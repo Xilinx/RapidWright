@@ -1,5 +1,3 @@
 ### RapidWright Status Update
 
-The RapidWright repository has been retired, effective immediately. 
-
-The future availability of part of the repository in source format is being reviewed. Subject to these issues being resolved, we hope to re-launch an updated RapidWright repository. We are disappointed by this development and apologize for any inconvenience that it may cause to the community.
+RapidWright will be released as an open source project in the first week of October. This beta release will have similar functionality to the previous offering and we expect the new release to be easier to use.  Lower level functionality will be provided as a library of APIs, while the majority of the code will remain open source.  We look forward to engaging with the community and appreciate your support and patience.
