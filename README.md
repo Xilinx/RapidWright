@@ -16,9 +16,7 @@ performance.
 
 For more information, please see http://www.rapidwright.io.
 
----
-** NOTE **
-RapidWright is not an official product from Xilinx and designs 
+
+NOTE: RapidWright is not an official product from Xilinx and designs 
 created or derived from it are not warranted. Please see 
 LICENSE.TXT for full details.
----
