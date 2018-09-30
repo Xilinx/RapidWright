@@ -1,0 +1,129 @@
+/*
+ * 
+ * Copyright (c) 2018 Xilinx, Inc. 
+ * All rights reserved.
+ *
+ * Author: Chris Lavin, Xilinx Research Labs.
+ *
+ * This file is part of RapidWright. 
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * 
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * 
+ */
+/**
+ * 
+ */
+package com.xilinx.rapidwright.util;
+
+import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
+
+import javafx.util.Pair;
+
+/**
+ * A parent class for all task jobs types.
+ * 
+ * Created on: Jan 26, 2018
+ */
+public abstract class Job {
+
+	private String command;
+	
+	private String runDir;
+	
+	private long jobNumber;
+
+	public static final String DEFAULT_SCRIPT_NAME = "run";
+	
+	public static final String DEFAULT_COMMAND_NAME = "cmd";
+	
+	public static final String DEFAULT_LOG_EXTENSION = ".log";
+
+	public static final String DEFAULT_SCRIPT_LOG_FILE = DEFAULT_SCRIPT_NAME + DEFAULT_LOG_EXTENSION;
+	
+	public static final String DEFAULT_COMMAND_LOG_FILE = DEFAULT_COMMAND_NAME + DEFAULT_LOG_EXTENSION;
+	
+	public abstract long launchJob();
+	
+	public abstract boolean isFinished();
+
+	public abstract boolean jobWasSuccessful();
+	
+	public abstract void killJob();
+	
+	
+	public Pair<String,String> createLaunchScript(){
+		List<String> startupScript = new ArrayList<>();
+		
+		String scriptExt = FileTools.isWindows() ? ".bat" : ".sh";
+		String dir = getRunDir()==null? System.getProperty("user.dir") : getRunDir();
+		FileTools.makeDirs(dir);
+		
+		startupScript.add("cd " + dir);
+		startupScript.add(getCommand() + " > " + DEFAULT_COMMAND_LOG_FILE + " 2>&1");
+
+		String startupScriptName = dir + File.separator + DEFAULT_SCRIPT_NAME + scriptExt;
+		FileTools.writeLinesToTextFile(startupScript, startupScriptName);
+		new File(startupScriptName).setExecutable(true);
+		String startupScriptLog = dir + File.separator + DEFAULT_SCRIPT_LOG_FILE;
+		return new Pair<>(startupScriptName,startupScriptLog);
+	}
+	/**
+	 * @return the command
+	 */
+	public String getCommand() {
+		return command;
+	}
+
+
+
+	/**
+	 * @param command the command to set
+	 */
+	public void setCommand(String command) {
+		this.command = command;
+	}
+
+	/**
+	 * @return the jobNumber
+	 */
+	public long getJobNumber() {
+		return jobNumber;
+	}
+
+	/**
+	 * @param jobNumber the jobNumber to set
+	 */
+	public void setJobNumber(long jobNumber) {
+		this.jobNumber = jobNumber;
+	}
+
+	/**
+	 * @return the runDir
+	 */
+	public String getRunDir() {
+		return runDir;
+	}
+
+	/**
+	 * @param runDir the runDir to set
+	 */
+	public void setRunDir(String runDir) {
+		this.runDir = runDir;
+	}
+	
+	public String toString(){
+		return Long.toString(jobNumber);
+	}
+}
