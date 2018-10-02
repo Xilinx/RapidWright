@@ -18,7 +18,7 @@ for details)
  
 (2) Third Party Libraries Distributed with RapidWright
  
-RapidWright (GPL 2.0)
+RapidWright (Apache 2.0)
  - JOpt Simple (MIT License)
  - Hessian Implementation (Apache 1.1 License)
  - Protocol Buffers (Protocol Buffer License)
