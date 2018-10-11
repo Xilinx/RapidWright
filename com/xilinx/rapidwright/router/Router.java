@@ -618,8 +618,8 @@ public class Router extends AbstractRouter {
 						}
 					}
 					if(w.isRouteThru()){
-						//continue nextNode;
-						//* TODO - Finish Routethru support - must recognize when a routethru is already used
+						continue nextNode;
+						/* TODO - Finish Routethru support - must recognize when a routethru is already used
 						SitePin pin = w.getSitePin();
 						if(pin != null){
 							SiteInst si = design.getSiteInstFromSite(pin.getSite());
@@ -640,7 +640,7 @@ public class Router extends AbstractRouter {
 									}
 								}
 							}							
-						}//*/
+						}*/
 					}
 
 					// Don't follow INT tile sinks 
