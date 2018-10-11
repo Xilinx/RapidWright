@@ -346,17 +346,68 @@ public class EDIFNetlist extends EDIFName {
 	 * @return The hierarchical net, or null if none could be found.
 	 */
 	public EDIFNet getNetFromHierName(String netName){
-		EDIFHierNet net = getAbsoluteNetFromHierName(netName);
+		EDIFHierNet net = getHierNetFromName(netName);
 		return net == null ? null : net.getNet();
 	}
 	
 	/**
+	 * Gets the hierarchical port instance object from the full name.
+	 * @param hierPortInstName Full hierarchical name of the port instance. 
+	 * @return The port instance of interest or null if none could be found.
+	 */
+	public EDIFHierPortInst getHierPortInstFromName(String hierPortInstName){
+		String instName = "";
+		String localPortName = hierPortInstName;
+		int lastSep = hierPortInstName.lastIndexOf(EDIFTools.EDIF_HIER_SEP);
+		if(lastSep != -1){
+			instName = hierPortInstName.substring(0,lastSep);
+			localPortName = hierPortInstName.substring(lastSep+1);
+		}
+		
+		EDIFCellInst inst = getCellInstFromHierName(instName);
+		if(inst == null) return null;
+		EDIFPortInst port = inst.getPortInst(localPortName);
+		if(port == null) return null;
+		
+		String parentInstName = getHierParentName(instName);
+		EDIFHierPortInst hierPortInst = new EDIFHierPortInst(parentInstName,port);
+		
+		return hierPortInst;
+	}
+	
+	/**
+	 * Looks at the hierarchical name and returns the parent or instance above.  For example:
+	 * "block0/operator0" -> "block0"; "block0" -> ""; "" -> ""
+	 * @param hierReferenceName Hierarchical reference name
+	 * @return 
+	 */
+	private String getHierParentName(String hierReferenceName){
+		if(hierReferenceName == null) return null;
+		if(hierReferenceName.length() == 0) return hierReferenceName;
+		int lastSep = hierReferenceName.lastIndexOf(EDIFTools.EDIF_HIER_SEP);
+		if(lastSep != -1){
+			return hierReferenceName.substring(0,lastSep);
+		}		
+		return "";
+	}
+	
+	/**
+	 * Please use {@link EDIFNetlist#getHierNetFromName(String)} instead.  This method has been 
+	 * refactored for naming consistency and will be removed in a future release.
+	 * @deprecated
+	 * @see {@link EDIFNetlist#getHierNetFromName(String)}
+	 */
+	public EDIFHierNet getAbsoluteNetFromHierName(String netName){
+		return getHierNetFromName(netName);
+	}
+	
+	/**
 	 * Gets the hierarchical net from the netname provided. Returns the wrapped EDIFNet, with the hierarchical
-	 * String in EDIFAbsoluteNet.
+	 * String in {@link EDIFHierNet}.
 	 * @param netName Full hierarchical name of the net to retrieve. 
 	 * @return The absolute net with hierarchical name, or null if none could be found.
 	 */
-	public EDIFHierNet getAbsoluteNetFromHierName(String netName){
+	public EDIFHierNet getHierNetFromName(String netName){
 		String instName = "";
 		String localNetName = netName;
 		int lastSep = netName.lastIndexOf(EDIFTools.EDIF_HIER_SEP);
@@ -476,13 +527,14 @@ public class EDIFNetlist extends EDIFName {
 		ArrayList<EDIFHierPortInst> leafCellPins = new ArrayList<>();
 		List<String> aliases = new ArrayList<>();
 		aliases.add(netName);
-		EDIFHierNet an = getAbsoluteNetFromHierName(netName);
+		EDIFHierNet an = getHierNetFromName(netName);
 		if(an == null) return Collections.emptyList();
 		Queue<EDIFHierPortInst> queue = new LinkedList<>();
 		EDIFPortInst source = null;
 		for(EDIFPortInst p : an.getNet().getPortInsts()){
 			EDIFHierPortInst absPortInst = new EDIFHierPortInst(an.getHierarchicalInstName(), p);
-			boolean isCellPin = p.getCellInst() != null && p.getCellInst().getCellType().isPrimitive();
+			// Checks if cell is primitive or black box
+			boolean isCellPin = p.getCellInst() != null && p.getCellInst().getCellType().getCellInsts().size() == 0;
 			if(isCellPin){
 				leafCellPins.add(absPortInst);
 			}
@@ -620,6 +672,7 @@ public class EDIFNetlist extends EDIFName {
 		EDIFCell c = getTopCell();
 		Queue<EDIFHierPortInst> queue = new LinkedList<>();
 		// All parent nets are either top-level inputs or outputs of leaf cells
+		// Here we gather all top-level inputs
 		for(EDIFNet n : c.getNets()){
 			for(EDIFPortInst p : n.getPortInsts()){
 				if(p.isTopLevelPort() && p.isInput()){
@@ -627,12 +680,14 @@ public class EDIFNetlist extends EDIFName {
 				}
 			}
 		}
+		// Here we search for all leaf cell insts 
 		Queue<EDIFHierCellInst> instQueue = new LinkedList<>();
 		instQueue.add(new EDIFHierCellInst("", getTopCellInst()));
 		while(!instQueue.isEmpty()){
 			EDIFHierCellInst currInst = instQueue.poll(); 
 			for(EDIFCellInst eci : currInst.getInst().getCellType().getCellInsts()){
-				if(eci.getCellType().isPrimitive()){
+				// Checks if cell is primitive or black box
+				if(eci.getCellType().getCellInsts().size() == 0){
 					for(EDIFPortInst portInst : eci.getPortInsts()){
 						if(portInst.isOutput()){
 							queue.add(new EDIFHierPortInst(currInst.getHierarchicalInstName(), portInst));
