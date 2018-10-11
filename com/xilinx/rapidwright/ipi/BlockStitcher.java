@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Queue;
 import java.util.Set;
@@ -86,6 +87,8 @@ public class BlockStitcher {
 	
 	public static final boolean DUMP_SYNTH_DCP_ONLY = false;
 	
+	public static final boolean CREATE_ROUTED_DCP = false;
+	
 	public static final boolean INSTANCE_PORT_IOs = true;
 	
 	private static HashSet<String> reportedUnconnects = new HashSet<>();
@@ -116,10 +119,17 @@ public class BlockStitcher {
 		return found;
 	}
 	
+	/**
+	 * Stitches the logical netlist components into the black boxes of the top-level EDIF netlist.
+	 * Also stitches together the physical nets.
+	 * @param design
+	 * @param constraints
+	 */
 	public void stitchDesign(Design design, HashMap<String,PackagePinConstraint> constraints){
 		boolean debug = false;
 		EDIFNetlist n = design.getNetlist();
-		HashMap<String,ArrayList<String>> reverseMap = new HashMap<>();
+		// Create a reverse parent net map (Parent Net -> Children Nets: all logical nets that are physically equivalent) 
+		HashMap<String,ArrayList<String>> reverseMap = new HashMap<>();		
 		for(Entry<String,String> e : n.getParentNetMap().entrySet()){
 			ArrayList<String> l = reverseMap.get(e.getValue());
 			if(l == null){
@@ -128,26 +138,31 @@ public class BlockStitcher {
 			}
 			l.add(e.getKey());
 		}
-
-		HashSet<String> createdAbsPorts = new HashSet<>();
+		
+		HashSet<String> addedPorts = new HashSet<>();
 		HashMap<String,ArrayList<EDIFHierPortInst>> portGroups = new HashMap<>();
+		// For each parent (physical) net...
 		for(Entry<String,ArrayList<String>> e : reverseMap.entrySet()){
 			if(debug) System.out.println(e.getKey() + ":");
 			ArrayList<EDIFHierPortInst> absPortInsts = new ArrayList<>();
-			EDIFHierNet absNet = n.getAbsoluteNetFromHierName(e.getKey());
+			EDIFHierNet absNet = n.getHierNetFromName(e.getKey());
 			if(absNet == null){
 				throw new RuntimeException("ERROR: Couldn't find net named " + e.getKey());
 			}
+			// For each child (physically equivalent) net...
 			for(String netName : e.getValue()){
-				absNet = n.getAbsoluteNetFromHierName(netName);
+				absNet = n.getHierNetFromName(netName);
+				// Get all the port instances that belong to these nets
 				for(EDIFPortInst p : absNet.getNet().getPortInsts()){
 					EDIFHierPortInst absPort = new EDIFHierPortInst(absNet.getHierarchicalInstName(), p);
-					if(createdAbsPorts.contains(absPort.toString())) continue;
-					createdAbsPorts.add(absPort.toString());
+					if(addedPorts.contains(absPort.toString())) continue;
+					addedPorts.add(absPort.toString());
 					absPortInsts.add(absPort);
 				}
 			}
+			// For each port instance connected to the group of physically equivalent nets...
 			for(EDIFHierPortInst p : absPortInsts){
+				// Create a port group - physically equivalent set of ports
 				portGroups.put(p.toString(), absPortInsts);
 				if(debug) System.out.println("  "+ p.getFullHierarchicalInstName() + "/"+ p.getPortInst().getName());
 				ModuleInst mi = design.getModuleInst(p.getFullHierarchicalInstName());
@@ -194,7 +209,18 @@ public class BlockStitcher {
 				for(EDIFHierPortInst passThru : getPassThruPortInsts(port, curr)){
 					String passThruName = passThru.toString();
 					if(visited.contains(passThruName)) continue;
-					q.addAll(portGroups.get(passThruName));
+					ArrayList<EDIFHierPortInst> passThruGroup = portGroups.get(passThruName);
+					if(passThruGroup == null){
+						// This is likely a pass-thru that is static-driven and down stream 
+						// sinks have not been explored
+						EDIFHierPortInst portInst = n.getHierPortInstFromName(passThruName);
+						passThruGroup = new ArrayList<>();
+						for(EDIFPortInst pi : portInst.getPortInst().getNet().getPortInsts()){
+							passThruGroup.add(new EDIFHierPortInst(portInst.getHierarchicalInstName(), pi));
+						}
+						
+					}
+					q.addAll(passThruGroup);
 				}
 				Net net = getCorrespondingNet(curr,design);
 				if(net == null) continue;
@@ -534,9 +560,8 @@ public class BlockStitcher {
 		}
 		t.stop().start("Stitch Design");
 
-		
 		stitcher.stitchDesign(stitched, constraints);
-
+		
 		Set<String> uniqifiedNetlists = new HashSet<>();
 		for(Entry<ModuleInst,EDIFNetlist> e : miMap.entrySet()){
 			//System.out.println(" MAPPINGS: " + e.getKey() + " " + e.getValue() + " " + stitcher.instNameToInst.get(e.getKey().getName()) );
@@ -649,18 +674,24 @@ public class BlockStitcher {
 		runtimes[3] = System.currentTimeMillis() - runtimes[3];
 		runtimes[4] = System.currentTimeMillis();
 
-		stitched.writeCheckpoint(args[1].replace(".edf", "_placed.dcp"));
-		
-		Router router = new Router(stitched);
-		router.routeDesign();
-		
-		runtimes[4] = System.currentTimeMillis() - runtimes[4];
-		runtimes[5] = System.currentTimeMillis();
+		String placedDCPName = args[1].replace(".edf", "_placed.dcp");
+		stitched.writeCheckpoint(placedDCPName);
 		
 		String routedDCPName = args[1].replace(".edf", "_routed.dcp");
-		stitched.writeCheckpoint(routedDCPName);
+		if(CREATE_ROUTED_DCP){
+			Router router = new Router(stitched);
+			router.routeDesign();
+
+			runtimes[4] = System.currentTimeMillis() - runtimes[4];
+			runtimes[5] = System.currentTimeMillis();
+
+			
+			stitched.writeCheckpoint(routedDCPName);
+		}else{
+			runtimes[4] = System.currentTimeMillis() - runtimes[4];
+		}
 		
-		EDIFTools.writeEDIFFile(args[1].replace(".edf", BlockCreator.ROUTED_EDIF_SUFFIX), stitched.getNetlist(), stitched.getPartName());
+		//EDIFTools.writeEDIFFile(args[1].replace(".edf", BlockCreator.ROUTED_EDIF_SUFFIX), stitched.getNetlist(), stitched.getPartName());
 
 		runtimes[5] = System.currentTimeMillis() - runtimes[5];
 		runtimes[0] = System.currentTimeMillis() - runtimes[0];
@@ -670,12 +701,13 @@ public class BlockStitcher {
 		System.out.printf("           Module Loading Time : %8.3fs \n", runtimes[1]/1000.0);
 		System.out.printf("                Stitching Time : %8.3fs \n", runtimes[2]/1000.0);
 		System.out.printf("                   Placer Time : %8.3fs \n", runtimes[3]/1000.0);
-		System.out.printf("                   Router Time : %8.3fs \n", runtimes[4]/1000.0);
-		System.out.printf("            Saving Design Time : %8.3fs \n", runtimes[5]/1000.0);
+		if(CREATE_ROUTED_DCP) System.out.printf("                   Router Time : %8.3fs \n", runtimes[4]/1000.0);
+		System.out.printf("            Saving Design Time : %8.3fs \n", runtimes[CREATE_ROUTED_DCP ? 5 : 4]/1000.0);
 	    System.out.println("----------------------------------------------");
 		System.out.printf("                 Total Runtime : %8.3fs \n", runtimes[0]/1000.0);
 		
-		System.out.println("Created Routed DCP at: " + routedDCPName);
+		if(CREATE_ROUTED_DCP) System.out.println("Created Routed DCP at: " + routedDCPName);
+		else System.out.println("Created Placed DCP at: " + placedDCPName);
 	}
 }
 
