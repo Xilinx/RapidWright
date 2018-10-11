@@ -63,5 +63,7 @@ public class PackagePinConstraint {
 		this.ioStandard = ioStandard;
 	}
 	
-	
+	public String toString(){
+		return name + ":" + ioStandard;
+	}
 }
