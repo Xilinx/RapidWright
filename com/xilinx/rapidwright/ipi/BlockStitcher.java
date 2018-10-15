@@ -91,6 +91,8 @@ public class BlockStitcher {
 	
 	public static final boolean INSTANCE_PORT_IOs = true;
 	
+	public static final boolean REPORT_UNCONNECTED = false;
+	
 	private static HashSet<String> reportedUnconnects = new HashSet<>();
 	
 	private ArrayList<EDIFHierPortInst> getPassThruPortInsts(Port port, EDIFHierPortInst curr){
@@ -203,7 +205,7 @@ public class BlockStitcher {
 					continue;
 				}
 				Port port = mi.getPort(curr.getPortInst().getName());
-				if(!port.isOutPort() && port.getType() == PortType.UNCONNECTED){
+				if(REPORT_UNCONNECTED && !port.isOutPort() && port.getType() == PortType.UNCONNECTED){
 					MessageGenerator.briefError("WARNING: " + curr + " is unconnected internally.");
 				}
 				for(EDIFHierPortInst passThru : getPassThruPortInsts(port, curr)){
@@ -610,6 +612,12 @@ public class BlockStitcher {
 		runtimes[2] = System.currentTimeMillis() - runtimes[2];
 		runtimes[3] = System.currentTimeMillis();
 		
+		if(new File(xdcFileName).exists()){
+			for(String line : FileTools.getLinesFromTextFile(xdcFileName)){
+				stitched.addXDCConstraint(ConstraintGroup.LATE,line);
+			}
+		}
+		
 		if(implHelper != null){
 			stitched.setAutoIOBuffers(false);
 			stitched.setDesignOutOfContext(true);
@@ -635,11 +643,6 @@ public class BlockStitcher {
 			t.stop().start("Write Stitched EDIF");
 			EDIFTools.writeEDIFFile(args[1].replace(".edf", "_stitched.edf"), stitched.getNetlist(), stitched.getPartName());
 			t.stop().start("Save Checkpoint");
-			if(constraints != null){
-				for(String line : FileTools.getLinesFromTextFile(xdcFileName)){
-					stitched.addXDCConstraint(ConstraintGroup.LATE,line);
-				}
-			}
 			stitched.writeCheckpoint(args[1].replace(".edf","_placed.dcp"));
 			t.stop();
 			t.printSummary();
