@@ -24,7 +24,6 @@
  */
 package com.xilinx.rapidwright.util;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.HashMap;
@@ -34,7 +33,7 @@ import com.xilinx.rapidwright.device.Series;
 import com.caucho.hessian.io.Hessian2Input;
 
 /**
- * Generated on: Fri Sep 21 10:51:55 2018
+ * Generated on: Mon Oct 15 14:01:36 2018
  * by: com.xilinx.rapidwright.release.PartNamePopulator
  * 
  * Class to hold utility APIs dealing with Parts and device names.
@@ -78,6 +77,9 @@ public class PartNameTools {
 	}
 	public static Part getPart(String partName) {
 		Part p = partMap.get(partName);
+		if(p == null && !partName.startsWith("xc")){
+			p = partMap.get("xc" + partName);
+		}
 		if(p == null){
 			throw new RuntimeException("\n\n\tERROR: Couldn't identify " + partName + " in RapidWright part database. ");
 		}

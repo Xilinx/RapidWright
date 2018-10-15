@@ -26,7 +26,7 @@ package com.xilinx.rapidwright.device;
 
 
 /**
- * Generated on: Fri Sep 21 10:51:55 2018
+ * Generated on: Mon Oct 15 14:01:36 2018
  * by: com.xilinx.rapidwright.release.PartNamePopulator
  * 
  * Set of all Supported Xilinx families in RapidWright
