@@ -78,6 +78,9 @@ public class PartNameTools {
 	}
 	public static Part getPart(String partName) {
 		Part p = partMap.get(partName);
+		if(p == null && !partName.startsWith("xc")){
+			p = partMap.get("xc" + partName);
+		}
 		if(p == null){
 			throw new RuntimeException("\n\n\tERROR: Couldn't identify " + partName + " in RapidWright part database. ");
 		}
