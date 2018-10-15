@@ -1,3 +1,23 @@
+============= RapidWright 2018.2.1-beta released on 2018-10-15 =================
+Notes:
+ - API Additions:
+   - com.xilinx.rapidwright.device.Site "public SiteTypeEnum[] getAlternateSiteTypeEnums()"
+   - com.xilinx.rapidwright.design.SiteInst "public SiteTypeEnum getPrimarySiteTypeEnum()"
+   - com.xilinx.rapidwright.design.SiteInst "public SiteTypeEnum[] getAlternateSiteTypeEnums()"
+ - API Removals:
+   - com.xilinx.rapidwright.device.Site "public SiteType getPrimarySiteType()"
+ - Resolves issues: #4, #5
+ - Preliminary tutorial for running IP Integrator flow (rapid_compile_ipi)
+Known Issues:
+ - Netlists that have two ports by same name where one is a single bit
+ bus and another is multi-bit are not currently supported (for
+ example, a module has an input 'my_signal' and 'my_signal[2:0]' is
+ currently not allowed in the EDIF parser.
+ - Clock router in Router class is disabled (under development).  
+ - PolynomialGenerator is a toy demonstration and does not produce a
+ functionally valid circuit.  
+ - Issue #4 - JDK9 Compliance for some 3rd party libraries prints out warnings
+
 ============= RapidWright 2018.2.0-beta released on 2018-10-01 =================
 Notes:
  - Initial release with new RapidWright API Library 
