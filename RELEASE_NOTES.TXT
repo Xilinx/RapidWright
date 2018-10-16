@@ -6,7 +6,7 @@ Notes:
    - com.xilinx.rapidwright.design.SiteInst "public SiteTypeEnum[] getAlternateSiteTypeEnums()"
  - API Removals:
    - com.xilinx.rapidwright.device.Site "public SiteType getPrimarySiteType()"
- - Resolves issues: #4, #5
+ - Resolves issues: #5, #6
  - Preliminary tutorial for running IP Integrator flow (rapid_compile_ipi)
 Known Issues:
  - Netlists that have two ports by same name where one is a single bit
