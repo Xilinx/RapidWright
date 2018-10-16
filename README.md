@@ -15,7 +15,7 @@ overlays and a core piece of strategy in achieving near-spec
 performance.
 
 If you run into issues, feel free to file an issue on the [Github issue
-tracker](https://github.com/Xilinx/RapidWright/issues/new) or, for more broad questions/requests, post on our [support
+tracker](https://github.com/Xilinx/RapidWright/issues/new), or, for more broad questions/requests, post on our [support
 forum](https://groups.google.com/forum/#!forum/rapidwright). 
 
 For more information, please see http://www.rapidwright.io.
