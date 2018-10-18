@@ -40,15 +40,16 @@ public class WidgetMaker {
 		treeWidget.setColumnCount(1);
 		treeWidget.setHeaderLabel(header);
 		
-		HashMap<FamilyType, QTreeWidgetItem> familyItems = new HashMap<FamilyType, QTreeWidgetItem>();
+		HashMap<String, QTreeWidgetItem> familyItems = new HashMap<String, QTreeWidgetItem>();
 		
 		for(String partName : Device.getAvailableDevices()){
 			Part p = PartNameTools.getPart(partName);
-			FamilyType type = p.getArchitecture();
+			//FamilyType type = p.getArchitecture();
+			String type = PartNameTools.getFullArchitectureName(p.getArchitecture());
 			QTreeWidgetItem familyItem = familyItems.get(type);
 			if(familyItem == null){
 				familyItem = new QTreeWidgetItem(treeWidget);
-				familyItem.setText(0, PartNameTools.getFullArchitectureName(type));
+				familyItem.setText(0, type);
 				familyItems.put(type, familyItem);
 			}
 			QTreeWidgetItem partItem = null;
