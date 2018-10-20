@@ -378,8 +378,8 @@ public class HandPlacer extends QMainWindow {
 		action(tr("Open"), "fileopen", StandardKey.Open, "openDesign()",fileMenu, tb);
 		action(tr("Open w/Auto Placer"), "opendebug", null, "openWithAutoPlacer()",fileMenu, tb);
 		fileMenu.addSeparator();
-		action(tr("&Save"), "filesave", StandardKey.Save, "saveDesign()", fileMenu, tb);
-		action(tr("&Save As"), "filesaveas", null, "saveAsDesign()", fileMenu, tb);
+		//action(tr("&Save"), "filesave", StandardKey.Save, "saveDesign()", fileMenu, tb);
+		//action(tr("&Save As"), "filesaveas", null, "saveAsDesign()", fileMenu, tb);
 		action(tr("&Save As DCP"), "filesaveas", StandardKey.SaveAs, "saveAsDCPDesign()", fileMenu, tb);
 		action(tr("&Save As PDF"), "exportpdf", null, "saveAsPDFDesign()", fileMenu, tb);
 		fileMenu.addSeparator();
