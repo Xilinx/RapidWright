@@ -81,6 +81,18 @@ public class RouteNode{
 	}
 	
 	/**
+	 * Constructor common for routing expansion
+	 * @param wire Wire object to construct route node from
+	 * @param parent The parent of the wire in the expanion search
+	 */
+	public RouteNode(Wire wire, RouteNode parent){
+		setTile(wire.getTile());
+		setWire(wire.getWireIndex());
+		setParent(parent);
+		setLevel(parent.getLevel() + 1);
+	}
+	
+	/**
 	 * A quick population constructor.
 	 * @param tile The tile of the new node.
 	 * @param wire The wire of the new node.

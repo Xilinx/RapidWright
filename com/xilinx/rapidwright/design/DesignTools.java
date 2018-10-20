@@ -32,20 +32,27 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.PriorityQueue;
 
 import com.xilinx.rapidwright.design.blocks.UtilizationType;
 import com.xilinx.rapidwright.device.BELClass;
 import com.xilinx.rapidwright.device.BELPin;
+import com.xilinx.rapidwright.device.Node;
+import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.SitePIP;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
+import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
+import com.xilinx.rapidwright.router.RouteNode;
 import com.xilinx.rapidwright.util.MessageGenerator;
 import com.xilinx.rapidwright.util.Utils;
 
@@ -699,5 +706,47 @@ public class DesignTools {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+	}
+	
+	/**
+	 * Demonstrates a rudimentary path expansion for finding a routing path in the 
+	 * interconnect.
+	 * @param start Desired start node
+	 * @param end Desired end node
+	 * @return A list of PIPs that configure a path from start to end nodes, or null if a path could not be found.
+	 */
+	public static List<PIP> findRoutingPath(Node start, Node end){
+		return findRoutingPath(new RouteNode(start), new RouteNode(end));
+	}
+	
+	/**
+	 * Demonstrates a rudimentary path expansion for finding a routing path in the 
+	 * interconnect.
+	 * @param start Desired start node
+	 * @param end Desired end node
+	 * @return A list of PIPs that configure a path from start to end nodes, or null if a path could not be found.
+	 */
+	public static List<PIP> findRoutingPath(RouteNode start, RouteNode end){
+		PriorityQueue<RouteNode> q = new PriorityQueue<RouteNode>(16, new Comparator<RouteNode>() {
+			public int compare(RouteNode i, RouteNode j) {return i.getCost() - j.getCost();}});
+		q.add(start);
+		HashSet<Wire> visited = new HashSet<>();
+		visited.add(new Wire(start.getTile(), start.getWire()));
+		
+		while(!q.isEmpty()){
+			RouteNode curr = q.remove();
+			if(curr.equals(end)){
+				return curr.getPIPsBackToSource();
+			}
+			if(visited.size() > 100000) return null;
+			for(Wire w : curr.getConnections()){
+				if(visited.contains(w)) continue;
+				visited.add(w);
+				RouteNode rn = new RouteNode(w,curr);
+				rn.setCost((rn.getManhattanDistance(end) << 1) + rn.getLevel());
+				q.add(rn);
+			}
+		}
+		return null;
 	}
 }
