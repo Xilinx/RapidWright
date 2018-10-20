@@ -46,6 +46,7 @@ public class PBlockRange {
 	
 	public PBlockRange(Device dev, String range){
 		int colonIndex = range.indexOf(':');
+		if(colonIndex < 0) throw new RuntimeException("ERROR: Invalid pblock string '" + range + "'");
 		String lowerLeftName = range.substring(0, colonIndex);
 		String upperRightName = range.substring(colonIndex+1);
 		if(lowerLeftName.startsWith(PBlockCorner.CLOCK_REGION) && upperRightName.startsWith(PBlockCorner.CLOCK_REGION)){

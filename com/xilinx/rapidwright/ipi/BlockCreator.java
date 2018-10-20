@@ -34,6 +34,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -75,6 +76,8 @@ public class BlockCreator {
 	public static final String ROUTED_EDIF_SUFFIX = "_routed.edf";
 
 	public static final String IMPL_RUN_SCRIPT_NAME = "launch_impl_run.tcl";
+
+	public static final String USED_PBLOCK_FILE_SUFFIX = "_routed_pblock.txt";
 	
 	public static final boolean BC_DEBUG = false;
 	
@@ -100,6 +103,15 @@ public class BlockCreator {
 			m.setDevice(d.getDevice());
 			m.calculateAllValidPlacements(d.getDevice());
 			modImpls.add(m);
+			
+			// Store PBlock with Module Here
+			String guidedPblockFile = routedDCPFileName.replace("_routed.dcp", USED_PBLOCK_FILE_SUFFIX);
+			List<String> lines = FileTools.getLinesFromTextFile(guidedPblockFile);
+			if(lines == null || lines.size() == 0){
+				throw new RuntimeException("ERROR: Problem reading pblock from guided block file " + guidedPblockFile);
+			}
+			String pblockString = lines.get(0).trim(); 
+			if(pblockString.length() > 0) m.setPBlock(pblockString);
 		}
 		return modImpls;
 	}
@@ -236,7 +248,9 @@ public class BlockCreator {
 					Job job = createImplRun(optDcpFileName, pblock, i, blockHelper, useLSF);
 					jobs.addJob(job);
 					jobLocations.put(job.getJobNumber(), optDcpFileName + " " + i);
+					FileTools.writeStringToTextFile(pblock.toString(), optDcpFileName.replace("opt.dcp", +i+USED_PBLOCK_FILE_SUFFIX));
 				}
+				
 				implIndex = pblocks.size();
 			}else{
 				// Create a run for each implementation of each module in pblock file
@@ -245,6 +259,7 @@ public class BlockCreator {
 					for(String pblock : FileTools.getLinesFromTextFile(pblockFileName)){
 						if(pblock.startsWith("#")) continue;
 						PBlock pblock2 = pblock.trim().equals("") ? null : new PBlock(dev,pblock);
+						FileTools.writeStringToTextFile(pblock, optDcpFileName.replace("opt.dcp", +implIndex+USED_PBLOCK_FILE_SUFFIX));
 						Job job = createImplRun(optDcpFileName, pblock2, implIndex, null, useLSF);
 						jobs.addJob(job);
 						jobLocations.put(job.getJobNumber(), optDcpFileName + " " + implIndex);

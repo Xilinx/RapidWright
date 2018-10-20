@@ -28,6 +28,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.python.antlr.ast.GeneratorExpDerived;
+
+import com.xilinx.rapidwright.design.blocks.PBlock;
+import com.xilinx.rapidwright.design.blocks.PBlockRange;
+import com.xilinx.rapidwright.design.blocks.SubPBlock;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
@@ -425,40 +430,76 @@ public class ModuleInst{
 	}
 	
 	/**
+	 * Get's the current lower left site as used for a placement directive 
+	 * for an implementation guide.  
+	 * @return The current lower left site used for placement.
+	 */
+	public Site getLowerLeftPlacement(SiteTypeEnum type){
+		// Calculate anchor offset
+		Tile origAnchor = getModule().getAnchor().getSite().getTile();
+		Tile currAnchor = getAnchor().getSite().getTile();
+		int dx = currAnchor.getTileXCoordinate() - origAnchor.getTileXCoordinate();
+		int dy = currAnchor.getTileYCoordinate() - origAnchor.getTileYCoordinate();
+		
+		// Get original lower left placement 
+		Tile origLowerLeft = getLowerLeftTile(type);
+		
+		String origTilePrefix = origLowerLeft.getTileNamePrefix();
+		String newSuffix = "X" + (origLowerLeft.getTileXCoordinate() + dx) + "Y" + (origLowerLeft.getTileYCoordinate() + dy);
+		
+		Tile newTile = origLowerLeft.getDevice().getTile(origTilePrefix + newSuffix);
+		for(Site s : newTile.getSites()){
+			if(s.getSiteTypeEnum() == type) return s;
+		}
+		return null;
+	}
+	
+	/**
 	 * Chooses a lower left reference tile in a module instance for the purpose
-	 * of placement.
+	 * of placement. The tile chosen is from the context of the original module, not 
+	 * the module instance's current location.
 	 * @param type The site type space in which to reference.
-	 * @return 
+	 * @return A lower left tile from the module's original footprint.
 	 */
 	public Tile getLowerLeftTile(SiteTypeEnum type){
-		SiteInst lowerLeftIP = null;
-			int x = Integer.MAX_VALUE;
-			int y = Integer.MAX_VALUE;
-			for(SiteInst s : getModule().getSiteInsts()){
-				if(s.getSite().isCompatibleSiteType(type)){
-					if(lowerLeftIP == null){
-						lowerLeftIP = s;
-					}else if(s.getSite().getInstanceY() < lowerLeftIP.getSite().getInstanceY()){
-						lowerLeftIP = s;
-						
-					}
-				}
-				if(s.getSite().isCompatibleSiteType(type) || (s.getSite().getName().startsWith("SLICE_") && Utils.isSLICE(type))){
-					if(s.getSite().getInstanceX() < x){
-						x = s.getSite().getInstanceX();
-					}
-					if(s.getSite().getInstanceY() < y){
-						y = s.getSite().getInstanceY();
-					}
+		PBlock pb = getModule().getPBlock();
+		if(pb != null){
+			for(PBlockRange range : pb){
+				if(range.getLowerLeftSite().getSiteTypeEnum() == type){
+					return range.getLowerLeftSite().getTile();
 				}
 			}
-			
-			Device dev = getDesign().getDevice();
-			String prefix = lowerLeftIP.getSite().getName().substring(0, lowerLeftIP.getSite().getName().lastIndexOf('_')+1);
-			Site target = dev.getSite(prefix + "X" + x + "Y" + y);
-			
-			return target.getTile();
 		}
+		
+		
+		SiteInst lowerLeftIP = null;
+		int x = Integer.MAX_VALUE;
+		int y = Integer.MAX_VALUE;
+		for(SiteInst s : getModule().getSiteInsts()){
+			if(s.getSite().isCompatibleSiteType(type)){
+				if(lowerLeftIP == null){
+					lowerLeftIP = s;
+				}else if(s.getSite().getInstanceY() < lowerLeftIP.getSite().getInstanceY()){
+					lowerLeftIP = s;
+					
+				}
+			}
+			if(s.getSite().isCompatibleSiteType(type) || (s.getSite().getName().startsWith("SLICE_") && Utils.isSLICE(type))){
+				if(s.getSite().getInstanceX() < x){
+					x = s.getSite().getInstanceX();
+				}
+				if(s.getSite().getInstanceY() < y){
+					y = s.getSite().getInstanceY();
+				}
+			}
+		}
+		
+		Device dev = getDesign().getDevice();
+		String prefix = lowerLeftIP.getSite().getName().substring(0, lowerLeftIP.getSite().getName().lastIndexOf('_')+1);
+		Site target = dev.getSite(prefix + "X" + x + "Y" + y);
+		
+		return target.getTile();
+	}
 
 	/**
 	 * Attempts to place the module instance such that it's lower left tile falls
@@ -468,7 +509,7 @@ public class ModuleInst{
 	 * @return True if the placement succeeded, false otherwise.
 	 */
 	public boolean placeMINearTile(Tile ipTile, SiteTypeEnum type){
-		Tile targetTile =  getLowerLeftTile(type);
+		Tile targetTile = getLowerLeftTile(type);
 		Device dev = targetTile.getDevice();
 		
 		Tile newAnchorTile = getModule().getCorrespondingAnchorTile(targetTile, ipTile, dev);

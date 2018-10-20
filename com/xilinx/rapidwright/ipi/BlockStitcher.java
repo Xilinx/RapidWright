@@ -26,6 +26,7 @@ package com.xilinx.rapidwright.ipi;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -36,6 +37,7 @@ import java.util.Set;
 
 import com.xilinx.rapidwright.design.ConstraintGroup;
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.Module;
 import com.xilinx.rapidwright.design.ModuleImpls;
 import com.xilinx.rapidwright.design.ModuleInst;
 import com.xilinx.rapidwright.design.Net;
@@ -61,6 +63,7 @@ import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.edif.InstPair;
 import com.xilinx.rapidwright.placer.blockplacer.BlockPlacer2;
+import com.xilinx.rapidwright.placer.handplacer.HandPlacer;
 import com.xilinx.rapidwright.router.Router;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.FileTools;
@@ -89,9 +92,15 @@ public class BlockStitcher {
 	
 	public static final boolean CREATE_ROUTED_DCP = false;
 	
+	public static final boolean OPEN_HAND_PLACER = false;
+	
 	public static final boolean INSTANCE_PORT_IOs = true;
 	
 	public static final boolean REPORT_UNCONNECTED = false;
+
+	public static final String CACHE_ID = "CACHE_ID";
+	
+	public static final String BLOCK_NAME = "BLOCK_NAME";
 	
 	private static HashSet<String> reportedUnconnects = new HashSet<>();
 	
@@ -453,6 +462,7 @@ public class BlockStitcher {
 		ImplGuide implHelper = null;
 		HashSet<String> unusedImplGuides = null;
 		
+		boolean buildExampleGuideFile = false;
 		if(!DUMP_SYNTH_DCP_ONLY){
 			String implGuideFileName = args[1].replace(".edf", ".impl.guide");
 			if(new File(implGuideFileName).exists()){
@@ -460,6 +470,7 @@ public class BlockStitcher {
 				unusedImplGuides = new HashSet<String>(implHelper.getBlockNames());
 			}else{
 				System.out.println("INFO: No .impl.guide file found, proceeding with auto block placement and routing.");
+				buildExampleGuideFile = true;
 			}
 		}
 		t.stop().start("Reading Top Level EDIF");
@@ -512,6 +523,11 @@ public class BlockStitcher {
 			//System.out.println(routedDCPFileName + " " + edifFileName + " " + xciFileName);
 
 			ModuleImpls modImpls = BlockCreator.createOrRetrieveBlock(edifFileName, routedDCPFileName, blockName, xciFileName, blockImplCount);
+			for(Module m : modImpls){
+				// Add Cache ID to Module
+				m.getMetaDataMap().put(CACHE_ID, cacheID);
+				m.getMetaDataMap().put(BLOCK_NAME, blockName);
+			}
 			totalBlocks++;
 			
 			String modInstName = stitcher.bdInstNameToModInstName.get(blockName);
@@ -652,6 +668,37 @@ public class BlockStitcher {
 			placer.placeDesign(stitched, false);
 		}
 
+		// Create an example impl guide file
+		if(buildExampleGuideFile){
+			ImplGuide ig = new ImplGuide();
+			ig.setPart(stitched.getPart());
+			ig.setDevice(stitched.getDevice());
+			
+			for(ModuleImpls m : stitched.getModules()){
+				BlockGuide bg = ig.createBlockGuide(m.get(0).getMetaDataMap().get(CACHE_ID));
+				for(Module m2 : m){
+					bg.addImplementation(m2.getImplementationIndex(), m2.getPBlock());
+				}
+			}
+			
+			for(ModuleInst mi : miMap.keySet()){
+				String cacheID = mi.getModule().getMetaDataMap().get(CACHE_ID);
+				BlockGuide bg = ig.getBlock(cacheID);
+				
+				BlockInst bi = new BlockInst();
+				bi.setImpl(mi.getModule().getImplementationIndex());
+				bi.setName(mi.getName());
+				bi.setParent(bg);
+				bi.setPlacement(mi.getLowerLeftPlacement(mi.getAnchor().getSiteTypeEnum()));
+				bg.addBlockInst(bi);
+			}
+			
+			// Remove any blocks that don't have pblock/implementations
+			ig.removeBlocksWithoutPBlocks();
+			
+			ig.writeImplGuide(args[1].replace(".edf", ".impl.guide.example"));
+		}
+		
 		// Need to remove duplicate sites because IPI will generate the same IOs in multiple IP blocks :-(
 		HashMap<String,SiteInst> duplicateCheck = new HashMap<String, SiteInst>();
 		ArrayList<SiteInst> removeThese = new ArrayList<SiteInst>();
@@ -673,6 +720,8 @@ public class BlockStitcher {
 		for(SiteInst i : removeThese){
 			stitched.removeSiteInst(i);
 		}
+		
+		if(OPEN_HAND_PLACER) HandPlacer.openDesign(stitched);
 		
 		runtimes[3] = System.currentTimeMillis() - runtimes[3];
 		runtimes[4] = System.currentTimeMillis();

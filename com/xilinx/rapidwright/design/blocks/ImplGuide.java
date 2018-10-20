@@ -28,6 +28,7 @@ package com.xilinx.rapidwright.design.blocks;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -292,11 +293,24 @@ public class ImplGuide {
 	
 	/**
 	 * Adds a block to this implementation guide
-	 * @param blockGuide
-	 * @return
+	 * @param blockGuide The block to add.
+	 * @return Previous block guide with the same cache ID.
 	 */
 	public BlockGuide addBlock(BlockGuide blockGuide){
 		return blockGuides.put(blockGuide.getCacheID(), blockGuide);
+	}
+	
+	/**
+	 * Creates a new block guide with the associated cache ID and
+	 * adds it to the impl guide.
+	 * @param cacheID The Vivado cache ID for the block to be created
+	 * @return The newly created block guide
+	 */
+	public BlockGuide createBlockGuide(String cacheID){
+		BlockGuide bg = new BlockGuide();
+		bg.setCacheID(cacheID);
+		addBlock(bg);
+		return bg;
 	}
 	
 	public Set<String> getBlockNames(){
@@ -305,6 +319,24 @@ public class ImplGuide {
 	
 	public BlockGuide getBlock(String id){
 		return blockGuides.get(id);
+	}
+	
+	public BlockGuide removeBlock(String id){
+		return blockGuides.remove(id);
+	}
+	
+	public void removeBlocksWithoutPBlocks(){
+		ArrayList<BlockGuide> toRemove = new ArrayList<>();
+		for(BlockGuide bg : getBlocks()){
+			boolean isNull = false; 
+			for(PBlock pb : bg.getImplementations()){
+				if(pb == null) isNull = true;
+			}
+			if(isNull) toRemove.add(bg);
+		}
+		for(BlockGuide bg : toRemove){
+			removeBlock(bg.getCacheID());
+		}
 	}
 	
 	public boolean hasBlock(String id){
