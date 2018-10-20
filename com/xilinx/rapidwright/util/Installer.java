@@ -31,6 +31,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStream;
 import java.lang.ProcessBuilder.Redirect;
 import java.net.HttpURLConnection;
 import java.net.InetAddress;
@@ -41,6 +42,10 @@ import java.nio.channels.ReadableByteChannel;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.security.DigestInputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -84,6 +89,40 @@ public class Installer {
 		}
 	}
 
+	/**
+	 * Convert bytes of an MD5 checksum into common alpha-numeric String representation.
+	 * @param checksum The digested result from an MD5 instance.
+	 * @return The alpha-numeric String representation of the checksum.
+	 */
+	public static String bytesToString(byte[] checksum){
+		StringBuilder result = new StringBuilder(32);
+		for (int i=0; i < checksum.length; i++) {
+			result.append(Integer.toString( ( checksum[i] & 0xff ) + 0x100, 16).substring( 1 ));
+		}
+		return result.toString();		
+	}
+	
+	/**
+	 * Performs an MD5 checksum on the provided file and returns the result.
+	 * @param fileName Name of the file on which to perform the checksum
+	 * @return Checksum result String or null if no file was found.
+	 */
+	public static String calculateMD5OfFile(String fileName){
+		try {
+			MessageDigest md5 = MessageDigest.getInstance("MD5");
+			InputStream in = Files.newInputStream(Paths.get(fileName)); 
+			DigestInputStream dig = new DigestInputStream(in, md5);
+			byte[] buffer = new byte[1024];
+			while(dig.read(buffer) != -1){}
+			byte[] checksum = md5.digest();
+			return bytesToString(checksum);
+		} catch (NoSuchAlgorithmException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			return null;
+		}
+		return null;
+	}
 	
 	public static long downloadFile(String url, String dstFileName) throws IOException{
 		URL website = new URL(url);
@@ -204,7 +243,7 @@ public class Installer {
     public static final String RELEASE = "https://github.com/Xilinx/RapidWright/releases/latest";
     public static final String DATA_ZIP = "rapidwright_data.zip";
     public static final String JARS_ZIP = "rapidwright_jars.zip";
-    
+       
 	public static void main(String[] args) throws IOException {
 		for(String arg : args){
 			if(arg.equals("-v") || args.equals("--verbose")){
