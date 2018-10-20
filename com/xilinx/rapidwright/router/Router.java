@@ -56,7 +56,9 @@ import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
+import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.MessageGenerator;
+import com.xilinx.rapidwright.util.Utils;
 
 
 /**
@@ -618,8 +620,12 @@ public class Router extends AbstractRouter {
 						}
 					}
 					if(w.isRouteThru()){
-						continue nextNode;
-						/* TODO - Finish Routethru support - must recognize when a routethru is already used
+						SitePin wsp = w.getSitePin();
+						
+						// TODO Let's not support LUT route-thrus for now
+						if(wsp != null && Utils.isSLICE(wsp.getSite().getSiteTypeEnum())){
+							continue nextNode;
+						}
 						SitePin pin = w.getSitePin();
 						if(pin != null){
 							SiteInst si = design.getSiteInstFromSite(pin.getSite());
@@ -640,7 +646,7 @@ public class Router extends AbstractRouter {
 									}
 								}
 							}							
-						}*/
+						}
 					}
 
 					// Don't follow INT tile sinks 
@@ -1691,7 +1697,7 @@ public class Router extends AbstractRouter {
 		// Assume the net is completely un-routed 
 		// For each pin, route backward from the input pin
 		for(SitePinInst sink : currNet.getPins()){
-			boolean debug = false;//sink.getSiteInstName().equals("microblaze_0_local_memory/lmb_bram/RAMB36_X2Y10") && sink.getName().equals("RSTRAMAL_X");
+			boolean debug = false;
 			if(sink.isOutPin()) continue;
 			int watchdog = 10000;
 			int wire = sink.getSiteInst().getSite().getTileWireIndexFromPinName(sink.getName());
@@ -1700,7 +1706,9 @@ public class Router extends AbstractRouter {
 				throw new RuntimeException("ERROR: Problem while trying to route static sink " + sink);
 			}
 			Tile t = sink.getTile();
-			if(debug) System.out.println("SINK: " + t.getName() + " " + t.getWireName(wire));
+			if(debug) {
+				System.out.println("SINK: " + t.getName() + " " + t.getWireName(wire));
+			}
 			
 			Node node = new Node(t,wire);
 			RouteNode n = new RouteNode(node.getTile(),node.getWire());
@@ -2061,5 +2069,17 @@ public class Router extends AbstractRouter {
 			if(watchdog < 0) break;
 		}
 		return null;
+	}
+	
+	public static void main(String[] args) {
+		if(args.length != 2){
+			System.out.println("USAGE: <input.dcp> <output.dcp>");
+		}
+		CodePerfTracker t = new CodePerfTracker("Router", true);
+		Router r = new Router(Design.readCheckpoint(args[0],t));
+		t.start("Route Design");
+		r.routeDesign();
+		t.stop();
+		r.getDesign().writeCheckpoint(args[1],t);
 	}
 }
