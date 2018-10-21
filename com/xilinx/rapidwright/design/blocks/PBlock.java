@@ -55,7 +55,25 @@ public class PBlock extends ArrayList<PBlockRange> {
 	private PBlock parent;
 	
 	private boolean containRouting;
-
+	/** Set of all basic sites that can be referenced in a PBlock */
+	private static HashSet<SiteTypeEnum> pblockTypes;
+	
+	static{
+		pblockTypes = new HashSet<>();
+		pblockTypes.add(SiteTypeEnum.SLICEL);
+		pblockTypes.add(SiteTypeEnum.SLICEM);
+		pblockTypes.add(SiteTypeEnum.DSP48E1);
+		pblockTypes.add(SiteTypeEnum.DSP48E2);
+		pblockTypes.add(SiteTypeEnum.RAMB180);
+		pblockTypes.add(SiteTypeEnum.RAMB181);
+		pblockTypes.add(SiteTypeEnum.RAMB18E1);
+		pblockTypes.add(SiteTypeEnum.RAMBFIFO18);
+		pblockTypes.add(SiteTypeEnum.RAMBFIFO36);
+		pblockTypes.add(SiteTypeEnum.RAMBFIFO36E1);
+		pblockTypes.add(SiteTypeEnum.URAM288);
+		pblockTypes.add(SiteTypeEnum.LAGUNA);
+	}
+	
 	public PBlock(){
 		
 	}
@@ -525,5 +543,14 @@ public class PBlock extends ArrayList<PBlockRange> {
 
 	public void setContainRouting(boolean containRouting) {
 		this.containRouting = containRouting;
+	}
+	
+	/**
+	 * Returns true if the provided site type is referenced in a pblock corner.
+	 * @param type The site type in question.
+	 * @return True if it can be used as a pblock reference point, false otherwise.
+	 */
+	public static boolean isPBlockCornerSiteType(SiteTypeEnum type){
+		return pblockTypes.contains(type);
 	}
 }

@@ -118,10 +118,18 @@ public class ImplGuide {
 				}
 				case IMPL:{
 					int index = Integer.parseInt(tokens[1]);
-					int subImplCount = Integer.parseInt(tokens[2]);
-					StringBuilder sb = new StringBuilder(checkPblockValid(ig, lineNumber, tokens[3]));
+					int subImplCount = 0;
+					int tokenIdx = 0;
+					try{
+						subImplCount = Integer.parseInt(tokens[2]);
+					}catch (NumberFormatException e){
+						subImplCount = 0;
+						tokenIdx = -1;
+					}
 					
-					for(int i=4; i < tokens.length; i++){
+					StringBuilder sb = new StringBuilder(checkPblockValid(ig, lineNumber, tokens[3+tokenIdx]));
+					
+					for(int i=4+tokenIdx; i < tokens.length; i++){
 						sb.append(" ");
 						sb.append(checkPblockValid(ig, lineNumber, tokens[i]));
 					}

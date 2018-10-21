@@ -682,6 +682,7 @@ public class BlockStitcher {
 			}
 			
 			for(ModuleInst mi : miMap.keySet()){
+				if(mi.getModule().getPBlock() == null) continue;
 				String cacheID = mi.getModule().getMetaDataMap().get(CACHE_ID);
 				BlockGuide bg = ig.getBlock(cacheID);
 				
@@ -689,7 +690,7 @@ public class BlockStitcher {
 				bi.setImpl(mi.getModule().getImplementationIndex());
 				bi.setName(mi.getName());
 				bi.setParent(bg);
-				bi.setPlacement(mi.getLowerLeftPlacement(mi.getAnchor().getSiteTypeEnum()));
+				bi.setPlacement(mi.getLowerLeftPlacement());
 				bg.addBlockInst(bi);
 			}
 			

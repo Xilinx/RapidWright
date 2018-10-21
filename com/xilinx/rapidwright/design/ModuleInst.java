@@ -431,7 +431,20 @@ public class ModuleInst{
 	
 	/**
 	 * Get's the current lower left site as used for a placement directive 
-	 * for an implementation guide.  
+	 * for an implementation guide.  If a pblock was used and is presently annotated
+	 * on the Module, it will use the lower left most corner of the pblock.
+	 * @return The current lower left site used for placement.
+	 */
+	public Site getLowerLeftPlacement(){
+		return getLowerLeftPlacement(null);
+	}
+	
+	/**
+	 * Get's the current lower left site as used for a placement directive 
+	 * for an implementation guide.  If a pblock was used and is presently annotated
+	 * on the Module, it will use the lower left most corner of the pblock.
+	 * @param type If a desired type is requested for the corner, otherwise it will search 
+	 * for the most lower left corner site 
 	 * @return The current lower left site used for placement.
 	 */
 	public Site getLowerLeftPlacement(SiteTypeEnum type){
@@ -448,6 +461,9 @@ public class ModuleInst{
 		String newSuffix = "X" + (origLowerLeft.getTileXCoordinate() + dx) + "Y" + (origLowerLeft.getTileYCoordinate() + dy);
 		
 		Tile newTile = origLowerLeft.getDevice().getTile(origTilePrefix + newSuffix);
+		if(type == null){
+			return newTile.getSites()[0];
+		}
 		for(Site s : newTile.getSites()){
 			if(s.getSiteTypeEnum() == type) return s;
 		}
@@ -464,6 +480,9 @@ public class ModuleInst{
 	public Tile getLowerLeftTile(SiteTypeEnum type){
 		PBlock pb = getModule().getPBlock();
 		if(pb != null){
+			if(type == null) 
+				return pb.getBottomLeftTile();
+			
 			for(PBlockRange range : pb){
 				if(range.getLowerLeftSite().getSiteTypeEnum() == type){
 					return range.getLowerLeftSite().getTile();
@@ -476,15 +495,14 @@ public class ModuleInst{
 		int x = Integer.MAX_VALUE;
 		int y = Integer.MAX_VALUE;
 		for(SiteInst s : getModule().getSiteInsts()){
-			if(s.getSite().isCompatibleSiteType(type)){
+			boolean isSiteCompatible = type == null ? PBlock.isPBlockCornerSiteType(s.getSiteTypeEnum()) : 
+				(s.getSite().isCompatibleSiteType(type) || (Utils.isSLICE(s) && Utils.isSLICE(type))); 
+			if(isSiteCompatible){
 				if(lowerLeftIP == null){
 					lowerLeftIP = s;
 				}else if(s.getSite().getInstanceY() < lowerLeftIP.getSite().getInstanceY()){
 					lowerLeftIP = s;
-					
 				}
-			}
-			if(s.getSite().isCompatibleSiteType(type) || (s.getSite().getName().startsWith("SLICE_") && Utils.isSLICE(type))){
 				if(s.getSite().getInstanceX() < x){
 					x = s.getSite().getInstanceX();
 				}
@@ -500,7 +518,7 @@ public class ModuleInst{
 		
 		return target.getTile();
 	}
-
+	
 	/**
 	 * Attempts to place the module instance such that it's lower left tile falls
 	 * on the specified IP tile (CLB,DSP,BRAM,...)
