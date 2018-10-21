@@ -42,5 +42,5 @@ public class FileFilters {
 	/** Design Checkpoint File Filter */ 
 	public static Filter dcpFilter = new Filter("Design Checkpoint Files (*.dcp)");
 	/** Impl Guide File Filter */
-	public static Filter igFilter = new Filter("Impl Guide Files (*.impl.guide)");
+	public static Filter igFilter = new Filter("Implementation Guide Files (*.igf)");
 }

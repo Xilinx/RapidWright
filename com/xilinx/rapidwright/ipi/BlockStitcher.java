@@ -464,12 +464,12 @@ public class BlockStitcher {
 		
 		boolean buildExampleGuideFile = false;
 		if(!DUMP_SYNTH_DCP_ONLY){
-			String implGuideFileName = args[1].replace(".edf", ".impl.guide");
+			String implGuideFileName = args[1].replace(".edf", ".igf");
 			if(new File(implGuideFileName).exists()){
 				implHelper = ImplGuide.readImplGuide(implGuideFileName);
 				unusedImplGuides = new HashSet<String>(implHelper.getBlockNames());
 			}else{
-				System.out.println("INFO: No .impl.guide file found, proceeding with auto block placement and routing.");
+				System.out.println("INFO: No .igf file found, proceeding with auto block placement and routing.");
 				buildExampleGuideFile = true;
 			}
 		}
@@ -540,7 +540,7 @@ public class BlockStitcher {
 				if(blockGuide != null){
 					BlockInst bi = blockGuide.getInst(modInstName);
 					if(bi == null){
-						throw new RuntimeException("ERROR: Missing placement for " + modInstName + " in impl.guide file.");
+						throw new RuntimeException("ERROR: Missing placement for " + modInstName + " in .igf file.");
 					}
 					implementationIndex = bi.getImplIndex();
 				}
@@ -697,7 +697,7 @@ public class BlockStitcher {
 			// Remove any blocks that don't have pblock/implementations
 			ig.removeBlocksWithoutPBlocks();
 			
-			ig.writeImplGuide(args[1].replace(".edf", ".impl.guide.example"));
+			ig.writeImplGuide(args[1].replace(".edf", ".igf.example"));
 		}
 		
 		// Need to remove duplicate sites because IPI will generate the same IOs in multiple IP blocks :-(
