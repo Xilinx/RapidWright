@@ -1,3 +1,41 @@
+============= RapidWright 2018.2.2-beta released on 2018-10-20 =================
+Notes:
+ - API Additions:
+   - com.xilinx.rapidwright.device.PIP "public boolean isRouteThru()"
+   - com.xilinx.rapidwright.device.Site "public BEL[] getBELs()"
+   - com.xilinx.rapidwright.design.SiteInst "public BEL[] getBELs()"
+   - com.xilinx.rapidwright.design.SiteInst "public String getPrimarySitePinName(String alternateSitePinName)"
+   - com.xilinx.rapidwright.design.SiteInst "public String getAlternateSitePinName(String primarySitePinName)"
+   - com.xilinx.rapidwright.design.Module "public PBlock getPBlock()"
+   - com.xilinx.rapidwright.design.Module "public void setPBlock(PBlock pblock)"
+   - com.xilinx.rapidwright.design.Module "public Map<String, String> getMetaDataMap()"
+   - com.xilinx.rapidwright.design.Module "public void setMetaDataMap(HashMap<String, String> metaDataMap)"
+   
+ - API Removals:
+   - com.xilinx.rapidwright.design.Module "public String[] getExternalInputNames()"
+   - com.xilinx.rapidwright.design.Module "public void setExternalInputNames(String[] externalInputNames)"
+   - com.xilinx.rapidwright.design.Module "public String[] getExternalOutputNames()"
+   - com.xilinx.rapidwright.design.Module "public void setExternalOutputNames(String[] externalOutputNames)"
+   - com.xilinx.rapidwright.design.Module "public HashMap<String, ArrayList<String>> getMetaDataMap()"
+   - com.xilinx.rapidwright.design.Module "public void setMetaDataMap(HashMap<String, ArrayList<String>> metaDataMap)"
+   
+ - API Renames:
+   - com.xilinx.rapidwright.design.Module "public String getPBlock()" --> "public String getPBlockString()" 
+ - Changes Implementation Guide File extension from '.impl.guide' to '.igf'
+ - Fixed an issue in the HandPlacer where it would fail to start because of some missing saveDesign() methods.
+ - Modules now store PBlocks when using the rapid_compile_ipi flow
+ - If no impl guide file is supplied, rapid_compile_ipi will create an example file
+ - enables non-LUT routethrus in Router
+ - Resolves issue: #7
+Known Issues:
+ - Netlists that have two ports by same name where one is a single bit
+ bus and another is multi-bit are not currently supported (for
+ example, a module has an input 'my_signal' and 'my_signal[2:0]' is
+ currently not allowed in the EDIF parser.
+ - Clock router in Router class is disabled (under development).  
+ - PolynomialGenerator is a toy demonstration and does not produce a
+ functionally valid circuit.  
+
 ============= RapidWright 2018.2.1-beta released on 2018-10-15 =================
 Notes:
  - API Additions:
