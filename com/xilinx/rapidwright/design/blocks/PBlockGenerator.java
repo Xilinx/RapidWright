@@ -71,7 +71,9 @@ public class PBlockGenerator {
 	public int STARTING_X = -1;	    // Parameterized with command line argument when present.
 	public int STARTING_Y = -1;		// Parameterized with command line argument when present.
 	public int PBLOCK_COUNT = 1;
-
+	public int MAX_COLUMNS = 30;
+	
+	
 	public static final int AVOID_NULL_COLUMN_COUNT = 2;
 	
 	public static final PBlockGenEmitter emitter = new PBlockGenEmitter();
@@ -164,6 +166,10 @@ public class PBlockGenerator {
 		try {
 			BufferedReader br = new BufferedReader(new FileReader(shapesReportFileName));
 			String line = null;
+			int ffCount = 0;
+			int lutCount = 0;
+			int carryCount = 0;
+			double fractionalShapeArea = 0.0;
 			while((line = br.readLine()) != null){
 				if(line.startsWith("WxH: ")){
 					int pos = line.lastIndexOf('x');
@@ -176,16 +182,32 @@ public class PBlockGenerator {
 					if(widestShape < widthDim){
 						widestShape = widthDim;
 					}
-					shapeArea += widthDim * heightDim;
+					
+					double sliceUsage = Math.max(((double)lutCount)/LUTS_PER_CLE, ((double)ffCount)/FF_PER_CLE);
+					sliceUsage = Math.max(sliceUsage, ((double)carryCount));
+					fractionalShapeArea += (carryCount > 0 || lutCount > 0 || ffCount > 0) ? sliceUsage : widthDim * heightDim;
+					
+					lutCount = 0;
+					ffCount = 0;
+					carryCount = 0;
+				}else if(line.startsWith("(SLICE")){
+					if(line.contains("FF")) ffCount++;
+					else if(line.contains("LUT")) lutCount++;
+					else if(line.contains("CARRY")) carryCount++;
 				}else if(line.contains("Shape builder is called from")){
 					// It seems in some shape DB dumps, there is a stack trace followed by another, updated set of shapes.
 					// If we see this, reset and start over
 					tallestShape = 0;
 					widestShape = 0;
 					shapeArea = 0;
+					fractionalShapeArea = 0.0;
+					ffCount = 0;
+					lutCount = 0;
+					carryCount = 0; 
 					continue;
 				}
 			}
+			shapeArea = (int) fractionalShapeArea;
 			br.close();
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
@@ -803,12 +825,30 @@ public class PBlockGenerator {
 		}else {
 			pblockCLEHeight = bramCLECount;
 		}
+
+		// Sanity check on height with respect to SLICE needs
+		//      w
+		//  |-------|           Area         = A (Math.max(slicesRequired,sliceMsRequired))
+		//  |       |           Width        = w 
+		//  |   A   | h         Height       = h
+		//  |       |           Aspect Ratio = r (ASPECT_RATIO)
+		//  |-------|
+		//                      A = w * h;  w = h * r
+		//                      A = (h * r) * h
+		//                      A = h^2 * r
+		//                      h = sqrt(A / r)
+		//
+		int checkedCLEHeight = (int) Math.ceil(Math.sqrt(((double) Math.max(slicesRequired,sliceMsRequired)) / ASPECT_RATIO));
+		if(pblockCLEHeight < checkedCLEHeight){
+			pblockCLEHeight = checkedCLEHeight;
+		}
 		
 		if(pblockCLEHeight > CLE_REGION_HEIGHT){
 			// If we are taller than a region, let's just stop at region height
 			pblockCLEHeight = CLE_REGION_HEIGHT;
 			// TODO - In the future we can optimize this for larger blocks if needed
 		}
+		
 		
 		
 		// Now, given an aspect ratio, we know how many columns of each we'll need
