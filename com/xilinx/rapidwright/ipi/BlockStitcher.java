@@ -662,6 +662,7 @@ public class BlockStitcher {
 			stitched.writeCheckpoint(args[1].replace(".edf","_placed.dcp"));
 			t.stop();
 			t.printSummary();
+			if(OPEN_HAND_PLACER) HandPlacer.openDesign(stitched);
 			return;
 		}else{
 			BlockPlacer2 placer = new BlockPlacer2();
@@ -683,6 +684,7 @@ public class BlockStitcher {
 			
 			for(ModuleInst mi : miMap.keySet()){
 				if(mi.getModule().getPBlock() == null) continue;
+				if(mi.getModule().getAnchor() == null) continue;
 				String cacheID = mi.getModule().getMetaDataMap().get(CACHE_ID);
 				BlockGuide bg = ig.getBlock(cacheID);
 				

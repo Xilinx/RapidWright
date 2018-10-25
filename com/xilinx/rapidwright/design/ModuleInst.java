@@ -219,6 +219,7 @@ public class ModuleInst{
 	 */
 	public ArrayList<Site> getAllValidPlacements(){
 		ArrayList<Site> validSites = new ArrayList<Site>();
+		if(getAnchor() == null) return validSites;
 		Site originalSite = getAnchor().getSite();
 		Design design = getDesign();
 		Site[] sites = design.getDevice().getAllCompatibleSites(getAnchor().getSiteTypeEnum());
@@ -251,6 +252,7 @@ public class ModuleInst{
 		Device dev = newAnchorSite.getDevice();
 		
 		// Do some error checking on the newAnchorSite
+		if(module.getAnchor() == null) return false;
 		Site p = module.getAnchor().getSite();
 		Tile t = newAnchorSite.getTile();
 		Site newValidSite = p.getCorrespondingSite(module.getAnchor().getSiteTypeEnum(), t);
@@ -449,7 +451,10 @@ public class ModuleInst{
 	 */
 	public Site getLowerLeftPlacement(SiteTypeEnum type){
 		// Calculate anchor offset
-		Tile origAnchor = getModule().getAnchor().getSite().getTile();
+		SiteInst anchor = getModule().getAnchor();
+		if(anchor == null) return null;
+		
+		Tile origAnchor = anchor.getSite().getTile();
 		Tile currAnchor = getAnchor().getSite().getTile();
 		int dx = currAnchor.getTileXCoordinate() - origAnchor.getTileXCoordinate();
 		int dy = currAnchor.getTileYCoordinate() - origAnchor.getTileYCoordinate();
@@ -532,7 +537,10 @@ public class ModuleInst{
 		
 		Tile newAnchorTile = getModule().getCorrespondingAnchorTile(targetTile, ipTile, dev);
 		if(newAnchorTile == null) return false;
-		Site moduleAnchor = getModule().getAnchor().getSite();
+		
+		SiteInst anchor = getModule().getAnchor();
+		if(anchor == null) return false;
+		Site moduleAnchor = anchor.getSite();
 		boolean success = place(newAnchorTile.getSites()[moduleAnchor.getTile().getSiteIndex(moduleAnchor)]);
 		
 		if(!success) System.out.println("Failed placement attempt, TargetTile="+targetTile.getName()+" ipTile="+ipTile.getName());
