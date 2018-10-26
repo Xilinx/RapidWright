@@ -42,6 +42,7 @@ import com.xilinx.rapidwright.design.ModuleImpls;
 import com.xilinx.rapidwright.design.ModuleInst;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
+import com.xilinx.rapidwright.design.PinType;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Port;
 import com.xilinx.rapidwright.design.PortType;
@@ -297,12 +298,9 @@ public class BlockStitcher {
 				}
 
 				String ioStandard = constraints.get(portName).getIoStandard();
+				String pkgPin = constraints.get(portName).getName();
 				EDIFNet logNet = e.getKey().getPortInst().getNet();
-				if(isPortOutput){
-					design.createOBUF(portName, site, portNet, logNet, ioStandard);
-				}else{
-					design.createIBUF(portName, site, portNet, logNet, ioStandard);
-				}
+				design.createAndPlaceIOB(portName, isPortOutput ? PinType.OUT : PinType.IN, pkgPin, ioStandard, portNet, logNet);
 			}
 		}
 		

@@ -788,25 +788,58 @@ public class EDIFTools {
 		return sinks;
 	}
 
+	/**
+	 * Creates (or gets if it already exists) a top level port instance.
+	 * @param d Current design with the netlist
+	 * @param name Name of the top level port
+	 * @param dir The desired port directionality
+	 * @return The top level port instance (created or retrieved) from the top cell.
+	 */
 	public static EDIFPortInst createTopLevelPortInst(Design d, String name, PinType dir){
-		EDIFPortInst pr = d.getNetlist().getTopCellInst().getPortInst(name);
+		EDIFNetlist n = d.getNetlist();
+		EDIFPort port = n.getTopCell().getPort(name);
+		if(port == null && name.contains("[") && name.contains("]")){
+			// check if this is a part of a bus
+			port = n.getTopCell().getPort(getRootBusName(name));
+		}
+		if(port == null){
+			port = d.getTopEDIFCell().createPort(name, EDIFDirection.getDir(dir), 1);
+		}
+		EDIFPortInst pr = n.getTopCellInst().getPortInst(name);
 		if(pr == null){
-			EDIFPort p = d.getTopEDIFCell().getPort(name);
-			if(p == null){
-				p = d.getTopEDIFCell().createPort(name, EDIFDirection.getDir(dir), 1);
+			int idx = -1;
+			if(port.getWidth() > 1){
+				idx = getPortIndexFromName(name);
+				if(port.isLittleEndian()) idx = (port.getWidth()-1) - idx;
 			}
-			pr = new EDIFPortInst(p,null);
+			pr = new EDIFPortInst(port, null, idx);
 		}
 		return pr;
 	}
 
+	/**
+	 * Creates (or gets) a top level port by the specified name.  It will
+	 * also ensure that the port is connected to the specified {@link EDIFCellInst} 
+	 * which should be part of an IBUF or OBUF.
+	 * @param d Current design with netlist
+	 * @param name Name of the port (and net if none exists)
+	 * @param i IBUF (or INBUF in UltraScale devices) or OBUF instances
+	 * @param dir Direction of the pin on the IBUF/INBUF/OBUF instance to connect. 
+	 */
 	public static void addTopLevelPort(Design d, String name, EDIFCellInst i, PinType dir){
 		EDIFPortInst pr = createTopLevelPortInst(d, name, dir);
-		EDIFNet portNet = d.getTopEDIFCell().getNet(name);
+		EDIFNet portNet = pr.getNet();
+		if(portNet == null){
+			portNet = d.getTopEDIFCell().getNet(name);
+		}
 		if(portNet == null){
 			portNet = d.getTopEDIFCell().createNet(name);
 		}
-		portNet.createPortInst(dir == PinType.IN ? "I" : "O", i);
-		portNet.addPortInst(pr);
+		String portName = dir == PinType.IN ? "I" : "O";
+		EDIFPortInst bufPortInst = portNet.getPortInst(i.getName() + EDIFTools.EDIF_HIER_SEP + portName);
+		if(bufPortInst == null)
+			portNet.createPortInst(portName, i);
+		if(pr.getNet() == null) 
+			portNet.addPortInst(pr);
 	}
 }
