@@ -1,3 +1,26 @@
+============= RapidWright 2018.2.3-beta released on 2018-10-29 =================
+Notes:
+ - API Additions:
+   - com.xilinx.rapidwright.design.Design "public Cell createAndPlaceIOB(String name, PinType dir, String pkgPin, String ioStandard, Net portNet, EDIFNet logNet)"
+   - com.xilinx.rapidwright.design.Design "public Cell placeIOB(EDIFCellInst bufInst, String pkgPin, String ioStandard)"
+ - API Removals:
+   - com.xilinx.rapidwright.design.Design "public EDIFCellInst createIBUF(String portName, Site site, Net portNet, EDIFNet logNet, String ioStandard)"
+   - com.xilinx.rapidwright.design.Design "public Cell createOBUF(String portName, Site site, Net portNet, EDIFNet logNet, String ioStandard)"
+      
+ - Enables fix to run HandPlacer in both modes of BlockStitcher (rapid_compile_ipi)
+ - Fixes routing issue when loading two different devices
+ - Fixes some issues related to creating top-level ports
+ - Removes artificial anchor for Modules that do not have internal logic (anchor is allowed to be null)
+ - Resolves issue: #8
+Known Issues:
+ - Netlists that have two ports by same name where one is a single bit
+ bus and another is multi-bit are not currently supported (for
+ example, a module has an input 'my_signal' and 'my_signal[2:0]' is
+ currently not allowed in the EDIF parser.
+ - Clock router in Router class is disabled (under development).  
+ - PolynomialGenerator is a toy demonstration and does not produce a
+ functionally valid circuit.  
+
 ============= RapidWright 2018.2.2-beta released on 2018-10-20 =================
 Notes:
  - API Additions:
