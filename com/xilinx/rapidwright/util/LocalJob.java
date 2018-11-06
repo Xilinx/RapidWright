@@ -29,8 +29,6 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
 
-import javafx.util.Pair;
-
 
 
 /**
@@ -52,8 +50,8 @@ public class LocalJob extends Job {
 		try {
 			ProcessBuilder pb = new ProcessBuilder();
 			pb.redirectErrorStream(true);
-			pb.redirectOutput(new File(launchScriptNames.getValue()));
-			pb.command(launchScriptNames.getKey());
+			pb.redirectOutput(new File(launchScriptNames.getSecond()));
+			pb.command(launchScriptNames.getFirst());
 			p = pb.start();
 		} catch (IOException e) {
 			e.printStackTrace();

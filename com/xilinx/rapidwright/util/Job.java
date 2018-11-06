@@ -29,7 +29,6 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
-import javafx.util.Pair;
 
 /**
  * A parent class for all task jobs types.
@@ -77,7 +76,7 @@ public abstract class Job {
 		FileTools.writeLinesToTextFile(startupScript, startupScriptName);
 		new File(startupScriptName).setExecutable(true);
 		String startupScriptLog = dir + File.separator + DEFAULT_SCRIPT_LOG_FILE;
-		return new Pair<>(startupScriptName,startupScriptLog);
+		return new Pair<String,String>(startupScriptName,startupScriptLog);
 	}
 	/**
 	 * @return the command

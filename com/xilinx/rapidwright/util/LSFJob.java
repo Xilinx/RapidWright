@@ -25,8 +25,6 @@
  */
 package com.xilinx.rapidwright.util;
 
-import javafx.util.Pair;
-
 /**
  * A batch job to be run on an LSF cluster.
  * 
@@ -53,13 +51,13 @@ public class LSFJob extends Job {
 				"-J",
 				getRunDir()==null? System.getProperty("user.dir") : getRunDir(),
 				"-oo",
-				launchScriptNames.getValue().replace(DEFAULT_LOG_EXTENSION, "_lsf_%J" + DEFAULT_LOG_EXTENSION),
+				launchScriptNames.getSecond().replace(DEFAULT_LOG_EXTENSION, "_lsf_%J" + DEFAULT_LOG_EXTENSION),
 				"-P",
 				LSF_PROJECT +"-"+ System.getenv("USER"), 
 				"-q", 
 				LSF_QUEUE,
 				FileTools.isWindows() ? "cmd.exe" : "/bin/bash",
-				launchScriptNames.getKey()};
+				launchScriptNames.getFirst()};
 		
 		for(String line : FileTools.getCommandOutput(cmd)){
 			String jobID = line.substring(line.indexOf('<')+1, line.indexOf('>'));
