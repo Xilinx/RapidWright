@@ -1,3 +1,23 @@
+============= RapidWright 2018.2.4-beta released on 2018-11-15 =================
+Notes:
+ - API Additions:
+   - com.xilinx.rapidwright.design.SiteInst "public boolean unrouteIntraSiteNet(BELPin src, BELPin snk)"
+   - com.xilinx.rapidwright.design.SitePinInst "public void setSiteInst(SiteInst instance, boolean keepRouting"
+   - com.xilinx.rapidwright.device.Wire "public ArrayList<PIP> getBackwardPIPs()"
+   - com.xilinx.rapidwright.device.Wire "public ArrayList<PIP> getForwardPIPs()"
+ - API Removals:
+   - com.xilinx.rapidwright.device.Wire "public ? getBackwardPIPs()"
+   - com.xilinx.rapidwright.device.Wire "public ? getForwardPIPs()"
+ - Resolves issues: #14, 15
+Known Issues:
+ - Netlists that have two ports by same name where one is a single bit
+ bus and another is multi-bit are not currently supported (for
+ example, a module has an input 'my_signal' and 'my_signal[2:0]' is
+ currently not allowed in the EDIF parser.
+ - Clock router in Router class is disabled (under development).  
+ - PolynomialGenerator is a toy demonstration and does not produce a
+ functionally valid circuit.  
+
 ============= RapidWright 2018.2.3-beta released on 2018-10-29 =================
 Notes:
  - API Additions:
