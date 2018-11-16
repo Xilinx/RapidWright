@@ -552,7 +552,7 @@ public class EDIFNetlist extends EDIFName {
 				EDIFCellInst inst = getCellInstFromHierName(p.getHierarchicalInstName());
 				EDIFPortInst epr = inst.getPortInst(p.getPortInst().getPortInstNameFromPort());
 				if(epr == null){
-					if(getTopCellInst().equals(inst) && p.getPortInst().isOutput()){
+					if(parentNetName == null && getTopCellInst().equals(inst) && p.getPortInst().isOutput()){
 						source = p.getPortInst();
 						parentNetName = p.getPortInst().getNet().getName();
 					}
@@ -577,7 +577,7 @@ public class EDIFNetlist extends EDIFName {
 						EDIFHierPortInst absPortInst = new EDIFHierPortInst(instName, opr);
 						if(epr.getCellInst().getCellType().isPrimitive()){
 							leafCellPins.add(absPortInst);
-							if(epr.isOutput()) {
+							if(parentNetName == null && epr.isOutput()) {
 								source = epr;
 								parentNetName = netName;
 							}
@@ -736,11 +736,14 @@ public class EDIFNetlist extends EDIFName {
 	 * @return the physicalNetPinMap
 	 */
 	public Map<String, ArrayList<EDIFHierPortInst>> getPhysicalNetPinMap() {
+		if(physicalNetPinMap == null){
+			generateParentNetMap();
+		}
 		return physicalNetPinMap;
 	}
 	
 	public List<EDIFHierPortInst> getPhysicalPins(String parentNetName) {
-		return physicalNetPinMap.get(parentNetName);
+		return getPhysicalNetPinMap().get(parentNetName);
 	}
 
 	/**
