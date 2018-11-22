@@ -26,7 +26,7 @@ package com.xilinx.rapidwright.device;
 
 
 /**
- * Generated on: Mon Oct 15 14:01:36 2018
+ * Generated on: Wed Nov 21 12:36:13 2018
  * by: com.xilinx.rapidwright.release.PartNamePopulator
  * 
  * Set of all Supported Xilinx families in RapidWright
@@ -62,6 +62,5 @@ public enum FamilyType {
 		ZYNQ,
 		ZYNQUPLUS,
 		ZYNQUPLUSRFSOC,
-		ZYNQUPLUSRFSOCES1,
 		ZYNQUPLUSES2,
 }

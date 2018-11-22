@@ -26,7 +26,7 @@ package com.xilinx.rapidwright.device;
 
 
 /**
- * Generated on: Fri Sep 21 10:51:55 2018
+ * Generated on: Mon Oct 29 14:02:22 2018
  * by: com.xilinx.rapidwright.release.SiteAndTileTypeUpdater
  * 
  * Enumeration of Site type for all valid devices within Vivado.

@@ -39,6 +39,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.io.OutputStreamWriter;
 import java.lang.management.ManagementFactory;
 import java.nio.channels.FileChannel;
 import java.text.SimpleDateFormat;
@@ -49,6 +50,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipInputStream;
@@ -104,6 +106,8 @@ public class FileTools {
 	/** Static empty array to save on memory */
 	public static int[] emptyIntArray = new int[0];
 	/** Static empty array to save on memory */
+	public static short[] emptyShortArray = new short[0];
+	/** Static empty array to save on memory */
 	public static String[] emptyStringArray = new String[0];
 	//===================================================================================//
 	/* Get Streams                                                                       */
@@ -146,6 +150,12 @@ public class FileTools {
 		}
 	}
 	
+	/**
+	 * Creates a BufferedReader that reads an input file and determines based on file
+	 * extension (*.gz) if the file is gzipped or not.  
+	 * @param fileName Name of the text or gzipped file
+	 * @return An opened BufferedReader to the file.
+	 */
 	public static BufferedReader getProperInputStream(String fileName){
 		BufferedReader in = null;
 		try{
@@ -163,6 +173,31 @@ public class FileTools {
 		}
 
 		return in;
+	}
+	
+	/**
+	 * Creates a new BufferedWriter that will either write out text or a gzipped
+	 * compressed version of text based on the file extension (*.gz -> gzipped, all
+	 * others target an uncompressed output.
+	 * @param fileName Name of the output file.  Will be gzipped if has *.gz extension.
+	 * @return The opened BufferedWriter to the named file.
+	 */
+	public static BufferedWriter getProperOutputStream(String fileName){
+		BufferedWriter out = null;
+
+		try{
+			if(fileName.endsWith(".gz")){
+				out = new BufferedWriter(new OutputStreamWriter(new GZIPOutputStream(new FileOutputStream(fileName))));
+			}else{
+				out = new BufferedWriter(new FileWriter(fileName));	
+			}			
+		}
+		catch(IOException e){
+			e.printStackTrace();
+		}
+
+		
+		return out;
 	}
 	
 	//===================================================================================//
@@ -372,6 +407,17 @@ public class FileTools {
 		dos.writeInts(intArray);
 		return true;
 	}
+
+	public static boolean writeShortArray(UnsafeOutput dos, short[] intArray){
+		if(intArray == null){
+			dos.writeShort(0);
+			return true;
+		}
+		dos.writeShort(intArray.length);
+		dos.writeShorts(intArray);
+		return true;
+	}
+
 	
 	public static int[] readIntArray(Hessian2Input dis){
 		int size;
@@ -398,6 +444,13 @@ public class FileTools {
 		if(length == 0) return emptyIntArray;
 		return dis.readInts(length);
 	}
+
+	public static short[] readShortArray(UnsafeInput dis){
+		int length = dis.readShort();
+		if(length == 0) return emptyShortArray;
+		return dis.readShorts(length);
+	}
+
 	
 	public static boolean writeString(DataOutputStream dos, String str){
 		try {
@@ -951,6 +1004,10 @@ public class FileTools {
 			try {
 				return new FileInputStream(rwPath + File.separator + name);
 			} catch (FileNotFoundException e) {
+				System.err.println("ERROR: Failed to find RapidWright resource file "
+						+ rwPath + File.separator + name + ". Please check the installation path "
+						+ "and/or RAPIDWRIGHT_PATH environment variable.");
+				e.printStackTrace();
 				return null;
 			}
 		}
@@ -1229,7 +1286,6 @@ public class FileTools {
 		Process p;
 		try {
 			p = Runtime.getRuntime().exec(command);
-			p.waitFor();
 			
 		    BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
 		    BufferedReader readerErr = new BufferedReader(new InputStreamReader(p.getErrorStream()));
@@ -1246,6 +1302,7 @@ public class FileTools {
 
 		    reader.close();
 		    readerErr.close();
+			p.waitFor();
 		    return lines;
 		} catch (IOException e) {
 			e.printStackTrace();

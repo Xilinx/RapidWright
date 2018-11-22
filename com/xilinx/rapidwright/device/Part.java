@@ -29,32 +29,34 @@ import java.util.Arrays;
 import java.util.HashSet;
 
 /**
- * Generated on: Mon Oct 15 14:01:36 2018
+ * Generated on: Wed Nov 21 12:36:12 2018
  * by: com.xilinx.rapidwright.release.PartNamePopulator
  * 
  * Class used to uniquely represent a Xilinx part.
  */
 public class Part {
 	/** Vivado part attribute NAME */
-	private String name;
+	String name;
 	/** Vivado part attribute ARCHITECTURE */
-	private FamilyType architecture;
+	FamilyType architecture;
 	/** Vivado part attribute ARCHITECTURE_FULL_NAME */
-	private String architectureFullName;
+	String architectureFullName;
 	/** Vivado part attribute FAMILY */
-	private FamilyType family;
+	FamilyType family;
 	/** Vivado part attribute DEVICE */
-	private String device;
+	String device;
 	/** Vivado part attribute PACKAGE */
-	private String pkg;
+	String pkg;
 	/** Vivado part attribute SPEED */
-	private String speed;
+	String speed;
 	/** Vivado part attribute TEMPERATURE_GRADE_LETTER */
-	private String temperatureGradeLetter;
+	String temperatureGradeLetter;
 	/** Vivado part attribute REVISION */
-	private String revision;
+	String revision;
+	/** Vivado part attribute SERIES */
+	Series series;
 
-	public Part(String name, FamilyType architecture, String architectureFullName, FamilyType family, String device, String pkg, String speed, String temperatureGradeLetter, String revision) {
+	public Part(String name, FamilyType architecture, String architectureFullName, FamilyType family, String device, String pkg, String speed, String temperatureGradeLetter, String revision, Series series) {
 		this.name = name;
 		this.architecture = architecture;
 		this.architectureFullName = architectureFullName;
@@ -64,6 +66,7 @@ public class Part {
 		this.speed = speed;
 		this.temperatureGradeLetter = temperatureGradeLetter;
 		this.revision = revision;
+		this.series = series;
 	}
 
 	/**
@@ -121,6 +124,12 @@ public class Part {
 	public String getRevision() {
 		return revision;
 	}
+	/**
+	 * @return the series
+	 */
+	public Series getSeries() {
+		return series;
+	}
 	private static HashSet<FamilyType> series7;
 	private static FamilyType[] series7Types;
 	private static HashSet<FamilyType> ultraScale;
@@ -166,7 +175,6 @@ public class Part {
 				FamilyType.ZYNQUPLUS, 
 				FamilyType.ZYNQUPLUSES2, 
 				FamilyType.ZYNQUPLUSRFSOC, 
-				FamilyType.ZYNQUPLUSRFSOCES1, 
 		};
 		ultraScalePlus = new HashSet<FamilyType>(Arrays.asList(ultraScalePlusTypes));
 	}

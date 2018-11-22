@@ -26,7 +26,7 @@ package com.xilinx.rapidwright.device;
 
 
 /**
- * Generated on: Fri Sep 21 10:51:55 2018
+ * Generated on: Mon Oct 29 14:02:22 2018
  * by: com.xilinx.rapidwright.release.SiteAndTileTypeUpdater
  * 
  * Enumeration of Tile type for all valid devices within Vivado.
@@ -120,6 +120,7 @@ public enum TileTypeEnum {
 	CFG_CENTER_TOP,
 	CFG_CENTER_TOP_SLAVE,
 	CFG_CFG,
+	CFG_CFG_CMAC_FILL_RBRK_FT,
 	CFG_CFG_FILL_FT,
 	CFG_CFG_FILL_OLY_DK_FT,
 	CFG_CFG_FILL_OLY_FT,

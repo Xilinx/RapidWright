@@ -26,7 +26,7 @@ package com.xilinx.rapidwright.design;
 
 
 /**
- * Generated on: Fri Sep 21 10:51:56 2018
+ * Generated on: Wed Nov 21 12:36:14 2018
  * by: com.xilinx.rapidwright.release.UnisimParser
  * 
  * Enumerates supported Unisim primitives that map to Xilinx devices.
@@ -169,6 +169,7 @@ public enum Unisim {
 	GTHE3_COMMON,
 	GTHE4_CHANNEL,
 	GTHE4_COMMON,
+	GTM_DUAL,
 	GTPA1_DUAL,
 	GTPE2_CHANNEL,
 	GTPE2_COMMON,
@@ -200,6 +201,7 @@ public enum Unisim {
 	IBUFDS_GTE2,
 	IBUFDS_GTE3,
 	IBUFDS_GTE4,
+	IBUFDS_GTM,
 	IBUFDS_GTXE1,
 	IBUFDS_IBUFDISABLE,
 	IBUFDS_IBUFDISABLE_INT,
@@ -639,6 +641,8 @@ public enum Unisim {
 	OBUFDS_GTE3_ADV,
 	OBUFDS_GTE4,
 	OBUFDS_GTE4_ADV,
+	OBUFDS_GTM,
+	OBUFDS_GTM_ADV,
 	OBUFDS_LDT_25,
 	OBUFDS_LVDSEXT_25,
 	OBUFDS_LVDSEXT_33,

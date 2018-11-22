@@ -24,17 +24,19 @@
  */
 package com.xilinx.rapidwright.device;
 
-import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
-
+import java.util.List;
+import com.xilinx.rapidwright.device.FamilyType;
+import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.util.FileTools;
 import com.caucho.hessian.io.Hessian2Input;
 
 /**
- * Generated on: Thu Aug 30 15:50:56 2018
+ * Generated on: Wed Nov 21 12:36:13 2018
  * by: com.xilinx.rapidwright.release.PartNamePopulator
  * 
  * Class to hold utility APIs dealing with Parts and device names.
@@ -62,7 +64,8 @@ public class PartNameTools {
 				strings[part[5]],
 				strings[part[6]],
 				strings[part[7]],
-				strings[part[8]]
+				strings[part[8]],
+				Series.valueOf(strings[part[9]])
 				);
 			partMap.put(strings[part[0]], tmpPart);
 			if(!strings[part[8]].equals("")) {
@@ -124,11 +127,11 @@ public class PartNameTools {
 			case VIRTEXU: return FamilyType.VIRTEXU;
 			case VIRTEXUPLUS: return FamilyType.VIRTEXUPLUS;
 			case VIRTEXUPLUS58GES1: return FamilyType.VIRTEXUPLUS58G;
+			case VIRTEXUPLUSHBM: return FamilyType.VIRTEXUPLUSHBM;
 			case VIRTEXUPLUSHBMES1: return FamilyType.VIRTEXUPLUSHBM;
 			case ZYNQ: return FamilyType.ZYNQ;
 			case ZYNQUPLUS: return FamilyType.ZYNQUPLUS;
 			case ZYNQUPLUSRFSOC: return FamilyType.ZYNQUPLUSRFSOC;
-			case ZYNQUPLUSRFSOCES1: return FamilyType.ZYNQUPLUSRFSOC;
 			case ZYNQUPLUSES2: return FamilyType.ZYNQUPLUS;
 			default: return null;
 		}
@@ -170,7 +173,6 @@ public class PartNameTools {
 			case ZYNQ: return "Zynq-7000";
 			case ZYNQUPLUS: return "Zynq UltraScale+";
 			case ZYNQUPLUSRFSOC: return "Zynq UltraScale+ RFSOC";
-			case ZYNQUPLUSRFSOCES1: return "Zynq UltraScale+ RFSOC";
 			case ZYNQUPLUSES2: return "Zynq UltraScale+";
 			default: return null;
 		}
@@ -212,7 +214,6 @@ public class PartNameTools {
 			case ZYNQ: return Series.Series7;
 			case ZYNQUPLUS: return Series.UltraScalePlus;
 			case ZYNQUPLUSRFSOC: return Series.UltraScalePlus;
-			case ZYNQUPLUSRFSOCES1: return Series.UltraScalePlus;
 			case ZYNQUPLUSES2: return Series.UltraScalePlus;
 			default: return null;
 		}
@@ -227,5 +228,18 @@ public class PartNameTools {
 			return p.getDevice()+"-"+p.getPkg();
 		}
 		return p.getDevice()+p.getPkg();
+	}
+	/**
+	 * Gets all parts that are available for the provided series.
+	 * @param series The series of interest
+	 * @return A list of all parts that are available for
+	 * the provided series.
+	 */
+	public static List<Part> getAllParts(Series series){
+		ArrayList<Part> parts = new ArrayList<>();
+		for(Part p : getParts()){
+			if(p.getSeries() == series) parts.add(p);
+		}
+		return parts;
 	}
 }
