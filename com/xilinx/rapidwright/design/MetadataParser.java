@@ -80,13 +80,14 @@ public class MetadataParser {
 	private static final String PATH = "path";
 	private static final String PIN = "pin";
 	private static final String PORT = "port";
+	private static final String PPLOCS = "pplocs";
 	private static final String _ARROW = "-->";
 	
 	private enum MDParserState {BLOCK_BEGIN, BLOCK_NAME, BLOCK_PBLOCKS, BLOCK_CLOCKS, BLOCK_INPUTS, BLOCK_OUTPUTS,
 								PBLOCK_BEGIN, PBLOCK_NAME, PBLOCK_GRID_RANGES, PBLOCK_END,						
 								CLOCK_BEGIN, CLOCK_NAME, CLOCK_PERIOD, CLOCK_END,
 								PORT_BEGIN, PORT_NAME, PORT_NET, PORT_NUMPRIMS, PORT_TYPE, PORT_MAXDELAY, 
-								PORT_CONNS_BEGIN, PORT_CONNS_PIN, PORT_CONNS_END, PORT_END, BLOCK_END};
+								PORT_CONNS_BEGIN, PORT_CONNS_PIN, PORT_CONNS_END, PORT_END, PORT_PPLOCS, BLOCK_END};
 	
 	private Device dev;
 	
@@ -265,6 +266,18 @@ public class MetadataParser {
 					currPort.setName(tokens[2]);
 					if(nextTokens[1].equals(TYPE)){
 						currState = MDParserState.PORT_TYPE;
+					}else if(nextTokens[1].equals(PPLOCS)){
+						currState = MDParserState.PORT_PPLOCS;
+					}else{
+						currState = MDParserState.PORT_NET;
+					}
+					break;
+				}
+				case PORT_PPLOCS:{
+					expect(PPLOCS, tokens[1]);
+					currPort.setPartitionPinLoc(dev.getTile(tokens[2]));
+					if(nextTokens[1].equals(TYPE)){
+						currState = MDParserState.PORT_TYPE;
 					}else{
 						currState = MDParserState.PORT_NET;
 					}
@@ -426,5 +439,15 @@ public class MetadataParser {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+	}
+	
+	public static void main(String[] args) {
+		// Test parser
+		if(args.length != 2){
+			System.out.println("USAGE: <module.dcp> <metadata.txt>");
+			return;
+		}
+		Design d = Design.readCheckpoint(args[0]);
+		Module m = new Module(d,args[1]);
 	}
 }

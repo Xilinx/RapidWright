@@ -27,6 +27,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import com.xilinx.rapidwright.device.Tile;
+
 /**
  * This class represents the ports used to define the interfaces of modules.  
  * They consist of a unique name and the {@link SitePinInst} to which they are
@@ -45,6 +47,8 @@ public class Port implements Serializable, Cloneable{
 	private PortType type;
 	/** List of port names this port connects directly to (pass-thru connections) */
 	private ArrayList<String> passThruPortNames;
+	/** Specifies the tile where the partition pin should go */
+	private Tile partitionPinLoc;
 	/** Flag to be used when no pin is available denoting direction of port */
 	private boolean isOutputPort = false;
 	/** Worst case delay in or out of the port in nanoseconds */
@@ -179,6 +183,16 @@ public class Port implements Serializable, Cloneable{
 		if(passThruPortNames == null) passThruPortNames = new ArrayList<String>();
 		passThruPortNames.add(portName);
 	}
+
+	public Tile getPartitionPinLoc() {
+		return partitionPinLoc;
+	}
+
+
+	public void setPartitionPinLoc(Tile partitionPinLoc) {
+		this.partitionPinLoc = partitionPinLoc;
+	}
+
 
 	/**
 	 * @return the worstCasePortDelay

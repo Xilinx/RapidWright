@@ -661,6 +661,22 @@ public class FileTools {
 		return lines;
 	}
 	
+	/**
+	 * Gets the last n number of lines from a text file and returns them.
+	 * @param fileName Name of the text file
+	 * @param n Number of last lines to get
+	 * @return A list of the last n lines in the text file
+	 */
+	public static List<String> getLastNLinesFromTextFile(String fileName, int n){
+		if(n <= 0) return Collections.emptyList();
+		ArrayList<String> lines = getLinesFromTextFile(fileName);
+		ArrayList<String> toReturn = new ArrayList<>();
+		for(int i=(lines.size()-(n+1)); i < lines.size(); i++){
+			toReturn.add(lines.get(i));
+		}
+		return toReturn;
+	}
+	
 	public static ArrayList<String> getLinesFromInputStream(InputStream in){
 		String line = null;
 		ArrayList<String> lines = new ArrayList<String>();

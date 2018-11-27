@@ -150,6 +150,17 @@ public class EDIFPortInst {
 			cellInst.addPortInst(this);
 		}
 	}
+	
+	/**
+	 * Checks if this is an output of a GND or VCC primitive cell.
+	 * @return True if the underlying cell is a static output from GND or VCC, false otherwise.
+	 */
+	public boolean isPrimitiveStaticSource(){
+		if(cellInst == null) return false;
+		String name = cellInst.getCellType().getName();
+		if(name.equals("GND") || name.equals("VCC")) return true;
+		return false;
+	}
 
 	public String getFullName(){
 		String fullName = getName();

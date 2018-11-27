@@ -31,6 +31,12 @@ package com.xilinx.rapidwright.design;
  */
 public class PinSwap {
 
+	private Cell cell;
+	
+	private Cell companionCell; 
+	
+	private String companionLogicalName;
+	
 	private String logicalName;
 	
 	private String oldPhysicalName;
@@ -49,9 +55,10 @@ public class PinSwap {
 	 * @param net
 	 * @param newNetPinName
 	 */
-	public PinSwap(String logicalName, String oldPhysicalName, String newPhysicalName, String depopulatedLogicalName,
+	public PinSwap(Cell c, String logicalName, String oldPhysicalName, String newPhysicalName, String depopulatedLogicalName,
 			String newNetPinName) {
 		super();
+		this.cell = c;
 		this.logicalName = logicalName;
 		this.oldPhysicalName = oldPhysicalName;
 		this.newPhysicalName = newPhysicalName;
@@ -130,6 +137,44 @@ public class PinSwap {
 		this.depopulatedLogicalName = depopulatedLogicalName;
 	}
 
+	/**
+	 * @return the cell
+	 */
+	public Cell getCell() {
+		return cell;
+	}
+
+	/**
+	 * @return the companionCell
+	 */
+	public Cell getCompanionCell() {
+		return companionCell;
+	}
+	
+	/**
+	 * If this pin swap does not directly involve two cells, it may
+	 * involve another indirectly.  If this pin swap is a LUT6 it will
+	 * check for a LUT5 and vice versa.  
+	 * @return Cell in the overlapping LUT BEL site.
+	 */
+	public Cell checkForCompanionCell(){
+		if(companionCell != null) return companionCell;
+		String otherBEL = cell.getBELName().charAt(1) == '5' ? cell.getBELName().replace('5', '6') : cell.getBELName().replace('6', '5');
+		return cell.getSiteInst().getCell(otherBEL);
+	}
+
+	/**
+	 * @param companionCell the companionCell to set
+	 */
+	public void setCompanionCell(Cell companionCell, String companionLogicalName) {
+		this.companionCell = companionCell;
+		this.companionLogicalName = companionLogicalName;
+	}
+
+	public String getCompanionLogicalName(){
+		return this.companionLogicalName;
+	}
+	
 	/* (non-Javadoc)
 	 * @see java.lang.Object#hashCode()
 	 */
@@ -174,6 +219,6 @@ public class PinSwap {
 	}
 	
 	public String toString(){
-		return logicalName + ":" + oldPhysicalName +"->" + newPhysicalName; 
+		return cell.getBELName().charAt(1) + "LUT/" + logicalName + ":" + oldPhysicalName +"->" + newPhysicalName; 
 	}
 }
