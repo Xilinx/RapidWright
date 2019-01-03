@@ -24,8 +24,10 @@
 package com.xilinx.rapidwright.util;
 
 
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.net.URL;
 import java.security.CodeSource;
@@ -46,6 +48,9 @@ import com.xilinx.rapidwright.device.Device;
 public class RapidWright {
 	/** Option to unpack ./data/ directory into current directory */
 	public static final String UNPACK_OPTION_NAME = "--unpack_data";
+	/** Option to create JSON Kernel file for Jupyter Notebook support */
+	public static final String CREATE_JUPYTER_KERNEL = "--create_jupyter_kernel";
+	public static final String JUPYTER_KERNEL_FILENAME = "kernel.json";
 	
 	public static final String[] UNPACK_FOLDERS = new String[]{FileTools.DATA_FOLDER_NAME, FileTools.TCL_FOLDER_NAME, FileTools.IMAGES_FOLDER_NAME};
 	
@@ -94,6 +99,64 @@ public class RapidWright {
 			}
 		}
 		return true;
+	}
+	
+	private static String toWindowsPath(String linuxPath){
+		linuxPath = linuxPath.startsWith("/") ? linuxPath.substring(1) : linuxPath;
+		return linuxPath.replace("/", "\\\\");
+	}
+	
+	public static void createJupyterKernelFile(){
+		try {
+			File f = new File(JUPYTER_KERNEL_FILENAME);
+			BufferedWriter bw = new BufferedWriter(new FileWriter(f));
+			bw.write("{\n");
+			bw.write(" \"argv\": [\"java\",\n");
+
+			// Figure proper CLASSPATH based on if this is running from a jar or not 
+			CodeSource src = RapidWright.class.getProtectionDomain().getCodeSource();
+			if(src == null) {
+				MessageGenerator.briefError("Couldn't identify classpath for running RapidWright.  "
+						+ "Either set the CLASSPATH correctly, or modify " + f.getAbsolutePath() + " "
+						+ "to include classpath information");
+			}
+			bw.write("          \"-classpath\",\n");
+			boolean isWindows = FileTools.isWindows();
+			String location = src.getLocation().getPath();
+			location = isWindows ? toWindowsPath(location) : location;
+			if(location.toLowerCase().endsWith(".jar")){
+				bw.write("          \""+location+"\",\n");
+			}else{
+				bw.write("          \""+location+ "");
+				File jarDir = new File(location + File.separator + FileTools.JARS_FOLDER_NAME);
+				if(jarDir != null && jarDir.isDirectory()){
+					for(String jar : jarDir.list()){
+						if(isWindows && jar.contains("-linux64-")) continue;
+						if(!isWindows && jar.contains("-win64-")) continue;
+						if(jar.contains("javadoc")) continue;
+						bw.write(";" + jarDir.getAbsolutePath() + File.separator + jar);
+					}					
+				}else{
+					MessageGenerator.briefError("ERROR: Couldn't read RapidWright/jars directory, please check RapidWright installation.");
+				}
+
+				bw.write("\",\n");
+			}
+			bw.write("          \"org.jupyterkernel.kernel.Session\",\n");
+			bw.write("          \"-k\", \"python\",\n");
+			bw.write("          \"-f\", \"{connection_file}\"],\n");
+			bw.write(" \"display_name\": \"Jython 2.7\",\n");
+			bw.write(" \"language\": \"python\"\n");
+			bw.write("}\n");
+			bw.close();
+			System.out.println("Wrote Jupyter Notebook Kernel File: '" + f.getAbsolutePath() + "'\n");
+			System.out.println("You can install the RapidWright (Jython 2.7) kernel by running:");
+			System.out.println("    $ jupyter kernelspec install " + f.getParent());
+			System.out.println("Or control the kernel installation with:");
+			System.out.println("    $ jupyter kernelspec list");
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 	}
 	
 	public static void main(String[] args) {
@@ -168,15 +231,21 @@ public class RapidWright {
 			for(String s : args){
 				if(s.equals(UNPACK_OPTION_NAME)){
 					boolean success = unPackSupportingJarData();
-					if(success) MessageGenerator.briefMessageAndExit("Successfully unpacked "
+					if(success){
+						System.out.println("Successfully unpacked "
 							+ " RapidWright jar data.  Please set the environment "
 							+ "variable RAPIDWRIGHT_PATH to the directory which contains the "
 							+ "recently expanded data directory (current directory="+System.getProperty("user.dir")+".");
+						return;
+					}
 					else {
 						MessageGenerator.briefErrorAndExit("ERROR: Couldn't unpack ./data directory "
 							+ "from RapidWright jar.");
 					}
 					
+				}else if(s.equals(CREATE_JUPYTER_KERNEL)){
+					createJupyterKernelFile();
+					return;
 				}
 			}
 		}
