@@ -37,6 +37,8 @@ public enum NetType{
 		if(name == null || name.equals("")) return UNKNOWN;
 		if(name.equals(Net.GND_NET)) return GND;
 		if(name.equals(Net.VCC_NET)) return VCC;
+		if(name.endsWith("<const0>")) return GND;
+		if(name.endsWith("<const1>")) return VCC;
 		return WIRE;
 	}
 }
