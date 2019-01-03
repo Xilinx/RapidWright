@@ -36,6 +36,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.PriorityQueue;
 
 import com.xilinx.rapidwright.design.blocks.UtilizationType;
@@ -52,6 +53,7 @@ import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
+import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.router.RouteNode;
 import com.xilinx.rapidwright.util.MessageGenerator;
 import com.xilinx.rapidwright.util.Utils;
@@ -748,5 +750,31 @@ public class DesignTools {
 			}
 		}
 		return null;
+	}
+	
+	/**
+	 * Examines a site wire in a populated site inst for all the connected BELPins for
+	 * cells occupying those BELs.  It attempts to lookup the net attached to the cell pin
+	 * in order to find the hierarchical parent net name of the net and returns its name.
+	 * @param inst The site instance where the site wire in question resides.
+	 * @param siteWire The site wire index in the site where the site inst resides.
+	 * @return The hierarchical parent net name using the site wire or null if none could be found.
+	 */
+	public static String resolveNetNameFromSiteWire(SiteInst inst, int siteWire){
+		String parentNetName = null;
+		Map<String,String> parentNetMap = inst.getDesign().getNetlist().getParentNetMap();
+		BELPin[] pins = inst.getSite().getBELPins(siteWire);
+		for(BELPin pin : pins){
+			if(pin.isSitePort()) continue;
+			Cell c = inst.getCell(pin.getBEL().getName());
+			if(c == null || c.getEDIFCellInst() == null) continue;
+			String logPinName = c.getLogicalPinMapping(pin.getName());
+			EDIFPortInst portInst = c.getEDIFCellInst().getPortInst(logPinName);
+			if(portInst == null) continue;
+			EDIFNet net =  portInst.getNet();
+			String netName = c.getParentHierarchicalInstName() + EDIFTools.EDIF_HIER_SEP + net.getName(); 
+			parentNetName = parentNetMap.get(netName);
+		}
+		return parentNetName;
 	}
 }
