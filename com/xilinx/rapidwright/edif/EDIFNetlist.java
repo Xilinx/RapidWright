@@ -44,6 +44,7 @@ import java.util.Set;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.FileTools;
@@ -72,6 +73,8 @@ public class EDIFNetlist extends EDIFName {
 	
 	protected int nameSpaceUniqueCount = 0;
 
+	private Device device;
+	
 	private boolean DEBUG = false;
 	
 	public EDIFNetlist(String name){
@@ -127,6 +130,22 @@ public class EDIFNetlist extends EDIFName {
 		return primLib;
 	}
 	
+	/**
+	 * Will create or get the specified unisim cell and ensure it is added to the HDI 
+	 * primitives library. If the cell is already in the library, it will simply get it
+	 * and return it.
+	 * @param unisim The desired Unisim cell type.
+	 * @return The current unisim cell in the HDI primitive library for this netlist.
+	 */
+	public EDIFCell getHDIPrimitive(Unisim unisim){
+		EDIFLibrary lib = getHDIPrimitivesLibrary();
+		EDIFCell cell = lib.getCell(unisim.name());
+		if(cell == null){
+			cell = Design.getUnisimCell(unisim);
+		}
+		return lib.addCell(cell);
+	}
+	
 	public EDIFLibrary getWorkLibrary(){
 		EDIFLibrary primLib = libraries.get(EDIFTools.EDIF_LIBRARY_WORK_NAME); 
 		if(primLib == null){
@@ -180,6 +199,16 @@ public class EDIFNetlist extends EDIFName {
 		this.design = design;
 	}
 	
+	
+	
+	public Device getDevice() {
+		return device;
+	}
+
+	public void setDevice(Device device) {
+		this.device = device;
+	}
+
 	public EDIFCell getTopCell(){
 		return design.getTopCell();
 	}
@@ -511,6 +540,13 @@ public class EDIFNetlist extends EDIFName {
 		return set;
 	}
 	
+	private boolean isTransformPrim(EDIFHierPortInst p){
+		EDIFCellInst cellInst = p.getPortInst().getCellInst();
+		if(!cellInst.getCellType().isPrimitive()) return false;
+		Unisim u = Unisim.valueOf(p.getPortInst().getCellInst().getCellType().getName());
+		return u.hasTransform(device.getSeries());
+	}
+	
 	/**
 	 * TODO - Revisit this code, simplify, remove duplication
 	 * Get's all equivalent nets in the netlist from the provided net name. 
@@ -585,6 +621,13 @@ public class EDIFNetlist extends EDIFName {
 						queue.add(absPortInst);
 					}
 				}
+			}else if(p.isOutput() && isTransformPrim(p)){
+				if(p.getPortInst().getPort().getWidth() > 1){
+					aliases.add(p.getTransformedNetName());
+				}else{
+					aliases.add(p.toString());					
+				}
+
 			}else{
 				// Moving down in hierarchy
 				EDIFPort port = p.getPortInst().getPort();
@@ -634,6 +677,8 @@ public class EDIFNetlist extends EDIFName {
 			}else{
 				physicalNetPinMap.put(parentNetName, leafCellPins);
 			}
+		} else if(an.getNet().getPortInsts().size() == 0){
+			return aliases;
 		} else{
 			throw new RuntimeException("ERROR: Couldn't identify parent net, no output pins (or top level output port) found.");
 		}
@@ -687,14 +732,14 @@ public class EDIFNetlist extends EDIFName {
 			EDIFHierCellInst currInst = instQueue.poll(); 
 			for(EDIFCellInst eci : currInst.getInst().getCellType().getCellInsts()){
 				// Checks if cell is primitive or black box
-				if(eci.getCellType().getCellInsts().size() == 0){
+				if(eci.getCellType().getCellInsts().size() == 0 && eci.getCellType().getNets().size() == 0){
 					for(EDIFPortInst portInst : eci.getPortInsts()){
 						if(portInst.isOutput()){
-							queue.add(new EDIFHierPortInst(currInst.getHierarchicalInstName(), portInst));
+							queue.add(new EDIFHierPortInst(currInst.getFullHierarchicalInstName(), portInst));
 						}
 					}
 				}else{
-					String hName = currInst.getInst().equals(getTopCellInst()) ? eci.getName() : currInst.getHierarchicalInstName() + EDIFTools.EDIF_HIER_SEP + eci.getName();
+					String hName = currInst.getFullHierarchicalInstName();
 					instQueue.add(new EDIFHierCellInst(hName,eci));
 				}
 			}

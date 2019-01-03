@@ -145,6 +145,24 @@ public class EDIFHierPortInst {
 		return hierarchicalInstName + EDIFTools.EDIF_HIER_SEP + portInst.getNet();
 	}
 	
+	public String getTransformedNetName(){
+		String portName = null;
+		if(portInst.getPort().getWidth() > 1){
+			EDIFCellInst eci = portInst.getCellInst();
+			int idx = portInst.getIndex();
+			if(portInst.getPort().isLittleEndian()){
+				idx = (portInst.getPort().getWidth()-1) - idx;
+			}
+			portName = portInst.getPort().getBusName() + idx;
+			if(eci != null) 
+				portName = portInst.getCellInst().getName() + EDIFTools.EDIF_HIER_SEP + portName;  
+		}else{
+			portName = portInst.getFullName();
+		}
+		if(hierarchicalInstName.equals("")) return portName;
+		return hierarchicalInstName + "/" + portName;
+	}
+	
 	public boolean isOutput(){
 		return portInst.getPort().isOutput();
 	}
