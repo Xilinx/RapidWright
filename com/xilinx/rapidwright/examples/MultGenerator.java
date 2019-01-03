@@ -331,7 +331,7 @@ public class MultGenerator extends ArithmeticGenerator {
         		net = logic0;
         	}
         	si.routeIntraSiteNet(net, si.getSite().getBELPin(pinName), si.getBEL(element).getPin("D"));
-        	si.addSitePIP(element, "D", "O");
+        	si.addSitePIP(element, "D");
         }
         
         for(EDIFPort port : inst.getCellType().getPorts()){

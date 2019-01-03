@@ -136,7 +136,7 @@ public class SLRCrosserGenerator {
 				}else{
 					n.addPin(new SitePinInst(false,rxOrTx +"_" + name,si));
 				}
-				si.addSitePIP(rxOrTx + "_OPTINV_" + name, "I", "O");
+				si.addSitePIP(rxOrTx + "_OPTINV_" + name, "I");
 			}else if(!existingNet.equals(n)){
 				throw new RuntimeException("ERROR: Incompatible control nets in "
 					+ "Laguna site, currently: " + existingNet + ", failed to add " + n);
@@ -236,7 +236,7 @@ public class SLRCrosserGenerator {
 		
 		Net ce = n.getPhysicalNetFromPin("", c.getEDIFCellInst().getPortInst("CE"), d);
 		ce.addPin(new SitePinInst(false,"CE_PRE_OPTINV",c.getSiteInst()));
-        c.getSiteInst().addSitePIP("IINV", "I_PREINV", "I");
+        c.getSiteInst().addSitePIP("IINV", "I_PREINV");
         Net clk_in = n.getPhysicalNetFromPin("", c.getEDIFCellInst().getPortInst("I"), d);
         Net clk = n.getPhysicalNetFromPin("", c.getEDIFCellInst().getPortInst("O"), d);
         

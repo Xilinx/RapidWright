@@ -707,7 +707,7 @@ public class Router extends AbstractRouter {
 				SitePIP existingPIP = currPin.getSiteInst().getUsedSitePIP(rBelName);
 				if(existingPIP == null) {
 					//SitePIP p = new SitePIP(dev, currPin.getSiteInst(), rBelName, "CLK", "OUT");
-					currPin.getSiteInst().addSitePIP(rBelName, "CLK", "OUT");					
+					currPin.getSiteInst().addSitePIP(rBelName, "CLK");					
 				}
 			}
 		}

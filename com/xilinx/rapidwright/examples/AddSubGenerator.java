@@ -88,11 +88,11 @@ public class AddSubGenerator extends ArithmeticGenerator {
 		String cePinName = "CKEN" + (isLowerSlice ? (isFF2 ? "2" : "1") : (isFF2 ? "4" : "3")); 
 		if(ff.getSiteInst().getSitePinInst(clkPinName) == null){
 			clk.createPin(false, clkPinName, ff.getSiteInst());
-			ff.getSiteInst().addSitePIP(clkPinName + "INV","CLK","OUT");
+			ff.getSiteInst().addSitePIP(clkPinName + "INV","CLK");
 		}
 		if(ff.getSiteInst().getSitePinInst(rstPinName) == null){
 			rst.createPin(false, rstPinName, ff.getSiteInst());
-			ff.getSiteInst().addSitePIP("RST_"+(isLowerSlice ? "ABCD" : "EFGH")+"INV","RST","OUT");
+			ff.getSiteInst().addSitePIP("RST_"+(isLowerSlice ? "ABCD" : "EFGH")+"INV","RST");
 		}
 		if(ff.getSiteInst().getSitePinInst(cePinName) == null){
 			ce.createPin(false, cePinName, ff.getSiteInst());
@@ -209,7 +209,7 @@ public class AddSubGenerator extends ArithmeticGenerator {
 			BELPin snk = carryCell.getBEL().getPin("S" + cleIndex);
 			si.routeIntraSiteNet(pNet, src, snk);
 			si.routeIntraSiteNet(sNet, carryCell.getBEL().getPin("O"+cleIndex), ff.getPin("D"));
-			si.addSitePIP("FFMUX"+letter+"1", "XORIN", "OUT1");
+			si.addSitePIP("FFMUX"+letter+"1", "XORIN");
 			
 			soNet.createPin(true,letter +"Q",si);
 			
@@ -240,8 +240,8 @@ public class AddSubGenerator extends ArithmeticGenerator {
 				bNet.createPin(false, letter +"_I", siNeighbor);
 				aNetInt.createPin(true, letter +"Q", siNeighbor);
 				bNetInt.createPin(true, letter +"Q2", siNeighbor);
-				siNeighbor.addSitePIP("FFMUX" + letter +"1", "BYP", "OUT1");
-				siNeighbor.addSitePIP("FFMUX" + letter +"2", "BYP", "OUT2");
+				siNeighbor.addSitePIP("FFMUX" + letter +"1", "BYP");
+				siNeighbor.addSitePIP("FFMUX" + letter +"2", "BYP");
 			}
 			
 			
