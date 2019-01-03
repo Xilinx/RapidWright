@@ -64,6 +64,25 @@ public class Pair<T,U> {
 		return "<" + first.toString() + "," + second.toString() + ">";
 	}
 	
+	/**
+	 * Combines two arrays of equal length into an array of Pair
+	 * objects for convenience in loop or parameter passing.
+	 * @param t First array, stored in the first location
+	 * @param u Second array, stored in the second location
+	 * @return An array of populated Pair objects or null if input was invalid.
+	 */
+	public static <V,W> Pair<V,W>[] zip(V[] t, W[] u){
+		if(t==null || u == null) return null;
+		if(t.length != u.length) return null;
+		@SuppressWarnings("unchecked")
+		Pair<V,W>[] arr = new Pair[t.length];
+		for(int i=0; i < t.length; i++){
+			arr[i].first = t[i];
+			arr[i].second = u[i];
+		}
+		return arr;
+	}
+	
 	@Override
 	public int hashCode() {
 		final int prime = 31;
