@@ -369,7 +369,7 @@ public class Installer {
 		System.out.println("================================================================================");
 		System.out.println("  4. Let's test the DeviceBrowser in RapidWright ...");
 		System.out.println("================================================================================");
-		System.out.println("  In a few seconds you should see a window open called DeviceBroswer...");
+		System.out.println("  In a few seconds you should see a window open called DeviceBrowser...");
 		cmd = new ArrayList<>(Arrays.asList("java","-cp", classpath, "com.xilinx.rapidwright.device.browser.DeviceBrowser"));
 		String rwPathVarName = "RAPIDWRIGHT_PATH";
 		String existingPath = System.getenv(rwPathVarName);
