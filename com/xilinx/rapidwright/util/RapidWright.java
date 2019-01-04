@@ -137,7 +137,7 @@ public class RapidWright {
 						bw.write(";" + jarDir.getAbsolutePath() + File.separator + jar);
 					}					
 				}else{
-					MessageGenerator.briefError("ERROR: Couldn't read RapidWright/jars directory, please check RapidWright installation.");
+					MessageGenerator.briefError("ERROR: Couldn't read "+jarDir.getAbsolutePath()+" directory, please check RapidWright installation.");
 				}
 
 				bw.write("\",\n");
