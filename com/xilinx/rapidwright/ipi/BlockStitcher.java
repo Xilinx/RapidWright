@@ -57,12 +57,12 @@ import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
+import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFLibrary;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFTools;
-import com.xilinx.rapidwright.edif.InstPair;
 import com.xilinx.rapidwright.placer.blockplacer.BlockPlacer2;
 import com.xilinx.rapidwright.placer.handplacer.HandPlacer;
 import com.xilinx.rapidwright.router.Router;
@@ -422,20 +422,20 @@ public class BlockStitcher {
 	}
 	
 	private void populateModuleInstMaps(EDIFCell top){
-		Queue<InstPair> queue = new LinkedList<InstPair>();
+		Queue<EDIFHierCellInst> queue = new LinkedList<EDIFHierCellInst>();
 		for(EDIFCellInst i : top.getCellInsts()){
-			queue.add(new InstPair("", i));
+			queue.add(new EDIFHierCellInst("", i));
 		}
 		while(!queue.isEmpty()){
-			InstPair p = queue.poll();
-			EDIFCellInst i = p.inst;
+			EDIFHierCellInst p = queue.poll();
+			EDIFCellInst i = p.getInst();
 			if(i.getName().equals("VCC") || i.getName().equals("GND")) continue;
-			String sep = p.parentHierarchicalName.equals("") ? "" : "/";
-			String curr = p.parentHierarchicalName + sep + i.getName();
+			String sep = p.getHierarchicalInstName().equals("") ? "" : "/";
+			String curr = p.getHierarchicalInstName() + sep + i.getName();
 			instNameToInst.put(curr, i);
 			if(i.getCellType().getCellInsts() == null) continue;
 			for(EDIFCellInst i2 : i.getCellType().getCellInsts()){
-				queue.add(new InstPair(curr, i2));
+				queue.add(new EDIFHierCellInst(curr, i2));
 			}
 		}
 	}

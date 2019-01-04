@@ -1,5 +1,5 @@
 /* 
- * Copyright (c) 2018 Xilinx, Inc. 
+ * Copyright (c) 2019 Xilinx, Inc. 
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -26,7 +26,7 @@ package com.xilinx.rapidwright.device;
 
 
 /**
- * Generated on: Mon Oct 29 14:02:22 2018
+ * Generated on: Thu Jan 03 15:11:48 2019
  * by: com.xilinx.rapidwright.release.SiteAndTileTypeUpdater
  * 
  * Enumeration of Tile type for all valid devices within Vivado.

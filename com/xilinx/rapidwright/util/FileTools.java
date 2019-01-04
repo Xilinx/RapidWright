@@ -39,6 +39,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.lang.management.ManagementFactory;
 import java.nio.channels.FileChannel;
@@ -47,17 +48,15 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
+import java.util.zip.DeflaterOutputStream;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
+import java.util.zip.InflaterInputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipInputStream;
 
-import com.caucho.hessian.io.Deflation;
-import com.caucho.hessian.io.Hessian2Input;
-import com.caucho.hessian.io.Hessian2Output;
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
@@ -87,6 +86,8 @@ public class FileTools {
 	public static final String DATA_FOLDER_NAME = "data";
 	/** Tcl source folder name */
 	public static final String TCL_FOLDER_NAME = "tcl";
+	/** Java library folder name */
+	public static final String JARS_FOLDER_NAME = "jars";
 	/** Images source folder name */
 	public static final String IMAGES_FOLDER_NAME = "images";
 	/** Python source folder name */
@@ -112,42 +113,32 @@ public class FileTools {
 	//===================================================================================//
 	/* Get Streams                                                                       */
 	//===================================================================================//
-	public static Hessian2Output getHessianOutputStream(String fileName){
-		FileOutputStream fos;
-		try{
+	public static UnsafeOutput getUnsafeOutputStream(String fileName){
+		FileOutputStream fos = null; 
+		try {
 			fos = new FileOutputStream(fileName);
-			BufferedOutputStream bos = new BufferedOutputStream(fos);
-			Hessian2Output hos = new Hessian2Output(bos);
-			Deflation dos = new Deflation();
-			return dos.wrap(hos);
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
 		}
-		catch(Exception e){
-			MessageGenerator.briefError("Problem opening stream for file: " + fileName);
-		}
-		return null;
+		return getUnsafeOutputStream(fos);
 	}
 	
-	public static Hessian2Input getHessianInputStream(String fileName){
-		FileInputStream fis;
+	public static UnsafeOutput getUnsafeOutputStream(OutputStream os){
+		return new UnsafeOutput(new DeflaterOutputStream(os));
+	}
+	
+	public static UnsafeInput getUnsafeInputStream(String fileName){
+		FileInputStream fis = null;
 		try {
 			fis = new FileInputStream(fileName);
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
-			return null;
 		}
-		return getHessianInputStream(fis);
+		return getUnsafeInputStream(fis);
 	}
 	
-	public static Hessian2Input getHessianInputStream(InputStream in){
-		BufferedInputStream bis = new BufferedInputStream(in);
-		Hessian2Input his = new Hessian2Input(bis);
-		Deflation dis = new Deflation();
-		try {
-			return dis.unwrap(his);
-		} catch (IOException e) {
-			e.printStackTrace();
-			return null;
-		}
+	public static UnsafeInput getUnsafeInputStream(InputStream in){
+		return new UnsafeInput(new InflaterInputStream(in));
 	}
 	
 	/**
@@ -203,29 +194,6 @@ public class FileTools {
 	//===================================================================================//
 	/* Custom Read/Write File Functions for Device/WireEnumeration Class                 */
 	//===================================================================================//
-	public static HashMap<String,Integer> readHashMap(Hessian2Input dis, Integer[] allInts){
-		int count;
-		HashMap<String,Integer> tileMap = null;
-		String[] keys;
-		try {
-			// TODO - The following read is necessary, but could be removed in a future version
-			dis.readInt();//size = dis.readInt();
-			count = dis.readInt();
-			tileMap = new HashMap<String,Integer>(count);
-			keys = new String[count];
-			for(int i = 0; i < keys.length; i++){
-				keys[i] = dis.readString();
-			}
-			for(int i=0; i < count; i++){
-				tileMap.put(keys[i], allInts[dis.readInt()]);
-			}
-
-		} catch (IOException e) {
-			MessageGenerator.briefErrorAndExit("Error in readHashMap()");
-		}
-		return tileMap;
-	}
-
 	public static HashMap<String,Integer> readHashMap(UnsafeInput dis, Integer[] allInts){
 		int count;
 		HashMap<String,Integer> tileMap = null;
@@ -242,33 +210,6 @@ public class FileTools {
 		return tileMap;
 	}
 
-	
-	public static boolean writeHashMap(Hessian2Output dos, HashMap<String,Integer> map){
-		try {
-			int size = 0;
-			for(String s : map.keySet()){
-				size += s.length() + 1;
-			}
-			//TODO - The loop above is not needed, and we don't need to write the int below (remove in future version)
-			dos.writeInt(size);
-			size = map.size();
-			dos.writeInt(size);
-			ArrayList<Integer> values = new ArrayList<Integer>(map.size());
-			for(String s : map.keySet()){
-				//dos.write(s.getBytes());
-				values.add(map.get(s));
-				dos.writeString(s);
-				//dos.write('\n');
-			}
-			for(Integer i : values){
-				dos.writeInt(i.intValue());
-			}
-		} catch (IOException e) {
-			return false;
-		}
-		return true;
-	}
-	
 	public static boolean writeHashMap(UnsafeOutput dos, HashMap<String,Integer> map){
 		int size = map.size();
 		dos.writeInt(size);
@@ -279,61 +220,6 @@ public class FileTools {
 		}
 		for(Integer i : values){
 			dos.writeInt(i.intValue());
-		}
-		return true;
-	}
-	
-	public static HashMap<String, ArrayList<String>> readStringMultiMap(Hessian2Input dis){
-		int count;
-		HashMap<String,ArrayList<String>> map = null;
-		try {
-			count = dis.readInt();
-			map = new HashMap<String, ArrayList<String>>(count);
-			for(int i = 0; i < count; i++){
-				String key = dis.readString();
-				int valueCount = dis.readInt();
-				ArrayList<String> value = new ArrayList<String>(valueCount);
-				for (int j = 0; j < valueCount; j++) {
-					value.add(dis.readString());
-				}
-				map.put(key, value);
-			}
-
-		} catch (IOException e) {
-			MessageGenerator.briefErrorAndExit("Error in readStringMultiMap()");
-		}
-		return map;
-	}
-	
-	public static boolean writeStringMultiMap(Hessian2Output dos, HashMap<String, ArrayList<String>> map){
-		try {
-			dos.writeInt(map.size());
-			for(String s : map.keySet()){
-				dos.writeString(s);
-				ArrayList<String> values = map.get(s);
-				dos.writeInt(values.size());
-				for(String str : values){
-					dos.writeString(str);
-				}
-			}
-		} catch (IOException e){
-			return false;
-		}
-		return true;
-	}
-	
-	public static boolean writeStringArray(Hessian2Output dos, String[] stringArray){
-		int size = 0;
-		for(String s : stringArray){
-			size += s.length() + 1;
-		}
-		try {
-			dos.writeInt(stringArray.length);
-			for(int i=0; i<stringArray.length; i++){
-				dos.writeString(stringArray[i]);
-			}
-		} catch (IOException e){
-			return false;
 		}
 		return true;
 	}
@@ -349,23 +235,7 @@ public class FileTools {
 		}
 		return true;
 	}
-	
-	public static String[] readStringArray(Hessian2Input dis){
-		int size;
-		String[] wireArray = null;
-		try {
-			size = dis.readInt();
-			wireArray = new String[size];
-			for(int i = 0; i < wireArray.length; i++){
-				wireArray[i] = dis.readString();
-			}
-		} catch (IOException e) {
-			e.printStackTrace();
-			MessageGenerator.briefErrorAndExit("Error in readStringArray()");
-		}
-		return wireArray;
-	}
-	
+		
 	public static String[] readStringArray(UnsafeInput dis){
 		int size;
 		String[] wireArray = null;
@@ -378,24 +248,6 @@ public class FileTools {
 			wireArray[i] = dis.readString();
 		}
 		return wireArray;
-	}
-	
-	public static boolean writeIntArray(Hessian2Output dos, int[] intArray){
-		try{
-			if(intArray == null){
-				dos.writeInt(0);
-				return true;
-			}
-			dos.writeInt(intArray.length);
-			for(int i : intArray){
-				dos.writeInt(i);
-			}
-		} 
-		catch (IOException e){
-			return false;
-		}
-		
-		return true;
 	}
 	
 	public static boolean writeIntArray(UnsafeOutput dos, int[] intArray){
@@ -417,27 +269,6 @@ public class FileTools {
 		dos.writeShorts(intArray);
 		return true;
 	}
-
-	
-	public static int[] readIntArray(Hessian2Input dis){
-		int size;
-		int[] intArray = null;
-		try {
-			size = dis.readInt();
-			if(size == 0){
-				return emptyIntArray;
-			}
-			intArray = new int[size];
-			for(int i = 0; i < intArray.length; i++){
-				intArray[i] = dis.readInt();
-			}
-		} catch (IOException e) {
-			e.printStackTrace();
-			System.out.println("Error in readIntArray()");
-			System.exit(1);
-		}
-		return intArray;
-	}
 	
 	public static int[] readIntArray(UnsafeInput dis){
 		int length = dis.readInt();
@@ -450,7 +281,6 @@ public class FileTools {
 		if(length == 0) return emptyShortArray;
 		return dis.readShorts(length);
 	}
-
 	
 	public static boolean writeString(DataOutputStream dos, String str){
 		try {
@@ -473,28 +303,6 @@ public class FileTools {
 		return new String(buffer);
 	}
 
-	public static boolean writeIntegerHashSet(Hessian2Output dos, HashSet<Integer> ints) {
-		int[] nums = new int[ints.size()];
-		int idx = 0;
-		for(Integer i : ints){
-			nums[idx] = i;
-			idx++;
-		}
-		return writeIntArray(dos, nums);
-	}
-	
-	public static HashSet<Integer> readIntegerHashSet(Hessian2Input dis){
-		int[] nums = readIntArray(dis);
-		if(nums == null){
-			return new HashSet<Integer>();
-		}
-		HashSet<Integer> tmp = new HashSet<Integer>();
-		for(int i : nums){
-			tmp.add(i);
-		}
-		return tmp;
-	}
-
 	//===================================================================================//
 	/* Generic Read/Write Serialization Methods                                          */
 	//===================================================================================//	
@@ -503,6 +311,7 @@ public class FileTools {
 	 * @param fileName The file to read from.
 	 * @return The Object de-serialized from the file or null if there was an error.
 	 */
+	@SuppressWarnings("resource")
 	public static Object loadFromFile(String fileName){
 		File inputFile = new File(fileName);
 		FileInputStream fis;
@@ -568,30 +377,6 @@ public class FileTools {
 		return true;
 	}
 
-	public static boolean saveToCompressedFile(Object o, String fileName){
-		Hessian2Output hos = getHessianOutputStream(fileName);
-		try{
-			hos.writeObject(o);
-			hos.close();
-		}
-		catch(IOException e){
-			return false;
-		}
-		return true;
-	}
-	
-	public static Object loadFromCompressedFile(String fileName){
-		Hessian2Input his = getHessianInputStream(fileName);
-		try{
-			Object o = his.readObject();
-			his.close();
-			return o;
-		}
-		catch(IOException e){
-			return null;
-		}
-	}
-	
 	/**
 	 * This is a simple method that writes the elements of an ArrayList of Strings
 	 * into lines in the text file fileName.
@@ -1039,10 +824,15 @@ public class FileTools {
 	 */
 	public static String getRapidWrightResourceFileName(String name){
 		String rwPath = getRapidWrightPath();
+		if(rwPath == null){
+			// Looks like we may be running from a jar, attempt to extract needed files from jar
+			RapidWright.unPackSupportingJarData();
+			// Try again
+			rwPath = getRapidWrightPath();
+		}
 		if(rwPath != null){
 			return rwPath + File.separator + name;
 		}
-		// TODO - For files inside a jar, we need to extract them first.
 		
 		return null;
 	}

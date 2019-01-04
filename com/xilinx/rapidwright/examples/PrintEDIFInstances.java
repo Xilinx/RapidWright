@@ -29,8 +29,8 @@ import java.io.PrintWriter;
 import java.util.LinkedList;
 import java.util.Queue;
 
-import com.xilinx.rapidwright.edif.InstPair;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
+import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.util.MessageGenerator;
@@ -47,16 +47,16 @@ public class PrintEDIFInstances {
 		try {
 			PrintWriter pw = new PrintWriter(fileName);
 			pw.println("DESIGN NAME: " + ee.getName());
-			Queue<InstPair> queue = new LinkedList<InstPair>();
-			queue.add(new InstPair("", ee.getTopCellInst()));
+			Queue<EDIFHierCellInst> queue = new LinkedList<EDIFHierCellInst>();
+			queue.add(new EDIFHierCellInst("", ee.getTopCellInst()));
 			while(!queue.isEmpty()){
-				InstPair p = queue.poll();
-				EDIFCellInst i = p.inst;
-				String path = p.parentHierarchicalName;
+				EDIFHierCellInst p = queue.poll();
+				EDIFCellInst i = p.getInst();
+				String path = p.getHierarchicalInstName();
 				String curr = path + "/" + i.getName();
 				pw.println(curr + " (" + i.getCellType() + ") from library " + i.getCellType().getLibrary());
 				for(EDIFCellInst i2 : i.getCellType().getCellInsts()){
-					queue.add(new InstPair(curr, i2));
+					queue.add(new EDIFHierCellInst(curr, i2));
 				}
 			}
 			

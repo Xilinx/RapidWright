@@ -799,7 +799,7 @@ public class EDIFNetlist extends EDIFName {
 	public HashMap<String, EDIFNet> generateEDIFNetMap(HashMap<String, EDIFCellInst> cellInstMap) {
 		HashMap<String,EDIFNet> map = new HashMap<String, EDIFNet>();
 		
-		Queue<InstPair> toProcess = new LinkedList<InstPair>();
+		Queue<EDIFHierCellInst> toProcess = new LinkedList<EDIFHierCellInst>();
 	
 		// Add nets at the very top level to start
 		for(EDIFNet net : getTopCell().getNets()){
@@ -809,22 +809,22 @@ public class EDIFNetlist extends EDIFName {
 		Collection<EDIFCellInst> topInstances = getTopCellInst().getCellType().getCellInsts(); 
 		if(topInstances != null){
 			for(EDIFCellInst i : topInstances){
-				toProcess.add(new InstPair("",i));			
+				toProcess.add(new EDIFHierCellInst("",i));			
 			}			
 		}
 				
 		while(!toProcess.isEmpty()){
-			InstPair curr = toProcess.poll();			
-			String name = curr.parentHierarchicalName + curr.inst.getName();
-			if(curr.inst.getCellType().getNets() == null) continue;
-			for(EDIFNet net : curr.inst.getCellType().getNets()){
+			EDIFHierCellInst curr = toProcess.poll();			
+			String name = curr.getHierarchicalInstName() + curr.getInst().getName();
+			if(curr.getInst().getCellType().getNets() == null) continue;
+			for(EDIFNet net : curr.getInst().getCellType().getNets()){
 				map.put(name + "/" + net.getName(), net);
 				//System.out.println("NET: " + name + "/" + net.getOldName());
 			}
-			String parentName = curr.parentHierarchicalName + curr.inst.getName() + "/";
-			if(curr.inst.getCellType().getCellInsts()==null) continue;
-			for(EDIFCellInst i : curr.inst.getCellType().getCellInsts()){
-				toProcess.add(new InstPair(parentName, i));
+			String parentName = curr.getHierarchicalInstName() + curr.getInst().getName() + "/";
+			if(curr.getInst().getCellType().getCellInsts()==null) continue;
+			for(EDIFCellInst i : curr.getInst().getCellType().getCellInsts()){
+				toProcess.add(new EDIFHierCellInst(parentName, i));
 			}
 		
 		}
@@ -862,27 +862,27 @@ public class EDIFNetlist extends EDIFName {
 		}
 			
 	
-		Queue<InstPair> toProcess = new LinkedList<InstPair>();
+		Queue<EDIFHierCellInst> toProcess = new LinkedList<EDIFHierCellInst>();
 		Collection<EDIFCellInst> topInstances = getTopCellInst().getCellType().getCellInsts(); 
 		if(topInstances != null){
 			for(EDIFCellInst i : topInstances){
-				toProcess.add(new InstPair("",i));			
+				toProcess.add(new EDIFHierCellInst("",i));			
 			}			
 		}
 		
 		while(!toProcess.isEmpty()){
-			InstPair curr = toProcess.poll();
-			if(primitives.contains(curr.inst.getCellType().getName())){
-				String name = curr.parentHierarchicalName + curr.inst.getName();
-				primitiveInstances.put(name, curr.inst);
+			EDIFHierCellInst curr = toProcess.poll();
+			if(primitives.contains(curr.getInst().getCellType().getName())){
+				String name = curr.getHierarchicalInstName() + curr.getInst().getName();
+				primitiveInstances.put(name, curr.getInst());
 			}else{
-				String parentName = curr.parentHierarchicalName + curr.inst.getName()+ "/"; 
-				if(curr.inst.getCellType().getCellInsts() == null) {
+				String parentName = curr.getHierarchicalInstName() + curr.getInst().getName()+ "/"; 
+				if(curr.getInst().getCellType().getCellInsts() == null) {
 					//System.out.println("No instances for cell type: " + curr.inst.getCellType());
 					continue;
 				}
-				for(EDIFCellInst i : curr.inst.getCellType().getCellInsts()){
-					toProcess.add(new InstPair(parentName, i));
+				for(EDIFCellInst i : curr.getInst().getCellType().getCellInsts()){
+					toProcess.add(new EDIFHierCellInst(parentName, i));
 				}
 			}
 		}

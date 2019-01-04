@@ -321,6 +321,7 @@ public class EDIFParser {
 		return o;
 	}
 	
+	@SuppressWarnings("unused")
 	public EDIFNetlist parseEDIFNetlist(){
 		expect(LEFT_PAREN, getNextToken());
 		expect(EDIF, getNextToken());
@@ -454,6 +455,7 @@ public class EDIFParser {
 		EDIFLibrary library = (EDIFLibrary) parseEDIFNameObject(new EDIFLibrary());
 		expect(LEFT_PAREN, getNextToken());
 		expect(EDIFLEVEL, getNextToken());
+		@SuppressWarnings("unused")
 		int level = Integer.parseInt(getNextToken());
 		expect(RIGHT_PAREN, getNextToken());
 		

@@ -1,5 +1,5 @@
 /* 
- * Copyright (c) 2018 Xilinx, Inc. 
+ * Copyright (c) 2019 Xilinx, Inc. 
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -24,19 +24,18 @@
  */
 package com.xilinx.rapidwright.device;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
+import com.esotericsoftware.kryo.io.UnsafeInput;
 import com.xilinx.rapidwright.device.FamilyType;
 import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.util.FileTools;
-import com.caucho.hessian.io.Hessian2Input;
 
 /**
- * Generated on: Wed Nov 21 12:36:13 2018
+ * Generated on: Thu Jan 03 15:11:48 2019
  * by: com.xilinx.rapidwright.release.PartNamePopulator
  * 
  * Class to hold utility APIs dealing with Parts and device names.
@@ -45,14 +44,10 @@ public class PartNameTools {
 	public static HashMap<String,Part> partMap;
 	static {
 		partMap = new HashMap<String,Part>();
-		Hessian2Input his = FileTools.getHessianInputStream(FileTools.getRapidWrightResourceInputStream(FileTools.PART_DB_PATH));
+		UnsafeInput his = FileTools.getUnsafeInputStream(FileTools.getRapidWrightResourceInputStream(FileTools.PART_DB_PATH));
 		String[] strings = FileTools.readStringArray(his);
 		int partCount = 0;
-		try {
-			partCount = his.readInt();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
+		partCount = his.readInt();
 		for(int i=0; i < partCount; i++){
 			int[] part = FileTools.readIntArray(his);
 			Part tmpPart = new Part(

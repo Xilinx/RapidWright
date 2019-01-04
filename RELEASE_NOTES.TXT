@@ -1,3 +1,32 @@
+============= RapidWright 2018.3.0-beta released on 2019-01-07 =================
+Notes:
+ - API Additions:
+   - com.xilinx.rapidwright.design.SiteInst "public void addSitePIP(String belName, String inputPin)"
+   - com.xilinx.rapidwright.design.SiteInst "public SitePIP getSitePIP(String belName, String inputPin)"
+   - com.xilinx.rapidwright.design.SiteInst "public Set<String> getSiteWiresFromNet(Net net)"
+   - com.xilinx.rapidwright.device.Device "public Node getNode(String name)"
+   - com.xilinx.rapidwright.device.Device "public Wire getWire(String name)"
+   - com.xilinx.rapidwright.device.Device "public PIP getPIP(String name)"
+   - com.xilinx.rapidwright.device.Device "public SitePin getSitePin(String name)"
+   - com.xilinx.rapidwright.device.Site "public Integer getSiteWireIndex(String siteWireName)"
+   - com.xilinx.rapidwright.device.Site "public BELPin[] getBELPins(int siteWireIndex)"
+   - com.xilinx.rapidwright.device.Site "public BELPin[] getBELPins(String siteWireName)"
+   - com.xilinx.rapidwright.device.Site "public SitePIP getSitePIP(BELPin input)"
+   - com.xilinx.rapidwright.device.Wire "public Node getNode()"
+ - Deprecated APIs:
+   - com.xilinx.rapidwright.design.SiteInst "public void addSitePIP(String belName, String inputPin, String outputPin)"
+   - com.xilinx.rapidwright.design.SiteInst "public SitePIP getSitePIP(String belName, String inputPin, String outputPin)"
+   - com.xilinx.rapidwright.device.Site "public BELPin[] getConnectedBELPins(int siteWireIndex)"
+   - com.xilinx.rapidwright.device.Site "public SitePIP getSitePIP(BELPin input, BELPin output)"
+ - Compatibility with Vivado 2018.3.0 and its devices
+ - Adds support for RapidWright Jupyter Notebook kernels
+ - Reduces device file size to improve download times and load times
+ - Removes Hessian implementation dependency for PartNameTools resource file and
+   ModuleCache files.  This was done to resolve Java >=9 issues with 
+   obsolete reflection usage.
+ - Removed com.xilinx.rapidwright.edif.InstPair class and replaced functionality
+   with com.xilinx.rapidwright.edif.EDIFHierCellInst.
+   
 ============= RapidWright 2018.2.5-beta released on 2018-11-28 =================
 Notes:
  - Fixes an issue in

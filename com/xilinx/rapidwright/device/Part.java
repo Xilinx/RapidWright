@@ -1,5 +1,5 @@
 /* 
- * Copyright (c) 2018 Xilinx, Inc. 
+ * Copyright (c) 2019 Xilinx, Inc. 
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -29,7 +29,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 
 /**
- * Generated on: Wed Nov 21 12:36:12 2018
+ * Generated on: Thu Jan 03 15:11:48 2019
  * by: com.xilinx.rapidwright.release.PartNamePopulator
  * 
  * Class used to uniquely represent a Xilinx part.
