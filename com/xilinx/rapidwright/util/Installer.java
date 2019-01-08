@@ -246,11 +246,11 @@ public class Installer {
        
 	public static void main(String[] args) throws IOException {
 		for(String arg : args){
-			if(arg.equals("-v") || args.equals("--verbose")){
+			if(arg.equals("-v") || arg.equals("--verbose")){
 				verbose = true;
-			}else if(arg.equals("-s") || args.equals("--skip-zip-download")){
+			}else if(arg.equals("-s") || arg.equals("--skip-zip-download")){
 				skip_zip_download = true;
-			}else if(arg.equals("-h") || args.equals("--help")){
+			}else if(arg.equals("-h") || arg.equals("--help")){
 				System.out.println("================================================================================");
 				System.out.println(" RapidWright Installer");
 				System.out.println("================================================================================");
