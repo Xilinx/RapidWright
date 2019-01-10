@@ -46,6 +46,7 @@ import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.MessageGenerator;
@@ -73,7 +74,7 @@ public class EDIFNetlist extends EDIFName {
 	
 	protected int nameSpaceUniqueCount = 0;
 
-	private Device device;
+	private transient Device device;
 	
 	private boolean DEBUG = false;
 	
@@ -540,11 +541,16 @@ public class EDIFNetlist extends EDIFName {
 		return set;
 	}
 	
+	private static boolean isDeviceNullPrinted = false;
 	private boolean isTransformPrim(EDIFHierPortInst p){
 		EDIFCellInst cellInst = p.getPortInst().getCellInst();
 		if(!cellInst.getCellType().isPrimitive()) return false;
 		Unisim u = Unisim.valueOf(p.getPortInst().getCellInst().getCellType().getName());
-		return u.hasTransform(device.getSeries());
+		if(device == null && !isDeviceNullPrinted){
+			System.err.println("WARNING: EDIFNetlist.device==null when calling isTransformPrim(), results may be incorrect");
+			isDeviceNullPrinted = true;
+		}
+		return u.hasTransform(device == null ? Series.UltraScale : device.getSeries());
 	}
 	
 	/**

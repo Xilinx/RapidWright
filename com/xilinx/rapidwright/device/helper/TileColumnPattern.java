@@ -296,6 +296,10 @@ public class TileColumnPattern extends ArrayList<TileTypeEnum> implements Compar
 
 	@Override
 	public int compareTo(TileColumnPattern o) {
-		return o.getNumInstances() - getNumInstances();
+		int numInstsDiff = o.getNumInstances() - getNumInstances();
+		if(numInstsDiff == 0){
+			return size() - o.size();
+		}
+		return numInstsDiff;
 	}
 }

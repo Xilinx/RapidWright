@@ -563,6 +563,7 @@ public class BlockStitcher {
 		
 		// Update package in case block loading changed it
 		stitched.getDevice().setActivePackage(PartNameTools.getPart(stitcher.partName).getPkg());
+		stitched.getNetlist().setDevice(stitched.getDevice());
 		
 		runtimes[1] = System.currentTimeMillis() - runtimes[1];
 		runtimes[2] = System.currentTimeMillis();

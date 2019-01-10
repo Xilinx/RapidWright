@@ -42,6 +42,7 @@ import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.FamilyType;
 import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.PartNameTools;
+import com.xilinx.rapidwright.device.SLR;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
@@ -915,7 +916,7 @@ public class PBlockGenerator {
 			throw new RuntimeException("ERROR: PBlockGenerator couldn't match a compatible pattern with numSLICECols=" + numSLICEColumns +
 					" numSLICEMCols=" + numSLICEMColumns + " numDSPColumns="+numDSPColumns + " numBRAMColumns=" + numBRAMColumns);
 		}
-		boolean trivial = matches.get(0).size() < 2;;
+		boolean trivial = matches.get(0).size() < 2;
 		ArrayList<String> pBlocks = new ArrayList<String>(PBLOCK_COUNT);
 		for(TileColumnPattern p : matches){
 			Iterator<Integer> patternInstancesItr = patMap.get(p).iterator();
@@ -986,8 +987,34 @@ public class PBlockGenerator {
 		}
 		int sliceX = tmp.getSites()[0].getInstanceX();
 		int sliceY = tmp.getSites()[0].getInstanceY() - CLE_REGION_HEIGHT;
-		tmp = dev.getSite("SLICE_X" + sliceX + "Y" + sliceY).getTile();
-		row = tmp.getRow();
+		Site tmpSite = dev.getSite("SLICE_X" + sliceX + "Y" + sliceY);
+		tmp = tmpSite.getTile();
+		
+		if(dev.getNumOfSLRs() > 1){
+			SLR master = null;
+			for(int i=0; i < dev.getNumOfSLRs(); i++){
+				if(dev.getSLR(i).isMasterSLR()){
+					master = dev.getSLR(i);
+					break;
+				}
+			}
+			
+			// Relocate to master SLR if necessary
+			int slrCLBHeight = (dev.getNumOfClockRegionRows() / dev.getNumOfSLRs()) * CLE_REGION_HEIGHT;
+			// If we're below master, add
+			if(tmp.getRow() < master.getLowerRight().getRow()){
+				while(tmp.getRow() < master.getLowerRight().getRow()){
+					tmpSite = tmpSite.getNeighborSite(0, -slrCLBHeight);
+					tmp = tmpSite.getTile();
+				}
+			} else { // Subtract
+				while(tmp.getRow() > master.getUpperLeft().getRow()){
+					tmpSite = tmpSite.getNeighborSite(0, slrCLBHeight);
+					tmp = tmpSite.getTile();
+				}
+			}
+		}
+		row = tmp.getRow();		
 		return row;
 	}
 	

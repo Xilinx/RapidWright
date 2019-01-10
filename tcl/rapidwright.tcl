@@ -76,7 +76,9 @@ proc compile_block_dcp { dcpFile } {
         
         # Generate constraint
         puts "args $urptName $shapesFileName"
-        set pBlockVal [exec java -Xmx2G com.xilinx.rapidwright.design.blocks.PBlockGenerator -u $urptName -s $shapesFileName -c 1]
+	if { [catch {set pBlockVal [exec java -Xmx2G com.xilinx.rapidwright.design.blocks.PBlockGenerator -u $urptName -s $shapesFileName -c 1]}] } {
+	    set pBlockVal "PBlockGenerator Failed!"
+	}
         puts "pBlock = $pBlockVal, from: $urptName $shapesFileName"
         set fp [open [string map {".dcp" "_pblock.txt"} $dcpFile] "w"]
         puts $fp "$pBlockVal \n#Created from: com.xilinx.rapidwright.design.blocks.PBlockGenerator -u $urptName -s $shapesFileName -c 1"
@@ -327,8 +329,8 @@ proc run_block_stitcher { } {
     set topLevelEdifFileName "[pwd]/${bdName}.edf"
     set cachePath [get_property IP_OUTPUT_REPO [current_project]]
     
-    puts "java com.xilinx.rapidwright.ipi.BlockStitcher ${cachePath}/[version -short] $topLevelEdifFileName $ipsFileName"
-    puts [exec java com.xilinx.rapidwright.ipi.BlockStitcher "${cachePath}/[version -short]" $topLevelEdifFileName $ipsFileName]    
+    puts "java -Xss16M com.xilinx.rapidwright.ipi.BlockStitcher ${cachePath}[cache_version_dir] $topLevelEdifFileName $ipsFileName"
+    puts [exec java -Xss16M com.xilinx.rapidwright.ipi.BlockStitcher "${cachePath}[cache_version_dir]" $topLevelEdifFileName $ipsFileName]    
 }
 
 proc check_if_lsf_available {} {
@@ -420,7 +422,7 @@ proc prep_for_block_stitcher {} {
         foreach ip $opt_runs_needed {       
             set name [get_property CONFIG.Component_Name $ip]
             set ip_run [get_runs "${name}_synth_1"]
-            set dir "${cachePath}/[version -short]/[config_ip_cache -get_id $ip]"
+            set dir "${cachePath}[cache_version_dir]/[config_ip_cache -get_id $ip]"
             file mkdir $dir
             set post_tcl_name "$dir/post.tcl"
             set fp [open $post_tcl_name "w"]
@@ -451,7 +453,7 @@ proc create_block_post_tcl { ip  cachePath } {
     set ip_run [get_runs "${name}_synth_1"]
     
     set cache_id [config_ip_cache -get_id $ip]
-    set dir "${cachePath}/[version -short]/${cache_id}"
+    set dir "${cachePath}[cache_version_dir]/${cache_id}"
     file mkdir $dir
     
     set post_tcl_name "$dir/post.tcl"
@@ -475,6 +477,14 @@ proc ultra_clear_cache { } {
 
     set filePath "${directory}/${projName}.srcs/sources_1/bd/${bdName}/${bdFileName}"
     reset_target all [get_files $filePath]
+}
+
+proc cache_version_dir { } {
+    if { [version -short] < 2018.3 } { 
+    	return "/[version -short]" 
+    } else { 
+    	return "" 
+    }
 }
 
 # Creates an EDIF file of the top level connectivity of the IPI design
@@ -517,7 +527,7 @@ proc get_lines_matching {keyword file_name} {
 
 proc needs_impl_run { cachePath ip } {
     set cache_id [config_ip_cache -get_id $ip]
-    set cacheIPDir "${cachePath}/[version -short]/$cache_id"
+    set cacheIPDir "${cachePath}[cache_version_dir]/$cache_id"
     if { ! [file exists $cacheIPDir] } {
         puts "OPT NEEDED: $cacheIPDir does not exist"
         return true

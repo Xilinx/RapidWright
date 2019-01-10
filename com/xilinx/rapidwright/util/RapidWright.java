@@ -50,6 +50,7 @@ public class RapidWright {
 	public static final String UNPACK_OPTION_NAME = "--unpack_data";
 	/** Option to create JSON Kernel file for Jupyter Notebook support */
 	public static final String CREATE_JUPYTER_KERNEL = "--create_jupyter_kernel";
+	public static final String HELP_OPTION_NAME = "--help";
 	public static final String JUPYTER_KERNEL_FILENAME = "kernel.json";
 	
 	public static final String[] UNPACK_FOLDERS = new String[]{FileTools.DATA_FOLDER_NAME, FileTools.TCL_FOLDER_NAME, FileTools.IMAGES_FOLDER_NAME};
@@ -151,7 +152,7 @@ public class RapidWright {
 			bw.close();
 			System.out.println("Wrote Jupyter Notebook Kernel File: '" + f.getAbsolutePath() + "'\n");
 			System.out.println("You can install the RapidWright (Jython 2.7) kernel by running:");
-			System.out.println("    $ jupyter kernelspec install " + f.getParent());
+			System.out.println("    $ jupyter kernelspec install " + f.getAbsolutePath().replace(JUPYTER_KERNEL_FILENAME, ""));
 			System.out.println("Or control the kernel installation with:");
 			System.out.println("    $ jupyter kernelspec list");
 		} catch (IOException e) {

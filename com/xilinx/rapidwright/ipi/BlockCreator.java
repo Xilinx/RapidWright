@@ -111,7 +111,7 @@ public class BlockCreator {
 				throw new RuntimeException("ERROR: Problem reading pblock from guided block file " + guidedPblockFile);
 			}
 			String pblockString = lines.get(0).trim(); 
-			if(pblockString.length() > 0) m.setPBlock(pblockString);
+			if(pblockString.length() > 0 && !pblockString.contains("Failed!")) m.setPBlock(pblockString);
 		}
 		return modImpls;
 	}
@@ -505,6 +505,7 @@ public class BlockCreator {
 		for(Module m : modules){
 			m.setSrcDatFile(uniqueFileName+".dat");
 			m.setNetlist(e);
+			e.setDevice(m.getDevice());
 		}
 
 		ModuleCache.saveToCompactFile(modules,uniqueFileName+".dat");
