@@ -1,4 +1,4 @@
-============= RapidWright 2018.3.0-beta released on 2019-01-07 =================
+============= RapidWright 2018.3.0-beta released on 2019-01-10 =================
 Notes:
  - API Additions:
    - com.xilinx.rapidwright.design.SiteInst "public void addSitePIP(String belName, String inputPin)"
