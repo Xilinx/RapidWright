@@ -20,7 +20,6 @@ for details)
  
 RapidWright (Apache 2.0)
  - JOpt Simple (MIT License)
- - Hessian Implementation (Apache 1.1 License)
  - Protocol Buffers (Protocol Buffer License)
  - Kryo (BSD 3-clause "New" or "Revised" License)
  - MinLog (BSD 3-clause "New" or "Revised" License)
@@ -287,12 +286,11 @@ RapidWright (Apache 2.0)
 The RapidWright API Library is composed of two groups of compiled Java
 class files.  The first group of files are licensed under Apache 2.0 (see previous entry):
 
-com/xilinx/rapidwright/device/BEL.class, com/xilinx/rapidwright/device/BELClass.class, com/xilinx/rapidwright/device/BELPin$Direction.class, com/xilinx/rapidwright/device/BELPin.class, com/xilinx/rapidwright/device/ClockRegion.class, com/xilinx/rapidwright/device/Device.class, com/xilinx/rapidwright/device/Grade.class, com/xilinx/rapidwright/device/Node.class, com/xilinx/rapidwright/device/PIP.class, com/xilinx/rapidwright/device/PIPType.class, com/xilinx/rapidwright/device/Package.class, com/xilinx/rapidwright/device/PackagePin.class, com/xilinx/rapidwright/device/SLR.class, com/xilinx/rapidwright/device/Site.class, com/xilinx/rapidwright/device/SitePIP.class, com/xilinx/rapidwright/device/SitePIPStatus.class, com/xilinx/rapidwright/device/SitePin.class, com/xilinx/rapidwright/device/Tile.class, com/xilinx/rapidwright/device/Wire.class, com/xilinx/rapidwright/design/Cell.class, com/xilinx/rapidwright/design/ConstraintGroup.class, com/xilinx/rapidwright/design/Design.class, com/xilinx/rapidwright/design/Module.class, com/xilinx/rapidwright/design/Module$a.class, com/xilinx/rapidwright/design/ModuleCache.class, com/xilinx/rapidwright/design/Net.class, com/xilinx/rapidwright/design/Pin.class, com/xilinx/rapidwright/design/SiteInstance.class
+com/xilinx/rapidwright/device/BEL.class, com/xilinx/rapidwright/device/BELClass.class, com/xilinx/rapidwright/device/BELPin$Direction.class, com/xilinx/rapidwright/device/BELPin.class, com/xilinx/rapidwright/device/ClockRegion.class, com/xilinx/rapidwright/device/Device.class, com/xilinx/rapidwright/device/Grade.class, com/xilinx/rapidwright/device/Node.class, com/xilinx/rapidwright/device/PIP.class, com/xilinx/rapidwright/device/PIPType.class, com/xilinx/rapidwright/device/Package.class, com/xilinx/rapidwright/device/PackagePin.class, com/xilinx/rapidwright/device/SLR.class, com/xilinx/rapidwright/device/Site.class, com/xilinx/rapidwright/device/SitePIP.class, com/xilinx/rapidwright/device/SitePIPStatus.class, com/xilinx/rapidwright/device/SitePin.class, com/xilinx/rapidwright/device/Tile.class, com/xilinx/rapidwright/device/Wire.class, com/xilinx/rapidwright/design/Cell.class, com/xilinx/rapidwright/design/ConstraintGroup.class, com/xilinx/rapidwright/design/Design.class, com/xilinx/rapidwright/design/Module.class, com/xilinx/rapidwright/design/Module$a.class, com/xilinx/rapidwright/design/ModuleCache.class, com/xilinx/rapidwright/design/Net.class, com/xilinx/rapidwright/design/SiteInst.class, com/xilinx/rapidwright/design/SitePinInst.class
 
 The Xilinx EULA governs the use of the remaining set of files:
 
-a.class, b.class, c$q.class, c$q$a.class, d.class, c$b.class, c$d.class, c$h.class, c$k.class, c$m.class, c$a.class, c$g$a.class, c$e$a.class, c$p.class, c$k$a.class, c$i$a.class, c$c$a.class, l.class, c$l.class, c$n.class, c$o.class, i.class, k.class, g.class, h.class, j.class, e.class, c.class, c$f.class, c$a$a.class, c$j.class, c$i.class, c$g.class, f.class, c$e.class, c$m$a.class, c$r.class, c$c.class, m.class, c$o$a.class, n.class, o.class, n$c.class, n$e$a.class, n$a$a.class, n$i.class, q.class, n$g$a.class, n$k$a.class, n$l.class, n$i$a.class, n$c$a.class, p.class, r.class, n$h.class, n$d.class, n$g.class, n$a.class, v$i.class, s.class, t.class, n$f.class, n$e.class, n$k.class, n$j.class, u.class, n$b.class, I.class, A.class, F.class, M.class, v$b.class, v$n.class, v$u$b.class, v$t.class, w.class, v$q$a.class, H.class, v$s$b.class, v$l$a.class, v$q.class, G.class, v$s$a.class, x.class, v$a.class, v$u$a.class, v$i$a.class, v$v.class, v$a$b.class, v$a$a.class, v$c$b.class, v$f.class, v$c$b$a.class, v.class, v$p.class, N.class, v$r.class, v$o$a.class, v$e$a.class, L.class, v$l.class, v$k.class, v$u.class, v$h.class, y.class, v$g.class, z.class, D.class, v$g$a.class, K.class, v$o.class, v$k$a.class, v$d.class, B.class, v$g$b.class, v$s.class, v$j.class, C.class, O.class, v$m.class, v$c.class, v$c$c.class, J.class, P.class, Q.class, R.class, E.class, v$c$a.class, v$e.class, S.class, com/xilinx/rapidwright/device/a.class, com/xilinx/rapidwright/device/b.class, com/xilinx/rapidwright/device/c.class, com/xilinx/rapidwright/device/d.class, com/xilinx/rapidwright/device/e.class, com/xilinx/rapidwright/device/f.class, com/xilinx/rapidwright/design/a.class, com/xilinx/rapidwright/design/b.class, com/xilinx/rapidwright/design/c.class, com/xilinx/rapidwright/design/d.class, com/xilinx/rapidwright/design/e.class, com/xilinx/rapidwright/design/f.class, com/xilinx/rapidwright/design/g.class, com/xilinx/rapidwright/design/h.class, com/xilinx/rapidwright/design/i.class, com/xilinx/rapidwright/design/j.class
-
+A.class, B.class, C.class, D.class, E.class, F.class, G.class, H.class, I.class, J.class, K.class, L.class, M.class, N.class, O.class, P.class, Q.class, R.class, a.class, b.class, c$a$a.class, c$a.class, c$b.class, c$c$a.class, c$c.class, c$d.class, c$e$a.class, c$e.class, c$f.class, c$g$a.class, c$g.class, c$h.class, c$i$a.class, c$i.class, c$j.class, c$k$a.class, c$k.class, c$l.class, c$m$a.class, c$m.class, c$n.class, c$o$a.class, c$o.class, c$p.class, c$q$a.class, c$q.class, c$r.class, c.class, com/xilinx/rapidwright/design/a.class, com/xilinx/rapidwright/design/b.class, com/xilinx/rapidwright/design/c.class, com/xilinx/rapidwright/design/d.class, com/xilinx/rapidwright/design/e.class, com/xilinx/rapidwright/design/f.class, com/xilinx/rapidwright/design/g.class, com/xilinx/rapidwright/design/h.class, com/xilinx/rapidwright/design/i.class, com/xilinx/rapidwright/design/j.class, com/xilinx/rapidwright/device/a.class, com/xilinx/rapidwright/device/b.class, com/xilinx/rapidwright/device/c.class, com/xilinx/rapidwright/device/d.class, com/xilinx/rapidwright/device/e.class, com/xilinx/rapidwright/device/f.class, com/xilinx/rapidwright/device/g.class, d.class, e.class, f.class, g.class, h.class, i.class, j.class, k.class, l.class, m.class, n$a$a.class, n$a.class, n$b.class, n$c$a.class, n$c.class, n$d.class, n$e$a.class, n$e.class, n$f.class, n$g$a.class, n$g.class, n$h.class, n$i$a.class, n$i.class, n$j.class, n$k$a.class, n$k.class, n$l.class, n.class, o.class, p.class, q.class, r.class, s.class, t.class, u.class, v$a$a.class, v$a$b.class, v$a.class, v$b.class, v$c$a.class, v$c$b$a.class, v$c$b.class, v$c$c.class, v$c.class, v$d.class, v$e$a.class, v$e.class, v$f.class, v$g$a.class, v$g$b.class, v$g.class, v$h.class, v$i$a.class, v$i.class, v$j.class, v$k$a.class, v$k.class, v$l$a.class, v$l.class, v$m.class, v$n.class, v$o$a.class, v$o.class, v$p.class, v$q$a.class, v$q.class, v$r.class, v$s$a.class, v$s$b.class, v$s.class, v$t.class, v$u$a.class, v$u$b.class, v$u.class, v$v.class, v.class, w.class, x.class, y.class, z.class 
 
 -- BEGIN Xilinx EULA --
 
@@ -401,51 +399,6 @@ IF LICENSEE DOES NOT AGREE TO ALL OF THE TERMS AND CONDITIONS OF THIS AGREEMENT,
  WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ************************ END LICENSE ************************
 
-***************** Hessian Implementation - Apache 1.1 License *****************
- The Apache Software License, Version 1.1
-
- Copyright (c) 2001-2004 Caucho Technology, Inc.  All rights reserved.
-
- Redistribution and use in source and binary forms, with or without
- modification, are permitted provided that the following conditions
- are met:
-
- 1. Redistributions of source code must retain the above copyright
-    notice, this list of conditions and the following disclaimer.
-
- 2. Redistributions in binary form must reproduce the above copyright
-    notice, this list of conditions and the following disclaimer in
-    the documentation and/or other materials provided with the
-    distribution.
-
- 3. The end-user documentation included with the redistribution, if
-    any, must include the following acknowlegement:
-       "This product includes software developed by the
-        Caucho Technology (http://www.caucho.com/)."
-    Alternately, this acknowlegement may appear in the software itself,
-    if and wherever such third-party acknowlegements normally appear.
-
- 4. The names "Hessian", "Resin", and "Caucho" must not be used to
-    endorse or promote products derived from this software without prior
-    written permission. For written permission, please contact
-    info@caucho.com.
-
- 5. Products derived from this software may not be called "Resin"
-    nor may "Resin" appear in their names without prior written
-    permission of Caucho Technology.
-
- THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESSED OR IMPLIED
- WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- DISCLAIMED.  IN NO EVENT SHALL CAUCHO TECHNOLOGY OR ITS CONTRIBUTORS
- BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY,
- OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT
- OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
- BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
- WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
- OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
- IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-************************ END LICENSE ************************
 
 ************************ Protocol Buffers License ************************
 This license applies to all parts of Protocol Buffers except the following:
