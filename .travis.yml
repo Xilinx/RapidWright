@@ -22,6 +22,6 @@ branches:
 
 # Download jars zip
 before_install:
-- curl -s https://api.github.com/repos/Xilinx/RapidWright/releases/latest | grep '/rapidwright_jars.zip' | awk -F'"' '{print $4}' | wget -qi -
+- curl -s https://api.github.com/repos/Xilinx/RapidWright/releases/latest | grep '/rapidwright_jars.zip' | awk -F'"' '{print $4}' | wget -i -
 - unzip rapidwright_jars.zip
 
