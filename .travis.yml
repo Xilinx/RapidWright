@@ -1,0 +1,27 @@
+notifications:
+  email:
+    recipients:
+      - chris.lavin@xilinx.com
+    on_success: always
+    on_failure: always
+
+language: java
+
+jdk:
+  - oraclejdk8
+  - oraclejdk9
+  - oraclejdk11
+  - openjdk8
+  - openjdk9
+  - openjdk10
+  - openjdk11
+
+branches:
+  only:
+    - master
+
+# Download jars zip
+before_install:
+- curl -s https://api.github.com/repos/Xilinx/RapidWright/releases/latest | grep '/rapidwright_jars.zip' | awk -F'"' '{print $4}' | wget -qi -
+- unzip rapidwright_jars.zip
+
