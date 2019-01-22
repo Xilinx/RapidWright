@@ -34,7 +34,7 @@ import java.util.Map;
 
 /**
  * A cell instance in a logical (EDIF) netlist.  Instantiates
- * an {@link EDIFCellInst}.
+ * an {@link EDIFCell}.
  * 
  * Created on: May 11, 2017
  */
