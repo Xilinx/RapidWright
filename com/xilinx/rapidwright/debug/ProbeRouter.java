@@ -56,7 +56,14 @@ public class ProbeRouter {
 		}
 		return map;
 	}
-		
+	
+	/**
+	 * Updates a design containing an ILA (integrated logic analyzer) probe connections
+	 * that already exist in a design.  
+	 * @param d The existing placed and routed design with an ILA.
+	 * @param probeToTargetNets A map from probe names to desired net names (full hierarchical names).
+	 * @param pblock An optional pblock (area constraint) to contain routing within a certain area.
+	 */
 	public static void updateProbeConnections(Design d, Map<String,String> probeToTargetNets, PBlock pblock){
 		ArrayList<SitePinInst> pinsToRoute = new ArrayList<>(); 
 		for(Entry<String,String> e : probeToTargetNets.entrySet()){
@@ -70,7 +77,8 @@ public class ProbeRouter {
 			Net oldPhysNet = d.getNetlist().getPhysicalNetFromPin(parentCellInstName, portInst, d);
 			
 			// Find the sink flop
-			EDIFHierPortInst startingPoint = new EDIFHierPortInst(cellInstName.substring(0, cellInstName.lastIndexOf('/')), portInst);
+			String hierInstName = cellInstName.contains(EDIFTools.EDIF_HIER_SEP) ? cellInstName.substring(0, cellInstName.lastIndexOf('/')) : ""; 
+			EDIFHierPortInst startingPoint = new EDIFHierPortInst(hierInstName, portInst);
 			ArrayList<EDIFHierPortInst> sinks = EDIFTools.findSinks(startingPoint);
 			if(sinks.size() != 1) {
 				System.err.println("ERROR: Currently we only support a single flip flop "
@@ -123,7 +131,7 @@ public class ProbeRouter {
 		}
 		
 		// Attempt route new net to probe
-		   // Should we add a flop?
+		// TODO - Should we add a flop?
 		Router r = new Router(d);
 		if(pblock != null) r.setRoutingPblock(pblock);
 		r.routePinsReEntrant(pinsToRoute, false);

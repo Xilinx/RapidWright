@@ -459,14 +459,16 @@ public class EDIFTools {
 		
 		String[] parts = routedNetName.split(EDIFTools.EDIF_HIER_SEP);
 		int idx = 0;
-		while( idx < parts.length){
-			if(parts[idx++].equals(currInst.getName())){
-				break;
+		if(!n.getTopCell().equals(currInst.getCellType())){
+			while( idx < parts.length){
+				if(parts[idx++].equals(currInst.getName())){
+					break;
+				}
 			}
-		}
-		if(idx == parts.length){
-			throw new RuntimeException("ERROR: Couldn't find instance " +
-				currInst.getName() + " from routed net name " + routedNetName);
+			if(idx == parts.length){
+				throw new RuntimeException("ERROR: Couldn't find instance " +
+					currInst.getName() + " from routed net name " + routedNetName);
+			}
 		}
 		
 		for(int i=idx; i <= parts.length-2; i++){
