@@ -12,6 +12,10 @@ import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFTools;
 
+/**
+ * A simple netlist creation example (no placement and routing information included).  
+ * Demonstrates basic EDIF netlist functionality with RapidWright APIs.
+ */
 public class ExampleNetlistCreation {
 
 	public static final String clk = "clk";
