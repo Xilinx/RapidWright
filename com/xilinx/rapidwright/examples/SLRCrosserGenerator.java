@@ -45,6 +45,7 @@ import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.device.ClockRegion;
 import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
@@ -502,7 +503,7 @@ public class SLRCrosserGenerator {
 			accepts(CLK_NAME_OPT).withOptionalArg().defaultsTo(clkName).describedAs("Clk net name");
 			accepts(CLK_IN_NAME_OPT).withOptionalArg().defaultsTo(clkInName).describedAs("Clk input net name");
 			accepts(CLK_OUT_NAME_OPT).withOptionalArg().defaultsTo(clkOutName).describedAs("Clk output net name");
-			accepts(CLK_CONSTRAINT_OPT).withOptionalArg().ofType(Double.class).defaultsTo(clkPeriodConstraint).describedAs("Clk period constraint (ns)");
+			accepts(CLK_CONSTRAINT_OPT).withRequiredArg().ofType(Double.class).describedAs("Clk period constraint (ns)");
 			accepts(BUS_WIDTH_OPT).withOptionalArg().ofType(Integer.class).defaultsTo(busWidth).describedAs("SLR crossing bus width");
 			accepts(INPUT_PREFIX_OPT).withOptionalArg().defaultsTo(inputPrefix).describedAs("Input bus name prefix");
 			accepts(OUTPUT_PREFIX_OPT).withOptionalArg().defaultsTo(outputPrefix).describedAs("Output bus name prefix");
@@ -552,7 +553,6 @@ public class SLRCrosserGenerator {
 		String clkName = (String) opts.valueOf(CLK_NAME_OPT);
 		String clkInName = (String) opts.valueOf(CLK_IN_NAME_OPT);
 		String clkOutName = (String) opts.valueOf(CLK_OUT_NAME_OPT);
-		double clkPeriodConstraint = (double) opts.valueOf(CLK_CONSTRAINT_OPT);
 		int busWidth = (int) opts.valueOf(BUS_WIDTH_OPT);		
 		String inputPrefix = (String) opts.valueOf(INPUT_PREFIX_OPT);
 		String outputPrefix= (String) opts.valueOf(OUTPUT_PREFIX_OPT);
@@ -561,6 +561,10 @@ public class SLRCrosserGenerator {
 		String[] lagunaNames = ((String) opts.valueOf(LAGUNA_SITES_OPT)).split(",");
 		boolean commonCentroid = (boolean) opts.valueOf(COMMON_CENTROID_OPT);
 		
+		Double clkPeriodConstraint = null;
+		if(opts.hasArgument(CLK_CONSTRAINT_OPT)){
+			clkPeriodConstraint = (double) opts.valueOf(CLK_CONSTRAINT_OPT);
+		}
 		// Perform some error checking on inputs
 		Part part = PartNameTools.getPart(partName);
 		if(part == null || !part.isUltraScalePlus()){
@@ -614,9 +618,13 @@ public class SLRCrosserGenerator {
 		Router r = new Router(d);
 		r.routeStaticNets();
 		t.stop();
-
+		
 		// Add a clock constraint
-		d.addXDCConstraint(ConstraintGroup.LATE, "create_clock -name "+clkName+" -period "+clkPeriodConstraint+" [get_nets "+clkName+"]");
+		if(clkPeriodConstraint != null){
+			d.addXDCConstraint(ConstraintGroup.LATE, "create_clock -name "+clkName+" -period "+clkPeriodConstraint+" [get_nets "+clkName+"]");
+			d.addXDCConstraint(ConstraintGroup.LATE, "create_property MAX_PROG_DELAY net"); 
+			d.addXDCConstraint(ConstraintGroup.LATE, "set_property MAX_PROG_DELAY 0 [get_nets "+clkName+"]");			
+		}
 		
 		d.writeCheckpoint(outputDCPFileName, t);
 		if(verbose) System.out.println("Wrote final DCP: " + outputDCPFileName);
