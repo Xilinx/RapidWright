@@ -63,7 +63,7 @@ public class UltraScaleClockRouting {
 		while(!q.isEmpty()){
 			RouteNode curr = q.poll();
 			IntentCode c = curr.getIntentCode(); 
-			if(c.isUltraScaleClockRouting()){
+			if(c == IntentCode.NODE_GLOBAL_HROUTE){
 				clk.getPIPs().addAll(curr.getPIPsBackToSource());
 				return curr;
 			}
@@ -94,12 +94,24 @@ public class UltraScaleClockRouting {
 		while(!q.isEmpty()){
 			RouteNode curr = q.poll();
 			visited.add(curr);
-			IntentCode c = curr.getIntentCode(); 
-			if(centroid.equals(curr.getTile().getClockRegion()) && c == IntentCode.NODE_GLOBAL_HROUTE && curr.getWireConnections().size() > 10){
-				clk.getPIPs().addAll(curr.getPIPsBackToSource());
-				return curr;
-			}
+
 			for(Wire w : curr.getWireConnections()){
+				RouteNode parent = curr.getParent(); 
+				if(parent != null){
+					if(w.getIntentCode()      == IntentCode.NODE_GLOBAL_VDISTR &&
+					   curr.getIntentCode()   == IntentCode.NODE_GLOBAL_VROUTE && 
+					   parent.getIntentCode() == IntentCode.NODE_GLOBAL_VROUTE && 
+					   centroid.equals(w.getTile().getClockRegion()) &&
+					   centroid.equals(curr.getTile().getClockRegion()) &&
+					   centroid.equals(parent.getTile().getClockRegion()) && 
+					   parent.getWireName().contains("BOT")){
+						clk.getPIPs().addAll(curr.getPIPsBackToSource());
+						return curr;
+					}
+				}
+				
+				
+				
 				// Only using routing lines to get to centroid
 				if(!w.getIntentCode().isUltraScaleClockRouting()) continue;
 				RouteNode rn = new RouteNode(w.getTile(), w.getWireIndex(), curr, curr.getLevel()+1);
@@ -124,6 +136,9 @@ public class UltraScaleClockRouting {
 	public static RouteNode transitionCentroidToDistributionLine(Net clk, RouteNode centroidRouteLine){
 		Queue<RouteNode> q = new LinkedList<RouteNode>();
 		centroidRouteLine.setParent(null);
+		if(centroidRouteLine.getIntentCode() == IntentCode.NODE_GLOBAL_VDISTR){
+			return centroidRouteLine;
+		}
 		q.add(centroidRouteLine);
 		ClockRegion currCR = centroidRouteLine.getTile().getClockRegion();
 		int watchDog = 1000;
