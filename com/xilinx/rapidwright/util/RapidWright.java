@@ -166,6 +166,7 @@ public class RapidWright {
 			@SuppressWarnings("rawtypes")
 			Class[] primerClass = new Class[]{
 					com.xilinx.rapidwright.debug.DesignInstrumentor.class,
+					com.xilinx.rapidwright.debug.ProbeRouter.class,
 					com.xilinx.rapidwright.design.Cell.class,
 					com.xilinx.rapidwright.design.Design.class,
 					com.xilinx.rapidwright.design.Module.class,
@@ -216,6 +217,7 @@ public class RapidWright {
 					com.xilinx.rapidwright.util.StringTools.class,
 					com.xilinx.rapidwright.design.DesignTools.class,
 					com.xilinx.rapidwright.design.tools.LUTTools.class,
+					com.xilinx.rapidwright.device.helper.TileColumnPattern.class,
 			};
 			
 			args = new String[3];
