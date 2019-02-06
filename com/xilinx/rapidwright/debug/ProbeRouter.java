@@ -63,6 +63,17 @@ public class ProbeRouter {
 	 * @param d The existing placed and routed design with an ILA.
 	 * @param probeToTargetNets A map from probe names to desired net names (full hierarchical names).
 	 * @param pblock An optional pblock (area constraint) to contain routing within a certain area.
+	 */	
+	public static void updateProbeConnections(Design d, Map<String,String> probeToTargetNets){
+		updateProbeConnections(d, probeToTargetNets, null);
+	}
+	
+	/**
+	 * Updates a design containing an ILA (integrated logic analyzer) probe connections
+	 * that already exist in a design.  
+	 * @param d The existing placed and routed design with an ILA.
+	 * @param probeToTargetNets A map from probe names to desired net names (full hierarchical names).
+	 * @param pblock An optional pblock (area constraint) to contain routing within a certain area.
 	 */
 	public static void updateProbeConnections(Design d, Map<String,String> probeToTargetNets, PBlock pblock){
 		ArrayList<SitePinInst> pinsToRoute = new ArrayList<>(); 
