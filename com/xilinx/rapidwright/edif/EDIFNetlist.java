@@ -39,8 +39,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.regex.Pattern;
 import java.util.Queue;
-import java.util.Set;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
@@ -509,36 +509,96 @@ public class EDIFNetlist extends EDIFName {
 	}
 	
 	/**
-	 * Searches all lower levels of hierarchy to find all leaf decendants.  It returns the
-	 * set of all leaf cells that fall under the hierarchy of the provided instance name.
+	 * Searches all EDIFCellInst objects to find those with matching names
+	 * against the wildcard pattern.  
+	 * @param wildcardPattern Search pattern that includes alphanumeric and wildcards (*).
+	 * @return The list of all matching EDIFHierCellInst 
+	 */
+	public List<EDIFHierCellInst> findCellInsts(String wildcardPattern){
+		return getAllDescendants("", wildcardPattern, false);
+	}
+	
+	/**
+	 * Searches all lower levels of hierarchy to find all leaf descendants.  It returns a
+	 * list of all leaf cells that fall under the hierarchy of the provided instance name.
 	 * @param instanceName Name of the instance to start searching from.
+	 * @return A list of all leaf cell instances or null if the instanceName was not found.
+	 */
+	public List<EDIFHierCellInst> getAllLeafDescendants(String instanceName){
+		return getAllDescendants(instanceName,null,true);
+	}
+	
+	private String convertWildcardToRegex(String wildcardPattern){
+		StringBuilder sb = new StringBuilder();
+		for(int i=0; i < wildcardPattern.length(); i++){
+			char c = wildcardPattern.charAt(i);
+			switch (c) {
+				case '*':
+					sb.append(".*");
+					break;
+				case '?': case '\\': case '{': case '}': case '|':
+				case '^': case '$':  case '(': case ')': case '[': case ']':
+					sb.append("\\");
+					sb.append(c);
+					break;
+				default:
+					sb.append(c);
+			}
+		}
+		sb.append("$");
+		return sb.toString();
+	}
+
+	public List<EDIFHierCellInst> getAllLeafDescendants(String instanceName, String wildcardPattern){
+		return getAllDescendants(instanceName, wildcardPattern, true);
+	}
+		
+	
+	/**
+	 * Searches all lower levels of hierarchy to find descendants.  It returns the
+	 * set of all cells that fall under the hierarchy of the provided instance name.
+	 * @param instanceName Name of the instance to start searching from.
+	 * @param wildcardPattern if non-null, filters results by matching wildcard pattern
+	 * @param leavesOnly Flag indicating if only leaf cells should be included
 	 * @return A set of all leaf cell instances or null if the instanceName was not found.
 	 */
-	public Set<EDIFHierCellInst> getAllLeafDecendants(String instanceName){
-		Set<EDIFHierCellInst> set = new HashSet<>();
+	public List<EDIFHierCellInst> getAllDescendants(String instanceName, String wildcardPattern, boolean leavesOnly){
+		List<EDIFHierCellInst> children = new ArrayList<>();
 		
 		EDIFCellInst eci = getCellInstFromHierName(instanceName);
 		if(eci == null) return null;
 		Queue<EDIFHierCellInst> q = new LinkedList<>();
 		q.add(new EDIFHierCellInst(instanceName, eci));
+		String pattern = convertWildcardToRegex(wildcardPattern);
+		System.out.println(pattern);
+		Pattern pat = wildcardPattern != null ? Pattern.compile(pattern) : null;
 		
 		while(!q.isEmpty()){
 			EDIFHierCellInst i = q.poll();
 			for(EDIFCellInst child : i.getInst().getCellType().getCellInsts()){
 				String fullName = "";
 				if(!i.isTopLevelInst()){
-					fullName = i.getHierarchicalInstName() + EDIFTools.EDIF_HIER_SEP + child.getName();
+					fullName = i.getFullHierarchicalInstName();
 				}
 				EDIFHierCellInst newCell = new EDIFHierCellInst(fullName, child);
 				if(newCell.getInst().getCellType().isPrimitive()){
-					set.add(newCell);
+					if(pat != null && !pat.matcher(newCell.getFullHierarchicalInstName()).matches()){
+						continue;
+					}
+					children.add(newCell);
 				} else{
 					q.add(newCell);
+					if(!leavesOnly) {
+						if(pat != null && !pat.matcher(newCell.getFullHierarchicalInstName()).matches()){
+							continue;
+						}
+						children.add(newCell);
+					}
 				}
 			}
 		}
 		
-		return set;
+		return children;
 	}
 	
 	private static boolean isDeviceNullPrinted = false;
