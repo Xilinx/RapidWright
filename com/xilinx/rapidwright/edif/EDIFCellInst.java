@@ -164,6 +164,14 @@ public class EDIFCellInst extends EDIFPropertyObject {
 		return cellType;
 	}
 
+	public Collection<EDIFPort> getCellPorts(){
+		return cellType.getPorts();
+	}
+	
+	public String getCellName(){
+		return cellType.getName();
+	}
+
 	/**
 	 * @param cellType the cellType to set
 	 */
