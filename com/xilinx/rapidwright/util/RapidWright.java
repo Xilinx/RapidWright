@@ -52,6 +52,8 @@ public class RapidWright {
 	public static final String CREATE_JUPYTER_KERNEL = "--create_jupyter_kernel";
 	public static final String HELP_OPTION_NAME = "--help";
 	public static final String JUPYTER_KERNEL_FILENAME = "kernel.json";
+	public static final String JUPYTER_JYTHON_KERNEL_NAME = "jython27";
+	public static final String[] RAPIDWRIGHT_OPTIONS = new String[]{CREATE_JUPYTER_KERNEL, HELP_OPTION_NAME, UNPACK_OPTION_NAME};
 	
 	public static final String[] UNPACK_FOLDERS = new String[]{FileTools.DATA_FOLDER_NAME, FileTools.TCL_FOLDER_NAME, FileTools.IMAGES_FOLDER_NAME};
 	
@@ -109,7 +111,8 @@ public class RapidWright {
 	
 	public static void createJupyterKernelFile(){
 		try {
-			File f = new File(JUPYTER_KERNEL_FILENAME);
+			FileTools.makeDirs(JUPYTER_JYTHON_KERNEL_NAME);
+			File f = new File(JUPYTER_JYTHON_KERNEL_NAME + File.separator + JUPYTER_KERNEL_FILENAME);
 			BufferedWriter bw = new BufferedWriter(new FileWriter(f));
 			bw.write("{\n");
 			bw.write(" \"argv\": [\"java\",\n");
@@ -135,7 +138,11 @@ public class RapidWright {
 						if(isWindows && jar.contains("-linux64-")) continue;
 						if(!isWindows && jar.contains("-win64-")) continue;
 						if(jar.contains("javadoc")) continue;
-						bw.write(";" + jarDir.getAbsolutePath() + File.separator + jar);
+						String jarPath = jarDir.getAbsolutePath() + File.separator;
+						if(isWindows){
+							jarPath = jarPath.replace("\\", "\\\\");
+						}
+						bw.write(";" + jarPath + jar);
 					}					
 				}else{
 					MessageGenerator.briefError("ERROR: Couldn't read "+jarDir.getAbsolutePath()+" directory, please check RapidWright installation.");
@@ -152,8 +159,8 @@ public class RapidWright {
 			bw.close();
 			System.out.println("Wrote Jupyter Notebook Kernel File: '" + f.getAbsolutePath() + "'\n");
 			System.out.println("You can install the RapidWright (Jython 2.7) kernel by running:");
-			System.out.println("    $ jupyter kernelspec install " + f.getAbsolutePath().replace(JUPYTER_KERNEL_FILENAME, ""));
-			System.out.println("Or control the kernel installation with:");
+			System.out.println("    $ jupyter kernelspec install " + f.getAbsolutePath().replace(File.separator + JUPYTER_KERNEL_FILENAME, ""));
+			System.out.println("and list currently installed kernels with:");
 			System.out.println("    $ jupyter kernelspec list");
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -238,7 +245,7 @@ public class RapidWright {
 						System.out.println("Successfully unpacked "
 							+ " RapidWright jar data.  Please set the environment "
 							+ "variable RAPIDWRIGHT_PATH to the directory which contains the "
-							+ "recently expanded data directory (current directory="+System.getProperty("user.dir")+".");
+							+ "recently expanded data directory (current directory="+System.getProperty("user.dir")+").");
 						return;
 					}
 					else {
@@ -249,6 +256,12 @@ public class RapidWright {
 				}else if(s.equals(CREATE_JUPYTER_KERNEL)){
 					createJupyterKernelFile();
 					return;
+				}else if(s.equals(HELP_OPTION_NAME)){
+					System.out.println("*** RapidWright specific options: ***");
+					for(String option : RAPIDWRIGHT_OPTIONS){
+						System.out.println("\t" + option);
+					}
+					System.out.println("*** Jython --help output: ***");
 				}
 			}
 		}
