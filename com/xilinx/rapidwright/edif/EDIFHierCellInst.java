@@ -93,4 +93,12 @@ public class EDIFHierCellInst {
 	public String toString(){
 		return getFullHierarchicalInstName();
 	}
+	
+	public EDIFCell getCellType(){
+		return instance.getCellType();
+	}
+	
+	public String getCellName(){
+		return instance.getCellName();
+	}
 }
