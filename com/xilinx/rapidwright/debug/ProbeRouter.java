@@ -24,6 +24,7 @@
 package com.xilinx.rapidwright.debug;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TreeMap;
@@ -38,6 +39,7 @@ import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFNet;
+import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.router.Router;
@@ -146,6 +148,22 @@ public class ProbeRouter {
 		Router r = new Router(d);
 		if(pblock != null) r.setRoutingPblock(pblock);
 		r.routePinsReEntrant(pinsToRoute, false);
+	}
+	
+	public static List<EDIFHierCellInst> findILAs(Design d){
+		List<EDIFHierCellInst> candidates = d.getNetlist().getAllDescendants("", "u_ila_*", false);
+		ArrayList<EDIFHierCellInst> ilas = new ArrayList<EDIFHierCellInst>();
+		nextInst: for(EDIFHierCellInst i : candidates){
+			if(i.getCellName().contains("u_ila_")){
+				for(EDIFPort p : i.getCellType().getPorts()){
+					if(p.getName().contains("SL_IPORT_")){
+						ilas.add(i);
+						continue nextInst;
+					}
+				}
+			}
+		}
+		return ilas;
 	}
 	
 	private static final String PBLOCK_SWITCH = "--pblock";
