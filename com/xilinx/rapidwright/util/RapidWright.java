@@ -142,7 +142,7 @@ public class RapidWright {
 						if(isWindows){
 							jarPath = jarPath.replace("\\", "\\\\");
 						}
-						bw.write(";" + jarPath + jar);
+						bw.write(File.pathSeparator + jarPath + jar);
 					}					
 				}else{
 					MessageGenerator.briefError("ERROR: Couldn't read "+jarDir.getAbsolutePath()+" directory, please check RapidWright installation.");
