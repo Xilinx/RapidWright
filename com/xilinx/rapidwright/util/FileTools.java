@@ -1163,13 +1163,15 @@ public class FileTools {
 		ProcessBuilder pb = new ProcessBuilder(command);
 		pb.redirectErrorStream(true);
 		pb.redirectOutput(new File(logFileName));
-		Process p;
+		Process p = null;
 		int returnVal = -1;
 		try {
 			p = pb.start();
 			returnVal = p.waitFor();
 		} catch (IOException | InterruptedException e) {
 			e.printStackTrace();
+		} finally {
+			p.destroyForcibly();
 		}
 		return returnVal;
 		/*
