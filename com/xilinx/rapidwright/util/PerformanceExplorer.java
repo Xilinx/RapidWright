@@ -312,7 +312,7 @@ public class PerformanceExplorer {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-		System.exit(0);
+		return;
 	}
 
 	
@@ -326,6 +326,7 @@ public class PerformanceExplorer {
 		
 		if(opts.has(HELP_OPT)){
 			printHelp(p);
+			return;
 		}
 		
 		String dcpInputName = (String) opts.valueOf(INPUT_DCP_OPT);

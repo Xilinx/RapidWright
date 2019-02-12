@@ -262,7 +262,7 @@ public class Installer {
 								 + "  -s, --skip-zip-download : Uses local copies of the data and jar zip  in the\n"
 								 + "                            same directory instead of downloading them.\n"
 								 + "  -h, --help              : Prints this help message.");
-				System.exit(0);
+				return;
 			}
 		}
 		
