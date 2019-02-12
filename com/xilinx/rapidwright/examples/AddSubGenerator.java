@@ -308,7 +308,6 @@ public class AddSubGenerator extends ArithmeticGenerator {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-		System.exit(0);
 	}
 	
 	public static void main(String[] args) {
@@ -318,6 +317,7 @@ public class AddSubGenerator extends ArithmeticGenerator {
 		boolean verbose = (boolean) opts.valueOf(VERBOSE_OPT);
 		if(opts.has(HELP_OPT)){
 			printHelp(p);
+			return;
 		}
 		CodePerfTracker t = verbose ? new CodePerfTracker(AddSubGenerator.class.getSimpleName(),true).start("Init") : null;
 		
