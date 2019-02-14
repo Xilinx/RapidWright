@@ -358,7 +358,8 @@ public class PipelineGenerator {
 		// Perform some error checking on inputs
 		Part part = PartNameTools.getPart(partName);
 		if(part == null || part.isSeries7()){
-			MessageGenerator.briefErrorAndExit("ERROR: Invalid/unsupport part " + partName + ".");
+			MessageGenerator.briefErrorAndExit("ERROR: Invalid/unsupported part " + partName + ".  This example was coded "+
+							  "for UltraScale or UltraScale+ devices.");
 		}
 		
 		Design d = new Design(designName,partName);
