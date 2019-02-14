@@ -3,7 +3,7 @@
  * Copyright (c) 2018 Xilinx, Inc. 
  * All rights reserved.
  *
- * Author: Chris Lavin, Xilinx Research Labs.
+ * Author: Chris Neely, Xilinx Research Labs.
  *
  * This file is part of RapidWright. 
  * 
