@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map.Entry;
 
 import com.xilinx.rapidwright.device.Device;
@@ -78,6 +79,10 @@ public class TileColumnPattern extends ArrayList<TileTypeEnum> implements Compar
 		updateFlags();
 	}
 	
+	public static TileColumnPattern createTileColumnPattern(List<TileTypeEnum> types) {
+		return createTileColumnPattern(types,0, types.size());
+	}
+	
 	/**
 	 * Creates a TileColumnPattern from an existing list of tile types and uses the start and end 
 	 * as indicies to get a sublist of filteredTypes.
@@ -86,7 +91,7 @@ public class TileColumnPattern extends ArrayList<TileTypeEnum> implements Compar
 	 * @param end The end index to use to build a subList of filteredTypes
 	 * @return A tile column pattern or null if the list contained a NULL (break) tileType.
 	 */
-	public static TileColumnPattern createTileColumnPattern(ArrayList<TileTypeEnum> filteredTypes, int start, int end) {
+	public static TileColumnPattern createTileColumnPattern(List<TileTypeEnum> filteredTypes, int start, int end) {
 		TileColumnPattern p = new TileColumnPattern();
 		for(TileTypeEnum t : filteredTypes.subList(start, end)){
 			if(t == TileTypeEnum.NULL) return null;

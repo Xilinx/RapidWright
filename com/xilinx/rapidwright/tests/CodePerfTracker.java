@@ -50,6 +50,13 @@ public class CodePerfTracker {
 	private int maxSegmentNameSize = 24;
 	private boolean printProgress = true;
 	private boolean trackMemoryUsingGC = false;
+
+	public static final CodePerfTracker SILENT;
+	
+	static {
+		SILENT = new CodePerfTracker("",false);
+		SILENT.setVerbose(false);
+	}
 	
 	private static final boolean GLOBAL_DEBUG = true;
 

@@ -27,6 +27,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.trolltech.qt.core.QPointF;
+import com.trolltech.qt.core.QRectF;
+import com.trolltech.qt.core.QSizeF;
 import com.trolltech.qt.core.Qt;
 import com.trolltech.qt.core.Qt.DockWidgetArea;
 import com.trolltech.qt.core.Qt.MatchFlag;
@@ -153,6 +155,9 @@ public class HandPlacer extends QMainWindow {
 		scene.changeNetView(0);
 		
 		resize(1024, 768);
+		
+		// Zoom out to full view
+		view.fitInView(new QRectF(new QPointF(0, 0), new QSizeF(scene.getSceneSize())), Qt.AspectRatioMode.KeepAspectRatio);
 	}
 	
 	public HandPlacer(QWidget parent, String fileToOpen, boolean debugPlacer){

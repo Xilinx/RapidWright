@@ -128,6 +128,10 @@ public class TileScene extends QGraphicsScene{
 		initializeScene(hideTiles, drawPrimitives);
 	}
 	
+	public QSize getSceneSize(){
+		return sceneSize;
+	}
+	
 	/**
 	 * Initializes the scene
 	 * @param hideTiles

@@ -318,6 +318,7 @@ public class PerformanceExplorer {
 						Job j = useLSF ? new LSFJob() : new LocalJob();
 						j.setRunDir(instDir);
 						j.setCommand(getVivadoPath() + " -mode batch -source " + scriptName);
+						@SuppressWarnings("unused")
 						long id = j.launchJob();
 						jobs.addRunningJob(j);
 					}
@@ -345,6 +346,7 @@ public class PerformanceExplorer {
 	private static final String HELP_OPT = "h";
 	private static final String RUN_DIR_OPT = "d";
 	private static final String VIVADO_PATH_OPT = "y";
+	private static final String MAX_CONCURRENT_JOBS_OPT = "z";
 	
 	private static OptionParser createOptionParser(){
 		// Defaults		
@@ -364,6 +366,7 @@ public class PerformanceExplorer {
 			accepts(RUN_DIR_OPT).withOptionalArg().defaultsTo("<current directory>").describedAs("Run directory (jobs data location)");
 			accepts(VIVADO_PATH_OPT).withOptionalArg().defaultsTo(DEFAULT_VIVADO).describedAs("Specifies vivado path");
 			accepts(CONTAIN_ROUTING_OPT).withOptionalArg().ofType(Boolean.class).defaultsTo(DEFAULT_CONTAIN_ROUTING).describedAs("Sets attribute on pblock to contain routing");
+			accepts(MAX_CONCURRENT_JOBS_OPT).withOptionalArg().ofType(Integer.class).defaultsTo(JobQueue.MAX_LOCAL_CONCURRENT_JOBS).describedAs("Max number of concurrent job when run locally");
 			acceptsAll( Arrays.asList(HELP_OPT, "?"), "Print Help" ).forHelp();			
 		}};
 		
@@ -405,6 +408,10 @@ public class PerformanceExplorer {
 		
 		Design d = Design.readCheckpoint(dcpInputName);
 		PerformanceExplorer pe = new PerformanceExplorer(d, runDir, clkName, targetPeriod);
+
+		if(opts.hasArgument(MAX_CONCURRENT_JOBS_OPT)){
+			JobQueue.MAX_LOCAL_CONCURRENT_JOBS = (int) opts.valueOf(MAX_CONCURRENT_JOBS_OPT);
+		}
 		
 		if(opts.hasArgument(CLK_UNCERTAINTY_OPT)){
 			String clkUncertaintyValues = (String) opts.valueOf(CLK_UNCERTAINTY_OPT);

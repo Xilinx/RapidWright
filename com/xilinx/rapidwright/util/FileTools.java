@@ -34,6 +34,7 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -1384,6 +1385,37 @@ public class FileTools {
 		} catch (IOException e1) {
 			e1.printStackTrace();
 		}
+	}
+	
+	private static FilenameFilter dcpFilter = new FilenameFilter() {
+		@Override
+		public boolean accept(File dir, String name){
+			return name.toLowerCase().endsWith(".dcp");
+		}
+	};
+	
+	/**
+	 * Gets a filename filter for DCP files (ends with .dcp).
+	 * @return The DCP filename filter
+	 */
+	public static FilenameFilter getDCPFilenameFilter(){
+		return dcpFilter;
+	}
+	
+	/**
+	 * Creates a custom filename filter that uses the provided
+	 * matches string on the name of the file (not the path).  
+	 * @param matches Uses the String.matches() to match filename.
+	 * @return The newly created filename filter object.
+	 */
+	public static FilenameFilter getFilenameFilter(String matches){
+		FilenameFilter filter = new FilenameFilter() {
+			@Override
+			public boolean accept(File dir, String name){
+				return name.matches(matches);
+			}
+		};
+		return filter;
 	}
 	
 	public static void main(String[] args) {

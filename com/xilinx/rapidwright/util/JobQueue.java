@@ -38,9 +38,9 @@ import java.util.concurrent.ConcurrentLinkedQueue;
  */
 public class JobQueue {
 
-	public static final int MAX_LOCAL_CONCURRENT_JOBS = 4;
+	public static int MAX_LOCAL_CONCURRENT_JOBS = Math.max(1, Runtime.getRuntime().availableProcessors() / 2);
 	
-	public static final int MAX_LSF_CONCURRENT_JOBS = 120;
+	public static int MAX_LSF_CONCURRENT_JOBS = 120;
 	
 	public static boolean USE_LSF_IF_AVAILABLE = true; 
 	

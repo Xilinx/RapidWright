@@ -45,16 +45,13 @@ import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.device.ClockRegion;
 import com.xilinx.rapidwright.device.Device;
-import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Node;
-import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.device.Tile;
-import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.edif.EDIFCell;
@@ -231,7 +228,7 @@ public class SLRCrosserGenerator {
 		EDIFNetlist n = d.getNetlist();
 		Cell c = d.getCell(bufName);
 		if(c == null){
-			c = d.createCell(bufName, d.getNetlistInstMap().get(bufName));
+			c = d.createCell(bufName, d.getNetlist().getCellInstFromHierName(bufName));
 		}
 		d.placeCell(c, s, s.getBEL("BUFCE"));
 		
@@ -388,6 +385,33 @@ public class SLRCrosserGenerator {
 	}
 	
 	/**
+	 * Creates/instantiates a BUFGCE in the design
+	 * @param d The current design
+	 * @param clkName Name of the clock net
+	 * @param clkInName Name of the clock in port
+	 * @param clkOutName Name of the clock out port, or null for none
+	 * @param bufgceInstName Name of the BUFGCE instance
+	 */
+	public static void createBUFGCE(Design d, String clkName, String clkInName, String clkOutName, String bufgceInstName){
+		EDIFNetlist n = d.getNetlist();
+		EDIFCell parent = n.getTopCell();
+		
+		// Create BUFGCE in netlist and connect it
+		EDIFCellInst bufgce = Design.createUnisimInst(parent, bufgceInstName, Unisim.BUFGCE);
+		EDIFNet clkInNet = parent.createNet(clkInName);
+		clkInNet.createPortInst(parent.createPort(clkInName, EDIFDirection.INPUT, 1));
+		
+		clkInNet.createPortInst("I", bufgce);
+		EDIFNet clkNet = parent.createNet(clkName);
+		clkNet.createPortInst("O", bufgce);
+		if(clkOutName != null){
+			clkNet.createPortInst(parent.createPort(clkOutName, EDIFDirection.OUTPUT, 1));
+		}
+		EDIFNet vccNet = EDIFTools.getStaticNet(NetType.VCC, parent, n);
+		vccNet.createPortInst("CE", bufgce);
+	}
+	
+	/**
 	 * Creates the logical netlist of the SLR crosser design.
 	 * @param d Current design 
 	 * @param busWidth Width of the buses to create
@@ -402,16 +426,10 @@ public class SLRCrosserGenerator {
 		EDIFCell parent = n.getTopCell();
 		
 		// Create BUFGCE in netlist and connect it
-		EDIFCellInst bufgce = Design.createUnisimInst(parent, bufgceInstName, Unisim.BUFGCE);
-		EDIFNet clkInNet = parent.createNet(clkInName);
-		clkInNet.createPortInst(parent.createPort(clkInName, EDIFDirection.INPUT, 1));
-		
-		clkInNet.createPortInst("I", bufgce);
-		EDIFNet clkNet = parent.createNet(clkName);
-		clkNet.createPortInst("O", bufgce);
-		clkNet.createPortInst(parent.createPort(clkOutName, EDIFDirection.OUTPUT, 1));
+		createBUFGCE(d, clkName, clkInName, clkOutName, bufgceInstName);
+
+		EDIFNet clkNet = parent.getNet(clkName);
 		EDIFNet vccNet = EDIFTools.getStaticNet(NetType.VCC, parent, n);
-		vccNet.createPortInst("CE", bufgce);
 		EDIFNet gndNet = EDIFTools.getStaticNet(NetType.GND, parent, n);
 		
 		// Create register pairs
