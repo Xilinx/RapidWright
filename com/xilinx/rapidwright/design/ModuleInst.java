@@ -23,10 +23,7 @@
 package com.xilinx.rapidwright.design;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.design.blocks.PBlockRange;
@@ -35,10 +32,10 @@ import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
-import com.xilinx.rapidwright.edif.EDIFHierNet;
+import com.xilinx.rapidwright.edif.EDIFNet;
+import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
-import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.util.MessageGenerator;
 import com.xilinx.rapidwright.util.Utils;
 
@@ -366,6 +363,26 @@ public class ModuleInst{
 	}
 	
 	/**
+	 * Gets the corresponding port pin (SitePinInst) on this module instance
+	 * that corresponds to the module's port.  
+	 * @param port The port on the prototype module.
+	 * @return The corresponding port pin on this module instance, or null if could not be found.
+	 */
+	public SitePinInst getCorrespondingPin(Port port){
+		SitePinInst modulePin = port.getSitePinInst();
+		if(modulePin == null) return null;
+		
+		Tile anchorTile = getAnchor().getTile();
+		Tile newPinTile = getCorrespondingTile(modulePin.getTile(), anchorTile, anchorTile.getDevice());
+		
+		if(newPinTile == null) return null;
+		
+		Site newSite = newPinTile.getSites()[modulePin.getSite().getSiteIndexInTile()];
+		SiteInst newSiteInst = getDesign().getSiteInstFromSite(newSite);
+		return newSiteInst.getSitePinInst(modulePin.getName());
+	}
+	
+	/**
 	 * Gets (if it exists), the corresponding net within the module instance of the port.
 	 * @param p The port on the module of interest
 	 * @return The corresponding net on the module instance.
@@ -543,44 +560,93 @@ public class ModuleInst{
 		if(!success) System.out.println("Failed placement attempt, TargetTile="+targetTile.getName()+" ipTile="+ipTile.getName());
 		return success;  
 	}		
+
+	/**
+	 * Connects two signals by port name between this module instance and a top-level port. 
+	 * This method will create a new net for the connection handling adding both
+	 * a logical net (EDIFNet) and physical net (Net).
+	 * @param portName This module instance's port name to connect.
+	 * @param otherPortName The top-level port of the the cell instance.
+	 * 
+	 */
+	public void connect(String portName, String otherPortName){
+		connect(portName, null, otherPortName, -1);
+	}
+	
+	/**
+	 * Connects two signals by port name between this module instance and a top-level port. 
+	 * This method will create a new net for the connection handling adding both
+	 * a logical net (EDIFNet) and physical net (Net).
+	 * @param portName This module instance's port name to connect.
+	 * @param otherPortName The top-level port of the the cell instance.
+	 * @param busIndex If the port is multi-bit, specify the index to connect or -1 if single bit bus.
+	 */
+	public void connect(String portName, String otherPortName, int busIndex){
+		connect(portName, null, otherPortName, busIndex);
+	}
 	
 	/**
 	 * Connects two signals by port name between this module instance and another. 
 	 * This method will create a new net for the connection handling adding both
 	 * a logical net (EDIFNet) and physical net (Net).
 	 * @param portName This module instance's port name to connect.
-	 * @param other The other module instance to connect to. 
-	 * @param otherPortName The port name on the other module instance to connect to.
+	 * @param other The other module instance to connect to. If this is null, it will 
+	 * connect it to an existing parent cell port named otherPortName
+	 * @param otherPortName The port name on the other module instance to connect to or
+	 * the top-level port of the the cell instance.
 	 */
 	public void connect(String portName, ModuleInst other, String otherPortName){
+		connect(portName, other, otherPortName, -1);
+	}
+	
+	/**
+	 * Connects two signals by port name between this module instance and another. 
+	 * This method will create a new net for the connection handling adding both
+	 * a logical net (EDIFNet) and physical net (Net).
+	 * @param portName This module instance's port name to connect.
+	 * @param other The other module instance to connect to. If this is null, it will 
+	 * connect it to an existing parent cell port named otherPortName
+	 * @param otherPortName The port name on the other module instance to connect to or
+	 * the top-level port of the the cell instance.
+	 * @param busIndex If the port is multi-bit, specify the index to connect or -1 if single bit bus.
+	 */
+	public void connect(String portName, ModuleInst other, String otherPortName, int busIndex){
 		EDIFCell top = design.getTopEDIFCell();
 		EDIFCellInst eci0 = top.getCellInst(getName());
 		if(eci0 == null) throw new RuntimeException("ERROR: Couldn't find logical cell instance for " + getName());
+		if(other == null) {
+			// Connect to a top-level port
+			EDIFPort port = top.getPort(otherPortName);
+			
+			String netName = busIndex == -1 ? otherPortName : port.getBusName() + "[" + busIndex + "]";
+			EDIFNet net = top.getNet(netName);
+			if(net == null){
+				net = top.createNet(netName);
+			}
+			if(net.getPortInst(netName) == null){
+				net.createPortInst(port, busIndex);
+			}
+			net.createPortInst(portName, busIndex, eci0);
+			return;
+		}
 		EDIFCellInst eci1 = top.getCellInst(other.getName());
-		if(eci1 == null) throw new RuntimeException("ERROR: Couldn't find logical cell instance for " + other.getName());
+		if(eci1 == null) throw new RuntimeException("ERROR: Couldn't find logical cell instance for " + getName());
 		
-		Map<Cell,String> cells = new HashMap<>();
+		//String netName = busIndex == -1 ? getName() + "_" + portName : getName() + "_" + portName + "["+busIndex+"]";
+		//EDIFNet net = top.createNet(netName);
+		//EDIFPortInst pr0 = net.createPortInst(portName, busIndex, eci0);
+		//EDIFPortInst pr1 = net.createPortInst(otherPortName, busIndex, eci1);
+
+		// Connect physical pins
+		Port p0 = getPort(busIndex == -1 ? portName : portName + "[" + busIndex + "]");
+		Port p1 = other.getPort(busIndex == -1 ? otherPortName : otherPortName + "[" + busIndex + "]");
+		SitePinInst pin0 = getCorrespondingPin(p0);
+		SitePinInst pin1 = other.getCorrespondingPin(p1);
 		
-		
-		String netName = getName() + "_" + portName + "_net";
-		Net net = design.createNet(netName);
-		EDIFPortInst pr0 = net.getLogicalNet().createPortInst(portName, eci0);
-		EDIFPortInst pr1 = net.getLogicalNet().createPortInst(otherPortName, eci1);
-		
-		
-		
-		for(CellPin cp : getConnectedCellPins(new EDIFHierNet("", net.getLogicalNet()))){
-			String sitePinName = cp.getCell().getCorrespondingSitePinName(cp.getLogicalPinName());
-			SitePinInst p = new SitePinInst(sitePinName,cp.getCell().getSiteInst());
-			net.addPin(p);
+		if(pin0.isOutPin()){
+			pin0.getNet().addPin(pin1);
+		}else{
+			pin1.getNet().addPin(pin0);
 		}
-	}
-	
-	private List<CellPin> getConnectedCellPins(EDIFHierNet net){
-		// TODO
-		for(EDIFPortInst pr : net.getNet().getPortInsts()){
-			//...
-		}
-		return Collections.emptyList();
 	}
 }
