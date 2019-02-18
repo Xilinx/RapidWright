@@ -144,7 +144,7 @@ public class BrowseDevice{
 						}
 						break;
 					case 7:
-						System.exit(0);
+						return;
 						
 				}
 			} catch (Exception e) {
