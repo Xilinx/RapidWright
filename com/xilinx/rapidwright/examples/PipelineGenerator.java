@@ -74,6 +74,9 @@ public class PipelineGenerator {
 			System.err.println("Error: the width (="+width+") and distance (="+distance+") parameters conflict in a way "+
 					"that would result in an overlap in the veritical direction.  "+
 					"Please choose different parameters or modify this example.");
+			/* Note: when getting neighboring sites, further below with attached note, the function takes in a dx and dy as parameters.  Please feel free to change the way dx
+			and dy are computed in this example further below.
+			 */
 			System.exit(1);
 		}
 
@@ -81,8 +84,10 @@ public class PipelineGenerator {
 		Set<Site> used = new HashSet<>();
 		String bus = "["+(width-1)+":0]";
 
-		// Declare the I/O
-
+		/* Note: some of the first objects below are for the EDIF-related information, having to do with the logical interfaces
+		 * of modules.  Below, we are creating the I/O for this module is declared below.  Some of the conditions were added in case
+		 * the pipeline is instantiated within a larger design.
+		 * */
 		EDIFPort inputPort = top.createPort(INPUT_NAME + bus, EDIFDirection.INPUT, width);
 		EDIFPort outputPort = top.createPort(OUTPUT_NAME + bus, EDIFDirection.OUTPUT, width);
 		EDIFPort clkPort;
@@ -135,6 +140,9 @@ public class PipelineGenerator {
 			rst = top.getNet(rstPort.getName());
 		}
 
+		/* A few additional objects related the physical implementation are declared and assigned below.
+		* To contrast these, with the EDIF-related objects having similar name, the physical-related
+		 * Nets below are used in contexts related to placement and routing. */
 		Net clkNet = d.createNet(clk);
 		Net rstNet = d.createNet(rst);
 		Net ceNet = d.createNet(ce);
@@ -162,11 +170,12 @@ public class PipelineGenerator {
 			}
 		}
 
-
+		/* The starting point was passed into the constructor for this object as slice coordinates */
 		Site prevSite = startingPoint;
 		Site newSite = startingPoint;
 
-		// Create one row of registers
+
+		// Create multiple columns of registers
 		for(int j=0; j < depth; j++) {
 
 			int newSiteRow = newSite.getTile().getRow();
@@ -192,6 +201,7 @@ public class PipelineGenerator {
 					else if (dir == direction.horizontal)
 						testTile = d.getDevice().getTile(newSiteRow, newSiteCol+tmpDistance);
 
+					// here we are checking that we are selecting a valid site type containing flops.
 					invalid = testTile.getSites().length == 0;
 					invalid = invalid || !(testTile.getSites()[0].isCompatibleSiteType(SiteTypeEnum.SLICEL) ||
 							testTile.getSites()[0].isCompatibleSiteType(SiteTypeEnum.SLICEM));
@@ -206,14 +216,19 @@ public class PipelineGenerator {
 			}
 			prevSite = newSite;
 
+			// create one row of flops
 			for (int i = width - 1; i >= 0; i--) {
 
 				EDIFNet inputNet = ic[j][i];
 				EDIFNet outputNet = ic[j + 1][i];
 
-
+				/*
+				 *  Note: as mentioned above, when we get the next "neighbor site", we pass it a dx and dy each time.
+				 */
 				Site currSlice = prevSite.getNeighborSite(0, i / BITS_PER_CLE);
 
+				/* Below is just a check to handle null pointers in case we have reached some site type that doesn't contain flops
+				* */
 				int v = 0;
 				while (!currSlice.isCompatibleSiteType(SiteTypeEnum.SLICEL) && !currSlice.isCompatibleSiteType(SiteTypeEnum.SLICEM)) {
 					v++;
@@ -227,6 +242,9 @@ public class PipelineGenerator {
 				}
 
 				used.add(currSlice);
+
+				/* Below picks the letter site containing pairs of flops.  There is example code dealing with either "FF" or "FF2".
+				 */
 				String letter = Character.toString((char) ('A' + i % 8));
 				BEL ff = currSlice.getBEL(letter + "FF");
 				char[] letter_char = new char[1];
@@ -237,10 +255,12 @@ public class PipelineGenerator {
 				String rstPinName = isLowerSlice ? "SRST1" : "SRST2";
 				String cePinName = "CKEN" + (isLowerSlice ? (isFF2 ? "2" : "1") : (isFF2 ? "4" : "3"));
 
+				// note line below "places" the flop
 				Cell ffCell = d.createAndPlaceCell(top, "d_" + j + "_" + i, Unisim.FDRE, currSlice, ff);
 				ffCell.addProperty("INIT", "1'b0", EDIFValueType.STRING);
 				SiteInst ff_si = ffCell.getSiteInst();
 
+				// connect the flop I/O to the physical nets
 				inputNet.createPortInst("D", ffCell);
 				outputNet.createPortInst("Q", ffCell);
 
@@ -267,13 +287,14 @@ public class PipelineGenerator {
 			}
 		}
 
-		d.routeSites();
+
+		d.routeSites(); // this step below is necessary when using "intra-sites", for example, the "letter sites" above
 
 		// Find rectangular area consumed
 		PBlock footprint = new PBlock(d.getDevice(),used);
 
 		if(route){
-			Router r = new Router(d);
+			Router r = new Router(d); // the Manhattan distance router
 			r.setRoutingPblock(footprint);
 			r.setSupressWarningsErrors(false);
 			r.routeDesign();
@@ -285,7 +306,7 @@ public class PipelineGenerator {
 	private static OptionParser createOptionParser(){
 
 		// Defaults, please modify these to experiment
-		String partName = "xcvu9p-flgb2104-2-i";
+		String partName = "xcvu3p-ffvc1517-2-e";
 		String designName = "pipeline";
 		String outputDCPFileName = System.getProperty("user.dir") + File.separator + designName +".dcp";
 		String clkName = "clk";
@@ -294,10 +315,11 @@ public class PipelineGenerator {
 		/**** SOME DEFAULTS ****/
 		int width = 10;
 		int depth = 3;
-		int distance = 4;
-		String sliceSite = "SLICE_X101Y480";
+		int distance = 10;
+		String sliceSite = "SLICE_X42Y70";
 		boolean verbose = true;
 
+		// example code for command
 		OptionParser p = new OptionParser() {{
 			accepts(PART_OPT).withOptionalArg().defaultsTo(partName).describedAs("Ultrascale/UltraScale+ Part Name");
 			accepts(DESIGN_NAME_OPT).withOptionalArg().defaultsTo(designName).describedAs("Design Name");
@@ -318,8 +340,7 @@ public class PipelineGenerator {
 	private static void printHelp(OptionParser p){
 		MessageGenerator.printHeader("Pipeline Generator");
 		System.out.println("This RapidWright program creates an example pipelined bus as a placed and routed DCP. \n"
-			+ "See \n"
-			+ "RapidWright documentation for more information.\n");
+			+ "See the RapidWright documentation for more information.\n");
 		try {
 			p.accepts(OUT_DCP_OPT).withOptionalArg().defaultsTo("pipeline.dcp").describedAs("Output DCP File Name");
 			p.printHelpOn(System.out);
