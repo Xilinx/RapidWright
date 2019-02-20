@@ -5,6 +5,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -12,6 +13,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.Random;
 import java.util.Set;
 import java.util.Map.Entry;
 
@@ -103,6 +105,8 @@ public class SATRouter {
 	
 	private int commonNodeWeight = 10;
 	
+	private final long SEED = 82;
+	
 	private int[] lutInputWeights = new int[]{50, 45, 35, 30, 20, 10};
 	/**
 	 * Initialize the SAT router with a design and area constraint (pblock) to describe
@@ -127,6 +131,8 @@ public class SATRouter {
 	 * must be located within the pblock.
 	 */
 	public SATRouter(Design design, PBlock pblock, Collection<Net> netsToRoute){
+		if(FileTools.isWindows()) 
+			throw new RuntimeException("Sorry, this tool is not currently supported in Windows.  Please try again in Linux");
 		init(design,pblock);
 		this.netsToRoute = new HashSet<>(netsToRoute);
 	}
@@ -199,9 +205,13 @@ public class SATRouter {
 						}
 					}
 				}
-				if((output != null && p != output) && si.getNetFromSiteWire(siteWireName).equals(net) && outputSite.equals(c.getSite())){
-					// Input pin is within same site as output
-					continue;
+				if(output != null && p != output){
+					if(siteWireName == null){
+						continue;
+					}else if(si.getNetFromSiteWire(siteWireName).equals(net) && outputSite.equals(c.getSite())){
+						// Input pin is within same site as output
+						continue;
+					}
 				}
 				// Special case for SRLs, must tie certain pins to GND
 				if(c.getType().contains("SRL16")){
@@ -312,9 +322,6 @@ public class SATRouter {
 	 * @return True if the node is safe to use, false otherwise.
 	 */
 	private boolean includeNode(Node n){
-		//if(n.toString().equals("INT_X8Y235/BYPASS_W6")){
-		//	System.out.println();
-		//}
 		SitePin sp = n.getSitePin();
 		if(sp != null){
 			SiteInst si = design.getSiteInstFromSite(sp.getSite());
@@ -404,6 +411,13 @@ public class SATRouter {
 		}
 	}
 	
+	public static void randomizeLines(String inputFileName, String outputFileName, long seed){
+		ArrayList<String> lines = FileTools.getLinesFromTextFile(inputFileName);
+		Random rnd = new Random(seed);
+		Collections.shuffle(lines, rnd);
+		FileTools.writeLinesToTextFile(lines, outputFileName);
+	}
+	
 	public void createNetsFiles(){
 		try {
 			BufferedWriter bw = new BufferedWriter(new FileWriter(pbFile));
@@ -432,6 +446,8 @@ public class SATRouter {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+		
+		randomizeLines(pbFile, pbFile, SEED);
 	}
 	
 	/**
