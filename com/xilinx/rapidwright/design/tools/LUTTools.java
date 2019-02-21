@@ -58,7 +58,15 @@ public class LUTTools {
 	 * @return True if this is a LUT[1-6], false otherwise.
 	 */
 	public static boolean isCellALUT(Cell c){
-		EDIFCellInst i = c.getEDIFCellInst();
+		return isCellALUT(c.getEDIFCellInst());
+	}
+	
+	/**
+	 * Checks if this cell is a LUT (LUT1, LUT2, LUT3,...). A CFGLUT5 will return false.
+	 * @param c The cell in question
+	 * @return True if this is a LUT[1-6], false otherwise.
+	 */
+	public static boolean isCellALUT(EDIFCellInst i){
 		if(i == null) return false;
 		EDIFCell ec = i.getCellType();
 		if(ec == null) return false;
@@ -75,8 +83,18 @@ public class LUTTools {
 	 * @return The number of LUT inputs or 0 if cell is not a LUT.
 	 */
 	public static int getLUTSize(Cell c){
+		return getLUTSize(c.getEDIFCellInst());
+	}
+	
+	/**
+	 * If the provided cell instance is a LUT, it will return the LUT input
+	 * count.  If it is not a LUT, it will return 0.
+	 * @param c The LUT cell
+	 * @return The number of LUT inputs or 0 if cell is not a LUT.
+	 */
+	public static int getLUTSize(EDIFCellInst c){
 		if(!isCellALUT(c)) return 0;
-		String typeName = c.getEDIFCellInst().getCellType().getName();
+		String typeName = c.getCellType().getName();
 		return Integer.parseInt(typeName.replace("LUT", ""));
 	}
 	
@@ -132,6 +150,15 @@ public class LUTTools {
 	 * @param c The Cell in question.
 	 */
 	public static void printTruthTable(Cell c){
+		printTruthTable(c.getEDIFCellInst());
+	}
+
+	/**
+	 * Prints out the truth table for the given INIT string on the cell. If the
+	 * cell is not a LUT, it prints nothing.
+	 * @param c The cell instance in question.
+	 */
+	public static void printTruthTable(EDIFCellInst c){
 		if(!isCellALUT(c)) return;
 		String init = c.getProperty(LUT_INIT).getValue();
 		int lutSize = getLUTSize(init);
@@ -232,6 +259,39 @@ public class LUTTools {
 		if(size == 0) throw new RuntimeException("ERROR: Cell " + c.getName() + " is not a LUT");
 		String init = getLUTInitFromEquation(equation, size);
 		return c.addProperty(LUT_INIT, init);
+	}
+
+	/**
+	 * Programs a LUT cell's init string from the provided equation.   
+	 * @param c The LUT cell instance to program.
+	 * @param equation The desired programming of the LUT using Vivado LUT equation syntax.
+	 * @return The previous LUT init string or null if none.
+	 */
+	public static EDIFPropertyValue configureLUT(EDIFCellInst c, String equation){
+		int size = getLUTSize(c);
+		if(size == 0) throw new RuntimeException("ERROR: Cell " + c.getName() + " is not a LUT");
+		String init = getLUTInitFromEquation(equation, size);
+		return c.addProperty(LUT_INIT, init);
+	}
+	
+	/**
+	 * Reads the init string in this LUT and creates an equivalent (non-optimal) equation. 
+	 * @param c The LUT instance 
+	 * @return The equation following LUT equation syntax or null if cell is not configured.
+	 */
+	public static String getLUTEquation(Cell c){
+		return getLUTEquation(c.getEDIFCellInst());
+	}
+	
+	/**
+	 * Reads the init string in this LUT and creates an equivalent (non-optimal) equation. 
+	 * @param i The LUT instance 
+	 * @return The equation following LUT equation syntax or null if cell is not configured.
+	 */
+	public static String getLUTEquation(EDIFCellInst i){
+		String init = i.getProperty(LUT_INIT).getValue();
+		if(init == null) return null;
+		return getLUTEquation(init);
 	}
 	
 	
