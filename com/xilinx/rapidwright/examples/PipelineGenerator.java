@@ -74,8 +74,10 @@ public class PipelineGenerator {
 			System.err.println("Error: the width (="+width+") and distance (="+distance+") parameters conflict in a way "+
 					"that would result in an overlap in the veritical direction.  "+
 					"Please choose different parameters or modify this example.");
-			/* Note: when getting neighboring sites, further below with attached note, the function takes in a dx and dy as parameters.  Please feel free to change the way dx
-			and dy are computed in this example further below.
+
+			/* Note: Sites is the term for the locations on the device for placing instances.
+			When getting neighboring sites, e.g. when using adjacent slices, the function takes in a dx and dy as parameters.
+			This is also noted further below within the nested for loops.  The dx and dy can be modified to help control placement.
 			 */
 			System.exit(1);
 		}
@@ -84,9 +86,11 @@ public class PipelineGenerator {
 		Set<Site> used = new HashSet<>();
 		String bus = "["+(width-1)+":0]";
 
-		/* Note: some of the first objects below are for the EDIF-related information, having to do with the logical interfaces
-		 * of modules.  Below, we are creating the I/O for this module is declared below.  Some of the conditions were added in case
-		 * the pipeline is instantiated within a larger design.
+		/* Note: some of the first objects below are the EDIFNet objects, having to do with the logical connections
+		 * of modules.  In general, the EDIF-related objects are used for capturing the logical representation.
+		 * We are creating the I/O for this module below.
+		 *
+		 * Some of the conditions below were added in case the pipeline is later instantiated within a larger design.
 		 * */
 		EDIFPort inputPort = top.createPort(INPUT_NAME + bus, EDIFDirection.INPUT, width);
 		EDIFPort outputPort = top.createPort(OUTPUT_NAME + bus, EDIFDirection.OUTPUT, width);
@@ -140,9 +144,7 @@ public class PipelineGenerator {
 			rst = top.getNet(rstPort.getName());
 		}
 
-		/* A few additional objects related the physical implementation are declared and assigned below.
-		* To contrast these, with the EDIF-related objects having similar name, the physical-related
-		 * Nets below are used in contexts related to placement and routing. */
+		/* The "Net" objects below are used later for representing the physical connections in the implementation of the design. */
 		Net clkNet = d.createNet(clk);
 		Net rstNet = d.createNet(rst);
 		Net ceNet = d.createNet(ce);
@@ -170,7 +172,7 @@ public class PipelineGenerator {
 			}
 		}
 
-		/* The starting point was passed into the constructor for this object as slice coordinates */
+		/* The starting point was passed into the constructor for this object as slice coordinates.  It was set in the CreateOptionParser() method. */
 		Site prevSite = startingPoint;
 		Site newSite = startingPoint;
 
@@ -227,7 +229,7 @@ public class PipelineGenerator {
 				 */
 				Site currSlice = prevSite.getNeighborSite(0, i / BITS_PER_CLE);
 
-				/* Below is just a check to handle null pointers in case we have reached some site type that doesn't contain flops
+				/* Below is a check in case we have reached some site type that doesn't contain flops
 				* */
 				int v = 0;
 				while (!currSlice.isCompatibleSiteType(SiteTypeEnum.SLICEL) && !currSlice.isCompatibleSiteType(SiteTypeEnum.SLICEM)) {
@@ -243,7 +245,7 @@ public class PipelineGenerator {
 
 				used.add(currSlice);
 
-				/* Below picks the letter site containing pairs of flops.  There is example code dealing with either "FF" or "FF2".
+				/* Below picks the letter site containing pairs of flops.  The first flop is called "FF".  The second flop is called "FF2".
 				 */
 				String letter = Character.toString((char) ('A' + i % 8));
 				BEL ff = currSlice.getBEL(letter + "FF");
@@ -287,8 +289,9 @@ public class PipelineGenerator {
 			}
 		}
 
-
-		d.routeSites(); // this step below is necessary when using "intra-sites", for example, the "letter sites" above
+		/* In the case that the design uses "intra-sites", for example this design uses the "letter sites" inside of a slice,
+		* then it becomes necessary to call the routeSites() method below.  */
+		d.routeSites();
 
 		// Find rectangular area consumed
 		PBlock footprint = new PBlock(d.getDevice(),used);
@@ -302,7 +305,7 @@ public class PipelineGenerator {
 
 		return footprint;
 	}
-	
+
 	private static OptionParser createOptionParser(){
 
 		// Defaults, please modify these to experiment
@@ -333,10 +336,10 @@ public class PipelineGenerator {
 			accepts(VERBOSE_OPT).withOptionalArg().ofType(Boolean.class).defaultsTo(verbose).describedAs("Print verbose output");
 			acceptsAll( Arrays.asList(HELP_OPT, "?"), "Print Help" ).forHelp();
 		}};
-		
+
 		return p;
 	}
-	
+
 	private static void printHelp(OptionParser p){
 		MessageGenerator.printHeader("Pipeline Generator");
 		System.out.println("This RapidWright program creates an example pipelined bus as a placed and routed DCP. \n"
@@ -344,12 +347,12 @@ public class PipelineGenerator {
 		try {
 			p.accepts(OUT_DCP_OPT).withOptionalArg().defaultsTo("pipeline.dcp").describedAs("Output DCP File Name");
 			p.printHelpOn(System.out);
-			
+
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 	}
-	
+
 	public static void main(String[] args) {
 		// Extract program options
 		OptionParser p = createOptionParser();
@@ -360,7 +363,7 @@ public class PipelineGenerator {
 			return;
 		}
 		CodePerfTracker t = verbose ? new CodePerfTracker(PipelineGenerator.class.getSimpleName(),true).start("Init") : null;
-		
+
 		String partName = (String) opts.valueOf(PART_OPT);
 		String designName = (String) opts.valueOf(DESIGN_NAME_OPT);
 		String outputDCPFileName = (String) opts.valueOf(OUT_DCP_OPT);
