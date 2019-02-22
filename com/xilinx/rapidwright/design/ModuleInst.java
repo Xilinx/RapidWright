@@ -632,10 +632,10 @@ public class ModuleInst{
 		EDIFCellInst eci1 = top.getCellInst(other.getName());
 		if(eci1 == null) throw new RuntimeException("ERROR: Couldn't find logical cell instance for " + getName());
 		
-		//String netName = busIndex == -1 ? getName() + "_" + portName : getName() + "_" + portName + "["+busIndex+"]";
-		//EDIFNet net = top.createNet(netName);
-		//EDIFPortInst pr0 = net.createPortInst(portName, busIndex, eci0);
-		//EDIFPortInst pr1 = net.createPortInst(otherPortName, busIndex, eci1);
+		String netName = busIndex == -1 ? getName() + "_" + portName : getName() + "_" + portName + "["+busIndex+"]";
+		EDIFNet net = top.createNet(netName);
+		net.createPortInst(portName, busIndex, eci0);
+		net.createPortInst(otherPortName, busIndex, eci1);
 
 		// Connect physical pins
 		Port p0 = getPort(busIndex == -1 ? portName : portName + "[" + busIndex + "]");
