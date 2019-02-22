@@ -177,7 +177,7 @@ public class PipelineGenerator {
 		Site newSite = startingPoint;
 
 
-		// Create multiple columns of registers
+		// Note: the outer loop replicates flops for having multiple cycles
 		for(int j=0; j < depth; j++) {
 
 			int newSiteRow = newSite.getTile().getRow();
@@ -218,7 +218,7 @@ public class PipelineGenerator {
 			}
 			prevSite = newSite;
 
-			// create one row of flops
+			// the inner for loop creates flops for one cycle, having the width of the bus
 			for (int i = width - 1; i >= 0; i--) {
 
 				EDIFNet inputNet = ic[j][i];
