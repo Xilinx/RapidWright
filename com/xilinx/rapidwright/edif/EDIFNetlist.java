@@ -422,16 +422,6 @@ public class EDIFNetlist extends EDIFName {
 	}
 	
 	/**
-	 * Please use {@link EDIFNetlist#getHierNetFromName(String)} instead.  This method has been 
-	 * refactored for naming consistency and will be removed in a future release.
-	 * @deprecated
-	 * @see {@link EDIFNetlist#getHierNetFromName(String)}
-	 */
-	public EDIFHierNet getAbsoluteNetFromHierName(String netName){
-		return getHierNetFromName(netName);
-	}
-	
-	/**
 	 * Gets the hierarchical net from the netname provided. Returns the wrapped EDIFNet, with the hierarchical
 	 * String in {@link EDIFHierNet}.
 	 * @param netName Full hierarchical name of the net to retrieve. 
