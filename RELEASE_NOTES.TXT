@@ -1,3 +1,24 @@
+============= RapidWright 2018.3.1-beta released on 2019-02-27 =================
+Notes:
+ - API Additions:
+   - com.xilinx.rapidwright.design.Design "public SiteInst createSiteInst(Site site)"
+   - com.xilinx.rapidwright.design.Design "public SiteInst createSiteInst(String siteName)"
+   - com.xilinx.rapidwright.design.Design "public SiteInst createSiteInst(String name, SiteTypeEnum type, Site placement)"
+   - com.xilinx.rapidwright.design.SiteInst "public Cell getCell(BEL bel)"
+   - com.xilinx.rapidwright.design.Cell "public Map<EDIFName, EDIFPropertyValue> getProperties()"
+   - com.xilinx.rapidwright.design.Cell "public void setProperties(Map<EDIFName, EDIFPropertyValue> properties)"
+ - API Removals (deprecated):
+   - com.xilinx.rapidwright.design.SiteInst "public void addSitePIP(String belName, String inputPin, String outputPin)"
+   - com.xilinx.rapidwright.design.SiteInst "public SitePIP getSitePIP(String belName, String inputPin, String outputPin)"
+   - com.xilinx.rapidwright.device.Site "public BELPin[] getConnectedBELPins(int siteWireIndex)"
+   - com.xilinx.rapidwright.device.Site "public SitePIP getSitePIP(BELPin input, BELPin output)"
+ - Changed the toString() method on SiteInst class to help address issue #23
+ - Improved the error message when trying to create and place a transformed prim (issue #22)
+ - Removed the Hessian library, no longer used
+ - Fixes issue with SLRCrossingGenerator DCPs not always working with Vivado's clock router
+ - Adds preliminary support for SAT routing
+ - Pblock support for PerformanceExplorer
+
 ============= RapidWright 2018.3.0-beta released on 2019-01-10 =================
 Notes:
  - API Additions:
