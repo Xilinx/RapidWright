@@ -39,6 +39,7 @@ import java.net.URL;
 import java.net.UnknownHostException;
 import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
+import java.nio.charset.Charset;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -66,7 +67,7 @@ public class Installer {
 	
 	private static String rwPathVarName = "RAPIDWRIGHT_PATH";
 	private static String classpathVarName = "CLASSPATH";
-
+	private static String MD5_FILE_NAME = "MD5SUM.TXT";
 	
 	/**
 	 * This is a simple method that writes the elements of an ArrayList of Strings
@@ -188,6 +189,10 @@ public class Installer {
 		return returnVal;
 	}
 	
+	public static boolean isWindows(){
+		return System.getProperty("os.name").startsWith("Windows");
+	}
+	
 	/**
 	 * Identifies all necessary jar files in /jars directory and creates a CLASSPATH string.
 	 * @return The dependent jar files 
@@ -195,7 +200,7 @@ public class Installer {
 	public static String getJarsClasspath(){
 		String cwd = System.getProperty("user.dir");
 		String jarsDir = cwd + File.separator + "RapidWright" + File.separator +"jars";
-		boolean isWindows = System.getProperty("os.name").startsWith("Windows");
+		boolean isWindows = isWindows();
 		StringBuilder sb = new StringBuilder();
 		for(String jar : new File(jarsDir).list()){
 			if(jar.contains("javadoc")) continue;
@@ -305,10 +310,41 @@ public class Installer {
 			System.out.println("  Using proxy settings from HTTPS_PROXY="+value+", host=" + host + ", port=" + port);
 		}
 		
+		boolean missingDep = false;
+		Integer returnVal = runCommand(Arrays.asList("git","--version"));
+		if(returnVal != 0){
+			System.err.println("ERROR: Couldn't find 'git' on PATH, please install or set PATH environment variable accordingly.");
+			if(isWindows()){
+				System.err.println("\tgit can be downloaded from: https://git-scm.com/download/win");
+			}else{
+				System.err.println("\tgit can be installed by:\n");
+				System.err.println("\tDebian/Ubuntu: 'sudo apt-get install git'\n");
+				System.err.println("\tRedHat/Fedora: 'sudo yum install git'\n");
+			}
+			missingDep = true;
+		}
+		returnVal = runCommand(Arrays.asList("javac","-version"));
+		if(returnVal != 0){
+			System.err.println("ERROR: Couldn't find 'javac' on PATH, please install or set PATH environment variable accordingly.");
+			if(isWindows()){
+				System.err.println("\tJava JDK can be downloaded from: https://www.oracle.com/technetwork/java/javase/downloads/jdk8-downloads-2133151.html");
+			}else{
+				System.err.println("\tJDK can be installed by:\n");
+				System.err.println("  \tDebian/Ubuntu: 'sudo apt-get install openjdk-8-jdk'\n");
+				System.err.println("  \tRedHat/Fedora: 'sudo yum install java-1.8.0-openjdk'\n");
+			}
+			missingDep = true;
+		}
+		if(missingDep){
+			System.out.println("Missing pre-requisite(s), please address issues above to continue install.");
+			return;
+		}
+		
+		
 		System.out.println("================================================================================");
 		System.out.println("  1. Checking out code from "+REPO+" ...");
 		System.out.println("================================================================================");
-		Integer returnVal = runCommand(Arrays.asList("git","clone", REPO));
+		returnVal = runCommand(Arrays.asList("git","clone", REPO));
 		if(returnVal != 0){
 			System.err.println("ERROR: Problem cloning repository. See output above for cause");
 			System.err.println("  Some common reasons for failure:");
@@ -325,8 +361,30 @@ public class Installer {
 		System.out.println("  Please be patient, download may take several minutes...");
 		String latestRelease = getURLRedirect(RELEASE);
 		latestRelease = latestRelease.replace("/tag/", "/download/");
+		
+		
 		for(String name : new String[]{DATA_ZIP,JARS_ZIP}){
-			if(skip_zip_download){
+			boolean alreadyDownloaded = false;
+			if(new File(name).exists()){
+				System.out.println("Checking if existing "+name+" can be used...");
+				downloadFile(latestRelease+"/"+MD5_FILE_NAME, MD5_FILE_NAME);
+				String md5sum = null;
+				for(String line : Files.readAllLines(Paths.get(MD5_FILE_NAME), Charset.forName("US-ASCII"))){
+					String[] parts = line.split("\\s+"); 
+					if(parts[1].trim().equals(name)){
+						md5sum = parts[0].trim();
+						break;
+					}
+				}
+				String calcMD5Sum = calculateMD5OfFile(name);
+				if(md5sum.equals(calcMD5Sum)){
+					System.out.println(name + " is valid, skipping download.");
+					alreadyDownloaded = true;
+				}else{
+					System.out.println(name + " md5sum is invalid: " + calcMD5Sum + ", should be: " + md5sum);
+				}
+			}
+			if(alreadyDownloaded || skip_zip_download){
 				if(!new File(name).exists()){
 					System.err.println("  ERROR: Option --skip-zip-download set but could not find file " + name +"\n"
 							+ "  Please remove the option or download the zip file manually and place it in the \n"
@@ -382,6 +440,15 @@ public class Installer {
 			System.err.println("  ERROR: Looks like the DeviceBrowser did not run or crashed. Please examine\n"
 					+ "  the output for clues as to what went wrong.  If you are stumped, please request help\n"
 					+ "  on the RapidWright Google Group Forum: https://groups.google.com/forum/#!forum/rapidwright.");
+			if(!isWindows()){
+				System.err.println("\n*** If you are running Linux ***"); 
+				System.err.println("If you are running Linux, a common problem is to be missing libpng12.so.0.\n" +
+								   "If you are running a CentOS/RedHat/Fedora distro, try the following:\n" + 
+								   "    sudo yum install libpng12\n\n" + 
+								   "If you are running a Debian/Ubuntu distro, try the following:\n" + 
+								   "    wget -q -O /tmp/libpng12.deb http://mirrors.kernel.org/ubuntu/pool/main/libp/libpng/libpng12-0_1.2.54-1ubuntu1_amd64.deb && sudo dpkg -i /tmp/libpng12.deb && rm /tmp/libpng12.deb");
+			}
+			System.exit(1);
 		}
 		
 		System.out.println("================================================================================");
@@ -434,6 +501,7 @@ public class Installer {
 			System.out.print("Cleaning up zip files ...");
 			boolean success = new File(cwd + DATA_ZIP).delete();
 			success &= new File(cwd + JARS_ZIP).delete();
+			success &= new File(cwd + MD5_FILE_NAME).delete();
 			if(success) System.out.print("Done.");
 			else System.out.println("Problem deleting zip files.");
 			
