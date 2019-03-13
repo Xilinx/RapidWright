@@ -385,7 +385,7 @@ public class BlockPlacer2 {
 		rangeLimit = Math.max(dev.getColumns(), dev.getRows());
 		maxInnerIteration = (int)(1 * Math.pow(hardMacros.size(), 1.3333));
 		//maxInnerIteration = (int)(Math.pow(Math.max(dev.getColumns(), dev.getRows()), 1.3333));
-		if(hardMacros.size() < 2){
+		if(hardMacros.size() < 2 || allPaths.size() == 0){
 			finished = true;
 			maxInnerIteration = 0;
 		}
