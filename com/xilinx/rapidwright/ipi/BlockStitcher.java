@@ -544,7 +544,10 @@ public class BlockStitcher {
 				}
 			}
 			//System.out.println(modInstName + " " + implementationIndex);
+			EDIFNetlist tmp = stitched.getNetlist();
+			stitched.setNetlist(null);
 			ModuleInst mi = stitched.createModuleInst(modInstName, modImpls.get(implementationIndex));
+			stitched.setNetlist(tmp);
 			miMap.put(mi, modImpls.getNetlist());
 			SiteInst anchor = mi.getModule().getAnchor();
 			if(anchor != null){
