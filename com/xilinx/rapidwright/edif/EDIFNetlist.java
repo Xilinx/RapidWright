@@ -243,7 +243,11 @@ public class EDIFNetlist extends EDIFName {
 			EDIFCell curr = cells.poll();
 			EDIFLibrary destLib = getLibrary(curr.getLibrary().getName());
 			if(destLib == null){
-				destLib = getWorkLibrary();
+				if(curr.getLibrary().getName().equals(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME)){
+					destLib = getHDIPrimitivesLibrary();
+				}else{
+					destLib = getWorkLibrary();
+				}
 			}
 			
 			if(!destLib.containsCell(curr)){
@@ -515,7 +519,25 @@ public class EDIFNetlist extends EDIFName {
 	 * @return A list of all leaf cell instances or null if the instanceName was not found.
 	 */
 	public List<EDIFHierCellInst> getAllLeafDescendants(String instanceName){
-		return getAllDescendants(instanceName,null,true);
+		List<EDIFHierCellInst> leafCells = new ArrayList<>();
+		
+		EDIFCellInst currTop = getCellInstFromHierName(instanceName);
+		
+		Queue<EDIFHierCellInst> toProcess = new LinkedList<EDIFHierCellInst>();
+		EDIFHierCellInst eci = new EDIFHierCellInst(EDIFTools.getHierarchicalRootFromPinName(instanceName), currTop);
+		toProcess.add(eci);
+		
+		while(!toProcess.isEmpty()){
+			EDIFHierCellInst curr = toProcess.poll();
+			if(curr.getCellType().isPrimitive()){
+				leafCells.add(curr);
+			}else{
+				for(EDIFCellInst i : curr.getInst().getCellType().getCellInsts()){
+					toProcess.add(new EDIFHierCellInst(curr.getFullHierarchicalInstName(), i));
+				}
+			}
+		}
+		return leafCells;
 	}
 	
 	private String convertWildcardToRegex(String wildcardPattern){
