@@ -39,7 +39,7 @@ public class EDIFHierCellInst {
 
 	/**
 	 * Constructor
-	 * @param hierarchicalInstanceName Full hierarchical name of the instance
+	 * @param hierarchicalInstanceName Full hierarchical name of the parent instance
 	 * @param instance The actual instance object
 	 */
 	public EDIFHierCellInst(String hierarchicalInstanceName, EDIFCellInst instance) {
@@ -49,14 +49,14 @@ public class EDIFHierCellInst {
 	}
 
 	/**
-	 * @return the full hierarchical name of this instance
+	 * @return the hierarchical name of this parent instance
 	 */
 	public String getHierarchicalInstName() {
 		return hierarchicalInstName;
 	}
 
 	/**
-	 * @param hierarchicalInstanceName the full hierarchical name of the instances
+	 * @param hierarchicalInstanceName the hierarchical name of the parent instance
 	 */
 	public void setHierarchicalInstName(String hierarchicalInstanceName) {
 		this.hierarchicalInstName = hierarchicalInstanceName;
