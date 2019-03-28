@@ -183,7 +183,7 @@ public class EDIFCellInst extends EDIFPropertyObject {
 	public boolean isBlackBox(){
 		EDIFPropertyValue val = getProperty(BLACK_BOX_PROP);
 		if(val == null) return false;
-		if(val.getValue().equals("true")) return true;
+		if(val.getValue().toLowerCase().equals("true")) return true;
 		return false;
 	}
 
