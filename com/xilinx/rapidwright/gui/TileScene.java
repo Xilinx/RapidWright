@@ -412,8 +412,9 @@ public class TileScene extends QGraphicsScene{
 	 */
 	
 	private void drawCLB(QPainter painter, int rectX, int rectY, int rectSide){
-		switch(device.getArchitecture()){
-			case VIRTEX7:
+		
+		switch(device.getSeries()){
+			case Series7:
 				painter.drawRect(rectX, rectY + rectSide / 2, rectSide / 2 - 1, rectSide / 2 - 1);
 				painter.drawRect(rectX + rectSide / 2, rectY, rectSide / 2 - 1, rectSide / 2 - 1);					
 				break;				
@@ -422,17 +423,11 @@ public class TileScene extends QGraphicsScene{
 		}
 	}
 	
-	@SuppressWarnings("incomplete-switch")
 	private void drawBRAM(QPainter painter, int rectX, int rectY, int rectSide, int offset, QColor color){
-		switch(device.getArchitecture()){
-			case KINTEX7:
-			case VIRTEX7:
-			case VIRTEXU:
-			case KINTEXU:
-			case VIRTEXUPLUS:
-			case KINTEXUPLUS:
-			case ZYNQ:
-			case ZYNQUPLUS:
+		switch(device.getSeries()){
+			case Series7:
+			case UltraScale:
+			case UltraScalePlus:
 				painter.drawRect(rectX, rectY - 4 * tileSize, rectSide - 1, 5 * rectSide + 3 * 2 * offset - 1);
 				painter.setPen(color.darker());
 				painter.drawRect(rectX+2, rectY-4 * tileSize + 2, rectSide - 5, ((int)(2.5 * rectSide)) + 3 * 2 * offset - 5);
@@ -441,17 +436,11 @@ public class TileScene extends QGraphicsScene{
 		}
 	}
 	
-	@SuppressWarnings("incomplete-switch")
 	private void drawDSP(QPainter painter, int rectX, int rectY, int rectSide, int offset, QColor color){
-		switch(device.getArchitecture()){
-			case KINTEX7:
-			case VIRTEX7:
-			case VIRTEXU:
-			case KINTEXU:
-			case VIRTEXUPLUS:
-			case KINTEXUPLUS:
-			case ZYNQ:
-			case ZYNQUPLUS:
+		switch(device.getSeries()){
+			case Series7:
+			case UltraScale:
+			case UltraScalePlus:
 				painter.drawRect(rectX, rectY - 4 * tileSize, rectSide - 1, 5 * rectSide + 3 * 2 * offset - 1);
 				painter.setPen(color.darker());
 				painter.drawRect(rectX+2, rectY-4 * tileSize + 2, rectSide - 5, ((int)(2.5 * rectSide)) + 3 * 2 * offset - 5);
@@ -473,12 +462,12 @@ public class TileScene extends QGraphicsScene{
 	
 	@SuppressWarnings("incomplete-switch")
 	private void populateTileTypesToHide(){
-		switch(device.getArchitecture()){
-		case KINTEXU:
-		case VIRTEXU:
-			tileColumnTypesToHide.add(TileTypeEnum.CFRM_CBRK_L);
-			tileRowTypesToHide.add(TileTypeEnum.RCLK_INT_L);
-			tileRowTypesToHide.add(TileTypeEnum.INT_RBRK);
+		switch(device.getSeries()){
+			case UltraScale:
+				tileColumnTypesToHide.add(TileTypeEnum.CFRM_CBRK_L);
+				tileRowTypesToHide.add(TileTypeEnum.RCLK_INT_L);
+				tileRowTypesToHide.add(TileTypeEnum.INT_RBRK);
+				break;
 		}
 	}
 }
