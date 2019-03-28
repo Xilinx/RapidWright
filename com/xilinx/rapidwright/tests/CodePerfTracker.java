@@ -201,8 +201,9 @@ public class CodePerfTracker {
 		}
 		runtimes.add(totalRuntime);
 		memUsages.add(totalUsage);
-		if(isUsingGCCallsToTrackMemory()) segmentNames.add("*Total*");
-		else segmentNames.add(" [No GC] *Total*");
+		String totalName = isUsingGCCallsToTrackMemory() ? "*Total*" : " [No GC] *Total*";  
+		segmentNames.add(totalName);
+		if(maxSegmentNameSize < totalName.length()) maxSegmentNameSize = totalName.length();
 	}
 	
 	public void printSummary(){
