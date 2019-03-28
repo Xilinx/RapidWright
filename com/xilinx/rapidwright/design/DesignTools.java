@@ -37,7 +37,9 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.PriorityQueue;
+import java.util.Set;
 
 import com.xilinx.rapidwright.design.blocks.UtilizationType;
 import com.xilinx.rapidwright.device.BELClass;
@@ -48,7 +50,10 @@ import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.SitePIP;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
+import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
+import com.xilinx.rapidwright.edif.EDIFHierCellInst;
+import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPort;
@@ -776,5 +781,171 @@ public class DesignTools {
 			parentNetName = parentNetMap.get(netName);
 		}
 		return parentNetName;
+	}
+
+	/**
+	 * NOTE: This method is not fully tested.  
+	 * Populates a black box in a netlist with the provided design. This method
+	 * most closely resembles the Vivado command 'read_checkpoint -cell <cell name> <DCP Name>. 
+	 * @param design The top level design
+	 * @param hierarchicalCellName Name of the black box in the design netlist.
+	 * @param cell The 'guts' to be inserted into the black box
+	 */
+	public static void populateBlackBox(Design design, String hierarchicalCellName, Design cell){
+		// Populate Logical Netlist into cell
+		EDIFCellInst i = design.getNetlist().getCellInstFromHierName(hierarchicalCellName);
+		if(!i.isBlackBox()) {
+			System.err.println("ERROR: The cell instance " + hierarchicalCellName + " is not a black box.");
+			return;
+		}
+		i.setCellType(cell.getTopEDIFCell());
+		design.getNetlist().migrateCellAndSubCells(cell.getTopEDIFCell());
+		
+		// Add placement information
+		// We need to prefix all cell and net names with the hierarchicalCellName as a prefix
+		for(SiteInst si : cell.getSiteInsts()){
+			for(Cell c : new ArrayList<Cell>(si.getCells())){
+				c.updateName(hierarchicalCellName + "/" + c.getName());
+				if(!c.isRoutethru())
+					design.addCell(c);
+			}
+			design.addSiteInst(si);
+		}
+		
+		// Add routing information
+		for(Net n : cell.getNets()){
+			if(n.getName().equals(Net.USED_NET)) continue;
+			if(n.isStaticNet()){
+				Net staticNet = design.getNet(n.getName());
+				staticNet.addPins((ArrayList<SitePinInst>)n.getPins());
+				for(PIP p : n.getPIPs()){
+					staticNet.addPIP(p);
+				}
+			}else{
+				n.updateName(hierarchicalCellName + "/" + n.getName());
+				design.addNet(n);				
+			}
+		}
+	}
+
+	/**
+	 * Turns the cell named hierarchicalCellName into a blackbox and removes any 
+	 * associated placement and routing information associated with that instance. In Vivado,
+	 * this can be accomplished by running: (1) 'update_design -cells <name> -black_box' or (2)
+	 * by deleting all of the cells and nets insides of a cell instance.  Method (2) is 
+	 * more likely to have complications.  
+	 * @param d The current design 
+	 * @param hierarchicalCellName The name of the hierarchical cell to become a black box.
+	 */
+	public static void makeBlackBox(Design d, String hierarchicalCellName){
+		EDIFCellInst cellInst = d.getNetlist().getCellInstFromHierName(hierarchicalCellName);
+		if(cellInst == null) throw new RuntimeException("ERROR: Couldn't find cell " + hierarchicalCellName + " in source design " + d.getName());
+		
+		Set<SiteInst> touched = new HashSet<>();
+		Map<String,String> boundaryNets = new HashMap<>();
+		
+		// Find all the nets that connect to the cell (keep them)
+		for(EDIFPortInst portInst : cellInst.getPortInsts()){
+			EDIFNet net = portInst.getNet();
+			String hierNetName = EDIFTools.getHierarchicalRootFromPinName(hierarchicalCellName) + EDIFTools.EDIF_HIER_SEP + net.getName();
+			String parentNetName = d.getNetlist().getParentNetName(hierNetName);
+			boundaryNets.put(parentNetName, portInst.isOutput() ? hierNetName : null);
+		}
+		
+		// Remove all placement and routing information related to the cell to be blackboxed
+		for(EDIFHierCellInst i : d.getNetlist().getAllLeafDescendants(hierarchicalCellName)){
+			// Get the physical cell, make sure we can unplace/unroute it first 
+			Cell c = d.getCell(i.getFullHierarchicalInstName());
+			if(c == null) {
+				continue;
+			}
+			BEL bel = c.getBEL();
+			SiteInst si = c.getSiteInst();
+			
+			// Remove all physical nets first
+			for(String logPin : c.getPinMappingsP2L().values()){
+				SitePinInst pin = c.getSitePinFromLogicalPin(logPin, null);
+				if(pin == null) continue;
+				if(pin.getNet() == null) continue;
+				Net net = pin.getNet();
+				net.removePin(pin, true);
+				if(boundaryNets.containsKey(net.getName())) continue;
+				if(net.isStaticNet()) continue;
+				d.removeNet(net);
+				
+				// Unroute site connections 
+				String physPinName = c.getPhysicalPinMapping(logPin);
+				if(physPinName != null){
+					BELPin belPin = c.getBEL().getPin(physPinName);
+					si.unrouteIntraSiteNet(belPin, belPin); 					
+				}
+			}
+			touched.add(c.getSiteInst());
+			
+			c.unplace();
+			d.removeCell(c.getName());
+			si.removeCell(bel);
+		}
+		
+		// Clean up any cells from Transformed Prims
+		for(SiteInst si : d.getSiteInsts()){
+			for(Cell c : si.getCells()){
+				if(c.getName().startsWith(hierarchicalCellName + EDIFTools.EDIF_HIER_SEP)){
+					touched.add(si);
+				}
+			}
+		}
+		
+		Map<Net, String> netsToUpdate = new HashMap<>();
+		// Update black box output nets with new net names (those with sinks inside the black box)
+		for(Net n : d.getNets()){
+			String newName = boundaryNets.get(n.getName());
+			if(newName != null){
+				netsToUpdate.put(n, newName);
+			}
+		}
+		
+		for(Entry<Net, String> e : netsToUpdate.entrySet()){
+			EDIFHierNet newSource = d.getNetlist().getHierNetFromName(e.getValue());
+			DesignTools.updateNetName(d, e.getKey(), newSource.getNet(), e.getValue());
+		}
+		
+		// Clean up SiteInst objects
+		for(SiteInst siteInst : touched){
+			d.removeSiteInst(siteInst);
+		}
+		
+		// Make EDIFCell blackbox
+		EDIFCell blackBox = new EDIFCell(cellInst.getCellType().getLibrary(),"black_box");
+		for(EDIFPort port : cellInst.getCellType().getPorts()){
+			blackBox.addPort(port);
+		}
+		cellInst.setCellType(blackBox);
+		cellInst.addProperty(EDIFCellInst.BLACK_BOX_PROP, true);
+	}
+
+	/**
+	 * Helper method for makeBlackBox().  When cutting out nets that used
+	 * to be source'd from something inside a black box, the net names
+	 * need to be updated.
+	 * @param d The current design 
+	 * @param currNet Current net that requires a name change
+	 * @param newSource The source net (probably a pin on the black box) 
+	 * @param newName New name for the net
+	 * @return True if the operation succeeded, false otherwise.
+	 */
+	private static Net updateNetName(Design d, Net currNet, EDIFNet newSource, String newName){
+		List<PIP> pips = currNet.getPIPs();
+		List<SitePinInst> pins = currNet.getPins();
+		
+		d.removeNet(currNet);
+		
+		Net newNet = d.createNet(newName, newSource);
+		newNet.setPIPs(pips);
+		for(SitePinInst pin : pins){
+			newNet.addPin(pin);
+		}
+		
+		return newNet;
 	}
 }
