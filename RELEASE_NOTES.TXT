@@ -1,3 +1,20 @@
+============= RapidWright 2018.3.2-beta released on 2019-03-28 =================
+Notes:
+ - API Additions:
+   - com.xilinx.rapidwright.design.Cell "public boolean updateName(String newCellName)"
+   - com.xilinx.rapidwright.design.Cell "public boolean isPlaced()"
+   - com.xilinx.rapidwright.design.Design "public Cell addCell(Cell c)"
+   - com.xilinx.rapidwright.design.Design "public void addSiteInst(SiteInst inst)";
+   - com.xilinx.rapidwright.design.Design "public Net addNet(Net net)";
+   - com.xilinx.rapidwright.design.Net "public boolean updateName(String newName)"
+ - Fixes an issue related to creating a module instance if the cell instance isn't already present in the netlist
+ - Adds return value for
+ - com.xilinx.rapidwright.design.Design.removeNet(*), returns the net that was removed or null if unsuccessful
+ - Changed behavior of com.xilinx.rapidwright.design.Design.removeSiteInst(SiteInst) -- now only unroutes portions of nets connected to SiteInst rather than the entire net.
+ - Fixed potential NPE case in com.xilinx.rapidwright.design.Design.removeCell(Cell).
+ - Changed com.xilinx.rapidwright.design.Net.addPins(ArrayList<SitePinInst>) to accept List<SitePinInst>.
+ - Fixed an issue when unrouting partial nets in com.xilinx.rapidwright.design.Net.unroute().
+
 ============= RapidWright 2018.3.1-beta released on 2019-02-27 =================
 Notes:
  - API Additions:
