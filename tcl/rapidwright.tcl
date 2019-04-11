@@ -444,6 +444,7 @@ proc prep_for_block_stitcher {} {
         }
         close $fp_jobs
         puts "Running opt_design jobs..."
+	puts "java com.xilinx.rapidwright.util.JobQueue $jobs_file_name"
         puts [exec java com.xilinx.rapidwright.util.JobQueue $jobs_file_name]
     }    
 }
