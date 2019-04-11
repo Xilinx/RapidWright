@@ -90,7 +90,7 @@ public class EDIFHierNet {
 	}
 	
 	public String getHierarchicalNetName(){
-		if(this.hierarchicalInstName.equals("")){
+		if(this.hierarchicalInstName.length() == 0){
 			return net.getName();
 		}
 		return this.hierarchicalInstName + EDIFTools.EDIF_HIER_SEP + net.getName();

@@ -172,6 +172,21 @@ public class EDIFNetlist extends EDIFName {
 		}
 	}
 	
+	public void removeUnusedCellsFromWorkLibrary(){
+		HashMap<String,EDIFCell> cellsToRemove = new HashMap<>(getWorkLibrary().getCellMap());
+		
+		for(EDIFHierCellInst i : getAllDescendants("", null, false)){
+			if(i.getCellType().getLibrary().getName().equals(EDIFTools.EDIF_LIBRARY_WORK_NAME)){
+				cellsToRemove.remove(i.getCellType().getEDIFName());
+			}
+		}
+		
+		for(String name : cellsToRemove.keySet()){
+			getWorkLibrary().removeCell(name);
+			System.out.println(name);
+		}
+	}
+	
 	/**
 	 * Iterates through libraries to find first cell with matching name and 
 	 * returns it.
@@ -541,6 +556,7 @@ public class EDIFNetlist extends EDIFName {
 	}
 	
 	private String convertWildcardToRegex(String wildcardPattern){
+		if(wildcardPattern == null) return null;
 		StringBuilder sb = new StringBuilder();
 		for(int i=0; i < wildcardPattern.length(); i++){
 			char c = wildcardPattern.charAt(i);
@@ -582,7 +598,6 @@ public class EDIFNetlist extends EDIFName {
 		Queue<EDIFHierCellInst> q = new LinkedList<>();
 		q.add(new EDIFHierCellInst(instanceName, eci));
 		String pattern = convertWildcardToRegex(wildcardPattern);
-		System.out.println(pattern);
 		Pattern pat = wildcardPattern != null ? Pattern.compile(pattern) : null;
 		
 		while(!q.isEmpty()){
@@ -869,6 +884,48 @@ public class EDIFNetlist extends EDIFName {
 		return getPhysicalNetPinMap().get(parentNetName);
 	}
 
+	/**
+	 * Gets all the primitive pin sinks that are strict descendants of
+	 * this provided net.
+	 * @param net The net to trace to its sinks.
+	 * @return The list of all sink pins on primitive cells that are descendants 
+	 * of the provided net 
+	 */
+	public List<EDIFHierPortInst> getSinksFromNet(EDIFHierNet net){
+		Queue<EDIFHierNet> q = new LinkedList<>();
+		q.add(net);
+		ArrayList<EDIFHierPortInst> sinks = new ArrayList<>();
+		HashSet<String> visited = new HashSet<>();
+		while(!q.isEmpty()){
+			EDIFHierNet curr = q.poll();
+			if(visited.contains(curr.getHierarchicalNetName())) continue;
+			visited.add(curr.getHierarchicalNetName());
+			for(EDIFPortInst portInst : curr.getNet().getPortInsts()){
+				if(portInst.isOutput()) continue;
+				if(portInst.isTopLevelPort()){
+					// Going up in hierarchy
+					EDIFCellInst cellInst = getCellInstFromHierName(curr.getHierarchicalInstName());
+					EDIFPortInst epr = cellInst.getPortInst(portInst.getPortInstNameFromPort());
+					if(epr == null || epr.getNet() == null) continue;
+					String hierName = EDIFTools.getHierarchicalRootFromPinName(curr.getHierarchicalInstName());
+					q.add(new EDIFHierNet(hierName, epr.getNet()));
+				}else if(portInst.getCellInst().getCellType().isPrimitive()){
+					// We found a sink
+					sinks.add(new EDIFHierPortInst(curr.getHierarchicalInstName(),portInst));
+					continue;
+				}else{
+					// Going down in hierarchy
+					EDIFNet internalNet = portInst.getInternalNet();
+					String hierName = curr.getHierarchicalInstName() + EDIFTools.EDIF_HIER_SEP + portInst.getCellInst().getName();
+					q.add(new EDIFHierNet(hierName,internalNet));
+				}
+			}
+			
+		}
+		
+		return sinks;
+	}
+	
 	/**
 	 * @param netlist
 	 * @param cellInstMap 
