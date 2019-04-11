@@ -22,6 +22,8 @@
  */
 package com.xilinx.rapidwright.design;
 
+import com.xilinx.rapidwright.edif.EDIFTools;
+
 /**
  * This enum is simply a way to check net types easier than using Strings.
  * @author Chris Lavin
@@ -37,8 +39,12 @@ public enum NetType{
 		if(name == null || name.equals("")) return UNKNOWN;
 		if(name.equals(Net.GND_NET)) return GND;
 		if(name.equals(Net.VCC_NET)) return VCC;
-		if(name.endsWith("<const0>")) return GND;
-		if(name.endsWith("<const1>")) return VCC;
+		if(name.endsWith(EDIFTools.LOGICAL_GND_NET_NAME)) return GND;
+		if(name.endsWith(EDIFTools.LOGICAL_VCC_NET_NAME)) return VCC;
 		return WIRE;
+	}
+	
+	public boolean isStaticNetType(){
+		return this == GND || this == VCC; 
 	}
 }
