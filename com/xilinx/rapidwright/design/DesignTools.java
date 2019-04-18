@@ -35,10 +35,12 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.PriorityQueue;
+import java.util.Queue;
 import java.util.Set;
 
 import com.xilinx.rapidwright.design.blocks.UtilizationType;
@@ -54,6 +56,7 @@ import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierNet;
+import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPort;
@@ -829,6 +832,71 @@ public class DesignTools {
 	}
 
 	/**
+	 * Creates a map from Node to a list of PIPs for a given list of PIPs 
+	 * (likely from the routing of a net).
+	 * @param route The list of PIPs to create the map from.
+	 * @return The map of all involved nodes to their respectively connected PIPs.
+	 */
+	public static Map<Node, ArrayList<PIP>> getNodePIPMap(List<PIP> route){
+		Map<Node,ArrayList<PIP>> conns = new HashMap<>();
+		// Create a map from nodes to PIPs
+		for(PIP pip : route){
+			for(int wireIndex : new int[]{pip.getStartWireIndex(), pip.getEndWireIndex()}){
+				Node curr = new Node(pip.getTile(), wireIndex);
+				ArrayList<PIP> pips = conns.get(curr);
+				if(pips == null){
+					pips = new ArrayList<>();
+					conns.put(curr, pips);
+				}
+				pips.add(pip);
+			}	
+		}
+		return conns;
+	}
+	
+	/**
+	 * Examines the routing of a net and will remove all parts of the routing
+	 * that connect to the provided node.  This is most useful when attempting to
+	 * unroute parts of a static (VCC/GND) net that have multiple sources.  
+	 * @param net The net with potential disjoint routing trees
+	 * @param node Node belonging to the routing tree to remove.
+	 * @return True if PIPs were removed, false otherwise
+	 */
+	public static boolean removeConnectedRouting(Net net, Node node){
+		HashSet<PIP> toRemove = new HashSet<>();
+		Map<Node,ArrayList<PIP>> conns = getNodePIPMap(net.getPIPs());
+
+		// Traverse the connected set of PIPs starting from the node
+		Queue<Node> q = new LinkedList<>();
+		q.add(node);
+		while(!q.isEmpty()){
+			Node curr = q.poll();
+			ArrayList<PIP> pips = conns.get(curr);
+			if(pips == null) continue;
+			for(PIP p : pips){
+				// Be careful to detect a cycle
+				if(!toRemove.contains(p)){
+					toRemove.add(p);
+					Node startNode = new Node(p.getTile(), p.getStartWireIndex()); 
+					q.add(curr.equals(startNode) ? startNode : new Node(p.getTile(), p.getEndWireIndex()));
+				}
+			}
+		}
+		
+		if(toRemove.size() == 0) return false;
+		
+		// Update net with new PIPs
+		ArrayList<PIP> keep = new ArrayList<>();
+		for(PIP p : net.getPIPs()){
+			if(toRemove.contains(p)) continue;
+			keep.add(p);
+		}
+		net.setPIPs(keep);
+		
+		return true;
+	}
+	
+	/**
 	 * Turns the cell named hierarchicalCellName into a blackbox and removes any 
 	 * associated placement and routing information associated with that instance. In Vivado,
 	 * this can be accomplished by running: (1) 'update_design -cells <name> -black_box' or (2)
@@ -838,18 +906,41 @@ public class DesignTools {
 	 * @param hierarchicalCellName The name of the hierarchical cell to become a black box.
 	 */
 	public static void makeBlackBox(Design d, String hierarchicalCellName){
-		EDIFCellInst cellInst = d.getNetlist().getCellInstFromHierName(hierarchicalCellName);
-		if(cellInst == null) throw new RuntimeException("ERROR: Couldn't find cell " + hierarchicalCellName + " in source design " + d.getName());
+		EDIFCellInst futureBlackBox = d.getNetlist().getCellInstFromHierName(hierarchicalCellName);
+		if(futureBlackBox == null) throw new RuntimeException("ERROR: Couldn't find cell " + hierarchicalCellName + " in source design " + d.getName());
 		
 		Set<SiteInst> touched = new HashSet<>();
 		Map<String,String> boundaryNets = new HashMap<>();
 		
 		// Find all the nets that connect to the cell (keep them)
-		for(EDIFPortInst portInst : cellInst.getPortInsts()){
+		for(EDIFPortInst portInst : futureBlackBox.getPortInsts()){
 			EDIFNet net = portInst.getNet();
-			String hierNetName = EDIFTools.getHierarchicalRootFromPinName(hierarchicalCellName) + EDIFTools.EDIF_HIER_SEP + net.getName();
+			String hierParentName = EDIFTools.getHierarchicalRootFromPinName(hierarchicalCellName);
+			String hierNetName = hierParentName + EDIFTools.EDIF_HIER_SEP + net.getName();
 			String parentNetName = d.getNetlist().getParentNetName(hierNetName);
 			boundaryNets.put(parentNetName, portInst.isOutput() ? hierNetName : null);
+
+			// Remove parts of routed GND/VCC nets exiting the black box
+			if(portInst.isInput()) continue;
+			NetType netType = NetType.getNetTypeFromNetName(parentNetName);
+			if(netType.isStaticNetType()){
+				// Black box is supplying VCC/GND, we must unroute connected tree
+				EDIFHierNet hierNet = new EDIFHierNet(hierParentName, net);
+				List<EDIFHierPortInst> sinks = d.getNetlist().getSinksFromNet(hierNet);
+				// extract site wire and site pins and nodes to unroute
+				for(EDIFHierPortInst sink : sinks){
+					Cell c = d.getCell(sink.getFullHierarchicalInstName());
+					if(c == null || !c.isPlaced()) continue;
+					SiteInst i = c.getSiteInst();
+					String logicalPinName = sink.getPortInst().getName();
+					String sitePinName = c.getCorrespondingSitePinName(logicalPinName);
+					SitePinInst pin = i.getSitePinInst(sitePinName);
+					Net staticNet = d.getStaticNet(netType);
+					removeConnectedRouting(staticNet, new Node(pin.getTile(),pin.getConnectedTileWire()));
+					BELPin snk = c.getBEL().getPin(c.getPhysicalPinMapping(logicalPinName));
+					i.unrouteIntraSiteNet(i.getSite().getBELPin(sitePinName), snk);
+				}
+			}
 		}
 		
 		// Remove all placement and routing information related to the cell to be blackboxed
@@ -916,12 +1007,12 @@ public class DesignTools {
 		}
 		
 		// Make EDIFCell blackbox
-		EDIFCell blackBox = new EDIFCell(cellInst.getCellType().getLibrary(),"black_box");
-		for(EDIFPort port : cellInst.getCellType().getPorts()){
+		EDIFCell blackBox = new EDIFCell(futureBlackBox.getCellType().getLibrary(),"black_box");
+		for(EDIFPort port : futureBlackBox.getCellType().getPorts()){
 			blackBox.addPort(port);
 		}
-		cellInst.setCellType(blackBox);
-		cellInst.addProperty(EDIFCellInst.BLACK_BOX_PROP, true);
+		futureBlackBox.setCellType(blackBox);
+		futureBlackBox.addProperty(EDIFCellInst.BLACK_BOX_PROP, true);
 	}
 
 	/**

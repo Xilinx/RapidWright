@@ -1217,7 +1217,7 @@ public class FileTools {
 		}
 	}
 	
-	private static final int BINARY_CHECK_LENGTH = 4096;
+	private static final int BINARY_CHECK_LENGTH = 8192;
 	private static byte[] binaryCheckData; 
 
 	public static boolean isDataBinary(InputStream is){

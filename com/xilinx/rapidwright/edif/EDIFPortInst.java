@@ -204,6 +204,12 @@ public class EDIFPortInst {
 		return parentNet;
 	}
 
+	public EDIFNet getInternalNet(){
+		EDIFCellInst cellInst = getCellInst();
+		if(cellInst == null) return null;
+		return cellInst.getCellType().getInternalNet(this);
+	}
+	
 	/**
 	 * @param parentNet the parentNet to set
 	 */
