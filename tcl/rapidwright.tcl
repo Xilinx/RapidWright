@@ -76,7 +76,7 @@ proc compile_block_dcp { dcpFile } {
         
         # Generate constraint
         puts "args $urptName $shapesFileName"
-	if { [catch {set pBlockVal [exec java -Xmx2G com.xilinx.rapidwright.design.blocks.PBlockGenerator -u $urptName -s $shapesFileName -c 1]}] } {
+	if { [catch {set pBlockVal [exec java --illegal-access=deny -Xmx2G com.xilinx.rapidwright.design.blocks.PBlockGenerator -u $urptName -s $shapesFileName -c 1]}] } {
 	    set pBlockVal "PBlockGenerator Failed!"
 	}
         puts "pBlock = $pBlockVal, from: $urptName $shapesFileName"

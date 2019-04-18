@@ -40,6 +40,8 @@ public class LocalJob extends Job {
 
 	private Process p;
 	
+	private static int jobCount = 0;
+	
 	/* (non-Javadoc)
 	 * @see com.xilinx.rapidwright.util.Job#launchJob()
 	 */
@@ -78,6 +80,9 @@ public class LocalJob extends Job {
 
 	
 	public long getProcessID(){
+		/* -- This technique uses reflective access to private members of protected JDK classes
+		 * -- and causes warnings and potentially future errors.  We will just use a running
+		 * -- count for unique IDs.
 		String className = p.getClass().getName();
 		if(className.equals("java.lang.UNIXProcess")){
 			try{
@@ -96,8 +101,8 @@ public class LocalJob extends Job {
 				return -1;
 			}
 		}
-		
-		return -1;
+		*/
+		return ++jobCount;
 	}
 
 	/* (non-Javadoc)
