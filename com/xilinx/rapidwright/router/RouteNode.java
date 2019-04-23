@@ -23,7 +23,9 @@
 package com.xilinx.rapidwright.router;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.PriorityQueue;
 
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Device;
@@ -381,5 +383,16 @@ public class RouteNode{
 		RouteNode n = new RouteNode(w.getTile(), w.getWireIndex());
 		n.setParent(parent);
 		return n;
+	}
+	
+	
+	/**
+	 * Creates a new priority queue that sorts route nodes based on
+	 * their lowest cost (see {@link RouteNode#getCost()}).  
+	 * @return The newly created priority queue.
+	 */
+	public static PriorityQueue<RouteNode> getPriorityQueue(){
+		return new PriorityQueue<RouteNode>(16, new Comparator<RouteNode>() {
+			public int compare(RouteNode i, RouteNode j) {return i.getCost() - j.getCost();}});
 	}
 }
