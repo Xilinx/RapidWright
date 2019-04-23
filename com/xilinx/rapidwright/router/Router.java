@@ -49,6 +49,7 @@ import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePIP;
 import com.xilinx.rapidwright.device.SitePin;
@@ -941,9 +942,9 @@ public class Router extends AbstractRouter {
 		return sources;
 	}
 	
-	public boolean isSwitchBox(Tile t){
+	public static boolean isSwitchBox(Tile t){
 		TileTypeEnum tt = t.getTileTypeEnum();
-		if(design.getPart().isSeries7()){
+		if(t.getDevice().getSeries() == Series.Series7){
 			return tt == TileTypeEnum.INT_L || tt == TileTypeEnum.INT_R;
 		}
 		return tt == TileTypeEnum.INT;
@@ -1737,7 +1738,7 @@ public class Router extends AbstractRouter {
 				sink.setRouted(true);
 			}
 			
-			
+			currNet.setPIPs(netPIPs);
 		}
 		
 	}
@@ -1878,7 +1879,7 @@ public class Router extends AbstractRouter {
 	public void routeStaticNets(){
 		for(String staticNetName : new String[]{Net.GND_NET, Net.VCC_NET} ){
 			Net staticNet = design.getNet(staticNetName); 
-			if(staticNet.getPIPs().size() == 0){
+			if(staticNet != null && staticNet.getPIPs().size() == 0){
 				currNet = staticNet;
 				// release some reservedNodes
 				ArrayList<RouteNode> rNodes = reservedNodes.remove(currNet);
@@ -2032,7 +2033,7 @@ public class Router extends AbstractRouter {
 	 * @return A wire (tile and wire) of a switch box that can drive the site pin, or null
 	 * if none could be found.
 	 */
-	public ArrayList<RouteNode> findInputPinFeed(SitePinInst p){
+	public static ArrayList<RouteNode> findInputPinFeed(SitePinInst p){
 		Site site = p.getSiteInst().getSite();
 		String pinName = p.getName();
 		Tile t = site.getTile();
