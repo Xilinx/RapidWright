@@ -796,6 +796,11 @@ public class EDIFNetlist extends EDIFName {
 		return parentNetMap;
 	}
 	
+	public void resetParentNetMap(){
+		parentNetMap = null;
+		physicalNetPinMap = null;
+	}
+	
 	private void generateParentNetMap(){
 		long start = 0;
 		if(DEBUG){
