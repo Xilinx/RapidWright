@@ -534,6 +534,9 @@ public class DesignTools {
 		// Get the connected site pin from cell pin 
 		String sitePinName = cellPin.getConnectedSitePinName();
 		if(sitePinName == null){
+			sitePinName = cell.getCorrespondingSitePinName(cellPinName);
+		}
+		if(sitePinName == null){
 			throw new RuntimeException("ERROR: Couldn't find corresponding site pin for element pin " + cellPin + ".");
 		}
 		if(!cell.getSiteInst().getSite().hasPin(sitePinName)){
@@ -543,7 +546,8 @@ public class DesignTools {
 		SitePinInst sitePin = new SitePinInst(cellPin.isOutput(), sitePinName, cell.getSiteInst());
 		if(sitePin.isOutPin()){
 			SitePinInst oldSource = net.replaceSource(sitePin);
-			oldSource.detachSiteInst();
+			if(oldSource != null)
+				oldSource.detachSiteInst();
 		}else{
 			net.addPin(sitePin);			
 		}
