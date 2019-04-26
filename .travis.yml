@@ -24,6 +24,6 @@ branches:
 before_install:
 # Rate limiting will cause this command to fail, we'll need to hard code the jars path for now
 #- curl -s https://api.github.com/repos/Xilinx/RapidWright/releases/latest | grep '/rapidwright_jars.zip' | awk -F'"' '{print $4}' | wget -i -
-- wget https://github.com/Xilinx/RapidWright/releases/download/v2018.3.2-beta/rapidwright_jars.zip
+- wget https://github.com/Xilinx/RapidWright/releases/download/v2018.3.3-beta/rapidwright_jars.zip
 - unzip rapidwright_jars.zip
 

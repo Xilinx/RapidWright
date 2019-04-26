@@ -1,3 +1,21 @@
+============= RapidWright 2018.3.2-beta released on 2019-04-26 =================
+Notes:
+ - API Additions:
+   - com.xilinx.rapidwright.design.Cell "public boolean copyCell(String name, EDIFCellInst edifCellInst)"
+   - com.xilinx.rapidwright.design.Cell "public boolean copyCell(String name, EDIFCellInst edifCellInst, SiteInst i)"
+   - com.xilinx.rapidwright.device.Node "public Node(RouteNode routeNode)"
+   - com.xilinx.rapidwright.device.Node "public Node getStartNode()"
+   - com.xilinx.rapidwright.device.Node "public Node getEndNode()"
+   - com.xilinx.rapidwright.device.Node "public Node getStartRouteNode()"
+   - com.xilinx.rapidwright.device.Node "public Node getEndRouteNode()"
+   - com.xilinx.rapidwright.design.Module "public void setValidPlacements(ArrayList<Site> placements)"
+ - Adds stamp-based placement.  For designs with multiple instances of the same cell, this
+   ability allows users to take an already placed and routed copy of the cell and apply that
+   placement and routing to the various instances.  See DesignTools.stampPlacement() or 
+   com.xilinx.rapidwright.examples.StampPlacement.java.
+ - Several bug fixes (see commit log for details).   
+ 
+ 
 ============= RapidWright 2018.3.2-beta released on 2019-03-28 =================
 Notes:
  - API Additions:

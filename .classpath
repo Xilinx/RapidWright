@@ -2,9 +2,9 @@
 <classpath>
 	<classpathentry excluding="devices/|doc/|images/|jars/|patches/|patches/virtex5/|debug/|data/|ltx_templates/|testFiles/|build/classes/main/com/xilinx/rapidwright/debug/|build/classes/main/com/xilinx/rapidwright/design/blocks/|build/classes/main/com/xilinx/rapidwright/design/parser/|build/classes/main/com/xilinx/rapidwright/device/browser/|build/classes/main/com/xilinx/rapidwright/device/helper/|build/classes/main/com/xilinx/rapidwright/edif/|build/classes/main/com/xilinx/rapidwright/examples/|build/classes/main/com/xilinx/rapidwright/gui/|build/classes/main/com/xilinx/rapidwright/ipi/|build/classes/main/com/xilinx/rapidwright/optimizer/|build/classes/main/com/xilinx/rapidwright/pb/|build/classes/main/com/xilinx/rapidwright/pipeliner/|build/classes/main/com/xilinx/rapidwright/placer/annealer/|build/classes/main/com/xilinx/rapidwright/placer/handPlacer/|build/classes/main/com/xilinx/rapidwright/router/|build/classes/main/com/xilinx/rapidwright/tests/|build/classes/main/com/xilinx/rapidwright/unisim/|build/classes/main/com/xilinx/rapidwright/util/|build/libs/|build/resources/main/|build/tmp/compileJava/|build/tmp/jar/|build/|tcl/" kind="src" path=""/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
-	<classpathentry kind="lib" path="jars/rapidwright-api-lib-2018.3.2.jar">
+	<classpathentry kind="lib" path="jars/rapidwright-api-lib-2018.3.3.jar">
 		<attributes>
-			<attribute name="javadoc_location" value="jar:platform:/resource/RapidWright/jars/rapidwright-api-lib-2018.3.2-javadoc.jar!/"/>
+			<attribute name="javadoc_location" value="jar:platform:/resource/RapidWright/jars/rapidwright-api-lib-2018.3.3-javadoc.jar!/"/>
 		</attributes>
 	</classpathentry>
 	<classpathentry kind="lib" path="jars/reflectasm-1.10.1-shaded.jar"/>
