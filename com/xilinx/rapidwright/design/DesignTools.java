@@ -48,9 +48,11 @@ import com.xilinx.rapidwright.device.BELClass;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.SitePIP;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
+import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
@@ -1042,5 +1044,115 @@ public class DesignTools {
 		}
 		
 		return newNet;
+	}
+
+	/**
+	 * Gets or creates the corresponding SiteInst from the prototype orig from a module.
+	 * @param design The current design from which to get the corresponding site instance.
+	 * @param orig The original site instance (from the module)
+	 * @param newAnchor The new anchor location of the module.
+	 * @param module The Module to use as the template.
+	 * @return The corresponding SiteInst from design if it exists, 
+	 * or a newly created one in the translated location. If the new location
+	 * cannot be determined or is invalid, null is returned.
+	 */
+	public static SiteInst getCorrespondingSiteInst(Design design, SiteInst orig, Site newAnchor, Module module){
+		Tile newTile = Module.getCorrespondingTile(orig.getTile(), newAnchor.getTile(), module.getAnchor().getTile());
+		Site newSite = newTile.getSites()[orig.getSite().getSiteIndexInTile()];
+		SiteInst newSiteInst = design.getSiteInstFromSite(newSite);
+		if(newSiteInst == null){
+			newSiteInst = design.createSiteInst(newSite.getName(), orig.getSiteTypeEnum(), newSite);
+		}
+		return newSiteInst; 
+	}
+
+	/**
+	 * Given a design with multiple identical cell instances, place
+	 * each of those instances using the stamp module template
+	 * at the anchored site locations provided in instPlacements. 
+	 * @param design The top level design with identical multiple cell instances.
+	 * @param stamp The prototype stamp (or stencil) to use for replicated placement and routing.
+	 * This must match identically with the named instances in instPlacements
+	 * @param instPlacements
+	 * @return True if the procedure completed successfully, false otherwise.
+	 */
+	public static boolean stampPlacement(Design design, Module stamp, Map<String,Site> instPlacements){
+		for(Entry<String,Site> e : instPlacements.entrySet()){
+			String instName = e.getKey();
+			String prefix = instName + "/";
+			Site newAnchor = e.getValue();
+			Site anchor = stamp.getAnchor().getSite();
+			
+			// Create New Nets
+			for(Net n : stamp.getNets()){
+				Net newNet = null;
+				if(n.isStaticNet()){
+					newNet = n.getName().equals(Net.GND_NET) ? design.getGndNet() : design.getVccNet();
+				}else{
+					String newNetName = prefix + n.getName();
+					EDIFNet newEDIFNet = design.getNetlist().getNetFromHierName(newNetName);
+					newNet = design.createNet(newNetName, newEDIFNet);					
+				}
+				
+				for(SitePinInst p : n.getPins()){
+					SiteInst newSiteInst = getCorrespondingSiteInst(design, p.getSiteInst(), newAnchor, stamp);
+					if(newSiteInst == null) 
+						return false;
+					SitePinInst newPin = new SitePinInst(p.isOutPin(), p.getName(), newSiteInst);
+					newNet.addPin(newPin);
+				}
+				
+				for(PIP p : n.getPIPs()){
+					Tile newTile = Module.getCorrespondingTile(p.getTile(), newAnchor.getTile(), anchor.getTile());
+					if(newTile == null){
+						return false;
+					}
+					PIP newPIP = new PIP(newTile, p.getStartWireIndex(), p.getEndWireIndex());
+					newNet.addPIP(newPIP);
+				}
+			}	
+	
+			// Create SiteInst & New Cells
+			for(SiteInst si : stamp.getSiteInsts()){
+				SiteInst newSiteInst = getCorrespondingSiteInst(design, si, newAnchor, stamp);
+				if(newSiteInst == null) 
+					return false;
+				for(Cell c : si.getCells()){
+					String newCellName = prefix + c.getName();
+					EDIFCellInst cellInst = design.getNetlist().getCellInstFromHierName(newCellName);
+					if(cellInst == null && c.getEDIFCellInst() != null) {
+						System.out.println("WARNING: Stamped cell not found: " + newCellName);
+						continue;
+					}
+					
+					Cell newCell = c.copyCell(newCellName, cellInst); 
+					design.placeCell(newCell, newSiteInst.getSite(), c.getBEL(), c.getPinMappingsP2L());
+				}
+				
+				for(SitePIP sitePIP : si.getUsedSitePIPs()){
+					newSiteInst.addSitePIP(sitePIP);
+				}
+				
+				for(Entry<String,Net> e2 : si.getNetSiteWireMap().entrySet()){
+					String siteWire = e2.getKey();
+					String netName = e2.getValue().getName();
+					Net newNet = null;
+					if(e2.getValue().isStaticNet()){
+						newNet = netName.equals(Net.GND_NET) ? design.getGndNet() : design.getVccNet(); 
+					}else if(netName.equals(Net.USED_NET)){
+						newNet = design.getNet(Net.USED_NET);
+						if(newNet == null){
+							newNet = new Net(Net.USED_NET);
+						}
+					}else{
+						newNet = design.getNet(prefix + netName);
+					}
+					
+					BELPin[] belPins = newSiteInst.getSite().getBELPins(siteWire);
+					newSiteInst.routeIntraSiteNet(newNet, belPins[0], belPins[0]);
+				}
+			}
+		}
+		return true;
 	}
 }
