@@ -94,8 +94,7 @@ public class LUTTools {
 	 */
 	public static int getLUTSize(EDIFCellInst c){
 		if(!isCellALUT(c)) return 0;
-		String typeName = c.getCellType().getName();
-		return Integer.parseInt(typeName.replace("LUT", ""));
+		return c.getCellType().getName().charAt(3);
 	}
 	
 	/**
