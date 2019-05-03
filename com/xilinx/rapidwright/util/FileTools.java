@@ -1336,12 +1336,12 @@ public class FileTools {
 	 * @return Full path to vivado executable, or throws RuntimeException if not found.  
 	 */
 	public static String getVivadoPath(){
-		String[] cmd = new String[]{isWindows() ? "where" : "which","vivado"};
+		String[] cmd = new String[]{isWindows() ? "where" : "which",isWindows() ? "vivado.bat" : "vivado"};
 		String output = execCommandGetOutput(true, cmd).get(0);
 		if(output.contains("INFO:") || output.contains("which: no")){
 			throw new RuntimeException("ERROR: Couldn't find vivado on PATH");
 		}
-		return output.trim();
+		return output.trim().replace("\\", "/");
 	}
 	
 	private static String currentOS = null;

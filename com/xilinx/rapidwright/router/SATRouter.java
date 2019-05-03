@@ -131,8 +131,6 @@ public class SATRouter {
 	 * must be located within the pblock.
 	 */
 	public SATRouter(Design design, PBlock pblock, Collection<Net> netsToRoute){
-		if(FileTools.isWindows()) 
-			throw new RuntimeException("Sorry, this tool is not currently supported in Windows.  Please try again in Linux");
 		init(design,pblock);
 		this.netsToRoute = new HashSet<>(netsToRoute);
 	}
@@ -460,7 +458,7 @@ public class SATRouter {
 		if(vivadoPath == null || vivadoPath.length() == 0){
 			throw new RuntimeException("ERROR: Couldn't find vivado, please set PATH environment variable accordingly.");
 		}
-		String loaderPath = FileTools.getVivadoPath().replace("bin/vivado", "bin/loader");
+		String loaderPath = vivadoPath.replace("bin/vivado", "bin/loader");
 		List<String> command = new ArrayList<>();
 		command.add(loaderPath);
 		command.add("-exec");
