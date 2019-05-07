@@ -207,7 +207,7 @@ public class Installer {
 			if(jar.contains("macosx") || jar.contains("linux32") || jar.contains("win32")) continue;
 			if(isWindows && jar.contains("linux64")) continue;
 			if(!isWindows && jar.contains("win64")) continue;
-			
+			if(!jar.toLowerCase().endsWith(".jar")) continue;
 			if(sb.length() > 0) sb.append(File.pathSeparator);
 			sb.append(jarsDir);
 			sb.append(File.separator);
