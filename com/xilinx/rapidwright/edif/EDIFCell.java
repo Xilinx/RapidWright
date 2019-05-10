@@ -148,8 +148,16 @@ public class EDIFCell extends EDIFPropertyObject {
 	}
 	/**
 	 * Adds a port to the cell.  Checks for naming collisions and throws
-	 * RuntimeException if it occurs. Note that ports are mapped by bus 
-	 * name (bracket ranges are removed).
+	 * RuntimeException if it occurs. Note that ports are usually keyed by
+	 * bus name (see {@link EDIFPort#getBusName()}) to enable getPort() to 
+	 * only require the bus name for getting a port.  However, is situations
+	 * where the bus name collides with a single bit bus name, the range
+	 * is included for the multi-bit bus and getPort() requires the range.  
+	 * This is only in the case where a single bit bus collides by having the 
+	 * same name.  For example single bit port 'my_port[0]' and multi-bit port 
+	 * 'my_port[0][3:0]' being added will require that requesting the multi-bit
+	 * port through getPort() will require the entire name 'my_port[0][3:0]'.  
+	 * Ultimately this naming scheme is discouraged. 
 	 * @param port The port to add.
 	 * @return The port that was added.
 	 */
@@ -158,16 +166,34 @@ public class EDIFCell extends EDIFPropertyObject {
 		port.setParentCell(this);
 		EDIFPort collision = ports.put(port.getBusName(),port);
 		if(collision != null && port != collision){
-			throw new RuntimeException("ERROR: Name collsion inside EDIFCell " + 
-				getName() + ", trying to add port " + port.getName() +
-				" which already exists inside this cell.");
+			if(collision.getWidth() != port.getWidth()) {
+				// We have a situation where two ports have the same root name,
+				// For example:
+				//   my_port[0]
+				//   my_port[0][3:0]
+				//
+				if(collision.getWidth() > 1) {
+					ports.put(collision.getName(), collision);
+				}else {
+					ports.put(collision.getBusName(), collision);
+					ports.put(port.getName(), port);
+				}				
+			}else {
+				throw new RuntimeException("ERROR: Name collsion inside EDIFCell " +
+					getName() + ", trying to add port " + port.getName() +
+					" which already exists inside this cell.");
+			}
+			 
 		}
 		return port;
 	}
 	
 	/**
-	 * Gets a port by bus name (Port.getBusName()).  Multi-bit ports need to 
-	 * have brackets removed.	
+	 * Gets a port by bus name (see {@link EDIFPort#getBusName()}).  Multi-bit ports need to 
+	 * have brackets removed unless the {@link EDIFCell} already has a port
+	 * with the same name as the bus name of the multi-bit port.  In only this case,
+	 * the range would be required in order to distinguish the ambiguity.  
+	 * See {@link EDIFCell#addPort(EDIFPort)} for more information.	
 	 * @param name Bus name of the port to get.
 	 * @return The port or null if none exists.
 	 */
