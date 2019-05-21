@@ -65,6 +65,7 @@ import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.router.RouteNode;
+import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.MessageGenerator;
 import com.xilinx.rapidwright.util.Utils;
 
@@ -912,14 +913,17 @@ public class DesignTools {
 	 * @param hierarchicalCellName The name of the hierarchical cell to become a black box.
 	 */
 	public static void makeBlackBox(Design d, String hierarchicalCellName){
+		CodePerfTracker t = CodePerfTracker.SILENT;//  new CodePerfTracker("makeBlackBox", true);
+		t.start("Init");
 		EDIFCellInst futureBlackBox = d.getNetlist().getCellInstFromHierName(hierarchicalCellName);
 		if(futureBlackBox == null) throw new RuntimeException("ERROR: Couldn't find cell " + hierarchicalCellName + " in source design " + d.getName());
 		
 		Set<SiteInst> touched = new HashSet<>();
 		Map<String,String> boundaryNets = new HashMap<>();
 		
+		t.stop().start("Find border nets");
 		// Find all the nets that connect to the cell (keep them)
-		for(EDIFPortInst portInst : futureBlackBox.getPortInsts()){
+		for(EDIFPortInst portInst : futureBlackBox.getPortInsts()){		
 			EDIFNet net = portInst.getNet();
 			String hierParentName = EDIFTools.getHierarchicalRootFromPinName(hierarchicalCellName);
 			String hierNetName = hierParentName + EDIFTools.EDIF_HIER_SEP + net.getName();
@@ -942,15 +946,25 @@ public class DesignTools {
 					String sitePinName = c.getCorrespondingSitePinName(logicalPinName);
 					SitePinInst pin = i.getSitePinInst(sitePinName);
 					Net staticNet = d.getStaticNet(netType);
-					removeConnectedRouting(staticNet, new Node(pin.getTile(),pin.getConnectedTileWire()));
+					Site site = i.getSite();
 					BELPin snk = c.getBEL().getPin(c.getPhysicalPinMapping(logicalPinName));
-					i.unrouteIntraSiteNet(i.getSite().getBELPin(sitePinName), snk);
+					if(pin == null && netType == NetType.GND){
+						// GND post inside the site, let's unroute the site wires
+						i.unrouteIntraSiteNet(site.getBELPin("HARD0GND", "0"), snk);
+						continue;
+					}
+					removeConnectedRouting(staticNet, new Node(pin.getTile(),pin.getConnectedTileWire()));
+					i.unrouteIntraSiteNet(site.getBELPin(sitePinName), snk);
 				}
 			}
 		}
 		
+		t.stop().start("Remove p&r");
+
+		List<EDIFHierCellInst> allLeafs = d.getNetlist().getAllLeafDescendants(hierarchicalCellName);
+
 		// Remove all placement and routing information related to the cell to be blackboxed
-		for(EDIFHierCellInst i : d.getNetlist().getAllLeafDescendants(hierarchicalCellName)){
+		for(EDIFHierCellInst i : allLeafs){
 			// Get the physical cell, make sure we can unplace/unroute it first 
 			Cell c = d.getCell(i.getFullHierarchicalInstName());
 			if(c == null) {
@@ -984,6 +998,8 @@ public class DesignTools {
 			si.removeCell(bel);
 		}
 		
+		t.stop().start("cleanup t-prims");
+		
 		// Clean up any cells from Transformed Prims
 		for(SiteInst si : d.getSiteInsts()){
 			for(Cell c : si.getCells()){
@@ -992,6 +1008,8 @@ public class DesignTools {
 				}
 			}
 		}
+		
+		t.stop().start("new net names");
 		
 		Map<Net, String> netsToUpdate = new HashMap<>();
 		// Update black box output nets with new net names (those with sinks inside the black box)
@@ -1007,10 +1025,14 @@ public class DesignTools {
 			DesignTools.updateNetName(d, e.getKey(), newSource.getNet(), e.getValue());
 		}
 		
+		t.stop().start("cleanup siteinsts");
+		
 		// Clean up SiteInst objects
 		for(SiteInst siteInst : touched){
 			d.removeSiteInst(siteInst);
 		}
+		
+		t.stop().start("create bbox");
 		
 		// Make EDIFCell blackbox
 		EDIFCell blackBox = new EDIFCell(futureBlackBox.getCellType().getLibrary(),"black_box");
@@ -1019,6 +1041,8 @@ public class DesignTools {
 		}
 		futureBlackBox.setCellType(blackBox);
 		futureBlackBox.addProperty(EDIFCellInst.BLACK_BOX_PROP, true);
+		
+		t.stop().printSummary();
 	}
 
 	/**

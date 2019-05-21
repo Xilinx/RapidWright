@@ -921,6 +921,7 @@ public class EDIFNetlist extends EDIFName {
 				}else{
 					// Going down in hierarchy
 					EDIFNet internalNet = portInst.getInternalNet();
+					if(internalNet == null) continue;
 					String hierName = curr.getHierarchicalInstName() + EDIFTools.EDIF_HIER_SEP + portInst.getCellInst().getName();
 					q.add(new EDIFHierNet(hierName,internalNet));
 				}
