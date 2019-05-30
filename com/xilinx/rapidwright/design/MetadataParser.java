@@ -31,6 +31,7 @@ import java.io.FileReader;
 import java.io.IOException;
 
 import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.util.FileTools;
 
 /**
@@ -355,10 +356,16 @@ public class MetadataParser {
 							SiteInst si = m.getSiteInstAtSite(dev.getSite(siteName));
 							
 							SitePinInst p = si.getSitePinInst(pinName);
-							if(p == null){
+							if(p == null){							
 								Net n = si.getNetFromSiteWire(pinName);
 								if(n == null){
-									throw new RuntimeException("ERROR: Don't know net of " + sitePinName);
+									// Check if alternate site type
+									if(si.getSiteTypeEnum() != si.getSite().getSiteTypeEnum()) {
+										String altPinName = si.getAlternateSitePinName(pinName);
+										n = si.getNetFromSiteWire(altPinName);
+									}
+									if(n == null)
+										throw new RuntimeException("ERROR: Don't know net of " + sitePinName);
 								}
 								p = new SitePinInst(si.getSite().isOutputPin(pinName), pinName, si);
 								n.addPin(p);
