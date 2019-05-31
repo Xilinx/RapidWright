@@ -62,6 +62,7 @@ import java.util.zip.ZipInputStream;
 public class Installer {
 
 	public static boolean verbose = false;
+	public static boolean KEEP_ZIP_FILES = false;
 	public static boolean SKIP_ZIP_DOWNLOAD = false;
 	public static boolean SKIP_TEST = false;
 	
@@ -255,6 +256,8 @@ public class Installer {
 		for(String arg : args){
 			if(arg.equals("-v") || arg.equals("--verbose")){
 				verbose = true;
+			}else if(arg.equals("-k") || arg.equals("--keep-zip-file")){
+				KEEP_ZIP_FILES = true;
 			}else if(arg.equals("-s") || arg.equals("--skip-zip-download")){
 				SKIP_ZIP_DOWNLOAD = true;
 			}else if(arg.equals("-t") || arg.equals("--skip-test")){
@@ -268,6 +271,8 @@ public class Installer {
 								 + "  Options\n"
 								 + "  --------\n"
 								 + "  -v, --verbose           : Prints the commands run from a Java ProcessBuilder\n"
+								 + "  -k, --keep-zip-file     : Does not delete downloaded data and jar zip files\n"
+								 + "                            at the end of a successful install\n"
 								 + "  -s, --skip-zip-download : Uses local copies of the data and jar zip  in the\n"
 								 + "                            same directory instead of downloading them.\n"
 								 + "  -t, --skip-test         : Skips the attempt to test RapidWright by opening\n"
@@ -507,12 +512,12 @@ public class Installer {
 		System.out.println("    BAT (Windows): "+bat + "\n");
 		
 		String cwd = System.getProperty("user.dir") + File.separator;
-		if(returnVal == 0 && !SKIP_ZIP_DOWNLOAD){
+		if(returnVal == 0 && (!SKIP_ZIP_DOWNLOAD || !KEEP_ZIP_FILES)){
 			System.out.print("Cleaning up zip files ...");
 			boolean success = new File(cwd + DATA_ZIP).delete();
 			success &= new File(cwd + JARS_ZIP).delete();
 			success &= new File(cwd + MD5_FILE_NAME).delete();
-			if(success) System.out.print("Done.");
+			if(success) System.out.println("Done.");
 			else System.out.println("Problem deleting zip files.");
 			
 		}
