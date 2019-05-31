@@ -512,7 +512,7 @@ public class Installer {
 		System.out.println("    BAT (Windows): "+bat + "\n");
 		
 		String cwd = System.getProperty("user.dir") + File.separator;
-		if(returnVal == 0 && (!SKIP_ZIP_DOWNLOAD || !KEEP_ZIP_FILES)){
+		if(returnVal == 0 && (!SKIP_ZIP_DOWNLOAD && !KEEP_ZIP_FILES)){
 			System.out.print("Cleaning up zip files ...");
 			boolean success = new File(cwd + DATA_ZIP).delete();
 			success &= new File(cwd + JARS_ZIP).delete();
