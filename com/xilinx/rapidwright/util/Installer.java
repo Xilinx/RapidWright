@@ -62,7 +62,10 @@ import java.util.zip.ZipInputStream;
 public class Installer {
 
 	public static boolean verbose = false;
-	public static boolean skip_zip_download = false;
+	public static boolean KEEP_ZIP_FILES = false;
+	public static boolean SKIP_ZIP_DOWNLOAD = false;
+	public static boolean SKIP_TEST = false;
+	
 
 	
 	private static String rwPathVarName = "RAPIDWRIGHT_PATH";
@@ -253,8 +256,12 @@ public class Installer {
 		for(String arg : args){
 			if(arg.equals("-v") || arg.equals("--verbose")){
 				verbose = true;
+			}else if(arg.equals("-k") || arg.equals("--keep-zip-file")){
+				KEEP_ZIP_FILES = true;
 			}else if(arg.equals("-s") || arg.equals("--skip-zip-download")){
-				skip_zip_download = true;
+				SKIP_ZIP_DOWNLOAD = true;
+			}else if(arg.equals("-t") || arg.equals("--skip-test")){
+				SKIP_TEST = true;
 			}else if(arg.equals("-h") || arg.equals("--help")){
 				System.out.println("================================================================================");
 				System.out.println(" RapidWright Installer");
@@ -264,8 +271,12 @@ public class Installer {
 								 + "  Options\n"
 								 + "  --------\n"
 								 + "  -v, --verbose           : Prints the commands run from a Java ProcessBuilder\n"
+								 + "  -k, --keep-zip-file     : Does not delete downloaded data and jar zip files\n"
+								 + "                            at the end of a successful install\n"
 								 + "  -s, --skip-zip-download : Uses local copies of the data and jar zip  in the\n"
 								 + "                            same directory instead of downloading them.\n"
+								 + "  -t, --skip-test         : Skips the attempt to test RapidWright by opening\n"
+								 + "                            the DeviceBrowser (scripted installs).\n" 
 								 + "  -h, --help              : Prints this help message.");
 				return;
 			}
@@ -384,7 +395,7 @@ public class Installer {
 					System.out.println(name + " md5sum is invalid: " + calcMD5Sum + ", should be: " + md5sum);
 				}
 			}
-			if(alreadyDownloaded || skip_zip_download){
+			if(alreadyDownloaded || SKIP_ZIP_DOWNLOAD){
 				if(!new File(name).exists()){
 					System.err.println("  ERROR: Option --skip-zip-download set but could not find file " + name +"\n"
 							+ "  Please remove the option or download the zip file manually and place it in the \n"
@@ -424,31 +435,35 @@ public class Installer {
 		
 		String rwDir = System.getProperty("user.dir") + File.separator + "RapidWright";
 		String classpath = rwDir+File.pathSeparator + jarsClassPath;
-		System.out.println("================================================================================");
-		System.out.println("  4. Let's test the DeviceBrowser in RapidWright ...");
-		System.out.println("================================================================================");
-		System.out.println("  In a few seconds you should see a window open called DeviceBrowser...");
-		cmd = new ArrayList<>(Arrays.asList("java","-cp", classpath, "com.xilinx.rapidwright.device.browser.DeviceBrowser"));
-		String rwPathVarName = "RAPIDWRIGHT_PATH";
-		String existingPath = System.getenv(rwPathVarName);
-		if(existingPath != null && !existingPath.equals("")){
-			System.out.println("  NOTE: You already have the " + rwPathVarName + " set, be sure to update it. ");
-		}
-		
-		returnVal = runCommand(cmd);
-		if(returnVal != 0){
-			System.err.println("  ERROR: Looks like the DeviceBrowser did not run or crashed. Please examine\n"
-					+ "  the output for clues as to what went wrong.  If you are stumped, please request help\n"
-					+ "  on the RapidWright Google Group Forum: https://groups.google.com/forum/#!forum/rapidwright.");
-			if(!isWindows()){
-				System.err.println("\n*** If you are running Linux ***"); 
-				System.err.println("If you are running Linux, a common problem is to be missing libpng12.so.0.\n" +
-								   "If you are running a CentOS/RedHat/Fedora distro, try the following:\n" + 
-								   "    sudo yum install libpng12\n\n" + 
-								   "If you are running a Debian/Ubuntu distro, try the following:\n" + 
-								   "    wget -q -O /tmp/libpng12.deb http://mirrors.kernel.org/ubuntu/pool/main/libp/libpng/libpng12-0_1.2.54-1ubuntu1_amd64.deb && sudo dpkg -i /tmp/libpng12.deb && rm /tmp/libpng12.deb");
+		if(SKIP_TEST){
+			System.out.println("Skipping DeviceBrowser test...");
+		}else{
+			System.out.println("================================================================================");
+			System.out.println("  4. Let's test the DeviceBrowser in RapidWright ...");
+			System.out.println("================================================================================");
+			System.out.println("  In a few seconds you should see a window open called DeviceBrowser...");
+			cmd = new ArrayList<>(Arrays.asList("java","-cp", classpath, "com.xilinx.rapidwright.device.browser.DeviceBrowser"));
+			String rwPathVarName = "RAPIDWRIGHT_PATH";
+			String existingPath = System.getenv(rwPathVarName);
+			if(existingPath != null && !existingPath.equals("")){
+				System.out.println("  NOTE: You already have the " + rwPathVarName + " set, be sure to update it. ");
 			}
-			System.exit(1);
+			
+			returnVal = runCommand(cmd);
+			if(returnVal != 0){
+				System.err.println("  ERROR: Looks like the DeviceBrowser did not run or crashed. Please examine\n"
+						+ "  the output for clues as to what went wrong.  If you are stumped, please request help\n"
+						+ "  on the RapidWright Google Group Forum: https://groups.google.com/forum/#!forum/rapidwright.");
+				if(!isWindows()){
+					System.err.println("\n*** If you are running Linux ***"); 
+					System.err.println("If you are running Linux, a common problem is to be missing libpng12.so.0.\n" +
+									   "If you are running a CentOS/RedHat/Fedora distro, try the following:\n" + 
+									   "    sudo yum install libpng12\n\n" + 
+									   "If you are running a Debian/Ubuntu distro, try the following:\n" + 
+									   "    wget -q -O /tmp/libpng12.deb http://mirrors.kernel.org/ubuntu/pool/main/libp/libpng/libpng12-0_1.2.54-1ubuntu1_amd64.deb && sudo dpkg -i /tmp/libpng12.deb && rm /tmp/libpng12.deb");
+				}
+				System.exit(1);
+			}		
 		}
 		
 		System.out.println("================================================================================");
@@ -497,12 +512,12 @@ public class Installer {
 		System.out.println("    BAT (Windows): "+bat + "\n");
 		
 		String cwd = System.getProperty("user.dir") + File.separator;
-		if(returnVal == 0 && !skip_zip_download){
+		if(returnVal == 0 && (!SKIP_ZIP_DOWNLOAD && !KEEP_ZIP_FILES)){
 			System.out.print("Cleaning up zip files ...");
 			boolean success = new File(cwd + DATA_ZIP).delete();
 			success &= new File(cwd + JARS_ZIP).delete();
 			success &= new File(cwd + MD5_FILE_NAME).delete();
-			if(success) System.out.print("Done.");
+			if(success) System.out.println("Done.");
 			else System.out.println("Problem deleting zip files.");
 			
 		}

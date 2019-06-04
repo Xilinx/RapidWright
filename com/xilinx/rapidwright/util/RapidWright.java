@@ -26,13 +26,9 @@ package com.xilinx.rapidwright.util;
 
 import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.net.URL;
 import java.security.CodeSource;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
 
 import org.python.core.PySystemState;
 import org.python.util.jython;
@@ -54,55 +50,6 @@ public class RapidWright {
 	public static final String JUPYTER_KERNEL_FILENAME = "kernel.json";
 	public static final String JUPYTER_JYTHON_KERNEL_NAME = "jython27";
 	public static final String[] RAPIDWRIGHT_OPTIONS = new String[]{CREATE_JUPYTER_KERNEL, HELP_OPTION_NAME, UNPACK_OPTION_NAME};
-	
-	public static final String[] UNPACK_FOLDERS = new String[]{FileTools.DATA_FOLDER_NAME, FileTools.TCL_FOLDER_NAME, FileTools.IMAGES_FOLDER_NAME};
-	
-	private static boolean folderCheck(String name){
-		if(new File(name).exists()){
-			MessageGenerator.briefError("Couldn't unpack ./"+name+"/ directory, file/directory already exists.");
-			return false;
-		}
-		return true;
-	}
-	
-	public static boolean unPackSupportingJarData(){
-		for(String folderName : UNPACK_FOLDERS){
-			if(!folderCheck(folderName)) return false;
-			try{
-				CodeSource src = Device.class.getProtectionDomain().getCodeSource();
-				if(src == null) {
-					MessageGenerator.briefError("Couldn't locate code source domain");
-					return false;
-				}
-				URL jar = src.getLocation();
-				ZipInputStream zip = new ZipInputStream(jar.openStream());
-				ZipEntry e;
-				byte[] buffer = new byte[1024];
-				while((e = zip.getNextEntry()) != null){
-					String name = e.getName();
-					if(name.startsWith(folderName)){
-						if(!e.isDirectory()){
-							System.out.println("Unpacking " + e.getName());
-							File newFile = new File(e.getName());
-							new File(newFile.getParent()).mkdirs();
-							FileOutputStream fos = new FileOutputStream(newFile);
-							
-							int len = 0;
-							while((len = zip.read(buffer)) > 0){
-								fos.write(buffer, 0, len);
-							}
-							fos.close();
-						}
-					}
-				}
-				zip.close();
-			} catch(IOException e){
-				e.printStackTrace();
-				return false;
-			}
-		}
-		return true;
-	}
 	
 	private static String toWindowsPath(String linuxPath){
 		linuxPath = linuxPath.startsWith("/") ? linuxPath.substring(1) : linuxPath;
@@ -240,7 +187,7 @@ public class RapidWright {
 		} else {
 			for(String s : args){
 				if(s.equals(UNPACK_OPTION_NAME)){
-					boolean success = unPackSupportingJarData();
+					boolean success = FileTools.unPackSupportingJarData();
 					if(success){
 						System.out.println("Successfully unpacked "
 							+ " RapidWright jar data.  Please set the environment "
