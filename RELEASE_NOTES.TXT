@@ -1,4 +1,20 @@
-============= RapidWright 2018.3.2-beta released on 2019-04-26 =================
+============= RapidWright 2019.1.0-beta released on 2019-06-** =================
+Notes:
+ - API Additions:
+   - com.xilinx.rapidwright.device.Node "public boolean isTiedToGnd()"
+   - com.xilinx.rapidwright.device.Node "public boolean isTiedToVcc()"
+   - com.xilinx.rapidwright.device.Node "public boolean isTied()"
+ - Bug Fixes:
+   - Issue #32 - Adding the tied value of a node, see API additions above.
+   - Issue #29 - Site.getIntTile() issues
+   - Issue #12,#28 - Adding 'src' folder as parent to 'com' folder.
+ - Support for Vivado 2019.1 devices.
+ - Changes to enable GraalVM shared library compilation for
+   interoperability with C++ (see documentation for tutorial details).
+ - Several bug fixes (see commit log for details).   
+ 
+
+============= RapidWright 2018.3.3-beta released on 2019-04-26 =================
 Notes:
  - API Additions:
    - com.xilinx.rapidwright.design.Cell "public boolean copyCell(String name, EDIFCellInst edifCellInst)"
