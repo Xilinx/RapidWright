@@ -43,7 +43,9 @@ import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.lang.management.ManagementFactory;
+import java.net.URL;
 import java.nio.channels.FileChannel;
+import java.security.CodeSource;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -103,8 +105,10 @@ public class FileTools {
 	public static final String PART_DUMP_FILE_NAME = DATA_FOLDER_NAME + File.separator + "partdump.csv";
 	/** Location of the main parts database file */
 	public static final String PART_DB_PATH = DATA_FOLDER_NAME + File.separator + "parts.db";
-	/** Common instance of the Kryo class for serialization purposes */
+	/** Common instance of the Kryo class for serialization purposes */	
 	private static Kryo kryo;
+	/** Supporting data folders packed in standalone jars of RapidWright */ 
+	public static final String[] UNPACK_FOLDERS = new String[]{DATA_FOLDER_NAME, TCL_FOLDER_NAME, IMAGES_FOLDER_NAME};
 	/** Static empty array to save on memory */
 	public static int[] emptyIntArray = new int[0];
 	/** Static empty array to save on memory */
@@ -827,7 +831,7 @@ public class FileTools {
 		String rwPath = getRapidWrightPath();
 		if(rwPath == null){
 			// Looks like we may be running from a jar, attempt to extract needed files from jar
-			RapidWright.unPackSupportingJarData();
+			unPackSupportingJarData();
 			// Try again
 			rwPath = getRapidWrightPath();
 		}
@@ -1416,6 +1420,64 @@ public class FileTools {
 			}
 		};
 		return filter;
+	}
+
+
+	/**
+	 * Used for unpacking data files inside a standalone jar to be used 
+	 * for regular use by RapidWright.
+	 * @return True if operation succeeds, false otherwise.
+	 */
+	public static boolean unPackSupportingJarData(){
+		for(String folderName : FileTools.UNPACK_FOLDERS){
+			if(!folderCheck(folderName)) return false;
+			try{
+				CodeSource src = Device.class.getProtectionDomain().getCodeSource();
+				if(src == null) {
+					MessageGenerator.briefError("Couldn't locate code source domain");
+					return false;
+				}
+				URL jar = src.getLocation();
+				ZipInputStream zip = new ZipInputStream(jar.openStream());
+				ZipEntry e;
+				byte[] buffer = new byte[1024];
+				while((e = zip.getNextEntry()) != null){
+					String name = e.getName();
+					if(name.startsWith(folderName)){
+						if(!e.isDirectory()){
+							System.out.println("Unpacking " + e.getName());
+							File newFile = new File(e.getName());
+							new File(newFile.getParent()).mkdirs();
+							FileOutputStream fos = new FileOutputStream(newFile);
+							
+							int len = 0;
+							while((len = zip.read(buffer)) > 0){
+								fos.write(buffer, 0, len);
+							}
+							fos.close();
+						}
+					}
+				}
+				zip.close();
+			} catch(IOException e){
+				e.printStackTrace();
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/** 
+	 * Check if file/folder name is available to be used
+	 * @param name Name of the file/directory to check
+	 * @return True if the the file/folder name is free (unused), false otherwise.
+	 */
+	public static boolean folderCheck(String name){
+		if(new File(name).exists()){
+			MessageGenerator.briefError("File/folder ./"+name+"/ already exists.");
+			return false;
+		}
+		return true;
 	}
 	
 	public static void main(String[] args) {

@@ -244,6 +244,10 @@ public class Utils{
 		ints.add(TileTypeEnum.INT);
 		ints.add(TileTypeEnum.INT_L);
 		ints.add(TileTypeEnum.INT_R);
+		ints.add(TileTypeEnum.INT_L_SLV);
+		ints.add(TileTypeEnum.INT_R_SLV);
+		ints.add(TileTypeEnum.INT_L_SLV_FLY);
+		ints.add(TileTypeEnum.INT_R_SLV_FLY);
 		
 		gts = new HashSet<TileTypeEnum>();
 		gts.add(TileTypeEnum.GTZ_TOP);
