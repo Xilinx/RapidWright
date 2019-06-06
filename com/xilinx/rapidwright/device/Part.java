@@ -29,7 +29,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 
 /**
- * Generated on: Thu Jan 03 15:11:48 2019
+ * Generated on: Fri May 31 18:12:56 2019
  * by: com.xilinx.rapidwright.release.PartNamePopulator
  * 
  * Class used to uniquely represent a Xilinx part.
@@ -136,9 +136,12 @@ public class Part {
 	private static FamilyType[] ultraScaleTypes;
 	private static HashSet<FamilyType> ultraScalePlus;
 	private static FamilyType[] ultraScalePlusTypes;
+	private static HashSet<FamilyType> versal;
+	private static FamilyType[] versalTypes;
 	static {
 		series7Types = new FamilyType[] {
 				FamilyType.AARTIX7, 
+				FamilyType.AKINTEX7, 
 				FamilyType.ARTIX7, 
 				FamilyType.ARTIX7L, 
 				FamilyType.ASPARTAN7, 
@@ -158,12 +161,14 @@ public class Part {
 		ultraScaleTypes = new FamilyType[] {
 				FamilyType.KINTEXU, 
 				FamilyType.QKINTEXU, 
+				FamilyType.QRKINTEXU, 
 				FamilyType.VIRTEXU, 
 		};
 		ultraScale = new HashSet<FamilyType>(Arrays.asList(ultraScaleTypes));
 		ultraScalePlusTypes = new FamilyType[] {
 				FamilyType.AZYNQUPLUS, 
 				FamilyType.KINTEXUPLUS, 
+				FamilyType.QKINTEXUPLUS, 
 				FamilyType.QVIRTEXUPLUS, 
 				FamilyType.QZYNQUPLUS, 
 				FamilyType.QZYNQUPLUSRFSOC, 
@@ -173,10 +178,12 @@ public class Part {
 				FamilyType.VIRTEXUPLUSHBM, 
 				FamilyType.VIRTEXUPLUSHBMES1, 
 				FamilyType.ZYNQUPLUS, 
-				FamilyType.ZYNQUPLUSES2, 
 				FamilyType.ZYNQUPLUSRFSOC, 
 		};
 		ultraScalePlus = new HashSet<FamilyType>(Arrays.asList(ultraScalePlusTypes));
+		versalTypes = new FamilyType[] {
+		};
+		versal = new HashSet<FamilyType>(Arrays.asList(versalTypes));
 	}
 	
 	public boolean isSeries7(){
@@ -189,6 +196,10 @@ public class Part {
 	
 	public boolean isUltraScalePlus(){
 		return ultraScalePlus.contains(architecture);
+	}
+	
+	public boolean isVersal(){
+		return versal.contains(architecture);
 	}
 	
 	public String toString(){

@@ -26,13 +26,14 @@ package com.xilinx.rapidwright.device;
 
 
 /**
- * Generated on: Thu Jan 03 15:11:48 2019
+ * Generated on: Fri May 31 18:12:56 2019
  * by: com.xilinx.rapidwright.release.PartNamePopulator
  * 
  * Set of all Supported Xilinx families in RapidWright
  */
 public enum FamilyType {
 		AARTIX7,
+		AKINTEX7,
 		ARTIX7,
 		ARTIX7L,
 		ASPARTAN7,
@@ -46,6 +47,8 @@ public enum FamilyType {
 		QKINTEX7,
 		QKINTEX7L,
 		QKINTEXU,
+		QKINTEXUPLUS,
+		QRKINTEXU,
 		QVIRTEX7,
 		QVIRTEXUPLUS,
 		QZYNQ,
@@ -62,5 +65,4 @@ public enum FamilyType {
 		ZYNQ,
 		ZYNQUPLUS,
 		ZYNQUPLUSRFSOC,
-		ZYNQUPLUSES2,
 }

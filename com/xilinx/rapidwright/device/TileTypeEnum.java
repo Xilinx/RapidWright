@@ -26,7 +26,7 @@ package com.xilinx.rapidwright.device;
 
 
 /**
- * Generated on: Thu Jan 03 15:11:48 2019
+ * Generated on: Fri May 31 18:12:56 2019
  * by: com.xilinx.rapidwright.release.SiteAndTileTypeUpdater
  * 
  * Enumeration of Tile type for all valid devices within Vivado.

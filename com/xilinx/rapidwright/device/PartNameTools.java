@@ -35,7 +35,7 @@ import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.util.FileTools;
 
 /**
- * Generated on: Thu Jan 03 15:11:48 2019
+ * Generated on: Fri May 31 18:12:56 2019
  * by: com.xilinx.rapidwright.release.PartNamePopulator
  * 
  * Class to hold utility APIs dealing with Parts and device names.
@@ -99,6 +99,7 @@ public class PartNameTools {
 	public static FamilyType getArchitectureFromFamilyType(FamilyType type) {
 		switch(type){
 			case AARTIX7: return FamilyType.ARTIX7;
+			case AKINTEX7: return FamilyType.KINTEX7;
 			case ARTIX7: return FamilyType.ARTIX7;
 			case ARTIX7L: return FamilyType.ARTIX7;
 			case ASPARTAN7: return FamilyType.SPARTAN7;
@@ -112,6 +113,8 @@ public class PartNameTools {
 			case QKINTEX7: return FamilyType.KINTEX7;
 			case QKINTEX7L: return FamilyType.KINTEX7;
 			case QKINTEXU: return FamilyType.KINTEXU;
+			case QKINTEXUPLUS: return FamilyType.KINTEXUPLUS;
+			case QRKINTEXU: return FamilyType.KINTEXU;
 			case QVIRTEX7: return FamilyType.VIRTEX7;
 			case QVIRTEXUPLUS: return FamilyType.VIRTEXUPLUS;
 			case QZYNQ: return FamilyType.ZYNQ;
@@ -127,7 +130,6 @@ public class PartNameTools {
 			case ZYNQ: return FamilyType.ZYNQ;
 			case ZYNQUPLUS: return FamilyType.ZYNQUPLUS;
 			case ZYNQUPLUSRFSOC: return FamilyType.ZYNQUPLUSRFSOC;
-			case ZYNQUPLUSES2: return FamilyType.ZYNQUPLUS;
 			default: return null;
 		}
 	}
@@ -139,6 +141,7 @@ public class PartNameTools {
 	public static String getFullArchitectureName(FamilyType type) {
 		switch(type){
 			case AARTIX7: return "Artix-7";
+			case AKINTEX7: return "Kintex-7";
 			case ARTIX7: return "Artix-7";
 			case ARTIX7L: return "Artix-7";
 			case ASPARTAN7: return "Spartan-7";
@@ -152,6 +155,8 @@ public class PartNameTools {
 			case QKINTEX7: return "Kintex-7";
 			case QKINTEX7L: return "Kintex-7";
 			case QKINTEXU: return "Kintex UltraScale";
+			case QKINTEXUPLUS: return "Kintex UltraScale+";
+			case QRKINTEXU: return "Kintex UltraScale";
 			case QVIRTEX7: return "Virtex-7";
 			case QVIRTEXUPLUS: return "Virtex UltraScale+";
 			case QZYNQ: return "Zynq-7000";
@@ -168,7 +173,6 @@ public class PartNameTools {
 			case ZYNQ: return "Zynq-7000";
 			case ZYNQUPLUS: return "Zynq UltraScale+";
 			case ZYNQUPLUSRFSOC: return "Zynq UltraScale+ RFSOC";
-			case ZYNQUPLUSES2: return "Zynq UltraScale+";
 			default: return null;
 		}
 	}
@@ -180,6 +184,7 @@ public class PartNameTools {
 	public static Series getSeriesFromFamilyType(FamilyType type) {
 		switch(type){
 			case AARTIX7: return Series.Series7;
+			case AKINTEX7: return Series.Series7;
 			case ARTIX7: return Series.Series7;
 			case ARTIX7L: return Series.Series7;
 			case ASPARTAN7: return Series.Series7;
@@ -193,6 +198,8 @@ public class PartNameTools {
 			case QKINTEX7: return Series.Series7;
 			case QKINTEX7L: return Series.Series7;
 			case QKINTEXU: return Series.UltraScale;
+			case QKINTEXUPLUS: return Series.UltraScalePlus;
+			case QRKINTEXU: return Series.UltraScale;
 			case QVIRTEX7: return Series.Series7;
 			case QVIRTEXUPLUS: return Series.UltraScalePlus;
 			case QZYNQ: return Series.Series7;
@@ -209,7 +216,6 @@ public class PartNameTools {
 			case ZYNQ: return Series.Series7;
 			case ZYNQUPLUS: return Series.UltraScalePlus;
 			case ZYNQUPLUSRFSOC: return Series.UltraScalePlus;
-			case ZYNQUPLUSES2: return Series.UltraScalePlus;
 			default: return null;
 		}
 	}

@@ -32,7 +32,8 @@ public enum Series {
 	
 	Series7("\\-7"),
 	UltraScale("UltraScale$"), 
-	UltraScalePlus("UltraScale\\+");
+	UltraScalePlus("UltraScale\\+"),
+	Versal("Versal");
 	
 	private Pattern archRegex;
 
