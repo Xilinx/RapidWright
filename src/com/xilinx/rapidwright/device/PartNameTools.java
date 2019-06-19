@@ -35,7 +35,7 @@ import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.util.FileTools;
 
 /**
- * Generated on: Fri May 31 18:12:56 2019
+ * Generated on: Wed Jun 19 13:05:02 2019
  * by: com.xilinx.rapidwright.release.PartNamePopulator
  * 
  * Class to hold utility APIs dealing with Parts and device names.

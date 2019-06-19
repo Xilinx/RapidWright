@@ -776,14 +776,15 @@ public class FileTools {
 	public static String getRapidWrightPath(){
 		String path = System.getenv(RAPIDWRIGHT_VARIABLE_NAME);
 		if(path == null){
-			final File f = new File(Device.class.getProtectionDomain().getCodeSource().getLocation().getPath());
+			final File f = new File(FileTools.class.getProtectionDomain().getCodeSource().getLocation().getPath());
 			if(f.isDirectory()){
-				for(String dir : f.list()){
+				File rootFolder = f.getParentFile();
+				for(String dir : rootFolder.list()){
 					if(dir.equals(DATA_FOLDER_NAME)) {
 						MessageGenerator.briefMessage("WARNING: " + RAPIDWRIGHT_VARIABLE_NAME +
 							" is not set.  Proceeding with inferred location from Java execution path: " + 
-							f.getAbsolutePath());
-						return f.getAbsolutePath();
+							rootFolder.getAbsolutePath());
+						return rootFolder.getAbsolutePath();
 					}
 				}
 			}
@@ -1375,6 +1376,9 @@ public class FileTools {
 				if(e.isDirectory()){
 					new File(destFilePath).mkdirs();
 				}else{
+					File currFile = new File(destFilePath);
+					String parentName = currFile.getParentFile().getAbsolutePath();
+					makeDirs(parentName);
 					BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(destFilePath));
 					int read = 0;
 					while( (read = zin.read(buffer)) != -1){

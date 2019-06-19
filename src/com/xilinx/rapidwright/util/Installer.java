@@ -220,11 +220,13 @@ public class Installer {
 	}
 	
 	/**
-	 * @return
+	 * Gets all Java (.java) source files recursively under the 
+	 * provided directory
+	 * @param dir The directory to look under for Java source files
+	 * @return A list of all Java source files with absolute path names.
 	 */
-	private static List<String> getAllJavaSources() {
-		String cwd = System.getProperty("user.dir") + File.separator + "RapidWright";
-		Path root = FileSystems.getDefault().getPath(cwd);
+	public static List<String> getAllJavaSources(String dir) {
+		Path root = FileSystems.getDefault().getPath(dir);
 		List<String> javaSrcs = null;
 		
 		try{
@@ -424,7 +426,7 @@ public class Installer {
 		System.out.println("================================================================================");
 
 		String jarsClassPath = getJarsClasspath();
-		List<String> allJavaSources = getAllJavaSources();
+		List<String> allJavaSources = getAllJavaSources(System.getProperty("user.dir") + File.separator + "RapidWright");
 		ArrayList<String> cmd = new ArrayList<>(Arrays.asList("javac","-cp", jarsClassPath));
 		cmd.addAll(allJavaSources);
 		returnVal = runCommand(cmd);
