@@ -972,6 +972,12 @@ public class EDIFNetlist extends EDIFName {
 		return map;
 	}
 
+	/**
+	 * This will be removed in the next release.  
+	 * Consider using {@link EDIFCell#getPortMap()} instead
+	 * @deprecated
+	 * @return
+	 */
 	public HashMap<String,EDIFPort> generateEDIFPortMap(){
 		HashMap<String,EDIFPort> map = new HashMap<String, EDIFPort>(); 
 		for(EDIFPort port : getTopCellInst().getCellType().getPorts()){
