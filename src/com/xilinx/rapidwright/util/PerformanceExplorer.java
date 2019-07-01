@@ -57,6 +57,8 @@ public class PerformanceExplorer {
 	private static final List<RouterDirective> DEFAULT_ROUTE_DIRECTIVES = Arrays.asList(RouterDirective.Default, RouterDirective.Explore);
 	private static final String DEFAULT_VIVADO = "vivado";
 	private static final boolean DEFAULT_CONTAIN_ROUTING = true;
+	private static final boolean DEFAULT_ADD_EDIF_METADATA = true;
+
 	private static final DecimalFormat df = new DecimalFormat("#.###");
 	
 	private Design design; 
@@ -70,6 +72,8 @@ public class PerformanceExplorer {
 	private ArrayList<PBlock> pblocks;
 	
 	private boolean containRouting;
+	
+	private boolean addEDIFAndMetadata;
 	
 	private ArrayList<PlacerDirective> placerDirectives;
 	
@@ -244,6 +248,14 @@ public class PerformanceExplorer {
 		this.containRouting = containRouting;
 	}
 
+	public boolean addEDIFAndMetadata() {
+		return addEDIFAndMetadata;
+	}
+
+	public void setAddEDIFAndMetadata(boolean addEDIFAndMetadata) {
+		this.addEDIFAndMetadata = addEDIFAndMetadata;
+	}
+
 	public ArrayList<String> createTclScript(String initialDcp, String instDirectory, 
 			PlacerDirective p, RouterDirective r, String clockUncertainty, PBlock pblock){
 		ArrayList<String> lines = new ArrayList<>();
@@ -265,6 +277,11 @@ public class PerformanceExplorer {
 		lines.add("route_design -directive " + r.name());
 		lines.add("report_timing -file "+instDirectory + File.separator+ROUTED_TIMING_RESULT);
 		lines.add("write_checkpoint -force " + instDirectory + File.separator + "routed.dcp");
+		if(addEDIFAndMetadata){
+			lines.add("write_edif -force " + instDirectory + File.separator + "routed.edf");
+			lines.add("source " + FileTools.getRapidWrightPath() + File.separator + "tcl" + File.separator + "rapidwright.tcl");
+			lines.add("generate_metadata "+ instDirectory + File.separator + "routed.dcp false 0");
+		}
 		return lines;
 	}
 	
@@ -277,6 +294,7 @@ public class PerformanceExplorer {
 		}
 		
 		FileTools.makeDirs(runDirectory);
+		runDirectory = new File(runDirectory).getAbsolutePath();		
 		String dcpName = runDirectory + File.separator + INITIAL_DCP_NAME;
 		// Update clock period constraint
 		for(ConstraintGroup g : ConstraintGroup.values()){
@@ -343,6 +361,7 @@ public class PerformanceExplorer {
 	private static final String MIN_CLK_UNCERTAINTY_OPT = "m";
 	private static final String MAX_CLK_UNCERTAINTY_OPT = "x";
 	private static final String CLK_UNCERTAINTY_STEP_OPT = "s";
+	private static final String ADD_EDIF_METADATA_OPT = "a";
 	private static final String HELP_OPT = "h";
 	private static final String RUN_DIR_OPT = "d";
 	private static final String VIVADO_PATH_OPT = "y";
@@ -363,6 +382,7 @@ public class PerformanceExplorer {
 			accepts(MIN_CLK_UNCERTAINTY_OPT).withOptionalArg().defaultsTo(printNS(DEFAULT_MIN_CLK_UNCERT)).describedAs("Min clk uncertainty (ns)");
 			accepts(MAX_CLK_UNCERTAINTY_OPT).withOptionalArg().defaultsTo(printNS(DEFAULT_MAX_CLK_UNCERT)).describedAs("Max clk uncertainty (ns)");
 			accepts(CLK_UNCERTAINTY_STEP_OPT).withOptionalArg().defaultsTo(printNS(DEFAULT_STEP_CLK_UNCERT)).describedAs("Clk uncertainty step (ns)");
+			accepts(ADD_EDIF_METADATA_OPT).withOptionalArg().ofType(Boolean.class).defaultsTo(DEFAULT_ADD_EDIF_METADATA).describedAs("Create EDIF and Metadata");
 			accepts(RUN_DIR_OPT).withOptionalArg().defaultsTo("<current directory>").describedAs("Run directory (jobs data location)");
 			accepts(VIVADO_PATH_OPT).withOptionalArg().defaultsTo(DEFAULT_VIVADO).describedAs("Specifies vivado path");
 			accepts(CONTAIN_ROUTING_OPT).withOptionalArg().ofType(Boolean.class).defaultsTo(DEFAULT_CONTAIN_ROUTING).describedAs("Sets attribute on pblock to contain routing");
@@ -429,6 +449,8 @@ public class PerformanceExplorer {
 		pe.setRouterDirectives(routerDirValues.split(","));
 		pe.setVivadoPath((String)opts.valueOf(VIVADO_PATH_OPT));
 		pe.setContainRouting((boolean)opts.valueOf(CONTAIN_ROUTING_OPT));
+		pe.setAddEDIFAndMetadata((boolean)opts.valueOf(ADD_EDIF_METADATA_OPT));
+
 		
 		if(opts.hasArgument(PBLOCK_FILE_OPT)){
 			String fileName = (String) opts.valueOf(PBLOCK_FILE_OPT);
