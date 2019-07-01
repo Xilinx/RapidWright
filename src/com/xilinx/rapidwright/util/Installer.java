@@ -426,8 +426,9 @@ public class Installer {
 		System.out.println("================================================================================");
 
 		String jarsClassPath = getJarsClasspath();
-		List<String> allJavaSources = getAllJavaSources(System.getProperty("user.dir") + File.separator + "RapidWright");
-		ArrayList<String> cmd = new ArrayList<>(Arrays.asList("javac","-cp", jarsClassPath));
+		String rwDir = System.getProperty("user.dir") + File.separator + "RapidWright";
+		List<String> allJavaSources = getAllJavaSources(rwDir + "/src");
+		ArrayList<String> cmd = new ArrayList<>(Arrays.asList("javac","-cp", jarsClassPath, "-d", rwDir + "/bin"));
 		cmd.addAll(allJavaSources);
 		returnVal = runCommand(cmd);
 		if(returnVal != 0){
@@ -435,7 +436,6 @@ public class Installer {
 			System.exit(1);
 		}
 		
-		String rwDir = System.getProperty("user.dir") + File.separator + "RapidWright";
 		String classpath = rwDir+File.pathSeparator + jarsClassPath;
 		if(SKIP_TEST){
 			System.out.println("Skipping DeviceBrowser test...");

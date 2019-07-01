@@ -1,13 +1,23 @@
-============= RapidWright 2019.1.0-beta released on 2019-06-** =================
+============= RapidWright 2019.1.0-beta released on 2019-07-01 =================
 Notes:
  - API Additions:
    - com.xilinx.rapidwright.device.Node "public boolean isTiedToGnd()"
    - com.xilinx.rapidwright.device.Node "public boolean isTiedToVcc()"
    - com.xilinx.rapidwright.device.Node "public boolean isTied()"
+   - com.xilinx.rapidwright.design.Cell "public List<String> getAllPhysicalPinMappings(String logicalPin)"
+   - com.xilinx.rapidwright.design.Net "public boolean rename(String newName)"
+ - Deprecated APIs:
+   - com.xilinx.rapidwright.design.SitePinInst "public ArrayList<Cell> getConnectedCells()"
+   - com.xilinx.rapidwright.design.Design "public HashMap<String,EDIFPort> getNetlistPortMap()"
  - Bug Fixes:
    - Issue #32 - Adding the tied value of a node, see API additions above.
    - Issue #29 - Site.getIntTile() issues
-   - Issue #12,#28 - Adding 'src' folder as parent to 'com' folder.
+   - Issue #12,#28 - Inserting 'src' folder as parent to 'com' folder.
+   - Issue #33 - Fixes for createIBUFDS()
+   - Issue #34 - Design.getNetlistPortMap() deprecated
+   - Issue #36 - Updating Javadoc to reflect Routethru behavior
+   - Issue #37 - Added getAllPhysicalPinMappings()
+   - Issue #38,#39 - Created DesignTools.getConnectedCells(SitePinInst)
  - Support for Vivado 2019.1 devices.
  - Changes to enable GraalVM shared library compilation for
    interoperability with C++ (see documentation for tutorial details).
