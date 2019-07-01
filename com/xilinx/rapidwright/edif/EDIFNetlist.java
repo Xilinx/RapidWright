@@ -910,6 +910,7 @@ public class EDIFNetlist extends EDIFName {
 				if(portInst.isTopLevelPort()){
 					// Going up in hierarchy
 					EDIFCellInst cellInst = getCellInstFromHierName(curr.getHierarchicalInstName());
+					if(cellInst == null) continue;
 					EDIFPortInst epr = cellInst.getPortInst(portInst.getPortInstNameFromPort());
 					if(epr == null || epr.getNet() == null) continue;
 					String hierName = EDIFTools.getHierarchicalRootFromPinName(curr.getHierarchicalInstName());
