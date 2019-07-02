@@ -1,4 +1,5 @@
 apply plugin: 'java'
+jar.enabled = false
 
 project.buildDir = 'bin'
 
@@ -15,3 +16,4 @@ dependencies {
   compile fileTree(dir: 'jars', include: ['*.jar'])
 
 }
+
