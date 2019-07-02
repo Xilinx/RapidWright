@@ -1,4 +1,4 @@
-############################################################################### 
+############################################################################## 
 # Copyright (c) 2018 Xilinx, Inc. 
 # All rights reserved.
 #
@@ -48,6 +48,10 @@ proc compile_block_dcp { dcpFile } {
 # Work around to get clock constraints loaded
     set unzipDir .unzip_${dcpFile}
     file mkdir ${unzipDir}
+    set rwpath ${::env(RAPIDWRIGHT_PATH)}
+    set cpath ${::env(CLASSPATH)}
+    puts "RAPIDWRIGHT_PATH=$rwpath"
+    puts "CLASSPATH=$cpath"
     exec java com.xilinx.rapidwright.util.Unzip ${dcpFile} ${unzipDir}
     read_xdc ${unzipDir}/${rootDcpFileName}_in_context.xdc
     file delete -force ${unzipDir}
@@ -437,6 +441,12 @@ proc prep_for_block_stitcher {} {
             puts $fp "# $ip $ip_run"
             puts $fp "set dir $dir"
             puts $fp "set dcpName ${ip}.dcp"
+
+	    puts $fp [subst -nocommands -novariables {set rwpath ${::env(RAPIDWRIGHT_PATH)}}]
+	    puts $fp [subst -nocommands -novariables {set cpath ${::env(CLASSPATH)}}]
+	    puts $fp [subst -nocommands -novariables {puts "RAPIDWRIGHT_PATH=$rwpath"}]
+	    puts $fp [subst -nocommands -novariables {puts "CLASSPATH=$cpath"}]
+
             puts $fp {compileBlock $dcpName}
             close $fp
             set vivado_path [exec java com.xilinx.rapidwright.util.FileTools --get_vivado_path]
