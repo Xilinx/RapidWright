@@ -89,7 +89,8 @@ public class HandPlacer extends QMainWindow {
 
 	@SuppressWarnings("unused")
 	private boolean debugPlacer;
-	
+
+	public QToolBar toolbar;
 	
 	public static void main(String[] args) {
 		QApplication.setGraphicsSystem("raster");
@@ -184,6 +185,7 @@ public class HandPlacer extends QMainWindow {
 		view = new TileView(scene);
 		setCentralWidget(view);
 		
+		toolbar = new QToolBar(this);
 		setupFileActions();
 		setupEditActions();
 		setupViewActions();
@@ -268,6 +270,8 @@ public class HandPlacer extends QMainWindow {
 		updateWireEstimate();
 	}
 
+	public QDockWidget macroListDockWidget; 
+	
 	private void createModuleList() {
 		
 		macroList = new QTreeWidget();
@@ -280,11 +284,11 @@ public class HandPlacer extends QMainWindow {
 		macroList.setSortingEnabled(true);
 		
 		
-		QDockWidget dockWidget = new QDockWidget(tr("Module List"), this);
-		dockWidget.setAllowedAreas(DockWidgetArea.RightDockWidgetArea,
+		macroListDockWidget = new QDockWidget(tr("Module List"), this);
+		macroListDockWidget.setAllowedAreas(DockWidgetArea.RightDockWidgetArea,
 				DockWidgetArea.LeftDockWidgetArea);
-		dockWidget.setWidget(macroList);
-		addDockWidget(DockWidgetArea.RightDockWidgetArea, dockWidget);
+		macroListDockWidget.setWidget(macroList);
+		addDockWidget(DockWidgetArea.RightDockWidgetArea, macroListDockWidget);
 	}
 	
 	protected void about() {
@@ -373,49 +377,46 @@ public class HandPlacer extends QMainWindow {
 	}
 
 	private void setupFileActions() {
-		QToolBar tb = new QToolBar(this);
-		tb.setWindowTitle(tr("File Actions"));
-		addToolBar(tb);
+		toolbar.setWindowTitle(tr("File Actions"));
+		addToolBar(toolbar);
 
 		QMenu fileMenu = new QMenu(tr("&File"), this);
 		menuBar().addMenu(fileMenu);
 
-		action(tr("Open"), "fileopen", StandardKey.Open, "openDesign()",fileMenu, tb);
-		action(tr("Open w/Auto Placer"), "opendebug", null, "openWithAutoPlacer()",fileMenu, tb);
+		action(tr("Open"), "fileopen", StandardKey.Open, "openDesign()",fileMenu, toolbar);
+		action(tr("Open w/Auto Placer"), "opendebug", null, "openWithAutoPlacer()",fileMenu, toolbar);
 		fileMenu.addSeparator();
 		//action(tr("&Save"), "filesave", StandardKey.Save, "saveDesign()", fileMenu, tb);
 		//action(tr("&Save As"), "filesaveas", null, "saveAsDesign()", fileMenu, tb);
-		action(tr("&Save As DCP"), "filesaveas", StandardKey.SaveAs, "saveAsDCPDesign()", fileMenu, tb);
-		action(tr("&Save As PDF"), "exportpdf", null, "saveAsPDFDesign()", fileMenu, tb);
+		action(tr("&Save As DCP"), "filesaveas", StandardKey.SaveAs, "saveAsDCPDesign()", fileMenu, toolbar);
+		action(tr("&Save As PDF"), "exportpdf", null, "saveAsPDFDesign()", fileMenu, toolbar);
 		fileMenu.addSeparator();
-		action(tr("&Print"), "fileprint", StandardKey.Print, null, fileMenu, tb);		
+		action(tr("&Print"), "fileprint", StandardKey.Print, null, fileMenu, toolbar);		
 		fileMenu.addSeparator();
 		action(tr("&Quit"), null, "Ctrl+Q", "close()", fileMenu, null);
 	}
 
 	private void setupEditActions() {
-		QToolBar b = new QToolBar(this);
-		b.setWindowTitle(tr("Edit Actions"));
-		addToolBar(b);
+		toolbar.setWindowTitle(tr("Edit Actions"));
+		addToolBar(toolbar);
 
 		QMenu m = new QMenu(tr("&Edit"), this);
 		menuBar().addMenu(m);
 
 		actionUndo = action(tr("&Undo"), "editundo", StandardKey.Undo, null, m,
-				b);
+				toolbar);
 		actionUndo.setEnabled(false);
 		actionUndo.triggered.connect(undoStack, "undo()");
 		actionRedo = action(tr("&Redo"), "editredo", StandardKey.Redo, null, m,
-				b);
+				toolbar);
 		actionRedo.setEnabled(false);
 		actionRedo.triggered.connect(undoStack, "redo()");
 
 	}
 	
 	private void setupViewActions(){
-		QToolBar tb = new QToolBar(this);
-		tb.setWindowTitle(tr("View Actions"));
-		addToolBar(tb);
+		toolbar.setWindowTitle(tr("View Actions"));
+		addToolBar(toolbar);
 		QMenu m = new QMenu(tr("&View"), this);
 		menuBar().addMenu(m);
 		
@@ -425,11 +426,11 @@ public class HandPlacer extends QMainWindow {
 		//netViewCombo.addItem(tr("All nets(not clk)"));
 		netViewCombo.setEnabled(false);
 		netViewCombo.currentIndexChanged.connect(scene,"changeNetView(int)");
-		tb.addWidget(netViewCombo);
+		toolbar.addWidget(netViewCombo);
 		
-		actionZoomIn = action(tr("&Zoom Out"), "zoomout", StandardKey.ZoomOut, "zoomout()", m, tb);
-		actionZoomOut = action(tr("&Zoom In"), "zoomin", "Ctrl+=", "zoomin()", m, tb);
-		actionZoomSelection = action(tr("&Zoom Selection"), "zoomselection", null, "zoomselection()", m, tb);
+		actionZoomIn = action(tr("&Zoom Out"), "zoomout", StandardKey.ZoomOut, "zoomout()", m, toolbar);
+		actionZoomOut = action(tr("&Zoom In"), "zoomin", "Ctrl+=", "zoomin()", m, toolbar);
+		actionZoomSelection = action(tr("&Zoom Selection"), "zoomselection", null, "zoomselection()", m, toolbar);
 		actionZoomIn.setEnabled(false);
 		actionZoomOut.setEnabled(false);
 		actionZoomSelection.setEnabled(false);

@@ -175,15 +175,15 @@ public class EDIFNetlist extends EDIFName {
 	public void removeUnusedCellsFromWorkLibrary(){
 		HashMap<String,EDIFCell> cellsToRemove = new HashMap<>(getWorkLibrary().getCellMap());
 		
+		cellsToRemove.remove(getTopCell().getLegalEDIFName());
 		for(EDIFHierCellInst i : getAllDescendants("", null, false)){
 			if(i.getCellType().getLibrary().getName().equals(EDIFTools.EDIF_LIBRARY_WORK_NAME)){
-				cellsToRemove.remove(i.getCellType().getEDIFName());
+				cellsToRemove.remove(i.getCellType().getLegalEDIFName());
 			}
 		}
 		
 		for(String name : cellsToRemove.keySet()){
 			getWorkLibrary().removeCell(name);
-			System.out.println(name);
 		}
 	}
 	
