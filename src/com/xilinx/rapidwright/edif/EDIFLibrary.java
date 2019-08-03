@@ -221,6 +221,24 @@ public class EDIFLibrary extends EDIFName {
 		return visited;
 	}
 	
+	/**
+	 * Checks if this library is the work library or that the name
+	 * matches {@link EDIFTools#EDIF_LIBRARY_WORK_NAME}.
+	 * @return True if this is the work library, false otherwise.
+	 */
+	public boolean isWorkLibrary() {
+		return getName().equals(EDIFTools.EDIF_LIBRARY_WORK_NAME);
+	}
+
+	/**
+	 * Checks if this library is the HDI primitives library or that the name
+	 * matches {@link EDIFTools#EDIF_LIBRARY_HDI_PRIMITIVES_NAME}.
+	 * @return True if this is the HDI primitives library, false otherwise.
+	 */
+	public boolean isHDIPrimitivesLibrary() {
+		return getName().equals(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME);
+	}
+
 	private void visit(EDIFCell cell, List<EDIFCell> visited, Map<String,EDIFCell> yetToVisit){
 		yetToVisit.remove(cell.getLegalEDIFName());
 		for(EDIFCellInst i : cell.getCellInsts()){

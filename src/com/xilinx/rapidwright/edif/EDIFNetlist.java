@@ -251,6 +251,39 @@ public class EDIFNetlist extends EDIFName {
 		return comments;
 	}
 
+	/**
+	 * Migrates all cells in the provided library
+	 * into the standard work library.  
+	 * @param library The library with cells to be migrated to work.
+	 */
+	public void migrateToWorkLibrary(String library) {
+		EDIFLibrary work = getWorkLibrary();
+		EDIFLibrary oldWork = getLibrary(library);
+		List<EDIFCell> toRemove = new ArrayList<>(oldWork.getCells());
+		for (EDIFCell c : toRemove) {
+			work.addCell(c);
+			oldWork.removeCell(c);
+		}
+		removeLibrary(library);
+	}
+
+	/**
+	 * Migrates all libraries except HDI primitives and work to 
+	 * the work library.
+	 */
+	public void consolidateAllToWorkLibrary() {
+		List<EDIFLibrary> librariesToMigrate = new ArrayList<>();
+		for (EDIFLibrary l : getLibraries()) {
+			if (!l.isHDIPrimitivesLibrary() && !l.isWorkLibrary()) {
+				librariesToMigrate.add(l);
+			}
+		}
+		for (EDIFLibrary l : librariesToMigrate) {
+			migrateToWorkLibrary(l.getName());
+		}
+	}
+
+	
 	public void migrateCellAndSubCells(EDIFCell cell){
 		Queue<EDIFCell> cells = new LinkedList<>();
 		cells.add(cell);
