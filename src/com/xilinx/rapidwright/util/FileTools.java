@@ -811,7 +811,13 @@ public class FileTools {
 		String rwPath = getRapidWrightPath();
 		if(rwPath != null){
 			try {
-				return new FileInputStream(rwPath + File.separator + name);
+				File resourceFile = new File(rwPath + File.separator + name);
+				if(resourceFile.exists()) {
+					return new FileInputStream(resourceFile);
+				} else {
+					System.err.println("WARNING: " + RAPIDWRIGHT_VARIABLE_NAME + " is set to " + rwPath
+							+ " but the resource " + name + " is not present, will attempt to load from jar...");
+				}
 			} catch (FileNotFoundException e) {
 				System.err.println("ERROR: Failed to find RapidWright resource file "
 						+ rwPath + File.separator + name + ". Please check the installation path "
