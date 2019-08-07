@@ -1,3 +1,21 @@
+============= RapidWright 2019.1.1-beta released on 2019-08-07 =================
+Notes:
+ - API Additions:
+   - com.xilinx.rapidwright.design.Design "public boolean removeSiteInst(SiteInst instance, boolean keepSitePinRouting)"
+   - com.xilinx.rapidwright.design.Net "public Set<SiteInst> getSiteInsts()"
+ - Removed APIs:
+   - com.xilinx.rapidwright.design.SitePinInst "public ArrayList<Cell> getConnectedCells()"
+   - com.xilinx.rapidwright.design.Design "public HashMap<String,EDIFPort> getNetlistPortMap()"
+ - Improved GraalVM compatibility for C++ shared library creation.
+   Some data files were being loaded using certain Kryo APIs that are
+   incompatible with the native compilation flow in GraalVM.  This
+   release replaced those APIs and improved startup time for use of
+   those files by >10X (1.2 secs -> 0.1 secs).
+ - Fixes a subtle internal site routing issue when creating module instances.  Most
+   commonly seen on BRAMs with REGCLK* pins.  This ensures internal site routing
+   matches to original template SiteInst.
+ - Several bug fixes (see commit log for details).   
+
 ============= RapidWright 2019.1.0-beta released on 2019-07-01 =================
 Notes:
  - API Additions:

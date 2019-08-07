@@ -38,6 +38,7 @@ import java.util.Queue;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SitePinInst;
@@ -789,7 +790,7 @@ public class Router extends AbstractRouter {
 	 */
 	public static List<String> getAlternativeLUTInputs(SitePinInst currSink){
 		if(!currSink.isLUTInputPin()) return Collections.emptyList();
-		Cell lut = currSink.getConnectedCells().get(0);
+		Cell lut = DesignTools.getConnectedCells(currSink).iterator().next();
 		String currLutType = lut.getBELName();
 		String otherLutType = currLutType.endsWith("6LUT") ? currLutType.replace("6", "5") : currLutType.replace("5", "6");
 
@@ -813,7 +814,7 @@ public class Router extends AbstractRouter {
 	 * @param newPinName The new physical BEL pin on the lut to serve as the new input.
 	 */
 	public static void swapLUTInputPins(SitePinInst lutInput, String newPinName){
-		Cell lut = lutInput.getConnectedCells().get(0);
+		Cell lut = DesignTools.getConnectedCells(lutInput).iterator().next();
 		String existingName = "A" + lutInput.getName().charAt(1);
 		
 		String logPin = lut.removePinMapping(existingName);

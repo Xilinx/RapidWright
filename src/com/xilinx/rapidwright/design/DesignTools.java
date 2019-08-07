@@ -427,9 +427,9 @@ public class DesignTools {
 	 */
 	public static boolean areAllPinsConnectedToALUT(Net n){
 		for(SitePinInst p : n.getPins()){
-			ArrayList<Cell> connectedCells = p.getConnectedCells();
+			Set<Cell> connectedCells = getConnectedCells(p);
 			if(connectedCells == null || connectedCells.size() == 0) return false;
-			for(Cell lut : p.getConnectedCells()){
+			for(Cell lut : connectedCells){
 				if(!lut.getType().contains("LUT")){
 					return false;
 				}

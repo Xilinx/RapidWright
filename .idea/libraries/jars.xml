@@ -7,10 +7,10 @@
       <root url="jar://$PROJECT_DIR$/jars/protobuf-java-3.0.2.jar!/" />
       <root url="jar://$PROJECT_DIR$/jars/commons-cli-1.2.jar!/" />
       <root url="jar://$PROJECT_DIR$/jars/jeromq-0.3.6.jar!/" />
-      <root url="jar://$PROJECT_DIR$/jars/rapidwright-api-lib-2019.1.0-javadoc.jar!/" />
+      <root url="jar://$PROJECT_DIR$/jars/rapidwright-api-lib-2019.1.1-javadoc.jar!/" />
       <root url="jar://$PROJECT_DIR$/jars/objenesis-2.1.jar!/" />
       <root url="jar://$PROJECT_DIR$/jars/qtjambi-4.5.2_01.jar!/" />
-      <root url="jar://$PROJECT_DIR$/jars/rapidwright-api-lib-2019.1.0.jar!/" />
+      <root url="jar://$PROJECT_DIR$/jars/rapidwright-api-lib-2019.1.1.jar!/" />
       <root url="jar://$PROJECT_DIR$/jars/jupyter-kernel-jsr223.jar!/" />
       <root url="jar://$PROJECT_DIR$/jars/json.jar!/" />
       <root url="jar://$PROJECT_DIR$/jars/junit-4.12.jar!/" />

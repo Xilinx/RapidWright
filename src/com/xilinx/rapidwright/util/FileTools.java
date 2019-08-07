@@ -97,9 +97,11 @@ public class FileTools {
 	public static final String PYTHON_FOLDER_NAME = "python";
 	/** Folder where device files are kept */
 	public static final String DEVICE_FOLDER_NAME = DATA_FOLDER_NAME + File.separator + "devices";
-	/** File name of the EDIF library containing all Uniprims */
+	/** File name of the UnisimManager initialization data file (replaced HDI_PRIMITIVES_FILE_NAME and VALID_CELL_PLACEMENTS_FILE_NAME) */
+	public static final String UNISIM_DATA_FILE_NAME = DATA_FOLDER_NAME + File.separator + "unisim_data.dat";
+	/** File name of the EDIF library containing all Uniprims -- Will be removed in 2019.2 */
 	public static final String HDI_PRIMITIVES_FILE_NAME = DATA_FOLDER_NAME + File.separator + "hdi_primitives.edf";
-	/** File name of containing a kryo compressed map of valid cell placements per family type */
+	/** File name of containing a kryo compressed map of valid cell placements per family type -- Will be removed in 2019.2 */
 	public static final String VALID_CELL_PLACEMENTS_FILE_NAME = DATA_FOLDER_NAME + File.separator + "valid_cell_placements.dat";
 	/** File name created from Vivado for all supported parts for RapidWright */
 	public static final String PART_DUMP_FILE_NAME = DATA_FOLDER_NAME + File.separator + "partdump.csv";
@@ -823,6 +825,23 @@ public class FileTools {
 	}
 	
 	/**
+	 * Checks if a particular RapidWright file or jar resource exists. 
+	 * This will prioritize checking first in the location indicated by the 
+	 * RAPIDWRIGHT_PATH environment variable, then check in the location from
+	 * the running class files.  
+	 * @param name Name of the RapidWright resource file.  
+	 * @return True if the resource exists, false otherwise.
+	 */
+	public static boolean checkIfRapidWrightResourceExists(String name) {
+		String rwPath = getRapidWrightPath();
+		if(rwPath != null){
+			boolean foundFile = new File(rwPath + File.separator + name).exists();
+			if (foundFile) return foundFile;
+		}
+		return null != FileTools.class.getResourceAsStream("/" + name.replace(File.separator, "/"));
+	}
+	
+	/**
 	 * Finds and returns a file name that can be read for the corresponding
 	 * RapidWright resource. 
 	 * @param name Name of the RapidWright resource
@@ -847,6 +866,7 @@ public class FileTools {
 	 * Gets the HDIPrimitivesResource (FileTools.HDI_PRIMITIVES_FILE_NAME) 
 	 * as an InputStream.  
 	 * @return Returns the input stream for the HDI Primitives resource 
+	 * @deprecated
 	 */
 	public static InputStream getHDIPrimitivesResourceStream(){
 		return getRapidWrightResourceInputStream(HDI_PRIMITIVES_FILE_NAME);
@@ -855,11 +875,20 @@ public class FileTools {
 	/**
 	 * Gets an input stream to the file containing valid cell placements of the hdi primitives.
 	 * @return An input stream to the valid cell placements map file.
+	 * @deprecated
 	 */
 	public static InputStream getValidCellPlacementsResourceStream(){
 		return getRapidWrightResourceInputStream(VALID_CELL_PLACEMENTS_FILE_NAME);
 	}
 
+	/**
+	 * Gets an input stream to the file containing valid cell placements of the hdi primitives.
+	 * @return An input stream to the valid cell placements map file.
+	 */
+	public static InputStream getUnisimDataResourceStream(){
+		return getRapidWrightResourceInputStream(UNISIM_DATA_FILE_NAME);
+	}
+	
 	/**
 	 * Gets an input stream to the file containing a CSV file of valid parts for RapidWright.
 	 * @return An input stream to the valid cell placements map file.
