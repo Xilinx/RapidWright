@@ -611,38 +611,58 @@ public class ModuleInst{
 	 * @param busIndex If the port is multi-bit, specify the index to connect or -1 if single bit bus.
 	 */
 	public void connect(String portName, ModuleInst other, String otherPortName, int busIndex){
+		connect(portName, busIndex, other, otherPortName, busIndex);
+	}
+
+	/**
+	 * Connects two signals by port name between this module instance and another.
+	 * This method will create a new net for the connection handling adding both
+	 * a logical net (EDIFNet) and physical net (Net).
+	 * @param portName This module instance's port name to connect.
+	 * @param busIndex0 If the assigned port of this module instance is multi-bit,
+	 * specify the index to connect or -1 if single bit bus.
+	 * @param other The other module instance to connect to. If this is null, it will
+	 * connect it to an existing parent cell port named otherPortName
+	 * @param otherPortName The port name on the other module instance to connect to or
+	 * the top-level port of the the cell instance.
+	 * @param busIndex1 If the port (of the other module instance or the existing parent cell) is multi-bit,
+	 * specify the index to connect or -1 if single bit bus.
+	 */
+
+	public void connect(String portName, int busIndex0, ModuleInst other, String otherPortName, int busIndex1){
 		EDIFCell top = design.getTopEDIFCell();
 		EDIFCellInst eci0 = top.getCellInst(getName());
 		if(eci0 == null) throw new RuntimeException("ERROR: Couldn't find logical cell instance for " + getName());
 		if(other == null) {
 			// Connect to a top-level port
 			EDIFPort port = top.getPort(otherPortName);
-			
-			String netName = busIndex == -1 ? otherPortName : port.getBusName() + "[" + busIndex + "]";
+
+			String netName = busIndex1 == -1 ? otherPortName : port.getBusName() + "[" + busIndex1 + "]";
 			EDIFNet net = top.getNet(netName);
 			if(net == null){
 				net = top.createNet(netName);
 			}
 			if(net.getPortInst(netName) == null){
-				net.createPortInst(port, busIndex);
+				net.createPortInst(port, busIndex1);
 			}
-			net.createPortInst(portName, busIndex, eci0);
+			net.createPortInst(portName, busIndex0, eci0);
 			return;
 		}
 		EDIFCellInst eci1 = top.getCellInst(other.getName());
 		if(eci1 == null) throw new RuntimeException("ERROR: Couldn't find logical cell instance for " + getName());
-		
-		String netName = busIndex == -1 ? getName() + "_" + portName : getName() + "_" + portName + "["+busIndex+"]";
+
+		String netName = busIndex0 == -1 ? getName() + "_" + portName : getName() + "_" + portName + "["+busIndex0+"]";
 		EDIFNet net = top.createNet(netName);
-		net.createPortInst(portName, busIndex, eci0);
-		net.createPortInst(otherPortName, busIndex, eci1);
+		net.createPortInst(portName, busIndex0, eci0);
+		net.createPortInst(otherPortName, busIndex1, eci1);
 
 		// Connect physical pins
-		Port p0 = getPort(busIndex == -1 ? portName : portName + "[" + busIndex + "]");
-		Port p1 = other.getPort(busIndex == -1 ? otherPortName : otherPortName + "[" + busIndex + "]");
+		Port p0 = getPort(busIndex0 == -1 ? portName : portName + "[" + busIndex0 + "]");
+		Port p1 = other.getPort(busIndex1 == -1 ? otherPortName : otherPortName + "[" + busIndex1 + "]");
+
 		SitePinInst pin0 = getCorrespondingPin(p0);
 		SitePinInst pin1 = other.getCorrespondingPin(p1);
-		
+
 		if(pin0.isOutPin()){
 			pin0.getNet().addPin(pin1);
 		}else{
