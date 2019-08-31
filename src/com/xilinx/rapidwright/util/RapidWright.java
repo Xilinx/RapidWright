@@ -78,11 +78,11 @@ public class RapidWright {
 			if(location.toLowerCase().endsWith(".jar")){
 				bw.write("          \""+location+"\",\n");
 			}else{
+				bw.write("          \""+location+ "");
 				File binFolder = new File(location);
 				if(binFolder.isDirectory() && binFolder.getName().equals("bin")){
 					location = binFolder.getParentFile().getAbsolutePath();
 				}
-				bw.write("          \""+location+ "");
 				File jarDir = new File(location + File.separator + FileTools.JARS_FOLDER_NAME);
 				if(jarDir != null && jarDir.isDirectory()){
 					for(String jar : jarDir.list()){
