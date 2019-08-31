@@ -282,6 +282,9 @@ public class PerformanceExplorer {
 			lines.add("source " + FileTools.getRapidWrightPath() + File.separator + "tcl" + File.separator + "rapidwright.tcl");
 			lines.add("generate_metadata "+ instDirectory + File.separator + "routed.dcp false 0");
 		}
+		for (int i = 0 ; i < lines.size(); i++){
+			lines.set(i, lines.get(i).replace('\\', '/'));
+		}
 		return lines;
 	}
 	
