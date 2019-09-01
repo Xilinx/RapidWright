@@ -126,13 +126,13 @@ public class EDIFLibrary extends EDIFName {
 	}
 	
 	/**
-	 * Checks the library based on the legal EDIF name (rename) if the cell
+	 * Checks the library based on the EDIF cell if the cell
 	 * is stored within.  
 	 * @param cell The cell in question.
 	 * @return True if the cell exists in the library, False otherwise.
 	 */
 	public boolean containsCell(EDIFCell cell){
-		return containsCell(cell.getLegalEDIFName());
+		return cells == null ? false : cells.containsValue(cell);
 	}
 	
 	/**
