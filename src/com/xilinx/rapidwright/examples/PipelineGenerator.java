@@ -62,7 +62,8 @@ public class PipelineGenerator {
 	protected static final String VERBOSE_OPT = "v";
 	protected static final String HELP_OPT = "h";
 
-
+	private static final String DEFAULT_OUTPUT_FILE_NAME = "pipeline_w_d_dist_.dcp";
+	
 	public static final int BITS_PER_CLE = 8;
 
 	private static final String SLICE_SITES_OPT = "s";
@@ -564,7 +565,7 @@ public class PipelineGenerator {
 
 				String startSliceType = ""+(startingPoint.getSiteTypeEnum()==SiteTypeEnum.SLICEL ? 1: 0);
 
-				System.out.println(d.getName()+"\t"+site+"\t"+startType+"\t"+startCol+"\t"+startRow+"\t"+endType+"\t"+endCol+"\t"+endRow+"\t"+dx+"\t"+dy+"\t"+pips+"\t"+piptypes+"\t"+nodetypes+"\t"+startSliceType);
+				//System.out.println(d.getName()+"\t"+site+"\t"+startType+"\t"+startCol+"\t"+startRow+"\t"+endType+"\t"+endCol+"\t"+endRow+"\t"+dx+"\t"+dy+"\t"+pips+"\t"+piptypes+"\t"+nodetypes+"\t"+startSliceType);
 
 
 				/*
@@ -732,7 +733,7 @@ ps.close();
 		//	+ "See \n"
 		//	+ "RapidWright documentation for more information.\n");
 		try {
-			p.accepts(OUT_DCP_OPT).withOptionalArg().defaultsTo("pipeline_w_d_dist_.dcp").describedAs("Output DCP File Name");
+			p.accepts(OUT_DCP_OPT).withOptionalArg().defaultsTo(DEFAULT_OUTPUT_FILE_NAME).describedAs("Output DCP File Name");
 			p.printHelpOn(System.out);
 			
 		} catch (IOException e) {
@@ -801,7 +802,10 @@ ps.close();
 						designName = "pipeline_" + width + "w_" + depth + "d_dx" + (distanceX >= 0 ? "" + distanceX : "neg" + ((int)Math.abs(distanceX))) +
 								"_dy" + (distanceY >= 0 ? "" + distanceY : "neg" + ((int)Math.abs(distanceY))) + "_org" + sliceName;
 
-						outputDCPFileName = System.getProperty("user.dir") + File.separator + designName + ".dcp";
+						if(outputDCPFileName.equals(DEFAULT_OUTPUT_FILE_NAME)) {
+							outputDCPFileName = System.getProperty("user.dir") + File.separator + designName + ".dcp";							
+						}
+
 
 						Design d = new Design(designName, partName);
 						d.setAutoIOBuffers(false);
