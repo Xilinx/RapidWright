@@ -6,6 +6,5 @@
 .pydevproject
 /.settings/
 /bin/
-.idea/workspace.xml
-.idea/usage.statistics.xml
-.idea/tasks.xml
+.idea
+*.iml

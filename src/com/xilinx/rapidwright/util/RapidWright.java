@@ -79,6 +79,10 @@ public class RapidWright {
 				bw.write("          \""+location+"\",\n");
 			}else{
 				bw.write("          \""+location+ "");
+				File binFolder = new File(location);
+				if(binFolder.isDirectory() && binFolder.getName().equals("bin")){
+					location = binFolder.getParentFile().getAbsolutePath();
+				}
 				File jarDir = new File(location + File.separator + FileTools.JARS_FOLDER_NAME);
 				if(jarDir != null && jarDir.isDirectory()){
 					for(String jar : jarDir.list()){
