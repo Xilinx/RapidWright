@@ -118,10 +118,25 @@ public class SATRouter {
 	 * the route attempt.
 	 */
 	public SATRouter(Design design, PBlock pblock){
-		init(design,pblock);
+		init(design,pblock, true);
 		populateNetsToRoute();
 	}
 
+	/**
+	 * Initialize the SAT router with a design and area constraint (pblock) to describe
+	 * the routing problem.
+	 * @param design A placed design to route
+	 * @param pblock The area to use to identify nets to route and to supply 
+	 * routing nodes for completing the routes.  All nets that have all 
+	 * endpoints physically located inside the pblock will be included in 
+	 * the route attempt.
+	 * @param unroute Unroutes the design before using the SAT solver (by default, always unroutes)
+	 */
+	public SATRouter(Design design, PBlock pblock, boolean unroute){
+		init(design,pblock, unroute);
+		populateNetsToRoute();
+	}
+	
 	/**
 	 * Initializes the SAT router with a design, area constraint (pblock) and 
 	 * list of nets to route.  
@@ -131,11 +146,11 @@ public class SATRouter {
 	 * must be located within the pblock.
 	 */
 	public SATRouter(Design design, PBlock pblock, Collection<Net> netsToRoute){
-		init(design,pblock);
+		init(design,pblock, true);
 		this.netsToRoute = new HashSet<>(netsToRoute);
 	}
 
-	private void init(Design design, PBlock pblock){
+	private void init(Design design, PBlock pblock, boolean unroute){
 		this.design = design;
 		this.setPblock(pblock);
 		// Clear out any site routing so we have a fresh start
@@ -143,7 +158,7 @@ public class SATRouter {
 			i.getCTagMap().clear();
 			i.getSiteCTags().clear();
 		}*/
-		design.unrouteDesign();
+		if(unroute) design.unrouteDesign();
 	}
 	
 	public void updateSitePinInsts(){
