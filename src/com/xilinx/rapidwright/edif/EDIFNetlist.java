@@ -523,9 +523,9 @@ public class EDIFNetlist extends EDIFName {
 		if(n == null){
 			if(parentNetName == null){
 				// Maybe it is GND/VCC
-				EDIFPortInst src = p.getNet().getSourcePortInsts(false).get(0);
-				if(src.getCellInst() != null){
-					String cellType = src.getCellInst().getCellType().getName();
+				List<EDIFPortInst> src = p.getNet().getSourcePortInsts(false);
+				if(src.size() > 0 && src.get(0).getCellInst() != null){
+					String cellType = src.get(0).getCellInst().getCellType().getName();
 					if(cellType.equals("GND")) return d.getGndNet();
 					if(cellType.equals("VCC")) return d.getVccNet();
 				}
@@ -737,10 +737,10 @@ public class EDIFNetlist extends EDIFName {
 				for(EDIFPortInst opr : otherNet.getPortInsts()){
 					if(epr.getPort() != opr.getPort()){ // Here we really want to compare object references!
 						EDIFHierPortInst absPortInst = new EDIFHierPortInst(instName, opr);
-						if(epr.getCellInst().getCellType().isPrimitive()){
+						if(opr.getCellInst().getCellType().isPrimitive()){
 							leafCellPins.add(absPortInst);
-							if(parentNetName == null && epr.isOutput()) {
-								source = epr;
+							if(parentNetName == null && opr.isOutput()) {
+								source = opr;
 								parentNetName = netName;
 							}
 						}
