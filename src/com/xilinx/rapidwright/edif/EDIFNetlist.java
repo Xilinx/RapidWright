@@ -283,10 +283,38 @@ public class EDIFNetlist extends EDIFName {
 		}
 	}
 
-	
 	public void migrateCellAndSubCells(EDIFCell cell){
-		Queue<EDIFCell> cells = new LinkedList<>(); // which contains cells that have been added to libraries but whose subcells haven't.
+		Queue<EDIFCell> cells = new LinkedList<>();
+		cells.add(cell);
+		while(!cells.isEmpty()){
+			EDIFCell curr = cells.poll();
+			EDIFLibrary destLib = getLibrary(curr.getLibrary().getName());
+			if(destLib == null){
+				if(curr.getLibrary().getName().equals(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME)){
+					destLib = getHDIPrimitivesLibrary();
+				}else{
+					destLib = getWorkLibrary();
+				}
+			}
 
+			if(!destLib.containsCell(curr)){
+				destLib.addCell(curr);
+			}
+
+			for(EDIFCellInst inst : curr.getCellInsts()){
+				cells.add(inst.getCellType());
+			}
+		}
+	}
+
+
+	public void migrateCellAndSubCells(EDIFCell cell, boolean uniqueifyCollisions){
+		if (!uniqueifyCollisions){
+			migrateCellAndSubCells(cell);
+			return;
+		}
+
+		Queue<EDIFCell> cells = new LinkedList<>(); // which contains cells that have been added to libraries but whose subcells haven't.
 		//Step 1: add the top cell to the library.
 		//If the top cell belongs to HDIPrimitivesLibrary && the top cell exists in HDIPrimitivesLibrary, return and do nothing.
 		//Otherwise, the code would add the top cell to the library; if repeat happens, using "parameterized" suffix to distinguish
