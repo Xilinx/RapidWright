@@ -799,7 +799,7 @@ public class EDIFNetlist extends EDIFName {
 				for(EDIFPortInst opr : otherNet.getPortInsts()){
 					if(epr.getPort() != opr.getPort()){ // Here we really want to compare object references!
 						EDIFHierPortInst absPortInst = new EDIFHierPortInst(instName, opr);
-						if(opr.getCellInst().getCellType().isPrimitive()){
+						if(opr.getCellInst() != null && opr.getCellInst().getCellType().isPrimitive()){
 							leafCellPins.add(absPortInst);
 							if(parentNetName == null && opr.isOutput()) {
 								source = opr;
