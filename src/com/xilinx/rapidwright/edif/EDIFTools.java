@@ -62,6 +62,8 @@ public class EDIFTools {
 	public static String EDIF_HIER_SEP = "/";
 	
 	public static final String EDIF_LIBRARY_HDI_PRIMITIVES_NAME = "hdi_primitives";
+
+	public static final String MACRO_PRIMITIVES_LIB = "macro_primitives";
 	
 	public static final String EDIF_LIBRARY_WORK_NAME = "work";
 	

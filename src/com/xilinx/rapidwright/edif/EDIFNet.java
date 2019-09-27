@@ -161,7 +161,7 @@ public class EDIFNet extends EDIFPropertyObject {
 			p.writeEDIFExport(wr, "          ");
 		}							
 		wr.write("          )\n"); // joined end
-		if(getProperties() != null){
+		if(getProperties().size() > 0){
 			wr.write("\n");
 			exportEDIFProperties(wr, "           ");
 		}

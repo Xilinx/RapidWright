@@ -41,6 +41,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.regex.Pattern;
 import java.util.Queue;
+import java.util.Set;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
@@ -75,6 +76,8 @@ public class EDIFNetlist extends EDIFName {
 	protected int nameSpaceUniqueCount = 0;
 
 	private transient Device device;
+
+	private Set<String> primsToRemoveOnCollapse = new HashSet<String>();
 	
 	private boolean DEBUG = false;
 	
@@ -1034,14 +1037,6 @@ public class EDIFNetlist extends EDIFName {
 	 */
 	public HashMap<String,EDIFCellInst> generateCellInstMap(){
 		HashMap<String,EDIFCellInst> primitiveInstances = new HashMap<String, EDIFCellInst>();
-		HashSet<String> primitives = new HashSet<String>();
-		EDIFLibrary lib = getHDIPrimitivesLibrary();
-		if(lib != null){
-			for(EDIFCell c : lib.getCells()){
-				primitives.add(c.getName());
-			}
-		}
-			
 	
 		Queue<EDIFHierCellInst> toProcess = new LinkedList<EDIFHierCellInst>();
 		Collection<EDIFCellInst> topInstances = getTopCellInst().getCellType().getCellInsts(); 
@@ -1053,7 +1048,7 @@ public class EDIFNetlist extends EDIFName {
 		
 		while(!toProcess.isEmpty()){
 			EDIFHierCellInst curr = toProcess.poll();
-			if(primitives.contains(curr.getInst().getCellType().getName())){
+			if(curr.getInst().getCellType().isPrimitive()){
 				String name = curr.getHierarchicalInstName() + curr.getInst().getName();
 				primitiveInstances.put(name, curr.getInst());
 			}else{
@@ -1071,6 +1066,88 @@ public class EDIFNetlist extends EDIFName {
 		return primitiveInstances;
 	}
 
+	private static Set<String> getAllDecendantCellTypes(EDIFCell c) {
+		Set<String> types = new HashSet<>();
+		
+		Queue<EDIFCell> q = new LinkedList<>();
+		q.add(c);
+		while(!q.isEmpty()) {
+			EDIFCell curr = q.poll();
+			types.add(curr.getName());
+			for(EDIFCellInst i : curr.getCellInsts()) {
+				q.add(i.getCellType());
+			}
+		}
+		
+		return types;
+	}
+	
+	/**
+	 * Expands macro primitives into a native-compatible implementation.
+	 * In Vivado, some non-native unisims are expanded or transformed
+	 * into one or more native unisims to target the architecture while
+	 * supporting the functionality of the macro unisim.  When writing out
+	 * EDIF in Vivado, these primitives are collapsed back down to their
+	 * primitive state.  This method compensates for this behavior by expanding
+	 * the macro primitives. As an example, IBUF => IBUF (IBUFCTRL, IBUF) for 
+	 * UltraScale devices.
+	 * @param series The architecture series targeted by this netlist.
+	 */
+	public void expandMacroUnisims(Series series) {
+		EDIFLibrary macros = Design.getMacroPrimitives(series);
+		EDIFLibrary netlistPrims = getHDIPrimitivesLibrary(); 
+		
+		// Find the macro primitives to replace
+		Set<String> toReplace = new HashSet<String>();
+		for(EDIFCell c : netlistPrims.getCells()) {
+			if(macros.containsCell(c.getName())) {
+				toReplace.addAll(getAllDecendantCellTypes(macros.getCell(c.getName())));
+			}
+		}
+		
+		// Replace macro primitives in library and import pre-requisite cells if needed
+		for(String cellName : toReplace) {
+			EDIFCell removed = netlistPrims.removeCell(cellName);
+			if(removed == null) {
+				primsToRemoveOnCollapse.add(cellName);
+			}
+			EDIFCell toAdd = macros.getCell(cellName);
+			if(toAdd == null) {
+				toAdd = Design.getUnisimCell(Unisim.valueOf(cellName));
+			}
+			netlistPrims.addCell(toAdd);
+		}
+		
+		// Update all cell references to macro versions
+		for(EDIFLibrary lib : getLibraries()) {
+			for(EDIFCell cell : lib.getCells()) { 
+				for(EDIFCellInst inst : cell.getCellInsts()) {
+					if(toReplace.contains(inst.getCellType().getName())) {
+						inst.setCellType(netlistPrims.getCell(inst.getCellType().getName()));
+					}
+				}
+			}
+		}
+	}
+	
+	/**
+	 * Collapses any macro primitives back into their primitive state.  
+	 * Performs the opposite of {@link EDIFNetlist#expandMacroUnisims(Series)}.
+	 * @param series The architecture series targeted by this netlist.
+	 */
+	public void collapseMacroUnisims(Series series) {
+		EDIFLibrary macros = Design.getMacroPrimitives(series);
+		for(EDIFCell cell : getHDIPrimitivesLibrary().getCells()) {
+			if(macros.containsCell(cell.getName())) {
+				cell.makePrimitive();
+			}
+		}
+		for(String name : primsToRemoveOnCollapse) {
+			getHDIPrimitivesLibrary().removeCell(name);
+		}
+	}
+	
+	
 	public static void main(String[] args) throws FileNotFoundException {
 		CodePerfTracker t = new CodePerfTracker("EDIF Import/Export", true);
 		t.start("Read EDIF");

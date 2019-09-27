@@ -196,7 +196,7 @@ public class EDIFCellInst extends EDIFPropertyObject {
 		wr.write(cellType.getLegalEDIFName());
 		wr.write(" (libraryref ");
 		wr.write(cellType.getLibrary().getLegalEDIFName());
-		if(getProperties() != null){
+		if(getProperties().size() > 0){
 			wr.write(")))\n");
 			exportEDIFProperties(wr, "           ");
 			wr.write("         )\n");				

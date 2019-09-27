@@ -349,6 +349,15 @@ public class EDIFCell extends EDIFPropertyObject {
 		return getLibrary().getName().equals(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME) && (instances == null || instances.size() == 0) && (nets == null || nets.size() == 0);
 	}
 	
+	/**
+	 * Deletes internal representation.  
+	 */
+	protected void makePrimitive() { 
+		instances = null;
+		nets = null;
+		internalPortMap = null;
+	}
+	
 	public void exportEDIF(Writer wr) throws IOException{
 		wr.write("   (cell ");
 		exportEDIFName(wr);
@@ -369,7 +378,7 @@ public class EDIFCell extends EDIFPropertyObject {
 			}
 			wr.write("       )\n"); // Contents end
 		}
-		if(getProperties() != null){
+		if(getProperties().size() > 0){
 			wr.write("\n");
 			exportEDIFProperties(wr, "           ");
 		}

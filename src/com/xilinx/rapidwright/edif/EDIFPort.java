@@ -166,7 +166,7 @@ public class EDIFPort extends EDIFPropertyObject {
 		wr.write(" (direction ");
 		wr.write(direction.toString());
 		wr.write(")");
-		if(getProperties() != null){
+		if(getProperties().size() > 0){
 			wr.write("\n");
 			exportEDIFProperties(wr, indent+"   ");
 			wr.write(indent);
