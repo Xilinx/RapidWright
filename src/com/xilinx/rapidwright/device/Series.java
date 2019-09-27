@@ -30,18 +30,111 @@ import java.util.regex.Pattern;
 
 public enum Series {
 	
-	Series7("\\-7"),
-	UltraScale("UltraScale$"), 
-	UltraScalePlus("UltraScale\\+"),
-	Versal("Versal");
+	// See https://www.xilinx.com/support/documentation/user_guides/ug470_7Series_Config.pdf Table 5-24
+	// See https://www.xilinx.com/support/documentation/user_guides/ug570-ultrascale-configuration.pdf Table 9-20, 9-21
+	//             RegEx|BlockType|Top/Bottom|Row Addr|Col Addr|Minor Addr
+	Series7       ("\\-7",          23,  3, 22, 17,  5,  7, 10,  0,  7),
+	UltraScale    ("UltraScale$",   23,  3, -1, 17,  6,  7, 10,  0,  7), 
+	UltraScalePlus("UltraScale\\+", 24,  3, -1, 18,  6,  8, 10,  0,  8),
+	Versal        ("Versal",        -1, -1, -1, -1, -1, -1, -1, -1, -1);
 	
 	private Pattern archRegex;
+	
+	private int blockTypeLSB;
+	
+	private int blockTypeWidth;
+	
+	private int topBotBitLSB;
+	
+	private int rowLSB; 
+	
+	private int rowWidth;
+	
+	private int columnLSB;
+	
+	private int columnWidth;
+	
+	private int minorAddrLSB;
+	
+	private int minorAddrWidth;
 
-	private Series(String regex){
+	private Series(String regex, int blockTypeLSB, int blockTypeWidth, 
+					int topBotBit, int rowLSB, int rowWidth,
+					int colLSB, int colWidth, int minorLSB, int minorWidth) {
 		archRegex = Pattern.compile(regex);
+		this.blockTypeLSB = blockTypeLSB;
+		this.blockTypeWidth = blockTypeWidth;
+		this.topBotBitLSB = topBotBit;
+		this.rowLSB = rowLSB;
+		this.rowWidth = rowWidth;
+		this.columnLSB = colLSB;
+		this.columnWidth = colWidth;
+		this.minorAddrLSB = minorLSB;
+		this.minorAddrWidth = minorWidth;
 	}
 
 	public Pattern getArchRegex(){
 		return archRegex;
 	}
+
+	public int getBlockTypeLSB() {
+		return blockTypeLSB;
+	}
+
+	public int getBlockTypeWidth() {
+		return blockTypeWidth;
+	}
+	
+	public int getBlockTypeMask() {
+		return ((1 << getBlockTypeWidth()) - 1) << getBlockTypeLSB();
+	}
+
+	public int getTopBotBitLSB() {
+		return topBotBitLSB;
+	}
+	
+	public int getTopBotBitMask() {
+		return hasTopBotBit() ? 1 << topBotBitLSB : 0;
+	}
+	
+	public boolean hasTopBotBit() {
+		return topBotBitLSB != -1;
+	}
+
+	public int getRowLSB() {
+		return rowLSB;
+	}
+
+	public int getRowWidth() {
+		return rowWidth;
+	}
+
+	public int getRowMask() {
+		return ((1 << getRowWidth()) - 1) << getRowLSB();
+	}
+	
+	public int getColumnLSB() {
+		return columnLSB;
+	}
+
+	public int getColumnWidth() {
+		return columnWidth;
+	}
+
+	public int getColumnMask() {
+		return ((1 << getColumnWidth()) - 1) << getColumnLSB();
+	}
+	
+	public int getMinorAddrLSB() {
+		return minorAddrLSB;
+	}
+
+	public int getMinorAddrWidth() {
+		return minorAddrWidth;
+	}
+	
+	public int getMinorAddrMask() {
+		return ((1 << getMinorAddrWidth()) - 1) << getMinorAddrLSB();
+	}
+	
 }
