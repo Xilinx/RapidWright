@@ -109,9 +109,17 @@ public class StringTools {
 						int aStart = ai, bStart = bi;
 						while(ai < a.length() && isDigit(a.charAt(ai))) ai++;
 						while(bi < b.length() && isDigit(b.charAt(bi))) bi++;
-						int aInt = Integer.parseInt(a.substring(aStart,ai));
-						int bInt = Integer.parseInt(b.substring(bStart,bi));
-						if(aInt != bInt) return aInt - bInt;
+						String aStr = a.substring(aStart,ai);
+						String bStr = b.substring(bStart,bi);
+						if(aStr.length() > 9 || bStr.length() > 9) {
+							if(!aStr.equals(bStr)) {
+								return aStr.compareTo(bStr);
+							}
+						} else {
+							int aInt = Integer.parseInt(aStr);
+							int bInt = Integer.parseInt(bStr);
+							if(aInt != bInt) return aInt - bInt;							
+						}
 					} else if(a.charAt(ai) != b.charAt(bi)) 
 						return a.charAt(ai) - b.charAt(bi);
 					ai++; bi++;
