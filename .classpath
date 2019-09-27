@@ -2,9 +2,9 @@
 <classpath>
 	<classpathentry kind="src" path="src"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
-	<classpathentry kind="lib" path="jars/rapidwright-api-lib-2019.1.1.jar">
+	<classpathentry kind="lib" path="jars/rapidwright-api-lib-2019.1.2.jar" sourcepath="/RapidWrightXDEF/src">
 		<attributes>
-			<attribute name="javadoc_location" value="jar:platform:/resource/RapidWright/jars/rapidwright-api-lib-2019.1.1-javadoc.jar!/"/>
+			<attribute name="javadoc_location" value="jar:platform:/resource/RapidWright/jars/rapidwright-api-lib-2019.1.2-javadoc.jar!/"/>
 		</attributes>
 	</classpathentry>
 	<classpathentry kind="lib" path="jars/reflectasm-1.10.1-shaded.jar"/>

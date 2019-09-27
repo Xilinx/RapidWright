@@ -1211,4 +1211,34 @@ public class DesignTools {
 		}
 		return cells;
 	}
+	
+	/**
+	 * Quick and dumb placement of a cell.  Does not attempt
+	 * any optimization and will not change the placement
+	 * of other cells.  Currently it will only place a cell in an empty site. 
+	 * If the cell is already placed, it will leave it as is.
+	 * TODO - implement basic optimizations    
+	 * @param c The cell to place
+	 * @return True if the cell is successfully placed, false otherwise.
+	 */
+	public static boolean placeCell(Cell c, Design design) {
+		if(c.isPlaced()) {
+			// Don't move cell if already placed
+			return true;
+		}
+		Map<SiteTypeEnum, Set<String>> compatTypes = c.getCompatiblePlacements();
+		
+		for(Entry<SiteTypeEnum, Set<String>> e : compatTypes.entrySet()) {
+			for(Site s : design.getDevice().getAllSitesOfType(e.getKey())) {
+				SiteInst i = design.getSiteInstFromSite(s);
+				if(i == null) {
+					for(String bel : e.getValue()) {
+						boolean success = design.placeCell(c, s, s.getBEL(bel));
+						if (success) return true;
+					}
+				}
+			}
+		}
+		return false;
+	}
 }

@@ -1,3 +1,26 @@
+============= RapidWright 2019.1.2-beta released on 2019-09-30 ================
+Notes:
+ - API Additions:
+   - com.xilinx.rapidwright.design.Cell "public Map<SiteTypeEnum,Set<String>> getCompatiblePlacements()"
+   - com.xilinx.rapidwright.device.PIP "public PIP(PIP prototype, Tile newTile)"
+   - com.xilinx.rapidwright.design.Design "public static EDIFLibrary getMacroPrimitives(Series s)"
+   - com.xilinx.rapidwright.design.Design "public Cell createCell(String instName, Unisim unisim)"
+   - com.xilinx.rapidwright.device.Device "public String getName()"
+   - com.xilinx.rapidwright.device.Device "public SLR[] getSLRs()"
+   - com.xilinx.rapidwright.device.SLR "public String toString()"
+   - com.xilinx.rapidwright.device.SLR "public String getName()"
+ - Deprecated APIs:
+   - com.xilinx.rapidwright.device.Device "public String getDeviceName()" 
+ - Adds macro primitive expansion/translation and turns it on by
+   default when loading EDIF/DCPs -- eliminates problems in netlist
+   traversal and matches Vivado behavior on EDIF load
+ - Fixes an issue when creating designs from scratch for certain
+   devices not being loaded correctly in Vivado 
+ - Updates device data to include SLR CONFIG_ORDER_INDEX property
+ - Adjusts whitespace output in EDIF writer to more closely match Vivado generated 
+   EDIF files
+ - Several bug fixes (see commit log for details).   
+
 ============= RapidWright 2019.1.1-beta released on 2019-08-07 =================
 Notes:
  - API Additions:
