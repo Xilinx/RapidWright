@@ -226,6 +226,10 @@ public class EDIFCell extends EDIFPropertyObject {
 		return p;
 	}
 	
+	public EDIFPort createPort(EDIFPort port) {
+		return createPort(port.getName(), port.getDirection(), port.getWidth());
+	}
+	
 	public void rename(String newName){
 		setName(newName);
 	}

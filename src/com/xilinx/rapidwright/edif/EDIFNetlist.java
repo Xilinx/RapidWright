@@ -286,7 +286,6 @@ public class EDIFNetlist extends EDIFName {
 		}
 	}
 
-	
 	public void migrateCellAndSubCells(EDIFCell cell){
 		Queue<EDIFCell> cells = new LinkedList<>();
 		cells.add(cell);
@@ -300,13 +299,76 @@ public class EDIFNetlist extends EDIFName {
 					destLib = getWorkLibrary();
 				}
 			}
-			
+
 			if(!destLib.containsCell(curr)){
 				destLib.addCell(curr);
 			}
-			
+
 			for(EDIFCellInst inst : curr.getCellInsts()){
 				cells.add(inst.getCellType());
+			}
+		}
+	}
+
+
+	public void migrateCellAndSubCells(EDIFCell cell, boolean uniqueifyCollisions){
+		if (!uniqueifyCollisions){
+			migrateCellAndSubCells(cell);
+			return;
+		}
+
+		Queue<EDIFCell> cells = new LinkedList<>(); // which contains cells that have been added to libraries but whose subcells haven't.
+		//Step 1: add the top cell to the library.
+		//If the top cell belongs to HDIPrimitivesLibrary && the top cell exists in HDIPrimitivesLibrary, return and do nothing.
+		//Otherwise, the code would add the top cell to the library; if repeat happens, using "parameterized" suffix to distinguish
+		EDIFLibrary destLibTop = getLibrary(cell.getLibrary().getName());
+		if(destLibTop == null){
+			if(cell.getLibrary().getName().equals(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME)){
+				destLibTop = getHDIPrimitivesLibrary();
+			}else{
+				destLibTop = getWorkLibrary();
+			}
+		}
+		if (destLibTop.containsCell(cell) && destLibTop.getName().equals(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME))
+			return;
+		int i=0;
+		String currentCellName = cell.getName();
+		while (destLibTop.containsCell(cell)) {
+			cell.setName(currentCellName + "_parameterized" + i);
+			cell.setView(currentCellName + "_parameterized" + i);
+			cell.updateEDIFRename();
+			i++;
+		}
+		destLibTop.addCell(cell);
+		cells.add(cell);
+
+		//Step 2: add the subcells, subsubcells... to the library.
+		//Do it like before, but updating the celltype of each cellInst should be noticed.
+		while(!cells.isEmpty()){
+			EDIFCell pollFromCells = cells.poll();
+			for(EDIFCellInst inst : pollFromCells.getCellInsts()) {
+				EDIFCell instCellType = inst.getCellType();
+				EDIFLibrary destLibSub = getLibrary(instCellType.getLibrary().getName());
+				if (destLibSub == null) {
+					if (instCellType.getLibrary().getName().equals(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME)) {
+						destLibSub = getHDIPrimitivesLibrary();
+					} else {
+						destLibSub = getWorkLibrary();
+					}
+				}
+				if (destLibSub.containsCell(instCellType) && destLibSub.getName().equals(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME))
+					continue;
+				i=0;
+				currentCellName = instCellType.getName();
+				while (destLibSub.containsCell(instCellType)) {
+					instCellType.setName(currentCellName + "_parameterized" + i);
+					instCellType.setView(currentCellName + "_parameterized" + i);
+					instCellType.updateEDIFRename();
+					i++;
+				}
+				inst.setCellType(instCellType); // updating the celltype, which could be changed due to adding suffix
+				destLibSub.addCell(instCellType);
+				cells.add(instCellType);
 			}
 		}
 	}
@@ -526,9 +588,9 @@ public class EDIFNetlist extends EDIFName {
 		if(n == null){
 			if(parentNetName == null){
 				// Maybe it is GND/VCC
-				EDIFPortInst src = p.getNet().getSourcePortInsts(false).get(0);
-				if(src.getCellInst() != null){
-					String cellType = src.getCellInst().getCellType().getName();
+				List<EDIFPortInst> src = p.getNet().getSourcePortInsts(false);
+				if(src.size() > 0 && src.get(0).getCellInst() != null){
+					String cellType = src.get(0).getCellInst().getCellType().getName();
 					if(cellType.equals("GND")) return d.getGndNet();
 					if(cellType.equals("VCC")) return d.getVccNet();
 				}
@@ -740,10 +802,10 @@ public class EDIFNetlist extends EDIFName {
 				for(EDIFPortInst opr : otherNet.getPortInsts()){
 					if(epr.getPort() != opr.getPort()){ // Here we really want to compare object references!
 						EDIFHierPortInst absPortInst = new EDIFHierPortInst(instName, opr);
-						if(epr.getCellInst().getCellType().isPrimitive()){
+						if(opr.getCellInst() != null && opr.getCellInst().getCellType().isPrimitive()){
 							leafCellPins.add(absPortInst);
-							if(parentNetName == null && epr.isOutput()) {
-								source = epr;
+							if(parentNetName == null && opr.isOutput()) {
+								source = opr;
 								parentNetName = netName;
 							}
 						}
