@@ -761,7 +761,7 @@ public class EDIFNetlist extends EDIFName {
 		for(EDIFPortInst p : an.getNet().getPortInsts()){
 			EDIFHierPortInst absPortInst = new EDIFHierPortInst(an.getHierarchicalInstName(), p);
 			// Checks if cell is primitive or black box
-			boolean isCellPin = p.getCellInst() != null && p.getCellInst().getCellType().getCellInsts().size() == 0;
+			boolean isCellPin = p.getCellInst() != null && p.getCellInst().getCellType().isPrimitive();
 			if(isCellPin){
 				leafCellPins.add(absPortInst);
 			}
