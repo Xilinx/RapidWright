@@ -1185,7 +1185,12 @@ public class EDIFNetlist extends EDIFName {
 			for(EDIFCell cell : lib.getCells()) { 
 				for(EDIFCellInst inst : cell.getCellInsts()) {
 					if(toReplace.contains(inst.getCellType().getName())) {
-						inst.setCellType(netlistPrims.getCell(inst.getCellType().getName()));
+						EDIFCell newCell = netlistPrims.getCell(inst.getCellType().getName());
+						inst.setCellType(newCell);
+						for(EDIFPortInst portInst : inst.getPortInsts()) {
+							String portName = portInst.getPort().getBusName();
+							portInst.setPort(newCell.getPort(portName));
+						}
 					}
 				}
 			}
