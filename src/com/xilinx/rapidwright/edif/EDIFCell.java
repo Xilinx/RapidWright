@@ -328,6 +328,7 @@ public class EDIFCell extends EDIFPropertyObject {
 	}
 
 	protected EDIFNet getInternalNet(String portInstName){
+		if(internalPortMap == null) return null;
 		return internalPortMap.get(portInstName);
 	}
 	
