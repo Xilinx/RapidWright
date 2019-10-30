@@ -42,6 +42,7 @@ import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Module;
 import com.xilinx.rapidwright.design.ModuleCache;
 import com.xilinx.rapidwright.design.ModuleImpls;
+import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.blocks.BlockGuide;
 import com.xilinx.rapidwright.design.blocks.ImplGuide;
 import com.xilinx.rapidwright.design.blocks.PBlock;
@@ -56,6 +57,7 @@ import com.xilinx.rapidwright.util.LSFJob;
 import com.xilinx.rapidwright.util.LocalJob;
 import com.xilinx.rapidwright.util.MessageGenerator;
 import com.xilinx.rapidwright.util.StringTools;
+import com.xilinx.rapidwright.util.Utils;
 
 
 /**
@@ -98,6 +100,18 @@ public class BlockCreator {
 		for(String dcpName : routedDCPFileNames){
 			Design d = new Design(e);
 			d.updateDesignWithCheckpointPlaceAndRoute(dcpName);
+			SiteInst anchorCandidate = null;
+			for(SiteInst i : d.getSiteInsts()) {
+				if(i.getName().startsWith(SiteInst.STATIC_SOURCE)) continue;
+				if(Utils.isModuleSiteType(i.getSite().getSiteTypeEnum())){
+					anchorCandidate = i;
+					break;				
+				}
+			}
+			if(anchorCandidate == null) {
+				// No suitable anchor site instances, let's create a dummy one
+				d.createSiteInst(d.getDevice().getSite("SLICE_X0Y0"));
+			}
 			Module m = new Module(d,dcpName.replace(ROUTED_DCP_SUFFIX, METADATA_FILE_SUFFIX));
 
 			m.setDevice(d.getDevice());
