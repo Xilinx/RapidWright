@@ -102,7 +102,7 @@ public class BlockCreator {
 			d.updateDesignWithCheckpointPlaceAndRoute(dcpName);
 			SiteInst anchorCandidate = null;
 			for(SiteInst i : d.getSiteInsts()) {
-				if(i.getName().startsWith(SiteInst.STATIC_SOURCE)) continue;
+				if(i.getName().startsWith("STATIC_SOURCE")) continue;
 				if(Utils.isModuleSiteType(i.getSite().getSiteTypeEnum())){
 					anchorCandidate = i;
 					break;				
