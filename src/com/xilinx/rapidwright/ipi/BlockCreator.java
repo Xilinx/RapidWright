@@ -522,8 +522,8 @@ public class BlockCreator {
 			e.setDevice(m.getDevice());
 		}
 
-		ModuleCache.saveToCompactFile(modules,uniqueFileName+".dat");
-		FileTools.writeObjectToKryoFile(uniqueFileName+".kryo", e);
+		//ModuleCache.saveToCompactFile(modules,uniqueFileName+".dat");
+		//FileTools.writeObjectToKryoFile(uniqueFileName+".kryo", e);
 		inMemModuleCache.put(cacheID, modules);
 		return modules;
 	}
