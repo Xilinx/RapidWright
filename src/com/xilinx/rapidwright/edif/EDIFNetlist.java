@@ -761,7 +761,7 @@ public class EDIFNetlist extends EDIFName {
 		for(EDIFPortInst p : an.getNet().getPortInsts()){
 			EDIFHierPortInst absPortInst = new EDIFHierPortInst(an.getHierarchicalInstName(), p);
 			// Checks if cell is primitive or black box
-			boolean isCellPin = p.getCellInst() != null && p.getCellInst().getCellType().isPrimitive();
+			boolean isCellPin = p.getCellInst() != null && p.getCellInst().getCellType().isLeafCellOrBlackBox();
 			if(isCellPin){
 				leafCellPins.add(absPortInst);
 			}
@@ -802,7 +802,7 @@ public class EDIFNetlist extends EDIFName {
 				for(EDIFPortInst opr : otherNet.getPortInsts()){
 					if(epr.getPort() != opr.getPort()){ // Here we really want to compare object references!
 						EDIFHierPortInst absPortInst = new EDIFHierPortInst(instName, opr);
-						if(opr.getCellInst() != null && opr.getCellInst().getCellType().isPrimitive()){
+						if(opr.getCellInst() != null && opr.getCellInst().getCellType().isLeafCellOrBlackBox()){
 							leafCellPins.add(absPortInst);
 							if(parentNetName == null && opr.isOutput()) {
 								source = opr;
@@ -841,7 +841,7 @@ public class EDIFNetlist extends EDIFName {
 							EDIFHierPortInst absPortInst = new EDIFHierPortInst(instName, ipr);
 							
 							
-							boolean isCellPin = ipr.getCellInst() != null && ipr.getCellInst().getCellType().isPrimitive();
+							boolean isCellPin = ipr.getCellInst() != null && ipr.getCellInst().getCellType().isLeafCellOrBlackBox();
 							if(isCellPin){
 								leafCellPins.add(absPortInst);
 							}
