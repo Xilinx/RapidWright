@@ -27,6 +27,10 @@ package com.xilinx.rapidwright.edif;
 
 import java.io.IOException;
 import java.io.Writer;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Map.Entry;
 
 /**
  * Represents the EDIF property value construct.  Currently supports: 
@@ -70,6 +74,58 @@ public class EDIFPropertyValue {
 	}
 
 	/**
+	 * In situations where the type is an integer, this method will parse the verilog-syntax
+	 * integer format to get an integer value and return it.
+	 * @return The integer value of this property, or null if it is not an integer or failed to
+	 * parse.
+	 */
+	public Integer getIntValue() {
+		if(type != EDIFValueType.STRING) {
+			return null;
+		}
+		int radix = 10;
+		boolean lastCharWasTick = false;
+		boolean isSigned = false;
+		for(int i=0; i < value.length(); i++) {
+			char c = value.charAt(i);
+			if(lastCharWasTick) {
+				switch (c) {
+					case 'b':
+					case 'B':
+						radix = 2;
+						break;
+					case 'o':
+					case 'O':
+						radix = 8;
+						break;
+					case 'd':
+					case 'D':
+						radix = 10;
+						break;
+					case 'h':
+					case 'H':
+						radix = 16;
+						break;
+					case 's':
+					case 'S':
+						isSigned = true;
+						continue;
+				}
+				if(isSigned) {
+					return Integer.parseInt(value.substring(i+1), radix);
+				}
+				return Integer.parseUnsignedInt(value.substring(i+1), radix);
+				
+			}
+			if(c == '\'') {
+				lastCharWasTick = true;
+			}
+		}
+
+		return Integer.parseUnsignedInt(value);
+	}
+	
+	/**
 	 * @param value the value to set
 	 */
 	public void setValue(String value) {
@@ -91,5 +147,47 @@ public class EDIFPropertyValue {
 			wr.write(value);
 		}
 		wr.write(")");
+	}
+	
+	@Override
+	public String toString() {
+		return type + "("+value+")";
+	}
+
+	public static void main(String[] args) {
+		int[] testValues = new int[] {0, 1, -1, 4, 15, -15, 16, 
+				Integer.MAX_VALUE, Integer.MIN_VALUE};
+		int[] radixValues = new int[] { 2,   8,  10,  16};
+		char[] radixChars = new char[] {'b', 'o', 'd', 'h'};
+		
+		Map<String,Integer> examples = new HashMap<>();
+		for(int testValue : testValues) {
+			for(int i=0; i < radixValues.length; i++) {
+				int radix = radixValues[i];
+				char radixChar = radixChars[i];
+				for(String signed : new String[] {"s", "S", ""}) {
+					if(testValue < 0 && signed.length() != 0) continue;
+					String value = signed.length() == 0 ? Integer.toUnsignedString(testValue,radix) :
+						Integer.toString(testValue,radix);
+					examples.put("32'" + Character.toString(radixChar) + value, testValue);
+					examples.put("32'" + Character.toString(Character.toUpperCase(radixChar))
+						+ value, testValue);
+					examples.put(Integer.toUnsignedString(testValue), testValue);
+				}
+			}
+		}
+		
+		for(Entry<String,Integer> e : examples.entrySet()) {
+			EDIFPropertyValue p = new EDIFPropertyValue();
+			p.setType(EDIFValueType.INTEGER);
+			p.setValue(e.getKey());
+			System.out.print(e.getKey() + " " + e.getValue());
+			Integer parsedValue = p.getIntValue();
+			System.out.println( " " + parsedValue);
+			if(!e.getValue().equals(parsedValue)) {
+				throw new RuntimeException("ERROR: Couldn't parse test value " + e.getKey());
+			}
+		}
+		
 	}
 }
