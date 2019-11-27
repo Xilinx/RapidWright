@@ -127,7 +127,7 @@ public class RouteNode{
 	public RouteNode(String nodeName, Device dev){
 		String tileName = nodeName.substring(0, nodeName.indexOf('/'));
 		setTile(dev.getTile(tileName));
-		if(tile == null) throw new RuntimeException("ERROR: Tile '" + tileName + "' not found in device " + dev.getDeviceName() );
+		if(tile == null) throw new RuntimeException("ERROR: Tile '" + tileName + "' not found in device " + dev.getName() );
 		setWire(getTile().getWireIndex(nodeName.substring(nodeName.indexOf('/')+1)));
 		setParent(null);
 		setLevel(0);

@@ -28,7 +28,6 @@ import com.trolltech.qt.core.Qt.ItemDataRole;
 import com.trolltech.qt.gui.QTreeWidget;
 import com.trolltech.qt.gui.QTreeWidgetItem;
 import com.xilinx.rapidwright.device.Device;
-import com.xilinx.rapidwright.device.FamilyType;
 import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.PartNameTools;
 

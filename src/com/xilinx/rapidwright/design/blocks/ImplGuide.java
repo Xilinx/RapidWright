@@ -173,7 +173,7 @@ public class ImplGuide {
 						if(s == null){
 							throw new RuntimeException("ERROR: " + tokens[3] + " could " 
 								+ "not be found in the device " 
-								+ ig.getDevice().getDeviceName() + ".");
+								+ ig.getDevice().getName() + ".");
 						}
 						bi.setPlacement(s);
 					}

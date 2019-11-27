@@ -320,7 +320,7 @@ public class TileScene extends QGraphicsScene{
 				if(tile.getSites().length > 1){
 					siteNames += " ...";
 				}				
-				String tileName = device.getDeviceName() + " | " +  tile.getName() +
+				String tileName = device.getName() + " | " +  tile.getName() +
 				" | " + tile.getTileTypeEnum() + " (" + currX + "," + currY + ")" + siteNames;
 				this.updateStatus.emit(tileName, tile);
 				prevX = currX;

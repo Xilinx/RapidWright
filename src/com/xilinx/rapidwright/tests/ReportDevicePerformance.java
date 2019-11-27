@@ -26,7 +26,6 @@
 package com.xilinx.rapidwright.tests;
 
 import com.xilinx.rapidwright.device.Device;
-import com.xilinx.rapidwright.device.Part;
 
 /**
  * Reports the runtime and memory usage on a handful of devices.
@@ -53,11 +52,11 @@ public class ReportDevicePerformance {
 			p.stop();
 			
 			System.out.printf("%12s: %2.3fs %7.3fMBs\n", 
-					d.getDeviceName(), 
+					d.getName(), 
 					(p.getRuntime(deviceLoad))/1000000000.0,
 					(p.getMemUsage(deviceLoad))/(1024.0*1024.0));
 			
-			//System.out.println(d.getDeviceName() + " " +  + " " + );
+			//System.out.println(d.getName() + " " +  + " " + );
 		}
 	}
 }

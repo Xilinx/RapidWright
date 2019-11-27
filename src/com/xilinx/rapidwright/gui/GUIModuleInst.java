@@ -25,7 +25,6 @@ package com.xilinx.rapidwright.gui;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
-import java.util.Set;
 
 import com.trolltech.qt.QVariant;
 import com.trolltech.qt.core.QPointF;

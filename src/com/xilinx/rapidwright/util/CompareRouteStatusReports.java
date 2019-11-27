@@ -25,9 +25,7 @@
 package com.xilinx.rapidwright.util;
 
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.TreeMap;
-import java.util.TreeSet;
 
 /**
  * Tool for comparing reports from the Vivado Tcl command report_route_status.

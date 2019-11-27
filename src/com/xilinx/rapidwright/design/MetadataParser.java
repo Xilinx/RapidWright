@@ -31,7 +31,6 @@ import java.io.FileReader;
 import java.io.IOException;
 
 import com.xilinx.rapidwright.device.Device;
-import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.util.FileTools;
 
 /**
