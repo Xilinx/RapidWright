@@ -159,7 +159,8 @@ public class TileColumnPattern extends ArrayList<TileTypeEnum> implements Compar
 		outer: for(int row=0; row < dev.getRows(); row++){
 			for(int col=0; col < dev.getColumns(); col++){
 				Tile t = dev.getTile(row, col);
-				if(t.getTileTypeEnum() == TileTypeEnum.DSP || t.getTileTypeEnum() == TileTypeEnum.BRAM){
+				TileTypeEnum tt = t.getTileTypeEnum();
+				if(Utils.isDSP(tt) || Utils.isBRAM(tt)){
 					rowIdx = row;
 					break outer;
 				}
@@ -209,6 +210,9 @@ public class TileColumnPattern extends ArrayList<TileTypeEnum> implements Compar
 			}
 		}
 		MAX_PATTERN_LENGTH = longestRunWithoutNull;
+		if(longestRunWithoutNull==1 && (currRunWithoutNull>0)) {
+			MAX_PATTERN_LENGTH = currRunWithoutNull;
+		}
 		// Generate all possible patterns and store them in the map keeping track of each
 		// instance of each pattern
 		for(int i=1; i < MAX_PATTERN_LENGTH; i++){

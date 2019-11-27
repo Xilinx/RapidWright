@@ -25,7 +25,6 @@
 package com.xilinx.rapidwright.util;
 
 import java.io.File;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
@@ -195,6 +194,20 @@ public class StringTools {
 		sb.append(s.substring(i+1));
 		sb.append('>');
 		return sb.toString();
+	}
+	
+	/**
+	 * Counts occurrences of a character in a string.
+	 * @param str String to check
+	 * @param c Character of interest
+	 * @return The number of occurrences in the the string
+	 */
+	public static int countOccurrences(String str, char c) {
+		int count = 0;
+		for(int i=0; i < str.length(); i++) {
+			if(str.charAt(i) == c) count++;
+		}
+		return count;
 	}
 	
 	public static void main(String[] args) {

@@ -34,13 +34,14 @@ import java.util.Map.Entry;
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.ConstraintGroup;
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.Module;
+import com.xilinx.rapidwright.design.ModuleInst;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFDirection;
-import com.xilinx.rapidwright.edif.EDIFLibrary;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPort;
@@ -48,6 +49,7 @@ import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.edif.EDIFPropertyValue;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.MessageGenerator;
+import com.xilinx.rapidwright.util.StringTools;
 
 
 /**
@@ -143,97 +145,71 @@ public class ILAInserter {
 	 * @param ila The ILA+Debug Hub design (likely to be created with createILADesign())
 	 * @return True if the ILA+Debug Hub insertion was successful, false otherwise
 	 */
-	public static boolean applyILAToDesign(Design original, Design ila, String clkName){
-		/*
-		// Site instances
-		for(SiteInst si : ila.getSiteInsts()){
-			if(original.isSiteUsed(si.getSite())){
-				//throw new RuntimeException("ERROR: Collision on site " + si.getSiteName());
-				System.out.println("Collision on site " + si.getSiteName());
-			}
-			SiteInst siCopy = new SiteInst(si.getName(), original, si.getSiteTypeEnum(), si.getSite());
-			
-			for(Cell c : si.getCells()){
-				Cell cCopy = new Cell(c,siCopy);
-				siCopy.addCell(cCopy);
-			}
+	public static boolean applyILAToDesign(Design original, Design ila, String clkName) {
+		// Turn ILA into a module and instantiate it into the design
+		Module m = new Module(ila);
+		ModuleInst mi = original.createModuleInst(ila.getName(), m);
+		original.getNetlist().migrateCellAndSubCells(ila.getTopEDIFCell());
+		if(m.getAnchor() != null) {
+			mi.place(m.getAnchor().getSite());
 		}
 		
-		// Nets
-		for(Net n : ila.getNets()){
-			Net nCopy = new Net(n.getName(),n.getType());
-			nCopy.setLogicalNet(n.getLogicalNet());
-			for(PIP p : n.getPIPs()){
-				nCopy.addPIP(new PIP(p));
-			}
-			for(Pin p : n.getPins()){
-				Pin pCopy = new Pin(p.isOutPin(),p.getName(),original.getSiteInst(p.getSiteInstName()));
-				pCopy.setPinType(p.getPinType());
-				pCopy.setNet(nCopy);
-				pCopy.setRouted(p.isRouted());
-				nCopy.addPin(pCopy,true,true);
-			}
-			
-		}*/
 
 		// Logical netlist
-		EDIFNetlist e = original.getNetlist();
-			
-		EDIFCellInst ilaInst = e.getTopCell().addCellInst(ila.getNetlist().getTopCellInst());
-		EDIFCell ilaTop = ila.getNetlist().getTopCell();
-		ilaTop.setView("netlist");
-		e.getTopCell().getLibrary().addCell(ilaTop);
-		for(EDIFLibrary lib : ila.getNetlist().getLibraries()){
-			EDIFLibrary orig = e.getLibrary(lib.getName()); 
-			if(orig == null){
-				orig = e.getWorkLibrary();
-			}
-			if(orig.getName().equals(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME)){
-				for(EDIFCell c : lib.getCells()){
-					if(!orig.containsCell(c)){
-						orig.addCell(c);
-					}
-				}				
-			}else{
-				for(EDIFCell c : lib.getCells()){
-					orig.addCell(c);
-				}
-			}
-		}
-		//EDIFTools.consolidateLibraries(e);
+		EDIFNetlist netlist = original.getNetlist();
+		EDIFCell top = netlist.getTopCell();
 		
 		// Need to bring out clk net to top level
 		EDIFNet clk = null;
+		
 		String ilaClkPort = "ila_clk_out";
 		int lastSep = clkName.lastIndexOf(EDIFTools.EDIF_HIER_SEP);
-		if(lastSep > -1){
+		if(lastSep > -1) {
+
+			// Find clock net closes to the top level cell
+			int minNum = Integer.MAX_VALUE;
+			String minAlias = null;
+			for(String clkNetAlias : netlist.getNetAliases(clkName)) {
+				int level = StringTools.countOccurrences(clkNetAlias, EDIFTools.EDIF_HIER_SEP.charAt(0));
+				if(level < minNum) {
+					minNum = level;
+					minAlias = clkNetAlias;
+				}
+			}
 			
-			String currInst = clkName.substring(0, lastSep);
-			EDIFCellInst eci = original.getNetlist().getCellInstFromHierName(currInst);
-			clk = eci.getCellType().getNet(clkName.substring(lastSep+1));
-			EDIFPort port = null;
-			do{
-				port = eci.getCellType().createPort(ilaClkPort, EDIFDirection.OUTPUT, 1);
-				clk.createPortInst(port);
-				currInst.lastIndexOf(EDIFTools.EDIF_HIER_SEP);
-				currInst = currInst.substring(0,lastSep);
-			}while(currInst.contains(EDIFTools.EDIF_HIER_SEP));
-			
-			clk = new EDIFNet("clk_conn_net",original.getNetlist().getTopCell());
-			clk.createPortInst(port, eci);
-			
-		}else{
-			clk = original.getNetlist().getTopCell().getNet(clkName);
+			// Create new ports to wire clock to top level in order to connect it to the ILA
+			lastSep = minAlias.lastIndexOf(EDIFTools.EDIF_HIER_SEP);
+			if(lastSep > -1) {
+				clk = netlist.getNetFromHierName(minAlias); 
+				EDIFCellInst currInst = null;
+				String currInstName = minAlias.substring(0, lastSep);
+				// Drill up to the top level cell
+				do {
+					currInst = netlist.getCellInstFromHierName(currInstName);
+					EDIFPort port = null;
+					// Create port on the instance
+					port = currInst.getCellType().createPort(ilaClkPort, EDIFDirection.OUTPUT, 1);
+					// Connect the net to the port
+					clk.createPortInst(port);
+					// Pop up to next level
+					lastSep = currInstName.lastIndexOf(EDIFTools.EDIF_HIER_SEP);
+					currInstName = lastSep > -1 ? currInstName.substring(0, lastSep) : "";
+					EDIFCellInst prevInst = currInst;
+					currInst = netlist.getCellInstFromHierName(currInstName);
+					// Create a new net in the parent cell, connect it to the port
+					clk = currInst.getCellType().createNet(ilaClkPort);
+					clk.createPortInst(port, prevInst);
+				} while(!currInst.getCellType().equals(top));
+			} else {
+				clk = top.getNet(minAlias);
+			}
+		} else {
+			clk = top.getNet(clkName);
 		}
 		
 		// Connect the clock (assumes all probed signals are synchronous)
-		clk.createPortInst(ilaTop.getPort("clk"), ilaInst);
+		clk.createPortInst("clk", mi.getCellInst());
 		
-		List<String> constraints = original.getXDCConstraints(ConstraintGroup.NORMAL);
-		if(constraints == null){
-			constraints = new ArrayList<>();
-			original.setXDCConstraints(constraints, ConstraintGroup.NORMAL);
-		}
 		for(String c : ila.getXDCConstraints(ConstraintGroup.NORMAL)){
 			if(c.contains("current_instance ")){
 				if(!c.contains("-quiet")){
@@ -241,9 +217,8 @@ public class ILAInserter {
 				}
 				
 			}
-			constraints.add(c);
+			original.addXDCConstraint(c);
 		}
-		
 		
 		return true;
 	}

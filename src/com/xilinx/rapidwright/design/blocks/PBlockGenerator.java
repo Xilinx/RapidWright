@@ -134,9 +134,9 @@ public class PBlockGenerator {
 					throw new RuntimeException("ERROR: Couldn't load device for part: " +
 							line.split("\\s+")[3] + " (" +  partName + ")");
 				}
-			}else if(line.startsWith("| CLB LUTs")){
+			}else if(line.startsWith("| CLB LUTs") || line.startsWith("| Slice LUTs")){
 				lutCount = Integer.parseInt(line.split("\\s+")[4]);
-			}else if(line.startsWith("| CLB Registers")){
+			}else if(line.startsWith("| CLB Registers") || line.startsWith("| Slice Registers")){
 				regCount = Integer.parseInt(line.split("\\s+")[4]);				
 			}else if(line.startsWith("|   LUT as Memory")){
 				lutRAMCount = Integer.parseInt(line.split("\\s+")[5]);
@@ -146,7 +146,7 @@ public class PBlockGenerator {
 				bram18kCount = Integer.parseInt(line.split("\\s+")[3]);
 			}else if(line.startsWith("| DSPs")){
 				dspCount = Integer.parseInt(line.split("\\s+")[3]);
-			}else if(line.startsWith("| CARRY8")){
+			}else if(line.startsWith("| CARRY")){
 				carryCount = Integer.parseInt(line.split("\\s+")[3]);
 			}
 		}

@@ -55,7 +55,7 @@ public class EDIFCell extends EDIFPropertyObject {
 	
 	public EDIFCell(EDIFLibrary lib, String name){
 		super(name);
-		if(lib != null && lib.getCell(this.getLegalEDIFName()) == null) lib.addCell(this);
+		if(lib != null) lib.addCell(this);
 	}
 	
 	protected EDIFCell(){
@@ -328,6 +328,7 @@ public class EDIFCell extends EDIFPropertyObject {
 	}
 
 	protected EDIFNet getInternalNet(String portInstName){
+		if(internalPortMap == null) return null;
 		return internalPortMap.get(portInstName);
 	}
 	
@@ -351,6 +352,10 @@ public class EDIFCell extends EDIFPropertyObject {
 	
 	public boolean isPrimitive(){
 		return getLibrary().getName().equals(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME) && (instances == null || instances.size() == 0) && (nets == null || nets.size() == 0);
+	}
+	
+	public boolean isLeafCellOrBlackBox() {
+		return (instances == null || instances.size() == 0) && (nets == null || nets.size() == 0);
 	}
 	
 	/**
