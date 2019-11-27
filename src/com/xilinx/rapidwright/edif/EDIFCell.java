@@ -55,7 +55,7 @@ public class EDIFCell extends EDIFPropertyObject {
 	
 	public EDIFCell(EDIFLibrary lib, String name){
 		super(name);
-		if(lib != null) lib.addCell(this);
+		if(lib != null && lib.getCell(this.getLegalEDIFName()) == null) lib.addCell(this);
 	}
 	
 	protected EDIFCell(){
