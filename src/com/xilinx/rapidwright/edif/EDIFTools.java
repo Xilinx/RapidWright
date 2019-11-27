@@ -206,10 +206,8 @@ public class EDIFTools {
 		}
 		for(EDIFCell c : workLib.getExternallyReferencedCells()){
 			if(c.getLibrary().getName().equals(hdiPrims.getName())){
-				if(!hdiPrims.containsCell(c.getName())) {
-					c.moveToLibrary(hdiPrims);
-					hdiPrims.addCell(c);					
-				}
+				c.moveToLibrary(hdiPrims);
+				hdiPrims.addCell(c);
 			}
 		}
 	}

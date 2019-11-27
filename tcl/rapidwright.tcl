@@ -578,8 +578,7 @@ proc create_preimplemented_ila_dcp { part probe_count probe_depth output_dcp} {
     make_wrapper -files [get_files ${proj_loc}/${proj_name}.srcs/sources_1/bd/${bd_design}/${bd_design}.bd] -top
     add_files -norecurse ${proj_loc}/${proj_name}.srcs/sources_1/bd/${bd_design}/hdl/${bd_design}_wrapper.v
     set_property -name {STEPS.SYNTH_DESIGN.ARGS.MORE OPTIONS} -value {-mode out_of_context} -objects [get_runs $synth_run]
-    #launch_runs $synth_run -lsf {bsub -R "select[osdistro=rhel && (osver=ws7)]" -N -q medium}
-    launch_runs $synth_run 
+    launch_runs $synth_run -lsf {bsub -R "select[osdistro=rhel && (osver=ws6)]" -N -q medium}
     wait_on_run $synth_run
     
     open_run $synth_run -name $synth_run
@@ -637,6 +636,7 @@ proc write_rw_checkpoint { filename } {
     write_checkpoint -force $filename
     set output_edf [string map {".dcp" ".edf"} $filename]
     write_edif -force $output_edf
+    exec java com.xilinx.rapidwright.dcp.CheckpointTools $filename $output_edf 
 }
 
 proc get_x_coord { name } {
