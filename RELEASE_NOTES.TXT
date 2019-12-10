@@ -1,3 +1,36 @@
+============= RapidWright 2019.2.0-beta released on 2019-12-11 ================
+Notes:
+ * Major feature: 
+     Timing model and graph (published work at FPT 2019). Provides a
+     data path delay model for UltraScale+ interconnect and logic.
+     Provides approximate timing delays with ~2% error or less
+     on average.  See com.xilinx.rapidwright.timing package and
+     documentation for details.
+
+ - API Additions:
+   - com.xilinx.rapidwright.design.Cell "public Tile getTile()"
+   - com.xilinx.rapidwright.design.ClockRegion "public static void calculateFrameECC(int[] frame, int[] mask)"
+   - com.xilinx.rapidwright.design.ClockRegion "public SLR getSLR()"
+   - com.xilinx.rapidwright.design.ClockRegion "public boolean containsTile(Tile tile)"
+   - com.xilinx.rapidwright.device.Device "public SLR getMasterSLR()"
+   - com.xilinx.rapidwright.device.Device "public SLR getSLRByConfigOrderIndex(int cfgOrderIdx)"
+   - com.xilinx.rapidwright.device.SLR "public Device getDevice()"
+   - com.xilinx.rapidwright.device.SLR "public Series getSeries()"
+   - com.xilinx.rapidwright.device.SLR "public Collection<ClockRegion> getClockRegions()"
+   - com.xilinx.rapidwright.device.SLR "public ClockRegion getClockRegion(String name)"
+   - com.xilinx.rapidwright.device.SLR "public boolean hasClockRegion(String name)"
+   - com.xilinx.rapidwright.device.SLR "public boolean containsTile(Tile tile)"
+   - com.xilinx.rapidwright.device.SLR "public int getNumOfClockRegionRows()"
+   - com.xilinx.rapidwright.device.SLR "public int getNumOfClockRegionColumns()"
+   - com.xilinx.rapidwright.device.Tile "public SLR getSLR()"
+ - Deprecated APIs:
+   - com.xilinx.rapidwright.device.Device "public String getDeviceName()"
+ - Bug Fixes:
+   - Issue #51 - Missing macro proimitive definitions (DSP48E2)
+   - Issue #52 - Re-enabled compact module format
+   - Issue #54 - Fixed SLR name/index mismatch   
+   - Several other bug fixes (see commit log for details).   
+
 ============= RapidWright 2019.1.2-beta released on 2019-09-30 ================
 Notes:
  - API Additions:

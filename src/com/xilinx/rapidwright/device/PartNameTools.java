@@ -35,7 +35,7 @@ import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.util.FileTools;
 
 /**
- * Generated on: Wed Sep 25 17:39:08 2019
+ * Generated on: Fri Dec 06 10:46:56 2019
  * by: com.xilinx.rapidwright.release.PartNamePopulator
  * 
  * Class to hold utility APIs dealing with Parts and device names.
@@ -124,6 +124,7 @@ public class PartNameTools {
 			case VIRTEX7: return FamilyType.VIRTEX7;
 			case VIRTEXU: return FamilyType.VIRTEXU;
 			case VIRTEXUPLUS: return FamilyType.VIRTEXUPLUS;
+			case VIRTEXUPLUS58G: return FamilyType.VIRTEXUPLUS58G;
 			case VIRTEXUPLUS58GES1: return FamilyType.VIRTEXUPLUS58G;
 			case VIRTEXUPLUSHBM: return FamilyType.VIRTEXUPLUSHBM;
 			case VIRTEXUPLUSHBMES1: return FamilyType.VIRTEXUPLUSHBM;

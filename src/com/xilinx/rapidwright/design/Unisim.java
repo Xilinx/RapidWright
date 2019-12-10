@@ -29,7 +29,7 @@ import java.util.Map;
 import com.xilinx.rapidwright.device.Series;
 
 /**
- * Generated on: Wed Sep 25 17:39:08 2019
+ * Generated on: Fri Dec 06 10:46:56 2019
  * by: com.xilinx.rapidwright.release.UnisimParser
  * 
  * Enumerates supported Unisim primitives that map to Xilinx devices.
@@ -610,8 +610,10 @@ public enum Unisim {
 	LUT6_L,
 	MASTER_JTAG,
 	MBUFGCE,
+	MBUFGCE_DIV,
 	MBUFGCTRL,
 	MBUFG_GT,
+	MBUFG_PS,
 	ME_NOC_M_AXI,
 	ME_NOC_M_AXIS,
 	ME_NOC_S_AXI,
@@ -1238,108 +1240,108 @@ public enum Unisim {
 
 	static {
 		series7UnisimTransforms = new HashMap<Unisim, Unisim[]>();
-		series7UnisimTransforms.put(Unisim.LUT6_2,new Unisim[]{Unisim.LUT6,Unisim.LUT5});
-		series7UnisimTransforms.put(Unisim.ROM128X1,new Unisim[]{Unisim.LUT6,Unisim.LUT6,Unisim.MUXF7});
-		series7UnisimTransforms.put(Unisim.FDRSE,new Unisim[]{Unisim.FDRE,Unisim.LUT4});
-		series7UnisimTransforms.put(Unisim.IBUFDS_DIFF_OUT_IBUFDISABLE,new Unisim[]{Unisim.IBUFDS_IBUFDISABLE_INT,Unisim.IBUFDS_IBUFDISABLE_INT});
-		series7UnisimTransforms.put(Unisim.ROM256X1,new Unisim[]{Unisim.LUT6,Unisim.LUT6,Unisim.LUT6,Unisim.LUT6,Unisim.MUXF7,Unisim.MUXF7,Unisim.MUXF8});
-		series7UnisimTransforms.put(Unisim.IBUFDS_DIFF_OUT_INTERMDISABLE,new Unisim[]{Unisim.IBUFDS_INTERMDISABLE_INT,Unisim.IBUFDS_INTERMDISABLE_INT});
-		series7UnisimTransforms.put(Unisim.RAM32X1D,new Unisim[]{Unisim.RAMD32,Unisim.RAMD32});
-		series7UnisimTransforms.put(Unisim.IBUFDS,new Unisim[]{Unisim.DIFFINBUF,Unisim.IBUFCTRL});
-		series7UnisimTransforms.put(Unisim.RAM16X4S,new Unisim[]{Unisim.RAM16X2S,Unisim.RAM16X2S});
-		series7UnisimTransforms.put(Unisim.FDCPE,new Unisim[]{Unisim.FDCE,Unisim.FDPE,Unisim.LDCE,Unisim.LUT3});
-		series7UnisimTransforms.put(Unisim.IBUF,new Unisim[]{Unisim.INBUF,Unisim.IBUFCTRL});
-		series7UnisimTransforms.put(Unisim.IBUFDS_IBUFDISABLE_INT,new Unisim[]{Unisim.DIFFINBUF,Unisim.IBUFCTRL});
-		series7UnisimTransforms.put(Unisim.IBUF_INTERMDISABLE,new Unisim[]{Unisim.INBUF,Unisim.IBUFCTRL});
-		series7UnisimTransforms.put(Unisim.RAM32X2S,new Unisim[]{Unisim.RAM32X1S,Unisim.RAM32X1S});
-		series7UnisimTransforms.put(Unisim.IOBUFDS_DIFF_OUT_DCIEN,new Unisim[]{Unisim.IBUFDS_IBUFDISABLE_INT,Unisim.IBUFDS_IBUFDISABLE_INT,Unisim.OBUFTDS_DCIEN});
-		series7UnisimTransforms.put(Unisim.RAM32X8S,new Unisim[]{Unisim.RAM32X4S,Unisim.RAM32X4S});
-		series7UnisimTransforms.put(Unisim.FDRSE_1,new Unisim[]{Unisim.FDRE,Unisim.LUT4});
-		series7UnisimTransforms.put(Unisim.IOBUF_INTERMDISABLE,new Unisim[]{Unisim.IBUF_INTERMDISABLE,Unisim.OBUFT});
-		series7UnisimTransforms.put(Unisim.RAM32X4S,new Unisim[]{Unisim.RAM32X2S,Unisim.RAM32X2S});
-		series7UnisimTransforms.put(Unisim.IBUFDS_IBUFDISABLE,new Unisim[]{Unisim.IBUFDS_IBUFDISABLE_INT,Unisim.IBUFDS_IBUFDISABLE_INT});
-		series7UnisimTransforms.put(Unisim.RAM32M,new Unisim[]{Unisim.RAMS32,Unisim.RAMS32,Unisim.RAMD32,Unisim.RAMD32,Unisim.RAMD32,Unisim.RAMD32,Unisim.RAMD32,Unisim.RAMD32});
-		series7UnisimTransforms.put(Unisim.IOBUFDS_INTERMDISABLE,new Unisim[]{Unisim.IBUFDS_INTERMDISABLE,Unisim.OBUFTDS});
-		series7UnisimTransforms.put(Unisim.RAM128X1S,new Unisim[]{Unisim.RAMS64E,Unisim.RAMS64E,Unisim.MUXF7});
-		series7UnisimTransforms.put(Unisim.RAM16X8S,new Unisim[]{Unisim.RAM32X1S,Unisim.RAM32X1S,Unisim.RAM32X1S,Unisim.RAM32X1S,Unisim.RAM32X1S,Unisim.RAM32X1S,Unisim.RAM32X1S,Unisim.RAM32X1S});
-		series7UnisimTransforms.put(Unisim.RAM64M,new Unisim[]{Unisim.RAMD64E,Unisim.RAMD64E,Unisim.RAMD64E,Unisim.RAMD64E});
-		series7UnisimTransforms.put(Unisim.IOBUFDS_DIFF_OUT_INTERMDISABLE,new Unisim[]{Unisim.IBUFDS_INTERMDISABLE_INT,Unisim.IBUFDS_INTERMDISABLE_INT,Unisim.OBUFTDS});
-		series7UnisimTransforms.put(Unisim.RAM128X1D,new Unisim[]{Unisim.RAMD64E,Unisim.RAMD64E,Unisim.RAMD64E,Unisim.RAMD64E,Unisim.MUXF7,Unisim.MUXF7});
-		series7UnisimTransforms.put(Unisim.LDCPE,new Unisim[]{Unisim.LDCE,Unisim.LUT3,Unisim.LUT4});
-		series7UnisimTransforms.put(Unisim.LDCP,new Unisim[]{Unisim.LDCE,Unisim.LUT3,Unisim.LUT3});
-		series7UnisimTransforms.put(Unisim.RAM64X2S,new Unisim[]{Unisim.RAM64X1S,Unisim.RAM64X1S});
-		series7UnisimTransforms.put(Unisim.RAM64X1D,new Unisim[]{Unisim.RAMD64E,Unisim.RAMD64E});
-		series7UnisimTransforms.put(Unisim.RAM256X1S,new Unisim[]{Unisim.RAMS64E,Unisim.RAMS64E,Unisim.RAMS64E,Unisim.RAMS64E,Unisim.MUXF7,Unisim.MUXF7,Unisim.MUXF8});
-		series7UnisimTransforms.put(Unisim.FDRS,new Unisim[]{Unisim.FDRE,Unisim.LUT2});
-		series7UnisimTransforms.put(Unisim.IBUFDS_INTERMDISABLE,new Unisim[]{Unisim.IBUFDS_INTERMDISABLE_INT,Unisim.IBUFDS_INTERMDISABLE_INT});
-		series7UnisimTransforms.put(Unisim.FDRS_1,new Unisim[]{Unisim.FDRE,Unisim.LUT2});
-		series7UnisimTransforms.put(Unisim.FDCP,new Unisim[]{Unisim.FDCE,Unisim.FDPE,Unisim.LDCE,Unisim.LUT3});
-		series7UnisimTransforms.put(Unisim.IBUFDS_DIFF_OUT,new Unisim[]{Unisim.IBUFDS,Unisim.IBUFDS});
 		series7UnisimTransforms.put(Unisim.IOBUFDS_DIFF_OUT,new Unisim[]{Unisim.IBUFDS,Unisim.IBUFDS,Unisim.OBUFTDS});
-		series7UnisimTransforms.put(Unisim.IOBUFDS_DCIEN,new Unisim[]{Unisim.IBUFDS_IBUFDISABLE,Unisim.OBUFTDS_DCIEN});
-		series7UnisimTransforms.put(Unisim.RAM16X2S,new Unisim[]{Unisim.RAM32X1S,Unisim.RAM32X1S});
-		series7UnisimTransforms.put(Unisim.BUFGP,new Unisim[]{Unisim.BUFG,Unisim.IBUF});
-		series7UnisimTransforms.put(Unisim.CFGLUT5,new Unisim[]{Unisim.SRLC32E});
-		series7UnisimTransforms.put(Unisim.IOBUFDS,new Unisim[]{Unisim.IBUFDS,Unisim.OBUFTDS});
-		series7UnisimTransforms.put(Unisim.IOBUF,new Unisim[]{Unisim.IBUF,Unisim.OBUFT});
+		series7UnisimTransforms.put(Unisim.RAM64X2S,new Unisim[]{Unisim.RAM64X1S,Unisim.RAM64X1S});
+		series7UnisimTransforms.put(Unisim.FDCPE,new Unisim[]{Unisim.FDCE,Unisim.FDPE,Unisim.LDCE,Unisim.LUT3});
 		series7UnisimTransforms.put(Unisim.IOBUF_DCIEN,new Unisim[]{Unisim.IBUF_IBUFDISABLE,Unisim.OBUFT_DCIEN});
+		series7UnisimTransforms.put(Unisim.RAM128X1S,new Unisim[]{Unisim.RAMS64E,Unisim.RAMS64E,Unisim.MUXF7});
+		series7UnisimTransforms.put(Unisim.RAM16X2S,new Unisim[]{Unisim.RAM32X1S,Unisim.RAM32X1S});
+		series7UnisimTransforms.put(Unisim.RAM64X1D,new Unisim[]{Unisim.RAMD64E,Unisim.RAMD64E});
+		series7UnisimTransforms.put(Unisim.IBUFDS,new Unisim[]{Unisim.DIFFINBUF,Unisim.IBUFCTRL});
+		series7UnisimTransforms.put(Unisim.IOBUFDS,new Unisim[]{Unisim.IBUFDS,Unisim.OBUFTDS});
+		series7UnisimTransforms.put(Unisim.LDCP,new Unisim[]{Unisim.LDCE,Unisim.LUT3,Unisim.LUT3});
 		series7UnisimTransforms.put(Unisim.IBUF_IBUFDISABLE,new Unisim[]{Unisim.INBUF,Unisim.IBUFCTRL});
+		series7UnisimTransforms.put(Unisim.IBUFDS_IBUFDISABLE_INT,new Unisim[]{Unisim.DIFFINBUF,Unisim.IBUFCTRL});
+		series7UnisimTransforms.put(Unisim.RAM256X1S,new Unisim[]{Unisim.RAMS64E,Unisim.RAMS64E,Unisim.RAMS64E,Unisim.RAMS64E,Unisim.MUXF7,Unisim.MUXF7,Unisim.MUXF8});
+		series7UnisimTransforms.put(Unisim.FDCP,new Unisim[]{Unisim.FDCE,Unisim.FDPE,Unisim.LDCE,Unisim.LUT3});
+		series7UnisimTransforms.put(Unisim.LUT6_2,new Unisim[]{Unisim.LUT6,Unisim.LUT5});
+		series7UnisimTransforms.put(Unisim.RAM128X1D,new Unisim[]{Unisim.RAMD64E,Unisim.RAMD64E,Unisim.RAMD64E,Unisim.RAMD64E,Unisim.MUXF7,Unisim.MUXF7});
+		series7UnisimTransforms.put(Unisim.ROM128X1,new Unisim[]{Unisim.LUT6,Unisim.LUT6,Unisim.MUXF7});
+		series7UnisimTransforms.put(Unisim.IBUFDS_DIFF_OUT,new Unisim[]{Unisim.IBUFDS,Unisim.IBUFDS});
+		series7UnisimTransforms.put(Unisim.IOBUF,new Unisim[]{Unisim.IBUF,Unisim.OBUFT});
+		series7UnisimTransforms.put(Unisim.CFGLUT5,new Unisim[]{Unisim.SRLC32E});
+		series7UnisimTransforms.put(Unisim.RAM64M,new Unisim[]{Unisim.RAMD64E,Unisim.RAMD64E,Unisim.RAMD64E,Unisim.RAMD64E});
+		series7UnisimTransforms.put(Unisim.FDRS_1,new Unisim[]{Unisim.FDRE,Unisim.LUT2});
+		series7UnisimTransforms.put(Unisim.FDRSE,new Unisim[]{Unisim.FDRE,Unisim.LUT4});
+		series7UnisimTransforms.put(Unisim.IOBUFDS_INTERMDISABLE,new Unisim[]{Unisim.IBUFDS_INTERMDISABLE,Unisim.OBUFTDS});
+		series7UnisimTransforms.put(Unisim.RAM32X4S,new Unisim[]{Unisim.RAM32X2S,Unisim.RAM32X2S});
+		series7UnisimTransforms.put(Unisim.IBUFDS_INTERMDISABLE,new Unisim[]{Unisim.IBUFDS_INTERMDISABLE_INT,Unisim.IBUFDS_INTERMDISABLE_INT});
+		series7UnisimTransforms.put(Unisim.LDCPE,new Unisim[]{Unisim.LDCE,Unisim.LUT3,Unisim.LUT4});
+		series7UnisimTransforms.put(Unisim.IBUFDS_IBUFDISABLE,new Unisim[]{Unisim.IBUFDS_IBUFDISABLE_INT,Unisim.IBUFDS_IBUFDISABLE_INT});
+		series7UnisimTransforms.put(Unisim.RAM16X8S,new Unisim[]{Unisim.RAM32X1S,Unisim.RAM32X1S,Unisim.RAM32X1S,Unisim.RAM32X1S,Unisim.RAM32X1S,Unisim.RAM32X1S,Unisim.RAM32X1S,Unisim.RAM32X1S});
+		series7UnisimTransforms.put(Unisim.IBUF,new Unisim[]{Unisim.INBUF,Unisim.IBUFCTRL});
+		series7UnisimTransforms.put(Unisim.IOBUFDS_DIFF_OUT_INTERMDISABLE,new Unisim[]{Unisim.IBUFDS_INTERMDISABLE_INT,Unisim.IBUFDS_INTERMDISABLE_INT,Unisim.OBUFTDS});
+		series7UnisimTransforms.put(Unisim.RAM32X1D,new Unisim[]{Unisim.RAMD32,Unisim.RAMD32});
+		series7UnisimTransforms.put(Unisim.IBUFDS_DIFF_OUT_INTERMDISABLE,new Unisim[]{Unisim.IBUFDS_INTERMDISABLE_INT,Unisim.IBUFDS_INTERMDISABLE_INT});
+		series7UnisimTransforms.put(Unisim.IBUFDS_DIFF_OUT_IBUFDISABLE,new Unisim[]{Unisim.IBUFDS_IBUFDISABLE_INT,Unisim.IBUFDS_IBUFDISABLE_INT});
+		series7UnisimTransforms.put(Unisim.FDRS,new Unisim[]{Unisim.FDRE,Unisim.LUT2});
+		series7UnisimTransforms.put(Unisim.RAM32M,new Unisim[]{Unisim.RAMS32,Unisim.RAMS32,Unisim.RAMD32,Unisim.RAMD32,Unisim.RAMD32,Unisim.RAMD32,Unisim.RAMD32,Unisim.RAMD32});
+		series7UnisimTransforms.put(Unisim.FDRSE_1,new Unisim[]{Unisim.FDRE,Unisim.LUT4});
+		series7UnisimTransforms.put(Unisim.IOBUFDS_DCIEN,new Unisim[]{Unisim.IBUFDS_IBUFDISABLE,Unisim.OBUFTDS_DCIEN});
+		series7UnisimTransforms.put(Unisim.IOBUFDS_DIFF_OUT_DCIEN,new Unisim[]{Unisim.IBUFDS_IBUFDISABLE_INT,Unisim.IBUFDS_IBUFDISABLE_INT,Unisim.OBUFTDS_DCIEN});
+		series7UnisimTransforms.put(Unisim.ROM256X1,new Unisim[]{Unisim.LUT6,Unisim.LUT6,Unisim.LUT6,Unisim.LUT6,Unisim.MUXF7,Unisim.MUXF7,Unisim.MUXF8});
+		series7UnisimTransforms.put(Unisim.BUFGP,new Unisim[]{Unisim.BUFG,Unisim.IBUF});
+		series7UnisimTransforms.put(Unisim.IBUF_INTERMDISABLE,new Unisim[]{Unisim.INBUF,Unisim.IBUFCTRL});
+		series7UnisimTransforms.put(Unisim.IOBUF_INTERMDISABLE,new Unisim[]{Unisim.IBUF_INTERMDISABLE,Unisim.OBUFT});
+		series7UnisimTransforms.put(Unisim.RAM32X2S,new Unisim[]{Unisim.RAM32X1S,Unisim.RAM32X1S});
+		series7UnisimTransforms.put(Unisim.RAM32X8S,new Unisim[]{Unisim.RAM32X4S,Unisim.RAM32X4S});
+		series7UnisimTransforms.put(Unisim.RAM16X4S,new Unisim[]{Unisim.RAM16X2S,Unisim.RAM16X2S});
 		ultraScaleUnisimTransforms = new HashMap<Unisim, Unisim[]>();
-		ultraScaleUnisimTransforms.put(Unisim.LUT6_2,new Unisim[]{Unisim.LUT6,Unisim.LUT5});
-		ultraScaleUnisimTransforms.put(Unisim.FDRSE,new Unisim[]{Unisim.FDRE,Unisim.LUT4});
-		ultraScaleUnisimTransforms.put(Unisim.IBUFDS_DIFF_OUT_IBUFDISABLE,new Unisim[]{Unisim.DIFFINBUF,Unisim.IBUFCTRL,Unisim.IBUFCTRL});
-		ultraScaleUnisimTransforms.put(Unisim.ROM256X1,new Unisim[]{Unisim.LUT6,Unisim.LUT6,Unisim.LUT6,Unisim.LUT6,Unisim.MUXF7,Unisim.MUXF7,Unisim.MUXF8});
-		ultraScaleUnisimTransforms.put(Unisim.RAM32X1D,new Unisim[]{Unisim.RAMD32,Unisim.RAMD32});
-		ultraScaleUnisimTransforms.put(Unisim.RAM16X4S,new Unisim[]{Unisim.RAM16X2S,Unisim.RAM16X2S});
-		ultraScaleUnisimTransforms.put(Unisim.FDCPE,new Unisim[]{Unisim.FDCE,Unisim.FDPE,Unisim.LDCE,Unisim.LUT3});
-		ultraScaleUnisimTransforms.put(Unisim.IBUF,new Unisim[]{Unisim.INBUF,Unisim.IBUFCTRL});
-		ultraScaleUnisimTransforms.put(Unisim.RAM32M16,new Unisim[]{Unisim.RAMS32,Unisim.RAMS32,Unisim.RAMD32,Unisim.RAMD32,Unisim.RAMD32,Unisim.RAMD32,Unisim.RAMD32,Unisim.RAMD32,Unisim.RAMD32,Unisim.RAMD32,Unisim.RAMD32,Unisim.RAMD32,Unisim.RAMD32,Unisim.RAMD32,Unisim.RAMD32,Unisim.RAMD32});
-		ultraScaleUnisimTransforms.put(Unisim.IBUF_INTERMDISABLE,new Unisim[]{Unisim.INBUF,Unisim.IBUFCTRL});
-		ultraScaleUnisimTransforms.put(Unisim.RAM32X2S,new Unisim[]{Unisim.RAM32X1S,Unisim.RAM32X1S});
-		ultraScaleUnisimTransforms.put(Unisim.DSP48E2,new Unisim[]{Unisim.DSP_ALU,Unisim.DSP_A_B_DATA,Unisim.DSP_C_DATA,Unisim.DSP_M_DATA,Unisim.DSP_MULTIPLIER,Unisim.DSP_OUTPUT,Unisim.DSP_PREADD,Unisim.DSP_PREADD_DATA});
-		ultraScaleUnisimTransforms.put(Unisim.IOBUFDS_DIFF_OUT_DCIEN,new Unisim[]{Unisim.DIFFINBUF,Unisim.IBUFCTRL,Unisim.IBUFCTRL,Unisim.OBUFTDS_DCIEN});
-		ultraScaleUnisimTransforms.put(Unisim.RAM32X4S,new Unisim[]{Unisim.RAM32X2S,Unisim.RAM32X2S});
-		ultraScaleUnisimTransforms.put(Unisim.IBUFDS_IBUFDISABLE,new Unisim[]{Unisim.DIFFINBUF,Unisim.IBUFCTRL});
-		ultraScaleUnisimTransforms.put(Unisim.IOBUFDS_INTERMDISABLE,new Unisim[]{Unisim.DIFFINBUF,Unisim.IBUFCTRL,Unisim.OBUFTDS});
-		ultraScaleUnisimTransforms.put(Unisim.RAM128X1S,new Unisim[]{Unisim.RAMS64E,Unisim.RAMS64E,Unisim.MUXF7});
-		ultraScaleUnisimTransforms.put(Unisim.RAM16X8S,new Unisim[]{Unisim.RAM32X1S,Unisim.RAM32X1S,Unisim.RAM32X1S,Unisim.RAM32X1S,Unisim.RAM32X1S,Unisim.RAM32X1S,Unisim.RAM32X1S,Unisim.RAM32X1S});
-		ultraScaleUnisimTransforms.put(Unisim.IOBUFDS_DIFF_OUT_INTERMDISABLE,new Unisim[]{Unisim.DIFFINBUF,Unisim.IBUFCTRL,Unisim.IBUFCTRL,Unisim.OBUFTDS});
-		ultraScaleUnisimTransforms.put(Unisim.IOBUFDSE3,new Unisim[]{Unisim.DIFFINBUF,Unisim.IBUFCTRL,Unisim.OBUFTDS_DCIEN});
-		ultraScaleUnisimTransforms.put(Unisim.RAM128X1D,new Unisim[]{Unisim.RAMD64E,Unisim.RAMD64E,Unisim.RAMD64E,Unisim.RAMD64E,Unisim.MUXF7,Unisim.MUXF7});
-		ultraScaleUnisimTransforms.put(Unisim.LDCP,new Unisim[]{Unisim.LDCE,Unisim.LUT3,Unisim.LUT3});
-		ultraScaleUnisimTransforms.put(Unisim.RAM64X2S,new Unisim[]{Unisim.RAM64X1S,Unisim.RAM64X1S});
-		ultraScaleUnisimTransforms.put(Unisim.RAM256X1S,new Unisim[]{Unisim.RAMS64E,Unisim.RAMS64E,Unisim.RAMS64E,Unisim.RAMS64E,Unisim.MUXF7,Unisim.MUXF7,Unisim.MUXF8});
-		ultraScaleUnisimTransforms.put(Unisim.IBUFDS_INTERMDISABLE,new Unisim[]{Unisim.DIFFINBUF,Unisim.IBUFCTRL});
-		ultraScaleUnisimTransforms.put(Unisim.FDRS_1,new Unisim[]{Unisim.FDRE,Unisim.LUT2});
-		ultraScaleUnisimTransforms.put(Unisim.FDCP,new Unisim[]{Unisim.FDCE,Unisim.FDPE,Unisim.LDCE,Unisim.LUT3});
-		ultraScaleUnisimTransforms.put(Unisim.IBUFDS_DIFF_OUT,new Unisim[]{Unisim.DIFFINBUF,Unisim.IBUFCTRL,Unisim.IBUFCTRL});
-		ultraScaleUnisimTransforms.put(Unisim.IOBUFDS_DCIEN,new Unisim[]{Unisim.DIFFINBUF,Unisim.IBUFCTRL,Unisim.OBUFTDS_DCIEN});
-		ultraScaleUnisimTransforms.put(Unisim.RAM512X1S,new Unisim[]{Unisim.RAMS64E1,Unisim.RAMS64E1,Unisim.RAMS64E1,Unisim.RAMS64E1,Unisim.RAMS64E1,Unisim.RAMS64E1,Unisim.RAMS64E1,Unisim.RAMS64E1,Unisim.MUXF7,Unisim.MUXF7,Unisim.MUXF7,Unisim.MUXF7,Unisim.MUXF8,Unisim.MUXF8,Unisim.MUXF9});
-		ultraScaleUnisimTransforms.put(Unisim.ROM128X1,new Unisim[]{Unisim.LUT6,Unisim.LUT6,Unisim.MUXF7});
-		ultraScaleUnisimTransforms.put(Unisim.IBUFDS_DIFF_OUT_INTERMDISABLE,new Unisim[]{Unisim.DIFFINBUF,Unisim.IBUFCTRL,Unisim.IBUFCTRL});
-		ultraScaleUnisimTransforms.put(Unisim.IBUFDS,new Unisim[]{Unisim.DIFFINBUF,Unisim.IBUFCTRL});
-		ultraScaleUnisimTransforms.put(Unisim.IBUFDS_IBUFDISABLE_INT,new Unisim[]{Unisim.DIFFINBUF,Unisim.IBUFCTRL});
-		ultraScaleUnisimTransforms.put(Unisim.RAM32X8S,new Unisim[]{Unisim.RAM32X4S,Unisim.RAM32X4S});
-		ultraScaleUnisimTransforms.put(Unisim.FDRSE_1,new Unisim[]{Unisim.FDRE,Unisim.LUT4});
-		ultraScaleUnisimTransforms.put(Unisim.IOBUF_INTERMDISABLE,new Unisim[]{Unisim.INBUF,Unisim.OBUFT,Unisim.IBUFCTRL});
-		ultraScaleUnisimTransforms.put(Unisim.IBUFDSE3,new Unisim[]{Unisim.DIFFINBUF,Unisim.IBUFCTRL});
-		ultraScaleUnisimTransforms.put(Unisim.RAM32M,new Unisim[]{Unisim.RAMS32,Unisim.RAMS32,Unisim.RAMD32,Unisim.RAMD32,Unisim.RAMD32,Unisim.RAMD32,Unisim.RAMD32,Unisim.RAMD32});
-		ultraScaleUnisimTransforms.put(Unisim.RAM64M,new Unisim[]{Unisim.RAMD64E,Unisim.RAMD64E,Unisim.RAMD64E,Unisim.RAMD64E});
-		ultraScaleUnisimTransforms.put(Unisim.RAM64M8,new Unisim[]{Unisim.RAMD64E,Unisim.RAMD64E,Unisim.RAMD64E,Unisim.RAMD64E,Unisim.RAMD64E,Unisim.RAMD64E,Unisim.RAMD64E,Unisim.RAMD64E});
-		ultraScaleUnisimTransforms.put(Unisim.LDCPE,new Unisim[]{Unisim.LDCE,Unisim.LUT3,Unisim.LUT4});
-		ultraScaleUnisimTransforms.put(Unisim.IOBUFE3,new Unisim[]{Unisim.INBUF,Unisim.OBUFT_DCIEN,Unisim.IBUFCTRL});
-		ultraScaleUnisimTransforms.put(Unisim.RAM64X1D,new Unisim[]{Unisim.RAMD64E,Unisim.RAMD64E});
-		ultraScaleUnisimTransforms.put(Unisim.IBUFE3,new Unisim[]{Unisim.INBUF,Unisim.IBUFCTRL});
-		ultraScaleUnisimTransforms.put(Unisim.FDRS,new Unisim[]{Unisim.FDRE,Unisim.LUT2});
 		ultraScaleUnisimTransforms.put(Unisim.IOBUFDS_DIFF_OUT,new Unisim[]{Unisim.DIFFINBUF,Unisim.IBUFCTRL,Unisim.IBUFCTRL,Unisim.OBUFTDS});
-		ultraScaleUnisimTransforms.put(Unisim.RAM256X1D,new Unisim[]{Unisim.RAMD64E,Unisim.RAMD64E,Unisim.RAMD64E,Unisim.RAMD64E,Unisim.RAMD64E,Unisim.RAMD64E,Unisim.RAMD64E,Unisim.RAMD64E,Unisim.MUXF7,Unisim.MUXF7,Unisim.MUXF7,Unisim.MUXF7,Unisim.MUXF8,Unisim.MUXF8});
-		ultraScaleUnisimTransforms.put(Unisim.RAM16X2S,new Unisim[]{Unisim.RAM32X1S,Unisim.RAM32X1S});
-		ultraScaleUnisimTransforms.put(Unisim.BUFGP,new Unisim[]{Unisim.BUFG,Unisim.IBUF});
-		ultraScaleUnisimTransforms.put(Unisim.CFGLUT5,new Unisim[]{Unisim.SRLC32E});
-		ultraScaleUnisimTransforms.put(Unisim.IOBUFDS,new Unisim[]{Unisim.DIFFINBUF,Unisim.IBUFCTRL,Unisim.OBUFTDS});
-		ultraScaleUnisimTransforms.put(Unisim.IOBUF,new Unisim[]{Unisim.INBUF,Unisim.OBUFT,Unisim.IBUFCTRL});
+		ultraScaleUnisimTransforms.put(Unisim.FDCPE,new Unisim[]{Unisim.FDCE,Unisim.FDPE,Unisim.LDCE,Unisim.LUT3});
 		ultraScaleUnisimTransforms.put(Unisim.IOBUF_DCIEN,new Unisim[]{Unisim.INBUF,Unisim.OBUFT_DCIEN,Unisim.IBUFCTRL});
+		ultraScaleUnisimTransforms.put(Unisim.RAM128X1S,new Unisim[]{Unisim.RAMS64E,Unisim.RAMS64E,Unisim.MUXF7});
+		ultraScaleUnisimTransforms.put(Unisim.RAM64X1D,new Unisim[]{Unisim.RAMD64E,Unisim.RAMD64E});
+		ultraScaleUnisimTransforms.put(Unisim.IOBUFDS,new Unisim[]{Unisim.DIFFINBUF,Unisim.IBUFCTRL,Unisim.OBUFTDS});
+		ultraScaleUnisimTransforms.put(Unisim.LDCP,new Unisim[]{Unisim.LDCE,Unisim.LUT3,Unisim.LUT3});
+		ultraScaleUnisimTransforms.put(Unisim.DSP48E2,new Unisim[]{Unisim.DSP_ALU,Unisim.DSP_A_B_DATA,Unisim.DSP_C_DATA,Unisim.DSP_M_DATA,Unisim.DSP_MULTIPLIER,Unisim.DSP_OUTPUT,Unisim.DSP_PREADD,Unisim.DSP_PREADD_DATA});
+		ultraScaleUnisimTransforms.put(Unisim.IBUFDS_IBUFDISABLE_INT,new Unisim[]{Unisim.DIFFINBUF,Unisim.IBUFCTRL});
+		ultraScaleUnisimTransforms.put(Unisim.RAM256X1S,new Unisim[]{Unisim.RAMS64E,Unisim.RAMS64E,Unisim.RAMS64E,Unisim.RAMS64E,Unisim.MUXF7,Unisim.MUXF7,Unisim.MUXF8});
+		ultraScaleUnisimTransforms.put(Unisim.FDCP,new Unisim[]{Unisim.FDCE,Unisim.FDPE,Unisim.LDCE,Unisim.LUT3});
+		ultraScaleUnisimTransforms.put(Unisim.IBUFDSE3,new Unisim[]{Unisim.DIFFINBUF,Unisim.IBUFCTRL});
+		ultraScaleUnisimTransforms.put(Unisim.LUT6_2,new Unisim[]{Unisim.LUT6,Unisim.LUT5});
+		ultraScaleUnisimTransforms.put(Unisim.IBUFDS_DIFF_OUT,new Unisim[]{Unisim.DIFFINBUF,Unisim.IBUFCTRL,Unisim.IBUFCTRL});
+		ultraScaleUnisimTransforms.put(Unisim.CFGLUT5,new Unisim[]{Unisim.SRLC32E});
+		ultraScaleUnisimTransforms.put(Unisim.FDRSE,new Unisim[]{Unisim.FDRE,Unisim.LUT4});
+		ultraScaleUnisimTransforms.put(Unisim.IOBUFDS_INTERMDISABLE,new Unisim[]{Unisim.DIFFINBUF,Unisim.IBUFCTRL,Unisim.OBUFTDS});
+		ultraScaleUnisimTransforms.put(Unisim.RAM32X4S,new Unisim[]{Unisim.RAM32X2S,Unisim.RAM32X2S});
+		ultraScaleUnisimTransforms.put(Unisim.IBUFDS_INTERMDISABLE,new Unisim[]{Unisim.DIFFINBUF,Unisim.IBUFCTRL});
+		ultraScaleUnisimTransforms.put(Unisim.LDCPE,new Unisim[]{Unisim.LDCE,Unisim.LUT3,Unisim.LUT4});
+		ultraScaleUnisimTransforms.put(Unisim.RAM256X1D,new Unisim[]{Unisim.RAMD64E,Unisim.RAMD64E,Unisim.RAMD64E,Unisim.RAMD64E,Unisim.RAMD64E,Unisim.RAMD64E,Unisim.RAMD64E,Unisim.RAMD64E,Unisim.MUXF7,Unisim.MUXF7,Unisim.MUXF7,Unisim.MUXF7,Unisim.MUXF8,Unisim.MUXF8});
+		ultraScaleUnisimTransforms.put(Unisim.RAM16X8S,new Unisim[]{Unisim.RAM32X1S,Unisim.RAM32X1S,Unisim.RAM32X1S,Unisim.RAM32X1S,Unisim.RAM32X1S,Unisim.RAM32X1S,Unisim.RAM32X1S,Unisim.RAM32X1S});
+		ultraScaleUnisimTransforms.put(Unisim.IBUF,new Unisim[]{Unisim.INBUF,Unisim.IBUFCTRL});
+		ultraScaleUnisimTransforms.put(Unisim.RAM32X1D,new Unisim[]{Unisim.RAMD32,Unisim.RAMD32});
+		ultraScaleUnisimTransforms.put(Unisim.IBUFDS_DIFF_OUT_IBUFDISABLE,new Unisim[]{Unisim.DIFFINBUF,Unisim.IBUFCTRL,Unisim.IBUFCTRL});
+		ultraScaleUnisimTransforms.put(Unisim.FDRS,new Unisim[]{Unisim.FDRE,Unisim.LUT2});
+		ultraScaleUnisimTransforms.put(Unisim.RAM32M,new Unisim[]{Unisim.RAMS32,Unisim.RAMS32,Unisim.RAMD32,Unisim.RAMD32,Unisim.RAMD32,Unisim.RAMD32,Unisim.RAMD32,Unisim.RAMD32});
+		ultraScaleUnisimTransforms.put(Unisim.FDRSE_1,new Unisim[]{Unisim.FDRE,Unisim.LUT4});
+		ultraScaleUnisimTransforms.put(Unisim.IOBUFDS_DIFF_OUT_DCIEN,new Unisim[]{Unisim.DIFFINBUF,Unisim.IBUFCTRL,Unisim.IBUFCTRL,Unisim.OBUFTDS_DCIEN});
+		ultraScaleUnisimTransforms.put(Unisim.IOBUFDSE3,new Unisim[]{Unisim.DIFFINBUF,Unisim.IBUFCTRL,Unisim.OBUFTDS_DCIEN});
+		ultraScaleUnisimTransforms.put(Unisim.RAM64X2S,new Unisim[]{Unisim.RAM64X1S,Unisim.RAM64X1S});
+		ultraScaleUnisimTransforms.put(Unisim.RAM16X2S,new Unisim[]{Unisim.RAM32X1S,Unisim.RAM32X1S});
+		ultraScaleUnisimTransforms.put(Unisim.IBUFDS,new Unisim[]{Unisim.DIFFINBUF,Unisim.IBUFCTRL});
 		ultraScaleUnisimTransforms.put(Unisim.IBUF_IBUFDISABLE,new Unisim[]{Unisim.INBUF,Unisim.IBUFCTRL});
+		ultraScaleUnisimTransforms.put(Unisim.RAM128X1D,new Unisim[]{Unisim.RAMD64E,Unisim.RAMD64E,Unisim.RAMD64E,Unisim.RAMD64E,Unisim.MUXF7,Unisim.MUXF7});
+		ultraScaleUnisimTransforms.put(Unisim.ROM128X1,new Unisim[]{Unisim.LUT6,Unisim.LUT6,Unisim.MUXF7});
+		ultraScaleUnisimTransforms.put(Unisim.IOBUF,new Unisim[]{Unisim.INBUF,Unisim.OBUFT,Unisim.IBUFCTRL});
+		ultraScaleUnisimTransforms.put(Unisim.IBUFE3,new Unisim[]{Unisim.INBUF,Unisim.IBUFCTRL});
+		ultraScaleUnisimTransforms.put(Unisim.RAM64M,new Unisim[]{Unisim.RAMD64E,Unisim.RAMD64E,Unisim.RAMD64E,Unisim.RAMD64E});
+		ultraScaleUnisimTransforms.put(Unisim.FDRS_1,new Unisim[]{Unisim.FDRE,Unisim.LUT2});
+		ultraScaleUnisimTransforms.put(Unisim.RAM512X1S,new Unisim[]{Unisim.RAMS64E1,Unisim.RAMS64E1,Unisim.RAMS64E1,Unisim.RAMS64E1,Unisim.RAMS64E1,Unisim.RAMS64E1,Unisim.RAMS64E1,Unisim.RAMS64E1,Unisim.MUXF7,Unisim.MUXF7,Unisim.MUXF7,Unisim.MUXF7,Unisim.MUXF8,Unisim.MUXF8,Unisim.MUXF9});
+		ultraScaleUnisimTransforms.put(Unisim.IBUFDS_IBUFDISABLE,new Unisim[]{Unisim.DIFFINBUF,Unisim.IBUFCTRL});
+		ultraScaleUnisimTransforms.put(Unisim.IOBUFE3,new Unisim[]{Unisim.INBUF,Unisim.OBUFT_DCIEN,Unisim.IBUFCTRL});
+		ultraScaleUnisimTransforms.put(Unisim.IOBUFDS_DIFF_OUT_INTERMDISABLE,new Unisim[]{Unisim.DIFFINBUF,Unisim.IBUFCTRL,Unisim.IBUFCTRL,Unisim.OBUFTDS});
+		ultraScaleUnisimTransforms.put(Unisim.RAM32M16,new Unisim[]{Unisim.RAMS32,Unisim.RAMS32,Unisim.RAMD32,Unisim.RAMD32,Unisim.RAMD32,Unisim.RAMD32,Unisim.RAMD32,Unisim.RAMD32,Unisim.RAMD32,Unisim.RAMD32,Unisim.RAMD32,Unisim.RAMD32,Unisim.RAMD32,Unisim.RAMD32,Unisim.RAMD32,Unisim.RAMD32});
+		ultraScaleUnisimTransforms.put(Unisim.IBUFDS_DIFF_OUT_INTERMDISABLE,new Unisim[]{Unisim.DIFFINBUF,Unisim.IBUFCTRL,Unisim.IBUFCTRL});
+		ultraScaleUnisimTransforms.put(Unisim.IOBUFDS_DCIEN,new Unisim[]{Unisim.DIFFINBUF,Unisim.IBUFCTRL,Unisim.OBUFTDS_DCIEN});
+		ultraScaleUnisimTransforms.put(Unisim.RAM64M8,new Unisim[]{Unisim.RAMD64E,Unisim.RAMD64E,Unisim.RAMD64E,Unisim.RAMD64E,Unisim.RAMD64E,Unisim.RAMD64E,Unisim.RAMD64E,Unisim.RAMD64E});
+		ultraScaleUnisimTransforms.put(Unisim.ROM256X1,new Unisim[]{Unisim.LUT6,Unisim.LUT6,Unisim.LUT6,Unisim.LUT6,Unisim.MUXF7,Unisim.MUXF7,Unisim.MUXF8});
+		ultraScaleUnisimTransforms.put(Unisim.BUFGP,new Unisim[]{Unisim.BUFG,Unisim.IBUF});
+		ultraScaleUnisimTransforms.put(Unisim.IBUF_INTERMDISABLE,new Unisim[]{Unisim.INBUF,Unisim.IBUFCTRL});
+		ultraScaleUnisimTransforms.put(Unisim.IOBUF_INTERMDISABLE,new Unisim[]{Unisim.INBUF,Unisim.OBUFT,Unisim.IBUFCTRL});
+		ultraScaleUnisimTransforms.put(Unisim.RAM32X2S,new Unisim[]{Unisim.RAM32X1S,Unisim.RAM32X1S});
+		ultraScaleUnisimTransforms.put(Unisim.RAM32X8S,new Unisim[]{Unisim.RAM32X4S,Unisim.RAM32X4S});
+		ultraScaleUnisimTransforms.put(Unisim.RAM16X4S,new Unisim[]{Unisim.RAM16X2S,Unisim.RAM16X2S});
 	}
 	
 	/**
