@@ -40,8 +40,9 @@ import com.xilinx.rapidwright.util.FileTools;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -225,8 +226,7 @@ public class TimingModel {
         }
         forDebugTimingGroupByPorts = new LinkedHashMap<>();
         String series = device.getSeries().name().toLowerCase();
-        String fileName = FileTools.getRapidWrightPath() + File.separator +
-                TimingModel.TIMING_DATA_DIR + File.separator +series+
+        String fileName = TimingModel.TIMING_DATA_DIR + File.separator +series+
                 File.separator + "intersite_delay_terms.txt";
         if (!readDelayTerms(fileName)) {
         	throw new RuntimeException("Error reading file:" + fileName);
@@ -456,9 +456,9 @@ public class TimingModel {
      */
     protected boolean readDelayTerms(String filename) {
         boolean result = true;
-        BufferedReader br;
+        InputStream in = FileTools.getRapidWrightResourceInputStream(filename); 
         try {
-            br = new BufferedReader(new FileReader(filename));
+            BufferedReader br = new BufferedReader(new InputStreamReader(in));
             String line = "";
             int lineCntr = 0;
             while ((line=br.readLine()) != null) {// && line.length() != 0) {
@@ -544,13 +544,16 @@ public class TimingModel {
                 else if (split[0].equalsIgnoreCase("FAR_MAX"))        FAR_MAX =(int) Math.floor(value);
 
                 else {
-                    if (split.length == 2)
-                        System.err.println("Bad formatted line:"+lineCntr+": \""+split[0]+"\"");
-                    else
-                        System.err.println("Unrecognized term on line:"+lineCntr+": \""+split[0]+"\"");
-                    System.exit(1);
+                	String errMessage;
+                    if (split.length == 2) {
+                        errMessage = "Bad formatted line:"+lineCntr+": \""+split[0]+"\"";
+                    } else {
+                        errMessage = "Unrecognized term on line:"+lineCntr+": \""+split[0]+"\"";
+                    }
+                    throw new RuntimeException("ERROR: " + errMessage);
                 }
             }
+            br.close();
         } catch (IOException e) {
             e.printStackTrace();
             result = false;

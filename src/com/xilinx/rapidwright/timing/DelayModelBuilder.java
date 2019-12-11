@@ -23,8 +23,6 @@
 
 package com.xilinx.rapidwright.timing;
 
-import com.xilinx.rapidwright.util.FileTools;
-
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
@@ -60,8 +58,7 @@ class DelayModelBuilder {
      * Prepare the appropriate input file for {@link #getDelayModel(String, String, String)}
      */
     public static DelayModel getDelayModel(String series) {
-        String fileName = FileTools.getRapidWrightPath() + File.separator +
-                TimingModel.TIMING_DATA_DIR + File.separator +series+
+        String fileName = TimingModel.TIMING_DATA_DIR + File.separator +series+
                 File.separator + "intrasite_delay_terms.txt";
         return getDelayModel("small", "text", fileName);
     }

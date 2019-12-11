@@ -23,8 +23,8 @@
 
 package com.xilinx.rapidwright.timing;
 
-import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -35,6 +35,8 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import com.xilinx.rapidwright.util.FileTools;
 
 /**
  * An implementation of DelayModelSource, used to provide data source to DelayModel class.
@@ -210,16 +212,16 @@ class DelayModelSourceFromText extends DelayModelSource {
      * Parse and dispatch each line of the given file to either  storeLogicDelayArc or storeIntraSiteDelayArc.
      * @param fileName Specify the text file to load logic and intra-site delays from.
      */
-    private void read(String fileName) {
+    private void readIntraSiteDelays(String fileName) {
 
-        FileInputStream inputStream = null;
+        InputStream inputStream = null;
         Scanner sc = null;
 
         String siteName = null;
         String belName  = null;
 
         try {
-            inputStream = new FileInputStream(fileName);
+            inputStream = FileTools.getRapidWrightResourceInputStream(fileName);
             sc = new Scanner(inputStream, "UTF-8");
             while (sc.hasNextLine()) {
                 // Make canonical from "," without spaces
@@ -285,7 +287,7 @@ class DelayModelSourceFromText extends DelayModelSource {
         logicDelays     = new ArrayList<DelayEntry>();
         intraSiteDelays = new ArrayList<DelayEntry>();
         configCodeMap   = new HashMap<String, Short>();
-        read(fileName);
+        readIntraSiteDelays(fileName);
     }
 
     // ************************    helper methods     ***********************
