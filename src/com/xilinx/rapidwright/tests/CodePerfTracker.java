@@ -192,7 +192,7 @@ public class CodePerfTracker {
 	private void addTotalEntry(){
 		long totalRuntime = 0L;
 		long totalUsage = 0L;
-		maxSegmentNameSize = 0;
+//		maxSegmentNameSize = 0;
 		for(int i=0; i < runtimes.size(); i++){
 			totalRuntime += runtimes.get(i);
 			totalUsage += memUsages.get(i);
