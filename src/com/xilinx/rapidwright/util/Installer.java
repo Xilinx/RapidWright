@@ -344,7 +344,7 @@ public class Installer {
 			}else{
 				System.err.println("\tJDK can be installed by:\n");
 				System.err.println("  \tDebian/Ubuntu: 'sudo apt-get install openjdk-8-jdk'\n");
-				System.err.println("  \tRedHat/Fedora: 'sudo yum install java-1.8.0-openjdk'\n");
+				System.err.println("  \tRedHat/Fedora: 'sudo yum install java-1.8.0-openjdk-devel'\n");
 			}
 			missingDep = true;
 		}
