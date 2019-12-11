@@ -1,12 +1,19 @@
 package com.xilinx.rapidwright.tests;
 
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.timing.TimingEdge;
 import com.xilinx.rapidwright.timing.TimingGraph;
 import com.xilinx.rapidwright.timing.TimingManager;
+import com.xilinx.rapidwright.timing.TimingVertex;
 import com.xilinx.rapidwright.util.FileTools;
+import com.xilinx.rapidwright.util.Installer;
+import com.xilinx.rapidwright.util.MessageGenerator;
+
 import org.jgrapht.GraphPath;
 
+import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.text.DecimalFormat;
@@ -15,11 +22,16 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Scanner;
-import java.util.Set;
 
 
 public class CheckAccuracyUsingGnlDesigns {
 
+	public static String GNL_DESIGN_PATH = File.separator + "designs"+File.separator+"timing"+
+                                           File.separator+"gnl" + File.separator;
+	
+	private static String DOWNLOAD_PATH = 
+			"https://github.com/Xilinx/RapidWright/releases/download/v2019.1.2-beta/";
+	
     public CheckAccuracyUsingGnlDesigns() {
     }
 
@@ -28,7 +40,7 @@ public class CheckAccuracyUsingGnlDesigns {
 
         TimingManager tm = new TimingManager(d);
         TimingGraph tg   = tm.getTimingGraph();
-        GraphPath maxDelayPath = tg.getMaxDelayPath();
+        GraphPath<TimingVertex, TimingEdge> maxDelayPath = tg.getMaxDelayPath();
         return maxDelayPath.getWeight();
     }
 
@@ -41,24 +53,31 @@ public class CheckAccuracyUsingGnlDesigns {
         DecimalFormat zeroDecimalPoint = new DecimalFormat("0");
         DecimalFormat fourDecimalPoint = new DecimalFormat("0.0000");
 
-        String RWPath  = FileTools.getRapidWrightPath();
-        String desPath = "/designs/timing/gnl/";
-//        String outPath = "/./";
+        String path = FileTools.getRapidWrightPath() + GNL_DESIGN_PATH;
+        String outFileName = suiteFileName.substring(0,suiteFileName.lastIndexOf('.'));
         try {
-            String outFileName = suiteFileName.substring(0,suiteFileName.lastIndexOf('.'));
-//            printStream = new PrintStream(RWPath + outPath + outFileName + ".out");
             printStream = new PrintStream(outFileName + ".out");
-        } catch (Exception e) {
+        } catch (FileNotFoundException e) {
             e.printStackTrace();
-            System.exit(1);
+            System.err.println("Could not write file " + outFileName + ".out");
+            return;
         }
 
         List<Double> absErrorList = new ArrayList<Double>();;
 
         try {
-
-            FileInputStream inputStream = new FileInputStream(RWPath + desPath + "golden/" + suiteFileName);
-            printStream.println("#designs                                vivado  model(golden)   model   error   abs_error");
+        	String goldenFileName = path + "golden/" + suiteFileName;
+        	if(!new File(goldenFileName).exists()) {
+        		System.out.print("ERROR: GNL designs could not be found.  Would you like to"
+        				+ " download them ");
+        		MessageGenerator.agreeToContinue();
+        		String gnlDesignFileName = "gnl_timing_designs.zip";
+        		Installer.downloadFile(DOWNLOAD_PATH + gnlDesignFileName, gnlDesignFileName);
+        		FileTools.unzipFile(gnlDesignFileName, FileTools.getRapidWrightPath());
+        	}
+            FileInputStream inputStream = new FileInputStream(goldenFileName);
+            printStream.println("#designs                                vivado  model(golden)   "
+                                + "model   error   abs_error");
 
             Scanner sc = new Scanner(inputStream, "UTF-8");
             while (sc.hasNextLine()) {
@@ -66,7 +85,7 @@ public class CheckAccuracyUsingGnlDesigns {
                 boolean lineIsBlank = line.replaceAll("\\s+", "").isEmpty();
 
                 if (lineIsBlank || line.trim().matches("^#.*")) { // if not a comment line
-//                    System.out.println("skip " + line);
+
                 } else {
                     List<String> items     = Arrays.asList(line.trim().split("\\s+"));
                     String desName         = items.get(0);
@@ -75,7 +94,7 @@ public class CheckAccuracyUsingGnlDesigns {
                     String refDelayString  = zeroDecimalPoint.format(Double.valueOf(items.get(1)));
                     Double refDelay        = Double.valueOf(refDelayString );
 
-                    Double tempDelay      = runOneDesign(RWPath + desPath + desName + ".dcp", desName);
+                    Double tempDelay      = runOneDesign(path + desName + ".dcp", desName);
                     String delayString    = zeroDecimalPoint.format(tempDelay);
                     Double delay          = Double.valueOf(delayString);
                     String errorString    = fourDecimalPoint.format((delay - refDelay) / refDelay);
@@ -90,9 +109,11 @@ public class CheckAccuracyUsingGnlDesigns {
                     }
 
                     printStream.println(desName +"\t"+ refDelayString + "\t" + goldenEstString
-                                        + "\t\t" + delayString + "\t" + errorString + "\t" + absErrorString);
+                                        + "\t\t" + delayString + "\t" + errorString + "\t" 
+                                        + absErrorString);
                 }
             }
+            sc.close();
             // Note that Scanner suppresses exceptions
             if (sc.ioException() != null) {
                 throw sc.ioException();
@@ -103,12 +124,12 @@ public class CheckAccuracyUsingGnlDesigns {
         }
 
         Double avgAbsError = absErrorList.stream().mapToDouble(val -> val).average().orElse(0.0);
-        printStream.println("# Average absolute error : "
-                             + fourDecimalPoint.format(avgAbsError));
-        printStream.println("# Minimum absolute error : "
-                             + fourDecimalPoint.format(Collections.min(absErrorList)));
-        printStream.println("# Maximum absolute error : "
-                             + fourDecimalPoint.format(Collections.max(absErrorList)));
+        printStream.println("# Average absolute percent error : "
+                             + fourDecimalPoint.format(avgAbsError*100) + " %");
+        printStream.println("# Minimum absolute percent error : "
+                             + fourDecimalPoint.format(Collections.min(absErrorList)*100) + " %");
+        printStream.println("# Maximum absolute percent error : "
+                             + fourDecimalPoint.format(Collections.max(absErrorList)*100) + " %");
         printStream.println("# Number of designs with |estimated delay - golden estimated delay| > "
                              + errPrecision + " is " + numErrors);
 
