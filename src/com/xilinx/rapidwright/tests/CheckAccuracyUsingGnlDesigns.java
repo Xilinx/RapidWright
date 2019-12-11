@@ -30,7 +30,7 @@ public class CheckAccuracyUsingGnlDesigns {
                                            File.separator+"gnl" + File.separator;
 	
 	private static String DOWNLOAD_PATH = 
-			"https://github.com/Xilinx/RapidWright/releases/download/v2019.1.2-beta/";
+			"https://github.com/Xilinx/RapidWright/releases/download/v2019.2.0-beta/";
 	
     public CheckAccuracyUsingGnlDesigns() {
     }
