@@ -189,7 +189,7 @@ public class FloorPlanScene extends TileScene {
 		// iterate through ModuleInsts
 		for (String key : modInstances.keySet()){
 			ModuleInst modInst = modInstances.get(key);
-			if(modInst.getInsts().size() == 0){
+			if(modInst.getSiteInsts().size() == 0){
 				continue;
 			}
 			GUIModuleInst ghmpi = new GUIModuleInst(modInst, this, true);
@@ -200,7 +200,7 @@ public class FloorPlanScene extends TileScene {
 		
 		
 		for (String key : modInstances.keySet()){
-			ArrayList<SiteInst> instList = modInstances.get(key).getInsts();
+			List<SiteInst> instList = modInstances.get(key).getSiteInsts();
 			if(instList.size() == 0) continue;
 			SiteInst inst0 = instList.get(0);
 			String moduleName = inst0.getModuleInstName();

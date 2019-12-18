@@ -264,7 +264,7 @@ public class PolynomialGenerator {
 			vcc.createPortInst("ce", ci);
 		}else{
 			EDIFCellInst dsp = mi.getCellInst().getCellType().getCellInst(MULT_NAME);
-			SiteInst si = mi.getInsts().get(0);
+			SiteInst si = mi.getSiteInsts().get(0);
 			for(EDIFPortInst p : dsp.getPortInsts()){
 				if(p.getName().startsWith("ACIN") || p.getName().startsWith("BCIN") || p.getName().startsWith("PCIN")) continue;
 				if(p.getName().startsWith("CARRYCASCIN") || p.getName().startsWith("MULTSIGNIN") ) continue;

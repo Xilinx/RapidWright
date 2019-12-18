@@ -101,8 +101,8 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
 		int minCol = Integer.MAX_VALUE;
 		int maxRow = -1;
 		int maxCol = -1;
-		if (moduleInst.getInsts().get(0).isPlaced()) {
-			instances = moduleInst.getInsts();
+		if (moduleInst.getSiteInsts().get(0).isPlaced()) {
+			instances = moduleInst.getSiteInsts();
 			nets = moduleInst.getNets();
 			anchorTile = moduleInst.getAnchor().getTile();
 		} else {
@@ -482,7 +482,7 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
 	
 	public void setAnchorOffset() {
 		SiteInst anchorInst = null;
-		if (moduleInst.getInsts().get(0).isPlaced()) {
+		if (moduleInst.getSiteInsts().get(0).isPlaced()) {
 			anchorInst  = moduleInst.getAnchor();
 		} else {
 			anchorInst = moduleInst.getModule().getAnchor();

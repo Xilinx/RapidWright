@@ -73,7 +73,7 @@ public class HardMacro extends ModuleInst implements Comparable<Object> {
 	 */
 	public void calculateTileSize(){
 		HashSet<Tile> tileSet = new HashSet<Tile>(); 
-		for(SiteInst i : getInsts()){
+		for(SiteInst i : getSiteInsts()){
 			tileSet.add(i.getTile());
 		}
 		for(Net n : getNets()){
