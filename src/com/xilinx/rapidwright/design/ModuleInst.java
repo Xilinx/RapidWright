@@ -24,6 +24,7 @@ package com.xilinx.rapidwright.design;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 
 import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.design.blocks.PBlockRange;
@@ -71,6 +72,9 @@ public class ModuleInst{
 	public ModuleInst(String name, Design design){
 		this.name = name;
 		this.setDesign(design);
+		if(design != null) {
+			design.getModuleInstMap().put(name, this);
+		}
 		this.module = null;
 		this.setAnchor(null);
 		instances = new ArrayList<SiteInst>();
@@ -157,8 +161,17 @@ public class ModuleInst{
 
 	/**
 	 * @return the instances
+	 * @deprecated Please use {@link #getSiteInsts()}
 	 */
 	public ArrayList<SiteInst> getInsts(){
+		return instances;
+	}
+	
+	/**
+	 * Gets the site instance that belong to this module instance.
+	 * @return The list of site instances that belong to this module instance.
+	 */
+	public List<SiteInst> getSiteInsts(){
 		return instances;
 	}
 
