@@ -926,7 +926,7 @@ public class DesignTools {
 		for(EDIFPortInst portInst : futureBlackBox.getPortInsts()){		
 			EDIFNet net = portInst.getNet();
 			String hierParentName = EDIFTools.getHierarchicalRootFromPinName(hierarchicalCellName);
-			String hierNetName = hierParentName + EDIFTools.EDIF_HIER_SEP + net.getName();
+			String hierNetName = hierParentName.length() == 0 ? net.getName() : hierParentName + EDIFTools.EDIF_HIER_SEP + net.getName();
 			String parentNetName = d.getNetlist().getParentNetName(hierNetName);
 			boundaryNets.put(parentNetName, portInst.isOutput() ? hierNetName : null);
 

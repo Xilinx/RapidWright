@@ -374,7 +374,7 @@ public class EDIFTools {
 	
 	public static String getHierarchicalRootFromPinName(String s){
 		int idx = s.lastIndexOf(EDIF_HIER_SEP);
-		if(idx < 0) return null;
+		if(idx < 0) return "";
 		return s.substring(0, idx);
 	}
 	
