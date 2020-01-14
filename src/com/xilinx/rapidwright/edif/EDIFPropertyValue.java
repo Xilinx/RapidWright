@@ -123,6 +123,60 @@ public class EDIFPropertyValue {
 
 		return Integer.parseUnsignedInt(value);
 	}
+
+	/**
+	 * In situations where the type is an integer, this method will parse the verilog-syntax
+	 * integer format to get a long value and return it.
+	 * @return The long integer value of this property, or null if it is not an integer or failed to
+	 * parse.
+	 */
+	public Long getLongValue() {
+		if(type != EDIFValueType.STRING) {
+			return null;
+		}
+		int radix = 10;
+		boolean lastCharWasTick = false;
+		boolean isSigned = false;
+		for(int i=0; i < value.length(); i++) {
+			char c = value.charAt(i);
+			if(lastCharWasTick) {
+				switch (c) {
+					case 'b':
+					case 'B':
+						radix = 2;
+						break;
+					case 'o':
+					case 'O':
+						radix = 8;
+						break;
+					case 'd':
+					case 'D':
+						radix = 10;
+						break;
+					case 'h':
+					case 'H':
+						radix = 16;
+						break;
+					case 's':
+					case 'S':
+						isSigned = true;
+						continue;
+				}
+				if(isSigned) {
+					return Long.parseLong(value.substring(i+1), radix);
+				}
+				return Long.parseUnsignedLong(value.substring(i+1), radix);
+				
+			}
+			if(c == '\'') {
+				lastCharWasTick = true;
+			}
+		}
+
+		return Long.parseUnsignedLong(value);
+	}
+
+	
 	
 	/**
 	 * @param value the value to set
