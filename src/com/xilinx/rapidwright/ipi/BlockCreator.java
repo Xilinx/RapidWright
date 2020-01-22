@@ -391,6 +391,7 @@ public class BlockCreator {
 		pw.println("		error \"Please set the environment variable RAPIDWRIGHT_PATH to point to your RapidWright installation.\"");
 		pw.println("	}");
 		pw.println("}");
+		pw.println("puts \"RAPIDWRIGHT_PATH=$::env(RAPIDWRIGHT_PATH)\"");
 		
 		
 		pw.println("open_checkpoint " + optDcpFileName);
