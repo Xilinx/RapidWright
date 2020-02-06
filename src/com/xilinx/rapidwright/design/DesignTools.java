@@ -782,7 +782,14 @@ public class DesignTools {
 		for(BELPin pin : pins){
 			if(pin.isSitePort()) continue;
 			Cell c = inst.getCell(pin.getBEL().getName());
-			if(c == null || c.getEDIFCellInst() == null) continue;
+			if(c == null || c.getEDIFCellInst() == null) {
+				Net currNet = inst.getNetFromSiteWire(pin.getSiteWireName());
+				if(currNet == null) {
+					continue;
+				} else {
+					return parentNetMap.get(currNet.getName()); 
+				}
+			} 
 			String logPinName = c.getLogicalPinMapping(pin.getName());
 			EDIFPortInst portInst = c.getEDIFCellInst().getPortInst(logPinName);
 			if(portInst == null) continue;
@@ -810,6 +817,10 @@ public class DesignTools {
 		}
 		i.setCellType(cell.getTopEDIFCell());
 		design.getNetlist().migrateCellAndSubCells(cell.getTopEDIFCell());
+		
+		for(EDIFPortInst portInst : i.getPortInsts()) {
+			portInst.getPort().setParentCell(i.getCellType());
+		}
 		
 		// Add placement information
 		// We need to prefix all cell and net names with the hierarchicalCellName as a prefix
