@@ -528,7 +528,7 @@ public class EDIFNetlist extends EDIFName {
 	 * @param hierReferenceName Hierarchical reference name
 	 * @return 
 	 */
-	private String getHierParentName(String hierReferenceName){
+	public static String getHierParentName(String hierReferenceName){
 		if(hierReferenceName == null) return null;
 		if(hierReferenceName.length() == 0) return hierReferenceName;
 		int lastSep = hierReferenceName.lastIndexOf(EDIFTools.EDIF_HIER_SEP);
@@ -536,6 +536,18 @@ public class EDIFNetlist extends EDIFName {
 			return hierReferenceName.substring(0,lastSep);
 		}		
 		return "";
+	}
+	
+	/**
+	 * Creates a new hierarchical cell instance reference from the provided hierarchical cell 
+	 * instance name
+	 * @param instName Full hierarchical cell instance name
+	 * @return Hierarchical cell instance reference or null if named instance could not be found
+	 */
+	public EDIFHierCellInst getHierCellInstFromName(String instName) {
+		EDIFCellInst inst = getCellInstFromHierName(instName);
+		String parentName = getHierParentName(instName);
+		return new EDIFHierCellInst(parentName, inst);
 	}
 	
 	/**
