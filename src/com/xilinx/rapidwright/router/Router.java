@@ -60,6 +60,7 @@ import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.edif.EDIFHierNet;
+import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
@@ -1976,6 +1977,10 @@ public class Router extends AbstractRouter {
 			if(currNet.getPIPs().size() > 0) continue;
 		
 			if(currNet.getSource() == null && !currNet.isStaticNet()){
+				EDIFNet logNet = currNet.getLogicalNet();
+				if(logNet != null && logNet.getParentCell().getName().equals("IOBUF")) {
+					continue;
+				}
 				if(!supressWarningsErrors) MessageGenerator.briefError("WARNING: " + currNet.getName() + " does not have a source pin associated with it.");
 				continue;
 			}
