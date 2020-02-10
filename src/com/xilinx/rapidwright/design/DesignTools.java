@@ -809,17 +809,19 @@ public class DesignTools {
 	 * @param cell The 'guts' to be inserted into the black box
 	 */
 	public static void populateBlackBox(Design design, String hierarchicalCellName, Design cell){
+		EDIFNetlist netlist = design.getNetlist();
+		
 		// Populate Logical Netlist into cell
-		EDIFCellInst i = design.getNetlist().getCellInstFromHierName(hierarchicalCellName);
-		if(!i.isBlackBox()) {
+		EDIFCellInst inst = netlist.getCellInstFromHierName(hierarchicalCellName);
+		if(!inst.isBlackBox()) {
 			System.err.println("ERROR: The cell instance " + hierarchicalCellName + " is not a black box.");
 			return;
 		}
-		i.setCellType(cell.getTopEDIFCell());
-		design.getNetlist().migrateCellAndSubCells(cell.getTopEDIFCell());
+		inst.setCellType(cell.getTopEDIFCell());
+		netlist.migrateCellAndSubCells(cell.getTopEDIFCell());
 		
-		for(EDIFPortInst portInst : i.getPortInsts()) {
-			portInst.getPort().setParentCell(i.getCellType());
+		for(EDIFPortInst portInst : inst.getPortInsts()) {
+			portInst.getPort().setParentCell(inst.getCellType());
 		}
 		
 		// Add placement information
@@ -834,19 +836,64 @@ public class DesignTools {
 		}
 		
 		// Add routing information
-		for(Net n : cell.getNets()){
-			if(n.getName().equals(Net.USED_NET)) continue;
-			if(n.isStaticNet()){
-				Net staticNet = design.getNet(n.getName());
-				staticNet.addPins((ArrayList<SitePinInst>)n.getPins());
-				for(PIP p : n.getPIPs()){
+		for(Net net : cell.getNets()){
+			if(net.getName().equals(Net.USED_NET)) continue;
+			if(net.isStaticNet()){
+				Net staticNet = design.getNet(netlist.getName());
+				staticNet.addPins((ArrayList<SitePinInst>)net.getPins());
+				for(PIP p : net.getPIPs()){
 					staticNet.addPIP(p);
 				}
 			}else{
-				n.updateName(hierarchicalCellName + "/" + n.getName());
-				design.addNet(n);				
+				net.updateName(hierarchicalCellName + "/" + net.getName());
+				design.addNet(net);				
 			}
 		}
+		
+		// Rectify boundary nets 
+		netlist.resetParentNetMap();
+		
+		// for each port on the black box, 
+		//   iterate over all the nets and regularize on the proper net name for the physical
+		//   net.  Put all physical pins on the correct physical net once the black box has been
+		//   updated.
+		for(EDIFPortInst portInst : inst.getPortInstMap().values()) {
+			EDIFNet net = portInst.getNet();
+			String parentInstName = EDIFNetlist.getHierParentName(hierarchicalCellName);
+			String netName = parentInstName.length() == 0 ? net.getName() : 
+				parentInstName + EDIFTools.EDIF_HIER_SEP + net.getName();
+			String parentNetAlias = netlist.getParentNetName(netName);
+			Net parentNet = design.getNet(parentNetAlias);
+			if(parentNet == null) {
+				parentNet = new Net(parentNetAlias,netlist.getNetFromHierName(parentNetAlias));
+			}
+			for(String netAlias : netlist.getNetAliases(netName)) {
+				if(parentNetAlias.equals(netAlias)) continue;
+				Net alias = design.getNet(netAlias);
+				if(alias != null) {
+					// Move this non-parent net physical information to the parent
+					for(SiteInst si : alias.getSiteInsts()) {
+						if(si.getNetList().remove(alias)) {
+							si.getNetList().add(parentNet);
+						}
+						Set<String> siteWires = si.getSiteWiresFromNet(alias);
+						if(siteWires != null) {
+							for(String siteWire : new ArrayList<>(siteWires)) {
+								BELPin belPin = si.getSite().getBELPins(siteWire)[0];
+								si.unrouteIntraSiteNet(belPin, belPin);
+								si.routeIntraSiteNet(parentNet, belPin, belPin);
+							}							
+						}
+					}
+					for(SitePinInst pin : new ArrayList<SitePinInst>(alias.getPins())) {
+						alias.removePin(pin);
+						parentNet.addPin(pin);
+					}
+					alias.unroute();
+				}
+			}
+			parentNet.unroute();
+		}		
 	}
 
 	/**
@@ -1251,5 +1298,10 @@ public class DesignTools {
 			}
 		}
 		return false;
+	}
+	
+	public static void main(String[] args) {
+		EDIFNetlist n = EDIFTools.readEdifFile("/home/clavin/test_verilog/design.edf");
+		n.exportEDIF("/home/clavin/test_verilog/design_roundtrip.edf");
 	}
 }
