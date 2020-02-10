@@ -1177,7 +1177,8 @@ public class EDIFNetlist extends EDIFName {
 			if(toAdd == null) {
 				toAdd = Design.getUnisimCell(Unisim.valueOf(cellName));
 			}
-			netlistPrims.addCell(toAdd);
+			// Add copy to prim library to avoid destructive changes when collapsed
+			new EDIFCell(netlistPrims, toAdd);
 		}
 		
 		// Update all cell references to macro versions

@@ -58,6 +58,22 @@ public class EDIFCell extends EDIFPropertyObject {
 		if(lib != null) lib.addCell(this);
 	}
 	
+	/**
+	 * Copy constructor - Creates a new EDIFCell object, EDIFCell
+	 * contents point to orig.
+	 * @param lib Destination library of the copied cell.
+	 * @param orig The original cell
+	 */
+	public EDIFCell(EDIFLibrary lib, EDIFCell orig) {
+		super(orig.getName());
+		if(lib != null) lib.addCell(this);
+		instances = orig.instances;
+		nets = orig.nets;
+		ports = orig.ports;
+		internalPortMap = orig.internalPortMap;
+		view = orig.view;
+	}
+	
 	protected EDIFCell(){
 		
 	}

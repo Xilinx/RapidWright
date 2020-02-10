@@ -43,6 +43,7 @@ import com.xilinx.rapidwright.device.FamilyType;
 import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.device.SLR;
+import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
@@ -64,7 +65,6 @@ public class PBlockGenerator {
 	public static final int FF_PER_CLE = 16;
 	public static final float CLES_PER_BRAM = 5;
 	public static final float CLES_PER_DSP = 2.5f;
-	public static final int CLE_REGION_HEIGHT = 60;
 	
 	/** X dimension over Y dimension */
 	public float ASPECT_RATIO = 0.125f;//1.5f;	
@@ -843,10 +843,10 @@ public class PBlockGenerator {
 		if(pblockCLEHeight < checkedCLEHeight){
 			pblockCLEHeight = checkedCLEHeight;
 		}
-		
-		if(pblockCLEHeight > CLE_REGION_HEIGHT){
+		int cleHeight = dev.getSeries().getCLEHeight();
+		if(pblockCLEHeight > cleHeight){
 			// If we are taller than a region, let's just stop at region height
-			pblockCLEHeight = CLE_REGION_HEIGHT;
+			pblockCLEHeight = cleHeight;
 			// TODO - In the future we can optimize this for larger blocks if needed
 		}
 		
@@ -907,8 +907,8 @@ public class PBlockGenerator {
 		
 		
 		int numSLICERows = pblockCLEHeight;
-		int numDSPRows = (int) (pblockCLEHeight == CLE_REGION_HEIGHT ? (CLE_REGION_HEIGHT / CLES_PER_DSP) : dspsRequired);
-		int numBRAMRows = (int) (pblockCLEHeight == CLE_REGION_HEIGHT ? (CLE_REGION_HEIGHT / CLES_PER_BRAM) : ramb36sRequired);
+		int numDSPRows = (int) (pblockCLEHeight == cleHeight ? (cleHeight / CLES_PER_DSP) : dspsRequired);
+		int numBRAMRows = (int) (pblockCLEHeight == cleHeight ? (cleHeight / CLES_PER_BRAM) : ramb36sRequired);
 		
 		HashMap<TileColumnPattern, TreeSet<Integer>> patMap = TileColumnPattern.genColumnPatternMap(dev);
 		ArrayList<TileColumnPattern> matches = getCompatiblePatterns(numSLICEColumns, numSLICEMColumns, numDSPColumns, numBRAMColumns, patMap);
@@ -985,8 +985,10 @@ public class PBlockGenerator {
 				tmp = dev.getTile(row, c);
 			}
 		}
+		int cleHeight = dev.getSeries().getCLEHeight(); 
+		
 		int sliceX = tmp.getSites()[0].getInstanceX();
-		int sliceY = tmp.getSites()[0].getInstanceY() - CLE_REGION_HEIGHT;
+		int sliceY = tmp.getSites()[0].getInstanceY() - cleHeight;
 		Site tmpSite = dev.getSite("SLICE_X" + sliceX + "Y" + sliceY);
 		tmp = tmpSite.getTile();
 		
@@ -1000,7 +1002,7 @@ public class PBlockGenerator {
 			}
 			
 			// Relocate to master SLR if necessary
-			int slrCLBHeight = (dev.getNumOfClockRegionRows() / dev.getNumOfSLRs()) * CLE_REGION_HEIGHT;
+			int slrCLBHeight = (dev.getNumOfClockRegionRows() / dev.getNumOfSLRs()) * cleHeight;
 			// If we're below master, add
 			if(tmp.getRow() < master.getLowerRight().getRow()){
 				while(tmp.getRow() < master.getLowerRight().getRow()){

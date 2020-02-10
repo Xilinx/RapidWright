@@ -297,7 +297,8 @@ public class Utils{
 		moduleSiteTypes.add(SiteTypeEnum.FIFO36E1);
 		moduleSiteTypes.add(SiteTypeEnum.DSP48E1);
 		moduleSiteTypes.add(SiteTypeEnum.DSP48E2);
-		moduleSiteTypes.add(SiteTypeEnum.BUFGCE);	
+		moduleSiteTypes.add(SiteTypeEnum.BUFGCE);
+//		moduleSiteTypes.add(SiteTypeEnum.PS7);	
 		
 		sliceTypes = new HashSet<SiteTypeEnum>();
 		sliceTypes.add(SiteTypeEnum.SLICEL);
