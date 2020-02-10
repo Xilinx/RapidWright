@@ -541,7 +541,7 @@ public class EDIFParser {
 		
 		expect(LEFT_PAREN, getNextToken());
 		expect(VIEW, getNextToken());
-		cell.setView(getNextToken());
+		cell.setView(parseEDIFNameObject(new EDIFName()));
 		expect(LEFT_PAREN, getNextToken());
 		expect(VIEWTYPE, getNextToken());
 		expect("NETLIST", getNextToken());
@@ -657,7 +657,7 @@ public class EDIFParser {
 		inst = updateEDIFRefCellInstMap(inst);
 		expect(LEFT_PAREN,getNextToken());
 		expect(VIEWREF,getNextToken());
-		inst.setViewref(getNextToken());
+		inst.setViewref(parseEDIFNameObject(new EDIFName()));
 		expect(LEFT_PAREN,getNextToken());
 		expect(CELLREF,getNextToken());
 		String cellref = getNextToken();

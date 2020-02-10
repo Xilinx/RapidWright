@@ -44,9 +44,9 @@ public class EDIFCellInst extends EDIFPropertyObject {
 	
 	private EDIFCell cellType;
 	
-	private String viewref;
+	private EDIFName viewref;
 	
-	public static final String DEFAULT_VIEWREF = EDIFCell.DEFAULT_VIEW;
+	public static final EDIFName DEFAULT_VIEWREF = EDIFCell.DEFAULT_VIEW;
 
 	public static final String BLACK_BOX_PROP = "IS_IMPORTED";
 	
@@ -60,20 +60,20 @@ public class EDIFCellInst extends EDIFPropertyObject {
 		super(name);
 		setCellType(cellType);
 		if(parentCell != null) parentCell.addCellInst(this);
-		viewref = cellType != null ? cellType.getView() : DEFAULT_VIEWREF;
+		viewref = cellType != null ? cellType.getEDIFView() : DEFAULT_VIEWREF;
 	}
 	
 	/**
 	 * @return the viewref
 	 */
-	public String getViewref() {
+	public EDIFName getViewref() {
 		return viewref;
 	}
 
 	/**
 	 * @param viewref the viewref to set
 	 */
-	public void setViewref(String viewref) {
+	public void setViewref(EDIFName viewref) {
 		this.viewref = viewref;
 	}
 
@@ -177,7 +177,7 @@ public class EDIFCellInst extends EDIFPropertyObject {
 	 */
 	public void setCellType(EDIFCell cellType) {
 		this.cellType = cellType;
-		this.viewref = cellType != null ? cellType.getView() : null;
+		this.viewref = cellType != null ? cellType.getEDIFView() : null;
 	}
 	
 	public boolean isBlackBox(){
@@ -191,7 +191,7 @@ public class EDIFCellInst extends EDIFPropertyObject {
 		wr.write("         (instance ");
 		exportEDIFName(wr);
 		wr.write(" (viewref ");
-		wr.write(getViewref());
+		wr.write( getViewref().getLegalEDIFName());
 		wr.write(" (cellref ");
 		wr.write(cellType.getLegalEDIFName());
 		wr.write(" (libraryref ");

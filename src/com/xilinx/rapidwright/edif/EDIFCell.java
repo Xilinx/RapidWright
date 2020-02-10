@@ -39,7 +39,7 @@ import java.util.Map;
  */
 public class EDIFCell extends EDIFPropertyObject {
 
-	public static final String DEFAULT_VIEW = "netlist";
+	public static final EDIFName DEFAULT_VIEW = new EDIFName("netlist");
 	
 	private EDIFLibrary library;
 	
@@ -51,7 +51,7 @@ public class EDIFCell extends EDIFPropertyObject {
 	
 	private Map<String,EDIFNet> internalPortMap;
 	
-	private String view = DEFAULT_VIEW;
+	private EDIFName view = DEFAULT_VIEW;
 	
 	public EDIFCell(EDIFLibrary lib, String name){
 		super(name);
@@ -276,9 +276,18 @@ public class EDIFCell extends EDIFPropertyObject {
 	}
 	
 	/**
+	 * Gets the original view name
 	 * @return the view
 	 */
 	public String getView() {
+		return view.getName();
+	}
+	
+	/**
+	 * Gets the EDIFName object representation of the view name
+	 * @return Gets the EDIFName object storing the view name
+	 */
+	public EDIFName getEDIFView() {
 		return view;
 	}
 
@@ -286,6 +295,10 @@ public class EDIFCell extends EDIFPropertyObject {
 	 * @param view the view to set
 	 */
 	public void setView(String view) {
+		this.view = new EDIFName(view);
+	}
+	
+	public void setView(EDIFName view) {
 		this.view = view;
 	}
 	
@@ -387,7 +400,9 @@ public class EDIFCell extends EDIFPropertyObject {
 		wr.write("   (cell ");
 		exportEDIFName(wr);
 		wr.write(" (celltype GENERIC)\n");
-		wr.write("     (view "+getView()+" (viewtype NETLIST)\n");
+		wr.write("     (view ");
+		view.exportEDIFName(wr);
+		wr.write(" (viewtype NETLIST)\n");
 		wr.write("       (interface \n");
 		for(EDIFPort port : getPorts()){
 			port.exportEDIF(wr, "        ");
