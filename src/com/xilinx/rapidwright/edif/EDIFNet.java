@@ -74,6 +74,19 @@ public class EDIFNet extends EDIFPropertyObject {
 	
 	public EDIFPortInst createPortInst(String portName, EDIFCellInst cellInst){
 		EDIFPort port = cellInst.getPort(portName);
+		if(port == null) {
+			// check if it is a bussed port
+			int lengthRootName = portName.lastIndexOf('[');
+			if(lengthRootName == -1) return null;
+			String name = portName.substring(0, lengthRootName);
+			int idx = Integer.parseInt(portName.substring(lengthRootName+1, portName.lastIndexOf(']')));
+			String portRootName = portName.substring(0,lengthRootName);
+			port = cellInst.getPort(portRootName);
+			if(port == null) {
+				return null;
+			}
+			return createPortInst(name, port.getWidth()-idx-1, cellInst);
+		}
 		return new EDIFPortInst(port, this, cellInst);
 	}
 	
