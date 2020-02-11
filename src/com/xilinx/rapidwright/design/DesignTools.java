@@ -839,7 +839,7 @@ public class DesignTools {
 		for(Net net : cell.getNets()){
 			if(net.getName().equals(Net.USED_NET)) continue;
 			if(net.isStaticNet()){
-				Net staticNet = design.getNet(netlist.getName());
+				Net staticNet = design.getNet(net.getName());
 				staticNet.addPins((ArrayList<SitePinInst>)net.getPins());
 				for(PIP p : net.getPIPs()){
 					staticNet.addPIP(p);
