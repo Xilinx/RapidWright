@@ -102,6 +102,17 @@ public class EDIFPropertyObject extends EDIFName {
 	}
 	
 	/**
+	 * Convenience method to remove a property
+	 * @param key Name of the property
+	 * @return The old property value or null if none existed
+	 */
+	public EDIFPropertyValue removeProperty(String key) {
+		if(properties == null) return null;
+		EDIFName k = new EDIFName(key);
+		return properties.remove(k);
+	}
+	
+	/**
 	 * Adds the property entry mapping for this object.
 	 * @param key Key entry for the property
 	 * @param value Value entry for the property
