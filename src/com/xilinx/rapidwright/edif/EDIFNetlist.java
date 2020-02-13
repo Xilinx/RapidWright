@@ -849,20 +849,22 @@ public class EDIFNetlist extends EDIFName {
 					aliases.add(sb.toString()); 
 					
 					for(EDIFPortInst ipr : otherNet.getPortInsts()){
-						if(port != ipr.getPort()){ // Here we really want to compare object references!
-							EDIFHierPortInst absPortInst = new EDIFHierPortInst(instName, ipr);
-							
-							
-							boolean isCellPin = ipr.getCellInst() != null && ipr.getCellInst().getCellType().isLeafCellOrBlackBox();
-							if(isCellPin){
-								leafCellPins.add(absPortInst);
-							}
-							if((ipr.getCellInst() == null && ipr.isInput()) || (isCellPin && ipr.isOutput())){
-								source = ipr;
-								parentNetName = netName;
-							}
-							queue.add(absPortInst);
+						EDIFPort currPort = ipr.getPort();
+						if(currPort.getName().equals(port.getName()) && 
+								currPort.getParentCell().equals(port.getParentCell())) {
+							continue;
 						}
+						EDIFHierPortInst absPortInst = new EDIFHierPortInst(instName, ipr);
+						boolean isCellPin = ipr.getCellInst() != null && 
+											ipr.getCellInst().getCellType().isLeafCellOrBlackBox();
+						if(isCellPin){
+							leafCellPins.add(absPortInst);
+						}
+						if((ipr.getCellInst() == null && ipr.isInput()) || (isCellPin && ipr.isOutput())){
+							source = ipr;
+							parentNetName = netName;
+						}
+						queue.add(absPortInst);
 					}
 				}
 			}
