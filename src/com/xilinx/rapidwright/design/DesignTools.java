@@ -76,6 +76,7 @@ import com.xilinx.rapidwright.util.Utils;
  */
 public class DesignTools {
 
+	private static int uniqueBlackBoxCount = 0;
 
 	/**
 	 * Tries to identify the clock pin source for the given user signal output by
@@ -849,9 +850,16 @@ public class DesignTools {
 				design.addNet(net);				
 			}
 		}
-		
+
 		// Rectify boundary nets 
 		netlist.resetParentNetMap();
+		
+		postBlackBoxCleanup(hierarchicalCellName, design);
+	}
+
+	public static void postBlackBoxCleanup(String hierCellName, Design design) {		
+		EDIFNetlist netlist = design.getNetlist();
+		EDIFCellInst inst = netlist.getCellInstFromHierName(hierCellName);
 		
 		// for each port on the black box, 
 		//   iterate over all the nets and regularize on the proper net name for the physical
@@ -859,7 +867,7 @@ public class DesignTools {
 		//   updated.
 		for(EDIFPortInst portInst : inst.getPortInstMap().values()) {
 			EDIFNet net = portInst.getNet();
-			String parentInstName = EDIFNetlist.getHierParentName(hierarchicalCellName);
+			String parentInstName = EDIFNetlist.getHierParentName(hierCellName);
 			String netName = parentInstName.length() == 0 ? net.getName() : 
 				parentInstName + EDIFTools.EDIF_HIER_SEP + net.getName();
 			String parentNetAlias = netlist.getParentNetName(netName);
@@ -893,9 +901,9 @@ public class DesignTools {
 				}
 			}
 			parentNet.unroute();
-		}		
+		}
 	}
-
+	
 	/**
 	 * Creates a map from Node to a list of PIPs for a given list of PIPs 
 	 * (likely from the routing of a net).
@@ -1093,7 +1101,8 @@ public class DesignTools {
 		t.stop().start("create bbox");
 		
 		// Make EDIFCell blackbox
-		EDIFCell blackBox = new EDIFCell(futureBlackBox.getCellType().getLibrary(),"black_box");
+		EDIFCell blackBox = new EDIFCell(futureBlackBox.getCellType().getLibrary(),"black_box" + 
+				uniqueBlackBoxCount++);
 		for(EDIFPort port : futureBlackBox.getCellType().getPorts()){
 			blackBox.addPort(port);
 		}
@@ -1298,10 +1307,5 @@ public class DesignTools {
 			}
 		}
 		return false;
-	}
-	
-	public static void main(String[] args) {
-		EDIFNetlist n = EDIFTools.readEdifFile("/home/clavin/test_verilog/design.edf");
-		n.exportEDIF("/home/clavin/test_verilog/design_roundtrip.edf");
 	}
 }
