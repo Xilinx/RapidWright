@@ -200,7 +200,7 @@ public class TimingGroup implements Comparable<TimingGroup> {
      * @param n Node to be added.
      * @param c IntentCode is the Vivado-assigned Type for the given node.
      */
-    protected void add(Node n, IntentCode c) {
+    public void add(Node n, IntentCode c) {
         nodes.add(n);
         if (c == IntentCode.NODE_PINFEED)
             hasPinFeed = true;
@@ -215,7 +215,7 @@ public class TimingGroup implements Comparable<TimingGroup> {
      * Used for adding a PIP into a TimingGroup.
      * @param p PIP to be added.
      */
-    protected void add(PIP p) {
+    public void add(PIP p) {
         pips.add(p);
     }
 
