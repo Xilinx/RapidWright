@@ -47,7 +47,7 @@ import java.util.List;
  * TODO: change interaction with user to reduce runtime. In particular, a list of timing arcs will be
  * returned for the cell passed in by a user.
  */
-interface DelayModel {
+public interface DelayModel {
 
     /**
      * Get the delay in ps between two bel pins within the given site name.
@@ -59,7 +59,7 @@ interface DelayModel {
      * @return Intra-site delay in ps. Return -1 if the connection does not exist.
      * @throws  IllegalArgumentException if the given siteName is not recognized by the model.
      */
-    short getIntraSiteDelay(String siteName, String frBelPin, String toBelPin);
+    public short getIntraSiteDelay(String siteName, String frBelPin, String toBelPin);
 
     /**
      * Get the delay between input and output pins of a bel.
@@ -76,14 +76,14 @@ interface DelayModel {
      * @return Logic delay in ps. Return -1 if the connection does not exist.
      * @throws  IllegalArgumentException if the given bel is not recognized by the model.
      */
-    short getLogicDelay(String belName, String frBelPin, String toBelPin, List<String> config);
+    public short getLogicDelay(String belName, String frBelPin, String toBelPin, List<String> config);
     /**
      * Get the delay between input and output pins of a bel.
      *
      * For parameters' description,
      * please see getLogicDelay(String belName, String frBelPin, String toBelPin, List<String> config).
      */
-     short getLogicDelay(String belName, String frBelPin, String toBelPin);
+     public short getLogicDelay(String belName, String frBelPin, String toBelPin);
 }
 
 
