@@ -26,6 +26,8 @@ package com.xilinx.rapidwright.timing;
 
 import java.util.List;
 
+import com.xilinx.rapidwright.device.SiteTypeEnum;
+
 
 /**
  * Provide delay lookup for logic and intra site delay.
@@ -52,14 +54,14 @@ public interface DelayModel {
     /**
      * Get the delay in ps between two bel pins within the given site name.
      *
-     * @param siteName The name of the site, such as SLICEL and SLICEM.
+     * @param siteTypeName The name of the site type, such as SLICEL and SLICEM.
      * @param frBelPin The bel pin which is the driver of the connection.  Thus, it must be a bel output pin.
      * The bel name must be included, ie., AFF2/D. An input site pin is considered a valid frBelPin.
      * @param toBelPin The bel pin which is the sink of the connection (a bel input pin, or an output site pin).
      * @return Intra-site delay in ps. Return -1 if the connection does not exist.
-     * @throws  IllegalArgumentException if the given siteName is not recognized by the model.
+     * @throws  IllegalArgumentException if the given siteTypeName is not recognized by the model.
      */
-    public short getIntraSiteDelay(String siteName, String frBelPin, String toBelPin);
+    public short getIntraSiteDelay(SiteTypeEnum siteTypeName, String frBelPin, String toBelPin);
 
     /**
      * Get the delay between input and output pins of a bel.
