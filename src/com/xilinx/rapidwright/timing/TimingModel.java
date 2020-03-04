@@ -32,6 +32,7 @@ import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.PIPType;
 import com.xilinx.rapidwright.device.Site;
+import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
@@ -1457,7 +1458,7 @@ public class TimingModel {
                         !sourcepin.startsWith("SRST")) {
 
                     short tmpIntrasiteDelay = 0;
-                    tmpIntrasiteDelay = intrasiteAndLogicDelayModel.getIntraSiteDelay("SLICEL", 
+                    tmpIntrasiteDelay = intrasiteAndLogicDelayModel.getIntraSiteDelay(SiteTypeEnum.SLICEL, 
                                             sourcepin, sinkType + "/" + "D");
                     intrasiteDelay += tmpIntrasiteDelay;
                 } else if (sourcepin.startsWith("CKEN")) {
@@ -1489,7 +1490,7 @@ public class TimingModel {
                                 fromPinName += sourceBELPin.getName();
                             }
                             tmpIntrasiteDelay = intrasiteAndLogicDelayModel.getIntraSiteDelay(
-                            		"SLICEL", fromPinName, startPinInst.getName());
+                            		SiteTypeEnum.SLICEL, fromPinName, startPinInst.getName());
                             intrasiteDelay += tmpIntrasiteDelay;
                         } else if (w.getWireName().endsWith("_O"))
                             intrasiteDelay += INTRASITE_DELAY_LUT_OUTPUT_TO_O_SITEPIN;

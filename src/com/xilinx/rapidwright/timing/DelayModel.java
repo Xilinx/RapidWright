@@ -26,6 +26,8 @@ package com.xilinx.rapidwright.timing;
 
 import java.util.List;
 
+import com.xilinx.rapidwright.device.SiteTypeEnum;
+
 
 /**
  * Provide delay lookup for logic and intra site delay.
@@ -47,19 +49,19 @@ import java.util.List;
  * TODO: change interaction with user to reduce runtime. In particular, a list of timing arcs will be
  * returned for the cell passed in by a user.
  */
-interface DelayModel {
+public interface DelayModel {
 
     /**
      * Get the delay in ps between two bel pins within the given site name.
      *
-     * @param siteName The name of the site, such as SLICEL and SLICEM.
+     * @param siteTypeName The name of the site type, such as SLICEL and SLICEM.
      * @param frBelPin The bel pin which is the driver of the connection.  Thus, it must be a bel output pin.
      * The bel name must be included, ie., AFF2/D. An input site pin is considered a valid frBelPin.
      * @param toBelPin The bel pin which is the sink of the connection (a bel input pin, or an output site pin).
      * @return Intra-site delay in ps. Return -1 if the connection does not exist.
-     * @throws  IllegalArgumentException if the given siteName is not recognized by the model.
+     * @throws  IllegalArgumentException if the given siteTypeName is not recognized by the model.
      */
-    short getIntraSiteDelay(String siteName, String frBelPin, String toBelPin);
+    public short getIntraSiteDelay(SiteTypeEnum siteTypeName, String frBelPin, String toBelPin);
 
     /**
      * Get the delay between input and output pins of a bel.
@@ -76,14 +78,14 @@ interface DelayModel {
      * @return Logic delay in ps. Return -1 if the connection does not exist.
      * @throws  IllegalArgumentException if the given bel is not recognized by the model.
      */
-    short getLogicDelay(String belName, String frBelPin, String toBelPin, List<String> config);
+    public short getLogicDelay(String belName, String frBelPin, String toBelPin, List<String> config);
     /**
      * Get the delay between input and output pins of a bel.
      *
      * For parameters' description,
      * please see getLogicDelay(String belName, String frBelPin, String toBelPin, List<String> config).
      */
-     short getLogicDelay(String belName, String frBelPin, String toBelPin);
+     public short getLogicDelay(String belName, String frBelPin, String toBelPin);
 }
 
 

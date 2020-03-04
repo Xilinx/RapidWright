@@ -30,6 +30,8 @@ import java.util.Map;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
+import com.xilinx.rapidwright.device.SiteTypeEnum;
+
 /**
  * Implement DelayModel using as small memory as possible.
  */
@@ -54,13 +56,13 @@ class SmallDelayModel implements DelayModel {
     /**
      *  Implement the method with the same signature defined in DelayModel interface.
      */
-    public short getIntraSiteDelay(String siteName, String frBelPin, String toBelPin) {
+    public short getIntraSiteDelay(SiteTypeEnum siteTypeName, String frBelPin, String toBelPin) {
         boolean verbose = false;
         Short delay = null;
-        Short idx = site2IdxMap.get(siteName);
+        Short idx = site2IdxMap.get(siteTypeName.name());
         if (idx == null) {
             throw new IllegalArgumentException("SmallDelayModel: Unknown site/belName to getIntraSiteDelay."
-                    + "  site/belName " + siteName + "  frBelPin " + frBelPin + "  toBelPin " + toBelPin);
+                    + "  site/belName " + siteTypeName + "  frBelPin " + frBelPin + "  toBelPin " + toBelPin);
         } else {
             // Certain that the following combination do not cause duplication. Otherwise, separators must be added.
             String key = idx + frBelPin + toBelPin;
@@ -69,7 +71,7 @@ class SmallDelayModel implements DelayModel {
                 delay = -2;
                 if (verbose) {
                     System.out.println("WARNING in SmallDelayModel: Unknown connection to getIntraSiteDelay."
-                            + "  site/belName " + siteName + "  frBelPin " + frBelPin + "  toBelPin " + toBelPin);
+                            + "  site/belName " + siteTypeName + "  frBelPin " + frBelPin + "  toBelPin " + toBelPin);
                 }
             }
         }
