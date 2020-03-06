@@ -68,7 +68,7 @@ public class PBlockGenerator {
 	
 	/** X dimension over Y dimension */
 	public float ASPECT_RATIO = 0.125f;//1.5f;	
-	public float OVERHEAD_RATIO = 4.5f;//1.25f;
+	public float OVERHEAD_RATIO = 1.5f;//1.25f;
 	public int STARTING_X = -1;	    // Parameterized with command line argument when present.
 	public int STARTING_Y = -1;		// Parameterized with command line argument when present.
 	public int PBLOCK_COUNT = 1;
@@ -940,50 +940,9 @@ public class PBlockGenerator {
 					}
 					if(p.get(pIdx) == t) pIdx++;
 				}
-				
-                // Updated code
-                // Goal: code added for some 7 series devices, to avoid illegal placement due to clb-free portions in the device
-				int upperRX = upperLeft.getInstanceX()+(numSLICEColumns+numSLICEMColumns)-1;
-				int upperLX = upperLeft.getInstanceX();
-				int upperLY = upperLeft.getInstanceY();
-				boolean allowed_xc7z020 = dev.getName().contains("xc7z020") && !(( ((upperLX<68)&&(upperRX>67)) ||  ((upperLX>67)&&(upperLX<80)) || ((upperLX<80)&&(upperRX>79)) ) && (upperLY>49));   
-				boolean allowed_xc7z030 = dev.getName().contains("xc7z030") && !(( ((upperLX<72)&&(upperRX>71)) ||  ((upperLX>71)&&(upperLX<84)) || ((upperLX<84)&&(upperRX>83)) ) && (upperLY>99));
-				boolean allowed_xc7z045 = dev.getName().contains("xc7z045") && !(( ((upperLX<124)&&(upperRX>123)) ||  ((upperLX>123)&&(upperLX<136)) || ((upperLX<136)&&(upperRX>135)) ) && (upperLY>249));
-				boolean no_xc7z030_xc7z020 = !dev.getName().contains("xc7z030") && !dev.getName().contains("xc7z020") && !dev.getName().contains("xc7z045");
-				
-				// Try moving the pblock lower. Completly removing it is not optimal, as there is a risk that the pattern bellow the gap won't be used at all
-				if(!allowed_xc7z030 &&  dev.getName().contains("xc7z030")) {
-					upperLY = 95;
-					if((upperLY-(numSLICERows-1))>0) // Do I have enough rows? If not, placement unfeasible
-						allowed_xc7z030 = true;				
-				}
-					
-				if(!allowed_xc7z045 &&  dev.getName().contains("xc7z045")) {
-					upperLY = 245;
-					if((upperLY-(numSLICERows-1))>0) // Do I have enough rows? If not, placement unfeasible
-						allowed_xc7z045 = true;				
-				}
-                
-                if(!allowed_xc7z020 &&  dev.getName().contains("xc7z020")) {
-					upperLY = 45;
-					if((upperLY-(numSLICERows-1))>0) // Do I have enough rows? If not, placement unfeasible
-						allowed_xc7z020 = true;				
-				}
-							
-				if(allowed_xc7z020 || allowed_xc7z030 || no_xc7z030_xc7z020 || allowed_xc7z045)
-					sb.append("SLICE_X" + upperLX + "Y" + (upperLY-(numSLICERows-1)) + ":SLICE_X" + upperRX + "Y" + upperLY);
-				else 
-					continue; // If pblock not feasible, jump over this pblock, look for other patterns		
-				// Bellow, old code
-				// sb.append("SLICE_X" + upperLeft.getInstanceX() + "Y" + (upperLeft.getInstanceY()-(numSLICERows-1)) + 
-				//		 ":SLICE_X" + (upperLeft.getInstanceX()+(numSLICEColumns+numSLICEMColumns)-1) + "Y" + upperLeft.getInstanceY());
-				// End of updated code
-                
-                
-                
-                
-                
-			}
+				sb.append("SLICE_X" + upperLeft.getInstanceX() + "Y" + (upperLeft.getInstanceY()-(numSLICERows-1)) + 
+						 ":SLICE_X" + (upperLeft.getInstanceX()+(numSLICEColumns+numSLICEMColumns)-1) + "Y" + upperLeft.getInstanceY());
+            }
 			if(numBRAMColumns > 0){
 				int pIdx = 0;
 				for(int i=0; pIdx < p.size(); i++){
