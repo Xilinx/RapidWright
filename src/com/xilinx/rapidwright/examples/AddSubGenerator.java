@@ -47,6 +47,7 @@ import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.edif.EDIFCell;
+import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFDirection;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFPort;
@@ -99,7 +100,13 @@ public class AddSubGenerator extends ArithmeticGenerator {
 		}
 	}
 	
-	public static PBlock createAddSub(Design d, Site origin, int width, boolean isSubtract, boolean inputFlop, boolean route){
+	public static PBlock createAddSub(Design d, Site origin, int width, boolean isSubtract, 
+			boolean inputFlop, boolean route){
+		return createAddSub(d, origin, width, isSubtract, inputFlop, true, route);
+	}
+	
+	public static PBlock createAddSub(Design d, Site origin, int width, boolean isSubtract, 
+			boolean inputFlop, boolean outputFlop, boolean route){
 		EDIFCell top = d.getNetlist().getTopCell();
 		Set<Site> used = new HashSet<>();
 		String bus = "["+(width-1)+":0]";
@@ -107,21 +114,36 @@ public class AddSubGenerator extends ArithmeticGenerator {
 		EDIFPort aPort = top.createPort(INPUT_A_NAME + bus, EDIFDirection.INPUT, width);
 		EDIFPort bPort = top.createPort(INPUT_B_NAME + bus, EDIFDirection.INPUT, width);
 		EDIFPort outPort = top.createPort(RESULT_NAME + bus, EDIFDirection.OUTPUT, width);
-		EDIFPort clkPort = top.createPort("clk", EDIFDirection.INPUT, 1);
-		EDIFPort cePort = top.createPort("ce", EDIFDirection.INPUT, 1);
-		EDIFPort rstPort = top.createPort("rst", EDIFDirection.INPUT, 1);
-		EDIFNet clk = top.createNet(clkPort.getName());
-		EDIFNet rst = top.createNet(rstPort.getName());
-		EDIFNet ce = top.createNet(cePort.getName());
+	
+		EDIFPort clkPort = null;
+		EDIFPort cePort = null;
+		EDIFPort rstPort = null;
+		EDIFNet clk = null;
+		EDIFNet rst = null;
+		EDIFNet ce = null;
 		
-		clk.createPortInst(clkPort);
-		rst.createPortInst(rstPort);
-		ce.createPortInst(cePort);
-		Net clkNet = d.createNet(clk);
-		Net rstNet = d.createNet(rst);
-		Net ceNet = d.createNet(ce);
+		Net clkNet = null;
+		Net rstNet = null;
+		Net ceNet = null;
 		EDIFNet gnd = EDIFTools.getStaticNet(NetType.GND, top, d.getNetlist());
 		EDIFNet vcc = EDIFTools.getStaticNet(NetType.VCC, top, d.getNetlist());
+
+		if(inputFlop || outputFlop) {
+			clkPort = top.createPort("clk", EDIFDirection.INPUT, 1);
+			cePort = top.createPort("ce", EDIFDirection.INPUT, 1);
+			rstPort = top.createPort("rst", EDIFDirection.INPUT, 1);
+			clk = top.createNet(clkPort.getName());
+			rst = top.createNet(rstPort.getName());
+			ce = top.createNet(cePort.getName());
+			
+			clk.createPortInst(clkPort);
+			rst.createPortInst(rstPort);
+			ce.createPortInst(cePort);
+			clkNet = d.createNet(clk);
+			rstNet = d.createNet(rst);
+			ceNet = d.createNet(ce);
+		}
+		
 		
 		Cell carryCell = null;
 		int carryCLEs = ((width+BITS_PER_CLE-1) / BITS_PER_CLE); // Ceiling divide
@@ -131,12 +153,13 @@ public class AddSubGenerator extends ArithmeticGenerator {
 			used.add(currSlice);
 			String letter = Character.toString((char)('A'+i%8));
 			BEL lut = currSlice.getBEL(letter + "6LUT");
-			BEL ff = currSlice.getBEL(letter + "FF");
+			BEL ff = outputFlop ? currSlice.getBEL(letter + "FF") : null;
 			Cell lutCell = d.createAndPlaceCell(top, "add" + i, Unisim.LUT2, currSlice, lut);
 			lutCell.addProperty("INIT", isSubtract ? "4'h9" : "4'h6", EDIFValueType.STRING);
-			Cell ffCell = d.createAndPlaceCell(top, "sum" + i, Unisim.FDRE, currSlice, ff);
-			ffCell.addProperty("INIT", "1'b0", EDIFValueType.STRING);
-			SiteInst si = ffCell.getSiteInst();
+			Cell ffCell = outputFlop ? 
+					d.createAndPlaceCell(top, "sum" + i, Unisim.FDRE, currSlice, ff) : null;
+			if(outputFlop) ffCell.addProperty("INIT", "1'b0", EDIFValueType.STRING);
+			SiteInst si = lutCell.getSiteInst();
 						
 			
 			if(letter.equals("A")){
@@ -178,20 +201,21 @@ public class AddSubGenerator extends ArithmeticGenerator {
 			EDIFNet bInt = inputFlop ? top.createNet(INPUT_B_NAME +"_int"+ index) : null;
 			EDIFNet p = top.createNet("p" + index);
 			EDIFNet s = top.createNet("s" + index);
-			EDIFNet so = top.createNet("so" + index);
+			EDIFNet so = outputFlop ? top.createNet("so" + index) : s;
 			(inputFlop ? aInt: a).createPortInst("I0", lutCell);
-			a.createPortInst(aPort,i);
+			a.createPortInst(aPort,aPort.getWidth()-i-1);
 			(inputFlop ? aInt: a).createPortInst("DI", edifIndex, carryCell);
 			(inputFlop ? bInt: b).createPortInst("I1", lutCell);
-			b.createPortInst(bPort, i);
+			b.createPortInst(bPort, bPort.getWidth()-i-1);
 			p.createPortInst("O", lutCell);
 			p.createPortInst("S", edifIndex, carryCell);
 			s.createPortInst("O", edifIndex, carryCell);
-			s.createPortInst("D", ffCell);
-			so.createPortInst("Q", ffCell);
-			so.createPortInst(outPort, i);
-			
-			connectFDRECtrl(clkNet, rstNet, ceNet, ffCell);
+			if(outputFlop) {
+				s.createPortInst("D", ffCell);
+				so.createPortInst("Q", ffCell);
+				connectFDRECtrl(clkNet, rstNet, ceNet, ffCell);
+			}
+			so.createPortInst(outPort, outPort.getWidth()-i-1);
 			
 			// Physical Nets
 			Net aNet = d.createNet(a);
@@ -200,7 +224,7 @@ public class AddSubGenerator extends ArithmeticGenerator {
 			Net bNetInt = inputFlop ? d.createNet(bInt) : null;
 			Net pNet = d.createNet(p);
 			Net sNet = d.createNet(s);
-			Net soNet = d.createNet(so);
+			Net soNet = outputFlop ? d.createNet(so) : sNet;
 			(inputFlop ? aNetInt : aNet).createPin(false,letter +"5",si);
 			(inputFlop ? aNetInt : aNet).createPin(false,letter +"X",si);
 			(inputFlop ? bNetInt : bNet).createPin(false,letter +"6",si);
@@ -208,10 +232,15 @@ public class AddSubGenerator extends ArithmeticGenerator {
 			BELPin src = lut.getPin("O6");
 			BELPin snk = carryCell.getBEL().getPin("S" + cleIndex);
 			si.routeIntraSiteNet(pNet, src, snk);
-			si.routeIntraSiteNet(sNet, carryCell.getBEL().getPin("O"+cleIndex), ff.getPin("D"));
-			si.addSitePIP("FFMUX"+letter+"1", "XORIN");
+			if(outputFlop) { 
+				si.routeIntraSiteNet(sNet, carryCell.getBEL().getPin("O"+cleIndex), ff.getPin("D"));
+			} else {
+				BELPin sitePin = si.getSite().getBELPin(letter+"MUX");
+				si.routeIntraSiteNet(sNet, carryCell.getBEL().getPin("O"+cleIndex), sitePin);
+			}
+			si.addSitePIP((outputFlop ? "FFMUX"+letter+"1" : "OUTMUX"+letter), "XORIN");
 			
-			soNet.createPin(true,letter +"Q",si);
+			soNet.createPin(true,letter + (outputFlop ? "Q" : "MUX"),si);
 			
 			if(inputFlop){
 				Site inputFFSite = null;
