@@ -1222,7 +1222,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                 float tmpNetDelay;
                 try {
                     tmpNetDelay = intrasiteAndLogicDelayModel.getIntraSiteDelay(
-                            si.getSiteTypeEnum().name(),
+                            si.getSiteTypeEnum(),
                             param2,
                             param3);
                 } catch (IllegalArgumentException iae) {
@@ -1240,7 +1240,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                         String param2 = srcCell.getBELName()+"/"+ source.getName();
                         String param3 =  dstCell.getBELName() +"/" +sink_belpins.get(D).getName();
                         float tmpNetDelay = intrasiteAndLogicDelayModel.getIntraSiteDelay(
-                                si.getSiteTypeEnum().name(),
+                                si.getSiteTypeEnum(),
                                 param2,
                                 param3);
                         netDelay = tmpNetDelay;
