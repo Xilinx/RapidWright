@@ -770,6 +770,8 @@ public class FileTools {
 	/* Simple Device Load Methods & Helpers                                              */
 	//===================================================================================//
 	
+	private static boolean FIRST_TIME_WARN_INFERRED_RW_PATH = true;
+	
 	/**
 	 * Gets and returns the value of the environment variable RAPIDWRIGHT_PATH. If this
 	 * variable is not set, it searches the file system from where the RapidWright code
@@ -787,9 +789,13 @@ public class FileTools {
 				File rootFolder = f.getParentFile();
 				for(String dir : rootFolder.list()){
 					if(dir.equals(DATA_FOLDER_NAME)) {
-						MessageGenerator.briefMessage("WARNING: " + RAPIDWRIGHT_VARIABLE_NAME +
-							" is not set.  Proceeding with inferred location from Java execution path: " + 
-							rootFolder.getAbsolutePath());
+						if(FIRST_TIME_WARN_INFERRED_RW_PATH) {
+							MessageGenerator.briefMessage("WARNING: " + RAPIDWRIGHT_VARIABLE_NAME +
+									" is not set.  Proceeding with inferred location from Java "
+									+ "execution path: " + 
+									rootFolder.getAbsolutePath());
+							FIRST_TIME_WARN_INFERRED_RW_PATH = false;
+						}
 						return rootFolder.getAbsolutePath();
 					}
 				}
