@@ -1,3 +1,24 @@
+============= RapidWright 2019.2.1-beta released on 2020-03-10 ================
+Notes:
+ * Minor feature: 
+     Module and ModuleInst information for physical hierarchy in
+     designs is now stored with DCP files.
+ - API Additions:
+   - com.xilinx.rapidwright.design.Design "public Cell createAndPlaceCell(String name, Unisim cellType, String location, String...params)"
+   - com.xilinx.rapidwright.design.Design "public Cell createAndPlaceCell(EDIFCell parent, String name, Unisim cellType, String location, String...params)"
+   - com.xilinx.rapidwright.design.Design "public boolean renameSiteInst(SiteInst inst, String newName)"
+   - com.xilinx.rapidwright.device.BELPin "public BELPin getSourcePin()"
+   - com.xilinx.rapidwright.design.SiteInst "public SitePIP getSitePIP(BELPin inputPin)"
+   - com.xilinx.rapidwright.design.Cell "public Map<String,String> getPinMappingsL2P()"
+   - com.xilinx.rapidwright.device.ClockRegion "public boolean hasTileColumn(int colIndex)"
+   - com.xilinx.rapidwright.design.Design "public void addModuleImpls(ModuleImpls modImpls)"
+ - Bug Fixes / Pull Requests:
+   - Issue #56 - EDIF Parser fails on submodules with certain characters in their names
+   - Pull Request #57 - TimingGroup: Make 'add' functions public
+   - Pull Request #59 - Delay model changes (DelayModel interface is public, uses SiteTypeEnum instead of String)
+   - Other bug fixes (see commit log for details).   
+
+
 ============= RapidWright 2019.2.0-beta released on 2019-12-11 ================
 Notes:
  * Major feature: 
