@@ -97,6 +97,9 @@ public class BlockPlacer2 {
 	private String inputXPNFileName;
 	private double alpha;
 	private double beta;
+    
+    // Update. Added variable to support partial .dcp
+    public boolean save_partial_dcp = true;
 	
 	/** 
 	 * Empty Constructor
@@ -602,6 +605,8 @@ public class BlockPlacer2 {
 		Arrays.sort(array);
 		
 		HashSet<Tile> usedTiles = new HashSet<Tile>();
+        // Added variable for genreating partial dcp
+        boolean save_and_exit = false;
 		// Perform final placement of all hard macros
 		for(HardMacro hm : array){	
 			//System.out.println(moveCount.get(hm) + " " + hm.tileSize + " " + hm.getName());
@@ -610,13 +615,25 @@ public class BlockPlacer2 {
 				
 				if(!placeModuleNear((ModuleInst)hm, hm.getTempAnchorSite().getTile(), usedTiles)){
 					System.out.println("Saving as debug.");
-					MessageGenerator.briefErrorAndExit("ERROR: Placement failed, couldn't find valid site for " + hm.getName());					
+                    // Updated code. Goal: if placement fails, unplace that IP and generate .dcp in order to let vivado continue PAR
+					if(save_partial_dcp) {
+                        save_and_exit = true;
+                        System.out.println("ERROR: Placement failed for "+hm.getName());
+                        hm.unplace(); 
+                    } else
+                        MessageGenerator.briefErrorAndExit("ERROR: Placement failed, couldn't find valid site for " + hm.getName());	                   
 				}
 			}
 			else{
 				usedTiles.addAll(footPrint);
 				if(!hm.place(hm.getTempAnchorSite())){
-					MessageGenerator.briefErrorAndExit("ERROR: Problem placing " + hm.getName() + " on site: " + hm.getTempAnchorSite());
+                    // Updated code. Goal: if placement fails, unplace that IP and generate .dcp in order to let vivado continue PAR
+					if(save_partial_dcp) {
+                        save_and_exit = true;
+                        System.out.println("ERROR: Placement failed for "+hm.getName());
+                        hm.unplace(); 
+                    } else 
+                        MessageGenerator.briefErrorAndExit("ERROR: Problem placing " + hm.getName() + " on site: " + hm.getTempAnchorSite());
 				}
 			}
 		}
@@ -626,6 +643,13 @@ public class BlockPlacer2 {
 			i.place(i.getSite());
 		}
 		
+        // Updated code. Goal: if placement fails, unplace that IP and generate .dcp in order to let vivado continue PAR
+        if(save_and_exit) {
+			String placedDCPName = "partialy_placed.dcp";
+			design.writeCheckpoint(placedDCPName);
+			MessageGenerator.briefErrorAndExit("ERROR: Placement failed, couldn't find valid site for all the IPs. Partially placed .dcp saved for debug " );
+		}
+                
 		return design;
 	}
 	
@@ -838,7 +862,9 @@ public class BlockPlacer2 {
 			}
 		}
 
-		
+		// Updated code. Store initial number of valid Sites
+        int nr_valid_sites = validSiteRange.size();
+        int rand_site = 0;
 		while(true){
 			/*if(iterations > 10*validSites.size()){
 				selected = hardMacros.get(rand.nextInt(hardMacros.size()-1));
@@ -847,17 +873,19 @@ public class BlockPlacer2 {
 				hm0 = selected;
 				iterations = 0;
 			}*/
-			if(iterations >  hardMacros.size()*validSiteRange.size()){
-				return false;
+			if(iterations >=  nr_valid_sites){  // Updated code. Maximum trial nr = nr valid Sites
+                return false;
 			}
 			iterations++;
 			
 			//site1 = validSites.get(rand.nextInt(validSites.size()-1));
 			if (validSiteRange.size()> 0){
 				if (validSiteRange.size()>1){
-					site1 = validSiteRange.get(rand.nextInt(validSiteRange.size()-1));
+                    rand_site = rand.nextInt(validSiteRange.size()-1);  
+					site1 = validSiteRange.get(rand_site);
 				}else{
 					//site1 = validSiteRange.get(rand.nextInt(validSiteRange.size()));
+                    rand_site = 0;
 					site1 = validSiteRange.get(0);
 				}
 			}else{
@@ -865,7 +893,8 @@ public class BlockPlacer2 {
 			}
 			if(site0.equals(site1)) {
 				//if(DEBUG_LEVEL > 1) System.out.println("  SAME SITE");
-				continue;
+                validSiteRange.remove(rand_site); // Updated code. Remove sites that were already checked
+                continue;
 			}
 			hm1 = currentPlacements.get(site1);
 				
@@ -876,7 +905,8 @@ public class BlockPlacer2 {
 					hm1.setTempAnchorSite(site1, currentPlacements);
 					hm0.setTempAnchorSite(site0, currentPlacements);
 					//if(DEBUG_LEVEL > 1) System.out.println("  BAD SWAP");
-					continue;
+					validSiteRange.remove(rand_site); // Updated code. Remove sites that were already checked
+                    continue;
 				}
 				//System.out.println(hm0.getName()+"<->"+hm1.getName());
 				break;
@@ -886,13 +916,14 @@ public class BlockPlacer2 {
 				if(!checkValidPlacement(hm0)){
 					hm0.setTempAnchorSite(site0, currentPlacements);
 					//if(DEBUG_LEVEL > 1) System.out.println("  BAD SITE0");
-					continue;
+                    validSiteRange.remove(rand_site); // Updated code. Remove sites that were already checked
+                    continue;
 				}
 				//System.out.println(hm0.getName()+"-> EMPTY");
 				break;
 			}
 		}
-		currentMove.setMove(site0, site1, hm0, hm1);
+        currentMove.setMove(site0, site1, hm0, hm1);
 		return true;
 	}
 	

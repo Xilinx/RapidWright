@@ -942,14 +942,14 @@ public class PBlockGenerator {
 				}
 				sb.append("SLICE_X" + upperLeft.getInstanceX() + "Y" + (upperLeft.getInstanceY()-(numSLICERows-1)) + 
 						 ":SLICE_X" + (upperLeft.getInstanceX()+(numSLICEColumns+numSLICEMColumns)-1) + "Y" + upperLeft.getInstanceY());
-			}
+            }
 			if(numBRAMColumns > 0){
 				int pIdx = 0;
 				for(int i=0; pIdx < p.size(); i++){
 					TileTypeEnum t = dev.getTile(row, col+i).getTileTypeEnum();
 					if(Utils.isBRAM(t)){
 						for(Site s : dev.getTile(row, col+i).getSites()){
-							if(s.getSiteTypeEnum() == SiteTypeEnum.RAMBFIFO36) upperLeft = s;
+							if((s.getSiteTypeEnum() == SiteTypeEnum.RAMBFIFO36)||(s.getSiteTypeEnum() == SiteTypeEnum.RAMBFIFO36E1)) upperLeft = s; // Update. Goal: support for 7 series
 						}
 						break;
 					}
