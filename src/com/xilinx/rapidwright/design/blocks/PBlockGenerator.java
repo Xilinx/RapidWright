@@ -106,7 +106,6 @@ public class PBlockGenerator {
 	int tallestShape = 0;
 	int widestShape = 0;
 	int shapeArea = 0;
-	boolean horiz_density = true; // Select if horizontal density algorithm is desired
 	Site startingPoint = null;
 
 	String blockRangeSlice = null;
