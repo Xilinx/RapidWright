@@ -36,7 +36,7 @@ import java.util.Map;
  * rename if it exists.  
  * Created on: May 11, 2017
  */
-public class EDIFName {
+public class EDIFName implements Comparable<EDIFName> {
 	/** Name of the EDIF object */
 	private String name;
 	/** Legal EDIF rename of the original name */
@@ -155,5 +155,9 @@ public class EDIFName {
 	
 	public <K, V> Map<K, V> getNewMap(){
 		return new LinkedHashMap<K,V>();
+	}
+
+	public int compareTo(EDIFName o) {
+		return this.getName().compareTo(o.getName());
 	}
 }

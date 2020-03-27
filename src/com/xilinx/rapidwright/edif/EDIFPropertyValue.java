@@ -79,7 +79,7 @@ public class EDIFPropertyValue {
 	 * parse.
 	 */
 	public Integer getIntValue() {
-		if(type != EDIFValueType.STRING) {
+		if(type != EDIFValueType.INTEGER) {
 			return null;
 		}
 		int radix = 10;
