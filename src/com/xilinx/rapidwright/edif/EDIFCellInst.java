@@ -38,7 +38,7 @@ import java.util.Map;
  * 
  * Created on: May 11, 2017
  */
-public class EDIFCellInst extends EDIFPropertyObject {
+public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
 	
 	private EDIFCell parentCell;
 	
@@ -204,4 +204,9 @@ public class EDIFCellInst extends EDIFPropertyObject {
 			wr.write("))))\n");
 		}
 	}
+
+    @Override
+    public String getUniqueKey() {
+        return getCellType().getUniqueKey() + "_" + getParentCell().getUniqueKey() + "_" + getName();
+    }
 }
