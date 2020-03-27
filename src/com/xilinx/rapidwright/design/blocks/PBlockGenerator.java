@@ -25,14 +25,19 @@
 package com.xilinx.rapidwright.design.blocks;
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
+import java.util.TreeMap;
 import java.util.TreeSet;
 
 import joptsimple.OptionParser;
@@ -73,7 +78,8 @@ public class PBlockGenerator {
 	public int STARTING_Y = -1;		// Parameterized with command line argument when present.
 	public int PBLOCK_COUNT = 1;
 	public int MAX_COLUMNS = 30;
-	
+	public String GLOBAL_PBLOCK = ""; 
+	public int IP_NR_INSTANCES = 0;
 	
 	public static final int AVOID_NULL_COLUMN_COUNT = 2;
 	
@@ -87,7 +93,8 @@ public class PBlockGenerator {
 	public static final String STARTING_X_OPT         = "x";
 	public static final String STARTING_Y_OPT         = "y";
 	public static final String COUNT_REQUEST_OPT      = "c";
-	
+	public static final String GLOBAL_PBLOCK_OPT 	  = "p";  //  File containig already implemented pblocks for free resources computation
+	public static final String IP_NR_INSTANCES_OPT    = "i";	 
 	Device dev = null;
 	int lutCount = 0;
 	int lutRAMCount = 0;
@@ -99,7 +106,7 @@ public class PBlockGenerator {
 	int tallestShape = 0;
 	int widestShape = 0;
 	int shapeArea = 0;
-
+	boolean horiz_density = true; // Select if horizontal density algorithm is desired
 	Site startingPoint = null;
 
 	String blockRangeSlice = null;
@@ -918,6 +925,114 @@ public class PBlockGenerator {
 		}
 		boolean trivial = matches.get(0).size() < 2;
 		ArrayList<String> pBlocks = new ArrayList<String>(PBLOCK_COUNT);
+		
+		// Code inserted to obtain the pblock pattern having the highest number of free resources on the device
+		boolean do_horiz_dens = !GLOBAL_PBLOCK.contentEquals("");
+		TreeMap<Float,TileColumnPattern> store_best_pattern =new TreeMap<Float,TileColumnPattern> () ; // Store an ordered list of the patterns. The order is given by the number of free resources
+		if(do_horiz_dens) {
+			// Store pblocks already implemented for other IPs. Parse the file only once.
+			HashMap<Integer, Integer> x_l = new HashMap<Integer, Integer>();
+			HashMap<Integer, Integer> x_r = new HashMap<Integer, Integer>();
+			HashMap<Integer, Integer> y_d = new HashMap<Integer, Integer>();
+			HashMap<Integer, Integer> y_u = new HashMap<Integer, Integer>();
+			HashMap<Integer, Integer> nr_inst = new HashMap<Integer, Integer>();
+			get_already_impl_PBlocks(x_l,x_r,y_d,y_u,nr_inst);
+			
+			// Order the patterns according to the available resources			 
+			for(TileColumnPattern p : matches){				
+				HashMap<Integer, Integer []> clb_pblock = new HashMap<Integer, Integer []> ();
+				create_allCLB_PBlocks (clb_pblock,patMap,p, numSLICEColumns, numSLICEMColumns,numBRAMColumns,numDSPColumns,numSLICERows); // Generate all the pblocks for this pattern (pattern may repeat on the device). Use this to compute free resources using the command bellow
+				float free_resources = (float) check_free_resources(clb_pblock,x_l,x_r,y_u,y_d,nr_inst); // nr of resources is an integer value, but convert it to float to be able to have more keys for the same amount of free resources
+				while (store_best_pattern.containsKey(free_resources)) { 	// if there is another pattern with the same nr of free resources, this shall be less important as the previous one, because matches is also ordered. 
+					free_resources -= (float)1/matches.size();  			// there are max matches.size() elems that could have the same nr of resources. of course, this worst case scenario of having this nr of equal keys never happens, but better as random value like -0.01
+				}
+				store_best_pattern.put(free_resources, p);				
+			}
+			// Select the patterns with most available resources and only the amount requested by the user
+			int nr_added_patterns = 1;
+			for(float key : store_best_pattern.descendingKeySet()){ // descending order = start with the ones with most free resources
+				TileColumnPattern p = store_best_pattern.get(key);
+				Iterator<Integer> patternInstancesItr = patMap.get(p).iterator();
+				int col = patternInstancesItr.next();
+				if(patternInstancesItr.hasNext()){
+					// If there are two instances, choose the second one to avoid edge effects
+					col = patternInstancesItr.next();
+				}
+				int row = TileColumnPattern.getCommonRow(dev);
+				// Let's go down by one region to avoid edge effects
+				row = getTileRowInRegionBelow(col, row);
+				Site upperLeft = null;
+				StringBuilder sb = new StringBuilder();
+				
+				// Create pblock for CLBs
+				if(numSLICEColumns > 0 || numSLICEMColumns > 0){
+					HashMap<Integer, Integer []> clb_pblock = new HashMap<Integer, Integer []> ();
+					create_allCLB_PBlocks (clb_pblock,patMap,p, numSLICEColumns, numSLICEMColumns,numBRAMColumns,numDSPColumns,numSLICERows);		// Re-generate pblock to write it in the file
+					// clb_pblock value:  Integer[] {x_l,x_r,y_d,y_u}
+					int LeftX   = clb_pblock.get(0)[0];
+					int RightX  = clb_pblock.get(0)[1];
+					int UpperY  = clb_pblock.get(0)[3];
+					int LowerY  = clb_pblock.get(0)[2];
+
+					sb.append("SLICE_X" + LeftX + "Y" + LowerY + ":SLICE_X" + RightX + "Y" + UpperY);
+					
+					// Write PBlock in Global PBlock file, so that the next IPs will try to use other columns if free
+					// Current solution works actually if only 1 pblock is used for the implementation of the IP. If more are used, this won't give an accurate value
+					// Also, current solution computes free resources only in case of CLB pblocks. The BRAMS and DRAMs columns are selected to match the most suitable clb pblock
+					List<String> Write_PBlocks = new ArrayList<String>();
+					for (Integer i: clb_pblock.keySet()) {
+						Write_PBlocks.add("SLICE_X" + clb_pblock.get(i)[0] + "Y" + clb_pblock.get(i)[2] + ":SLICE_X" + clb_pblock.get(i)[1] + "Y" + clb_pblock.get(i)[3]);			
+					} 
+					if(IP_NR_INSTANCES==0) {
+						System.out.println(" CRITICAL WARNING: IP_NR_INSTANCES is 0! Default value 1 was set.");
+						IP_NR_INSTANCES = 1;
+					}
+					try (FileWriter fw = new FileWriter(GLOBAL_PBLOCK, true); // append to file
+						    BufferedWriter bw = new BufferedWriter(fw);
+						    PrintWriter out = new PrintWriter(bw)) {
+							int nr_instances = (int) Math.ceil((double)IP_NR_INSTANCES / Write_PBlocks.size()); // distribute instances over number of pblocks of this pattern
+							for(int string_nr = 0; string_nr<Write_PBlocks.size();string_nr++)
+								out.println(Write_PBlocks.get(string_nr)+" "+nr_instances);										
+					} catch (IOException e) {
+						System.out.println("Problem appending all the pblocks to the " + GLOBAL_PBLOCK +" file");
+					}
+				
+				}
+				if(numBRAMColumns > 0){
+					int pIdx = 0;
+					for(int i=0; pIdx < p.size(); i++){
+						TileTypeEnum t = dev.getTile(row, col+i).getTileTypeEnum();
+						if(Utils.isBRAM(t)){
+							for(Site s : dev.getTile(row, col+i).getSites()){
+								if((s.getSiteTypeEnum() == SiteTypeEnum.RAMBFIFO36)||(s.getSiteTypeEnum() == SiteTypeEnum.RAMBFIFO36E1)) upperLeft = s; // Update. Goal: support for 7 series
+							}
+							break;
+						}
+						if(p.get(pIdx) == t) pIdx++;
+					}
+					sb.append(" RAMB36_X" + upperLeft.getInstanceX() + "Y" + (upperLeft.getInstanceY()-(numBRAMRows-1)) + 
+							 ":RAMB36_X" + (upperLeft.getInstanceX()+numBRAMColumns-1) + "Y" + upperLeft.getInstanceY());
+				}
+				if(numDSPColumns > 0){
+					int pIdx = 0;
+					for(int i=0; pIdx < p.size(); i++){
+						TileTypeEnum t = dev.getTile(row, col+i).getTileTypeEnum();
+						if(Utils.isDSP(t)){
+							upperLeft = dev.getTile(row, col+i).getSites()[1];
+							break;
+						}
+						if(p.get(pIdx) == t) pIdx++;
+					}
+					sb.append(" DSP48E2_X" + upperLeft.getInstanceX() + "Y" + (upperLeft.getInstanceY()-(numDSPRows-1)) + 
+							 ":DSP48E2_X" + (upperLeft.getInstanceX()+numDSPColumns-1) + "Y" + upperLeft.getInstanceY());
+					
+				}
+				pBlocks.add(sb.toString());
+				if(nr_added_patterns == PBLOCK_COUNT) break;
+				nr_added_patterns++;
+			}
+		}
+		// Code in case horizontal density algorithm not desired
 		for(TileColumnPattern p : matches){
 			Iterator<Integer> patternInstancesItr = patMap.get(p).iterator();
 			int col = patternInstancesItr.next();
@@ -1020,6 +1135,244 @@ public class PBlockGenerator {
 		return row;
 	}
 	
+	/**
+	 * Some patterns use also BRAMs or DSPs, but the CLB pblock might end up far away from the BRAM/DSP column. 
+	 * In the case described above, routing might become longer and use unnecessarily resources
+	 * This function tries to overcome this issue. It is not an optimal solution, but is supposed to give better results as the default ones	
+	 * @param p - TileColumnPattern of the pblock
+	 * @param row 
+	 * @param col
+	 * @param numSLICEColumns - Number of requried CLB resources
+	 * @param numSLICEMColumns - Number of requried CLBM resources
+	 * @param numBRAMColumns - Number of requried BRAM resources
+	 * @param numDSPColumns - Number of requried DSP resources
+	 * @param for_clb - Input determines if the xl output must be a CLB
+	 */
+	private int get_xl_offset_pblock(TileColumnPattern p, int row, int col, int numSLICEColumns,int numSLICEMColumns, int numBRAMColumns,int numDSPColumns, boolean for_clb) {
+		int xl_offset = 0;		// default value
+		int req_numSLICEColumns  = numSLICEColumns;
+		int req_numSLICEMColumns = numSLICEMColumns;
+		int req_numBRAMColumns   = numBRAMColumns;
+		int req_numDSPColumns    = numDSPColumns;
+		int col_all_fulfilled;
+		// Go through Pattern components and check at which column all required resources are fulfilled
+		int pIdx = 0;
+		for(col_all_fulfilled=0; pIdx < p.size(); col_all_fulfilled++){
+			TileTypeEnum t = dev.getTile(row, col+col_all_fulfilled).getTileTypeEnum();
+			
+			if(Utils.isCLBM(t) && (req_numSLICEMColumns>0)){
+				req_numSLICEMColumns--;
+			}else if(Utils.isCLB(t)){
+				req_numSLICEColumns--;
+			}else if(Utils.isDSP(t)){
+				req_numDSPColumns--;
+			}else if(Utils.isBRAM(t)){
+				req_numBRAMColumns--;
+			}	
+			if(req_numBRAMColumns <= 0 && req_numDSPColumns <= 0 && req_numSLICEMColumns <= 0 && req_numSLICEColumns <= 0) {
+				break;
+			}
+			if(p.get(pIdx) == t) 
+				pIdx++;
+		}
+		
+		// Start from the column at which all resources were fulfilled. go back.
+		// Check which is the most left column required to fulfil all our resources constraints
+		req_numSLICEColumns  = numSLICEColumns;
+		req_numSLICEMColumns = numSLICEMColumns;
+		req_numBRAMColumns   = numBRAMColumns;
+		req_numDSPColumns    = numDSPColumns;
+		int col_offset;
+		for(col_offset=0; pIdx >= 0; col_offset++){
+			TileTypeEnum t = dev.getTile(row, col+col_all_fulfilled-col_offset).getTileTypeEnum();
+			if(Utils.isCLBM(t) && (req_numSLICEMColumns>0)){
+				req_numSLICEMColumns--;
+				if((req_numSLICEColumns<=0) && (for_clb) && (req_numSLICEMColumns==0))	// This logic solves the task of returning a clb pblock offset only. Without it, if BRAM is the first in the pattern (with offset), BRAM column will be returned
+					break;
+			}else if(Utils.isCLB(t)){
+				req_numSLICEColumns--;
+				if((req_numSLICEMColumns<=0) && (for_clb) && (req_numSLICEColumns==0))
+					break;
+			}else if(Utils.isDSP(t)){
+				req_numDSPColumns--;
+			}else if(Utils.isBRAM(t)){
+				req_numBRAMColumns--;
+			}	
+			if(req_numBRAMColumns <= 0 && req_numDSPColumns <= 0 && req_numSLICEMColumns <= 0 && req_numSLICEColumns <= 0) {
+				break;
+			}	
+			if(p.get(pIdx) == t) 
+				pIdx--;
+		}
+		xl_offset = col_all_fulfilled - col_offset; 
+		return xl_offset;
+	}
+	
+	/**
+	 * Construct CLB PBlocks
+	 * Create a map to store not only the first pblock, but all the pblocks for the other columns of a certain pattern. This is useful for example when determining whether the IP has enough space on the device.
+	 * @param clb_pblock - Key is simply an integer to go over all patterns. 0 should always be the first one to be chosen in the main code, as it shall avoid edge effects. Value is an array holding all the pblocks for a given pattern
+	 * @param patMap - Map holding all patterns of a device. 
+	 * @param p - TileColumnPattern
+	 * @param numSLICEColumns - Number of requried CLB resources
+	 * @param numSLICEMColumns - Number of requried CLBM resources
+	 * @param numBRAMColumns - Number of requried BRAM resources
+	 * @param numDSPColumns - Number of requried DSP resources
+	 * @param numSLICERows - Number of requried rows in the pblock
+	 */
+	private void create_allCLB_PBlocks (HashMap<Integer, Integer []> clb_pblock, HashMap<TileColumnPattern, TreeSet<Integer>> patMap, TileColumnPattern p, int numSLICEColumns, int numSLICEMColumns, int numBRAMColumns, int numDSPColumns, int numSLICERows) {
+		int x_r;  // right column
+		int x_l;  // left column
+		int y_u;  // upper row
+		int y_d;  // lower row
+		
+		boolean avoid_edge = false;
+		Iterator<Integer> patternInstancesItr = patMap.get(p).iterator();
+		int main_pblock_col = patternInstancesItr.next(); 
+		if(patternInstancesItr.hasNext()){ 						// does it have a next pattern?
+			avoid_edge = true; 									// If there are two instances, choose the second one to avoid edge effects		
+		}
+		int row = TileColumnPattern.getCommonRow(dev);
+		row = getTileRowInRegionBelow(main_pblock_col, row);	// Let's go down by one region to avoid edge effects
+
+		Site upperLeft = null;
+		if(numSLICEColumns > 0 || numSLICEMColumns > 0){ 		// Generate CLB PBlocks only if slices required
+			int run_nr = 0;
+			while (patternInstancesItr.hasNext() || (run_nr==0) ) {
+				if(run_nr!=0)
+					main_pblock_col = patternInstancesItr.next(); 
+				// Select the most left column that would give you a compact implemented design (as offset)
+				int offset_col = get_xl_offset_pblock(p,row,main_pblock_col,numSLICEColumns,numSLICEMColumns,numBRAMColumns,numDSPColumns,true); 		// 'true' in order to get the value only for CLB offset			
+				// Allign it to a tile
+				if(dev.getTile(row, main_pblock_col+offset_col).toString().contains("_R"))  	// _L has slices | 1 | 0 |, while tile _R has slices | 0 | 1 |
+					upperLeft = dev.getTile(row /* TODO - Make Data Driven*/, main_pblock_col+offset_col).getSites()[0];								// Get the site corresponding to these col & row			
+				else 
+					upperLeft = dev.getTile(row /* TODO - Make Data Driven*/, main_pblock_col+offset_col).getSites()[1];								// Get the site corresponding to these col & row
+					
+				y_u = upperLeft.getInstanceY();
+				y_d = (y_u-(numSLICERows-1));
+				x_l = upperLeft.getInstanceX();
+				// Computing xr by simply adding (numSLICEColumns+numSLICEMColumns) is not enough for some patterns. 
+				// If the pattern contains | clbl | clbl | clbl | clbm, but the pblock needs only 1 clbl, and 1 clbm, the generated pblock won't be correct. The code bellow addresses this issue
+				int req_numSLICEMColumns = numSLICEMColumns;
+				int req_numSLICEColumns = numSLICEColumns;			
+				int i;		
+				for(i=main_pblock_col+offset_col; i<dev.getColumns(); i++){ // i<dev.getColumns() was introduced, as we don't know anymore at this step the value of xl in the original pattern. 
+					TileTypeEnum t = dev.getTile(row, i).getTileTypeEnum();
+					if(Utils.isCLBM(t) && (req_numSLICEMColumns>0)){
+						req_numSLICEMColumns--;
+						if((req_numSLICEColumns<=0) && (req_numSLICEMColumns==0))
+							break;
+					}else if(Utils.isCLB(t)){
+						req_numSLICEColumns--;
+						if((req_numSLICEMColumns<=0) && (req_numSLICEColumns<=0))
+							break;
+					}
+					
+				}
+				
+				// Allign it to a tile
+				if(dev.getTile(row, i).toString().contains("_R"))  	// _L has slices | 1 | 0 |, while tile _R has slices | 0 | 1 |
+					x_r = dev.getTile(row, i).getSites()[1].getInstanceX();
+				else 
+					x_r = dev.getTile(row, i).getSites()[0].getInstanceX();
+				
+				// If this is the only pblock , simply add it. If not, the next elem shall be added with index 0, to avoid edge effects
+				if(dev.getSite(upperLeft.getName())!=null && dev.getSite("SLICE_X"+x_r+"Y"+y_d)!=null ) {
+					if(run_nr==0) {
+						if(!avoid_edge) 
+							clb_pblock.put(0, new Integer[] {x_l,x_r,y_d,y_u});
+						 else 		
+							clb_pblock.put(1, new Integer[] {x_l,x_r,y_d,y_u});	
+					} else if((run_nr==1)&&(avoid_edge)) // actually run_nr==1 is enough, as avoid_edge is true in this case by default
+						clb_pblock.put(0, new Integer[] {x_l,x_r,y_d,y_u});
+					else 
+						clb_pblock.put(run_nr, new Integer[] {x_l,x_r,y_d,y_u});
+					run_nr++;
+				}
+			}
+					
+			if(!(clb_pblock.containsKey(0))) {			// if the next element was not a real one...copy value of key 1 into key 0
+				for(int key : clb_pblock.keySet() ) {	// contains only 1 elem, probably key = 1. But to avoid special cases error, this 'for' was attached
+					Integer[] val = clb_pblock.get(key);
+					clb_pblock.remove(key);
+					clb_pblock.put(0, val);
+					break;
+				}
+			}
+		} 
+	}
+
+	/**
+	 * Function takes as input one pblock (multiple if pattern repeats) and checks whether this is already used by other IPs & How many free resources (= rows) are left  
+	 * @param clb_pblock - Key is simply an integer to go over all patterns. 0 should always be the first one to be chosen in the main code, as it shall avoid edge effects. Value is an array holding all the pblocks for a given pattern
+	 * @param x_l - Leftmost columns of the pblocks
+	 * @param x_r - Rightmost columns of the pblocks
+	 * @param y_u - Upper rows of the pblocks
+	 * @param y_d - Lowest rows of the pblocks
+	 * @param nr_inst - Number of IP instances
+	 */
+	public int check_free_resources (HashMap<Integer, Integer []> clb_pblock,HashMap<Integer, Integer> x_l,HashMap<Integer, Integer> x_r,HashMap<Integer, Integer> y_u,HashMap<Integer, Integer> y_d,HashMap<Integer, Integer> nr_inst) {
+		int my_free_rows = dev.getRows();     				// Tricky, xc7z has less rows on the left side of the device. Also, nr_rows could be bigger than nr of rows having slices. This needs to be improved!
+		int pattern_freq = clb_pblock.size(); 				// How often the pattern of the current pblock repeats on the device
+		my_free_rows = my_free_rows*pattern_freq;			// My available resources = nr_rows * how often my pattern repeats
+		boolean overlap = false;
+		
+		for (int i : x_l.keySet()) { 						// Go through all the pblocks in the global pblock file
+			for(int my_pattern_col : clb_pblock.keySet()) { // Go through all my  pblocks. clb_pblock value:  Integer[] {x_l,x_r,y_d,y_u}
+				overlap = false;
+				if(  ((clb_pblock.get(my_pattern_col)[0]<=x_l.get(i)) && (clb_pblock.get(my_pattern_col)[1]>=x_l.get(i))) || ((clb_pblock.get(my_pattern_col)[0]<=x_r.get(i)) && (clb_pblock.get(my_pattern_col)[1]>=x_r.get(i))) || ((clb_pblock.get(my_pattern_col)[0]>=x_l.get(i)) && (clb_pblock.get(my_pattern_col)[1]<=x_r.get(i)))  )
+					overlap = true;
+				if(overlap) {
+					my_free_rows -=  (y_u.get(i)-y_d.get(i)+1)*nr_inst.get(i);
+					my_free_rows -= 10; 					// for each overlapp, add buffer between IPs 
+				}
+			}					
+		}
+		return my_free_rows;
+	}
+	
+	/**
+	 * Read PBlock File for obtaining already implemented pblocks  
+	 * @param x_l  
+	 * @param x_r  
+	 * @param y_d
+	 * @param y_u
+	 * @param nr_inst
+	 */
+	public int get_already_impl_PBlocks ( HashMap<Integer, Integer> x_l, HashMap<Integer, Integer> x_r,HashMap<Integer, Integer> y_d, HashMap<Integer, Integer> y_u, HashMap<Integer, Integer> nr_inst ) {
+		if(GLOBAL_PBLOCK.contentEquals("")) {
+			MessageGenerator.briefErrorAndExit(" ERROR: Name of the PBlock file not given.");
+		}
+			
+		ArrayList<String> lines = new ArrayList<String>();
+		lines = FileTools.getLinesFromTextFile(GLOBAL_PBLOCK);	// File containig all the already implemented pblocks
+		int line_nr = 0;
+		for(String line : lines){
+			if(line.contains("Failed"))
+				continue;
+			String[] blocks = line.split(" ");
+			if(line.contains("SLICE")||line.contains("DSP")||line.contains("RAM"))
+				nr_inst.put(line_nr, Integer.parseInt(blocks[blocks.length-1])); // last value in the text line shall be instance nr. of the corresponding IP	
+			for (String block: blocks) {
+				if(block.startsWith("SLICE")) {
+					 String[] strs = block.split("[XY:]+");
+					 if(strs.length!=6) {
+						 //System.out.println("Error in parsing one of the PBlocks in the file, as not all (x_lest,x_right,y_left,y_right) are present ");						  
+						 continue; // ignore it, don.t stop the tool
+					 } else {
+						 x_l.put(line_nr, (int) Integer.parseInt(strs[1]));
+						 y_d.put(line_nr, (int) Integer.parseInt(strs[2]));
+						 x_r.put(line_nr, (int) Integer.parseInt(strs[4]));
+						 y_u.put(line_nr, (int) Integer.parseInt(strs[5]));						 												 
+					 }	 
+				}
+			}
+			line_nr++;
+		}
+		return line_nr;
+	}
+		
 	public static void main(String[] args) {		
 		OptionParser optParser = new OptionParser() {
 			{
@@ -1045,6 +1398,12 @@ public class PBlockGenerator {
 				accepts(STARTING_Y_OPT)
 					.withOptionalArg().ofType(int.class).
 					describedAs("PBlock Y (SLICE) Axis Starting Point Requested.");
+				accepts(GLOBAL_PBLOCK_OPT)
+					.withOptionalArg().ofType(String.class).
+					describedAs("File containing already implemented PBlocks.");
+				accepts(IP_NR_INSTANCES_OPT)
+					.withOptionalArg().ofType(int.class).
+					describedAs("Number of IP instances for this pblock.");
 				acceptsAll( Arrays.asList("h", "?"), "Print Help" ).forHelp();
 			}
 		};
@@ -1078,6 +1437,14 @@ public class PBlockGenerator {
 			pbGen.STARTING_Y = (int) opts.valueOf(STARTING_Y_OPT);
 		}		
 
+		if(opts.has(GLOBAL_PBLOCK_OPT)){
+			pbGen.GLOBAL_PBLOCK = (String) opts.valueOf(GLOBAL_PBLOCK_OPT);
+		}	
+		
+		if(opts.has(IP_NR_INSTANCES_OPT)){
+			pbGen.IP_NR_INSTANCES = (int) opts.valueOf(IP_NR_INSTANCES_OPT);
+		}
+		
 		HashSet<String> alreadySeen = new HashSet<String>();
 		int requested = pbGen.PBLOCK_COUNT;
 		for(String s : pbGen.generatePBlockFromReport(fileName, shapesReportFileName)){
