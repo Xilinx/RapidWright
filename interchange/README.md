@@ -5,6 +5,7 @@ Prototyping an interchange format to allow designs from other tools such as [VTR
 Current schema for logical netlist can be found here:
 https://github.com/Xilinx/RapidWright/blob/interchange/interchange/LogicalNetlist.capnp
 
+
 ## Easiest way to Setup a RapidWright Repo Locally:
 ```
 wget http://www.rapidwright.io/docs/_downloads/rapidwright-installer.jar
