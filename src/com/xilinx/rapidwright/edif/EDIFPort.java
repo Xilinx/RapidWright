@@ -32,7 +32,7 @@ import java.io.Writer;
  * Represents a port on an {@link EDIFCell} within an EDIF netlist.
  * Created on: May 11, 2017
  */
-public class EDIFPort extends EDIFPropertyObject {
+public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
 
 	private EDIFCell parentCell;
 	
@@ -203,4 +203,9 @@ public class EDIFPort extends EDIFPropertyObject {
 			return new int[] {Integer.parseInt(getName().substring(lastLeftBracket,getName().length()-1))};
 		return null;
 	}
+
+    @Override
+    public String getUniqueKey() {
+        return parentCell.getUniqueKey() + "_" + getName();
+    }
 }
