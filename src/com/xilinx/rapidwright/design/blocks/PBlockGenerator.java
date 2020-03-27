@@ -1134,6 +1134,7 @@ public class PBlockGenerator {
 		return row;
 	}
 	
+	
 	/**
 	 * Some patterns use also BRAMs or DSPs, but the CLB pblock might end up far away from the BRAM/DSP column. 
 	 * In the case described above, routing might become longer and use unnecessarily resources
