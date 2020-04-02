@@ -1,11 +1,11 @@
 apply plugin: 'java'
-jar.enabled = false
+jar.enabled = true
 
 project.buildDir = 'bin'
 
 sourceSets {
   main {
-    java.outputDir = file('bin')
+    java.outputDir = file('compiled')
     java {
       srcDirs = ['src']
     }    
