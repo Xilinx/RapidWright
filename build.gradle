@@ -5,7 +5,7 @@ project.buildDir = 'bin'
 
 sourceSets {
   main {
-    java.outputDir = file('compiled')
+    java.outputDir = file('bin/compiled')
     java {
       srcDirs = ['src']
     }    
