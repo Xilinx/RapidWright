@@ -59,6 +59,15 @@ public class EDIFHierPortInst {
 	}
 
 	/**
+	 * Gets the net on the port inst
+	 * @return The net on the port inst
+	 */
+	public EDIFNet getNet() {
+	    if(portInst == null) return null;
+	    return portInst.getNet();
+	}
+	
+	/**
 	 * Returns the full hierarchical name of the instance on which this port resides.
 	 * @return The full hierarchical name.
 	 */
