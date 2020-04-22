@@ -617,7 +617,9 @@ public class Router extends AbstractRouter {
 					if(currNode.getTile().equals(w.getTile()) && !currNode.getTile().getName().startsWith("INT")){
 						// Look for possible route-thru conflict
 						SitePin sp = currNode.getTile().getSitePinFromWire(currNode.getWire());
-						if(sp != null){
+						// Check to make sure the site pin we found is not the source of the net
+						if(sp != null && !sp.getSite().equals(currNet.getSource().getSite()) 
+						        && !sp.getPinName().equals(currNet.getSource().getName())){
 							for(BELPin p : sp.getBELPin().getSiteConns()){
 								SiteInst si = design.getSiteInstFromSite(sp.getSite());
 								if(si != null){
