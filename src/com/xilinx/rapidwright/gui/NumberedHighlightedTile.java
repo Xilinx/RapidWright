@@ -58,6 +58,8 @@ public class NumberedHighlightedTile  extends QGraphicsRectItem{
 		this.moveBy(x, y);
 		this.scene.addItem(this);
 		this.scene.addItem(text);
+
+		this.text.setZValue(this.zValue() + 1);
 	}
 	
 	public void remove(){
