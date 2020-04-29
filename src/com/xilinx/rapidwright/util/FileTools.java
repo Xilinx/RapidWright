@@ -1440,6 +1440,21 @@ public class FileTools {
 		}
 	}
 	
+	private static FilenameFilter ednFilter = new FilenameFilter() {
+		@Override
+		public boolean accept(File dir, String name){
+			return name.toLowerCase().endsWith(".edn");
+		}
+	};
+	
+	/**
+	 * Gets a filename filter for EDN files (ends with .edn).
+	 * @return The EDN filename filter
+	 */
+	public static FilenameFilter getEDNFilenameFilter(){
+		return ednFilter;
+	}
+
 	private static FilenameFilter dcpFilter = new FilenameFilter() {
 		@Override
 		public boolean accept(File dir, String name){

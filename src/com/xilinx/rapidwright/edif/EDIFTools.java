@@ -719,6 +719,9 @@ public class EDIFTools {
 
 	public static EDIFNetlist readEdifFile(String edifFileName){
 		EDIFNetlist edif;
+		File edifFile = new File(edifFileName);
+		String fullEDIFFileName = edifFile.getAbsolutePath();
+		String edifDirectoryName = edifFile.getParent();
 		if(EDIFTools.EDIF_DEBUG && FileTools.isFileNewer(edifFileName + ".dat", edifFileName)){
 			edif = FileTools.readObjectFromKryoFile(edifFileName + ".dat", EDIFNetlist.class);
 		}else{
@@ -727,6 +730,12 @@ public class EDIFTools {
 				if(EDIFTools.EDIF_DEBUG) FileTools.writeObjectToKryoFile(edifFileName + ".dat", edif);			
 			}
 		}
+		if(edifDirectoryName != null) {
+			String[] ednFiles = new File(edifDirectoryName).list(FileTools.getEDNFilenameFilter()); 
+			edif.setOrigDirectory(edifDirectoryName);
+			edif.setEncryptedCells(ednFiles);
+		}
+		
 		return edif;
 	}
 
@@ -735,16 +744,52 @@ public class EDIFTools {
 		edif.exportEDIF(fileName);
 	}
 
-	public static void writeEDIFFile(OutputStream out, EDIFNetlist edif, String partName){
+	public static void writeEDIFFile(OutputStream out, EDIFNetlist edif, String partName) {
+		writeEDIFFile(out, null, edif, partName); 
+	}
+
+	
+	/**
+	 * Write out EDIF to a stream.  Also checks if netlist has potential encrypted cells and 
+	 * creates a Tcl script to help re-import design into Vivado intact.
+	 * @param out The output stream
+	 * @param dcpFileName The name of the DCP file associated with this netlist
+	 * @param edif The netlist of the design 
+	 * @param partName The target part for this design
+	 */
+	public static void writeEDIFFile(OutputStream out, String dcpFileName, EDIFNetlist edif, 
+										String partName){
 		String hiddenEDIFFileName = ".temp_edif_" + FileTools.getUniqueProcessAndHostID() + ".edf";
 		writeEDIFFile(hiddenEDIFFileName, edif, partName);
 		Path path = FileSystems.getDefault().getPath(hiddenEDIFFileName);
 		try {
 			Files.copy(path, out);
 			Files.delete(path);
+			if(dcpFileName != null && edif.getEncryptedCells() != null) {
+				if(edif.getEncryptedCells().length > 0) {
+					writeTclLoadScriptForPartialEncryptedDesigns(edif, dcpFileName, partName);
+				}				
+			}
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+	}
+	
+	public static void writeTclLoadScriptForPartialEncryptedDesigns(EDIFNetlist edif, 
+															String dcpFileName, String partName) {
+		ArrayList<String> lines = new ArrayList<String>();
+		for(String cellName : edif.getEncryptedCells()) {
+			lines.add("read_edif " + edif.getOrigDirectory() + File.separator + cellName);
+		}
+		String pathDCPFileName = new File(dcpFileName).getAbsolutePath();
+		
+		lines.add("read_checkpoint " + pathDCPFileName);
+		lines.add("link_design -part " + partName);
+		String tclFileName = pathDCPFileName.replace(".dcp", "_load.tcl");
+		FileTools.writeLinesToTextFile(lines, tclFileName);
+		System.out.println("INFO: Design Checkpoint may contain encrypted cells. To reload design "
+				+ "into \n      Vivado, please source this Tcl script to load checkpoint: "
+				+ "\n\n        source " + tclFileName + "\n");
 	}
 
 	public static EDIFNetlist readEdifFromDcpFile(String dcpFileName){

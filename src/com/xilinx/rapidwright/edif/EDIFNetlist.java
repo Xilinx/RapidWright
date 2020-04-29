@@ -79,6 +79,10 @@ public class EDIFNetlist extends EDIFName {
 
 	private Set<String> primsToRemoveOnCollapse = new HashSet<String>();
 	
+	private String origDirectory;
+	
+	private String[] encryptedCells; 
+	
 	private boolean DEBUG = false;
 	
 	public EDIFNetlist(String name){
@@ -1229,7 +1233,32 @@ public class EDIFNetlist extends EDIFName {
 		}
 	}
 	
-	
+	/**
+	 * Keeps track of the original source directory from where this EDIF file was loaded. 
+	 * @return Original directory path from where the EDIF file was loaded
+	 */
+	public String getOrigDirectory() {
+		return origDirectory;
+	}
+
+	protected void setOrigDirectory(String origDirectory) {
+		this.origDirectory = origDirectory;
+	}
+
+	/**
+	 * Gets the list of EDN filenames that were present in the original directory where the EDIF
+	 * file was loaded from.  These may be important when loading a netlist/checkpoint back into 
+	 * Vivado.
+	 * @return A list of EDN filenames that may populate encrypted cells within the netlist.
+	 */
+	public String[] getEncryptedCells() {
+		return encryptedCells;
+	}
+
+	protected void setEncryptedCells(String[] encryptedCells) {
+		this.encryptedCells = encryptedCells;
+	}
+
 	public static void main(String[] args) throws FileNotFoundException {
 		CodePerfTracker t = new CodePerfTracker("EDIF Import/Export", true);
 		t.start("Read EDIF");
