@@ -720,8 +720,21 @@ public class EDIFTools {
 	public static EDIFNetlist readEdifFile(String edifFileName){
 		EDIFNetlist edif;
 		File edifFile = new File(edifFileName);
-		String fullEDIFFileName = edifFile.getAbsolutePath();
 		String edifDirectoryName = edifFile.getParent();
+		if(edifDirectoryName == null) {
+			try {
+				File canEdifFile = edifFile.getCanonicalFile();
+				if(canEdifFile != null) {
+					edifDirectoryName = canEdifFile.getParent();
+				}
+			} catch (IOException e) {
+				// Unable to determine EDIF source directory - not sure if 
+				// this is worth throwing an error as we are only checking for EDN files
+				System.err.println("WARNING: Could not determine source directory for EDIF. "
+					+ "If it contained encrypted cells \n(present as .edn files), they will not "
+					+ "be passed to resulting DCP load script.");
+			}
+		}
 		if(EDIFTools.EDIF_DEBUG && FileTools.isFileNewer(edifFileName + ".dat", edifFileName)){
 			edif = FileTools.readObjectFromKryoFile(edifFileName + ".dat", EDIFNetlist.class);
 		}else{
