@@ -81,19 +81,20 @@ proc compile_block_dcp  { dcpFile  ip_nr_instances} {
         place_design -unplace
         
     # Generate constraint
-    #if {[info exists env(GLOBAL_PBLOCK)]} {
-    #    set global_pblock_file ${::env(GLOBAL_PBLOCK)}
-    #    set global_pblock_command "-p $global_pblock_file"
-    #} else {
-    #    set global_pblock_command ""
-    #}
-    puts "args $urptName $shapesFileName $ip_nr_instances $global_pblock_command"
-	if { [catch {set pBlockVal [exec java --illegal-access=deny -Xmx2G com.xilinx.rapidwright.design.blocks.PBlockGenerator -u $urptName -s $shapesFileName -c 1 -i $ip_nr_instances -p "~/global_pblock.txt"]}] } {
+    if {[info exists ::env(GLOBAL_PBLOCK)]} {
+        set global_pblock_file ${::env(GLOBAL_PBLOCK)}
+        set global_pblock_command "-p $global_pblock_file"
+    } else {
+        set global_pblock_command ""
+        set global_pblock_file ""
+    }
+    puts "args $urptName $shapesFileName $ip_nr_instances $global_pblock_file"
+	if { [catch {set pBlockVal [exec java --illegal-access=deny -Xmx2G com.xilinx.rapidwright.design.blocks.PBlockGenerator -u $urptName -s $shapesFileName -c 1 -i $ip_nr_instances $global_pblock_command]}] } {
 	    set pBlockVal "PBlockGenerator Failed!"
 	}
         puts "pBlock = $pBlockVal, from: $urptName $shapesFileName"
         set fp [open [string map {".dcp" "_pblock.txt"} $dcpFile] "w"]
-        puts $fp "$pBlockVal \n#Created from: com.xilinx.rapidwright.design.blocks.PBlockGenerator -u $urptName -s $shapesFileName -c 1 -i $ip_nr_instances -p ~/global_pblock.txt"
+        puts $fp "$pBlockVal \n#Created from: com.xilinx.rapidwright.design.blocks.PBlockGenerator -u $urptName -s $shapesFileName -c 1 -i $ip_nr_instances $global_pblock_command"
         close $fp
 
         set designCells [get_cells -filter {NAME!=VCC && NAME!=GND}]
