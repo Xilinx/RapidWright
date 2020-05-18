@@ -32,11 +32,11 @@ proc compileBlocks {dirName} {
     }
 }
 
-proc compileBlock { dcpFile } {
-    set blockImplCount [compile_block_dcp $dcpFile]
+proc compileBlock  { dcpFile ip_nr_instances} {
+    set blockImplCount [compile_block_dcp $dcpFile $ip_nr_instances]
 }
 
-proc compile_block_dcp { dcpFile } {
+proc compile_block_dcp  { dcpFile  ip_nr_instances} {
     set rootDcpFileName [string map {".dcp" ""} $dcpFile]
     
     puts "Loading $dcpFile";
@@ -80,14 +80,21 @@ proc compile_block_dcp { dcpFile } {
         set_param place.debugShape ""
         place_design -unplace
         
-        # Generate constraint
-        puts "args $urptName $shapesFileName"
-	if { [catch {set pBlockVal [exec java --illegal-access=deny -Xmx2G com.xilinx.rapidwright.design.blocks.PBlockGenerator -u $urptName -s $shapesFileName -c 1]}] } {
+    # Generate constraint
+    if {[info exists ::env(GLOBAL_PBLOCK)]} {
+        set global_pblock_file ${::env(GLOBAL_PBLOCK)}
+        set global_pblock_command "-p $global_pblock_file"
+    } else {
+        set global_pblock_command ""
+        set global_pblock_file ""
+    }
+    puts "args $urptName $shapesFileName $ip_nr_instances $global_pblock_file"
+	if { [catch {set pBlockVal [exec java --illegal-access=deny -Xmx2G com.xilinx.rapidwright.design.blocks.PBlockGenerator -u $urptName -s $shapesFileName -c 1 -i $ip_nr_instances $global_pblock_command]}] } {
 	    set pBlockVal "PBlockGenerator Failed!"
 	}
         puts "pBlock = $pBlockVal, from: $urptName $shapesFileName"
         set fp [open [string map {".dcp" "_pblock.txt"} $dcpFile] "w"]
-        puts $fp "$pBlockVal \n#Created from: com.xilinx.rapidwright.design.blocks.PBlockGenerator -u $urptName -s $shapesFileName -c 1"
+        puts $fp "$pBlockVal \n#Created from: com.xilinx.rapidwright.design.blocks.PBlockGenerator -u $urptName -s $shapesFileName -c 1 -i $ip_nr_instances $global_pblock_command"
         close $fp
 
         set designCells [get_cells -filter {NAME!=VCC && NAME!=GND}]
@@ -427,6 +434,10 @@ proc prep_for_block_stitcher {} {
         }
     }
     if {[llength $opt_runs_needed] > 0} {
+        # Get nr of IP instances. Used in the function computing PBlock position. Based on this, algorithm can estimate how many resources are free 
+        array unset nr_instances
+		get_ip_inst_nr {nr_instances}
+		
         set jobs_file_name "${directory}/${bdName}.jobs"
         set fp_jobs [open $jobs_file_name w]     
         foreach ip $opt_runs_needed {       
@@ -447,13 +458,14 @@ proc prep_for_block_stitcher {} {
             puts $fp "# $ip $ip_run"
             puts $fp "set dir $dir"
             puts $fp "set dcpName ${ip}.dcp"
-
+            
 	    puts $fp [subst -nocommands -novariables {set rwpath ${::env(RAPIDWRIGHT_PATH)}}]
 	    puts $fp [subst -nocommands -novariables {set cpath ${::env(CLASSPATH)}}]
 	    puts $fp [subst -nocommands -novariables {puts "RAPIDWRIGHT_PATH=$rwpath"}]
 	    puts $fp [subst -nocommands -novariables {puts "CLASSPATH=$cpath"}]
-
-            puts $fp {compileBlock $dcpName}
+        
+            set id [config_ip_cache -get_id $ip]
+            puts $fp "compileBlock \$dcpName $nr_instances($id)"
             close $fp
             set vivado_path [exec java com.xilinx.rapidwright.util.FileTools --get_vivado_path]
             puts $fp_jobs "$vivado_path -mode batch -source $post_tcl_name # $dir"
@@ -687,5 +699,19 @@ proc get_uniq_ip_name {cachePath ip} {
 		return $ip_return
 	} else {
 		return $ip
+	}
+}
+
+proc get_ip_inst_nr {nr_instances} {
+	upvar  $nr_instances return_array
+	array unset return_array
+	foreach ip_cell [get_bd_cells -hierarchical -filter TYPE==ip] {
+		set ip [get_ips -all [get_property CONFIG.Component_Name $ip_cell]]
+		set id [config_ip_cache -get_id $ip]
+		if { ![info exists return_array($id)] } {
+			set return_array($id) 1
+		} else {
+			set return_array($id) [expr {$return_array($id)+1}]
+		}
 	}
 }
