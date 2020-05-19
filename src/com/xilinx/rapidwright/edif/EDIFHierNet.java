@@ -96,6 +96,15 @@ public class EDIFHierNet {
 		return this.hierarchicalInstName + EDIFTools.EDIF_HIER_SEP + net.getName();
 	}
 
+	/**
+	 * Gets the parent cell instance where this net is defined.
+	 * @return The parent cell instance of this net.
+	 */
+	public EDIFCellInst getParentInst() {
+	    EDIFNetlist netlist = net.getParentCell().getLibrary().getNetlist();
+	    return netlist.getCellInstFromHierName(hierarchicalInstName);
+	}
+	
 	/* (non-Javadoc)
 	 * @see java.lang.Object#hashCode()
 	 */
