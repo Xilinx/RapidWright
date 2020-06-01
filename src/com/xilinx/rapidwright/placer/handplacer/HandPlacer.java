@@ -93,7 +93,6 @@ public class HandPlacer extends QMainWindow {
 	public QToolBar toolbar;
 	
 	public static void main(String[] args) {
-		QApplication.setGraphicsSystem("raster");
 		QApplication.initialize(args);
 
 		boolean debugPlacer = false;
@@ -114,7 +113,6 @@ public class HandPlacer extends QMainWindow {
 	}
 	
 	public static void openDesign(Design d){
-		QApplication.setGraphicsSystem("raster");
 		QApplication.initialize(new String[]{});
 		
 		HandPlacer handPlacer = new HandPlacer(null, d);
