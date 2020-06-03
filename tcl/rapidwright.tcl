@@ -715,3 +715,14 @@ proc get_ip_inst_nr {nr_instances} {
 		}
 	}
 }
+
+proc rainbow_highlight { objs } {
+    set n 1
+    foreach o $objs {
+	highlight_objects -color_index $n $o
+	set n [expr ($n + 1) % 20 ]
+	if {$n == 0} {
+	    set n 1
+	}
+    }
+}
