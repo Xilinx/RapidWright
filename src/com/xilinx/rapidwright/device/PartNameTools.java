@@ -1,5 +1,5 @@
 /* 
- * Copyright (c) 2019 Xilinx, Inc. 
+ * Copyright (c) 2020 Xilinx, Inc. 
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -28,14 +28,14 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
-import com.esotericsoftware.kryo.io.UnsafeInput;
+import com.esotericsoftware.kryo.unsafe.UnsafeInput;
 import com.xilinx.rapidwright.device.FamilyType;
 import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.util.FileTools;
 
 /**
- * Generated on: Fri Dec 06 10:46:56 2019
+ * Generated on: Fri Apr 24 19:01:24 2020
  * by: com.xilinx.rapidwright.release.PartNamePopulator
  * 
  * Class to hold utility APIs dealing with Parts and device names.

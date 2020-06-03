@@ -1,3 +1,35 @@
+============= RapidWright 2019.2.2-beta released on 2020-06-02 ================
+Notes:
+ * Minor feature: 
+   - Support to manage/load EDIF files with blackboxes where encrypted
+     IP is not populated. 
+   - Adds a very basic Makefile to compile without Gradle on
+     Linux-based platforms.
+ - API Additions:
+   - com.xilinx.rapidwright.device.Device "public int getSiteTypeCount()"
+   - com.xilinx.rapidwright.device.Device "public int getTileTypeCount()"
+   - com.xilinx.rapidwright.device.Site "public int getSiteWireCount()"
+   - com.xilinx.rapidwright.device.Site "public String getSiteWireName(int wireIndex)"
+   - com.xilinx.rapidwright.device.Site "public int getSitePinCount()"
+   - com.xilinx.rapidwright.device.Site "public int getHighestInputPinIndex()"
+   - com.xilinx.rapidwright.device.Site "public boolean isInputPin(int pinIndex)"
+   - com.xilinx.rapidwright.device.Site "public boolean isOutputPin(int pinIndex)"
+   - com.xilinx.rapidwright.device.Site "public SitePIP[] getSitePIPs()"
+   - com.xilinx.rapidwright.device.Site "public SitePIP getSitePIP(int index)"
+   - com.xilinx.rapidwright.device.Site "public int getSitePIPCount()"
+   - com.xilinx.rapidwright.device.Site "public String[] getSiteWireNames()"
+   - com.xilinx.rapidwright.device.Tile "public int getTilePatternIndex()"
+
+ - Bug Fixes / Pull Requests:
+   - Issue #4 - Java 9 Compliance
+      - Updates several libraries and provides a workaround for Kryo
+      to avoid Illegal access messages from JVM
+   - Pull Request #58 - Fixed file naming issues when having multiple instances of an IP
+   - Pull Request #60 - Horizontal density (pblock creation)
+   - Pull Request #62 - Ensure that highlighted tile numbers are drawn above tile highlighting
+   - Other bug fixes (see commit log for details).   
+
+
 ============= RapidWright 2019.2.1-beta released on 2020-03-10 ================
 Notes:
  * Minor feature: 

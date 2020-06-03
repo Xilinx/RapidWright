@@ -43,6 +43,8 @@ import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.lang.management.ManagementFactory;
+import java.lang.management.RuntimeMXBean;
+import java.lang.reflect.Field;
 import java.net.URL;
 import java.nio.channels.FileChannel;
 import java.security.CodeSource;
@@ -63,8 +65,8 @@ import java.util.zip.ZipInputStream;
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
-import com.esotericsoftware.kryo.io.UnsafeInput;
-import com.esotericsoftware.kryo.io.UnsafeOutput;
+import com.esotericsoftware.kryo.unsafe.UnsafeInput;
+import com.esotericsoftware.kryo.unsafe.UnsafeOutput;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.FamilyType;
 import com.xilinx.rapidwright.device.Part;
@@ -117,6 +119,30 @@ public class FileTools {
 	public static short[] emptyShortArray = new short[0];
 	/** Static empty array to save on memory */
 	public static String[] emptyStringArray = new String[0];
+	
+
+	static {
+		// TODO - This turns off illegal reflective access warnings in Java 9+
+		// This is due to reflective use in Kryo which is a direct dependency of this
+		// project.  Data files are encoded using the Unsafe interface because of the
+		// performance benefits it provides.  There is currently no work-around to
+		// maintain performance. This quieting of the illegal reflective access warning
+		// can be made verbose by specifying the JVM option "--illegal-access=warn"
+		boolean allowWarnings = false;
+		RuntimeMXBean rmxBean = ManagementFactory.getRuntimeMXBean();
+		for(String input : rmxBean.getInputArguments()) {
+			if(input.startsWith("--illegal-access")) {
+				allowWarnings = true;
+			}
+		}
+		
+		if(!allowWarnings) {
+			Device.quietReflectiveAccessWarning();
+		}
+	}
+	
+	
+	
 	//===================================================================================//
 	/* Get Streams                                                                       */
 	//===================================================================================//
@@ -263,7 +289,7 @@ public class FileTools {
 			return true;
 		}
 		dos.writeInt(intArray.length);
-		dos.writeInts(intArray);
+		dos.writeInts(intArray, 0, intArray.length);
 		return true;
 	}
 
@@ -273,7 +299,7 @@ public class FileTools {
 			return true;
 		}
 		dos.writeShort(intArray.length);
-		dos.writeShorts(intArray);
+		dos.writeShorts(intArray, 0, intArray.length);
 		return true;
 	}
 	
