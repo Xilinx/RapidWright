@@ -1,4 +1,4 @@
-============= RapidWright 2019.2.2-beta released on 2020-06-02 ================
+============= RapidWright 2019.2.2-beta released on 2020-06-03 ================
 Notes:
  * Minor feature: 
    - Support to manage/load EDIF files with blackboxes where encrypted
