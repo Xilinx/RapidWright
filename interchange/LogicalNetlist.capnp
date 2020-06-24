@@ -3,6 +3,11 @@ using Java = import "/capnp/java.capnp";
 $Java.package("com.xilinx.rapidwright.interchange");
 $Java.outerClassname("LogicalNetlist");
 
+using StringIdx = UInt32;
+using PortIdx = UInt32;
+using CellIdx = UInt32;
+using InstIdx = UInt32;
+
 struct Netlist {
 
   name     @0 : Text;
@@ -15,32 +20,32 @@ struct Netlist {
 
   
   struct Cell {
-    name    @0 : UInt32;
-    propMap @1 : PropertyMap;
-    view    @2 : UInt32;
-    lib     @3 : UInt32;
-    insts   @4 : List(UInt32);
-    nets    @5 : List(Net);
-    ports   @6 : List(UInt32);
+    name     @0 : StringIdx;
+    propMap  @1 : PropertyMap;
+    view     @2 : StringIdx;
+    lib      @3 : StringIdx;
+    insts    @4 : List(InstIdx);
+    nets     @5 : List(Net);
+    ports    @6 : List(PortIdx);
   }
   
   struct CellInstance {
-    name    @0 : UInt32;
-    propMap @1 : PropertyMap;
-    view    @2 : UInt32;
-    cell    @3 : UInt32;
+    name     @0 : StringIdx;
+    propMap  @1 : PropertyMap;
+    view     @2 : StringIdx;
+    cell     @3 : CellIdx;
   }
   
   struct Net {
-    name      @0 : UInt32;
+    name      @0 : StringIdx;
     propMap   @1 : PropertyMap;
     portInsts @2 : List(PortInstance);
   }
   
   struct Port {
-    name    @0 : UInt32;
-    dir     @1 : Direction;
-    propMap @2 : PropertyMap;
+    name     @0 : StringIdx;
+    dir      @1 : Direction;
+    propMap  @2 : PropertyMap;
     union {
       bit @3 : Void;
       bus @4 : Bus;
@@ -59,23 +64,23 @@ struct Netlist {
   }
   
   struct PortInstance {
-    name  @0 : UInt32;
-    port  @1 : UInt32;
-    idx   @2 : UInt32;
+    name  @0 : StringIdx;
+    port  @1 : StringIdx;
+    idx   @2 : UInt32; # Index within bussed port
     union {
       extPort @3 : Void;
-      inst    @4 : UInt32;
+      inst    @4 : InstIdx;
     }
   }
   
   struct PropertyMap {
     entries @0 : List(Entry);  	
     struct Entry {	
-      key @0 : UInt32;
+      key @0 : StringIdx;
       union {
-        textValue @1 : UInt32;
-        intValue  @2 : Int32;
-        boolValue @3 : Bool;
+        textValue  @1 : StringIdx;
+        intValue   @2 : Int32;
+        boolValue  @3 : Bool;
       }
     }
   }

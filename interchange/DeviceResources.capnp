@@ -4,6 +4,12 @@ using Dir = import "LogicalNetlist.capnp";
 $Java.package("com.xilinx.rapidwright.interchange");
 $Java.outerClassname("DeviceResources");
 
+using StringIdx = UInt32;
+using SiteTypeIdx = UInt32;
+using BELPinIdx = UInt32;
+using WireIdx = UInt32;
+using WireIDInTileType = UInt32; # ID in Tile Type
+
 struct Device {
 
   name         @0 : Text;
@@ -18,7 +24,7 @@ struct Device {
   # Placement definition objects
   #######################################  
   struct SiteType {
-    name      @0 : UInt32;
+    name      @0 : StringIdx;
     pins      @1 : List(SitePin); 
     lastInput @2 : UInt32; # Index of the last input pin
     bels      @3 : List(BEL);
@@ -28,9 +34,9 @@ struct Device {
   }
 
   struct TileType {
-    name      @0 : UInt32;
-    siteTypes @1 : List(UInt32);
-    wires     @2 : List(UInt32);
+    name      @0 : StringIdx;
+    siteTypes @1 : List(SiteTypeIdx);
+    wires     @2 : List(StringIdx);
     pips      @3 : List(PIP);
   }
   
@@ -38,9 +44,9 @@ struct Device {
   # Placement instance objects
   #######################################  
   struct BEL {
-    name      @0 : UInt32;
-    type      @1 : UInt32;
-    pins      @2 : List(UInt32); # String index names
+    name      @0 : StringIdx;
+    type      @1 : StringIdx;
+    pins      @2 : List(BELPinIdx); 
     category  @3 : BELCategory; # This would be BELClass/class, but conflicts with Java language
   }
   
@@ -51,13 +57,13 @@ struct Device {
   }
       
   struct Site {
-    name      @0 : UInt32;
-    type      @1 : UInt32; # index in device of site type
+    name      @0 : StringIdx;
+    type      @1 : SiteTypeIdx; 
   }
 
   struct Tile {
-    name       @0 : UInt32;
-    type       @1 : UInt32;
+    name       @0 : StringIdx;
+    type       @1 : StringIdx;
     sites      @2 : List(Site);
     row        @3 : UInt16;
     col        @4 : UInt16;
@@ -68,25 +74,25 @@ struct Device {
   # Intra-site routing resources
   ######################################
   struct BELPin {
-    name   @0 : UInt32;
+    name   @0 : StringIdx;
     dir    @1 : Dir.Netlist.Direction;
-    bel    @2 : UInt32; # String name index
+    bel    @2 : StringIdx;
   }
 
   struct SiteWire {
-    name   @0 : UInt32;
-    pins   @1 : List(UInt32);
+    name   @0 : StringIdx;
+    pins   @1 : List(BELPinIdx);
   }
        
   struct SitePIP {
-    inpin  @0 : UInt32;
-    outpin @1 : UInt32;
+    inpin  @0 : BELPinIdx;
+    outpin @1 : BELPinIdx;
   }
   
   struct SitePin {
-    name     @0 : UInt32;
+    name     @0 : StringIdx;
     dir      @1 : Dir.Netlist.Direction;
-    sitewire @2 : UInt32; # String index name
+    sitewire @2 : StringIdx; 
   }
   
   
@@ -94,17 +100,17 @@ struct Device {
   # Inter-site routing resources
   ######################################  
   struct Wire {
-    tile      @0 : UInt32;
-    wire      @1 : UInt32;
+    tile      @0 : StringIdx;
+    wire      @1 : StringIdx;
   }
   
   struct Node {
-    wires    @0 : List(UInt32);
+    wires    @0 : List(WireIdx);
   }
   
   struct PIP {
-    wire0        @0 : UInt32;
-    wire1        @1 : UInt32;
+    wire0        @0 : WireIDInTileType;
+    wire1        @1 : WireIDInTileType;
     directional  @2 : Bool;
     buffered20   @3 : Bool;
     buffered21   @4 : Bool;
