@@ -495,7 +495,7 @@ public class BlockCreator {
 		}
 		//System.out.println("Cache miss on " + cellInstanceName + " " + cacheID);
 		String datFileName = uniqueFileName+".dat";
-		boolean storedModuleValid = new File(datFileName).exists() && new File(uniqueFileName+".kryo").exists(); 
+		/*boolean storedModuleValid = new File(datFileName).exists() && new File(uniqueFileName+".kryo").exists(); 
 		if(storedModuleValid){
 			// Check that all *routed.dcp files are older than .dat
 			for(String routedDCP : getRoutedDCPFileNames(routedDCPFileName, blockImplCount)){
@@ -512,7 +512,7 @@ public class BlockCreator {
 			ModuleImpls modules = readStoredModule(uniqueFileName, cellInstanceName);
 			inMemModuleCache.put(cacheID, modules);
 			return modules;
-		}
+		}*/
 		//System.out.println("Generating dat/kryo for " + uniqueFileName);
 		EDIFNetlist e = EDIFTools.readEdifFile(edifFileName);
 		String metadataFileName = routedDCPFileName == null ? null : routedDCPFileName.replace(ROUTED_DCP_SUFFIX, METADATA_FILE_SUFFIX);
@@ -523,8 +523,8 @@ public class BlockCreator {
 			e.setDevice(m.getDevice());
 		}
 
-		ModuleCache.saveToCompactFile(modules,uniqueFileName+".dat");
-		FileTools.writeObjectToKryoFile(uniqueFileName+".kryo", e);
+		//ModuleCache.saveToCompactFile(modules,uniqueFileName+".dat");
+		//FileTools.writeObjectToKryoFile(uniqueFileName+".kryo", e);
 		inMemModuleCache.put(cacheID, modules);
 		return modules;
 	}
