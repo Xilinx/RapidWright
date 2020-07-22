@@ -1,10 +1,6 @@
 package com.xilinx.rapidwright.interchange;
 
-import java.io.FileOutputStream;
 import java.io.IOException;
-
-import org.capnproto.MessageBuilder;
-import org.capnproto.SerializePacked;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
@@ -12,8 +8,6 @@ import com.xilinx.rapidwright.tests.CodePerfTracker;
 
 public class PhysicalNetlistExample {
 
-
-        
     public static void main(String[] args) throws IOException {
         if(args.length != 1) {
             System.out.println("USAGE: <input>.dcp");
@@ -30,13 +24,11 @@ public class PhysicalNetlistExample {
         t.start("Read DCP");
         // Read DCP into memory using RapidWright
         Design design = Design.readCheckpoint(args[0], CodePerfTracker.SILENT);
+        
         t.stop().start("Write Logical Netlist");
         // Write Logical & Physical Netlist to Cap'n Proto Serialization file
         String logNetlistFileName = args[0].replace(".dcp", ".netlist");
-        FileOutputStream fo = new java.io.FileOutputStream(logNetlistFileName);
-        MessageBuilder message = LogicalNetlistExample.writeLogNetlist(design.getNetlist());
-        SerializePacked.writeToUnbuffered(fo.getChannel(), message);
-        fo.close();
+        LogNetlistWriter.writeLogNetlist(design.getNetlist(), logNetlistFileName);
         
         t.stop().start("Write Physical Netlist");
         String physNetlistFileName = args[0].replace(".dcp", ".phys");
@@ -44,7 +36,7 @@ public class PhysicalNetlistExample {
         
         t.stop().start("Read Logical Netlist");
         // Read Netlist into RapidWright netlist
-        EDIFNetlist n2 = LogicalNetlistExample.readLogNetlist(logNetlistFileName);
+        EDIFNetlist n2 = LogNetlistReader.readLogNetlist(logNetlistFileName);
         
         t.stop().start("Read Physical Netlist");
         Design roundtrip = PhysNetlistReader.readPhysNetlist(physNetlistFileName, n2);
