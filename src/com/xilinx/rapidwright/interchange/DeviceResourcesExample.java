@@ -45,13 +45,18 @@ import com.xilinx.rapidwright.tests.CodePerfTracker;
 
 public class DeviceResourcesExample {
 
-    private static Enumerator<String> allStrings = new Enumerator<>();
-    private static Enumerator<String> allSiteTypes = new Enumerator<>();
+    private static Enumerator<String> allStrings;
+    private static Enumerator<String> allSiteTypes;
 
-    private static HashMap<TileTypeEnum,Tile> tileTypes = new HashMap<>(); 
-    private static HashMap<SiteTypeEnum,Site> siteTypes = new HashMap<>();
+    private static HashMap<TileTypeEnum,Tile> tileTypes; 
+    private static HashMap<SiteTypeEnum,Site> siteTypes;
     
     public static void populateEnumerations(Device device) {
+        allStrings = new Enumerator<>();
+        allSiteTypes = new Enumerator<>();
+
+        tileTypes = new HashMap<>(); 
+        siteTypes = new HashMap<>();
         for(Tile tile : device.getAllTiles()) {
             allStrings.addObject(tile.getName());
             if(!tileTypes.containsKey(tile.getTileTypeEnum())) {
@@ -111,11 +116,7 @@ public class DeviceResourcesExample {
         writeAllWiresAndNodesToBuilder(device, devBuilder);
         t.stop();
         
-        int idx = devBuilder.getTileList().get(0).getName();
-        System.out.println("Tile 0 Name: " + idx);
-        System.out.println("  " + devBuilder.getStrList().get(idx).toString());
         return message;        
-
     }
     
     public static void writeAllStringsToBuilder(DeviceResources.Device.Builder devBuilder) {
@@ -196,7 +197,8 @@ public class DeviceResourcesExample {
                 SitePin.Builder pin = pins.get(j);
                 pin.setName(allStrings.getIndex(pinNames.get(j)));
                 pin.setDir(j <= highestIndexInputPin ? Direction.INPUT : Direction.OUTPUT);
-                pin.setSitewire(site.getSiteWireIndex(pinNames.get(j)));
+                Integer siteWireIdx = site.getSiteWireIndex(pinNames.get(j));
+                pin.setSitewire(siteWireIdx == null ? -1 : siteWireIdx);
             }
             
             // SitePIPs
@@ -298,19 +300,28 @@ public class DeviceResourcesExample {
         }
         
     }
+    
+    private static long makeKey(Tile tile, int wire) {
+        long key = wire;
+        key = (((long)tile.getUniqueAddress()) << 32) | key;  
+        return key; 
+    }
         
     public static void writeAllWiresAndNodesToBuilder(Device device, DeviceResources.Device.Builder devBuilder) {
-        Enumerator<Wire> allWires = new Enumerator<>();
-        Enumerator<Node> allNodes = new Enumerator<>();
+        LongEnumerator allWires = new LongEnumerator();
+        LongEnumerator allNodes = new LongEnumerator();
+        
         
         for(Tile tile : device.getAllTiles()) {
             for(int i=0; i < tile.getWireCount(); i++) {
                 Wire wire = new Wire(tile,i);
-                allWires.addObject(wire);
+                allWires.addObject(makeKey(wire.getTile(), wire.getWireIndex()));
             }
             for(PIP p : tile.getPIPs()) {
-                allNodes.addObject(p.getStartNode());
-                allNodes.addObject(p.getEndNode());
+                Node start = p.getStartNode();
+                allNodes.addObject(makeKey(start.getTile(), start.getWire()));
+                Node end = p.getEndNode();
+                allNodes.addObject(makeKey(end.getTile(), end.getWire()));
             }
         }
         
@@ -319,7 +330,9 @@ public class DeviceResourcesExample {
         
         for(int i=0; i < allWires.size(); i++) {
             DeviceResources.Device.Wire.Builder wireBuilder = wireBuilders.get(i);
-            Wire wire = allWires.get(i);
+            long wireKey = allWires.get(i);
+            Wire wire = new Wire(device.getTile((int)(wireKey >>> 32)), (int)(wireKey & 0xffffffff));
+            //Wire wire = allWires.get(i);
             wireBuilder.setTile(allStrings.getIndex(wire.getTile().getName()));
             wireBuilder.setWire(wire.getWireIndex());
         }
@@ -328,11 +341,13 @@ public class DeviceResourcesExample {
                 devBuilder.initNodes(allNodes.size());
         for(int i=0; i < allNodes.size(); i++) {
             DeviceResources.Device.Node.Builder nodeBuilder = nodeBuilders.get(i);
-            Node node = allNodes.get(i);
+            //Node node = allNodes.get(i);
+            long nodeKey = allNodes.get(i);
+            Node node = new Node(device.getTile((int)(nodeKey >>> 32)), (int)(nodeKey & 0xffffffff));
             Wire[] wires = node.getAllWiresInNode();
             PrimitiveList.Int.Builder wBuilders = nodeBuilder.initWires(wires.length);
             for(int k=0; k < wires.length; k++) {
-                wBuilders.set(k, allWires.getIndex(wires[k]));
+                wBuilders.set(k, allWires.getIndex(makeKey(wires[k].getTile(), wires[k].getWireIndex())));
             }
         }
     }
@@ -351,7 +366,11 @@ public class DeviceResourcesExample {
     }
    
     public static boolean verifyDeviceResources(String devResFileName, String deviceName) {
-        allStrings.clear();
+        allStrings = new Enumerator<String>();
+        allSiteTypes = new Enumerator<String>();
+        tileTypes = new HashMap<TileTypeEnum, Tile>();
+        siteTypes = new HashMap<SiteTypeEnum, Site>();
+        verifiedSiteTypes = new HashSet<SiteTypeEnum>();
 
         Device device = Device.getDevice(deviceName);
         
@@ -360,7 +379,7 @@ public class DeviceResourcesExample {
         
         try {
             fis = new java.io.FileInputStream(devResFileName);
-            ReaderOptions readerOptions = new ReaderOptions(1024L*1024L*128L, 64);
+            ReaderOptions readerOptions = new ReaderOptions(1024L*1024L*512L, 64);
             MessageReader readMsg = SerializePacked.readFromUnbuffered((fis).getChannel(), readerOptions);
             fis.close();
             
@@ -380,16 +399,23 @@ public class DeviceResourcesExample {
         
         // Create a lookup map for tile types
         HashMap<String,TileType.Reader> tileTypeMap = new HashMap<String, TileType.Reader>();
+        HashMap<String, StructList.Reader<DeviceResources.Device.PIP.Reader>> ttPIPMap = new HashMap<>();
         for(int i=0; i < dReader.getTileTypeList().size(); i++) {
             TileType.Reader ttReader = dReader.getTileTypeList().get(i);
-            tileTypeMap.put(allStrings.get(ttReader.getName()), ttReader);
+            String name = allStrings.get(ttReader.getName());
+            tileTypeMap.put(name, ttReader);
+            ttPIPMap.put(name, ttReader.getPips());
         }
+        
+        
         
         expect(device.getName(), dReader.getName().toString());
 
         Reader<DeviceResources.Device.Tile.Reader> tilesReader = dReader.getTileList();
         expect(device.getAllTiles().size(), tilesReader.size());
 
+        Reader<SiteType.Reader> stReaders = dReader.getSiteTypeList();
+        
         int tileCount = tilesReader.size();
         for(int i=0; i < tileCount; i++) {
             DeviceResources.Device.Tile.Reader tileReader = tilesReader.get(i);
@@ -408,16 +434,17 @@ public class DeviceResourcesExample {
                 expect(tile.getSites()[j].getName(), allStrings.get(siteReader.getName()));
                 int siteTypeIdx = siteReader.getType();
                 expect(tile.getSites()[j].getSiteTypeEnum().name(),
-                        allStrings.get(dReader.getSiteTypeList().get(siteTypeIdx).getName()));
+                        allStrings.get(stReaders.get(siteTypeIdx).getName()));
                 verifySiteType(device, dReader, tile.getSites()[j], siteTypeIdx);
             }
             
             // Verify Tile Types
-            TileType.Reader tileType = tileTypeMap.get(allStrings.get(tileReader.getType()));
+            String tileTypeName = allStrings.get(tileReader.getType());
+            TileType.Reader tileType = tileTypeMap.get(tileTypeName);
             expect(tile.getTileTypeEnum().name(), allStrings.get(tileType.getName()));
             expect(tile.getWireCount(), tileType.getWires().size());
             PrimitiveList.Int.Reader wiresReader = tileType.getWires();
-            for(int j=0; j < tile.getWireCount(); j++) {
+            for(int j=0; j < tile.getWireCount(); j++) {                
                 expect(tile.getWireName(j), allStrings.get(wiresReader.get(j)));
             }
             PrimitiveList.Int.Reader siteTypesReader = tileType.getSiteTypes();
@@ -427,7 +454,7 @@ public class DeviceResourcesExample {
                         allStrings.get(siteTypesReader.get(j)));
             }
             ArrayList<PIP> pips = tile.getPIPs();
-            Reader<DeviceResources.Device.PIP.Reader> pipsReader = tileType.getPips();
+            Reader<DeviceResources.Device.PIP.Reader> pipsReader = ttPIPMap.get(tileTypeName);
             expect(pips.size(), pipsReader.size());
 
             for(int j=0; j < pips.size(); j++) {
@@ -458,7 +485,7 @@ public class DeviceResourcesExample {
         return true;
     }
     
-    private static HashSet<SiteTypeEnum> verifiedSiteTypes = new HashSet<SiteTypeEnum>(); 
+    private static HashSet<SiteTypeEnum> verifiedSiteTypes; 
     
     private static boolean verifySiteType(Device device, DeviceResources.Device.Reader dReader,
             Site site, int siteTypeIdx) {
@@ -480,7 +507,8 @@ public class DeviceResourcesExample {
             if( (isInput != (dir == Direction.INPUT)) || (isOutput != (dir == Direction.OUTPUT)) ){
                 throw new RuntimeException("ERROR: Mismatch on site pin direction");
             }
-            expect(site.getSiteWireIndex(pinName), spReader.getSitewire());
+            Integer siteWireIndex = site.getSiteWireIndex(pinName);
+            expect(siteWireIndex == null ? -1 : siteWireIndex, spReader.getSitewire());
         }
         expect(highestIndexInputPin, stReader.getLastInput());
         
@@ -556,7 +584,7 @@ public class DeviceResourcesExample {
             return;
         }
 
-        CodePerfTracker t = new CodePerfTracker("Device Resources Dump");
+        CodePerfTracker t = new CodePerfTracker("Device Resources Dump: " + args[0]);
         t.useGCToTrackMemory(true);
 
         // Create device resource file if it doesn't exist

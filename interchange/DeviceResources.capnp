@@ -93,6 +93,7 @@ struct Device {
     name     @0 : StringIdx;
     dir      @1 : Dir.Netlist.Direction;
     sitewire @2 : StringIdx; 
+    belpin   @3 : BELPinIdx;
   }
   
   

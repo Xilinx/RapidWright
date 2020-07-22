@@ -1,5 +1,5 @@
 CAPNPC = capnpc
-SRCS = LogicalNetlist.capnp DeviceResources.capnp
+SRCS = LogicalNetlist.capnp DeviceResources.capnp PhysicalNetlist.capnp
 DST = ../src/com/xilinx/rapidwright/interchange
 JAVA_CP_RUNTIME=../jars/runtime-0.1.4.jar
 JAVA_SCHEMA_DIR=schema/capnp

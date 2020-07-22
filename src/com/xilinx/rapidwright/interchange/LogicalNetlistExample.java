@@ -170,11 +170,13 @@ public class LogicalNetlistExample {
         return lib;
     }
     
-    public static EDIFCell readEDIFCell(int cellIdx, EDIFNetlist n, Netlist.Reader netlist) {
+    public static EDIFCell readEDIFCell(int cellIdx, EDIFNetlist n, Netlist.Reader netlist,
+                                        StructList.Reader<Netlist.Cell.Reader> cellListReader,
+                                        StructList.Reader<Netlist.CellInstance.Reader> instListReader) {
         EDIFCell edifCell = allCells.get(cellIdx);
         if(edifCell != null) return edifCell;
         
-        Cell.Reader cellReader = netlist.getCellList().get(cellIdx);
+        Cell.Reader cellReader = cellListReader.get(cellIdx);
         
         edifCell = new EDIFCell(getEDIFLibrary(cellReader, n),
                                         allStrings.get(cellReader.getName()));
@@ -190,19 +192,21 @@ public class LogicalNetlistExample {
         }
         
         // Instances
-        int instCount = cellReader.getInsts().size();
+        PrimitiveList.Int.Reader cellInstsReader = cellReader.getInsts();
+        int instCount = cellInstsReader.size(); 
         for(int j=0; j < instCount; j++) {
-            readEDIFCellInst(cellReader.getInsts().get(j), n, netlist, edifCell);
+            readEDIFCellInst(cellInstsReader.get(j), n, netlist, edifCell, cellListReader, instListReader);
         }
         
         // Nets
-        int netCount = cellReader.getNets().size();
+        StructList.Reader<Net.Reader> netListReader = cellReader.getNets();
+        int netCount = netListReader.size();
         for(int j=0; j < netCount; j++) {
-            Net.Reader netReader = cellReader.getNets().get(j);
+            Net.Reader netReader = netListReader.get(j);
             EDIFNet net = new EDIFNet(allStrings.get(netReader.getName()), edifCell);
             extractPropertyMap(netReader.getPropMap(), net);
-            int portInstCount = netReader.getPortInsts().size();
             StructList.Reader<PortInstance.Reader> portInsts = netReader.getPortInsts();
+            int portInstCount = portInsts.size();
             for(int k=0; k < portInstCount; k++) {
                 PortInstance.Reader portInstReader = portInsts.get(k);
                 EDIFCellInst inst = null;
@@ -249,18 +253,20 @@ public class LogicalNetlistExample {
     }
     
     public static EDIFCellInst readEDIFCellInst(int instIdx, EDIFNetlist n, Netlist.Reader netlist,
-                                                EDIFCell parent) {
+                                                EDIFCell parent, 
+                                                StructList.Reader<Netlist.Cell.Reader> cellListReader,
+                                                StructList.Reader<Netlist.CellInstance.Reader> instListReader) {
         EDIFCellInst edifCellInst = allInsts.get(instIdx);
         if(edifCellInst != null) {
             parent.addCellInst(edifCellInst);
             return edifCellInst;
         }
         
-        CellInstance.Reader instReader = netlist.getInstList().get(instIdx);
+        CellInstance.Reader instReader = instListReader.get(instIdx);
         int instCellIdx = instReader.getCell();
         EDIFCell cell = allCells.get(instCellIdx);
         if( cell == null ) {
-            cell = readEDIFCell(instCellIdx, n, netlist);
+            cell = readEDIFCell(instCellIdx, n, netlist, cellListReader, instListReader);
         }
         
         String instName = allStrings.get(instReader.getName());
@@ -293,15 +299,18 @@ public class LogicalNetlistExample {
         allCells.clear();
         allInsts.clear();
         
-        int strCount = netlist.getStrList().size();
+        TextList.Reader strListReader = netlist.getStrList();
+        int strCount = strListReader.size();
         for(int i=0; i < strCount; i++) {
-            String str = netlist.getStrList().get(i).toString();
+            String str = strListReader.get(i).toString();
             allStrings.add(str);
         }
         
         int cellCount = netlist.getCellList().size();
+        StructList.Reader<Netlist.Cell.Reader> cellListReader = netlist.getCellList();
+        StructList.Reader<Netlist.CellInstance.Reader> instListReader = netlist.getInstList();
         for(int i=0; i < cellCount; i++) {
-            readEDIFCell(i, n, netlist);
+            readEDIFCell(i, n, netlist, cellListReader, instListReader);
         }
         EDIFDesign design = new EDIFDesign(allCells.get(netlist.getTopInst().getCell()).getName());
         design.setTopCell(allCells.get(netlist.getTopInst().getCell()));
