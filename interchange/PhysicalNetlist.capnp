@@ -19,6 +19,7 @@ struct PhysNetlist {
     cellPin @0 : StringIdx;
     bel     @1 : StringIdx;
     belPin  @2 : StringIdx;
+    isFixed @3 : Bool;
   }
 
   struct CellPlacement {
