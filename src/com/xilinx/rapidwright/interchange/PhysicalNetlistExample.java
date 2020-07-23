@@ -9,8 +9,8 @@ import com.xilinx.rapidwright.tests.CodePerfTracker;
 public class PhysicalNetlistExample {
 
     public static void main(String[] args) throws IOException {
-        if(args.length != 1) {
-            System.out.println("USAGE: <input>.dcp");
+        if(args.length != 2) {
+            System.out.println("USAGE: <input>.dcp <output>.dcp");
             System.out.println("   Example round trip test for a logical & physical netlist to start from a DCP,"
                     + " get converted to a\n   Cap'n Proto serialized file and then read back into "
                     + "a DCP file.  Creates two new files:\n\t1. <input>.netlist "
@@ -43,7 +43,7 @@ public class PhysicalNetlistExample {
         
         t.stop().start("Write DCP");
         // Write RapidWright netlist back to edif
-        roundtrip.writeCheckpoint(args[0].replace(".dcp", ".roundtrip.dcp"), CodePerfTracker.SILENT);
+        roundtrip.writeCheckpoint(args[1], CodePerfTracker.SILENT);
         
         t.stop().printSummary();
     }

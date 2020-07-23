@@ -131,7 +131,8 @@ public class PhysNetlistReader {
             SiteInst siteInst = design.getSiteInstFromSite(site);
             BEL bel = site.getBEL(strings.get(placement.getBel()));
             Cell cell = new Cell(cellName, siteInst, bel, cellInst);
-            
+            cell.setBELFixed(placement.getIsBelFixed());
+            cell.setSiteFixed(placement.getIsSiteFixed());
     
             PrimitiveList.Int.Reader otherBELs = placement.getOtherBels();
             int otherBELCount = otherBELs.size();
@@ -153,6 +154,9 @@ public class PhysNetlistReader {
                 String belPinName = strings.get(pinMapping.getBelPin());
                 String cellPinName = strings.get(pinMapping.getCellPin());
                 c.addPinMapping(belPinName, cellPinName);
+                if(pinMapping.getIsFixed()) {
+                	c.fixPin(belPinName);
+                }
             }
         }        
     }
@@ -203,7 +207,7 @@ public class PhysNetlistReader {
                         PhysSitePin.Reader spReader = segment.getSitePin();
                         SiteInst siteInst = getSiteInst(spReader.getSite(), design, strings);
                         String pinName = strings.get(spReader.getPin());
-                        net.addPin(new SitePinInst(pinName, siteInst), true);   
+                        net.addPin(new SitePinInst(pinName, siteInst), false);   
                         break;
                     }
                     case _NOT_IN_SCHEMA: {
