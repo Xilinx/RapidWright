@@ -29,6 +29,8 @@ struct PhysNetlist {
     bel           @3 : StringIdx;
     pinMap        @4 : List(PinMapping);
     otherBels     @5 : List(StringIdx);
+    isBelFixed    @6 : Bool;
+    isSiteFixed   @7 : Bool;
   }
   
   struct PhysCell {
