@@ -32,6 +32,7 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -1307,5 +1308,41 @@ public class DesignTools {
 			}
 		}
 		return false;
+	}
+	
+	
+	/**
+	 * Creates any and all missing SitePinInsts for this net.  This is common as a placed
+	 * DCP will not have SitePinInsts annotated and this information is generally necessary
+	 * for routing to take place.  
+	 * @param design The current design of this net.
+	 * @return The list of pins that were created or an empty list if none were created.
+	 */
+	public static List<SitePinInst> createMissingSitePinInsts(Design design, Net net) {
+		EDIFNetlist n = design.getNetlist();
+		List<EDIFHierPortInst> physPins = n.getPhysicalPins(net.getName());
+		if(physPins == null) return Collections.emptyList();
+		List<SitePinInst> newPins = new ArrayList<>();
+		for(EDIFHierPortInst p :  physPins) {
+			Cell c = design.getCell(p.getFullHierarchicalInstName());
+			if(c == null || c.getBEL() == null) continue;
+			String sitePinName = c.getCorrespondingSitePinName(p.getPortInst().getName());
+			SiteInst si = c.getSiteInst();
+			SitePinInst newPin = si.getSitePinInst(sitePinName);
+			if(newPin != null) continue;
+			newPin = net.createPin(p.isOutput(), sitePinName, c.getSiteInst());
+			newPins.add(newPin);
+		}
+		return newPins;
+	}
+	
+	/**
+	 * Creates all missing SitePinInsts in a design. See also {@link #createMissingSitePinInsts(Design, Net)}
+	 * @param design The current design
+	 */
+	public static void createMissingSitePinInsts(Design design) {
+		for(Net net : design.getNets()) {
+			createMissingSitePinInsts(design,net);
+		}
 	}
 }
