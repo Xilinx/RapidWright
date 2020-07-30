@@ -1331,7 +1331,7 @@ public class DesignTools {
 			SitePinInst newPin = si.getSitePinInst(sitePinName);
 			if(newPin != null) continue;
 			newPin = net.createPin(p.isOutput(), sitePinName, c.getSiteInst());
-			newPins.add(newPin);
+			if(newPin != null) newPins.add(newPin);
 		}
 		return newPins;
 	}
