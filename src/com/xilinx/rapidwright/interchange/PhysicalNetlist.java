@@ -457,7 +457,7 @@ public final class PhysicalNetlist {
 
 
     public static class PhysNet {
-      public static final org.capnproto.StructSize STRUCT_SIZE = new org.capnproto.StructSize((short)1,(short)1);
+      public static final org.capnproto.StructSize STRUCT_SIZE = new org.capnproto.StructSize((short)1,(short)2);
       public static final class Factory extends org.capnproto.StructFactory<Builder, Reader> {
         public Factory() {
         }
@@ -491,17 +491,29 @@ public final class PhysicalNetlist {
           _setIntField(0, value);
         }
 
-        public final boolean hasRouting() {
+        public final boolean hasSources() {
           return !_pointerFieldIsNull(0);
         }
-        public final org.capnproto.StructList.Builder<com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteSrc.Builder> getRouting() {
-          return _getPointerField(com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteSrc.listFactory, 0, null, 0);
+        public final org.capnproto.StructList.Builder<com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranch.Builder> getSources() {
+          return _getPointerField(com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranch.listFactory, 0, null, 0);
         }
-        public final void setRouting(org.capnproto.StructList.Reader<com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteSrc.Reader> value) {
-          _setPointerField(com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteSrc.listFactory, 0, value);
+        public final void setSources(org.capnproto.StructList.Reader<com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranch.Reader> value) {
+          _setPointerField(com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranch.listFactory, 0, value);
         }
-        public final org.capnproto.StructList.Builder<com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteSrc.Builder> initRouting(int size) {
-          return _initPointerField(com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteSrc.listFactory, 0, size);
+        public final org.capnproto.StructList.Builder<com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranch.Builder> initSources(int size) {
+          return _initPointerField(com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranch.listFactory, 0, size);
+        }
+        public final boolean hasStubs() {
+          return !_pointerFieldIsNull(1);
+        }
+        public final org.capnproto.StructList.Builder<com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranch.Builder> getStubs() {
+          return _getPointerField(com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranch.listFactory, 1, null, 0);
+        }
+        public final void setStubs(org.capnproto.StructList.Reader<com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranch.Reader> value) {
+          _setPointerField(com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranch.listFactory, 1, value);
+        }
+        public final org.capnproto.StructList.Builder<com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranch.Builder> initStubs(int size) {
+          return _initPointerField(com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranch.listFactory, 1, size);
         }
       }
 
@@ -514,11 +526,18 @@ public final class PhysicalNetlist {
           return _getIntField(0);
         }
 
-        public final boolean hasRouting() {
+        public final boolean hasSources() {
           return !_pointerFieldIsNull(0);
         }
-        public final org.capnproto.StructList.Reader<com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteSrc.Reader> getRouting() {
-          return _getPointerField(com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteSrc.listFactory, 0, null, 0);
+        public final org.capnproto.StructList.Reader<com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranch.Reader> getSources() {
+          return _getPointerField(com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranch.listFactory, 0, null, 0);
+        }
+
+        public final boolean hasStubs() {
+          return !_pointerFieldIsNull(1);
+        }
+        public final org.capnproto.StructList.Reader<com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranch.Reader> getStubs() {
+          return _getPointerField(com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranch.listFactory, 1, null, 0);
         }
 
       }
@@ -526,8 +545,8 @@ public final class PhysicalNetlist {
     }
 
 
-    public static class RouteSrc {
-      public static final org.capnproto.StructSize STRUCT_SIZE = new org.capnproto.StructSize((short)1,(short)1);
+    public static class RouteBranch {
+      public static final org.capnproto.StructSize STRUCT_SIZE = new org.capnproto.StructSize((short)1,(short)2);
       public static final class Factory extends org.capnproto.StructFactory<Builder, Reader> {
         public Factory() {
         }
@@ -538,7 +557,7 @@ public final class PhysicalNetlist {
           return new Builder(segment, data, pointers, dataSize, pointerCount);
         }
         public final org.capnproto.StructSize structSize() {
-          return PhysNetlist.RouteSrc.STRUCT_SIZE;
+          return PhysNetlist.RouteBranch.STRUCT_SIZE;
         }
         public final Reader asReader(Builder builder) {
           return builder.asReader();
@@ -555,14 +574,26 @@ public final class PhysicalNetlist {
           return new Reader(segment, data, pointers, dataSize, pointerCount, 0x7fffffff);
         }
         public final RouteSegment.Builder getRouteSegment() {
-          return new PhysNetlist.RouteSrc.RouteSegment.Builder(segment, data, pointers, dataSize, pointerCount);
+          return new PhysNetlist.RouteBranch.RouteSegment.Builder(segment, data, pointers, dataSize, pointerCount);
         }
         public final RouteSegment.Builder initRouteSegment() {
           _setShortField(0,(short)0);
           _clearPointerField(0);
-  return new PhysNetlist.RouteSrc.RouteSegment.Builder(segment, data, pointers, dataSize, pointerCount);
+  return new PhysNetlist.RouteBranch.RouteSegment.Builder(segment, data, pointers, dataSize, pointerCount);
         }
 
+        public final boolean hasBranches() {
+          return !_pointerFieldIsNull(1);
+        }
+        public final org.capnproto.StructList.Builder<com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranch.Builder> getBranches() {
+          return _getPointerField(com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranch.listFactory, 1, null, 0);
+        }
+        public final void setBranches(org.capnproto.StructList.Reader<com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranch.Reader> value) {
+          _setPointerField(com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranch.listFactory, 1, value);
+        }
+        public final org.capnproto.StructList.Builder<com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranch.Builder> initBranches(int size) {
+          return _initPointerField(com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranch.listFactory, 1, size);
+        }
       }
 
       public static final class Reader extends org.capnproto.StructReader {
@@ -571,13 +602,20 @@ public final class PhysicalNetlist {
         }
 
         public RouteSegment.Reader getRouteSegment() {
-          return new PhysNetlist.RouteSrc.RouteSegment.Reader(segment, data, pointers, dataSize, pointerCount, nestingLimit);
+          return new PhysNetlist.RouteBranch.RouteSegment.Reader(segment, data, pointers, dataSize, pointerCount, nestingLimit);
+        }
+
+        public final boolean hasBranches() {
+          return !_pointerFieldIsNull(1);
+        }
+        public final org.capnproto.StructList.Reader<com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranch.Reader> getBranches() {
+          return _getPointerField(com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranch.listFactory, 1, null, 0);
         }
 
       }
 
       public static class RouteSegment {
-        public static final org.capnproto.StructSize STRUCT_SIZE = new org.capnproto.StructSize((short)1,(short)1);
+        public static final org.capnproto.StructSize STRUCT_SIZE = new org.capnproto.StructSize((short)1,(short)2);
         public static final class Factory extends org.capnproto.StructFactory<Builder, Reader> {
           public Factory() {
           }
@@ -588,7 +626,7 @@ public final class PhysicalNetlist {
             return new Builder(segment, data, pointers, dataSize, pointerCount);
           }
           public final org.capnproto.StructSize structSize() {
-            return PhysNetlist.RouteSrc.RouteSegment.STRUCT_SIZE;
+            return PhysNetlist.RouteBranch.RouteSegment.STRUCT_SIZE;
           }
           public final Reader asReader(Builder builder) {
             return builder.asReader();
@@ -614,67 +652,67 @@ public final class PhysicalNetlist {
             return new Reader(segment, data, pointers, dataSize, pointerCount, 0x7fffffff);
           }
           public final boolean isBelPin() {
-            return which() == PhysNetlist.RouteSrc.RouteSegment.Which.BEL_PIN;
+            return which() == PhysNetlist.RouteBranch.RouteSegment.Which.BEL_PIN;
           }
           public final com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysBelPin.Builder getBelPin() {
-            assert which() == PhysNetlist.RouteSrc.RouteSegment.Which.BEL_PIN:
+            assert which() == PhysNetlist.RouteBranch.RouteSegment.Which.BEL_PIN:
                         "Must check which() before get()ing a union member.";
             return _getPointerField(com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysBelPin.factory, 0, null, 0);
           }
           public final void setBelPin(com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysBelPin.Reader value) {
-            _setShortField(0, (short)PhysNetlist.RouteSrc.RouteSegment.Which.BEL_PIN.ordinal());
+            _setShortField(0, (short)PhysNetlist.RouteBranch.RouteSegment.Which.BEL_PIN.ordinal());
             _setPointerField(com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysBelPin.factory,0, value);
           }
           public final com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysBelPin.Builder initBelPin() {
-            _setShortField(0, (short)PhysNetlist.RouteSrc.RouteSegment.Which.BEL_PIN.ordinal());
+            _setShortField(0, (short)PhysNetlist.RouteBranch.RouteSegment.Which.BEL_PIN.ordinal());
             return _initPointerField(com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysBelPin.factory,0, 0);
           }
           public final boolean isSitePin() {
-            return which() == PhysNetlist.RouteSrc.RouteSegment.Which.SITE_PIN;
+            return which() == PhysNetlist.RouteBranch.RouteSegment.Which.SITE_PIN;
           }
           public final com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysSitePin.Builder getSitePin() {
-            assert which() == PhysNetlist.RouteSrc.RouteSegment.Which.SITE_PIN:
+            assert which() == PhysNetlist.RouteBranch.RouteSegment.Which.SITE_PIN:
                         "Must check which() before get()ing a union member.";
             return _getPointerField(com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysSitePin.factory, 0, null, 0);
           }
           public final void setSitePin(com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysSitePin.Reader value) {
-            _setShortField(0, (short)PhysNetlist.RouteSrc.RouteSegment.Which.SITE_PIN.ordinal());
+            _setShortField(0, (short)PhysNetlist.RouteBranch.RouteSegment.Which.SITE_PIN.ordinal());
             _setPointerField(com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysSitePin.factory,0, value);
           }
           public final com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysSitePin.Builder initSitePin() {
-            _setShortField(0, (short)PhysNetlist.RouteSrc.RouteSegment.Which.SITE_PIN.ordinal());
+            _setShortField(0, (short)PhysNetlist.RouteBranch.RouteSegment.Which.SITE_PIN.ordinal());
             return _initPointerField(com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysSitePin.factory,0, 0);
           }
           public final boolean isPip() {
-            return which() == PhysNetlist.RouteSrc.RouteSegment.Which.PIP;
+            return which() == PhysNetlist.RouteBranch.RouteSegment.Which.PIP;
           }
           public final com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysPIP.Builder getPip() {
-            assert which() == PhysNetlist.RouteSrc.RouteSegment.Which.PIP:
+            assert which() == PhysNetlist.RouteBranch.RouteSegment.Which.PIP:
                         "Must check which() before get()ing a union member.";
             return _getPointerField(com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysPIP.factory, 0, null, 0);
           }
           public final void setPip(com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysPIP.Reader value) {
-            _setShortField(0, (short)PhysNetlist.RouteSrc.RouteSegment.Which.PIP.ordinal());
+            _setShortField(0, (short)PhysNetlist.RouteBranch.RouteSegment.Which.PIP.ordinal());
             _setPointerField(com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysPIP.factory,0, value);
           }
           public final com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysPIP.Builder initPip() {
-            _setShortField(0, (short)PhysNetlist.RouteSrc.RouteSegment.Which.PIP.ordinal());
+            _setShortField(0, (short)PhysNetlist.RouteBranch.RouteSegment.Which.PIP.ordinal());
             return _initPointerField(com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysPIP.factory,0, 0);
           }
           public final boolean isSitePIP() {
-            return which() == PhysNetlist.RouteSrc.RouteSegment.Which.SITE_P_I_P;
+            return which() == PhysNetlist.RouteBranch.RouteSegment.Which.SITE_P_I_P;
           }
           public final com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysSitePIP.Builder getSitePIP() {
-            assert which() == PhysNetlist.RouteSrc.RouteSegment.Which.SITE_P_I_P:
+            assert which() == PhysNetlist.RouteBranch.RouteSegment.Which.SITE_P_I_P:
                         "Must check which() before get()ing a union member.";
             return _getPointerField(com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysSitePIP.factory, 0, null, 0);
           }
           public final void setSitePIP(com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysSitePIP.Reader value) {
-            _setShortField(0, (short)PhysNetlist.RouteSrc.RouteSegment.Which.SITE_P_I_P.ordinal());
+            _setShortField(0, (short)PhysNetlist.RouteBranch.RouteSegment.Which.SITE_P_I_P.ordinal());
             _setPointerField(com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysSitePIP.factory,0, value);
           }
           public final com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysSitePIP.Builder initSitePIP() {
-            _setShortField(0, (short)PhysNetlist.RouteSrc.RouteSegment.Which.SITE_P_I_P.ordinal());
+            _setShortField(0, (short)PhysNetlist.RouteBranch.RouteSegment.Which.SITE_P_I_P.ordinal());
             return _initPointerField(com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysSitePIP.factory,0, 0);
           }
         }
@@ -694,49 +732,49 @@ public final class PhysicalNetlist {
             }
           }
           public final boolean isBelPin() {
-            return which() == PhysNetlist.RouteSrc.RouteSegment.Which.BEL_PIN;
+            return which() == PhysNetlist.RouteBranch.RouteSegment.Which.BEL_PIN;
           }
           public boolean hasBelPin() {
             return !_pointerFieldIsNull(0);
           }
           public com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysBelPin.Reader getBelPin() {
-            assert which() == PhysNetlist.RouteSrc.RouteSegment.Which.BEL_PIN:
+            assert which() == PhysNetlist.RouteBranch.RouteSegment.Which.BEL_PIN:
                         "Must check which() before get()ing a union member.";
             return _getPointerField(com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysBelPin.factory,0,null, 0);
           }
 
           public final boolean isSitePin() {
-            return which() == PhysNetlist.RouteSrc.RouteSegment.Which.SITE_PIN;
+            return which() == PhysNetlist.RouteBranch.RouteSegment.Which.SITE_PIN;
           }
           public boolean hasSitePin() {
             return !_pointerFieldIsNull(0);
           }
           public com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysSitePin.Reader getSitePin() {
-            assert which() == PhysNetlist.RouteSrc.RouteSegment.Which.SITE_PIN:
+            assert which() == PhysNetlist.RouteBranch.RouteSegment.Which.SITE_PIN:
                         "Must check which() before get()ing a union member.";
             return _getPointerField(com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysSitePin.factory,0,null, 0);
           }
 
           public final boolean isPip() {
-            return which() == PhysNetlist.RouteSrc.RouteSegment.Which.PIP;
+            return which() == PhysNetlist.RouteBranch.RouteSegment.Which.PIP;
           }
           public boolean hasPip() {
             return !_pointerFieldIsNull(0);
           }
           public com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysPIP.Reader getPip() {
-            assert which() == PhysNetlist.RouteSrc.RouteSegment.Which.PIP:
+            assert which() == PhysNetlist.RouteBranch.RouteSegment.Which.PIP:
                         "Must check which() before get()ing a union member.";
             return _getPointerField(com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysPIP.factory,0,null, 0);
           }
 
           public final boolean isSitePIP() {
-            return which() == PhysNetlist.RouteSrc.RouteSegment.Which.SITE_P_I_P;
+            return which() == PhysNetlist.RouteBranch.RouteSegment.Which.SITE_P_I_P;
           }
           public boolean hasSitePIP() {
             return !_pointerFieldIsNull(0);
           }
           public com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysSitePIP.Reader getSitePIP() {
-            assert which() == PhysNetlist.RouteSrc.RouteSegment.Which.SITE_P_I_P:
+            assert which() == PhysNetlist.RouteBranch.RouteSegment.Which.SITE_P_I_P:
                         "Must check which() before get()ing a union member.";
             return _getPointerField(com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysSitePIP.factory,0,null, 0);
           }
@@ -1289,8 +1327,8 @@ public static final org.capnproto.SegmentReader b_8ff6d7ce6725fc21 =
    "\u0059\u0000\u0000\u0000\u004a\u0000\u0000\u0000" +
    "\u0000\u001d\u002f\u0036\u0009\u0074\u00de\u00d2" +
    "\u0059\u0000\u0000\u0000\u0042\u0000\u0000\u0000" +
-   "\u006d\u00bd\u002d\u0064\u0029\u0041\u0029\u0084" +
-   "\u0055\u0000\u0000\u0000\u004a\u0000\u0000\u0000" +
+   "\u004f\u00b9\u00b6\u00d8\u00db\u0085\u00d9\u00e8" +
+   "\u0055\u0000\u0000\u0000\u0062\u0000\u0000\u0000" +
    "\u008a\u0012\u00cf\u00f7\u0074\u0079\u00c2\u00ea" +
    "\u0055\u0000\u0000\u0000\u0042\u0000\u0000\u0000" +
    "\u0093\u00a8\u0070\u00ae\u00d2\u00aa\u00d6\u008c" +
@@ -1312,8 +1350,8 @@ public static final org.capnproto.SegmentReader b_8ff6d7ce6725fc21 =
    "\u0050\u0068\u0079\u0073\u0043\u0065\u006c\u006c" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0050\u0068\u0079\u0073\u004e\u0065\u0074\u0000" +
-   "\u0052\u006f\u0075\u0074\u0065\u0053\u0072\u0063" +
-   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0052\u006f\u0075\u0074\u0065\u0042\u0072\u0061" +
+   "\u006e\u0063\u0068\u0000\u0000\u0000\u0000\u0000" +
    "\u0050\u0068\u0079\u0073\u0042\u0065\u006c\u0000" +
    "\u0050\u0068\u0079\u0073\u0042\u0065\u006c\u0050" +
    "\u0069\u006e\u0000\u0000\u0000\u0000\u0000\u0000" +
@@ -1741,12 +1779,12 @@ public static final org.capnproto.SegmentReader b_d2de7409362f1d00 =
    "\u0000\u001d\u002f\u0036\u0009\u0074\u00de\u00d2" +
    "\"\u0000\u0000\u0000\u0001\u0000\u0001\u0000" +
    "\u0021\u00fc\u0025\u0067\u00ce\u00d7\u00f6\u008f" +
-   "\u0001\u0000\u0007\u0000\u0000\u0000\u0000\u0000" +
+   "\u0002\u0000\u0007\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0015\u0000\u0000\u0000\u0052\u0001\u0000\u0000" +
    "\u0029\u0000\u0000\u0000\u0007\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u0025\u0000\u0000\u0000\u0077\u0000\u0000\u0000" +
+   "\u0025\u0000\u0000\u0000\u00af\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0050\u0068\u0079\u0073\u0069\u0063\u0061\u006c" +
@@ -1756,21 +1794,28 @@ public static final org.capnproto.SegmentReader b_d2de7409362f1d00 =
    "\u0074\u002e\u0050\u0068\u0079\u0073\u004e\u0065" +
    "\u0074\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0001\u0000\u0001\u0000" +
-   "\u0008\u0000\u0000\u0000\u0003\u0000\u0004\u0000" +
+   "\u000c\u0000\u0000\u0000\u0003\u0000\u0004\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u0029\u0000\u0000\u0000\u002a\u0000\u0000\u0000" +
+   "\u0045\u0000\u0000\u0000\u002a\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u0024\u0000\u0000\u0000\u0003\u0000\u0001\u0000" +
-   "\u0030\u0000\u0000\u0000\u0002\u0000\u0001\u0000" +
+   "\u0040\u0000\u0000\u0000\u0003\u0000\u0001\u0000" +
+   "\u004c\u0000\u0000\u0000\u0002\u0000\u0001\u0000" +
    "\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0001\u0000\u0001\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u002d\u0000\u0000\u0000\u0042\u0000\u0000\u0000" +
+   "\u0049\u0000\u0000\u0000\u0042\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u0028\u0000\u0000\u0000\u0003\u0000\u0001\u0000" +
-   "\u0044\u0000\u0000\u0000\u0002\u0000\u0001\u0000" +
+   "\u0044\u0000\u0000\u0000\u0003\u0000\u0001\u0000" +
+   "\u0060\u0000\u0000\u0000\u0002\u0000\u0001\u0000" +
+   "\u0002\u0000\u0000\u0000\u0001\u0000\u0000\u0000" +
+   "\u0000\u0000\u0001\u0000\u0002\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u005d\u0000\u0000\u0000\u0032\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0058\u0000\u0000\u0000\u0003\u0000\u0001\u0000" +
+   "\u0074\u0000\u0000\u0000\u0002\u0000\u0001\u0000" +
    "\u006e\u0061\u006d\u0065\u0000\u0000\u0000\u0000" +
    "\u0008\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
@@ -1779,70 +1824,103 @@ public static final org.capnproto.SegmentReader b_d2de7409362f1d00 =
    "\u0008\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u0072\u006f\u0075\u0074\u0069\u006e\u0067\u0000" +
+   "\u0073\u006f\u0075\u0072\u0063\u0065\u0073\u0000" +
    "\u000e\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0003\u0000\u0001\u0000" +
    "\u0010\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u006d\u00bd\u002d\u0064\u0029\u0041\u0029\u0084" +
+   "\u004f\u00b9\u00b6\u00d8\u00db\u0085\u00d9\u00e8" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u000e\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0073\u0074\u0075\u0062\u0073\u0000\u0000\u0000" +
+   "\u000e\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0003\u0000\u0001\u0000" +
+   "\u0010\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u004f\u00b9\u00b6\u00d8\u00db\u0085\u00d9\u00e8" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u000e\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" + "");
-public static final org.capnproto.SegmentReader b_84294129642dbd6d =
+public static final org.capnproto.SegmentReader b_e8d985dbd8b6b94f =
    org.capnproto.GeneratedClassSupport.decodeRawBytes(
    "\u0000\u0000\u0000\u0000\u0005\u0000\u0006\u0000" +
-   "\u006d\u00bd\u002d\u0064\u0029\u0041\u0029\u0084" +
+   "\u004f\u00b9\u00b6\u00d8\u00db\u0085\u00d9\u00e8" +
    "\"\u0000\u0000\u0000\u0001\u0000\u0001\u0000" +
    "\u0021\u00fc\u0025\u0067\u00ce\u00d7\u00f6\u008f" +
-   "\u0001\u0000\u0007\u0000\u0000\u0000\u0000\u0000" +
+   "\u0002\u0000\u0007\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u0015\u0000\u0000\u0000\u005a\u0001\u0000\u0000" +
+   "\u0015\u0000\u0000\u0000\u0072\u0001\u0000\u0000" +
    "\u0029\u0000\u0000\u0000\u0007\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u0025\u0000\u0000\u0000\u003f\u0000\u0000\u0000" +
+   "\u0025\u0000\u0000\u0000\u0077\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0050\u0068\u0079\u0073\u0069\u0063\u0061\u006c" +
    "\u004e\u0065\u0074\u006c\u0069\u0073\u0074\u002e" +
    "\u0063\u0061\u0070\u006e\u0070\u003a\u0050\u0068" +
    "\u0079\u0073\u004e\u0065\u0074\u006c\u0069\u0073" +
-   "\u0074\u002e\u0052\u006f\u0075\u0074\u0065\u0053" +
-   "\u0072\u0063\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0074\u002e\u0052\u006f\u0075\u0074\u0065\u0042" +
+   "\u0072\u0061\u006e\u0063\u0068\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0001\u0000\u0001\u0000" +
-   "\u0004\u0000\u0000\u0000\u0003\u0000\u0004\u0000" +
+   "\u0008\u0000\u0000\u0000\u0003\u0000\u0004\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u0048\u0000\u0098\u00db\u004e\u0097\u001c\u00d3" +
-   "\r\u0000\u0000\u0000\u006a\u0000\u0000\u0000" +
+   "\u0077\u0090\u0051\u0083\u00c0\u0057\u002d\u00b2" +
+   "\u0029\u0000\u0000\u0000\u006a\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0001\u0000\u0000\u0000\u0001\u0000\u0000\u0000" +
+   "\u0000\u0000\u0001\u0000\u0004\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0015\u0000\u0000\u0000\u004a\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0014\u0000\u0000\u0000\u0003\u0000\u0001\u0000" +
+   "\u0030\u0000\u0000\u0000\u0002\u0000\u0001\u0000" +
    "\u0072\u006f\u0075\u0074\u0065\u0053\u0065\u0067" +
-   "\u006d\u0065\u006e\u0074\u0000\u0000\u0000\u0000" + "");
-public static final org.capnproto.SegmentReader b_d31c974edb980048 =
+   "\u006d\u0065\u006e\u0074\u0000\u0000\u0000\u0000" +
+   "\u0062\u0072\u0061\u006e\u0063\u0068\u0065\u0073" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u000e\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0003\u0000\u0001\u0000" +
+   "\u0010\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u004f\u00b9\u00b6\u00d8\u00db\u0085\u00d9\u00e8" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u000e\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" + "");
+public static final org.capnproto.SegmentReader b_b22d57c083519077 =
    org.capnproto.GeneratedClassSupport.decodeRawBytes(
    "\u0000\u0000\u0000\u0000\u0005\u0000\u0006\u0000" +
-   "\u0048\u0000\u0098\u00db\u004e\u0097\u001c\u00d3" +
-   "\u002b\u0000\u0000\u0000\u0001\u0000\u0001\u0000" +
-   "\u006d\u00bd\u002d\u0064\u0029\u0041\u0029\u0084" +
-   "\u0001\u0000\u0007\u0000\u0001\u0000\u0004\u0000" +
+   "\u0077\u0090\u0051\u0083\u00c0\u0057\u002d\u00b2" +
+   "\u002e\u0000\u0000\u0000\u0001\u0000\u0001\u0000" +
+   "\u004f\u00b9\u00b6\u00d8\u00db\u0085\u00d9\u00e8" +
+   "\u0002\u0000\u0007\u0000\u0001\u0000\u0004\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u0015\u0000\u0000\u0000\u00c2\u0001\u0000\u0000" +
+   "\u0015\u0000\u0000\u0000\u00da\u0001\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u0025\u0000\u0000\u0000\u00e7\u0000\u0000\u0000" +
+   "\u0029\u0000\u0000\u0000\u00e7\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0050\u0068\u0079\u0073\u0069\u0063\u0061\u006c" +
    "\u004e\u0065\u0074\u006c\u0069\u0073\u0074\u002e" +
    "\u0063\u0061\u0070\u006e\u0070\u003a\u0050\u0068" +
    "\u0079\u0073\u004e\u0065\u0074\u006c\u0069\u0073" +
-   "\u0074\u002e\u0052\u006f\u0075\u0074\u0065\u0053" +
-   "\u0072\u0063\u002e\u0072\u006f\u0075\u0074\u0065" +
-   "\u0053\u0065\u0067\u006d\u0065\u006e\u0074\u0000" +
+   "\u0074\u002e\u0052\u006f\u0075\u0074\u0065\u0042" +
+   "\u0072\u0061\u006e\u0063\u0068\u002e\u0072\u006f" +
+   "\u0075\u0074\u0065\u0053\u0065\u0067\u006d\u0065" +
+   "\u006e\u0074\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0010\u0000\u0000\u0000\u0003\u0000\u0004\u0000" +
    "\u0000\u0000\u00ff\u00ff\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000" +

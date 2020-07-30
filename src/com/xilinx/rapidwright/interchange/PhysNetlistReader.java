@@ -37,8 +37,7 @@ import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysSitePI
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysSitePin;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PinMapping;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.Property;
-import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteSrc;
-import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteSrc.RouteSegment;
+import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranch;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.SiteInstance;
 
 public class PhysNetlistReader {
@@ -173,49 +172,73 @@ public class PhysNetlistReader {
             EDIFHierNet edifNet = netlist.getHierNetFromName(netName);
             Net net = new Net(netName, edifNet == null ? null : edifNet.getNet());
             design.addNet(net);
-            StructList.Reader<RouteSrc.Reader> routeSrcs = netReader.getRouting();
+            // Sources
+            StructList.Reader<RouteBranch.Reader> routeSrcs = netReader.getSources();
             int routeSrcsCount = routeSrcs.size();
             for(int j=0; j < routeSrcsCount; j++) {
-                RouteSegment.Reader segment = routeSrcs.get(j).getRouteSegment();
-                switch(segment.which()) {
-                    case PIP:{
-                        PhysPIP.Reader pReader = segment.getPip();
-                        Tile tile = device.getTile(strings.get(pReader.getTile()));
-                        String wire0 = strings.get(pReader.getWire0());
-                        String wire1 = strings.get(pReader.getWire1());
-                        PIP pip = new PIP(tile,wire0, wire1);
-                        pip.setIsPIPFixed(pReader.getIsFixed());
-                        net.addPIP(pip);                        
-                        break;
-                    }
-                    case BEL_PIN:{
-                        PhysBelPin.Reader bpReader = segment.getBelPin();
-                        SiteInst siteInst = getSiteInst(bpReader.getSite(), design, strings);
-                        BELPin belPin = siteInst.getSite().getBELPin(strings.get(bpReader.getBel()), 
-                                                                    strings.get(bpReader.getPin()));
-                        siteInst.routeIntraSiteNet(net, belPin, belPin);                        
-                        break;
-                    }
-                    case SITE_P_I_P:{
-                        PhysSitePIP.Reader spReader = segment.getSitePIP();
-                        SiteInst siteInst = getSiteInst(spReader.getSite(), design, strings);
-                        siteInst.addSitePIP(strings.get(spReader.getBel()), 
-                                            strings.get(spReader.getPin()));
-                        break;                        
-                    }
-                    case SITE_PIN: {
-                        PhysSitePin.Reader spReader = segment.getSitePin();
-                        SiteInst siteInst = getSiteInst(spReader.getSite(), design, strings);
-                        String pinName = strings.get(spReader.getPin());
-                        net.addPin(new SitePinInst(pinName, siteInst), false);   
-                        break;
-                    }
-                    case _NOT_IN_SCHEMA: {
-                        throw new RuntimeException("ERROR: Unknown route segment type");
-                    }
-                }
-            }           
+                RouteBranch.Reader branchReader = routeSrcs.get(j);
+                readRouteBranch(branchReader, net, design, strings);
+            }
+            // Stubs
+            StructList.Reader<RouteBranch.Reader> routeStubs = netReader.getStubs();
+            int routeStubsCount = routeStubs.size();
+            for(int j=0; j < routeStubsCount; j++) {
+                RouteBranch.Reader branchReader = routeStubs.get(j);
+                readRouteBranch(branchReader, net, design, strings);
+            }
+
         }        
+    }
+    
+    private static void readRouteBranch(RouteBranch.Reader branchReader, Net net, Design design, 
+                                        Enumerator<String> strings) {
+        RouteBranch.RouteSegment.Reader segment = branchReader.getRouteSegment();
+        Device device = design.getDevice();
+        switch(segment.which()) {
+            case PIP:{
+                PhysPIP.Reader pReader = segment.getPip();
+                Tile tile = device.getTile(strings.get(pReader.getTile()));
+                String wire0 = strings.get(pReader.getWire0());
+                String wire1 = strings.get(pReader.getWire1());
+                PIP pip = new PIP(tile,wire0, wire1);
+                pip.setIsPIPFixed(pReader.getIsFixed());
+                net.addPIP(pip);                        
+                break;
+            }
+            case BEL_PIN:{
+                PhysBelPin.Reader bpReader = segment.getBelPin();
+                SiteInst siteInst = getSiteInst(bpReader.getSite(), design, strings);
+                BELPin belPin = siteInst.getSite().getBELPin(strings.get(bpReader.getBel()), 
+                                                            strings.get(bpReader.getPin()));
+                siteInst.routeIntraSiteNet(net, belPin, belPin);                        
+                break;
+            }
+            case SITE_P_I_P:{
+                PhysSitePIP.Reader spReader = segment.getSitePIP();
+                SiteInst siteInst = getSiteInst(spReader.getSite(), design, strings);
+                siteInst.addSitePIP(strings.get(spReader.getBel()), 
+                                    strings.get(spReader.getPin()));
+                break;                        
+            }
+            case SITE_PIN: {
+                PhysSitePin.Reader spReader = segment.getSitePin();
+                SiteInst siteInst = getSiteInst(spReader.getSite(), design, strings);
+                String pinName = strings.get(spReader.getPin());
+                net.addPin(new SitePinInst(pinName, siteInst), false);   
+                break;
+            }
+            case _NOT_IN_SCHEMA: {
+                throw new RuntimeException("ERROR: Unknown route segment type");
+            }
+        }        
+        
+        StructList.Reader<RouteBranch.Reader> branches = branchReader.getBranches();
+        int branchesCount = branches.size();
+        for(int j=0; j < branchesCount; j++) {
+            RouteBranch.Reader bReader = branches.get(j);
+            readRouteBranch(bReader, net, design, strings);
+        }
+        
     }
     
     private static void readDesignProperties(PhysNetlist.Reader physNetlist, Design design, 

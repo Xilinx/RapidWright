@@ -12,4 +12,8 @@ public class SiteBELPin {
         this.site = site;
         this.belPin = belPin;
     }        
+    
+    public String toString() {
+        return site.getName() + "/" + belPin.toString();
+    }
 }

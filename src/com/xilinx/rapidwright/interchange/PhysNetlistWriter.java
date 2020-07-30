@@ -5,7 +5,11 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Queue;
 
 import org.capnproto.MessageBuilder;
 import org.capnproto.SerializePacked;
@@ -33,12 +37,13 @@ import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysSitePI
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysSitePin;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PinMapping;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.Property;
-import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteSrc;
+import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranch;
+import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranch.RouteSegment;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.SiteInstance;
-import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteSrc.RouteSegment;
 
 public class PhysNetlistWriter {
         
+    public static final boolean BUILD_ROUTING_GRAPH_ON_EXPORT = false;
     
     private static void writeSiteInsts(PhysNetlist.Builder physNetlist, Design design, 
             Enumerator<String> strings) {
@@ -83,25 +88,25 @@ public class PhysNetlistWriter {
                                         Enumerator<String> strings) {
     	
     	// Extract out site routing first, for partially routed designs...
-    	HashMap<Net, ArrayList<Object>> netSiteRouting = new HashMap<>();
+    	HashMap<Net, ArrayList<RouteBranchNode>> netSiteRouting = new HashMap<>();
     	for(SiteInst siteInst : design.getSiteInsts()) {
     		Site site = siteInst.getSite();
             for(SitePIP sitePIP : siteInst.getUsedSitePIPs()) {
                 String siteWire = sitePIP.getInputPin().getSiteWireName();
                 Net net = siteInst.getNetFromSiteWire(siteWire);
                 SitePIPStatus status = siteInst.getSitePIPStatus(sitePIP);
-                ArrayList<Object> segments = netSiteRouting.get(net);
+                ArrayList<RouteBranchNode> segments = netSiteRouting.get(net);
                 if(segments == null) {
-                	segments = new ArrayList<Object>();
+                	segments = new ArrayList<RouteBranchNode>();
                 	netSiteRouting.put(net, segments);
                 }
-                segments.add(new SiteSitePIP(site, sitePIP, status.isFixed()));
+                segments.add(new RouteBranchNode(site, sitePIP, status.isFixed()));
             }
             
             for(Entry<Net,HashSet<String>> e : siteInst.getSiteCTags().entrySet()) {
-                ArrayList<Object> segments = netSiteRouting.get(e.getKey());
+                ArrayList<RouteBranchNode> segments = netSiteRouting.get(e.getKey());
                 if(segments == null) {
-                	segments = new ArrayList<Object>();
+                	segments = new ArrayList<RouteBranchNode>();
                 	netSiteRouting.put(e.getKey(), segments);
                 }
                 if(e.getValue() != null && e.getValue().size() > 0) {
@@ -110,7 +115,7 @@ public class PhysNetlistWriter {
 	                    for(BELPin belPin : belPins) {
 	                        if(!belPin.isOutput()) 
 	                            continue;
-	                        segments.add(new SiteBELPin(site,belPin));
+	                        segments.add(new RouteBranchNode(site,belPin));
 	                        break;
 	                    }
                     }                	
@@ -133,81 +138,137 @@ public class PhysNetlistWriter {
             PhysNet.Builder physNet = nets.get(i);
             physNet.setName(strings.getIndex(net.getName()));
             // We need to traverse the net inside sites to fully populate routing spec
-            ArrayList<Object> routingSources = new ArrayList<>(net.getPIPs()); 
-            for(SitePinInst spi : net.getPins()) {
-                routingSources.add(spi);
+            ArrayList<RouteBranchNode> routingSources = new ArrayList<>();
+            for(PIP p : net.getPIPs()) {
+                routingSources.add(new RouteBranchNode(p));
             }
-            ArrayList<Object> segments = netSiteRouting.remove(net);
+            for(SitePinInst spi : net.getPins()) {
+                routingSources.add(new RouteBranchNode(spi));
+            }
+            ArrayList<RouteBranchNode> segments = netSiteRouting.remove(net);
             if(segments != null) routingSources.addAll(segments);
-            
+            if(net.getName().equals("n216")) {
+                System.out.println();
+            }
             populateRouting(routingSources, physNet, strings);
             i++;
         }
 
         // Clean up any nets not found in design that were stored in site routing
-        for(Entry<Net,ArrayList<Object>> e : netSiteRouting.entrySet()) {
+        for(Entry<Net,ArrayList<RouteBranchNode>> e : netSiteRouting.entrySet()) {
         	PhysNet.Builder physNet = nets.get(i);
         	physNet.setName(strings.getIndex(e.getKey().getName()));
         	populateRouting(e.getValue(), physNet, strings);
         	i++;
         }
     }
+    
+    private static void populateRouting(ArrayList<RouteBranchNode> routingBranches, 
+                                        PhysNet.Builder physNet, Enumerator<String> strings) {
 
-    private static void populateRouting(ArrayList<Object> routingSources, PhysNet.Builder physNet, 
-    									Enumerator<String> strings) {
-    	if(routingSources == null || routingSources.size() == 0) return;
-        Builder<RouteSrc.Builder> routeSrcs = physNet.initRouting(routingSources.size());
-        for(int j=0; j < routingSources.size(); j++) {
-            Object currSrc = routingSources.get(j);
-            RouteSegment.Builder segment = routeSrcs.get(j).getRouteSegment();
-            switch(RouteClass.valueOf(currSrc.getClass().getSimpleName())) {
-                case PIP:{
-                    PIP pip = (PIP) currSrc;
-                    PhysPIP.Builder physPIP = segment.initPip();
-                    physPIP.setTile(strings.getIndex(pip.getTile().getName()));
-                    physPIP.setWire0(strings.getIndex(pip.getStartWireName()));
-                    physPIP.setWire1(strings.getIndex(pip.getEndWireName()));
-                    physPIP.setIsFixed(pip.isPIPFixed());
-                    if(pip.isBidirectional()) {
-                        // TODO - Check context of net to determine direction
-                        physPIP.setForward(true);
-                    }
-                    break;
-                }
-                case SiteBELPin:{
-                    SiteBELPin sbp = (SiteBELPin) currSrc;
-                    PhysBelPin.Builder physPin = segment.initBelPin();
-                    physPin.setBel(strings.getIndex(sbp.belPin.getBEL().getName()));
-                    physPin.setPin(strings.getIndex(sbp.belPin.getName()));
-                    physPin.setSite(strings.getIndex(sbp.site.getName()));
-                    break;
-                }
-                case SitePinInst:{
-                    SitePinInst spi = (SitePinInst) currSrc;
-                    PhysSitePin.Builder physSitePin = segment.initSitePin();
-                    physSitePin.setSite(strings.getIndex(spi.getSite().getName()));
-                    physSitePin.setPin(strings.getIndex(spi.getName()));
-                    break;
-                }
-                case SiteSitePIP: {
-                    SiteSitePIP sitePIP = (SiteSitePIP) currSrc;
-                    PhysSitePIP.Builder physSitePIP = segment.initSitePIP();
-                    physSitePIP.setSite(strings.getIndex(sitePIP.site.getName()));
-                    physSitePIP.setBel(strings.getIndex(sitePIP.sitePIP.getBELName()));
-                    physSitePIP.setPin(strings.getIndex(sitePIP.sitePIP.getInputPinName()));
-                    physSitePIP.setIsFixed(sitePIP.isFixed);
-                    break;
-                }
-                default:
-                    throw new RuntimeException("Unhandled class in routing representation: " +
-                            currSrc.getClass());
+        List<RouteBranchNode> sources = new ArrayList<>();
+        List<RouteBranchNode> stubs = new ArrayList<>();
+        
+        if(BUILD_ROUTING_GRAPH_ON_EXPORT) {
+            Map<String, RouteBranchNode> map = new HashMap<>();
+            for(RouteBranchNode rb : routingBranches) {
+                map.put(rb.toString(), rb);
             }
             
+            // PASS 1: Connect drivers of each branch, put sources on source list
+            for(RouteBranchNode rb : routingBranches) {
+                if(rb.isSource()) {
+                    sources.add(rb);
+                } else {
+                    for(String driver : rb.getDrivers()) {
+                        RouteBranchNode driverBranch = map.get(driver);
+                        if(driverBranch == null) continue;
+                        driverBranch.addBranch(rb);
+                    }
+                }
+            }
+            
+            // PASS 2: Any nodes not reachable by sources, go onto branches list
+            Queue<RouteBranchNode> queue = new LinkedList<>(sources);
+            while(!queue.isEmpty()) {
+                RouteBranchNode curr = queue.poll();
+                map.remove(curr.toString());
+                queue.addAll(curr.getBranches());
+            }
+            for(RouteBranchNode rb : map.values()) {
+                if(rb.getParent() == null) {
+                    stubs.add(rb);
+                }
+            }
+        } else {
+            stubs = routingBranches;
+        }
+        
+        // Serialize...
+        Builder<RouteBranch.Builder> routeSrcs = physNet.initSources(sources.size());
+        for(int i=0; i < sources.size(); i++) {
+            RouteBranch.Builder srcBuilder = routeSrcs.get(i);
+            RouteBranchNode src = sources.get(i);
+            writeRouteBranch(srcBuilder, src, strings);
+        }
+        Builder<RouteBranch.Builder> routeStubs = physNet.initStubs(stubs.size());
+        for(int i=0; i < stubs.size(); i++) {
+            RouteBranch.Builder stubBuilder = routeStubs.get(i);
+            RouteBranchNode src = stubs.get(i);
+            writeRouteBranch(stubBuilder, src, strings);
         }
     }
-    
-    enum RouteClass {
-        PIP, SiteBELPin, SitePinInst, SiteSitePIP;
+
+    private static void writeRouteBranch(RouteBranch.Builder srcBuilder, RouteBranchNode src, 
+                                            Enumerator<String> strings) {
+        RouteSegment.Builder segment = srcBuilder.getRouteSegment();
+        switch(src.getType()) {
+            case PIP:{
+                PIP pip = src.getPIP();
+                PhysPIP.Builder physPIP = segment.initPip();
+                physPIP.setTile(strings.getIndex(pip.getTile().getName()));
+                physPIP.setWire0(strings.getIndex(pip.getStartWireName()));
+                physPIP.setWire1(strings.getIndex(pip.getEndWireName()));
+                physPIP.setIsFixed(pip.isPIPFixed());
+                if(pip.isBidirectional()) {
+                    // TODO - Check context of net to determine direction
+                    physPIP.setForward(true);
+                }
+                break;
+            }
+            case BEL_PIN:{
+                SiteBELPin sbp = src.getBELPin();
+                PhysBelPin.Builder physPin = segment.initBelPin();
+                physPin.setBel(strings.getIndex(sbp.belPin.getBEL().getName()));
+                physPin.setPin(strings.getIndex(sbp.belPin.getName()));
+                physPin.setSite(strings.getIndex(sbp.site.getName()));
+                break;
+            }
+            case SITE_PIN:{
+                SitePinInst spi = src.getSitePin();
+                PhysSitePin.Builder physSitePin = segment.initSitePin();
+                physSitePin.setSite(strings.getIndex(spi.getSite().getName()));
+                physSitePin.setPin(strings.getIndex(spi.getName()));
+                break;
+            }
+            case SITE_PIP: {
+                SiteSitePIP sitePIP = src.getSitePIP();
+                PhysSitePIP.Builder physSitePIP = segment.initSitePIP();
+                physSitePIP.setSite(strings.getIndex(sitePIP.site.getName()));
+                physSitePIP.setBel(strings.getIndex(sitePIP.sitePIP.getBELName()));
+                physSitePIP.setPin(strings.getIndex(sitePIP.sitePIP.getInputPinName()));
+                physSitePIP.setIsFixed(sitePIP.isFixed);
+                break;
+            }
+            default:
+                throw new RuntimeException("Unhandled class in routing representation: " +
+                        src.getType());
+        }
+        int size = src.getBranches().size();
+        Builder<RouteBranch.Builder> branches = srcBuilder.initBranches(size);
+        for(int i=0; i < size; i++) {
+            writeRouteBranch(branches.get(i), src.getBranch(i), strings);
+        }
     }
     
     private static void writeDesignProperties(PhysNetlist.Builder physNetlist, Design design, 

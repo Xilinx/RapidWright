@@ -39,16 +39,18 @@ struct PhysNetlist {
   
   struct PhysNet {
     name      @0 : StringIdx;
-    routing   @1 : List(RouteSrc);
+    sources   @1 : List(RouteBranch);
+    stubs     @2 : List(RouteBranch);
   }
   
-  struct RouteSrc {
+  struct RouteBranch {
     routeSegment : union {
       belPin  @0 : PhysBelPin;
       sitePin @1 : PhysSitePin;
       pip     @2 : PhysPIP;
       sitePIP @3 : PhysSitePIP;
     }
+    branches @4 : List(RouteBranch);  
   }
   
   struct PhysBel {
