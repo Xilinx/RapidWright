@@ -26,7 +26,7 @@ package com.xilinx.rapidwright.device;
 
 
 /**
- * Generated on: Fri Apr 24 14:31:29 2020
+ * Generated on: Fri Jul 31 14:30:49 2020
  * by: com.xilinx.rapidwright.release.SiteAndTileTypeUpdater
  * 
  * Enumeration of Site type for all valid devices within Vivado.
@@ -196,6 +196,8 @@ public enum SiteTypeEnum {
 	RAMBFIFO18,
 	RAMBFIFO36,
 	RAMBFIFO36E1,
+	RFADC,
+	RFDAC,
 	RIU_OR,
 	SLICEL,
 	SLICEM,

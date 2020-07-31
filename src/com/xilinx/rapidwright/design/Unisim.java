@@ -29,7 +29,7 @@ import java.util.Map;
 import com.xilinx.rapidwright.device.Series;
 
 /**
- * Generated on: Fri Apr 24 19:01:24 2020
+ * Generated on: Fri Jul 31 15:29:11 2020
  * by: com.xilinx.rapidwright.release.UnisimParser
  * 
  * Enumerates supported Unisim primitives that map to Xilinx devices.
@@ -1171,6 +1171,8 @@ public enum Unisim {
 	RAMS32,
 	RAMS64E,
 	RAMS64E1,
+	RFADC,
+	RFDAC,
 	RIU_OR,
 	ROM128X1,
 	ROM16X1,
