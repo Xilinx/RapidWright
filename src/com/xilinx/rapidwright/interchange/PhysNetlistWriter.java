@@ -115,7 +115,7 @@ public class PhysNetlistWriter {
 	                    for(BELPin belPin : belPins) {
 	                        if(!belPin.isOutput()) 
 	                            continue;
-	                        segments.add(new RouteBranchNode(site,belPin));
+                            segments.add(new RouteBranchNode(site,belPin));	                            
 	                        break;
 	                    }
                     }                	
@@ -147,9 +147,6 @@ public class PhysNetlistWriter {
             }
             ArrayList<RouteBranchNode> segments = netSiteRouting.remove(net);
             if(segments != null) routingSources.addAll(segments);
-            if(net.getName().equals("n216")) {
-                System.out.println();
-            }
             populateRouting(routingSources, physNet, strings);
             i++;
         }
@@ -160,6 +157,15 @@ public class PhysNetlistWriter {
         	physNet.setName(strings.getIndex(e.getKey().getName()));
         	populateRouting(e.getValue(), physNet, strings);
         	i++;
+        }
+    }
+    
+    
+    @SuppressWarnings("unused")
+    private static void debugPrintRouteBranchNodes(List<RouteBranchNode> nodes, String prefix) {
+        for(RouteBranchNode n : nodes) {
+            System.out.println(prefix + n.toString());
+            debugPrintRouteBranchNodes(n.getBranches(), prefix + "  ");
         }
     }
     
@@ -188,10 +194,17 @@ public class PhysNetlistWriter {
                 }
             }
             
-            // PASS 2: Any nodes not reachable by sources, go onto branches list
+            //if(strings.get(physNet.getName()).equals("n216")) debugPrintRouteBranchNodes(sources, "");
+            
+            // PASS 2: Any nodes not reachable by sources, go onto stubs list
             Queue<RouteBranchNode> queue = new LinkedList<>(sources);
             while(!queue.isEmpty()) {
                 RouteBranchNode curr = queue.poll();
+                if(curr.hasBeenVisited()) {
+                    System.out.println();
+                    continue;
+                }
+                curr.setVisited(true);
                 map.remove(curr.toString());
                 queue.addAll(curr.getBranches());
             }
@@ -203,6 +216,8 @@ public class PhysNetlistWriter {
         } else {
             stubs = routingBranches;
         }
+
+        //debugPrintRouteBranchNodes(sources, "");
         
         // Serialize...
         Builder<RouteBranch.Builder> routeSrcs = physNet.initSources(sources.size());

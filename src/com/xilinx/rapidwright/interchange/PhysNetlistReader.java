@@ -163,7 +163,6 @@ public class PhysNetlistReader {
     private static void readRouting(PhysNetlist.Reader physNetlist, Design design, 
                                     Enumerator<String> strings) {
         StructList.Reader<PhysNet.Reader> nets = physNetlist.getPhysNets();
-        Device device = design.getDevice();
         EDIFNetlist netlist = design.getNetlist();
         int netCount = nets.size();
         for(int i=0; i < netCount; i++) {

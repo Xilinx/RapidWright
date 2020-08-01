@@ -31,6 +31,8 @@ public class RouteBranchNode {
     
     private RouteBranchNode parent = null;
     
+    private boolean visited = false;
+    
     public RouteBranchNode(SitePinInst sitePin) {
         routeSegment = sitePin;
         type = RouteSegmentType.SITE_PIN;
@@ -152,17 +154,15 @@ public class RouteBranchNode {
                 break;
             }case BEL_PIN:{
                 SiteBELPin belPin = getBELPin();
-                if(belPin.belPin.isOutput() && !isSource()) {
+                if(belPin.belPin.isOutput() && belPin.belPin.getBEL().getBELClass() == BELClass.RBEL
+                                                                                && !isSource()) {
                     String site = belPin.site.getName() + "/";
                     for(SitePIP p : belPin.belPin.getSitePIPs()) {
                         drivers.add(site + p.toString());
                     }
-                }else {
-                    BELPin src = belPin.belPin.getSourcePin();
-                    if(src.isSitePort()) {
-                        String site = belPin.site.getName() + "/";
-                        drivers.add(site + src.getConnectedSitePinName());
-                    }
+                }else if(belPin.belPin.getBEL().getBELClass() == BELClass.PORT) {
+                    String site = belPin.site.getName() + ".";
+                    drivers.add(site + belPin.belPin.getName());
                 }
                 break;
             }
@@ -177,5 +177,13 @@ public class RouteBranchNode {
     
     public RouteBranchNode getBranch(int idx) {
         return branches.get(idx);
+    }
+    
+    public boolean hasBeenVisited() {
+        return visited;
+    }
+    
+    public void setVisited(boolean value) {
+        this.visited = value;
     }
 }
