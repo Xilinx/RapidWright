@@ -35,7 +35,7 @@ import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.util.FileTools;
 
 /**
- * Generated on: Fri Apr 24 19:01:24 2020
+ * Generated on: Fri Jul 31 15:29:11 2020
  * by: com.xilinx.rapidwright.release.PartNamePopulator
  * 
  * Class to hold utility APIs dealing with Parts and device names.
@@ -65,6 +65,13 @@ public class PartNameTools {
 			partMap.put(strings[part[0]], tmpPart);
 			if(!strings[part[8]].equals("")) {
 				partMap.put(strings[part[4]]+"-"+strings[part[8]], tmpPart);
+				if(!partMap.containsKey(strings[part[4]])) {
+					partMap.put(strings[part[4]], tmpPart);
+					partMap.put(strings[part[4]]+strings[part[5]], tmpPart);
+					partMap.put(strings[part[4]]+strings[part[5]]+strings[part[6]], tmpPart);
+					partMap.put(strings[part[4]]+"-"+strings[part[5]], tmpPart);
+					partMap.put(strings[part[4]]+"-"+strings[part[5]]+strings[part[6]], tmpPart);
+				}
 			} else {
 				partMap.put(strings[part[4]], tmpPart);
 				partMap.put(strings[part[4]]+strings[part[5]], tmpPart);
@@ -117,6 +124,7 @@ public class PartNameTools {
 			case QRKINTEXU: return FamilyType.KINTEXU;
 			case QVIRTEX7: return FamilyType.VIRTEX7;
 			case QVIRTEXUPLUS: return FamilyType.VIRTEXUPLUS;
+			case QVIRTEXUPLUSHBM: return FamilyType.VIRTEXUPLUSHBM;
 			case QZYNQ: return FamilyType.ZYNQ;
 			case QZYNQUPLUS: return FamilyType.ZYNQUPLUS;
 			case QZYNQUPLUSRFSOC: return FamilyType.ZYNQUPLUSRFSOC;
@@ -131,6 +139,7 @@ public class PartNameTools {
 			case ZYNQ: return FamilyType.ZYNQ;
 			case ZYNQUPLUS: return FamilyType.ZYNQUPLUS;
 			case ZYNQUPLUSRFSOC: return FamilyType.ZYNQUPLUSRFSOC;
+			case ZYNQUPLUSRFSOCES1: return FamilyType.ZYNQUPLUSRFSOC;
 			default: return null;
 		}
 	}
@@ -160,6 +169,7 @@ public class PartNameTools {
 			case QRKINTEXU: return "Kintex UltraScale";
 			case QVIRTEX7: return "Virtex-7";
 			case QVIRTEXUPLUS: return "Virtex UltraScale+";
+			case QVIRTEXUPLUSHBM: return "Virtex UltraScale+";
 			case QZYNQ: return "Zynq-7000";
 			case QZYNQUPLUS: return "Zynq UltraScale+";
 			case QZYNQUPLUSRFSOC: return "Zynq UltraScale+ RFSOC";
@@ -174,6 +184,7 @@ public class PartNameTools {
 			case ZYNQ: return "Zynq-7000";
 			case ZYNQUPLUS: return "Zynq UltraScale+";
 			case ZYNQUPLUSRFSOC: return "Zynq UltraScale+ RFSOC";
+			case ZYNQUPLUSRFSOCES1: return "Zynq UltraScale+ RFSOC";
 			default: return null;
 		}
 	}
@@ -203,6 +214,7 @@ public class PartNameTools {
 			case QRKINTEXU: return Series.UltraScale;
 			case QVIRTEX7: return Series.Series7;
 			case QVIRTEXUPLUS: return Series.UltraScalePlus;
+			case QVIRTEXUPLUSHBM: return Series.UltraScalePlus;
 			case QZYNQ: return Series.Series7;
 			case QZYNQUPLUS: return Series.UltraScalePlus;
 			case QZYNQUPLUSRFSOC: return Series.UltraScalePlus;
@@ -217,6 +229,7 @@ public class PartNameTools {
 			case ZYNQ: return Series.Series7;
 			case ZYNQUPLUS: return Series.UltraScalePlus;
 			case ZYNQUPLUSRFSOC: return Series.UltraScalePlus;
+			case ZYNQUPLUSRFSOCES1: return Series.UltraScalePlus;
 			default: return null;
 		}
 	}

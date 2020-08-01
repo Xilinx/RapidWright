@@ -1,3 +1,31 @@
+============= RapidWright 2020.1.0-beta released on 2020-07-31 ================
+Notes:
+ * Coresponds to the Vivado 2020.1 release, all device models consistent
+ * Fixed an issue where timing designs would not open in Vivado
+ * Adds utility method (DesignTools.createMissingSitePinInsts()) to
+   create missing SitePinInsts to nets to faciltiate routing.
+ * Changes hashCode() and equals() on PIP class to ignore flags, only
+   includes tile and wire names
+ - API Additions:
+   - com.xilinx.rapidwright.design.Design "public ModuleInst createModuleInst(String name, Module module, boolean includePortRouting)"
+   - com.xilinx.rapidwright.design.Design "public void copyPartitionPins(Design source, ModuleInst dest, Map<EDIFPort,EDIFPort> portMap)"
+   - com.xilinx.rapidwright.design.Design "public void trimPartitionPins(Pair<Tile,Tile> range)"
+   - com.xilinx.rapidwright.design.Net "public void trimPartitionPins(Pair<Tile,Tile> range)"
+   - com.xilinx.rapidwright.device.BELPin "public SitePin getSitePin(Site site)" 
+   - com.xilinx.rapidwright.device.BELPin "public Node getExternalNode(Site site)" 
+   - com.xilinx.rapidwright.device.Node "public List<Node> getAllUphillNodes()"
+   - com.xilinx.rapidwright.device.Node "public List<PIP> getAllUphillPIPs()"
+   - com.xilinx.rapidwright.device.PIP "public boolean isReversed()"
+   - com.xilinx.rapidwright.device.PIP "public void setIsReversed(boolean isReversed)"
+ - API Refactored:
+   - com.xilinx.rapidwright.device.Site "public Node getConnectedNode(int pinIndex)"
+     - getconnectedNode(int pinIndex) --> getConnectedNode(int pinIndex)
+ - Bug Fixes / Pull Requests:
+   - Issue #70 - Fixes NPE when EDIFCellInst is null on Cell.
+   - Issue #35 - Missing SitePinInsts for placed-only designs.
+   - Pull Request #68 - Fixed getLUTSize(), proper processing of LUT size/parsing.
+   - Other bug fixes (see commit log for details).   
+
 ============= RapidWright 2019.2.2-beta released on 2020-06-03 ================
 Notes:
  * Minor feature: 
