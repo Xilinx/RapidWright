@@ -1326,7 +1326,8 @@ public class DesignTools {
 		for(EDIFHierPortInst p :  physPins) {
 			Cell c = design.getCell(p.getFullHierarchicalInstName());
 			if(c == null || c.getBEL() == null) continue;
-			String sitePinName = c.getCorrespondingSitePinName(p.getPortInst().getName());
+			String sitePinName = getRoutedSitePin(c, net, p.getPortInst().getName());
+			if(sitePinName == null) continue;
 			SiteInst si = c.getSiteInst();
 			SitePinInst newPin = si.getSitePinInst(sitePinName);
 			if(newPin != null) continue;
@@ -1334,6 +1335,51 @@ public class DesignTools {
 			if(newPin != null) newPins.add(newPin);
 		}
 		return newPins;
+	}
+
+	/**
+	 * Gets the site pin that is currently routed to the specified cell pin.  If 
+	 * the site instance is not routed, it will return null.
+	 * @param cell The cell with the pin of interest.
+	 * @param net The physical net to which this pin belongs
+	 * @param logicalPinName The logical pin name of the cell to query.
+	 * @return The name of the site pin on the cell's site to which the pin is routed.
+	 */
+	public static String getRoutedSitePin(Cell cell, Net net, String logicalPinName) {
+	    SiteInst inst = cell.getSiteInst();
+	    String belPinName = cell.getPhysicalPinMapping(logicalPinName);
+	    Set<String> siteWires = inst.getSiteWiresFromNet(net);
+	    BELPin curr = cell.getBEL().getPin(belPinName);
+	    
+	    while(curr != null) {
+	        if(!siteWires.contains(curr.getSiteWireName())) return null;
+	        if(curr.isInput()) {
+	            BELPin source = curr.getSourcePin();
+	            if(source.isSitePort()) {
+	                return source.getName();
+	            } else if(source.getBEL().getBELClass() == BELClass.RBEL){
+	                SitePIP sitePIP = inst.getUsedSitePIP(source.getBEL().getName());
+	                if(sitePIP == null) return null;
+	                curr = sitePIP.getInputPin();
+	            } else {
+	                return null;
+	            }
+	        }else { // output
+	            for(BELPin sink : curr.getSiteConns()) {
+	                if(!siteWires.contains(sink.getSiteWireName())) continue;
+	                if(sink.isSitePort()) {
+	                    return sink.getName();
+	                } else if(sink.getBEL().getBELClass() == BELClass.RBEL){
+	                    SitePIP sitePIP = inst.getUsedSitePIP(sink.getBEL().getName());
+	                    if(sitePIP == null) return null;
+	                    curr = sitePIP.getOutputPin();
+	                } else {
+	                    return null;
+	                }
+	            }
+	        }
+	    }
+	    return null;
 	}
 	
 	/**
