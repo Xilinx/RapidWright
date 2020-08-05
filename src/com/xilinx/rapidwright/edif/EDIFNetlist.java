@@ -912,6 +912,10 @@ public class EDIFNetlist extends EDIFName {
 		return parentNetMap;
 	}
 	
+	/**
+	 * Resets the internal parent net map of the netlist.  This is necessary any time modifications 
+	 * are made to the netlist (add/remove/change cells/nets, removing/adding black boxes, etc). 
+	 */
 	public void resetParentNetMap(){
 		parentNetMap = null;
 		physicalNetPinMap = null;
