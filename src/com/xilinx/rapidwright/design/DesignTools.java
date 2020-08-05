@@ -858,6 +858,12 @@ public class DesignTools {
 		postBlackBoxCleanup(hierarchicalCellName, design);
 	}
 
+	/**
+	 * Attempts to rename boundary nets around the previous blackbox to follow naming convention 
+	 * (net is named after source).
+	 * @param hierCellName The hierarchical cell instance that was previously a black box
+	 * @param design The current design.
+	 */
 	public static void postBlackBoxCleanup(String hierCellName, Design design) {		
 		EDIFNetlist netlist = design.getNetlist();
 		EDIFCellInst inst = netlist.getCellInstFromHierName(hierCellName);
