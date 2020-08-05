@@ -24,6 +24,7 @@ import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.BELPin;
+import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePIP;
@@ -40,10 +41,11 @@ import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.Property;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranch;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranch.RouteSegment;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.SiteInstance;
+import com.xilinx.rapidwright.interchange.RouteBranchNode.RouteSegmentType;
 
 public class PhysNetlistWriter {
         
-    public static final boolean BUILD_ROUTING_GRAPH_ON_EXPORT = false;
+    public static final boolean BUILD_ROUTING_GRAPH_ON_EXPORT = true;
     
     private static void writeSiteInsts(PhysNetlist.Builder physNetlist, Design design, 
             Enumerator<String> strings) {
@@ -189,19 +191,27 @@ public class PhysNetlistWriter {
                     for(String driver : rb.getDrivers()) {
                         RouteBranchNode driverBranch = map.get(driver);
                         if(driverBranch == null) continue;
+                        if(driverBranch.getType() == RouteSegmentType.PIP) {
+                            PIP pip = driverBranch.getPIP();
+                            if(pip.isBidirectional() && rb.getType() == RouteSegmentType.PIP) {
+                                PIP curr = rb.getPIP();
+                                Node driverNode = pip.isReversed() ? 
+                                                  pip.getStartNode() : pip.getEndNode();
+                                if(!curr.getStartNode().equals(driverNode)) {
+                                    continue;
+                                }
+                            }
+                        }
                         driverBranch.addBranch(rb);
                     }
                 }
             }
-            
-            //if(strings.get(physNet.getName()).equals("n216")) debugPrintRouteBranchNodes(sources, "");
             
             // PASS 2: Any nodes not reachable by sources, go onto stubs list
             Queue<RouteBranchNode> queue = new LinkedList<>(sources);
             while(!queue.isEmpty()) {
                 RouteBranchNode curr = queue.poll();
                 if(curr.hasBeenVisited()) {
-                    System.out.println();
                     continue;
                 }
                 curr.setVisited(true);
@@ -216,7 +226,7 @@ public class PhysNetlistWriter {
         } else {
             stubs = routingBranches;
         }
-
+        
         //debugPrintRouteBranchNodes(sources, "");
         
         // Serialize...
@@ -246,8 +256,7 @@ public class PhysNetlistWriter {
                 physPIP.setWire1(strings.getIndex(pip.getEndWireName()));
                 physPIP.setIsFixed(pip.isPIPFixed());
                 if(pip.isBidirectional()) {
-                    // TODO - Check context of net to determine direction
-                    physPIP.setForward(true);
+                    physPIP.setForward(!pip.isReversed());
                 }
                 break;
             }

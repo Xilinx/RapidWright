@@ -119,10 +119,13 @@ public class RouteBranchNode {
         
         switch(type) {
             case PIP:{
-                Node node = getPIP().getStartNode();
+                PIP pip = getPIP();
+                Node node = pip.isReversed() ? pip.getEndNode() : pip.getStartNode();
                 for(Wire w : node.getAllWiresInNode()) {
                     for(PIP p : w.getBackwardPIPs()) {
-                        drivers.add(p.toString());
+                        if(!p.equals(getPIP())) {
+                            drivers.add(p.toString());   
+                        }
                     }
                 }
                 SitePin pin = node.getSitePin();
