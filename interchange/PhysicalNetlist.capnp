@@ -35,6 +35,14 @@ struct PhysNetlist {
   
   struct PhysCell {
     cellName    @0 : StringIdx;
+    physType    @1 : PhysCellType;
+  }
+  
+  enum PhysCellType {
+    locked  @0;
+    port    @1;
+    gnd     @2;
+    vcc     @3;
   }
   
   struct PhysNet {
