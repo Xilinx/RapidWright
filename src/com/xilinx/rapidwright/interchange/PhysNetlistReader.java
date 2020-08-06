@@ -5,6 +5,7 @@ import java.io.IOException;
 
 import org.capnproto.MessageReader;
 import org.capnproto.PrimitiveList;
+import org.capnproto.ReaderOptions;
 import org.capnproto.SerializePacked;
 import org.capnproto.StructList;
 import org.capnproto.TextList;
@@ -51,7 +52,10 @@ public class PhysNetlistReader {
         
         
         FileInputStream fis = new java.io.FileInputStream(physNetlistFileName);
-        MessageReader readMsg = SerializePacked.readFromUnbuffered((fis).getChannel());
+        ReaderOptions rdOptions = 
+        		new ReaderOptions(ReaderOptions.DEFAULT_READER_OPTIONS.traversalLimitInWords,
+        		ReaderOptions.DEFAULT_READER_OPTIONS.nestingLimit * 128);
+        MessageReader readMsg = SerializePacked.readFromUnbuffered((fis).getChannel(), rdOptions);
         fis.close();
     
         PhysNetlist.Reader physNetlist = readMsg.getRoot(PhysNetlist.factory);
