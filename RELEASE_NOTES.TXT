@@ -1,3 +1,20 @@
+============= RapidWright 2020.1.1-beta released on 2020-08-07 ================
+Notes:
+ * Minor update with API additions
+ * Adds an alternative source pin to Nets (for dual output scenarios)
+ - API Additions:
+   - com.xilinx.rapidwright.design.Design "public static readCheckpoint(String dcpFileName, String edfFileName, CodePerfTracker t)"
+   - com.xilinx.rapidwright.design.Net "public SitePinInst getAlternateSource()"
+   - com.xilinx.rapidwright.design.Net "public void setAlternateSource(SitePinInst altSource)"
+   - com.xilinx.rapidwright.design.SiteInst "public BELPin[] getSiteWirePins(String siteWireName)"
+   - com.xilinx.rapidwright.design.SiteInst "public BELPin[] getSiteWirePins(int siteWireIdx)"
+   - com.xilinx.rapidwright.design.SiteInst "public String[] getSiteWires()"
+   - com.xilinx.rapidwright.design.SiteInst "public String[] getSitePinNames()"
+   - com.xilinx.rapidwright.design.SiteInst "public int getHighestSitePinInputIndex()"
+   - com.xilinx.rapidwright.design.SiteInst "public boolean isSitePinInput(String pinName)"
+   - com.xilinx.rapidwright.design.SiteInst "public boolean isSitePinOutput(String pinName)"
+   - com.xilinx.rapidwright.device.Node "public IntentCode getIntentCode()"
+
 ============= RapidWright 2020.1.0-beta released on 2020-07-31 ================
 Notes:
  * Coresponds to the Vivado 2020.1 release, all device models consistent
