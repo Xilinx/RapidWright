@@ -178,7 +178,7 @@ public final class PhysicalNetlist {
     }
 
     public static class PinMapping {
-      public static final org.capnproto.StructSize STRUCT_SIZE = new org.capnproto.StructSize((short)3,(short)0);
+      public static final org.capnproto.StructSize STRUCT_SIZE = new org.capnproto.StructSize((short)2,(short)1);
       public static final class Factory extends org.capnproto.StructFactory<Builder, Reader> {
         public Factory() {
         }
@@ -201,6 +201,13 @@ public final class PhysicalNetlist {
       public static final class Builder extends org.capnproto.StructBuilder {
         Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
           super(segment, data, pointers, dataSize, pointerCount);
+        }
+        public Which which() {
+          switch(_getShortField(7)) {
+            case 0 : return Which.MULTI;
+            case 1 : return Which.OTHER_CELL;
+            default: return Which._NOT_IN_SCHEMA;
+          }
         }
         public final Reader asReader() {
           return new Reader(segment, data, pointers, dataSize, pointerCount, 0x7fffffff);
@@ -233,20 +240,34 @@ public final class PhysicalNetlist {
           _setBooleanField(96, value);
         }
 
-        public final int getMultiCell() {
-          return _getIntField(4);
+        public final boolean isMulti() {
+          return which() == PhysNetlist.PinMapping.Which.MULTI;
         }
-        public final void setMultiCell(int value) {
-          _setIntField(4, value);
+        public final org.capnproto.Void getMulti() {
+          assert which() == PhysNetlist.PinMapping.Which.MULTI:
+                      "Must check which() before get()ing a union member.";
+          return org.capnproto.Void.VOID;
         }
-
-        public final int getMultiType() {
-          return _getIntField(5);
-        }
-        public final void setMultiType(int value) {
-          _setIntField(5, value);
+        public final void setMulti(org.capnproto.Void value) {
+          _setShortField(7, (short)PhysNetlist.PinMapping.Which.MULTI.ordinal());
         }
 
+        public final boolean isOtherCell() {
+          return which() == PhysNetlist.PinMapping.Which.OTHER_CELL;
+        }
+        public final com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.MultiCellPinMapping.Builder getOtherCell() {
+          assert which() == PhysNetlist.PinMapping.Which.OTHER_CELL:
+                      "Must check which() before get()ing a union member.";
+          return _getPointerField(com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.MultiCellPinMapping.factory, 0, null, 0);
+        }
+        public final void setOtherCell(com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.MultiCellPinMapping.Reader value) {
+          _setShortField(7, (short)PhysNetlist.PinMapping.Which.OTHER_CELL.ordinal());
+          _setPointerField(com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.MultiCellPinMapping.factory,0, value);
+        }
+        public final com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.MultiCellPinMapping.Builder initOtherCell() {
+          _setShortField(7, (short)PhysNetlist.PinMapping.Which.OTHER_CELL.ordinal());
+          return _initPointerField(com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.MultiCellPinMapping.factory,0, 0);
+        }
       }
 
       public static final class Reader extends org.capnproto.StructReader {
@@ -254,6 +275,13 @@ public final class PhysicalNetlist {
           super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
         }
 
+        public Which which() {
+          switch(_getShortField(7)) {
+            case 0 : return Which.MULTI;
+            case 1 : return Which.OTHER_CELL;
+            default: return Which._NOT_IN_SCHEMA;
+          }
+        }
         public final int getCellPin() {
           return _getIntField(0);
         }
@@ -270,12 +298,92 @@ public final class PhysicalNetlist {
           return _getBooleanField(96);
         }
 
+        public final boolean isMulti() {
+          return which() == PhysNetlist.PinMapping.Which.MULTI;
+        }
+        public final org.capnproto.Void getMulti() {
+          assert which() == PhysNetlist.PinMapping.Which.MULTI:
+                      "Must check which() before get()ing a union member.";
+          return org.capnproto.Void.VOID;
+        }
+
+        public final boolean isOtherCell() {
+          return which() == PhysNetlist.PinMapping.Which.OTHER_CELL;
+        }
+        public boolean hasOtherCell() {
+          return !_pointerFieldIsNull(0);
+        }
+        public com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.MultiCellPinMapping.Reader getOtherCell() {
+          assert which() == PhysNetlist.PinMapping.Which.OTHER_CELL:
+                      "Must check which() before get()ing a union member.";
+          return _getPointerField(com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.MultiCellPinMapping.factory,0,null, 0);
+        }
+
+      }
+
+      public enum Which {
+        MULTI,
+        OTHER_CELL,
+        _NOT_IN_SCHEMA,
+      }
+    }
+
+
+    public static class MultiCellPinMapping {
+      public static final org.capnproto.StructSize STRUCT_SIZE = new org.capnproto.StructSize((short)1,(short)0);
+      public static final class Factory extends org.capnproto.StructFactory<Builder, Reader> {
+        public Factory() {
+        }
+        public final Reader constructReader(org.capnproto.SegmentReader segment, int data,int pointers, int dataSize, short pointerCount, int nestingLimit) {
+          return new Reader(segment,data,pointers,dataSize,pointerCount,nestingLimit);
+        }
+        public final Builder constructBuilder(org.capnproto.SegmentBuilder segment, int data,int pointers, int dataSize, short pointerCount) {
+          return new Builder(segment, data, pointers, dataSize, pointerCount);
+        }
+        public final org.capnproto.StructSize structSize() {
+          return PhysNetlist.MultiCellPinMapping.STRUCT_SIZE;
+        }
+        public final Reader asReader(Builder builder) {
+          return builder.asReader();
+        }
+      }
+      public static final Factory factory = new Factory();
+      public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
+        new org.capnproto.StructList.Factory<Builder, Reader>(factory);
+      public static final class Builder extends org.capnproto.StructBuilder {
+        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+          super(segment, data, pointers, dataSize, pointerCount);
+        }
+        public final Reader asReader() {
+          return new Reader(segment, data, pointers, dataSize, pointerCount, 0x7fffffff);
+        }
         public final int getMultiCell() {
-          return _getIntField(4);
+          return _getIntField(0);
+        }
+        public final void setMultiCell(int value) {
+          _setIntField(0, value);
         }
 
         public final int getMultiType() {
-          return _getIntField(5);
+          return _getIntField(1);
+        }
+        public final void setMultiType(int value) {
+          _setIntField(1, value);
+        }
+
+      }
+
+      public static final class Reader extends org.capnproto.StructReader {
+        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+          super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
+        }
+
+        public final int getMultiCell() {
+          return _getIntField(0);
+        }
+
+        public final int getMultiType() {
+          return _getIntField(1);
         }
 
       }
@@ -1372,9 +1480,9 @@ public static final org.capnproto.SegmentReader b_8ff6d7ce6725fc21 =
    "\u0007\u0000\u0007\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0015\u0000\u0000\u0000\u0012\u0001\u0000\u0000" +
-   "\u0025\u0000\u0000\u0000\u00d7\u0000\u0000\u0000" +
+   "\u0025\u0000\u0000\u0000\u00e7\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u00e5\u0000\u0000\u0000\u008f\u0001\u0000\u0000" +
+   "\u00f9\u0000\u0000\u0000\u008f\u0001\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0050\u0068\u0079\u0073\u0069\u0063\u0061\u006c" +
@@ -1382,35 +1490,40 @@ public static final org.capnproto.SegmentReader b_8ff6d7ce6725fc21 =
    "\u0063\u0061\u0070\u006e\u0070\u003a\u0050\u0068" +
    "\u0079\u0073\u004e\u0065\u0074\u006c\u0069\u0073" +
    "\u0074\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u0034\u0000\u0000\u0000\u0001\u0000\u0001\u0000" +
+   "\u0038\u0000\u0000\u0000\u0001\u0000\u0001\u0000" +
    "\u00b3\u0004\u006d\u0000\u0043\u00d2\u0048\u00d4" +
-   "\u0061\u0000\u0000\u0000\u005a\u0000\u0000\u0000" +
+   "\u0069\u0000\u0000\u0000\u005a\u0000\u0000\u0000" +
+   "\u0079\u0021\u0063\u0015\u0004\u00d9\u00e0\u00ca" +
+   "\u0069\u0000\u0000\u0000\u00a2\u0000\u0000\u0000" +
    "\u00c9\u004a\u0093\u00ca\u0090\u00af\u00ed\u00bb" +
-   "\u0061\u0000\u0000\u0000\u0072\u0000\u0000\u0000" +
+   "\u006d\u0000\u0000\u0000\u0072\u0000\u0000\u0000" +
    "\u0009\u00cc\u00ca\u006a\u00f0\u009f\u00ac\u00a0" +
-   "\u0061\u0000\u0000\u0000\u004a\u0000\u0000\u0000" +
+   "\u006d\u0000\u0000\u0000\u004a\u0000\u0000\u0000" +
    "\r\u00a6\u00dc\u0070\u00a5\u0089\u001b\u008b" +
-   "\u0061\u0000\u0000\u0000\u006a\u0000\u0000\u0000" +
+   "\u006d\u0000\u0000\u0000\u006a\u0000\u0000\u0000" +
    "\u0000\u001d\u002f\u0036\u0009\u0074\u00de\u00d2" +
-   "\u0061\u0000\u0000\u0000\u0042\u0000\u0000\u0000" +
+   "\u006d\u0000\u0000\u0000\u0042\u0000\u0000\u0000" +
    "\u004f\u00b9\u00b6\u00d8\u00db\u0085\u00d9\u00e8" +
-   "\u005d\u0000\u0000\u0000\u0062\u0000\u0000\u0000" +
+   "\u0069\u0000\u0000\u0000\u0062\u0000\u0000\u0000" +
    "\u008a\u0012\u00cf\u00f7\u0074\u0079\u00c2\u00ea" +
-   "\u005d\u0000\u0000\u0000\u0042\u0000\u0000\u0000" +
+   "\u0069\u0000\u0000\u0000\u0042\u0000\u0000\u0000" +
    "\u0093\u00a8\u0070\u00ae\u00d2\u00aa\u00d6\u008c" +
-   "\u0059\u0000\u0000\u0000\u005a\u0000\u0000\u0000" +
+   "\u0065\u0000\u0000\u0000\u005a\u0000\u0000\u0000" +
    "\u009e\u0021\u0082\u0019\u00cd\u0091\u004c\u00de" +
-   "\u0059\u0000\u0000\u0000\u0062\u0000\u0000\u0000" +
+   "\u0065\u0000\u0000\u0000\u0062\u0000\u0000\u0000" +
    "\u006e\u0000\u0044\u00b5\u001d\u009a\u003c\u00f9" +
-   "\u0059\u0000\u0000\u0000\u0042\u0000\u0000\u0000" +
+   "\u0065\u0000\u0000\u0000\u0042\u0000\u0000\u0000" +
    "\u00ef\u0066\u004c\u00b8\u00a5\u007a\u00b1\u0090" +
-   "\u0055\u0000\u0000\u0000\u0062\u0000\u0000\u0000" +
+   "\u0061\u0000\u0000\u0000\u0062\u0000\u0000\u0000" +
    "\u0005\u00f7\u00f0\u00a8\u0001\u00c5\u0081\u00db" +
-   "\u0055\u0000\u0000\u0000\u006a\u0000\u0000\u0000" +
+   "\u0061\u0000\u0000\u0000\u006a\u0000\u0000\u0000" +
    "\u00a3\u006b\u0032\u001a\u00d4\u001e\u00a0\u00d7" +
-   "\u0055\u0000\u0000\u0000\u004a\u0000\u0000\u0000" +
+   "\u0061\u0000\u0000\u0000\u004a\u0000\u0000\u0000" +
    "\u0050\u0069\u006e\u004d\u0061\u0070\u0070\u0069" +
    "\u006e\u0067\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u004d\u0075\u006c\u0074\u0069\u0043\u0065\u006c" +
+   "\u006c\u0050\u0069\u006e\u004d\u0061\u0070\u0070" +
+   "\u0069\u006e\u0067\u0000\u0000\u0000\u0000\u0000" +
    "\u0043\u0065\u006c\u006c\u0050\u006c\u0061\u0063" +
    "\u0065\u006d\u0065\u006e\u0074\u0000\u0000\u0000" +
    "\u0050\u0068\u0079\u0073\u0043\u0065\u006c\u006c" +
@@ -1571,10 +1684,10 @@ public static final org.capnproto.SegmentReader b_d448d243006d04b3 =
    org.capnproto.GeneratedClassSupport.decodeRawBytes(
    "\u0000\u0000\u0000\u0000\u0005\u0000\u0006\u0000" +
    "\u00b3\u0004\u006d\u0000\u0043\u00d2\u0048\u00d4" +
-   "\"\u0000\u0000\u0000\u0001\u0000\u0003\u0000" +
+   "\"\u0000\u0000\u0000\u0001\u0000\u0002\u0000" +
    "\u0021\u00fc\u0025\u0067\u00ce\u00d7\u00f6\u008f" +
-   "\u0000\u0000\u0007\u0000\u0000\u0000\u0000\u0000" +
-   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0001\u0000\u0007\u0000\u0000\u0000\u0002\u0000" +
+   "\u0007\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0015\u0000\u0000\u0000\u006a\u0001\u0000\u0000" +
    "\u0029\u0000\u0000\u0000\u0007\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
@@ -1617,20 +1730,20 @@ public static final org.capnproto.SegmentReader b_d448d243006d04b3 =
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u00a0\u0000\u0000\u0000\u0003\u0000\u0001\u0000" +
    "\u00ac\u0000\u0000\u0000\u0002\u0000\u0001\u0000" +
-   "\u0004\u0000\u0000\u0000\u0004\u0000\u0000\u0000" +
+   "\u0004\u0000\u00ff\u00ff\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0001\u0000\u0004\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u00a9\u0000\u0000\u0000\u0052\u0000\u0000\u0000" +
+   "\u00a9\u0000\u0000\u0000\u0032\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u00a8\u0000\u0000\u0000\u0003\u0000\u0001\u0000" +
-   "\u00b4\u0000\u0000\u0000\u0002\u0000\u0001\u0000" +
-   "\u0005\u0000\u0000\u0000\u0005\u0000\u0000\u0000" +
+   "\u00a4\u0000\u0000\u0000\u0003\u0000\u0001\u0000" +
+   "\u00b0\u0000\u0000\u0000\u0002\u0000\u0001\u0000" +
+   "\u0005\u0000\u00fe\u00ff\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0001\u0000\u0005\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u00b1\u0000\u0000\u0000\u0052\u0000\u0000\u0000" +
+   "\u00ad\u0000\u0000\u0000\u0052\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u00b0\u0000\u0000\u0000\u0003\u0000\u0001\u0000" +
-   "\u00bc\u0000\u0000\u0000\u0002\u0000\u0001\u0000" +
+   "\u00ac\u0000\u0000\u0000\u0003\u0000\u0001\u0000" +
+   "\u00b8\u0000\u0000\u0000\u0002\u0000\u0001\u0000" +
    "\u0063\u0065\u006c\u006c\u0050\u0069\u006e\u0000" +
    "\u0008\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
@@ -1663,6 +1776,60 @@ public static final org.capnproto.SegmentReader b_d448d243006d04b3 =
    "\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u006d\u0075\u006c\u0074\u0069\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u006f\u0074\u0068\u0065\u0072\u0043\u0065\u006c" +
+   "\u006c\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0010\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0079\u0021\u0063\u0015\u0004\u00d9\u00e0\u00ca" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0010\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" + "");
+public static final org.capnproto.SegmentReader b_cae0d90415632179 =
+   org.capnproto.GeneratedClassSupport.decodeRawBytes(
+   "\u0000\u0000\u0000\u0000\u0005\u0000\u0006\u0000" +
+   "\u0079\u0021\u0063\u0015\u0004\u00d9\u00e0\u00ca" +
+   "\"\u0000\u0000\u0000\u0001\u0000\u0001\u0000" +
+   "\u0021\u00fc\u0025\u0067\u00ce\u00d7\u00f6\u008f" +
+   "\u0000\u0000\u0007\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0015\u0000\u0000\u0000\u00b2\u0001\u0000\u0000" +
+   "\u002d\u0000\u0000\u0000\u0007\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0029\u0000\u0000\u0000\u0077\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0050\u0068\u0079\u0073\u0069\u0063\u0061\u006c" +
+   "\u004e\u0065\u0074\u006c\u0069\u0073\u0074\u002e" +
+   "\u0063\u0061\u0070\u006e\u0070\u003a\u0050\u0068" +
+   "\u0079\u0073\u004e\u0065\u0074\u006c\u0069\u0073" +
+   "\u0074\u002e\u004d\u0075\u006c\u0074\u0069\u0043" +
+   "\u0065\u006c\u006c\u0050\u0069\u006e\u004d\u0061" +
+   "\u0070\u0070\u0069\u006e\u0067\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0001\u0000\u0001\u0000" +
+   "\u0008\u0000\u0000\u0000\u0003\u0000\u0004\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0029\u0000\u0000\u0000\u0052\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0028\u0000\u0000\u0000\u0003\u0000\u0001\u0000" +
+   "\u0034\u0000\u0000\u0000\u0002\u0000\u0001\u0000" +
+   "\u0001\u0000\u0000\u0000\u0001\u0000\u0000\u0000" +
+   "\u0000\u0000\u0001\u0000\u0001\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0031\u0000\u0000\u0000\u0052\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0030\u0000\u0000\u0000\u0003\u0000\u0001\u0000" +
+   "\u003c\u0000\u0000\u0000\u0002\u0000\u0001\u0000" +
    "\u006d\u0075\u006c\u0074\u0069\u0043\u0065\u006c" +
    "\u006c\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0008\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +

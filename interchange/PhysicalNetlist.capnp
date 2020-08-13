@@ -20,8 +20,15 @@ struct PhysNetlist {
     bel        @1 : StringIdx;
     belPin     @2 : StringIdx;
     isFixed    @3 : Bool;
-    multiCell  @4 : StringIdx;
-    multiType  @5 : StringIdx; 
+    union {
+      multi     @4 : Void;
+      otherCell @5 : MultiCellPinMapping;
+    }
+  }
+
+  struct MultiCellPinMapping {
+    multiCell  @0 : StringIdx;
+    multiType  @1 : StringIdx;   
   }
 
   struct CellPlacement {
