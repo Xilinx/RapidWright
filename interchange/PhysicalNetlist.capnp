@@ -16,10 +16,12 @@ struct PhysNetlist {
   properties   @6 : List(Property);
 
   struct PinMapping {
-    cellPin @0 : StringIdx;
-    bel     @1 : StringIdx;
-    belPin  @2 : StringIdx;
-    isFixed @3 : Bool;
+    cellPin    @0 : StringIdx;
+    bel        @1 : StringIdx;
+    belPin     @2 : StringIdx;
+    isFixed    @3 : Bool;
+    multiCell  @4 : StringIdx;
+    multiType  @5 : StringIdx; 
   }
 
   struct CellPlacement {
@@ -31,6 +33,7 @@ struct PhysNetlist {
     otherBels     @5 : List(StringIdx);
     isBelFixed    @6 : Bool;
     isSiteFixed   @7 : Bool;
+    altSiteType   @8 : StringIdx;
   }
   
   struct PhysCell {
