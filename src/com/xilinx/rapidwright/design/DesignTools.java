@@ -1345,7 +1345,8 @@ public class DesignTools {
 
 	/**
 	 * Gets the site pin that is currently routed to the specified cell pin.  If 
-	 * the site instance is not routed, it will return null.
+	 * the site instance is not routed, it will return null. 
+	 * Side Effect: It will set alternative source site pins on the net if present.
 	 * @param cell The cell with the pin of interest.
 	 * @param net The physical net to which this pin belongs
 	 * @param logicalPinName The logical pin name of the cell to query.
@@ -1354,10 +1355,13 @@ public class DesignTools {
 	public static String getRoutedSitePin(Cell cell, Net net, String logicalPinName) {
 	    SiteInst inst = cell.getSiteInst();
 	    String belPinName = cell.getPhysicalPinMapping(logicalPinName);
+	    if(belPinName == null) return null;
 	    Set<String> siteWires = inst.getSiteWiresFromNet(net);
-	    BELPin curr = cell.getBEL().getPin(belPinName);
-	    
-	    while(curr != null) {
+	    String toReturn = null;
+	    Queue<BELPin> queue = new LinkedList<>();
+	    queue.add(cell.getBEL().getPin(belPinName));
+	    while(!queue.isEmpty()) {
+		    BELPin curr = queue.remove();
 	        if(!siteWires.contains(curr.getSiteWireName())) return null;
 	        if(curr.isInput()) {
 	            BELPin source = curr.getSourcePin();
@@ -1366,7 +1370,7 @@ public class DesignTools {
 	            } else if(source.getBEL().getBELClass() == BELClass.RBEL){
 	                SitePIP sitePIP = inst.getUsedSitePIP(source.getBEL().getName());
 	                if(sitePIP == null) return null;
-	                curr = sitePIP.getInputPin();
+	                queue.add(sitePIP.getInputPin());
 	            } else {
 	                return null;
 	            }
@@ -1374,18 +1378,34 @@ public class DesignTools {
 	            for(BELPin sink : curr.getSiteConns()) {
 	                if(!siteWires.contains(sink.getSiteWireName())) continue;
 	                if(sink.isSitePort()) {
-	                    return sink.getName();
+	                	// Check if there is a dual output scenario
+	                	if(toReturn != null) {
+	                		SitePinInst source = net.getSource();
+	                		if(source != null && source.getName().equals(sink.getName())) {
+		                		net.setAlternateSource(new SitePinInst(true, toReturn, inst));
+		                		toReturn = sink.getName();
+	                		}else {
+		                		net.setAlternateSource(new SitePinInst(true, sink.getName(), inst));	                			
+	                		}
+	                		// We'll return the first one we found, store the 2nd in the alternate
+	                		// reference on the net
+	                		return toReturn;
+	                	}else {
+			                toReturn = sink.getName();	                		
+	                	}
 	                } else if(sink.getBEL().getBELClass() == BELClass.RBEL){
+	                	// Check if the SitePIP is being used
 	                    SitePIP sitePIP = inst.getUsedSitePIP(sink.getBEL().getName());
-	                    if(sitePIP == null) return null;
-	                    curr = sitePIP.getOutputPin();
-	                } else {
-	                    return null;
+	                    if(sitePIP == null) continue;
+	                    // Don't proceed if its configured for a different pin
+	                    if(!sitePIP.getInputPinName().equals(sink.getName())) continue;
+	                    // Make this the new source to search from and keep looking...
+	                    queue.add(sitePIP.getOutputPin());
 	                }
 	            }
 	        }
 	    }
-	    return null;
+	    return toReturn;
 	}
 	
 	/**
