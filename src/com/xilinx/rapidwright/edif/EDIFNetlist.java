@@ -35,6 +35,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -404,7 +405,6 @@ public class EDIFNetlist extends EDIFName {
 	}
 	
 	/**
-	 * TODO - Testing and updates to mitigate runtime impact
 	 * Get Libraries in export order so that any cell instance appearing in a library will only 
 	 * refer to cells in its own library or previous libraries in the list.  This is a pre-requisite
 	 * for export to a file.
@@ -412,7 +412,7 @@ public class EDIFNetlist extends EDIFName {
 	 * is always first.
 	 */
 	public List<EDIFLibrary> getLibrariesInExportOrder() {
-		TreeSet<EDIFLibrary> toExport = new TreeSet<EDIFLibrary>();
+		Set<EDIFLibrary> toExport = new LinkedHashSet<EDIFLibrary>();
 		// Assume HDI Primitives are always first as they should not refer to any previous libraries
 		toExport.add(getHDIPrimitivesLibrary());
 		

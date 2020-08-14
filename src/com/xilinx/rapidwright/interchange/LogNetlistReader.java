@@ -2,6 +2,7 @@ package com.xilinx.rapidwright.interchange;
 
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.util.List;
 
 import org.capnproto.MessageReader;
 import org.capnproto.PrimitiveList;
@@ -251,9 +252,17 @@ public class LogNetlistReader {
         for(int i=0; i < cellCount; i++) {
             readEDIFCell(i, n, netlist, cellListReader, instListReader);
         }
+        
         EDIFDesign design = new EDIFDesign(allCells.get(netlist.getTopInst().getCell()).getName());
         design.setTopCell(allCells.get(netlist.getTopInst().getCell()));
         n.setDesign(design);
+        
+        // Put libraries in proper export order
+        List<EDIFLibrary> libs = n.getLibrariesInExportOrder();
+        n.getLibrariesMap().clear();
+        for(EDIFLibrary lib : libs) {
+        	n.addLibrary(lib);
+        }
         
         return n;
     }
