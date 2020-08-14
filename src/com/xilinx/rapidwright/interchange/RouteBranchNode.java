@@ -110,6 +110,9 @@ public class RouteBranchNode {
     }
     
     public void addBranch(RouteBranchNode routeBranch) {
+    	if(routeBranch.getParent() != null) {
+    		return;
+    	}
         branches.add(routeBranch);
         routeBranch.setParent(this);
     }
@@ -143,8 +146,7 @@ public class RouteBranchNode {
             case SITE_PIN:{
                 SitePinInst spi = getSitePin(); 
                 if(spi.isOutPin()) {
-                    BEL bel = spi.getSite().getBEL(spi.getName());
-                    BELPin belPin = bel.getPins()[0].getSourcePin();
+                    BELPin belPin = spi.getBELPin().getSourcePin();
                     drivers.add(spi.getSite().getName() + "/" + belPin.toString());
                 } else {
                     Node node = getSitePin().getConnectedNode();

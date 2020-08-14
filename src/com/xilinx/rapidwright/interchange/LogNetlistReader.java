@@ -5,6 +5,7 @@ import java.io.IOException;
 
 import org.capnproto.MessageReader;
 import org.capnproto.PrimitiveList;
+import org.capnproto.ReaderOptions;
 import org.capnproto.SerializePacked;
 import org.capnproto.StructList;
 import org.capnproto.TextList;
@@ -225,7 +226,8 @@ public class LogNetlistReader {
      */
     public static EDIFNetlist readLogNetlist(String fileName) throws IOException {
         FileInputStream fis = new java.io.FileInputStream(fileName);
-        MessageReader readMsg = SerializePacked.readFromUnbuffered((fis).getChannel());
+        ReaderOptions readerOptions = new ReaderOptions(1024L*1024L*1024L, 64);
+        MessageReader readMsg = SerializePacked.readFromUnbuffered((fis).getChannel(),readerOptions);
         fis.close();
         
         Netlist.Reader netlist = readMsg.getRoot(Netlist.factory);

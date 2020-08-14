@@ -9,8 +9,8 @@ import com.xilinx.rapidwright.tests.CodePerfTracker;
 public class PhysicalNetlistExample {
 
     public static void main(String[] args) throws IOException {
-        if(args.length != 2) {
-            System.out.println("USAGE: <input>.dcp <output>.dcp");
+        if(args.length < 2 || args.length > 4) {
+            System.out.println("USAGE: <input>.dcp [input.edf] <output>.dcp");
             System.out.println("   Example round trip test for a logical & physical netlist to start from a DCP,"
                     + " get converted to a\n   Cap'n Proto serialized file and then read back into "
                     + "a DCP file.  Creates two new files:\n\t1. <input>.netlist "
@@ -22,16 +22,25 @@ public class PhysicalNetlistExample {
         CodePerfTracker t = new CodePerfTracker("DCP->Interchange Format->DCP",false);
         
         t.start("Read DCP");
+        
+        String edifFileName = null;
+        String outputDCPFileName = args[1];
+        if(args.length > 2) {
+        	edifFileName = args[1];
+        	outputDCPFileName = args[2];
+        }
         // Read DCP into memory using RapidWright
-        Design design = Design.readCheckpoint(args[0], CodePerfTracker.SILENT);
+        Design design = edifFileName == null ? 
+        					Design.readCheckpoint(args[0], CodePerfTracker.SILENT) : 
+        					Design.readCheckpoint(args[0], edifFileName, CodePerfTracker.SILENT);
         
         t.stop().start("Write Logical Netlist");
         // Write Logical & Physical Netlist to Cap'n Proto Serialization file
-        String logNetlistFileName = args[0].replace(".dcp", ".netlist");
+        String logNetlistFileName = outputDCPFileName.replace(".dcp", ".netlist");
         LogNetlistWriter.writeLogNetlist(design.getNetlist(), logNetlistFileName);
         
         t.stop().start("Write Physical Netlist");
-        String physNetlistFileName = args[0].replace(".dcp", ".phys");
+        String physNetlistFileName = outputDCPFileName.replace(".dcp", ".phys");
         PhysNetlistWriter.writePhysNetlist(design, physNetlistFileName);
         
         t.stop().start("Read Logical Netlist");
@@ -43,7 +52,7 @@ public class PhysicalNetlistExample {
         
         t.stop().start("Write DCP");
         // Write RapidWright netlist back to edif
-        roundtrip.writeCheckpoint(args[1], CodePerfTracker.SILENT);
+        roundtrip.writeCheckpoint(outputDCPFileName, CodePerfTracker.SILENT);
         
         t.stop().printSummary();
     }
