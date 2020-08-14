@@ -1,4 +1,4 @@
-# RapidWright 
+# RapidWright
 
 Try RapidWright in your browser: [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/clavin-xlnx/RapidWright-binder/master?filepath=HelloWorld.ipynb)
 
@@ -24,6 +24,28 @@ and [Javadoc](http://www.rapidwright.io/javadoc/index.html) reference is also av
 
 For more information, please see http://www.rapidwright.io.
 
-NOTE: RapidWright is not an official product from Xilinx and designs 
-created or derived from it are not warranted. Please see 
+NOTE: RapidWright is not an official product from Xilinx and designs
+created or derived from it are not warranted. Please see
 LICENSE.TXT for full details.
+
+## Installation
+
+### Easiest way to Setup a RapidWright Repo Locally:
+
+```
+wget http://www.rapidwright.io/docs/_downloads/rapidwright-installer.jar
+java -jar rapidwright-installer.jar -t
+source rapidwright.sh
+cd RapidWright
+```
+
+More details here:
+http://www.rapidwright.io/docs/Automatic_Install.html#automatic-install
+
+
+### How to Update RapidWright to the Most Recent Release (Assumes Linux)
+
+```
+cd $RAPIDWRIGHT_PATH
+make update_jars
+```
