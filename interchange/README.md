@@ -20,17 +20,16 @@ http://www.rapidwright.io/docs/Automatic_Install.html#automatic-install
 ```
 git checkout interchange
 cd interchange && make && cd ..
-gradle build
-export CLASSPATH=$CLASSPATH:`pwd`/jars/runtime-0.1.4.jar
-java com.xilinx.rapidwright.interchange.LogicalNetlistExample
-# download an example EDIF file
-wget http://www.rapidwright.io/docs/_downloads/picoblaze_synth.dcp
-unzip -j picoblaze_synth.dcp picoblaze_top.edf
-java com.xilinx.rapidwright.interchange.LogicalNetlistExample picoblaze_top.edf
+make
+java com.xilinx.rapidwright.interchange.PhysicalNetlistExample
+# download an example DCP file
+wget http://www.rapidwright.io/docs/_downloads/picoblaze_best.zip
+unzip -j picoblaze_best.zip pblock0.dcp pblock0.edf -d .
+java com.xilinx.rapidwright.interchange.PhysicalNetlistExample pblock0.dcp pblock0_interchange.dcp
 ```
 
 ## How to Re-generate Cap'n Proto Java Code from Schema
 ```
 cd interchange && make && cd ..
-gradle build
+make
 ```
