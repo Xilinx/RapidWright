@@ -1,3 +1,23 @@
+============= RapidWright 2020.1.2-beta released on 2020-08-13 ================
+Notes:
+ * Minor update with API additions
+ - API Additions:
+   - com.xilinx.rapidwright.design.Cell "public AltPinMapping getAltPinMapping(String physicalPin)"
+   - com.xilinx.rapidwright.design.Cell "public void addAltPinMapping(String physicalPin, AltPinMapping logicalPin)"
+   - com.xilinx.rapidwright.design.Cell "public boolean hasAltPinMappings()"
+   - com.xilinx.rapidwright.design.Cell "public Map<String,AltPinMapping> getAltPinMappings()"
+   - com.xilinx.rapidwright.design.Cell "public boolean isLocked()"
+   - com.xilinx.rapidwright.design.Cell "public void setNullBEL(boolean b)"
+   - com.xilinx.rapidwright.design.Cell "public boolean isNullBEL()"
+   - com.xilinx.rapidwright.design.Cell "public void setLocked(boolean isLocked)"
+   - com.xilinx.rapidwright.design.Cell "public void setRoutethru(boolean isRoutethru)"
+   - com.xilinx.rapidwright.design.Cell "public void setType(String type)"
+   - com.xilinx.rapidwright.design.Cell "public void setAltBlockedSiteType(SiteTypeEnum typeEnum)"
+   - com.xilinx.rapidwright.design.Cell "public SiteTypeEnum getAltBlockedSiteType()"
+   - com.xilinx.rapidwright.design.SiteInst "public boolean isSiteLocked()"
+   - com.xilinx.rapidwright.design.SiteInst "public void setSiteLocked(boolean isSiteLocked)"
+
+
 ============= RapidWright 2020.1.1-beta released on 2020-08-07 ================
 Notes:
  * Minor update with API additions
