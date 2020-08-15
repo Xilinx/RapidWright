@@ -131,6 +131,7 @@ public class RouteThruHelper {
     }
 
     public static boolean isRouteThruPIPAvailable(Design design, PIP routethru) {
+        if(!routethru.isRouteThru()) return false;
         return isRouteThruPIPAvailable(design, routethru.getStartWire(), routethru.getEndWire());
     }
     
