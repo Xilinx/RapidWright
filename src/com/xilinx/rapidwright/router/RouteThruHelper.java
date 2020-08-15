@@ -131,14 +131,17 @@ public class RouteThruHelper {
     }
 
     public static boolean isRouteThruPIPAvailable(Design design, PIP routethru) {
-        if(!routethru.isRouteThru()) return false;
-        SitePin outPin = routethru.getEndWire().getSitePin();
+        return isRouteThruPIPAvailable(design, routethru.getStartWire(), routethru.getEndWire());
+    }
+    
+    public static boolean isRouteThruPIPAvailable(Design design, Wire start, Wire end) {
+        SitePin outPin = end.getSitePin();
         if(outPin == null) return false;
         SiteInst siteInst = design.getSiteInstFromSite(outPin.getSite());
         if(siteInst == null) return true;
         Net outputNetCollision = siteInst.getNetFromSiteWire(outPin.getBELPin().getSiteWireName());
         if(outputNetCollision != null) return false;
-        SitePin inPin = routethru.getStartWire().getSitePin();
+        SitePin inPin = start.getSitePin();
         BELPin belPin = inPin.getBELPin();
         Net inputNetCollision = siteInst.getNetFromSiteWire(belPin.getSiteWireName());
         if(inputNetCollision != null) return false;
