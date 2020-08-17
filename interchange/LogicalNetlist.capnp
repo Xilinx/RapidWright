@@ -65,7 +65,7 @@ struct Netlist {
   
   struct PortInstance {
     name  @0 : StringIdx;
-    port  @1 : StringIdx;
+    port  @1 : PortIdx;
     idx   @2 : UInt32; # Index within bussed port
     union {
       extPort @3 : Void;
