@@ -147,7 +147,6 @@ public class LogNetlistWriter {
                 int k = 0;
                 for (EDIFPortInst portInst : net.getPortInsts()) {
                     PortInstance.Builder piBuilder = portInsts.get(k);
-                    piBuilder.setName(allStrings.getIndex(portInst.getName()));
                     piBuilder.setPort(allPorts.getIndex(portInst.getPort()));
                     if (portInst.getCellInst() != null) {
                         piBuilder.setInst(allInsts.getIndex(portInst.getCellInst()));
