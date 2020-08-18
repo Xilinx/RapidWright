@@ -181,8 +181,12 @@ public class LogNetlistReader {
             int end = portReader.getBus().getBusEnd();
             width = Math.abs(start-end) + 1;
         }
-        
-        edifPort = parent.createPort(allStrings.get(portReader.getName()), 
+        String portBusName = allStrings.get(portReader.getName());
+        if(portReader.isBus()) {
+        	portBusName += "["+ portReader.getBus().getBusStart() + 
+        			":" + portReader.getBus().getBusEnd() + "]";
+        }
+        edifPort = parent.createPort(portBusName, 
                                      getEDIFDirection(portReader), width);
         extractPropertyMap(portReader.getPropMap(), edifPort);
         
@@ -227,7 +231,7 @@ public class LogNetlistReader {
      */
     public static EDIFNetlist readLogNetlist(String fileName) throws IOException {
         FileInputStream fis = new java.io.FileInputStream(fileName);
-        ReaderOptions readerOptions = new ReaderOptions(1024L*1024L*1024L, 64);
+        ReaderOptions readerOptions = new ReaderOptions(32L*1024L*1024L*1024L, 64);
         MessageReader readMsg = SerializePacked.readFromUnbuffered((fis).getChannel(),readerOptions);
         fis.close();
         

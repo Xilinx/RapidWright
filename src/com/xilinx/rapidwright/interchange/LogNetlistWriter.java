@@ -168,7 +168,7 @@ public class LogNetlistWriter {
         StructList.Builder<Port.Builder> portsList = netlist.initPortList(allPorts.size());
         for (EDIFPort port : allPorts) {
             Port.Builder portBuilder = portsList.get(i);
-            portBuilder.setName(allStrings.getIndex(port.getName()));
+            portBuilder.setName(allStrings.getIndex(port.getBusName()));
             portBuilder.setDir(LogNetlistReader.getDirection(port));
             populatePropertyMap(portBuilder.getPropMap(), port);
             if (port.isBus()) {

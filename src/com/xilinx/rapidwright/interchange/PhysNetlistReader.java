@@ -62,7 +62,7 @@ public class PhysNetlistReader {
         
         FileInputStream fis = new java.io.FileInputStream(physNetlistFileName);
         ReaderOptions rdOptions = 
-        		new ReaderOptions(ReaderOptions.DEFAULT_READER_OPTIONS.traversalLimitInWords * 8,
+        		new ReaderOptions(ReaderOptions.DEFAULT_READER_OPTIONS.traversalLimitInWords * 32,
         		ReaderOptions.DEFAULT_READER_OPTIONS.nestingLimit * 128);
         MessageReader readMsg = SerializePacked.readFromUnbuffered((fis).getChannel(), rdOptions);
         fis.close();
