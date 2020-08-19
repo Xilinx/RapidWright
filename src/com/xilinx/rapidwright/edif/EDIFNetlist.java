@@ -528,6 +528,12 @@ public class EDIFNetlist extends EDIFName {
 		EDIFCellInst currInst = getTopCellInst();
 		if(name.equals("")) return currInst;
 		String[] parts = name.split(EDIFTools.EDIF_HIER_SEP);
+		
+		// Sadly, cells can be named 'fred/' instead of 'fred', this code handles this situation
+		if(name.charAt(name.length()-1) == '/') {
+			parts[parts.length-1] = parts[parts.length-1] + EDIFTools.EDIF_HIER_SEP;  
+		}
+		
 		for(int i=0; i < parts.length; i++){
 			EDIFCellInst checkInst = currInst.getCellType().getCellInst(parts[i]);
 			// Someone named their instance with hierarchy separators, joy!
