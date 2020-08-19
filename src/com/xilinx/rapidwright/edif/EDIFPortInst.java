@@ -78,10 +78,13 @@ public class EDIFPortInst {
 		}
 		if(cellInst != null){
 			if(!port.equals(cellInst.getPort(port.getBusName()))){
-				throw new RuntimeException("ERROR: Provided port '"+ 
-					port.getName() + "' does not exist on EDIFCell type '" + 
-					cellInst.getCellType().getName() + "' when adding port "
-					+ "ref to instance '" + cellInst.getName() + "'.");
+				// check for name collision
+				if(!port.equals(cellInst.getPort(port.getName()))){
+					throw new RuntimeException("ERROR: Provided port '"+ 
+							port.getName() + "' does not exist on EDIFCell type '" + 
+							cellInst.getCellType().getName() + "' when adding port "
+							+ "ref to instance '" + cellInst.getName() + "'.");					
+				}
 			}
 		}
 		this.index = index;
