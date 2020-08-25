@@ -743,7 +743,7 @@ public final class LogicalNetlist {
           super(segment, data, pointers, dataSize, pointerCount);
         }
         public Which which() {
-          switch(_getShortField(4)) {
+          switch(_getShortField(3)) {
             case 0 : return Which.EXT_PORT;
             case 1 : return Which.INST;
             default: return Which._NOT_IN_SCHEMA;
@@ -759,11 +759,13 @@ public final class LogicalNetlist {
           _setIntField(0, value);
         }
 
-        public final int getIdx() {
-          return _getIntField(1);
+        public final BusIdx.Builder getBusIdx() {
+          return new Netlist.PortInstance.BusIdx.Builder(segment, data, pointers, dataSize, pointerCount);
         }
-        public final void setIdx(int value) {
-          _setIntField(1, value);
+        public final BusIdx.Builder initBusIdx() {
+          _setShortField(2,(short)0);
+          _setIntField(2,0);
+  return new Netlist.PortInstance.BusIdx.Builder(segment, data, pointers, dataSize, pointerCount);
         }
 
         public final boolean isExtPort() {
@@ -775,7 +777,7 @@ public final class LogicalNetlist {
           return org.capnproto.Void.VOID;
         }
         public final void setExtPort(org.capnproto.Void value) {
-          _setShortField(4, (short)Netlist.PortInstance.Which.EXT_PORT.ordinal());
+          _setShortField(3, (short)Netlist.PortInstance.Which.EXT_PORT.ordinal());
         }
 
         public final boolean isInst() {
@@ -787,7 +789,7 @@ public final class LogicalNetlist {
           return _getIntField(3);
         }
         public final void setInst(int value) {
-          _setShortField(4, (short)Netlist.PortInstance.Which.INST.ordinal());
+          _setShortField(3, (short)Netlist.PortInstance.Which.INST.ordinal());
           _setIntField(3, value);
         }
 
@@ -799,7 +801,7 @@ public final class LogicalNetlist {
         }
 
         public Which which() {
-          switch(_getShortField(4)) {
+          switch(_getShortField(3)) {
             case 0 : return Which.EXT_PORT;
             case 1 : return Which.INST;
             default: return Which._NOT_IN_SCHEMA;
@@ -809,8 +811,8 @@ public final class LogicalNetlist {
           return _getIntField(0);
         }
 
-        public final int getIdx() {
-          return _getIntField(1);
+        public BusIdx.Reader getBusIdx() {
+          return new Netlist.PortInstance.BusIdx.Reader(segment, data, pointers, dataSize, pointerCount, nestingLimit);
         }
 
         public final boolean isExtPort() {
@@ -838,6 +840,108 @@ public final class LogicalNetlist {
         INST,
         _NOT_IN_SCHEMA,
       }
+      public static class BusIdx {
+        public static final org.capnproto.StructSize STRUCT_SIZE = new org.capnproto.StructSize((short)2,(short)0);
+        public static final class Factory extends org.capnproto.StructFactory<Builder, Reader> {
+          public Factory() {
+          }
+          public final Reader constructReader(org.capnproto.SegmentReader segment, int data,int pointers, int dataSize, short pointerCount, int nestingLimit) {
+            return new Reader(segment,data,pointers,dataSize,pointerCount,nestingLimit);
+          }
+          public final Builder constructBuilder(org.capnproto.SegmentBuilder segment, int data,int pointers, int dataSize, short pointerCount) {
+            return new Builder(segment, data, pointers, dataSize, pointerCount);
+          }
+          public final org.capnproto.StructSize structSize() {
+            return Netlist.PortInstance.BusIdx.STRUCT_SIZE;
+          }
+          public final Reader asReader(Builder builder) {
+            return builder.asReader();
+          }
+        }
+        public static final Factory factory = new Factory();
+        public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
+          new org.capnproto.StructList.Factory<Builder, Reader>(factory);
+        public static final class Builder extends org.capnproto.StructBuilder {
+          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+            super(segment, data, pointers, dataSize, pointerCount);
+          }
+          public Which which() {
+            switch(_getShortField(2)) {
+              case 0 : return Which.SINGLE_BIT;
+              case 1 : return Which.IDX;
+              default: return Which._NOT_IN_SCHEMA;
+            }
+          }
+          public final Reader asReader() {
+            return new Reader(segment, data, pointers, dataSize, pointerCount, 0x7fffffff);
+          }
+          public final boolean isSingleBit() {
+            return which() == Netlist.PortInstance.BusIdx.Which.SINGLE_BIT;
+          }
+          public final org.capnproto.Void getSingleBit() {
+            assert which() == Netlist.PortInstance.BusIdx.Which.SINGLE_BIT:
+                        "Must check which() before get()ing a union member.";
+            return org.capnproto.Void.VOID;
+          }
+          public final void setSingleBit(org.capnproto.Void value) {
+            _setShortField(2, (short)Netlist.PortInstance.BusIdx.Which.SINGLE_BIT.ordinal());
+          }
+
+          public final boolean isIdx() {
+            return which() == Netlist.PortInstance.BusIdx.Which.IDX;
+          }
+          public final int getIdx() {
+            assert which() == Netlist.PortInstance.BusIdx.Which.IDX:
+                        "Must check which() before get()ing a union member.";
+            return _getIntField(2);
+          }
+          public final void setIdx(int value) {
+            _setShortField(2, (short)Netlist.PortInstance.BusIdx.Which.IDX.ordinal());
+            _setIntField(2, value);
+          }
+
+        }
+
+        public static final class Reader extends org.capnproto.StructReader {
+          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+            super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
+          }
+
+          public Which which() {
+            switch(_getShortField(2)) {
+              case 0 : return Which.SINGLE_BIT;
+              case 1 : return Which.IDX;
+              default: return Which._NOT_IN_SCHEMA;
+            }
+          }
+          public final boolean isSingleBit() {
+            return which() == Netlist.PortInstance.BusIdx.Which.SINGLE_BIT;
+          }
+          public final org.capnproto.Void getSingleBit() {
+            assert which() == Netlist.PortInstance.BusIdx.Which.SINGLE_BIT:
+                        "Must check which() before get()ing a union member.";
+            return org.capnproto.Void.VOID;
+          }
+
+          public final boolean isIdx() {
+            return which() == Netlist.PortInstance.BusIdx.Which.IDX;
+          }
+          public final int getIdx() {
+            assert which() == Netlist.PortInstance.BusIdx.Which.IDX:
+                        "Must check which() before get()ing a union member.";
+            return _getIntField(2);
+          }
+
+        }
+
+        public enum Which {
+          SINGLE_BIT,
+          IDX,
+          _NOT_IN_SCHEMA,
+        }
+      }
+
+
     }
 
 
@@ -1695,7 +1799,7 @@ public static final org.capnproto.SegmentReader b_bb789fd3bdf57009 =
    "\u001d\u0000\u0000\u0000\u0001\u0000\u0002\u0000" +
    "\u00b1\u00bd\u006b\u00fd\u0096\u0042\u007e\u00e4" +
    "\u0000\u0000\u0007\u0000\u0000\u0000\u0002\u0000" +
-   "\u0004\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0003\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0015\u0000\u0000\u0000\u0052\u0001\u0000\u0000" +
    "\u0029\u0000\u0000\u0000\u0007\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
@@ -1717,27 +1821,27 @@ public static final org.capnproto.SegmentReader b_bb789fd3bdf57009 =
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\\\u0000\u0000\u0000\u0003\u0000\u0001\u0000" +
    "\u0068\u0000\u0000\u0000\u0002\u0000\u0001\u0000" +
-   "\u0001\u0000\u0000\u0000\u0001\u0000\u0000\u0000" +
-   "\u0000\u0000\u0001\u0000\u0001\u0000\u0000\u0000" +
+   "\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0043\u00b0\u00aa\u008e\u00ca\u00e5\u002e\u00ef" +
+   "\u0065\u0000\u0000\u0000\u003a\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u0065\u0000\u0000\u0000\"\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u0060\u0000\u0000\u0000\u0003\u0000\u0001\u0000" +
-   "\u006c\u0000\u0000\u0000\u0002\u0000\u0001\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0002\u0000\u00ff\u00ff\u0000\u0000\u0000\u0000" +
-   "\u0000\u0000\u0001\u0000\u0002\u0000\u0000\u0000" +
-   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u0069\u0000\u0000\u0000\u0042\u0000\u0000\u0000" +
-   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u0064\u0000\u0000\u0000\u0003\u0000\u0001\u0000" +
-   "\u0070\u0000\u0000\u0000\u0002\u0000\u0001\u0000" +
-   "\u0003\u0000\u00fe\u00ff\u0003\u0000\u0000\u0000" +
    "\u0000\u0000\u0001\u0000\u0003\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u006d\u0000\u0000\u0000\u002a\u0000\u0000\u0000" +
+   "\u004d\u0000\u0000\u0000\u0042\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u0068\u0000\u0000\u0000\u0003\u0000\u0001\u0000" +
-   "\u0074\u0000\u0000\u0000\u0002\u0000\u0001\u0000" +
+   "\u0048\u0000\u0000\u0000\u0003\u0000\u0001\u0000" +
+   "\u0054\u0000\u0000\u0000\u0002\u0000\u0001\u0000" +
+   "\u0003\u0000\u00fe\u00ff\u0003\u0000\u0000\u0000" +
+   "\u0000\u0000\u0001\u0000\u0004\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0051\u0000\u0000\u0000\u002a\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u004c\u0000\u0000\u0000\u0003\u0000\u0001\u0000" +
+   "\u0058\u0000\u0000\u0000\u0002\u0000\u0001\u0000" +
    "\u0070\u006f\u0072\u0074\u0000\u0000\u0000\u0000" +
    "\u0008\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
@@ -1746,14 +1850,7 @@ public static final org.capnproto.SegmentReader b_bb789fd3bdf57009 =
    "\u0008\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u0069\u0064\u0078\u0000\u0000\u0000\u0000\u0000" +
-   "\u0008\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u0008\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0062\u0075\u0073\u0049\u0064\u0078\u0000\u0000" +
    "\u0065\u0078\u0074\u0050\u006f\u0072\u0074\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
@@ -1763,6 +1860,59 @@ public static final org.capnproto.SegmentReader b_bb789fd3bdf57009 =
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0069\u006e\u0073\u0074\u0000\u0000\u0000\u0000" +
+   "\u0008\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0008\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" + "");
+public static final org.capnproto.SegmentReader b_ef2ee5ca8eaab043 =
+   org.capnproto.GeneratedClassSupport.decodeRawBytes(
+   "\u0000\u0000\u0000\u0000\u0005\u0000\u0006\u0000" +
+   "\u0043\u00b0\u00aa\u008e\u00ca\u00e5\u002e\u00ef" +
+   "\u002a\u0000\u0000\u0000\u0001\u0000\u0002\u0000" +
+   "\u0009\u0070\u00f5\u00bd\u00d3\u009f\u0078\u00bb" +
+   "\u0000\u0000\u0007\u0000\u0001\u0000\u0002\u0000" +
+   "\u0002\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0015\u0000\u0000\u0000\u008a\u0001\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0025\u0000\u0000\u0000\u0077\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u004c\u006f\u0067\u0069\u0063\u0061\u006c\u004e" +
+   "\u0065\u0074\u006c\u0069\u0073\u0074\u002e\u0063" +
+   "\u0061\u0070\u006e\u0070\u003a\u004e\u0065\u0074" +
+   "\u006c\u0069\u0073\u0074\u002e\u0050\u006f\u0072" +
+   "\u0074\u0049\u006e\u0073\u0074\u0061\u006e\u0063" +
+   "\u0065\u002e\u0062\u0075\u0073\u0049\u0064\u0078" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0008\u0000\u0000\u0000\u0003\u0000\u0004\u0000" +
+   "\u0000\u0000\u00ff\u00ff\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0001\u0000\u0001\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0029\u0000\u0000\u0000\u0052\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0028\u0000\u0000\u0000\u0003\u0000\u0001\u0000" +
+   "\u0034\u0000\u0000\u0000\u0002\u0000\u0001\u0000" +
+   "\u0001\u0000\u00fe\u00ff\u0002\u0000\u0000\u0000" +
+   "\u0000\u0000\u0001\u0000\u0002\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0031\u0000\u0000\u0000\"\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u002c\u0000\u0000\u0000\u0003\u0000\u0001\u0000" +
+   "\u0038\u0000\u0000\u0000\u0002\u0000\u0001\u0000" +
+   "\u0073\u0069\u006e\u0067\u006c\u0065\u0042\u0069" +
+   "\u0074\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0069\u0064\u0078\u0000\u0000\u0000\u0000\u0000" +
    "\u0008\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +

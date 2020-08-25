@@ -29,6 +29,7 @@ import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.Net;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.Port;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.PortInstance;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.PropertyMap;
+import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.PortInstance.BusIdx;
 
 public class LogNetlistReader {
 
@@ -156,7 +157,13 @@ public class LogNetlistReader {
                 EDIFCell portCellType = inst == null? edifCell : inst.getCellType();
                 EDIFPort port = readEDIFPort(portInstReader.getPort(), n, portReaderList, portCellType);
 
-                net.createPortInst(port, portInstReader.getIdx(), inst);
+                BusIdx.Reader portIdxReader = portInstReader.getBusIdx();
+                if(portIdxReader.isSingleBit()) {
+                    net.createPortInst(port, inst);
+                }else {
+                    net.createPortInst(port, portIdxReader.getIdx(), inst);    
+                }
+                
             }
         }
         

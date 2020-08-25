@@ -153,7 +153,9 @@ public class LogNetlistWriter {
                     } else {
                         piBuilder.setExtPort(Void.VOID);
                     }
-                    piBuilder.setIdx(portInst.getIndex());
+                    if(portInst.getPort().isBus()) {
+                        piBuilder.initBusIdx().setIdx(portInst.getIndex());   
+                    }
                     k++;
                 }
                 j++;

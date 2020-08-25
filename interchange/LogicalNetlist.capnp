@@ -65,10 +65,13 @@ struct Netlist {
   
   struct PortInstance {
     port  @0 : PortIdx;
-    idx   @1 : UInt32; # Index within bussed port
+    busIdx : union {
+        singleBit @1 : Void; # Single bit
+        idx       @2 : UInt32; # Index within bussed port
+    }
     union {
-      extPort @2 : Void;
-      inst    @3 : InstIdx;
+      extPort     @3 : Void;
+      inst        @4 : InstIdx;
     }
   }
   
