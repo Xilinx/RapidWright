@@ -52,7 +52,13 @@ public class LogNetlistReader {
             PropertyMap.Entry.Reader entryReader = entries.get(i);
             String key = allStrings.get(entryReader.getKey());
             if(entryReader.isTextValue()) {
-                obj.addProperty(key, allStrings.get(entryReader.getTextValue()));
+            	String textValue = allStrings.get(entryReader.getTextValue());
+            	if(textValue.contains("\"")) {
+            		throw new RuntimeException("ERROR: String '"+textValue+
+            				"'\n\t value contains unescaped '\"' "
+            				+ "character. Please replace with EDIF escape value '%34%'.");
+            	}
+                obj.addProperty(key, textValue);
             } else if(entryReader.isIntValue()) {
                 obj.addProperty(key, entryReader.getIntValue());
             } else if(entryReader.isBoolValue()) {
