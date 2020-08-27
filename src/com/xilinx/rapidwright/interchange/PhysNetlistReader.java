@@ -168,6 +168,20 @@ public class PhysNetlistReader {
                     }
                 }
                 BEL bel = siteInst.getBEL(strings.get(placement.getBel()));
+                if(bel == null) {
+                    System.err.println(
+                  		  "[WARNING] The placement specified on BEL " + site.getName() + "/" 
+                          + strings.get(placement.getBel()) + " could not be found in the target "
+                          + "device and this placement entry has been skipped.");
+                    continue;
+                }
+                if(bel.getBELType().equals("HARD0") || bel.getBELType().equals("HARD1")) {
+                    System.err.println(
+                    		  "[WARNING] The placement specified on BEL " + site.getName() + "/" 
+                            + bel.getName() + " is not valid. HARD0 and HARD1 BEL types do not "
+                            + "require placed cells and this placement entry has been skipped.");
+                    continue;
+                }
                 Cell cell = new Cell(cellName, siteInst, bel, cellInst);
                 cell.setBELFixed(placement.getIsBelFixed());
                 cell.setSiteFixed(placement.getIsSiteFixed());
