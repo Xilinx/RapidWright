@@ -1327,8 +1327,33 @@ public class DesignTools {
 	public static List<SitePinInst> createMissingSitePinInsts(Design design, Net net) {
 		EDIFNetlist n = design.getNetlist();
 		List<EDIFHierPortInst> physPins = n.getPhysicalPins(net.getName());
-		if(physPins == null) return Collections.emptyList();
 		List<SitePinInst> newPins = new ArrayList<>();
+		if(physPins == null) {
+			// Likely net inside encrypted IP, let's see if we can infer anything from existing
+			// physical description
+			for(SiteInst siteInst : net.getSiteInsts()) {
+				for(String siteWire : siteInst.getSiteWiresFromNet(net)) {
+					for(BELPin pin : siteInst.getSiteWirePins(siteWire)) {
+						if(pin.isSitePort()) {
+							SitePinInst currPin = siteInst.getSitePinInst(pin.getName());
+							if(currPin == null) {
+								boolean isOutput = siteInst.isSitePinOutput(pin.getName());
+								if(isOutput && net.getSource() != null) {
+									currPin = new SitePinInst(pin.getName(), siteInst);
+									net.setAlternateSource(currPin);
+								}else {
+									currPin = net.createPin(isOutput, pin.getName(), siteInst);
+								}
+								newPins.add(currPin);
+							}
+						}
+					}
+				}
+			}
+			
+			return newPins;
+		}
+
 		for(EDIFHierPortInst p :  physPins) {
 			Cell c = design.getCell(p.getFullHierarchicalInstName());
 			if(c == null || c.getBEL() == null) continue;
