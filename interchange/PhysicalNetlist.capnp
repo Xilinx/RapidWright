@@ -59,7 +59,15 @@ struct PhysNetlist {
     name      @0 : StringIdx;
     sources   @1 : List(RouteBranch);
     stubs     @2 : List(RouteBranch);
+    type      @3 : NetType = signal;
   }
+  
+  enum NetType {
+    signal   @0;
+    gnd      @1;
+    vcc      @2;
+  }
+  
   
   struct RouteBranch {
     routeSegment : union {
@@ -100,6 +108,10 @@ struct PhysNetlist {
     bel     @1 : StringIdx;
     pin     @2 : StringIdx;
     isFixed @3 : Bool;
+    union {
+      inverts     @4 : Void;
+      isInverting @5 : Bool;
+    }
   }
   
   struct SiteInstance {
