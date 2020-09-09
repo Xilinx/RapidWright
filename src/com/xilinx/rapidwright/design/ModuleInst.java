@@ -24,6 +24,7 @@ package com.xilinx.rapidwright.design;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 
 import com.xilinx.rapidwright.design.blocks.PBlock;
@@ -243,15 +244,28 @@ public class ModuleInst{
 		return validSites;
 	}
 
+	/**
+	 * Places the module instance anchor at the newAnchorSite as well as all other 
+	 * instances and nets within the module instance at their relative offsets of the new site.
+	 * @param newAnchorSite The new site for the anchor of the module instance.
+	 * @return True if placement was successful, false otherwise.
+	 */
+	public boolean place(Site newAnchorSite){	
+		return place(newAnchorSite, false);
+	}
+	
 	
 	/**
 	 * Places the module instance anchor at the newAnchorSite as well as all other 
 	 * instances and nets within the module instance at their relative offsets of the new site.
 	 * @param newAnchorSite The new site for the anchor of the module instance.
-	 * @param dev The device on which the module instance is being placed.
+	 * @param skipIncompatible Flag telling the placement checks to skip any incompatible site that
+	 * does not match the floorplan according to the original module and simply leave it unplaced.  
+	 * Setting to false will cause placement to fail on first mismatch of floorplan placement 
+	 * attempt.
 	 * @return True if placement was successful, false otherwise.
 	 */
-	public boolean place(Site newAnchorSite){	
+	public boolean place(Site newAnchorSite, boolean skipIncompatible){	
 		// Check if parameters are null
 		if(newAnchorSite == null){
 			return false;
@@ -296,8 +310,12 @@ public class ModuleInst{
 				
 				// revert placement to original placement before method call
 				if(originalSites == null){
-					unplace();
-					return false;
+					if(skipIncompatible) {
+						continue;						
+					} else {
+						unplace();
+						return false;	
+					}
 				}
 				for(SiteInst i : originalSites.keySet()){
 					design.getSiteInst(i.getName()).place(originalSites.get(i));
@@ -326,16 +344,20 @@ public class ModuleInst{
 		//=======================================================//
 		/* Place net at new location                             */
 		//=======================================================//
-		for(Net net : nets){
+		nextnet: for(Net net : nets){
 			net.getPIPs().clear();
 			Net templateNet = net.getModuleTemplateNet();
 			for(PIP pip : templateNet.getPIPs()){
 				Tile templatePipTile = pip.getTile();
 				Tile newPipTile = module.getCorrespondingTile(templatePipTile, newAnchorSite.getTile(), dev);
 				if(newPipTile == null){
-					unplace();
-					MessageGenerator.briefError("Warning: Unable to return module instance "+ name +" back to original placement.");
-					return false;
+					if(skipIncompatible) {
+						continue nextnet;
+					}else {
+						unplace();
+						MessageGenerator.briefError("Warning: Unable to return module instance "+ name +" back to original placement.");
+						return false;
+					}					
 				}
 				PIP newPip = new PIP(pip);///new PIP(newPipTile, pip.getStartWire(), pip.getEndWire(), pip.getPIPType());
 				newPip.setTile(newPipTile);
