@@ -1390,6 +1390,7 @@ public class DesignTools {
 	        if(!siteWires.contains(curr.getSiteWireName())) return null;
 	        if(curr.isInput()) {
 	            BELPin source = curr.getSourcePin();
+	            if(source == null) return null;
 	            if(source.isSitePort()) {
 	                return source.getName();
 	            } else if(source.getBEL().getBELClass() == BELClass.RBEL){
