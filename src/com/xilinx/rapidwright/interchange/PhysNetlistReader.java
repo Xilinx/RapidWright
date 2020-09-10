@@ -2,8 +2,11 @@ package com.xilinx.rapidwright.interchange;
 
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 
 import org.capnproto.MessageReader;
 import org.capnproto.PrimitiveList;
@@ -18,6 +21,7 @@ import com.xilinx.rapidwright.design.AltPinMapping;
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Unisim;
@@ -31,7 +35,9 @@ import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierNet;
+import com.xilinx.rapidwright.edif.EDIFLibrary;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.CellPlacement;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.MultiCellPinMapping;
@@ -122,6 +128,8 @@ public class PhysNetlistReader {
         int placementCount = placements.size();
         Device device = design.getDevice();
         EDIFNetlist netlist = design.getNetlist();
+        EDIFLibrary macroPrims = Design.getMacroPrimitives(device.getSeries());
+        Map<String, List<String>> macroLeafChildren = new HashMap<>();
         for(int i=0; i < placementCount; i++) {
             CellPlacement.Reader placement = placements.get(i);
             String cellName = strings.get(placement.getCellName());
@@ -156,8 +164,8 @@ public class PhysNetlistReader {
 				portCell.setSiteFixed(placement.getIsSiteFixed());
             } else {
             	cellInst = netlist.getCellInstFromHierName(cellName);
+            	String cellType = strings.get(placement.getType());
                 if(cellInst == null) {
-                    String cellType = strings.get(placement.getType());
                     Optional<Unisim> maybeUnisim = Enums.getIfPresent(Unisim.class, cellType);
                     Unisim unisim = maybeUnisim.isPresent() ? maybeUnisim.get() : null;
                     if(unisim == null) {
@@ -167,20 +175,26 @@ public class PhysNetlistReader {
                         cellInst = Design.createUnisimInst(null, cellName, unisim);                    
                     }
                 }
+                if((cellType != null && macroPrims.containsCell(cellType)) || 
+                		macroPrims.containsCell(cellInst.getCellType())) {
+                	throw new RuntimeException("ERROR: Placement for macro primitive " 
+                			+ cellInst.getCellType().getName() + " (instance "+cellName+") is "
+                			+ "invalid.  Please only provide placements for the macro's children "
+                			+ "leaf cells: " + cellInst.getCellType().getCellInsts() +".");
+                }
+                
                 BEL bel = siteInst.getBEL(strings.get(placement.getBel()));
                 if(bel == null) {
-                    System.err.println(
-                  		  "[WARNING] The placement specified on BEL " + site.getName() + "/" 
+                    throw new RuntimeException(
+                  		  "ERROR: The placement specified on BEL " + site.getName() + "/" 
                           + strings.get(placement.getBel()) + " could not be found in the target "
-                          + "device and this placement entry has been skipped.");
-                    continue;
+                          + "device.");
                 }
                 if(bel.getBELType().equals("HARD0") || bel.getBELType().equals("HARD1")) {
-                    System.err.println(
-                    		  "[WARNING] The placement specified on BEL " + site.getName() + "/" 
+                    throw new RuntimeException(
+                    		  "ERROR: The placement specified on BEL " + site.getName() + "/" 
                             + bel.getName() + " is not valid. HARD0 and HARD1 BEL types do not "
-                            + "require placed cells and this placement entry has been skipped.");
-                    continue;
+                            + "require placed cells.");
                 }
                 Cell cell = new Cell(cellName, siteInst, bel, cellInst);
                 cell.setBELFixed(placement.getIsBelFixed());
@@ -237,7 +251,59 @@ public class PhysNetlistReader {
                     }                	
                 }
             }
-        }        
+        }
+        
+        // Validate macro primitives are placed fully
+        HashSet<String> checked = new HashSet<>();
+        for(Cell c : design.getCells()) {
+        	EDIFCell cellType = c.getParentCell();
+        	if(cellType != null && macroPrims.containsCell(cellType)) {
+        		String parentHierName = c.getParentHierarchicalInstName();
+            	if(checked.contains(parentHierName)) continue;
+            	List<String> missingPlacements = null;
+            	List<String> childrenNames = macroLeafChildren.get(cellType.getName());
+            	if(childrenNames == null) {
+            		childrenNames = EDIFTools.getMacroLeafCellNames(cellType);
+            		macroLeafChildren.put(cellType.getName(), childrenNames);
+            	}
+            	//for(EDIFCellInst inst : cellType.getCellInsts()) { // TODO - Fix up loop list
+            	for(String childName : childrenNames) {
+            		String childCellName = parentHierName + EDIFTools.EDIF_HIER_SEP + childName;
+            		Cell child = design.getCell(childCellName);
+            		if(child == null) {
+            			if(missingPlacements == null) missingPlacements = new ArrayList<String>();
+            			missingPlacements.add(childName + " (" + childCellName + ")");
+            		}
+            	}
+            	if(missingPlacements != null && !cellType.getName().equals("IOBUFDS")) {
+        			throw new RuntimeException("ERROR: Macro primitive '"+ parentHierName 
+        					+ "' is not fully placed. Expected placements for all child cells: " 
+        					+ cellType.getCellInsts() + ", but missing placements "
+        				    + "for cells: " + missingPlacements);            		
+            	}
+            	
+            	checked.add(parentHierName);
+        	}
+        }
+    }
+    
+    private static NetType getNetType(PhysNet.Reader netReader, String netName) {
+    	switch(netReader.getType()) {
+    		case GND:
+    			if(!netName.equals(Net.GND_NET)) {
+    				throw new RuntimeException("ERROR: Invalid GND Net " + netName +
+    						", should be named " + Net.GND_NET);
+    			}
+    			return NetType.GND;
+    		case VCC:
+    			if(!netName.equals(Net.VCC_NET)) {
+    				throw new RuntimeException("ERROR: Invalid VCC Net " + netName +
+    						", should be named " + Net.VCC_NET);
+    			}
+    			return NetType.VCC;
+    		default:
+    			return NetType.WIRE;
+    	}
     }
     
     private static void readRouting(PhysNetlist.Reader physNetlist, Design design, 
@@ -251,6 +317,8 @@ public class PhysNetlistReader {
             EDIFHierNet edifNet = netlist.getHierNetFromName(netName);
             Net net = new Net(netName, edifNet == null ? null : edifNet.getNet());
             design.addNet(net);
+            net.setType(getNetType(netReader, netName));
+            
             // Sources
             StructList.Reader<RouteBranch.Reader> routeSrcs = netReader.getSources();
             int routeSrcsCount = routeSrcs.size();

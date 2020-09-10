@@ -23,6 +23,7 @@ import com.xilinx.rapidwright.design.AltPinMapping;
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.BELPin;
@@ -200,6 +201,10 @@ public class PhysNetlistWriter {
                 		net = spi.getNet();
                 	}
                 }
+                if(net == null) {
+                	throw new RuntimeException("ERROR: Couldn't determine net corresponding to the "
+                			+ "sitePIP " + site.getName() +"/" + sitePIP);
+                }
                 SitePIPStatus status = siteInst.getSitePIPStatus(sitePIP);
                 ArrayList<RouteBranchNode> segments = netSiteRouting.get(net);
                 if(segments == null) {
@@ -243,6 +248,17 @@ public class PhysNetlistWriter {
         for(Net net : design.getNets()) {
             PhysNet.Builder physNet = nets.get(i);
             physNet.setName(strings.getIndex(net.getName()));
+            switch (net.getType()) {
+            	case GND:
+            		physNet.setType(PhysNetlist.NetType.GND);
+            		break;
+            	case VCC:
+            		physNet.setType(PhysNetlist.NetType.VCC);
+            		break;            		
+            	default:
+            		physNet.setType(PhysNetlist.NetType.SIGNAL);
+            }
+            
             // We need to traverse the net inside sites to fully populate routing spec
             ArrayList<RouteBranchNode> routingSources = new ArrayList<>();
             for(PIP p : net.getPIPs()) {
