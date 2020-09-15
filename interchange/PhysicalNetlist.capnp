@@ -14,6 +14,7 @@ struct PhysNetlist {
   strList      @4 : List(Text);
   siteInsts    @5 : List(SiteInstance);
   properties   @6 : List(Property);
+  nullNet      @7 : PhysNet;
 
   struct PinMapping {
     cellPin    @0 : StringIdx;
