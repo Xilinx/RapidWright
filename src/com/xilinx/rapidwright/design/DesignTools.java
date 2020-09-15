@@ -49,6 +49,7 @@ import com.xilinx.rapidwright.device.BELClass;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.SitePIP;
@@ -1441,6 +1442,58 @@ public class DesignTools {
 	public static void createMissingSitePinInsts(Design design) {
 		for(Net net : design.getNets()) {
 			createMissingSitePinInsts(design,net);
+		}
+	}
+	
+	private static HashSet<String> muxPins; 
+	
+	static {
+		muxPins = new HashSet<String>();
+		for(char c = 'A' ; c <= 'H' ; c++) {
+			muxPins.add(c + "MUX");
+		}
+	}
+	
+	/**
+	 * In Series7 and UltraScale architectures, there are dual output site pin scenarios where an 
+	 * optional additional output can be used to drive out of the SLICE using the OUTMUX routing 
+	 * BEL.  When unrouting a design, some site routing can be left "dangling".  This method will
+	 * remove those unnecessary sitePIPs and site routing for the *MUX output.  
+	 * @param design The design from which to remove the unnecessary site routing 
+	 */
+	public static void unrouteDualOutputSitePinRouting(Design design) {
+		boolean isSeries7 = design.getDevice().getSeries() == Series.Series7;
+		for(SiteInst siteInst : design.getSiteInsts()) {
+			if(Utils.isSLICE(siteInst)) {
+				ArrayList<String> toRemove = null;
+				for(Entry<String,Net> e : siteInst.getNetSiteWireMap().entrySet()) {
+					if(muxPins.contains(e.getKey())) {
+						// MUX output is used, is the same net also driving the direct output?
+						String directPin = e.getKey().charAt(0) + (isSeries7 ? "" : "_O");
+						Net net = siteInst.getNetFromSiteWire(directPin);
+						if(e.getValue().equals(net)) {
+							if(toRemove == null) {
+								toRemove = new ArrayList<String>();
+							}
+							toRemove.add(e.getKey());
+						}
+					}
+				}
+				if(toRemove == null) continue;
+				for(String name : toRemove) {
+					Net net = siteInst.getNetFromSiteWire(name);
+					BELPin belPin = siteInst.getBEL(name).getPin(name);
+					BELPin muxOutput = belPin.getSourcePin();
+					SitePIP sitePIP = siteInst.getUsedSitePIP(muxOutput.getBEL().getName());
+					BELPin srcPin = sitePIP.getInputPin().getSourcePin();
+					boolean success = siteInst.unrouteIntraSiteNet(srcPin, belPin);
+					if(!success) throw new RuntimeException("ERROR: Failed to unroute dual output "
+							+ "net/pin scenario: " + net + " on pin " + name);
+					siteInst.routeIntraSiteNet(net, srcPin, srcPin);
+				}
+				
+				
+			}
 		}
 	}
 }
