@@ -1458,7 +1458,8 @@ public class DesignTools {
 	 * In Series7 and UltraScale architectures, there are dual output site pin scenarios where an 
 	 * optional additional output can be used to drive out of the SLICE using the OUTMUX routing 
 	 * BEL.  When unrouting a design, some site routing can be left "dangling".  This method will
-	 * remove those unnecessary sitePIPs and site routing for the *MUX output.  
+	 * remove those unnecessary sitePIPs and site routing for the *MUX output.  It will also remove
+	 * the output source pin if it is the *MUX output.
 	 * @param design The design from which to remove the unnecessary site routing 
 	 */
 	public static void unrouteDualOutputSitePinRouting(Design design) {
@@ -1490,10 +1491,129 @@ public class DesignTools {
 					if(!success) throw new RuntimeException("ERROR: Failed to unroute dual output "
 							+ "net/pin scenario: " + net + " on pin " + name);
 					siteInst.routeIntraSiteNet(net, srcPin, srcPin);
+					if(net.getSource().getName().equals(belPin.getName())) {
+						net.removePin(net.getSource());						
+					}
 				}
-				
-				
 			}
 		}
+	}
+	
+	/**
+	 * Finds a legal/available alternative output site pin for the given net.  The most common case 
+	 * is the SLICE.  It depends on the existing output pin of the net to be routed within the site 
+	 * and checks if site routing resource are available to use the alternative output site pin.
+	 * @param net The net of interest.
+	 * @return A new potential site pin inst that could be added/routed to.
+	 */
+	public static SitePinInst getLegalAlternativeOutputPin(Net net) {
+		SitePinInst alt = net.getAlternateSource();
+		if(alt != null) return alt;
+		SitePinInst src = net.getSource();
+		if(src == null) return null;
+		SiteInst siteInst = src.getSiteInst();
+		// Currently only support SLICE scenarios
+		if(!Utils.isSLICE(siteInst)) return null;
+		
+		// Series 7: AMUX <-> A, BMUX <-> B, CMUX <-> C, DMUX <-> D
+		// UltraScale/+: AMUX <-> A_O, BMUX <-> B_O, ... HMUX <-> H_O 
+		Queue<BELPin> q = new LinkedList<>();
+		BELPin srcPin = src.getBELPin();
+		
+		// Find the logical source
+		BELPin logicalSource = getLogicalBELPinDriver(src);
+		if(logicalSource == null) return null;
+		q.add(logicalSource);
+
+		// Fan out from logical source to all site pins
+		BELPin alternateExit = null;
+		while(!q.isEmpty()) {
+			BELPin currOutPin = q.poll();
+			Net currNet = siteInst.getNetFromSiteWire(currOutPin.getSiteWireName());
+			// Skip any resources used by another net
+			if(currNet != null && !currNet.equals(net)) continue;
+			for(BELPin pin : currOutPin.getSiteConns()) {
+				if(pin.getBEL().getBELClass() == BELClass.RBEL) {
+					SitePIP pip = src.getSiteInst().getSitePIP(pin);
+					q.add(pip.getOutputPin());
+				}else if(pin.isSitePort() && !pin.equals(srcPin)) {
+					Net currNet2 = siteInst.getNetFromSiteWire(pin.getSiteWireName());
+					if(currNet2 == null || currNet2.equals(net)) {
+						alternateExit = pin;
+					}
+				}
+			}
+		}
+		if(alternateExit != null) {
+			// Create the pin in such a way as it is not put in the SiteInst map
+			SitePinInst sitePinInst = new SitePinInst();
+			sitePinInst.setSiteInst(src.getSiteInst());
+			sitePinInst.setPinName(alternateExit.getName());
+			sitePinInst.setIsOutputPin(true);
+			return sitePinInst;
+		}
+		return null;
+	}
+	
+	/**
+	 * Looks backwards from a SitePinInst output pin and finds the corresponding BELPin of the 
+	 * driver.
+	 * @param sitePinInst The output site pin instance from which to find the logical driver.
+	 * @return The logical driver's BELPin of the provided sitePinInst.
+	 */
+	public static BELPin getLogicalBELPinDriver(SitePinInst sitePinInst) {
+		if(!sitePinInst.isOutPin()) return null;
+		SiteInst siteInst = sitePinInst.getSiteInst();
+		for(BELPin pin : sitePinInst.getBELPin().getSiteConns()) {
+			if(pin.isInput()) continue;
+			if(pin.getBEL().getBELClass() == BELClass.RBEL) {
+				SitePIP p = siteInst.getUsedSitePIP(pin.getBEL().getName());
+				for(BELPin pin2 : p.getInputPin().getSiteConns()) {
+					if(pin2.isOutput()) {
+						return pin2;
+					}
+				}
+			}
+			return pin;
+		}
+		return null;
+	}
+	
+	/**
+	 * Routes (within the site) the alternate site output pin for SLICE dual-output scenarios. 
+	 * @param net The current net of interest to be routed
+	 * @param sitePinInst The alternate site output pin to be routed
+	 * @return True if the routing was successful, false otherwise
+	 */
+	public static boolean routeAlternativeOutputSitePin(Net net, SitePinInst sitePinInst) {
+		if(sitePinInst == null) return false;
+		net.setAlternateSource(sitePinInst);
+		sitePinInst.setNet(net);
+
+		BELPin driver = getLogicalBELPinDriver(net.getSource());
+		BELPin belPinPort = sitePinInst.getBELPin();
+		
+		return sitePinInst.getSiteInst().routeIntraSiteNet(net, driver, belPinPort);
+	}
+	
+	/**
+	 * Un-routes (within the site) the alternate source pin on the provided net.  This is in 
+	 * reference to dual-output site pin scenarios for SLICEs.  
+	 * @param net The relevant net that has the populated alternative site pin.
+	 * @return True if the alternate source was unrouted successfully, false otherwise.
+	 */
+	public static boolean unrouteAlternativeOutputSitePin(Net net) {
+		SitePinInst altPin = net.getAlternateSource();
+		if(altPin == null) return false;
+		SiteInst siteInst = altPin.getSiteInst();
+		
+		BELPin driver = getLogicalBELPinDriver(net.getSource());
+		BELPin belPinPort = altPin.getBELPin();
+		
+		boolean result = siteInst.unrouteIntraSiteNet(driver, belPinPort);
+		// Re-route the driver site wire
+		siteInst.routeIntraSiteNet(net, driver, driver);
+		
+		return result;
 	}
 }
