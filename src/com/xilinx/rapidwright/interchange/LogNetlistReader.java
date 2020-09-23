@@ -11,6 +11,8 @@ import org.capnproto.SerializePacked;
 import org.capnproto.StructList;
 import org.capnproto.TextList;
 
+import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFDesign;
@@ -21,6 +23,7 @@ import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFPropertyObject;
+import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.Cell;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.CellInstance;
@@ -177,6 +180,29 @@ public class LogNetlistReader {
         
         allCells.ensureSize(cellIdx+1);
         allCells.update(edifCell, cellIdx);
+        
+        // Check if Unisim definitions match 
+        if(edifCell.getLibrary().isHDIPrimitivesLibrary()) {
+        	Unisim cellType = Unisim.valueOf(edifCell.getName());
+        	EDIFCell cell = Design.getUnisimCell(cellType);
+        	if(cell.getPorts().size() != edifCell.getPorts().size()) {
+        		System.err.println("[WARNING]: Unisim mismatch found in EDIF Library: " 
+                     + EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME  + ", Cell: " 
+                     + edifCell.getName() + ", port names/widths mismatch, should be: \n\t" 
+                     + cell.getPorts() + ",\n\tbut found: \n\t\t" + edifCell.getPorts());
+        	}
+        	for(EDIFPort port : cell.getPorts()) {
+        		String portKey = port.getWidth() > 1 ? port.getBusName() : port.getName();
+        		EDIFPort portMatch = edifCell.getPort(portKey);
+        		if(portMatch == null || portMatch.getWidth() != port.getWidth()) {
+            		System.err.println("[WARNING]: Unisim mismatch found in EDIF Library: " 
+                            + EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME  + ", Cell: " 
+                            + edifCell.getName() + ", port names/widths mismatch, should be: \n\t" 
+                            + cell.getPorts() + ",\nbut found: \n\t" + edifCell.getPorts());
+        		}
+        	}
+        	
+        }
         return edifCell;
     }
     
