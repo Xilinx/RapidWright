@@ -51,6 +51,7 @@ import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysSitePi
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PinMapping;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.Property;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranch;
+import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranch.RouteSegment;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.SiteInstance;
 
 public class PhysNetlistReader {
@@ -68,7 +69,7 @@ public class PhysNetlistReader {
 
         FileInputStream fis = new java.io.FileInputStream(physNetlistFileName);
         ReaderOptions rdOptions =
-                new ReaderOptions(ReaderOptions.DEFAULT_READER_OPTIONS.traversalLimitInWords * 32,
+                new ReaderOptions(ReaderOptions.DEFAULT_READER_OPTIONS.traversalLimitInWords * 64,
                 ReaderOptions.DEFAULT_READER_OPTIONS.nestingLimit * 128);
         MessageReader readMsg = SerializePacked.readFromUnbuffered((fis).getChannel(), rdOptions);
         fis.close();
@@ -209,8 +210,18 @@ public class PhysNetlistReader {
                 }
             }
 
-
-
+            PhysNet.Reader nullNet = physNetlist.getNullNet();
+            StructList.Reader<RouteBranch.Reader> stubs = nullNet.getStubs();
+            int stubCount = stubs.size();
+            for(int k=0; k < stubCount; k++) {
+            	RouteSegment.Reader segment = stubs.get(k).getRouteSegment();
+                PhysSitePIP.Reader spReader = segment.getSitePIP();
+                SiteInst sitePIPSiteInst = getSiteInst(spReader.getSite(), design, strings);
+                sitePIPSiteInst.addSitePIP(strings.get(spReader.getBel()),
+                                           strings.get(spReader.getPin()));            	
+            }
+            
+            
             StructList.Reader<PinMapping.Reader> pinMap = placement.getPinMap();
             int pinMapCount = pinMap.size();
             for(int j=0; j < pinMapCount; j++) {

@@ -189,6 +189,7 @@ public class PhysNetlistWriter {
     	
     	// Extract out site routing first, for partially routed designs...
     	HashMap<Net, ArrayList<RouteBranchNode>> netSiteRouting = new HashMap<>();
+    	List<RouteBranchNode> nullNetStubs = new ArrayList<>();
     	for(SiteInst siteInst : design.getSiteInsts()) {
     		Site site = siteInst.getSite();
             for(SitePIP sitePIP : siteInst.getUsedSitePIPs()) {
@@ -201,11 +202,12 @@ public class PhysNetlistWriter {
                 		net = spi.getNet();
                 	}
                 }
-                if(net == null) {
-                	throw new RuntimeException("ERROR: Couldn't determine net corresponding to the "
-                			+ "sitePIP " + site.getName() +"/" + sitePIP);
-                }
                 SitePIPStatus status = siteInst.getSitePIPStatus(sitePIP);
+                if(net == null) {
+                	nullNetStubs.add(new RouteBranchNode(site, sitePIP, status.isFixed()));
+                	continue;
+                }
+                
                 ArrayList<RouteBranchNode> segments = netSiteRouting.get(net);
                 if(segments == null) {
                 	segments = new ArrayList<RouteBranchNode>();
@@ -224,7 +226,7 @@ public class PhysNetlistWriter {
                     for(String siteWire : e.getValue()) {
 	                    BELPin[] belPins = siteInst.getSiteWirePins(siteWire);
 	                    for(BELPin belPin : belPins) {
-	                        if(!belPin.isOutput()) 
+	                        if(belPin.isInput()) 
 	                            continue;
                             segments.add(new RouteBranchNode(site,belPin));	                            
 	                        break;
@@ -232,6 +234,20 @@ public class PhysNetlistWriter {
                     }                	
                 }
             }
+    	}
+    	
+    	PhysNet.Builder nullNet = physNetlist.getNullNet();
+    	Builder<RouteBranch.Builder> stubs = nullNet.initStubs(nullNetStubs.size());
+    	int i=0;
+    	for(RouteBranchNode node : nullNetStubs) {
+    		RouteBranch.Builder stub = stubs.get(i);
+    		PhysSitePIP.Builder physSitePIP = stub.initRouteSegment().initSitePIP();
+            SiteSitePIP sitePIP = node.getSitePIP();
+            physSitePIP.setSite(strings.getIndex(sitePIP.site.getName()));
+            physSitePIP.setBel(strings.getIndex(sitePIP.sitePIP.getBELName()));
+            physSitePIP.setPin(strings.getIndex(sitePIP.sitePIP.getInputPinName()));
+            physSitePIP.setIsFixed(sitePIP.isFixed);
+    		i++;
     	}
     	
     	int physNetCount = netSiteRouting.size();
@@ -244,7 +260,7 @@ public class PhysNetlistWriter {
     	
     	
         Builder<PhysNet.Builder> nets = physNetlist.initPhysNets(physNetCount);
-        int i=0;
+        i=0;
         for(Net net : design.getNets()) {
             PhysNet.Builder physNet = nets.get(i);
             physNet.setName(strings.getIndex(net.getName()));
