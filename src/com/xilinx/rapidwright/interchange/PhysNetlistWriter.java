@@ -1,6 +1,5 @@
 package com.xilinx.rapidwright.interchange;
 
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -13,7 +12,6 @@ import java.util.Queue;
 
 import org.capnproto.MessageBuilder;
 import org.capnproto.PrimitiveList;
-import org.capnproto.SerializePacked;
 import org.capnproto.StructList;
 import org.capnproto.Text;
 import org.capnproto.TextList;
@@ -23,7 +21,6 @@ import com.xilinx.rapidwright.design.AltPinMapping;
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
-import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.BELPin;
@@ -468,8 +465,6 @@ public class PhysNetlistWriter {
         
         writeStrings(physNetlist, strings);
         
-        FileOutputStream fo = new java.io.FileOutputStream(fileName);
-        SerializePacked.writeToUnbuffered(fo.getChannel(), message);
-        fo.close();
+        Interchange.writeInterchangeFile(fileName, message);
     }
 }

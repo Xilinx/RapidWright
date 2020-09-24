@@ -1,12 +1,10 @@
 package com.xilinx.rapidwright.interchange;
 
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.Map.Entry;
 
 import org.capnproto.MessageBuilder;
 import org.capnproto.PrimitiveList;
-import org.capnproto.SerializePacked;
 import org.capnproto.StructList;
 import org.capnproto.Text;
 import org.capnproto.TextList;
@@ -32,7 +30,7 @@ import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.PortInstance;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.PropertyMap;
 
 public class LogNetlistWriter {
-
+	
     private static Enumerator<EDIFCell> allCells = new Enumerator<>();
     private static Enumerator<EDIFCellInst> allInsts = new Enumerator<>();
     private static Enumerator<EDIFPort> allPorts = new Enumerator<>();
@@ -227,8 +225,6 @@ public class LogNetlistWriter {
         
         writeAllStringsToNetlistBuilder(netlist);
         
-        FileOutputStream fo = new java.io.FileOutputStream(fileName);
-        SerializePacked.writeToUnbuffered(fo.getChannel(), message);
-        fo.close();
+        Interchange.writeInterchangeFile(fileName, message);
     }
 }

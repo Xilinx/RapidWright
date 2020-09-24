@@ -1,6 +1,5 @@
 package com.xilinx.rapidwright.interchange;
 
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -11,7 +10,6 @@ import java.util.Map;
 import org.capnproto.MessageReader;
 import org.capnproto.PrimitiveList;
 import org.capnproto.ReaderOptions;
-import org.capnproto.SerializePacked;
 import org.capnproto.StructList;
 import org.capnproto.TextList;
 import org.python.google.common.base.Enums;
@@ -65,14 +63,10 @@ public class PhysNetlistReader {
     public static Design readPhysNetlist(String physNetlistFileName, EDIFNetlist netlist) throws IOException {
         Design design = new Design();
         design.setNetlist(netlist);
-
-
-        FileInputStream fis = new java.io.FileInputStream(physNetlistFileName);
         ReaderOptions rdOptions =
                 new ReaderOptions(ReaderOptions.DEFAULT_READER_OPTIONS.traversalLimitInWords * 64,
                 ReaderOptions.DEFAULT_READER_OPTIONS.nestingLimit * 128);
-        MessageReader readMsg = SerializePacked.readFromUnbuffered((fis).getChannel(), rdOptions);
-        fis.close();
+        MessageReader readMsg = Interchange.readInterchangeFile(physNetlistFileName, rdOptions);
 
         PhysNetlist.Reader physNetlist = readMsg.getRoot(PhysNetlist.factory);
         design.setPartName(physNetlist.getPart().toString());
