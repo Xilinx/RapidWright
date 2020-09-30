@@ -726,3 +726,112 @@ proc rainbow_highlight { objs } {
 	}
     }
 }
+
+proc write_properties { fp inst_or_net } {
+    set lines [split [report_property -return_string $inst_or_net] "\n"]
+    set num_lines [llength $lines]
+    for {set i 1} {$i < $num_lines} {incr i} {
+        set tokens [regexp -all -inline {\S+} [lindex $lines $i]]
+        if { [string match "false" [lindex $tokens 2]] } { 
+            set value [lindex $tokens [expr [llength $tokens] - 1]]
+            puts $fp "           (property [lindex $tokens 0] (string \"$value\"))"
+        }
+    }    
+}
+
+proc write_cell_to_edif_recursive { cell fp cells_written } {
+    foreach inst [get_cells -hier -filter NAME=~"[get_property NAME $cell]/*"] {
+        set cells_written [write_cell_to_edif_recursive $inst $fp $cells_written]
+    }
+    set replace_map {}
+    lappend replace_map "[get_property NAME $cell]/"
+    lappend replace_map ""
+    set pin_replace_map {}
+    lappend pin_replace_map ""
+    lappend pin_replace_map ""
+    
+    set cell_type [get_property REF_NAME $cell] 
+    if { ![dict exists $cells_written $cell_type] } {
+        dict append cells_written $cell_type 1
+        puts "$cell_type $cells_written" 
+        set cell_name [get_property NAME $cell]
+        puts $fp "   (cell $cell_type (celltype GENERIC)\n     (view netlist (viewtype NETLIST)\n       (interface "
+        foreach pin [get_pins -of $cell] { 
+            set dir "[get_property DIRECTION $pin]"
+            if ![string equal "INOUT" $dir] {
+              set dir "${dir}PUT"  
+            }
+            if { [get_property BUS_NAME $pin] != {} } {
+                set bus_name [get_property BUS_NAME $pin]
+                puts $fp "        (port (array (rename $bus_name \"$bus_name\[[get_property BUS_START $pin]:[get_property BUS_STOP $pin]\] [get_property BUS_WIDTH $pin]) (direction $dir))"
+            } else {
+                puts $fp "        (port [get_property REF_PIN_NAME $pin] (direction $dir))"
+            }
+        }
+        puts $fp "       )"
+        set insts [get_cells -hier -filter PARENT==$cell_name]
+        if [expr [llength $insts] > 0] {
+            puts $fp "       (contents"
+            foreach inst $insts {
+                set inst_name [string map $replace_map [get_property NAME $inst]]
+                puts $fp "         (instance $inst_name (viewref netlist (cellref [get_property REF_NAME $inst] (libraryref hdi_primitives))))"
+            }
+            foreach net [get_nets -hier -filter PARENT_CELL==$cell_name] {
+                set net_name [string map $replace_map [get_property NAME $net]]
+                puts $fp "         (net $net_name (joined"
+                foreach pin [get_pins -of $net] {
+                    set parent_cell_name [get_property PARENT_CELL $pin]
+                    lset pin_replace_map 0 "$parent_cell_name/"
+                    set pin_name [string map $pin_replace_map [get_property NAME $pin]]
+                    set instance ""
+                    if { $parent_cell_name != $cell_name } {
+                        set pin_inst_name [string map $replace_map $parent_cell_name]
+                        set instance " (instanceref $pin_inst_name)"
+                    }
+                    puts $fp "          (portref $pin_name$instance)"
+                }
+                puts $fp "          )"
+                puts $fp "         )"
+            }
+            puts $fp "      )"
+        }
+        puts $fp "     )\n   )"
+    }
+    return $cells_written
+}
+
+# WIP - Attempts to write out an EDIF netlist of the cell provided. Currently doesn't write out
+#       properties of any objects and does not do proper EDIF 'rename' substitution.
+proc write_cell_to_edif { cell file_name } {
+    set fp [open $file_name "w"]
+    set cell_type [get_property REF_NAME $cell]
+    puts $fp "(edif $cell_type"
+    puts $fp "  (edifversion 2 0 0)"
+    puts $fp "  (edifLevel 0)"
+    puts $fp "  (keywordmap (keywordlevel 0))"
+    puts $fp "(status"
+    puts $fp " (written"
+    set time_stamp [clock format [clock seconds] -format "%Y %m %d %H %M %S"]
+    puts $fp "  (timeStamp $time_stamp)"
+    puts $fp "  (program \"Vivado\" (version \"[version -short]\"))"
+    set start_idx [expr [string first "on" [version]]+3]
+    set end_idx [expr [string first "IP" [version]] -2]
+    set build_date [string range [version] $start_idx $end_idx]
+    puts $fp "  (comment \"Built on '$build_date'\")"
+    puts $fp "  (comment \"Built by 'rapidwright.tcl:write_cell_to_edif'\")"
+    puts $fp " )"
+    puts $fp ")"
+    puts $fp "  (Library hdi_primitives"
+    puts $fp "    (edifLevel 0)"
+    puts $fp "    (technology (numberDefinition ))"
+    write_cell_to_edif_recursive $cell $fp [dict create]
+    puts $fp "  )"
+    puts $fp "(comment \"Reference To The Cell Of Highest Level\")"
+    puts $fp ""
+    puts $fp "  (design $cell_type"
+    puts $fp "    (cellref $cell_type (libraryref hdi_primitives))"
+    puts $fp "    (property part (string \"[get_property PART [current_project]]\"))"
+    puts $fp "  )"
+    puts $fp ")"
+    close $fp
+}
