@@ -5,7 +5,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.ArrayDeque;
+import java.util.Queue;
 import java.util.Map;
+import java.util.Set;
 
 import org.capnproto.MessageReader;
 import org.capnproto.PrimitiveList;
@@ -34,7 +37,9 @@ import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.edif.EDIFLibrary;
+import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.CellPlacement;
@@ -72,6 +77,8 @@ public class PhysNetlistReader {
         design.setPartName(physNetlist.getPart().toString());
 
         Enumerator<String> allStrings = readAllStrings(physNetlist);
+
+        checkConstantRoutingAndNetNaming(physNetlist, netlist, allStrings);
 
         readSiteInsts(physNetlist, design, allStrings);
 
@@ -158,8 +165,8 @@ public class PhysNetlistReader {
                 portCell.setBELFixed(placement.getIsBelFixed());
                 portCell.setSiteFixed(placement.getIsSiteFixed());
             } else {
-            	cellInst = netlist.getCellInstFromHierName(cellName);
-            	String cellType = strings.get(placement.getType());
+                cellInst = netlist.getCellInstFromHierName(cellName);
+                String cellType = strings.get(placement.getType());
                 if(cellInst == null) {
                     Optional<Unisim> maybeUnisim = Enums.getIfPresent(Unisim.class, cellType);
                     Unisim unisim = maybeUnisim.isPresent() ? maybeUnisim.get() : null;
@@ -170,24 +177,24 @@ public class PhysNetlistReader {
                         cellInst = Design.createUnisimInst(null, cellName, unisim);
                     }
                 }
-                if((cellType != null && macroPrims.containsCell(cellType)) || 
-                		macroPrims.containsCell(cellInst.getCellType())) {
-                	throw new RuntimeException("ERROR: Placement for macro primitive " 
-                			+ cellInst.getCellType().getName() + " (instance "+cellName+") is "
-                			+ "invalid.  Please only provide placements for the macro's children "
-                			+ "leaf cells: " + cellInst.getCellType().getCellInsts() +".");
+                if((cellType != null && macroPrims.containsCell(cellType)) ||
+                        macroPrims.containsCell(cellInst.getCellType())) {
+                    throw new RuntimeException("ERROR: Placement for macro primitive "
+                            + cellInst.getCellType().getName() + " (instance "+cellName+") is "
+                            + "invalid.  Please only provide placements for the macro's children "
+                            + "leaf cells: " + cellInst.getCellType().getCellInsts() +".");
                 }
-                
+
                 BEL bel = siteInst.getBEL(strings.get(placement.getBel()));
                 if(bel == null) {
                     throw new RuntimeException(
-                  		  "ERROR: The placement specified on BEL " + site.getName() + "/" 
+                          "ERROR: The placement specified on BEL " + site.getName() + "/"
                           + strings.get(placement.getBel()) + " could not be found in the target "
                           + "device.");
                 }
                 if(bel.getBELType().equals("HARD0") || bel.getBELType().equals("HARD1")) {
                     throw new RuntimeException(
-                    		  "ERROR: The placement specified on BEL " + site.getName() + "/" 
+                              "ERROR: The placement specified on BEL " + site.getName() + "/"
                             + bel.getName() + " is not valid. HARD0 and HARD1 BEL types do not "
                             + "require placed cells.");
                 }
@@ -208,14 +215,14 @@ public class PhysNetlistReader {
             StructList.Reader<RouteBranch.Reader> stubs = nullNet.getStubs();
             int stubCount = stubs.size();
             for(int k=0; k < stubCount; k++) {
-            	RouteSegment.Reader segment = stubs.get(k).getRouteSegment();
+                RouteSegment.Reader segment = stubs.get(k).getRouteSegment();
                 PhysSitePIP.Reader spReader = segment.getSitePIP();
                 SiteInst sitePIPSiteInst = getSiteInst(spReader.getSite(), design, strings);
                 sitePIPSiteInst.addSitePIP(strings.get(spReader.getBel()),
-                                           strings.get(spReader.getPin()));            	
+                                           strings.get(spReader.getPin()));
             }
-            
-            
+
+
             StructList.Reader<PinMapping.Reader> pinMap = placement.getPinMap();
             int pinMapCount = pinMap.size();
             for(int j=0; j < pinMapCount; j++) {
@@ -257,61 +264,61 @@ public class PhysNetlistReader {
                 }
             }
         }
-        
+
         // Validate macro primitives are placed fully
         HashSet<String> checked = new HashSet<>();
         for(Cell c : design.getCells()) {
-        	EDIFCell cellType = c.getParentCell();
-        	if(cellType != null && macroPrims.containsCell(cellType)) {
-        		String parentHierName = c.getParentHierarchicalInstName();
-            	if(checked.contains(parentHierName)) continue;
-            	List<String> missingPlacements = null;
-            	List<String> childrenNames = macroLeafChildren.get(cellType.getName());
-            	if(childrenNames == null) {
-            		childrenNames = EDIFTools.getMacroLeafCellNames(cellType);
-            		macroLeafChildren.put(cellType.getName(), childrenNames);
-            	}
-            	//for(EDIFCellInst inst : cellType.getCellInsts()) { // TODO - Fix up loop list
-            	for(String childName : childrenNames) {
-            		String childCellName = parentHierName + EDIFTools.EDIF_HIER_SEP + childName;
-            		Cell child = design.getCell(childCellName);
-            		if(child == null) {
-            			if(missingPlacements == null) missingPlacements = new ArrayList<String>();
-            			missingPlacements.add(childName + " (" + childCellName + ")");
-            		}
-            	}
-            	if(missingPlacements != null && !cellType.getName().equals("IOBUFDS")) {
-        			throw new RuntimeException("ERROR: Macro primitive '"+ parentHierName 
-        					+ "' is not fully placed. Expected placements for all child cells: " 
-        					+ cellType.getCellInsts() + ", but missing placements "
-        				    + "for cells: " + missingPlacements);            		
-            	}
-            	
-            	checked.add(parentHierName);
-        	}
+            EDIFCell cellType = c.getParentCell();
+            if(cellType != null && macroPrims.containsCell(cellType)) {
+                String parentHierName = c.getParentHierarchicalInstName();
+                if(checked.contains(parentHierName)) continue;
+                List<String> missingPlacements = null;
+                List<String> childrenNames = macroLeafChildren.get(cellType.getName());
+                if(childrenNames == null) {
+                    childrenNames = EDIFTools.getMacroLeafCellNames(cellType);
+                    macroLeafChildren.put(cellType.getName(), childrenNames);
+                }
+                //for(EDIFCellInst inst : cellType.getCellInsts()) { // TODO - Fix up loop list
+                for(String childName : childrenNames) {
+                    String childCellName = parentHierName + EDIFTools.EDIF_HIER_SEP + childName;
+                    Cell child = design.getCell(childCellName);
+                    if(child == null) {
+                        if(missingPlacements == null) missingPlacements = new ArrayList<String>();
+                        missingPlacements.add(childName + " (" + childCellName + ")");
+                    }
+                }
+                if(missingPlacements != null && !cellType.getName().equals("IOBUFDS")) {
+                    throw new RuntimeException("ERROR: Macro primitive '"+ parentHierName
+                            + "' is not fully placed. Expected placements for all child cells: "
+                            + cellType.getCellInsts() + ", but missing placements "
+                            + "for cells: " + missingPlacements);
+                }
+
+                checked.add(parentHierName);
+            }
         }
     }
-    
+
     private static NetType getNetType(PhysNet.Reader netReader, String netName) {
-    	switch(netReader.getType()) {
-    		case GND:
-    			if(!netName.equals(Net.GND_NET)) {
-    				throw new RuntimeException("ERROR: Invalid GND Net " + netName +
-    						", should be named " + Net.GND_NET);
-    			}
-    			return NetType.GND;
-    		case VCC:
-    			if(!netName.equals(Net.VCC_NET)) {
-    				throw new RuntimeException("ERROR: Invalid VCC Net " + netName +
-    						", should be named " + Net.VCC_NET);
-    			}
-    			return NetType.VCC;
-    		default:
-    			return NetType.WIRE;
-    	}
+        switch(netReader.getType()) {
+            case GND:
+                if(!netName.equals(Net.GND_NET)) {
+                    throw new RuntimeException("ERROR: Invalid GND Net " + netName +
+                            ", should be named " + Net.GND_NET);
+                }
+                return NetType.GND;
+            case VCC:
+                if(!netName.equals(Net.VCC_NET)) {
+                    throw new RuntimeException("ERROR: Invalid VCC Net " + netName +
+                            ", should be named " + Net.VCC_NET);
+                }
+                return NetType.VCC;
+            default:
+                return NetType.WIRE;
+        }
     }
-    
-    private static void readRouting(PhysNetlist.Reader physNetlist, Design design, 
+
+    private static void readRouting(PhysNetlist.Reader physNetlist, Design design,
                                     Enumerator<String> strings) {
         StructList.Reader<PhysNet.Reader> nets = physNetlist.getPhysNets();
         EDIFNetlist netlist = design.getNetlist();
@@ -323,7 +330,7 @@ public class PhysNetlistReader {
             Net net = new Net(netName, edifNet == null ? null : edifNet.getNet());
             design.addNet(net);
             net.setType(getNetType(netReader, netName));
-            
+
             // Sources
             StructList.Reader<RouteBranch.Reader> routeSrcs = netReader.getSources();
             int routeSrcsCount = routeSrcs.size();
@@ -360,15 +367,15 @@ public class PhysNetlistReader {
             case BEL_PIN:{
                 PhysBelPin.Reader bpReader = segment.getBelPin();
                 SiteInst siteInst = getSiteInst(bpReader.getSite(), design, strings);
-                String bel_name = strings.get(bpReader.getBel());
-                BEL bel = siteInst.getBEL(bel_name);
+                String belName = strings.get(bpReader.getBel());
+                BEL bel = siteInst.getBEL(belName);
                 if(bel == null) {
-                    throw new RuntimeException(String.format("ERROR: Failed to get BEL %s", bel_name));
+                    throw new RuntimeException(String.format("ERROR: Failed to get BEL %s", belName));
                 }
-                String bel_pin = strings.get(bpReader.getPin());
-                BELPin belPin = bel.getPin(bel_pin);
+                String belPinName = strings.get(bpReader.getPin());
+                BELPin belPin = bel.getPin(belPinName);
                 if(belPin == null) {
-                    throw new RuntimeException(String.format("ERROR: Failed to get BEL pin %s/%s", bel_name, bel_pin));
+                    throw new RuntimeException(String.format("ERROR: Failed to get BEL pin %s/%s", belName, belPinName));
                 }
                 siteInst.routeIntraSiteNet(net, belPin, belPin);
                 break;
@@ -438,5 +445,177 @@ public class PhysNetlistReader {
             siteInst.place(site);
         }
         return siteInst;
+    }
+
+    private static void checkNetTypeFromCellNet(Map<String, PhysNet.Reader> cellPinToPhysicalNet, EDIFNet net, Enumerator<String> strings) {
+        // Expand EDIFNet and make sure sink cell pins that are part of a
+        // physical net are annotated as a VCC or GND net.
+        //
+        // It is harder to verify if the VCC/GND net type is correct, because
+        // site local inverters may convert signals on a VCC to a GND net or
+        // vise versa.
+        //
+        // If the full physical net is present and the inverting site pips are
+        // labelled, then it would be possible to confirm if the NetType was
+        // always correct.
+        Queue<EDIFNet> netsToExpand = new ArrayDeque<EDIFNet>();
+        netsToExpand.add(net);
+
+        while(!netsToExpand.isEmpty()) {
+            net = netsToExpand.remove();
+            for(EDIFPortInst portInst : net.getPortInsts()) {
+                if(portInst.isOutput() && !portInst.isTopLevelPort()) {
+                    // Only following downstream connections.
+                    continue;
+                }
+
+                if(portInst.isInput() && portInst.isTopLevelPort()) {
+                    // Only following downstream connections.
+                    continue;
+                }
+
+                if(portInst.isTopLevelPort()) {
+                    // Follow net to parent cell (if any)
+                    EDIFCell parent = portInst.getParentCell();
+                    if(parent != null) {
+                        EDIFNet outerNet = parent.getInternalNet(portInst);
+                        if(outerNet != null) {
+                            netsToExpand.add(outerNet);
+                        }
+                    }
+                } else {
+                    // Follow net to child cell (if any) or add to sink port
+                    // list.
+                    EDIFNet innerNet = portInst.getInternalNet();
+                    if(innerNet != null) {
+                        netsToExpand.add(innerNet);
+                    } else {
+                        PhysNet.Reader physNet = cellPinToPhysicalNet.get(portInst.getFullName());
+                        if(physNet != null) {
+                            if (physNet.getType() != PhysNetlist.NetType.VCC && physNet.getType() != PhysNetlist.NetType.GND) {
+                                throw new RuntimeException(String.format("ERROR: Net %s connected to cell pin %s should be VCC or GND but is %s", strings.get(physNet.getName()), portInst.getFullName(), physNet.getType().name()));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private static void mapBelPinsToPhysicalNets(Map<String, PhysNet.Reader> belPinToPhysicalNet, PhysNet.Reader netReader, RouteBranch.Reader routeBranch, Enumerator<String> strings) {
+        // Populate a map from strings formatted like "<site>/<bel>/<bel pin>"
+        // to PhysNet by recursively expanding routing branches.
+
+        RouteSegment.Reader segment = routeBranch.getRouteSegment();
+        if(segment.which() == RouteSegment.Which.BEL_PIN) {
+            PhysBelPin.Reader bpReader = segment.getBelPin();
+            belPinToPhysicalNet.put(strings.get(bpReader.getSite()) + "/" + strings.get(bpReader.getBel()) + "/" + strings.get(bpReader.getPin()), netReader);
+        }
+
+        for(PhysNetlist.RouteBranch.Reader childBranch : routeBranch.getBranches()) {
+            mapBelPinsToPhysicalNets(belPinToPhysicalNet, netReader, childBranch, strings);
+        }
+    }
+
+    private static void checkConstantRoutingAndNetNaming(PhysNetlist.Reader PhysicalNetlist, EDIFNetlist netlist, Enumerator<String> strings) {
+        // Checks that constant routing and net names are valid.
+        //
+        // Specifically:
+        //  - At most 1 GND and 1 VCC nets should be present
+        //  - The GND and VCC nets names conform to Nets.GND_NET and Nets.VCC_NET.
+        //  - Each net name should be unique
+        //  - All EDIFPortInst sinks on nets driven from VCC or GND cells
+        //    should be connected to nets marked as either VCC or GND nets.
+
+        // First scan physical nets to create a mapping from BEL pins to
+        // physical nets.
+        //
+        // At this time, check that net names are unique.  If the VCC or GND
+        // nets appear, ensure they conform with the constant Nets.GND_NET
+        // and Nets.VCC_NET.
+        boolean foundGndNet = false;
+        boolean foundVccNet = false;
+        Map<String, PhysNet.Reader> belPinToPhysicalNet = new HashMap<String, PhysNet.Reader>();
+        Set<Integer> netNames = new HashSet<Integer>();
+        for(PhysNet.Reader physNet : PhysicalNetlist.getPhysNets()) {
+            for(PhysNetlist.RouteBranch.Reader routeBranch : physNet.getSources()) {
+                mapBelPinsToPhysicalNets(belPinToPhysicalNet, physNet, routeBranch, strings);
+            }
+
+            for(PhysNetlist.RouteBranch.Reader routeBranch : physNet.getStubs()) {
+                mapBelPinsToPhysicalNets(belPinToPhysicalNet, physNet, routeBranch, strings);
+            }
+
+            if(!netNames.add(physNet.getName())) {
+                throw new RuntimeException(String.format("ERROR: Net %s appears in physical netlist more than once?", strings.get(physNet.getName())));
+            }
+
+            if(physNet.getType() == PhysNetlist.NetType.VCC) {
+                if(foundVccNet) {
+                    throw new RuntimeException("ERROR: VCC net type appears more than once in physical netlist?");
+                }
+                foundVccNet = true;
+
+                String netName = strings.get(physNet.getName());
+                if(!netName.equals(Net.VCC_NET)) {
+                    throw new RuntimeException("ERROR: Invalid VCC Net " + netName +
+                            ", should be named " + Net.VCC_NET);
+                }
+            }
+
+            if(physNet.getType() == PhysNetlist.NetType.GND) {
+                if(foundGndNet) {
+                    throw new RuntimeException("ERROR: GND net type appears more than once in physical netlist?");
+                }
+                foundGndNet = true;
+
+                String netName = strings.get(physNet.getName());
+                if(!netName.equals(Net.GND_NET)) {
+                    throw new RuntimeException("ERROR: Invalid GND Net " + netName +
+                            ", should be named " + Net.GND_NET);
+                }
+            }
+        }
+
+        // Iterate over placements and map cell pins to physical nets.
+        Map<String, PhysNet.Reader> cellPinToPhysicalNet = new HashMap<String, PhysNet.Reader>();
+        for(CellPlacement.Reader placement : PhysicalNetlist.getPlacements()) {
+            for(PinMapping.Reader pinMap : placement.getPinMap()) {
+                String key = strings.get(placement.getSite()) + "/" + strings.get(pinMap.getBel()) + "/" + strings.get(pinMap.getBelPin());
+                PhysNet.Reader net = belPinToPhysicalNet.get(key);
+                if(net != null) {
+                    cellPinToPhysicalNet.put(strings.get(placement.getCellName()) + "/"  + strings.get(pinMap.getCellPin()), net);
+                }
+            }
+        }
+
+        // Search the EDIFNetlist for sinks from VCC or GND nets.  Find the
+        // EDIFPortInst sinks on those nets, and see if a physical net
+        // corrisponds to that cell pin.
+        //
+        // If so, verify that the physical net is marked with either VCC or
+        // GND.
+        //
+        // Note: Sink port instances on the VCC net may end up in the GND
+        // physical net, or vise versa. This can occur when a constant net is
+        // run through a site local inverter.  Modelling these site local
+        // inverters is not done here, hence why the requirement is only that
+        // the net type be either VCC or GND.
+        for (EDIFCellInst leafEdifCellInst : netlist.getAllLeafCellInstances()) {
+            EDIFCell leafEdifCell = leafEdifCellInst.getCellType();
+            String leafEdifCellName = leafEdifCell.getName();
+            EDIFCell parent = leafEdifCellInst.getParentCell();
+
+            if(leafEdifCellName.equals("VCC")) {
+                EDIFPortInst portInst = leafEdifCellInst.getPortInst("P");
+                EDIFNet net = portInst.getNet();
+                checkNetTypeFromCellNet(cellPinToPhysicalNet, net, strings);
+            } else if(leafEdifCellName.equals("GND")) {
+                EDIFPortInst portInst = leafEdifCellInst.getPortInst("G");
+                EDIFNet net = portInst.getNet();
+                checkNetTypeFromCellNet(cellPinToPhysicalNet, net, strings);
+            } else {
+            }
+        }
     }
 }
