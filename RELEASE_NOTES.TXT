@@ -1,3 +1,16 @@
+============= RapidWright 2020.1.2-beta released on 2020-10-12 ================
+Notes:
+ * Re-adds missing macro primitive definitions that were absent in previous releases
+ * Adds missing macro/translated primitive definitions IOBUFDS and OBUFTDS_DUAL_BUF
+ * Adds some basic helper methods to handle route-thrus
+ * Adds APIs to provide default property values for primitive cells (often unisims)
+ * Minor update with API additions
+ - API Additions:
+   - com.xilinx.rapidwright.design.SiteInst "public void unrouteSite()"
+   - com.xilinx.rapidwright.design.Design "public static EDIFLibrary getPrimitivesLibrary()"
+   - com.xilinx.rapidwright.design.Design "public static VivadoProp getDefaultProperty(Series series, String cellTypeName, String propName)"
+   - com.xilinx.rapidwright.design.Design "public static Map<String, VivadoProp> getDefaultCellProperties(Series series, String cellTypeName)"
+
 ============= RapidWright 2020.1.2-beta released on 2020-08-13 ================
 Notes:
  * Minor update with API additions
