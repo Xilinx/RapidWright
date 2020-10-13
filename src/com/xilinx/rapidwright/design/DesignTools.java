@@ -1332,7 +1332,7 @@ public class DesignTools {
 		if(physPins == null) {
 			// Likely net inside encrypted IP, let's see if we can infer anything from existing
 			// physical description
-			for(SiteInst siteInst : net.getSiteInsts()) {
+			for(SiteInst siteInst : new ArrayList<>(net.getSiteInsts())) {
 				for(String siteWire : new ArrayList<>(siteInst.getSiteWiresFromNet(net))) {
 					for(BELPin pin : siteInst.getSiteWirePins(siteWire)) {
 						if(pin.isSitePort()) {
