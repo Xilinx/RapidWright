@@ -1,6 +1,6 @@
 /*
  * 
- * Copyright (c) 2018 Xilinx, Inc. 
+ * Copyright (c) 2020 Xilinx, Inc. 
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -22,23 +22,15 @@
  */
 package com.xilinx.rapidwright.design;
 
-public class CellPin {
-
-	private Cell cell;
-	
-	private String logicalPinName;
-
-	public CellPin(Cell cell, String physicalPinName) {
-		super();
-		this.cell = cell;
-		this.logicalPinName = physicalPinName;
-	}
-
-	public Cell getCell() {
-		return cell;
-	}
-
-	public String getLogicalPinName() {
-		return logicalPinName;
-	}
+/**
+ * Enumerates the Type of properties found when querying Vivado objects with report_property.
+ *
+ */
+public enum VivadoPropType {
+	BINARY,
+	BOOL,
+	DOUBLE,
+	HEX,
+	INT,
+	STRING,
 }
