@@ -359,7 +359,25 @@ public class PhysNetlistReader {
                 Tile tile = device.getTile(strings.get(pReader.getTile()));
                 String wire0 = strings.get(pReader.getWire0());
                 String wire1 = strings.get(pReader.getWire1());
-                PIP pip = new PIP(tile, wire0, wire1);
+                if(tile == null) {
+                    throw new RuntimeException("ERROR: Tile " + tile + " for pip from wire " + wire0 + " to wire " + wire1 + " not found.");
+                }
+
+                Integer wire0Idx = tile.getWireIndex(wire0);
+                if (wire0Idx == null) {
+                    throw new RuntimeException("ERROR: Wire0 " + wire0 + " in tile " + tile + " not found.");
+                }
+
+                Integer wire1Idx = tile.getWireIndex(wire1);
+                if (wire1Idx == null) {
+                    throw new RuntimeException("ERROR: Wire1 " + wire1 + " in tile " + tile + " not found.");
+                }
+
+                PIP pip = tile.getPIP(wire0Idx, wire1Idx);
+                if(pip == null) {
+                    throw new RuntimeException("ERROR: PIP for tile " + tile + " from wire " + wire0 + " to wire " + wire1 + " not found.");
+                }
+
                 pip.setIsPIPFixed(pReader.getIsFixed());
                 net.addPIP(pip);
                 break;
