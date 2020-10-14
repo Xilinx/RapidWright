@@ -84,6 +84,20 @@ public class EDIFNetlist extends EDIFName {
 	private String[] encryptedCells; 
 	
 	private boolean DEBUG = false;
+
+	public static final Map<String,String> macroExpandExceptionMap;
+	public static final Map<String,String> macroCollapseExceptionMap;
+	
+	static {
+	    macroExpandExceptionMap = new HashMap<>();
+	    // Prim -> Macro (when name is not same)
+	    macroExpandExceptionMap.put("OBUFTDS", "OBUFTDS_DUAL_BUF");
+	    
+	    macroCollapseExceptionMap = new HashMap<>();
+	    for(Entry<String,String> e : macroExpandExceptionMap.entrySet()) {
+	    	macroCollapseExceptionMap.put(e.getValue(), e.getKey());
+	    }
+	}
 	
 	public EDIFNetlist(String name){
 		super(name);
@@ -1191,6 +1205,9 @@ public class EDIFNetlist extends EDIFName {
 		
 		// Replace macro primitives in library and import pre-requisite cells if needed
 		for(String cellName : toReplace) {
+			if(macroExpandExceptionMap.containsKey(cellName)) {
+				cellName = macroExpandExceptionMap.get(cellName);
+			}
 			EDIFCell removed = netlistPrims.removeCell(cellName);
 			if(removed == null) {
 				primsToRemoveOnCollapse.add(cellName);
@@ -1205,10 +1222,15 @@ public class EDIFNetlist extends EDIFName {
 		
 		// Update all cell references to macro versions
 		for(EDIFLibrary lib : getLibraries()) {
+			boolean isHDILib = lib.isHDIPrimitivesLibrary(); 
 			for(EDIFCell cell : lib.getCells()) { 
 				for(EDIFCellInst inst : cell.getCellInsts()) {
-					if(toReplace.contains(inst.getCellType().getName())) {
-						EDIFCell newCell = netlistPrims.getCell(inst.getCellType().getName());
+					String cellName = inst.getCellType().getName();
+					if(toReplace.contains(cellName)) {
+						if(!isHDILib) {
+							cellName = macroExpandExceptionMap.getOrDefault(cellName, cellName); 
+						}
+						EDIFCell newCell = netlistPrims.getCell(cellName);
 						inst.setCellType(newCell);
 						for(EDIFPortInst portInst : inst.getPortInsts()) {
 							String portName = portInst.getPort().getBusName();
@@ -1227,13 +1249,24 @@ public class EDIFNetlist extends EDIFName {
 	 */
 	public void collapseMacroUnisims(Series series) {
 		EDIFLibrary macros = Design.getMacroPrimitives(series);
-		for(EDIFCell cell : getHDIPrimitivesLibrary().getCells()) {
+		EDIFLibrary prims = getHDIPrimitivesLibrary();
+		ArrayList<EDIFCell> reinsert = new ArrayList<EDIFCell>();
+		for(EDIFCell cell : prims.getCells()) {
 			if(macros.containsCell(cell.getName())) {
 				cell.makePrimitive();
+				if(macroCollapseExceptionMap.containsKey(cell.getName())) {
+					cell.rename(macroCollapseExceptionMap.get(cell.getName()));
+					reinsert.add(cell);
+				}
 			}
 		}
+		for(EDIFCell cell : reinsert) {
+			prims.removeCell(cell);
+			prims.addCell(cell);
+		}
+		
 		for(String name : primsToRemoveOnCollapse) {
-			getHDIPrimitivesLibrary().removeCell(name);
+			prims.removeCell(name);
 		}
 	}
 	
