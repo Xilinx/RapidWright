@@ -89,8 +89,7 @@ public class DeviceResourcesWriter {
                 }   
             }
             
-        }
-        
+        }        
         for(Entry<String,String> e : EDIFNetlist.macroExpandExceptionMap.entrySet()) {
             allStrings.addObject(e.getKey()); 
             allStrings.addObject(e.getValue());

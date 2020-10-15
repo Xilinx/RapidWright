@@ -304,8 +304,7 @@ public class LogNetlistReader {
             EDIFDesign design = new EDIFDesign(allCells.get(netlist.getTopInst().getCell()).getName());
             design.setTopCell(allCells.get(netlist.getTopInst().getCell()));
             n.setDesign(design);            
-        }
-        
+        }       
         // Put libraries in proper export order
         List<EDIFLibrary> libs = n.getLibrariesInExportOrder();
         n.getLibrariesMap().clear();
