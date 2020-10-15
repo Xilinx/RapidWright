@@ -46,6 +46,7 @@ http://www.rapidwright.io/docs/Automatic_Install.html#automatic-install
 ### How to Update RapidWright to the Most Recent Release (Assumes Linux)
 
 ```
+git checkout master
 cd $RAPIDWRIGHT_PATH
 make update_jars
 ```
