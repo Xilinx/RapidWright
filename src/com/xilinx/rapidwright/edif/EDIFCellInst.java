@@ -180,6 +180,14 @@ public class EDIFCellInst extends EDIFPropertyObject {
 		this.viewref = cellType != null ? cellType.getEDIFView() : null;
 	}
 	
+   public void updateCellType(EDIFCell cellType) {
+        setCellType(cellType);
+        for(EDIFPortInst portInst : getPortInsts()) {
+            String portName = portInst.getPort().getBusName();
+            portInst.setPort(cellType.getPort(portName));
+        }
+    }
+	
 	public boolean isBlackBox(){
 		EDIFPropertyValue val = getProperty(BLACK_BOX_PROP);
 		if(val == null) return false;

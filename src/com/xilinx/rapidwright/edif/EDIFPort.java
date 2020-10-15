@@ -192,7 +192,7 @@ public class EDIFPort extends EDIFPropertyObject {
 	 * @return
 	 */
 	public boolean isBus() {
-		return width > 1;
+		return width > 1 || !getName().equals(getBusName());
 	}
 	
 	public int[] getBitBlastedIndicies(){
