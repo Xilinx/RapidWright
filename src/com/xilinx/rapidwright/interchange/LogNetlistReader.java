@@ -190,7 +190,7 @@ public class LogNetlistReader {
                      + cell.getPorts() + ",\n\tbut found: \n\t\t" + edifCell.getPorts());
         	}
         	for(EDIFPort port : cell.getPorts()) {
-        		String portKey = port.getWidth() > 1 ? port.getBusName() : port.getName();
+        	    String portKey = port.getBusName();
         		EDIFPort portMatch = edifCell.getPort(portKey);
         		if(portMatch == null || portMatch.getWidth() != port.getWidth()) {
             		System.err.println("[WARNING]: Unisim mismatch found in EDIF Library: " 
@@ -273,8 +273,11 @@ public class LogNetlistReader {
         ReaderOptions readerOptions = new ReaderOptions(32L*1024L*1024L*1024L, 64);
         MessageReader readMsg = Interchange.readInterchangeFile(fileName, readerOptions);
         
-        
-        Netlist.Reader netlist = readMsg.getRoot(Netlist.factory);
+        Netlist.Reader netlist = readMsg.getRoot(Netlist.factory); 
+        return getLogNetlist(netlist, false);
+    }
+
+    protected static EDIFNetlist getLogNetlist(Netlist.Reader netlist, boolean skipTopStuff) {
         EDIFNetlist n = new EDIFNetlist(netlist.getName().toString());
 
         allStrings.clear();
@@ -297,15 +300,17 @@ public class LogNetlistReader {
             readEDIFCell(i, n, netlist, cellListReader, instListReader, portReaderList);
         }
         
-        EDIFDesign design = new EDIFDesign(allCells.get(netlist.getTopInst().getCell()).getName());
-        design.setTopCell(allCells.get(netlist.getTopInst().getCell()));
-        n.setDesign(design);
+        if(!skipTopStuff) {
+            EDIFDesign design = new EDIFDesign(allCells.get(netlist.getTopInst().getCell()).getName());
+            design.setTopCell(allCells.get(netlist.getTopInst().getCell()));
+            n.setDesign(design);            
+        }
         
         // Put libraries in proper export order
         List<EDIFLibrary> libs = n.getLibrariesInExportOrder();
         n.getLibrariesMap().clear();
         for(EDIFLibrary lib : libs) {
-        	n.addLibrary(lib);
+            n.addLibrary(lib);
         }
         
         return n;

@@ -14,6 +14,7 @@ import org.capnproto.StructList;
 import org.capnproto.Text;
 import org.capnproto.TextList;
 
+import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELClass;
 import com.xilinx.rapidwright.device.BELPin;
@@ -27,12 +28,20 @@ import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
+import com.xilinx.rapidwright.edif.EDIFCell;
+import com.xilinx.rapidwright.edif.EDIFCellInst;
+import com.xilinx.rapidwright.edif.EDIFDesign;
+import com.xilinx.rapidwright.edif.EDIFLibrary;
+import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.BELCategory;
+import com.xilinx.rapidwright.interchange.DeviceResources.Device.PrimToMacroExpansion;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.SitePin;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.SiteType;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.SiteWire;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.TileType;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.BEL.Builder;
+import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.Direction;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 
@@ -81,6 +90,11 @@ public class DeviceResourcesWriter {
             }
             
         }
+        
+        for(Entry<String,String> e : EDIFNetlist.macroExpandExceptionMap.entrySet()) {
+            allStrings.addObject(e.getKey()); 
+            allStrings.addObject(e.getValue());
+        }
     }
 
     
@@ -107,11 +121,47 @@ public class DeviceResourcesWriter {
         
         t.stop().start("Wires&Nodes");
         writeAllWiresAndNodesToBuilder(device, devBuilder);
-        t.stop();
         
-        FileOutputStream fo = new java.io.FileOutputStream(fileName);
-        SerializePacked.writeToUnbuffered(fo.getChannel(), message);
-        fo.close();        
+        t.stop().start("Prims&Macros");
+        // Create an EDIFNetlist populated with just primitive and macro libraries
+        EDIFLibrary prims = Design.getPrimitivesLibrary();       
+        EDIFLibrary macros = Design.getMacroPrimitives(device.getSeries());
+        EDIFNetlist netlist = new EDIFNetlist("PrimitiveLibs");
+        netlist.addLibrary(prims);
+        netlist.addLibrary(macros);
+        ArrayList<EDIFCell> dupsToRemove = new ArrayList<EDIFCell>();
+        for(EDIFCell cell : macros.getCells()) {
+            EDIFCell hdiCell = prims.getCell(cell.getName());
+            if(hdiCell != null) {
+                dupsToRemove.add(cell);
+            }
+            for(EDIFCellInst inst : cell.getCellInsts()) {
+                EDIFCell hdiCellInst = prims.getCell(inst.getCellType().getName());
+                if(hdiCellInst != null) {
+                    // remap cell definition to HDI Primitives library
+                    inst.updateCellType(hdiCellInst);
+                }
+                
+            }
+        }
+        
+        Netlist.Builder netlistBuilder = devBuilder.getPrimLibs();
+        LogNetlistWriter.populateNetlistBuilder(netlist, netlistBuilder, true);
+        
+        // Write macro exception map
+        int size = EDIFNetlist.macroExpandExceptionMap.size();
+        StructList.Builder<PrimToMacroExpansion.Builder> exceptionMap = 
+                devBuilder.initExceptionMap(size);
+        int i=0;
+        for(Entry<String, String> entry : EDIFNetlist.macroExpandExceptionMap.entrySet()) {
+            PrimToMacroExpansion.Builder entryBuilder = exceptionMap.get(i);
+            entryBuilder.setMacroName(allStrings.getIndex(entry.getValue()));
+            entryBuilder.setPrimName(allStrings.getIndex(entry.getKey()));
+            i++;
+        }        
+        t.stop().start("Write File");
+        Interchange.writeInterchangeFile(fileName, message);
+        t.stop();
     }
     
     public static void writeAllStringsToBuilder(DeviceResources.Device.Builder devBuilder) {
@@ -119,7 +169,7 @@ public class DeviceResourcesWriter {
         TextList.Builder strList = devBuilder.initStrList(stringCount);
         for(int i=0; i < stringCount; i++) {
             strList.set(i, new Text.Reader(allStrings.get(i)));
-        }        
+        }
     }
 
     protected static BELCategory getBELCategory(BEL bel) {
