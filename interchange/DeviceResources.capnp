@@ -19,6 +19,8 @@ struct Device {
   tileList     @4 : List(Tile);
   wires        @5 : List(Wire);
   nodes        @6 : List(Node);
+  primLibs     @7 : Dir.Netlist; # Netlist libraries of Unisim primitives and macros
+  exceptionMap @8 : List(PrimToMacroExpansion); # Prims to macros expand w/same name, except these
 
   #######################################
   # Placement definition objects
@@ -115,5 +117,15 @@ struct Device {
     directional  @2 : Bool;
     buffered20   @3 : Bool;
     buffered21   @4 : Bool;
+  }
+  
+  ######################################
+  # Macro expansion exception map for 
+  # primitives that don't expand to a 
+  # macro of the same name.
+  ######################################  
+  struct PrimToMacroExpansion {
+    primName  @0 : StringIdx;
+    macroName @1 : StringIdx;
   }
 }

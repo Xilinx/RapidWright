@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Set;
 
 import org.capnproto.MessageReader;
 import org.capnproto.PrimitiveList;
@@ -15,6 +16,7 @@ import org.capnproto.StructList;
 import org.capnproto.TextList;
 import org.capnproto.StructList.Reader;
 
+import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Device;
@@ -24,9 +26,14 @@ import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePIP;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
+import com.xilinx.rapidwright.edif.EDIFLibrary;
+import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.edif.EDIFTools;
+import com.xilinx.rapidwright.interchange.DeviceResources.Device.PrimToMacroExpansion;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.SitePin;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.SiteType;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.TileType;
+import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.Direction;
 
 public class DeviceResourcesVerifier {
@@ -44,27 +51,18 @@ public class DeviceResourcesVerifier {
         return true;
     }
    
-    public static boolean verifyDeviceResources(String devResFileName, String deviceName) {
+    public static boolean verifyDeviceResources(String devResFileName, String deviceName) throws IOException {
         allStrings = new Enumerator<String>();
         verifiedSiteTypes = new HashSet<SiteTypeEnum>();
 
         Device device = Device.getDevice(deviceName);
         
-        FileInputStream fis = null;
         DeviceResources.Device.Reader dReader = null;
-        
-        try {
-            fis = new java.io.FileInputStream(devResFileName);
-            ReaderOptions readerOptions = new ReaderOptions(1024L*1024L*512L, 64);
-            MessageReader readMsg = SerializePacked.readFromUnbuffered((fis).getChannel(), readerOptions);
-            fis.close();
-            
-            dReader = readMsg.getRoot(DeviceResources.Device.factory);
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        ReaderOptions readerOptions = new ReaderOptions(1024L*1024L*512L, 64);
+        MessageReader readMsg = null;
+        readMsg = Interchange.readInterchangeFile(devResFileName, readerOptions);
+
+        dReader = readMsg.getRoot(DeviceResources.Device.factory);
         
         int strCount = dReader.getStrList().size();
         TextList.Reader reader = dReader.getStrList();
@@ -82,8 +80,6 @@ public class DeviceResourcesVerifier {
             tileTypeMap.put(name, ttReader);
             ttPIPMap.put(name, ttReader.getPips());
         }
-        
-        
         
         expect(device.getName(), dReader.getName().toString());
 
@@ -155,6 +151,51 @@ public class DeviceResourcesVerifier {
                 if(pipReader.getBuffered21() != isBuffered21) {
                     throw new RuntimeException("PIP Buffered21 mismatch " + pip);
                 }
+            }
+        }
+        
+        Netlist.Reader primLibs = dReader.getPrimLibs();
+        EDIFNetlist primsAndMacros = LogNetlistReader.getLogNetlist(primLibs, true);
+        Set<String> libsFound = primsAndMacros.getLibrariesMap().keySet();
+        for(String libExpected : new String[] {EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME, 
+            device.getSeries()+"_"+EDIFTools.MACRO_PRIMITIVES_LIB}) {
+            if(!libsFound.remove(libExpected)) {
+                throw new RuntimeException("Missing expected library: " + libExpected);
+            }
+        }
+        int size = libsFound.size(); 
+        if(size > 0) {
+            throw new RuntimeException("Found the following unexpected librar"+
+                    (size > 1 ? "ies" : "y")+": " + libsFound);
+        }
+        for(EDIFLibrary lib : primsAndMacros.getLibraries()) {
+            EDIFLibrary reference = lib.isHDIPrimitivesLibrary() ? Design.getPrimitivesLibrary() : 
+                                                    Design.getMacroPrimitives(device.getSeries());
+            Set<String> cellsFound = lib.getCellMap().keySet();
+            Set<String> cellsExpected = reference.getCellMap().keySet();
+            
+            if(!cellsFound.containsAll(cellsExpected)) {
+                cellsExpected.removeAll(cellsFound);
+                throw new RuntimeException("Missing some cells expected in library " +
+                        lib.getName() + ": " + cellsExpected);
+            }
+            if(!cellsExpected.containsAll(cellsFound)) {
+                cellsFound.removeAll(cellsExpected);
+                throw new RuntimeException("Extra cells found in library " +
+                        lib.getName() + ": " + cellsFound);
+            }
+        }
+        
+        StructList.Reader<PrimToMacroExpansion.Reader> exceptionMap = dReader.getExceptionMap();
+        int mapSize = exceptionMap.size();
+        for(int i=0; i < mapSize; i++) {
+            PrimToMacroExpansion.Reader entry = exceptionMap.get(i);
+            String primName = allStrings.get(entry.getPrimName());
+            String macroName = allStrings.get(entry.getMacroName());
+            if(!EDIFNetlist.macroExpandExceptionMap.get(primName).equals(macroName)) {
+                throw new RuntimeException("Exception map mismatch: " + 
+                        "("+ primName+"-->" +macroName+") does not match expected mapping ("+
+                        primName+"-->"+EDIFNetlist.macroExpandExceptionMap.get(primName)+")");
             }
         }
         

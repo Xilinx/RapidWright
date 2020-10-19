@@ -210,12 +210,27 @@ public class LogNetlistWriter {
      * @throws IOException 
      */
     public static void writeLogNetlist(EDIFNetlist n, String fileName) throws IOException {
-        populateEnumerations(n);
-
         MessageBuilder message = new MessageBuilder();
         Netlist.Builder netlist = message.initRoot(Netlist.factory);
 
-        writeTopNetlistStuffToNetlistBuilder(n, netlist);
+        populateNetlistBuilder(n, netlist, false);
+
+        Interchange.writeInterchangeFile(fileName, message);
+    }
+    
+    /**
+     * Helper method to populate the logical netlist object with an existing builder.
+     * @param n The EDIF Netlist to serialize
+     * @param netlist The current builder object to receive the EDIF Netlist
+     */
+    protected static void populateNetlistBuilder(EDIFNetlist n, Netlist.Builder netlist, 
+            boolean skipTopNetlistStuff) {
+        populateEnumerations(n);
+        if(!skipTopNetlistStuff) {
+            writeTopNetlistStuffToNetlistBuilder(n, netlist);
+        }else {
+            netlist.setName(n.getName());
+        }
         
         writeAllCellsToNetlistBuilder(netlist);
 
@@ -224,7 +239,5 @@ public class LogNetlistWriter {
         writeAllInstsToNetlistBuilder(netlist);
         
         writeAllStringsToNetlistBuilder(netlist);
-        
-        Interchange.writeInterchangeFile(fileName, message);
     }
 }
