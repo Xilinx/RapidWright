@@ -57,25 +57,12 @@ public class DeviceResourcesVerifier {
 
         Device device = Device.getDevice(deviceName);
         
-        FileInputStream fis = null;
         DeviceResources.Device.Reader dReader = null;
         ReaderOptions readerOptions = new ReaderOptions(1024L*1024L*512L, 64);
         MessageReader readMsg = null;
         readMsg = Interchange.readInterchangeFile(devResFileName, readerOptions);
 
         dReader = readMsg.getRoot(DeviceResources.Device.factory);
-//        try {
-//            fis = new java.io.FileInputStream(devResFileName);
-//            ReaderOptions readerOptions = new ReaderOptions(1024L*1024L*512L, 64);
-//            MessageReader readMsg = SerializePacked.readFromUnbuffered((fis).getChannel(), readerOptions);
-//            fis.close();
-//            
-//            dReader = readMsg.getRoot(DeviceResources.Device.factory);
-//        } catch (FileNotFoundException e) {
-//            e.printStackTrace();
-//        } catch (IOException e) {
-//            e.printStackTrace();
-//        }
         
         int strCount = dReader.getStrList().size();
         TextList.Reader reader = dReader.getStrList();
@@ -93,8 +80,6 @@ public class DeviceResourcesVerifier {
             tileTypeMap.put(name, ttReader);
             ttPIPMap.put(name, ttReader.getPips());
         }
-        
-        
         
         expect(device.getName(), dReader.getName().toString());
 
