@@ -97,7 +97,7 @@ public class Part {
 	 * @return the device
 	 */
 	public String getDevice() {
-		String suffix = getRevision().equals("") ? "" : ("-" + getRevision());
+		String suffix = getRevision().isEmpty() ? "" : ("-" + getRevision());
 		return device + suffix;
 	}
 	/**

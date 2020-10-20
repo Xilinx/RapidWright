@@ -36,7 +36,7 @@ public enum NetType{
 	UNKNOWN;
 	
 	public static NetType getNetTypeFromNetName(String name){
-		if(name == null || name.equals("")) return UNKNOWN;
+		if(name == null || name.isEmpty()) return UNKNOWN;
 		if(name.equals(Net.GND_NET)) return GND;
 		if(name.equals(Net.VCC_NET)) return VCC;
 		if(name.endsWith(EDIFTools.LOGICAL_GND_NET_NAME)) return GND;

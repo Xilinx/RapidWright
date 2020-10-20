@@ -98,7 +98,7 @@ public class ImplGuide {
 		outer: for(String line : FileTools.getLinesFromTextFile(fileName)){
 			lineNumber++;
 			line = line.trim();
-			if(line.equals("")) continue;
+			if(line.isEmpty()) continue;
 			if(line.startsWith("#")) continue;
 			String[] tokens = line.split("\\s+");
 			

@@ -712,7 +712,7 @@ public class Router extends AbstractRouter {
 			String rBelName = clkSitePIPNames.get(currPin.getName());
 			if(rBelName == null){
 				if(!supressWarningsErrors) MessageGenerator.briefError("Warning unsupported clock pin: " + currPin);
-			}else if(!rBelName.equals("")){
+			}else if(!rBelName.isEmpty()){
 				SitePIP existingPIP = currPin.getSiteInst().getUsedSitePIP(rBelName);
 				if(existingPIP == null) {
 					//SitePIP p = new SitePIP(dev, currPin.getSiteInst(), rBelName, "CLK", "OUT");

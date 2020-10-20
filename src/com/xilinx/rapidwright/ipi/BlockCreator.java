@@ -272,7 +272,7 @@ public class BlockCreator {
 				if(new File(pblockFileName).exists()){
 					for(String pblock : FileTools.getLinesFromTextFile(pblockFileName)){
 						if(pblock.startsWith("#")) continue;
-						PBlock pblock2 = (pblock.trim().equals("") || pblock.contains("Failed!")) ? null : new PBlock(dev,pblock);
+						PBlock pblock2 = (pblock.trim().isEmpty() || pblock.contains("Failed!")) ? null : new PBlock(dev,pblock);
 						FileTools.writeStringToTextFile(pblock, optDcpFileName.replace("opt.dcp", +implIndex+USED_PBLOCK_FILE_SUFFIX));
 						Job job = createImplRun(optDcpFileName, pblock2, implIndex, null, useLSF);
 						jobs.addJob(job);

@@ -540,7 +540,7 @@ public class EDIFNetlist extends EDIFName {
 	 */
 	public EDIFCellInst getCellInstFromHierName(String name){
 		EDIFCellInst currInst = getTopCellInst();
-		if(name.equals("")) return currInst;
+		if(name.isEmpty()) return currInst;
 		String[] parts = name.split(EDIFTools.EDIF_HIER_SEP);
 		
 		// Sadly, cells can be named 'fred/' instead of 'fred', this code handles this situation
@@ -666,7 +666,7 @@ public class EDIFNetlist extends EDIFName {
 
 	public Net getPhysicalNetFromPin(String parentHierInstName, EDIFPortInst p, Design d){
 		String hierarchicalNetName = null;
-		if(parentHierInstName.equals("")){
+		if(parentHierInstName.isEmpty()){
 			hierarchicalNetName = p.getNet().getName();
 		}else{
 			hierarchicalNetName = parentHierInstName + EDIFTools.EDIF_HIER_SEP + p.getNet().getName();
@@ -888,7 +888,7 @@ public class EDIFNetlist extends EDIFName {
 					checkInst = getCellInstFromHierName(instName);
 				}
 				StringBuilder sb = new StringBuilder(instName);
-				if(!instName.equals("")) sb.append(EDIFTools.EDIF_HIER_SEP);
+				if(!instName.isEmpty()) sb.append(EDIFTools.EDIF_HIER_SEP);
 				sb.append(otherNet);
 				aliases.add(sb.toString());
 				for(EDIFPortInst opr : otherNet.getPortInsts()){
@@ -921,7 +921,7 @@ public class EDIFNetlist extends EDIFName {
 						continue;
 					}
 					StringBuilder sb = new StringBuilder(p.getHierarchicalInstName());
-					if(!p.getHierarchicalInstName().equals("")) sb.append(EDIFTools.EDIF_HIER_SEP);
+					if(!p.getHierarchicalInstName().isEmpty()) sb.append(EDIFTools.EDIF_HIER_SEP);
 					sb.append(p.getPortInst().getCellInst().getName());
 					String instName = sb.toString();
 					sb.append(EDIFTools.EDIF_HIER_SEP);
