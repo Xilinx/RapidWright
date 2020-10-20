@@ -83,7 +83,7 @@ public class EDIFHierNet {
 	 * @return Full hierarchical name of the instance attached to the port.
 	 */
 	public String getHierarchicalInstName(EDIFPortInst port){
-		if(this.hierarchicalInstName.equals("")){
+		if(this.hierarchicalInstName.isEmpty()){
 			return port.getCellInst().getName();
 		}
 		return this.hierarchicalInstName + EDIFTools.EDIF_HIER_SEP + port.getCellInst().getName();

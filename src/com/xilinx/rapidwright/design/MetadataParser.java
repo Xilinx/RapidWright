@@ -434,7 +434,7 @@ public class MetadataParser {
 			line = nextLine;
 			nextLine = br.readLine();
 			lineNumber++;
-			while(nextLine != null && (nextLine.trim().equals("") || nextLine.startsWith("#"))){
+			while(nextLine != null && (nextLine.trim().isEmpty() || nextLine.startsWith("#"))){
 				nextLine = br.readLine();
 				lineNumber++;
 			}

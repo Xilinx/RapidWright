@@ -94,7 +94,7 @@ public class ILAInserter {
 		}
 		for(List<String> file : xdcLines){
 			for(String line : file){
-				if(line.equals("") || line.startsWith("#")) continue;
+				if(line.isEmpty() || line.startsWith("#")) continue;
 				if(line.contains(XDC_MARK_DEBUG) && line.contains(XDC_SET_PROPERTY)){
 					String[] tokens = line.split("\\s+");
 					if(tokens[0].equals(XDC_SET_PROPERTY) && tokens[1].equals(XDC_MARK_DEBUG) && tokens[2].equals("true") && tokens[3].equals("[get_nets")){

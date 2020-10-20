@@ -207,7 +207,7 @@ public class BlockStitcher {
 						else if(inst.getCellType().getName().equals("VCC")) {
 							newNet = validateNet(newNet, design.getVccNet());
 						}
-					} else if(curr.getHierarchicalInstName().equals("")){
+					} else if(curr.getHierarchicalInstName().isEmpty()){
 						topPorts.add(curr);
 					}
 					continue;
@@ -428,7 +428,7 @@ public class BlockStitcher {
 			EDIFHierCellInst p = queue.poll();
 			EDIFCellInst i = p.getInst();
 			if(i.getName().equals("VCC") || i.getName().equals("GND")) continue;
-			String sep = p.getHierarchicalInstName().equals("") ? "" : "/";
+			String sep = p.getHierarchicalInstName().isEmpty() ? "" : "/";
 			String curr = p.getHierarchicalInstName() + sep + i.getName();
 			instNameToInst.put(curr, i);
 			if(i.getCellType().getCellInsts() == null) continue;

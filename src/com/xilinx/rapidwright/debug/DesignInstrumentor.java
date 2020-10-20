@@ -87,7 +87,7 @@ public class DesignInstrumentor {
 		for(String line : FileTools.getLinesFromTextFile(fileName)){
 			// Skip comments and empty lines
 			if(line.startsWith("#")) continue;
-			if(line.trim().equals("")) continue;
+			if(line.trim().isEmpty()) continue;
 			
 			// Every line should be a key value pair
 			String[] tokens = line.split("\\s+");

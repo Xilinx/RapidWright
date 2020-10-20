@@ -290,7 +290,7 @@ public class Installer {
 
 		
 		String value = System.getenv("HTTPS_PROXY");
-		if(value != null && !value.equals("")){
+		if(value != null && !value.isEmpty()){
 			int idx = value.lastIndexOf(':');
 			String host = value.substring(0, idx).replace("http://", "").replace("https://", "");
 			
@@ -449,7 +449,7 @@ public class Installer {
 			cmd = new ArrayList<>(Arrays.asList("java","-cp", classpath, "com.xilinx.rapidwright.device.browser.DeviceBrowser"));
 			String rwPathVarName = "RAPIDWRIGHT_PATH";
 			String existingPath = System.getenv(rwPathVarName);
-			if(existingPath != null && !existingPath.equals("")){
+			if(existingPath != null && !existingPath.isEmpty()){
 				System.out.println("  NOTE: You already have the " + rwPathVarName + " set, be sure to update it. ");
 			}
 			

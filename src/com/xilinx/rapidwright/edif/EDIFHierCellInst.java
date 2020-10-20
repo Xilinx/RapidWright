@@ -78,7 +78,7 @@ public class EDIFHierCellInst {
 	
 	public String getFullHierarchicalInstName(){
 		if(isTopLevelInst()) return "";
-		if(hierarchicalInstName.equals("")) return instance.getName();
+		if(hierarchicalInstName.isEmpty()) return instance.getName();
 		return hierarchicalInstName + EDIFTools.EDIF_HIER_SEP + instance.getName();
 	}
 

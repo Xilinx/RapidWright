@@ -946,7 +946,7 @@ public class FileTools {
 	 * @return The path of the folder where the parts files resides.
 	 */
 	public static String getPartFolderResourceName(Part part){
-		FamilyType ft = part.getRevision().equals("") ? part.getArchitecture() : part.getFamily();
+		FamilyType ft = part.getRevision().isEmpty() ? part.getArchitecture() : part.getFamily();
 		return 	DEVICE_FOLDER_NAME + 
 				File.separator + 
 				ft.toString().toLowerCase() + 

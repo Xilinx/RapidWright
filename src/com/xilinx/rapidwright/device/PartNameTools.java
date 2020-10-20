@@ -63,7 +63,7 @@ public class PartNameTools {
 				Series.valueOf(strings[part[9]])
 				);
 			partMap.put(strings[part[0]], tmpPart);
-			if(!strings[part[8]].equals("")) {
+			if(!strings[part[8]].isEmpty()) {
 				partMap.put(strings[part[4]]+"-"+strings[part[8]], tmpPart);
 				if(!partMap.containsKey(strings[part[4]])) {
 					partMap.put(strings[part[4]], tmpPart);
