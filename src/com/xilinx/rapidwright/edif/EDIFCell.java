@@ -27,9 +27,13 @@ package com.xilinx.rapidwright.edif;
 
 import java.io.IOException;
 import java.io.Writer;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 
 /**
  * Represent a logical cell in an EDIF netlist.  Can 
@@ -425,5 +429,42 @@ public class EDIFCell extends EDIFPropertyObject {
 		wr.write("     )\n"); // View end
 		wr.write("   )\n"); // Cell end
 	}
+	
+	/**
+	 * Recursively finds all leaf cell descendants of this cell
+	 * @return A list of all leaf cell descendants of this cell
+	 */
+    public List<EDIFHierCellInst> getAllLeafDescendants() {
+    	return getAllLeafDescendants("");
+    }
+    
+    /**
+     * Recursively finds all leaf cell descendants of this cell
+     * @param parentInstanceName Parent name or prefix name for all leaf cell descendants to be 
+     * added.  Is not error checked against netlist because the context is not available.
+     * @return A list of all leaf cell descendants of this cell
+     */
+    public List<EDIFHierCellInst> getAllLeafDescendants(String parentInstanceName) {
+		List<EDIFHierCellInst> leafCells = new ArrayList<>();
+		
+		if(!hasContents()) return leafCells;
+		
+		Queue<EDIFHierCellInst> toProcess = new LinkedList<EDIFHierCellInst>();
+		for(EDIFCellInst inst : getCellInsts()) {
+			toProcess.add(new EDIFHierCellInst(parentInstanceName, inst));
+		}
+		
+		while(!toProcess.isEmpty()){
+			EDIFHierCellInst curr = toProcess.poll();
+			if(curr.getCellType().isPrimitive()){
+				leafCells.add(curr);
+			}else{
+				for(EDIFCellInst i : curr.getInst().getCellType().getCellInsts()){
+					toProcess.add(new EDIFHierCellInst(curr.getFullHierarchicalInstName(), i));
+				}
+			}
+		}
+		return leafCells;
+    }
 }
  
