@@ -625,7 +625,11 @@ public class EDIFNetlist extends EDIFName {
 					if(cellType.equals("VCC")) return d.getVccNet();
 				}
 			}
-			
+			if(parentNetName == null) {
+				System.err.println("WARNING: Could not find parent of net \"" + hierarchicalNetName +
+						"\", please check that the netlist is fully connected through all levels of "
+						+ "hierarchy for this net.");
+			}
 			EDIFNet logicalNet = getNetFromHierName(parentNetName);
 			List<EDIFPortInst> eprList = logicalNet.getSourcePortInsts(false);
 			if(eprList.size() > 1) throw new RuntimeException("ERROR: Bad assumption on net, has two sources.");
