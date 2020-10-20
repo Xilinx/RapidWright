@@ -37,6 +37,7 @@ public class PhysicalNetlistExample {
         t.stop().start("Write Logical Netlist");
         // Write Logical & Physical Netlist to Cap'n Proto Serialization file
         String logNetlistFileName = outputDCPFileName.replace(".dcp", ".netlist");
+        design.getNetlist().collapseMacroUnisims(design.getDevice().getSeries());
         LogNetlistWriter.writeLogNetlist(design.getNetlist(), logNetlistFileName);
         
         t.stop().start("Write Physical Netlist");
@@ -49,6 +50,8 @@ public class PhysicalNetlistExample {
         
         t.stop().start("Read Physical Netlist");
         Design roundtrip = PhysNetlistReader.readPhysNetlist(physNetlistFileName, n2);
+        n2.expandMacroUnisims(roundtrip.getDevice().getSeries());
+        
         
         t.stop().start("Write DCP");
         // Write RapidWright netlist back to edif

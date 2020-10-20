@@ -35,6 +35,7 @@ import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
+import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.edif.EDIFLibrary;
 import com.xilinx.rapidwright.edif.EDIFNet;
@@ -84,6 +85,8 @@ public class PhysNetlistReader {
 
         readPlacement(physNetlist, design, allStrings);
 
+        checkMacros(design);
+        
         readRouting(physNetlist, design, allStrings);
 
         readDesignProperties(physNetlist, design, allStrings);
@@ -635,5 +638,49 @@ public class PhysNetlistReader {
             } else {
             }
         }
+    }
+    
+    /**
+     * Examines a design to ensure that the provided macro placement is consistent with the 
+     * macro definition in the library.
+     * @param design The placed design to be checked
+     */
+    private static void checkMacros(Design design) {
+    	EDIFNetlist netlist = design.getNetlist();
+    	List<EDIFHierCellInst> leaves = netlist.getTopCell().getAllLeafDescendants();
+    	EDIFLibrary macros = Design.getMacroPrimitives(design.getDevice().getSeries());
+    	for(EDIFHierCellInst leaf : leaves) {
+    		if(macros.containsCell(leaf.getCellType())) {
+    			EDIFCell macro = macros.getCell(leaf.getCellName());
+    			// Check that the macro children instances have the same placement status 
+    			// (all placed or none are placed)
+    			Boolean isPlaced = null;
+    			boolean inconsistentPlacement = false;
+    			String macroName = leaf.getFullHierarchicalInstName() + EDIFTools.EDIF_HIER_SEP;
+    			List<EDIFHierCellInst> macroLeaves = macro.getAllLeafDescendants();
+    			for(EDIFHierCellInst inst : macroLeaves) {
+    				String cellName = macroName + inst.getFullHierarchicalInstName();
+    				Cell cell = design.getCell(cellName);
+    				boolean isCellPlaced = !(cell == null || !cell.isPlaced());
+    				if(isPlaced == null) isPlaced = isCellPlaced;
+    				else if(isPlaced != isCellPlaced) {
+    					inconsistentPlacement = true;
+    				}
+    			}
+    			if(inconsistentPlacement) {
+					System.err.println("ERROR: Inconsistent macro placement for " + macroName 
+							+ ", please ensure all member cell instances are either "
+							+ "unplaced or fully placed: ");
+    				for(EDIFHierCellInst inst : macroLeaves) {
+    					String cellName = macroName + inst.getFullHierarchicalInstName();
+    					Cell cell = design.getCell(cellName);
+    					boolean isCellPlaced = !(cell == null || !cell.isPlaced());
+        				System.err.println("\t" + cellName + " is " + (isCellPlaced ? "placed" : "unplaced"));
+        			}
+    			}
+    			
+    		}
+    	}
+    	
     }
 }

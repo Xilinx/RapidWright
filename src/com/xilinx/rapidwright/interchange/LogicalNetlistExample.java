@@ -32,6 +32,7 @@ public class LogicalNetlistExample {
         t.stop().start("Write Cap'n Proto");
         // Write Netlist to Cap'n Proto Serialization file
         String capnProtoFileName = args[0].replace(".edf", ".netlist");
+        n.collapseMacroUnisims(n.getDevice().getSeries());
         LogNetlistWriter.writeLogNetlist(n, capnProtoFileName);
         
         t.stop().start("Read Cap'n Proto");
