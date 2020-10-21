@@ -71,6 +71,7 @@ public class PBlockGenerator {
 	public static final float CLES_PER_DSP = 2.5f;
 	public static int RAMLUTS_PER_CLE = 8;
 	public static int CARRY_PER_CLE = 1;
+	public static int SLICES_PER_TILE = 1;
 	
 	/** X dimension over Y dimension */
 	public float ASPECT_RATIO = 0.125f;//1.5f;	
@@ -161,15 +162,19 @@ public class PBlockGenerator {
 		if (dev.getName().contains("xc7")) {
 			CARRY_PER_CLE = 2;
 			RAMLUTS_PER_CLE = 4;
+			SLICES_PER_TILE = 2;
 		}
-		if(debug){
+		//if(debug){ // ELA
 			System.out.println("Parsed report: " + reportFileName);
 			System.out.println("  Device: " + dev.getName());
+			System.out.println("Ela    CARRY: " + carryCount);
+			System.out.println("Ela    lutRAMCount: " + lutRAMCount);
+			System.out.println("Ela  regCount:  " + regCount);
 			System.out.println("    LUTs: " + lutCount);
 			System.out.println("    DSPs: " + dspCount);
 			System.out.println("18kBRAMs: " + bram18kCount);
 			System.out.println("36kBRAMs: " + bram36kCount);
-		}
+		//} // ELA
 		if(lutCount < LUTS_PER_CLE) lutCount = LUTS_PER_CLE;
 	}
 	
@@ -726,8 +731,12 @@ public class PBlockGenerator {
 			for(TileTypeEnum t : p){
 				if(slicems > 0 && Utils.isCLBM(t)){
 					slicems--;
+					if(SLICES_PER_TILE==2)
+						slices--;
 				}else if(Utils.isCLB(t)){
 					slices--;
+					if(SLICES_PER_TILE==2)
+						slices--;
 				}else if(Utils.isDSP(t)){
 					dsps--;
 				}else if(Utils.isBRAM(t)){
@@ -801,26 +810,35 @@ public class PBlockGenerator {
 		getTallestShape(shapesReportFileName);
 		
 		// Let's calculate exactly how many sites we need of each type
-		int slicesRequired = Math.round((((float)lutCount / (float)LUTS_PER_CLE) * OVERHEAD_RATIO) + 0.5f);
-		if(regCount/FF_PER_CLE > lutCount/LUTS_PER_CLE){
-			slicesRequired = Math.round((((float)regCount / (float)FF_PER_CLE) * OVERHEAD_RATIO) + 0.5f);
+		int slicesLUTSRequired = Math.round((((float)(lutCount-lutRAMCount) / (float)LUTS_PER_CLE)*SLICES_PER_TILE * OVERHEAD_RATIO) + 0.5f); // Multiply with SLICES_PER_TILE for 7 series, where one CLB has 2 slices
+		System.out.println("ela . based on luts slicesLUTSRequired = "+slicesLUTSRequired);
+		// Let's calculate how many FF & carry slices we need
+		int slicesFFCarryRequired = Math.round((((float)regCount / (float)FF_PER_CLE)*SLICES_PER_TILE * OVERHEAD_RATIO) + 0.5f);		
+		System.out.println("ela . based on regs slicesFFCarryRequired = "+slicesFFCarryRequired);
+		if(carryCount/CARRY_PER_CLE > slicesFFCarryRequired/SLICES_PER_TILE){
+			slicesFFCarryRequired = Math.round((((float)carryCount / (float)CARRY_PER_CLE)*SLICES_PER_TILE*OVERHEAD_RATIO)+ 0.5f);
 		}
-		if(carryCount/CARRY_PER_CLE > slicesRequired){
-			slicesRequired = Math.round((((float)carryCount / (float)CARRY_PER_CLE)*OVERHEAD_RATIO)+ 0.5f);
-		}
+		System.out.println("ela . based on regs+carry slicesFFCarryRequired = "+slicesFFCarryRequired);
 		int dspsRequired = dspCount;
 		if((dspsRequired & 0x1) == 0x1){
 			// if we have an odd number of dsp, round up by 1 more
 			dspsRequired++;
 		} 
 		int ramb36sRequired = bram36kCount + (int)Math.ceil((float)bram18kCount / 2.0);
-		int sliceMsRequired = (int)Math.ceil((float)lutRAMCount / (float)RAMLUTS_PER_CLE);
+		System.out.println("ela . ramb36sRequired= "+ramb36sRequired);
+		int sliceMsRequired = (int)Math.ceil((float)lutRAMCount / (float)RAMLUTS_PER_CLE); // Not multiplying with SLICES_PER_TILE, as in one M-CLB Tile, there is only one slice having LUTRAM 
+		System.out.println("ela . sliceMsRequired= "+sliceMsRequired);
 		
+		// now compute Nr slices: 
+		int slicesRequired = slicesLUTSRequired + (slicesFFCarryRequired - (slicesLUTSRequired+sliceMsRequired));
+		System.out.println("ela . slicesRequired= "+slicesRequired);
 		int pblockCLEHeight = 0;
 		//Figure out how tall we need to make the pblock
 		//Make DSPs and BRAMs upto as tall as a region before creating a new column
 		int dspCLECount = (int) Math.ceil(dspsRequired * CLES_PER_DSP);
 		int bramCLECount = (int) Math.ceil(ramb36sRequired * CLES_PER_BRAM);
+		System.out.println("ela . ramb36sRequired = "+ramb36sRequired+" bramCLECount= "+bramCLECount);
+		
 		if(dspCLECount == 0 && bramCLECount == 0){
 			// ASPECT_RATIO = width(X) / height(Y)
 			// width = ASPECT_RATIO * height
@@ -828,10 +846,12 @@ public class PBlockGenerator {
 			// AREA = ASPECT_RATIO * height^2
 			// height = sqrt ( AREA / height )
 			if(slicesRequired > sliceMsRequired){
-				pblockCLEHeight = (int) Math.ceil(Math.sqrt(slicesRequired/ASPECT_RATIO));
+				pblockCLEHeight = (int) Math.ceil(Math.sqrt(slicesRequired/(SLICES_PER_TILE*ASPECT_RATIO))); // One PBlock must contain tiles. It can not have 3 slices for exp. => compute height using tile nr, not slice nr. (for 7 series, for ultra. tiles=slices anyway)
 			}else{
-				pblockCLEHeight = (int) Math.ceil(Math.sqrt(sliceMsRequired/ASPECT_RATIO));
+				pblockCLEHeight = (int) Math.ceil(Math.sqrt(sliceMsRequired/(SLICES_PER_TILE*ASPECT_RATIO)));
 			}
+			System.out.println("ela . slicesRequired= "+slicesRequired+ " and sliceMsRequired = " +sliceMsRequired+" thus pblockCLEHeight= "+pblockCLEHeight);
+			
 		}else if(dspCLECount > bramCLECount){
 			pblockCLEHeight = dspCLECount;
 		}else {
@@ -850,7 +870,8 @@ public class PBlockGenerator {
 		//                      A = h^2 * r
 		//                      h = sqrt(A / r)
 		//
-		int checkedCLEHeight = (int) Math.ceil(Math.sqrt(((double) Math.max(slicesRequired,sliceMsRequired)) / ASPECT_RATIO));
+		int checkedCLEHeight = (int) Math.ceil(Math.sqrt(((double) Math.max(slicesRequired,sliceMsRequired)) / (SLICES_PER_TILE*ASPECT_RATIO)));
+		System.out.println("ela . checkedCLEHeight= "+checkedCLEHeight);
 		if(pblockCLEHeight < checkedCLEHeight){
 			pblockCLEHeight = checkedCLEHeight;
 		}
@@ -866,10 +887,10 @@ public class PBlockGenerator {
 		// Now, given an aspect ratio, we know how many columns of each we'll need
 		int numSLICEColumns = (int) Math.ceil((float)slicesRequired / pblockCLEHeight);
 		numSLICEColumns = (numSLICEColumns > 0) ? numSLICEColumns : 1;
-		
+		System.out.println("ela . numSLICEColumns= "+numSLICEColumns);
 		int numSLICEMColumns = (int) Math.ceil((float)sliceMsRequired / pblockCLEHeight);
 		numSLICEMColumns = (sliceMsRequired > 0 && numSLICEMColumns == 0) ? 1 : numSLICEMColumns;
-		
+		System.out.println("ela . numSLICEMColumns= "+numSLICEMColumns);
 		int numBRAMColumns = (int) Math.ceil(((float)ramb36sRequired * CLES_PER_BRAM) / pblockCLEHeight);;
 		numBRAMColumns = (ramb36sRequired > 0 && numBRAMColumns == 0) ? 1 : numBRAMColumns;
 		
@@ -880,9 +901,11 @@ public class PBlockGenerator {
 		if(dspCLECount == 0 && bramCLECount == 0){
 			int areaSLICEExcess = (numSLICEColumns * pblockCLEHeight) - slicesRequired;
 			int areaSLICEMExcess = numSLICEMColumns * pblockCLEHeight - sliceMsRequired;
+			System.out.println("ela . areaSLICEExcess= "+areaSLICEExcess + " and areaSLICEMExcess "+areaSLICEMExcess);
 			
 			int sliceExcessHeight = numSLICEColumns > 0 ? areaSLICEExcess / numSLICEColumns : 0; 
 			int sliceMExcessHeight = numSLICEMColumns > 0 ? areaSLICEMExcess / numSLICEMColumns : 0;
+			System.out.println("ela . sliceExcessHeight= "+sliceExcessHeight+" sliceMExcessHeight = "+sliceMExcessHeight);
 			
 			if(numSLICEColumns > 0 && numSLICEMColumns == 0){
 				pblockCLEHeight -= sliceExcessHeight;
@@ -890,6 +913,7 @@ public class PBlockGenerator {
 				pblockCLEHeight -= sliceMExcessHeight;
 			}else if(numSLICEColumns > 0 && numSLICEMColumns > 0){
 				pblockCLEHeight -= Integer.min(sliceExcessHeight, sliceMExcessHeight);
+				System.out.println("ela . pblockCLEHeight first update = "+pblockCLEHeight);
 				// In the case where we have both SLICEL and SLICEM, extra SLICEM spots
 				// can absorb some SLICELs, further reducing height
 				areaSLICEMExcess = numSLICEMColumns * pblockCLEHeight - sliceMsRequired;
@@ -897,6 +921,8 @@ public class PBlockGenerator {
 				if(excessHeight > 0){
 					pblockCLEHeight -= excessHeight;
 				}
+
+				System.out.println("ela . pblockCLEHeight second update = "+pblockCLEHeight);
 			}
 		}
 		
@@ -904,16 +930,21 @@ public class PBlockGenerator {
 		if(tallestShape > pblockCLEHeight){
 			pblockCLEHeight = tallestShape;
 		}
+		System.out.println("ela . tallestShape= "+tallestShape);
+		
 		if(widestShape > (numSLICEColumns+numSLICEMColumns)){
 			int extra = numSLICEColumns+numSLICEMColumns - widestShape;
 			numSLICEColumns = numSLICEColumns + extra;
 		}
+		System.out.println("ela . widestShape= "+widestShape);
 		int pblockArea = (numSLICEColumns+numSLICEMColumns) * pblockCLEHeight;
+		
 		if(shapeArea > pblockArea){
 			// Let's choose to make the pblock taller rather than wider
 			double areaShortage = shapeArea - pblockArea;
 			int increaseHeightBy = (int) Math.ceil(areaShortage  / (numSLICEColumns+numSLICEMColumns));
 			pblockCLEHeight += increaseHeightBy;
+			System.out.println("ela . pblockCLEHeight = "+pblockCLEHeight+" updated by shapeArea = "+shapeArea);
 		}
 		
 		
@@ -1183,8 +1214,12 @@ public class PBlockGenerator {
 			
 			if(Utils.isCLBM(t) && (reqNumSLICEMColumns>0)) {
 				reqNumSLICEMColumns--;
+				if(SLICES_PER_TILE==2)
+					reqNumSLICEColumns--;
 			} else if(Utils.isCLB(t)) {
 				reqNumSLICEColumns--;
+				if(SLICES_PER_TILE==2)
+					reqNumSLICEColumns--;
 			} else if(Utils.isDSP(t)) {
 				reqNumDSPColumns--;
 			} else if(Utils.isBRAM(t)) {
@@ -1209,10 +1244,14 @@ public class PBlockGenerator {
 			TileTypeEnum t = dev.getTile(row, col+colAllFulfilled-colOffset).getTileTypeEnum();
 			if(Utils.isCLBM(t) && (reqNumSLICEMColumns>0)) {
 				reqNumSLICEMColumns--;
+				if(SLICES_PER_TILE==2)
+					reqNumSLICEColumns--;
 				if((reqNumSLICEColumns<=0) && (forCLB) && (reqNumSLICEMColumns==0))	// This logic solves the task of returning a clb pblock offset only. Without it, if BRAM is the first in the pattern (with offset), BRAM column will be returned
 					break;
 			} else if(Utils.isCLB(t)) {
 				reqNumSLICEColumns--;
+				if(SLICES_PER_TILE==2)
+					reqNumSLICEColumns--;
 				if((reqNumSLICEMColumns<=0) && (forCLB) && (reqNumSLICEColumns==0))
 					break;
 			} else if(Utils.isDSP(t)) {
@@ -1290,11 +1329,15 @@ public class PBlockGenerator {
 					TileTypeEnum t = dev.getTile(row, i).getTileTypeEnum();
 					if(Utils.isCLBM(t) && (req_numSLICEMColumns>0)) {
 						req_numSLICEMColumns--;
-						if((req_numSLICEColumns<=0) && (req_numSLICEMColumns==0)) {
+						if(SLICES_PER_TILE==2)
+							req_numSLICEColumns--;
+						if((req_numSLICEColumns<=0) && (req_numSLICEMColumns<=0)) {
 							break;
 						}
 					} else if(Utils.isCLB(t)) {
 						req_numSLICEColumns--;
+						if(SLICES_PER_TILE==2)
+							req_numSLICEColumns--;
 						if((req_numSLICEMColumns<=0) && (req_numSLICEColumns<=0)) {
 							break;
 						}
