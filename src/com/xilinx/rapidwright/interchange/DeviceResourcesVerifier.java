@@ -224,8 +224,8 @@ public class DeviceResourcesVerifier {
             if( (isInput != (dir == Direction.INPUT)) || (isOutput != (dir == Direction.OUTPUT)) ){
                 throw new RuntimeException("ERROR: Mismatch on site pin direction");
             }
-            Integer siteWireIndex = site.getSiteWireIndex(pinName);
-            expect(siteWireIndex == null ? -1 : siteWireIndex, spReader.getSitewire());
+            String tileWireName = site.getTileWireNameFromPinName(pinName);
+            expect(tileWireName == null ? -1 : allStrings.getIndex(tileWireName), spReader.getSitewire());
         }
         expect(highestIndexInputPin, stReader.getLastInput());
         

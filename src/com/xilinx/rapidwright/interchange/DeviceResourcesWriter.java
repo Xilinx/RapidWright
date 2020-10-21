@@ -241,8 +241,8 @@ public class DeviceResourcesWriter {
                 SitePin.Builder pin = pins.get(j);
                 pin.setName(allStrings.getIndex(pinNames.get(j)));
                 pin.setDir(j <= highestIndexInputPin ? Direction.INPUT : Direction.OUTPUT);
-                Integer siteWireIdx = site.getSiteWireIndex(pinNames.get(j));
-                pin.setSitewire(siteWireIdx == null ? -1 : siteWireIdx);
+                String tileWireName = site.getTileWireNameFromPinName(pinNames.get(j));
+                pin.setSitewire(tileWireName == null ? -1 : allStrings.getIndex(tileWireName));
             }
             
             // SitePIPs
