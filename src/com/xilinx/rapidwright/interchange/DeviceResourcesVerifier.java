@@ -17,6 +17,7 @@ import org.capnproto.TextList;
 import org.capnproto.StructList.Reader;
 
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Device;
@@ -33,44 +34,49 @@ import com.xilinx.rapidwright.interchange.DeviceResources.Device.PrimToMacroExpa
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.SitePin;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.SiteType;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.TileType;
+import com.xilinx.rapidwright.interchange.DeviceResources.Device.ParentPins;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.Direction;
 
 public class DeviceResourcesVerifier {
     private static Enumerator<String> allStrings;
-    
+
     private static boolean expect(String gold, String test) {
-        if(!gold.equals(test)) throw new RuntimeException("ERROR: Device mismatch: gold=" + gold 
+        if(gold == null && test == null) return true;
+        if(!gold.equals(test)) throw new RuntimeException("ERROR: Device mismatch: gold=" + gold
                 + ", test=" + test);
         return true;
     }
-    
+
     private static boolean expect(int gold, int test) {
-        if(gold != test) throw new RuntimeException("ERROR: Device mismatch: gold=" + gold 
+        if(gold != test) throw new RuntimeException("ERROR: Device mismatch: gold=" + gold
                 + ", test=" + test);
         return true;
     }
-   
+
     public static boolean verifyDeviceResources(String devResFileName, String deviceName) throws IOException {
         allStrings = new Enumerator<String>();
         verifiedSiteTypes = new HashSet<SiteTypeEnum>();
 
         Device device = Device.getDevice(deviceName);
-        
+
+        Design design = new Design();
+        design.setPartName(deviceName);
+
         DeviceResources.Device.Reader dReader = null;
         ReaderOptions readerOptions = new ReaderOptions(1024L*1024L*512L, 64);
         MessageReader readMsg = null;
         readMsg = Interchange.readInterchangeFile(devResFileName, readerOptions);
 
         dReader = readMsg.getRoot(DeviceResources.Device.factory);
-        
+
         int strCount = dReader.getStrList().size();
         TextList.Reader reader = dReader.getStrList();
         for(int i=0; i < strCount; i++) {
             String str = reader.get(i).toString();
             allStrings.addObject(str);
         }
-        
+
         // Create a lookup map for tile types
         HashMap<String,TileType.Reader> tileTypeMap = new HashMap<String, TileType.Reader>();
         HashMap<String, StructList.Reader<DeviceResources.Device.PIP.Reader>> ttPIPMap = new HashMap<>();
@@ -80,14 +86,14 @@ public class DeviceResourcesVerifier {
             tileTypeMap.put(name, ttReader);
             ttPIPMap.put(name, ttReader.getPips());
         }
-        
+
         expect(device.getName(), dReader.getName().toString());
 
         Reader<DeviceResources.Device.Tile.Reader> tilesReader = dReader.getTileList();
         expect(device.getAllTiles().size(), tilesReader.size());
 
         Reader<SiteType.Reader> stReaders = dReader.getSiteTypeList();
-        
+
         int tileCount = tilesReader.size();
         for(int i=0; i < tileCount; i++) {
             DeviceResources.Device.Tile.Reader tileReader = tilesReader.get(i);
@@ -97,34 +103,81 @@ public class DeviceResourcesVerifier {
             expect(tile.getRow(), tileReader.getRow());
             expect(tile.getColumn(), tileReader.getCol());
 
-            expect(tile.getTilePatternIndex(), tileReader.getTilePatIdx()); 
-            
-            // Verify Sites
-            expect(tile.getSites().length, tileReader.getSites().size());
-            for(int j=0; j < tile.getSites().length; j++) {
-                DeviceResources.Device.Site.Reader siteReader = tileReader.getSites().get(j);
-                expect(tile.getSites()[j].getName(), allStrings.get(siteReader.getName()));
-                int siteTypeIdx = siteReader.getType();
-                expect(tile.getSites()[j].getSiteTypeEnum().name(),
-                        allStrings.get(stReaders.get(siteTypeIdx).getName()));
-                verifySiteType(device, dReader, tile.getSites()[j], siteTypeIdx);
-            }
-            
+            expect(tile.getTilePatternIndex(), tileReader.getTilePatIdx());
+
             // Verify Tile Types
             String tileTypeName = allStrings.get(tileReader.getType());
             TileType.Reader tileType = tileTypeMap.get(tileTypeName);
             expect(tile.getTileTypeEnum().name(), allStrings.get(tileType.getName()));
             expect(tile.getWireCount(), tileType.getWires().size());
             PrimitiveList.Int.Reader wiresReader = tileType.getWires();
-            for(int j=0; j < tile.getWireCount(); j++) {                
+            for(int j=0; j < tile.getWireCount(); j++) {
                 expect(tile.getWireName(j), allStrings.get(wiresReader.get(j)));
             }
-            PrimitiveList.Int.Reader siteTypesReader = tileType.getSiteTypes();
+
+            // Verify Sites
+            expect(tile.getSites().length, tileReader.getSites().size());
+            for(int j=0; j < tile.getSites().length; j++) {
+                DeviceResources.Device.Site.Reader siteReader = tileReader.getSites().get(j);
+                expect(tile.getSites()[j].getName(), allStrings.get(siteReader.getName()));
+                int tileTypeSiteTypeIdx = siteReader.getType();
+                int siteTypeIdx = tileType.getSiteTypes().get(tileTypeSiteTypeIdx).getPrimaryType();
+                expect(tile.getSites()[j].getSiteTypeEnum().name(),
+                        allStrings.get(stReaders.get(siteTypeIdx).getName()));
+                verifySiteType(device, dReader, tile.getSites()[j], siteTypeIdx);
+            }
+
+            Reader<DeviceResources.Device.SiteTypeInTileType.Reader> siteTypesReader = tileType.getSiteTypes();
             expect(tile.getSites().length, siteTypesReader.size());
             for(int j=0; j < tile.getSites().length; j++) {
-                expect(tile.getSites()[j].getSiteTypeEnum().name(),
-                        allStrings.get(siteTypesReader.get(j)));
+                DeviceResources.Device.SiteTypeInTileType.Reader siteTypeReader = siteTypesReader.get(j);
+                SiteType.Reader stReader = stReaders.get(siteTypeReader.getPrimaryType());
+                int siteTypeName = stReader.getName();
+                Site site = tile.getSites()[j];
+                expect(site.getSiteTypeEnum().name(),
+                       allStrings.get(siteTypeName));
+
+                PrimitiveList.Int.Reader pinToWires = siteTypeReader.getPrimaryPinsToTileWires();
+                expect(site.getSitePinCount(), pinToWires.size());
+                for(int k=0; k < site.getSitePinCount(); k++) {
+                    String pinName = site.getPinName(k);
+                    expect(allStrings.getIndex(pinName),
+                           stReader.getPins().get(k).getName());
+                    expect(allStrings.getIndex(site.getTileWireNameFromPinName(pinName)),
+                           pinToWires.get(k));
+                }
+
+                SiteTypeEnum[] altSiteTypes = site.getAlternateSiteTypeEnums();
+                expect(altSiteTypes.length, siteTypeReader.getAltPinsToPrimaryPins().size());
+                for(int k=0; k < altSiteTypes.length; k++) {
+                    SiteInst siteInst = design.createSiteInst("site_instance", altSiteTypes[k], site);
+                    SiteType.Reader altStReader = stReaders.get(stReader.getAltSiteTypes().get(k));
+                    expect(allStrings.getIndex(altSiteTypes[k].name()), altStReader.getName());
+
+                    ParentPins.Reader parentPins = siteTypeReader.getAltPinsToPrimaryPins().get(k);
+
+                    String[] altSitePins = siteInst.getSitePinNames();
+                    Set<String> altSitePinSet = new HashSet<String>();
+                    for(int l=0; l < altSitePins.length; ++l) {
+                        altSitePinSet.add(altSitePins[l]);
+                    }
+                    expect(parentPins.getPins().size(), altSitePins.length);
+                    expect(parentPins.getPins().size(), altStReader.getPins().size());
+
+                    for(int l=0; l < parentPins.getPins().size(); l++) {
+                        String sitePin = allStrings.get(altStReader.getPins().get(l).getName());
+                        if(!altSitePinSet.contains(sitePin)) {
+                            throw new RuntimeException("Site pin " + sitePin + " not found in site.");
+                        }
+
+                        String primSitePin = siteInst.getPrimarySitePinName(sitePin);
+                        expect(site.getPinIndex(primSitePin), parentPins.getPins().get(l));
+                    }
+
+                    design.removeSiteInst(siteInst);
+                }
             }
+
             ArrayList<PIP> pips = tile.getPIPs();
             Reader<DeviceResources.Device.PIP.Reader> pipsReader = ttPIPMap.get(tileTypeName);
             expect(pips.size(), pipsReader.size());
@@ -138,12 +191,12 @@ public class DeviceResourcesVerifier {
                     throw new RuntimeException("PIP Directionality mismatch " + pip);
                 }
                 PIPType type = pip.getPIPType();
-                 
-                boolean isBuffered20 = 
-                        type == PIPType.BI_DIRECTIONAL_BUFFERED20 || 
+
+                boolean isBuffered20 =
+                        type == PIPType.BI_DIRECTIONAL_BUFFERED20 ||
                         type == PIPType.BI_DIRECTIONAL_BUFFERED21_BUFFERED20;
-                boolean isBuffered21 = 
-                        type == PIPType.BI_DIRECTIONAL_BUFFERED21_BUFFERED20 || 
+                boolean isBuffered21 =
+                        type == PIPType.BI_DIRECTIONAL_BUFFERED21_BUFFERED20 ||
                         type == PIPType.DIRECTIONAL_BUFFERED21;
                 if(pipReader.getBuffered20() != isBuffered20) {
                     throw new RuntimeException("PIP Buffered20 mismatch " + pip);
@@ -153,27 +206,27 @@ public class DeviceResourcesVerifier {
                 }
             }
         }
-        
+
         Netlist.Reader primLibs = dReader.getPrimLibs();
         EDIFNetlist primsAndMacros = LogNetlistReader.getLogNetlist(primLibs, true);
         Set<String> libsFound = primsAndMacros.getLibrariesMap().keySet();
-        for(String libExpected : new String[] {EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME, 
+        for(String libExpected : new String[] {EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME,
             device.getSeries()+"_"+EDIFTools.MACRO_PRIMITIVES_LIB}) {
             if(!libsFound.remove(libExpected)) {
                 throw new RuntimeException("Missing expected library: " + libExpected);
             }
         }
-        int size = libsFound.size(); 
+        int size = libsFound.size();
         if(size > 0) {
             throw new RuntimeException("Found the following unexpected librar"+
                     (size > 1 ? "ies" : "y")+": " + libsFound);
         }
         for(EDIFLibrary lib : primsAndMacros.getLibraries()) {
-            EDIFLibrary reference = lib.isHDIPrimitivesLibrary() ? Design.getPrimitivesLibrary() : 
+            EDIFLibrary reference = lib.isHDIPrimitivesLibrary() ? Design.getPrimitivesLibrary() :
                                                     Design.getMacroPrimitives(device.getSeries());
             Set<String> cellsFound = lib.getCellMap().keySet();
             Set<String> cellsExpected = reference.getCellMap().keySet();
-            
+
             if(!cellsFound.containsAll(cellsExpected)) {
                 cellsExpected.removeAll(cellsFound);
                 throw new RuntimeException("Missing some cells expected in library " +
@@ -185,7 +238,7 @@ public class DeviceResourcesVerifier {
                         lib.getName() + ": " + cellsFound);
             }
         }
-        
+
         StructList.Reader<PrimToMacroExpansion.Reader> exceptionMap = dReader.getExceptionMap();
         int mapSize = exceptionMap.size();
         for(int i=0; i < mapSize; i++) {
@@ -193,17 +246,17 @@ public class DeviceResourcesVerifier {
             String primName = allStrings.get(entry.getPrimName());
             String macroName = allStrings.get(entry.getMacroName());
             if(!EDIFNetlist.macroExpandExceptionMap.get(primName).equals(macroName)) {
-                throw new RuntimeException("Exception map mismatch: " + 
+                throw new RuntimeException("Exception map mismatch: " +
                         "("+ primName+"-->" +macroName+") does not match expected mapping ("+
                         primName+"-->"+EDIFNetlist.macroExpandExceptionMap.get(primName)+")");
             }
         }
-        
+
         return true;
     }
-    
-    private static HashSet<SiteTypeEnum> verifiedSiteTypes; 
-    
+
+    private static HashSet<SiteTypeEnum> verifiedSiteTypes;
+
     private static boolean verifySiteType(Device device, DeviceResources.Device.Reader dReader,
             Site site, int siteTypeIdx) {
         if(verifiedSiteTypes.contains(site.getSiteTypeEnum())) {
@@ -219,22 +272,20 @@ public class DeviceResourcesVerifier {
             SitePin.Reader spReader = sitePinsReader.get(i);
             expect(pinName, allStrings.get(spReader.getName()));
             Direction dir = spReader.getDir();
-            boolean isInput = site.isInputPin(pinName); 
-            boolean isOutput = site.isOutputPin(pinName); 
+            boolean isInput = site.isInputPin(pinName);
+            boolean isOutput = site.isOutputPin(pinName);
             if( (isInput != (dir == Direction.INPUT)) || (isOutput != (dir == Direction.OUTPUT)) ){
-                throw new RuntimeException("ERROR: Mismatch on site pin direction");
+                throw new RuntimeException("ERROR: Mismatch on site pin direction, site pin " + pinName + " for site " + site.getName());
             }
-            String tileWireName = site.getTileWireNameFromPinName(pinName);
-            expect(tileWireName == null ? -1 : allStrings.getIndex(tileWireName), spReader.getSitewire());
         }
         expect(highestIndexInputPin, stReader.getLastInput());
-        
+
         Reader<DeviceResources.Device.BELPin.Reader> stBPReader = stReader.getBelPins();
         Reader<DeviceResources.Device.BEL.Reader> stBELReader = stReader.getBels();
         expect(site.getBELs().length, stBELReader.size());
         for(int i=0; i < site.getBELs().length; i++) {
             BEL bel = site.getBELs()[i];
-            DeviceResources.Device.BEL.Reader belReader = stBELReader.get(i); 
+            DeviceResources.Device.BEL.Reader belReader = stBELReader.get(i);
             expect(bel.getName(),allStrings.get(belReader.getName()));
             expect(bel.getBELType(),allStrings.get(belReader.getType()));
             expect(DeviceResourcesWriter.getBELCategory(bel).name(), belReader.getCategory().name());
@@ -242,15 +293,15 @@ public class DeviceResourcesVerifier {
             expect(bel.getPins().length, belPinsReader.size());
             for(int j=0; j < bel.getPins().length; j++) {
                 BELPin belPin = bel.getPin(j);
-                DeviceResources.Device.BELPin.Reader bpReader = 
+                DeviceResources.Device.BELPin.Reader bpReader =
                         stBPReader.get(belPinsReader.get(j));
                 expect(belPin.getName(), allStrings.get(bpReader.getName()));
                 expect(DeviceResourcesWriter.getBELPinDirection(belPin).name(), bpReader.getDir().name());
                 expect(bel.getName(), allStrings.get(bpReader.getBel()));
             }
         }
-        
-        // Check SitePIPs 
+
+        // Check SitePIPs
         expect(site.getSitePIPCount(), stReader.getSitePIPs().size());
         for(int i=0; i < site.getSitePIPCount(); i++) {
             SitePIP sitePIP = site.getSitePIP(i);
@@ -260,7 +311,7 @@ public class DeviceResourcesVerifier {
             expect(sitePIP.getInputPinName(), allStrings.get(in.getName()));
             expect(sitePIP.getOutputPinName(), allStrings.get(out.getName()));
         }
-        
+
         // SiteWires
         Reader<DeviceResources.Device.SiteWire.Reader> siteWiresReader = stReader.getSiteWires();
         expect(site.getSiteWireCount(), siteWiresReader.size());
@@ -275,7 +326,7 @@ public class DeviceResourcesVerifier {
                         "/" + DeviceResourcesWriter.getBELPinDirection(belPin));
             }
             for(int j=0; j < siteWire.getPins().size(); j++) {
-                DeviceResources.Device.BELPin.Reader bp = 
+                DeviceResources.Device.BELPin.Reader bp =
                         stBPReader.get(siteWire.getPins().get(j));
                 String belName = allStrings.get(bp.getBel());
                 String pinName = allStrings.get(bp.getName());
@@ -286,8 +337,11 @@ public class DeviceResourcesVerifier {
                 }
             }
         }
-        
-        
+
+        //SiteTypeEnum[] altSiteTypes = site.getAlternateSiteTypeEnums();
+        //PrimitiveList.Int.Reader altSiteTypesReader = stReader.getAltSiteTypes();
+        //expect(altSiteTypes.length, altSiteTypesReader.size());
+
         verifiedSiteTypes.add(site.getSiteTypeEnum());
         return true;
     }

@@ -15,6 +15,8 @@ import org.capnproto.Text;
 import org.capnproto.TextList;
 
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.SiteInst;
+import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELClass;
 import com.xilinx.rapidwright.device.BELPin;
@@ -49,14 +51,36 @@ public class DeviceResourcesWriter {
     private static Enumerator<String> allStrings;
     private static Enumerator<String> allSiteTypes;
 
-    private static HashMap<TileTypeEnum,Tile> tileTypes; 
+    private static HashMap<TileTypeEnum,Tile> tileTypes;
     private static HashMap<SiteTypeEnum,Site> siteTypes;
-    
-    public static void populateEnumerations(Device device) {
+
+    public static void populateSiteEnumerations(SiteInst site_inst, Site site) {
+        if(!siteTypes.containsKey(site_inst.getSiteTypeEnum())) {
+            siteTypes.put(site_inst.getSiteTypeEnum(), site);
+            allStrings.addObject(site_inst.getSiteTypeEnum().toString());
+
+            for(String siteWire : site_inst.getSiteWires()) {
+                allStrings.addObject(siteWire);
+            }
+            for(BEL bel : site_inst.getBELs()) {
+                allStrings.addObject(bel.getName());
+                allStrings.addObject(bel.getBELType());
+                for(BELPin belPin : bel.getPins()) {
+                    allStrings.addObject(belPin.getName());
+                }
+            }
+            for(String sitePin : site_inst.getSitePinNames()) {
+                allStrings.addObject(sitePin);
+            }
+        }
+    }
+
+    public static void populateEnumerations(Design design, Device device) {
+
         allStrings = new Enumerator<>();
         allSiteTypes = new Enumerator<>();
 
-        tileTypes = new HashMap<>(); 
+        tileTypes = new HashMap<>();
         siteTypes = new HashMap<>();
         for(Tile tile : device.getAllTiles()) {
             allStrings.addObject(tile.getName());
@@ -70,37 +94,33 @@ public class DeviceResourcesWriter {
             for(Site site : tile.getSites()) {
                 allStrings.addObject(site.getName());
                 allStrings.addObject(site.getSiteTypeEnum().name());
-                if(!siteTypes.containsKey(site.getSiteTypeEnum())) {
-                    allStrings.addObject(site.getSiteTypeEnum().toString());
-                    for(int i=0; i < site.getSiteWireCount(); i++) {
-                        allStrings.addObject(site.getSiteWireName(i));
-                    }
-                    for(BEL bel : site.getBELs()) {
-                        allStrings.addObject(bel.getName());
-                        allStrings.addObject(bel.getBELType());
-                        for(BELPin belPin : bel.getPins()) {
-                            allStrings.addObject(belPin.getName());
-                        }
-                    }
-                    for(int i=0; i < site.getSitePinCount(); i++) {
-                        allStrings.addObject(site.getPinName(i));
-                    }
-                    siteTypes.put(site.getSiteTypeEnum(), site);
-                }   
+                SiteInst siteInst = design.createSiteInst("site_instance", site.getSiteTypeEnum(), site);
+                populateSiteEnumerations(siteInst, site);
+                design.removeSiteInst(siteInst);
+
+                SiteTypeEnum[] altSiteTypes = site.getAlternateSiteTypeEnums();
+                for(int i=0; i < altSiteTypes.length; i++) {
+                    SiteInst altSiteInst = design.createSiteInst("site_instance", altSiteTypes[i], site);
+                    populateSiteEnumerations(altSiteInst, site);
+                    design.removeSiteInst(altSiteInst);
+                }
             }
-            
-        }        
+
+        }
         for(Entry<String,String> e : EDIFNetlist.macroExpandExceptionMap.entrySet()) {
-            allStrings.addObject(e.getKey()); 
+            allStrings.addObject(e.getKey());
             allStrings.addObject(e.getValue());
         }
     }
 
-    
-    public static void writeDeviceResourcesFile(Device device, CodePerfTracker t, 
+
+    public static void writeDeviceResourcesFile(String part, Device device, CodePerfTracker t,
                                                                 String fileName) throws IOException {
+        Design design = new Design();
+        design.setPartName(part);
+
         t.start("populateEnums");
-        populateEnumerations(device);
+        populateEnumerations(design, device);
 
         MessageBuilder message = new MessageBuilder();
         DeviceResources.Device.Builder devBuilder = message.initRoot(DeviceResources.Device.factory);
@@ -108,22 +128,22 @@ public class DeviceResourcesWriter {
 
         t.stop().start("Strings");
         writeAllStringsToBuilder(devBuilder);
-        
+
         t.stop().start("SiteTypes");
-        writeAllSiteTypesToBuilder(device, devBuilder);
-        
+        writeAllSiteTypesToBuilder(design, device, devBuilder);
+
         t.stop().start("TileTypes");
-        writeAllTileTypesToBuilder(device, devBuilder);
-        
+        writeAllTileTypesToBuilder(design, device, devBuilder);
+
         t.stop().start("Tiles");
         writeAllTilesToBuilder(device, devBuilder);
-        
+
         t.stop().start("Wires&Nodes");
         writeAllWiresAndNodesToBuilder(device, devBuilder);
-        
+
         t.stop().start("Prims&Macros");
         // Create an EDIFNetlist populated with just primitive and macro libraries
-        EDIFLibrary prims = Design.getPrimitivesLibrary();       
+        EDIFLibrary prims = Design.getPrimitivesLibrary();
         EDIFLibrary macros = Design.getMacroPrimitives(device.getSeries());
         EDIFNetlist netlist = new EDIFNetlist("PrimitiveLibs");
         netlist.addLibrary(prims);
@@ -140,16 +160,16 @@ public class DeviceResourcesWriter {
                     // remap cell definition to HDI Primitives library
                     inst.updateCellType(hdiCellInst);
                 }
-                
+
             }
         }
-        
+
         Netlist.Builder netlistBuilder = devBuilder.getPrimLibs();
         LogNetlistWriter.populateNetlistBuilder(netlist, netlistBuilder, true);
-        
+
         // Write macro exception map
         int size = EDIFNetlist.macroExpandExceptionMap.size();
-        StructList.Builder<PrimToMacroExpansion.Builder> exceptionMap = 
+        StructList.Builder<PrimToMacroExpansion.Builder> exceptionMap =
                 devBuilder.initExceptionMap(size);
         int i=0;
         for(Entry<String, String> entry : EDIFNetlist.macroExpandExceptionMap.entrySet()) {
@@ -157,12 +177,12 @@ public class DeviceResourcesWriter {
             entryBuilder.setMacroName(allStrings.getIndex(entry.getValue()));
             entryBuilder.setPrimName(allStrings.getIndex(entry.getKey()));
             i++;
-        }        
+        }
         t.stop().start("Write File");
         Interchange.writeInterchangeFile(fileName, message);
         t.stop();
     }
-    
+
     public static void writeAllStringsToBuilder(DeviceResources.Device.Builder devBuilder) {
         int stringCount = allStrings.size();
         TextList.Builder strList = devBuilder.initStrList(stringCount);
@@ -181,7 +201,7 @@ public class DeviceResourcesWriter {
             return BELCategory.SITE_PORT;
         return BELCategory._NOT_IN_SCHEMA;
     }
-    
+
     protected static Direction getBELPinDirection(BELPin belPin) {
         BELPin.Direction dir = belPin.getDir();
         if(dir == BELPin.Direction.INPUT)
@@ -192,32 +212,36 @@ public class DeviceResourcesWriter {
             return Direction.INOUT;
         return Direction._NOT_IN_SCHEMA;
     }
-    
-    public static void writeAllSiteTypesToBuilder(Device device, DeviceResources.Device.Builder devBuilder) {
+
+    public static void writeAllSiteTypesToBuilder(Design design, Device device, DeviceResources.Device.Builder devBuilder) {
         StructList.Builder<SiteType.Builder> siteTypesList = devBuilder.initSiteTypeList(siteTypes.size());
-        
-        int i=0; 
+
+        int i=0;
         for(Entry<SiteTypeEnum,Site> e : siteTypes.entrySet()) {
             SiteType.Builder siteType = siteTypesList.get(i);
             Site site = e.getValue();
+            SiteInst site_inst = design.createSiteInst("site_instance", e.getKey(), site);
+            Tile tile = site_inst.getTile();
             siteType.setName(allStrings.getIndex(e.getKey().name()));
             allSiteTypes.addObject(e.getKey().name());
             // BELs & BELPins
             Enumerator<BELPin> allBELPins = new Enumerator<BELPin>();
-            StructList.Builder<Builder> belBuilders = siteType.initBels(site.getBELs().length);
-            for(int j=0; j < site.getBELs().length; j++) {
-                BEL bel = site.getBELs()[j];
+            StructList.Builder<Builder> belBuilders = siteType.initBels(site_inst.getBELs().length);
+            for(int j=0; j < site_inst.getBELs().length; j++) {
+                BEL bel = site_inst.getBELs()[j];
                 Builder belBuilder = belBuilders.get(j);
                 belBuilder.setName(allStrings.getIndex(bel.getName()));
                 belBuilder.setType(allStrings.getIndex(bel.getBELType()));
                 PrimitiveList.Int.Builder belPinsBuilder = belBuilder.initPins(bel.getPins().length);
                 for(int k=0; k < bel.getPins().length; k++) {
                     belPinsBuilder.set(k, allBELPins.size());
-                    BELPin belPin = bel.getPin(k); 
+                    BELPin belPin = bel.getPin(k);
                     allBELPins.addObject(belPin);
                 }
                 belBuilder.setCategory(getBELCategory(bel));
             }
+
+            Enumerator<SitePIP> allSitePIPs = new Enumerator<SitePIP>();
             StructList.Builder<DeviceResources.Device.BELPin.Builder> belPinBuilders =
                     siteType.initBelPins(allBELPins.size());
             for(int j=0; j < allBELPins.size(); j++) {
@@ -226,71 +250,149 @@ public class DeviceResourcesWriter {
                 belPinBuilder.setName(allStrings.getIndex(belPin.getName()));
                 belPinBuilder.setDir(getBELPinDirection(belPin));
                 belPinBuilder.setBel(allStrings.getIndex(belPin.getBEL().getName()));
+
+                SitePIP sitePip = site_inst.getSitePIP(belPin);
+                if(sitePip != null) {
+                    allSitePIPs.addObject(sitePip);
+                }
             }
-            
+
             // SitePins
-            int highestIndexInputPin = site.getHighestInputPinIndex();
+            int highestIndexInputPin = site_inst.getHighestSitePinInputIndex();
             ArrayList<String> pinNames = new ArrayList<String>();
-            for(int j=0; j < site.getSitePinCount(); j++) {
-                String pinName = site.getPinName(j);
+            for(String pinName : site_inst.getSitePinNames()) {
                 pinNames.add(pinName);
             }
             siteType.setLastInput(highestIndexInputPin);
+
             StructList.Builder<SitePin.Builder> pins = siteType.initPins(pinNames.size());
             for(int j=0; j < pinNames.size(); j++) {
-                com.xilinx.rapidwright.device.SitePin site_pin = new com.xilinx.rapidwright.device.SitePin(site, pinNames.get(j));
+                String primarySitePinName = pinNames.get(j);
+                int sitePinIndex = site.getPinIndex(pinNames.get(j));
+                if(sitePinIndex == -1) {
+                    primarySitePinName = site_inst.getPrimarySitePinName(pinNames.get(j));
+                    sitePinIndex = site.getPinIndex(primarySitePinName);
+                }
+
+                if(sitePinIndex == -1) {
+                    throw new RuntimeException("Failed to find pin index for site " + site.getName() + " site type " + e.getKey().name()+ " site pin " + primarySitePinName + " / " + pinNames.get(j));
+                }
+
                 SitePin.Builder pin = pins.get(j);
                 pin.setName(allStrings.getIndex(pinNames.get(j)));
-                pin.setDir(j <= highestIndexInputPin ? Direction.INPUT : Direction.OUTPUT);
-                String tileWireName = site.getTileWireNameFromPinName(pinNames.get(j));
-                pin.setSitewire(tileWireName == null ? -1 : allStrings.getIndex(tileWireName));
-                pin.setBelpin(allBELPins.getIndex(site_pin.getBELPin()));
+                pin.setDir(sitePinIndex <= highestIndexInputPin ? Direction.INPUT : Direction.OUTPUT);
+
+                BELPin belPin = site.getBELPin(primarySitePinName);
+                pin.setBelpin(belPin == null ? -1 : allBELPins.getIndex(belPin));
             }
-            
+
             // SitePIPs
-            StructList.Builder<DeviceResources.Device.SitePIP.Builder> spBuilders = 
-                    siteType.initSitePIPs(site.getSitePIPCount());
-            for(int j=0; j < site.getSitePIPCount(); j++) {
+            StructList.Builder<DeviceResources.Device.SitePIP.Builder> spBuilders =
+                    siteType.initSitePIPs(allSitePIPs.size());
+            for(int j=0; j < allSitePIPs.size(); j++) {
                 DeviceResources.Device.SitePIP.Builder spBuilder = spBuilders.get(j);
-                SitePIP sitePIP = site.getSitePIP(j);
+                SitePIP sitePIP = allSitePIPs.get(j);
                 spBuilder.setInpin(allBELPins.getIndex(sitePIP.getInputPin()));
                 spBuilder.setOutpin(allBELPins.getIndex(sitePIP.getOutputPin()));
             }
-            
+
             // SiteWires
-            StructList.Builder<SiteWire.Builder> swBuilders = 
-                    siteType.initSiteWires(site.getSiteWireCount());
-            for(int j=0; j < site.getSiteWireCount(); j++) {
+            String[] siteWires = site_inst.getSiteWires();
+            StructList.Builder<SiteWire.Builder> swBuilders =
+                    siteType.initSiteWires(siteWires.length);
+            for(int j=0; j < siteWires.length; j++) {
                 SiteWire.Builder swBuilder = swBuilders.get(j);
-                String siteWireName = site.getSiteWireName(j);
+                String siteWireName = siteWires[j];
                 swBuilder.setName(allStrings.getIndex(siteWireName));
-                BELPin[] swPins = site.getBELPins(siteWireName);
+                BELPin[] swPins = site_inst.getSiteWirePins(siteWireName);
                 PrimitiveList.Int.Builder bpBuilders = swBuilder.initPins(swPins.length);
                 for(int k=0; k < swPins.length; k++) {
                     bpBuilders.set(k, allBELPins.getIndex(swPins[k]));
                 }
             }
-            
+
+            design.removeSiteInst(site_inst);
+            i++;
+        }
+
+        i = 0;
+        for(Entry<SiteTypeEnum,Site> e : siteTypes.entrySet()) {
+            Site site = e.getValue();
+
+            SiteType.Builder siteType = siteTypesList.get(i);
+
+            SiteTypeEnum[] altSiteTypes = site.getAlternateSiteTypeEnums();
+            PrimitiveList.Int.Builder altSiteTypesBuilder = siteType.initAltSiteTypes(altSiteTypes.length);
+
+            for(int j=0; j < altSiteTypes.length; ++j) {
+                Integer siteTypeIdx = allSiteTypes.maybeGetIndex(altSiteTypes[j].name());
+                if(siteTypeIdx == null) {
+                    throw new RuntimeException("Site type " + altSiteTypes[j].name() + " is missing from allSiteTypes Enumerator.");
+                }
+                altSiteTypesBuilder.set(j, siteTypeIdx);
+            }
+
             i++;
         }
     }
 
-    public static void writeAllTileTypesToBuilder(Device device, DeviceResources.Device.Builder devBuilder) {
+    private static void populateAltSitePins(
+            Design design,
+            Site site,
+            int primaryTypeIndex,
+            StructList.Builder<DeviceResources.Device.ParentPins.Builder> listOfParentPins,
+            DeviceResources.Device.Builder devBuilder) {
+        PrimitiveList.Int.Builder altSiteTypes = devBuilder.getSiteTypeList().get(primaryTypeIndex).getAltSiteTypes();
+        SiteTypeEnum[] altSiteTypeEnums = site.getAlternateSiteTypeEnums();
+        for(int i = 0; i < altSiteTypeEnums.length; ++i) {
+            SiteInst siteInst = design.createSiteInst("site_instance", altSiteTypeEnums[i], site);
+
+            DeviceResources.Device.SiteType.Builder altSiteType = devBuilder.getSiteTypeList().get(altSiteTypes.get(i));
+            StructList.Builder<DeviceResources.Device.SitePin.Builder> sitePins = altSiteType.getPins();
+            PrimitiveList.Int.Builder parentPins = listOfParentPins.get(i).initPins(altSiteType.getPins().size());
+
+            for(int j = 0; j < sitePins.size(); j++) {
+                DeviceResources.Device.SitePin.Builder sitePin = sitePins.get(j);
+                String sitePinName = allStrings.get(sitePin.getName());
+                String parentPinName = siteInst.getPrimarySitePinName(sitePinName);
+                parentPins.set(j, site.getPinIndex(parentPinName));
+            }
+
+            design.removeSiteInst(siteInst);
+        }
+    }
+
+    public static void writeAllTileTypesToBuilder(Design design, Device device, DeviceResources.Device.Builder devBuilder) {
         StructList.Builder<TileType.Builder> tileTypesList = devBuilder.initTileTypeList(tileTypes.size());
-        int i=0; 
+        int i=0;
         for(Entry<TileTypeEnum,Tile> e : tileTypes.entrySet()) {
             Tile tile = e.getValue();
             TileType.Builder tileType = tileTypesList.get(i);
             // name
             tileType.setName(allStrings.getIndex(e.getKey().name()));
-            
+
             // siteTypes
             Site[] sites = tile.getSites();
-            PrimitiveList.Int.Builder siteTypes = tileType.initSiteTypes(sites.length);
+            StructList.Builder<DeviceResources.Device.SiteTypeInTileType.Builder> siteTypes = tileType.initSiteTypes(sites.length);
             for(int j=0; j < sites.length; j++) {
-                siteTypes.set(j, allStrings.getIndex(sites[j].getSiteTypeEnum().name()));
+                DeviceResources.Device.SiteTypeInTileType.Builder siteType = siteTypes.get(j);
+                int primaryTypeIndex = allSiteTypes.getIndex(sites[j].getSiteTypeEnum().name());
+                siteType.setPrimaryType(primaryTypeIndex);
+
+                int numPins = sites[j].getSitePinCount();
+                PrimitiveList.Int.Builder pinWires = siteType.initPrimaryPinsToTileWires(numPins);
+                for(int k=0; k < numPins; ++k) {
+                    pinWires.set(k, allStrings.getIndex(sites[j].getTileWireNameFromPinName(sites[j].getPinName(k))));
+                }
+
+                populateAltSitePins(
+                        design,
+                        sites[j],
+                        primaryTypeIndex,
+                        siteType.initAltPinsToPrimaryPins(sites[j].getAlternateSiteTypeEnums().length),
+                        devBuilder);
             }
-            
+
             // wires
             PrimitiveList.Int.Builder wires = tileType.initWires(tile.getWireCount());
             for(int j=0 ; j < tile.getWireCount(); j++) {
@@ -314,50 +416,50 @@ public class DeviceResourcesWriter {
                     pipBuilder.setBuffered21(true);
                 } else if(pip.getPIPType() == PIPType.DIRECTIONAL_BUFFERED21) {
                     pipBuilder.setBuffered21(true);
-                }                
+                }
             }
             i++;
         }
-        
+
     }
 
     public static void writeAllTilesToBuilder(Device device, DeviceResources.Device.Builder devBuilder) {
         Collection<Tile> tiles = device.getAllTiles();
-        StructList.Builder<DeviceResources.Device.Tile.Builder> tileBuilders = 
+        StructList.Builder<DeviceResources.Device.Tile.Builder> tileBuilders =
                 devBuilder.initTileList(tiles.size());
-        
-        int i=0; 
+
+        int i=0;
         for(Tile tile : tiles) {
             DeviceResources.Device.Tile.Builder tileBuilder = tileBuilders.get(i);
             tileBuilder.setName(allStrings.getIndex(tile.getName()));
             tileBuilder.setType(allStrings.getIndex(tile.getTileTypeEnum().name()));
             Site[] sites = tile.getSites();
-            StructList.Builder<DeviceResources.Device.Site.Builder> siteBuilders = 
+            StructList.Builder<DeviceResources.Device.Site.Builder> siteBuilders =
                     tileBuilder.initSites(sites.length);
             for(int j=0; j < sites.length; j++) {
                 DeviceResources.Device.Site.Builder siteBuilder = siteBuilders.get(j);
                 siteBuilder.setName(allStrings.getIndex(sites[j].getName()));
-                siteBuilder.setType(allSiteTypes.getIndex(sites[j].getSiteTypeEnum().name()));
+                siteBuilder.setType(j);
             }
             tileBuilder.setRow((short)tile.getRow());
             tileBuilder.setCol((short)tile.getColumn());
-            tileBuilder.setTilePatIdx(tile.getTilePatternIndex());            
+            tileBuilder.setTilePatIdx(tile.getTilePatternIndex());
             i++;
         }
-        
+
     }
-    
+
     private static long makeKey(Tile tile, int wire) {
         long key = wire;
-        key = (((long)tile.getUniqueAddress()) << 32) | key;  
-        return key; 
+        key = (((long)tile.getUniqueAddress()) << 32) | key;
+        return key;
     }
-        
+
     public static void writeAllWiresAndNodesToBuilder(Device device, DeviceResources.Device.Builder devBuilder) {
         LongEnumerator allWires = new LongEnumerator();
         LongEnumerator allNodes = new LongEnumerator();
-        
-        
+
+
         for(Tile tile : device.getAllTiles()) {
             for(int i=0; i < tile.getWireCount(); i++) {
                 Wire wire = new Wire(tile,i);
@@ -370,10 +472,10 @@ public class DeviceResourcesWriter {
                 allNodes.addObject(makeKey(end.getTile(), end.getWire()));
             }
         }
-        
-        StructList.Builder<DeviceResources.Device.Wire.Builder> wireBuilders = 
+
+        StructList.Builder<DeviceResources.Device.Wire.Builder> wireBuilders =
                 devBuilder.initWires(allWires.size());
-        
+
         for(int i=0; i < allWires.size(); i++) {
             DeviceResources.Device.Wire.Builder wireBuilder = wireBuilders.get(i);
             long wireKey = allWires.get(i);
@@ -382,8 +484,8 @@ public class DeviceResourcesWriter {
             wireBuilder.setTile(allStrings.getIndex(wire.getTile().getName()));
             wireBuilder.setWire(allStrings.getIndex(wire.getWireName()));
         }
-        
-        StructList.Builder<DeviceResources.Device.Node.Builder> nodeBuilders = 
+
+        StructList.Builder<DeviceResources.Device.Node.Builder> nodeBuilders =
                 devBuilder.initNodes(allNodes.size());
         for(int i=0; i < allNodes.size(); i++) {
             DeviceResources.Device.Node.Builder nodeBuilder = nodeBuilders.get(i);
