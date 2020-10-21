@@ -378,7 +378,7 @@ public class DeviceResourcesWriter {
             Wire wire = new Wire(device.getTile((int)(wireKey >>> 32)), (int)(wireKey & 0xffffffff));
             //Wire wire = allWires.get(i);
             wireBuilder.setTile(allStrings.getIndex(wire.getTile().getName()));
-            wireBuilder.setWire(wire.getWireIndex());
+            wireBuilder.setWire(allStrings.getIndex(wire.getWireName()));
         }
         
         StructList.Builder<DeviceResources.Device.Node.Builder> nodeBuilders = 
