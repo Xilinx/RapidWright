@@ -238,11 +238,13 @@ public class DeviceResourcesWriter {
             siteType.setLastInput(highestIndexInputPin);
             StructList.Builder<SitePin.Builder> pins = siteType.initPins(pinNames.size());
             for(int j=0; j < pinNames.size(); j++) {
+                com.xilinx.rapidwright.device.SitePin site_pin = new com.xilinx.rapidwright.device.SitePin(site, pinNames.get(j));
                 SitePin.Builder pin = pins.get(j);
                 pin.setName(allStrings.getIndex(pinNames.get(j)));
                 pin.setDir(j <= highestIndexInputPin ? Direction.INPUT : Direction.OUTPUT);
                 String tileWireName = site.getTileWireNameFromPinName(pinNames.get(j));
                 pin.setSitewire(tileWireName == null ? -1 : allStrings.getIndex(tileWireName));
+                pin.setBelpin(allBELPins.getIndex(site_pin.getBELPin()));
             }
             
             // SitePIPs
