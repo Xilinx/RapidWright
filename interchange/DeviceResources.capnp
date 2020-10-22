@@ -9,6 +9,8 @@ using SiteTypeIdx = UInt32;
 using BELPinIdx = UInt32;
 using WireIdx = UInt32;
 using WireIDInTileType = UInt32; # ID in Tile Type
+using SitePinIdx = UInt32;
+using TileTypeSiteTypeIdx = UInt32;
 
 struct Device {
 
@@ -24,43 +26,66 @@ struct Device {
 
   #######################################
   # Placement definition objects
-  #######################################  
+  #######################################
   struct SiteType {
-    name      @0 : StringIdx;
-    pins      @1 : List(SitePin); 
-    lastInput @2 : UInt32; # Index of the last input pin
-    bels      @3 : List(BEL);
-    belPins   @4 : List(BELPin); # All BEL Pins in site type
-    sitePIPs  @5 : List(SitePIP);
-    siteWires @6 : List(SiteWire);
+    name         @0 : StringIdx;
+    pins         @1 : List(SitePin);
+    lastInput    @2 : UInt32; # Index of the last input pin
+    bels         @3 : List(BEL);
+    belPins      @4 : List(BELPin); # All BEL Pins in site type
+    sitePIPs     @5 : List(SitePIP);
+    siteWires    @6 : List(SiteWire);
+    altSiteTypes @7 : List(SiteTypeIdx);
+  }
+
+  # Maps site pins from alternative site types to the parent primary site pins
+  struct ParentPins {
+    # pins[0] is the mapping of the siteTypeList[altSiteType].pins[0] to the
+    # primary site pin index.
+    #
+    # To determine the tile wire for a alternative site type, first get the
+    # site pin index for primary site, then use primaryPinsToTileWires.
+    pins  @0 : List(SitePinIdx);
+  }
+
+  struct SiteTypeInTileType {
+    primaryType @0 : SiteTypeIdx;
+
+    # primaryPinsToTileWires[0] is the tile wire that matches
+    # siteTypeList[primaryType].pins[0], etc.
+    primaryPinsToTileWires @1 : List(StringIdx);
+
+    # altPinsToPrimaryPins[0] is the mapping for
+    # siteTypeList[primaryType].altSiteTypes[0], etc.
+    altPinsToPrimaryPins @2 : List(ParentPins);
   }
 
   struct TileType {
     name      @0 : StringIdx;
-    siteTypes @1 : List(SiteTypeIdx);
+    siteTypes @1 : List(SiteTypeInTileType);
     wires     @2 : List(StringIdx);
     pips      @3 : List(PIP);
   }
-  
+
   #######################################
   # Placement instance objects
-  #######################################  
+  #######################################
   struct BEL {
     name      @0 : StringIdx;
     type      @1 : StringIdx;
-    pins      @2 : List(BELPinIdx); 
+    pins      @2 : List(BELPinIdx);
     category  @3 : BELCategory; # This would be BELClass/class, but conflicts with Java language
   }
-  
+
   enum BELCategory {
     logic    @0;
     routing  @1;
     sitePort @2;
   }
-      
+
   struct Site {
     name      @0 : StringIdx;
-    type      @1 : SiteTypeIdx; 
+    type      @1 : TileTypeSiteTypeIdx; # Index into TileType.siteTypes
   }
 
   struct Tile {
@@ -71,7 +96,7 @@ struct Device {
     col        @4 : UInt16;
     tilePatIdx @5 : UInt32;
   }
-  
+
   ######################################
   # Intra-site routing resources
   ######################################
@@ -85,32 +110,31 @@ struct Device {
     name   @0 : StringIdx;
     pins   @1 : List(BELPinIdx);
   }
-       
+
   struct SitePIP {
     inpin  @0 : BELPinIdx;
     outpin @1 : BELPinIdx;
   }
-  
+
   struct SitePin {
     name     @0 : StringIdx;
     dir      @1 : Dir.Netlist.Direction;
-    sitewire @2 : StringIdx; 
-    belpin   @3 : BELPinIdx;
+    belpin   @2 : BELPinIdx;
   }
-  
-  
+
+
   ######################################
   # Inter-site routing resources
-  ######################################  
+  ######################################
   struct Wire {
     tile      @0 : StringIdx;
     wire      @1 : StringIdx;
   }
-  
+
   struct Node {
     wires    @0 : List(WireIdx);
   }
-  
+
   struct PIP {
     wire0        @0 : WireIDInTileType;
     wire1        @1 : WireIDInTileType;
@@ -118,12 +142,12 @@ struct Device {
     buffered20   @3 : Bool;
     buffered21   @4 : Bool;
   }
-  
+
   ######################################
-  # Macro expansion exception map for 
-  # primitives that don't expand to a 
+  # Macro expansion exception map for
+  # primitives that don't expand to a
   # macro of the same name.
-  ######################################  
+  ######################################
   struct PrimToMacroExpansion {
     primName  @0 : StringIdx;
     macroName @1 : StringIdx;

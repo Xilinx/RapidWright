@@ -26,7 +26,7 @@ public class DeviceResourcesExample {
             Device device = Device.getDevice(args[0]);
             t.stop();
             // Write Netlist to Cap'n Proto Serialization file
-            DeviceResourcesWriter.writeDeviceResourcesFile(device, t, capnProtoFileName);            
+            DeviceResourcesWriter.writeDeviceResourcesFile(args[0], device, t, capnProtoFileName);            
             Device.releaseDeviceReferences();
         }
         
