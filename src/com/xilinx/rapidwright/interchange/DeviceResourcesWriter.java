@@ -54,22 +54,22 @@ public class DeviceResourcesWriter {
     private static HashMap<TileTypeEnum,Tile> tileTypes;
     private static HashMap<SiteTypeEnum,Site> siteTypes;
 
-    public static void populateSiteEnumerations(SiteInst site_inst, Site site) {
-        if(!siteTypes.containsKey(site_inst.getSiteTypeEnum())) {
-            siteTypes.put(site_inst.getSiteTypeEnum(), site);
-            allStrings.addObject(site_inst.getSiteTypeEnum().toString());
+    public static void populateSiteEnumerations(SiteInst siteInst, Site site) {
+        if(!siteTypes.containsKey(siteInst.getSiteTypeEnum())) {
+            siteTypes.put(siteInst.getSiteTypeEnum(), site);
+            allStrings.addObject(siteInst.getSiteTypeEnum().toString());
 
-            for(String siteWire : site_inst.getSiteWires()) {
+            for(String siteWire : siteInst.getSiteWires()) {
                 allStrings.addObject(siteWire);
             }
-            for(BEL bel : site_inst.getBELs()) {
+            for(BEL bel : siteInst.getBELs()) {
                 allStrings.addObject(bel.getName());
                 allStrings.addObject(bel.getBELType());
                 for(BELPin belPin : bel.getPins()) {
                     allStrings.addObject(belPin.getName());
                 }
             }
-            for(String sitePin : site_inst.getSitePinNames()) {
+            for(String sitePin : siteInst.getSitePinNames()) {
                 allStrings.addObject(sitePin);
             }
         }
@@ -220,15 +220,15 @@ public class DeviceResourcesWriter {
         for(Entry<SiteTypeEnum,Site> e : siteTypes.entrySet()) {
             SiteType.Builder siteType = siteTypesList.get(i);
             Site site = e.getValue();
-            SiteInst site_inst = design.createSiteInst("site_instance", e.getKey(), site);
-            Tile tile = site_inst.getTile();
+            SiteInst siteInst = design.createSiteInst("site_instance", e.getKey(), site);
+            Tile tile = siteInst.getTile();
             siteType.setName(allStrings.getIndex(e.getKey().name()));
             allSiteTypes.addObject(e.getKey().name());
             // BELs & BELPins
             Enumerator<BELPin> allBELPins = new Enumerator<BELPin>();
-            StructList.Builder<Builder> belBuilders = siteType.initBels(site_inst.getBELs().length);
-            for(int j=0; j < site_inst.getBELs().length; j++) {
-                BEL bel = site_inst.getBELs()[j];
+            StructList.Builder<Builder> belBuilders = siteType.initBels(siteInst.getBELs().length);
+            for(int j=0; j < siteInst.getBELs().length; j++) {
+                BEL bel = siteInst.getBELs()[j];
                 Builder belBuilder = belBuilders.get(j);
                 belBuilder.setName(allStrings.getIndex(bel.getName()));
                 belBuilder.setType(allStrings.getIndex(bel.getBELType()));
@@ -251,16 +251,16 @@ public class DeviceResourcesWriter {
                 belPinBuilder.setDir(getBELPinDirection(belPin));
                 belPinBuilder.setBel(allStrings.getIndex(belPin.getBEL().getName()));
 
-                SitePIP sitePip = site_inst.getSitePIP(belPin);
+                SitePIP sitePip = siteInst.getSitePIP(belPin);
                 if(sitePip != null) {
                     allSitePIPs.addObject(sitePip);
                 }
             }
 
             // SitePins
-            int highestIndexInputPin = site_inst.getHighestSitePinInputIndex();
+            int highestIndexInputPin = siteInst.getHighestSitePinInputIndex();
             ArrayList<String> pinNames = new ArrayList<String>();
-            for(String pinName : site_inst.getSitePinNames()) {
+            for(String pinName : siteInst.getSitePinNames()) {
                 pinNames.add(pinName);
             }
             siteType.setLastInput(highestIndexInputPin);
@@ -270,7 +270,7 @@ public class DeviceResourcesWriter {
                 String primarySitePinName = pinNames.get(j);
                 int sitePinIndex = site.getPinIndex(pinNames.get(j));
                 if(sitePinIndex == -1) {
-                    primarySitePinName = site_inst.getPrimarySitePinName(pinNames.get(j));
+                    primarySitePinName = siteInst.getPrimarySitePinName(pinNames.get(j));
                     sitePinIndex = site.getPinIndex(primarySitePinName);
                 }
 
@@ -297,21 +297,21 @@ public class DeviceResourcesWriter {
             }
 
             // SiteWires
-            String[] siteWires = site_inst.getSiteWires();
+            String[] siteWires = siteInst.getSiteWires();
             StructList.Builder<SiteWire.Builder> swBuilders =
                     siteType.initSiteWires(siteWires.length);
             for(int j=0; j < siteWires.length; j++) {
                 SiteWire.Builder swBuilder = swBuilders.get(j);
                 String siteWireName = siteWires[j];
                 swBuilder.setName(allStrings.getIndex(siteWireName));
-                BELPin[] swPins = site_inst.getSiteWirePins(siteWireName);
+                BELPin[] swPins = siteInst.getSiteWirePins(siteWireName);
                 PrimitiveList.Int.Builder bpBuilders = swBuilder.initPins(swPins.length);
                 for(int k=0; k < swPins.length; k++) {
                     bpBuilders.set(k, allBELPins.getIndex(swPins[k]));
                 }
             }
 
-            design.removeSiteInst(site_inst);
+            design.removeSiteInst(siteInst);
             i++;
         }
 
