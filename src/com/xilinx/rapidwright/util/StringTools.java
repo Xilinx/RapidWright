@@ -210,6 +210,23 @@ public class StringTools {
 		return count;
 	}
 	
+	/**
+	 * Get the longest common prefix between two strings starting at the beginning.
+	 * @param s0 First string to check
+	 * @param s1 Second string to check
+	 * @return Longest common prefix string or empty string if none.
+	 */
+	public static String longestCommonPrefix(String s0, String s1) {
+		if(s0 == null || s1 == null) return "";
+		int min = Math.min(s0.length(), s1.length());
+		for(int i=0; i < min; i++) {
+			if(s0.charAt(i) != s1.charAt(i)) {
+				return s0.substring(0, i);
+			}
+		}
+		return s0.substring(0,min);
+	}
+	
 	public static void main(String[] args) {
 		String[] tests = new String[] {
 			"ARCHITECTURE",
