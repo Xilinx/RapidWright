@@ -821,8 +821,11 @@ public class PBlockGenerator {
 		int ramb36sRequired = bram36kCount + (int)Math.ceil((float)bram18kCount / 2.0);
 		int sliceMsRequired = (int)Math.ceil((float)lutRAMCount / (float)RAMLUTS_PER_CLE); // Not multiplying with SLICES_PER_TILE, as in one M-CLB Tile, there is only one slice having LUTRAM 
 		
-		// now compute Nr slices: 
-		int slicesRequired = slicesLUTSRequired + (slicesFFCarryRequired - (slicesLUTSRequired+sliceMsRequired));
+		// now compute Nr slices. If nr of FF & carry slices is smaller than current total nr of slices given by LUTs, than these could be mapped in the same slices. 
+		// Update if more slices are needed for FF & carry
+		int slicesRequired = slicesLUTSRequired;
+		if (slicesFFCarryRequired > (slicesLUTSRequired+sliceMsRequired))
+			slicesRequired += (slicesFFCarryRequired - (slicesLUTSRequired+sliceMsRequired));
 		int pblockCLEHeight = 0;
 		//Figure out how tall we need to make the pblock
 		//Make DSPs and BRAMs upto as tall as a region before creating a new column
