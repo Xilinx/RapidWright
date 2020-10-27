@@ -32,7 +32,6 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -1615,5 +1614,47 @@ public class DesignTools {
 		siteInst.routeIntraSiteNet(net, driver, driver);
 		
 		return result;
+	}
+	/**
+	 * Given a SitePinInst, this method will find any return hierarchical logical cell pins within
+	 * the site directly connected to the site pin.
+	 * @param sitePin The site pin to query.
+	 * @return A list of hierarchical port instances that connect to the site pin.
+	 */
+	public static ArrayList<EDIFHierPortInst> getPortInstsFromSitePinInst(SitePinInst sitePin) {
+		SiteInst siteInst = sitePin.getSiteInst();
+		BELPin[] belPins = siteInst.getSiteWirePins(sitePin.getName());
+		ArrayList<EDIFHierPortInst> portInsts = new ArrayList<EDIFHierPortInst>();
+		for(BELPin belPin : belPins) {
+			if(belPin.isOutput() == sitePin.isOutPin()) {
+				if(belPin.getBEL().getBELClass() == BELClass.RBEL) {
+					// Routing BEL, lets look ahead/behind it
+					SitePIP sitePIP = siteInst.getUsedSitePIP(belPin);
+					if(sitePIP != null) {
+						BELPin otherPin = belPin.isOutput() ? sitePIP.getInputPin() : sitePIP.getOutputPin();
+						for(BELPin belPin2 : otherPin.getSiteConns()) {
+							if(belPin2.equals(otherPin)) continue;
+							EDIFHierPortInst portInst = getPortInstFromBELPin(siteInst, belPin2);
+							if(portInst != null) portInsts.add(portInst);
+						}				
+					}
+				}else {
+					EDIFHierPortInst portInst = getPortInstFromBELPin(siteInst, belPin);
+					if(portInst != null) portInsts.add(portInst);					
+				}
+			}
+		}
+		return portInsts;
+	}
+
+	private static EDIFHierPortInst getPortInstFromBELPin(SiteInst siteInst, BELPin belPin) {
+		Cell targetCell = siteInst.getCell(belPin.getBEL());
+		if(targetCell == null) return null;
+		String logPinName = targetCell.getLogicalPinMapping(belPin.getName());
+		if(logPinName == null) return null;
+		EDIFPortInst portInst = targetCell.getEDIFCellInst().getPortInst(logPinName);
+		EDIFHierPortInst hierPortInst = 
+				new EDIFHierPortInst(targetCell.getParentHierarchicalInstName(), portInst); 
+		return hierPortInst;
 	}
 }

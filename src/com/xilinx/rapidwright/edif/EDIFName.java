@@ -53,6 +53,15 @@ public class EDIFName {
 	}
 	
 	/**
+	 * Copy constructor
+	 * @param edifName
+	 */
+	public EDIFName(EDIFName edifName) {
+		this.name = edifName.name;
+		this.edifRename = edifName.edifRename;
+	}
+	
+	/**
 	 * Forces the object to update its EDIF legal equivalent name based on 
 	 * the current name.  If the name is the same, the edifRename will be
 	 * null.

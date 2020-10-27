@@ -51,6 +51,14 @@ public class EDIFNet extends EDIFPropertyObject {
 		if(parentCell != null) parentCell.addNet(this);
 	}
 	
+	/**
+	 * Copy constructor, does not copy portInsts
+	 * @param net
+	 */
+	public EDIFNet(EDIFNet net) {
+		super((EDIFPropertyObject) net);
+	}
+	
 	protected EDIFNet(){
 		
 	}

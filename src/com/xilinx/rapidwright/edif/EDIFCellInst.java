@@ -64,6 +64,17 @@ public class EDIFCellInst extends EDIFPropertyObject {
 	}
 	
 	/**
+	 * Copy constructor.  Creates new objects except portInsts. 
+	 * @param inst Prototype instance to copy 
+	 */
+	public EDIFCellInst(EDIFCellInst inst, EDIFCell parentCell) {
+		super((EDIFPropertyObject)inst);
+		this.parentCell = parentCell;
+		this.cellType = inst.cellType;
+		this.viewref = new EDIFName(inst.viewref);
+	}
+	
+	/**
 	 * @return the viewref
 	 */
 	public EDIFName getViewref() {
@@ -183,8 +194,12 @@ public class EDIFCellInst extends EDIFPropertyObject {
    public void updateCellType(EDIFCell cellType) {
         setCellType(cellType);
         for(EDIFPortInst portInst : getPortInsts()) {
-            String portName = portInst.getPort().getBusName();
-            portInst.setPort(cellType.getPort(portName));
+            EDIFPort origPort = portInst.getPort();
+            EDIFPort port = cellType.getPort(origPort.getBusName());
+            if(port == null || port.getWidth() != origPort.getWidth()) {
+            	port = cellType.getPort(origPort.getName());
+            }
+            portInst.setPort(port);
         }
     }
 	

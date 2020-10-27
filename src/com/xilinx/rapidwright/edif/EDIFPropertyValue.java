@@ -51,6 +51,11 @@ public class EDIFPropertyValue {
 		this.type = type;
 	}
 	
+	public EDIFPropertyValue(EDIFPropertyValue propValue) {
+		this.value = propValue.value;
+		this.type = propValue.type;
+	}
+	
 	/**
 	 * @return the type
 	 */
