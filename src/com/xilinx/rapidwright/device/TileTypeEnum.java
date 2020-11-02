@@ -26,7 +26,7 @@ package com.xilinx.rapidwright.device;
 
 
 /**
- * Generated on: Mon Oct 12 15:41:42 2020
+ * Generated on: Sat Oct 31 12:15:12 2020
  * by: com.xilinx.rapidwright.release.SiteAndTileTypeUpdater
  * 
  * Enumeration of Tile type for all valid devices within Vivado.
@@ -317,6 +317,7 @@ public enum TileTypeEnum {
 	FE_FE_RBRK_FT,
 	FE_FE_TERM_B_FT,
 	FE_FE_TERM_T_FT,
+	FSR_DMC_TARGET_FT,
 	FSR_GAP,
 	FSR_GAP50_MINICBRK_FT,
 	FSR_GAP50_MINICBRK_RBRK_FT,
@@ -811,6 +812,7 @@ public enum TileTypeEnum {
 	RCLK_CLEL_R_L,
 	RCLK_CLEL_R_R,
 	RCLK_CLEM_CLKBUF_L,
+	RCLK_CLEM_DMC_L,
 	RCLK_CLEM_L,
 	RCLK_CLEM_R,
 	RCLK_CLE_M_L,
@@ -856,6 +858,7 @@ public enum TileTypeEnum {
 	RCLK_INT_L,
 	RCLK_INT_R,
 	RCLK_INT_TERM_L,
+	RCLK_LAG_DMC_L,
 	RCLK_LAG_L,
 	RCLK_LAG_R,
 	RCLK_RCLK_BRAM_L_AUXCLMP_FT,
@@ -863,6 +866,7 @@ public enum TileTypeEnum {
 	RCLK_RCLK_CBRK_CTR_LEFT_M12BUF_L_FT,
 	RCLK_RCLK_CBRK_CTR_RIGHT_M12BUF_L_FT,
 	RCLK_RCLK_CBRK_IO_M12BUF_L_FT,
+	RCLK_RCLK_CLE_M_DECAP_DMC_L_FT,
 	RCLK_RCLK_CLE_M_DECAP_L_FT,
 	RCLK_RCLK_CLE_M_DECAP_R_FT,
 	RCLK_RCLK_CTR_FILL_FT,

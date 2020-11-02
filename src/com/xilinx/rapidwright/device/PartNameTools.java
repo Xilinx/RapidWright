@@ -35,7 +35,7 @@ import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.util.FileTools;
 
 /**
- * Generated on: Mon Oct 12 15:41:42 2020
+ * Generated on: Sat Oct 31 12:15:12 2020
  * by: com.xilinx.rapidwright.release.PartNamePopulator
  * 
  * Class to hold utility APIs dealing with Parts and device names.
@@ -63,7 +63,7 @@ public class PartNameTools {
 				Series.valueOf(strings[part[9]])
 				);
 			partMap.put(strings[part[0]], tmpPart);
-			if(!strings[part[8]].isEmpty()) {
+			if(!(strings[part[8]].isEmpty())) {
 				partMap.put(strings[part[4]]+"-"+strings[part[8]], tmpPart);
 				if(!partMap.containsKey(strings[part[4]])) {
 					partMap.put(strings[part[4]], tmpPart);
