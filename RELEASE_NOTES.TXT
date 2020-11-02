@@ -1,4 +1,4 @@
-============= RapidWright 2020.1.4-beta released on 2020-10-30 ================
+============= RapidWright 2020.1.4-beta released on 2020-11-02 ================
 Notes:
  * Adds 2020.1 update 1 Vivado devices (XCVU19P, XCZU46DR, XCZU47DR,
    XCZU48DR, XCZU49DR; Alveo devices: U55N, U55C)
