@@ -96,6 +96,12 @@ public class EDIFHierPortInst {
 		return portInst;
 	}
 
+	public EDIFCell getCellType() {
+		if(portInst == null) return null;
+		if(portInst.getCellInst() == null) return null;
+		return portInst.getCellInst().getCellType();
+	}
+	
 	/**
 	 * @param portInst the port instance to set
 	 */

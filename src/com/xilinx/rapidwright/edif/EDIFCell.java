@@ -33,6 +33,7 @@ import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Queue;
 
 /**
@@ -63,7 +64,7 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
 	}
 	
 	/**
-	 * Copy constructor - Creates a new EDIFCell object, EDIFCell
+	 * Shallow Copy constructor - Creates a new EDIFCell object, EDIFCell
 	 * contents point to orig.
 	 * @param lib Destination library of the copied cell.
 	 * @param orig The original cell
@@ -76,6 +77,54 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
 		ports = orig.ports;
 		internalPortMap = orig.internalPortMap;
 		view = orig.view;
+	}
+	
+	/**
+	 * Full Deep Copy Constructor with rename
+	 * @param lib Destination library of the new cell
+	 * @param orig Prototype of the original cell
+	 * @param newCellName Name of the new cell copy
+	 */
+	public EDIFCell(EDIFLibrary lib, EDIFCell orig, String newCellName) {
+		super(newCellName);
+		if(lib != null) lib.addCell(this);
+		if(orig.instances != null) {
+			for(Entry<String,EDIFCellInst> e : orig.instances.entrySet()) {
+				addCellInst(new EDIFCellInst(e.getValue(), this));
+			}
+		}
+		if(orig.ports != null) {
+			for(Entry<String, EDIFPort> e: orig.ports.entrySet()) {
+				addPort(new EDIFPort(e.getValue()));
+			}
+		}
+		if(orig.nets != null) {
+			for(Entry<String, EDIFNet> e : orig.nets.entrySet()) {
+				EDIFNet net = addNet(new EDIFNet(e.getValue()));
+				for(Entry<String, EDIFPortInst> e2 : e.getValue().getPortInstMap().entrySet()) {
+					EDIFPortInst prototype = e2.getValue();
+					EDIFPortInst newPortInst = new EDIFPortInst(prototype);
+					EDIFPort newPort = null;
+					if(prototype.getCellInst() != null) {
+						newPortInst.setCellInst(getCellInst(prototype.getCellInst().getName()));
+						newPort = newPortInst.getCellInst().getCellType().getPort(prototype.getPort().getBusName());
+						if(newPort == null || newPort.getWidth() != prototype.getPort().getWidth()) {
+							newPort = newPortInst.getCellInst().getCellType().getPort(prototype.getPort().getName());
+						}
+					} else {
+						newPort = getPort(prototype.getPort().getBusName());
+						if(newPort == null || newPort.getWidth() != prototype.getPort().getWidth()) {
+							newPort = getPort(prototype.getPort().getName());
+						}
+					}
+					
+					newPortInst.setPort(newPort);
+					net.addPortInst(newPortInst);
+				}
+			}
+		}
+		view = orig.view;
+		setProperties(orig.createDuplicatePropertiesMap());
 	}
 	
 	protected EDIFCell(){

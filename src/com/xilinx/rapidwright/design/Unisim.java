@@ -29,7 +29,7 @@ import java.util.Map;
 import com.xilinx.rapidwright.device.Series;
 
 /**
- * Generated on: Mon Oct 12 15:41:42 2020
+ * Generated on: Sat Oct 31 12:15:12 2020
  * by: com.xilinx.rapidwright.release.UnisimParser
  * 
  * Enumerates supported Unisim primitives that map to Xilinx devices.

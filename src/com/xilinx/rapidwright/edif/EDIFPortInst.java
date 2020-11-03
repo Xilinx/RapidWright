@@ -47,6 +47,18 @@ public class EDIFPortInst {
 	public EDIFPortInst(EDIFPort port, EDIFNet parentNet){
 		this(port, parentNet, -1, null);
 	}
+
+	/**
+	 * Copy constructor
+	 * @param portInst
+	 */
+	public EDIFPortInst(EDIFPortInst portInst) {
+		this.name = portInst.name;
+		this.port = null;
+		this.parentNet = null;
+		this.index = portInst.index;
+		this.cellInst = null;
+	}
 	
 	public EDIFPortInst(EDIFPort port, EDIFNet parentNet, int index){
 		this(port,parentNet,index,null);

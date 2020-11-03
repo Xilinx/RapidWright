@@ -619,6 +619,30 @@ public class EDIFNetlist extends EDIFName {
 	}
 	
 	/**
+	 * Gets the next level hierarchical child instance name from an ancestor. Assumes descendent is
+	 * instantiated within ancestor at some level.  
+	 * 
+	 * For example:
+	 * getNextHierChildName("a/b/c", "a/b/c/d/e") returns "a/b/c/d"
+	 * getNextHierChildName("a/b/c", "a/b/c/d") returns "a/b/c/d"
+	 * getNextHierChildName("a/b/c", "a/b/d") returns null
+	 * getNextHierChildName("a/b/c", "a/b/c") returns null
+	 * 
+	 * @param ancestor The parent or more shallow instance in a netlist 
+	 * @param descendent The child or deeper instance in a netlist
+	 * @return The name of the next hierarchical child instance in the ancestor/descendent chain.  
+	 * Returns null if none could be found.  
+	 */
+	public static String getNextHierChildName(String ancestor, String descendent) {
+		if(ancestor == null || descendent == null) return null;
+		if(!descendent.startsWith(ancestor)) return null;
+		if(ancestor.equals(descendent)) return null;
+		int nextHierSeparator = descendent.indexOf(EDIFTools.EDIF_HIER_SEP, ancestor.length()+1);
+		if(nextHierSeparator == -1) return descendent;
+		return descendent.substring(0,nextHierSeparator);
+	}
+	
+	/**
 	 * Creates a new hierarchical cell instance reference from the provided hierarchical cell 
 	 * instance name
 	 * @param instName Full hierarchical cell instance name
@@ -687,7 +711,11 @@ public class EDIFNetlist extends EDIFName {
 					if(cellType.equals("VCC")) return d.getVccNet();
 				}
 			}
-			
+			if(parentNetName == null) {
+				System.err.println("WARNING: Could not find parent of net \"" + hierarchicalNetName +
+						"\", please check that the netlist is fully connected through all levels of "
+						+ "hierarchy for this net.");
+			}
 			EDIFNet logicalNet = getNetFromHierName(parentNetName);
 			List<EDIFPortInst> eprList = logicalNet.getSourcePortInsts(false);
 			if(eprList.size() > 1) throw new RuntimeException("ERROR: Bad assumption on net, has two sources.");

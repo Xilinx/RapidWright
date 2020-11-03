@@ -51,6 +51,18 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
 		setIsLittleEndian();
 	}
 	
+	/**
+     * Copy Constructor
+     * @param port
+     */
+    public EDIFPort(EDIFPort port) {
+        super((EDIFPropertyObject)port);
+        this.direction = port.direction;
+        this.width = port.width;
+        this.isLittleEndian = port.isLittleEndian;
+        this.busName = port.busName;
+    }
+	
 	protected EDIFPort(){
 		
 	}
@@ -209,3 +221,4 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
         return parentCell.getUniqueKey() + "_" + getName();
     }
 }
+

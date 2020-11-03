@@ -28,6 +28,7 @@ package com.xilinx.rapidwright.edif;
 import java.io.IOException;
 import java.io.Writer;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -46,6 +47,11 @@ public class EDIFPropertyObject extends EDIFName {
 	
 	public EDIFPropertyObject(String name){
 		super(name);
+	}
+	
+	public EDIFPropertyObject(EDIFPropertyObject obj) {
+		super((EDIFName)obj);
+		properties = obj.createDuplicatePropertiesMap();
 	}
 	
 	protected EDIFPropertyObject(){
@@ -147,6 +153,19 @@ public class EDIFPropertyObject extends EDIFName {
 		return properties;
 	}
 
+	/**
+	 * Creates a completely new copy of the map
+	 * @return
+	 */
+	public Map<EDIFName, EDIFPropertyValue> createDuplicatePropertiesMap(){
+		if(properties == null) return null;
+		Map<EDIFName, EDIFPropertyValue> newMap = new HashMap<EDIFName, EDIFPropertyValue>();
+		for(Entry<EDIFName, EDIFPropertyValue> e : properties.entrySet()) {
+			newMap.put(new EDIFName(e.getKey()), new EDIFPropertyValue(e.getValue()));
+		}
+		return newMap;
+	}
+	
 	/**
 	 * @param properties the properties to set
 	 */

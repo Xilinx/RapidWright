@@ -1,4 +1,27 @@
-============= RapidWright 2020.1.2-beta released on 2020-10-12 ================
+============= RapidWright 2020.1.4-beta released on 2020-11-02 ================
+Notes:
+ * Adds 2020.1 update 1 Vivado devices (XCVU19P, XCZU46DR, XCZU47DR,
+   XCZU48DR, XCZU49DR; Alveo devices: U55N, U55C)
+ * Adds a netlist flattening helper method ()
+ * Adds preliminary support for reproducing intermediate clock routing
+   state through the use of partial PIPs - not necessarily modifiable
+   though.  This is intermediate routing information added to clock nets
+   after during place_design that informs clock routing during
+   route_design.  Previously this was causing some ERRORs when writing
+   out placed DCPs.
+   * Some PIPs in these intermediate clock nets can have PIPs with no
+     end wire.  This can be checked with PIP.isEndWireNull().  Or
+     compare the end wire index with PIP.NULL_END_WIRE_IDX (0x0000FFFF).
+ * Various netlist helper methods (see commit log for details).
+ - API Additions:
+   - com.xilinx.rapidwright.design.Net "public boolean hasGapRouting()"
+   - com.xilinx.rapidwright.design.Net "public void setHasGapRouting(boolean hasGapRouting)"
+   - com.xilinx.rapidwright.design.SitePinInst public Integer getSiteWireIndex()
+   - com.xilinx.rapidwright.design.SitePinInst public Integer getSiteWireName()
+   - com.xilinx.rapidwright.design.SitePinInst public Integer getSiteWireBELPins()
+   - com.xilinx.rapidwright.device.PIP "public boolean isEndWireNull()"
+
+============= RapidWright 2020.1.3-beta released on 2020-10-12 ================
 Notes:
  * Re-adds missing macro primitive definitions that were absent in previous releases
  * Adds missing macro/translated primitive definitions IOBUFDS and OBUFTDS_DUAL_BUF
