@@ -20,7 +20,7 @@ public class DeviceResourcesExample {
 
         // Create device resource file if it doesn't exist
         String capnProtoFileName = args[0] + ".device";
-        if(!new File(capnProtoFileName).exists()) {
+        //if(!new File(capnProtoFileName).exists()) {
             //MessageGenerator.waitOnAnyKey();
             t.start("Load Device");
             Device device = Device.getDevice(args[0]);
@@ -28,7 +28,7 @@ public class DeviceResourcesExample {
             // Write Netlist to Cap'n Proto Serialization file
             DeviceResourcesWriter.writeDeviceResourcesFile(args[0], device, t, capnProtoFileName);            
             Device.releaseDeviceReferences();
-        }
+        //}
         
         t.start("Verify file");
         // Verify device resources

@@ -128,6 +128,7 @@ public class DeviceResourcesVerifier {
             }
 
             Reader<DeviceResources.Device.SiteTypeInTileType.Reader> siteTypesReader = tileType.getSiteTypes();
+
             expect(tile.getSites().length, siteTypesReader.size());
             for(int j=0; j < tile.getSites().length; j++) {
                 DeviceResources.Device.SiteTypeInTileType.Reader siteTypeReader = siteTypesReader.get(j);
