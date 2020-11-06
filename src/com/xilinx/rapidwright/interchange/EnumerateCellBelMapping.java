@@ -2,17 +2,25 @@ package com.xilinx.rapidwright.interchange;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
+import java.util.HashMap;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.AbstractMap;
 
 import com.xilinx.rapidwright.device.Device;
-import com.xilinx.rapidwright.device.SiteTypeEnum;
+import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.Site;
+import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFDesign;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
@@ -22,8 +30,58 @@ import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.ConstraintGroup;
+import com.xilinx.rapidwright.design.Unisim;
+import com.xilinx.rapidwright.design.SiteInst;
 
 public class EnumerateCellBelMapping {
+    private static class StringPairCompare implements Comparator<Map.Entry<String, String>> {
+        @Override
+        public int compare(Map.Entry<String, String> a, Map.Entry<String, String> b) {
+            int result = a.getKey().compareTo(b.getKey());
+            if(result != 0) {
+                return result;
+            }
+
+            return b.getValue().compareTo(b.getValue());
+        }
+    };
+
+    private static void addSite(Map<SiteTypeEnum, List<Site>> site_map, Site site, SiteTypeEnum site_type) {
+        List<Site> sites = site_map.get(site_type);
+        if(sites == null) {
+            sites = new ArrayList<Site>();
+            site_map.put(site_type, sites);
+        }
+
+        sites.add(site);
+    }
+
+    public static List<List<String>> getParametersFor(String cell_name) {
+        List<List<String>> parameter_sets = new ArrayList<List<String>>();
+        parameter_sets.add(new ArrayList<String>());
+        if(cell_name.equals("RAMB18E1")) {
+            int[] port_widths = {1, 2, 4, 9, 18};
+            for(int read_width_a : port_widths) {
+                for(int read_width_b : port_widths) {
+                    for(int write_width_a : port_widths) {
+                        for(int write_width_b : port_widths) {
+                            List<String> parameters = new ArrayList<String>();
+                            parameters.add(String.format("READ_WIDTH_A=%d", read_width_a));
+                            parameters.add(String.format("READ_WIDTH_B=%d", read_width_b));
+                            parameters.add(String.format("WRITE_WIDTH_A=%d", write_width_a));
+                            parameters.add(String.format("WRITE_WIDTH_B=%d", write_width_b));
+
+                            parameter_sets.add(parameters);
+                        }
+                    }
+                }
+            }
+        }
+
+        System.out.printf("%s - %d\n", cell_name, parameter_sets.size());
+
+        return parameter_sets;
+    }
 
     public static void main(String[] args) throws IOException {
         if(args.length != 1) {
@@ -52,12 +110,27 @@ public class EnumerateCellBelMapping {
         netlist.setDevice(device);
         EDIFLibrary library = new EDIFLibrary("work");
         netlist.addLibrary(library);
+        netlist.addLibrary(prims);
 
         EDIFCell top_level = new EDIFCell(library, "top");
 
         EDIFDesign edif_design = new EDIFDesign("design");
         edif_design.setTopCell(top_level);
 
+        t.start("Enumerate sites in tiles");
+        Map<SiteTypeEnum, List<Site>> site_map = new HashMap<SiteTypeEnum, List<Site>>();
+        for(Tile[] tiles : device.getTiles()) {
+            for(Tile tile : tiles) {
+                for(Site site : tile.getSites()) {
+                    addSite(site_map, site, site.getSiteTypeEnum());
+                    for(SiteTypeEnum site_type : site.getAlternateSiteTypeEnums()) {
+                        addSite(site_map, site, site_type);
+                    }
+                }
+            }
+        }
+
+        t.stop().start("Enumerate cells in sites");
         for(EDIFCell cell : prims.getCells()) {
             if(!primsInPart.contains(cell.getName())) {
                 continue;
@@ -66,18 +139,90 @@ public class EnumerateCellBelMapping {
             EDIFCellInst cell_inst = new EDIFCellInst("test", cell, top_level);
             Cell phys_cell = design.createCell("test", cell_inst);
 
+            List<Map.Entry<SiteTypeEnum, String>> entries = new ArrayList<>();
+
             Map<SiteTypeEnum,Set<String>> sites = phys_cell.getCompatiblePlacements();
             for (Map.Entry<SiteTypeEnum,Set<String>> site : sites.entrySet()) {
                 for(String bel : site.getValue()) {
-                    System.out.printf("%s -> %s / %s\n", cell.getName(), site.getKey().name(), bel);
+                    entries.add(new AbstractMap.SimpleEntry<SiteTypeEnum, String>(site.getKey(), bel));
                 }
             }
 
             design.removeCell(phys_cell);
             top_level.removeCellInst(cell_inst);
+            phys_cell = null;
+            cell_inst = null;
+
+            Map<List<Map.Entry<String, String>>, List<Site>> all_pin_mapping = new HashMap<List<Map.Entry<String, String>>, List<Site>>();
+
+            for(Map.Entry<SiteTypeEnum, String> possible_site : entries) {
+                SiteTypeEnum site_type = possible_site.getKey();
+                String bel = possible_site.getValue();
+                if(!site_map.containsKey(site_type)) {
+                    continue;
+                }
+
+                Map<List<Map.Entry<String, String>>, List<Site>> mapping_to_sites = new HashMap<List<Map.Entry<String, String>>, List<Site>>();
+
+                for(List<String> parameters : getParametersFor(cell.getName())) {
+                    String parameters_joined = new String("");
+                    for(String parameter : parameters) {
+                        parameters_joined += " " + parameter;
+                    }
+                    System.out.printf("Checking cell %s for parameters = %s\n", cell.getName(), parameters_joined);
+
+                    for(Site site : site_map.get(site_type)) {
+                        SiteInst site_inst = design.createSiteInst("test_site", site_type, site);
+
+                        String[] parameter_array = parameters.toArray(new String[parameters.size()]);
+                        phys_cell = design.createAndPlaceCell("test", Unisim.valueOf(cell.getName()), site.getName() + "/" + bel, parameter_array);
+
+                        HashSet<Map.Entry<String, String>> pin_mapping = new HashSet<Map.Entry<String, String>>();
+
+                        for(Map.Entry<String, String> pin_map : phys_cell.getPinMappingsL2P().entrySet()) {
+                            pin_mapping.add(pin_map);
+                        }
+
+                        for(Map.Entry<String, String> pin_map : phys_cell.getPinMappingsP2L().entrySet()) {
+                            pin_mapping.add(new AbstractMap.SimpleEntry<String, String>(pin_map.getValue(), pin_map.getKey()));
+                        }
+
+                        List<Map.Entry<String, String>> pin_map_list = new ArrayList<Map.Entry<String, String>>();
+                        for(Map.Entry<String, String> pin_map : pin_mapping) {
+                            pin_map_list.add(pin_map);
+                        }
+
+                        Collections.sort(pin_map_list, new StringPairCompare());
+
+                        List<Site> sites_for_pin_map = mapping_to_sites.get(pin_map_list);
+                        if(sites_for_pin_map == null) {
+                            sites_for_pin_map = new ArrayList<Site>();
+                            mapping_to_sites.put(pin_map_list, sites_for_pin_map);
+                        }
+                        sites_for_pin_map.add(site);
+
+                        sites_for_pin_map = all_pin_mapping.get(pin_map_list);
+                        if(sites_for_pin_map == null) {
+                            sites_for_pin_map = new ArrayList<Site>();
+                            all_pin_mapping.put(pin_map_list, sites_for_pin_map);
+                        }
+                        sites_for_pin_map.add(site);
+
+                        design.removeCell(phys_cell);
+                        design.removeSiteInst(site_inst);
+                        top_level.removeCellInst("test");
+                        design.getTopEDIFCell().removeCellInst("test");
+
+                    }
+                    System.out.printf("Have %d pin mappings for cell %s site type %s parameters = %s\n", mapping_to_sites.size(), cell.getName(), site_type.name(), parameters_joined);
+                }
+
+                System.out.printf("Have %d pin mappings for cell %s site type %s\n", mapping_to_sites.size(), cell.getName(), site_type.name());
+            }
+
+            System.out.printf("Have %d pin mappings for cell %s\n", all_pin_mapping.size(), cell.getName());
         }
 
         t.stop().printSummary();
     }
 }
-
