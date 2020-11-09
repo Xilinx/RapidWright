@@ -159,7 +159,7 @@ public class PBlockGenerator {
 			}
 		}
 		
-		if (dev.getName().contains("xc7")) {
+		if (if (dev.getSeries() == Series.Series7) {
 			CARRY_PER_CLE = 2;
 			RAMLUTS_PER_CLE = 4;
 			SLICES_PER_TILE = 2;
