@@ -6,6 +6,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.capnproto.MessageReader;
@@ -14,8 +16,10 @@ import org.capnproto.ReaderOptions;
 import org.capnproto.SerializePacked;
 import org.capnproto.StructList;
 import org.capnproto.TextList;
+import org.capnproto.PrimitiveList.Int;
 import org.capnproto.StructList.Reader;
 
+import com.sun.org.apache.xpath.internal.compiler.PsuedoNames;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.device.BEL;
@@ -23,14 +27,19 @@ import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.PIPType;
+import com.xilinx.rapidwright.device.PIPWires;
+import com.xilinx.rapidwright.device.PseudoPIPHelper;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePIP;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
+import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.edif.EDIFLibrary;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.PrimToMacroExpansion;
+import com.xilinx.rapidwright.interchange.DeviceResources.Device.PseudoCell;
+import com.xilinx.rapidwright.interchange.DeviceResources.Device.PseudoPIP;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.SitePin;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.SiteType;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.TileType;
@@ -76,15 +85,70 @@ public class DeviceResourcesVerifier {
             String str = reader.get(i).toString();
             allStrings.addObject(str);
         }
+        
+        Map<TileTypeEnum,HashMap<PIPWires, PseudoPIPHelper>> pseudoPIPMap = PseudoPIPHelper.getPseudoPIPMap(device);
 
         // Create a lookup map for tile types
         HashMap<String,TileType.Reader> tileTypeMap = new HashMap<String, TileType.Reader>();
+        PIPWires staticKey = new PIPWires(0,0);
         HashMap<String, StructList.Reader<DeviceResources.Device.PIP.Reader>> ttPIPMap = new HashMap<>();
         for(int i=0; i < dReader.getTileTypeList().size(); i++) {
             TileType.Reader ttReader = dReader.getTileTypeList().get(i);
             String name = allStrings.get(ttReader.getName());
             tileTypeMap.put(name, ttReader);
             ttPIPMap.put(name, ttReader.getPips());
+
+            // Verify Pseudo PIPs
+            HashMap<PIPWires, PseudoPIPHelper> goldMap = pseudoPIPMap.get(TileTypeEnum.valueOf(name));
+            if(goldMap == null || goldMap.size() == 0) {
+                if(ttReader.hasPseudoPIPs()) {
+                    throw new RuntimeException("ERROR: Found pseudo PIPs in tile type " + name 
+                            + " when there should be none");
+                }
+            } else {
+                StructList.Reader<PseudoPIP.Reader> pseudoPIPs = ttReader.getPseudoPIPs();
+                if(goldMap.size() != pseudoPIPs.size()) {
+                    throw new RuntimeException("ERROR: Mismatch on expected number of pseudo PIPs " 
+                            + " in tile type " + name + ", expected "+goldMap.size()+" but found "
+                                    +  pseudoPIPs.size() + ".");
+                }
+                
+                for(int j=0; j < pseudoPIPs.size(); j++) {
+                    PseudoPIP.Reader pseudoPIP = pseudoPIPs.get(j);
+                    staticKey.setStartWire(pseudoPIP.getWire0());
+                    staticKey.setEndWire(pseudoPIP.getWire1());
+                    PseudoPIPHelper pipHelper = goldMap.get(staticKey);
+                    List<BELPin> goldBELPins = pipHelper.getUsedBELPins();
+                    HashSet<BELPin> foundBELPins = new HashSet<BELPin>();
+                    Site site = pipHelper.getTilePrototype().getSitePinFromWire(staticKey.getStartWire()).getSite();
+                    StructList.Reader<PseudoCell.Reader> pseudoCells = pseudoPIP.getPseudoCells();
+                    for(int k=0; k < pseudoCells.size(); k++) {
+                        PseudoCell.Reader pseudoCell = pseudoCells.get(k);
+                        String belName = allStrings.get(pseudoCell.getBel());
+                        BEL bel = site.getBEL(belName);
+                        Int.Reader pinNamesReader = pseudoCell.getPins();
+                        for(int l=0; l < pinNamesReader.size(); l++) {
+                            String pinName = allStrings.get(pinNamesReader.get(l));
+                            BELPin testPin = bel.getPin(pinName);
+                            foundBELPins.add(testPin);
+                        }
+                        
+                    }
+                    
+                    for(BELPin goldBELPin : goldBELPins) {
+                        if(goldBELPin.isSitePort()) continue;
+                        if(!foundBELPins.remove(goldBELPin)) {
+                            throw new RuntimeException("ERROR: BELPin " + goldBELPin.toString() 
+                                + " not found for pseudo PIP " + name +"." 
+                                    + pipHelper.getPseudoPIPName());
+                        }
+                    }
+                    if(foundBELPins.size() > 0) {
+                        throw new RuntimeException("ERROR: Found unknown BELPins "+ foundBELPins 
+                                +" for pseudo PIP " + pipHelper.getPseudoPIPName() + " ");
+                    }
+                }
+            }
         }
 
         expect(device.getName(), dReader.getName().toString());

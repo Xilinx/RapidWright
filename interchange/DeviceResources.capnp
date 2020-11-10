@@ -61,10 +61,11 @@ struct Device {
   }
 
   struct TileType {
-    name      @0 : StringIdx;
-    siteTypes @1 : List(SiteTypeInTileType);
-    wires     @2 : List(StringIdx);
-    pips      @3 : List(PIP);
+    name       @0 : StringIdx;
+    siteTypes  @1 : List(SiteTypeInTileType);
+    wires      @2 : List(StringIdx);
+    pips       @3 : List(PIP);
+    pseudoPIPs @4 : List(PseudoPIP);
   }
 
   #######################################
@@ -142,6 +143,17 @@ struct Device {
     buffered20   @3 : Bool;
     buffered21   @4 : Bool;
   }
+  
+  struct PseudoPIP {
+    wire0        @0 : WireIDInTileType;
+    wire1        @1 : WireIDInTileType;
+    pseudoCells  @2 : List(PseudoCell);
+  }
+
+  struct PseudoCell {
+    bel          @0 : StringIdx;
+    pins         @1 : List(StringIdx);
+  }
 
   ######################################
   # Macro expansion exception map for
@@ -153,3 +165,4 @@ struct Device {
     macroName @1 : StringIdx;
   }
 }
+
