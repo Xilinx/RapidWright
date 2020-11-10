@@ -17,7 +17,6 @@ jobs:
       - name: Install RapidWright
         run: wget https://github.com/Xilinx/RapidWright/releases/download/v2020.1.4-beta/rapidwright_jars.zip && unzip rapidwright_jars.zip
       - name: Compile RapidWright
-        run: gradle assemble
-        run: gradle check
+        run: gradle build 
 
 
