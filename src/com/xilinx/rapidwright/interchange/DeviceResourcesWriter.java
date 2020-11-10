@@ -44,7 +44,6 @@ import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.BELCategory;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.PrimToMacroExpansion;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.PseudoCell;
-import com.xilinx.rapidwright.interchange.DeviceResources.Device.PseudoPIP;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.SitePin;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.SiteType;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.SiteWire;
@@ -370,7 +369,6 @@ public class DeviceResourcesWriter {
 
     public static void writeAllTileTypesToBuilder(Design design, Device device, DeviceResources.Device.Builder devBuilder) {
         StructList.Builder<TileType.Builder> tileTypesList = devBuilder.initTileTypeList(tileTypes.size());
-        Map<TileTypeEnum,HashMap<PIPWires,PseudoPIPHelper>> pseudoPIPMap = PseudoPIPHelper.getPseudoPIPMap(device);
         
         int i=0;
         for(Entry<TileTypeEnum,Tile> e : tileTypes.entrySet()) {
@@ -425,18 +423,11 @@ public class DeviceResourcesWriter {
                 } else if(pip.getPIPType() == PIPType.DIRECTIONAL_BUFFERED21) {
                     pipBuilder.setBuffered21(true);
                 }
-            }
-            
-            //pseudo PIPs 
-            HashMap<PIPWires,PseudoPIPHelper> pseudoPIPs = pseudoPIPMap.get(e.getKey());
-            if(pseudoPIPs.size() > 0) {
-                StructList.Builder<PseudoPIP.Builder> pseudoPIPBuilder = tileType.initPseudoPIPs(pseudoPIPs.size());
-                int j=0;
-                for(Entry<PIPWires,PseudoPIPHelper> e2 : pseudoPIPs.entrySet()) {
-                    PseudoPIP.Builder pipBuilder = pseudoPIPBuilder.get(j);
-                    pipBuilder.setWire0(e2.getKey().getStartWire());
-                    pipBuilder.setWire1(e2.getKey().getEndWire());
-                    List<BELPin> belPins = e2.getValue().getUsedBELPins();
+                
+                if(pip.isRouteThru()) {
+                    PseudoPIPHelper pseudoPIPHelper = PseudoPIPHelper.getPseudoPIPHelper(pip);
+                    List<BELPin> belPins = pseudoPIPHelper.getUsedBELPins();
+
                     HashMap<BEL,ArrayList<BELPin>> pins = new HashMap<BEL, ArrayList<BELPin>>();
                     for(BELPin pin : belPins) {
                         if(pin.getBEL().getBELClass() == BELClass.PORT) continue;
@@ -460,7 +451,6 @@ public class DeviceResourcesWriter {
                         }
                         k++;
                     }
-                    j++;
                 }
             }
             i++;

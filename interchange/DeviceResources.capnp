@@ -65,7 +65,6 @@ struct Device {
     siteTypes  @1 : List(SiteTypeInTileType);
     wires      @2 : List(StringIdx);
     pips       @3 : List(PIP);
-    pseudoPIPs @4 : List(PseudoPIP);
   }
 
   #######################################
@@ -142,14 +141,12 @@ struct Device {
     directional  @2 : Bool;
     buffered20   @3 : Bool;
     buffered21   @4 : Bool;
+    union {
+      conventional @5 : Void;
+      pseudoCells  @6 : List(PseudoCell);
+    }
   }
   
-  struct PseudoPIP {
-    wire0        @0 : WireIDInTileType;
-    wire1        @1 : WireIDInTileType;
-    pseudoCells  @2 : List(PseudoCell);
-  }
-
   struct PseudoCell {
     bel          @0 : StringIdx;
     pins         @1 : List(StringIdx);
