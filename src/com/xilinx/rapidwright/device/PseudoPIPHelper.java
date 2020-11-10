@@ -235,6 +235,11 @@ public class PseudoPIPHelper {
         }
         return pins;
     }
+    
+    public String getPseudoPIPName() {
+        return tilePrototype.getTileTypeEnum() + "." + tilePrototype.getWireName(getStartWire()) 
+                + "->" + tilePrototype.getWireName(getEndWire()); 
+    }
         
     public static void main(String[] args) {
         // Quick example test
