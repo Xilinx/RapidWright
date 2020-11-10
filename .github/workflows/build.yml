@@ -1,4 +1,4 @@
-name: RapidWright Java CI
+name: Build
 
 on:
   push:
