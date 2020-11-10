@@ -61,10 +61,10 @@ struct Device {
   }
 
   struct TileType {
-    name      @0 : StringIdx;
-    siteTypes @1 : List(SiteTypeInTileType);
-    wires     @2 : List(StringIdx);
-    pips      @3 : List(PIP);
+    name       @0 : StringIdx;
+    siteTypes  @1 : List(SiteTypeInTileType);
+    wires      @2 : List(StringIdx);
+    pips       @3 : List(PIP);
   }
 
   #######################################
@@ -141,6 +141,15 @@ struct Device {
     directional  @2 : Bool;
     buffered20   @3 : Bool;
     buffered21   @4 : Bool;
+    union {
+      conventional @5 : Void;
+      pseudoCells  @6 : List(PseudoCell);
+    }
+  }
+  
+  struct PseudoCell {
+    bel          @0 : StringIdx;
+    pins         @1 : List(StringIdx);
   }
 
   ######################################
@@ -153,3 +162,4 @@ struct Device {
     macroName @1 : StringIdx;
   }
 }
+
