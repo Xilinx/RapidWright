@@ -1,6 +1,8 @@
 package com.xilinx.rapidwright.interchange;
 
 import java.io.File;
+import java.io.BufferedWriter;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -58,24 +60,112 @@ public class EnumerateCellBelMapping {
 
     public static List<List<String>> getParametersFor(String cell_name) {
         List<List<String>> parameter_sets = new ArrayList<List<String>>();
-        parameter_sets.add(new ArrayList<String>());
         if(cell_name.equals("RAMB18E1") || cell_name.equals("RAMB18E2")) {
-            int[] port_widths = {1, 2, 4, 9, 18};
-            for(int read_width_a : port_widths) {
-                for(int read_width_b : port_widths) {
-                    for(int write_width_a : port_widths) {
-                        for(int write_width_b : port_widths) {
-                            List<String> parameters = new ArrayList<String>();
-                            parameters.add(String.format("READ_WIDTH_A=%d", read_width_a));
-                            parameters.add(String.format("READ_WIDTH_B=%d", read_width_b));
-                            parameters.add(String.format("WRITE_WIDTH_A=%d", write_width_a));
-                            parameters.add(String.format("WRITE_WIDTH_B=%d", write_width_b));
+            int[] port_widths = {0, 1, 2, 4, 9, 18};
+            for(int write_width_a : port_widths) {
+                for(int write_width_b : port_widths) {
+                    List<String> parameters = new ArrayList<String>();
+                    parameters.add(String.format("WRITE_WIDTH_A=%d", write_width_a));
+                    parameters.add(String.format("WRITE_WIDTH_B=%d", write_width_b));
 
-                            parameter_sets.add(parameters);
-                        }
-                    }
+                    parameter_sets.add(parameters);
                 }
             }
+
+            {
+                List<String> parameters = new ArrayList<String>();
+                parameters.add("RAM_MODE=SDP");
+                parameters.add("WRITE_WIDTH_A=0");
+                parameters.add("WRITE_WIDTH_B=36");
+                parameter_sets.add(parameters);
+            }
+
+            {
+                List<String> parameters = new ArrayList<String>();
+                parameters.add("WRITE_WIDTH_A=0");
+                parameters.add("WRITE_WIDTH_B=0");
+                parameters.add("DOA_REG=1");
+                parameter_sets.add(parameters);
+            }
+
+            {
+                List<String> parameters = new ArrayList<String>();
+                parameters.add("WRITE_WIDTH_A=0");
+                parameters.add("WRITE_WIDTH_B=0");
+                parameters.add("DOA_REG=0");
+                parameter_sets.add(parameters);
+            }
+
+            {
+                List<String> parameters = new ArrayList<String>();
+                parameters.add("WRITE_WIDTH_A=0");
+                parameters.add("WRITE_WIDTH_B=0");
+                parameters.add("DOB_REG=1");
+                parameter_sets.add(parameters);
+            }
+
+            {
+                List<String> parameters = new ArrayList<String>();
+                parameters.add("WRITE_WIDTH_A=0");
+                parameters.add("WRITE_WIDTH_B=0");
+                parameters.add("DOB_REG=0");
+                parameter_sets.add(parameters);
+            }
+        }
+
+        if(cell_name.equals("RAMB36E1") || cell_name.equals("RAMB36E2")) {
+            int[] port_widths = {0, 1, 2, 4, 9, 18, 36};
+            for(int write_width_a : port_widths) {
+                for(int write_width_b : port_widths) {
+                    List<String> parameters = new ArrayList<String>();
+                    parameters.add(String.format("WRITE_WIDTH_A=%d", write_width_a));
+                    parameters.add(String.format("WRITE_WIDTH_B=%d", write_width_b));
+
+                    parameter_sets.add(parameters);
+                }
+            }
+
+            {
+                List<String> parameters = new ArrayList<String>();
+                parameters.add("RAM_MODE=SDP");
+                parameters.add("WRITE_WIDTH_A=0");
+                parameters.add("WRITE_WIDTH_B=72");
+                parameter_sets.add(parameters);
+            }
+
+            {
+                List<String> parameters = new ArrayList<String>();
+                parameters.add("WRITE_WIDTH_A=0");
+                parameters.add("WRITE_WIDTH_B=0");
+                parameters.add("DOA_REG=1");
+                parameter_sets.add(parameters);
+            }
+
+            {
+                List<String> parameters = new ArrayList<String>();
+                parameters.add("WRITE_WIDTH_A=0");
+                parameters.add("WRITE_WIDTH_B=0");
+                parameters.add("DOA_REG=0");
+                parameter_sets.add(parameters);
+            }
+
+            {
+                List<String> parameters = new ArrayList<String>();
+                parameters.add("WRITE_WIDTH_A=0");
+                parameters.add("WRITE_WIDTH_B=0");
+                parameters.add("DOB_REG=1");
+                parameter_sets.add(parameters);
+            }
+
+            {
+                List<String> parameters = new ArrayList<String>();
+                parameters.add("WRITE_WIDTH_A=0");
+                parameters.add("WRITE_WIDTH_B=0");
+                parameters.add("DOB_REG=0");
+                parameter_sets.add(parameters);
+            }
+        } else {
+            parameter_sets.add(new ArrayList<String>());
         }
 
         System.out.printf("%s - %d\n", cell_name, parameter_sets.size());
@@ -84,11 +174,13 @@ public class EnumerateCellBelMapping {
     }
 
     public static void main(String[] args) throws IOException {
-        if(args.length != 1) {
-            System.out.println("USAGE: <device name>");
+        if(args.length != 2) {
+            System.out.println("USAGE: <device name> <output dir>");
             System.out.println("   Example dump of device information for interchange format.");
             return;
         }
+
+        String output_dir = args[1];
 
         CodePerfTracker t = new CodePerfTracker("Enumerate Cell<->BEL mapping: " + args[0]);
         t.useGCToTrackMemory(true);
@@ -166,7 +258,7 @@ public class EnumerateCellBelMapping {
             phys_cell = null;
             cell_inst = null;
 
-            Map<List<Map.Entry<String, String>>, List<Site>> all_pin_mapping = new HashMap<List<Map.Entry<String, String>>, List<Site>>();
+            Map<List<Map.Entry<String, String>>, Map<Map.Entry<String, String>, List<Map.Entry<SiteTypeEnum, Site>>>> all_pin_mapping = new HashMap<List<Map.Entry<String, String>>, Map<Map.Entry<String, String>, List<Map.Entry<SiteTypeEnum, Site>>>>();
 
             for(Map.Entry<SiteTypeEnum, String> possible_site : entries) {
                 SiteTypeEnum site_type = possible_site.getKey();
@@ -174,8 +266,6 @@ public class EnumerateCellBelMapping {
                 if(!site_map.containsKey(site_type)) {
                     continue;
                 }
-
-                Map<List<Map.Entry<String, String>>, List<Site>> mapping_to_sites = new HashMap<List<Map.Entry<String, String>>, List<Site>>();
 
                 for(List<String> parameters : getParametersFor(cell.getName())) {
                     String parameters_joined = new String("");
@@ -207,33 +297,57 @@ public class EnumerateCellBelMapping {
 
                         Collections.sort(pin_map_list, new StringPairCompare());
 
-                        List<Site> sites_for_pin_map = mapping_to_sites.get(pin_map_list);
-                        if(sites_for_pin_map == null) {
-                            sites_for_pin_map = new ArrayList<Site>();
-                            mapping_to_sites.put(pin_map_list, sites_for_pin_map);
+                        Map<Map.Entry<String, String>, List<Map.Entry<SiteTypeEnum, Site>>> parameter_to_pin_map = all_pin_mapping.get(pin_map_list);
+                        if(parameter_to_pin_map == null) {
+                            parameter_to_pin_map = new HashMap<Map.Entry<String, String>, List<Map.Entry<SiteTypeEnum, Site>>>();
+                            all_pin_mapping.put(pin_map_list, parameter_to_pin_map);
                         }
-                        sites_for_pin_map.add(site);
 
-                        sites_for_pin_map = all_pin_mapping.get(pin_map_list);
+                        Map.Entry<String, String> key = new AbstractMap.SimpleEntry<String, String>(parameters_joined, bel);
+                        List<Map.Entry<SiteTypeEnum, Site>> sites_for_pin_map = parameter_to_pin_map.get(key);
                         if(sites_for_pin_map == null) {
-                            sites_for_pin_map = new ArrayList<Site>();
-                            all_pin_mapping.put(pin_map_list, sites_for_pin_map);
+                            sites_for_pin_map = new ArrayList<Map.Entry<SiteTypeEnum, Site>>();
+                            parameter_to_pin_map.put(key, sites_for_pin_map);
                         }
-                        sites_for_pin_map.add(site);
+                        sites_for_pin_map.add(new AbstractMap.SimpleEntry<SiteTypeEnum, Site>(site_type, site));
 
                         design.removeCell(phys_cell);
                         design.removeSiteInst(site_inst);
                         top_level.removeCellInst("test");
                         design.getTopEDIFCell().removeCellInst("test");
-
                     }
-                    System.out.printf("Have %d pin mappings for cell %s site type %s parameters = %s\n", mapping_to_sites.size(), cell.getName(), site_type.name(), parameters_joined);
                 }
-
-                System.out.printf("Have %d pin mappings for cell %s site type %s\n", mapping_to_sites.size(), cell.getName(), site_type.name());
             }
 
-            System.out.printf("Have %d pin mappings for cell %s\n", all_pin_mapping.size(), cell.getName());
+            BufferedWriter bw = null;
+            File file = new File(output_dir + "/" + cell.getName() + ".yaml");
+            if (!file.exists()) {
+                file.createNewFile();
+            }
+
+            FileWriter fw = new FileWriter(file);
+            bw = new BufferedWriter(fw);
+
+            bw.write(String.format("cell: %s\n", cell.getName()));
+            bw.write("pin_maps:\n");
+            for(Map.Entry<List<Map.Entry<String, String>>, Map<Map.Entry<String, String>, List<Map.Entry<SiteTypeEnum, Site>>>> pins_to_parameters_and_sites : all_pin_mapping.entrySet()) {
+                bw.write("- pins:\n");
+                for(Map.Entry<String, String> pin : pins_to_parameters_and_sites.getKey()) {
+                    bw.write(String.format("  - \"%s %s\"\n", pin.getKey(), pin.getValue()));
+                }
+
+                bw.write("  parameters_and_sites:\n");
+                for(Map.Entry<Map.Entry<String, String>, List<Map.Entry<SiteTypeEnum, Site>>> parameters_and_sites : pins_to_parameters_and_sites.getValue().entrySet()) {
+                    bw.write(String.format("  - parameters: \"%s\"\n", parameters_and_sites.getKey().getKey()));
+                    bw.write(String.format("    bel: %s\n", parameters_and_sites.getKey().getValue()));
+                    bw.write("    sites:\n");
+                    for(Map.Entry<SiteTypeEnum, Site> site : parameters_and_sites.getValue()) {
+                        bw.write(String.format("    - [%s, %s]\n", site.getKey().name(), site.getValue().getName()));
+                    }
+                }
+            }
+
+            bw.close();
         }
 
         t.stop().printSummary();
