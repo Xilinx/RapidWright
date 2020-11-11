@@ -23,6 +23,7 @@ struct Device {
   nodes        @6 : List(Node);
   primLibs     @7 : Dir.Netlist; # Netlist libraries of Unisim primitives and macros
   exceptionMap @8 : List(PrimToMacroExpansion); # Prims to macros expand w/same name, except these
+  cellBelMap   @9 : List(CellBelMapping);
 
   #######################################
   # Placement definition objects
@@ -146,7 +147,7 @@ struct Device {
       pseudoCells  @6 : List(PseudoCell);
     }
   }
-  
+
   struct PseudoCell {
     bel          @0 : StringIdx;
     pins         @1 : List(StringIdx);
@@ -160,6 +161,47 @@ struct Device {
   struct PrimToMacroExpansion {
     primName  @0 : StringIdx;
     macroName @1 : StringIdx;
+  }
+
+  # Cell <-> BEL and Cell pin <-> BEL Pin mapping
+  struct CellBelMapping {
+    cell          @0 : StringIdx;
+    commonPins    @1 : List(CommonCellBelPinMaps);
+    parameterPins @2 : List(ParameterCellBelPinMaps);
+  }
+
+  # Map one cell pin to one BEL pin.
+  # Note: There may be more than one BEL pin mapped to one cell pin.
+  struct CellBelPinEntry {
+    cellPin @0 : StringIdx;
+    belPin  @1 : StringIdx;
+  }
+
+  # Specifies BELs located in a specific site type.
+  struct SiteTypeBelEntry {
+    siteType @0 : StringIdx;
+    bels     @1 : List(StringIdx);
+  }
+
+  # This is the portion of Cell <-> BEL pin mapping that is common across all
+  # parameter settings for a specific site type and BELs within that site
+  # type.
+  struct CommonCellBelPinMaps {
+    siteTypes @0 : SiteTypeBelEntry;
+    pins      @1 : List(CellBelPinEntry);
+  }
+
+  # This is the portion of the Cell <-> BEL pin mapping that is parameter
+  # specific.
+  struct ParameterSiteTypeBelEntry {
+    bel       @0 : StringIdx;
+    siteType  @1 : StringIdx;
+    parameter @2 : Dir.Netlist.PropertyMap.Entry;
+  }
+
+  struct ParameterCellBelPinMaps {
+    parametersSiteTypes @0 : List(ParameterSiteTypeBelEntry);
+    pins                @1 : List(CellBelPinEntry);
   }
 }
 
