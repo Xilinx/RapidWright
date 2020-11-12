@@ -4,6 +4,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.AbstractMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -19,8 +20,10 @@ import org.capnproto.TextList;
 import org.capnproto.PrimitiveList.Int;
 import org.capnproto.StructList.Reader;
 
+import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.SiteInst;
+import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Device;
@@ -36,6 +39,11 @@ import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.edif.EDIFLibrary;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFTools;
+import com.xilinx.rapidwright.edif.EDIFCell;
+import com.xilinx.rapidwright.edif.EDIFCellInst;
+import com.xilinx.rapidwright.edif.EDIFDesign;
+import com.xilinx.rapidwright.interchange.EnumerateCellBelMapping;
+import com.xilinx.rapidwright.interchange.CellBelMapping;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.PrimToMacroExpansion;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.PseudoCell;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.SitePin;
@@ -294,6 +302,8 @@ public class DeviceResourcesVerifier {
             }
         }
 
+        verifyCellBelPinMaps(allStrings, dReader, design);
+
         return true;
     }
 
@@ -386,5 +396,91 @@ public class DeviceResourcesVerifier {
 
         verifiedSiteTypes.add(site.getSiteTypeEnum());
         return true;
+    }
+
+    static private void verifyCellBelPinMap(Map<SiteTypeEnum, List<Site>> siteMap, CellBelMapping cellBelMap, EDIFCell topLevelCell, EDIFCell cell, Design design) {
+        EDIFCellInst cellInst = new EDIFCellInst("test", cell, topLevelCell);
+        Cell physCell = design.createCell("test", cellInst);
+
+        List<Map.Entry<SiteTypeEnum, String>> entries = new ArrayList<>();
+
+        Map<SiteTypeEnum,Set<String>> sites = physCell.getCompatiblePlacements();
+        Map<SiteTypeEnum,Set<String>> sitesFromDev = cellBelMap.getCompatiblePlacements(cell.getName());
+
+        expect(sites.size(), sitesFromDev.size());
+        // TODO: Check rest of getCompatiblePlacements
+
+        for (Map.Entry<SiteTypeEnum,Set<String>> site : sites.entrySet()) {
+            for(String bel : site.getValue()) {
+                entries.add(new AbstractMap.SimpleEntry<SiteTypeEnum, String>(site.getKey(), bel));
+            }
+        }
+
+        design.removeCell(physCell);
+        topLevelCell.removeCellInst(cellInst);
+        physCell = null;
+        cellInst = null;
+
+        for(Map.Entry<SiteTypeEnum, String> possibleSite : entries) {
+            SiteTypeEnum siteType = possibleSite.getKey();
+            String bel = possibleSite.getValue();
+            if(!siteMap.containsKey(siteType)) {
+                continue;
+            }
+
+            for(List<String> parameters : EnumerateCellBelMapping.getParametersFor(cell.getName())) {
+                String[] parameterArray = parameters.toArray(new String[parameters.size()]);
+                Map<String, String> pinMappingFromDev = cellBelMap.getPinMappingsP2L(
+                        cell.getName(),
+                        siteType,
+                        bel,
+                        parameterArray);
+
+                for(Site site : siteMap.get(siteType)) {
+                    SiteInst siteInst = design.createSiteInst("test_site", siteType, site);
+                    physCell = design.createAndPlaceCell("test", Unisim.valueOf(cell.getName()), site.getName() + "/" + bel, parameterArray);
+
+                    HashSet<Map.Entry<String, String>> pinMapping = new HashSet<Map.Entry<String, String>>();
+
+                    for(Map.Entry<String, String> pinMap : physCell.getPinMappingsL2P().entrySet()) {
+                        pinMapping.add(pinMap);
+                    }
+
+                    for(Map.Entry<String, String> pinMap : physCell.getPinMappingsP2L().entrySet()) {
+                        pinMapping.add(new AbstractMap.SimpleEntry<String, String>(pinMap.getValue(), pinMap.getKey()));
+                    }
+
+                    expect(pinMappingFromDev.size(), pinMapping.size());
+                    // TODO: Check rest of pin map.
+
+                    design.removeCell(physCell);
+                    design.removeSiteInst(siteInst);
+                    topLevelCell.removeCellInst("test");
+                    design.getTopEDIFCell().removeCellInst("test");
+                }
+            }
+        }
+    }
+
+    static private void verifyCellBelPinMaps(Enumerator<String> allStrings, DeviceResources.Device.Reader dReader, Design design) {
+        EDIFLibrary prims = Design.getPrimitivesLibrary(design.getDevice().getName());
+        EDIFLibrary library = new EDIFLibrary("work");
+
+        EDIFNetlist netlist = new EDIFNetlist("netlist");
+        netlist.setDevice(design.getDevice());
+        netlist.addLibrary(library);
+        netlist.addLibrary(prims);
+
+        EDIFCell topLevelCell = new EDIFCell(library, "top");
+
+        EDIFDesign edifDesign = new EDIFDesign("design");
+        edifDesign.setTopCell(topLevelCell);
+
+        Map<SiteTypeEnum, List<Site>> siteMap = EnumerateCellBelMapping.createSiteMap(design.getDevice());
+
+        CellBelMapping cellBelMap = new CellBelMapping(allStrings, dReader.getCellBelMap());
+        for(EDIFCell cell : prims.getCells()) {
+            verifyCellBelPinMap(siteMap, cellBelMap, topLevelCell, cell, design);
+        }
     }
 }
