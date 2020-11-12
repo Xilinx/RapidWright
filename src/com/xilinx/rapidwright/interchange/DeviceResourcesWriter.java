@@ -41,6 +41,7 @@ import com.xilinx.rapidwright.edif.EDIFDesign;
 import com.xilinx.rapidwright.edif.EDIFLibrary;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
+import com.xilinx.rapidwright.interchange.EnumerateCellBelMapping;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.BELCategory;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.PrimToMacroExpansion;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.PseudoCell;
@@ -132,9 +133,6 @@ public class DeviceResourcesWriter {
         DeviceResources.Device.Builder devBuilder = message.initRoot(DeviceResources.Device.factory);
         devBuilder.setName(device.getName());
 
-        t.stop().start("Strings");
-        writeAllStringsToBuilder(devBuilder);
-
         t.stop().start("SiteTypes");
         writeAllSiteTypesToBuilder(design, device, devBuilder);
 
@@ -184,6 +182,13 @@ public class DeviceResourcesWriter {
             entryBuilder.setPrimName(allStrings.getIndex(entry.getKey()));
             i++;
         }
+
+        t.stop().start("Cell <-> BEL pin map");
+        EnumerateCellBelMapping.populateAllPinMappings(part, device, devBuilder, allStrings);
+
+        t.stop().start("Strings");
+        writeAllStringsToBuilder(devBuilder);
+
         t.stop().start("Write File");
         Interchange.writeInterchangeFile(fileName, message);
         t.stop();
@@ -369,7 +374,7 @@ public class DeviceResourcesWriter {
 
     public static void writeAllTileTypesToBuilder(Design design, Device device, DeviceResources.Device.Builder devBuilder) {
         StructList.Builder<TileType.Builder> tileTypesList = devBuilder.initTileTypeList(tileTypes.size());
-        
+
         int i=0;
         for(Entry<TileTypeEnum,Tile> e : tileTypes.entrySet()) {
             Tile tile = e.getValue();
@@ -423,7 +428,7 @@ public class DeviceResourcesWriter {
                 } else if(pip.getPIPType() == PIPType.DIRECTIONAL_BUFFERED21) {
                     pipBuilder.setBuffered21(true);
                 }
-                
+
                 if(pip.isRouteThru()) {
                     PseudoPIPHelper pseudoPIPHelper = PseudoPIPHelper.getPseudoPIPHelper(pip);
                     List<BELPin> belPins = pseudoPIPHelper.getUsedBELPins();
