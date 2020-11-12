@@ -187,7 +187,7 @@ struct Device {
   # parameter settings for a specific site type and BELs within that site
   # type.
   struct CommonCellBelPinMaps {
-    siteTypes @0 : SiteTypeBelEntry;
+    siteTypes @0 : List(SiteTypeBelEntry);
     pins      @1 : List(CellBelPinEntry);
   }
 

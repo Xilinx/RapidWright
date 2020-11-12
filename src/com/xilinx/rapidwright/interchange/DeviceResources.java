@@ -1910,14 +1910,17 @@ public final class DeviceResources {
         public final Reader asReader() {
           return new Reader(segment, data, pointers, dataSize, pointerCount, 0x7fffffff);
         }
-        public final com.xilinx.rapidwright.interchange.DeviceResources.Device.SiteTypeBelEntry.Builder getSiteTypes() {
-          return _getPointerField(com.xilinx.rapidwright.interchange.DeviceResources.Device.SiteTypeBelEntry.factory, 0, null, 0);
+        public final boolean hasSiteTypes() {
+          return !_pointerFieldIsNull(0);
         }
-        public final void setSiteTypes(com.xilinx.rapidwright.interchange.DeviceResources.Device.SiteTypeBelEntry.Reader value) {
-          _setPointerField(com.xilinx.rapidwright.interchange.DeviceResources.Device.SiteTypeBelEntry.factory,0, value);
+        public final org.capnproto.StructList.Builder<com.xilinx.rapidwright.interchange.DeviceResources.Device.SiteTypeBelEntry.Builder> getSiteTypes() {
+          return _getPointerField(com.xilinx.rapidwright.interchange.DeviceResources.Device.SiteTypeBelEntry.listFactory, 0, null, 0);
         }
-        public final com.xilinx.rapidwright.interchange.DeviceResources.Device.SiteTypeBelEntry.Builder initSiteTypes() {
-          return _initPointerField(com.xilinx.rapidwright.interchange.DeviceResources.Device.SiteTypeBelEntry.factory,0, 0);
+        public final void setSiteTypes(org.capnproto.StructList.Reader<com.xilinx.rapidwright.interchange.DeviceResources.Device.SiteTypeBelEntry.Reader> value) {
+          _setPointerField(com.xilinx.rapidwright.interchange.DeviceResources.Device.SiteTypeBelEntry.listFactory, 0, value);
+        }
+        public final org.capnproto.StructList.Builder<com.xilinx.rapidwright.interchange.DeviceResources.Device.SiteTypeBelEntry.Builder> initSiteTypes(int size) {
+          return _initPointerField(com.xilinx.rapidwright.interchange.DeviceResources.Device.SiteTypeBelEntry.listFactory, 0, size);
         }
         public final boolean hasPins() {
           return !_pointerFieldIsNull(1);
@@ -1938,11 +1941,11 @@ public final class DeviceResources {
           super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
         }
 
-        public boolean hasSiteTypes() {
+        public final boolean hasSiteTypes() {
           return !_pointerFieldIsNull(0);
         }
-        public com.xilinx.rapidwright.interchange.DeviceResources.Device.SiteTypeBelEntry.Reader getSiteTypes() {
-          return _getPointerField(com.xilinx.rapidwright.interchange.DeviceResources.Device.SiteTypeBelEntry.factory,0,null, 0);
+        public final org.capnproto.StructList.Reader<com.xilinx.rapidwright.interchange.DeviceResources.Device.SiteTypeBelEntry.Reader> getSiteTypes() {
+          return _getPointerField(com.xilinx.rapidwright.interchange.DeviceResources.Device.SiteTypeBelEntry.listFactory, 0, null, 0);
         }
 
         public final boolean hasPins() {
@@ -3876,21 +3879,25 @@ public static final org.capnproto.SegmentReader b_cba8e0da63fbe025 =
    "\u0029\u0000\u0000\u0000\u0052\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0028\u0000\u0000\u0000\u0003\u0000\u0001\u0000" +
-   "\u0034\u0000\u0000\u0000\u0002\u0000\u0001\u0000" +
+   "\u0044\u0000\u0000\u0000\u0002\u0000\u0001\u0000" +
    "\u0001\u0000\u0000\u0000\u0001\u0000\u0000\u0000" +
    "\u0000\u0000\u0001\u0000\u0001\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u0031\u0000\u0000\u0000\u002a\u0000\u0000\u0000" +
+   "\u0041\u0000\u0000\u0000\u002a\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u002c\u0000\u0000\u0000\u0003\u0000\u0001\u0000" +
-   "\u0048\u0000\u0000\u0000\u0002\u0000\u0001\u0000" +
+   "\u003c\u0000\u0000\u0000\u0003\u0000\u0001\u0000" +
+   "\u0058\u0000\u0000\u0000\u0002\u0000\u0001\u0000" +
    "\u0073\u0069\u0074\u0065\u0054\u0079\u0070\u0065" +
    "\u0073\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u000e\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0003\u0000\u0001\u0000" +
    "\u0010\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0032\u0007\u0031\u0092\u00a2\u0070\u008d\u0093" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u0010\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u000e\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0070\u0069\u006e\u0073\u0000\u0000\u0000\u0000" +
