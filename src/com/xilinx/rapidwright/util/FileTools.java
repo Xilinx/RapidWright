@@ -1102,6 +1102,7 @@ public class FileTools {
 	public static Kryo getKryoInstance(){
 		if(kryo == null){
 			kryo = new Kryo();
+			kryo.setRegistrationRequired(false);
 		}
 		return kryo;
 	}
