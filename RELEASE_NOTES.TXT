@@ -1,3 +1,17 @@
+============= RapidWright 2020.1.5-beta released on 2020-11-13 ================
+Notes:
+ * Fixes a bug with incorrect SRL16* pin mappings on Series 7 and
+   STARTUPE3 pins on Zynq UltraScale+
+ * Checks for null parameters on Design.placeCell() - See Issue #91
+ * Removes incorrect board reference from DCPs created in RapidWright
+ * Fixes an issue with Cell -> BEL pin mappings where parameters don't
+   have entries
+ * Switches to GitHub Actions from Travis CI for automatic builds
+ * Changes default behavior for Kryo so that it no longer requires
+   class registering
+ - API Additions:
+   - com.xilinx.rapidwright.design.Design "public static EDIFLibrary getPrimitivesLibrary(String deviceName)"
+
 ============= RapidWright 2020.1.4-beta released on 2020-11-02 ================
 Notes:
  * Adds 2020.1 update 1 Vivado devices (XCVU19P, XCZU46DR, XCZU47DR,
