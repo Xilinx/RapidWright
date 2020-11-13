@@ -65,11 +65,13 @@ import com.xilinx.rapidwright.util.MessageGenerator;
  * Created on: Jun 15, 2015
  */
 public class PBlockGenerator {
-
 	public static final int LUTS_PER_CLE = 8;
 	public static final int FF_PER_CLE = 16;
 	public static final float CLES_PER_BRAM = 5;
 	public static final float CLES_PER_DSP = 2.5f;
+	public static int RAMLUTS_PER_CLE = 8;
+	public static int CARRY_PER_CLE = 1;
+	public static int SLICES_PER_TILE = 1;
 	
 	/** X dimension over Y dimension */
 	public float ASPECT_RATIO = 0.125f;//1.5f;	
@@ -157,14 +159,19 @@ public class PBlockGenerator {
 			}
 		}
 		
-		if(debug){
+		if (dev.getSeries() == Series.Series7) {
+			CARRY_PER_CLE = 2;
+			RAMLUTS_PER_CLE = 4;
+			SLICES_PER_TILE = 2;
+		}
+		if(debug){ 
 			System.out.println("Parsed report: " + reportFileName);
 			System.out.println("  Device: " + dev.getName());
 			System.out.println("    LUTs: " + lutCount);
 			System.out.println("    DSPs: " + dspCount);
 			System.out.println("18kBRAMs: " + bram18kCount);
 			System.out.println("36kBRAMs: " + bram36kCount);
-		}
+		} 
 		if(lutCount < LUTS_PER_CLE) lutCount = LUTS_PER_CLE;
 	}
 	
@@ -191,7 +198,7 @@ public class PBlockGenerator {
 					}
 					
 					double sliceUsage = Math.max(((double)lutCount)/LUTS_PER_CLE, ((double)ffCount)/FF_PER_CLE);
-					sliceUsage = Math.max(sliceUsage, ((double)carryCount));
+					sliceUsage = Math.max(sliceUsage, ((double)carryCount/CARRY_PER_CLE));
 					fractionalShapeArea += (carryCount > 0 || lutCount > 0 || ffCount > 0) ? sliceUsage : widthDim * heightDim;
 					
 					lutCount = 0;
@@ -290,7 +297,7 @@ public class PBlockGenerator {
 		int RAMRequired = bram18kCount;
 		int RAM36Required = bram36kCount;
 		int carryBlocks = tallestShape;
-		int sliceMRequired = lutRAMCount / LUTS_PER_CLE;
+		int sliceMRequired = lutRAMCount / RAMLUTS_PER_CLE;
 		int nullColumnsOnLeft = 0;
 		int nullColumnsOnRight = 0;
 		
@@ -400,7 +407,7 @@ public class PBlockGenerator {
 			if(debug) {
 				System.out.printf("SLICEL %4.1f%% SLICEM %4.1f%% DSP %4.1f%% BRAM %4.1f%% %s\n",
 						100.0*(debugSlicesRequired-slicesRequired)/((float)debugSlicesRequired),
-						100.0*((lutRAMCount/LUTS_PER_CLE)-sliceMRequired)/((float)(lutRAMCount/LUTS_PER_CLE)),
+						100.0*((lutRAMCount/RAMLUTS_PER_CLE)-sliceMRequired)/((float)(lutRAMCount/RAMLUTS_PER_CLE)),
 						dspCount == 0 ? 100.0 : (100.0*(dspCount-DSPRequired)/((float)dspCount)),
 						bram36kCount == 0 ? 100.0 : (100.0*(bram36kCount-RAM36Required)/((float)bram36kCount)),
 						dev.getTile(r,c).getName()
@@ -721,8 +728,12 @@ public class PBlockGenerator {
 			for(TileTypeEnum t : p){
 				if(slicems > 0 && Utils.isCLBM(t)){
 					slicems--;
+					if(SLICES_PER_TILE==2)
+						slices--;
 				}else if(Utils.isCLB(t)){
 					slices--;
+					if(SLICES_PER_TILE==2)
+						slices--;
 				}else if(Utils.isDSP(t)){
 					dsps--;
 				}else if(Utils.isBRAM(t)){
@@ -796,12 +807,11 @@ public class PBlockGenerator {
 		getTallestShape(shapesReportFileName);
 		
 		// Let's calculate exactly how many sites we need of each type
-		int slicesRequired = Math.round((((float)lutCount / (float)LUTS_PER_CLE) * OVERHEAD_RATIO) + 0.5f);
-		if(regCount/FF_PER_CLE > lutCount/LUTS_PER_CLE){
-			slicesRequired = Math.round((((float)regCount / (float)FF_PER_CLE) * OVERHEAD_RATIO) + 0.5f);
-		}
-		if(carryCount > slicesRequired){
-			slicesRequired = (int)((float)carryCount*OVERHEAD_RATIO);
+		int slicesLUTSRequired = Math.round((((float)(lutCount-lutRAMCount) / (float)LUTS_PER_CLE)*SLICES_PER_TILE * OVERHEAD_RATIO) + 0.5f); // Multiply with SLICES_PER_TILE for 7 series, where one CLB has 2 slices
+		// Let's calculate how many FF & carry slices we need
+		int slicesFFCarryRequired = Math.round((((float)regCount / (float)FF_PER_CLE)*SLICES_PER_TILE * OVERHEAD_RATIO) + 0.5f);		
+		if(carryCount/CARRY_PER_CLE > slicesFFCarryRequired/SLICES_PER_TILE){
+			slicesFFCarryRequired = Math.round((((float)carryCount / (float)CARRY_PER_CLE)*SLICES_PER_TILE*OVERHEAD_RATIO)+ 0.5f);
 		}
 		int dspsRequired = dspCount;
 		if((dspsRequired & 0x1) == 0x1){
@@ -809,13 +819,19 @@ public class PBlockGenerator {
 			dspsRequired++;
 		} 
 		int ramb36sRequired = bram36kCount + (int)Math.ceil((float)bram18kCount / 2.0);
-		int sliceMsRequired = (int)Math.ceil((float)lutRAMCount / (float)LUTS_PER_CLE);
+		int sliceMsRequired = (int)Math.ceil((float)lutRAMCount / (float)RAMLUTS_PER_CLE); // Not multiplying with SLICES_PER_TILE, as in one M-CLB Tile, there is only one slice having LUTRAM 
 		
+		// now compute Nr slices. If nr of FF & carry slices is smaller than current total nr of slices given by LUTs, than these could be mapped in the same slices. 
+		// Update if more slices are needed for FF & carry
+		int slicesRequired = slicesLUTSRequired;
+		if (slicesFFCarryRequired > (slicesLUTSRequired+sliceMsRequired))
+			slicesRequired += (slicesFFCarryRequired - (slicesLUTSRequired+sliceMsRequired));
 		int pblockCLEHeight = 0;
 		//Figure out how tall we need to make the pblock
 		//Make DSPs and BRAMs upto as tall as a region before creating a new column
 		int dspCLECount = (int) Math.ceil(dspsRequired * CLES_PER_DSP);
 		int bramCLECount = (int) Math.ceil(ramb36sRequired * CLES_PER_BRAM);
+		
 		if(dspCLECount == 0 && bramCLECount == 0){
 			// ASPECT_RATIO = width(X) / height(Y)
 			// width = ASPECT_RATIO * height
@@ -823,10 +839,11 @@ public class PBlockGenerator {
 			// AREA = ASPECT_RATIO * height^2
 			// height = sqrt ( AREA / height )
 			if(slicesRequired > sliceMsRequired){
-				pblockCLEHeight = (int) Math.ceil(Math.sqrt(slicesRequired/ASPECT_RATIO));
+				pblockCLEHeight = (int) Math.ceil(Math.sqrt(slicesRequired/(SLICES_PER_TILE*ASPECT_RATIO))); // One PBlock must contain tiles. It can not have 3 slices for exp. => compute height using tile nr, not slice nr. (for 7 series, for ultra. tiles=slices anyway)
 			}else{
-				pblockCLEHeight = (int) Math.ceil(Math.sqrt(sliceMsRequired/ASPECT_RATIO));
+				pblockCLEHeight = (int) Math.ceil(Math.sqrt(sliceMsRequired/(SLICES_PER_TILE*ASPECT_RATIO)));
 			}
+			
 		}else if(dspCLECount > bramCLECount){
 			pblockCLEHeight = dspCLECount;
 		}else {
@@ -845,7 +862,7 @@ public class PBlockGenerator {
 		//                      A = h^2 * r
 		//                      h = sqrt(A / r)
 		//
-		int checkedCLEHeight = (int) Math.ceil(Math.sqrt(((double) Math.max(slicesRequired,sliceMsRequired)) / ASPECT_RATIO));
+		int checkedCLEHeight = (int) Math.ceil(Math.sqrt(((double) Math.max(slicesRequired,sliceMsRequired)) / (SLICES_PER_TILE*ASPECT_RATIO)));
 		if(pblockCLEHeight < checkedCLEHeight){
 			pblockCLEHeight = checkedCLEHeight;
 		}
@@ -861,10 +878,8 @@ public class PBlockGenerator {
 		// Now, given an aspect ratio, we know how many columns of each we'll need
 		int numSLICEColumns = (int) Math.ceil((float)slicesRequired / pblockCLEHeight);
 		numSLICEColumns = (numSLICEColumns > 0) ? numSLICEColumns : 1;
-		
 		int numSLICEMColumns = (int) Math.ceil((float)sliceMsRequired / pblockCLEHeight);
 		numSLICEMColumns = (sliceMsRequired > 0 && numSLICEMColumns == 0) ? 1 : numSLICEMColumns;
-		
 		int numBRAMColumns = (int) Math.ceil(((float)ramb36sRequired * CLES_PER_BRAM) / pblockCLEHeight);;
 		numBRAMColumns = (ramb36sRequired > 0 && numBRAMColumns == 0) ? 1 : numBRAMColumns;
 		
@@ -899,11 +914,13 @@ public class PBlockGenerator {
 		if(tallestShape > pblockCLEHeight){
 			pblockCLEHeight = tallestShape;
 		}
+		
 		if(widestShape > (numSLICEColumns+numSLICEMColumns)){
 			int extra = numSLICEColumns+numSLICEMColumns - widestShape;
 			numSLICEColumns = numSLICEColumns + extra;
 		}
 		int pblockArea = (numSLICEColumns+numSLICEMColumns) * pblockCLEHeight;
+		
 		if(shapeArea > pblockArea){
 			// Let's choose to make the pblock taller rather than wider
 			double areaShortage = shapeArea - pblockArea;
@@ -974,38 +991,44 @@ public class PBlockGenerator {
 				if(numSLICEColumns > 0 || numSLICEMColumns > 0){
 					HashMap<Integer, Integer []> CLBPBlock = new HashMap<Integer, Integer []> ();
 					createAllPBlocks (CLBPBlock,patMap,p, numSLICEColumns, numSLICEMColumns,numBRAMColumns,numDSPColumns,numSLICERows);		// Re-generate pblock to write it in the file
-					// clb_pblock value:  Integer[] {x_l,x_r,y_d,y_u}
-					int LeftX   = CLBPBlock.get(0)[0];
-					int RightX  = CLBPBlock.get(0)[1];
-					int UpperY  = CLBPBlock.get(0)[3];
-					int LowerY  = CLBPBlock.get(0)[2];
-
-					sb.append("SLICE_X" + LeftX + "Y" + LowerY + ":SLICE_X" + RightX + "Y" + UpperY);
-					
-					// Write PBlock in Global PBlock file, so that the next IPs will try to use other columns if free
-					// Current solution works actually if only 1 pblock is used for the implementation of the IP. If more are used, this won't give an accurate value
-					// Also, current solution computes free resources only in case of CLB pblocks. The BRAMS and DRAMs columns are selected to match the most suitable clb pblock
-					List<String> WritePBlocks = new ArrayList<String>();
-					for (Integer i: CLBPBlock.keySet()) {
-						WritePBlocks.add("SLICE_X" + CLBPBlock.get(i)[0] + "Y" + CLBPBlock.get(i)[2] + ":SLICE_X" + CLBPBlock.get(i)[1] + "Y" + CLBPBlock.get(i)[3]);
-					} 
-					if(IP_NR_INSTANCES==0) {
-						if (debug)
-							System.out.println(" CRITICAL WARNING: IP_NR_INSTANCES is 0! Default value 1 was set.");
-						IP_NR_INSTANCES = 1;
+					if(CLBPBlock.size()>0) { // If no feasible CLB PBlock found for this pattern, skip it!
+						// clb_pblock value:  Integer[] {x_l,x_r,y_d,y_u}
+						int LeftX   = CLBPBlock.get(0)[0];
+						int RightX  = CLBPBlock.get(0)[1];
+						int UpperY  = CLBPBlock.get(0)[3];
+						int LowerY  = CLBPBlock.get(0)[2];
+	
+						sb.append("SLICE_X" + LeftX + "Y" + LowerY + ":SLICE_X" + RightX + "Y" + UpperY);
+						
+						// Write PBlock in Global PBlock file, so that the next IPs will try to use other columns if free
+						// Current solution works actually if only 1 pblock is used for the implementation of the IP. If more are used, this won't give an accurate value
+						// Also, current solution computes free resources only in case of CLB pblocks. The BRAMS and DRAMs columns are selected to match the most suitable clb pblock
+						List<String> WritePBlocks = new ArrayList<String>();
+						for (Integer i: CLBPBlock.keySet()) {
+							WritePBlocks.add("SLICE_X" + CLBPBlock.get(i)[0] + "Y" + CLBPBlock.get(i)[2] + ":SLICE_X" + CLBPBlock.get(i)[1] + "Y" + CLBPBlock.get(i)[3]);
+						} 
+						if(IP_NR_INSTANCES==0) {
+							if (debug)
+								System.out.println(" CRITICAL WARNING: IP_NR_INSTANCES is 0! Default value 1 was set.");
+							IP_NR_INSTANCES = 1;
+						}
+						
+						try (FileWriter fw = new FileWriter(GLOBAL_PBLOCK, true); // append to file
+							    BufferedWriter bw = new BufferedWriter(fw);
+							    PrintWriter out = new PrintWriter(bw)) {
+								int nrInstances = (int) Math.ceil((double)IP_NR_INSTANCES / WritePBlocks.size()); // distribute instances over number of pblocks of this pattern
+								for(int stringNr = 0; stringNr<WritePBlocks.size();stringNr++)
+									out.println(WritePBlocks.get(stringNr)+" "+nrInstances);
+								} catch (IOException e) {
+									MessageGenerator.briefErrorAndExit("Problem appending all the pblocks to the " + GLOBAL_PBLOCK +" file");
+								}					
+					} else {
+						if(key == storeBestPattern.lastKey())
+							return pBlocks;
+						continue;
 					}
-					
-					try (FileWriter fw = new FileWriter(GLOBAL_PBLOCK, true); // append to file
-						    BufferedWriter bw = new BufferedWriter(fw);
-						    PrintWriter out = new PrintWriter(bw)) {
-							int nrInstances = (int) Math.ceil((double)IP_NR_INSTANCES / WritePBlocks.size()); // distribute instances over number of pblocks of this pattern
-							for(int stringNr = 0; stringNr<WritePBlocks.size();stringNr++)
-								out.println(WritePBlocks.get(stringNr)+" "+nrInstances);
-							} catch (IOException e) {
-								MessageGenerator.briefErrorAndExit("Problem appending all the pblocks to the " + GLOBAL_PBLOCK +" file");
-							}
 				
-				}
+				} 
 				if(numBRAMColumns > 0){
 					int pIdx = 0;
 					for(int i=0; pIdx < p.size(); i++){
@@ -1172,8 +1195,12 @@ public class PBlockGenerator {
 			
 			if(Utils.isCLBM(t) && (reqNumSLICEMColumns>0)) {
 				reqNumSLICEMColumns--;
+				if(SLICES_PER_TILE==2)
+					reqNumSLICEColumns--;
 			} else if(Utils.isCLB(t)) {
 				reqNumSLICEColumns--;
+				if(SLICES_PER_TILE==2)
+					reqNumSLICEColumns--;
 			} else if(Utils.isDSP(t)) {
 				reqNumDSPColumns--;
 			} else if(Utils.isBRAM(t)) {
@@ -1198,10 +1225,14 @@ public class PBlockGenerator {
 			TileTypeEnum t = dev.getTile(row, col+colAllFulfilled-colOffset).getTileTypeEnum();
 			if(Utils.isCLBM(t) && (reqNumSLICEMColumns>0)) {
 				reqNumSLICEMColumns--;
+				if(SLICES_PER_TILE==2)
+					reqNumSLICEColumns--;
 				if((reqNumSLICEColumns<=0) && (forCLB) && (reqNumSLICEMColumns==0))	// This logic solves the task of returning a clb pblock offset only. Without it, if BRAM is the first in the pattern (with offset), BRAM column will be returned
 					break;
 			} else if(Utils.isCLB(t)) {
 				reqNumSLICEColumns--;
+				if(SLICES_PER_TILE==2)
+					reqNumSLICEColumns--;
 				if((reqNumSLICEMColumns<=0) && (forCLB) && (reqNumSLICEColumns==0))
 					break;
 			} else if(Utils.isDSP(t)) {
@@ -1249,11 +1280,13 @@ public class PBlockGenerator {
 
 		Site upperLeft = null;
 		if(numSLICEColumns > 0 || numSLICEMColumns > 0) { 			// Generate CLB PBlocks only if slices required
-			int runNr = 0;
-			while (patternInstancesItr.hasNext() || (runNr==0) ) { 	// if there are still pattern occurrences to check or if this is the only one
-				if(runNr!=0) {
+			boolean first = true;									// If there is only one pattern and it is not feasible, avoid endless loop
+			int runNr = 0;											// Store nr. of valid patterns. Used as key for CLBPBlock. Don't replace "first" with this var as it will lead to error if only one invalid pattern exists 
+			while (patternInstancesItr.hasNext() || first ) { 	// if there are still pattern occurrences to check or if this is the only one
+				if(!first) {
 					mainPBlockCol = patternInstancesItr.next(); 
 				}
+				first=false;
 				// Select the most left column that would give you a compact implemented design (as offset)
 				// If createAllPBlocks is called after running getSortedMostCommonPatterns, the bellow function is probably not required.
 				// However, the function bellow is still called in case createAllPBlocks is used in another context, not after running getSortedMostCommonPatterns, to get compact designs
@@ -1277,11 +1310,15 @@ public class PBlockGenerator {
 					TileTypeEnum t = dev.getTile(row, i).getTileTypeEnum();
 					if(Utils.isCLBM(t) && (req_numSLICEMColumns>0)) {
 						req_numSLICEMColumns--;
-						if((req_numSLICEColumns<=0) && (req_numSLICEMColumns==0)) {
+						if(SLICES_PER_TILE==2)
+							req_numSLICEColumns--;
+						if((req_numSLICEColumns<=0) && (req_numSLICEMColumns<=0)) {
 							break;
 						}
 					} else if(Utils.isCLB(t)) {
 						req_numSLICEColumns--;
+						if(SLICES_PER_TILE==2)
+							req_numSLICEColumns--;
 						if((req_numSLICEMColumns<=0) && (req_numSLICEColumns<=0)) {
 							break;
 						}
