@@ -27,6 +27,8 @@ import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.Package;
+import com.xilinx.rapidwright.device.PackagePin;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.PIPType;
 import com.xilinx.rapidwright.device.PIPWires;
@@ -91,7 +93,7 @@ public class DeviceResourcesVerifier {
             String str = reader.get(i).toString();
             allStrings.addObject(str);
         }
-        
+
         // Create a lookup map for tile types
         HashMap<String,TileType.Reader> tileTypeMap = new HashMap<String, TileType.Reader>();
         HashMap<String, StructList.Reader<DeviceResources.Device.PIP.Reader>> ttPIPMap = new HashMap<>();
@@ -220,7 +222,7 @@ public class DeviceResourcesVerifier {
                 if(pipReader.getBuffered21() != isBuffered21) {
                     throw new RuntimeException("PIP Buffered21 mismatch " + pip);
                 }
-                
+
                 if(pipReader.hasPseudoCells()) {
                     PseudoPIPHelper pipHelper = PseudoPIPHelper.getPseudoPIPHelper(pip);
                     List<BELPin> goldBELPins = pipHelper.getUsedBELPins();
@@ -237,22 +239,22 @@ public class DeviceResourcesVerifier {
                             BELPin testPin = bel.getPin(pinName);
                             foundBELPins.add(testPin);
                         }
-                        
+
                     }
-                    
+
                     for(BELPin goldBELPin : goldBELPins) {
                         if(goldBELPin.isSitePort()) continue;
                         if(!foundBELPins.remove(goldBELPin)) {
-                            throw new RuntimeException("ERROR: BELPin " + goldBELPin.toString() 
-                                + " not found for pseudo PIP " + pipHelper.getTileTypeEnum() +"." 
+                            throw new RuntimeException("ERROR: BELPin " + goldBELPin.toString()
+                                + " not found for pseudo PIP " + pipHelper.getTileTypeEnum() +"."
                                     + pipHelper.getPseudoPIPName());
                         }
                     }
                     if(foundBELPins.size() > 0) {
-                        throw new RuntimeException("ERROR: Found unknown BELPins "+ foundBELPins 
+                        throw new RuntimeException("ERROR: Found unknown BELPins "+ foundBELPins
                                 +" for pseudo PIP " + pipHelper.getPseudoPIPName() + " ");
                     }
-                    
+
                 }
             }
         }
@@ -303,6 +305,7 @@ public class DeviceResourcesVerifier {
         }
 
         verifyCellBelPinMaps(allStrings, dReader, design);
+        verifyPackages(allStrings, dReader, device);
 
         return true;
     }
@@ -514,6 +517,62 @@ public class DeviceResourcesVerifier {
         for(EDIFCell cell : prims.getCells()) {
             if(!macroCells.contains(cell.getName())) {
                 verifyCellBelPinMap(siteMap, cellBelMap, topLevelCell, cell, design);
+            }
+        }
+    }
+
+    static private void verifyPackages(Enumerator<String> allStrings, DeviceResources.Device.Reader dReader, Device device) {
+        StructList.Reader<DeviceResources.Device.Package.Reader> packagesObj = dReader.getPackages();
+        Set<String> packages = device.getPackages();
+        expect(packages.size(), packagesObj.size());
+
+        Set<String> packagesFromReader = new HashSet<String>();
+        for(DeviceResources.Device.Package.Reader packageObj : packagesObj) {
+            String packageName = allStrings.get(packageObj.getName());
+            packagesFromReader.add(packageName);
+        }
+
+        if(!packagesFromReader.equals(packages)) {
+            throw new RuntimeException("Packages doesn't match");
+        }
+
+        for(DeviceResources.Device.Package.Reader packageObj : packagesObj) {
+            String packageName = allStrings.get(packageObj.getName());
+            Package pack = device.getPackage(packageName);
+
+            expect(pack.getName(), packageName);
+
+            Set<String> packagePinsFromReader = new HashSet<String>();
+            for(DeviceResources.Device.Package.PackagePin.Reader packagePinObj : packageObj.getPackagePins()) {
+                packagePinsFromReader.add(allStrings.get(packagePinObj.getPackagePin()));
+            }
+
+            Set<String> packagePins = new HashSet<String>();
+            packagePins.addAll(pack.getPackagePinMap().keySet());
+
+            expect(packagePins.size(), packagePinsFromReader.size());
+            if(!packagePins.equals(packagePinsFromReader)) {
+                throw new RuntimeException("Package pins doesn't match");
+            }
+
+            for(DeviceResources.Device.Package.PackagePin.Reader packagePinObj : packageObj.getPackagePins()) {
+                String packagePinName = allStrings.get(packagePinObj.getPackagePin());
+                PackagePin packagePin = pack.getPackagePinMap().get(packagePinName);
+
+                expect(packagePin.getName(), packagePinName);
+
+                Site site = packagePin.getSite();
+                if(site == null) {
+                    if(packagePinObj.getSite().isSite()) {
+                        throw new RuntimeException("Has site when no site is expected?");
+                    }
+                    if(packagePinObj.getBel().isBel()) {
+                        throw new RuntimeException("Has BEL when no site is expected?");
+                    }
+                } else {
+                    expect(site.getName(), allStrings.get(packagePinObj.getSite().getSite()));
+                    expect("PAD", allStrings.get(packagePinObj.getBel().getBel()));
+                }
             }
         }
     }

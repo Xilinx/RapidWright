@@ -24,7 +24,7 @@ struct Device {
   primLibs        @7 : Dir.Netlist; # Netlist libraries of Unisim primitives and macros
   exceptionMap    @8 : List(PrimToMacroExpansion); # Prims to macros expand w/same name, except these
   cellBelMap      @9 : List(CellBelMapping);
-  cellInversions @10 : List(CellInversions);
+  cellInversions @10 : Void;
   packages       @11 : List(Package);
 
   #######################################
@@ -206,58 +206,27 @@ struct Device {
     pins                @1 : List(CellBelPinEntry);
   }
 
-  ######################################
-  # Inverting pins description
-  #
-  # This block describes local site wire
-  # inverters, site routing BELs, and
-  # parameters.
-  ######################################
-  struct InversionRoutingBel {
-    # What routing BEL represents the inversion?
-    routingBel @0 : StringIdx;
-
-    # Which routing BEL pin is selected?
-    belPin     @1 : StringIdx;
-  }
-
-  struct CellPinInversionParameter {
-    # What parameter value configures this setting?
-    parameter    @0 : Dir.Netlist.PropertyMap.Entry;
-
-    # How are the routing BELs setup in this state?
-    routingBels  @1 : List(InversionRoutingBel);
-  }
-
-  struct CellPinInversion {
-    # Which cell pin supports a local site inverter?
-    cellPin      @0 : StringIdx;
-
-    # What parameters are used for the non-inverting case, and how to route
-    # through the inversion routing bels (if any).
-    notInverting @1 : CellPinInversionParameter;
-
-    # What parameters are used for the inverting case, and how to route
-    # through the inversion routing bels (if any).
-    inverting    @2 : CellPinInversionParameter;
-  }
-
-  struct CellInversions {
-    # Which cell is being described?
-    cell     @0 : StringIdx;
-
-    # Which cell have site local inverters?
-    cellPins @1 : List(CellPinInversion);
-  }
-
   struct Package {
     struct PackagePin {
         packagePin @0 : StringIdx;
-        site       @1 : StringIdx;
-        bel        @2 : StringIdx;
+        site : union {
+            site       @1 : StringIdx;
+            noSite     @2 : Void;
+        }
+        bel : union {
+            bel        @3 : StringIdx;
+            noBel      @4 : Void;
+        }
     }
 
-    name            @0 : StringIdx;
-    packagePins     @1 : List(PackagePin);
+    struct Grade {
+        name             @0 : StringIdx;
+        speedGrade       @1 : StringIdx;
+        temperatureGrade @2 : StringIdx;
+    }
+
+    name        @0 : StringIdx;
+    packagePins @1 : List(PackagePin);
+    grades      @2 : List(Grade);
   }
 }

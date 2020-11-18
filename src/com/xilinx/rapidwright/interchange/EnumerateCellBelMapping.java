@@ -424,7 +424,7 @@ public class EnumerateCellBelMapping {
         }
     };
 
-    private static class StringCompare implements Comparator<String> {
+    public static class StringCompare implements Comparator<String> {
         @Override
         public int compare(String a, String b) {
             return a.compareTo(b);
