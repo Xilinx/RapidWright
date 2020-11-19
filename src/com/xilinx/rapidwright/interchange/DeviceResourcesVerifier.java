@@ -96,12 +96,15 @@ public class DeviceResourcesVerifier {
         }
 
         // Create a lookup map for tile types
-        HashMap<String,TileType.Reader> tileTypeMap = new HashMap<String, TileType.Reader>();
+        Map<String,TileType.Reader> tileTypeMap = new HashMap<String, TileType.Reader>();
+        Map<TileTypeEnum, TileType.Reader> tileTypeEnumMap = new HashMap<TileTypeEnum, TileType.Reader>();
         HashMap<String, StructList.Reader<DeviceResources.Device.PIP.Reader>> ttPIPMap = new HashMap<>();
         for(int i=0; i < dReader.getTileTypeList().size(); i++) {
             TileType.Reader ttReader = dReader.getTileTypeList().get(i);
             String name = allStrings.get(ttReader.getName());
             tileTypeMap.put(name, ttReader);
+            TileTypeEnum tileTypeEnum = TileTypeEnum.valueOf(name);
+            tileTypeEnumMap.put(tileTypeEnum, ttReader);
             ttPIPMap.put(name, ttReader.getPips());
         }
 
@@ -307,6 +310,19 @@ public class DeviceResourcesVerifier {
 
         verifyCellBelPinMaps(allStrings, dReader, design);
         verifyPackages(allStrings, dReader, device);
+
+        // Get examples for each site type to a site.
+        Map<SiteTypeEnum, Site> siteTypes = new HashMap<SiteTypeEnum, Site>();
+        for(Tile tile : device.getAllTiles()) {
+            for(Site site : tile.getSites()) {
+                siteTypes.put(site.getSiteTypeEnum(), site);
+                SiteTypeEnum[] altSiteTypes = site.getAlternateSiteTypeEnums();
+                for(SiteTypeEnum altSiteType : altSiteTypes) {
+                    siteTypes.put(altSiteType, site);
+                }
+            }
+        }
+        ConstantDefinitions.verifyConstants(allStrings, device, design, siteTypes, dReader.getConstants(), tileTypeEnumMap);
 
         return true;
     }

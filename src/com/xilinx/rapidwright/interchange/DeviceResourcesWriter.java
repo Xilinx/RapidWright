@@ -143,7 +143,7 @@ public class DeviceResourcesWriter {
         writeAllSiteTypesToBuilder(design, device, devBuilder);
 
         t.stop().start("TileTypes");
-        writeAllTileTypesToBuilder(design, device, devBuilder);
+        Map<TileTypeEnum, TileType.Builder> tileTypesObj = writeAllTileTypesToBuilder(design, device, devBuilder);
 
         t.stop().start("Tiles");
         writeAllTilesToBuilder(device, devBuilder);
@@ -194,6 +194,9 @@ public class DeviceResourcesWriter {
 
         t.stop().start("Packages");
         populatePackages(allStrings, device, devBuilder);
+
+        t.stop().start("Constants");
+        ConstantDefinitions.writeConstants(allStrings, device, devBuilder.initConstants(), design, siteTypes, tileTypesObj);
 
         t.stop().start("Strings");
         writeAllStringsToBuilder(devBuilder);
@@ -381,13 +384,16 @@ public class DeviceResourcesWriter {
         }
     }
 
-    public static void writeAllTileTypesToBuilder(Design design, Device device, DeviceResources.Device.Builder devBuilder) {
+    public static Map<TileTypeEnum, TileType.Builder> writeAllTileTypesToBuilder(Design design, Device device, DeviceResources.Device.Builder devBuilder) {
         StructList.Builder<TileType.Builder> tileTypesList = devBuilder.initTileTypeList(tileTypes.size());
+
+        Map<TileTypeEnum, TileType.Builder> tileTypeObjs = new HashMap<TileTypeEnum, TileType.Builder>();
 
         int i=0;
         for(Entry<TileTypeEnum,Tile> e : tileTypes.entrySet()) {
             Tile tile = e.getValue();
             TileType.Builder tileType = tileTypesList.get(i);
+            tileTypeObjs.put(e.getKey(), tileType);
             // name
             tileType.setName(allStrings.getIndex(e.getKey().name()));
 
@@ -470,6 +476,7 @@ public class DeviceResourcesWriter {
             i++;
         }
 
+        return tileTypeObjs;
     }
 
     public static void writeAllTilesToBuilder(Device device, DeviceResources.Device.Builder devBuilder) {
@@ -519,6 +526,7 @@ public class DeviceResourcesWriter {
                     allNodes.addObject(makeKey(node.getTile(), node.getWire()));
                 }
             }
+
             for(PIP p : tile.getPIPs()) {
                 Node start = p.getStartNode();
                 if(start != null) {
@@ -557,7 +565,6 @@ public class DeviceResourcesWriter {
             }
         }
     }
-
     private static void populatePackages(Enumerator<String> allStrings, Device device, DeviceResources.Device.Builder devBuilder) {
         Set<String> packages = device.getPackages();
         List<String> packagesList = new ArrayList<String>();

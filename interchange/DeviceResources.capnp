@@ -10,6 +10,7 @@ using BELPinIdx = UInt32;
 using WireIdx = UInt32;
 using WireIDInTileType = UInt32; # ID in Tile Type
 using SitePinIdx = UInt32;
+using TileTypeIdx = UInt32;
 using TileTypeSiteTypeIdx = UInt32;
 
 struct Device {
@@ -26,6 +27,7 @@ struct Device {
   cellBelMap      @9 : List(CellBelMapping);
   cellInversions @10 : Void;
   packages       @11 : List(Package);
+  constants      @12 : Constants;
 
   #######################################
   # Placement definition objects
@@ -68,6 +70,7 @@ struct Device {
     siteTypes  @1 : List(SiteTypeInTileType);
     wires      @2 : List(StringIdx);
     pips       @3 : List(PIP);
+    constants  @4 : List(WireConstantSources);
   }
 
   #######################################
@@ -93,7 +96,7 @@ struct Device {
 
   struct Tile {
     name       @0 : StringIdx;
-    type       @1 : StringIdx;
+    type       @1 : TileTypeIdx;
     sites      @2 : List(Site);
     row        @3 : UInt16;
     col        @4 : UInt16;
@@ -153,6 +156,11 @@ struct Device {
   struct PseudoCell {
     bel          @0 : StringIdx;
     pins         @1 : List(StringIdx);
+  }
+
+  struct WireConstantSources {
+      wires        @0 : List(WireIDInTileType);
+      constant     @1 : ConstantType;
   }
 
   ######################################
@@ -228,5 +236,50 @@ struct Device {
     name        @0 : StringIdx;
     packagePins @1 : List(PackagePin);
     grades      @2 : List(Grade);
+  }
+
+  # Constants
+  enum ConstantType {
+      # Routing a VCC or GND are equal cost.
+      noPreference @0;
+      # Routing a GND has the best cost.
+      gnd          @1;
+      # Routing a VCC has the best cost.
+      vcc          @2;
+  }
+
+  struct Constants {
+    struct SitePinConstantExceptions {
+        siteType     @0 : StringIdx;
+        sitePin      @1 : StringIdx;
+        bestConstant @2 : ConstantType;
+    }
+
+    struct SiteConstantSource {
+        siteType     @0 : StringIdx;
+        bel          @1 : StringIdx;
+        belPin       @2 : StringIdx;
+        constant     @3 : ConstantType;
+    }
+
+    # When either constant signal can be routed to an input site pin, which
+    # constant should be used by default?
+    #
+    # For example, if a site pin has a local inverter and a cell requires a
+    # constant signal, then either a gnd or vcc could be routed to the site.
+    # The inverter can be used to select which ever constant is needed,
+    # regardless of what constant the cell requires.  In some fabrics, routing
+    # a VCC or routing a GND is significantly easier than the other.
+    defaultBestConstant    @0 : ConstantType;
+
+    # If there are exceptions to the default best constant, then this list
+    # specifies which site pins use a different constant.
+    bestConstantExceptions @1 : List(SitePinConstantExceptions);
+
+    # List of constants that can be found within the routing graph without
+    # consuming a BEL.
+    #
+    # Tools can always generate a constant source from a LUT BEL type.
+    siteSources            @2 : List(SiteConstantSource);
   }
 }
