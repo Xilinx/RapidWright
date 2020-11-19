@@ -405,10 +405,28 @@ public class DeviceResourcesVerifier {
         List<Map.Entry<SiteTypeEnum, String>> entries = new ArrayList<>();
 
         Map<SiteTypeEnum,Set<String>> sites = physCell.getCompatiblePlacements();
+        Set<SiteTypeEnum> siteTypes = new HashSet<SiteTypeEnum>();
+        siteTypes.addAll(sites.keySet());
+        siteTypes.retainAll(siteMap.keySet());
+
         Map<SiteTypeEnum,Set<String>> sitesFromDev = cellBelMap.getCompatiblePlacements(cell.getName());
 
-        expect(sites.size(), sitesFromDev.size());
-        // TODO: Check rest of getCompatiblePlacements
+        expect(siteTypes.size(), sitesFromDev.size());
+        if(!siteTypes.equals(sitesFromDev.keySet())) {
+            throw new RuntimeException(String.format(
+                        "Cell %s -> set of site types does not match",
+                        cell.getName()));
+        }
+
+        for(SiteTypeEnum siteType : siteTypes) {
+            Set<String> bels = sites.get(siteType);
+            Set<String> belsFromDev = sitesFromDev.get(siteType);
+            if(!bels.equals(belsFromDev)) {
+                throw new RuntimeException(String.format(
+                            "Cell %s -> BELs for site type %s doesn't match",
+                            cell.getName(), siteType.name()));
+            }
+        }
 
         for (Map.Entry<SiteTypeEnum,Set<String>> site : sites.entrySet()) {
             for(String bel : site.getValue()) {
@@ -436,27 +454,35 @@ public class DeviceResourcesVerifier {
                         bel,
                         parameterArray);
 
+                String parametersStr = new String();
+                for(String parameter : parameters) {
+                    parametersStr = parametersStr + " " + parameter;
+                }
+
                 for(Site site : siteMap.get(siteType)) {
                     SiteInst siteInst = design.createSiteInst("test_site", siteType, site);
                     physCell = design.createAndPlaceCell("test", Unisim.valueOf(cell.getName()), site.getName() + "/" + bel, parameterArray);
 
-                    HashSet<Map.Entry<String, String>> pinMapping = new HashSet<Map.Entry<String, String>>();
+                    Map<String, String> pinMapping = new HashMap<String, String>();
 
-                    for(Map.Entry<String, String> pinMap : physCell.getPinMappingsL2P().entrySet()) {
-                        pinMapping.add(pinMap);
-                    }
+                    // TODO: Disabled because of https://github.com/Xilinx/RapidWright/issues/101
+                    //for(Map.Entry<String, String> pinMap : physCell.getPinMappingsL2P().entrySet()) {
+                    //    pinMapping.add(pinMap);
+                    //}
 
                     for(Map.Entry<String, String> pinMap : physCell.getPinMappingsP2L().entrySet()) {
-                        pinMapping.add(new AbstractMap.SimpleEntry<String, String>(pinMap.getValue(), pinMap.getKey()));
+                        pinMapping.put(pinMap.getKey(), pinMap.getValue());
                     }
 
-                    expect(pinMappingFromDev.size(), pinMapping.size());
-                    // TODO: Check rest of pin map.
+                    if(!pinMapping.equals(pinMappingFromDev)) {
+                        throw new RuntimeException(String.format(
+                            "Cell %s -> BEL pins for site type %s and parameters %s doesn't match",
+                            cell.getName(), siteType.name(), parametersStr));
+                    }
 
                     design.removeCell(physCell);
                     design.removeSiteInst(siteInst);
                     topLevelCell.removeCellInst("test");
-                    design.getTopEDIFCell().removeCellInst("test");
                 }
             }
         }
@@ -478,9 +504,17 @@ public class DeviceResourcesVerifier {
 
         Map<SiteTypeEnum, List<Site>> siteMap = EnumerateCellBelMapping.createSiteMap(design.getDevice());
 
+        EDIFLibrary macros = Design.getMacroPrimitives(design.getDevice().getSeries());
+        Set<String> macroCells = new HashSet<String>();
+        for(EDIFCell cell : macros.getCells()) {
+            macroCells.add(cell.getName());
+        }
+
         CellBelMapping cellBelMap = new CellBelMapping(allStrings, dReader.getCellBelMap());
         for(EDIFCell cell : prims.getCells()) {
-            verifyCellBelPinMap(siteMap, cellBelMap, topLevelCell, cell, design);
+            if(!macroCells.contains(cell.getName())) {
+                verifyCellBelPinMap(siteMap, cellBelMap, topLevelCell, cell, design);
+            }
         }
     }
 }
