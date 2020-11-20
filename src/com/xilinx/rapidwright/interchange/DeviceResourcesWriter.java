@@ -18,6 +18,7 @@ import org.capnproto.StructList;
 import org.capnproto.Text;
 import org.capnproto.TextList;
 import org.capnproto.PrimitiveList.Int;
+import org.capnproto.Void;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.SiteInst;
@@ -576,6 +577,9 @@ public class DeviceResourcesWriter {
                 if(site != null) {
                     packagePinObj.initSite().setSite(allStrings.getIndex(site.getName()));
                     packagePinObj.initBel().setBel(allStrings.getIndex("PAD"));
+                } else {
+                    packagePinObj.initSite().setNoSite(Void.VOID);
+                    packagePinObj.initBel().setNoBel(Void.VOID);
                 }
             }
 
@@ -587,10 +591,6 @@ public class DeviceResourcesWriter {
                 gradeObj.setSpeedGrade(allStrings.getIndex(grade.getSpeedGrade()));
                 gradeObj.setTemperatureGrade(allStrings.getIndex(grade.getTemperatureGrade()));
             }
-
         }
-
-
     }
-
 }

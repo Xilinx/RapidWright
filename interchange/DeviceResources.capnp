@@ -210,12 +210,12 @@ struct Device {
     struct PackagePin {
         packagePin @0 : StringIdx;
         site : union {
-            site       @1 : StringIdx;
-            noSite     @2 : Void;
+            noSite     @1 : Void;
+            site       @2 : StringIdx;
         }
         bel : union {
-            bel        @3 : StringIdx;
-            noBel      @4 : Void;
+            noBel      @3 : Void;
+            bel        @4 : StringIdx;
         }
     }
 

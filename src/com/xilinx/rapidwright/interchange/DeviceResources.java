@@ -2270,8 +2270,8 @@ public final class DeviceResources {
             return new Device.Package.PackagePin.Site.Builder(segment, data, pointers, dataSize, pointerCount);
           }
           public final Site.Builder initSite() {
-            _setIntField(1,0);
-            _setShortField(4,(short)0);
+            _setShortField(2,(short)0);
+            _setIntField(2,0);
   return new Device.Package.PackagePin.Site.Builder(segment, data, pointers, dataSize, pointerCount);
           }
 
@@ -2279,7 +2279,7 @@ public final class DeviceResources {
             return new Device.Package.PackagePin.Bel.Builder(segment, data, pointers, dataSize, pointerCount);
           }
           public final Bel.Builder initBel() {
-            _setShortField(5,(short)0);
+            _setShortField(3,(short)0);
             _setIntField(3,0);
   return new Device.Package.PackagePin.Bel.Builder(segment, data, pointers, dataSize, pointerCount);
           }
@@ -2331,28 +2331,15 @@ public final class DeviceResources {
               super(segment, data, pointers, dataSize, pointerCount);
             }
             public Which which() {
-              switch(_getShortField(4)) {
-                case 0 : return Which.SITE;
-                case 1 : return Which.NO_SITE;
+              switch(_getShortField(2)) {
+                case 0 : return Which.NO_SITE;
+                case 1 : return Which.SITE;
                 default: return Which._NOT_IN_SCHEMA;
               }
             }
             public final Reader asReader() {
               return new Reader(segment, data, pointers, dataSize, pointerCount, 0x7fffffff);
             }
-            public final boolean isSite() {
-              return which() == Device.Package.PackagePin.Site.Which.SITE;
-            }
-            public final int getSite() {
-              assert which() == Device.Package.PackagePin.Site.Which.SITE:
-                          "Must check which() before get()ing a union member.";
-              return _getIntField(1);
-            }
-            public final void setSite(int value) {
-              _setShortField(4, (short)Device.Package.PackagePin.Site.Which.SITE.ordinal());
-              _setIntField(1, value);
-            }
-
             public final boolean isNoSite() {
               return which() == Device.Package.PackagePin.Site.Which.NO_SITE;
             }
@@ -2362,7 +2349,20 @@ public final class DeviceResources {
               return org.capnproto.Void.VOID;
             }
             public final void setNoSite(org.capnproto.Void value) {
-              _setShortField(4, (short)Device.Package.PackagePin.Site.Which.NO_SITE.ordinal());
+              _setShortField(2, (short)Device.Package.PackagePin.Site.Which.NO_SITE.ordinal());
+            }
+
+            public final boolean isSite() {
+              return which() == Device.Package.PackagePin.Site.Which.SITE;
+            }
+            public final int getSite() {
+              assert which() == Device.Package.PackagePin.Site.Which.SITE:
+                          "Must check which() before get()ing a union member.";
+              return _getIntField(2);
+            }
+            public final void setSite(int value) {
+              _setShortField(2, (short)Device.Package.PackagePin.Site.Which.SITE.ordinal());
+              _setIntField(2, value);
             }
 
           }
@@ -2373,21 +2373,12 @@ public final class DeviceResources {
             }
 
             public Which which() {
-              switch(_getShortField(4)) {
-                case 0 : return Which.SITE;
-                case 1 : return Which.NO_SITE;
+              switch(_getShortField(2)) {
+                case 0 : return Which.NO_SITE;
+                case 1 : return Which.SITE;
                 default: return Which._NOT_IN_SCHEMA;
               }
             }
-            public final boolean isSite() {
-              return which() == Device.Package.PackagePin.Site.Which.SITE;
-            }
-            public final int getSite() {
-              assert which() == Device.Package.PackagePin.Site.Which.SITE:
-                          "Must check which() before get()ing a union member.";
-              return _getIntField(1);
-            }
-
             public final boolean isNoSite() {
               return which() == Device.Package.PackagePin.Site.Which.NO_SITE;
             }
@@ -2397,11 +2388,20 @@ public final class DeviceResources {
               return org.capnproto.Void.VOID;
             }
 
+            public final boolean isSite() {
+              return which() == Device.Package.PackagePin.Site.Which.SITE;
+            }
+            public final int getSite() {
+              assert which() == Device.Package.PackagePin.Site.Which.SITE:
+                          "Must check which() before get()ing a union member.";
+              return _getIntField(2);
+            }
+
           }
 
           public enum Which {
-            SITE,
             NO_SITE,
+            SITE,
             _NOT_IN_SCHEMA,
           }
         }
@@ -2433,28 +2433,15 @@ public final class DeviceResources {
               super(segment, data, pointers, dataSize, pointerCount);
             }
             public Which which() {
-              switch(_getShortField(5)) {
-                case 0 : return Which.BEL;
-                case 1 : return Which.NO_BEL;
+              switch(_getShortField(3)) {
+                case 0 : return Which.NO_BEL;
+                case 1 : return Which.BEL;
                 default: return Which._NOT_IN_SCHEMA;
               }
             }
             public final Reader asReader() {
               return new Reader(segment, data, pointers, dataSize, pointerCount, 0x7fffffff);
             }
-            public final boolean isBel() {
-              return which() == Device.Package.PackagePin.Bel.Which.BEL;
-            }
-            public final int getBel() {
-              assert which() == Device.Package.PackagePin.Bel.Which.BEL:
-                          "Must check which() before get()ing a union member.";
-              return _getIntField(3);
-            }
-            public final void setBel(int value) {
-              _setShortField(5, (short)Device.Package.PackagePin.Bel.Which.BEL.ordinal());
-              _setIntField(3, value);
-            }
-
             public final boolean isNoBel() {
               return which() == Device.Package.PackagePin.Bel.Which.NO_BEL;
             }
@@ -2464,7 +2451,20 @@ public final class DeviceResources {
               return org.capnproto.Void.VOID;
             }
             public final void setNoBel(org.capnproto.Void value) {
-              _setShortField(5, (short)Device.Package.PackagePin.Bel.Which.NO_BEL.ordinal());
+              _setShortField(3, (short)Device.Package.PackagePin.Bel.Which.NO_BEL.ordinal());
+            }
+
+            public final boolean isBel() {
+              return which() == Device.Package.PackagePin.Bel.Which.BEL;
+            }
+            public final int getBel() {
+              assert which() == Device.Package.PackagePin.Bel.Which.BEL:
+                          "Must check which() before get()ing a union member.";
+              return _getIntField(3);
+            }
+            public final void setBel(int value) {
+              _setShortField(3, (short)Device.Package.PackagePin.Bel.Which.BEL.ordinal());
+              _setIntField(3, value);
             }
 
           }
@@ -2475,21 +2475,12 @@ public final class DeviceResources {
             }
 
             public Which which() {
-              switch(_getShortField(5)) {
-                case 0 : return Which.BEL;
-                case 1 : return Which.NO_BEL;
+              switch(_getShortField(3)) {
+                case 0 : return Which.NO_BEL;
+                case 1 : return Which.BEL;
                 default: return Which._NOT_IN_SCHEMA;
               }
             }
-            public final boolean isBel() {
-              return which() == Device.Package.PackagePin.Bel.Which.BEL;
-            }
-            public final int getBel() {
-              assert which() == Device.Package.PackagePin.Bel.Which.BEL:
-                          "Must check which() before get()ing a union member.";
-              return _getIntField(3);
-            }
-
             public final boolean isNoBel() {
               return which() == Device.Package.PackagePin.Bel.Which.NO_BEL;
             }
@@ -2499,11 +2490,20 @@ public final class DeviceResources {
               return org.capnproto.Void.VOID;
             }
 
+            public final boolean isBel() {
+              return which() == Device.Package.PackagePin.Bel.Which.BEL;
+            }
+            public final int getBel() {
+              assert which() == Device.Package.PackagePin.Bel.Which.BEL:
+                          "Must check which() before get()ing a union member.";
+              return _getIntField(3);
+            }
+
           }
 
           public enum Which {
-            BEL,
             NO_BEL,
+            BEL,
             _NOT_IN_SCHEMA,
           }
         }
@@ -4699,7 +4699,7 @@ public static final org.capnproto.SegmentReader b_e6303441bc30e80d =
    "\u0030\u0000\u0000\u0000\u0001\u0000\u0002\u0000" +
    "\u004c\u00d7\u0085\u004a\u0071\u0060\u00a9\u00fc" +
    "\u0000\u0000\u0007\u0000\u0001\u0000\u0002\u0000" +
-   "\u0004\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0002\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0015\u0000\u0000\u0000\u00aa\u0001\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
@@ -4714,34 +4714,34 @@ public static final org.capnproto.SegmentReader b_e6303441bc30e80d =
    "\u006b\u0061\u0067\u0065\u0050\u0069\u006e\u002e" +
    "\u0073\u0069\u0074\u0065\u0000\u0000\u0000\u0000" +
    "\u0008\u0000\u0000\u0000\u0003\u0000\u0004\u0000" +
-   "\u0000\u0000\u00ff\u00ff\u0001\u0000\u0000\u0000" +
+   "\u0000\u0000\u00ff\u00ff\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0001\u0000\u0001\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u0029\u0000\u0000\u0000\u002a\u0000\u0000\u0000" +
+   "\u0029\u0000\u0000\u0000\u003a\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0024\u0000\u0000\u0000\u0003\u0000\u0001\u0000" +
    "\u0030\u0000\u0000\u0000\u0002\u0000\u0001\u0000" +
-   "\u0001\u0000\u00fe\u00ff\u0000\u0000\u0000\u0000" +
+   "\u0001\u0000\u00fe\u00ff\u0002\u0000\u0000\u0000" +
    "\u0000\u0000\u0001\u0000\u0002\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u002d\u0000\u0000\u0000\u003a\u0000\u0000\u0000" +
+   "\u002d\u0000\u0000\u0000\u002a\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0028\u0000\u0000\u0000\u0003\u0000\u0001\u0000" +
    "\u0034\u0000\u0000\u0000\u0002\u0000\u0001\u0000" +
-   "\u0073\u0069\u0074\u0065\u0000\u0000\u0000\u0000" +
-   "\u0008\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u0008\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u006e\u006f\u0053\u0069\u0074\u0065\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0073\u0069\u0074\u0065\u0000\u0000\u0000\u0000" +
+   "\u0008\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0008\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" + "");
 public static final org.capnproto.SegmentReader b_de99aebdbcf60fff =
@@ -4751,7 +4751,7 @@ public static final org.capnproto.SegmentReader b_de99aebdbcf60fff =
    "\u0030\u0000\u0000\u0000\u0001\u0000\u0002\u0000" +
    "\u004c\u00d7\u0085\u004a\u0071\u0060\u00a9\u00fc" +
    "\u0000\u0000\u0007\u0000\u0001\u0000\u0002\u0000" +
-   "\u0005\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0003\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0015\u0000\u0000\u0000\u00a2\u0001\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
@@ -4766,34 +4766,34 @@ public static final org.capnproto.SegmentReader b_de99aebdbcf60fff =
    "\u006b\u0061\u0067\u0065\u0050\u0069\u006e\u002e" +
    "\u0062\u0065\u006c\u0000\u0000\u0000\u0000\u0000" +
    "\u0008\u0000\u0000\u0000\u0003\u0000\u0004\u0000" +
-   "\u0000\u0000\u00ff\u00ff\u0003\u0000\u0000\u0000" +
+   "\u0000\u0000\u00ff\u00ff\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0001\u0000\u0003\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u0029\u0000\u0000\u0000\"\u0000\u0000\u0000" +
+   "\u0029\u0000\u0000\u0000\u0032\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0024\u0000\u0000\u0000\u0003\u0000\u0001\u0000" +
    "\u0030\u0000\u0000\u0000\u0002\u0000\u0001\u0000" +
-   "\u0001\u0000\u00fe\u00ff\u0000\u0000\u0000\u0000" +
+   "\u0001\u0000\u00fe\u00ff\u0003\u0000\u0000\u0000" +
    "\u0000\u0000\u0001\u0000\u0004\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u002d\u0000\u0000\u0000\u0032\u0000\u0000\u0000" +
+   "\u002d\u0000\u0000\u0000\"\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0028\u0000\u0000\u0000\u0003\u0000\u0001\u0000" +
    "\u0034\u0000\u0000\u0000\u0002\u0000\u0001\u0000" +
-   "\u0062\u0065\u006c\u0000\u0000\u0000\u0000\u0000" +
-   "\u0008\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u0008\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u006e\u006f\u0042\u0065\u006c\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0062\u0065\u006c\u0000\u0000\u0000\u0000\u0000" +
+   "\u0008\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0008\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" + "");
 public static final org.capnproto.SegmentReader b_c8bd7533ae1db2ff =

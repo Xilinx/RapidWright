@@ -27,6 +27,7 @@ import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.Grade;
 import com.xilinx.rapidwright.device.Package;
 import com.xilinx.rapidwright.device.PackagePin;
 import com.xilinx.rapidwright.device.PIP;
@@ -570,9 +571,36 @@ public class DeviceResourcesVerifier {
                         throw new RuntimeException("Has BEL when no site is expected?");
                     }
                 } else {
+                    if(!packagePinObj.getSite().isSite()) {
+                        throw new RuntimeException("Has site when site is expected?");
+                    }
+                    if(!packagePinObj.getBel().isBel()) {
+                        throw new RuntimeException("Has BEL when site is expected?");
+                    }
+
                     expect(site.getName(), allStrings.get(packagePinObj.getSite().getSite()));
                     expect("PAD", allStrings.get(packagePinObj.getBel().getBel()));
                 }
+            }
+
+            Map<String, Integer> gradesMap = new HashMap<String, Integer>();
+            int i = 0;
+            for(Grade grade : pack.getGrades()) {
+                gradesMap.put(grade.getName(), i);
+                i += 1;
+            }
+
+            expect(pack.getGrades().length, gradesMap.size());
+            expect(pack.getGrades().length, packageObj.getGrades().size());
+
+            for(DeviceResources.Device.Package.Grade.Reader gradeObj : packageObj.getGrades()) {
+                String gradeName = allStrings.get(gradeObj.getName());
+                int gradeIndex = gradesMap.get(gradeName);
+                Grade grade = pack.getGrades()[gradeIndex];
+
+                expect(grade.getName(), gradeName);
+                expect(grade.getSpeedGrade(), allStrings.get(gradeObj.getSpeedGrade()));
+                expect(grade.getTemperatureGrade(), allStrings.get(gradeObj.getTemperatureGrade()));
             }
         }
     }
