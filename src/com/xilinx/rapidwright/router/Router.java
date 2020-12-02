@@ -1719,7 +1719,7 @@ public class Router extends AbstractRouter {
 				System.out.println("SINK: " + t.getName() + " " + t.getWireName(wire));
 			}
 			
-			Node node = new Node(t,wire);
+			Node node = Node.getNode(t,wire);
 			RouteNode n = new RouteNode(node.getTile(),node.getWire());
 			Queue<RouteNode> q = new LinkedList<RouteNode>();
 			visitedNodes = new HashSet<RouteNode>();
@@ -2109,7 +2109,7 @@ public class Router extends AbstractRouter {
 		int watchdog = 1000;
 		int wire = site.getTileWireIndexFromPinName(pinName);
 		if(wire == -1) return null; // Pin is not connected to anything (unbonded IO)
-		Node node = new Node(t,wire);
+		Node node = Node.getNode(t,wire);
 		RouteNode n = new RouteNode(node.getTile(),node.getWire());
 		Queue<RouteNode> q = new LinkedList<RouteNode>();
 		q.add(n);

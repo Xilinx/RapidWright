@@ -162,7 +162,7 @@ public class RouteThruHelper {
         for(Tile tile : rtHelper.device.getAllTiles()) {
             if(tile.getTileTypeEnum() == TileTypeEnum.INT) {
                 for(String wireName : tile.getWireNames()) {
-                    Node node = new Node(tile, wireName);
+                    Node node = Node.getNode(tile, wireName);
                     for(Node downhill : node.getAllDownhillNodes()) {
                         if(rtHelper.isRouteThru(node, downhill)) {
                             System.out.println(node + " " + downhill);

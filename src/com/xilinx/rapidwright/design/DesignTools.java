@@ -922,7 +922,7 @@ public class DesignTools {
 		// Create a map from nodes to PIPs
 		for(PIP pip : route){
 			for(int wireIndex : new int[]{pip.getStartWireIndex(), pip.getEndWireIndex()}){
-				Node curr = new Node(pip.getTile(), wireIndex);
+				Node curr = Node.getNode(pip.getTile(), wireIndex);
 				ArrayList<PIP> pips = conns.get(curr);
 				if(pips == null){
 					pips = new ArrayList<>();
@@ -957,8 +957,8 @@ public class DesignTools {
 				// Be careful to detect a cycle
 				if(!toRemove.contains(p)){
 					toRemove.add(p);
-					Node startNode = new Node(p.getTile(), p.getStartWireIndex()); 
-					q.add(curr.equals(startNode) ? startNode : new Node(p.getTile(), p.getEndWireIndex()));
+					Node startNode = p.getStartNode(); 
+					q.add(curr.equals(startNode) ? startNode : p.getEndNode());
 				}
 			}
 		}
@@ -1026,7 +1026,7 @@ public class DesignTools {
 						i.unrouteIntraSiteNet(site.getBELPin("HARD0GND", "0"), snk);
 						continue;
 					}
-					removeConnectedRouting(staticNet, new Node(pin.getTile(),pin.getConnectedTileWire()));
+					removeConnectedRouting(staticNet, Node.getNode(pin.getTile(),pin.getConnectedTileWire()));
 					i.unrouteIntraSiteNet(site.getBELPin(sitePinName), snk);
 				}
 			}

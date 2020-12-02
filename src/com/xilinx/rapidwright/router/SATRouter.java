@@ -321,8 +321,8 @@ public class SATRouter {
 		for(Net n : design.getNets()){
 			for(PIP p : n.getPIPs()){
 				if(pblock.containsTile(p.getTile())){
-					excludedNodes.add(new Node(p.getStartWire()));
-					excludedNodes.add(new Node(p.getEndWire()));
+					excludedNodes.add(p.getStartNode());
+					excludedNodes.add(p.getEndNode());
 				}
 			}
 		}
@@ -363,7 +363,7 @@ public class SATRouter {
 			for(Tile t : tiles){
 				for(int i=0; i < t.getWireCount(); i++){
 					if(IntentCode.isUltraScaleClocking(t, i)) continue;
-					Node n = new Node(t,i);					
+					Node n = Node.getNode(t,i);					
 					if(!includeNode(n)) continue;
 					if(reported.contains(n)) continue;
 					if(excludedNodes.contains(n)) continue;
@@ -373,7 +373,7 @@ public class SATRouter {
 						for(PIP p : w.getBackwardPIPs()){
 							if(p.isRouteThru()) continue;
 							String startWireName = p.getStartWireName();
-							Node start = new Node(w.getTile(),startWireName);
+							Node start = Node.getNode(w.getTile(),startWireName);
 							if(!currNodes.contains(start) && tiles.contains(start.getTile())){
 								bw.write(" " + start + (useWeightsOnNodes ? ":" + commonNodeWeight : ""));
 								currNodes.add(start);
@@ -407,7 +407,7 @@ public class SATRouter {
 					String pinName = lut.getSiteWireNameFromPhysicalPin("A" + (i+1));
 					int wire = lut.getSite().getTileWireIndexFromPinName(pinName);
 					wires[i] = new Wire(lut.getSite().getTile(), wire);
-					nodes[i] = new Node(wires[i]);
+					nodes[i] = Node.getNode(wires[i]);
 				}
 				for(int i=0; i < lutSize; i++){
 					bw.write(wires[i].toString());
@@ -534,8 +534,8 @@ public class SATRouter {
 				int rightBracket = line.indexOf(']');
 				String node0 = line.substring(2, comma-1);
 				String node1 = line.substring(comma+3, rightBracket-1);
-				Node n0 = new Node(node0,dev);
-				Node n1 = new Node(node1,dev);
+				Node n0 = Node.getNode(node0,dev);
+				Node n1 = Node.getNode(node1,dev);
 				if(!node1.equals(n1.toString())){
 					if(n0.equals(n1)) {
 						// No pin swapping, this is just a pass-thru
@@ -596,7 +596,7 @@ public class SATRouter {
 				boolean foundPIP = false;
 				outer: for(Wire w : n0.getAllWiresInNode()){
 					for(PIP p : w.getForwardPIPs()){
-						Node n2 = new Node(p.getEndWire());
+						Node n2 = p.getEndNode();
 						if(n1.equals(n2)){
 							PIP pip = new PIP(w.getTile(),w.getWireIndex(),p.getEndWireIndex());
 							pip.setIsPIPFixed(fixRouting);

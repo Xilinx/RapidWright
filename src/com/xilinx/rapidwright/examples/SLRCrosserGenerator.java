@@ -100,7 +100,7 @@ public class SLRCrosserGenerator {
 		int watchDog = 300;
 		while(!q.isEmpty()){
 			RouteNode curr = q.poll();
-			SitePin check = new Node(curr.getTile(),curr.getWire()).getSitePin();
+			SitePin check = Node.getNode(curr.getTile(),curr.getWire()).getSitePin();
 			if(check != null && check.getPinName().equals(targetPinName) && !check.getSite().equals(n.getSource().getSite())){
 				n.setPIPs(curr.getPIPsBackToSource());
 				return check;
@@ -289,7 +289,7 @@ public class SLRCrosserGenerator {
 		for(SitePinInst p : clk.getPins()){
 			if(p.isOutPin()) continue;
 			String wireName = p.getName().startsWith("TX") ? txClkWire : rxClkWire;
-			Node n = new Node(p.getSite().getIntTile(), p.getSite().getIntTile().getWireIndex(wireName));
+			Node n = Node.getNode(p.getSite().getIntTile(), p.getSite().getIntTile().getWireIndex(wireName));
 			RouteNode rn = new RouteNode(n.getTile(), n.getWire());
 			ArrayList<SitePinInst> sinks = lcbMappings.get(rn);
 			if(sinks == null){

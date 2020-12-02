@@ -330,7 +330,7 @@ public class RouteNode{
 	}
 	
 	public RouteNode getBaseWire(){
-		Node n = new Node(tile,wire);
+		Node n = Node.getNode(tile,wire);
 		return new RouteNode(n);
 	}
 	
