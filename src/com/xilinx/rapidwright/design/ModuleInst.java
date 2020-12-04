@@ -254,6 +254,14 @@ public class ModuleInst{
 		return place(newAnchorSite, false);
 	}
 	
+	/**
+	 * Places the module instance on the module's anchor site (original location of the module).  
+	 * This is the same as place(getModule().getAnchor().getSite()). 
+	 * @return True if the placement was successful, false otherwise.
+	 */
+	public boolean placeOnOriginalAnchor() {
+		return place(module.getAnchor().getSite(), false);
+	}
 	
 	/**
 	 * Places the module instance anchor at the newAnchorSite as well as all other 
