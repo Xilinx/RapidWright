@@ -1,3 +1,36 @@
+============= RapidWright 2020.1.6-beta released on 2020-12-04 ================
+Notes:
+ * Fixes Issue #104 - NPE for Node.isTied() issue.  
+ * Fixes Issue #105 (and Issue #63) - NPE and missing Nodes for Wire.getNode()
+ * As part of the fix for #105/#63, a Node cache is constructed behind
+   the API for the first call to an uncommon wire object.
+ * Deprecates all Node constructors and replaces with a Node.getNode()
+   equivalent also adds a sentinel "Invalid" Node for bad nodes on construction.
+ - API Additions:
+   - com.xilinx.rapidwright.device.BEL "public boolean isGndSource()"
+   - com.xilinx.rapidwright.device.BEL "public boolean isVccSource()"
+   - com.xilinx.rapidwright.device.BEL "public boolean canInvert()"
+   - com.xilinx.rapidwright.device.Node "public Node getNode(RouteNode routeNode)"
+   - com.xilinx.rapidwright.device.Node "public Node getNode(Tile tile, int wire)"
+   - com.xilinx.rapidwright.device.Node "public Node getNode(Wire wire)"
+   - com.xilinx.rapidwright.device.Node "public Node getNode(Tile tile, String wireName)"
+   - com.xilinx.rapidwright.device.Node "public Node getNode(String nodeName, Device dev)"
+   - com.xilinx.rapidwright.device.Node "public boolean isInvalidNode()"
+   - com.xilinx.rapidwright.device.Node "public IntentCode getIntentCode()"
+   - com.xilinx.rapidwright.device.Node "public IntentCode hasIntentCode(IntentCode intentCode)"
+ - API Modifications:
+   - com.xilinx.rapidwright.design.Cell "public Map<String,String> getPinMappingsL2P()"
+     --> Changed return type: "public Map<String,Set<String>> getPinMappingsL2P()"
+   - com.xilinx.rapidwright.design.Cell "public List<String> getAllPhysicalPinMappings(String logicalPin)"
+     --> Changed return type: "public Set<String> getAllPhysicalPinMappings(String logicalPin)"
+ - API Deprecations:
+   - com.xilinx.rapidwright.device.Node "public Node(RouteNode routeNode)"
+   - com.xilinx.rapidwright.device.Node "public Node(Tile tile,int wire)"
+   - com.xilinx.rapidwright.device.Node "public Node(Wire wire)"
+   - com.xilinx.rapidwright.device.Node "public Node(Tile tile, String wireName)"
+   - com.xilinx.rapidwright.device.Node "public Node(String nodeName, Device dev)"
+
+
 ============= RapidWright 2020.1.5-beta released on 2020-11-13 ================
 Notes:
  * Fixes a bug with incorrect SRL16* pin mappings on Series 7 and
