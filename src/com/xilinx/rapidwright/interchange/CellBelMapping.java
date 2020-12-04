@@ -26,7 +26,7 @@ class CellBelMapping {
         private Map<Map.Entry<SiteTypeEnum, String>, Map<String, String>> commonMaps;
         private Map<Map.Entry<SiteTypeEnum, String>, Map<String, Map<String, String>>> parameterMaps;
 
-        private Map<String, String> readPins(Enumerator<String> allStrings, StructList.Reader<CellBelPinEntry.Reader> pins) {
+        private Map<String, String> readPins(String cell, Enumerator<String> allStrings, StructList.Reader<CellBelPinEntry.Reader> pins) {
             Map<String, String> pinMap = new HashMap<String, String>();
 
             for(CellBelPinEntry.Reader pin : pins) {
@@ -35,8 +35,8 @@ class CellBelMapping {
                 String otherCellPin = pinMap.get(belPin);
                 if(otherCellPin != null) {
                     throw new RuntimeException(String.format(
-                                "Duplicate BEL pin entry '%s'",
-                                otherCellPin));
+                                "Duplicate BEL pin entry '%s' for '%s', '%s' <-> '%s'",
+                                otherCellPin, cell, cellPin, belPin));
                 }
                 pinMap.put(belPin, cellPin);
             }
@@ -56,13 +56,13 @@ class CellBelMapping {
             }
         }
 
-        public CellBelPinMapping(Enumerator<String> allStrings, Device.CellBelMapping.Reader cellBelMap) {
+        public CellBelPinMapping(String cell, Enumerator<String> allStrings, Device.CellBelMapping.Reader cellBelMap) {
             compatiblePlacements = new HashMap<SiteTypeEnum, Set<String>>();
             commonMaps = new HashMap<Map.Entry<SiteTypeEnum, String>, Map<String, String>>();
             parameterMaps = new HashMap<Map.Entry<SiteTypeEnum, String>, Map<String, Map<String, String>>>();
 
             for(CommonCellBelPinMaps.Reader commonPin : cellBelMap.getCommonPins()) {
-                Map<String, String> pins = readPins(allStrings, commonPin.getPins());
+                Map<String, String> pins = readPins(cell, allStrings, commonPin.getPins());
 
                 for(SiteTypeBelEntry.Reader entry : commonPin.getSiteTypes()) {
                     SiteTypeEnum siteType = SiteTypeEnum.valueOf(allStrings.get(entry.getSiteType()));
@@ -86,7 +86,7 @@ class CellBelMapping {
             }
 
             for(ParameterCellBelPinMaps.Reader parameterPin : cellBelMap.getParameterPins()) {
-                Map<String, String> pins = readPins(allStrings, parameterPin.getPins());
+                Map<String, String> pins = readPins(cell, allStrings, parameterPin.getPins());
 
                 for(ParameterSiteTypeBelEntry.Reader entry : parameterPin.getParametersSiteTypes()) {
                     SiteTypeEnum siteType = SiteTypeEnum.valueOf(allStrings.get(entry.getSiteType()));
@@ -177,7 +177,7 @@ class CellBelMapping {
                             cell));
             }
 
-            map.put(cell, new CellBelPinMapping(allStrings, cellBelMap));
+            map.put(cell, new CellBelPinMapping(cell, allStrings, cellBelMap));
         }
     }
 

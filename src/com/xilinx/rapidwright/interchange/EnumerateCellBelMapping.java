@@ -424,7 +424,7 @@ public class EnumerateCellBelMapping {
         }
     };
 
-    private static class StringCompare implements Comparator<String> {
+    public static class StringCompare implements Comparator<String> {
         @Override
         public int compare(String a, String b) {
             return a.compareTo(b);
@@ -626,9 +626,10 @@ public class EnumerateCellBelMapping {
 
                     HashSet<Map.Entry<String, String>> pinMapping = new HashSet<Map.Entry<String, String>>();
 
-                    for(Map.Entry<String, String> pinMap : physCell.getPinMappingsL2P().entrySet()) {
-                        pinMapping.add(pinMap);
-                    }
+                    // TODO: Disabled because of https://github.com/Xilinx/RapidWright/issues/101
+                    //for(Map.Entry<String, String> pinMap : physCell.getPinMappingsL2P().entrySet()) {
+                    //    pinMapping.add(pinMap);
+                    //}
 
                     for(Map.Entry<String, String> pinMap : physCell.getPinMappingsP2L().entrySet()) {
                         pinMapping.add(new AbstractMap.SimpleEntry<String, String>(pinMap.getValue(), pinMap.getKey()));
@@ -666,13 +667,26 @@ public class EnumerateCellBelMapping {
         Map<SiteTypeEnum, List<Site>> siteMap = EnumerateCellBelMapping.createSiteMap(device);
 
         // Count how many cells need mapping.
-        int count = prims.getCells().size();
+        EDIFLibrary macros = Design.getMacroPrimitives(device.getSeries());
+        Set<String> macroCells = new HashSet<String>();
+        for(EDIFCell cell : macros.getCells()) {
+            macroCells.add(cell.getName());
+        }
+
+        int count = 0;
+        for(EDIFCell cell : prims.getCells()) {
+            if(!macroCells.contains(cell.getName())) {
+                count += 1;
+            }
+        }
 
         int i = 0;
         StructList.Builder<CellBelMapping.Builder> cellMapping = devBuilder.initCellBelMap(count);
         for(EDIFCell cell : prims.getCells()) {
-            populateCellBelPin(allStrings, siteMap, cellMapping.get(i), topLevelCell, cell, design);
-            i += 1;
+            if(!macroCells.contains(cell.getName())) {
+                populateCellBelPin(allStrings, siteMap, cellMapping.get(i), topLevelCell, cell, design);
+                i += 1;
+            }
         }
     }
 

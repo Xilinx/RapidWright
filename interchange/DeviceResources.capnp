@@ -14,16 +14,18 @@ using TileTypeSiteTypeIdx = UInt32;
 
 struct Device {
 
-  name         @0 : Text;
-  strList      @1 : List(Text);
-  siteTypeList @2 : List(SiteType);
-  tileTypeList @3 : List(TileType);
-  tileList     @4 : List(Tile);
-  wires        @5 : List(Wire);
-  nodes        @6 : List(Node);
-  primLibs     @7 : Dir.Netlist; # Netlist libraries of Unisim primitives and macros
-  exceptionMap @8 : List(PrimToMacroExpansion); # Prims to macros expand w/same name, except these
-  cellBelMap   @9 : List(CellBelMapping);
+  name            @0 : Text;
+  strList         @1 : List(Text);
+  siteTypeList    @2 : List(SiteType);
+  tileTypeList    @3 : List(TileType);
+  tileList        @4 : List(Tile);
+  wires           @5 : List(Wire);
+  nodes           @6 : List(Node);
+  primLibs        @7 : Dir.Netlist; # Netlist libraries of Unisim primitives and macros
+  exceptionMap    @8 : List(PrimToMacroExpansion); # Prims to macros expand w/same name, except these
+  cellBelMap      @9 : List(CellBelMapping);
+  cellInversions @10 : Void;
+  packages       @11 : List(Package);
 
   #######################################
   # Placement definition objects
@@ -203,5 +205,28 @@ struct Device {
     parametersSiteTypes @0 : List(ParameterSiteTypeBelEntry);
     pins                @1 : List(CellBelPinEntry);
   }
-}
 
+  struct Package {
+    struct PackagePin {
+        packagePin @0 : StringIdx;
+        site : union {
+            noSite     @1 : Void;
+            site       @2 : StringIdx;
+        }
+        bel : union {
+            noBel      @3 : Void;
+            bel        @4 : StringIdx;
+        }
+    }
+
+    struct Grade {
+        name             @0 : StringIdx;
+        speedGrade       @1 : StringIdx;
+        temperatureGrade @2 : StringIdx;
+    }
+
+    name        @0 : StringIdx;
+    packagePins @1 : List(PackagePin);
+    grades      @2 : List(Grade);
+  }
+}

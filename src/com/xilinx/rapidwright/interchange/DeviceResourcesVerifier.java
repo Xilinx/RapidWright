@@ -27,6 +27,9 @@ import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.Grade;
+import com.xilinx.rapidwright.device.Package;
+import com.xilinx.rapidwright.device.PackagePin;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.PIPType;
 import com.xilinx.rapidwright.device.PIPWires;
@@ -91,7 +94,7 @@ public class DeviceResourcesVerifier {
             String str = reader.get(i).toString();
             allStrings.addObject(str);
         }
-        
+
         // Create a lookup map for tile types
         HashMap<String,TileType.Reader> tileTypeMap = new HashMap<String, TileType.Reader>();
         HashMap<String, StructList.Reader<DeviceResources.Device.PIP.Reader>> ttPIPMap = new HashMap<>();
@@ -220,7 +223,7 @@ public class DeviceResourcesVerifier {
                 if(pipReader.getBuffered21() != isBuffered21) {
                     throw new RuntimeException("PIP Buffered21 mismatch " + pip);
                 }
-                
+
                 if(pipReader.hasPseudoCells()) {
                     PseudoPIPHelper pipHelper = PseudoPIPHelper.getPseudoPIPHelper(pip);
                     List<BELPin> goldBELPins = pipHelper.getUsedBELPins();
@@ -237,22 +240,22 @@ public class DeviceResourcesVerifier {
                             BELPin testPin = bel.getPin(pinName);
                             foundBELPins.add(testPin);
                         }
-                        
+
                     }
-                    
+
                     for(BELPin goldBELPin : goldBELPins) {
                         if(goldBELPin.isSitePort()) continue;
                         if(!foundBELPins.remove(goldBELPin)) {
-                            throw new RuntimeException("ERROR: BELPin " + goldBELPin.toString() 
-                                + " not found for pseudo PIP " + pipHelper.getTileTypeEnum() +"." 
+                            throw new RuntimeException("ERROR: BELPin " + goldBELPin.toString()
+                                + " not found for pseudo PIP " + pipHelper.getTileTypeEnum() +"."
                                     + pipHelper.getPseudoPIPName());
                         }
                     }
                     if(foundBELPins.size() > 0) {
-                        throw new RuntimeException("ERROR: Found unknown BELPins "+ foundBELPins 
+                        throw new RuntimeException("ERROR: Found unknown BELPins "+ foundBELPins
                                 +" for pseudo PIP " + pipHelper.getPseudoPIPName() + " ");
                     }
-                    
+
                 }
             }
         }
@@ -303,6 +306,7 @@ public class DeviceResourcesVerifier {
         }
 
         verifyCellBelPinMaps(allStrings, dReader, design);
+        verifyPackages(allStrings, dReader, device);
 
         return true;
     }
@@ -405,10 +409,28 @@ public class DeviceResourcesVerifier {
         List<Map.Entry<SiteTypeEnum, String>> entries = new ArrayList<>();
 
         Map<SiteTypeEnum,Set<String>> sites = physCell.getCompatiblePlacements();
+        Set<SiteTypeEnum> siteTypes = new HashSet<SiteTypeEnum>();
+        siteTypes.addAll(sites.keySet());
+        siteTypes.retainAll(siteMap.keySet());
+
         Map<SiteTypeEnum,Set<String>> sitesFromDev = cellBelMap.getCompatiblePlacements(cell.getName());
 
-        expect(sites.size(), sitesFromDev.size());
-        // TODO: Check rest of getCompatiblePlacements
+        expect(siteTypes.size(), sitesFromDev.size());
+        if(!siteTypes.equals(sitesFromDev.keySet())) {
+            throw new RuntimeException(String.format(
+                        "Cell %s -> set of site types does not match",
+                        cell.getName()));
+        }
+
+        for(SiteTypeEnum siteType : siteTypes) {
+            Set<String> bels = sites.get(siteType);
+            Set<String> belsFromDev = sitesFromDev.get(siteType);
+            if(!bels.equals(belsFromDev)) {
+                throw new RuntimeException(String.format(
+                            "Cell %s -> BELs for site type %s doesn't match",
+                            cell.getName(), siteType.name()));
+            }
+        }
 
         for (Map.Entry<SiteTypeEnum,Set<String>> site : sites.entrySet()) {
             for(String bel : site.getValue()) {
@@ -436,27 +458,35 @@ public class DeviceResourcesVerifier {
                         bel,
                         parameterArray);
 
+                String parametersStr = new String();
+                for(String parameter : parameters) {
+                    parametersStr = parametersStr + " " + parameter;
+                }
+
                 for(Site site : siteMap.get(siteType)) {
                     SiteInst siteInst = design.createSiteInst("test_site", siteType, site);
                     physCell = design.createAndPlaceCell("test", Unisim.valueOf(cell.getName()), site.getName() + "/" + bel, parameterArray);
 
-                    HashSet<Map.Entry<String, String>> pinMapping = new HashSet<Map.Entry<String, String>>();
+                    Map<String, String> pinMapping = new HashMap<String, String>();
 
-                    for(Map.Entry<String, String> pinMap : physCell.getPinMappingsL2P().entrySet()) {
-                        pinMapping.add(pinMap);
-                    }
+                    // TODO: Disabled because of https://github.com/Xilinx/RapidWright/issues/101
+                    //for(Map.Entry<String, String> pinMap : physCell.getPinMappingsL2P().entrySet()) {
+                    //    pinMapping.add(pinMap);
+                    //}
 
                     for(Map.Entry<String, String> pinMap : physCell.getPinMappingsP2L().entrySet()) {
-                        pinMapping.add(new AbstractMap.SimpleEntry<String, String>(pinMap.getValue(), pinMap.getKey()));
+                        pinMapping.put(pinMap.getKey(), pinMap.getValue());
                     }
 
-                    expect(pinMappingFromDev.size(), pinMapping.size());
-                    // TODO: Check rest of pin map.
+                    if(!pinMapping.equals(pinMappingFromDev)) {
+                        throw new RuntimeException(String.format(
+                            "Cell %s -> BEL pins for site type %s and parameters %s doesn't match",
+                            cell.getName(), siteType.name(), parametersStr));
+                    }
 
                     design.removeCell(physCell);
                     design.removeSiteInst(siteInst);
                     topLevelCell.removeCellInst("test");
-                    design.getTopEDIFCell().removeCellInst("test");
                 }
             }
         }
@@ -478,9 +508,100 @@ public class DeviceResourcesVerifier {
 
         Map<SiteTypeEnum, List<Site>> siteMap = EnumerateCellBelMapping.createSiteMap(design.getDevice());
 
+        EDIFLibrary macros = Design.getMacroPrimitives(design.getDevice().getSeries());
+        Set<String> macroCells = new HashSet<String>();
+        for(EDIFCell cell : macros.getCells()) {
+            macroCells.add(cell.getName());
+        }
+
         CellBelMapping cellBelMap = new CellBelMapping(allStrings, dReader.getCellBelMap());
         for(EDIFCell cell : prims.getCells()) {
-            verifyCellBelPinMap(siteMap, cellBelMap, topLevelCell, cell, design);
+            if(!macroCells.contains(cell.getName())) {
+                verifyCellBelPinMap(siteMap, cellBelMap, topLevelCell, cell, design);
+            }
+        }
+    }
+
+    static private void verifyPackages(Enumerator<String> allStrings, DeviceResources.Device.Reader dReader, Device device) {
+        StructList.Reader<DeviceResources.Device.Package.Reader> packagesObj = dReader.getPackages();
+        Set<String> packages = device.getPackages();
+        expect(packages.size(), packagesObj.size());
+
+        Set<String> packagesFromReader = new HashSet<String>();
+        for(DeviceResources.Device.Package.Reader packageObj : packagesObj) {
+            String packageName = allStrings.get(packageObj.getName());
+            packagesFromReader.add(packageName);
+        }
+
+        if(!packagesFromReader.equals(packages)) {
+            throw new RuntimeException("Packages doesn't match");
+        }
+
+        for(DeviceResources.Device.Package.Reader packageObj : packagesObj) {
+            String packageName = allStrings.get(packageObj.getName());
+            Package pack = device.getPackage(packageName);
+
+            expect(pack.getName(), packageName);
+
+            Set<String> packagePinsFromReader = new HashSet<String>();
+            for(DeviceResources.Device.Package.PackagePin.Reader packagePinObj : packageObj.getPackagePins()) {
+                packagePinsFromReader.add(allStrings.get(packagePinObj.getPackagePin()));
+            }
+
+            Set<String> packagePins = new HashSet<String>();
+            packagePins.addAll(pack.getPackagePinMap().keySet());
+
+            expect(packagePins.size(), packagePinsFromReader.size());
+            if(!packagePins.equals(packagePinsFromReader)) {
+                throw new RuntimeException("Package pins doesn't match");
+            }
+
+            for(DeviceResources.Device.Package.PackagePin.Reader packagePinObj : packageObj.getPackagePins()) {
+                String packagePinName = allStrings.get(packagePinObj.getPackagePin());
+                PackagePin packagePin = pack.getPackagePinMap().get(packagePinName);
+
+                expect(packagePin.getName(), packagePinName);
+
+                Site site = packagePin.getSite();
+                if(site == null) {
+                    if(packagePinObj.getSite().isSite()) {
+                        throw new RuntimeException("Has site when no site is expected?");
+                    }
+                    if(packagePinObj.getBel().isBel()) {
+                        throw new RuntimeException("Has BEL when no site is expected?");
+                    }
+                } else {
+                    if(!packagePinObj.getSite().isSite()) {
+                        throw new RuntimeException("Has site when site is expected?");
+                    }
+                    if(!packagePinObj.getBel().isBel()) {
+                        throw new RuntimeException("Has BEL when site is expected?");
+                    }
+
+                    expect(site.getName(), allStrings.get(packagePinObj.getSite().getSite()));
+                    expect("PAD", allStrings.get(packagePinObj.getBel().getBel()));
+                }
+            }
+
+            Map<String, Integer> gradesMap = new HashMap<String, Integer>();
+            int i = 0;
+            for(Grade grade : pack.getGrades()) {
+                gradesMap.put(grade.getName(), i);
+                i += 1;
+            }
+
+            expect(pack.getGrades().length, gradesMap.size());
+            expect(pack.getGrades().length, packageObj.getGrades().size());
+
+            for(DeviceResources.Device.Package.Grade.Reader gradeObj : packageObj.getGrades()) {
+                String gradeName = allStrings.get(gradeObj.getName());
+                int gradeIndex = gradesMap.get(gradeName);
+                Grade grade = pack.getGrades()[gradeIndex];
+
+                expect(grade.getName(), gradeName);
+                expect(grade.getSpeedGrade(), allStrings.get(gradeObj.getSpeedGrade()));
+                expect(grade.getTemperatureGrade(), allStrings.get(gradeObj.getTemperatureGrade()));
+            }
         }
     }
 }

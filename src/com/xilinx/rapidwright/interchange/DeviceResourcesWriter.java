@@ -7,6 +7,8 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.LinkedHashMap;
 import java.util.Map.Entry;
 
 import org.capnproto.MessageBuilder;
@@ -16,6 +18,7 @@ import org.capnproto.StructList;
 import org.capnproto.Text;
 import org.capnproto.TextList;
 import org.capnproto.PrimitiveList.Int;
+import org.capnproto.Void;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.SiteInst;
@@ -25,6 +28,9 @@ import com.xilinx.rapidwright.device.BELClass;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Node;
+import com.xilinx.rapidwright.device.Package;
+import com.xilinx.rapidwright.device.Grade;
+import com.xilinx.rapidwright.device.PackagePin;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.PIPType;
 import com.xilinx.rapidwright.device.PIPWires;
@@ -185,6 +191,9 @@ public class DeviceResourcesWriter {
 
         t.stop().start("Cell <-> BEL pin map");
         EnumerateCellBelMapping.populateAllPinMappings(part, device, devBuilder, allStrings);
+
+        t.stop().start("Packages");
+        populatePackages(allStrings, device, devBuilder);
 
         t.stop().start("Strings");
         writeAllStringsToBuilder(devBuilder);
@@ -540,4 +549,48 @@ public class DeviceResourcesWriter {
         }
     }
 
+    private static void populatePackages(Enumerator<String> allStrings, Device device, DeviceResources.Device.Builder devBuilder) {
+        Set<String> packages = device.getPackages();
+        List<String> packagesList = new ArrayList<String>();
+        packagesList.addAll(packages);
+        packagesList.sort(new EnumerateCellBelMapping.StringCompare());
+        StructList.Builder<DeviceResources.Device.Package.Builder> packagesObj = devBuilder.initPackages(packages.size());
+
+        for(int i = 0; i < packages.size(); ++i) {
+            Package pack = device.getPackage(packagesList.get(i));
+            DeviceResources.Device.Package.Builder packageBuilder = packagesObj.get(i);
+
+            packageBuilder.setName(allStrings.getIndex(pack.getName()));
+
+            LinkedHashMap<String,PackagePin> packagePinMap = pack.getPackagePinMap();
+            List<String> packagePins = new ArrayList<String>();
+            packagePins.addAll(packagePinMap.keySet());
+            packagePins.sort(new EnumerateCellBelMapping.StringCompare());
+
+            StructList.Builder<DeviceResources.Device.Package.PackagePin.Builder> packagePinsObj = packageBuilder.initPackagePins(packagePins.size());
+            for(int j = 0; j < packagePins.size(); ++j) {
+                PackagePin packagePin = packagePinMap.get(packagePins.get(j));
+                DeviceResources.Device.Package.PackagePin.Builder packagePinObj = packagePinsObj.get(j);
+
+                packagePinObj.setPackagePin(allStrings.getIndex(packagePin.getName()));
+                Site site = packagePin.getSite();
+                if(site != null) {
+                    packagePinObj.initSite().setSite(allStrings.getIndex(site.getName()));
+                    packagePinObj.initBel().setBel(allStrings.getIndex("PAD"));
+                } else {
+                    packagePinObj.initSite().setNoSite(Void.VOID);
+                    packagePinObj.initBel().setNoBel(Void.VOID);
+                }
+            }
+
+            StructList.Builder<DeviceResources.Device.Package.Grade.Builder> grades = packageBuilder.initGrades(pack.getGrades().length);
+            for(int j = 0; j < pack.getGrades().length; ++j) {
+                Grade grade = pack.getGrades()[j];
+                DeviceResources.Device.Package.Grade.Builder gradeObj = grades.get(j);
+                gradeObj.setName(allStrings.getIndex(grade.getName()));
+                gradeObj.setSpeedGrade(allStrings.getIndex(grade.getSpeedGrade()));
+                gradeObj.setTemperatureGrade(allStrings.getIndex(grade.getTemperatureGrade()));
+            }
+        }
+    }
 }
