@@ -120,14 +120,16 @@ public class DeviceResourcesVerifier {
             DeviceResources.Device.Tile.Reader tileReader = tilesReader.get(i);
             String tileName = allStrings.get(tileReader.getName());
             Tile tile = device.getTile(tileName);
-            expect(tile.getTileTypeEnum().name(), allStrings.get(tileReader.getType()));
+            Integer tileTypeIndex = tileReader.getType();
+            TileType.Reader ttReader = dReader.getTileTypeList().get(tileTypeIndex);
+            String tileTypeName = allStrings.get(ttReader.getName());
+            expect(tile.getTileTypeEnum().name(), tileTypeName);
             expect(tile.getRow(), tileReader.getRow());
             expect(tile.getColumn(), tileReader.getCol());
 
             expect(tile.getTilePatternIndex(), tileReader.getTilePatIdx());
 
             // Verify Tile Types
-            String tileTypeName = allStrings.get(tileReader.getType());
             TileType.Reader tileType = tileTypeMap.get(tileTypeName);
             expect(tile.getTileTypeEnum().name(), allStrings.get(tileType.getName()));
             expect(tile.getWireCount(), tileType.getWires().size());
