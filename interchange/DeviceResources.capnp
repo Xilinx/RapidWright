@@ -262,6 +262,12 @@ struct Device {
         constant     @3 : ConstantType;
     }
 
+    struct NodeConstantSource {
+        tile     @0 : StringIdx;
+        wire     @1 : StringIdx;
+        constant @2 : ConstantType;
+    }
+
     # When either constant signal can be routed to an input site pin, which
     # constant should be used by default?
     #
@@ -281,5 +287,11 @@ struct Device {
     #
     # Tools can always generate a constant source from a LUT BEL type.
     siteSources            @2 : List(SiteConstantSource);
+
+    # Most tied nodes are handled under TileType.constants, however in some
+    # exceptional cases, the tying is inconsistent between tile types.
+    # nodeSources should be used to explicitly list nodes that fall into this
+    # case.
+    nodeSources            @3 : List(NodeConstantSource);
   }
 }

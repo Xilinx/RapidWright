@@ -27,6 +27,7 @@ import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.Constants;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.ConstantType;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.Constants.SiteConstantSource;
+import com.xilinx.rapidwright.interchange.DeviceResources.Device.Constants.NodeConstantSource;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.WireConstantSources;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.TileType;
 import com.xilinx.rapidwright.interchange.Enumerator;
@@ -37,12 +38,16 @@ public class ConstantDefinitions {
     private Map<Map.Entry<SiteTypeEnum, String>, String> gndBels;
     private Set<Map.Entry<TileTypeEnum, Integer>> vccWires;
     private Set<Map.Entry<TileTypeEnum, Integer>> gndWires;
+    private Set<Map.Entry<String, String>> exceptionalVccNodes;
+    private Set<Map.Entry<String, String>> exceptionalGndNodes;
 
     public ConstantDefinitions(Enumerator<String> allStrings, Constants.Reader reader, Map<TileTypeEnum, TileType.Reader> tileTypes) {
         vccBels = new HashMap<Map.Entry<SiteTypeEnum, String>, String>();
         gndBels = new HashMap<Map.Entry<SiteTypeEnum, String>, String>();
         vccWires = new HashSet<Map.Entry<TileTypeEnum, Integer>>();
         gndWires = new HashSet<Map.Entry<TileTypeEnum, Integer>>();
+        exceptionalVccNodes = new HashSet<Map.Entry<String, String>>();
+        exceptionalGndNodes = new HashSet<Map.Entry<String, String>>();
 
         for(SiteConstantSource.Reader source : reader.getSiteSources()) {
             String siteType = allStrings.get(source.getSiteType());
@@ -55,6 +60,20 @@ public class ConstantDefinitions {
                 vccBels.put(new AbstractMap.SimpleEntry<SiteTypeEnum, String>(siteTypeEnum, bel), belPin);
             } else if(constant == ConstantType.GND) {
                 gndBels.put(new AbstractMap.SimpleEntry<SiteTypeEnum, String>(siteTypeEnum, bel), belPin);
+            } else {
+                throw new RuntimeException("Unexpected value of constant " + constant.name());
+            }
+        }
+
+        for(NodeConstantSource.Reader source : reader.getNodeSources()) {
+            String tile = allStrings.get(source.getTile());
+            String wire = allStrings.get(source.getWire());
+
+            ConstantType constant = source.getConstant();
+            if(constant == ConstantType.VCC) {
+                exceptionalVccNodes.add(new AbstractMap.SimpleEntry<String, String>(tile, wire));
+            } else if(constant == ConstantType.GND) {
+                exceptionalGndNodes.add(new AbstractMap.SimpleEntry<String, String>(tile, wire));
             } else {
                 throw new RuntimeException("Unexpected value of constant " + constant.name());
             }
@@ -121,6 +140,12 @@ public class ConstantDefinitions {
     }
 
     public boolean isNodeTiedVcc(Node node) {
+        Tile tile = node.getTile();
+        Map.Entry<String, String> key = new AbstractMap.SimpleEntry<String, String>(tile.getName(), node.getWireName());
+        if(exceptionalVccNodes.contains(key)) {
+            return true;
+        }
+
         for(Wire wire : node.getAllWiresInNode()) {
             TileTypeEnum tileType = wire.getTile().getTileTypeEnum();
             boolean found = vccWires.contains(new AbstractMap.SimpleEntry<TileTypeEnum, Integer>(tileType, wire.getWireIndex()));
@@ -132,6 +157,12 @@ public class ConstantDefinitions {
     }
 
     public boolean isNodeTiedGnd(Node node) {
+        Tile tile = node.getTile();
+        Map.Entry<String, String> key = new AbstractMap.SimpleEntry<String, String>(tile.getName(), node.getWireName());
+        if(exceptionalGndNodes.contains(key)) {
+            return true;
+        }
+
         for(Wire wire : node.getAllWiresInNode()) {
             TileTypeEnum tileType = wire.getTile().getTileTypeEnum();
             boolean found = gndWires.contains(new AbstractMap.SimpleEntry<TileTypeEnum, Integer>(tileType, wire.getWireIndex()));
@@ -187,11 +218,21 @@ public class ConstantDefinitions {
 
             if(node.isTied()) {
                 if(node.isTiedToGnd() != constants.isNodeTiedGnd(node)) {
-                    throw new RuntimeException(String.format("Tile %s node %s GND tie mismatch!", tile.getName(), node.getWireName()));
+                    throw new RuntimeException(String.format("Tile %s node %s GND tie mismatch! %b != %b",
+                                tile.getName(),
+                                node.getWireName(),
+                                node.isTiedToGnd(),
+                                constants.isNodeTiedGnd(node)
+                                ));
                 }
 
                 if(node.isTiedToVcc() != constants.isNodeTiedVcc(node)) {
-                    throw new RuntimeException(String.format("Tile %s node %s GND tie mismatch!", tile.getName(), node.getWireName()));
+                    throw new RuntimeException(String.format("Tile %s node %s GND tie mismatch! %b != %b",
+                                tile.getName(),
+                                node.getWireName(),
+                                node.isTiedToVcc(),
+                                constants.isNodeTiedVcc(node)
+                                ));
                 }
             }
         }
@@ -276,30 +317,31 @@ public class ConstantDefinitions {
     public static void writeTiedWires(Enumerator<String> allStrings, Device device, Constants.Builder builder, Map<TileTypeEnum, TileType.Builder> tileTypes) {
         Map<TileTypeEnum, Set<Integer>> tileTiedWires = getTiedWires(device);
 
-        Map<TileTypeEnum, List<Integer>> tiedVccWires = new HashMap<TileTypeEnum, List<Integer>>();
-        Map<TileTypeEnum, List<Integer>> tiedGndWires = new HashMap<TileTypeEnum, List<Integer>>();
+        Map<TileTypeEnum, Set<Integer>> tiedVccWires = new HashMap<TileTypeEnum, Set<Integer>>();
+        Map<TileTypeEnum, Set<Integer>> tiedGndWires = new HashMap<TileTypeEnum, Set<Integer>>();
 
-        for(Map.Entry<TileTypeEnum, Set<Integer>> entry : tileTiedWires.entrySet()) {
-            TileTypeEnum tileType = entry.getKey();
-            Set<Integer> wires = entry.getValue();
-
-            Tile tile = null;
-            for(Tile aTile : device.getAllTiles()) {
-                if(aTile.getTileTypeEnum() == tileType) {
-                    tile = aTile;
-                    break;
-                }
-            }
-            if(tile == null) {
-                throw new RuntimeException("No tile found for tile type " + tileType.name());
+        for(Tile tile : device.getAllTiles()) {
+            TileTypeEnum tileType = tile.getTileTypeEnum();
+            if(!tileTiedWires.containsKey(tileType)) {
+                continue;
             }
 
-            List<Integer> vccWires = new ArrayList<Integer>();
-            List<Integer> gndWires = new ArrayList<Integer>();
+            if(!tiedVccWires.containsKey(tileType)) {
+                tiedVccWires.put(tileType, new HashSet<Integer>());
+                tiedGndWires.put(tileType, new HashSet<Integer>());
+            }
 
+            Set<Integer> vccWires = tiedVccWires.get(tileType);
+            Set<Integer> gndWires = tiedGndWires.get(tileType);
+
+            Set<Integer> wires = tileTiedWires.get(tileType);
             for(int wireIndex : wires) {
                 Wire wire = new Wire(tile, wireIndex);
                 Node node = wire.getNode();
+                if(node == null) {
+                    continue;
+                }
+
                 if(node.isTiedToGnd()) {
                     gndWires.add(wireIndex);
                 } else if(node.isTiedToVcc()) {
@@ -308,14 +350,82 @@ public class ConstantDefinitions {
                     throw new RuntimeException("All wires should be part of tied nodes!");
                 }
             }
+        }
 
-            if(vccWires.size() > 0) {
-                tiedVccWires.put(tileType, vccWires);
+        // Find tile type / wires that are inconstitently tied.
+        Map<TileTypeEnum, Set<Integer>> exceptionalWires = new HashMap<TileTypeEnum, Set<Integer>>();
+
+        for(TileTypeEnum tileType : tileTiedWires.keySet()) {
+            Set<Integer> bothWires = new HashSet<Integer>();
+
+            Set<Integer> vccWires = tiedVccWires.get(tileType);
+            Set<Integer> gndWires = tiedGndWires.get(tileType);
+
+            bothWires.addAll(vccWires);
+            bothWires.retainAll(gndWires);
+
+            if(bothWires.size() > 0) {
+                if(!exceptionalWires.containsKey(tileType)) {
+                    exceptionalWires.put(tileType, new HashSet<Integer>());
+                }
+
+                Set<Integer> wires = exceptionalWires.get(tileType);
+
+                for(int wireIndex : bothWires) {
+                    wires.add(wireIndex);
+                    vccWires.remove(wireIndex);
+                    gndWires.remove(wireIndex);
+                }
+            }
+        }
+
+        Set<List<String>> nodeSources = new HashSet<List<String>>();
+        for(Tile tile : device.getAllTiles()) {
+            TileTypeEnum tileType = tile.getTileTypeEnum();
+            if(!tileTiedWires.containsKey(tileType)) {
+                continue;
             }
 
-            if(gndWires.size() > 0) {
-                tiedGndWires.put(tileType, gndWires);
+            Set<Integer> wires = exceptionalWires.get(tileType);
+            if(wires == null) {
+                continue;
             }
+
+            for(int wireIndex : wires) {
+                Wire wire = new Wire(tile, wireIndex);
+                Node node = wire.getNode();
+                if(node == null) {
+                    continue;
+                }
+
+                List<String> nodeSource = new ArrayList<String>();
+                nodeSource.add(node.getTile().getName());
+                nodeSource.add(node.getWireName());
+                if(node.isTiedToGnd()) {
+                    nodeSource.add(new String("GND"));
+                } else if(node.isTiedToVcc()) {
+                    nodeSource.add(new String("VCC"));
+                } else {
+                    throw new RuntimeException("Node should be tied?!");
+                }
+
+                nodeSources.add(nodeSource);
+            }
+        }
+
+        int i = 0;
+        StructList.Builder<NodeConstantSource.Builder> nodeSourcesObj = builder.initNodeSources(nodeSources.size());
+        for(List<String> nodeSource : nodeSources) {
+            NodeConstantSource.Builder nodeSourceObj = nodeSourcesObj.get(i);
+            i += 1;
+
+            String tile = nodeSource.get(0);
+            String wire = nodeSource.get(1);
+            ConstantType constant = ConstantType.valueOf(nodeSource.get(2));
+
+            nodeSourceObj.setTile(allStrings.getIndex(tile));
+            nodeSourceObj.setWire(allStrings.getIndex(wire));
+            nodeSourceObj.setConstant(constant);
         }
 
         Set<TileTypeEnum> tileTypesInUse = new HashSet<TileTypeEnum>();
@@ -343,12 +453,17 @@ public class ConstantDefinitions {
                 WireConstantSources.Builder vccWires = wireConstants.get(idx);
                 idx += 1;
 
-                List<Integer> wires = tiedVccWires.get(tileTypeEnum);
+                Set<Integer> wireSet = tiedVccWires.get(tileTypeEnum);
+                List<Integer> wires = new ArrayList<Integer>();
+                wires.addAll(wireSet);
 
                 vccWires.setConstant(ConstantType.VCC);
                 PrimitiveList.Int.Builder wiresObj = vccWires.initWires(wires.size());
                 for(int j = 0; j < wires.size(); ++j) {
-                    wiresObj.set(j, wires.get(j));
+                    Integer wireId = wires.get(j);
+                    wiresObj.set(j, wireId);
+
+                    String wireName = allStrings.get(tileType.getWires().get(wireId));
                 }
             }
 
@@ -356,12 +471,17 @@ public class ConstantDefinitions {
                 WireConstantSources.Builder gndWires = wireConstants.get(idx);
                 idx += 1;
 
-                List<Integer> wires = tiedGndWires.get(tileTypeEnum);
+                Set<Integer> wireSet = tiedGndWires.get(tileTypeEnum);
+                List<Integer> wires = new ArrayList<Integer>();
+                wires.addAll(wireSet);
 
                 gndWires.setConstant(ConstantType.GND);
                 PrimitiveList.Int.Builder wiresObj = gndWires.initWires(wires.size());
                 for(int j = 0; j < wires.size(); ++j) {
-                    wiresObj.set(j, wires.get(j));
+                    Integer wireId = wires.get(j);
+                    wiresObj.set(j, wireId);
+
+                    String wireName = allStrings.get(tileType.getWires().get(wireId));
                 }
             }
         }
