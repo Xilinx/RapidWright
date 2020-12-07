@@ -513,12 +513,21 @@ public class DeviceResourcesWriter {
             for(int i=0; i < tile.getWireCount(); i++) {
                 Wire wire = new Wire(tile,i);
                 allWires.addObject(makeKey(wire.getTile(), wire.getWireIndex()));
+
+                Node node = wire.getNode();
+                if(node != null) {
+                    allNodes.addObject(makeKey(node.getTile(), node.getWire()));
+                }
             }
             for(PIP p : tile.getPIPs()) {
                 Node start = p.getStartNode();
-                allNodes.addObject(makeKey(start.getTile(), start.getWire()));
+                if(start != null) {
+                    allNodes.addObject(makeKey(start.getTile(), start.getWire()));
+                }
                 Node end = p.getEndNode();
-                allNodes.addObject(makeKey(end.getTile(), end.getWire()));
+                if(end != null) {
+                    allNodes.addObject(makeKey(end.getTile(), end.getWire()));
+                }
             }
         }
 
@@ -540,7 +549,7 @@ public class DeviceResourcesWriter {
             DeviceResources.Device.Node.Builder nodeBuilder = nodeBuilders.get(i);
             //Node node = allNodes.get(i);
             long nodeKey = allNodes.get(i);
-            Node node = new Node(device.getTile((int)(nodeKey >>> 32)), (int)(nodeKey & 0xffffffff));
+            Node node = Node.getNode(device.getTile((int)(nodeKey >>> 32)), (int)(nodeKey & 0xffffffff));
             Wire[] wires = node.getAllWiresInNode();
             PrimitiveList.Int.Builder wBuilders = nodeBuilder.initWires(wires.length);
             for(int k=0; k < wires.length; k++) {
