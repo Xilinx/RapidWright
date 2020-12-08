@@ -626,10 +626,11 @@ public class EnumerateCellBelMapping {
 
                     HashSet<Map.Entry<String, String>> pinMapping = new HashSet<Map.Entry<String, String>>();
 
-                    // TODO: Disabled because of https://github.com/Xilinx/RapidWright/issues/101
-                    //for(Map.Entry<String, String> pinMap : physCell.getPinMappingsL2P().entrySet()) {
-                    //    pinMapping.add(pinMap);
-                    //}
+                    for(Map.Entry<String, Set<String>> pinMap : physCell.getPinMappingsL2P().entrySet()) {
+                        for(String physPin : pinMap.getValue()) {
+                            pinMapping.add(new AbstractMap.SimpleEntry<String, String>(pinMap.getKey(), physPin));
+                        }
+                    }
 
                     for(Map.Entry<String, String> pinMap : physCell.getPinMappingsP2L().entrySet()) {
                         pinMapping.add(new AbstractMap.SimpleEntry<String, String>(pinMap.getValue(), pinMap.getKey()));

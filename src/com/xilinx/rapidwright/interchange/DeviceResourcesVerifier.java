@@ -487,10 +487,11 @@ public class DeviceResourcesVerifier {
 
                     Map<String, String> pinMapping = new HashMap<String, String>();
 
-                    // TODO: Disabled because of https://github.com/Xilinx/RapidWright/issues/101
-                    //for(Map.Entry<String, String> pinMap : physCell.getPinMappingsL2P().entrySet()) {
-                    //    pinMapping.add(pinMap);
-                    //}
+                    for(Map.Entry<String, Set<String>> pinMap : physCell.getPinMappingsL2P().entrySet()) {
+                        for(String physPin : pinMap.getValue()) {
+                            pinMapping.put(physPin, pinMap.getKey());
+                        }
+                    }
 
                     for(Map.Entry<String, String> pinMap : physCell.getPinMappingsP2L().entrySet()) {
                         pinMapping.put(pinMap.getKey(), pinMap.getValue());
