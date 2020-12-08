@@ -82,7 +82,7 @@ public class DeviceResourcesVerifier {
         design.setPartName(deviceName);
 
         DeviceResources.Device.Reader dReader = null;
-        ReaderOptions readerOptions = new ReaderOptions(1024L*1024L*512L, 64);
+        ReaderOptions readerOptions = new ReaderOptions(1024L*1024L*1024L*2L, 64);
         MessageReader readMsg = null;
         readMsg = Interchange.readInterchangeFile(devResFileName, readerOptions);
 
@@ -96,12 +96,15 @@ public class DeviceResourcesVerifier {
         }
 
         // Create a lookup map for tile types
-        HashMap<String,TileType.Reader> tileTypeMap = new HashMap<String, TileType.Reader>();
+        Map<String,TileType.Reader> tileTypeMap = new HashMap<String, TileType.Reader>();
+        Map<TileTypeEnum, TileType.Reader> tileTypeEnumMap = new HashMap<TileTypeEnum, TileType.Reader>();
         HashMap<String, StructList.Reader<DeviceResources.Device.PIP.Reader>> ttPIPMap = new HashMap<>();
         for(int i=0; i < dReader.getTileTypeList().size(); i++) {
             TileType.Reader ttReader = dReader.getTileTypeList().get(i);
             String name = allStrings.get(ttReader.getName());
             tileTypeMap.put(name, ttReader);
+            TileTypeEnum tileTypeEnum = TileTypeEnum.valueOf(name);
+            tileTypeEnumMap.put(tileTypeEnum, ttReader);
             ttPIPMap.put(name, ttReader.getPips());
         }
 
@@ -117,14 +120,16 @@ public class DeviceResourcesVerifier {
             DeviceResources.Device.Tile.Reader tileReader = tilesReader.get(i);
             String tileName = allStrings.get(tileReader.getName());
             Tile tile = device.getTile(tileName);
-            expect(tile.getTileTypeEnum().name(), allStrings.get(tileReader.getType()));
+            Integer tileTypeIndex = tileReader.getType();
+            TileType.Reader ttReader = dReader.getTileTypeList().get(tileTypeIndex);
+            String tileTypeName = allStrings.get(ttReader.getName());
+            expect(tile.getTileTypeEnum().name(), tileTypeName);
             expect(tile.getRow(), tileReader.getRow());
             expect(tile.getColumn(), tileReader.getCol());
 
             expect(tile.getTilePatternIndex(), tileReader.getTilePatIdx());
 
             // Verify Tile Types
-            String tileTypeName = allStrings.get(tileReader.getType());
             TileType.Reader tileType = tileTypeMap.get(tileTypeName);
             expect(tile.getTileTypeEnum().name(), allStrings.get(tileType.getName()));
             expect(tile.getWireCount(), tileType.getWires().size());
@@ -307,6 +312,19 @@ public class DeviceResourcesVerifier {
 
         verifyCellBelPinMaps(allStrings, dReader, design);
         verifyPackages(allStrings, dReader, device);
+
+        // Get examples for each site type to a site.
+        Map<SiteTypeEnum, Site> siteTypes = new HashMap<SiteTypeEnum, Site>();
+        for(Tile tile : device.getAllTiles()) {
+            for(Site site : tile.getSites()) {
+                siteTypes.put(site.getSiteTypeEnum(), site);
+                SiteTypeEnum[] altSiteTypes = site.getAlternateSiteTypeEnums();
+                for(SiteTypeEnum altSiteType : altSiteTypes) {
+                    siteTypes.put(altSiteType, site);
+                }
+            }
+        }
+        ConstantDefinitions.verifyConstants(allStrings, device, design, siteTypes, dReader.getConstants(), tileTypeEnumMap);
 
         return true;
     }
