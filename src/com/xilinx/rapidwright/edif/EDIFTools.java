@@ -1212,6 +1212,18 @@ public class EDIFTools {
 			}
 			currParentInstName = nextInstName;
 		}
+		
+		// Update Parent Net Map after creating new nets
+		Map<String,String> parentNetMap = netlist.getParentNetMap();
+		String srcNetName = srcParentInstName + EDIF_HIER_SEP + srcDupNetName;
+		String parentNetName = parentNetMap.get(srcNetName);
+		if(parentNetName == null) {
+			parentNetName = srcNetName;
+		}
+		for(Entry<String,EDIFNet> e : parentInstNameToLogNet.entrySet()) {
+			String currNetName = e.getKey() + EDIF_HIER_SEP + e.getValue().getName();
+			parentNetMap.put(currNetName, parentNetName);
+		}
 
 		return currNet;
 	}
