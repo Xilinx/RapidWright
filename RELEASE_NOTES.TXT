@@ -1,3 +1,14 @@
+============= RapidWright 2020.1.7-beta released on 2020-12-09 ================
+Notes:
+ * Fixes Issue #110 - Bad index because of integer overflow in VU19P.
+ * Fixes other issues related to logical -> physical mappings
+ * Fixes other issue related to Issue #63 in Wire.getStartWire()
+ * Updates EDIFTools.connectLogicalNetAcrossHierarchy() to update
+   parent net map.
+- API Additions:
+  - com.xilinx.rapidwright.design.Cell "public BELPin getBELPin(EDIFHierPortInst p)"
+  - com.xilinx.rapidwright.design.Cell "public BELPin getBELPin(EDIFPortInst p)"
+
 ============= RapidWright 2020.1.6-beta released on 2020-12-04 ================
 Notes:
  * Fixes Issue #104 - NPE for Node.isTied() issue.  
