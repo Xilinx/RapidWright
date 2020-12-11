@@ -149,18 +149,25 @@ public class TileColumnPattern extends ArrayList<TileTypeEnum> implements Compar
 	}
 
 	/**
-	 * Finds the first row that has a populated BRAM or DSP tile to help identify
+	 * Finds the first row that has a populated BRAM, DSP, and CLB tiles to help identify
 	 * tile column types.  Can reliably iterate over this row and identify column types.
 	 * @param dev The device of interest
 	 * @return The row index that contains populated BRAM or DSP tiles.
 	 */
 	public static int getCommonRow(Device dev){
 		int rowIdx = 0;
+		boolean hasDSP, hasBRAM, hasCLB;
 		outer: for(int row=0; row < dev.getRows(); row++){
+			hasDSP = false;
+			hasBRAM = false;
+			hasCLB = false;
 			for(int col=0; col < dev.getColumns(); col++){
 				Tile t = dev.getTile(row, col);
 				TileTypeEnum tt = t.getTileTypeEnum();
-				if(Utils.isDSP(tt) || Utils.isBRAM(tt)){
+				if(Utils.isDSP(tt)) hasDSP = true;
+				if(Utils.isBRAM(tt)) hasBRAM = true;
+				if(Utils.isCLB(tt)) hasCLB = true;
+				if(hasDSP && hasBRAM && hasCLB) {
 					rowIdx = row;
 					break outer;
 				}

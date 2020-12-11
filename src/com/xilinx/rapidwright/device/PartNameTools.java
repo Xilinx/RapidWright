@@ -35,7 +35,7 @@ import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.util.FileTools;
 
 /**
- * Generated on: Sat Oct 31 12:15:12 2020
+ * Generated on: Thu Nov 19 09:45:05 2020
  * by: com.xilinx.rapidwright.release.PartNamePopulator
  * 
  * Class to hold utility APIs dealing with Parts and device names.
@@ -129,6 +129,8 @@ public class PartNameTools {
 			case QZYNQUPLUS: return FamilyType.ZYNQUPLUS;
 			case QZYNQUPLUSRFSOC: return FamilyType.ZYNQUPLUSRFSOC;
 			case SPARTAN7: return FamilyType.SPARTAN7;
+			case VERSALAICORE: return FamilyType.VERSAL;
+			case VERSALPRIME: return FamilyType.VERSAL;
 			case VIRTEX7: return FamilyType.VIRTEX7;
 			case VIRTEXU: return FamilyType.VIRTEXU;
 			case VIRTEXUPLUS: return FamilyType.VIRTEXUPLUS;
@@ -174,6 +176,9 @@ public class PartNameTools {
 			case QZYNQUPLUS: return "Zynq UltraScale+";
 			case QZYNQUPLUSRFSOC: return "Zynq UltraScale+ RFSOC";
 			case SPARTAN7: return "Spartan-7";
+			case VERSAL: return "Versal ACAP";
+			case VERSALAICORE: return "Versal ACAP";
+			case VERSALPRIME: return "Versal ACAP";
 			case VIRTEX7: return "Virtex-7";
 			case VIRTEXU: return "Virtex UltraScale";
 			case VIRTEXUPLUS: return "Virtex UltraScale+";
@@ -219,6 +224,11 @@ public class PartNameTools {
 			case QZYNQUPLUS: return Series.UltraScalePlus;
 			case QZYNQUPLUSRFSOC: return Series.UltraScalePlus;
 			case SPARTAN7: return Series.Series7;
+			case VERSAL: return Series.Versal;
+			case VERSALAICORE: return Series.Versal;
+			case VERSALPRIME: return Series.Versal;
+			case VERSALAICOREES1: return Series.Versal;
+			case VERSALPRIMEES1: return Series.Versal;
 			case VIRTEX7: return Series.Series7;
 			case VIRTEXU: return Series.UltraScale;
 			case VIRTEXUPLUS: return Series.UltraScalePlus;

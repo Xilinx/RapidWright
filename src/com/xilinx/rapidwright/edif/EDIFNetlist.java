@@ -829,8 +829,10 @@ public class EDIFNetlist extends EDIFName {
 			}
 			queue.add(absPortInst);
 		}
+		HashSet<String> visited = new HashSet<>();
 		while(!queue.isEmpty()){
 			EDIFHierPortInst p = queue.poll();
+			visited.add(p.toString());
 			EDIFNet otherNet = null;
 			if(p.getPortInst().getCellInst() == null){
 				// Moving up in hierarchy
@@ -866,6 +868,10 @@ public class EDIFNetlist extends EDIFName {
 								source = opr;
 								parentNetName = netName;
 							}
+						}
+						if(visited.contains(absPortInst.toString())) {
+							//System.out.println(" DUPLICATE ENTRY: " + absPortInst);
+							continue;
 						}
 						queue.add(absPortInst);
 					}
@@ -909,6 +915,10 @@ public class EDIFNetlist extends EDIFName {
 						if((ipr.getCellInst() == null && ipr.isInput()) || (isCellPin && ipr.isOutput())){
 							source = ipr;
 							parentNetName = netName;
+						}
+						if(visited.contains(absPortInst.toString())) {
+							//System.out.println("DUPLICATE ENTRY: " + absPortInst);
+							continue;
 						}
 						queue.add(absPortInst);
 					}

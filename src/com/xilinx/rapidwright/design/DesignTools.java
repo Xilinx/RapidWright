@@ -880,6 +880,7 @@ public class DesignTools {
 			String parentNetAlias = netlist.getParentNetName(netName);
 			Net parentNet = design.getNet(parentNetAlias);
 			if(parentNet == null) {
+				if(parentNetAlias == null) parentNetAlias = netName;
 				parentNet = new Net(parentNetAlias,netlist.getNetFromHierName(parentNetAlias));
 			}
 			for(String netAlias : netlist.getNetAliases(netName)) {
