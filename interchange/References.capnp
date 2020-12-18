@@ -4,8 +4,9 @@ $Java.package("com.xilinx.rapidwright.interchange");
 $Java.outerClassname("References");
 
 enum ReferenceType {
-    root   @0;
-    parent @1;
+    root       @0;
+    rootValue  @1;
+    parent     @2;
 }
 
 enum ImplementationType {

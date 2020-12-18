@@ -11,42 +11,63 @@ struct HashSet {
 annotation hashSet(*) :HashSet;
 
 struct StringRef {
-    type  @0 :Ref.ReferenceType = root;
+    type  @0 :Ref.ReferenceType = rootValue;
     field @1 :Text = "strList";
 }
 annotation stringRef(*) :StringRef;
 using StringIdx = UInt32;
 
+struct PortRef {
+    type  @0 :Ref.ReferenceType = root;
+    field @1 :Text = "portList";
+}
+annotation portRef(*) :PortRef;
 using PortIdx = UInt32;
+
+struct CellRef {
+    type  @0 :Ref.ReferenceType = root;
+    field @1 :Text = "cellDecls";
+}
+annotation cellRef(*) :CellRef;
 using CellIdx = UInt32;
+
+struct InstRef {
+    type  @0 :Ref.ReferenceType = root;
+    field @1 :Text = "instList";
+}
+annotation instRef(*) :InstRef;
 using InstIdx = UInt32;
 
 struct Netlist {
 
-  name     @0 : Text;
-  propMap  @1 : PropertyMap;
-  topInst  @2 : CellInstance;
-  strList  @3 : List(Text) $hashSet();
-  cellList @4 : List(Cell);
-  portList @5 : List(Port);
-  instList @6 : List(CellInstance);
+  name      @0 : Text;
+  propMap   @1 : PropertyMap;
+  strList   @2 : List(Text) $hashSet();
+  portList  @3 : List(Port);
+  cellDecls @4 : List(CellDeclaration);
+  topInst   @5 : CellInstance;
+  instList  @6 : List(CellInstance);
+  cellList  @7 : List(Cell);
 
-
-  struct Cell {
+  struct CellDeclaration {
     name     @0 : StringIdx $stringRef();
-    propMap  @1 : PropertyMap;
-    view     @2 : StringIdx $stringRef();
-    lib      @3 : StringIdx $stringRef();
-    insts    @4 : List(InstIdx);
-    nets     @5 : List(Net);
-    ports    @6 : List(PortIdx);
   }
 
   struct CellInstance {
     name     @0 : StringIdx $stringRef();
     propMap  @1 : PropertyMap;
     view     @2 : StringIdx $stringRef();
-    cell     @3 : CellIdx;
+    cell     @3 : CellIdx $cellRef();
+  }
+
+  struct Cell {
+    index   @0 : CellIdx $cellRef();
+    propMap @1 : PropertyMap;
+    view    @2 : StringIdx $stringRef();
+    lib     @3 : StringIdx $stringRef();
+    insts   @4 : List(InstIdx) $instRef();
+    nets    @5 : List(Net);
+    ports   @6 : List(PortIdx) $portRef();
   }
 
   struct Net {
@@ -77,14 +98,14 @@ struct Netlist {
   }
 
   struct PortInstance {
-    port  @0 : PortIdx;
+    port  @0 : PortIdx $portRef();
     busIdx : union {
         singleBit @1 : Void; # Single bit
         idx       @2 : UInt32; # Index within bussed port
     }
     union {
       extPort     @3 : Void;
-      inst        @4 : InstIdx;
+      inst        @4 : InstIdx $instRef();
     }
   }
 

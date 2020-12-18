@@ -5,7 +5,7 @@ $Java.package("com.xilinx.rapidwright.interchange");
 $Java.outerClassname("PhysicalNetlist");
 
 struct StringRef {
-    type  @0 :Ref.ReferenceType = root;
+    type  @0 :Ref.ReferenceType = rootValue;
     field @1 :Text = "strList";
 }
 annotation stringRef(*) :StringRef;
