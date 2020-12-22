@@ -26,7 +26,7 @@ package com.xilinx.rapidwright.device;
 
 
 /**
- * Generated on: Wed Nov 18 14:16:23 2020
+ * Generated on: Wed Dec 16 10:12:41 2020
  * by: com.xilinx.rapidwright.release.SiteAndTileTypeUpdater
  * 
  * Enumeration of Site type for all valid devices within Vivado.
@@ -36,6 +36,8 @@ public enum SiteTypeEnum {
 	AIE_ARRAYSWITCH,
 	AIE_CORE,
 	AIE_FIFO,
+	AIE_INTF_B_TEST,
+	AIE_INTF_C_TEST,
 	AIE_MEMGRP,
 	AIE_NOC,
 	AIE_PL,
@@ -67,6 +69,7 @@ public enum SiteTypeEnum {
 	BLI_D_GRP7,
 	BLI_HBM_APB_INTF,
 	BLI_HBM_AXI_INTF,
+	BLI_TMR,
 	BSCAN,
 	BSCAN_JTAG_MONE2,
 	BUFCE_LEAF,
@@ -82,6 +85,7 @@ public enum SiteTypeEnum {
 	BUFG_FABRIC,
 	BUFG_GT,
 	BUFG_GT_SYNC,
+	BUFG_HSR_TEST,
 	BUFG_LB,
 	BUFG_PS,
 	BUFHCE,
@@ -118,8 +122,14 @@ public enum SiteTypeEnum {
 	FIFO36E1,
 	FRAME_ECC,
 	GCLK_DELAY,
+	GCLK_PD,
+	GCLK_TAPS_DECODE_GT,
+	GCLK_TAPS_DECODE_VNOC,
+	GCLK_TAPS_DECODE_VNOC_PS,
+	GCLK_TEST,
 	GCLK_TEST_BUF,
 	GCLK_TEST_BUFE3,
+	GCLK_TEST_RING,
 	GLOBALSIG,
 	GTHE2_CHANNEL,
 	GTHE2_COMMON,
@@ -151,6 +161,7 @@ public enum SiteTypeEnum {
 	HDIOLOGIC_S,
 	HDIO_BIAS,
 	HDIO_VREF,
+	HDLOGIC_APB,
 	HDLOGIC_CSSD,
 	HPIOB,
 	HPIOBDIFFINBUF,
@@ -193,6 +204,7 @@ public enum SiteTypeEnum {
 	ISERDESE2,
 	KEY_CLEAR,
 	LAGUNA,
+	MISR,
 	MMCM,
 	MMCME2_ADV,
 	MMCME3_ADV,
@@ -272,20 +284,8 @@ public enum SiteTypeEnum {
 	XPHY,
 	XPIOB,
 	XPIOLOGIC,
+	XPIO_DCI,
 	XPIO_VREF,
 	XPIPE_QUAD,
 	XPLL,
-	AIE_INTF_B_TEST,
-	AIE_INTF_C_TEST,
-	BLI_TMR,
-	BUFG_HSR_TEST,
-	GCLK_PD,
-	GCLK_TAPS_DECODE_GT,
-	GCLK_TAPS_DECODE_VNOC,
-	GCLK_TAPS_DECODE_VNOC_PS,
-	GCLK_TEST,
-	GCLK_TEST_RING,
-	HDLOGIC_APB,
-	MISR,
-	XPIO_DCI,
 }

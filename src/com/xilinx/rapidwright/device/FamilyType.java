@@ -26,7 +26,7 @@ package com.xilinx.rapidwright.device;
 
 
 /**
- * Generated on: Wed Nov 18 14:01:29 2020
+ * Generated on: Wed Dec 16 09:47:52 2020
  * by: com.xilinx.rapidwright.release.PartNamePopulator
  * 
  * Set of all Supported Xilinx families in RapidWright
@@ -58,9 +58,7 @@ public enum FamilyType {
 		SPARTAN7,
 		VERSAL,
 		VERSALAICORE,
-		VERSALAICOREES1,
 		VERSALPRIME,
-		VERSALPRIMEES1,
 		VIRTEX7,
 		VIRTEXU,
 		VIRTEXUPLUS,

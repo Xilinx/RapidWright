@@ -15,7 +15,7 @@ jobs:
         with:
           java-version: 1.8
       - name: Install RapidWright
-        run: wget https://github.com/Xilinx/RapidWright/releases/download/v2020.1.7-beta/rapidwright_jars.zip && unzip rapidwright_jars.zip
+        run: wget https://github.com/Xilinx/RapidWright/releases/download/v2020.2.0-beta/rapidwright_jars.zip && unzip rapidwright_jars.zip
       - name: Compile RapidWright
         run: make
 
