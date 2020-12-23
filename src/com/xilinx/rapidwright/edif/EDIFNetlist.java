@@ -378,9 +378,14 @@ public class EDIFNetlist extends EDIFName {
 					continue;
 				i=0;
 				currentCellName = instCellType.getName();
-				while (destLibSub.containsCell(instCellType)) {
-					instCellType.setName(currentCellName + "_parameterized" + i);
-					instCellType.setView(currentCellName + "_parameterized" + i);
+				if(checkIfAlreadyInLib(instCellType, destLibSub)) {
+					inst.setViewref(instCellType.getEDIFView());
+					continue;
+				}
+				while (destLibSub.containsCell(instCellType) && !checkIfAlreadyInLib(instCellType, destLibSub)) {
+					String newName = currentCellName + "_parameterized" + i;
+					instCellType.setName(newName);
+					instCellType.setView(newName);
 					instCellType.updateEDIFRename();
 					i++;
 				}
@@ -389,6 +394,14 @@ public class EDIFNetlist extends EDIFName {
 				cells.add(instCellType);
 			}
 		}
+	}
+	
+	private boolean checkIfAlreadyInLib(EDIFCell cell, EDIFLibrary lib) {
+		EDIFCell existing = lib.getCell(cell.getLegalEDIFName());
+		if(existing == cell && lib.getNetlist() == cell.getLibrary().getNetlist()) {
+			return true;
+		}
+		return false;
 	}
 	
 	/**
