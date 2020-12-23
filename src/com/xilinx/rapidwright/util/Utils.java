@@ -221,6 +221,8 @@ public class Utils{
 		clbs.add(TileTypeEnum.CLE_M_R);
 		clbs.add(TileTypeEnum.CLEM);
 		clbs.add(TileTypeEnum.CLEM_R);
+		clbs.add(TileTypeEnum.CLE_E_CORE);
+		clbs.add(TileTypeEnum.CLE_W_CORE);
 		
 		clbms = new HashSet<TileTypeEnum>();
 		clbms.add(TileTypeEnum.CLBLM_L);
@@ -234,11 +236,17 @@ public class Utils{
 		dsps.add(TileTypeEnum.DSP);
 		dsps.add(TileTypeEnum.DSP_L);
 		dsps.add(TileTypeEnum.DSP_R);
+		dsps.add(TileTypeEnum.DSP_ROCF_B_TILE);
+		dsps.add(TileTypeEnum.DSP_ROCF_T_TILE);
 		
 		brams = new HashSet<TileTypeEnum>();
 		brams.add(TileTypeEnum.BRAM);
 		brams.add(TileTypeEnum.BRAM_L);
 		brams.add(TileTypeEnum.BRAM_R);
+		brams.add(TileTypeEnum.BRAM_ROCF_BL_TILE);
+		brams.add(TileTypeEnum.BRAM_ROCF_BR_TILE);
+		brams.add(TileTypeEnum.BRAM_ROCF_TL_TILE);
+		brams.add(TileTypeEnum.BRAM_ROCF_TR_TILE);
 
 		ints = new HashSet<TileTypeEnum>();
 		ints.add(TileTypeEnum.INT);
@@ -307,6 +315,9 @@ public class Utils{
 		dspTypes = new HashSet<SiteTypeEnum>();
 		dspTypes.add(SiteTypeEnum.DSP48E1);
 		dspTypes.add(SiteTypeEnum.DSP48E2);
+		dspTypes.add(SiteTypeEnum.DSP58);
+		dspTypes.add(SiteTypeEnum.DSP58_CPLX);
+		dspTypes.add(SiteTypeEnum.DSPFP);
 		
 		bramTypes = new HashSet<SiteTypeEnum>();
 		bramTypes.add(SiteTypeEnum.FIFO18E1);
@@ -317,6 +328,8 @@ public class Utils{
 		bramTypes.add(SiteTypeEnum.RAMBFIFO18);
 		bramTypes.add(SiteTypeEnum.RAMBFIFO36);
 		bramTypes.add(SiteTypeEnum.RAMBFIFO36E1);
+		bramTypes.add(SiteTypeEnum.RAMB18_L);
+		bramTypes.add(SiteTypeEnum.RAMB18_U);
 		
 		iobTypes = new HashSet<SiteTypeEnum>();
 		iobTypes.add(SiteTypeEnum.IOB18);

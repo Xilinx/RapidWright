@@ -35,7 +35,7 @@ import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.util.FileTools;
 
 /**
- * Generated on: Sat Oct 31 12:15:12 2020
+ * Generated on: Wed Dec 16 09:47:52 2020
  * by: com.xilinx.rapidwright.release.PartNamePopulator
  * 
  * Class to hold utility APIs dealing with Parts and device names.
@@ -60,7 +60,15 @@ public class PartNameTools {
 				strings[part[6]],
 				strings[part[7]],
 				strings[part[8]],
-				Series.valueOf(strings[part[9]])
+				strings[part[9]],
+				strings[part[10]],
+				strings[part[11]],
+				strings[part[12]],
+				strings[part[13]],
+				strings[part[14]],
+				strings[part[15]],
+				strings[part[16]],
+				Series.valueOf(strings[part[17]])
 				);
 			partMap.put(strings[part[0]], tmpPart);
 			if(!(strings[part[8]].isEmpty())) {
@@ -129,6 +137,8 @@ public class PartNameTools {
 			case QZYNQUPLUS: return FamilyType.ZYNQUPLUS;
 			case QZYNQUPLUSRFSOC: return FamilyType.ZYNQUPLUSRFSOC;
 			case SPARTAN7: return FamilyType.SPARTAN7;
+			case VERSALAICORE: return FamilyType.VERSAL;
+			case VERSALPRIME: return FamilyType.VERSAL;
 			case VIRTEX7: return FamilyType.VIRTEX7;
 			case VIRTEXU: return FamilyType.VIRTEXU;
 			case VIRTEXUPLUS: return FamilyType.VIRTEXUPLUS;
@@ -174,6 +184,9 @@ public class PartNameTools {
 			case QZYNQUPLUS: return "Zynq UltraScale+";
 			case QZYNQUPLUSRFSOC: return "Zynq UltraScale+ RFSOC";
 			case SPARTAN7: return "Spartan-7";
+			case VERSAL: return "Versal ACAP";
+			case VERSALAICORE: return "Versal ACAP";
+			case VERSALPRIME: return "Versal ACAP";
 			case VIRTEX7: return "Virtex-7";
 			case VIRTEXU: return "Virtex UltraScale";
 			case VIRTEXUPLUS: return "Virtex UltraScale+";
@@ -219,6 +232,9 @@ public class PartNameTools {
 			case QZYNQUPLUS: return Series.UltraScalePlus;
 			case QZYNQUPLUSRFSOC: return Series.UltraScalePlus;
 			case SPARTAN7: return Series.Series7;
+			case VERSAL: return Series.Versal;
+			case VERSALAICORE: return Series.Versal;
+			case VERSALPRIME: return Series.Versal;
 			case VIRTEX7: return Series.Series7;
 			case VIRTEXU: return Series.UltraScale;
 			case VIRTEXUPLUS: return Series.UltraScalePlus;

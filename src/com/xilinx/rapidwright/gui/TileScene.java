@@ -415,6 +415,7 @@ public class TileScene extends QGraphicsScene{
 		
 		switch(device.getSeries()){
 			case Series7:
+			case Versal:
 				painter.drawRect(rectX, rectY + rectSide / 2, rectSide / 2 - 1, rectSide / 2 - 1);
 				painter.drawRect(rectX + rectSide / 2, rectY, rectSide / 2 - 1, rectSide / 2 - 1);					
 				break;				
@@ -433,6 +434,13 @@ public class TileScene extends QGraphicsScene{
 				painter.drawRect(rectX+2, rectY-4 * tileSize + 2, rectSide - 5, ((int)(2.5 * rectSide)) + 3 * 2 * offset - 5);
 				painter.drawRect(rectX+2, (rectY-2 * tileSize) + 7, rectSide - 5, ((int)(2.5 * rectSide)) + 3 * 2 * offset - 5);
 				break;
+			case Versal:
+				painter.drawRect(rectX, rectY - 3 * tileSize, rectSide - 1, 4 * rectSide + 3 * 2 * offset - 1);
+				painter.setPen(color.darker());
+				painter.drawRect(rectX+2, (rectY-3 * tileSize) + 2, rectSide - 5, ((int)(2 * rectSide)) + 3 * 2 * offset - 5);
+				painter.drawRect(rectX+2, (rectY-1 * tileSize) - 2, rectSide - 5, ((int)(2 * rectSide)) + 3 * 2 * offset - 5);
+				break;
+
 		}
 	}
 	
@@ -446,6 +454,13 @@ public class TileScene extends QGraphicsScene{
 				painter.drawRect(rectX+2, rectY-4 * tileSize + 2, rectSide - 5, ((int)(2.5 * rectSide)) + 3 * 2 * offset - 5);
 				painter.drawRect(rectX+2, (rectY-2 * tileSize) + 7, rectSide - 5, ((int)(2.5 * rectSide)) + 3 * 2 * offset - 5);
 				break;
+			case Versal:
+				painter.drawRect(rectX, rectY - 1 * tileSize, rectSide - 1, 2 * rectSide + offset);
+				painter.setPen(color.darker());
+				painter.drawRect(rectX + 2, rectY - tileSize + 2, ((rectSide - 1)/2 ) - 2, 2 * rectSide + offset - 4);
+				painter.drawRect(rectX + (tileSize/2) - 1, rectY - tileSize + 2, ((rectSide - 1)/2 ) - 2, 2 * rectSide + offset - 4);
+				break;
+
 		}
 
 	}

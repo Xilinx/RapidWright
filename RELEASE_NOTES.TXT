@@ -1,3 +1,33 @@
+============= RapidWright 2020.2.0-beta released on 2020-12-22 ================
+Notes:
+ * Adds initial support for Versal devices (Vivado 2020.2 compatibility)
+ * Augments PackagePin metadata to more closely provide available properties found in Vivado.
+ * To support interchange: DesignTools.getInvertiblePinMap() which provides a map for a unisim to 
+   denote which pins are invertible by which parameter names
+ * The Part class has been augmented with a set of new methods that contain basic resources
+    for a particular part that are reported in Vivado with the 'report_property' command, 
+    these methods include: getAvailableIobs(), getBlockRams(), getDsp(), getFlipflops(), 
+    getGbTransceivers(), getLutElements(), p.getMmcm() and p.getUltraRams()   
+ - API Additions:
+   - com.xilinx.rapidwright.design.Net "public boolean setBufferDelay(Site site, int value)" 
+   - com.xilinx.rapidwright.design.Net "public boolean getBufferDelay(Site site)"
+   - com.xilinx.rapidwright.device.BEL "public BELPin getInvertingPin()" 
+   - com.xilinx.rapidwright.device.BEL "public BELPin getNonInvertingPin()"
+   - com.xilinx.rapidwright.device.PackagePin "public boolean isGeneralPurpose()"
+   - com.xilinx.rapidwright.device.PackagePin "public boolean isGlobalClk()"   
+   - com.xilinx.rapidwright.device.PackagePin "public boolean isLowCap()"
+   - com.xilinx.rapidwright.device.PackagePin "public boolean isVrn()"
+   - com.xilinx.rapidwright.device.PackagePin "public boolean isVrp()"   
+   - com.xilinx.rapidwright.device.PackagePin "public boolean isVref()"
+   - com.xilinx.rapidwright.device.Site "public boolean isGlobalClkPad()"
+   - com.xilinx.rapidwright.device.Site "public boolean isGlobalClkBuffer()"
+   - com.xilinx.rapidwright.device.Site "public boolean isRegionalClkPad()"
+   - com.xilinx.rapidwright.device.Site "public boolean isRegionalClkBuffer()"
+ - API Deprecations:
+   - com.xilinx.rapidwright.device.Package "public String getSiteType(String packagePinName)"
+   - com.xilinx.rapidwright.device.PackagePin "public String getSiteType()"
+ - API Removals (deprecated):
+
 ============= RapidWright 2020.1.7-beta released on 2020-12-09 ================
 Notes:
  * Fixes Issue #110 - Bad index because of integer overflow in VU19P.

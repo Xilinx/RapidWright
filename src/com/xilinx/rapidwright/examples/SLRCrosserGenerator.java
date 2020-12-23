@@ -49,6 +49,7 @@ import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.PartNameTools;
+import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.device.Tile;
@@ -238,8 +239,15 @@ public class SLRCrosserGenerator {
         Net clk_in = n.getPhysicalNetFromPin("", c.getEDIFCellInst().getPortInst("I"), d);
         Net clk = n.getPhysicalNetFromPin("", c.getEDIFCellInst().getPortInst("O"), d);
         
-		c.getSiteInst().routeIntraSiteNet(ce, s.getBELPin("CE_PRE_OPTINV"), s.getBELPin("BUFCE", "CE"));
-		c.getSiteInst().routeIntraSiteNet(clk_in, s.getBELPin("CLK_IN"), s.getBELPin("BUFCE", "I"));
+        SiteInst si = c.getSiteInst();
+		String src0 = "CE_PRE_OPTINV";
+		String src1 = "CLK_IN";
+		if(d.getDevice().getSeries() == Series.Versal) {
+			src0 = "CE";
+			src1 = "I";
+		}
+		si.routeIntraSiteNet(ce, s.getBELPin(src0), s.getBELPin("BUFCE", "CE"));
+		si.routeIntraSiteNet(clk_in, s.getBELPin(src1), s.getBELPin("BUFCE", "I"));
         clk.addPin(new SitePinInst(true,"CLK_OUT",c.getSiteInst()));	
         
         return c;

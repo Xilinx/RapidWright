@@ -409,6 +409,12 @@ public class EDIFCell extends EDIFPropertyObject {
 		return getInternalNet(portInst.getPortInstNameFromPort());
 	}
 
+	/**
+	 * Takes an external (or internal) port name and returns the corresponding
+	 * EDIFNet connected inside the cell.
+	 * @param portInstName The external port name to get the internal net.
+	 * @return The internal connected net or null if none exists.
+	 */
 	public EDIFNet getInternalNet(String portInstName){
 		if(internalPortMap == null) return null;
 		return internalPortMap.get(portInstName);

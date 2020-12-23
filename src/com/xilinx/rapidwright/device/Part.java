@@ -29,7 +29,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 
 /**
- * Generated on: Sat Oct 31 12:15:12 2020
+ * Generated on: Wed Dec 16 09:47:52 2020
  * by: com.xilinx.rapidwright.release.PartNamePopulator
  * 
  * Class used to uniquely represent a Xilinx part.
@@ -53,10 +53,26 @@ public class Part {
 	String temperatureGradeLetter;
 	/** Vivado part attribute REVISION */
 	String revision;
+	/** Vivado part attribute AVAILABLE_IOBS */
+	String availableIobs;
+	/** Vivado part attribute BLOCK_RAMS */
+	String blockRams;
+	/** Vivado part attribute DSP */
+	String dsp;
+	/** Vivado part attribute FLIPFLOPS */
+	String flipflops;
+	/** Vivado part attribute GB_TRANSCEIVERS */
+	String gbTransceivers;
+	/** Vivado part attribute LUT_ELEMENTS */
+	String lutElements;
+	/** Vivado part attribute MMCM */
+	String mmcm;
+	/** Vivado part attribute ULTRA_RAMS */
+	String ultraRams;
 	/** Vivado part attribute SERIES */
 	Series series;
 
-	public Part(String name, FamilyType architecture, String architectureFullName, FamilyType family, String device, String pkg, String speed, String temperatureGradeLetter, String revision, Series series) {
+	public Part(String name, FamilyType architecture, String architectureFullName, FamilyType family, String device, String pkg, String speed, String temperatureGradeLetter, String revision, String availableIobs, String blockRams, String dsp, String flipflops, String gbTransceivers, String lutElements, String mmcm, String ultraRams, Series series) {
 		this.name = name;
 		this.architecture = architecture;
 		this.architectureFullName = architectureFullName;
@@ -66,6 +82,14 @@ public class Part {
 		this.speed = speed;
 		this.temperatureGradeLetter = temperatureGradeLetter;
 		this.revision = revision;
+		this.availableIobs = availableIobs;
+		this.blockRams = blockRams;
+		this.dsp = dsp;
+		this.flipflops = flipflops;
+		this.gbTransceivers = gbTransceivers;
+		this.lutElements = lutElements;
+		this.mmcm = mmcm;
+		this.ultraRams = ultraRams;
 		this.series = series;
 	}
 
@@ -123,6 +147,54 @@ public class Part {
 	 */
 	public String getRevision() {
 		return revision;
+	}
+	/**
+	 * @return the availableIobs
+	 */
+	public String getAvailableIobs() {
+		return availableIobs;
+	}
+	/**
+	 * @return the blockRams
+	 */
+	public String getBlockRams() {
+		return blockRams;
+	}
+	/**
+	 * @return the dsp
+	 */
+	public String getDsp() {
+		return dsp;
+	}
+	/**
+	 * @return the flipflops
+	 */
+	public String getFlipflops() {
+		return flipflops;
+	}
+	/**
+	 * @return the gbTransceivers
+	 */
+	public String getGbTransceivers() {
+		return gbTransceivers;
+	}
+	/**
+	 * @return the lutElements
+	 */
+	public String getLutElements() {
+		return lutElements;
+	}
+	/**
+	 * @return the mmcm
+	 */
+	public String getMmcm() {
+		return mmcm;
+	}
+	/**
+	 * @return the ultraRams
+	 */
+	public String getUltraRams() {
+		return ultraRams;
 	}
 	/**
 	 * @return the series
@@ -184,6 +256,9 @@ public class Part {
 		};
 		ultraScalePlus = new HashSet<FamilyType>(Arrays.asList(ultraScalePlusTypes));
 		versalTypes = new FamilyType[] {
+				FamilyType.VERSAL, 
+				FamilyType.VERSALAICORE, 
+				FamilyType.VERSALPRIME, 
 		};
 		versal = new HashSet<FamilyType>(Arrays.asList(versalTypes));
 	}
