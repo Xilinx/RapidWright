@@ -47,6 +47,7 @@ import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFDesign;
 import com.xilinx.rapidwright.interchange.EnumerateCellBelMapping;
 import com.xilinx.rapidwright.interchange.CellBelMapping;
+import com.xilinx.rapidwright.interchange.DeviceResources.Device.BELInverter;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.PrimToMacroExpansion;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.PseudoCell;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.SitePin;
@@ -58,6 +59,12 @@ import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.Direction;
 
 public class DeviceResourcesVerifier {
     private static Enumerator<String> allStrings;
+
+    private static boolean expect(boolean gold, boolean test) {
+        if(gold != test) throw new RuntimeException("ERROR: Device mismatch: gold=" + gold
+                + ", test=" + test);
+        return true;
+    }
 
     private static boolean expect(String gold, String test) {
         if(gold == null && test == null) return true;
@@ -372,6 +379,23 @@ public class DeviceResourcesVerifier {
                 expect(belPin.getName(), allStrings.get(bpReader.getName()));
                 expect(DeviceResourcesWriter.getBELPinDirection(belPin).name(), bpReader.getDir().name());
                 expect(bel.getName(), allStrings.get(bpReader.getBel()));
+            }
+
+            if(bel.canInvert()) {
+                expect(belReader.isInverting(), true);
+                expect(belReader.isNonInverting(), false);
+
+                BELInverter.Reader belInverter = belReader.getInverting();
+                DeviceResources.Device.BELPin.Reader bpReader;
+
+                bpReader = stBPReader.get(belInverter.getNonInvertingPin());
+                expect(bel.getNonInvertingPin().getName(), allStrings.get(bpReader.getName()));
+
+                bpReader = stBPReader.get(belInverter.getInvertingPin());
+                expect(bel.getInvertingPin().getName(), allStrings.get(bpReader.getName()));
+            } else {
+                expect(belReader.isInverting(), false);
+                expect(belReader.isNonInverting(), true);
             }
         }
 

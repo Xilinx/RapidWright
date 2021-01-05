@@ -25,7 +25,7 @@ struct Device {
   primLibs        @7 : Dir.Netlist; # Netlist libraries of Unisim primitives and macros
   exceptionMap    @8 : List(PrimToMacroExpansion); # Prims to macros expand w/same name, except these
   cellBelMap      @9 : List(CellBelMapping);
-  cellInversions @10 : Void;
+  cellInversions @10 : List(CellInversions);
   packages       @11 : List(Package);
   constants      @12 : Constants;
 
@@ -76,11 +76,20 @@ struct Device {
   #######################################
   # Placement instance objects
   #######################################
+  struct BELInverter {
+    nonInvertingPin @0 : BELPinIdx;
+    invertingPin    @1 : BELPinIdx;
+  }
+
   struct BEL {
     name      @0 : StringIdx;
     type      @1 : StringIdx;
     pins      @2 : List(BELPinIdx);
     category  @3 : BELCategory; # This would be BELClass/class, but conflicts with Java language
+    union {
+        nonInverting @4 : Void;
+        inverting    @5 : BELInverter;
+    }
   }
 
   enum BELCategory {
@@ -293,5 +302,44 @@ struct Device {
     # nodeSources should be used to explicitly list nodes that fall into this
     # case.
     nodeSources            @3 : List(NodeConstantSource);
+  }
+
+  ######################################
+  # Inverting pins description
+  #
+  # This block describes local site wire
+  # inverters, site routing BELs, and
+  # parameters.
+  ######################################
+  struct CellPinInversionParameter {
+    union {
+      # This inverter cannot be controlled by parameter, only via tool merging
+      # of INV cells or other means.
+      invOnly      @0 : Void;
+      # This inverter can be controlled by a parameter.
+      # What parameter value configures this setting?
+      parameter    @1 : Dir.Netlist.PropertyMap.Entry;
+    }
+  }
+
+  struct CellPinInversion {
+    # Which cell pin supports a local site inverter?
+    cellPin      @0 : StringIdx;
+
+    # What parameters are used for the non-inverting case, and how to route
+    # through the inversion routing bels (if any).
+    notInverting @1 : CellPinInversionParameter;
+
+    # What parameters are used for the inverting case, and how to route
+    # through the inversion routing bels (if any).
+    inverting    @2 : CellPinInversionParameter;
+  }
+
+  struct CellInversions {
+    # Which cell is being described?
+    cell     @0 : StringIdx;
+
+    # Which cell have site local inverters?
+    cellPins @1 : List(CellPinInversion);
   }
 }

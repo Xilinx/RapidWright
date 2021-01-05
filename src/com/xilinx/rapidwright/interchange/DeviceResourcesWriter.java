@@ -49,6 +49,7 @@ import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.interchange.EnumerateCellBelMapping;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.BELCategory;
+import com.xilinx.rapidwright.interchange.DeviceResources.Device.BELInverter;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.PrimToMacroExpansion;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.PseudoCell;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.SitePin;
@@ -202,6 +203,9 @@ public class DeviceResourcesWriter {
         t.stop().start("Constants");
         ConstantDefinitions.writeConstants(allStrings, device, devBuilder.initConstants(), design, siteTypes, tileTypesObj);
 
+        t.stop().start("Cell Inverters");
+        populateCellInverters(allStrings, device, devBuilder);
+
         t.stop().start("Strings");
         writeAllStringsToBuilder(devBuilder);
 
@@ -266,6 +270,14 @@ public class DeviceResourcesWriter {
                     allBELPins.addObject(belPin);
                 }
                 belBuilder.setCategory(getBELCategory(bel));
+
+                if(bel.canInvert()) {
+                    BELInverter.Builder belInverter = belBuilder.initInverting();
+                    belInverter.setNonInvertingPin(allBELPins.getIndex(bel.getNonInvertingPin()));
+                    belInverter.setInvertingPin(allBELPins.getIndex(bel.getInvertingPin()));
+                } else {
+                    belBuilder.setNonInverting(Void.VOID);
+                }
             }
 
             Enumerator<SitePIP> allSitePIPs = new Enumerator<SitePIP>();
@@ -612,5 +624,8 @@ public class DeviceResourcesWriter {
                 gradeObj.setTemperatureGrade(allStrings.getIndex(grade.getTemperatureGrade()));
             }
         }
+    }
+
+    private static void populateCellInverters(Enumerator<String> allStrings, Device device, DeviceResources.Device.Builder devBuilder) {
     }
 }
