@@ -48,9 +48,10 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
     
     public static final EDIFName DEFAULT_VIEWREF = EDIFCell.DEFAULT_VIEW;
 
-    public static final String BLACK_BOX_PROP = "IS_IMPORTED";
-    
-    private Map<String,EDIFPortInst> portInsts;
+	public static final String BLACK_BOX_PROP = "IS_IMPORTED";
+	public static final String BLACK_BOX_PROP_VERSAL = "black_box";
+	
+	private Map<String,EDIFPortInst> portInsts;
 
     protected EDIFCellInst(){
         
@@ -202,11 +203,14 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
             portInst.setPort(port);
         }
     }
-    
-    public boolean isBlackBox(){
-        EDIFPropertyValue val = getProperty(BLACK_BOX_PROP);
-        if(val == null) return false;
-        if(val.getValue().toLowerCase().equals("true")) return true;
+	
+	public boolean isBlackBox(){
+		EDIFPropertyValue val = getProperty(BLACK_BOX_PROP);
+		if(val != null && val.getValue().toLowerCase().equals("true")) 
+			return true;
+		val = getProperty(BLACK_BOX_PROP_VERSAL);
+		if(val != null && val.getValue().toLowerCase().equals("1")) 
+			return true;
         return false;
     }
 

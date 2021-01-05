@@ -379,5 +379,20 @@ public class TileColors {
 		tileColors.put(TileTypeEnum.XIPHY_L_TERM_B,QColor.black);
 		tileColors.put(TileTypeEnum.XIPHY_L_TERM_T,QColor.black);
 
+		// Versal
+		tileColors.put(TileTypeEnum.CLE_E_CORE, QColor.blue);
+		tileColors.put(TileTypeEnum.CLE_W_CORE, QColor.blue);
+		tileColors.put(TileTypeEnum.DSP_ROCF_B_TILE, QColor.cyan);
+		tileColors.put(TileTypeEnum.DSP_ROCF_T_TILE, QColor.cyan);
+		tileColors.put(TileTypeEnum.BRAM_ROCF_BL_TILE, QColor.magenta);
+		tileColors.put(TileTypeEnum.BRAM_ROCF_BR_TILE, QColor.magenta);
+		tileColors.put(TileTypeEnum.BRAM_ROCF_TL_TILE, QColor.magenta);
+		tileColors.put(TileTypeEnum.BRAM_ROCF_TR_TILE, QColor.magenta);
+		tileColors.put(TileTypeEnum.INTF_ROCF_BL_TILE,QColor.darkYellow);
+		tileColors.put(TileTypeEnum.INTF_ROCF_BR_TILE,QColor.darkYellow);
+		tileColors.put(TileTypeEnum.INTF_ROCF_TL_TILE,QColor.darkYellow);
+		tileColors.put(TileTypeEnum.INTF_ROCF_TR_TILE,QColor.darkYellow);
+		tileColors.put(TileTypeEnum.CLE_BC_CORE, QColor.darkBlue);
+		tileColors.put(TileTypeEnum.CLE_BC_CORE_MX, QColor.darkBlue);
 	}
 }

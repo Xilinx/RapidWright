@@ -48,6 +48,7 @@ import com.xilinx.rapidwright.device.ClockRegion;
 import com.xilinx.rapidwright.device.BELClass;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.BEL;
+import com.xilinx.rapidwright.device.FamilyType;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
@@ -252,6 +253,7 @@ public class Router extends AbstractRouter {
 	}
 	
 	private ArrayList<RouteNode> findNearestLongLines(RouteNode src, RouteNode snk){
+		
 		ArrayList<RouteNode> longLines = new ArrayList<RouteNode>();
 		boolean isUltraScale = design.getPart().isUltraScale(); 
 		int x = src.getTile().getTileXCoordinate() - snk.getTile().getTileXCoordinate();
@@ -303,7 +305,10 @@ public class Router extends AbstractRouter {
 		}else{
 			rangeAlt = 0;
 		}
-		
+		if(design.getDevice().getArchitecture() == FamilyType.VERSAL) {
+			longLineName = "OUT_" + longLineName; 
+			longLineNameAlt = "OUT_" + longLineNameAlt;
+		}
 		
 		RouteNode longLineStart = new RouteNode();
 		RouteNode longLineStartAlt = new RouteNode();
@@ -403,8 +408,12 @@ public class Router extends AbstractRouter {
 		int otherWireEnd = 0;
 		String startWireName = longLineStart.getWireName(); 
 
-		// UltraScale specific
-		otherWireEnd = longLineStart.getTile().getWireIndex(startWireName.replace("BEG", "END"));
+
+		//Versal Specific
+		if(design.getDevice().getArchitecture() == FamilyType.VERSAL)
+			otherWireEnd = longLineStart.getTile().getWireIndex(startWireName.replace("BEG", "END").replace("OUT", "IN"));
+		else // UltraScale specific
+			otherWireEnd = longLineStart.getTile().getWireIndex(startWireName.replace("BEG", "END"));
 		
 		for(Wire wc : longLineStart.getConnections()){
 			if(wc.getWireIndex() == otherWireEnd && (!wc.getTile().equals(longLineStart.getTile()))){
@@ -831,6 +840,7 @@ public class Router extends AbstractRouter {
 	 * This method routes all the connections within a net.  
 	 */
 	public void routeNet(){	
+		
 		SitePinInst currSource = currNet.getSource();
 		currSources = new HashSet<RouteNode>();
 		boolean firstSinkToRouteInNet = true;
@@ -885,7 +895,8 @@ public class Router extends AbstractRouter {
 				}
 				if(!successfulRoute) {
 					// If we couldn't route by swapping, return pin to original location
-					swapLUTInputPins(currSinkPin, origPinName);
+					if(!currSinkPin.getName().equals(origPinName))
+						swapLUTInputPins(currSinkPin, origPinName);
 				}
 			}
 			

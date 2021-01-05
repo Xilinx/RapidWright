@@ -30,6 +30,7 @@ import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.device.Tile;
@@ -335,6 +336,7 @@ public class SATRouter {
 	 * @return True if the node is safe to use, false otherwise.
 	 */
 	private boolean includeNode(Node n){
+		if(n == null) return false;
 		SitePin sp = n.getSitePin();
 		if(sp != null){
 			SiteInst si = design.getSiteInstFromSite(sp.getSite());
@@ -353,6 +355,7 @@ public class SATRouter {
 	 * to supply evRouter for routing.
 	 */
 	public void createPipFile(){
+		boolean isVersal = design.getDevice().getSeries() == Series.Versal;
 		try {
 			BufferedWriter bw = new BufferedWriter(new FileWriter(pipFile));
 			// Find all sites, expand from all outputs within the region
@@ -374,7 +377,7 @@ public class SATRouter {
 							if(p.isRouteThru()) continue;
 							String startWireName = p.getStartWireName();
 							Node start = Node.getNode(w.getTile(),startWireName);
-							if(!currNodes.contains(start) && tiles.contains(start.getTile())){
+							if(start != null && !currNodes.contains(start) && tiles.contains(start.getTile())){
 								bw.write(" " + start + (useWeightsOnNodes ? ":" + commonNodeWeight : ""));
 								currNodes.add(start);
 							}
@@ -404,7 +407,19 @@ public class SATRouter {
 				Wire[] wires = new Wire[lutSize];
 				Node[] nodes = new Node[lutSize];
 				for(int i=0; i < lutSize; i++){
-					String pinName = lut.getSiteWireNameFromPhysicalPin("A" + (i+1));
+					String physPinName = "A" + (i+1);
+					String pinName = lut.getSiteWireNameFromPhysicalPin(physPinName);
+					if(isVersal) {
+						BELPin[] pins = lut.getSiteInst().getSiteWirePins(pinName);
+						BELPin src = null;
+						for(BELPin pin : pins) {
+							if(pin.isOutput()) {
+								src = pin.getBEL().getPin("D");
+								break;
+							}
+						}
+						pinName = src.getSourcePin().getConnectedSitePinName();
+					}
 					int wire = lut.getSite().getTileWireIndexFromPinName(pinName);
 					wires[i] = new Wire(lut.getSite().getTile(), wire);
 					nodes[i] = Node.getNode(wires[i]);
