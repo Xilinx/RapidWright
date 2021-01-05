@@ -46,6 +46,7 @@ import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFDesign;
 import com.xilinx.rapidwright.edif.EDIFLibrary;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.interchange.EnumerateCellBelMapping;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.BELCategory;
@@ -158,7 +159,7 @@ public class DeviceResourcesWriter {
 
         t.stop().start("Prims&Macros");
         // Create an EDIFNetlist populated with just primitive and macro libraries
-        EDIFLibrary prims = Design.getPrimitivesLibrary();
+        EDIFLibrary prims = Design.getPrimitivesLibrary(device.getName());
         EDIFLibrary macros = Design.getMacroPrimitives(device.getSeries());
         EDIFNetlist netlist = new EDIFNetlist("PrimitiveLibs");
         netlist.addLibrary(prims);
@@ -167,15 +168,20 @@ public class DeviceResourcesWriter {
         for(EDIFCell cell : macros.getCells()) {
             EDIFCell hdiCell = prims.getCell(cell.getName());
             if(hdiCell != null) {
-                dupsToRemove.add(cell);
+                dupsToRemove.add(hdiCell);
             }
+        }
+        for(EDIFCell dupCell : dupsToRemove) {
+            prims.removeCell(dupCell);
+        }
+
+        for(EDIFCell cell : macros.getCells()) {
             for(EDIFCellInst inst : cell.getCellInsts()) {
                 EDIFCell hdiCellInst = prims.getCell(inst.getCellType().getName());
                 if(hdiCellInst != null) {
                     // remap cell definition to HDI Primitives library
                     inst.updateCellType(hdiCellInst);
                 }
-
             }
         }
 
