@@ -596,9 +596,14 @@ public class DeviceResourcesWriter {
                 Site site = packagePin.getSite();
                 if(site != null) {
                     packagePinObj.initSite().setSite(allStrings.getIndex(site.getName()));
-                    packagePinObj.initBel().setBel(allStrings.getIndex("PAD"));
                 } else {
                     packagePinObj.initSite().setNoSite(Void.VOID);
+                }
+
+                BEL bel = packagePin.getBEL();
+                if(bel != null) {
+                    packagePinObj.initBel().setBel(allStrings.getIndex(bel.getName()));
+                } else {
                     packagePinObj.initBel().setNoBel(Void.VOID);
                 }
             }
