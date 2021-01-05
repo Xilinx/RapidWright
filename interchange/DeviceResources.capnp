@@ -25,7 +25,7 @@ struct Device {
   primLibs        @7 : Dir.Netlist; # Netlist libraries of Unisim primitives and macros
   exceptionMap    @8 : List(PrimToMacroExpansion); # Prims to macros expand w/same name, except these
   cellBelMap      @9 : List(CellBelMapping);
-  cellInversions @10 : List(CellInversions);
+  cellInversions @10 : List(CellInversion);
   packages       @11 : List(Package);
   constants      @12 : Constants;
 
@@ -335,7 +335,7 @@ struct Device {
     inverting    @2 : CellPinInversionParameter;
   }
 
-  struct CellInversions {
+  struct CellInversion {
     # Which cell is being described?
     cell     @0 : StringIdx;
 

@@ -21,8 +21,10 @@ import org.capnproto.PrimitiveList.Int;
 import org.capnproto.Void;
 
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELClass;
 import com.xilinx.rapidwright.device.BELPin;
@@ -51,6 +53,9 @@ import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.interchange.EnumerateCellBelMapping;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.BELCategory;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.BELInverter;
+import com.xilinx.rapidwright.interchange.DeviceResources.Device.CellInversion;
+import com.xilinx.rapidwright.interchange.DeviceResources.Device.CellPinInversion;
+import com.xilinx.rapidwright.interchange.DeviceResources.Device.CellPinInversionParameter;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.PrimToMacroExpansion;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.PseudoCell;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.SitePin;
@@ -60,6 +65,7 @@ import com.xilinx.rapidwright.interchange.DeviceResources.Device.TileType;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.BEL.Builder;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.Direction;
+import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.PropertyMap;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 
 public class DeviceResourcesWriter {
@@ -182,6 +188,58 @@ public class DeviceResourcesWriter {
                     // remap cell definition to HDI Primitives library
                     inst.updateCellType(hdiCellInst);
                 }
+            }
+        }
+
+        List<Unisim> unisims = new ArrayList<Unisim>();
+        for(EDIFCell cell : macros.getCells()) {
+            String cellName = cell.getName();
+            String primName = EDIFNetlist.macroCollapseExceptionMap.get(cellName);
+            if(primName != null) {
+                cellName = primName;
+            }
+            Unisim unisim = Unisim.valueOf(cellName);
+            Map<String,String> invertiblePins = DesignTools.getInvertiblePinMap(device.getSeries(), unisim);
+            if(invertiblePins != null && invertiblePins.size() > 0) {
+                unisims.add(unisim);
+            }
+        }
+        for(EDIFCell cell : prims.getCells()) {
+            Unisim unisim = Unisim.valueOf(cell.getName());
+            Map<String,String> invertiblePins = DesignTools.getInvertiblePinMap(device.getSeries(), unisim);
+            if(invertiblePins != null && invertiblePins.size() > 0) {
+                unisims.add(unisim);
+            }
+        }
+
+        StructList.Builder<CellInversion.Builder> cellInversions = devBuilder.initCellInversions(unisims.size());
+        for(int i = 0; i < unisims.size(); ++i) {
+            Unisim unisim = unisims.get(i);
+            CellInversion.Builder cellInversion = cellInversions.get(i);
+            cellInversion.setCell(allStrings.getIndex(unisim.name()));
+
+            Map<String,String> invertiblePins = DesignTools.getInvertiblePinMap(device.getSeries(), unisim);
+            StructList.Builder<CellPinInversion.Builder> cellPinInversions = cellInversion.initCellPins(invertiblePins.size());
+
+            int j = 0;
+            for(Map.Entry<String, String> entry : invertiblePins.entrySet()) {
+                String port = entry.getKey();
+                String parameterStr = entry.getValue();
+
+                CellPinInversion.Builder pinInversion = cellPinInversions.get(j);
+                j += 1;
+
+                pinInversion.setCellPin(allStrings.getIndex(port));
+
+                CellPinInversionParameter.Builder param = pinInversion.getNotInverting();
+                PropertyMap.Entry.Builder parameter = param.initParameter();
+                parameter.setKey(allStrings.getIndex(parameterStr));
+                parameter.setTextValue(allStrings.getIndex("FALSE"));
+
+                param = pinInversion.getInverting();
+                parameter = param.initParameter();
+                parameter.setKey(allStrings.getIndex(parameterStr));
+                parameter.setTextValue(allStrings.getIndex("TRUE"));
             }
         }
 
