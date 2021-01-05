@@ -60,10 +60,13 @@ import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.edif.EDIFHierPortInst;
+import com.xilinx.rapidwright.edif.EDIFName;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
+import com.xilinx.rapidwright.edif.EDIFPropertyObject;
+import com.xilinx.rapidwright.edif.EDIFPropertyValue;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.router.RouteNode;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
@@ -880,6 +883,7 @@ public class DesignTools {
 			String parentNetAlias = netlist.getParentNetName(netName);
 			Net parentNet = design.getNet(parentNetAlias);
 			if(parentNet == null) {
+				if(parentNetAlias == null) parentNetAlias = netName;
 				parentNet = new Net(parentNetAlias,netlist.getNetFromHierName(parentNetAlias));
 			}
 			for(String netAlias : netlist.getNetAliases(netName)) {
@@ -1656,5 +1660,25 @@ public class DesignTools {
 		EDIFHierPortInst hierPortInst = 
 				new EDIFHierPortInst(targetCell.getParentHierarchicalInstName(), portInst); 
 		return hierPortInst;
+	}
+	
+	/**
+	 * Creates a map that contains pin names for keys that map to the Unisim Verilog parameter that
+	 * can invert a pins value.  
+	 * @param series The series of interest.
+	 * @param unisim The unisim of interest.
+	 * @return A map of invertible pins that are that are mapped to their respective parameter name
+	 * that controls inversion. 
+	 */
+	public static Map<String,String> getInvertiblePinMap(Series series, Unisim unisim) {
+		Map<String,String> invertPinMap = new HashMap<String, String>();
+		for(Entry<String, VivadoProp> e : Design.getDefaultCellProperties(series, unisim.name()).entrySet()) {
+			String propName = e.getKey(); 
+			if(propName.startsWith("IS_") && propName.endsWith("_INVERTED")){
+				String pinName = propName.substring(propName.indexOf('_')+1, propName.lastIndexOf('_'));
+				invertPinMap.put(pinName, propName);
+			}
+		}
+		return invertPinMap;
 	}
 }
