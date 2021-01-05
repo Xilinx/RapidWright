@@ -119,7 +119,7 @@ public class BlockCreator {
 			modImpls.add(m);
 			
 			// Store PBlock with Module Here
-			String guidedPblockFile = routedDCPFileName.replace("_routed.dcp", USED_PBLOCK_FILE_SUFFIX);
+			String guidedPblockFile = dcpName.replace("_routed.dcp", USED_PBLOCK_FILE_SUFFIX);
 			List<String> lines = FileTools.getLinesFromTextFile(guidedPblockFile);
 			if(lines == null || lines.size() == 0){
 				throw new RuntimeException("ERROR: Problem reading pblock from guided block file " + guidedPblockFile);
