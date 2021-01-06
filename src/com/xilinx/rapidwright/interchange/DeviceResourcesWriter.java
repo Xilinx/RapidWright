@@ -170,23 +170,25 @@ public class DeviceResourcesWriter {
         EDIFNetlist netlist = new EDIFNetlist("PrimitiveLibs");
         netlist.addLibrary(prims);
         netlist.addLibrary(macros);
-        ArrayList<EDIFCell> dupsToRemove = new ArrayList<EDIFCell>();
-        for(EDIFCell cell : macros.getCells()) {
-            EDIFCell hdiCell = prims.getCell(cell.getName());
-            if(hdiCell != null) {
+        List<EDIFCell> dupsToRemove = new ArrayList<EDIFCell>();
+        for(EDIFCell hdiCell : prims.getCells()) {
+            EDIFCell cell = macros.getCell(hdiCell.getName());
+            if(cell != null) {
                 dupsToRemove.add(hdiCell);
             }
         }
+
         for(EDIFCell dupCell : dupsToRemove) {
             prims.removeCell(dupCell);
         }
 
         for(EDIFCell cell : macros.getCells()) {
             for(EDIFCellInst inst : cell.getCellInsts()) {
-                EDIFCell hdiCellInst = prims.getCell(inst.getCellType().getName());
-                if(hdiCellInst != null) {
-                    // remap cell definition to HDI Primitives library
-                    inst.updateCellType(hdiCellInst);
+                EDIFCell instCell = inst.getCellType();
+                EDIFCell macroCell = macros.getCell(instCell.getName());
+                if(macroCell != null) {
+                    // remap cell definition to macro library
+                    inst.updateCellType(macroCell);
                 }
             }
         }
@@ -266,9 +268,6 @@ public class DeviceResourcesWriter {
 
         t.stop().start("Constants");
         ConstantDefinitions.writeConstants(allStrings, device, devBuilder.initConstants(), design, siteTypes, tileTypesObj);
-
-        t.stop().start("Cell Inverters");
-        populateCellInverters(allStrings, device, devBuilder);
 
         t.stop().start("Strings");
         writeAllStringsToBuilder(devBuilder);
@@ -688,8 +687,5 @@ public class DeviceResourcesWriter {
                 gradeObj.setTemperatureGrade(allStrings.getIndex(grade.getTemperatureGrade()));
             }
         }
-    }
-
-    private static void populateCellInverters(Enumerator<String> allStrings, Device device, DeviceResources.Device.Builder devBuilder) {
     }
 }

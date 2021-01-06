@@ -278,7 +278,8 @@ public class DeviceResourcesVerifier {
 
         Netlist.Reader primLibs = dReader.getPrimLibs();
         EDIFNetlist primsAndMacros = LogNetlistReader.getLogNetlist(primLibs, true);
-        Set<String> libsFound = primsAndMacros.getLibrariesMap().keySet();
+        Set<String> libsFound = new HashSet<String>();
+        libsFound.addAll(primsAndMacros.getLibrariesMap().keySet());
         for(String libExpected : new String[] {EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME,
             device.getSeries()+"_"+EDIFTools.MACRO_PRIMITIVES_LIB}) {
             if(!libsFound.remove(libExpected)) {
@@ -293,10 +294,37 @@ public class DeviceResourcesVerifier {
 
         Set<Unisim> unisimsExpected = new HashSet<Unisim>();
         for(EDIFLibrary lib : primsAndMacros.getLibraries()) {
-            EDIFLibrary reference = lib.isHDIPrimitivesLibrary() ? Design.getPrimitivesLibrary() :
+            EDIFLibrary reference = lib.isHDIPrimitivesLibrary() ? Design.getPrimitivesLibrary(design.getDevice().getName()) :
                                                     Design.getMacroPrimitives(device.getSeries());
-            Set<String> cellsFound = lib.getCellMap().keySet();
-            Set<String> cellsExpected = reference.getCellMap().keySet();
+
+            Set<String> cellsFound = new HashSet<String>();
+            cellsFound.addAll(lib.getCellMap().keySet());
+
+            Set<String> cellsExpected = new HashSet<String>();
+            cellsExpected.addAll(reference.getCellMap().keySet());
+
+            for(String cellName : reference.getCellMap().keySet()) {
+                if(!lib.isHDIPrimitivesLibrary()) {
+                    String primName = EDIFNetlist.macroCollapseExceptionMap.get(cellName);
+                    if(primName != null) {
+                        cellName = primName;
+                    }
+                }
+
+                unisimsExpected.add(Unisim.valueOf(cellName));
+            }
+
+            if(lib.isHDIPrimitivesLibrary()) {
+                EDIFLibrary macros = Design.getMacroPrimitives(device.getSeries());
+                Set<String> dupCells = new HashSet<String>();
+                for(String cell : cellsExpected) {
+                    if(macros.getCell(cell) != null) {
+                        dupCells.add(cell);
+                    }
+                }
+
+                cellsExpected.removeAll(dupCells);
+            }
 
             if(!cellsFound.containsAll(cellsExpected)) {
                 cellsExpected.removeAll(cellsFound);
@@ -307,10 +335,6 @@ public class DeviceResourcesVerifier {
                 cellsFound.removeAll(cellsExpected);
                 throw new RuntimeException("Extra cells found in library " +
                         lib.getName() + ": " + cellsFound);
-            }
-
-            for(String cellName : reference.getCellMap().keySet()) {
-                unisimsExpected.add(Unisim.valueOf(cellName));
             }
         }
 
@@ -711,6 +735,12 @@ public class DeviceResourcesVerifier {
                 expect(true, parameter.isTextValue());
                 expect("TRUE", allStrings.get(parameter.getTextValue()));
             }
+        }
+
+        expect(unisimsWithInversions.size(), unisimsInReader.size());
+
+        if(!unisimsWithInversions.equals(unisimsInReader)) {
+            throw new RuntimeException("Inverted parameters Unisim doesn't match!");
         }
     }
 }

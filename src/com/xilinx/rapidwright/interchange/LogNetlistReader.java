@@ -277,7 +277,8 @@ public class LogNetlistReader {
                 n.addLibrary(library);
             }
 
-            EDIFCell cell = new EDIFCell(library, allStrings.get(cellReader.getName()));
+            String cellName = allStrings.get(cellReader.getName());
+            EDIFCell cell = new EDIFCell(library, cellName);
             extractPropertyMap(cellReader.getPropMap(), cell);
 
             allCells.add(i, cell);
