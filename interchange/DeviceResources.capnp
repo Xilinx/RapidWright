@@ -1,10 +1,23 @@
 @0x9d262c6ba6512325;
 using Java = import "/capnp/java.capnp";
+using Ref = import "References.capnp";
 using Dir = import "LogicalNetlist.capnp";
 $Java.package("com.xilinx.rapidwright.interchange");
 $Java.outerClassname("DeviceResources");
 
+struct HashSet {
+    type  @0 : Ref.ImplementationType = enumerator;
+    hide  @1 : Bool = true;
+}
+annotation hashSet(*) :HashSet;
+
+struct StringRef {
+    type  @0 :Ref.ReferenceType = root;
+    field @1 :Text = "strList";
+}
+annotation stringRef(*) :StringRef;
 using StringIdx = UInt32;
+
 using SiteTypeIdx = UInt32;
 using BELPinIdx = UInt32;
 using WireIdx = UInt32;
@@ -16,7 +29,7 @@ using TileTypeSiteTypeIdx = UInt32;
 struct Device {
 
   name            @0 : Text;
-  strList         @1 : List(Text);
+  strList         @1 : List(Text) $hashSet();
   siteTypeList    @2 : List(SiteType);
   tileTypeList    @3 : List(TileType);
   tileList        @4 : List(Tile);
@@ -33,7 +46,7 @@ struct Device {
   # Placement definition objects
   #######################################
   struct SiteType {
-    name         @0 : StringIdx;
+    name         @0 : StringIdx $stringRef();
     pins         @1 : List(SitePin);
     lastInput    @2 : UInt32; # Index of the last input pin
     bels         @3 : List(BEL);
@@ -58,7 +71,7 @@ struct Device {
 
     # primaryPinsToTileWires[0] is the tile wire that matches
     # siteTypeList[primaryType].pins[0], etc.
-    primaryPinsToTileWires @1 : List(StringIdx);
+    primaryPinsToTileWires @1 : List(StringIdx) $stringRef();
 
     # altPinsToPrimaryPins[0] is the mapping for
     # siteTypeList[primaryType].altSiteTypes[0], etc.
@@ -66,9 +79,9 @@ struct Device {
   }
 
   struct TileType {
-    name       @0 : StringIdx;
+    name       @0 : StringIdx $stringRef();
     siteTypes  @1 : List(SiteTypeInTileType);
-    wires      @2 : List(StringIdx);
+    wires      @2 : List(StringIdx) $stringRef();
     pips       @3 : List(PIP);
     constants  @4 : List(WireConstantSources);
   }
@@ -82,8 +95,8 @@ struct Device {
   }
 
   struct BEL {
-    name      @0 : StringIdx;
-    type      @1 : StringIdx;
+    name      @0 : StringIdx $stringRef();
+    type      @1 : StringIdx $stringRef();
     pins      @2 : List(BELPinIdx);
     category  @3 : BELCategory; # This would be BELClass/class, but conflicts with Java language
     union {
@@ -99,12 +112,12 @@ struct Device {
   }
 
   struct Site {
-    name      @0 : StringIdx;
+    name      @0 : StringIdx $stringRef();
     type      @1 : TileTypeSiteTypeIdx; # Index into TileType.siteTypes
   }
 
   struct Tile {
-    name       @0 : StringIdx;
+    name       @0 : StringIdx $stringRef();
     type       @1 : TileTypeIdx;
     sites      @2 : List(Site);
     row        @3 : UInt16;
@@ -116,13 +129,13 @@ struct Device {
   # Intra-site routing resources
   ######################################
   struct BELPin {
-    name   @0 : StringIdx;
+    name   @0 : StringIdx $stringRef();
     dir    @1 : Dir.Netlist.Direction;
-    bel    @2 : StringIdx;
+    bel    @2 : StringIdx $stringRef();
   }
 
   struct SiteWire {
-    name   @0 : StringIdx;
+    name   @0 : StringIdx $stringRef();
     pins   @1 : List(BELPinIdx);
   }
 
@@ -132,7 +145,7 @@ struct Device {
   }
 
   struct SitePin {
-    name     @0 : StringIdx;
+    name     @0 : StringIdx $stringRef();
     dir      @1 : Dir.Netlist.Direction;
     belpin   @2 : BELPinIdx;
   }
@@ -142,8 +155,8 @@ struct Device {
   # Inter-site routing resources
   ######################################
   struct Wire {
-    tile      @0 : StringIdx;
-    wire      @1 : StringIdx;
+    tile      @0 : StringIdx $stringRef();
+    wire      @1 : StringIdx $stringRef();
   }
 
   struct Node {
@@ -163,8 +176,8 @@ struct Device {
   }
 
   struct PseudoCell {
-    bel          @0 : StringIdx;
-    pins         @1 : List(StringIdx);
+    bel          @0 : StringIdx $stringRef();
+    pins         @1 : List(StringIdx) $stringRef();
   }
 
   struct WireConstantSources {
@@ -178,13 +191,13 @@ struct Device {
   # macro of the same name.
   ######################################
   struct PrimToMacroExpansion {
-    primName  @0 : StringIdx;
-    macroName @1 : StringIdx;
+    primName  @0 : StringIdx $stringRef();
+    macroName @1 : StringIdx $stringRef();
   }
 
   # Cell <-> BEL and Cell pin <-> BEL Pin mapping
   struct CellBelMapping {
-    cell          @0 : StringIdx;
+    cell          @0 : StringIdx $stringRef();
     commonPins    @1 : List(CommonCellBelPinMaps);
     parameterPins @2 : List(ParameterCellBelPinMaps);
   }
@@ -192,14 +205,14 @@ struct Device {
   # Map one cell pin to one BEL pin.
   # Note: There may be more than one BEL pin mapped to one cell pin.
   struct CellBelPinEntry {
-    cellPin @0 : StringIdx;
-    belPin  @1 : StringIdx;
+    cellPin @0 : StringIdx $stringRef();
+    belPin  @1 : StringIdx $stringRef();
   }
 
   # Specifies BELs located in a specific site type.
   struct SiteTypeBelEntry {
-    siteType @0 : StringIdx;
-    bels     @1 : List(StringIdx);
+    siteType @0 : StringIdx $stringRef();
+    bels     @1 : List(StringIdx) $stringRef();
   }
 
   # This is the portion of Cell <-> BEL pin mapping that is common across all
@@ -213,8 +226,8 @@ struct Device {
   # This is the portion of the Cell <-> BEL pin mapping that is parameter
   # specific.
   struct ParameterSiteTypeBelEntry {
-    bel       @0 : StringIdx;
-    siteType  @1 : StringIdx;
+    bel       @0 : StringIdx $stringRef();
+    siteType  @1 : StringIdx $stringRef();
     parameter @2 : Dir.Netlist.PropertyMap.Entry;
   }
 
@@ -225,24 +238,24 @@ struct Device {
 
   struct Package {
     struct PackagePin {
-        packagePin @0 : StringIdx;
+        packagePin @0 : StringIdx $stringRef();
         site : union {
             noSite     @1 : Void;
-            site       @2 : StringIdx;
+            site       @2 : StringIdx $stringRef();
         }
         bel : union {
             noBel      @3 : Void;
-            bel        @4 : StringIdx;
+            bel        @4 : StringIdx $stringRef();
         }
     }
 
     struct Grade {
-        name             @0 : StringIdx;
-        speedGrade       @1 : StringIdx;
-        temperatureGrade @2 : StringIdx;
+        name             @0 : StringIdx $stringRef();
+        speedGrade       @1 : StringIdx $stringRef();
+        temperatureGrade @2 : StringIdx $stringRef();
     }
 
-    name        @0 : StringIdx;
+    name        @0 : StringIdx $stringRef();
     packagePins @1 : List(PackagePin);
     grades      @2 : List(Grade);
   }
@@ -259,21 +272,21 @@ struct Device {
 
   struct Constants {
     struct SitePinConstantExceptions {
-        siteType     @0 : StringIdx;
-        sitePin      @1 : StringIdx;
+        siteType     @0 : StringIdx $stringRef();
+        sitePin      @1 : StringIdx $stringRef();
         bestConstant @2 : ConstantType;
     }
 
     struct SiteConstantSource {
-        siteType     @0 : StringIdx;
-        bel          @1 : StringIdx;
-        belPin       @2 : StringIdx;
+        siteType     @0 : StringIdx $stringRef();
+        bel          @1 : StringIdx $stringRef();
+        belPin       @2 : StringIdx $stringRef();
         constant     @3 : ConstantType;
     }
 
     struct NodeConstantSource {
-        tile     @0 : StringIdx;
-        wire     @1 : StringIdx;
+        tile     @0 : StringIdx $stringRef();
+        wire     @1 : StringIdx $stringRef();
         constant @2 : ConstantType;
     }
 
