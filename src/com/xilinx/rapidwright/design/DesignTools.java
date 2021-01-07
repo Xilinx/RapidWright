@@ -1494,7 +1494,7 @@ public class DesignTools {
 					if(!success) throw new RuntimeException("ERROR: Failed to unroute dual output "
 							+ "net/pin scenario: " + net + " on pin " + name);
 					siteInst.routeIntraSiteNet(net, srcPin, srcPin);
-					if(net.getSource().getName().equals(belPin.getName())) {
+					if(net.getSource() != null && net.getSource().getName().equals(belPin.getName())) {
 						net.removePin(net.getSource());						
 					}
 				}
