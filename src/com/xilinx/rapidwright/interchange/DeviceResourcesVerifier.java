@@ -586,19 +586,24 @@ public class DeviceResourcesVerifier {
                     if(packagePinObj.getSite().isSite()) {
                         throw new RuntimeException("Has site when no site is expected?");
                     }
-                    if(packagePinObj.getBel().isBel()) {
-                        throw new RuntimeException("Has BEL when no site is expected?");
-                    }
                 } else {
                     if(!packagePinObj.getSite().isSite()) {
                         throw new RuntimeException("Has site when site is expected?");
                     }
+                    expect(site.getName(), allStrings.get(packagePinObj.getSite().getSite()));
+                }
+
+                BEL bel = packagePin.getBEL();
+                if(bel == null) {
+                    if(packagePinObj.getBel().isBel()) {
+                        throw new RuntimeException("Has BEL when no site is expected?");
+                    }
+                } else {
                     if(!packagePinObj.getBel().isBel()) {
                         throw new RuntimeException("Has BEL when site is expected?");
                     }
 
-                    expect(site.getName(), allStrings.get(packagePinObj.getSite().getSite()));
-                    expect("PAD", allStrings.get(packagePinObj.getBel().getBel()));
+                    expect(bel.getName(), allStrings.get(packagePinObj.getBel().getBel()));
                 }
             }
 
