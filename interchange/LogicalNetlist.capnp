@@ -18,22 +18,25 @@ annotation stringRef(*) :StringRef;
 using StringIdx = UInt32;
 
 struct PortRef {
-    type  @0 :Ref.ReferenceType = root;
+    type  @0 :Ref.ReferenceType = parent;
     field @1 :Text = "portList";
+    depth @2 :Int32 = 1;
 }
 annotation portRef(*) :PortRef;
 using PortIdx = UInt32;
 
 struct CellRef {
-    type  @0 :Ref.ReferenceType = root;
+    type  @0 :Ref.ReferenceType = parent;
     field @1 :Text = "cellDecls";
+    depth @2 :Int32 = 1;
 }
 annotation cellRef(*) :CellRef;
 using CellIdx = UInt32;
 
 struct InstRef {
-    type  @0 :Ref.ReferenceType = root;
+    type  @0 :Ref.ReferenceType = parent;
     field @1 :Text = "instList";
+    depth @2 :Int32 = 1;
 }
 annotation instRef(*) :InstRef;
 using InstIdx = UInt32;
@@ -98,14 +101,14 @@ struct Netlist {
   }
 
   struct PortInstance {
-    port  @0 : PortIdx $portRef();
+    port  @0 : PortIdx $portRef(depth = 3);
     busIdx : union {
         singleBit @1 : Void; # Single bit
         idx       @2 : UInt32; # Index within bussed port
     }
     union {
       extPort     @3 : Void;
-      inst        @4 : InstIdx $instRef();
+      inst        @4 : InstIdx $instRef(depth = 3);
     }
   }
 
