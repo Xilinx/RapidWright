@@ -22,6 +22,7 @@ import org.capnproto.StructList.Reader;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.device.BEL;
@@ -47,6 +48,9 @@ import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFDesign;
 import com.xilinx.rapidwright.interchange.EnumerateCellBelMapping;
 import com.xilinx.rapidwright.interchange.CellBelMapping;
+import com.xilinx.rapidwright.interchange.DeviceResources.Device.CellInversion;
+import com.xilinx.rapidwright.interchange.DeviceResources.Device.CellPinInversion;
+import com.xilinx.rapidwright.interchange.DeviceResources.Device.BELInverter;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.PrimToMacroExpansion;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.PseudoCell;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.SitePin;
@@ -55,9 +59,16 @@ import com.xilinx.rapidwright.interchange.DeviceResources.Device.TileType;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.ParentPins;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.Direction;
+import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.PropertyMap;
 
 public class DeviceResourcesVerifier {
     private static Enumerator<String> allStrings;
+
+    private static boolean expect(boolean gold, boolean test) {
+        if(gold != test) throw new RuntimeException("ERROR: Device mismatch: gold=" + gold
+                + ", test=" + test);
+        return true;
+    }
 
     private static boolean expect(String gold, String test) {
         if(gold == null && test == null) return true;
@@ -267,7 +278,8 @@ public class DeviceResourcesVerifier {
 
         Netlist.Reader primLibs = dReader.getPrimLibs();
         EDIFNetlist primsAndMacros = LogNetlistReader.getLogNetlist(primLibs, true);
-        Set<String> libsFound = primsAndMacros.getLibrariesMap().keySet();
+        Set<String> libsFound = new HashSet<String>();
+        libsFound.addAll(primsAndMacros.getLibrariesMap().keySet());
         for(String libExpected : new String[] {EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME,
             device.getSeries()+"_"+EDIFTools.MACRO_PRIMITIVES_LIB}) {
             if(!libsFound.remove(libExpected)) {
@@ -279,11 +291,40 @@ public class DeviceResourcesVerifier {
             throw new RuntimeException("Found the following unexpected librar"+
                     (size > 1 ? "ies" : "y")+": " + libsFound);
         }
+
+        Set<Unisim> unisimsExpected = new HashSet<Unisim>();
         for(EDIFLibrary lib : primsAndMacros.getLibraries()) {
-            EDIFLibrary reference = lib.isHDIPrimitivesLibrary() ? Design.getPrimitivesLibrary() :
+            EDIFLibrary reference = lib.isHDIPrimitivesLibrary() ? Design.getPrimitivesLibrary(design.getDevice().getName()) :
                                                     Design.getMacroPrimitives(device.getSeries());
-            Set<String> cellsFound = lib.getCellMap().keySet();
-            Set<String> cellsExpected = reference.getCellMap().keySet();
+
+            Set<String> cellsFound = new HashSet<String>();
+            cellsFound.addAll(lib.getCellMap().keySet());
+
+            Set<String> cellsExpected = new HashSet<String>();
+            cellsExpected.addAll(reference.getCellMap().keySet());
+
+            for(String cellName : reference.getCellMap().keySet()) {
+                if(!lib.isHDIPrimitivesLibrary()) {
+                    String primName = EDIFNetlist.macroCollapseExceptionMap.get(cellName);
+                    if(primName != null) {
+                        cellName = primName;
+                    }
+                }
+
+                unisimsExpected.add(Unisim.valueOf(cellName));
+            }
+
+            if(lib.isHDIPrimitivesLibrary()) {
+                EDIFLibrary macros = Design.getMacroPrimitives(device.getSeries());
+                Set<String> dupCells = new HashSet<String>();
+                for(String cell : cellsExpected) {
+                    if(macros.getCell(cell) != null) {
+                        dupCells.add(cell);
+                    }
+                }
+
+                cellsExpected.removeAll(dupCells);
+            }
 
             if(!cellsFound.containsAll(cellsExpected)) {
                 cellsExpected.removeAll(cellsFound);
@@ -296,6 +337,8 @@ public class DeviceResourcesVerifier {
                         lib.getName() + ": " + cellsFound);
             }
         }
+
+        verifyCellInversions(device, dReader, unisimsExpected);
 
         StructList.Reader<PrimToMacroExpansion.Reader> exceptionMap = dReader.getExceptionMap();
         int mapSize = exceptionMap.size();
@@ -372,6 +415,23 @@ public class DeviceResourcesVerifier {
                 expect(belPin.getName(), allStrings.get(bpReader.getName()));
                 expect(DeviceResourcesWriter.getBELPinDirection(belPin).name(), bpReader.getDir().name());
                 expect(bel.getName(), allStrings.get(bpReader.getBel()));
+            }
+
+            if(bel.canInvert()) {
+                expect(belReader.isInverting(), true);
+                expect(belReader.isNonInverting(), false);
+
+                BELInverter.Reader belInverter = belReader.getInverting();
+                DeviceResources.Device.BELPin.Reader bpReader;
+
+                bpReader = stBPReader.get(belInverter.getNonInvertingPin());
+                expect(bel.getNonInvertingPin().getName(), allStrings.get(bpReader.getName()));
+
+                bpReader = stBPReader.get(belInverter.getInvertingPin());
+                expect(bel.getInvertingPin().getName(), allStrings.get(bpReader.getName()));
+            } else {
+                expect(belReader.isInverting(), false);
+                expect(belReader.isNonInverting(), true);
             }
         }
 
@@ -626,6 +686,66 @@ public class DeviceResourcesVerifier {
                 expect(grade.getSpeedGrade(), allStrings.get(gradeObj.getSpeedGrade()));
                 expect(grade.getTemperatureGrade(), allStrings.get(gradeObj.getTemperatureGrade()));
             }
+        }
+    }
+
+    static private void verifyCellInversions(Device device, DeviceResources.Device.Reader dReader, Set<Unisim> unisimsExpected) {
+        Set<Unisim> unisimsWithInversions = new HashSet<Unisim>();
+        Set<Unisim> unisimsInReader = new HashSet<Unisim>();
+
+        for(Unisim unisim : unisimsExpected) {
+            Map<String, String> invertiblePinMap = DesignTools.getInvertiblePinMap(device.getSeries(), unisim);
+            if(invertiblePinMap != null && invertiblePinMap.size() > 0) {
+                unisimsWithInversions.add(unisim);
+            }
+        }
+
+        Map<String, String> macroToPrims = new HashMap<String, String>();
+        for(PrimToMacroExpansion.Reader entry : dReader.getExceptionMap()) {
+            String primName = allStrings.get(entry.getPrimName());
+            String macroName = allStrings.get(entry.getMacroName());
+            macroToPrims.put(macroName, primName);
+        }
+
+        for(CellInversion.Reader cellInversion : dReader.getCellInversions()) {
+            String cellName = allStrings.get(cellInversion.getCell());
+
+            String primName = macroToPrims.get(cellName);
+            if(primName != null) {
+                cellName = primName;
+            }
+
+            Unisim unisim = Unisim.valueOf(cellName);
+
+            unisimsInReader.add(unisim);
+
+            Map<String, String> invertiblePinMap = DesignTools.getInvertiblePinMap(device.getSeries(), unisim);
+
+            StructList.Reader<CellPinInversion.Reader> pins = cellInversion.getCellPins();
+            expect(invertiblePinMap.size(), pins.size());
+
+            for(CellPinInversion.Reader pin : pins) {
+                String cellPin = allStrings.get(pin.getCellPin());
+                String expectedParameter = invertiblePinMap.get(cellPin);
+                expect(true, pin.getNotInverting().isParameter());
+                expect(true, pin.getInverting().isParameter());
+
+                PropertyMap.Entry.Reader parameter = pin.getNotInverting().getParameter();
+                expect(expectedParameter, allStrings.get(parameter.getKey()));
+                expect(true, parameter.isTextValue());
+                expect("FALSE", allStrings.get(parameter.getTextValue()));
+
+                parameter = pin.getInverting().getParameter();
+                expect(expectedParameter, allStrings.get(parameter.getKey()));
+                expect(true, parameter.isTextValue());
+                expect("TRUE", allStrings.get(parameter.getTextValue()));
+            }
+        }
+
+        expect(unisimsWithInversions.size(), unisimsInReader.size());
+
+        if(!unisimsWithInversions.equals(unisimsInReader)) {
+            throw new RuntimeException("Inverted parameters Unisim doesn't match!");
         }
     }
 }
