@@ -193,12 +193,11 @@ public class EDIFLibrary extends EDIFName {
 	 */
 	public void uniqueifyCellsWithPrefix(String name){
 		ArrayList<EDIFCell> renamedCells = new ArrayList<>(getCells());
-		String validEDIFPrefix = EDIFTools.makeNameEDIFCompatible(name);
 		cells.clear();
 		for(EDIFCell c : renamedCells){
 			c.setName(name + c.getName());
 			if(c.getEDIFName() != null){
-				c.setEDIFRename(validEDIFPrefix + c.getEDIFName()); 
+				c.setEDIFRename(EDIFTools.makeNameEDIFCompatible(name + c.getEDIFName()));
 			}
 			addCell(c);
 		}

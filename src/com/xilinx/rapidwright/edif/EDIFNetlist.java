@@ -304,28 +304,32 @@ public class EDIFNetlist extends EDIFName {
 		}
 	}
 
-	public void migrateCellAndSubCells(EDIFCell cell){
-		Queue<EDIFCell> cells = new LinkedList<>();
-		cells.add(cell);
-		while(!cells.isEmpty()){
-			EDIFCell curr = cells.poll();
-			EDIFLibrary destLib = getLibrary(curr.getLibrary().getName());
-			if(destLib == null){
-				if(curr.getLibrary().getName().equals(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME)){
-					destLib = getHDIPrimitivesLibrary();
-				}else{
-					destLib = getWorkLibrary();
-				}
-			}
-
-			if(!destLib.containsCell(curr)){
-				destLib.addCell(curr);
-			}
-
-			for(EDIFCellInst inst : curr.getCellInsts()){
-				cells.add(inst.getCellType());
+	private EDIFCell migrateCellAndSubCellsWorker(EDIFCell cell) {
+		EDIFLibrary destLib = getLibrary(cell.getLibrary().getName());
+		if(destLib == null){
+			if(cell.getLibrary().getName().equals(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME)){
+				destLib = getHDIPrimitivesLibrary();
+			}else{
+				destLib = getWorkLibrary();
 			}
 		}
+
+		EDIFCell existingCell = destLib.getCell(cell.getLegalEDIFName());
+		if(existingCell == null){
+			destLib.addCell(cell);
+			for(EDIFCellInst inst : cell.getCellInsts()){
+				inst.updateCellType(migrateCellAndSubCellsWorker(inst.getCellType()));
+				//The view might have changed
+				inst.getViewref().setName(inst.getCellType().getView());
+			}
+			return cell;
+		} else {
+			return existingCell;
+		}
+	}
+	
+	public void migrateCellAndSubCells(EDIFCell cell) {
+		migrateCellAndSubCellsWorker(cell);
 	}
 
 
