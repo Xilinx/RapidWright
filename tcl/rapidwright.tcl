@@ -756,6 +756,7 @@ proc write_cell_to_edif_recursive { cell fp cells_written } {
         puts "$cell_type $cells_written" 
         set cell_name [get_property NAME $cell]
         puts $fp "   (cell $cell_type (celltype GENERIC)\n     (view netlist (viewtype NETLIST)\n       (interface "
+		set busses_written {}
         foreach pin [get_pins -of $cell] { 
             set dir "[get_property DIRECTION $pin]"
             if ![string equal "INOUT" $dir] {
@@ -763,7 +764,10 @@ proc write_cell_to_edif_recursive { cell fp cells_written } {
             }
             if { [get_property BUS_NAME $pin] != {} } {
                 set bus_name [get_property BUS_NAME $pin]
-                puts $fp "        (port (array (rename $bus_name \"$bus_name\[[get_property BUS_START $pin]:[get_property BUS_STOP $pin]\]\" [get_property BUS_WIDTH $pin]) (direction $dir))"
+				if { ![dict exists $busses_written $bus_name] } {
+					puts $fp "        (port (array (rename $bus_name \"$bus_name\[[get_property BUS_START $pin]:[get_property BUS_STOP $pin]\]\") [get_property BUS_WIDTH $pin]) (direction $dir))"
+					dict append busses_written $bus_name 1
+				}
             } else {
                 puts $fp "        (port [get_property REF_PIN_NAME $pin] (direction $dir))"
             }
@@ -830,7 +834,7 @@ proc write_cell_to_edif { cell file_name } {
     puts $fp ""
     puts $fp "  (design $cell_type"
     puts $fp "    (cellref $cell_type (libraryref hdi_primitives))"
-    puts $fp "    (property part (string \"[get_property PART [current_project]]\"))"
+    puts $fp "    (property PART (string \"[get_property PART [current_project]]\"))"
     puts $fp "  )"
     puts $fp ")"
     close $fp
