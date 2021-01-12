@@ -863,7 +863,12 @@ public class FileTools {
 			}
 		}
 		// Try getting it from inside the jar (classpath)
-		return FileTools.class.getResourceAsStream("/" + name.replace(File.separator, "/"));
+		InputStream res = FileTools.class.getResourceAsStream("/" + name.replace(File.separator, "/"));
+		if (res == null) {
+			System.err.println("ERROR: " + RAPIDWRIGHT_VARIABLE_NAME +
+					" is not set and Resource was not found in Classpath.");
+		}
+		return res;
 	}
 	
 	/**
