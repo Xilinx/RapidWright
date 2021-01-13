@@ -773,14 +773,16 @@ proc write_cell_to_edif_recursive { cell fp cells_written } {
             }
         }
         puts $fp "       )"
-        set insts [get_cells -hier -filter PARENT=={$cell_name}]
-        if [expr [llength $insts] > 0] {
-            puts $fp "       (contents"
+		set is_prim [get_property IS_PRIMITIVE $cell]
+		if {$is_prim == 0} {
+			current_instance $cell_name
+			set insts [get_cells]
+			puts $fp "       (contents"
             foreach inst $insts {
                 set inst_name [string map $replace_map [get_property NAME $inst]]
                 puts $fp "         (instance $inst_name (viewref netlist (cellref [get_property REF_NAME $inst] (libraryref hdi_primitives))))"
             }
-            foreach net [get_nets -hier -filter PARENT_CELL=={$cell_name}] {
+            foreach net [get_nets] {
                 set net_name [string map $replace_map [get_property NAME $net]]
                 puts $fp "         (net $net_name (joined"
                 foreach pin [get_pins -of $net] {
@@ -799,6 +801,7 @@ proc write_cell_to_edif_recursive { cell fp cells_written } {
             }
             puts $fp "      )"
         }
+		current_instance
         puts $fp "     )\n   )"
     }
     return $cells_written
