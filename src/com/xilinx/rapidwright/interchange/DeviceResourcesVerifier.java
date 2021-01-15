@@ -24,8 +24,10 @@ import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.SiteInst;
+import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.device.BEL;
+import com.xilinx.rapidwright.device.BELClass;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Grade;
@@ -57,6 +59,7 @@ import com.xilinx.rapidwright.interchange.DeviceResources.Device.SitePin;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.SiteType;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.TileType;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.ParentPins;
+import com.xilinx.rapidwright.interchange.DeviceResources.Device.BELCategory;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.Direction;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.PropertyMap;
@@ -81,6 +84,22 @@ public class DeviceResourcesVerifier {
         if(gold != test) throw new RuntimeException("ERROR: Device mismatch: gold=" + gold
                 + ", test=" + test);
         return true;
+    }
+
+    private static void verifyBelPin(StructList.Reader<DeviceResources.Device.BELPin.Reader> belPins, BELPin pin, int belPinIndex) {
+        DeviceResources.Device.BELPin.Reader belPin = belPins.get(belPinIndex);
+        expect(pin.getName(), allStrings.get(belPin.getName()));
+        BELPin.Direction dir = pin.getDir();
+        if(dir == BELPin.Direction.INPUT) {
+            expect(Direction.INPUT.name(), belPin.getDir().name());
+        } else if(dir == BELPin.Direction.OUTPUT) {
+            expect(Direction.OUTPUT.name(), belPin.getDir().name());
+        } else if(dir == BELPin.Direction.BIDIRECTIONAL) {
+            expect(Direction.INOUT.name(), belPin.getDir().name());
+        } else {
+            expect(Direction._NOT_IN_SCHEMA.name(), belPin.getDir().name());
+        }
+        expect(pin.getBEL().getName(), allStrings.get(belPin.getBel()));
     }
 
     public static boolean verifyDeviceResources(String devResFileName, String deviceName) throws IOException {
@@ -124,7 +143,158 @@ public class DeviceResourcesVerifier {
         Reader<DeviceResources.Device.Tile.Reader> tilesReader = dReader.getTileList();
         expect(device.getAllTiles().size(), tilesReader.size());
 
+        // Get examples for each site type to a site.
+        Map<SiteTypeEnum, Site> siteTypes = new HashMap<SiteTypeEnum, Site>();
+        for(Tile tile : device.getAllTiles()) {
+            for(Site site : tile.getSites()) {
+                siteTypes.put(site.getSiteTypeEnum(), site);
+                SiteTypeEnum[] altSiteTypes = site.getAlternateSiteTypeEnums();
+                for(SiteTypeEnum altSiteType : altSiteTypes) {
+                    siteTypes.put(altSiteType, site);
+                }
+            }
+        }
+
         Reader<SiteType.Reader> stReaders = dReader.getSiteTypeList();
+        for(SiteType.Reader stReader : stReaders) {
+            Set<Integer> belPinIndicies = new HashSet<Integer>();
+            SiteTypeEnum siteTypeEnum = SiteTypeEnum.valueOf(allStrings.get(stReader.getName()));
+
+            Site site = siteTypes.get(siteTypeEnum);
+            SiteInst siteInst = design.createSiteInst("site_instance", siteTypeEnum, site);
+
+            StructList.Reader<DeviceResources.Device.BELPin.Reader> belPinsReader = stReader.getBelPins();
+            StructList.Reader<DeviceResources.Device.BEL.Reader> belsReader = stReader.getBels();
+            BEL[] bels = siteInst.getBELs();
+            expect(bels.length, belsReader.size());
+            for(int i=0; i < bels.length; i++) {
+                BEL bel = bels[i];
+                DeviceResources.Device.BEL.Reader belReader = belsReader.get(i);
+
+                expect(bel.getName(), allStrings.get(belReader.getName()));
+                expect(bel.getBELType(), allStrings.get(belReader.getType()));
+
+                BELPin[] belPins = bel.getPins();
+                PrimitiveList.Int.Reader pinsReader = belReader.getPins();
+                expect(belPins.length, pinsReader.size());
+                for(int j=0; j < belPins.length; j++) {
+                    BELPin pin = belPins[j];
+                    int belPinIndex = pinsReader.get(j);
+                    belPinIndicies.add(belPinIndex);
+                    verifyBelPin(belPinsReader, pin, belPinIndex);
+                }
+
+                expect(DeviceResourcesWriter.getBELCategory(bel).name(), belReader.getCategory().name());
+
+                if(bel.canInvert()) {
+                    expect(true, belReader.hasInverting());
+                    BELInverter.Reader belInverter = belReader.getInverting();
+
+                    BELPin nonInverting = bel.getNonInvertingPin();
+                    belPinIndicies.add(belInverter.getNonInvertingPin());
+                    verifyBelPin(belPinsReader, nonInverting, belInverter.getNonInvertingPin());
+
+                    BELPin inverting = bel.getInvertingPin();
+                    belPinIndicies.add(belInverter.getInvertingPin());
+                    verifyBelPin(belPinsReader, inverting, belInverter.getInvertingPin());
+                } else {
+                    expect(false, belReader.hasInverting());
+                }
+            }
+
+            StructList.Reader<DeviceResources.Device.SitePin.Reader> pinsReader = stReader.getPins();
+            String[] pinNames = siteInst.getSitePinNames();
+            expect(pinNames.length, pinsReader.size());
+
+            int highestIndexInputPin = siteInst.getHighestSitePinInputIndex();
+            expect(highestIndexInputPin, stReader.getLastInput());
+
+            Set<String> pinNameSet = new HashSet<String>();
+            for(String pin : pinNames) {
+                pinNameSet.add(pin);
+            }
+            for(int i=0; i < pinNames.length; i++) {
+                DeviceResources.Device.SitePin.Reader pinReader = pinsReader.get(i);
+                String pinName = allStrings.get(pinReader.getName());
+                if(!pinNameSet.contains(pinName)) {
+                    throw new RuntimeException("Site pin " + pinName + " not found in site.");
+                }
+
+                String primarySitePinName = pinName;
+                int sitePinIndex = site.getPinIndex(pinName);
+                if(sitePinIndex == -1) {
+                    primarySitePinName = siteInst.getPrimarySitePinName(pinName);
+                    sitePinIndex = site.getPinIndex(primarySitePinName);
+                }
+
+                SitePinInst pin = siteInst.getSitePinInst(pinNames[i]);
+                Direction dir = pinReader.getDir();
+                if(sitePinIndex <= highestIndexInputPin) {
+                    expect(Direction.INPUT.name(), dir.name());
+                } else {
+                    expect(Direction.OUTPUT.name(), dir.name());
+                }
+
+                BEL bel = siteInst.getBEL(pinName);
+                BELPin[] belPins = bel.getPins();
+                if(belPins.length != 1) {
+                    throw new RuntimeException("Only expected 1 BEL pin on site pin BEL.");
+                }
+
+                BELPin belPin = belPins[0];
+                belPinIndicies.add(pinReader.getBelpin());
+                verifyBelPin(belPinsReader, belPin, pinReader.getBelpin());
+            }
+
+            Set<String> siteWires = new HashSet<String>();
+            for(String siteWire : siteInst.getSiteWires()) {
+                siteWires.add(siteWire);
+            }
+
+            StructList.Reader<DeviceResources.Device.SiteWire.Reader> siteWiresReader = stReader.getSiteWires();
+            expect(siteWires.size(), siteWiresReader.size());
+
+            Set<Map.Entry<String, String>> sitePipBels = new HashSet<Map.Entry<String, String>>();
+            for(DeviceResources.Device.SiteWire.Reader siteWireReader : siteWiresReader) {
+                String siteWireName = allStrings.get(siteWireReader.getName());
+                if(!siteWires.contains(siteWireName)) {
+                    throw new RuntimeException("Site wire " + siteWireName + " not found in site.");
+                }
+
+                BELPin[] belPins = siteInst.getSiteWirePins(siteWireName);
+                PrimitiveList.Int.Reader wiresReader = siteWireReader.getPins();
+                expect(belPins.length, wiresReader.size());
+
+                for(int i=0; i < belPins.length; i++) {
+                    belPinIndicies.add(wiresReader.get(i));
+                    verifyBelPin(belPinsReader, belPins[i], wiresReader.get(i));
+
+                    SitePIP sitePip = siteInst.getSitePIP(belPins[i]);
+                    if(sitePip != null) {
+                        sitePipBels.add(new AbstractMap.SimpleEntry<String, String>(
+                                    sitePip.getBELName(),
+                                    sitePip.getInputPinName()));
+                    }
+                }
+            }
+
+            expect(belPinIndicies.size(), belPinsReader.size());
+
+            StructList.Reader<DeviceResources.Device.SitePIP.Reader> sitePipsReader = stReader.getSitePIPs();
+            expect(sitePipBels.size(), sitePipsReader.size());
+
+            for(DeviceResources.Device.SitePIP.Reader spReader : sitePipsReader) {
+                DeviceResources.Device.BELPin.Reader bpReader = belPinsReader.get(spReader.getInpin());
+                String inputBel = allStrings.get(bpReader.getBel());
+                String inputBelPin = allStrings.get(bpReader.getName());
+                SitePIP sitePip = siteInst.getSitePIP(inputBel, inputBelPin);
+
+                verifyBelPin(belPinsReader, sitePip.getInputPin(), spReader.getInpin());
+                verifyBelPin(belPinsReader, sitePip.getOutputPin(), spReader.getOutpin());
+            }
+
+            design.removeSiteInst(siteInst);
+        }
 
         int tileCount = tilesReader.size();
         for(int i=0; i < tileCount; i++) {
@@ -356,17 +526,6 @@ public class DeviceResourcesVerifier {
         verifyCellBelPinMaps(allStrings, dReader, design);
         verifyPackages(allStrings, dReader, device);
 
-        // Get examples for each site type to a site.
-        Map<SiteTypeEnum, Site> siteTypes = new HashMap<SiteTypeEnum, Site>();
-        for(Tile tile : device.getAllTiles()) {
-            for(Site site : tile.getSites()) {
-                siteTypes.put(site.getSiteTypeEnum(), site);
-                SiteTypeEnum[] altSiteTypes = site.getAlternateSiteTypeEnums();
-                for(SiteTypeEnum altSiteType : altSiteTypes) {
-                    siteTypes.put(altSiteType, site);
-                }
-            }
-        }
         ConstantDefinitions.verifyConstants(allStrings, device, design, siteTypes, dReader.getConstants(), tileTypeEnumMap);
 
         return true;

@@ -18,12 +18,40 @@ struct StringRef {
 annotation stringRef(*) :StringRef;
 using StringIdx = UInt32;
 
+struct SiteTypeRef {
+    type  @0 :Ref.ReferenceType = root;
+    field @1 :Text = "siteTypeList";
+}
+annotation siteTypeRef(*) :SiteTypeRef;
 using SiteTypeIdx = UInt32;
+
+struct BELPinRef {
+    type  @0 :Ref.ReferenceType = parent;
+    field @1 :Text = "belPins";
+    depth @2 :Int32 = 1;
+}
+annotation belPinRef(*) :BELPinRef;
 using BELPinIdx = UInt32;
+
+struct WireRef {
+    type  @0 :Ref.ReferenceType = parent;
+    field @1 :Text = "wires";
+    depth @2 :Int32 = 1;
+}
+annotation wireRef(*) :WireRef;
 using WireIdx = UInt32;
+
 using WireIDInTileType = UInt32; # ID in Tile Type
 using SitePinIdx = UInt32;
+
+struct TileTypeRef {
+    type  @0 :Ref.ReferenceType = parent;
+    field @1 :Text = "tileTypeList";
+    depth @2 :Int32 = 1;
+}
+annotation tileTypeRef(*) :TileTypeRef;
 using TileTypeIdx = UInt32;
+
 using TileTypeSiteTypeIdx = UInt32;
 
 struct Device {
@@ -47,10 +75,10 @@ struct Device {
   #######################################
   struct SiteType {
     name         @0 : StringIdx $stringRef();
-    pins         @1 : List(SitePin);
-    lastInput    @2 : UInt32; # Index of the last input pin
-    bels         @3 : List(BEL);
-    belPins      @4 : List(BELPin); # All BEL Pins in site type
+    belPins      @1 : List(BELPin); # All BEL Pins in site type
+    pins         @2 : List(SitePin);
+    lastInput    @3 : UInt32; # Index of the last input pin
+    bels         @4 : List(BEL);
     sitePIPs     @5 : List(SitePIP);
     siteWires    @6 : List(SiteWire);
     altSiteTypes @7 : List(SiteTypeIdx);
@@ -67,7 +95,7 @@ struct Device {
   }
 
   struct SiteTypeInTileType {
-    primaryType @0 : SiteTypeIdx;
+    primaryType @0 : SiteTypeIdx $siteTypeRef();
 
     # primaryPinsToTileWires[0] is the tile wire that matches
     # siteTypeList[primaryType].pins[0], etc.
@@ -90,14 +118,14 @@ struct Device {
   # Placement instance objects
   #######################################
   struct BELInverter {
-    nonInvertingPin @0 : BELPinIdx;
-    invertingPin    @1 : BELPinIdx;
+    nonInvertingPin @0 : BELPinIdx $belPinRef(depth = 2);
+    invertingPin    @1 : BELPinIdx $belPinRef(depth = 2);
   }
 
   struct BEL {
     name      @0 : StringIdx $stringRef();
     type      @1 : StringIdx $stringRef();
-    pins      @2 : List(BELPinIdx);
+    pins      @2 : List(BELPinIdx) $belPinRef();
     category  @3 : BELCategory; # This would be BELClass/class, but conflicts with Java language
     union {
         nonInverting @4 : Void;
@@ -118,7 +146,7 @@ struct Device {
 
   struct Tile {
     name       @0 : StringIdx $stringRef();
-    type       @1 : TileTypeIdx;
+    type       @1 : TileTypeIdx $tileTypeRef();
     sites      @2 : List(Site);
     row        @3 : UInt16;
     col        @4 : UInt16;
@@ -136,20 +164,19 @@ struct Device {
 
   struct SiteWire {
     name   @0 : StringIdx $stringRef();
-    pins   @1 : List(BELPinIdx);
+    pins   @1 : List(BELPinIdx) $belPinRef();
   }
 
   struct SitePIP {
-    inpin  @0 : BELPinIdx;
-    outpin @1 : BELPinIdx;
+    inpin  @0 : BELPinIdx $belPinRef();
+    outpin @1 : BELPinIdx $belPinRef();
   }
 
   struct SitePin {
     name     @0 : StringIdx $stringRef();
     dir      @1 : Dir.Netlist.Direction;
-    belpin   @2 : BELPinIdx;
+    belpin   @2 : BELPinIdx $belPinRef();
   }
-
 
   ######################################
   # Inter-site routing resources
@@ -160,7 +187,7 @@ struct Device {
   }
 
   struct Node {
-    wires    @0 : List(WireIdx);
+    wires    @0 : List(WireIdx) $wireRef();
   }
 
   struct PIP {

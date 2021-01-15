@@ -318,8 +318,11 @@ public class DeviceResourcesWriter {
             Tile tile = siteInst.getTile();
             siteType.setName(allStrings.getIndex(e.getKey().name()));
             allSiteTypes.addObject(e.getKey().name());
-            // BELs & BELPins
+
             Enumerator<BELPin> allBELPins = new Enumerator<BELPin>();
+            Enumerator<SitePIP> allSitePIPs = new Enumerator<SitePIP>();
+
+            // BELs
             StructList.Builder<Builder> belBuilders = siteType.initBels(siteInst.getBELs().length);
             for(int j=0; j < siteInst.getBELs().length; j++) {
                 BEL bel = siteInst.getBELs()[j];
@@ -328,9 +331,8 @@ public class DeviceResourcesWriter {
                 belBuilder.setType(allStrings.getIndex(bel.getBELType()));
                 PrimitiveList.Int.Builder belPinsBuilder = belBuilder.initPins(bel.getPins().length);
                 for(int k=0; k < bel.getPins().length; k++) {
-                    belPinsBuilder.set(k, allBELPins.size());
                     BELPin belPin = bel.getPin(k);
-                    allBELPins.addObject(belPin);
+                    belPinsBuilder.set(k, allBELPins.getIndex(belPin));
                 }
                 belBuilder.setCategory(getBELCategory(bel));
 
@@ -340,22 +342,6 @@ public class DeviceResourcesWriter {
                     belInverter.setInvertingPin(allBELPins.getIndex(bel.getInvertingPin()));
                 } else {
                     belBuilder.setNonInverting(Void.VOID);
-                }
-            }
-
-            Enumerator<SitePIP> allSitePIPs = new Enumerator<SitePIP>();
-            StructList.Builder<DeviceResources.Device.BELPin.Builder> belPinBuilders =
-                    siteType.initBelPins(allBELPins.size());
-            for(int j=0; j < allBELPins.size(); j++) {
-                DeviceResources.Device.BELPin.Builder belPinBuilder = belPinBuilders.get(j);
-                BELPin belPin = allBELPins.get(j);
-                belPinBuilder.setName(allStrings.getIndex(belPin.getName()));
-                belPinBuilder.setDir(getBELPinDirection(belPin));
-                belPinBuilder.setBel(allStrings.getIndex(belPin.getBEL().getName()));
-
-                SitePIP sitePip = siteInst.getSitePIP(belPin);
-                if(sitePip != null) {
-                    allSitePIPs.addObject(sitePip);
                 }
             }
 
@@ -383,18 +369,13 @@ public class DeviceResourcesWriter {
                 SitePin.Builder pin = pins.get(j);
                 pin.setName(allStrings.getIndex(pinNames.get(j)));
                 pin.setDir(sitePinIndex <= highestIndexInputPin ? Direction.INPUT : Direction.OUTPUT);
-                BELPin belPin = site.getBELPin(primarySitePinName);
-                pin.setBelpin(belPin == null ? -1 : allBELPins.getIndex(belPin));
-            }
-
-            // SitePIPs
-            StructList.Builder<DeviceResources.Device.SitePIP.Builder> spBuilders =
-                    siteType.initSitePIPs(allSitePIPs.size());
-            for(int j=0; j < allSitePIPs.size(); j++) {
-                DeviceResources.Device.SitePIP.Builder spBuilder = spBuilders.get(j);
-                SitePIP sitePIP = allSitePIPs.get(j);
-                spBuilder.setInpin(allBELPins.getIndex(sitePIP.getInputPin()));
-                spBuilder.setOutpin(allBELPins.getIndex(sitePIP.getOutputPin()));
+                BEL bel = siteInst.getBEL(pinNames.get(j));
+                BELPin[] belPins = bel.getPins();
+                if(belPins.length != 1) {
+                    throw new RuntimeException("Only expected 1 BEL pin on site pin BEL.");
+                }
+                BELPin belPin = belPins[0];
+                pin.setBelpin(allBELPins.getIndex(belPin));
             }
 
             // SiteWires
@@ -410,6 +391,32 @@ public class DeviceResourcesWriter {
                 for(int k=0; k < swPins.length; k++) {
                     bpBuilders.set(k, allBELPins.getIndex(swPins[k]));
                 }
+            }
+
+            // Write out BEL pins.
+            StructList.Builder<DeviceResources.Device.BELPin.Builder> belPinBuilders =
+                    siteType.initBelPins(allBELPins.size());
+            for(int j=0; j < allBELPins.size(); j++) {
+                DeviceResources.Device.BELPin.Builder belPinBuilder = belPinBuilders.get(j);
+                BELPin belPin = allBELPins.get(j);
+                belPinBuilder.setName(allStrings.getIndex(belPin.getName()));
+                belPinBuilder.setDir(getBELPinDirection(belPin));
+                belPinBuilder.setBel(allStrings.getIndex(belPin.getBEL().getName()));
+
+                SitePIP sitePip = siteInst.getSitePIP(belPin);
+                if(sitePip != null) {
+                    allSitePIPs.addObject(sitePip);
+                }
+            }
+
+            // Write out SitePIPs
+            StructList.Builder<DeviceResources.Device.SitePIP.Builder> spBuilders =
+                    siteType.initSitePIPs(allSitePIPs.size());
+            for(int j=0; j < allSitePIPs.size(); j++) {
+                DeviceResources.Device.SitePIP.Builder spBuilder = spBuilders.get(j);
+                SitePIP sitePIP = allSitePIPs.get(j);
+                spBuilder.setInpin(allBELPins.getIndex(sitePIP.getInputPin()));
+                spBuilder.setOutpin(allBELPins.getIndex(sitePIP.getOutputPin()));
             }
 
             design.removeSiteInst(siteInst);
