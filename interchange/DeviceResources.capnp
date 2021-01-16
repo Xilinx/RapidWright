@@ -364,7 +364,7 @@ struct Device {
 
   struct CellPinInversion {
     # Which cell pin supports a local site inverter?
-    cellPin      @0 : StringIdx;
+    cellPin      @0 : StringIdx $stringRef();
 
     # What parameters are used for the non-inverting case, and how to route
     # through the inversion routing bels (if any).
@@ -377,7 +377,7 @@ struct Device {
 
   struct CellInversion {
     # Which cell is being described?
-    cell     @0 : StringIdx;
+    cell     @0 : StringIdx $stringRef();
 
     # Which cell have site local inverters?
     cellPins @1 : List(CellPinInversion);
