@@ -756,6 +756,7 @@ proc write_cell_to_edif_recursive { cell fp cells_written } {
         puts "$cell_type $cells_written" 
         set cell_name [get_property NAME $cell]
         puts $fp "   (cell $cell_type (celltype GENERIC)\n     (view netlist (viewtype NETLIST)\n       (interface "
+		set busses_written {}
         foreach pin [get_pins -of $cell] { 
             set dir "[get_property DIRECTION $pin]"
             if ![string equal "INOUT" $dir] {
@@ -763,20 +764,25 @@ proc write_cell_to_edif_recursive { cell fp cells_written } {
             }
             if { [get_property BUS_NAME $pin] != {} } {
                 set bus_name [get_property BUS_NAME $pin]
-                puts $fp "        (port (array (rename $bus_name \"$bus_name\[[get_property BUS_START $pin]:[get_property BUS_STOP $pin]\] [get_property BUS_WIDTH $pin]) (direction $dir))"
+				if { ![dict exists $busses_written $bus_name] } {
+					puts $fp "        (port (array (rename $bus_name \"$bus_name\[[get_property BUS_START $pin]:[get_property BUS_STOP $pin]\]\") [get_property BUS_WIDTH $pin]) (direction $dir))"
+					dict append busses_written $bus_name 1
+				}
             } else {
                 puts $fp "        (port [get_property REF_PIN_NAME $pin] (direction $dir))"
             }
         }
         puts $fp "       )"
-        set insts [get_cells -hier -filter PARENT==$cell_name]
-        if [expr [llength $insts] > 0] {
-            puts $fp "       (contents"
+		set is_prim [get_property IS_PRIMITIVE $cell]
+		if {$is_prim == 0} {
+			current_instance $cell_name
+			set insts [get_cells]
+			puts $fp "       (contents"
             foreach inst $insts {
                 set inst_name [string map $replace_map [get_property NAME $inst]]
                 puts $fp "         (instance $inst_name (viewref netlist (cellref [get_property REF_NAME $inst] (libraryref hdi_primitives))))"
             }
-            foreach net [get_nets -hier -filter PARENT_CELL==$cell_name] {
+            foreach net [get_nets] {
                 set net_name [string map $replace_map [get_property NAME $net]]
                 puts $fp "         (net $net_name (joined"
                 foreach pin [get_pins -of $net] {
@@ -795,6 +801,7 @@ proc write_cell_to_edif_recursive { cell fp cells_written } {
             }
             puts $fp "      )"
         }
+		current_instance
         puts $fp "     )\n   )"
     }
     return $cells_written
@@ -830,7 +837,7 @@ proc write_cell_to_edif { cell file_name } {
     puts $fp ""
     puts $fp "  (design $cell_type"
     puts $fp "    (cellref $cell_type (libraryref hdi_primitives))"
-    puts $fp "    (property part (string \"[get_property PART [current_project]]\"))"
+    puts $fp "    (property PART (string \"[get_property PART [current_project]]\"))"
     puts $fp "  )"
     puts $fp ")"
     close $fp

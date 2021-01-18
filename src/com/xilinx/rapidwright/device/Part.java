@@ -137,6 +137,8 @@ public class Part {
 		return speed;
 	}
 	/**
+	 * Note: The temperature grade letter is not available on Series 7 parts and will return an
+	 * empty String.
 	 * @return the temperatureGradeLetter
 	 */
 	public String getTemperatureGradeLetter() {

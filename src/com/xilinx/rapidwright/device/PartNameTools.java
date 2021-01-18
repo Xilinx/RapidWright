@@ -42,6 +42,9 @@ import com.xilinx.rapidwright.util.FileTools;
  */
 public class PartNameTools {
 	public static HashMap<String,Part> partMap;
+	private static void addToPartMap(String name, Part part) {
+		partMap.put(name.toLowerCase(), part);
+	}
 	static {
 		partMap = new HashMap<String,Part>();
 		UnsafeInput his = FileTools.getUnsafeInputStream(FileTools.getRapidWrightResourceInputStream(FileTools.PART_DB_PATH));
@@ -70,32 +73,33 @@ public class PartNameTools {
 				strings[part[16]],
 				Series.valueOf(strings[part[17]])
 				);
-			partMap.put(strings[part[0]], tmpPart);
+			addToPartMap(strings[part[0]], tmpPart);
 			if(!(strings[part[8]].isEmpty())) {
 				partMap.put(strings[part[4]]+"-"+strings[part[8]], tmpPart);
 				if(!partMap.containsKey(strings[part[4]])) {
-					partMap.put(strings[part[4]], tmpPart);
-					partMap.put(strings[part[4]]+strings[part[5]], tmpPart);
-					partMap.put(strings[part[4]]+strings[part[5]]+strings[part[6]], tmpPart);
-					partMap.put(strings[part[4]]+"-"+strings[part[5]], tmpPart);
-					partMap.put(strings[part[4]]+"-"+strings[part[5]]+strings[part[6]], tmpPart);
+					addToPartMap(strings[part[4]], tmpPart);
+					addToPartMap(strings[part[4]]+strings[part[5]], tmpPart);
+					addToPartMap(strings[part[4]]+strings[part[5]]+strings[part[6]], tmpPart);
+					addToPartMap(strings[part[4]]+"-"+strings[part[5]], tmpPart);
+					addToPartMap(strings[part[4]]+"-"+strings[part[5]]+strings[part[6]], tmpPart);
 				}
 			} else {
-				partMap.put(strings[part[4]], tmpPart);
-				partMap.put(strings[part[4]]+strings[part[5]], tmpPart);
-				partMap.put(strings[part[4]]+strings[part[5]]+strings[part[6]], tmpPart);
-				partMap.put(strings[part[4]]+"-"+strings[part[5]], tmpPart);
-				partMap.put(strings[part[4]]+"-"+strings[part[5]]+strings[part[6]], tmpPart);
+				addToPartMap(strings[part[4]], tmpPart);
+				addToPartMap(strings[part[4]]+strings[part[5]], tmpPart);
+				addToPartMap(strings[part[4]]+strings[part[5]]+strings[part[6]], tmpPart);
+				addToPartMap(strings[part[4]]+"-"+strings[part[5]], tmpPart);
+				addToPartMap(strings[part[4]]+"-"+strings[part[5]]+strings[part[6]], tmpPart);
 			}
 		}
 	}
 	public static Part getPart(String partName) {
-		Part p = partMap.get(partName);
-		if(p == null && !partName.startsWith("xc")){
-			p = partMap.get("xc" + partName);
+		String normalizedName = partName.toLowerCase();
+		Part p = partMap.get(normalizedName);
+		if(p == null && !normalizedName.startsWith("xc")){
+			p = partMap.get("xc" + normalizedName);
 		}
 		if(p == null){
-			throw new RuntimeException("\n\n\tERROR: Couldn't identify " + partName + " in RapidWright part database. ");
+			throw new RuntimeException("\n\n\tERROR: Couldn't identify " + normalizedName + " in RapidWright part database. ");
 		}
 		return p;
 	}

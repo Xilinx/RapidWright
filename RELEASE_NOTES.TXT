@@ -1,3 +1,16 @@
+============= RapidWright 2020.2.0-beta released on 2021-01-15 ================
+Notes:
+ * Adds a set of bitstream manipulation APIs
+ * Adds part name normalization (see pull request #120)
+ * Bug fix for migrateCellAndSubCells() (see pull request #116)
+ * Fixes an NPE on getSitePinFromLogicalPin()
+ * Fixes support for BUFCE_ROW on Net.{get,set}BufferDelay()
+ - API Additions:
+    - com.xilinx.rapidwright.bitstream.{BitLocation, Bitstream, BitstreamHeader, Block, 
+                                        BlockSubType, BlockType, CMDCode, ConfigArray, ConfigRow, 
+                                        FAR, Frame, IDCode, OpCode, Packet, PacketType, 
+                                        RegisterType} # Please see Javadocs for full details.
+
 ============= RapidWright 2020.2.0-beta released on 2020-12-22 ================
 Notes:
  * Adds initial support for Versal devices (Vivado 2020.2 compatibility)
