@@ -112,22 +112,12 @@ public class LogNetlistReader {
         }
     }
 
-    private EDIFLibrary getEDIFLibrary(Cell.Reader cellReader, EDIFNetlist netlist) {
-        String libName = allStrings.get(cellReader.getLib());
-        EDIFLibrary lib = netlist.getLibrary(libName);
-        if(lib == null) {
-            lib = netlist.addLibrary(new EDIFLibrary(libName));
-        }
-        return lib;
-    }
-
     private void readEDIFCell(int cellIdx, EDIFNetlist n, Netlist.Reader netlist,
                                         StructList.Reader<Netlist.Cell.Reader> cellListReader,
                                         StructList.Reader<Netlist.CellInstance.Reader> instListReader) {
         Cell.Reader cellReader = cellListReader.get(cellIdx);
 
-        EDIFCell edifCell = allCells.get(cellIdx);
-        edifCell.setView(allStrings.get(cellReader.getView()));
+        EDIFCell edifCell = allCells.get(cellReader.getIndex());
 
         // Instances
         PrimitiveList.Int.Reader cellInstsReader = cellReader.getInsts();
@@ -265,11 +255,11 @@ public class LogNetlistReader {
     }
 
     private void createCells(EDIFNetlist n, Netlist.Reader netlist) {
-        StructList.Reader<Netlist.Cell.Reader> cellListReader = netlist.getCellList();
+        StructList.Reader<Netlist.CellDeclaration.Reader> cellDeclsReader = netlist.getCellDecls();
 
-        allCells = new ArrayList<EDIFCell>(cellListReader.size());
-        for(int i = 0; i < cellListReader.size(); ++i) {
-            Netlist.Cell.Reader cellReader = cellListReader.get(i);
+        allCells = new ArrayList<EDIFCell>(cellDeclsReader.size());
+        for(int i = 0; i < cellDeclsReader.size(); ++i) {
+            Netlist.CellDeclaration.Reader cellReader = cellDeclsReader.get(i);
             String libraryName = allStrings.get(cellReader.getLib());
             EDIFLibrary library = n.getLibrary(libraryName);
             if(library == null) {
@@ -280,6 +270,7 @@ public class LogNetlistReader {
             String cellName = allStrings.get(cellReader.getName());
             EDIFCell cell = new EDIFCell(library, cellName);
             extractPropertyMap(cellReader.getPropMap(), cell);
+            cell.setView(allStrings.get(cellReader.getView()));
 
             allCells.add(i, cell);
 
