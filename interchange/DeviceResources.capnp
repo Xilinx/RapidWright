@@ -70,6 +70,7 @@ struct Device {
   packages       @11 : List(Package);
   constants      @12 : Constants;
   constraints    @13 : Constraints;
+  lutDefinitions @14 : LutDefinitions;
 
   #######################################
   # Placement definition objects
@@ -495,5 +496,36 @@ struct Device {
     tags            @0 :List(Tag);
     routedTags      @1 :List(RoutedTag);
     cellConstraints @2 :List(CellConstraint);
+  }
+
+  ######################################
+  # LUT definitions
+  ######################################
+  struct LutDefinitions {
+    struct LutCell {
+      cell      @0 : Text;
+      inputPins @1 : List(Text);
+    }
+
+    struct LutBel {
+      name      @0 : Text;
+      inputPins @1 : List(Text);
+      outputPin @2 : Text;
+      lowBit    @3 : Int8;
+      highBit   @4 : Int8;
+    }
+
+    struct LutElement {
+      width @0 : Int8;
+      bels  @1 : List(LutBel);
+    }
+
+    struct LutElements {
+      site @0 : Text;
+      luts @1 : List(LutElement);
+    }
+
+    lutCells    @0 : List(LutCell);
+    lutElements @1 : List(LutElements);
   }
 }
