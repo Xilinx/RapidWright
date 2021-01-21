@@ -387,7 +387,7 @@ struct Device {
   ######################################
   # Placement constraints
   #
-  # This section defines constrains required for valid placement above and
+  # This section defines constraints required for valid placement above and
   # beyond routing constraints.
   #
   # This section has three sections:
@@ -396,10 +396,10 @@ struct Device {
   #  - Cell constraints
   #
   # The tags sections defines a list of tags that take one of an exclusive set
-  # of states.  Tags are attached to an object with the FPGA fabric.
+  # of states.  Tags are attached to an object within the FPGA fabric.
   # Currently tags can only be attached to either a site type or tile type.
   # All instances of that site type or tile type will have it's own unique
-  # copy of the tag.  In order for the constraints to be considered "meet",
+  # instance of the tag.  In order for the constraints to be considered "met",
   # each tag instance must be constrained to either 0 or 1 states.  In the
   # event that a tag instance is constrained to 0 states, then that tag
   # instance value will be the "default" state.
