@@ -69,6 +69,7 @@ struct Device {
   cellInversions @10 : List(CellInversion);
   packages       @11 : List(Package);
   constants      @12 : Constants;
+  constraints    @13 : Constraints;
 
   #######################################
   # Placement definition objects
@@ -381,5 +382,118 @@ struct Device {
 
     # Which cell have site local inverters?
     cellPins @1 : List(CellPinInversion);
+  }
+
+  ######################################
+  # Placement constraints
+  #
+  # This section defines constraints required for valid placement above and
+  # beyond routing constraints.
+  #
+  # This section has three sections:
+  #  - Tags
+  #  - Routed tags
+  #  - Cell constraints
+  #
+  # The tags sections defines a list of tags that take one of an exclusive set
+  # of states.  Tags are attached to an object within the FPGA fabric.
+  # Currently tags can only be attached to either a site type or tile type.
+  # All instances of that site type or tile type will have it's own unique
+  # instance of the tag.  In order for the constraints to be considered "met",
+  # each tag instance must be constrained to either 0 or 1 states.  In the
+  # event that a tag instance is constrained to 0 states, then that tag
+  # instance value will be the "default" state.
+  #
+  # Routed tags are required to express instances where a cell constraint
+  # relates through a site routing mux to a tag. Routed tags route from a tag
+  # or routed tag to either another routed tag or a cell constraint.
+  #
+  # Cell constraints are the list of constraints that are applied (or removed)
+  # when a cell is placed (or unplaced).  The format of the cell constraint
+  # can be read as:
+  #  - When a cell of a specific type is (cell/cells field)
+  #  - Is placed at (siteTypes and bel field)
+  #  - Apply the following constraints (implies/requires field).
+  #
+  # In the case where a cell constraint references a routed tag, then the
+  # constraint also applies to the upstream tag or routed tag.
+  ######################################
+  struct Constraints {
+    struct State {
+      state       @0 :Text;
+      description @1 :Text;
+    }
+
+    struct Tag {
+      tag         @0 :Text;
+      description @1 :Text;
+      default     @2 :Text;
+      union {
+        siteTypes @3 :List(Text);
+        tileTypes @4 :List(Text);
+      }
+      states      @5 :List(State);
+    }
+
+    struct RoutedTagPin {
+      pin @0 :Text;
+      tag @1 :Text;
+    }
+
+    struct RoutedTag {
+      routedTag  @0 :Text;
+      routingBel @1 :Text;
+      belPins    @2 :List(RoutedTagPin);
+    }
+
+    struct RoutedTagPort {
+      tag  @0 :Text;
+      port @1 :Text;
+    }
+
+    struct TagPair {
+      union {
+        tag       @0 :Text;
+        routedTag @1 :RoutedTagPort;
+      }
+      state       @2 :Text;
+    }
+
+    struct TagStates {
+      union {
+        tag       @0 :Text;
+        routedTag @1 :RoutedTagPort;
+      }
+      states      @2 :List(Text);
+    }
+
+    struct BELLocation {
+      union {
+        anyBel @0 :Void;
+        name   @1 :Text;
+        bels   @2 :List(Text);
+      }
+    }
+
+    struct ConstraintLocation {
+      siteTypes  @0 :List(Text);
+      bel        @1 :BELLocation;
+      union {
+        implies  @2 :List(TagPair);
+        requires @3 :List(TagStates);
+      }
+    }
+
+    struct CellConstraint {
+      union {
+        cell    @0 :Text;
+        cells   @1 :List(Text);
+      }
+      locations @2 :List(ConstraintLocation);
+    }
+
+    tags            @0 :List(Tag);
+    routedTags      @1 :List(RoutedTag);
+    cellConstraints @2 :List(CellConstraint);
   }
 }
