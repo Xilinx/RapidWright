@@ -513,11 +513,15 @@ public class DeviceResourcesWriter {
 
             // pips
             ArrayList<PIP> pips = tile.getPIPs();
+            Enumerator<PIP> pip_enumerator = new Enumerator<PIP>();
             StructList.Builder<DeviceResources.Device.PIP.Builder> pipBuilders =
                     tileType.initPips(pips.size());
             for(int j=0; j < pips.size(); j++) {
                 DeviceResources.Device.PIP.Builder pipBuilder = pipBuilders.get(j);
                 PIP pip = pips.get(j);
+                if(pip_enumerator.getIndex(pip) != j) {
+                    throw new RuntimeException("Duplicate pip!!!!");
+                }
                 pipBuilder.setWire0(pip.getStartWireIndex());
                 pipBuilder.setWire1(pip.getEndWireIndex());
                 pipBuilder.setDirectional(!pip.isBidirectional());
