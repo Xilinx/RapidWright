@@ -519,8 +519,18 @@ public class DeviceResourcesWriter {
             for(int j=0; j < pips.size(); j++) {
                 DeviceResources.Device.PIP.Builder pipBuilder = pipBuilders.get(j);
                 PIP pip = pips.get(j);
-                if(pip_enumerator.getIndex(pip) != j) {
-                    throw new RuntimeException("Duplicate pip!!!!");
+                int pip_index = pip_enumerator.getIndex(pip);
+                if(pip_index != j) {
+                    PIP dup_pip = pips.get(pip_index);
+                    throw new RuntimeException(String.format(
+                                "Duplicate pip!!!! %d != %d, %s == %s, %d == %d, %d == %d, %d == %d, equals %b",
+                                j, pip_index,
+                                pip.toString(), dup_pip.toString(),
+                                pip.getStartWireIndex(), dup_pip.getStartWireIndex(),
+                                pip.getEndWireIndex(), dup_pip.getEndWireIndex(),
+                                pip.deepHashCode(), dup_pip.deepHashCode(),
+                                pip.equals(dup_pip)
+                                ));
                 }
                 pipBuilder.setWire0(pip.getStartWireIndex());
                 pipBuilder.setWire1(pip.getEndWireIndex());
