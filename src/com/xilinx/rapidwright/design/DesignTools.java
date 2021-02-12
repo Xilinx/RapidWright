@@ -1659,7 +1659,24 @@ public class DesignTools {
 
 	private static EDIFHierPortInst getPortInstFromBELPin(SiteInst siteInst, BELPin belPin) {
 		Cell targetCell = siteInst.getCell(belPin.getBEL());
-		if(targetCell == null) return null;
+		if(targetCell == null) {
+			// Is it routing through a FF? (Series 7 / UltraScale)
+			if(belPin.getName().equals("Q")) {
+				Net net = siteInst.getNetFromSiteWire(belPin.getSiteWireName());
+				BELPin d = belPin.getBEL().getPin("D");
+				Net otherNet = siteInst.getNetFromSiteWire(d.getSiteWireName());
+				if(net == otherNet) {
+					BELPin muxOut = d.getSourcePin();
+					SitePIP pip = siteInst.getUsedSitePIP(muxOut);
+					if(pip != null) {
+						BELPin src = pip.getInputPin().getSourcePin();
+						return getPortInstFromBELPin(siteInst, src);
+					}
+				}
+			}
+			
+			return null;
+		}
 		String logPinName = targetCell.getLogicalPinMapping(belPin.getName());
 		if(logPinName == null) return null;
 		EDIFPortInst portInst = targetCell.getEDIFCellInst().getPortInst(logPinName);
