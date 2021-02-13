@@ -1361,13 +1361,27 @@ public class DesignTools {
 		for(EDIFHierPortInst p :  physPins) {
 			Cell c = design.getCell(p.getFullHierarchicalInstName());
 			if(c == null || c.getBEL() == null) continue;
-			String sitePinName = getRoutedSitePin(c, net, p.getPortInst().getName());
+			String logicalPinName = p.getPortInst().getName();
+			String sitePinName = getRoutedSitePin(c, net, logicalPinName);
 			if(sitePinName == null) continue;
 			SiteInst si = c.getSiteInst();
 			SitePinInst newPin = si.getSitePinInst(sitePinName);
 			if(newPin != null) continue;
 			newPin = net.createPin(p.isOutput(), sitePinName, c.getSiteInst());
 			if(newPin != null) newPins.add(newPin);
+			Set<String> physPinMappings = c.getAllPhysicalPinMappings(logicalPinName); 
+			// BRAMs can have two physical pin mappings for a logical pin
+			if(physPinMappings.size() == 2) {
+				String[] pins = physPinMappings.toArray(new String[2]);
+				String existing = c.getPhysicalPinMapping(logicalPinName);
+				String otherPhysPinName = existing.equals(pins[0]) ? pins[1] : pins[0];
+				sitePinName = getRoutedSitePinFromPhysicalPin(c, net, otherPhysPinName);
+				if(sitePinName == null) continue;
+				newPin = si.getSitePinInst(sitePinName);
+				if(newPin != null) continue;
+				newPin = net.createPin(p.isOutput(), sitePinName, c.getSiteInst());
+				if(newPin != null) newPins.add(newPin);
+			}
 		}
 		return newPins;
 	}
@@ -1382,8 +1396,21 @@ public class DesignTools {
 	 * @return The name of the site pin on the cell's site to which the pin is routed.
 	 */
 	public static String getRoutedSitePin(Cell cell, Net net, String logicalPinName) {
+		String belPinName = cell.getPhysicalPinMapping(logicalPinName);
+		return getRoutedSitePinFromPhysicalPin(cell, net, belPinName);
+	}
+	
+	/**
+	 * Gets the site pin that is currently routed to the specified cell pin.  If 
+	 * the site instance is not routed, it will return null. 
+	 * Side Effect: It will set alternative source site pins on the net if present.
+	 * @param cell The cell with the pin of interest.
+	 * @param net The physical net to which this pin belongs
+	 * @param belPinName The physical pin name of the cell
+	 * @return The name of the site pin on the cell's site to which the pin is routed.
+	 */
+	public static String getRoutedSitePinFromPhysicalPin(Cell cell, Net net, String belPinName) {
 	    SiteInst inst = cell.getSiteInst();
-	    String belPinName = cell.getPhysicalPinMapping(logicalPinName);
 	    if(belPinName == null) return null;
 	    Set<String> siteWires = inst.getSiteWiresFromNet(net);
 	    String toReturn = null;
