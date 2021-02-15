@@ -841,7 +841,7 @@ public class PBlockGenerator {
 			if(slicesRequired > sliceMsRequired){
 				pblockCLEHeight = (int) Math.ceil(Math.sqrt(slicesRequired/(SLICES_PER_TILE*ASPECT_RATIO))); // One PBlock must contain tiles. It can not have 3 slices for exp. => compute height using tile nr, not slice nr. (for 7 series, for ultra. tiles=slices anyway)
 			}else{
-				pblockCLEHeight = (int) Math.ceil(Math.sqrt(sliceMsRequired/(SLICES_PER_TILE*ASPECT_RATIO)));
+				pblockCLEHeight = (int) Math.ceil(Math.sqrt(sliceMsRequired/(ASPECT_RATIO))); // Tile M-type has only one M slice in case of 7 series
 			}
 			
 		}else if(dspCLECount > bramCLECount){
