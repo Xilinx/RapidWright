@@ -31,11 +31,24 @@ import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.PortInstance;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.PropertyMap;
 
 public class LogNetlistWriter {
+    LogNetlistWriter() {
+        allCells = new Enumerator<>();
+        allInsts = new Enumerator<>();
+        allPorts = new Enumerator<>();
+        allStrings = new Enumerator<>();
+    }
 
-    private static Enumerator<EDIFCell> allCells = new Enumerator<>();
-    private static Enumerator<EDIFCellInst> allInsts = new Enumerator<>();
-    private static Enumerator<EDIFPort> allPorts = new Enumerator<>();
-    private static Enumerator<String> allStrings = new Enumerator<>();
+    LogNetlistWriter(Enumerator<String> outsideAllStrings) {
+        allCells = new Enumerator<>();
+        allInsts = new Enumerator<>();
+        allPorts = new Enumerator<>();
+        allStrings = outsideAllStrings;
+    }
+
+    private Enumerator<EDIFCell> allCells;
+    private Enumerator<EDIFCellInst> allInsts;
+    private Enumerator<EDIFPort> allPorts;
+    private Enumerator<String> allStrings;
 
     /**
      * Takes an EDIF property map and serializes (writes) it using the Cap'n Proto schema.  The
@@ -43,7 +56,7 @@ public class LogNetlistWriter {
      * @param builder The Cap'n Proto property map builder
      * @param obj The EDIF object that has a property map.
      */
-    public static void populatePropertyMap(PropertyMap.Builder builder, EDIFPropertyObject obj) {
+    private void populatePropertyMap(PropertyMap.Builder builder, EDIFPropertyObject obj) {
         StructList.Builder<PropertyMap.Entry.Builder> entries =
                 builder.initEntries(obj.getProperties().size());
         int i = 0;
@@ -71,7 +84,7 @@ public class LogNetlistWriter {
      * can be used for serialization.
      * @param n The current netlist to be serialized
      */
-    public static void populateEnumerations(EDIFNetlist n) {
+    private void populateEnumerations(EDIFNetlist n) {
         // Enumerate all cells, ports and instances to break cyclic reference dependency
         // in netlist description
         for (EDIFLibrary lib : n.getLibrariesInExportOrder()) {
@@ -93,7 +106,7 @@ public class LogNetlistWriter {
      * @param n The RapidWright netlist (source)
      * @param netlist The Cap'n Proto netlist message (dest)
      */
-    public static void writeTopNetlistStuffToNetlistBuilder(EDIFNetlist n, Netlist.Builder netlist) {
+    private void writeTopNetlistStuffToNetlistBuilder(EDIFNetlist n, Netlist.Builder netlist) {
         netlist.setName(n.getName());
 
         populatePropertyMap(netlist.getPropMap(), n.getDesign());
@@ -110,7 +123,7 @@ public class LogNetlistWriter {
      * Writes master list of all cell objects to the Cap'n Proto message netlist
      * @param netlist The netlist builder.
      */
-    public static void writeAllCellsToNetlistBuilder(Netlist.Builder netlist) {
+    private void writeAllCellsToNetlistBuilder(Netlist.Builder netlist) {
         StructList.Builder<CellDeclaration.Builder> cellDeclsList = netlist.initCellDecls(allCells.size());
         StructList.Builder<Cell.Builder> cellsList = netlist.initCellList(allCells.size());
 
@@ -167,7 +180,7 @@ public class LogNetlistWriter {
 
     }
 
-    public static void writeAllPortsToNetlistBuilder(Netlist.Builder netlist) {
+    private void writeAllPortsToNetlistBuilder(Netlist.Builder netlist) {
         int i = 0;
         StructList.Builder<Port.Builder> portsList = netlist.initPortList(allPorts.size());
         for (EDIFPort port : allPorts) {
@@ -186,7 +199,7 @@ public class LogNetlistWriter {
         }
     }
 
-    public static void writeAllInstsToNetlistBuilder(Netlist.Builder netlist) {
+    private void writeAllInstsToNetlistBuilder(Netlist.Builder netlist) {
         int i = 0;
         StructList.Builder<CellInstance.Builder> cellInstsList = netlist.initInstList(allInsts.size());
         for (EDIFCellInst inst : allInsts) {
@@ -199,7 +212,7 @@ public class LogNetlistWriter {
         }
     }
 
-    public static void writeAllStringsToNetlistBuilder(Netlist.Builder netlist) {
+    private void writeAllStringsToNetlistBuilder(Netlist.Builder netlist) {
         int stringCount = allStrings.size();
         TextList.Builder strList = netlist.initStrList(stringCount);
         for(int i=0; i < stringCount; i++) {
@@ -217,7 +230,10 @@ public class LogNetlistWriter {
         MessageBuilder message = new MessageBuilder();
         Netlist.Builder netlist = message.initRoot(Netlist.factory);
 
-        populateNetlistBuilder(n, netlist, false);
+        LogNetlistWriter writer = new LogNetlistWriter();
+        writer.writeTopNetlistStuffToNetlistBuilder(n, netlist);
+        writer.populateNetlistBuilder(n, netlist);
+        writer.writeAllStringsToNetlistBuilder(netlist);
 
         Interchange.writeInterchangeFile(fileName, message);
     }
@@ -227,21 +243,13 @@ public class LogNetlistWriter {
      * @param n The EDIF Netlist to serialize
      * @param netlist The current builder object to receive the EDIF Netlist
      */
-    protected static void populateNetlistBuilder(EDIFNetlist n, Netlist.Builder netlist,
-            boolean skipTopNetlistStuff) {
+    public void populateNetlistBuilder(EDIFNetlist n, Netlist.Builder netlist) {
         populateEnumerations(n);
-        if(!skipTopNetlistStuff) {
-            writeTopNetlistStuffToNetlistBuilder(n, netlist);
-        }else {
-            netlist.setName(n.getName());
-        }
 
         writeAllCellsToNetlistBuilder(netlist);
 
         writeAllPortsToNetlistBuilder(netlist);
 
         writeAllInstsToNetlistBuilder(netlist);
-
-        writeAllStringsToNetlistBuilder(netlist);
     }
 }
