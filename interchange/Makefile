@@ -10,7 +10,7 @@ JAVA_CP_RUNTIME = ../jars/runtime-0.1.4.jar
 JAVA_SCHEMA_DIR = schema/capnp
 JAVA_SCHEMA = $(JAVA_SCHEMA_DIR)/java.capnp
 
-all: $(JAVA_CP_RUNTIME) $(JAVA_SCHEMA) $(INTERCHANGE_REPO_PATH)
+all: $(JAVA_CP_RUNTIME) $(JAVA_SCHEMA) | $(INTERCHANGE_REPO_PATH)
 	mkdir -p $(DST)
 	$(CAPNPC) -ojava:$(DST) $(SRCS_WITH_PATH) -I schema
 
@@ -24,6 +24,6 @@ $(JAVA_SCHEMA):
 $(INTERCHANGE_REPO_PATH):
 	cd $(INTERCHANGE_REPO_PATH)/.. && git clone $(INTERCHANGE_CLONE_PATH)
 
-update_interchange: $(INTERCHANGE_REPO_PATH)
+update_interchange: | $(INTERCHANGE_REPO_PATH)
 	cd $(INTERCHANGE_REPO_PATH) && git pull
 
