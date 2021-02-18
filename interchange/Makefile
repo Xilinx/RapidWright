@@ -15,6 +15,7 @@ all: $(JAVA_CP_RUNTIME) $(JAVA_SCHEMA) | $(INTERCHANGE_REPO_PATH)
 	$(CAPNPC) -ojava:$(DST) $(SRCS_WITH_PATH) -I schema
 
 $(JAVA_CP_RUNTIME):
+	mkdir -p ../jars
 	wget https://search.maven.org/remotecontent?filepath=org/capnproto/runtime/0.1.4/runtime-0.1.4.jar -O $(JAVA_CP_RUNTIME)
 
 $(JAVA_SCHEMA):
