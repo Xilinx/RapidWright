@@ -246,7 +246,9 @@ public class DeviceResourcesWriter {
         }
 
         Netlist.Builder netlistBuilder = devBuilder.getPrimLibs();
-        LogNetlistWriter.populateNetlistBuilder(netlist, netlistBuilder, true);
+        netlistBuilder.setName(netlist.getName());
+        LogNetlistWriter writer = new LogNetlistWriter(allStrings);
+        writer.populateNetlistBuilder(netlist, netlistBuilder);
 
         // Write macro exception map
         int size = EDIFNetlist.macroExpandExceptionMap.size();

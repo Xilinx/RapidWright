@@ -43,6 +43,10 @@ public class LogNetlistReader {
         allStrings = new Enumerator<String>();
     }
 
+    public LogNetlistReader(Enumerator<String> otherAllStrings) {
+        allStrings = otherAllStrings;
+    }
+
     /**
      * Extracts the property map information from a Cap'n Proto reader object and deserializes it
      * into an EDIF property map object. The reverse function is
@@ -215,7 +219,7 @@ public class LogNetlistReader {
         MessageReader readMsg = Interchange.readInterchangeFile(fileName, readerOptions);
 
         Netlist.Reader netlist = readMsg.getRoot(Netlist.factory);
-        return getLogNetlist(netlist, false);
+        return getLogNetlist(netlist);
     }
 
     private void readStrings(Netlist.Reader netlist) {
@@ -282,27 +286,25 @@ public class LogNetlistReader {
         }
     }
 
-    public static EDIFNetlist getLogNetlist(Netlist.Reader netlist, boolean skipTopStuff) {
+    public EDIFNetlist readLogNetlist(Netlist.Reader netlist, boolean skipTopStuff) {
         EDIFNetlist n = new EDIFNetlist(netlist.getName().toString());
 
-        LogNetlistReader reader = new LogNetlistReader();
-        reader.readStrings(netlist);
-        reader.readPorts(netlist);
-        reader.createCells(n, netlist);
+        readPorts(netlist);
+        createCells(n, netlist);
 
         int cellCount = netlist.getCellList().size();
         StructList.Reader<Netlist.Cell.Reader> cellListReader = netlist.getCellList();
         StructList.Reader<Netlist.CellInstance.Reader> instListReader = netlist.getInstList();
-        reader.allInsts = new ArrayList<EDIFCellInst>(instListReader.size());
+        allInsts = new ArrayList<EDIFCellInst>(instListReader.size());
         for(int i=0; i < cellCount; i++) {
-            reader.readEDIFCell(i, n, netlist, cellListReader, instListReader);
+            readEDIFCell(i, n, netlist, cellListReader, instListReader);
         }
 
         if(!skipTopStuff) {
-            EDIFDesign design = new EDIFDesign(reader.allCells.get(netlist.getTopInst().getCell()).getName());
-            design.setTopCell(reader.allCells.get(netlist.getTopInst().getCell()));
+            EDIFDesign design = new EDIFDesign(allCells.get(netlist.getTopInst().getCell()).getName());
+            design.setTopCell(allCells.get(netlist.getTopInst().getCell()));
             n.setDesign(design);
-            reader.extractPropertyMap(netlist.getPropMap(), design);
+            extractPropertyMap(netlist.getPropMap(), design);
         }
 
         // Put libraries in proper export order
@@ -313,6 +315,12 @@ public class LogNetlistReader {
         }
 
         return n;
+    }
+
+    public static EDIFNetlist getLogNetlist(Netlist.Reader netlist) {
+        LogNetlistReader reader = new LogNetlistReader();
+        reader.readStrings(netlist);
+        return reader.readLogNetlist(netlist, /*skipTopStuff=*/false);
     }
 
 }

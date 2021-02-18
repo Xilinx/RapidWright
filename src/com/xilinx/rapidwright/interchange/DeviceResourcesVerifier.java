@@ -447,7 +447,10 @@ public class DeviceResourcesVerifier {
         }
 
         Netlist.Reader primLibs = dReader.getPrimLibs();
-        EDIFNetlist primsAndMacros = LogNetlistReader.getLogNetlist(primLibs, true);
+        LogNetlistReader netlistReader = new LogNetlistReader(allStrings);
+        EDIFNetlist primsAndMacros = netlistReader.readLogNetlist(primLibs,
+                /*skipTopStuff=*/true);
+
         Set<String> libsFound = new HashSet<String>();
         libsFound.addAll(primsAndMacros.getLibrariesMap().keySet());
         for(String libExpected : new String[] {EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME,
