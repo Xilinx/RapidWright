@@ -1361,13 +1361,28 @@ public class DesignTools {
 		for(EDIFHierPortInst p :  physPins) {
 			Cell c = design.getCell(p.getFullHierarchicalInstName());
 			if(c == null || c.getBEL() == null) continue;
-			String sitePinName = getRoutedSitePin(c, net, p.getPortInst().getName());
+			String logicalPinName = p.getPortInst().getName();
+			String sitePinName = getRoutedSitePin(c, net, logicalPinName);
 			if(sitePinName == null) continue;
 			SiteInst si = c.getSiteInst();
 			SitePinInst newPin = si.getSitePinInst(sitePinName);
 			if(newPin != null) continue;
 			newPin = net.createPin(p.isOutput(), sitePinName, c.getSiteInst());
 			if(newPin != null) newPins.add(newPin);
+			Set<String> physPinMappings = c.getAllPhysicalPinMappings(logicalPinName); 
+			// BRAMs can have two (or more) physical pin mappings for a logical pin
+			String existing = c.getPhysicalPinMapping(logicalPinName);
+			if(physPinMappings.size() > 1) {
+				for(String physPin : physPinMappings) {
+					if(existing.equals(physPin)) continue;
+					sitePinName = getRoutedSitePinFromPhysicalPin(c, net, physPin);
+					if(sitePinName == null) continue;
+					newPin = si.getSitePinInst(sitePinName);
+					if(newPin != null) continue;
+					newPin = net.createPin(p.isOutput(), sitePinName, c.getSiteInst());
+					if(newPin != null) newPins.add(newPin);					
+				}
+			}
 		}
 		return newPins;
 	}
@@ -1382,8 +1397,21 @@ public class DesignTools {
 	 * @return The name of the site pin on the cell's site to which the pin is routed.
 	 */
 	public static String getRoutedSitePin(Cell cell, Net net, String logicalPinName) {
+		String belPinName = cell.getPhysicalPinMapping(logicalPinName);
+		return getRoutedSitePinFromPhysicalPin(cell, net, belPinName);
+	}
+	
+	/**
+	 * Gets the site pin that is currently routed to the specified cell pin.  If 
+	 * the site instance is not routed, it will return null. 
+	 * Side Effect: It will set alternative source site pins on the net if present.
+	 * @param cell The cell with the pin of interest.
+	 * @param net The physical net to which this pin belongs
+	 * @param belPinName The physical pin name of the cell
+	 * @return The name of the site pin on the cell's site to which the pin is routed.
+	 */
+	public static String getRoutedSitePinFromPhysicalPin(Cell cell, Net net, String belPinName) {
 	    SiteInst inst = cell.getSiteInst();
-	    String belPinName = cell.getPhysicalPinMapping(logicalPinName);
 	    if(belPinName == null) return null;
 	    Set<String> siteWires = inst.getSiteWiresFromNet(net);
 	    String toReturn = null;
@@ -1401,6 +1429,12 @@ public class DesignTools {
 	                SitePIP sitePIP = inst.getUsedSitePIP(source.getBEL().getName());
 	                if(sitePIP == null) return null;
 	                queue.add(sitePIP.getInputPin());
+	            } else if(source.getBEL().getName().contains("LUT")) {
+	            	Cell possibleRouteThru = inst.getCell(source.getBEL());
+	            	if(possibleRouteThru != null && possibleRouteThru.isRoutethru()) {
+	            		String routeThru = possibleRouteThru.getPinMappingsP2L().keySet().iterator().next();
+	            		return source.getBEL().getPin(routeThru).getSourcePin().getName();
+	            	}
 	            } else {
 	                return null;
 	            }
@@ -1653,7 +1687,24 @@ public class DesignTools {
 
 	private static EDIFHierPortInst getPortInstFromBELPin(SiteInst siteInst, BELPin belPin) {
 		Cell targetCell = siteInst.getCell(belPin.getBEL());
-		if(targetCell == null) return null;
+		if(targetCell == null) {
+			// Is it routing through a FF? (Series 7 / UltraScale)
+			if(belPin.getName().equals("Q")) {
+				Net net = siteInst.getNetFromSiteWire(belPin.getSiteWireName());
+				BELPin d = belPin.getBEL().getPin("D");
+				Net otherNet = siteInst.getNetFromSiteWire(d.getSiteWireName());
+				if(net == otherNet) {
+					BELPin muxOut = d.getSourcePin();
+					SitePIP pip = siteInst.getUsedSitePIP(muxOut);
+					if(pip != null) {
+						BELPin src = pip.getInputPin().getSourcePin();
+						return getPortInstFromBELPin(siteInst, src);
+					}
+				}
+			}
+			
+			return null;
+		}
 		String logPinName = targetCell.getLogicalPinMapping(belPin.getName());
 		if(logPinName == null) return null;
 		EDIFPortInst portInst = targetCell.getEDIFCellInst().getPortInst(logPinName);
