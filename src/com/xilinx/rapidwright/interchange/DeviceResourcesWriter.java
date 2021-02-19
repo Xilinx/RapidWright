@@ -370,7 +370,7 @@ public class DeviceResourcesWriter {
 
                 SitePin.Builder pin = pins.get(j);
                 pin.setName(allStrings.getIndex(pinNames.get(j)));
-                pin.setDir(sitePinIndex <= highestIndexInputPin ? Direction.INPUT : Direction.OUTPUT);
+                pin.setDir(j <= highestIndexInputPin ? Direction.INPUT : Direction.OUTPUT);
                 BEL bel = siteInst.getBEL(pinNames.get(j));
                 BELPin[] belPins = bel.getPins();
                 if(belPins.length != 1) {
