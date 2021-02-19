@@ -1371,7 +1371,7 @@ public class DesignTools {
 					continue;					
 				}
 				if(c.getPhysicalPinMapping(logicalPinName) == null) {
-					String physPinMapping = c.getDefaultPinMapping(logicalPinName);
+					String physPinMapping = null;//c.getDefaultPinMapping(logicalPinName);
 					if(physPinMapping != null) {
 						c.addPinMapping(physPinMapping, logicalPinName);
 					}					
