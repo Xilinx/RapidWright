@@ -1363,7 +1363,20 @@ public class DesignTools {
 			if(c == null || c.getBEL() == null) continue;
 			String logicalPinName = p.getPortInst().getName();
 			String sitePinName = getRoutedSitePin(c, net, logicalPinName);
-			if(sitePinName == null) continue;
+			if(sitePinName == null) {
+				if(net.equals(design.getGndNet())) {
+					sitePinName = c.getCorrespondingSitePinName(logicalPinName);
+				}
+				if(sitePinName == null) {
+					continue;					
+				}
+				if(c.getPhysicalPinMapping(logicalPinName) == null) {
+					String physPinMapping = c.getDefaultPinMapping(logicalPinName);
+					if(physPinMapping != null) {
+						c.addPinMapping(physPinMapping, logicalPinName);
+					}					
+				}
+			}
 			SiteInst si = c.getSiteInst();
 			SitePinInst newPin = si.getSitePinInst(sitePinName);
 			if(newPin != null) continue;
@@ -1372,7 +1385,7 @@ public class DesignTools {
 			Set<String> physPinMappings = c.getAllPhysicalPinMappings(logicalPinName); 
 			// BRAMs can have two (or more) physical pin mappings for a logical pin
 			String existing = c.getPhysicalPinMapping(logicalPinName);
-			if(physPinMappings.size() > 1) {
+			if(physPinMappings != null && physPinMappings.size() > 1) {
 				for(String physPin : physPinMappings) {
 					if(existing.equals(physPin)) continue;
 					sitePinName = getRoutedSitePinFromPhysicalPin(c, net, physPin);
