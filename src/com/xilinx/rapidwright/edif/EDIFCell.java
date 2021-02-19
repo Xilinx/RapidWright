@@ -42,7 +42,7 @@ import java.util.Queue;
  * 
  * Created on: May 11, 2017
  */
-public class EDIFCell extends EDIFPropertyObject {
+public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
 
 	public static final EDIFName DEFAULT_VIEW = new EDIFName("netlist");
 	
@@ -484,7 +484,12 @@ public class EDIFCell extends EDIFPropertyObject {
 		wr.write("     )\n"); // View end
 		wr.write("   )\n"); // Cell end
 	}
-	
+
+    @Override
+    public String getUniqueKey() {
+        return getLibrary().getName() + "_" + getName();
+    }
+        
 	/**
 	 * Recursively finds all leaf cell descendants of this cell
 	 * @return A list of all leaf cell descendants of this cell

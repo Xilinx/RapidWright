@@ -38,6 +38,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Queue;
@@ -984,6 +985,25 @@ public class EDIFTools {
 			portNet.createPortInst(portName, i);
 		if(pr.getNet() == null) 
 			portNet.addPortInst(pr);
+	}
+
+	public static List<String> getMacroLeafCellNames(EDIFCell cell) {
+		Queue<EDIFHierCellInst> q = new LinkedList<>();
+		for(EDIFCellInst inst : cell.getCellInsts()) {
+			q.add(new EDIFHierCellInst("", inst));
+		}
+		ArrayList<String> leafCells = new ArrayList<String>();
+		while(!q.isEmpty()) {
+			EDIFHierCellInst inst = q.remove();
+			if(inst.getCellType().isPrimitive()) {
+				leafCells.add(inst.getFullHierarchicalInstName());
+			}else {
+				for(EDIFCellInst i : inst.getCellType().getCellInsts()) {
+					q.add(new EDIFHierCellInst(inst.getHierarchicalInstName(), i));
+				}
+			}
+		}
+		return leafCells;
 	}
 	
 	/**

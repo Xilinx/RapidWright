@@ -10,6 +10,7 @@ import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Module;
+import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
@@ -95,6 +96,10 @@ public class StampPlacement {
 		
 		Design design = Design.readCheckpoint(args[0], CodePerfTracker.SILENT);
 		Device device = design.getDevice();
+		
+	    for(Net net : design.getNets()) {
+	        if(net.isClockNet()) net.unroute();
+	    }
 		
 		t.stop().start("Load stamp DCPs");
 

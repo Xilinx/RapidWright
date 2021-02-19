@@ -87,7 +87,18 @@ public class EDIFHierCellInst {
 	 * @return True if this is the top instance, false otherwise.
 	 */
 	public boolean isTopLevelInst() {
-		return instance.getCellType().getLibrary().getNetlist().getTopCellInst().equals(instance);
+		EDIFCell cellType = instance.getCellType();
+		EDIFLibrary library = cellType.getLibrary();
+		EDIFNetlist netlist = library.getNetlist();
+		EDIFCellInst topCellInst = null;
+		if(netlist != null) {
+			topCellInst = netlist.getTopCellInst();
+		}
+		if(topCellInst != null) {
+			return topCellInst.equals(instance);
+		} else {
+			return false;
+		}
 	}
 	
 	public String toString(){

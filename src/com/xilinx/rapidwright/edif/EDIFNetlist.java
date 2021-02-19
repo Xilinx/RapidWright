@@ -35,6 +35,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -42,6 +43,7 @@ import java.util.Map.Entry;
 import java.util.regex.Pattern;
 import java.util.Queue;
 import java.util.Set;
+import java.util.TreeSet;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
@@ -433,6 +435,60 @@ public class EDIFNetlist extends EDIFName {
 		return libraries.values();
 	}
 	
+	/**
+	 * Get Libraries in export order so that any cell instance appearing in a library will only 
+	 * refer to cells in its own library or previous libraries in the list.  This is a pre-requisite
+	 * for export to a file.
+	 * @return List of all libraries in the netlist sorted for valid export, HDIPrimitives library
+	 * is always first.
+	 */
+	public List<EDIFLibrary> getLibrariesInExportOrder() {
+		Set<EDIFLibrary> toExport = new LinkedHashSet<EDIFLibrary>();
+		// Assume HDI Primitives are always first as they should not refer to any previous libraries
+		toExport.add(getHDIPrimitivesLibrary());
+		
+		Map<String, HashSet<EDIFLibrary>> deps = new HashMap<String, HashSet<EDIFLibrary>>();
+		for(EDIFLibrary lib : getLibraries()) {
+			if(lib.isHDIPrimitivesLibrary()) continue;
+			HashSet<EDIFLibrary> externalRefs = 
+					new HashSet<EDIFLibrary>(lib.getExternallyReferencedLibraries());
+			externalRefs.remove(getHDIPrimitivesLibrary());
+			
+			if(externalRefs.isEmpty()) {
+				toExport.add(lib);
+			} else {
+				deps.put(lib.getName(), externalRefs);
+			}
+		}
+		
+		Queue<Entry<String, HashSet<EDIFLibrary>>> q = new LinkedList<>(deps.entrySet());
+		int lastSize = q.size();
+		int size = lastSize;
+		int watchdog = 10;
+		while(!q.isEmpty()) {
+			Entry<String,HashSet<EDIFLibrary>> curr = q.poll();
+			size--;
+			if(toExport.containsAll(curr.getValue())) {
+				toExport.add(getLibrary(curr.getKey()));
+				continue;
+			} 
+			q.add(curr);
+			if(!q.isEmpty() && size == 0) {
+				if(q.size() == lastSize) {
+					watchdog--;
+					if(watchdog == 0) {
+						throw new RuntimeException("Circular dependency in EDIF Libraries between "
+								+ "cells.  Please merge libraries or resolve dependency.");
+					}
+					lastSize = q.size();
+					size = lastSize;
+				}
+			}
+		}
+		
+		return new ArrayList<>(toExport);
+	}
+	
 	public void exportEDIF(String fileName){
 		BufferedWriter bw = null;
 		
@@ -503,6 +559,12 @@ public class EDIFNetlist extends EDIFName {
 		EDIFCellInst currInst = getTopCellInst();
 		if(name.isEmpty()) return currInst;
 		String[] parts = name.split(EDIFTools.EDIF_HIER_SEP);
+		
+		// Sadly, cells can be named 'fred/' instead of 'fred', this code handles this situation
+		if(name.charAt(name.length()-1) == '/') {
+			parts[parts.length-1] = parts[parts.length-1] + EDIFTools.EDIF_HIER_SEP;  
+		}
+		
 		for(int i=0; i < parts.length; i++){
 			EDIFCellInst checkInst = currInst.getCellType().getCellInst(parts[i]);
 			// Someone named their instance with hierarchy separators, joy!
