@@ -1,10 +1,9 @@
-# RapidWright Interchange Format [Experimental]
+# FPGA Interchange Format for RapidWright
 
-Prototyping an interchange format to allow designs from other tools such as [VTR](https://github.com/verilog-to-routing/vtr-verilog-to-routing) and [nextpnr](https://github.com/YosysHQ/nextpnr) to read and write placed and routed designs with RapidWright.  This interface depends on [Cap'n Proto](https://capnproto.org/index.html) for serialization and you'll need to [install](https://capnproto.org/install.html) it with the [Java plugin](https://dwrensha.github.io/capnproto-java/index.html).
+The FPGA interchange format allows designs from other tools such as [VTR](https://github.com/verilog-to-routing/vtr-verilog-to-routing) and [nextpnr](https://github.com/YosysHQ/nextpnr) to read and write placed and routed designs with RapidWright.  This interface depends on [Cap'n Proto](https://capnproto.org/index.html) for serialization and you'll need to [install](https://capnproto.org/install.html) it with the [Java plugin](https://dwrensha.github.io/capnproto-java/index.html).
 
-Current schema for logical netlist can be found here:
-https://github.com/Xilinx/RapidWright/blob/interchange/interchange/LogicalNetlist.capnp
-
+Current schema for the interchange format can be found here:
+https://github.com/SymbiFlow/fpga-interchange-schema
 
 ## Easiest way to Setup a RapidWright Repo Locally:
 ```
@@ -18,7 +17,6 @@ http://www.rapidwright.io/docs/Automatic_Install.html#automatic-install
 
 ## How to Run Example
 ```
-git checkout interchange
 cd interchange && make && cd ..
 make
 java com.xilinx.rapidwright.interchange.PhysicalNetlistExample
