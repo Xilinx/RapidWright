@@ -14,6 +14,7 @@ import org.capnproto.StructList;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.SiteInst;
+import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Device;
@@ -202,6 +203,22 @@ public class ConstantDefinitions {
     public static void verifyConstants(Enumerator<String> allStrings, Device device, Design design, Map<SiteTypeEnum,Site> siteTypes, Constants.Reader reader, Map<TileTypeEnum, TileType.Reader> tileTypes) {
         if(reader.getDefaultBestConstant() != ConstantType.VCC) {
             throw new RuntimeException("Expected that default best constant be VCC! Got " + reader.getDefaultBestConstant().name());
+        }
+
+        if(!reader.getGndNetName().isName()) {
+            throw new RuntimeException("Expected GND net be specified.");
+        }
+        String gnd_net = allStrings.get(reader.getGndNetName().getName());
+        if(!gnd_net.equals(Net.GND_NET)) {
+            throw new RuntimeException("GND net should be " + Net.GND_NET + " but got " + gnd_net);
+        }
+
+        if(!reader.getVccNetName().isName()) {
+            throw new RuntimeException("Expected VCC net be specified.");
+        }
+        String vcc_net = allStrings.get(reader.getVccNetName().getName());
+        if(!vcc_net.equals(Net.VCC_NET)) {
+            throw new RuntimeException("VCC net should be " + Net.VCC_NET + " but got " + vcc_net);
         }
 
         ConstantDefinitions constants = new ConstantDefinitions(allStrings, reader, tileTypes);
@@ -550,6 +567,15 @@ public class ConstantDefinitions {
 
     public static void writeConstants(Enumerator<String> allStrings, Device device, Constants.Builder builder, Design design, Map<SiteTypeEnum,Site> siteTypes, Map<TileTypeEnum, TileType.Builder> tileTypes) {
         builder.setDefaultBestConstant(ConstantType.VCC);
+
+        builder.setGndCellType(allStrings.getIndex("GND"));
+        builder.setGndCellPin(allStrings.getIndex("G"));
+
+        builder.setVccCellType(allStrings.getIndex("VCC"));
+        builder.setVccCellPin(allStrings.getIndex("P"));
+
+        builder.getGndNetName().setName(allStrings.getIndex(Net.GND_NET));
+        builder.getVccNetName().setName(allStrings.getIndex(Net.VCC_NET));
 
         writeTiedWires(allStrings, device, builder, tileTypes);
         writeTiedBels(allStrings, device, builder, design, siteTypes);
