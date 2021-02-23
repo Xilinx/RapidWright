@@ -229,7 +229,7 @@ public class DeviceResourcesVerifier {
 
                 SitePinInst pin = siteInst.getSitePinInst(pinNames[i]);
                 Direction dir = pinReader.getDir();
-                if(sitePinIndex <= highestIndexInputPin) {
+                if(i <= highestIndexInputPin) {
                     expect(Direction.INPUT.name(), dir.name());
                 } else {
                     expect(Direction.OUTPUT.name(), dir.name());
