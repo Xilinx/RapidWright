@@ -26,6 +26,7 @@ package com.xilinx.rapidwright.util;
 
 import java.io.File;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 
@@ -225,6 +226,19 @@ public class StringTools {
 			}
 		}
 		return s0.substring(0,min);
+	}
+	
+	/**
+	 * Checks if given string starts with any of the provided prefix strings
+	 * @param str The string to check
+	 * @param prefixes The set of possible prefixes to match against str
+	 * @return True if any one prefix matches the given string.
+	 */
+	public static boolean startsWithAny(String str, Collection<String> prefixes) {
+		for(String prefix : prefixes) {
+			if(str.startsWith(prefix)) return true;
+		}
+		return false;
 	}
 	
 	public static void main(String[] args) {

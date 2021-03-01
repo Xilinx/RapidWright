@@ -71,6 +71,7 @@ import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.router.RouteNode;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.MessageGenerator;
+import com.xilinx.rapidwright.util.StringTools;
 import com.xilinx.rapidwright.util.Utils;
 
 /**
@@ -1744,5 +1745,124 @@ public class DesignTools {
 			}
 		}
 		return invertPinMap;
+	}
+
+	/**
+	 * Copies the logic and implementation of a set of cells from one design to another.
+	 * @param src The source design (with partial or full implementation)
+	 * @param dest The destination design (with matching cell instance interfaces) 
+	 * @param instNames Names of the cell instances to copy
+	 */
+	public static void copyImplementation(Design src, Design dest, String... instNames) {
+		copyImplementation(src, dest, false, false, instNames);
+	}
+	
+	/**
+	 * Copies the logic and implementation of a set of cells from one design to another.
+	 * @param src The source design (with partial or full implementation)
+	 * @param dest The destination design (with matching cell instance interfaces) 
+	 * @param lockPlacement Flag indicating if the destination implementation copy should have the 
+	 * 	placement locked
+	 * @param lockRouting Flag indicating if the destination implementation copy should have the 
+	 * 	routing locked
+	 * @param instNames Names of the cell instances to copy
+	 */
+	public static void copyImplementation(Design src, Design dest, boolean lockPlacement, 
+			boolean lockRouting, String... instNames) {
+		// Removing existing logic in target cells in destination design
+		for(String instName : instNames) {
+			DesignTools.makeBlackBox(dest, instName);
+			dest.getNetlist().removeUnusedCellsFromWorkLibrary();
+		}
+		
+		// Populate black boxes with existing logical netlist cells
+		EDIFNetlist destNetlist = dest.getNetlist();
+		HashSet<String> instsWithSeparator = new HashSet<>();
+		for(String instName : instNames) {
+			EDIFHierCellInst cellInst = src.getNetlist().getHierCellInstFromName(instName);
+			destNetlist.migrateCellAndSubCells(cellInst.getCellType());
+			EDIFHierCellInst bbInst = destNetlist.getHierCellInstFromName(instName);
+			bbInst.getInst().setCellType(cellInst.getCellType());
+			instsWithSeparator.add(instName + EDIFTools.EDIF_HIER_SEP);
+		}
+
+
+		// Identify cells to copy placement
+		for(Cell cell : src.getCells()) {
+			String cellName = cell.getName();
+			
+			if(StringTools.startsWithAny(cellName, instsWithSeparator)) {
+				SiteInst dstSiteInst = dest.getSiteInstFromSite(cell.getSite());
+				SiteInst srcSiteInst = cell.getSiteInst();
+				if(dstSiteInst == null) {
+					dstSiteInst = dest.createSiteInst(srcSiteInst.getName(), 
+									srcSiteInst.getSiteTypeEnum(), srcSiteInst.getSite());
+				}
+				Cell copy = new Cell(cell, dstSiteInst);
+				dstSiteInst.addCell(copy);
+				if(lockPlacement) {
+					copy.setBELFixed(true);
+				}
+			}
+		}
+		
+		// Identify nets to copy routing
+		HashSet<String> copiedNetNames = new HashSet<>();
+		for(Net net : src.getNets()) {
+			if(net.isStaticNet()) continue;
+			List<EDIFHierPortInst> pins = src.getNetlist().getPhysicalPins(net.getName());
+			if(pins == null) continue;
+			boolean allInside = true;
+			for(EDIFHierPortInst portInst : pins) {
+				String portInstName = portInst.getFullHierarchicalInstName();
+				if(!StringTools.startsWithAny(portInstName, instsWithSeparator)) {
+					allInside = false;
+					break;
+				}
+			}
+			if(allInside) {
+				copiedNetNames.add(net.getName());
+				Net copiedNet = dest.createNet(net.getName(), destNetlist.getNetFromHierName(net.getName()));
+				for(PIP p : net.getPIPs()) {
+					copiedNet.addPIP(p);
+					if(lockRouting) {
+						p.setIsPIPFixed(true);
+					}
+				}
+			}
+		}
+		
+		destNetlist.resetParentNetMap();
+		
+		for(SiteInst srcSiteInst : src.getSiteInsts()) {
+			for(Entry<String,Net> e : srcSiteInst.getNetSiteWireMap().entrySet()) {
+				String netName = e.getValue().getName();
+				boolean isIncluded = copiedNetNames.contains(netName);
+				String parentNetName = null;
+				if(isIncluded || 
+				   copiedNetNames.contains(parentNetName = destNetlist.getParentNetName(netName))) {
+					SiteInst dstSiteInst = dest.getSiteInstFromSite(srcSiteInst.getSite());
+					if(dstSiteInst == null) {
+						dstSiteInst = dest.createSiteInst(srcSiteInst.getName(), 
+										srcSiteInst.getSiteTypeEnum(), srcSiteInst.getSite());
+					}
+					BELPin[] belPins = srcSiteInst.getSiteWirePins(e.getKey());
+					Net copiedNet = dest.getNet(netName);
+					if(copiedNet == null && !isIncluded) {
+						copiedNet = dest.getNet(parentNetName);
+					}
+					dstSiteInst.routeIntraSiteNet(copiedNet, belPins[0], belPins[0]);
+				}
+			}
+			
+			for(SitePIP sitePIP : srcSiteInst.getUsedSitePIPs()) {
+				Net srcNet = srcSiteInst.getNetFromSiteWire(sitePIP.getInputPin().getSiteWireName());
+				if(copiedNetNames.contains(srcNet.getName())) {
+					SiteInst dstSiteInst = dest.getSiteInstFromSite(srcSiteInst.getSite());
+					dstSiteInst.addSitePIP(sitePIP);
+				}
+			}
+		}
+
 	}
 }
