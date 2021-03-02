@@ -52,6 +52,7 @@ import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.SitePIP;
+import com.xilinx.rapidwright.device.SitePIPStatus;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.Wire;
@@ -1800,9 +1801,8 @@ public class DesignTools {
 				}
 				Cell copy = new Cell(cell, dstSiteInst);
 				dstSiteInst.addCell(copy);
-				if(lockPlacement) {
-					copy.setBELFixed(true);
-				}
+				copy.setBELFixed(lockPlacement);
+				copy.setSiteFixed(lockPlacement);
 			}
 		}
 		
@@ -1833,7 +1833,6 @@ public class DesignTools {
 		}
 		
 		destNetlist.resetParentNetMap();
-		
 		for(SiteInst srcSiteInst : src.getSiteInsts()) {
 			for(Entry<String,Net> e : srcSiteInst.getNetSiteWireMap().entrySet()) {
 				String netName = e.getValue().getName();
