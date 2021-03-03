@@ -53,6 +53,7 @@ import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.SitePIP;
 import com.xilinx.rapidwright.device.SitePIPStatus;
+import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.Wire;
@@ -1771,23 +1772,26 @@ public class DesignTools {
 	public static void copyImplementation(Design src, Design dest, boolean lockPlacement, 
 			boolean lockRouting, String... instNames) {
 		// Removing existing logic in target cells in destination design
+		EDIFNetlist destNetlist = dest.getNetlist();
 		for(String instName : instNames) {
 			DesignTools.makeBlackBox(dest, instName);
-			dest.getNetlist().removeUnusedCellsFromWorkLibrary();
+			destNetlist.removeUnusedCellsFromWorkLibrary();
 		}
 		
 		// Populate black boxes with existing logical netlist cells
-		EDIFNetlist destNetlist = dest.getNetlist();
 		HashSet<String> instsWithSeparator = new HashSet<>();
 		for(String instName : instNames) {
 			EDIFHierCellInst cellInst = src.getNetlist().getHierCellInstFromName(instName);
 			destNetlist.migrateCellAndSubCells(cellInst.getCellType());
 			EDIFHierCellInst bbInst = destNetlist.getHierCellInstFromName(instName);
 			bbInst.getInst().setCellType(cellInst.getCellType());
+            for(EDIFPortInst portInst : bbInst.getInst().getPortInsts()) {
+            	portInst.getPort().setParentCell(cellInst.getCellType());
+            }
 			instsWithSeparator.add(instName + EDIFTools.EDIF_HIER_SEP);
 		}
-
-
+		destNetlist.resetParentNetMap();
+		
 		// Identify cells to copy placement
 		for(Cell cell : src.getCells()) {
 			String cellName = cell.getName();
@@ -1803,6 +1807,27 @@ public class DesignTools {
 				dstSiteInst.addCell(copy);
 				copy.setBELFixed(lockPlacement);
 				copy.setSiteFixed(lockPlacement);
+				
+				// Preserve site routing immediately around cell pins
+				for(Entry<String,String> e : copy.getPinMappingsP2L().entrySet()) {
+					EDIFHierCellInst cellInst = destNetlist.getHierCellInstFromName(copy.getName());
+					EDIFPortInst portInst = cellInst.getInst().getPortInst(e.getValue());
+					if(portInst == null) continue;
+					EDIFNet edifNet = portInst.getNet();
+					String netName = cellInst.getHierarchicalInstName() + EDIFTools.EDIF_HIER_SEP 
+							+ edifNet.getName();
+					String parentNetName = destNetlist.getParentNetName(netName);
+					if(parentNetName == null) {
+						System.out.println(netName + " has no parent net name");
+						parentNetName = netName;
+					}
+					Net net = dest.getNet(parentNetName);
+					if(net == null) {
+						net = dest.createNet(parentNetName, edifNet);
+					}
+					BELPin belPin = copy.getBEL().getPin(e.getKey());
+					dstSiteInst.routeIntraSiteNet(net, belPin, belPin);
+				}
 			}
 		}
 		
@@ -1812,27 +1837,44 @@ public class DesignTools {
 			if(net.isStaticNet()) continue;
 			List<EDIFHierPortInst> pins = src.getNetlist().getPhysicalPins(net.getName());
 			if(pins == null) continue;
-			boolean allInside = true;
+			
+			// Identify the kinds of routes to preserve:
+			//  - Has the source in the preservation zone
+			//  - Has at least one sink inside preservation zone
+			boolean srcInside = false;
+			List<EDIFHierPortInst> outside = new ArrayList<EDIFHierPortInst>();
 			for(EDIFHierPortInst portInst : pins) {
 				String portInstName = portInst.getFullHierarchicalInstName();
-				if(!StringTools.startsWithAny(portInstName, instsWithSeparator)) {
-					allInside = false;
-					break;
+				boolean isInside = StringTools.startsWithAny(portInstName, instsWithSeparator);
+				if(portInst.isOutput() && isInside) {
+					srcInside = true;
+				}
+				if(!isInside) {
+					outside.add(portInst);
 				}
 			}
-			if(allInside) {
-				copiedNetNames.add(net.getName());
-				Net copiedNet = dest.createNet(net.getName(), destNetlist.getNetFromHierName(net.getName()));
-				for(PIP p : net.getPIPs()) {
-					copiedNet.addPIP(p);
-					if(lockRouting) {
-						p.setIsPIPFixed(true);
-					}
+			// Don't keep routing if source is not in preservation zone
+			if(!srcInside) continue;
+			if((outside.size() + 1) >= pins.size()) continue;
+			
+			Set<PIP> pipsToRemove = new HashSet<>();
+			// Net is partially inside, preserve only portions inside
+			for(EDIFHierPortInst removeMe : outside) {
+				SitePinInst sitePin = removeMe.getRoutedSitePinInst(src);
+				pipsToRemove.addAll(unroutePin(sitePin, net));
+			}
+
+			copiedNetNames.add(net.getName());
+			Net copiedNet = dest.createNet(net.getName(), destNetlist.getNetFromHierName(net.getName()));
+			for(PIP p : net.getPIPs()) {
+				if(pipsToRemove.contains(p)) continue;
+				copiedNet.addPIP(p);
+				if(lockRouting) {
+					p.setIsPIPFixed(true);
 				}
 			}
 		}
 		
-		destNetlist.resetParentNetMap();
 		for(SiteInst srcSiteInst : src.getSiteInsts()) {
 			for(Entry<String,Net> e : srcSiteInst.getNetSiteWireMap().entrySet()) {
 				String netName = e.getValue().getName();
@@ -1862,6 +1904,97 @@ public class DesignTools {
 				}
 			}
 		}
+	}
+	
+	private static Set<PIP> unroutePin(SitePinInst pin, Net net){
+		Node sink = pin.getConnectedNode();
+		List<PIP> pips = net.getPIPs();
+		Map<Node,ArrayList<PIP>> reverseConns = new HashMap<>();
+		Map<Node,ArrayList<PIP>> reverseConnsStart = new HashMap<>();
+		Map<Node,Integer> fanout = new HashMap<>();
+		for(PIP pip : pips){
+			Node endNode = pip.getEndNode();
+			Node startNode = pip.getStartNode();
+			
+			ArrayList<PIP> rPips = reverseConns.get(endNode);
+			if(rPips == null){
+				rPips = new ArrayList<>();
+				reverseConns.put(endNode, rPips);
+			}
+			rPips.add(pip);
 
+			if (pip.isBidirectional()) {
+				rPips = reverseConnsStart.get(startNode);
+				if (rPips == null) {
+					rPips = new ArrayList<>();
+					reverseConnsStart.put(startNode, rPips);
+				}
+				rPips.add(pip);
+			}
+
+			Integer count = fanout.get(startNode);
+			if(count == null){
+				fanout.put(startNode, 1);
+			}else{
+				fanout.put(startNode, count+1);
+			}
+		}
+		ArrayList<PIP> curr = reverseConns.get(sink);
+		Integer fanoutCount = fanout.get(sink);
+		fanoutCount = fanoutCount == null ? 0 : fanoutCount;
+		boolean atReversedBidirectionalPip = false;
+		if (curr == null) {
+			// must be at a reversed bidirectional PIP
+			curr = reverseConnsStart.get(sink);
+			fanoutCount--;
+			atReversedBidirectionalPip = true;
+		}
+		HashSet<PIP> toRemove = new HashSet<>();
+		while(curr != null && curr.size() == 1 && fanoutCount < 2){
+			PIP pip = curr.get(0);
+			toRemove.add(pip);
+			if (new Node(pip.getTile(), pip.getStartWireIndex()).equals(sink)) {
+				// reached the source and there is another branch starting with a reversed
+				// bidirectional PIP ... don't traverse it
+				break;
+			}
+			sink = new Node(pip.getTile(), atReversedBidirectionalPip ? pip.getEndWireIndex() :
+					pip.getStartWireIndex());
+			atReversedBidirectionalPip = false;
+			curr = reverseConns.get(sink);
+			fanoutCount = fanout.get(sink);
+			fanoutCount = fanoutCount == null ? 0 : fanoutCount;
+			SitePin sitePin = sink.getSitePin();
+			if (curr == null && !(sitePin != null || sink.getWireName().contains(Net.VCC_WIRE_NAME) ||
+					sink.getWireName().contains(Net.GND_WIRE_NAME))) {
+				// curr should only be null when we're at the source site, so we've hit a reversed bidirectional PIP
+				// on our linear path
+				curr = reverseConnsStart.get(sink);
+				curr.remove(pip);
+				fanoutCount--;
+				atReversedBidirectionalPip = true;
+			}
+			if(sitePin != null && sitePin.isInput()){
+				SiteInst si = net.getSource().getSiteInst().getDesign().getSiteInstFromSite(sitePin.getSite());
+				if(si != null){
+					if(net.equals(si.getNetFromSiteWire(sitePin.getPinName()))){
+						fanoutCount = 2;
+					}
+				}
+			}
+		}
+		if(curr == null && fanout.size() == 1 && !net.isStaticNet()){
+			// We got all the way back to the source site. It is likely that 
+			// the net is using dual exit points from the site as is common in
+			// SLICEs -- we should unroute the sitenet
+			SitePin sPin = sink.getSitePin();
+			SiteInst si = net.getSource().getSiteInst();
+			if(!si.unrouteIntraSiteNet(sPin.getBELPin(), sPin.getBELPin())){
+				throw new RuntimeException("ERROR: Improperly routed net state while unrouting pin " +
+						" of net " + net.getName());
+			}
+		}
+		
+		return toRemove;
 	}
 }
