@@ -1247,4 +1247,35 @@ public class EDIFTools {
 
 		return currNet;
 	}
+	
+	public static void printHierSepNames(EDIFNetlist netlist) {
+		for(EDIFLibrary lib : netlist.getLibraries()) {
+			for(EDIFCell cell : lib.getCells()) {
+				if(cell.getName().contains(EDIF_HIER_SEP)) {
+					System.out.println("CELL: " + lib.getName() + "," + cell.getName());
+				}
+				
+				for(EDIFPort port : cell.getPorts()) {
+					if(port.getName().contains(EDIF_HIER_SEP)){
+						System.out.println("PORT: " + lib.getName() + "," + cell.getName() 
+						+"," + port.getName());
+					}
+				}
+				
+				for(EDIFNet net : cell.getNets()) {
+					if(net.getName().contains(EDIF_HIER_SEP)) {
+						System.out.println("NET: " + lib.getName() + "," + cell.getName() 
+						+"," + net.getName());
+					}
+				}
+				
+				for(EDIFCellInst inst : cell.getCellInsts()) {
+					if(inst.getName().contains(EDIF_HIER_SEP)) {
+						System.out.println("INST: " + lib.getName() + "," + cell.getName() 
+						+ "," + inst.getName());
+					}
+				}
+			}
+		}
+	}
 }
