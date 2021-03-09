@@ -667,7 +667,11 @@ public class EDIFNetlist extends EDIFName {
 	 */
 	public EDIFHierCellInst getHierCellInstFromName(String instName) {
 		EDIFCellInst inst = getCellInstFromHierName(instName);
-		String parentName = getHierParentName(instName);
+		String parentName = null;
+		if(instName != null) {
+			int lastOccurrance = instName.lastIndexOf(inst.getName());
+			parentName = lastOccurrance == 0 ? "" : instName.substring(0, lastOccurrance-1);			
+		}
 		return new EDIFHierCellInst(parentName, inst);
 	}
 	
