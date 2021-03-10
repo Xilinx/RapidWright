@@ -708,9 +708,6 @@ public class EDIFNetlist extends EDIFName {
 	 * @return Hierarchical cell instance reference or null if named instance could not be found
 	 */
 	public EDIFHierCellInst getHierCellInstFromName(String instName) {
-		if(instName.equals("i_pe_pcie/pcie/inst/pcie_4_0_pipe_inst/pcie_4_0_bram_inst/RAM32K.bram_comp_inst/bram_16k_0_int/ECC_RAM.RAMB36E2[3].ramb36e2_inst_REGCEAREGCE_cooolgate_en_gate_78")) {
-			System.out.println();
-		}
 		EDIFCellInst inst = getCellInstFromHierName(instName);
 		String parentName = null;
 		if(instName != null) {
