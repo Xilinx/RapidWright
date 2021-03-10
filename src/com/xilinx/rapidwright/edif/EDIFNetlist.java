@@ -195,6 +195,48 @@ public class EDIFNetlist extends EDIFName {
 		}
 	}
 	
+	/**
+	 * Helper method for {@link #removeUnusedCellsFromAllLibraries()}
+	 * @param cellsToRemove The map keeping track of unused cells
+	 * @param cell Cell to delete from removal list
+	 */
+	private static void _keepCell(HashMap<String,HashMap<String,EDIFCell>> cellsToRemove, 
+			EDIFCell cell) {
+		EDIFLibrary lib = cell.getLibrary();
+		if(lib.isHDIPrimitivesLibrary()) return;
+		String libName = lib.getName();
+		HashMap<String,EDIFCell> libCells = cellsToRemove.get(libName);
+		if(libCells == null) {
+			throw new RuntimeException("ERROR: Cell " + cell + " references unknown library " 
+					+ libName);
+		}
+		libCells.remove(cell.getLegalEDIFName());
+	}
+	
+	/**
+	 * Removals all unused cells from a netlist from any work library (all except hdi_primitives) 
+	 */
+	public void removeUnusedCellsFromAllWorkLibraries() {
+		HashMap<String,HashMap<String,EDIFCell>> cellsToRemove = new HashMap<>();
+		for(EDIFLibrary lib : getLibraries()) {
+			if(lib.isHDIPrimitivesLibrary()) continue;
+			cellsToRemove.put(lib.getName(), new HashMap<>(lib.getCellMap()));
+		}
+		
+		_keepCell(cellsToRemove, getTopCell());
+		for(EDIFHierCellInst i : getAllDescendants("", null, false)){
+			_keepCell(cellsToRemove, i.getCellType());
+		}
+		
+		for(Entry<String, HashMap<String,EDIFCell>> e : cellsToRemove.entrySet()) {
+			String libName = e.getKey();
+			EDIFLibrary lib = getLibrary(libName);
+			for(EDIFCell cell : e.getValue().values()) {
+				lib.removeCell(cell);
+			}
+		}
+	}
+	
 	public void removeUnusedCellsFromWorkLibrary(){
 		HashMap<String,EDIFCell> cellsToRemove = new HashMap<>(getWorkLibrary().getCellMap());
 		
@@ -666,9 +708,15 @@ public class EDIFNetlist extends EDIFName {
 	 * @return Hierarchical cell instance reference or null if named instance could not be found
 	 */
 	public EDIFHierCellInst getHierCellInstFromName(String instName) {
+		if(instName.equals("i_pe_pcie/pcie/inst/pcie_4_0_pipe_inst/pcie_4_0_bram_inst/RAM32K.bram_comp_inst/bram_16k_0_int/ECC_RAM.RAMB36E2[3].ramb36e2_inst_REGCEAREGCE_cooolgate_en_gate_78")) {
+			System.out.println();
+		}
 		EDIFCellInst inst = getCellInstFromHierName(instName);
 		String parentName = null;
 		if(instName != null) {
+			if(inst == null) {
+				System.out.println("instName=" + instName + " led to null inst");
+			}
 			int lastOccurrance = instName.lastIndexOf(inst.getName());
 			parentName = lastOccurrance == 0 ? "" : instName.substring(0, lastOccurrance-1);			
 		}
