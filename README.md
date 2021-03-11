@@ -49,5 +49,7 @@ http://www.rapidwright.io/docs/Automatic_Install.html#automatic-install
 
 ```
 cd $RAPIDWRIGHT_PATH
+git pull
+# resolve any issues
 make update_jars
 ```
