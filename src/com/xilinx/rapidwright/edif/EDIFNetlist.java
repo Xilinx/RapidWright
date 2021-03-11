@@ -43,7 +43,6 @@ import java.util.Map.Entry;
 import java.util.regex.Pattern;
 import java.util.Queue;
 import java.util.Set;
-import java.util.TreeSet;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
@@ -283,6 +282,16 @@ public class EDIFNetlist extends EDIFName {
 	
 	
 	public Device getDevice() {
+		if(device == null) {
+			String partName = EDIFTools.getPartName(this);
+			if(partName != null) {
+				device = Device.getDevice(partName);
+			}
+			if(device == null) {
+				System.err.println("WARNING: PART property on EDIF Design object not set correctly,"
+						+ " currently set to '"+partName+"', couldn't load device.");
+			}
+		}
 		return device;
 	}
 

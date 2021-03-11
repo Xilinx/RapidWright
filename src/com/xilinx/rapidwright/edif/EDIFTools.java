@@ -69,6 +69,8 @@ public class EDIFTools {
 	public static final String MACRO_PRIMITIVES_LIB = "macro_primitives";
 	
 	public static final String EDIF_LIBRARY_WORK_NAME = "work";
+
+	public static final String EDIF_PART_PROP = "PART";
 	
 	public static final Set<String> edifKeywordSet = 
 		new HashSet<>(Arrays.asList(
@@ -151,10 +153,10 @@ public class EDIFTools {
 	 * @return The part name or null if none was found.
 	 */
 	public static String getPartName(EDIFNetlist edif){
-		EDIFName key = new EDIFName("part");
+		EDIFName key = new EDIFName(EDIF_PART_PROP);
 		EDIFPropertyValue p = edif.getDesign().getProperties().get(key);
 		if(p == null) {
-			key.setName("PART");
+			key.setName(EDIF_PART_PROP.toLowerCase());
 			p = edif.getDesign().getProperties().get(key);
 			if(p == null) return null;
 		}
@@ -700,7 +702,7 @@ public class EDIFTools {
 	public static void ensureCorrectPartInEDIF(EDIFNetlist edif, String partName){
 		Map<EDIFName, EDIFPropertyValue> propMap = edif.getDesign().getProperties();
 		if(propMap == null){
-			edif.getDesign().addProperty("PART", partName);
+			edif.getDesign().addProperty(EDIF_PART_PROP, partName);
 			return;
 		}
 		boolean modified = false;
@@ -716,7 +718,7 @@ public class EDIFTools {
 			}
 		}
 		if(!modified){
-			edif.getDesign().addProperty("PART", partName);
+			edif.getDesign().addProperty(EDIF_PART_PROP, partName);
 		}
 	}
 
