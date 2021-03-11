@@ -29,6 +29,8 @@ java com.xilinx.rapidwright.interchange.PhysicalNetlistExample pblock0.dcp pbloc
 ## How to Update RapidWright to the Most Recent Release (Assumes Linux)
 ```
 cd $RAPIDWRIGHT_PATH
+git pull
+# resolve any issues
 make update_jars
 ```
 
