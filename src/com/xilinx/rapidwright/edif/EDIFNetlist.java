@@ -270,7 +270,7 @@ public class EDIFNetlist extends EDIFName {
 	 * @return the design
 	 */
 	public EDIFDesign getDesign() {
-		return design;
+		return this.design;
 	}
 
 	/**
@@ -283,7 +283,7 @@ public class EDIFNetlist extends EDIFName {
 	
 	
 	public Device getDevice() {
-		return device;
+		return this.device;
 	}
 
 	public void setDevice(Device device) {
