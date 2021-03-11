@@ -31,14 +31,7 @@ java com.xilinx.rapidwright.interchange.PhysicalNetlistExample pblock0.dcp pbloc
 cd $RAPIDWRIGHT_PATH
 git pull
 # resolve any issues
-rm -rf data jars
-curl -s https://api.github.com/repos/Xilinx/RapidWright/releases/latest | grep "browser_download_url.*_jars.zip" | cut -d : -f 2,3 | tr -d \" | wget -qi -
-curl -s https://api.github.com/repos/Xilinx/RapidWright/releases/latest | grep "browser_download_url.*_data.zip" | cut -d : -f 2,3 | tr -d \" | wget -qi -
-unzip rapidwright_jars.zip
-unzip rapidwright_data.zip
-rm jars/qtjambi-win64-msvc2005x64-4.5.2_01.jar
-make
-export CLASSPATH=$RAPIDWRIGHT_PATH/bin:$(echo $RAPIDWRIGHT_PATH/jars/*.jar | tr ' ' ':')
+make update_jars
 ```
 
 ## How to Re-generate Cap'n Proto Java Code from Schema
