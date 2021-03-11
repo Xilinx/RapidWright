@@ -2,6 +2,8 @@ package com.xilinx.rapidwright.interchange;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import org.capnproto.MessageReader;
@@ -295,7 +297,7 @@ public class LogNetlistReader {
         int cellCount = netlist.getCellList().size();
         StructList.Reader<Netlist.Cell.Reader> cellListReader = netlist.getCellList();
         StructList.Reader<Netlist.CellInstance.Reader> instListReader = netlist.getInstList();
-        allInsts = new ArrayList<EDIFCellInst>(instListReader.size());
+        allInsts = new ArrayList<EDIFCellInst>(Collections.nCopies(instListReader.size(), null));
         for(int i=0; i < cellCount; i++) {
             readEDIFCell(i, n, netlist, cellListReader, instListReader);
         }
