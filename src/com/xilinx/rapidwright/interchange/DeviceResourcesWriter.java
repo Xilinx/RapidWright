@@ -538,7 +538,6 @@ public class DeviceResourcesWriter {
 
                     HashMap<BEL,ArrayList<BELPin>> pins = new HashMap<BEL, ArrayList<BELPin>>();
                     for(BELPin pin : belPins) {
-                        if(pin.getBEL().getBELClass() == BELClass.PORT) continue;
                         ArrayList<BELPin> currBELPins = pins.get(pin.getBEL());
                         if(currBELPins == null) {
                             currBELPins = new ArrayList<>();
