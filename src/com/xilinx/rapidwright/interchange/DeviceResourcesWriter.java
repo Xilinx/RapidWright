@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -25,6 +26,9 @@ import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Unisim;
+import com.xilinx.rapidwright.design.VivadoPropType;
+import com.xilinx.rapidwright.design.VivadoProp;
+import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELClass;
 import com.xilinx.rapidwright.device.BELPin;
@@ -63,6 +67,10 @@ import com.xilinx.rapidwright.interchange.DeviceResources.Device.SiteType;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.SiteWire;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.TileType;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.BEL.Builder;
+import com.xilinx.rapidwright.interchange.DeviceResources.Device.ParameterDefinition;
+import com.xilinx.rapidwright.interchange.DeviceResources.Device.CellParameterDefinition;
+import com.xilinx.rapidwright.interchange.DeviceResources.Device.ParameterDefinitions;
+import com.xilinx.rapidwright.interchange.DeviceResources.Device.ParameterFormat;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.Direction;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.PropertyMap;
@@ -131,6 +139,64 @@ public class DeviceResourcesWriter {
         for(Entry<String,String> e : EDIFNetlist.macroExpandExceptionMap.entrySet()) {
             allStrings.addObject(e.getKey());
             allStrings.addObject(e.getValue());
+        }
+    }
+
+    private static void writeCellParameterDefinitions(Series series, EDIFNetlist prims, ParameterDefinitions.Builder builder) {
+        Set<String> cellsWithParameters = new HashSet<String>();
+        for(EDIFLibrary library : prims.getLibraries()) {
+            for(EDIFCell cell : library.getCells()) {
+                String cellTypeName = cell.getName();
+
+                Map<String,VivadoProp> defaultCellProperties = Design.getDefaultCellProperties(series, cellTypeName);
+                if(defaultCellProperties != null && defaultCellProperties.size() > 0) {
+                    cellsWithParameters.add(cellTypeName);
+                }
+            }
+        }
+
+        StructList.Builder<CellParameterDefinition.Builder> cellParamDefs = builder.initCells(cellsWithParameters.size());
+        int i = 0;
+        for(String cellTypeName : cellsWithParameters) {
+            CellParameterDefinition.Builder cellParamDef = cellParamDefs.get(i);
+            i += 1;
+
+
+            cellParamDef.setCellType(allStrings.getIndex(cellTypeName));
+            Map<String,VivadoProp> defaultCellProperties = Design.getDefaultCellProperties(series, cellTypeName);
+
+            StructList.Builder<ParameterDefinition.Builder> paramDefs = cellParamDef.initParameters(defaultCellProperties.size());
+            int j = 0;
+            for(Map.Entry<String, VivadoProp> property : defaultCellProperties.entrySet()) {
+                ParameterDefinition.Builder paramDef = paramDefs.get(j);
+                j += 1;
+
+                String propName = property.getKey();
+                VivadoProp propValue = property.getValue();
+
+                Integer nameIdx = allStrings.getIndex(propName);
+                paramDef.setName(nameIdx);
+
+                PropertyMap.Entry.Builder defaultValue = paramDef.getDefault();
+                defaultValue.setKey(nameIdx);
+                defaultValue.setTextValue(allStrings.getIndex(propValue.getValue()));
+
+                if(propValue.getType() == VivadoPropType.BINARY) {
+                    paramDef.setFormat(ParameterFormat.VERILOG_BINARY);
+                } else if(propValue.getType() == VivadoPropType.BOOL) {
+                    paramDef.setFormat(ParameterFormat.BOOLEAN);
+                } else if(propValue.getType() == VivadoPropType.DOUBLE) {
+                    paramDef.setFormat(ParameterFormat.FLOATING_POINT);
+                } else if(propValue.getType() == VivadoPropType.HEX) {
+                    paramDef.setFormat(ParameterFormat.VERILOG_HEX);
+                } else if(propValue.getType() == VivadoPropType.INT) {
+                    paramDef.setFormat(ParameterFormat.INTEGER);
+                } else if(propValue.getType() == VivadoPropType.STRING) {
+                    paramDef.setFormat(ParameterFormat.STRING);
+                } else {
+                    throw new RuntimeException(String.format("Unknown VivadoPropType %s", propValue.getType().name()));
+                }
+            }
         }
     }
 
@@ -249,6 +315,8 @@ public class DeviceResourcesWriter {
         netlistBuilder.setName(netlist.getName());
         LogNetlistWriter writer = new LogNetlistWriter(allStrings);
         writer.populateNetlistBuilder(netlist, netlistBuilder);
+
+        writeCellParameterDefinitions(device.getSeries(), netlist, devBuilder.getParameterDefs());
 
         // Write macro exception map
         int size = EDIFNetlist.macroExpandExceptionMap.size();

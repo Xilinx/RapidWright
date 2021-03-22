@@ -26,6 +26,8 @@ import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Unisim;
+import com.xilinx.rapidwright.design.VivadoPropType;
+import com.xilinx.rapidwright.design.VivadoProp;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELClass;
 import com.xilinx.rapidwright.device.BELPin;
@@ -60,6 +62,10 @@ import com.xilinx.rapidwright.interchange.DeviceResources.Device.SiteType;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.TileType;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.ParentPins;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.BELCategory;
+import com.xilinx.rapidwright.interchange.DeviceResources.Device.ParameterDefinition;
+import com.xilinx.rapidwright.interchange.DeviceResources.Device.CellParameterDefinition;
+import com.xilinx.rapidwright.interchange.DeviceResources.Device.ParameterDefinitions;
+import com.xilinx.rapidwright.interchange.DeviceResources.Device.ParameterFormat;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.Direction;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.PropertyMap;
@@ -729,6 +735,81 @@ public class DeviceResourcesVerifier {
                     topLevelCell.removeCellInst("test");
                 }
             }
+        }
+    }
+
+    static private void verifyParameterDefinitiosn(Enumerator<String> allStrings, DeviceResources.Device.Reader dReader, Design design) {
+        EDIFLibrary prims = Design.getPrimitivesLibrary(design.getDevice().getName());
+
+        Set<String> cellsWithParameters = new HashSet<String>();
+        for(EDIFCell cell : prims.getCells()) {
+            String cellTypeName = cell.getName();
+
+            Map<String,VivadoProp> defaultCellProperties = Design.getDefaultCellProperties(design.getDevice().getSeries(), cellTypeName);
+            if(defaultCellProperties != null && defaultCellProperties.size() > 0) {
+                cellsWithParameters.add(cellTypeName);
+            }
+        }
+
+        ParameterDefinitions.Reader paramDefs = dReader.getParameterDefs();
+        expect(paramDefs.getCells().size(), cellsWithParameters.size());
+
+        for(CellParameterDefinition.Reader cellParamDef : paramDefs.getCells()) {
+            String cellType = allStrings.get(cellParamDef.getCellType());
+
+            if(!cellsWithParameters.contains(cellType)) {
+                throw new RuntimeException(String.format(
+                            "Cell %s has parameters in DeviceResources, but not in RapidWright?",
+                            cellType));
+            }
+
+            Map<String,VivadoProp> defaultCellProperties = Design.getDefaultCellProperties(design.getDevice().getSeries(), cellType);
+            expect(cellParamDef.getParameters().size(), defaultCellProperties.size());
+
+            for(ParameterDefinition.Reader paramDef : cellParamDef.getParameters()) {
+                String paramName = allStrings.get(paramDef.getName());
+
+                // default.key and name should be the same.
+                expect(paramDef.getName(), paramDef.getDefault().getKey());
+
+                if(!defaultCellProperties.containsKey(paramName)) {
+                    throw new RuntimeException(String.format(
+                            "Cell %s has parameter %s in DeviceResources, but not in RapidWright?",
+                            cellType, paramName));
+                }
+                if(!paramDef.getDefault().isTextValue()) {
+                    throw new RuntimeException(String.format(
+                            "Cell %s parameter %s default is not a textValue",
+                            cellType, paramName));
+                }
+
+                VivadoProp propValue = defaultCellProperties.get(paramName);
+
+                expect(allStrings.get(paramDef.getDefault().getTextValue()), propValue.getValue());
+
+                ParameterFormat expected;
+                if(propValue.getType() == VivadoPropType.BINARY) {
+                    expected = ParameterFormat.VERILOG_BINARY;
+                } else if(propValue.getType() == VivadoPropType.BOOL) {
+                    expected = ParameterFormat.BOOLEAN;
+                } else if(propValue.getType() == VivadoPropType.DOUBLE) {
+                    expected = ParameterFormat.FLOATING_POINT;
+                } else if(propValue.getType() == VivadoPropType.HEX) {
+                    expected = ParameterFormat.VERILOG_HEX;
+                } else if(propValue.getType() == VivadoPropType.INT) {
+                    expected = ParameterFormat.INTEGER;
+                } else if(propValue.getType() == VivadoPropType.STRING) {
+                    expected = ParameterFormat.STRING;
+                } else {
+                    throw new RuntimeException(String.format("Unknown VivadoPropType %s", propValue.getType().name()));
+                }
+
+                if(expected != paramDef.getFormat()) {
+                    throw new RuntimeException(String.format("Expected ParameterFormat %s got %s",
+                                expected.name(), paramDef.getFormat().name()));
+                }
+            }
+
         }
     }
 
