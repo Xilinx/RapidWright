@@ -269,13 +269,16 @@ public class UltraScaleClockRouting {
 		Queue<RouteNode> q = new PriorityQueue<RouteNode>(16, new Comparator<RouteNode>() {
 			public int compare(RouteNode i, RouteNode j) {return i.getCost() - j.getCost();}});
 		Set<PIP> allPIPs = new HashSet<>();
+		HashSet<RouteNode> visited = new HashSet<>();
 		
 		nextLCB: for(RouteNode lcb : lcbTargets){
 			q.clear();
+			visited.clear();
 			ClockRegion currCR = lcb.getTile().getClockRegion();
 			q.addAll(startingPoints.get(currCR));
 			while(!q.isEmpty()){
 				RouteNode curr = q.poll(); 
+				visited.add(curr);
 				if(lcb.equals(curr)){
 					List<PIP> pips = curr.getPIPsBackToSource();
 					allPIPs.addAll(pips);
@@ -297,6 +300,7 @@ public class UltraScaleClockRouting {
 						if(p.getSite().getSiteTypeEnum() != SiteTypeEnum.BUFCE_LEAF) continue;
 					}
 					RouteNode rn = new RouteNode(w.getTile(), w.getWireIndex(), curr, curr.getLevel()+1);
+					if(visited.contains(rn)) continue;
 					rn.setCost(rn.getManhattanDistance(lcb));
 					q.add(rn);
 				}

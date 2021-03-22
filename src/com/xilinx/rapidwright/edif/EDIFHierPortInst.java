@@ -25,6 +25,13 @@
  */
 package com.xilinx.rapidwright.edif;
 
+import java.util.List;
+
+import com.xilinx.rapidwright.design.Cell;
+import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.device.Node;
+
 /**
  * Combines an {@link EDIFHierPortInst} with a full hierarchical
  * instance name to uniquely identify a port instance in a netlist.
@@ -184,5 +191,29 @@ public class EDIFHierPortInst {
 	
 	public boolean isInput(){
 		return portInst.getPort().isInput();
+	}
+	
+	/**
+	 * Gets the routed site pin if this port is on a placed leaf cell and its' site is routed
+	 * @param design The current design
+	 * @return The connected site pin to the connected to this cell pin.
+	 */
+	public SitePinInst getRoutedSitePinInst(Design design) {
+		String cellName = getFullHierarchicalInstName();
+		Cell cell = design.getCell(cellName);
+		if(cell == null) return null;
+		return cell.getSitePinFromPortInst(getPortInst(), null);
+	}
+	
+	/**
+	 * Gets the list of site pins if this port is on a placed leaf cell and its' site is routed
+	 * @param design The current design
+	 * @return The list of connected site pins to the connected to this cell pin.
+	 */
+	public List<SitePinInst> getAllRoutedSitePinInsts(Design design) {
+		String cellName = getFullHierarchicalInstName();
+		Cell cell = design.getCell(cellName);
+		if(cell == null) return null;
+		return cell.getAllSitePinsFromPortInst(getPortInst(), null);
 	}
 }

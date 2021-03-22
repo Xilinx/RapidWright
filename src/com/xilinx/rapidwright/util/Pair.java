@@ -61,7 +61,7 @@ public class Pair<T,U> {
 	}
 
 	public String toString(){
-		return "<" + first.toString() + "," + second.toString() + ">";
+		return "<" + first + "," + second + ">";
 	}
 	
 	/**

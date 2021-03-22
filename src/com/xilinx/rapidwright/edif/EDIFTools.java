@@ -38,6 +38,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Queue;
@@ -68,6 +69,8 @@ public class EDIFTools {
 	public static final String MACRO_PRIMITIVES_LIB = "macro_primitives";
 	
 	public static final String EDIF_LIBRARY_WORK_NAME = "work";
+
+	public static final String EDIF_PART_PROP = "PART";
 	
 	public static final Set<String> edifKeywordSet = 
 		new HashSet<>(Arrays.asList(
@@ -150,10 +153,10 @@ public class EDIFTools {
 	 * @return The part name or null if none was found.
 	 */
 	public static String getPartName(EDIFNetlist edif){
-		EDIFName key = new EDIFName("part");
+		EDIFName key = new EDIFName(EDIF_PART_PROP);
 		EDIFPropertyValue p = edif.getDesign().getProperties().get(key);
 		if(p == null) {
-			key.setName("PART");
+			key.setName(EDIF_PART_PROP.toLowerCase());
 			p = edif.getDesign().getProperties().get(key);
 			if(p == null) return null;
 		}
@@ -699,7 +702,7 @@ public class EDIFTools {
 	public static void ensureCorrectPartInEDIF(EDIFNetlist edif, String partName){
 		Map<EDIFName, EDIFPropertyValue> propMap = edif.getDesign().getProperties();
 		if(propMap == null){
-			edif.getDesign().addProperty("PART", partName);
+			edif.getDesign().addProperty(EDIF_PART_PROP, partName);
 			return;
 		}
 		boolean modified = false;
@@ -715,7 +718,7 @@ public class EDIFTools {
 			}
 		}
 		if(!modified){
-			edif.getDesign().addProperty("PART", partName);
+			edif.getDesign().addProperty(EDIF_PART_PROP, partName);
 		}
 	}
 
@@ -985,6 +988,25 @@ public class EDIFTools {
 		if(pr.getNet() == null) 
 			portNet.addPortInst(pr);
 	}
+
+	public static List<String> getMacroLeafCellNames(EDIFCell cell) {
+		Queue<EDIFHierCellInst> q = new LinkedList<>();
+		for(EDIFCellInst inst : cell.getCellInsts()) {
+			q.add(new EDIFHierCellInst("", inst));
+		}
+		ArrayList<String> leafCells = new ArrayList<String>();
+		while(!q.isEmpty()) {
+			EDIFHierCellInst inst = q.remove();
+			if(inst.getCellType().isPrimitive()) {
+				leafCells.add(inst.getFullHierarchicalInstName());
+			}else {
+				for(EDIFCellInst i : inst.getCellType().getCellInsts()) {
+					q.add(new EDIFHierCellInst(inst.getHierarchicalInstName(), i));
+				}
+			}
+		}
+		return leafCells;
+	}
 	
 	/**
 	 * Creates a map of all cells in the netlist and a mapping to a list of all the hierarchical 
@@ -1226,5 +1248,36 @@ public class EDIFTools {
 		}
 
 		return currNet;
+	}
+	
+	public static void printHierSepNames(EDIFNetlist netlist) {
+		for(EDIFLibrary lib : netlist.getLibraries()) {
+			for(EDIFCell cell : lib.getCells()) {
+				if(cell.getName().contains(EDIF_HIER_SEP)) {
+					System.out.println("CELL: " + lib.getName() + "," + cell.getName());
+				}
+				
+				for(EDIFPort port : cell.getPorts()) {
+					if(port.getName().contains(EDIF_HIER_SEP)){
+						System.out.println("PORT: " + lib.getName() + "," + cell.getName() 
+						+"," + port.getName());
+					}
+				}
+				
+				for(EDIFNet net : cell.getNets()) {
+					if(net.getName().contains(EDIF_HIER_SEP)) {
+						System.out.println("NET: " + lib.getName() + "," + cell.getName() 
+						+"," + net.getName());
+					}
+				}
+				
+				for(EDIFCellInst inst : cell.getCellInsts()) {
+					if(inst.getName().contains(EDIF_HIER_SEP)) {
+						System.out.println("INST: " + lib.getName() + "," + cell.getName() 
+						+ "," + inst.getName());
+					}
+				}
+			}
+		}
 	}
 }

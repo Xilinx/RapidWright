@@ -35,6 +35,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -193,6 +194,48 @@ public class EDIFNetlist extends EDIFName {
 		}
 	}
 	
+	/**
+	 * Helper method for {@link #removeUnusedCellsFromAllLibraries()}
+	 * @param cellsToRemove The map keeping track of unused cells
+	 * @param cell Cell to delete from removal list
+	 */
+	private static void _keepCell(HashMap<String,HashMap<String,EDIFCell>> cellsToRemove, 
+			EDIFCell cell) {
+		EDIFLibrary lib = cell.getLibrary();
+		if(lib.isHDIPrimitivesLibrary()) return;
+		String libName = lib.getName();
+		HashMap<String,EDIFCell> libCells = cellsToRemove.get(libName);
+		if(libCells == null) {
+			throw new RuntimeException("ERROR: Cell " + cell + " references unknown library " 
+					+ libName);
+		}
+		libCells.remove(cell.getLegalEDIFName());
+	}
+	
+	/**
+	 * Removals all unused cells from a netlist from any work library (all except hdi_primitives) 
+	 */
+	public void removeUnusedCellsFromAllWorkLibraries() {
+		HashMap<String,HashMap<String,EDIFCell>> cellsToRemove = new HashMap<>();
+		for(EDIFLibrary lib : getLibraries()) {
+			if(lib.isHDIPrimitivesLibrary()) continue;
+			cellsToRemove.put(lib.getName(), new HashMap<>(lib.getCellMap()));
+		}
+		
+		_keepCell(cellsToRemove, getTopCell());
+		for(EDIFHierCellInst i : getAllDescendants("", null, false)){
+			_keepCell(cellsToRemove, i.getCellType());
+		}
+		
+		for(Entry<String, HashMap<String,EDIFCell>> e : cellsToRemove.entrySet()) {
+			String libName = e.getKey();
+			EDIFLibrary lib = getLibrary(libName);
+			for(EDIFCell cell : e.getValue().values()) {
+				lib.removeCell(cell);
+			}
+		}
+	}
+	
 	public void removeUnusedCellsFromWorkLibrary(){
 		HashMap<String,EDIFCell> cellsToRemove = new HashMap<>(getWorkLibrary().getCellMap());
 		
@@ -239,6 +282,16 @@ public class EDIFNetlist extends EDIFName {
 	
 	
 	public Device getDevice() {
+		if(device == null) {
+			String partName = EDIFTools.getPartName(this);
+			if(partName != null) {
+				device = Device.getDevice(partName);
+			}
+			if(device == null) {
+				System.err.println("WARNING: PART property on EDIF Design object not set correctly,"
+						+ " currently set to '"+partName+"', couldn't load device.");
+			}
+		}
 		return device;
 	}
 
@@ -433,6 +486,60 @@ public class EDIFNetlist extends EDIFName {
 		return libraries.values();
 	}
 	
+	/**
+	 * Get Libraries in export order so that any cell instance appearing in a library will only 
+	 * refer to cells in its own library or previous libraries in the list.  This is a pre-requisite
+	 * for export to a file.
+	 * @return List of all libraries in the netlist sorted for valid export, HDIPrimitives library
+	 * is always first.
+	 */
+	public List<EDIFLibrary> getLibrariesInExportOrder() {
+		Set<EDIFLibrary> toExport = new LinkedHashSet<EDIFLibrary>();
+		// Assume HDI Primitives are always first as they should not refer to any previous libraries
+		toExport.add(getHDIPrimitivesLibrary());
+		
+		Map<String, HashSet<EDIFLibrary>> deps = new HashMap<String, HashSet<EDIFLibrary>>();
+		for(EDIFLibrary lib : getLibraries()) {
+			if(lib.isHDIPrimitivesLibrary()) continue;
+			HashSet<EDIFLibrary> externalRefs = 
+					new HashSet<EDIFLibrary>(lib.getExternallyReferencedLibraries());
+			externalRefs.remove(getHDIPrimitivesLibrary());
+			
+			if(externalRefs.isEmpty()) {
+				toExport.add(lib);
+			} else {
+				deps.put(lib.getName(), externalRefs);
+			}
+		}
+		
+		Queue<Entry<String, HashSet<EDIFLibrary>>> q = new LinkedList<>(deps.entrySet());
+		int lastSize = q.size();
+		int size = lastSize;
+		int watchdog = 10;
+		while(!q.isEmpty()) {
+			Entry<String,HashSet<EDIFLibrary>> curr = q.poll();
+			size--;
+			if(toExport.containsAll(curr.getValue())) {
+				toExport.add(getLibrary(curr.getKey()));
+				continue;
+			} 
+			q.add(curr);
+			if(!q.isEmpty() && size == 0) {
+				if(q.size() == lastSize) {
+					watchdog--;
+					if(watchdog == 0) {
+						throw new RuntimeException("Circular dependency in EDIF Libraries between "
+								+ "cells.  Please merge libraries or resolve dependency.");
+					}
+					lastSize = q.size();
+					size = lastSize;
+				}
+			}
+		}
+		
+		return new ArrayList<>(toExport);
+	}
+	
 	public void exportEDIF(String fileName){
 		BufferedWriter bw = null;
 		
@@ -503,6 +610,12 @@ public class EDIFNetlist extends EDIFName {
 		EDIFCellInst currInst = getTopCellInst();
 		if(name.isEmpty()) return currInst;
 		String[] parts = name.split(EDIFTools.EDIF_HIER_SEP);
+		
+		// Sadly, cells can be named 'fred/' instead of 'fred', this code handles this situation
+		if(name.charAt(name.length()-1) == '/') {
+			parts[parts.length-1] = parts[parts.length-1] + EDIFTools.EDIF_HIER_SEP;  
+		}
+		
 		for(int i=0; i < parts.length; i++){
 			EDIFCellInst checkInst = currInst.getCellType().getCellInst(parts[i]);
 			// Someone named their instance with hierarchy separators, joy!
@@ -605,7 +718,14 @@ public class EDIFNetlist extends EDIFName {
 	 */
 	public EDIFHierCellInst getHierCellInstFromName(String instName) {
 		EDIFCellInst inst = getCellInstFromHierName(instName);
-		String parentName = getHierParentName(instName);
+		String parentName = null;
+		if(instName != null) {
+			if(inst == null) {
+				System.out.println("instName=" + instName + " led to null inst");
+			}
+			int lastOccurrance = instName.lastIndexOf(inst.getName());
+			parentName = lastOccurrance == 0 ? "" : instName.substring(0, lastOccurrance-1);			
+		}
 		return new EDIFHierCellInst(parentName, inst);
 	}
 	

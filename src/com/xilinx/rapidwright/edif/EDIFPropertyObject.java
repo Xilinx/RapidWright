@@ -103,7 +103,7 @@ public class EDIFPropertyObject extends EDIFName {
 	 */
 	public EDIFPropertyValue addProperty(String key, boolean value){
 		EDIFName k = new EDIFName(key);
-		EDIFPropertyValue p = new EDIFPropertyValue(value ? "TRUE" : "FALSE", EDIFValueType.BOOLEAN);
+		EDIFPropertyValue p = new EDIFPropertyValue(value ? "true" : "false", EDIFValueType.BOOLEAN);
 		return addProperty(k,p);
 	}
 	

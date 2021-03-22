@@ -84,12 +84,12 @@ public class EDIFPropertyValue {
 	 * parse.
 	 */
 	public Integer getIntValue() {
-		if(type != EDIFValueType.STRING) {
+		if(type != EDIFValueType.INTEGER) {
 			return null;
 		}
 		int radix = 10;
 		boolean lastCharWasTick = false;
-		boolean isSigned = false;
+		boolean isSigned = value.contains("-");
 		for(int i=0; i < value.length(); i++) {
 			char c = value.charAt(i);
 			if(lastCharWasTick) {
@@ -125,7 +125,9 @@ public class EDIFPropertyValue {
 				lastCharWasTick = true;
 			}
 		}
-
+		if(isSigned) {
+			return Integer.parseInt(value);
+		}
 		return Integer.parseUnsignedInt(value);
 	}
 

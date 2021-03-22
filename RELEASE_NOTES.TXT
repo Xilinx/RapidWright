@@ -1,4 +1,25 @@
-============= RapidWright 2020.2.0-beta released on 2021-01-15 ================
+============= RapidWright 2020.2.2-beta released on 2021-03-10 ================
+Notes:
+ * First release to include the interchange project (see https://github.com/SymbiFlow/fpga-interchange-schema)
+ * Adds a new experimental DesignTools.copyImplementation() API for preserving partial implementation
+   results from a design on a per-module basis.
+ * Resolves Issue #127 - Duplicate PIPs from Tile.getPIPs()
+ * Fixes an issue related to not traversing routethrus when searching for site pins
+ * Fixes an issue in UltraScale clock routing getting stuck in a loop when routing to LCBs.
+ * Fix for missing portInst on FF routethrus
+ * Fixes missing BRAM site pins with multiple mappings
+ - API Additions:
+    - com.xilinx.rapidwright.design.Cell "public List<SitePinInst> getAllSitePinsFromPortInst(EDIFPortInst p, List<String> siteWires)"
+    - com.xilinx.rapidwright.design.Cell "public List<SitePinInst> getAllSitePinsFromLogicalPin(String logicalPinName, List<String> siteWires)"
+    - com.xilinx.rapidwright.design.Cell "public List<String> getAllCorrespondingSitePinNames(String logicalPinName)"
+    - com.xilinx.rapidwright.device.BEL "public boolean isStaticSource()"
+    - com.xilinx.rapidwright.device.BELPin "public String getBELName()"
+    - com.xilinx.rapidwright.device.BELPin "public boolean isGndSource()"
+    - com.xilinx.rapidwright.device.BELPin "public boolean isVccSource()"
+    - com.xilinx.rapidwright.device.BELPin "public boolean isStaticSource()"
+
+
+============= RapidWright 2020.2.1-beta released on 2021-01-15 ================
 Notes:
  * Adds a set of bitstream manipulation APIs
  * Adds part name normalization (see pull request #120)
