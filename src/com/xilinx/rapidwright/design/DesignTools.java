@@ -1479,6 +1479,12 @@ public class DesignTools {
 	                    if(!sitePIP.getInputPinName().equals(sink.getName())) continue;
 	                    // Make this the new source to search from and keep looking...
 	                    queue.add(sitePIP.getOutputPin());
+	                } else if(sink.getBELName().contains("FF")) {
+	                	// FF pass thru option (not a site PIP)
+	                	String siteWireName = sink.getBEL().getPin("Q").getSiteWireName();
+	                	if(siteWires.contains(siteWireName)) {
+	                		return siteWireName;
+	                	}
 	                }
 	            }
 	        }
