@@ -50,7 +50,8 @@ public class NodeGroupCache {
 			case NODE_PINFEED:
 				return true;
 			case NODE_LOCAL:
-				if(node.getWireName().contains("GLOBAL")) {
+				String wireName = node.getWireName();
+				if(wireName.contains("GLOBAL") || wireName.contains("CTRL")) {
 					return true;
 				}
 			default:
@@ -95,6 +96,9 @@ public class NodeGroupCache {
 			return nodeGroups;
 		}
 		for(Node uphillNode : exitNode.getAllUphillNodes()) {
+			if(uphillNode.getTile().getTileTypeEnum() != TileTypeEnum.INT) {
+				continue;
+			}
 			if(isEntryNode(uphillNode)) {
 				nodeGroups.add(new NodeGroup(uphillNode, exitNode));
 			}
@@ -110,6 +114,9 @@ public class NodeGroupCache {
 	public static List<CommonExitCluster> getDownstreamClusters(Node commonExitNode) {
 		List<CommonExitCluster> downstreamClusters = new ArrayList<CommonExitCluster>();
 		for(Node node : commonExitNode.getAllDownhillNodes()) {
+			if(node.getTile().getTileTypeEnum() != TileTypeEnum.INT) {
+				continue;
+			}
 			if(isExitNode(node)) {
 				downstreamClusters.add(new CommonExitCluster(node));
 			} else { // Entry Node
@@ -136,17 +143,17 @@ public class NodeGroupCache {
 				if(start != null && !visited.contains(start) && isExitNode(start)) {
 					visited.add(start);
 					CommonExitCluster startCluster = getCommonExitCluster(start);
-					System.out.println(start + ":");
-					System.out.println("\t" + startCluster);
-					getDownstreamClusters(startCluster);
+					//System.out.println(start + ":");
+					//System.out.println("\t" + startCluster);
+					if(startCluster.size() > 0) getDownstreamClusters(startCluster);
 				}
 				Node end = pip.getEndNode();
 				if(end != null && !visited.contains(end) && isExitNode(end)) {
 					visited.add(end);
 					CommonExitCluster endCluster = getCommonExitCluster(end);
-					System.out.println(end + ":");
-					System.out.println("\t" + endCluster);
-					getDownstreamClusters(endCluster);
+					//System.out.println(end + ":");
+					//System.out.println("\t" + endCluster);
+					if(endCluster.size() > 0) getDownstreamClusters(endCluster);
 				}
 			}
 		}
