@@ -430,7 +430,6 @@ public class DeviceResourcesVerifier {
                     }
 
                     for(BELPin goldBELPin : goldBELPins) {
-                        if(goldBELPin.isSitePort()) continue;
                         if(!foundBELPins.remove(goldBELPin)) {
                             throw new RuntimeException("ERROR: BELPin " + goldBELPin.toString()
                                 + " not found for pseudo PIP " + pipHelper.getTileTypeEnum() +"."
