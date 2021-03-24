@@ -87,6 +87,8 @@ public class FileTools {
 	public static final String RAPIDWRIGHT_VARIABLE_NAME = "RAPIDWRIGHT_PATH";
 	/** Suffix of the device part files */
 	public static final String DEVICE_FILE_SUFFIX = "_db.dat";
+	/** Suffic of NodeGroupCache files */
+	public static final String NODE_GROUP_CACHE_SUFFIX = "_ngcache.dat";
 	/** Data folder name */
 	public static final String DATA_FOLDER_NAME = "data";
 	/** Tcl source folder name */
@@ -977,6 +979,11 @@ public class FileTools {
 	
 	public static String getDeviceResourceName(Part part){
 		return getPartFolderResourceName(part) + part.getDevice() + DEVICE_FILE_SUFFIX;
+	}
+	
+	public static String getNodeGroupCacheName(Device device) {
+		return getPartFolderResourceName(device.getFamilyType()) 
+				+ device.getName() + NODE_GROUP_CACHE_SUFFIX;
 	}
 	
 	/**

@@ -24,25 +24,87 @@
  */
 package com.xilinx.rapidwright.device;
 
-import java.io.BufferedWriter;
-import java.io.FileWriter;
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Set;
 
 import com.esotericsoftware.kryo.unsafe.UnsafeInput;
 import com.esotericsoftware.kryo.unsafe.UnsafeOutput;
 import com.xilinx.rapidwright.util.FileTools;
-import com.xilinx.rapidwright.util.MessageGenerator;
-import com.xilinx.rapidwright.util.Pair;
 
 public class NodeGroupCache {
+
+	public static final String GROUP_NODE_CACHE_VERSION = "0.1.0";
+
+	private static HashMap<Device,Map<Node,CompactCluster>> singletonMap = 
+						new HashMap<Device, Map<Node,CompactCluster>>(); 
+	
+	
+	/**
+	 * Gets the nodes that are exit nodes of downstream clusters of the provided node.
+	 * @param node An exit node of an existing node cluster.
+	 * @return The list of exit nodes of downstream clusters of the provided node, or an empty list
+	 * if none could be found.
+	 */
+	public static List<Node> getDownstreamNodes(Node node) {
+		if(node == null) return Collections.emptyList();
+		Device device = node.getTile().getDevice();
+		Map<Node,CompactCluster> cache = getCache(device);
+		CompactCluster cluster = cache.get(node);
+		if(cluster == null) return Collections.emptyList();
+		return cluster.getDownstreamNodes(node);
+	}
+	
+	public static List<CommonExitCluster> getDownstreamClusters(Node node) {
+		List<Node> nodes = getDownstreamNodes(node);
+		List<CommonExitCluster> downstreamClusters = new ArrayList<CommonExitCluster>();
+		for(Node n : nodes) {
+			downstreamClusters.add(getCommonExitCluster(n));
+		}
+		return downstreamClusters;
+	}
+	
+	public static List<CommonExitCluster> getDownstreamClusters(CommonExitCluster sourceCluster) {
+		Node exitNode = sourceCluster.get(0).getExit();
+		return getDownstreamClusters(exitNode);
+	}
+	
+	private static Map<Node,CompactCluster> getCache(Device device) {
+		Map<Node,CompactCluster> cache = singletonMap.get(device);
+		if(cache == null) {
+			String cacheFileName = FileTools.getRapidWrightPath() + 
+					File.separator + FileTools.getNodeGroupCacheName(device);
+			cache = readCacheFile(cacheFileName, device);
+			if(cache == null) {
+				// First time, or cache file is invalid
+				if(!Device.QUIET_MESSAGE) {
+					 System.err.println("INFO: Building NodeGroupCache cache for "+device+"..."
+							 	+ "\n      This might take a few seconds for large devices on the first call.  "
+								+ "\n      It is triggered by calls to NodeGroupCache.getCache(). "
+								+ "\n      To avoid printing this message, set Device.QUIET_MESSAGE=true or set "
+								+ "the ENVIRONMENT variable "
+								+ "RW_QUIET_MESSAGE" +"=1.");
+				}
+				HashMap<Node,CompactCluster> compactDownstreamClusters = new HashMap<>();
+				HashMap<CompactCluster,Integer> uniqueClusters = new HashMap<>();
+				List<CompactCluster> uniqueClusterList = new ArrayList<>(); 
+				createCache(device, compactDownstreamClusters, uniqueClusters, uniqueClusterList);
+				writeCacheFile(cacheFileName, compactDownstreamClusters, uniqueClusters, uniqueClusterList);
+				if(!Device.QUIET_MESSAGE) {
+					System.err.println("INFO: Finished NodeGroupCache, wrote to " + cacheFileName);
+				}
+				cache = compactDownstreamClusters;
+			}
+			singletonMap.put(device, cache);
+		}
+		return cache;
+	}
 	
 	/**
 	 * Checks if the provided node is an exit node of a NodeGroup.
@@ -118,11 +180,11 @@ public class NodeGroupCache {
 		return nodeGroups;
 	}
 	
-	public static List<CommonExitCluster> getDownstreamClusters(CommonExitCluster sourceCluster) {
-		return getDownstreamClusters(sourceCluster.get(0).getExit());
+	private static List<CommonExitCluster> _getDownstreamClusters(CommonExitCluster sourceCluster) {
+		return _getDownstreamClusters(sourceCluster.get(0).getExit());
 	}
 	
-	public static List<CommonExitCluster> getDownstreamClusters(Node commonExitNode) {
+	private static List<CommonExitCluster> _getDownstreamClusters(Node commonExitNode) {
 		List<CommonExitCluster> downstreamClusters = new ArrayList<CommonExitCluster>();
 		for(Node node : commonExitNode.getAllDownhillNodes()) {
 			if(node.getTile().getTileTypeEnum() != TileTypeEnum.INT) {
@@ -133,112 +195,23 @@ public class NodeGroupCache {
 			} else { // Entry Node
 				for(Node downhillNode : node.getAllDownhillNodes()) {
 					if(!isExitNode(downhillNode)) {
-						throw new RuntimeException("ERROR: Bad Assumption: " + commonExitNode + " " + node + " -> " + downhillNode);
+						throw new RuntimeException("ERROR: Bad Assumption: " 
+								+ commonExitNode + " " + node + " -> " + downhillNode);
 					}
 					downstreamClusters.add(getCommonExitCluster(downhillNode));
 				}
 			}
 		}
 		return downstreamClusters;
-	}
+	}	
 	
-	private static int getNodeTileOffset(Node entry, Node exit) {
-		if(entry == null) return -1;
-		Tile tile = exit.getTile();
-		int xOffset = entry.getTile().getColumn() - tile.getColumn();
-		int yOffset = entry.getTile().getRow() - tile.getRow();
-		return xOffset << 16 | (yOffset & 0xffff);
-	}
-	
-	private static String getOffsetString(int offset) {
-		int x = offset >>> 16;
-		int y = (offset << 16) >> 16;
-		return "("+x+","+y+")";
-	}
-	
-
-	private static Long getCompactCluster(int wireIdx, int dx, int dy) {
-		return (((long)wireIdx) << 32) | (0xffff0000L & ((long)dx << 16)) | (dy & 0x000000000000ffffL);
-	}
-	
-	private static int getWireIndex(long compactCluster) {
-		return 0xffffffff & (int)(compactCluster >>> 32);
-	}
-	
-	private static int getDx(long compactCluster) {
-		int dx = 0xffff & (int)(compactCluster >>> 16);
-		return (dx << 16) >> 16;
-	}
-	
-	private static int getDy(long compactCluster) {
-		int dy = (int)(0xffff & compactCluster);
-		return (dy << 16) >> 16;
-	}
-	
-
-	
-	public static void main(String[] args) throws IOException {
-		Device device = Device.getDevice("xczu3eg");
-		HashSet<Node> visited = new HashSet<>();
-		HashMap<Node,CompactCluster> compactDownstreamClusters = new HashMap<>();
-		HashMap<CompactCluster,Integer> uniqueClusters = new HashMap<>();
-		List<CompactCluster> uniqueClusterList = new ArrayList<>(); 
-		// Iterate to find all nodes in the device
-		System.out.println(System.getProperty("user.dir"));
-		BufferedWriter bw = new BufferedWriter(new FileWriter(device.getName() +"_nodes.txt"));
-		for(Tile tile : device.getAllTiles()) {
-			for(PIP pip : tile.getPIPs()) {
-				for(Node node : new Node[] {pip.getStartNode(), pip.getEndNode()}) {
-					if(node != null && !visited.contains(node) && isExitNode(node)) {
-						//int templateIdx = node.getNodeTemplateIndex();
-						visited.add(node);
-						CommonExitCluster startCluster = getCommonExitCluster(node);
-						if(startCluster.size() > 0) {
-							bw.write("NODE " + node.getWireName());
-							List<CommonExitCluster> downstreamClusters = getDownstreamClusters(startCluster);
-							CompactCluster clusters = new CompactCluster(new long[downstreamClusters.size()]);
-							int i=0;
-							for(CommonExitCluster cluster : downstreamClusters) {
-								Node downstreamNode = cluster.get(0).getExit();
-								int dx = node.getTile().getTileXCoordinate() - downstreamNode.getTile().getTileXCoordinate();
-								int dy = node.getTile().getTileYCoordinate() - downstreamNode.getTile().getTileYCoordinate();
-								clusters.clusters[i] = getCompactCluster(downstreamNode.getWire(), dx, dy);
-								if(getWireIndex(clusters.clusters[i]) != downstreamNode.getWire()) {
-									throw new RuntimeException("ERROR: Bad Wire: " + getWireIndex(clusters.clusters[i]) + " " + downstreamNode.getWire());
-								}
-								if(getDx(clusters.clusters[i]) != dx) {
-									throw new RuntimeException("ERROR: Bad Dx: " + getDx(clusters.clusters[i])+  " "+ dx);
-								}
-								if(getDy(clusters.clusters[i]) != dy) {
-									throw new RuntimeException("ERROR: Bad Dy: " + getDy(clusters.clusters[i])+  " "+ dy);
-								}
-
-								bw.write(" " + downstreamNode.getWireName() + "-" + dx + "," + dy);
-								i++;
-							}
-							
-							// De-duplicate copies
-							Integer existingClusterIdx = uniqueClusters.get(clusters);
-							if(existingClusterIdx != null) {
-								clusters = uniqueClusterList.get(existingClusterIdx);
-							} else {
-								uniqueClusters.put(clusters, uniqueClusterList.size());
-								uniqueClusterList.add(clusters);
-							}
-							compactDownstreamClusters.put(node, clusters);
-						}
-						bw.write("\n");
-					}					
-				}
-			}
-		}
-		bw.close();
-		
-		String fileName = "nodeGroupCache.dat";
-		String cacheVer = "0.1.0";
+	private static void writeCacheFile(String fileName, 
+			Map<Node,CompactCluster> compactDownstreamClusters, 
+			Map<CompactCluster, Integer> uniqueClusters,
+			List<CompactCluster> uniqueClusterList) {
 		UnsafeOutput uos = FileTools.getUnsafeOutputStream(fileName);
 		uos.writeString(Device.DEVICE_FILE_VERSION);
-		uos.writeString(cacheVer);
+		uos.writeString(GROUP_NODE_CACHE_VERSION);
 		uos.writeInt(uniqueClusterList.size());
 		for(CompactCluster c : uniqueClusterList) {
 			uos.writeInt(c.clusters.length);
@@ -256,17 +229,19 @@ public class NodeGroupCache {
 			uos.writeInt(wire);
 			uos.writeInt(idx);
 		}
-		uos.close();
-		
-		
+		uos.close();		
+	}
+	
+	private static Map<Node, CompactCluster> readCacheFile(String fileName, Device device) {
+		if(!new File(fileName).exists()) {
+			return null;
+		}
 		UnsafeInput uis = FileTools.getUnsafeInputStream(fileName);
 		if(!Device.DEVICE_FILE_VERSION.equals(uis.readString())){
-			// TODO - Rebuild
-			throw new RuntimeException("ERROR: Bad Device Version");
+			return null;
 		}
-		if(!cacheVer.equals(uis.readString())){
-			// TODO - Rebuild
-			throw new RuntimeException("ERROR: Bad Cache Version");
+		if(!GROUP_NODE_CACHE_VERSION.equals(uis.readString())){
+			return null;
 		}
 		CompactCluster[] clusters = new CompactCluster[uis.readInt()];
 		for(int i=0; i < clusters.length; i++) {
@@ -286,11 +261,118 @@ public class NodeGroupCache {
 			Node node = Node.getNode(tile, wire);
 			CompactCluster cluster = clusters[idx];
 			if(node == null || cluster == null) {
-				throw new RuntimeException("ERROR: Bad read on cache");
+				return null;
 			}
 			restoredMap.put(node, cluster);
 		}
 		uis.close();
+
+		return restoredMap;
+	}
+	
+	/**
+	 * Populates a node to downstream cluster cache of connections
+	 * @param device The target device
+	 * @param compactDownstreamClusters An empty map to be populated with the connections
+	 * @param uniqueClusters An empty map to be populated with unique cluster patterns
+	 * @param uniqueClusterList An empty list to be populated with the list of unique cluster 
+	 * patterns
+	 */
+	private static void createCache(Device device, 
+			Map<Node,CompactCluster> compactDownstreamClusters, 
+			Map<CompactCluster, Integer> uniqueClusters,
+			List<CompactCluster> uniqueClusterList) {
+		
+		HashSet<Node> visited = new HashSet<>();
+		// Iterate to find all nodes in the device
+		for(Tile tile : device.getAllTiles()) {
+			for(PIP pip : tile.getPIPs()) {
+				for(Node node : new Node[] {pip.getStartNode(), pip.getEndNode()}) {
+					boolean checkNode = node != null && !visited.contains(node) && isExitNode(node); 
+					if(!checkNode) continue;
+
+					visited.add(node);
+					CommonExitCluster startCluster = getCommonExitCluster(node);
+					if(startCluster.size() < 1) continue;
+					
+					List<CommonExitCluster> downstreamClusters = _getDownstreamClusters(startCluster);
+					CompactCluster clusters = new CompactCluster(new long[downstreamClusters.size()]);
+					int i=0;
+					for(CommonExitCluster cluster : downstreamClusters) {
+						Node downstreamNode = cluster.get(0).getExit();
+						int dx = node.getTile().getTileXCoordinate() 
+								- downstreamNode.getTile().getTileXCoordinate();
+						int dy = node.getTile().getTileYCoordinate() 
+								- downstreamNode.getTile().getTileYCoordinate();
+						clusters.clusters[i] = CompactCluster.getCompactCluster(downstreamNode.getWire(), dx, dy);
+						if(CompactCluster.getWireIndex(clusters.clusters[i]) != downstreamNode.getWire()) {
+							throw new RuntimeException("ERROR: Bad Wire: " 
+									+ CompactCluster.getWireIndex(clusters.clusters[i]) 
+									+ " " + downstreamNode.getWire());
+						}
+						if(CompactCluster.getDx(clusters.clusters[i]) != dx) {
+							throw new RuntimeException("ERROR: Bad Dx: " 
+									+ CompactCluster.getDx(clusters.clusters[i])+  " "+ dx);
+						}
+						if(CompactCluster.getDy(clusters.clusters[i]) != dy) {
+							throw new RuntimeException("ERROR: Bad Dy: " 
+									+ CompactCluster.getDy(clusters.clusters[i])+  " "+ dy);
+						}
+						i++;
+					}
+					
+					// De-duplicate copies
+					Integer existingClusterIdx = uniqueClusters.get(clusters);
+					if(existingClusterIdx != null) {
+						clusters = uniqueClusterList.get(existingClusterIdx);
+					} else {
+						uniqueClusters.put(clusters, uniqueClusterList.size());
+						uniqueClusterList.add(clusters);
+					}
+					compactDownstreamClusters.put(node, clusters);
+				}
+			}
+		}
+	}
+	
+	/**
+	 * Clears the singleton map, thus deleting any references to the cache
+	 * objects.  This will enable the garbage collector to reclaim cache objects without any
+	 * other references. 
+	 */
+	public static void releaseCacheReferences(){
+		singletonMap.clear();
+	}
+	
+	/**
+	 * Creates all device node group caches up front.  This will take a long time.
+	 * @param device Specifies which devices to create the node group caches for.
+	 */
+	public static void createNodeGroupCaches(String ...devices) {
+		for(String deviceName : devices) {
+			getCache(Device.getDevice(deviceName));
+			releaseCacheReferences();
+		}
+	}
+	
+	public static void main(String[] args) throws IOException {
+		Device device = Device.getDevice("xczu3eg");
+		System.out.println(getDownstreamNodes(new Node("INT_X26Y60/WW4_E_BEG3",device)));
+	}
+	
+	public static void main2(String[] args) throws IOException {
+		Device device = Device.getDevice("xczu3eg");
+		HashMap<Node,CompactCluster> compactDownstreamClusters = new HashMap<>();
+		HashMap<CompactCluster,Integer> uniqueClusters = new HashMap<>();
+		List<CompactCluster> uniqueClusterList = new ArrayList<>(); 
+
+		createCache(device, compactDownstreamClusters, uniqueClusters, uniqueClusterList);
+		
+		String fileName = "nodeGroupCache.dat";
+
+		writeCacheFile(fileName, compactDownstreamClusters, uniqueClusters, uniqueClusterList);
+		
+		Map<Node, CompactCluster> restoredMap = readCacheFile(fileName, device);
 		
 		// Verify
 		if(restoredMap.size() != compactDownstreamClusters.size()) {
