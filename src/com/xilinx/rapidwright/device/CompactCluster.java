@@ -32,7 +32,9 @@ public class CompactCluster {
 			int wire = getWireIndex(cluster);
 			int dx = getDx(cluster);
 			int dy = getDy(cluster);
-			Tile newTile = refTile.getTileXYNeighbor(dx, dy);
+			int newX = refTile.getTileXCoordinate() - dx;
+			int newY = refTile.getTileYCoordinate() - dy;
+			Tile newTile = refTile.getDevice().getTile("INT_X" + newX + "Y" + newY);
 			nodes.add(Node.getNode(newTile, wire));
 		}
 		return nodes;

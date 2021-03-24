@@ -61,6 +61,11 @@ public class NodeGroupCache {
 		return cluster.getDownstreamNodes(node);
 	}
 	
+	/**
+	 * For a given exit node, this finds and returns a list of downstream common exit clusters
+	 * @param node The exit node of interest
+	 * @return A list of downstream common exit clusters 
+	 */
 	public static List<CommonExitCluster> getDownstreamClusters(Node node) {
 		List<Node> nodes = getDownstreamNodes(node);
 		List<CommonExitCluster> downstreamClusters = new ArrayList<CommonExitCluster>();
@@ -70,6 +75,11 @@ public class NodeGroupCache {
 		return downstreamClusters;
 	}
 	
+	/**
+	 * Gets the downstream clusters of the provided source cluster.  
+	 * @param sourceCluster The target source cluster.
+	 * @return A list of downstream clusters of the provided source cluster. 
+	 */
 	public static List<CommonExitCluster> getDownstreamClusters(CommonExitCluster sourceCluster) {
 		Node exitNode = sourceCluster.get(0).getExit();
 		return getDownstreamClusters(exitNode);
@@ -357,39 +367,25 @@ public class NodeGroupCache {
 	
 	public static void main(String[] args) throws IOException {
 		Device device = Device.getDevice("xczu3eg");
-		System.out.println(getDownstreamNodes(new Node("INT_X26Y60/WW4_E_BEG3",device)));
-	}
-	
-	public static void main2(String[] args) throws IOException {
-		Device device = Device.getDevice("xczu3eg");
-		HashMap<Node,CompactCluster> compactDownstreamClusters = new HashMap<>();
-		HashMap<CompactCluster,Integer> uniqueClusters = new HashMap<>();
-		List<CompactCluster> uniqueClusterList = new ArrayList<>(); 
 
-		createCache(device, compactDownstreamClusters, uniqueClusters, uniqueClusterList);
+		Map<Node,CompactCluster> cache = getCache(device);
 		
-		String fileName = "nodeGroupCache.dat";
-
-		writeCacheFile(fileName, compactDownstreamClusters, uniqueClusters, uniqueClusterList);
-		
-		Map<Node, CompactCluster> restoredMap = readCacheFile(fileName, device);
-		
-		// Verify
-		if(restoredMap.size() != compactDownstreamClusters.size()) {
-			throw new RuntimeException("ERROR: Bad match");
-		}
-		for(Entry<Node, CompactCluster> e : compactDownstreamClusters.entrySet()) {
-			CompactCluster cluster = restoredMap.get(e.getKey());
-			if(cluster == null) {
-				throw new RuntimeException("ERROR: Bad Match");
+		for(Entry<Node,CompactCluster> e : cache.entrySet()) {
+			Node node = e.getKey();
+			List<Node> downstreamNodes = cache.get(node).getDownstreamNodes(node);
+			
+			List<CommonExitCluster> downstreamClusters = _getDownstreamClusters(node);
+			
+			if(downstreamNodes.size() != downstreamClusters.size()) {
+				throw new RuntimeException("ERROR: Mismatch number of downstream nodes/clusters");
 			}
-			if(!e.getValue().equals(cluster)) {
-				throw new RuntimeException("ERROR: Bad Match");
+			for(int i=0; i < downstreamNodes.size(); i++) {
+				Node foundNode = downstreamClusters.get(i).get(0).getExit();
+				Node cachedNode = downstreamNodes.get(i);
+				if(!foundNode.equals(cachedNode)) {
+					throw new RuntimeException("ERROR: Mismatch for exit node " + node);
+				}
 			}
 		}
-		
-		
-		System.out.println("Node Count: " + compactDownstreamClusters.size());
-		System.out.println("Cluster Count: " + uniqueClusters.size());
 	}
 }
