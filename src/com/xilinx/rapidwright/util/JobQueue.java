@@ -88,7 +88,7 @@ public class JobQueue {
 			// it is running before we ask if it is finished
 			if(!launched || recentLSFJobLaunch){
 				try {
-					System.out.println("Waiting on " + running.size() + " jobs still running...");
+					System.out.println("Waiting on " + running.size() + " jobs still running, "+waitingToRun.size()+" not yet started...");
 					Thread.sleep(recentLSFJobLaunch ? 8000 : 2000);
 					if(recentLSFJobLaunch) recentLSFJobLaunch = false;
 				} catch (InterruptedException e) {

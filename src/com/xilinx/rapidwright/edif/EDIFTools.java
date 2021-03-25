@@ -284,7 +284,11 @@ public class EDIFTools {
 		EDIFCellInst curr = netlist.getTopCellInst();
 		
 		for(String name : names){
-			curr = curr.getCellType().getCellInst(name);
+			EDIFCellInst next = curr.getCellType().getCellInst(name);
+			if (next == null) {
+				throw new NullPointerException("Did not find cell "+name+" in "+curr+" while trying to resolve hierarchical name "+hierarchicalName);
+			}
+			curr = next;
 		}
 		
 		return curr;
