@@ -85,6 +85,7 @@ public class EDIFParser {
 	private static final String RENAME = "rename";
 	private static final String EDIFVERSION = "edifversion";
 	private static final String EDIFLEVEL = "ediflevel";
+	private static final String EXTERNAL = "external";
 	private static final String KEYWORDMAP = "keywordmap";
 	private static final String KEYWORDLEVEL = "keywordlevel";
 	private static final String STATUS = "status";
@@ -320,30 +321,8 @@ public class EDIFParser {
 		}
 		return o;
 	}
-	
-	@SuppressWarnings("unused")
-	public EDIFNetlist parseEDIFNetlist(){
-		expect(LEFT_PAREN, getNextToken());
-		expect(EDIF, getNextToken());
-		currNetlist = (EDIFNetlist) parseEDIFNameObject(new EDIFNetlist());
-		expect(LEFT_PAREN, getNextToken());
-		expect(EDIFVERSION, getNextToken());
-		expect("2", getNextToken());
-		expect("0", getNextToken());
-		expect("0", getNextToken());
-		expect(RIGHT_PAREN, getNextToken());
-		expect(LEFT_PAREN, getNextToken());
-		expect(EDIFLEVEL, getNextToken());
-		expect("0", getNextToken());
-		expect(RIGHT_PAREN, getNextToken());
-		expect(LEFT_PAREN, getNextToken());
-		expect(KEYWORDMAP, getNextToken());
-		expect(LEFT_PAREN, getNextToken());
-		expect(KEYWORDLEVEL, getNextToken());
-		expect("0", getNextToken());
-		expect(RIGHT_PAREN, getNextToken());
-		expect(RIGHT_PAREN, getNextToken());
-		expect(LEFT_PAREN, getNextToken());
+
+	private void parseStatus() {
 		expect(STATUS, getNextToken());
 		expect(LEFT_PAREN, getNextToken());
 		expect(WRITTEN, getNextToken());
@@ -378,14 +357,42 @@ public class EDIFParser {
 			}else{
 				expect(COMMENT + "|" + METAX, commentOrMetax);
 			}
-			expect(RIGHT_PAREN, getNextToken());			 
+			expect(RIGHT_PAREN, getNextToken());
 		}
 		expect(RIGHT_PAREN, currToken);
 		expect(RIGHT_PAREN, getNextToken());
+	}
+	
+	@SuppressWarnings("unused")
+	public EDIFNetlist parseEDIFNetlist(){
+		expect(LEFT_PAREN, getNextToken());
+		expect(EDIF, getNextToken());
+		currNetlist = (EDIFNetlist) parseEDIFNameObject(new EDIFNetlist());
+		expect(LEFT_PAREN, getNextToken());
+		expect(EDIFVERSION, getNextToken());
+		expect("2", getNextToken());
+		expect("0", getNextToken());
+		expect("0", getNextToken());
+		expect(RIGHT_PAREN, getNextToken());
+		expect(LEFT_PAREN, getNextToken());
+		expect(EDIFLEVEL, getNextToken());
+		expect("0", getNextToken());
+		expect(RIGHT_PAREN, getNextToken());
+		expect(LEFT_PAREN, getNextToken());
+		expect(KEYWORDMAP, getNextToken());
+		expect(LEFT_PAREN, getNextToken());
+		expect(KEYWORDLEVEL, getNextToken());
+		expect("0", getNextToken());
+		expect(RIGHT_PAREN, getNextToken());
+		expect(RIGHT_PAREN, getNextToken());
+
+		String currToken;
 		
 		while(LEFT_PAREN.equals(currToken = getNextToken())){
 			String nextToken = peekNextToken();
-			if(nextToken.equalsIgnoreCase(LIBRARY)){
+			if (nextToken.equalsIgnoreCase(STATUS)) {
+				parseStatus();
+			} else if(nextToken.equalsIgnoreCase(LIBRARY) || nextToken.equalsIgnoreCase(EXTERNAL)){
 				currNetlist.addLibrary(parseEDIFLibrary());
 			} else if(nextToken.equalsIgnoreCase(COMMENT)){
 				// Final Comment on Reference To The Cell Of Highest Level
@@ -412,7 +419,7 @@ public class EDIFParser {
 				expect(RIGHT_PAREN, currToken);
 
 			} else {
-				expect(LIBRARY + " | " + COMMENT + " | " + DESIGN, nextToken);
+				expect(LIBRARY + " | " + COMMENT + " | " + DESIGN + " | " + STATUS+ " | " + EXTERNAL, nextToken);
 			}
 			 
 		}
@@ -451,7 +458,10 @@ public class EDIFParser {
 	}
 	
 	private EDIFLibrary parseEDIFLibrary(){
-		expect(LIBRARY, getNextToken());
+		String token = getNextToken();
+		if (!token.equalsIgnoreCase(EXTERNAL) && !token.equalsIgnoreCase(LIBRARY) ) {
+			expect(LIBRARY + "|" + EXTERNAL, token);
+		}
 		EDIFLibrary library = (EDIFLibrary) parseEDIFNameObject(new EDIFLibrary());
 		expect(LEFT_PAREN, getNextToken());
 		expect(EDIFLEVEL, getNextToken());
@@ -564,7 +574,7 @@ public class EDIFParser {
 				while(LEFT_PAREN.equals(currToken = getNextToken())){
 					String nextToken = peekNextToken();
 					if(nextToken.equals(INSTANCE)){
-						cell.addCellInst(parseEDIFCellInst());
+						cell.addCellInst(parseEDIFCellInst(lib.getLegalEDIFName()));
 					} else if(nextToken.equals(NET)){
 						cell.addNet(parseEDIFNet(cell));
 					} else {
@@ -651,7 +661,7 @@ public class EDIFParser {
 		return portInst;
 	}
 	
-	private EDIFCellInst parseEDIFCellInst(){
+	private EDIFCellInst parseEDIFCellInst(String currentLibraryName){
 		expect(INSTANCE, getNextToken());
 		EDIFCellInst inst = (EDIFCellInst) parseEDIFNameObject(new EDIFCellInst());
 		inst = updateEDIFRefCellInstMap(inst);
@@ -661,11 +671,17 @@ public class EDIFParser {
 		expect(LEFT_PAREN,getNextToken());
 		expect(CELLREF,getNextToken());
 		String cellref = getNextToken();
-		expect(LEFT_PAREN,getNextToken());
-		expect(LIBRARYREF,getNextToken());
-		String libraryref = getNextToken();
-		inst.setCellType(getRefEDIFCell(cellref, libraryref));
-		expect(RIGHT_PAREN,getNextToken());
+
+		if (LEFT_PAREN.equals(peekNextToken())) {
+			expect(LEFT_PAREN, getNextToken());
+			expect(LIBRARYREF, getNextToken());
+			String libraryref = getNextToken();
+			inst.setCellType(getRefEDIFCell(cellref, libraryref));
+			expect(RIGHT_PAREN, getNextToken());
+		} else {
+			inst.setCellType(getRefEDIFCell(cellref, currentLibraryName));
+		}
+
 		expect(RIGHT_PAREN,getNextToken());
 		expect(RIGHT_PAREN,getNextToken());
 		String currToken = null;
