@@ -348,7 +348,7 @@ public class BlockPlacer2 {
 			tmp = c - avgCost;
 			stdDev = stdDev + (tmp*tmp);
 		}
-		stdDev = Math.sqrt(stdDev/(acceptedMoveCount-1));
+		stdDev = Math.sqrt(stdDev/(Math.max(acceptedMoveCount-1,1)));
 		//currentPlacements.clear();
 		//allPaths.clear();
 		//hardMacros.clear();
@@ -379,6 +379,9 @@ public class BlockPlacer2 {
 		//rangeLimit = Math.max(dev.getColumns(), dev.getRows());
 		rangeLimit = Math.max(squareWidth, squareWidth);
 		currentTemp = calculateStartTemp(hardMacros.size());
+		if (Double.isNaN(currentTemp)) {
+			throw new RuntimeException("initialized to NAN temperature");
+		}
 		//initializePlacer(debugFlow);
 		//unplaceDesign();
 		//initialPlacement();
@@ -475,6 +478,9 @@ public class BlockPlacer2 {
 				moveAcceptanceRate = 0;
 			}
 			//MOVES = ACCEPTED/TOTAL
+			if (Double.isNaN(currentTemp)) {
+				throw new RuntimeException("nan temperature!");
+			}
 			if(DEBUG_LEVEL > 0) System.out.printf("MOVES:%7d/%7d COST:%7.1f AVG_COST/MOVE:%7.1f TEMP:%7.1f ACCEPTANCE_RATE:%5.1f%% BEST:%7.1f BAD:%4.1f%%\n",currentAcceptedMoveCount,moveCount,prevSystemCost, totalMovesCost/moveCount, currentTemp, moveAcceptanceRate*100, bestSoFar, 100.0*badAcceptedMoveCount/badMoveCount);
 			
 			rangeLimit = rangeLimit * (1.0-goldenRate + moveAcceptanceRate);
