@@ -14,6 +14,7 @@ import org.capnproto.PrimitiveList;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.PropertyMap;
+import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.Direction;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.CommonCellBelPinMaps;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.ParameterCellBelPinMaps;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.SiteTypeBelEntry;
@@ -23,6 +24,7 @@ import com.xilinx.rapidwright.interchange.DeviceResources.Device.CellBelPinEntry
 class CellBelMapping {
     private class CellBelPinMapping {
         private Map<SiteTypeEnum, Set<String>>  compatiblePlacements;
+        private Map<Map.Entry<SiteTypeEnum, String>, Set<String>> inputBelPinMaps;
         private Map<Map.Entry<SiteTypeEnum, String>, Map<String, String>> commonMaps;
         private Map<Map.Entry<SiteTypeEnum, String>, Map<String, Map<String, String>>> parameterMaps;
 
@@ -56,10 +58,13 @@ class CellBelMapping {
             }
         }
 
-        public CellBelPinMapping(String cell, Enumerator<String> allStrings, Device.CellBelMapping.Reader cellBelMap) {
+        public CellBelPinMapping(String cell, Enumerator<String> allStrings,
+                Map<Map.Entry<SiteTypeEnum, String>, Set<String>> inInputBelPinMaps,
+                Device.CellBelMapping.Reader cellBelMap) {
             compatiblePlacements = new HashMap<SiteTypeEnum, Set<String>>();
             commonMaps = new HashMap<Map.Entry<SiteTypeEnum, String>, Map<String, String>>();
             parameterMaps = new HashMap<Map.Entry<SiteTypeEnum, String>, Map<String, Map<String, String>>>();
+            inputBelPinMaps = inInputBelPinMaps;
 
             for(CommonCellBelPinMaps.Reader commonPin : cellBelMap.getCommonPins()) {
                 Map<String, String> pins = readPins(cell, allStrings, commonPin.getPins());
@@ -147,6 +152,13 @@ class CellBelMapping {
 
             Map.Entry<SiteTypeEnum, String> key = new AbstractMap.SimpleEntry(siteType, bel);
 
+            Set<String> inputBelPins = inputBelPinMaps.get(key);
+            if(inputBelPins != null) {
+                for(String belPin : inputBelPins) {
+                    pins.put(belPin, "GND");
+                }
+            }
+
             Map<String, String> commonPins = commonMaps.get(key);
             pins.putAll(commonPins);
 
@@ -165,8 +177,31 @@ class CellBelMapping {
 
     private Map<String, CellBelPinMapping> map;
 
-    public CellBelMapping(Enumerator<String> allStrings, StructList.Reader<Device.CellBelMapping.Reader> cellBelMaps) {
+    public CellBelMapping(Enumerator<String> allStrings, StructList.Reader<Device.SiteType.Reader> siteTypes, StructList.Reader<Device.CellBelMapping.Reader> cellBelMaps) {
         map = new HashMap<String, CellBelPinMapping>();
+
+        Map<Map.Entry<SiteTypeEnum, String>, Set<String>> inputBelPinMaps = new HashMap<Map.Entry<SiteTypeEnum, String>, Set<String>>();
+        for(Device.SiteType.Reader siteType : siteTypes) {
+            SiteTypeEnum siteTypeEnum = SiteTypeEnum.valueOf(allStrings.get(siteType.getName()));
+            for(Device.BEL.Reader bel : siteType.getBels()) {
+                Map.Entry<SiteTypeEnum, String> key = new AbstractMap.SimpleEntry<SiteTypeEnum, String>(siteTypeEnum, allStrings.get(bel.getName()));
+
+                Set<String> inputBelPins = inputBelPinMaps.get(key);
+                if(inputBelPins == null) {
+                    inputBelPins = new HashSet<String>();
+                    inputBelPinMaps.put(key, inputBelPins);
+                }
+
+                PrimitiveList.Int.Reader belPins = bel.getPins();
+                for(int i = 0; i < belPins.size(); ++i) {
+                    Integer belPinIdx = belPins.get(i);
+                    Device.BELPin.Reader belPin = siteType.getBelPins().get(belPinIdx);
+                    if(belPin.getDir() == Direction.INPUT) {
+                        inputBelPins.add(allStrings.get(belPin.getName()));
+                    }
+                }
+            }
+        }
 
         for(Device.CellBelMapping.Reader cellBelMap : cellBelMaps) {
             String cell = allStrings.get(cellBelMap.getCell());
@@ -177,7 +212,7 @@ class CellBelMapping {
                             cell));
             }
 
-            map.put(cell, new CellBelPinMapping(cell, allStrings, cellBelMap));
+            map.put(cell, new CellBelPinMapping(cell, allStrings, inputBelPinMaps, cellBelMap));
         }
     }
 

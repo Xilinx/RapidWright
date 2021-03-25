@@ -22,6 +22,8 @@ import java.util.AbstractMap;
 import org.capnproto.MessageBuilder;
 import org.capnproto.StructList;
 
+import com.xilinx.rapidwright.device.BEL;
+import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.Site;
@@ -174,6 +176,27 @@ public class EnumerateCellBelMapping {
         return allPins;
     }
 
+    private Map<Map.Entry<SiteTypeEnum, String>, Set<String>> createInputBelPins() {
+        Map<Map.Entry<SiteTypeEnum, String>, Set<String>> inputBelPins = new HashMap<Map.Entry<SiteTypeEnum, String>, Set<String>>();
+        for(int i = 0; i < siteTypes.size(); ++i) {
+            Map.Entry<SiteTypeEnum, String> key = new AbstractMap.SimpleEntry<SiteTypeEnum, String>(siteTypes.get(i), bels.get(i));
+
+            Set<String> pins = inputBelPins.get(key);
+            if(pins == null) {
+                pins = new HashSet<String>();
+                inputBelPins.put(key, pins);
+            }
+
+            for(Map.Entry<String, String> entry : pinMappings.get(i)) {
+                if(entry.getKey() == "GND") {
+                    pins.add(entry.getValue());
+                }
+            }
+        }
+
+        return inputBelPins;
+    }
+
     private Map<Map.Entry<SiteTypeEnum, String>, Set<Map.Entry<String, String>>> createCommonPins(Set<Map.Entry<String, String>> allPins) {
 
         Map<Map.Entry<SiteTypeEnum, String>, Set<Map.Entry<String, String>>> commonPins = new HashMap<Map.Entry<SiteTypeEnum, String>, Set<Map.Entry<String, String>>>();
@@ -223,13 +246,20 @@ public class EnumerateCellBelMapping {
     }
 
     public void verifyCellBelPinMaps(
+        Map<Map.Entry<SiteTypeEnum, String>, Set<String>> inputBelPins,
         Map<Map.Entry<SiteTypeEnum, String>, Set<Map.Entry<String, String>>> commonPins,
         Map<Map.Entry<SiteTypeEnum, Map.Entry<String, String>>, Set<Map.Entry<String, String>>> parameterToPins) {
         for(int i = 0; i < siteTypes.size(); ++i) {
-            Set<Map.Entry<String, String>> assembledPins = new HashSet<Map.Entry<String, String>>();
+            Map<String, String> assembledMap = new HashMap<String, String>();
 
             Map.Entry<SiteTypeEnum, String> commonPinsKey = new AbstractMap.SimpleEntry<SiteTypeEnum, String>(siteTypes.get(i), bels.get(i));
-            assembledPins.addAll(commonPins.get(commonPinsKey));
+
+            for(String inputBelPin : inputBelPins.get(commonPinsKey)) {
+                assembledMap.put(inputBelPin, "GND");
+            }
+            for(Map.Entry<String, String> pinPair : commonPins.get(commonPinsKey)) {
+                assembledMap.put(pinPair.getValue(), pinPair.getKey());
+            }
 
             String parametersJoined = new String();
             for(String parameter : parameterSets.get(i)) {
@@ -238,10 +268,34 @@ public class EnumerateCellBelMapping {
                         siteTypes.get(i), new AbstractMap.SimpleEntry<String, String>(
                             bels.get(i),
                             parameter));
-                assembledPins.addAll(parameterToPins.get(key));
+                for(Map.Entry<String, String> pinPair : parameterToPins.get(key)) {
+                    assembledMap.put(pinPair.getValue(), pinPair.getKey());
+                }
+            }
+
+            Set<Map.Entry<String, String>> assembledPins = new HashSet<Map.Entry<String, String>>();
+            for(Map.Entry<String, String> entry : assembledMap.entrySet()) {
+                assembledPins.add(new AbstractMap.SimpleEntry<String, String>(entry.getValue(), entry.getKey()));
             }
 
             if(!pinMappings.get(i).equals(assembledPins)) {
+                Set<Map.Entry<String, String>> diff = new HashSet<Map.Entry<String, String>>();
+
+                diff.addAll(pinMappings.get(i));
+                diff.removeAll(assembledPins);
+                System.out.printf("pinMappings - assembledPins:\n");
+                for(Map.Entry<String, String> entry : diff) {
+                    System.out.printf(" - %s => %s\n", entry.getKey(), entry.getValue());
+                }
+
+                diff.clear();
+                diff.addAll(assembledPins);
+                diff.removeAll(pinMappings.get(i));
+                System.out.printf("assembledPins - pinMappings:\n");
+                for(Map.Entry<String, String> entry : diff) {
+                    System.out.printf(" - %s => %s\n", entry.getKey(), entry.getValue());
+                }
+
                 throw new RuntimeException(String.format(
                     "Site type %s BEL %s parameters %s doesn't generate correct pin set.",
                     siteTypes.get(i).name(),
@@ -345,11 +399,12 @@ public class EnumerateCellBelMapping {
 
         // Build forward lookups from site_type, bel -> common pins and
         // site_type, bel, parameters -> additional_pins
+        Map<Map.Entry<SiteTypeEnum, String>, Set<String>> inputBelPins = createInputBelPins();
         Map<Map.Entry<SiteTypeEnum, String>, Set<Map.Entry<String, String>>> commonPins = createCommonPins(allPins);
         Map<Map.Entry<SiteTypeEnum, Map.Entry<String, String>>, Set<Map.Entry<String, String>>> parameterToPins = createParameterToPins(allPins, commonPins);
 
         // Check if parameter combinations need additional logic.
-        verifyCellBelPinMaps(commonPins, parameterToPins);
+        verifyCellBelPinMaps(inputBelPins, commonPins, parameterToPins);
 
         // Build reverse maps to remove duplication.
         Map<Set<Map.Entry<String, String>>, Set<Map.Entry<SiteTypeEnum, String>>> commonPinsRev = new HashMap<Set<Map.Entry<String, String>>, Set<Map.Entry<SiteTypeEnum, String>>>();
@@ -624,16 +679,28 @@ public class EnumerateCellBelMapping {
                     String[] parameterArray = parameters.toArray(new String[parameters.size()]);
                     physCell = design.createAndPlaceCell("test", Unisim.valueOf(cell.getName()), site.getName() + "/" + bel, parameterArray);
 
-                    HashSet<Map.Entry<String, String>> pinMapping = new HashSet<Map.Entry<String, String>>();
+                    // Build complete P2L map.
+                    Map<String, String> pinMap = new HashMap<String, String>();
 
-                    for(Map.Entry<String, Set<String>> pinMap : physCell.getPinMappingsL2P().entrySet()) {
-                        for(String physPin : pinMap.getValue()) {
-                            pinMapping.add(new AbstractMap.SimpleEntry<String, String>(pinMap.getKey(), physPin));
+                    for(BELPin belPin : physCell.getBEL().getPins()) {
+                        if(belPin.getDir() != BELPin.Direction.INPUT) {
+                            continue;
+                        }
+
+                        pinMap.put(belPin.getName(), "GND");
+                    }
+
+                    for(Map.Entry<String, Set<String>> pinPair : physCell.getPinMappingsL2P().entrySet()) {
+                        for(String physPin : pinPair.getValue()) {
+                            pinMap.put(physPin, pinPair.getKey());
                         }
                     }
 
-                    for(Map.Entry<String, String> pinMap : physCell.getPinMappingsP2L().entrySet()) {
-                        pinMapping.add(new AbstractMap.SimpleEntry<String, String>(pinMap.getValue(), pinMap.getKey()));
+                    pinMap.putAll(physCell.getPinMappingsP2L());
+
+                    HashSet<Map.Entry<String, String>> pinMapping = new HashSet<Map.Entry<String, String>>();
+                    for(Map.Entry<String, String> pinPair : pinMap.entrySet()) {
+                        pinMapping.add(new AbstractMap.SimpleEntry<String, String>(pinPair.getValue(), pinPair.getKey()));
                     }
 
                     data.addInstance(siteType, site, bel, pinMapping, parameters);
