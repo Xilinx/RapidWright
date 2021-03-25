@@ -524,6 +524,9 @@ public class ModuleInst{
 		
 		Tile newTile = origLowerLeft.getDevice().getTile(origTilePrefix + newSuffix);
 		if(type == null){
+			if (newTile.getSites().length == 0) {
+				throw new RuntimeException("no sites in tile "+newTile+", orig lower left is "+origLowerLeft+" for mi " + getName());
+			}
 			return newTile.getSites()[0];
 		}
 		for(Site s : newTile.getSites()){
