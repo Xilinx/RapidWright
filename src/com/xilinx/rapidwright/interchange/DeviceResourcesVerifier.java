@@ -720,11 +720,30 @@ public class DeviceResourcesVerifier {
                         }
                     }
 
-                    for(Map.Entry<String, String> pinMap : physCell.getPinMappingsP2L().entrySet()) {
-                        pinMapping.put(pinMap.getKey(), pinMap.getValue());
-                    }
+                    pinMapping.putAll(physCell.getPinMappingsP2L());
 
                     if(!pinMapping.equals(pinMappingFromDev)) {
+                        for(String belPin : pinMappingFromDev.keySet()) {
+                            if(!pinMapping.containsKey(belPin)) {
+                                System.out.printf(" - %s in DeviceResources, not in RapidWright\n", belPin);
+                            }
+                        }
+                        for(String belPin : pinMapping.keySet()) {
+                            if(!pinMappingFromDev.containsKey(belPin)) {
+                                System.out.printf(" - %s in RapidWright, not in DeviceResources\n", belPin);
+                            }
+                        }
+
+                        for(String belPin : pinMapping.keySet()) {
+                            if(!pinMappingFromDev.containsKey(belPin)) {
+                                continue;
+                            }
+
+                            if(!pinMapping.get(belPin).equals(pinMappingFromDev.get(belPin))) {
+                                System.out.printf(" - %s != %s\n", pinMapping.get(belPin), pinMappingFromDev.get(belPin));
+                            }
+                        }
+
                         throw new RuntimeException(String.format(
                             "Cell %s -> BEL pins for site type %s and parameters %s doesn't match",
                             cell.getName(), siteType.name(), parametersStr));
