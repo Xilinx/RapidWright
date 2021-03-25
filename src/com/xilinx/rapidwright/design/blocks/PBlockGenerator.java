@@ -747,6 +747,12 @@ public class PBlockGenerator {
 		}	
 		return matches;
 	}
+
+	private String generatePblock(Site upperLeft, int columns, int rows) {
+		String siteTypeName = upperLeft.getNameSpacePrefix();
+		return siteTypeName+"X" + upperLeft.getInstanceX() + "Y" + (upperLeft.getInstanceY()-(rows-1)) +
+				":"+siteTypeName+"X" + (upperLeft.getInstanceX()+columns-1) + "Y" + upperLeft.getInstanceY();
+	}
 	
 	public ArrayList<String> generatePBlockFromReport2(String reportFileName, String shapesReportFileName){
 		getResourceUsages(reportFileName);
@@ -1041,8 +1047,7 @@ public class PBlockGenerator {
 						}
 						if(p.get(pIdx) == t) pIdx++;
 					}
-					sb.append(" RAMB36_X" + upperLeft.getInstanceX() + "Y" + (upperLeft.getInstanceY()-(numBRAMRows-1)) + 
-							 ":RAMB36_X" + (upperLeft.getInstanceX()+numBRAMColumns-1) + "Y" + upperLeft.getInstanceY());
+					sb.append(' '+generatePblock(upperLeft, numBRAMColumns, numBRAMRows));
 				}
 				if(numDSPColumns > 0){
 					int pIdx = 0;
@@ -1054,8 +1059,7 @@ public class PBlockGenerator {
 						}
 						if(p.get(pIdx) == t) pIdx++;
 					}
-					sb.append(" DSP48E2_X" + upperLeft.getInstanceX() + "Y" + (upperLeft.getInstanceY()-(numDSPRows-1)) + 
-							 ":DSP48E2_X" + (upperLeft.getInstanceX()+numDSPColumns-1) + "Y" + upperLeft.getInstanceY());
+					sb.append(' '+generatePblock(upperLeft, numDSPColumns, numDSPRows));
 					
 				}
 				pBlocks.add(sb.toString());
@@ -1087,8 +1091,7 @@ public class PBlockGenerator {
 					}
 					if(p.get(pIdx) == t) pIdx++;
 				}
-				sb.append("SLICE_X" + upperLeft.getInstanceX() + "Y" + (upperLeft.getInstanceY()-(numSLICERows-1)) + 
-						 ":SLICE_X" + (upperLeft.getInstanceX()+(numSLICEColumns+numSLICEMColumns)-1) + "Y" + upperLeft.getInstanceY());
+				sb.append(generatePblock(upperLeft, numSLICEColumns+numSLICEMColumns, numSLICERows));
             }
 			if(numBRAMColumns > 0){
 				int pIdx = 0;
@@ -1102,8 +1105,7 @@ public class PBlockGenerator {
 					}
 					if(p.get(pIdx) == t) pIdx++;
 				}
-				sb.append(" RAMB36_X" + upperLeft.getInstanceX() + "Y" + (upperLeft.getInstanceY()-(numBRAMRows-1)) + 
-						 ":RAMB36_X" + (upperLeft.getInstanceX()+numBRAMColumns-1) + "Y" + upperLeft.getInstanceY());
+				sb.append(' '+generatePblock(upperLeft, numBRAMColumns, numBRAMRows));
 			}
 			if(numDSPColumns > 0){
 				int pIdx = 0;
@@ -1115,8 +1117,7 @@ public class PBlockGenerator {
 					}
 					if(p.get(pIdx) == t) pIdx++;
 				}
-				sb.append(" DSP48E2_X" + upperLeft.getInstanceX() + "Y" + (upperLeft.getInstanceY()-(numDSPRows-1)) + 
-						 ":DSP48E2_X" + (upperLeft.getInstanceX()+numDSPColumns-1) + "Y" + upperLeft.getInstanceY());
+				sb.append(' '+generatePblock(upperLeft, numDSPColumns, numDSPRows));
 				
 			}
 			pBlocks.add(sb.toString());
