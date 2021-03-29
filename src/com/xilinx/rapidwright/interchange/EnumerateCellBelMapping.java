@@ -22,6 +22,8 @@ import java.util.AbstractMap;
 import org.capnproto.MessageBuilder;
 import org.capnproto.StructList;
 
+import com.xilinx.rapidwright.device.BEL;
+import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.Site;
@@ -242,6 +244,23 @@ public class EnumerateCellBelMapping {
             }
 
             if(!pinMappings.get(i).equals(assembledPins)) {
+                Set<Map.Entry<String, String>> diff = new HashSet<Map.Entry<String, String>>();
+
+                diff.addAll(pinMappings.get(i));
+                diff.removeAll(assembledPins);
+                System.out.printf("pinMappings - assembledPins:\n");
+                for(Map.Entry<String, String> entry : diff) {
+                    System.out.printf(" - %s => %s\n", entry.getKey(), entry.getValue());
+                }
+
+                diff.clear();
+                diff.addAll(assembledPins);
+                diff.removeAll(pinMappings.get(i));
+                System.out.printf("assembledPins - pinMappings:\n");
+                for(Map.Entry<String, String> entry : diff) {
+                    System.out.printf(" - %s => %s\n", entry.getKey(), entry.getValue());
+                }
+
                 throw new RuntimeException(String.format(
                     "Site type %s BEL %s parameters %s doesn't generate correct pin set.",
                     siteTypes.get(i).name(),
@@ -467,6 +486,9 @@ public class EnumerateCellBelMapping {
                     List<String> parameters = new ArrayList<String>();
                     parameters.add(String.format("WRITE_WIDTH_A=%d", writeWidthA));
                     parameters.add(String.format("WRITE_WIDTH_B=%d", writeWidthB));
+                    parameters.add("RAM_MODE=TDP");
+                    parameters.add("DOA_REG=0");
+                    parameters.add("DOB_REG=0");
 
                     parameterSets.add(parameters);
                 }
@@ -477,49 +499,62 @@ public class EnumerateCellBelMapping {
                 parameters.add("RAM_MODE=SDP");
                 parameters.add("WRITE_WIDTH_A=0");
                 parameters.add("WRITE_WIDTH_B=36");
+                parameters.add("DOA_REG=0");
+                parameters.add("DOB_REG=0");
                 parameterSets.add(parameters);
             }
 
             {
                 List<String> parameters = new ArrayList<String>();
+                parameters.add("RAM_MODE=TDP");
                 parameters.add("WRITE_WIDTH_A=0");
                 parameters.add("WRITE_WIDTH_B=0");
                 parameters.add("DOA_REG=1");
+                parameters.add("DOB_REG=0");
                 parameterSets.add(parameters);
             }
 
             {
                 List<String> parameters = new ArrayList<String>();
+                parameters.add("RAM_MODE=TDP");
                 parameters.add("WRITE_WIDTH_A=0");
                 parameters.add("WRITE_WIDTH_B=0");
                 parameters.add("DOA_REG=0");
+                parameters.add("DOB_REG=0");
                 parameterSets.add(parameters);
             }
 
             {
                 List<String> parameters = new ArrayList<String>();
+                parameters.add("RAM_MODE=TDP");
                 parameters.add("WRITE_WIDTH_A=0");
                 parameters.add("WRITE_WIDTH_B=0");
+                parameters.add("DOA_REG=0");
                 parameters.add("DOB_REG=1");
                 parameterSets.add(parameters);
             }
 
             {
                 List<String> parameters = new ArrayList<String>();
+                parameters.add("RAM_MODE=TDP");
                 parameters.add("WRITE_WIDTH_A=0");
                 parameters.add("WRITE_WIDTH_B=0");
+                parameters.add("DOA_REG=0");
                 parameters.add("DOB_REG=0");
                 parameterSets.add(parameters);
             }
         }
-
-        if(cellName.equals("RAMB36E1") || cellName.equals("RAMB36E2")) {
+        else if(cellName.equals("RAMB36E1") || cellName.equals("RAMB36E2")) {
             int[] portWidths = {0, 1, 2, 4, 9, 18, 36};
-            for(int writeWidthA : portWidths) {
+            int[] portWidthsNoZero = {1, 2, 4, 9, 18, 36};
+            for(int writeWidthA : portWidthsNoZero) {
                 for(int writeWidthB : portWidths) {
                     List<String> parameters = new ArrayList<String>();
                     parameters.add(String.format("WRITE_WIDTH_A=%d", writeWidthA));
                     parameters.add(String.format("WRITE_WIDTH_B=%d", writeWidthB));
+                    parameters.add("RAM_MODE=TDP");
+                    parameters.add("DOA_REG=0");
+                    parameters.add("DOB_REG=0");
 
                     parameterSets.add(parameters);
                 }
@@ -530,40 +565,52 @@ public class EnumerateCellBelMapping {
                 parameters.add("RAM_MODE=SDP");
                 parameters.add("WRITE_WIDTH_A=0");
                 parameters.add("WRITE_WIDTH_B=72");
+                parameters.add("DOA_REG=0");
+                parameters.add("DOB_REG=0");
                 parameterSets.add(parameters);
             }
 
             {
                 List<String> parameters = new ArrayList<String>();
-                parameters.add("WRITE_WIDTH_A=0");
+                parameters.add("RAM_MODE=TDP");
+                parameters.add("WRITE_WIDTH_A=1");
                 parameters.add("WRITE_WIDTH_B=0");
                 parameters.add("DOA_REG=1");
+                parameters.add("DOB_REG=0");
                 parameterSets.add(parameters);
             }
 
             {
                 List<String> parameters = new ArrayList<String>();
-                parameters.add("WRITE_WIDTH_A=0");
+                parameters.add("RAM_MODE=TDP");
+                parameters.add("WRITE_WIDTH_A=1");
                 parameters.add("WRITE_WIDTH_B=0");
                 parameters.add("DOA_REG=0");
+                parameters.add("DOB_REG=0");
                 parameterSets.add(parameters);
             }
 
             {
                 List<String> parameters = new ArrayList<String>();
-                parameters.add("WRITE_WIDTH_A=0");
+                parameters.add("RAM_MODE=TDP");
+                parameters.add("WRITE_WIDTH_A=1");
                 parameters.add("WRITE_WIDTH_B=0");
+                parameters.add("DOA_REG=0");
                 parameters.add("DOB_REG=1");
                 parameterSets.add(parameters);
             }
 
-            {
+
+            /* FIXME: https://github.com/SymbiFlow/RapidWright/issues/2
+             {
                 List<String> parameters = new ArrayList<String>();
+                parameters.add("RAM_MODE=TDP");
                 parameters.add("WRITE_WIDTH_A=0");
                 parameters.add("WRITE_WIDTH_B=0");
+                parameters.add("DOA_REG=0");
                 parameters.add("DOB_REG=0");
                 parameterSets.add(parameters);
-            }
+            }*/
         } else {
             parameterSets.add(new ArrayList<String>());
         }
@@ -624,16 +671,20 @@ public class EnumerateCellBelMapping {
                     String[] parameterArray = parameters.toArray(new String[parameters.size()]);
                     physCell = design.createAndPlaceCell("test", Unisim.valueOf(cell.getName()), site.getName() + "/" + bel, parameterArray);
 
-                    HashSet<Map.Entry<String, String>> pinMapping = new HashSet<Map.Entry<String, String>>();
+                    // Build complete P2L map.
+                    Map<String, String> pinMap = new HashMap<String, String>();
 
-                    for(Map.Entry<String, Set<String>> pinMap : physCell.getPinMappingsL2P().entrySet()) {
-                        for(String physPin : pinMap.getValue()) {
-                            pinMapping.add(new AbstractMap.SimpleEntry<String, String>(pinMap.getKey(), physPin));
+                    for(Map.Entry<String, Set<String>> pinPair : physCell.getPinMappingsL2P().entrySet()) {
+                        for(String physPin : pinPair.getValue()) {
+                            pinMap.put(physPin, pinPair.getKey());
                         }
                     }
 
-                    for(Map.Entry<String, String> pinMap : physCell.getPinMappingsP2L().entrySet()) {
-                        pinMapping.add(new AbstractMap.SimpleEntry<String, String>(pinMap.getValue(), pinMap.getKey()));
+                    pinMap.putAll(physCell.getPinMappingsP2L());
+
+                    HashSet<Map.Entry<String, String>> pinMapping = new HashSet<Map.Entry<String, String>>();
+                    for(Map.Entry<String, String> pinPair : pinMap.entrySet()) {
+                        pinMapping.add(new AbstractMap.SimpleEntry<String, String>(pinPair.getValue(), pinPair.getKey()));
                     }
 
                     data.addInstance(siteType, site, bel, pinMapping, parameters);
