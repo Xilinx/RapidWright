@@ -1433,7 +1433,14 @@ public class DesignTools {
 	    queue.add(cell.getBEL().getPin(belPinName));
 	    while(!queue.isEmpty()) {
 		    BELPin curr = queue.remove();
-	        if(!siteWires.contains(curr.getSiteWireName())) return null;
+		    String siteWireName = curr.getSiteWireName();
+	        if(!siteWires.contains(siteWireName)) {
+	        	// Allow dedicated paths to pass without site routing
+	        	if(siteWireName.equals("CIN") || siteWireName.equals("COUT")) {
+	        		return siteWireName;
+	        	}
+	        	return null;
+	        }
 	        if(curr.isInput()) {
 	            BELPin source = curr.getSourcePin();
 	            if(source == null) return null;
@@ -1481,7 +1488,7 @@ public class DesignTools {
 	                    queue.add(sitePIP.getOutputPin());
 	                } else if(sink.getBELName().contains("FF")) {
 	                	// FF pass thru option (not a site PIP)
-	                	String siteWireName = sink.getBEL().getPin("Q").getSiteWireName();
+	                	siteWireName = sink.getBEL().getPin("Q").getSiteWireName();
 	                	if(siteWires.contains(siteWireName)) {
 	                		return siteWireName;
 	                	}
