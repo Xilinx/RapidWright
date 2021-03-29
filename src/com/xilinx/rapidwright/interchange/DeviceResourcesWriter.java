@@ -654,7 +654,6 @@ public class DeviceResourcesWriter {
             }
             tileBuilder.setRow((short)tile.getRow());
             tileBuilder.setCol((short)tile.getColumn());
-            tileBuilder.setTilePatIdx(tile.getTilePatternIndex());
             i++;
         }
 

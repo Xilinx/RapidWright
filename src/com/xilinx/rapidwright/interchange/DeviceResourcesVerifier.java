@@ -314,8 +314,6 @@ public class DeviceResourcesVerifier {
             expect(tile.getRow(), tileReader.getRow());
             expect(tile.getColumn(), tileReader.getCol());
 
-            expect(tile.getTilePatternIndex(), tileReader.getTilePatIdx());
-
             // Verify Tile Types
             TileType.Reader tileType = tileTypeMap.get(tileTypeName);
             expect(tile.getTileTypeEnum().name(), allStrings.get(tileType.getName()));
