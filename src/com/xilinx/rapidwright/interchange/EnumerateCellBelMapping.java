@@ -546,7 +546,8 @@ public class EnumerateCellBelMapping {
         }
         else if(cellName.equals("RAMB36E1") || cellName.equals("RAMB36E2")) {
             int[] portWidths = {0, 1, 2, 4, 9, 18, 36};
-            for(int writeWidthA : portWidths) {
+            int[] portWidthsNoZero = {1, 2, 4, 9, 18, 36};
+            for(int writeWidthA : portWidthsNoZero) {
                 for(int writeWidthB : portWidths) {
                     List<String> parameters = new ArrayList<String>();
                     parameters.add(String.format("WRITE_WIDTH_A=%d", writeWidthA));
@@ -572,7 +573,7 @@ public class EnumerateCellBelMapping {
             {
                 List<String> parameters = new ArrayList<String>();
                 parameters.add("RAM_MODE=TDP");
-                parameters.add("WRITE_WIDTH_A=0");
+                parameters.add("WRITE_WIDTH_A=1");
                 parameters.add("WRITE_WIDTH_B=0");
                 parameters.add("DOA_REG=1");
                 parameters.add("DOB_REG=0");
@@ -582,7 +583,7 @@ public class EnumerateCellBelMapping {
             {
                 List<String> parameters = new ArrayList<String>();
                 parameters.add("RAM_MODE=TDP");
-                parameters.add("WRITE_WIDTH_A=0");
+                parameters.add("WRITE_WIDTH_A=1");
                 parameters.add("WRITE_WIDTH_B=0");
                 parameters.add("DOA_REG=0");
                 parameters.add("DOB_REG=0");
@@ -592,14 +593,16 @@ public class EnumerateCellBelMapping {
             {
                 List<String> parameters = new ArrayList<String>();
                 parameters.add("RAM_MODE=TDP");
-                parameters.add("WRITE_WIDTH_A=0");
+                parameters.add("WRITE_WIDTH_A=1");
                 parameters.add("WRITE_WIDTH_B=0");
                 parameters.add("DOA_REG=0");
                 parameters.add("DOB_REG=1");
                 parameterSets.add(parameters);
             }
 
-            {
+
+            /* FIXME: https://github.com/SymbiFlow/RapidWright/issues/2
+             {
                 List<String> parameters = new ArrayList<String>();
                 parameters.add("RAM_MODE=TDP");
                 parameters.add("WRITE_WIDTH_A=0");
@@ -607,7 +610,7 @@ public class EnumerateCellBelMapping {
                 parameters.add("DOA_REG=0");
                 parameters.add("DOB_REG=0");
                 parameterSets.add(parameters);
-            }
+            }*/
         } else {
             parameterSets.add(new ArrayList<String>());
         }
