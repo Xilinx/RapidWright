@@ -414,14 +414,12 @@ public class ModuleInst{
 	public SitePinInst getCorrespondingPin(Port port){
 		SitePinInst modulePin = port.getSitePinInst();
 		if(modulePin == null) return null;
-		
-		Tile anchorTile = getAnchor().getTile();
-		Tile newPinTile = getCorrespondingTile(modulePin.getTile(), anchorTile, anchorTile.getDevice());
-		
-		if(newPinTile == null) return null;
-		
-		Site newSite = newPinTile.getSites()[modulePin.getSite().getSiteIndexInTile()];
-		SiteInst newSiteInst = getDesign().getSiteInstFromSite(newSite);
+
+		String siteInstName = getName()+"/"+modulePin.getSiteInst().getName();
+		SiteInst newSiteInst = design.getSiteInst(siteInstName);
+		if (newSiteInst == null) {
+			throw new RuntimeException("Did not find corresponding Site Inst for "+modulePin.getSiteInst().getName()+" in "+getName());
+		}
 		return newSiteInst.getSitePinInst(modulePin.getName());
 	}
 	
