@@ -1,3 +1,8 @@
+============= RapidWright 2020.2.2-beta released on 2021-03-30 ================
+Notes:
+ * Minor release that updates pin mappings when placing cells
+ * A few other minor changes, please see  commit log for details
+
 ============= RapidWright 2020.2.2-beta released on 2021-03-10 ================
 Notes:
  * First release to include the interchange project (see https://github.com/SymbiFlow/fpga-interchange-schema)
