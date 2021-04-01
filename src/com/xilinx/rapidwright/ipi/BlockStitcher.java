@@ -441,7 +441,8 @@ public class BlockStitcher {
 	
 	public static void main(String[] args) {
 		if(args.length != 3){
-			MessageGenerator.briefMessageAndExit("USAGE: <directory to runs> <top_level_edif_file> <file_of_ip_names>");
+			System.out.println("USAGE: <directory to runs> <top_level_edif_file> <file_of_ip_names>");
+			return;
 		}
 		CodePerfTracker t = new CodePerfTracker("BlockStitcher", false);
 		t.start("Init");
@@ -618,7 +619,8 @@ public class BlockStitcher {
 			String dcpName = args[1].replace(".edf", "_rw_synth.dcp");
 			stitched.writeCheckpoint(dcpName,t);
 			//EDIFTools.writeEDIFFile(args[1].replace(".edf", "_stitched.edf"), stitched.getNetlist(), stitched.getPartName());
-			MessageGenerator.briefMessageAndExit("Wrote Synthesized DCP: " + dcpName);
+			System.out.println("Wrote Synthesized DCP: " + dcpName);
+			return;
 		}
 		
 		//XPNWriter.writeXPN(stitched, args[1].replace(".edf", ".xpn"), true);

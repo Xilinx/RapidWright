@@ -69,7 +69,8 @@ public class PrintEDIFInstances {
 	
 	public static void main(String[] args) {
 		if(args.length != 2){
-			MessageGenerator.briefMessageAndExit("USAGE: <input.edf> <instnames.txt>");
+			System.out.println("USAGE: <input.edf> <instnames.txt>");
+			return;
 		}
 		EDIFNetlist ee = EDIFTools.readEdifFile(args[0]);
 		printEDIFInstancesToFile(ee, args[1]);

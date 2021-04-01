@@ -531,7 +531,9 @@ public class BlockCreator {
 	
 	public static void main(String[] args) {
 		if(args.length != 5){
-			MessageGenerator.briefMessageAndExit("USAGE: <EDIF file name> <routed DCP file name> <XCI file name|path to store block> <part name> <blockImplCount>");
+			System.out.println("USAGE: <EDIF file name> <routed DCP file name> "
+					+ "<XCI file name|path to store block> <part name> <blockImplCount>");
+			return;
 		}
 		String edifFileName = args[0];
 		String routedDCPFileName = args[1];

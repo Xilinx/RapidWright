@@ -155,7 +155,8 @@ public class BrowseDevice{
 	public static void main(String[] args){
 		MessageGenerator.printHeader(" RapidWright Device Browser");		
 		if(args.length != 1){
-			MessageGenerator.briefMessageAndExit("USAGE: <device part name, ex: xc4vfx12ff668 >");
+			System.out.println("USAGE: <device part name, ex: xc4vfx12ff668 >");
+			return;
 		}
 		Device dev = (Device) Device.getDevice(args[0]);	
 		

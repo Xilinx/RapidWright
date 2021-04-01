@@ -68,7 +68,9 @@ public class BlockUpdater {
 	
 	public static void main(String[] args) {
 		if(args.length != 3 && args.length != 4){
-			MessageGenerator.briefMessageAndExit("USAGE: <path to cache entry> <new DCP> <implementation index> [impl guide file]");
+			System.out.println("USAGE: <path to cache entry> <new DCP> <implementation index> "
+					+ "[impl guide file]");
+			return;
 		}
 		String cacheEntryPath = null;
 		try {

@@ -37,7 +37,8 @@ public class CopyMMCMCell {
 	
 	public static void main(String[] args) {
 		if(args.length != 3){
-			MessageGenerator.briefMessageAndExit("USAGE: <source MMCM DCP> <input DCP> <output DCP>");
+			System.out.println("USAGE: <source MMCM DCP> <input DCP> <output DCP>");
+			return;
 		}
 		Design clkPath = Design.readCheckpoint(args[0], args[0].replace(".dcp", ".edf"));
 		Design input = Design.readCheckpoint(args[1], args[1].replace(".dcp", ".edf"));

@@ -105,7 +105,8 @@ public class CompareRouteStatusReports {
 	
 	public static void main(String[] args) {
 		if(args.length != 2){
-			MessageGenerator.briefMessageAndExit("USAGE: report1.txt report2.txt");
+			System.out.println("USAGE: report1.txt report2.txt");
+			return;
 		}
 		String file1 = args[0];
 		String file2 = args[1];

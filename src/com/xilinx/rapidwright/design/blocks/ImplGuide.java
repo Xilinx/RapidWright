@@ -353,7 +353,8 @@ public class ImplGuide {
 	
 	public static void main(String[] args) {
 		if(args.length != 2){
-			MessageGenerator.briefMessageAndExit("USAGE: <input.igf> <output.igf>");
+			System.out.println("USAGE: <input.igf> <output.igf>");
+			return;
 		}
 		ImplGuide ig = readImplGuide(args[0]);
 		ig.writeImplGuide(args[1]);

@@ -45,7 +45,8 @@ public class DesignImplementationDiff {
 
 	public static void main(String[] args) {
 		if(args.length != 2){
-			MessageGenerator.briefMessageAndExit("USAGE: <original.dcp> <superset.dcp>");
+			System.out.println("USAGE: <original.dcp> <superset.dcp>");
+			return;
 		}
 		Design original = Design.readCheckpoint(args[0]);
 		Design superset = Design.readCheckpoint(args[1]);

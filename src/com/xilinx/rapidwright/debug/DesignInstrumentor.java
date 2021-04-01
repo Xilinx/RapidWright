@@ -375,8 +375,8 @@ public class DesignInstrumentor {
 	 */
 	public static void main(String[] args) {
 		if(args.length != 3){
-			MessageGenerator.briefMessageAndExit
-				("USAGE: <instrumentation file name> <XPN file name> <EDIF file name>");
+			System.out.println("USAGE: <instrumentation file name> <XPN file name> <EDIF file name>");
+			return;
 		}
 		
 		long[] runtimes = new long[6];
