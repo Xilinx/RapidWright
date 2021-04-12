@@ -369,13 +369,7 @@ public class MetadataParser {
 								p = new SitePinInst(si.getSite().isOutputPin(pinName), pinName, si);
 								n.addPin(p);
 							}
-							if(currPort.getSitePinInst() == null){
-								if(p.isOutPin() && currPort.isOutPort()){
-									currPort.setSitePinInst(p);
-								}else if(!p.isOutPin() && !currPort.isOutPort()){
-									currPort.setSitePinInst(p);
-								}
-							}						
+							currPort.addSitePinInst(p);
 						}
 					}else if(tokens[1].equals(PORT)){
 						currPort.addPassThruPortName(tokens[2]);
