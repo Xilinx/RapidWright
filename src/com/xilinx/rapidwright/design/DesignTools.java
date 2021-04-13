@@ -1764,68 +1764,66 @@ public class DesignTools {
 	 * Copies the logic and implementation of a set of cells from one design to another.
 	 * @param src The source design (with partial or full implementation)
 	 * @param dest The destination design (with matching cell instance interfaces) 
-	 * @param instNames Names of the cell instances to copy
-	 */
-	public static void copyImplementation(Design src, Design dest, String... instNames) {
-		copyImplementation(src, dest, false, false, instNames);
-	}
-	
-	/**
-	 * Copies the logic and implementation of a set of cells from one design to another.
-	 * @param src The source design (with partial or full implementation)
-	 * @param dest The destination design (with matching cell instance interfaces) 
 	 * @param lockPlacement Flag indicating if the destination implementation copy should have the 
 	 * 	placement locked
 	 * @param lockRouting Flag indicating if the destination implementation copy should have the 
 	 * 	routing locked
-	 * @param instNames Names of the cell instances to copy
+	 * @param srcToDestInstNames A map of source (key) to destination (value) pairs of cell 
+	 * instances from which to copy the implementation
 	 */
 	public static void copyImplementation(Design src, Design dest, boolean lockPlacement, 
-			boolean lockRouting, String... instNames) {
+			boolean lockRouting, Map<String,String> srcToDestInstNames) {
 		// Removing existing logic in target cells in destination design
 		EDIFNetlist destNetlist = dest.getNetlist();
-		for(String instName : instNames) {
-			DesignTools.makeBlackBox(dest, instName);
+		for(Entry<String,String> e : srcToDestInstNames.entrySet()) {
+			DesignTools.makeBlackBox(dest, e.getValue());
 			destNetlist.removeUnusedCellsFromAllWorkLibraries();
 		}
 		
 		// Populate black boxes with existing logical netlist cells
 		HashSet<String> instsWithSeparator = new HashSet<>();
-		for(String instName : instNames) {
-			EDIFHierCellInst cellInst = src.getNetlist().getHierCellInstFromName(instName);
+		for(Entry<String,String> e : srcToDestInstNames.entrySet()) {
+			EDIFHierCellInst cellInst = src.getNetlist().getHierCellInstFromName(e.getKey());
 			destNetlist.migrateCellAndSubCells(cellInst.getCellType());
-			EDIFHierCellInst bbInst = destNetlist.getHierCellInstFromName(instName);
+			EDIFHierCellInst bbInst = destNetlist.getHierCellInstFromName(e.getValue());
 			bbInst.getInst().setCellType(cellInst.getCellType());
             for(EDIFPortInst portInst : bbInst.getInst().getPortInsts()) {
             	portInst.getPort().setParentCell(cellInst.getCellType());
             }
-			instsWithSeparator.add(instName + EDIFTools.EDIF_HIER_SEP);
+			instsWithSeparator.add(e.getKey() + EDIFTools.EDIF_HIER_SEP);
 		}
 		destNetlist.resetParentNetMap();
+		
+		Map<String,String> prefixes = new HashMap<>();
+		for(String srcPrefix : srcToDestInstNames.keySet()) {
+			prefixes.put(srcPrefix + "/", srcPrefix);
+		}
 		
 		// Identify cells to copy placement
 		for(Cell cell : src.getCells()) {
 			String cellName = cell.getName();
 			
-			if(StringTools.startsWithAny(cellName, instsWithSeparator)) {
+			String prefixMatch = null;
+			if((prefixMatch = StringTools.startsWithAny(cellName, prefixes.keySet())) != null) {
 				SiteInst dstSiteInst = dest.getSiteInstFromSite(cell.getSite());
 				SiteInst srcSiteInst = cell.getSiteInst();
 				if(dstSiteInst == null) {
 					dstSiteInst = dest.createSiteInst(srcSiteInst.getName(), 
 									srcSiteInst.getSiteTypeEnum(), srcSiteInst.getSite());
 				}
-				Cell copy = new Cell(cell, dstSiteInst);
+				String newCellPrefix = srcToDestInstNames.get(prefixes.get(prefixMatch));
+				String newCellName = newCellPrefix + cell.getName().substring(prefixMatch.length()-1);
+				Cell copy = cell.copyCell(newCellName, cell.getEDIFCellInst(), dstSiteInst);
 				dstSiteInst.addCell(copy);
 				copy.setBELFixed(lockPlacement);
 				copy.setSiteFixed(lockPlacement);
 				
 				// Preserve site routing from cell pins to site pins
-				copySiteRouting(copy, cell);
+				copySiteRouting(copy, cell, srcToDestInstNames, prefixes); 
 			}
 		}
 		
 		// Identify nets to copy routing
-		HashSet<String> copiedNetNames = new HashSet<>();
 		for(Net net : src.getNets()) {
 			if(net.isStaticNet()) continue;
 			List<EDIFHierPortInst> pins = src.getNetlist().getPhysicalPins(net.getName());
@@ -1837,11 +1835,11 @@ public class DesignTools {
 			List<EDIFHierPortInst> outside = new ArrayList<EDIFHierPortInst>();
 			for(EDIFHierPortInst portInst : pins) {
 				String portInstName = portInst.getFullHierarchicalInstName();
-				boolean isInside = StringTools.startsWithAny(portInstName, instsWithSeparator);
-				if(portInst.isOutput() && isInside) {
+				String prefixMatch = StringTools.startsWithAny(portInstName, prefixes.keySet());
+				if(portInst.isOutput() && prefixMatch != null) {
 					srcInside = true;
 				}
-				if(!isInside) {
+				if(prefixMatch == null) {
 					outside.add(portInst);
 				}
 			}
@@ -1857,9 +1855,14 @@ public class DesignTools {
 				}
 			}
 
-			copiedNetNames.add(net.getName());
+			String newNetName = net.getName();
+			String prefixMatch = null;
+			if((prefixMatch = StringTools.startsWithAny(net.getName(), prefixes.keySet())) != null) {
+				String noSeparator = prefixes.get(prefixMatch);
+				newNetName = srcToDestInstNames.get(noSeparator) + newNetName.substring(noSeparator.length());
+			}
 			EDIFNet logicalNet = destNetlist.getNetFromHierName(net.getName());
-			Net copiedNet = dest.createNet(net.getName(), logicalNet);
+			Net copiedNet = dest.createNet(newNetName, logicalNet);
 			for(PIP p : net.getPIPs()) {
 				if(pipsToRemove.contains(p)) continue;
 				copiedNet.addPIP(p);
@@ -1867,22 +1870,55 @@ public class DesignTools {
 					p.setIsPIPFixed(true);
 				}
 			}
-		}
+		}		
 	}
 	
+	/**
+	 * Copies the logic and implementation of a set of cells from one design to another.
+	 * @param src The source design (with partial or full implementation)
+	 * @param dest The destination design (with matching cell instance interfaces) 
+	 * @param instNames Names of the cell instances to copy
+	 */
+	public static void copyImplementation(Design src, Design dest, String... instNames) {
+		copyImplementation(src, dest, false, false, instNames);
+	}
+
+	/**
+	 * Copies the logic and implementation of a set of cells from one design to another.
+	 * @param src The source design (with partial or full implementation)
+	 * @param dest The destination design (with matching cell instance interfaces) 
+	 * @param lockPlacement Flag indicating if the destination implementation copy should have the 
+	 * 	placement locked
+	 * @param lockRouting Flag indicating if the destination implementation copy should have the 
+	 * 	routing locked
+	 * @param instNames Names of the cell instances to copy
+	 */
+	public static void copyImplementation(Design src, Design dest, boolean lockPlacement, 
+			boolean lockRouting, String... instNames) {
+		Map<String,String> map = new HashMap<>();
+		for(String instName : instNames) {
+			map.put(instName, instName);
+		}
+		copyImplementation(src, dest, lockPlacement, lockRouting, map);
+	}
+		
 	/**
 	 * Copies the site routing for all nets connected to the copied cell based on the original 
 	 * cell.  This method will use destination netlist net names to be consistent with source-named
 	 * net names as used in Vivado.
 	 * @param copy The destination cell context to receive the site routing
 	 * @param orig The original cell with the blueprint of site routing that should be copied
+	 * @param srcToDestNames Map of source to destination cell instance name prefixes that should be
+	 * copied. 
+	 * @param prefixes Map of prefixes with '/' at the end (keys) that map to the same String 
+	 * without the '/'
 	 */
-	private static void copySiteRouting(Cell copy, Cell orig) {
+	private static void copySiteRouting(Cell copy, Cell orig, Map<String,String> srcToDestNames, 
+			Map<String,String> prefixes) {
 		Design dest = copy.getSiteInst().getDesign();
 		EDIFNetlist destNetlist = dest.getNetlist();
 		SiteInst dstSiteInst = copy.getSiteInst();
 		SiteInst origSiteInst = orig.getSiteInst();
-		
 		// Ensure A6 has VCC if driven in original (dual LUT usage scenarios)
 		if(orig.getBELName().contains("LUT")) {
 			BEL lut6 = origSiteInst.getBEL(orig.getBELName().replace("5", "6"));
@@ -1942,41 +1978,49 @@ public class DesignTools {
 					}
 				}else {
 					curr = curr.getSourcePin();
-					if(!curr.isSitePort()) {
-						String belName = curr.getBELName();
-						Cell tmpCell = origSiteInst.getCell(belName);
-						if(tmpCell != null){
-							if(tmpCell.isRoutethru()) {
-								Cell rtCopy = new Cell(tmpCell,dstSiteInst);
-								dstSiteInst.getCellMap().put(belName, rtCopy);
-								for(String belPinName : rtCopy.getPinMappingsP2L().keySet()) {
-									BELPin tmp = rtCopy.getBEL().getPin(belPinName);
-									if(tmp.isInput()) {
-										curr = tmp;
-										break;
-									}
-								}	
-							} else {
-								// We found the source
-								break;
+					if(curr.isSitePort()) continue;
+					String belName = curr.getBELName();
+					Cell tmpCell = origSiteInst.getCell(belName);
+					if(tmpCell != null) {
+						if(tmpCell.isRoutethru()) {
+							String cellName = tmpCell.getName();
+							String prefixMatch = StringTools.startsWithAny(cellName, prefixes.keySet());
+							if(prefixMatch == null){
+								throw new RuntimeException("ERROR: Unable to find appropriate "
+									+ "translation name for cell: " + tmpCell);
 							}
-						} else if(net.isStaticNet() && (belName.contains("LUT") ||
-								curr.getBEL().isStaticSource())){
-							// LUT used as a static source
-							dstSiteInst.routeIntraSiteNet(net, curr, curr);
-							break;
+							String newPrefix = srcToDestNames.get(prefixes.get(prefixMatch));
+							String newCellName = newPrefix+cellName.substring(prefixMatch.length()-1);
+							Cell rtCopy = tmpCell
+									.copyCell(newCellName, tmpCell.getEDIFCellInst(), dstSiteInst);
+							dstSiteInst.getCellMap().put(belName, rtCopy);
+							for(String belPinName : rtCopy.getPinMappingsP2L().keySet()) {
+								BELPin tmp = rtCopy.getBEL().getPin(belPinName);
+								if(tmp.isInput()) {
+									curr = tmp;
+									break;
+								}
+							}	
 						} else {
-							SitePIP sitePIP = origSiteInst.getUsedSitePIP(curr);
-							if(sitePIP != null) {
-								dstSiteInst.addSitePIP(sitePIP);
-								curr = sitePIP.getInputPin();								
-							} else {
-								continue;
-							}
+							// We found the source
+							break;
 						}
+					} else if(net.isStaticNet() && (belName.contains("LUT") ||
+							curr.getBEL().isStaticSource())){
+						// LUT used as a static source
 						dstSiteInst.routeIntraSiteNet(net, curr, curr);
-						q.add(curr);
+						break;
+					} else {
+						SitePIP sitePIP = origSiteInst.getUsedSitePIP(curr);
+						if(sitePIP != null) {
+							dstSiteInst.addSitePIP(sitePIP);
+							curr = sitePIP.getInputPin();								
+						} else {
+							continue;
+						}
 					}
+					dstSiteInst.routeIntraSiteNet(net, curr, curr);
+					q.add(curr);
 				}
 			}
 		}
