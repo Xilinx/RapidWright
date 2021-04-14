@@ -823,12 +823,10 @@ public class DesignTools {
 			System.err.println("ERROR: The cell instance " + hierarchicalCellName + " is not a black box.");
 			return;
 		}
-		inst.setCellType(cell.getTopEDIFCell());
+		inst.getCellType().getLibrary().removeCell(inst.getCellType());
 		netlist.migrateCellAndSubCells(cell.getTopEDIFCell());
-		
-		for(EDIFPortInst portInst : inst.getPortInsts()) {
-			portInst.getPort().setParentCell(inst.getCellType());
-		}
+		inst.updateCellType(cell.getTopEDIFCell());
+		netlist.removeUnusedCellsFromAllWorkLibraries();
 		
 		// Add placement information
 		// We need to prefix all cell and net names with the hierarchicalCellName as a prefix
@@ -845,7 +843,7 @@ public class DesignTools {
 		for(Net net : cell.getNets()){
 			if(net.getName().equals(Net.USED_NET)) continue;
 			if(net.isStaticNet()){
-				Net staticNet = design.getNet(net.getName());
+				Net staticNet = design.getStaticNet(net.getType());
 				staticNet.addPins((ArrayList<SitePinInst>)net.getPins());
 				for(PIP p : net.getPIPs()){
 					staticNet.addPIP(p);
