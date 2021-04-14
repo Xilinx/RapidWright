@@ -135,7 +135,7 @@ public class Port implements Serializable, Cloneable{
 	 *  Gets the pin name of the instance where the port resides.
 	 * @return The pin name of the port.
 	 */
-	public String getSignleSitePinInstName(){
+	public String getSingleSitePinInstName(){
 		SitePinInst singleSitePinInst = getSingleSitePinInst();
 		return singleSitePinInst == null ? "null" : singleSitePinInst.getName();
 	}
