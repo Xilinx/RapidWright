@@ -10,7 +10,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.Map.Entry;
+import java.util.Queue;
 
 import org.capnproto.MessageBuilder;
 import org.capnproto.PrimitiveList;
@@ -201,6 +203,26 @@ public class DeviceResourcesWriter {
     }
 
 
+    private static boolean containsUnusedMacros(EDIFCell cell, Set<EDIFCell> unusedMacros) {
+    	Queue<EDIFCell> q = new LinkedList<>(); 
+    	Set<EDIFCell> visited = new HashSet<>();
+    	q.add(cell);
+    	while(!q.isEmpty()) {
+    		EDIFCell curr = q.poll();
+    		visited.add(curr);
+    		if(unusedMacros.contains(curr)) {
+    			unusedMacros.add(curr);
+    			return true;
+    		}
+    		for(EDIFCellInst inst : cell.getCellInsts()) {
+    			EDIFCell child = inst.getCellType();
+    			if(visited.contains(child)) continue;
+    			q.add(child);
+    		}
+    	}
+    	return false;
+    }
+    
     public static void writeDeviceResourcesFile(String part, Device device, CodePerfTracker t,
                                                                 String fileName) throws IOException {
         Design design = new Design();
@@ -233,6 +255,7 @@ public class DeviceResourcesWriter {
         // Create an EDIFNetlist populated with just primitive and macro libraries
         EDIFLibrary prims = Design.getPrimitivesLibrary(device.getName());
         EDIFLibrary macros = Design.getMacroPrimitives(device.getSeries());
+        Set<EDIFCell> unsupportedMacros = new HashSet<>();
         EDIFNetlist netlist = new EDIFNetlist("PrimitiveLibs");
         netlist.addLibrary(prims);
         netlist.addLibrary(macros);
@@ -251,12 +274,24 @@ public class DeviceResourcesWriter {
         for(EDIFCell cell : macros.getCells()) {
             for(EDIFCellInst inst : cell.getCellInsts()) {
                 EDIFCell instCell = inst.getCellType();
+                if(!prims.containsCell(instCell) && !macros.containsCell(instCell)) {
+                	unsupportedMacros.add(cell);
+                	continue;
+                }
                 EDIFCell macroCell = macros.getCell(instCell.getName());
-                if(macroCell != null) {
+                if(macroCell != null && !unsupportedMacros.contains(macroCell)) {
                     // remap cell definition to macro library
                     inst.updateCellType(macroCell);
                 }
             }
+        }
+
+        // Not all devices have all the primitives to support all macros, thus we will remove
+        // them to avoid stale references
+        for(EDIFCell macro : new ArrayList<>(macros.getCells())) {
+        	if(containsUnusedMacros(macro, unsupportedMacros)) {
+        		macros.removeCell(macro);
+        	}
         }
 
         List<Unisim> unisims = new ArrayList<Unisim>();
