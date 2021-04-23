@@ -56,6 +56,7 @@ import com.xilinx.rapidwright.edif.EDIFLibrary;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
+import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.interchange.EnumerateCellBelMapping;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.BELCategory;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.BELInverter;
@@ -348,7 +349,11 @@ public class DeviceResourcesWriter {
 
         Netlist.Builder netlistBuilder = devBuilder.getPrimLibs();
         netlistBuilder.setName(netlist.getName());
-        LogNetlistWriter writer = new LogNetlistWriter(allStrings);
+        LogNetlistWriter writer = new LogNetlistWriter(allStrings, new HashMap<String, String>() {{
+                    put(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME, LogNetlistWriter.DEVICE_PRIMITIVES_LIB);
+                    put(device.getSeries()+"_"+EDIFTools.MACRO_PRIMITIVES_LIB, LogNetlistWriter.DEVICE_MACROS_LIB);
+                }}
+            );
         writer.populateNetlistBuilder(netlist, netlistBuilder);
 
         writeCellParameterDefinitions(device.getSeries(), netlist, devBuilder.getParameterDefs());

@@ -69,6 +69,7 @@ import com.xilinx.rapidwright.interchange.DeviceResources.Device.ParameterFormat
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.Direction;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.PropertyMap;
+import com.xilinx.rapidwright.interchange.LogNetlistWriter;
 
 public class DeviceResourcesVerifier {
     private static Enumerator<String> allStrings;
@@ -450,14 +451,17 @@ public class DeviceResourcesVerifier {
         }
 
         Netlist.Reader primLibs = dReader.getPrimLibs();
-        LogNetlistReader netlistReader = new LogNetlistReader(allStrings);
+        LogNetlistReader netlistReader = new LogNetlistReader(allStrings, new HashMap<String, String>() {{
+                    put(LogNetlistWriter.DEVICE_PRIMITIVES_LIB, EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME);
+                }}
+            );
         EDIFNetlist primsAndMacros = netlistReader.readLogNetlist(primLibs,
                 /*skipTopStuff=*/true);
 
         Set<String> libsFound = new HashSet<String>();
         libsFound.addAll(primsAndMacros.getLibrariesMap().keySet());
         for(String libExpected : new String[] {EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME,
-            device.getSeries()+"_"+EDIFTools.MACRO_PRIMITIVES_LIB}) {
+            LogNetlistWriter.DEVICE_MACROS_LIB}) {
             if(!libsFound.remove(libExpected)) {
                 throw new RuntimeException("Missing expected library: " + libExpected);
             }
