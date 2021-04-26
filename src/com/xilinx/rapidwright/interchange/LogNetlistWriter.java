@@ -1,6 +1,8 @@
 package com.xilinx.rapidwright.interchange;
 
 import java.io.IOException;
+import java.util.Collections;
+import java.util.Map;
 import java.util.Map.Entry;
 
 import org.capnproto.MessageBuilder;
@@ -31,11 +33,17 @@ import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.PortInstance;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.PropertyMap;
 
 public class LogNetlistWriter {
+
+    // Name of the libraries used in DeviceResources primLibs
+    public static final String DEVICE_PRIMITIVES_LIB = "primitives";
+    public static final String DEVICE_MACROS_LIB = "macros";
+
     LogNetlistWriter() {
         allCells = new Enumerator<>();
         allInsts = new Enumerator<>();
         allPorts = new Enumerator<>();
         allStrings = new Enumerator<>();
+        libraryRename = Collections.emptyMap();
     }
 
     LogNetlistWriter(Enumerator<String> outsideAllStrings) {
@@ -43,12 +51,22 @@ public class LogNetlistWriter {
         allInsts = new Enumerator<>();
         allPorts = new Enumerator<>();
         allStrings = outsideAllStrings;
+        libraryRename = Collections.emptyMap();
+    }
+
+    LogNetlistWriter(Enumerator<String> outsideAllStrings, Map<String, String> libraryRename) {
+        allCells = new Enumerator<>();
+        allInsts = new Enumerator<>();
+        allPorts = new Enumerator<>();
+        allStrings = outsideAllStrings;
+        this.libraryRename = libraryRename;
     }
 
     private Enumerator<EDIFCell> allCells;
     private Enumerator<EDIFCellInst> allInsts;
     private Enumerator<EDIFPort> allPorts;
     private Enumerator<String> allStrings;
+    private Map<String, String> libraryRename;
 
     /**
      * Takes an EDIF property map and serializes (writes) it using the Cap'n Proto schema.  The
@@ -78,6 +96,13 @@ public class LogNetlistWriter {
         }
     }
 
+    /**
+     * Gets the possibly-renamed name for a library
+     * @param name The library name to map
+     */
+    private String lookupLibName(String name) {
+        return libraryRename.getOrDefault(name, name);
+    }
 
     /**
      * Enumerates all cells, ports and cell instances in the netlist so a integer lookup reference
@@ -135,7 +160,7 @@ public class LogNetlistWriter {
             cellBuilder.setIndex(i);
             populatePropertyMap(cellDeclBuilder.getPropMap(), cell);
             cellDeclBuilder.setView(allStrings.getIndex(cell.getView()));
-            cellDeclBuilder.setLib(allStrings.getIndex(cell.getLibrary().getName()));
+            cellDeclBuilder.setLib(allStrings.getIndex(lookupLibName(cell.getLibrary().getName())));
 
             PrimitiveList.Int.Builder insts = cellBuilder.initInsts(cell.getCellInsts().size());
             int j = 0;

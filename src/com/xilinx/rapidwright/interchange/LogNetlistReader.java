@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 import org.capnproto.MessageReader;
 import org.capnproto.PrimitiveList;
@@ -40,13 +41,21 @@ public class LogNetlistReader {
     private List<EDIFPort> allPorts;
     private List<EDIFCell> allCells;
     private List<EDIFCellInst> allInsts;
+    private Map<String, String> libraryRename;
 
     public LogNetlistReader() {
         allStrings = new Enumerator<String>();
+        libraryRename = Collections.emptyMap();
     }
 
     public LogNetlistReader(Enumerator<String> otherAllStrings) {
         allStrings = otherAllStrings;
+        libraryRename = Collections.emptyMap();
+    }
+
+    public LogNetlistReader(Enumerator<String> otherAllStrings, Map<String, String> libraryRename) {
+        allStrings = otherAllStrings;
+        this.libraryRename = libraryRename;
     }
 
     /**
@@ -267,6 +276,8 @@ public class LogNetlistReader {
         for(int i = 0; i < cellDeclsReader.size(); ++i) {
             Netlist.CellDeclaration.Reader cellReader = cellDeclsReader.get(i);
             String libraryName = allStrings.get(cellReader.getLib());
+            libraryName = libraryRename.getOrDefault(libraryName, libraryName);
+
             EDIFLibrary library = n.getLibrary(libraryName);
             if(library == null) {
                 library = new EDIFLibrary(libraryName);
