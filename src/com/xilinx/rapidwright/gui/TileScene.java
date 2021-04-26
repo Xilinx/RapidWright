@@ -38,10 +38,10 @@ import com.trolltech.qt.gui.QGraphicsRectItem;
 import com.trolltech.qt.gui.QGraphicsScene;
 import com.trolltech.qt.gui.QGraphicsSceneMouseEvent;
 import com.trolltech.qt.gui.QImage;
+import com.trolltech.qt.gui.QImage.Format;
 import com.trolltech.qt.gui.QPainter;
 import com.trolltech.qt.gui.QPen;
 import com.trolltech.qt.gui.QPixmap;
-import com.trolltech.qt.gui.QImage.Format;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Tile;
@@ -95,9 +95,12 @@ public class TileScene extends QGraphicsScene{
 	/** This is the set of row tile types which should not be drawn */
 	private HashSet<TileTypeEnum> tileRowTypesToHide;
 	/** Qt Size container for the scene */
-	private QSize sceneSize;
+	public QSize sceneSize;
 	/**  */
 	public HashSet<GUIModuleInst>[][] tileOccupantCount;
+
+
+
 	/**
 	 * Empty constructor
 	 */
@@ -131,7 +134,17 @@ public class TileScene extends QGraphicsScene{
 	public QSize getSceneSize(){
 		return sceneSize;
 	}
-	
+
+	private boolean drawPrimitives;
+	private boolean useImage = true;
+
+	public boolean isUseImage() {
+		return useImage;
+	}
+
+	public void setUseImage(boolean useImage) {
+		this.useImage = useImage;
+	}
 	/**
 	 * Initializes the scene
 	 * @param hideTiles
@@ -140,9 +153,10 @@ public class TileScene extends QGraphicsScene{
 	@SuppressWarnings("unchecked")
 	public void initializeScene(boolean hideTiles, boolean drawPrimitives){
 		this.clear();
+		this.drawPrimitives = drawPrimitives;
 		prevX = 0;
 		prevY = 0;
-		
+
 		// Used to avoid a bug in Qt
 		System.gc();
 
@@ -150,16 +164,17 @@ public class TileScene extends QGraphicsScene{
 			tileColumnTypesToHide = new HashSet<TileTypeEnum>();
 			tileRowTypesToHide = new HashSet<TileTypeEnum>();
 
-			if(hideTiles){ 
+			if(hideTiles){
 				populateTileTypesToHide();
 			}
-				
+
 			rows = device.getRows();
 			cols = device.getColumns();
 			sceneSize = new QSize((cols + 1) * (tileSize + 1), (rows + 1) * (tileSize + 1));
 			setSceneRect(new QRectF(new QPointF(0, 0), new QSizeF(sceneSize)));
-			drawFPGAFabric(drawPrimitives);
-		} 
+			setBackgroundBrush(new QBrush(QColor.black));
+			calculateSkippedTiles();
+		}
 		else{
 			setSceneRect(new QRectF(0, 0, tileSize + 1, tileSize + 1));
 		}
@@ -172,25 +187,31 @@ public class TileScene extends QGraphicsScene{
 			}
 		}
 	}
-	
-	private void drawFPGAFabric(boolean drawPrimitives){
-		setBackgroundBrush(new QBrush(QColor.black));
-		
-		//Create transparent QPixmap that accepts hovers 
+
+	private QPainter createImage() {
+		//Create transparent QPixmap that accepts hovers
 		//  so that moveMouseEvent is triggered
 		QPixmap pixelMap = new QPixmap(sceneSize);
 		pixelMap.fill(QColor.transparent);
 		QGraphicsPixmapItem background = addPixmap(pixelMap);
 		background.setAcceptsHoverEvents(true);
 		background.setZValue(-1);
-		
+
 		// Draw colored tiles onto QPixMap
 		qImage = new QImage(sceneSize, Format.Format_RGB16);
 		QPainter painter = new QPainter(qImage);
+		return painter;
+	}
+
+	TreeSet<Integer> colsToSkip;
+	TreeSet<Integer> rowsToSkip;
+
+	private void calculateSkippedTiles(){
+
 
 		// Determine which columns and rows to not draw
-		TreeSet<Integer> colsToSkip = new TreeSet<Integer>();
-		TreeSet<Integer> rowsToSkip = new TreeSet<Integer>();
+		colsToSkip = new TreeSet<Integer>();
+		rowsToSkip = new TreeSet<Integer>();
 		for(Tile[] tileRow : device.getTiles()){
 			for(Tile tile : tileRow){
 				TileTypeEnum type = tile.getTileTypeEnum();
@@ -202,7 +223,7 @@ public class TileScene extends QGraphicsScene{
 				}
 			}
 		}
-		
+
 		// Create new tile layout without hidden tiles
 		int i=0,j=0;
 		drawnTiles = new Tile[rows-rowsToSkip.size()][cols-colsToSkip.size()];
@@ -223,7 +244,13 @@ public class TileScene extends QGraphicsScene{
 		}
 		rows = rows-rowsToSkip.size();
 		cols = cols-colsToSkip.size();
-		
+
+
+	}
+	protected void drawFPGAFabric(QPainter painter) {
+
+		int i=0;
+
 		//Draw dashed lines where rows/columns have been removed
 		QPen missingTileLinePen = new QPen(QColor.lightGray, 2, PenStyle.DashLine);
 		painter.setPen(missingTileLinePen);
@@ -239,10 +266,10 @@ public class TileScene extends QGraphicsScene{
 			painter.drawLine(0,tileSize*realRow-1, cols*tileSize-3,tileSize*realRow-1);
 			i++;
 		}
-		
+
 		// Draw the tile layout
 		int offset = (int) Math.ceil((lineWidth / 2.0));
-		
+
 		for(int y = 0; y < rows; y++){
 			for(int x = 0; x < cols; x++){
 				Tile tile = drawnTiles[y][x];
@@ -251,7 +278,7 @@ public class TileScene extends QGraphicsScene{
 				// Set pen color based on current tile
 				QColor color = TileColors.getSuggestedTileColor(tile);
 				painter.setPen(color);
-				
+
 				int rectX = x * tileSize;
 				int rectY = y * tileSize;
 				int rectSide = tileSize - 2 * offset;
@@ -267,20 +294,27 @@ public class TileScene extends QGraphicsScene{
 						drawDSP(painter, rectX, rectY, rectSide, offset, color);
 					}else{ // Just fill the tile in with a color
 						colorTile(painter, x, y, offset, color);
-					}					
+					}
 				}
 				else{
 					colorTile(painter, x, y, offset, color);
 				}
 			}
 		}
-
-		painter.end();
 	}
-	
+
 	public void drawBackground(QPainter painter, QRectF rect){
 		super.drawBackground(painter, rect);
-		painter.drawImage(0, 0, qImage);
+		if (useImage) {
+			if (qImage == null) {
+				QPainter imgPainter = createImage();
+				drawFPGAFabric(imgPainter);
+				imgPainter.end();
+			}
+			painter.drawImage(0, 0, qImage);
+		} else {
+			drawFPGAFabric(painter);
+		}
 	}
 
 	/**
