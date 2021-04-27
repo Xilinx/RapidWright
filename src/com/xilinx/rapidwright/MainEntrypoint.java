@@ -1,0 +1,181 @@
+package com.xilinx.rapidwright;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import com.xilinx.rapidwright.debug.DesignInstrumentor;
+import com.xilinx.rapidwright.debug.ILAInserter;
+import com.xilinx.rapidwright.debug.ProbeRouter;
+import com.xilinx.rapidwright.design.MetadataParser;
+import com.xilinx.rapidwright.design.blocks.ImplGuide;
+import com.xilinx.rapidwright.design.blocks.PBlock;
+import com.xilinx.rapidwright.design.blocks.PBlockGenerator;
+import com.xilinx.rapidwright.design.tools.LUTTools;
+import com.xilinx.rapidwright.device.IntentCode;
+import com.xilinx.rapidwright.device.PseudoPIPHelper;
+import com.xilinx.rapidwright.device.browser.DeviceBrowser;
+import com.xilinx.rapidwright.device.browser.PBlockGenDebugger;
+import com.xilinx.rapidwright.device.helper.TileColumnPattern;
+import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.edif.EDIFParser;
+import com.xilinx.rapidwright.edif.EDIFPropertyValue;
+import com.xilinx.rapidwright.edif.EDIFTools;
+import com.xilinx.rapidwright.examples.AddSubGenerator;
+import com.xilinx.rapidwright.examples.CopyMMCMCell;
+import com.xilinx.rapidwright.examples.CustomRouting;
+import com.xilinx.rapidwright.examples.DecomposeLUT;
+import com.xilinx.rapidwright.examples.ExampleNetlistCreation;
+import com.xilinx.rapidwright.examples.IsolateLeafClkBuffer;
+import com.xilinx.rapidwright.examples.Lesson1;
+import com.xilinx.rapidwright.examples.MultGenerator;
+import com.xilinx.rapidwright.examples.PicoBlazeArray;
+import com.xilinx.rapidwright.examples.PipelineGenerator;
+import com.xilinx.rapidwright.examples.PipelineGeneratorWithRouting;
+import com.xilinx.rapidwright.examples.PolynomialGenerator;
+import com.xilinx.rapidwright.examples.PrintEDIFInstances;
+import com.xilinx.rapidwright.examples.ReportTimingExample;
+import com.xilinx.rapidwright.examples.RunSATRouterExample;
+import com.xilinx.rapidwright.examples.SLRCrosserGenerator;
+import com.xilinx.rapidwright.examples.StampPlacement;
+import com.xilinx.rapidwright.examples.UpdateRoutingUsingSATRouter;
+import com.xilinx.rapidwright.examples.tilebrowser.PartTileBrowser;
+import com.xilinx.rapidwright.interchange.DeviceResourcesExample;
+import com.xilinx.rapidwright.interchange.EnumerateCellBelMapping;
+import com.xilinx.rapidwright.interchange.Interchange;
+import com.xilinx.rapidwright.interchange.LogicalNetlistExample;
+import com.xilinx.rapidwright.interchange.PhysicalNetlistExample;
+import com.xilinx.rapidwright.interchange.PhysicalNetlistToDcp;
+import com.xilinx.rapidwright.ipi.BlockCreator;
+import com.xilinx.rapidwright.ipi.BlockStitcher;
+import com.xilinx.rapidwright.ipi.BlockUpdater;
+import com.xilinx.rapidwright.placer.blockplacer.SmallestEnclosingCircle;
+import com.xilinx.rapidwright.placer.handplacer.HandPlacer;
+import com.xilinx.rapidwright.placer.handplacer.ModuleOptimizer;
+import com.xilinx.rapidwright.router.RouteThruHelper;
+import com.xilinx.rapidwright.router.Router;
+import com.xilinx.rapidwright.tests.CheckAccuracyUsingGnlDesigns;
+import com.xilinx.rapidwright.tests.DeviceLoader;
+import com.xilinx.rapidwright.tests.PinMapTester;
+import com.xilinx.rapidwright.tests.ReportDevicePerformance;
+import com.xilinx.rapidwright.util.BrowseDevice;
+import com.xilinx.rapidwright.util.CompareRouteStatusReports;
+import com.xilinx.rapidwright.util.DesignImplementationDiff;
+import com.xilinx.rapidwright.util.FileTools;
+import com.xilinx.rapidwright.util.Installer;
+import com.xilinx.rapidwright.util.JobQueue;
+import com.xilinx.rapidwright.util.PartPrinter;
+import com.xilinx.rapidwright.util.PerformanceExplorer;
+import com.xilinx.rapidwright.util.RapidWright;
+import com.xilinx.rapidwright.util.StringTools;
+import com.xilinx.rapidwright.util.Unzip;
+
+public class MainEntrypoint {
+    interface MainStyleFunction<E extends Throwable> {
+        void main(String[] args) throws E;
+    }
+
+    private static final Map<String, MainStyleFunction<?>> functions = new HashMap<>();
+    private static final List<String> functionNames = new ArrayList<>();
+
+    private static void addFunction(String name, MainStyleFunction<?> func) {
+        functions.put(name.toLowerCase(), func);
+        functionNames.add(name);
+    }
+
+    static {
+        addFunction("AddSubGenerator", AddSubGenerator::main);
+        addFunction("BlockCreator", BlockCreator::main);
+        addFunction("BlockStitcher", BlockStitcher::main);
+        addFunction("BlockUpdater", BlockUpdater::main);
+        addFunction("BrowseDevice", BrowseDevice::main);
+        addFunction("CheckAccuracyUsingGnlDesigns", CheckAccuracyUsingGnlDesigns::main);
+        addFunction("CompareRouteStatusReports", CompareRouteStatusReports::main);
+        addFunction("CopyMMCMCell", CopyMMCMCell::main);
+        addFunction("CustomRouting", CustomRouting::main);
+        addFunction("DecomposeLUT", DecomposeLUT::main);
+        addFunction("DesignImplementationDiff", DesignImplementationDiff::main);
+        addFunction("DesignInstrumentor", DesignInstrumentor::main);
+        addFunction("DeviceBrowser", DeviceBrowser::main);
+        addFunction("DeviceLoader", DeviceLoader::main);
+        addFunction("DeviceResourcesExample", DeviceResourcesExample::main);
+        addFunction("EDIFNetlist", EDIFNetlist::main);
+        addFunction("EDIFParser", EDIFParser::main);
+        addFunction("EDIFPropertyValue", EDIFPropertyValue::main);
+        addFunction("EDIFTools", EDIFTools::main);
+        addFunction("EnumerateCellBelMapping", EnumerateCellBelMapping::main);
+        addFunction("ExampleNetlistCreation", ExampleNetlistCreation::main);
+        addFunction("FileTools", FileTools::main);
+        addFunction("HandPlacer", HandPlacer::main);
+        addFunction("ILAInserter", ILAInserter::main);
+        addFunction("ImplGuide", ImplGuide::main);
+        addFunction("IntentCode", IntentCode::main);
+        addFunction("Interchange", Interchange::main);
+        addFunction("IsolateLeafClkBuffer", IsolateLeafClkBuffer::main);
+        addFunction("JobQueue", JobQueue::main);
+        addFunction("Lesson1", Lesson1::main);
+        addFunction("LogicalNetlistExample", LogicalNetlistExample::main);
+        addFunction("LUTTools", LUTTools::main);
+        addFunction("MetadataParser", MetadataParser::main);
+        addFunction("ModuleOptimizer", ModuleOptimizer::main);
+        addFunction("MultGenerator", MultGenerator::main);
+        addFunction("PartPrinter", PartPrinter::main);
+        addFunction("PartTileBrowser", PartTileBrowser::main);
+        addFunction("PBlockGenDebugger", PBlockGenDebugger::main);
+        addFunction("PBlockGenerator", PBlockGenerator::main);
+        addFunction("PBlock", PBlock::main);
+        addFunction("PerformanceExplorer", PerformanceExplorer::main);
+        addFunction("PhysicalNetlistExample", PhysicalNetlistExample::main);
+        addFunction("PhysicalNetlistToDcp", PhysicalNetlistToDcp::main);
+        addFunction("PicoBlazeArray", PicoBlazeArray::main);
+        addFunction("PinMapTester", PinMapTester::main);
+        addFunction("PipelineGenerator", PipelineGenerator::main);
+        addFunction("PipelineGeneratorWithRouting", PipelineGeneratorWithRouting::main);
+        addFunction("PolynomialGenerator", PolynomialGenerator::main);
+        addFunction("PrintEDIFInstances", PrintEDIFInstances::main);
+        addFunction("ProbeRouter", ProbeRouter::main);
+        addFunction("PseudoPIPHelper", PseudoPIPHelper::main);
+        addFunction("RapidWright", RapidWright::main);
+        addFunction("ReportDevicePerformance", ReportDevicePerformance::main);
+        addFunction("ReportTimingExample", ReportTimingExample::main);
+        addFunction("Router", Router::main);
+        addFunction("RouteThruHelper", RouteThruHelper::main);
+        addFunction("RunSATRouterExample", RunSATRouterExample::main);
+        addFunction("SLRCrosserGenerator", SLRCrosserGenerator::main);
+        addFunction("SmallestEnclosingCircle", SmallestEnclosingCircle::main);
+        addFunction("StampPlacement", StampPlacement::main);
+        addFunction("StringTools", StringTools::main);
+        addFunction("TileColumnPattern", TileColumnPattern::main);
+        addFunction("Unzip", Unzip::main);
+        addFunction("UpdateRoutingUsingSATRouter", UpdateRoutingUsingSATRouter::main);
+    }
+
+    private static void listModes() {
+        for (String name : functionNames) {
+            System.err.print('\t');
+            System.err.println(name);
+        }
+    }
+
+    public static void main(String[] args) throws Throwable {
+        if (args.length == 0) {
+            System.err.println("Need one argument to determine the mode. Valid modes are (case-insensitive):");
+            listModes();
+            System.exit(1);
+        }
+
+
+        String mode = args[0];
+        MainStyleFunction<?> func = functions.get(mode.toLowerCase());
+        if (func == null) {
+            System.err.println("Invalid mode. Valid modes are (case-insensitive): ");
+            listModes();
+            System.exit(1);
+        }
+
+        String[] childArgs = new String[args.length-1];
+        System.arraycopy(args, 1, childArgs, 0, args.length-1);
+        func.main(childArgs);
+    }
+}

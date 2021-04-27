@@ -1,4 +1,5 @@
-apply plugin: 'java'
+apply plugin: 'application'
+mainClassName = "com.xilinx.rapidwright.MainEntrypoint"
 
 sourceSets {
   main {
