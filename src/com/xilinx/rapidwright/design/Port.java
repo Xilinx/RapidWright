@@ -24,8 +24,12 @@ package com.xilinx.rapidwright.design;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 
 import com.xilinx.rapidwright.device.Tile;
 
@@ -42,7 +46,7 @@ public class Port implements Serializable, Cloneable{
 	/** Name of the Port of the current module, this is the port of an instance in the module. */
 	private String name;
 	/** This is the pin that the port references. */
-	private SitePinInst sitePinInst;
+	private Set<SitePinInst> sitePinInsts = new HashSet<>();
 	/** Port type (provided by metadata) */
 	private PortType type;
 	/** List of port names this port connects directly to (pass-thru connections) */
@@ -59,7 +63,6 @@ public class Port implements Serializable, Cloneable{
 	 */
 	public Port(){
 		name = null;
-		setSitePinInst(null);
 	}
 	
 
@@ -69,25 +72,40 @@ public class Port implements Serializable, Cloneable{
 	 */
 	public Port(String name, SitePinInst sitePinInst){
 		this.name = name;
-		this.setSitePinInst(sitePinInst);
-		if(sitePinInst != null){
-			setOutputPort(sitePinInst.isOutPin());
-			sitePinInst.setPort(this);
+		addSitePinInst(sitePinInst);
+	}
+
+	/**
+	 * @param name Name of the port.
+	 * @param sitePinInsts Pins which the port references
+	 */
+	public Port(String name, Collection<SitePinInst> sitePinInsts){
+		this.name = name;
+		for (SitePinInst sitePinInst : sitePinInsts) {
+			addSitePinInst(sitePinInst);
 		}
 	}
-	
+
+
 	/**
 	 * Special constructor when creating a port that has a pass-thru connection
 	 * @param name Name of the port on the module
-	 * @param isOutputPin Flag denoting if this port is an output or input
+	 * @param isOutputPort Flag denoting if this port is an output or input
 	 * @param initialPassThruPinName The name of the pass-thru port this port connects to
 	 */
 	public Port(String name, boolean isOutputPort, String initialPassThruPinName){
-		this(name, null);
+		this.name = name;
 		setOutputPort(isOutputPort);
 		addPassThruPortName(initialPassThruPinName);
 	}
-	
+
+	/**
+	 * @param name Name of the port.
+	 */
+	public Port(String name) {
+		this.name = name;
+	}
+
 	/**
 	 * Gets and returns the name of the port.
 	 * @return The name of the port.
@@ -108,42 +126,75 @@ public class Port implements Serializable, Cloneable{
 	 * Gets and returns the instance name.
 	 * @return The name of the instance where this port resides.
 	 */
-	public String getSiteInstName(){
-		return sitePinInst == null ? "null" : (sitePinInst.getSiteInst() == null ? "null" : sitePinInst.getSiteInstName());
+	public String getSingleSiteInstName(){
+		SitePinInst singleSitePinInst = getSingleSitePinInst();
+		return singleSitePinInst == null ? "null" : (singleSitePinInst.getSiteInst() == null ? "null" : singleSitePinInst.getSiteInstName());
 	}
 	
 	/**
 	 *  Gets the pin name of the instance where the port resides.
 	 * @return The pin name of the port.
 	 */
-	public String getSitePinInstName(){
-		return sitePinInst == null ? "null" : sitePinInst.getName();
+	public String getSingleSitePinInstName(){
+		SitePinInst singleSitePinInst = getSingleSitePinInst();
+		return singleSitePinInst == null ? "null" : singleSitePinInst.getName();
+	}
+
+	private void setInternalDirectionFromPins() {
+		if (sitePinInsts.isEmpty()) {
+			return;
+		}
+		boolean hasOutputPin = false;
+		boolean hasInputPin = false;
+		for (SitePinInst sitePinInst : sitePinInsts) {
+			if (sitePinInst.isOutPin()) {
+				hasOutputPin = true;
+			} else {
+				hasInputPin = true;
+			}
+		}
+		if (hasOutputPin && hasInputPin) {
+			throw new IllegalStateException("Port "+getName()+" is a mix of input and output pins");
+		}
+		isOutputPort = hasOutputPin;
 	}
 	
 
 	/**
-	 * @param sitePinInst the pin to set
+	 * @param sitePinInst the pin to add
 	 */
-	public void setSitePinInst(SitePinInst sitePinInst) {
-		this.sitePinInst = sitePinInst;
-		if(sitePinInst != null) {
-			sitePinInst.setPort(this);
-			sitePinInst.setIsOutputPin(sitePinInst.isOutPin());
-		}
+	public void addSitePinInst(SitePinInst sitePinInst) {
+		Objects.requireNonNull(sitePinInst);
+		sitePinInsts.add(sitePinInst);
+		sitePinInst.setPort(this);
+		setInternalDirectionFromPins();
+		boundingBox = null;
 	}
 
 	/**
+	 * Convenience method for ports with at most one SitePinInst. Get the single SitePinInst associated with this
+	 * Port or null if there are none. Throws if there are multiple.
 	 * @return the pin
 	 */
-	public SitePinInst getSitePinInst() {
-		return sitePinInst;
+	public SitePinInst getSingleSitePinInst() {
+		if (sitePinInsts.isEmpty()) {
+			return null;
+		}
+		if (sitePinInsts.size() > 1) {
+			throw new IllegalStateException("Tried getting single SitePinInst in port "+getName()+", but there are "+sitePinInsts.size()+" pins");
+		}
+		return sitePinInsts.iterator().next();
+	}
+
+	public Set<SitePinInst> getSitePinInsts() {
+		return sitePinInsts;
 	}
 
 	/**
 	 * @return the instance
 	 */
-	public SiteInst getSiteInst() {
-		return sitePinInst.getSiteInst();
+	public SiteInst getSingleSiteInst() {
+		return getSingleSitePinInst().getSiteInst();
 	}
 
 	/**
@@ -152,7 +203,8 @@ public class Port implements Serializable, Cloneable{
 	 * @return True if this port is an output, false otherwise.
 	 */
 	public boolean isOutPort(){
-		return sitePinInst == null ? isOutputPort : sitePinInst.isOutPin();
+		setInternalDirectionFromPins();
+		return isOutputPort;
 	}
 
 
@@ -217,9 +269,7 @@ public class Port implements Serializable, Cloneable{
 	public int hashCode(){
 		final int prime = 31;
 		int result = 1;
-		result = prime * result + ((getSiteInstName() == null) ? 0 : getSiteInstName().hashCode());
-		result = prime * result + ((name == null) ? 0 : name.hashCode());
-		result = prime * result + ((getSitePinInstName() == null) ? 0 : getSitePinInstName().hashCode());
+		result = prime * result + sitePinInsts.hashCode();
 		return result;
 	}
 
@@ -236,23 +286,13 @@ public class Port implements Serializable, Cloneable{
 		if(getClass() != obj.getClass())
 			return false;
 		Port other = (Port) obj;
-		if(getSiteInstName() == null){
-			if(other.getSiteInstName() != null)
-				return false;
-		}
-		else if(!getSiteInstName().equals(other.getSiteInstName()))
+		if (!sitePinInsts.equals(other.sitePinInsts))
 			return false;
 		if(name == null){
 			if(other.name != null)
 				return false;
 		}
 		else if(!name.equals(other.name))
-			return false;
-		if(getSitePinInstName() == null){
-			if(other.getSitePinInstName() != null)
-				return false;
-		}
-		else if(!getSitePinInstName().equals(other.getSitePinInstName()))
 			return false;
 		return true;
 	}
@@ -262,7 +302,7 @@ public class Port implements Serializable, Cloneable{
 		StringBuilder sb = new StringBuilder();
 		sb.append("port ");
 		sb.append(name);
-		sb.append(sitePinInst == null ? " null" : " " + sitePinInst.getSitePinName());
+		sb.append(sitePinInsts);
 		if(passThruPortNames != null && passThruPortNames.size() > 0)
 			sb.append(" [PASSTHRU: " + passThruPortNames + "]");
 		return sb.toString();
@@ -283,5 +323,30 @@ public class Port implements Serializable, Cloneable{
 	 */
 	public void setType(PortType type) {
 		this.type = type;
+	}
+
+	public Net getNet() {
+		//All SitePinInsts in the port are required to have the same net, so just grab any pin's net
+		if (sitePinInsts.isEmpty()) {
+			return null;
+		}
+		return sitePinInsts.iterator().next().getNet();
+	}
+
+	public void removeSitePinInst(SitePinInst p) {
+		sitePinInsts.remove(p);
+		boundingBox = null;
+	}
+
+	TileRectangle boundingBox = null;
+	public TileRectangle getBoundingBox() {
+		if (boundingBox == null) {
+			TileRectangle.MutableRectangle mut = new TileRectangle.MutableRectangle();
+			for (SitePinInst sitePinInst : getSitePinInsts()) {
+				mut.extendTo(sitePinInst.getTile());
+			}
+			boundingBox = mut.toImmutable().orElseThrow(()->new IllegalStateException("Cannot get Bounding Box of Port without Pins"));
+		}
+		return boundingBox;
 	}
 }
