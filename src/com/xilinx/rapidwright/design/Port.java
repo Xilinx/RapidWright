@@ -168,6 +168,7 @@ public class Port implements Serializable, Cloneable{
 		sitePinInsts.add(sitePinInst);
 		sitePinInst.setPort(this);
 		setInternalDirectionFromPins();
+		boundingBox = null;
 	}
 
 	/**
@@ -334,5 +335,18 @@ public class Port implements Serializable, Cloneable{
 
 	public void removeSitePinInst(SitePinInst p) {
 		sitePinInsts.remove(p);
+		boundingBox = null;
+	}
+
+	TileRectangle boundingBox = null;
+	public TileRectangle getBoundingBox() {
+		if (boundingBox == null) {
+			TileRectangle.MutableRectangle mut = new TileRectangle.MutableRectangle();
+			for (SitePinInst sitePinInst : getSitePinInsts()) {
+				mut.extendTo(sitePinInst.getTile());
+			}
+			boundingBox = mut.toImmutable().orElseThrow(()->new IllegalStateException("Cannot get Bounding Box of Port without Pins"));
+		}
+		return boundingBox;
 	}
 }
