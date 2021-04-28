@@ -207,21 +207,27 @@ public class FloorPlanScene extends TileScene {
 			Module module = inst0.getModuleTemplate();
 
 			for (Port port : module.getPorts()) {
-				if (port.getSitePinInstName().toUpperCase().contains("CLK")	|| port.getSitePinInstName().toUpperCase().contains("RST"))
+				if (port.getSitePinInsts().stream().allMatch(p-> {
+					String name = p.getName().toUpperCase();
+					return name.contains("CLK") || name.contains("RST");
+				}))
 					continue;
-				String instName = moduleName + "/" + port.getSiteInstName();
-				SiteInst portInst = getDesign().getSiteInst(instName);
-				if(portInst == null) continue;
-				for (Net portInstNet : portInst.getNetList()) {
-					if (!portInstNet.isStaticNet()
-							&& portInstNet.getModuleInst() == null
-							&& !portInstNet.getName().contains("clk")
-							&& !netsFound.contains(portInstNet)
-							&& !portInstNet.getName().contains("rst")) {
-						netsFound.add(portInstNet);
-						addNetToScene(portInstNet);
+				for (SitePinInst sitePinInst : port.getSitePinInsts()) {
+					String instName = moduleName + "/" + sitePinInst.getSite().getName();
+					SiteInst portInst = getDesign().getSiteInst(instName);
+					if(portInst == null) continue;
+					for (Net portInstNet : portInst.getNetList()) {
+						if (!portInstNet.isStaticNet()
+								&& portInstNet.getModuleInst() == null
+								&& !portInstNet.getName().contains("clk")
+								&& !netsFound.contains(portInstNet)
+								&& !portInstNet.getName().contains("rst")) {
+							netsFound.add(portInstNet);
+							addNetToScene(portInstNet);
+						}
 					}
 				}
+
 			}
 		}
 		if(netsFound.size() < 2){

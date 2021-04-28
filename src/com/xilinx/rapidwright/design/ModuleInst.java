@@ -24,8 +24,9 @@ package com.xilinx.rapidwright.design;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.design.blocks.PBlockRange;
@@ -34,10 +35,10 @@ import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
-import com.xilinx.rapidwright.edif.EDIFNet;
-import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
+import com.xilinx.rapidwright.edif.EDIFNet;
+import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.util.MessageGenerator;
 import com.xilinx.rapidwright.util.Utils;
 
@@ -404,15 +405,15 @@ public class ModuleInst{
 	public Tile getCorrespondingTile(Tile templateTile, Tile newAnchorTile, Device dev){
 		return module.getCorrespondingTile(templateTile, newAnchorTile, dev);
 	}
-	
+
+
 	/**
-	 * Gets the corresponding port pin (SitePinInst) on this module instance
-	 * that corresponds to the module's port.  
-	 * @param port The port on the prototype module.
-	 * @return The corresponding port pin on this module instance, or null if could not be found.
+	 * Gets the corresponding pins (SitePinInst) on this module instance
+	 * that corresponds to the module's SitePinInst.
+	 * @param modulePin The SitePinInst on the prototype module.
+	 * @return The corresponding pin on this module instance, or null if could not be found.
 	 */
-	public SitePinInst getCorrespondingPin(Port port){
-		SitePinInst modulePin = port.getSitePinInst();
+	private SitePinInst getCorrespondingPin(SitePinInst modulePin) {
 		if(modulePin == null) return null;
 
 		String siteInstName = getName()+"/"+modulePin.getSiteInst().getName();
@@ -422,15 +423,41 @@ public class ModuleInst{
 		}
 		return newSiteInst.getSitePinInst(modulePin.getName());
 	}
-	
+
+	/**
+	 * Gets the corresponding port pins (SitePinInst) on this module instance
+	 * that corresponds to the module's port.
+	 * @param port The port on the prototype module.
+	 * @return The corresponding port pins on this module instance
+	 */
+	public Set<SitePinInst> getCorrespondingPins(Port port){
+		return port.getSitePinInsts().stream().map(this::getCorrespondingPin).collect(Collectors.toSet());
+	}
+
+	/**
+	 * Gets the single corresponding port pin (SitePinInst) on this module instance
+	 * that corresponds to the module's port. If the module port has multiple pins, this will throw an Exception.
+	 * @param port The port on the prototype module.
+	 * @return The corresponding port pin on this module instance, or null if could not be found.
+	 */
+	public SitePinInst getSingleCorrespondingPin(Port port){
+
+		if (port.getSitePinInsts().size()>1) {
+			throw new IllegalStateException("Cannot get single SitePinInst of Module "+module.getName()+"."+port.getName()+", as it has "+port.getSitePinInsts().size()+" pins");
+		}
+		return getCorrespondingPin(port.getSingleSitePinInst());
+	}
+
+
 	/**
 	 * Gets (if it exists), the corresponding net within the module instance of the port.
 	 * @param p The port on the module of interest
 	 * @return The corresponding net on the module instance.
 	 */
 	public Net getCorrespondingNet(Port p){
-		if(p.getSitePinInst() != null && p.getSitePinInst().getNet() != null){
-			String name = getName() + "/" + p.getSitePinInst().getNet().getName();
+		Net net = p.getNet();
+		if(net != null){
+			String name = getName() + "/" + net.getName();
 			return design.getNet(name);
 		}
 		// Get net of input port pass-thru
@@ -672,7 +699,6 @@ public class ModuleInst{
 	 * @param busIndex1 If the port (of the other module instance or the existing parent cell) is multi-bit,
 	 * specify the index to connect or -1 if single bit bus.
 	 */
-
 	public void connect(String portName, int busIndex0, ModuleInst other, String otherPortName, int busIndex1){
 		EDIFCell top = design.getTopEDIFCell();
 		EDIFCellInst eci0 = top.getCellInst(getName());
@@ -704,13 +730,18 @@ public class ModuleInst{
 		Port p0 = getPort(busIndex0 == -1 ? portName : portName + "[" + busIndex0 + "]");
 		Port p1 = other.getPort(busIndex1 == -1 ? otherPortName : otherPortName + "[" + busIndex1 + "]");
 
-		SitePinInst pin0 = getCorrespondingPin(p0);
-		SitePinInst pin1 = other.getCorrespondingPin(p1);
+		Net physicalNet;
+		Port inPort;
+		if (p0.isOutPort()) {
+			physicalNet = getCorrespondingNet(p0);
+			inPort = p1;
+		} else {
+			physicalNet = other.getCorrespondingNet(p1);
+			inPort = p0;
+		}
 
-		if(pin0.isOutPin()){
-			pin0.getNet().addPin(pin1);
-		}else{
-			pin1.getNet().addPin(pin0);
+		for (SitePinInst inPin : getCorrespondingPins(inPort)) {
+			physicalNet.addPin(inPin);
 		}
 	}
 }

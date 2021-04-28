@@ -41,21 +41,21 @@ import com.xilinx.rapidwright.design.ModuleInst;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.PinType;
-import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Port;
 import com.xilinx.rapidwright.design.PortType;
 import com.xilinx.rapidwright.design.SiteInst;
+import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.blocks.BlockGuide;
 import com.xilinx.rapidwright.design.blocks.BlockInst;
 import com.xilinx.rapidwright.design.blocks.ImplGuide;
 import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.device.Site;
-import com.xilinx.rapidwright.edif.EDIFHierNet;
-import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
+import com.xilinx.rapidwright.edif.EDIFHierNet;
+import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.edif.EDIFLibrary;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
@@ -336,15 +336,15 @@ public class BlockStitcher {
 		Port port = mi.getModule().getPort(pr.getPortInst().getName());
 		if(port.getType() == PortType.UNCONNECTED) 
 			return null;
-		if(port.getSitePinInst() == null){
+		if(port.getSitePinInsts().isEmpty()){
 			if(port.getType() == PortType.GROUND) return design.getGndNet();
 			if(port.getType() == PortType.POWER) return design.getVccNet();
 			return null;
 		}
-		if(port.getSitePinInst().getNet() == null){
+		if(port.getNet() == null){
 			return null;
 		}
-		String netName = modInstName + "/" + port.getSitePinInst().getNet().getName();
+		String netName = modInstName + "/" + port.getNet().getName();
 		Net net = design.getNet(netName);
 
 		return net;
