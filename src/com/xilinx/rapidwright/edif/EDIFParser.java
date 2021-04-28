@@ -26,13 +26,15 @@
 package com.xilinx.rapidwright.edif;
 
 import java.io.BufferedInputStream;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
-
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -51,7 +53,7 @@ import com.xilinx.rapidwright.util.MessageGenerator;
  */
 public class EDIFParser {
 
-	private String fileName;
+	private Path fileName;
 	
 	private InputStream in;
 	
@@ -119,13 +121,23 @@ public class EDIFParser {
 	private static final String DESIGN = "design";
 	private static final String METAX = "metax";
 	private static final String OWNER = "owner";
-	
-	public EDIFParser(String fileName) throws FileNotFoundException{
+
+	public EDIFParser(Path fileName) throws FileNotFoundException {
 		this.fileName = fileName;
-		in = new BufferedInputStream(new FileInputStream(this.fileName));
+		try {
+			in = new BufferedInputStream(Files.newInputStream(this.fileName));
+		} catch (FileNotFoundException e) {
+			throw e;
+		} catch (IOException e) {
+			throw new UncheckedIOException(e);
+		}
 		init();
 	}
-	
+
+	public EDIFParser(String fileName) throws FileNotFoundException {
+		this(Paths.get(fileName));
+	}
+
 	public EDIFParser(InputStream in){
 		this.in = in;
 		init();

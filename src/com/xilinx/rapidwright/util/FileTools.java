@@ -42,11 +42,15 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
+import java.io.UncheckedIOException;
 import java.lang.management.ManagementFactory;
 import java.lang.management.RuntimeMXBean;
-import java.lang.reflect.Field;
 import java.net.URL;
 import java.nio.channels.FileChannel;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.attribute.FileTime;
 import java.security.CodeSource;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -1118,10 +1122,24 @@ public class FileTools {
 	 * @param fileName2
 	 * @return
 	 */
+	public static boolean isFileNewer(Path fileName1, Path fileName2) {
+		try {
+			FileTime time1 = Files.getLastModifiedTime(fileName1);
+			FileTime time2 = Files.getLastModifiedTime(fileName2);
+			return time1.compareTo(time2) >= 0;
+		} catch (IOException e) {
+			throw new UncheckedIOException(e);
+		}
+	}
+
+	/**
+	 * Is fileName1 newer than fileName2?
+	 * @param fileName1
+	 * @param fileName2
+	 * @return
+	 */
 	public static boolean isFileNewer(String fileName1, String fileName2){
-		long time1 = new File(fileName1).lastModified();
-		long time2 = new File(fileName2).lastModified();
-		return time1 >= time2;
+		return isFileNewer(Paths.get(fileName1), Paths.get(fileName2));
 	}
 	
 	@SuppressWarnings("resource")
@@ -1291,12 +1309,23 @@ public class FileTools {
 	 * @param fileName Name of the file to check.
 	 * @return True if the file is considered binary, false otherwise.
 	 */
-	public static boolean isFileBinary(String fileName){
+	public static boolean isFileBinary(Path fileName){
 		try {
-			return isDataBinary(new BufferedInputStream(new FileInputStream(fileName)));
-		} catch (FileNotFoundException e) {
-			throw new RuntimeException("ERROR: Trying to read file " + fileName + " and it was not found.");
+			return isDataBinary(new BufferedInputStream(Files.newInputStream(fileName)));
+		} catch (IOException e) {
+			throw new RuntimeException("ERROR: Trying to read file " + fileName + " and it errored.", e);
 		}
+	}
+
+	/**
+	 * Uses a similar algorithm to diff to determine if the file
+	 * is a binary file by looking at the first 4k bytes to see if
+	 * there are any null characters.  If so, it is considered binary.
+	 * @param fileName Name of the file to check.
+	 * @return True if the file is considered binary, false otherwise.
+	 */
+	public static boolean isFileBinary(String fileName){
+		return isFileBinary(Paths.get(fileName));
 	}
 	
 	private static final int BINARY_CHECK_LENGTH = 8192;
@@ -1574,6 +1603,26 @@ public class FileTools {
 			return false;
 		}
 		return true;
+	}
+
+	/**
+	 * Appends an extension to the file. if there is already an extension, the result will have two extensions.
+	 * @param path
+	 * @param extension
+	 * @return
+	 */
+	public static Path appendExtension(Path path, String extension) {
+		return path.resolveSibling(path.getFileName().toString()+extension);
+	}
+
+
+	public static Path replaceExtension(Path path, String newExtension) {
+		String fn = path.getFileName().toString();
+		int idx = fn.lastIndexOf('.');
+		if (idx == -1) {
+			return path.resolveSibling(fn + newExtension);
+		}
+		return path.resolveSibling(fn.substring(0, idx) + newExtension);
 	}
 	
 	public static void main(String[] args) {

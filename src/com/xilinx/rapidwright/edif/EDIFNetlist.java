@@ -27,8 +27,10 @@ package com.xilinx.rapidwright.edif;
 
 import java.io.BufferedWriter;
 import java.io.FileNotFoundException;
-import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -40,9 +42,9 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.regex.Pattern;
 import java.util.Queue;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
@@ -539,66 +541,66 @@ public class EDIFNetlist extends EDIFName {
 		
 		return new ArrayList<>(toExport);
 	}
-	
-	public void exportEDIF(String fileName){
-		BufferedWriter bw = null;
-		
-		//for(EDIFLibrary lib : getLibraries()){
-		//	lib.ensureValidEDIFCellNames();
-		//}
-		
-		try {
-			bw = new BufferedWriter(new FileWriter(fileName));
-			bw.write("(edif ");
-			exportEDIFName(bw);
-			bw.write("\n");
-			bw.write("  (edifversion 2 0 0)\n");
-			bw.write("  (edifLevel 0)\n");
-			bw.write("  (keywordmap (keywordlevel 0))\n");
-			bw.write("(status\n");
-			bw.write(" (written\n");
-			bw.write("  (timeStamp ");
-			SimpleDateFormat formatter = new SimpleDateFormat("yyyy MM dd HH mm ss");
-			bw.write(formatter.format(new java.util.Date()));
+
+	public void exportEDIF(BufferedWriter bw) throws IOException {
+		bw.write("(edif ");
+		exportEDIFName(bw);
+		bw.write("\n");
+		bw.write("  (edifversion 2 0 0)\n");
+		bw.write("  (edifLevel 0)\n");
+		bw.write("  (keywordmap (keywordlevel 0))\n");
+		bw.write("(status\n");
+		bw.write(" (written\n");
+		bw.write("  (timeStamp ");
+		SimpleDateFormat formatter = new SimpleDateFormat("yyyy MM dd HH mm ss");
+		bw.write(formatter.format(new java.util.Date()));
+		bw.write(")\n");
+		bw.write("  (program \""+Device.FRAMEWORK_NAME+"\" (version \"" + Device.RAPIDWRIGHT_VERSION + "\"))\n");
+		for(String comment : getComments()){
+			bw.write("  (comment \"");
+			bw.write(comment);
+			bw.write("\")\n");
+		}
+		for(Entry<String,EDIFPropertyValue> e : metax.entrySet()){
+			bw.write("(metax ");
+			bw.write(e.getKey());
+			bw.write(" ");
+			e.getValue().writeEDIFString(bw);
 			bw.write(")\n");
-			bw.write("  (program \""+Device.FRAMEWORK_NAME+"\" (version \"" + Device.RAPIDWRIGHT_VERSION + "\"))\n");
-			for(String comment : getComments()){
-				bw.write("  (comment \"");
-				bw.write(comment);
-				bw.write("\")\n");
-			}
-			for(Entry<String,EDIFPropertyValue> e : metax.entrySet()){
-				bw.write("(metax ");
-				bw.write(e.getKey());
-				bw.write(" ");
-				e.getValue().writeEDIFString(bw);
-				bw.write(")\n");
-			}
-			bw.write(" )\n");
-			bw.write(")\n");
-			
-			getHDIPrimitivesLibrary().exportEDIF(bw);
-			for(EDIFLibrary lib : getLibrariesMap().values()){
-				if(lib.getName().equals(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME)) continue;
-				lib.exportEDIF(bw);
-			}
-			bw.write("(comment \"Reference To The Cell Of Highest Level\")\n\n");
-			bw.write("  (design ");
-			EDIFDesign design = getDesign(); 
-			design.exportEDIFName(bw);
-			bw.write("\n    (cellref " + design.getTopCell().getLegalEDIFName() + " (libraryref ");
-			bw.write(design.getTopCell().getLibrary().getLegalEDIFName() +"))\n");
-			design.exportEDIFProperties(bw, "    ");
-			bw.write("  )\n");
-			bw.write(")\n");
-			bw.flush();
-			bw.close();
+		}
+		bw.write(" )\n");
+		bw.write(")\n");
+
+		getHDIPrimitivesLibrary().exportEDIF(bw);
+		for(EDIFLibrary lib : getLibrariesMap().values()){
+			if(lib.getName().equals(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME)) continue;
+			lib.exportEDIF(bw);
+		}
+		bw.write("(comment \"Reference To The Cell Of Highest Level\")\n\n");
+		bw.write("  (design ");
+		EDIFDesign design = getDesign();
+		design.exportEDIFName(bw);
+		bw.write("\n    (cellref " + design.getTopCell().getLegalEDIFName() + " (libraryref ");
+		bw.write(design.getTopCell().getLibrary().getLegalEDIFName() +"))\n");
+		design.exportEDIFProperties(bw, "    ");
+		bw.write("  )\n");
+		bw.write(")\n");
+	}
+
+	public void exportEDIF(Path fileName){
+		try (BufferedWriter bw = Files.newBufferedWriter(fileName)){
+			exportEDIF(bw);
 		} catch (IOException e) {
 			MessageGenerator.briefError("ERROR: Failed to export EDIF file " + fileName);
 			e.printStackTrace();
 		}
 	}
-	
+
+	public void exportEDIF(String fileName) {
+		exportEDIF(Paths.get(fileName));
+	}
+
+
 	/**
 	 * Based on a hierarchical string, this method will get the instance corresponding
 	 * to the name provided.
