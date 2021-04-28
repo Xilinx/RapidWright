@@ -1,5 +1,5 @@
 /* 
- * Copyright (c) 2020 Xilinx, Inc. 
+ * Copyright (c) 2021 Xilinx, Inc. 
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -35,7 +35,7 @@ import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.util.FileTools;
 
 /**
- * Generated on: Wed Dec 16 09:47:52 2020
+ * Generated on: Mon Apr 26 22:14:08 2021
  * by: com.xilinx.rapidwright.release.PartNamePopulator
  * 
  * Class to hold utility APIs dealing with Parts and device names.
@@ -75,7 +75,7 @@ public class PartNameTools {
 				);
 			addToPartMap(strings[part[0]], tmpPart);
 			if(!(strings[part[8]].isEmpty())) {
-				partMap.put(strings[part[4]]+"-"+strings[part[8]], tmpPart);
+				addToPartMap(strings[part[4]]+"-"+strings[part[8]], tmpPart);
 				if(!partMap.containsKey(strings[part[4]])) {
 					addToPartMap(strings[part[4]], tmpPart);
 					addToPartMap(strings[part[4]]+strings[part[5]], tmpPart);
