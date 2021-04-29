@@ -35,6 +35,7 @@ import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELClass;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Package;
 import com.xilinx.rapidwright.device.Grade;
@@ -77,6 +78,7 @@ import com.xilinx.rapidwright.interchange.DeviceResources.Device.ParameterFormat
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.Direction;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.PropertyMap;
+import com.xilinx.rapidwright.interchange.WireType;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 
 public class DeviceResourcesWriter {
@@ -378,6 +380,9 @@ public class DeviceResourcesWriter {
 
         t.stop().start("Constants");
         ConstantDefinitions.writeConstants(allStrings, device, devBuilder.initConstants(), design, siteTypes, tileTypesObj);
+
+        t.stop().start("Wire Types");
+        writeWireTypes(allStrings, devBuilder);
 
         t.stop().start("Strings");
         writeAllStringsToBuilder(devBuilder);
@@ -743,6 +748,7 @@ public class DeviceResourcesWriter {
             //Wire wire = allWires.get(i);
             wireBuilder.setTile(allStrings.getIndex(wire.getTile().getName()));
             wireBuilder.setWire(allStrings.getIndex(wire.getWireName()));
+            wireBuilder.setType(wire.getIntentCode().ordinal());
         }
 
         StructList.Builder<DeviceResources.Device.Node.Builder> nodeBuilders =
@@ -806,6 +812,15 @@ public class DeviceResourcesWriter {
                 gradeObj.setSpeedGrade(allStrings.getIndex(grade.getSpeedGrade()));
                 gradeObj.setTemperatureGrade(allStrings.getIndex(grade.getTemperatureGrade()));
             }
+        }
+    }
+    public static void writeWireTypes(Enumerator<String> allStrings, DeviceResources.Device.Builder devBuilder) {
+        IntentCode[] intents = IntentCode.values();
+        StructList.Builder<DeviceResources.Device.WireType.Builder> wireTypesObj = devBuilder.initWireTypes(intents.length);
+        for (IntentCode intent : IntentCode.values()) {
+            DeviceResources.Device.WireType.Builder wireType = wireTypesObj.get(intent.ordinal());
+            wireType.setName(allStrings.getIndex(intent.toString()));
+            wireType.setCategory(WireType.intentToCategory(intent));
         }
     }
 }
