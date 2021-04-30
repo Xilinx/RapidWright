@@ -663,18 +663,19 @@ public class ModuleInst{
 	/**
 	 * Connects two signals by port name between this module instance and another.
 	 * This method will create a new net for the connection handling adding both
-	 * a logical net (EDIFNet) and physical net (Net).
+	 * a logical net (EDIFNet) and physical net (Net).  In the case of a top level connection, the 
+	 * physical net will not be created.
 	 * @param portName This module instance's port name to connect.
 	 * @param busIndex0 If the assigned port of this module instance is multi-bit,
 	 * specify the index to connect or -1 if single bit bus.
 	 * @param other The other module instance to connect to. If this is null, it will
-	 * connect it to an existing parent cell port named otherPortName
+	 * connect it to an existing parent cell port named otherPortName. When null, this is presumed
+	 * an out of context design where there might not be a source/sink.  
 	 * @param otherPortName The port name on the other module instance to connect to or
 	 * the top-level port of the the cell instance.
 	 * @param busIndex1 If the port (of the other module instance or the existing parent cell) is multi-bit,
 	 * specify the index to connect or -1 if single bit bus.
 	 */
-
 	public void connect(String portName, int busIndex0, ModuleInst other, String otherPortName, int busIndex1){
 		EDIFCell top = design.getTopEDIFCell();
 		EDIFCellInst eci0 = top.getCellInst(getName());
