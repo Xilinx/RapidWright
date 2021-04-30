@@ -119,7 +119,7 @@ public class DeviceResourcesVerifier {
         design.setPartName(deviceName);
 
         DeviceResources.Device.Reader dReader = null;
-        ReaderOptions readerOptions = new ReaderOptions(1024L*1024L*1024L*2L, 64);
+        ReaderOptions readerOptions = new ReaderOptions(1024L*1024L*1024L*16L, 64);
         MessageReader readMsg = null;
         readMsg = Interchange.readInterchangeFile(devResFileName, readerOptions);
 
