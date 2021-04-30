@@ -38,7 +38,8 @@ public class DeviceLoader {
 
 	public static void main(String[] args) {
 		if(args.length != 1){
-			MessageGenerator.briefMessageAndExit("USAGE: <partname>");
+			System.out.println("USAGE: <partname>");
+			return;
 		}
 		Part p = PartNameTools.getPart(args[0]);
 		if(p == null){

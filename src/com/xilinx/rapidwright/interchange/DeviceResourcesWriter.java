@@ -10,7 +10,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.Map.Entry;
+import java.util.Queue;
 
 import org.capnproto.MessageBuilder;
 import org.capnproto.PrimitiveList;
@@ -33,6 +35,7 @@ import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELClass;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Package;
 import com.xilinx.rapidwright.device.Grade;
@@ -54,6 +57,7 @@ import com.xilinx.rapidwright.edif.EDIFLibrary;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
+import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.interchange.EnumerateCellBelMapping;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.BELCategory;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.BELInverter;
@@ -74,6 +78,7 @@ import com.xilinx.rapidwright.interchange.DeviceResources.Device.ParameterFormat
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.Direction;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.PropertyMap;
+import com.xilinx.rapidwright.interchange.WireType;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 
 public class DeviceResourcesWriter {
@@ -201,6 +206,26 @@ public class DeviceResourcesWriter {
     }
 
 
+    private static boolean containsUnusedMacros(EDIFCell cell, Set<EDIFCell> unusedMacros) {
+    	Queue<EDIFCell> q = new LinkedList<>(); 
+    	Set<EDIFCell> visited = new HashSet<>();
+    	q.add(cell);
+    	while(!q.isEmpty()) {
+    		EDIFCell curr = q.poll();
+    		visited.add(curr);
+    		if(unusedMacros.contains(curr)) {
+    			unusedMacros.add(curr);
+    			return true;
+    		}
+    		for(EDIFCellInst inst : cell.getCellInsts()) {
+    			EDIFCell child = inst.getCellType();
+    			if(visited.contains(child)) continue;
+    			q.add(child);
+    		}
+    	}
+    	return false;
+    }
+    
     public static void writeDeviceResourcesFile(String part, Device device, CodePerfTracker t,
                                                                 String fileName) throws IOException {
         Design design = new Design();
@@ -233,6 +258,7 @@ public class DeviceResourcesWriter {
         // Create an EDIFNetlist populated with just primitive and macro libraries
         EDIFLibrary prims = Design.getPrimitivesLibrary(device.getName());
         EDIFLibrary macros = Design.getMacroPrimitives(device.getSeries());
+        Set<EDIFCell> unsupportedMacros = new HashSet<>();
         EDIFNetlist netlist = new EDIFNetlist("PrimitiveLibs");
         netlist.addLibrary(prims);
         netlist.addLibrary(macros);
@@ -251,12 +277,24 @@ public class DeviceResourcesWriter {
         for(EDIFCell cell : macros.getCells()) {
             for(EDIFCellInst inst : cell.getCellInsts()) {
                 EDIFCell instCell = inst.getCellType();
+                if(!prims.containsCell(instCell) && !macros.containsCell(instCell)) {
+                	unsupportedMacros.add(cell);
+                	continue;
+                }
                 EDIFCell macroCell = macros.getCell(instCell.getName());
-                if(macroCell != null) {
+                if(macroCell != null && !unsupportedMacros.contains(macroCell)) {
                     // remap cell definition to macro library
                     inst.updateCellType(macroCell);
                 }
             }
+        }
+
+        // Not all devices have all the primitives to support all macros, thus we will remove
+        // them to avoid stale references
+        for(EDIFCell macro : new ArrayList<>(macros.getCells())) {
+        	if(containsUnusedMacros(macro, unsupportedMacros)) {
+        		macros.removeCell(macro);
+        	}
         }
 
         List<Unisim> unisims = new ArrayList<Unisim>();
@@ -313,7 +351,11 @@ public class DeviceResourcesWriter {
 
         Netlist.Builder netlistBuilder = devBuilder.getPrimLibs();
         netlistBuilder.setName(netlist.getName());
-        LogNetlistWriter writer = new LogNetlistWriter(allStrings);
+        LogNetlistWriter writer = new LogNetlistWriter(allStrings, new HashMap<String, String>() {{
+                    put(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME, LogNetlistWriter.DEVICE_PRIMITIVES_LIB);
+                    put(device.getSeries()+"_"+EDIFTools.MACRO_PRIMITIVES_LIB, LogNetlistWriter.DEVICE_MACROS_LIB);
+                }}
+            );
         writer.populateNetlistBuilder(netlist, netlistBuilder);
 
         writeCellParameterDefinitions(device.getSeries(), netlist, devBuilder.getParameterDefs());
@@ -338,6 +380,9 @@ public class DeviceResourcesWriter {
 
         t.stop().start("Constants");
         ConstantDefinitions.writeConstants(allStrings, device, devBuilder.initConstants(), design, siteTypes, tileTypesObj);
+
+        t.stop().start("Wire Types");
+        writeWireTypes(allStrings, devBuilder);
 
         t.stop().start("Strings");
         writeAllStringsToBuilder(devBuilder);
@@ -654,7 +699,6 @@ public class DeviceResourcesWriter {
             }
             tileBuilder.setRow((short)tile.getRow());
             tileBuilder.setCol((short)tile.getColumn());
-            tileBuilder.setTilePatIdx(tile.getTilePatternIndex());
             i++;
         }
 
@@ -704,6 +748,7 @@ public class DeviceResourcesWriter {
             //Wire wire = allWires.get(i);
             wireBuilder.setTile(allStrings.getIndex(wire.getTile().getName()));
             wireBuilder.setWire(allStrings.getIndex(wire.getWireName()));
+            wireBuilder.setType(wire.getIntentCode().ordinal());
         }
 
         StructList.Builder<DeviceResources.Device.Node.Builder> nodeBuilders =
@@ -767,6 +812,15 @@ public class DeviceResourcesWriter {
                 gradeObj.setSpeedGrade(allStrings.getIndex(grade.getSpeedGrade()));
                 gradeObj.setTemperatureGrade(allStrings.getIndex(grade.getTemperatureGrade()));
             }
+        }
+    }
+    public static void writeWireTypes(Enumerator<String> allStrings, DeviceResources.Device.Builder devBuilder) {
+        IntentCode[] intents = IntentCode.values();
+        StructList.Builder<DeviceResources.Device.WireType.Builder> wireTypesObj = devBuilder.initWireTypes(intents.length);
+        for (IntentCode intent : IntentCode.values()) {
+            DeviceResources.Device.WireType.Builder wireType = wireTypesObj.get(intent.ordinal());
+            wireType.setName(allStrings.getIndex(intent.toString()));
+            wireType.setCategory(WireType.intentToCategory(intent));
         }
     }
 }

@@ -468,7 +468,8 @@ public class PolynomialGenerator {
 	
 	public static void main(String[] args) {
 		if(args.length != 2){
-			MessageGenerator.briefMessageAndExit("USAGE: <polynomial> <bit width>");
+			System.out.println("USAGE: <polynomial> <bit width>");
+			return;
 		}
 		String polynomial = args[0];
 		int bitWidth = Integer.parseInt(args[1]);

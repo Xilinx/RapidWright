@@ -24,14 +24,16 @@
  */
 package com.xilinx.rapidwright.edif;
 
+import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.nio.file.FileSystems;
+import java.io.OutputStreamWriter;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -52,7 +54,7 @@ import com.xilinx.rapidwright.design.PinType;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.FileTools;
-
+import com.xilinx.rapidwright.util.NoCloseOutputStream;
 
 
 /**
@@ -692,15 +694,18 @@ public class EDIFTools {
 		t.stop().printSummary();
 	}
 
-	public static EDIFNetlist loadEDIFFile(String fileName){
+	public static EDIFNetlist loadEDIFFile(Path fileName) {
 		EDIFParser p = null;
 		try {
 			p = new EDIFParser(fileName);
-		} catch (FileNotFoundException e) {
-			e.printStackTrace();
-			throw new RuntimeException("ERROR: Couldn't read file : " + fileName);
+		} catch (IOException e) {
+			throw new UncheckedIOException("ERROR: Couldn't read file : " + fileName, e);
 		}
 		return p.parseEDIFNetlist();
+	}
+
+	public static EDIFNetlist loadEDIFFile(String fileName){
+		return loadEDIFFile(Paths.get(fileName));
 	}
 
 	public static void ensureCorrectPartInEDIF(EDIFNetlist edif, String partName){
@@ -726,9 +731,9 @@ public class EDIFTools {
 		}
 	}
 
-	public static EDIFNetlist readEdifFile(String edifFileName){
+	public static EDIFNetlist readEdifFile(Path edifFileName){
 		EDIFNetlist edif;
-		File edifFile = new File(edifFileName);
+		File edifFile = edifFileName.toFile();
 		String edifDirectoryName = edifFile.getParent();
 		if(edifDirectoryName == null) {
 			try {
@@ -744,11 +749,11 @@ public class EDIFTools {
 					+ "be passed to resulting DCP load script.");
 			}
 		}
-		if(EDIFTools.EDIF_DEBUG && FileTools.isFileNewer(edifFileName + ".dat", edifFileName)){
+		if(EDIFTools.EDIF_DEBUG && FileTools.isFileNewer(FileTools.appendExtension(edifFileName , ".dat"), edifFileName)){
 			edif = FileTools.readObjectFromKryoFile(edifFileName + ".dat", EDIFNetlist.class);
 		}else{
 			edif = loadEDIFFile(edifFileName);
-			if(!(new File(edifFileName + ".dat").exists()) || FileTools.isFileNewer(edifFileName, edifFileName + ".dat") ){
+			if(!(new File(edifFileName + ".dat").exists()) || FileTools.isFileNewer(edifFileName, FileTools.appendExtension(edifFileName , ".dat")) ){
 				if(EDIFTools.EDIF_DEBUG) FileTools.writeObjectToKryoFile(edifFileName + ".dat", edif);			
 			}
 		}
@@ -761,13 +766,21 @@ public class EDIFTools {
 		return edif;
 	}
 
-	public static void writeEDIFFile(String fileName, EDIFNetlist edif, String partName){
+	public static EDIFNetlist readEdifFile(String edifFileName){
+		return readEdifFile(Paths.get(edifFileName));
+	}
+
+	public static void writeEDIFFile(Path fileName, EDIFNetlist edif, String partName){
 		ensureCorrectPartInEDIF(edif, partName);
 		edif.exportEDIF(fileName);
 	}
 
+	public static void writeEDIFFile(String fileName, EDIFNetlist edif, String partName){
+		writeEDIFFile(Paths.get(fileName), edif, partName);
+	}
+
 	public static void writeEDIFFile(OutputStream out, EDIFNetlist edif, String partName) {
-		writeEDIFFile(out, null, edif, partName); 
+		writeEDIFFile(out, (Path) null, edif, partName);
 	}
 
 	
@@ -779,14 +792,13 @@ public class EDIFTools {
 	 * @param edif The netlist of the design 
 	 * @param partName The target part for this design
 	 */
-	public static void writeEDIFFile(OutputStream out, String dcpFileName, EDIFNetlist edif, 
+	public static void writeEDIFFile(OutputStream out, Path dcpFileName, EDIFNetlist edif,
 										String partName){
-		String hiddenEDIFFileName = ".temp_edif_" + FileTools.getUniqueProcessAndHostID() + ".edf";
-		writeEDIFFile(hiddenEDIFFileName, edif, partName);
-		Path path = FileSystems.getDefault().getPath(hiddenEDIFFileName);
 		try {
-			Files.copy(path, out);
-			Files.delete(path);
+			ensureCorrectPartInEDIF(edif, partName);
+			try (BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(new NoCloseOutputStream(out)))) {
+				edif.exportEDIF(bw);
+			}
 			if(dcpFileName != null && edif.getEncryptedCells() != null) {
 				if(edif.getEncryptedCells().length > 0) {
 					writeTclLoadScriptForPartialEncryptedDesigns(edif, dcpFileName, partName);
@@ -796,19 +808,40 @@ public class EDIFTools {
 			e.printStackTrace();
 		}
 	}
+
+	/**
+	 * Write out EDIF to a stream.  Also checks if netlist has potential encrypted cells and
+	 * creates a Tcl script to help re-import design into Vivado intact.
+	 * @param out The output stream
+	 * @param dcpFileName The name of the DCP file associated with this netlist
+	 * @param edif The netlist of the design
+	 * @param partName The target part for this design
+	 */
+	public static void writeEDIFFile(OutputStream out, String dcpFileName, EDIFNetlist edif,
+									 String partName){
+		if (dcpFileName == null) {
+			writeEDIFFile(out, (Path) null, edif, partName);
+		} else {
+			writeEDIFFile(out, Paths.get(dcpFileName), edif, partName);
+		}
+	}
 	
 	public static void writeTclLoadScriptForPartialEncryptedDesigns(EDIFNetlist edif, 
-															String dcpFileName, String partName) {
+															Path dcpFileName, String partName) {
 		ArrayList<String> lines = new ArrayList<String>();
 		for(String cellName : edif.getEncryptedCells()) {
 			lines.add("read_edif " + edif.getOrigDirectory() + File.separator + cellName);
 		}
-		String pathDCPFileName = new File(dcpFileName).getAbsolutePath();
+		Path pathDCPFileName = dcpFileName.toAbsolutePath();
 		
 		lines.add("read_checkpoint " + pathDCPFileName);
 		lines.add("link_design -part " + partName);
-		String tclFileName = pathDCPFileName.replace(".dcp", "_load.tcl");
-		FileTools.writeLinesToTextFile(lines, tclFileName);
+		Path tclFileName = FileTools.replaceExtension(pathDCPFileName, "_load.tcl");
+		try {
+			Files.write(tclFileName, lines);
+		} catch (IOException e) {
+			throw new UncheckedIOException(e);
+		}
 		System.out.println("INFO: Design Checkpoint may contain encrypted cells. To reload design "
 				+ "into \n      Vivado, please source this Tcl script to load checkpoint: "
 				+ "\n\n        source " + tclFileName + "\n");

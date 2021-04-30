@@ -33,6 +33,7 @@ import com.trolltech.qt.core.Qt;
 import com.trolltech.qt.core.Qt.DockWidgetArea;
 import com.trolltech.qt.core.Qt.MatchFlag;
 import com.trolltech.qt.core.Qt.MatchFlags;
+import com.trolltech.qt.gui.QAbstractItemView.SelectionMode;
 import com.trolltech.qt.gui.QAction;
 import com.trolltech.qt.gui.QApplication;
 import com.trolltech.qt.gui.QComboBox;
@@ -41,28 +42,24 @@ import com.trolltech.qt.gui.QFileDialog;
 import com.trolltech.qt.gui.QGraphicsItemInterface;
 import com.trolltech.qt.gui.QIcon;
 import com.trolltech.qt.gui.QKeySequence;
+import com.trolltech.qt.gui.QKeySequence.StandardKey;
 import com.trolltech.qt.gui.QLabel;
 import com.trolltech.qt.gui.QMainWindow;
 import com.trolltech.qt.gui.QMenu;
 import com.trolltech.qt.gui.QMessageBox;
-import com.trolltech.qt.gui.QPainter;
-import com.trolltech.qt.gui.QPrinter;
 import com.trolltech.qt.gui.QStatusBar;
 import com.trolltech.qt.gui.QToolBar;
 import com.trolltech.qt.gui.QTreeWidget;
 import com.trolltech.qt.gui.QTreeWidgetItem;
 import com.trolltech.qt.gui.QUndoStack;
 import com.trolltech.qt.gui.QWidget;
-import com.trolltech.qt.gui.QAbstractItemView.SelectionMode;
-import com.trolltech.qt.gui.QKeySequence.StandardKey;
-import com.trolltech.qt.gui.QPrinter.OutputFormat;
-import com.trolltech.qt.gui.QPrinter.PageSize;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.gui.FileFilters;
 import com.xilinx.rapidwright.gui.GUIModuleInst;
 import com.xilinx.rapidwright.gui.TileView;
+import com.xilinx.rapidwright.gui.UiTools;
 import com.xilinx.rapidwright.util.FileTools;
 
 public class HandPlacer extends QMainWindow {
@@ -345,13 +342,7 @@ public class HandPlacer extends QMainWindow {
 		String fileName = QFileDialog.getSaveFileName(this, tr("Save As PDF"),".", FileFilters.pdfFilter);
         if (fileName.length() == 0)
             return;
-        QPrinter printer = new QPrinter();
-        printer.setOutputFormat(OutputFormat.PdfFormat);
-        printer.setOutputFileName(fileName);
-        printer.setPageSize(PageSize.Letter);
-        QPainter pdfPainter = new QPainter(printer);
-        scene.render(pdfPainter);
-        pdfPainter.end();
+        UiTools.saveAsPdf(scene, new File(fileName));
         statusBar().showMessage(fileName + " saved.", 2000);
 	}
 	

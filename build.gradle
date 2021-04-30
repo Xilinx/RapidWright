@@ -1,7 +1,5 @@
-apply plugin: 'java'
-jar.enabled = false
-
-project.buildDir = 'bin'
+apply plugin: 'application'
+mainClassName = "com.xilinx.rapidwright.MainEntrypoint"
 
 sourceSets {
   main {
@@ -11,6 +9,9 @@ sourceSets {
     }    
   }
 }
+
+sourceCompatibility = 8
+targetCompatibility = 8
 
 dependencies {
   compile fileTree(dir: 'jars', include: ['*.jar'])

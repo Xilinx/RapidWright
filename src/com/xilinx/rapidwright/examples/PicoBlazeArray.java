@@ -67,8 +67,7 @@ public class PicoBlazeArray {
 		String srcDirName = args[0];
 		File srcDir = new File(srcDirName);
 		if(!srcDir.isDirectory()){
-			System.err.println("ERROR: Couldn't read directory: " + srcDir);
-			System.exit(-1);
+			throw new RuntimeException("ERROR: Couldn't read directory: " + srcDir);
 		}
 		CodePerfTracker t = new CodePerfTracker("PicoBlaze Array", true).start("Creating design");
 		

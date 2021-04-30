@@ -1,3 +1,43 @@
+============= RapidWright 2020.2.4-beta released on 2021-04-28 ================
+Notes:
+ * Adds IOBank and IOStandard data to Package objects in device model
+   to match Vivado Tcl capabilities.
+ * Allows Ports to have multiple pins (see #156 for details)
+ * Fix for Issues #161, #159, #61
+ * Minor DCP format changes for improved Versal support
+ * Gradle improvements (see #165 for details) that adds three tasks:
+   1) 'run' - a top level application to run a sub application in RapidWright directly
+   2) 'installDist' - Creates a distribution of all RapidWright dependant code with convenience startup scripts
+   3) 'distZip'/'distTar' - Creates a zipped/tar'd distribution
+ * Allow ports to have multiple pins
+ * A few other minor changes, please see commit log for details
+ - API Additions:
+    - com.xilinx.rapidwright.design.Design "public EDIFCellInst createOrFindEDIFCellInst(String name, EDIFCell cell)"
+    - com.xilinx.rapidwright.device.Package "public Map<String,IOBank> getIOBanksMap()"
+    - com.xilinx.rapidwright.device.Package "public IOBank getIOBank(String name)"
+    - com.xilinx.rapidwright.device.Package "public Collection<IOBank> getIOBanks()"
+    - com.xilinx.rapidwright.device.Package "public Set<IOStandard> getSupportedIOStandards()"
+    - com.xilinx.rapidwright.device.Package "public boolean isIOStandardSupported(String ioStandard)"
+    - com.xilinx.rapidwright.device.Package "public PackagePin getPackagePin(String name)" 
+    - com.xilinx.rapidwright.device.PackagePin "public IOBank getIOBank()"
+    - com.xilinx.rapidwright.device.IOBank "public int getId()"
+    - com.xilinx.rapidwright.device.IOBank "public String getName()"
+    - com.xilinx.rapidwright.device.IOBank "public IOBankType getBankType()"
+    - com.xilinx.rapidwright.device.IOBank "public Map<String,PackagePin> getPackagePinsMap()"
+    - com.xilinx.rapidwright.device.IOBank "public Collection<PackagePin> getPackagePins()"
+    - com.xilinx.rapidwright.device.IOBank "public Set<IOStandard> getSupportedIOStandards()"
+    - com.xilinx.rapidwright.device.IOBank "public PackagePin getPackagePin(String name)"
+    - com.xilinx.rapidwright.device.IOBank "public boolean isIOStandardSupported(IOStandard ioStandard)"
+    - com.xilinx.rapidwright.device.IOBank "public int hashCode()"
+    - com.xilinx.rapidwright.device.IOBank "public boolean equals(Object obj)"
+    - com.xilinx.rapidwright.device.IOBank "public String toString()"
+
+
+============= RapidWright 2020.2.3-beta released on 2021-03-30 ================
+Notes:
+ * Minor release that updates pin mappings when placing cells
+ * A few other minor changes, please see  commit log for details
+
 ============= RapidWright 2020.2.2-beta released on 2021-03-10 ================
 Notes:
  * First release to include the interchange project (see https://github.com/SymbiFlow/fpga-interchange-schema)

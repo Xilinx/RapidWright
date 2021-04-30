@@ -225,7 +225,8 @@ public class ILAInserter {
 	
 	public static void main(String[] args) {
 		if(args.length < 4){
-			MessageGenerator.briefMessageAndExit("USAGE: <input.dcp> <output.dcp> probe_count probe_depth clk_net [ila dcp]");
+			System.out.println("USAGE: <input.dcp> <output.dcp> probe_count probe_depth clk_net [ila dcp]");
+			return;
 		}
 		String inputDcpFileName = args[0];
 		String outputDcpFileName = args[1];

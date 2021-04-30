@@ -69,6 +69,7 @@ import com.xilinx.rapidwright.interchange.DeviceResources.Device.ParameterFormat
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.Direction;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.PropertyMap;
+import com.xilinx.rapidwright.interchange.LogNetlistWriter;
 
 public class DeviceResourcesVerifier {
     private static Enumerator<String> allStrings;
@@ -314,8 +315,6 @@ public class DeviceResourcesVerifier {
             expect(tile.getRow(), tileReader.getRow());
             expect(tile.getColumn(), tileReader.getCol());
 
-            expect(tile.getTilePatternIndex(), tileReader.getTilePatIdx());
-
             // Verify Tile Types
             TileType.Reader tileType = tileTypeMap.get(tileTypeName);
             expect(tile.getTileTypeEnum().name(), allStrings.get(tileType.getName()));
@@ -452,14 +451,17 @@ public class DeviceResourcesVerifier {
         }
 
         Netlist.Reader primLibs = dReader.getPrimLibs();
-        LogNetlistReader netlistReader = new LogNetlistReader(allStrings);
+        LogNetlistReader netlistReader = new LogNetlistReader(allStrings, new HashMap<String, String>() {{
+                    put(LogNetlistWriter.DEVICE_PRIMITIVES_LIB, EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME);
+                }}
+            );
         EDIFNetlist primsAndMacros = netlistReader.readLogNetlist(primLibs,
                 /*skipTopStuff=*/true);
 
         Set<String> libsFound = new HashSet<String>();
         libsFound.addAll(primsAndMacros.getLibrariesMap().keySet());
         for(String libExpected : new String[] {EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME,
-            device.getSeries()+"_"+EDIFTools.MACRO_PRIMITIVES_LIB}) {
+            LogNetlistWriter.DEVICE_MACROS_LIB}) {
             if(!libsFound.remove(libExpected)) {
                 throw new RuntimeException("Missing expected library: " + libExpected);
             }
@@ -720,11 +722,30 @@ public class DeviceResourcesVerifier {
                         }
                     }
 
-                    for(Map.Entry<String, String> pinMap : physCell.getPinMappingsP2L().entrySet()) {
-                        pinMapping.put(pinMap.getKey(), pinMap.getValue());
-                    }
+                    pinMapping.putAll(physCell.getPinMappingsP2L());
 
                     if(!pinMapping.equals(pinMappingFromDev)) {
+                        for(String belPin : pinMappingFromDev.keySet()) {
+                            if(!pinMapping.containsKey(belPin)) {
+                                System.out.printf(" - %s in DeviceResources, not in RapidWright\n", belPin);
+                            }
+                        }
+                        for(String belPin : pinMapping.keySet()) {
+                            if(!pinMappingFromDev.containsKey(belPin)) {
+                                System.out.printf(" - %s in RapidWright, not in DeviceResources\n", belPin);
+                            }
+                        }
+
+                        for(String belPin : pinMapping.keySet()) {
+                            if(!pinMappingFromDev.containsKey(belPin)) {
+                                continue;
+                            }
+
+                            if(!pinMapping.get(belPin).equals(pinMappingFromDev.get(belPin))) {
+                                System.out.printf(" - %s != %s\n", pinMapping.get(belPin), pinMappingFromDev.get(belPin));
+                            }
+                        }
+
                         throw new RuntimeException(String.format(
                             "Cell %s -> BEL pins for site type %s and parameters %s doesn't match",
                             cell.getName(), siteType.name(), parametersStr));

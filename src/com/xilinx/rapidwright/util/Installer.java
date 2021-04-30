@@ -249,6 +249,19 @@ public class Installer {
 		return con.getHeaderField("Location");
 	}
 	
+	public static String getExpectedMD5(String releaseName, String fileName) throws IOException {
+		downloadFile(releaseName+"/"+MD5_FILE_NAME, MD5_FILE_NAME);
+		String md5sum = null;
+		for(String line : Files.readAllLines(Paths.get(MD5_FILE_NAME), Charset.forName("US-ASCII"))){
+			String[] parts = line.split("\\s+"); 
+			if(parts[1].trim().equals(fileName)){
+				md5sum = parts[0].trim();
+				break;
+			}
+		}
+		return md5sum;
+	}
+	
     public static final String REPO = "https://github.com/Xilinx/RapidWright.git";
     public static final String RELEASE = "https://github.com/Xilinx/RapidWright/releases/latest";
     public static final String DATA_ZIP = "rapidwright_data.zip";
@@ -380,15 +393,7 @@ public class Installer {
 			boolean alreadyDownloaded = false;
 			if(new File(name).exists()){
 				System.out.println("Checking if existing "+name+" can be used...");
-				downloadFile(latestRelease+"/"+MD5_FILE_NAME, MD5_FILE_NAME);
-				String md5sum = null;
-				for(String line : Files.readAllLines(Paths.get(MD5_FILE_NAME), Charset.forName("US-ASCII"))){
-					String[] parts = line.split("\\s+"); 
-					if(parts[1].trim().equals(name)){
-						md5sum = parts[0].trim();
-						break;
-					}
-				}
+				String md5sum = getExpectedMD5(latestRelease, name);
 				String calcMD5Sum = calculateMD5OfFile(name);
 				if(md5sum.equals(calcMD5Sum)){
 					System.out.println(name + " is valid, skipping download.");
@@ -416,6 +421,16 @@ public class Installer {
 									 + "  for details on how to install manually.");
 					System.exit(1);
 				}
+				String md5sum = getExpectedMD5(latestRelease, name);
+				String calcMD5Sum = calculateMD5OfFile(name);
+				if(!md5sum.equals(calcMD5Sum)){
+					System.err.println("ERROR: md5sum of " + name + " invalid: " 
+							+ calcMD5Sum + ", should be: " + md5sum);
+					System.err.println("Possible download failure. Please try again, or try "
+							+ "downloading separately with \n\t'wget " + url +"'");
+					return;
+				}
+				
 			}
 			System.out.println("Unzipping " + name + " ...");
 			unzipFile(name, "RapidWright");

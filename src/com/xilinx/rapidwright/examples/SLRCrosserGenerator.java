@@ -236,7 +236,7 @@ public class SLRCrosserGenerator {
 		Net ce = n.getPhysicalNetFromPin("", c.getEDIFCellInst().getPortInst("CE"), d);
 		ce.addPin(new SitePinInst(false,"CE_PRE_OPTINV",c.getSiteInst()));
         c.getSiteInst().addSitePIP("IINV", "I_PREINV");
-        Net clk_in = n.getPhysicalNetFromPin("", c.getEDIFCellInst().getPortInst("I"), d);
+        Net clkIn = n.getPhysicalNetFromPin("", c.getEDIFCellInst().getPortInst("I"), d);
         Net clk = n.getPhysicalNetFromPin("", c.getEDIFCellInst().getPortInst("O"), d);
         
         SiteInst si = c.getSiteInst();
@@ -247,9 +247,12 @@ public class SLRCrosserGenerator {
 			src1 = "I";
 		}
 		si.routeIntraSiteNet(ce, s.getBELPin(src0), s.getBELPin("BUFCE", "CE"));
-		si.routeIntraSiteNet(clk_in, s.getBELPin(src1), s.getBELPin("BUFCE", "I"));
-        clk.addPin(new SitePinInst(true,"CLK_OUT",c.getSiteInst()));	
-        
+		si.routeIntraSiteNet(clkIn, s.getBELPin(src1), s.getBELPin("BUFCE", "I"));
+        clk.addPin(new SitePinInst(true,"CLK_OUT",c.getSiteInst()));
+        if (clkIn != null) {
+			clkIn.addPin(new SitePinInst(false, src1, c.getSiteInst()));
+		}
+
         return c;
 	}
 	

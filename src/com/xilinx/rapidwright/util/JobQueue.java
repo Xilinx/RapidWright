@@ -181,11 +181,14 @@ public class JobQueue {
 			}
 		}else{
 			if(args[0].equalsIgnoreCase(LSF_AVAILABLE_OPTION)){
-				MessageGenerator.briefMessageAndExit(Boolean.toString(useLSF));
+				System.out.println(Boolean.toString(useLSF));
+				return;
 			}else if(args[0].equalsIgnoreCase(LSF_RESOURCE_OPTION)){
-				MessageGenerator.briefMessageAndExit(LSFJob.LSF_RESOURCE);
+				System.out.println(LSFJob.LSF_RESOURCE);
+				return;
 			}else if(args[0].equalsIgnoreCase(LSF_QUEUE_OPTION)){
-				MessageGenerator.briefMessageAndExit(LSFJob.LSF_QUEUE);
+				System.out.println(LSFJob.LSF_QUEUE);
+				return;
 			}
 			// Read a file in where each line is a job, command is first token, run directory is second
 			// separated by '#'

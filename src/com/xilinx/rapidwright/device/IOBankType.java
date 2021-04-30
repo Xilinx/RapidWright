@@ -1,10 +1,9 @@
-/*
- * 
- * Copyright (c) 2018 Xilinx, Inc. 
+/* 
+ * Copyright (c) 2021 Xilinx, Inc. 
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
- *
+ *  
  * This file is part of RapidWright. 
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,20 +19,26 @@
  * limitations under the License.
  * 
  */
+/**
+ * 
+ */
+package com.xilinx.rapidwright.device;
 
-
-package com.xilinx.rapidwright.util;
 
 /**
- * Simple tool for unziping files that is platform agnostic.
- * Created on: May 4, 2018
+ * Generated on: Tue Apr 27 08:16:41 2021
+ * by: com.xilinx.rapidwright.release.SiteAndTileTypeUpdater
+ * 
+ * Enumeration of IOBankType type for all valid devices within Vivado.
  */
-public class Unzip {
-	public static void main(String[] args) {
-		if(args.length != 2){
-			System.out.println("USAGE: <zip file> <dest dir>");
-			return;
-		}
-		FileTools.unzipFile(args[0], args[1]);
-	}
+public enum IOBankType {
+	BT_ADC,
+	BT_DAC,
+	BT_HIGH_DENSITY,
+	BT_HIGH_PERFORMANCE,
+	BT_HIGH_RANGE,
+	BT_MGT,
+	BT_NO_USER_IO,
+	BT_PSS,
+	BT_XP,
 }

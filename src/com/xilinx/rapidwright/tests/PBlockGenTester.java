@@ -37,7 +37,8 @@ import com.xilinx.rapidwright.util.MessageGenerator;
 public class PBlockGenTester {
 	public static void main(String[] args) {
 		if(args.length != 1){
-			MessageGenerator.briefMessageAndExit("USAGE: <dir_to_project_runs>");
+			System.out.println("USAGE: <dir_to_project_runs>");
+			return;
 		}
 		
 		File dir = new File(args[0]);

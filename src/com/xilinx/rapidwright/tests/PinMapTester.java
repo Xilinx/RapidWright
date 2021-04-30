@@ -55,7 +55,8 @@ public class PinMapTester {
 
     public static void main(String[] args) {
         if(args.length < 5){
-            MessageGenerator.briefMessageAndExit("USAGE: <partname> <cell name> <site> <site type> <bel> <parameters>");
+            System.out.println("USAGE: <partname> <cell name> <site> <site type> <bel> <parameters>");
+            return;
         }
         String partName = args[0];
         Part part = PartNameTools.getPart(partName);

@@ -232,13 +232,14 @@ public class StringTools {
 	 * Checks if given string starts with any of the provided prefix strings
 	 * @param str The string to check
 	 * @param prefixes The set of possible prefixes to match against str
-	 * @return True if any one prefix matches the given string.
+	 * @return A prefix that matches, although there could exist other matches that have a longer 
+	 * match.  Returns null if no prefix match is found.
 	 */
-	public static boolean startsWithAny(String str, Collection<String> prefixes) {
+	public static String startsWithAny(String str, Collection<String> prefixes) {
 		for(String prefix : prefixes) {
-			if(str.startsWith(prefix)) return true;
+			if(str.startsWith(prefix)) return prefix;
 		}
-		return false;
+		return null;
 	}
 	
 	public static void main(String[] args) {

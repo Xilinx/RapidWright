@@ -169,13 +169,14 @@ public class ProbeRouter {
 	private static final String PBLOCK_SWITCH = "--pblock";
 	
 	private static void printHelp(){
-		MessageGenerator.briefMessageAndExit("USAGE: <input.dcp> <probes.txt> <output.dcp> ["+
+		System.out.println("USAGE: <input.dcp> <probes.txt> <output.dcp> ["+
 			PBLOCK_SWITCH+" 'CLOCKREGION_X0Y10:CLOCKREGION_X5Y14 CLOCKREGION_X0Y0:CLOCKREGION_X3Y9']");
 	}
 	
 	public static void main(String[] args) {
 		if(args.length < 3 || args.length > 5){
 			printHelp();
+			return;
 		}
 		String inputDCP = args[0];
 		String probesFile = args[1];
@@ -186,7 +187,10 @@ public class ProbeRouter {
 		Design d = Design.readCheckpoint(inputDCP,t);
 		
 		if(args.length == 5){
-			if(!args[3].equals(PBLOCK_SWITCH)) printHelp();
+			if(!args[3].equals(PBLOCK_SWITCH)) {
+				printHelp();
+				return;
+			}
 			pblock = new PBlock(d.getDevice(), args[4]);
 		}
 		

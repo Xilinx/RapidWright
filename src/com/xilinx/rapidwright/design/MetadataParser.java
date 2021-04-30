@@ -257,6 +257,8 @@ public class MetadataParser {
 						expect(OUTPUT, tokens[2]);
 						currPort.setOutputPort(true);
 						outputCount--;
+					} else {
+						throw new RuntimeException("More ports than expected");
 					}
 					currState = MDParserState.PORT_NAME;
 					break;
@@ -369,13 +371,14 @@ public class MetadataParser {
 								p = new SitePinInst(si.getSite().isOutputPin(pinName), pinName, si);
 								n.addPin(p);
 							}
-							if(currPort.getSitePinInst() == null){
-								if(p.isOutPin() && currPort.isOutPort()){
-									currPort.setSitePinInst(p);
-								}else if(!p.isOutPin() && !currPort.isOutPort()){
-									currPort.setSitePinInst(p);
+							//Skip inputs on an output port. Happens if the output signal is used internally
+							if (p.isOutPin() == currPort.isOutPort()) {
+								currPort.addSitePinInst(p);
+							} else {
+								if (!currPort.isOutPort()) {
+									throw new RuntimeException("Output pin on input port "+currPort.getName()+": "+p);
 								}
-							}						
+							}
 						}
 					}else if(tokens[1].equals(PORT)){
 						currPort.addPassThruPortName(tokens[2]);

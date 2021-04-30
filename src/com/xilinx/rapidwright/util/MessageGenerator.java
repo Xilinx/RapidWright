@@ -76,6 +76,7 @@ public class MessageGenerator{
 	 * Used as a general way to create a message and send it to
 	 * std.out. Exits the program with return value of 0.
 	 * @param msg The message to print to standard outs
+	 * @deprecated Use 'System.out.println()' and 'return' instead.
 	 */
 	public static void briefMessageAndExit(String msg){
 		briefMessage(msg);

@@ -85,9 +85,12 @@ public class PBlock extends ArrayList<PBlockRange> {
 	 */
 	public PBlock(Device dev, String pblock){
 		super();
-		String[] pblockRanges = pblock.trim().split("\\s+");
-		for(String pblockRange : pblockRanges){
-			add(new PBlockRange(dev, pblockRange));
+		String trimmed = pblock.trim();
+		if (!trimmed.isEmpty()) {
+			String[] pblockRanges = trimmed.split("\\s+");
+			for (String pblockRange : pblockRanges) {
+				add(new PBlockRange(dev, pblockRange));
+			}
 		}
 	}
 	
