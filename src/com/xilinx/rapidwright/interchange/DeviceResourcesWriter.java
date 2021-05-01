@@ -88,6 +88,9 @@ public class DeviceResourcesWriter {
 
     public static void populateSiteEnumerations(SiteInst siteInst, Site site) {
         if(!siteTypes.containsKey(siteInst.getSiteTypeEnum())) {
+        	if(site.getSiteTypeEnum() != siteInst.getSiteTypeEnum()) {
+        		return;
+        	}
             siteTypes.put(siteInst.getSiteTypeEnum(), site);
             allStrings.addObject(siteInst.getSiteTypeEnum().toString());
 
@@ -112,6 +115,8 @@ public class DeviceResourcesWriter {
         allStrings = new Enumerator<>();
         allSiteTypes = new Enumerator<>();
 
+        HashMap<SiteTypeEnum,Site> allAltSiteTypeEnums = new HashMap<>();
+        
         tileTypes = new HashMap<>();
         siteTypes = new HashMap<>();
         for(Tile tile : device.getAllTiles()) {
@@ -135,6 +140,9 @@ public class DeviceResourcesWriter {
                     SiteInst altSiteInst = design.createSiteInst("site_instance", altSiteTypes[i], site);
                     populateSiteEnumerations(altSiteInst, site);
                     design.removeSiteInst(altSiteInst);
+                    if(!allAltSiteTypeEnums.containsKey(altSiteTypes[i])) {
+                        allAltSiteTypeEnums.put(altSiteTypes[i], site);                    	
+                    }
                 }
             }
 
@@ -142,6 +150,12 @@ public class DeviceResourcesWriter {
         for(Entry<String,String> e : EDIFNetlist.macroExpandExceptionMap.entrySet()) {
             allStrings.addObject(e.getKey());
             allStrings.addObject(e.getValue());
+        }
+        
+        for(Entry<SiteTypeEnum, Site> altSiteType : allAltSiteTypeEnums.entrySet()) {
+        	if (!siteTypes.containsKey(altSiteType.getKey())) {
+        		siteTypes.put(altSiteType.getKey(), altSiteType.getValue());
+        	}
         }
     }
 
