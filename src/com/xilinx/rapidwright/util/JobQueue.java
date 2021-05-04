@@ -71,6 +71,10 @@ public class JobQueue {
 		if(j instanceof LSFJob) recentLSFJobLaunch = true;
 		return running.add(j);
 	}
+
+	public boolean runAllToCompletion() {
+		return runAllToCompletion(isLSFAvailable() ? JobQueue.MAX_LSF_CONCURRENT_JOBS : JobQueue.MAX_LOCAL_CONCURRENT_JOBS);
+	}
 	
 	public boolean runAllToCompletion(int maxNumRunningJobs){
 		while(!waitingToRun.isEmpty() || !running.isEmpty()){
@@ -157,31 +161,44 @@ public class JobQueue {
 		MessageGenerator.briefError("All Jobs Killed.");
 		return true;
 	}
-	
+
+	private static Boolean lsfAvailable = null;
 	public static boolean isLSFAvailable(){
-		if(FileTools.isExecutableOnPath("bsub")){
-			return JobQueue.USE_LSF_IF_AVAILABLE;
+		if (lsfAvailable == null) {
+			if(FileTools.isExecutableOnPath("bsub")){
+				lsfAvailable = JobQueue.USE_LSF_IF_AVAILABLE;
+			}
+			lsfAvailable = false;
 		}
-		return false;
+		return lsfAvailable;
+	}
+
+	/**
+	 * Create a new Job. Will use LSF if available. If not, a local job will be created.
+	 * @return the new Job
+	 */
+	public static Job createJob() {
+		if (isLSFAvailable()) {
+			return new LSFJob();
+		}
+		return new LocalJob();
 	}
 	
 	public static void main(String[] args) throws InterruptedException {
-		JobQueue q = new JobQueue(); 
-		
-		boolean useLSF = isLSFAvailable();
+		JobQueue q = new JobQueue();
 		
 		// Run a test if no arguments
 		if(args.length == 0){
 			String mainDir = System.getenv("HOME") + File.separator+ "JobQueueTest" + File.separator;
 			for(int i=0; i < 10; i++){
-				Job job = useLSF ? new LSFJob() : new LocalJob();
+				Job job = createJob();
 				job.setCommand("vivado -version");
 				job.setRunDir(mainDir + i);
 				q.addJob(job);
 			}
 		}else{
 			if(args[0].equalsIgnoreCase(LSF_AVAILABLE_OPTION)){
-				System.out.println(Boolean.toString(useLSF));
+				System.out.println(Boolean.toString(isLSFAvailable()));
 				return;
 			}else if(args[0].equalsIgnoreCase(LSF_RESOURCE_OPTION)){
 				System.out.println(LSFJob.LSF_RESOURCE);
@@ -194,15 +211,18 @@ public class JobQueue {
 			// separated by '#'
 			for(String line : FileTools.getLinesFromTextFile(args[0])){
 				String[] parts = line.split("#");
-				Job j = useLSF ? new LSFJob() : new LocalJob();
+				Job j = createJob();
 				j.setCommand(parts[0].trim());
 				j.setRunDir(parts[1].trim());
 				q.addJob(j);
 			}
 		}
-		boolean success = q.runAllToCompletion(useLSF ? MAX_LSF_CONCURRENT_JOBS : MAX_LOCAL_CONCURRENT_JOBS);
+		boolean success = q.runAllToCompletion();
 		if(success) System.out.println("Runs completed successfully");
 		else System.err.println("One or more runs failed");
 	}
 
+	public int getCount() {
+		return waitingToRun.size() + running.size() + finished.size();
+	}
 }

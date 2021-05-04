@@ -312,7 +312,6 @@ public class PerformanceExplorer {
 		
 		design.writeCheckpoint(dcpName); 
 		JobQueue jobs = new JobQueue();
-		boolean useLSF = JobQueue.isLSFAvailable();
 		
 		if(pblocks == null){
 			pblocks = new ArrayList<>();
@@ -336,7 +335,7 @@ public class PerformanceExplorer {
 						String scriptName = instDir + File.separator + RUN_TCL_NAME;
 						FileTools.writeLinesToTextFile(tcl, scriptName);
 						
-						Job j = useLSF ? new LSFJob() : new LocalJob();
+						Job j = JobQueue.createJob();
 						j.setRunDir(instDir);
 						j.setCommand(getVivadoPath() + " -mode batch -source " + scriptName);
 						@SuppressWarnings("unused")
@@ -347,7 +346,7 @@ public class PerformanceExplorer {
 			}			
 		}
 		
-		boolean success = jobs.runAllToCompletion(JobQueue.MAX_LSF_CONCURRENT_JOBS);
+		boolean success = jobs.runAllToCompletion();
 
 		System.out.println("Performance Explorer " + (success ? "Finished Successfully." : "Failed!"));
 	}
