@@ -53,8 +53,6 @@ import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.Job;
 import com.xilinx.rapidwright.util.JobQueue;
-import com.xilinx.rapidwright.util.LSFJob;
-import com.xilinx.rapidwright.util.LocalJob;
 import com.xilinx.rapidwright.util.MessageGenerator;
 import com.xilinx.rapidwright.util.StringTools;
 import com.xilinx.rapidwright.util.Utils;
@@ -208,8 +206,6 @@ public class BlockCreator {
 	public static void implementBlocks(HashMap<String,String> ipNames, String cacheDir, ImplGuide implHelper, Device dev){
 		JobQueue jobs = new JobQueue();
 		Map<Long,String> jobLocations = new HashMap<>();
-
-		boolean useLSF = JobQueue.isLSFAvailable();
 		
 		for(Entry<String,String> e : ipNames.entrySet()){
 			String blockName = e.getKey();
@@ -259,7 +255,7 @@ public class BlockCreator {
 				ArrayList<PBlock> pblocks = blockHelper.getImplementations();
 				for(int i=0; i < pblocks.size(); i++){
 					PBlock pblock = pblocks.get(i);
-					Job job = createImplRun(optDcpFileName, pblock, i, blockHelper, useLSF);
+					Job job = createImplRun(optDcpFileName, pblock, i, blockHelper);
 					jobs.addJob(job);
 					jobLocations.put(job.getJobNumber(), optDcpFileName + " " + i);
 					FileTools.writeStringToTextFile(pblock.toString(), optDcpFileName.replace("opt.dcp", +i+USED_PBLOCK_FILE_SUFFIX));
@@ -272,16 +268,16 @@ public class BlockCreator {
 				if(new File(pblockFileName).exists()){
 					for(String pblock : FileTools.getLinesFromTextFile(pblockFileName)){
 						if(pblock.startsWith("#")) continue;
-						PBlock pblock2 = (pblock.trim().isEmpty() || pblock.contains("Failed!")) ? null : new PBlock(dev,pblock);
-						FileTools.writeStringToTextFile(pblock, optDcpFileName.replace("opt.dcp", +implIndex+USED_PBLOCK_FILE_SUFFIX));
-						Job job = createImplRun(optDcpFileName, pblock2, implIndex, null, useLSF);
+						PBlock pblock2 = (pblock.trim().isEmpty() || pblock.contains("Failed!")) ? null : new PBlock(dev, pblock);
+						FileTools.writeStringToTextFile(pblock, optDcpFileName.replace("opt.dcp", +implIndex + USED_PBLOCK_FILE_SUFFIX));
+						Job job = createImplRun(optDcpFileName, pblock2, implIndex, null);
 						jobs.addJob(job);
 						jobLocations.put(job.getJobNumber(), optDcpFileName + " " + implIndex);
 						implIndex++;
 					}					
 				}
 				else if(new File(optDcpFileName.replace("_opt.dcp", "_utilization.report")).exists()){
-					Job job = createImplRun(optDcpFileName, null, implIndex, null, useLSF);
+					Job job = createImplRun(optDcpFileName, null, implIndex, null);
 					jobs.addJob(job);
 					jobLocations.put(job.getJobNumber(), optDcpFileName + " " + implIndex);
 					implIndex++;					
@@ -294,7 +290,7 @@ public class BlockCreator {
 		}
 		
 		// Returns when all jobs are finished
-		boolean success = jobs.runAllToCompletion(useLSF ? JobQueue.MAX_LSF_CONCURRENT_JOBS : JobQueue.MAX_LOCAL_CONCURRENT_JOBS);
+		boolean success = jobs.runAllToCompletion();
 		if(!success)System.out.println("Job failures detected...");
 		// When all jobs are done, check outputs to see if any failed
 		if(jobLocations.size() > 0) MessageGenerator.printHeader("OOC Implementation Runs Summary");
@@ -463,11 +459,11 @@ public class BlockCreator {
 	 * @param implIndex The implementation index for this block
 	 * @return The job object representing the process (either local or on LSF)
 	 */
-	public static Job createImplRun(String optDcpFileName, PBlock pblock, int implIndex, BlockGuide blockGuide, boolean useLSF){
+	public static Job createImplRun(String optDcpFileName, PBlock pblock, int implIndex, BlockGuide blockGuide){
 		String currDir = optDcpFileName.substring(0, optDcpFileName.lastIndexOf('/')+1) + implIndex;
 		String scriptName = currDir + File.separator + IMPL_RUN_SCRIPT_NAME;
 		
-		Job j = useLSF ? new LSFJob() : new LocalJob();
+		Job j = JobQueue.createJob();
 		j.setRunDir(currDir);
 		j.setCommand(FileTools.getVivadoPath() + " -mode batch -source " + scriptName);
 		FileTools.makeDirs(currDir);
