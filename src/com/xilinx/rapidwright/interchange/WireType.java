@@ -30,6 +30,7 @@ public class WireType {
             case PADINPUT:
             case PADOUTPUT:
             case BUFINP2OUT:
+            case GENERIC:
             case NODE_CLE_CTRL:
             case NODE_IRI:
             case NODE_INTF_CTRL:
