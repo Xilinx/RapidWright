@@ -167,8 +167,9 @@ public class JobQueue {
 		if (lsfAvailable == null) {
 			if(FileTools.isExecutableOnPath("bsub")){
 				lsfAvailable = JobQueue.USE_LSF_IF_AVAILABLE;
+			} else {
+				lsfAvailable = false;
 			}
-			lsfAvailable = false;
 		}
 		return lsfAvailable;
 	}
