@@ -28,6 +28,7 @@ package com.xilinx.rapidwright.util;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.LinkedList;
+import java.util.Objects;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
@@ -50,8 +51,6 @@ public class JobQueue {
 	
 	private Queue<Job> finished;
 
-	private boolean recentLSFJobLaunch = false;
-
 	public static final String LSF_AVAILABLE_OPTION = "-lsf_available";
 	public static final String LSF_RESOURCE_OPTION = "-lsf_resource";
 	public static final String LSF_QUEUE_OPTION = "-lsf_queue";
@@ -64,11 +63,10 @@ public class JobQueue {
 	}
 	
 	public boolean addJob(Job j){
-		return waitingToRun.add(j);
+		return waitingToRun.add(Objects.requireNonNull(j));
 	}
 	
 	public boolean addRunningJob(Job j){
-		if(j instanceof LSFJob) recentLSFJobLaunch = true;
 		return running.add(j);
 	}
 
@@ -84,17 +82,13 @@ public class JobQueue {
 				long pid = j.launchJob();
 				running.add(j);
 				System.out.println("Running job [" + pid + "] " + j.getCommand() + " in " + j.getRunDir());
-				recentLSFJobLaunch = j instanceof LSFJob;
 				launched = true;
 			}
-			
-			// We must wait some time for LSF to enqueue the job so we can be sure
-			// it is running before we ask if it is finished
-			if(!launched || recentLSFJobLaunch){
+
+			if(!launched){
 				try {
 					System.out.println("Waiting on " + running.size() + " jobs still running, "+waitingToRun.size()+" not yet started...");
-					Thread.sleep(recentLSFJobLaunch ? 8000 : 2000);
-					if(recentLSFJobLaunch) recentLSFJobLaunch = false;
+					Thread.sleep(2000);
 				} catch (InterruptedException e) {
 					killAllRunningJobs();
 					throw new RuntimeException("ERROR: Jobs killed due to InterruptedException");
