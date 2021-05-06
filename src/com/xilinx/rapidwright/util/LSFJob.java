@@ -25,6 +25,11 @@
  */
 package com.xilinx.rapidwright.util;
 
+import java.util.List;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+
 /**
  * A batch job to be run on an LSF cluster.
  * 
@@ -67,18 +72,74 @@ public class LSFJob extends Job {
 		return -1;
 	}
 
+	Integer savedExitCode = null;
+
+	/**
+	 * Get the Job's status
+	 * @return Pair of (Finished, exit code)
+	 */
+	private Pair<Boolean, Integer> getStatus() {
+		if (savedExitCode != null) {
+			return new Pair<>(true, savedExitCode);
+		}
+		List<String> cmdOutput = FileTools.getCommandOutput(new String[]{"bjobs", "-o", "jobid stat exit_code exit_reason", "-json", Long.toString(getJobNumber())});
+		String outputString = String.join("\n", cmdOutput);
+		try {
+			JSONObject rootObject = new JSONObject(outputString);
+			JSONArray records = rootObject.getJSONArray("RECORDS");
+			if (records.length() != 1) {
+				throw new RuntimeException("did not get info of exactly one job");
+			}
+			JSONObject jobInfo = records.getJSONObject(0);
+			long jobid = jobInfo.getLong("JOBID");
+			if (jobid != getJobNumber()) {
+				throw new RuntimeException("Unexpected job id " + jobid + ", expected " + getJobNumber());
+			}
+
+			if (jobInfo.has("ERROR")) {
+				String error = jobInfo.getString("ERROR");
+				if (error.contains("is not found")) {
+					//We assume the job has not yet started
+					return new Pair<>(false, 0);
+				} else {
+					throw new RuntimeException("LSF Error: "+error);
+				}
+			}
+
+			String status = jobInfo.getString("STAT");
+
+			//Finished without error?
+			boolean isDone = status.equals("DONE");
+			if (isDone) {
+				savedExitCode = 0;
+				return new Pair<>(true, 0);
+			}
+
+			//Finished with error?
+			boolean isExited = status.equals("EXIT");
+			if (!isExited) {
+				//Not finished yet
+				return new Pair<>(false, 0);
+			}
+
+			String exitcode = jobInfo.getString("EXIT_CODE");
+			int exitInt = Integer.parseInt(exitcode);
+			if (exitInt == 0) {
+				throw new RuntimeException("Status claims exit with error, but exitCode is 0!");
+			}
+			savedExitCode = exitInt;
+			return new Pair<>(true, exitInt);
+		} catch (RuntimeException e) {
+			throw new RuntimeException("Failed getting status. cmd Output: \n"+outputString, e);
+		}
+	}
+
 	/* (non-Javadoc)
 	 * @see com.xilinx.rapidwright.util.Job#isFinished()
 	 */
 	@Override
 	public boolean isFinished() {
-		for(String line : FileTools.getCommandOutput(new String[]{"bjobs"})){
-			if(line.contains(Long.toString(getJobNumber()))) return false;
-			if(line.contains("No unfinished job found")){
-				return true;
-			}
-	    }
-		return true;
+		return getStatus().getFirst();
 	}
 
 	/* (non-Javadoc)
@@ -86,10 +147,8 @@ public class LSFJob extends Job {
 	 */
 	@Override
 	public boolean jobWasSuccessful() {
-		for(String line : FileTools.getCommandOutput(new String[]{"bjobs", "-l", Long.toString(getJobNumber())})){
-			if(line.contains("Exited with exit code")) return false;
-		}
-		return true;
+		int exitCode = getStatus().getSecond();
+		return exitCode == 0;
 	}
 
 	/* (non-Javadoc)
