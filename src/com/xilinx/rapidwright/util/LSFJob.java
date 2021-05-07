@@ -25,6 +25,7 @@
  */
 package com.xilinx.rapidwright.util;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.json.JSONArray;
@@ -63,13 +64,24 @@ public class LSFJob extends Job {
 				LSF_QUEUE,
 				FileTools.isWindows() ? "cmd.exe" : "/bin/bash",
 				launchScriptNames.getFirst()};
-		
-		for(String line : FileTools.getCommandOutput(cmd)){
-			String jobID = line.substring(line.indexOf('<')+1, line.indexOf('>'));
+
+		ArrayList<String> commandOutput = FileTools.getCommandOutput(cmd);
+		try {
+			if (commandOutput.size() != 1) {
+				throw new RuntimeException("not one line");
+			}
+			String line = commandOutput.get(0);
+			int startIdx = line.indexOf('<');
+			int endIdx = line.indexOf('>');
+			if (startIdx == -1 || endIdx == -1) {
+				throw new RuntimeException("did not find < or >");
+			}
+			String jobID = line.substring(startIdx+1, endIdx);
 			setJobNumber(Integer.parseInt(jobID));
-	    	return getJobNumber();
+			return getJobNumber();
+		} catch (RuntimeException e) {
+			throw new RuntimeException("unexpected output when starting lsf job:\n"+String.join("\n", commandOutput), e);
 		}
-		return -1;
 	}
 
 	Integer savedExitCode = null;
