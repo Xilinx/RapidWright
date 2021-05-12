@@ -7,7 +7,7 @@ public class MacroParamRule {
     public String instName;
     public String instParam;
     public int[] bitSlice;
-    public ParameterMapEntry[] tableLookup;
+    public MacroParamTableEntry[] tableLookup;
 
     public MacroParamRule(String primParam, String instName, String instParam) {
         this.primParam = primParam;
@@ -29,7 +29,7 @@ public class MacroParamRule {
         return result;
     }
 
-    public static MacroParamRule table(String primParam, String instName, String instParam, ParameterMapEntry[] table) {
+    public static MacroParamRule table(String primParam, String instName, String instParam, MacroParamTableEntry[] table) {
         MacroParamRule result = new MacroParamRule(primParam, instName, instParam);
         result.tableLookup = table;
         return result;
