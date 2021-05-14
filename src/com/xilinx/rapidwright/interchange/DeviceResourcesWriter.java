@@ -730,20 +730,10 @@ public class DeviceResourcesWriter {
                 allWires.addObject(makeKey(wire.getTile(), wire.getWireIndex()));
 
                 Node node = wire.getNode();
-                if(node != null) {
+                if(node == null)
+                    continue;
+                if (node.getTile() == tile)
                     allNodes.addObject(makeKey(node.getTile(), node.getWire()));
-                }
-            }
-
-            for(PIP p : tile.getPIPs()) {
-                Node start = p.getStartNode();
-                if(start != null) {
-                    allNodes.addObject(makeKey(start.getTile(), start.getWire()));
-                }
-                Node end = p.getEndNode();
-                if(end != null) {
-                    allNodes.addObject(makeKey(end.getTile(), end.getWire()));
-                }
             }
         }
 
