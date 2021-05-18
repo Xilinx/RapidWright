@@ -364,7 +364,7 @@ public class ConstantDefinitions {
                 } else if(node.isTiedToVcc()) {
                     vccWires.add(wireIndex);
                 } else {
-                    throw new RuntimeException("All wires should be part of tied nodes!");
+                    System.out.println("INFO: Node " + node + " is not tied as expected. Tile Type: " + tileType + ", wire: " + wire);
                 }
             }
         }
