@@ -174,29 +174,18 @@ public class ConstantDefinitions {
         return false;
     }
 
-    private static LongEnumerator getAllNodes(Device device) {
-        LongEnumerator allNodes = new LongEnumerator();
+    private static ArrayList<Long> getAllNodes(Device device) {
+        ArrayList<Long> allNodes = new ArrayList();
         for(Tile tile : device.getAllTiles()) {
             for(int i=0; i < tile.getWireCount(); i++) {
-                Wire wire = new Wire(tile, i);
+                Wire wire = new Wire(tile,i);
                 Node node = wire.getNode();
-                if(node != null) {
-                    allNodes.addObject(makeKey(node.getTile(), node.getWire()));
-                }
-            }
-            for(PIP p : tile.getPIPs()) {
-                Node start = p.getStartNode();
-                if(start != null) {
-                    allNodes.addObject(makeKey(start.getTile(), start.getWire()));
-                }
-
-                Node end = p.getEndNode();
-                if(end != null) {
-                    allNodes.addObject(makeKey(end.getTile(), end.getWire()));
-                }
+                if(node == null)
+                    continue;
+                if (node.getTile() == tile && node.getWire() == i)
+                    allNodes.add(makeKey(node.getTile(), node.getWire()));
             }
         }
-
         return allNodes;
     }
 
@@ -223,7 +212,7 @@ public class ConstantDefinitions {
 
         ConstantDefinitions constants = new ConstantDefinitions(allStrings, reader, tileTypes);
 
-        LongEnumerator allNodes = getAllNodes(device);
+        ArrayList<Long> allNodes = getAllNodes(device);
         for(int i=0; i < allNodes.size(); i++) {
             long nodeKey = allNodes.get(i);
             Tile tile = device.getTile((int)(nodeKey >>> 32));
@@ -286,7 +275,7 @@ public class ConstantDefinitions {
     }
 
     private static Map<TileTypeEnum, Set<Integer>> getTiedWires(Device device) {
-        LongEnumerator allNodes = getAllNodes(device);
+        ArrayList<Long> allNodes = getAllNodes(device);
 
         Map<TileTypeEnum, Set<Integer>> tileUntiedWires = new HashMap<TileTypeEnum, Set<Integer>>();
         Map<TileTypeEnum, Set<Integer>> tileTiedWires = new HashMap<TileTypeEnum, Set<Integer>>();
