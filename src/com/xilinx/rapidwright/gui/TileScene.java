@@ -186,6 +186,9 @@ public class TileScene extends QGraphicsScene{
 				tileOccupantCount[y][x] = new HashSet<GUIModuleInst>();
 			}
 		}
+
+		//Clear cached image in case of reinitialization
+		qImage = null;
 	}
 
 	private QPainter createImage() {
