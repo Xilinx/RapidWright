@@ -524,6 +524,8 @@ public class DeviceResourcesVerifier {
         int mapSize = exceptionMap.size();
         for(int i=0; i < mapSize; i++) {
             PrimToMacroExpansion.Reader entry = exceptionMap.get(i);
+            if (entry.getPrimName() == entry.getMacroName())
+                continue; // being used just for parameter rules
             String primName = allStrings.get(entry.getPrimName());
             String macroName = allStrings.get(entry.getMacroName());
             if(!EDIFNetlist.macroExpandExceptionMap.get(primName).equals(macroName)) {
