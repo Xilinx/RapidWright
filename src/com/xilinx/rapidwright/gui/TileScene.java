@@ -202,6 +202,7 @@ public class TileScene extends QGraphicsScene{
 
 		// Draw colored tiles onto QPixMap
 		qImage = new QImage(sceneSize, Format.Format_RGB16);
+		qImage.fill(0);
 		QPainter painter = new QPainter(qImage);
 		return painter;
 	}
