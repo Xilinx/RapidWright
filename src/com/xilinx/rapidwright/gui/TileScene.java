@@ -186,6 +186,9 @@ public class TileScene extends QGraphicsScene{
 				tileOccupantCount[y][x] = new HashSet<GUIModuleInst>();
 			}
 		}
+
+		//Clear cached image in case of reinitialization
+		qImage = null;
 	}
 
 	private QPainter createImage() {
@@ -199,6 +202,7 @@ public class TileScene extends QGraphicsScene{
 
 		// Draw colored tiles onto QPixMap
 		qImage = new QImage(sceneSize, Format.Format_RGB16);
+		qImage.fill(0);
 		QPainter painter = new QPainter(qImage);
 		return painter;
 	}
