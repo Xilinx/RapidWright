@@ -143,6 +143,7 @@ public enum Unisim {
 	DSP48E2,
 	DSP48E5,
 	DSP58,
+	DSP58C,
 	DSPCPLX,
 	DSPFP32,
 	DSP_ALU,

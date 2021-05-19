@@ -261,7 +261,6 @@ public class DeviceResourcesVerifier {
             StructList.Reader<DeviceResources.Device.SiteWire.Reader> siteWiresReader = stReader.getSiteWires();
             expect(siteWires.size(), siteWiresReader.size());
 
-            Set<Map.Entry<String, String>> sitePipBels = new HashSet<Map.Entry<String, String>>();
             for(DeviceResources.Device.SiteWire.Reader siteWireReader : siteWiresReader) {
                 String siteWireName = allStrings.get(siteWireReader.getName());
                 if(!siteWires.contains(siteWireName)) {
@@ -275,29 +274,30 @@ public class DeviceResourcesVerifier {
                 for(int i=0; i < belPins.length; i++) {
                     belPinIndicies.add(wiresReader.get(i));
                     verifyBelPin(belPinsReader, belPins[i], wiresReader.get(i));
-
-                    SitePIP sitePip = siteInst.getSitePIP(belPins[i]);
-                    if(sitePip != null) {
-                        sitePipBels.add(new AbstractMap.SimpleEntry<String, String>(
-                                    sitePip.getBELName(),
-                                    sitePip.getInputPinName()));
-                    }
                 }
             }
 
             expect(belPinIndicies.size(), belPinsReader.size());
 
             StructList.Reader<DeviceResources.Device.SitePIP.Reader> sitePipsReader = stReader.getSitePIPs();
-            expect(sitePipBels.size(), sitePipsReader.size());
-
+            SitePIP[] sitePIPs = siteInst.getSitePIPs();
+            expect(sitePIPs.length, sitePipsReader.size());
+            Map<String, SitePIP> sitePIPMap = new HashMap<>();
+            for(SitePIP sitePIP : sitePIPs) {
+            	sitePIPMap.put(sitePIP.toString(),sitePIP);
+            }
+            
+            
             for(DeviceResources.Device.SitePIP.Reader spReader : sitePipsReader) {
                 DeviceResources.Device.BELPin.Reader bpReader = belPinsReader.get(spReader.getInpin());
+                DeviceResources.Device.BELPin.Reader bpOutReader = belPinsReader.get(spReader.getOutpin());
                 String inputBel = allStrings.get(bpReader.getBel());
                 String inputBelPin = allStrings.get(bpReader.getName());
-                SitePIP sitePip = siteInst.getSitePIP(inputBel, inputBelPin);
+                String outputBelPin = allStrings.get(bpOutReader.getName());
+                SitePIP sitePIP = sitePIPMap.get(inputBel + "." + inputBelPin + "->>" + outputBelPin);
 
-                verifyBelPin(belPinsReader, sitePip.getInputPin(), spReader.getInpin());
-                verifyBelPin(belPinsReader, sitePip.getOutputPin(), spReader.getOutpin());
+                verifyBelPin(belPinsReader, sitePIP.getInputPin(), spReader.getInpin());
+                verifyBelPin(belPinsReader, sitePIP.getOutputPin(), spReader.getOutpin());
             }
 
             design.removeSiteInst(siteInst);

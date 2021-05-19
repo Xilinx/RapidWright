@@ -1,3 +1,20 @@
+============= RapidWright 2020.2.5-beta released on 2021-05-18 ================
+Notes: 
+ * License updates:
+    - Adds a redistribution clause for the RapidWright API library jar
+    - Adds entries for the Gradle Wrapper, JUnit 5 and JetBrains Java Annotations
+ * Now includes the Gradle Wrapper
+ * Includes fixes for #178 (parts), #179, #181, #182
+ - API Additions:
+   - com.xilinx.rapidwright.design.Module "public boolean isValidPlacement(Site proposedAnchorSite, Design design)"
+   - com.xilinx.rapidwright.design.Module "public Tile getCorrespondingTile(Tile templateTile, Tile newAnchorTile)"
+   - com.xilinx.rapidwright.design.Net "public SitePinInst createPin(String pinName, SiteInst si)"
+   - com.xilinx.rapidwright.design.SiteInst "public SitePIP[] getSitePIPs()"
+ - API Deprecations:
+   - com.xilinx.rapidwright.design.Module "public boolean isValidPlacement(Site proposedAnchorSite, Device dev, Design design)"
+   - com.xilinx.rapidwright.design.Module "public Tile getCorrespondingTile(Tile templateTile, Tile newAnchorTile, Device dev)"
+   - com.xilinx.rapidwright.design.Net "public SitePinInst createPin(boolean isOutput, String pinName, SiteInst si)"
+
 ============= RapidWright 2020.2.4-beta released on 2021-04-28 ================
 Notes:
  * Adds IOBank and IOStandard data to Package objects in device model
