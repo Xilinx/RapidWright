@@ -657,7 +657,8 @@ public class DeviceResourcesWriter {
                 if(pip.isRouteThru()) {
                     PseudoPIPHelper pseudoPIPHelper = PseudoPIPHelper.getPseudoPIPHelper(pip);
                     List<BELPin> belPins = pseudoPIPHelper.getUsedBELPins();
-
+                    if(belPins == null || belPins.size() < 1) continue;
+                    
                     HashMap<BEL,ArrayList<BELPin>> pins = new HashMap<BEL, ArrayList<BELPin>>();
                     for(BELPin pin : belPins) {
                         ArrayList<BELPin> currBELPins = pins.get(pin.getBEL());
