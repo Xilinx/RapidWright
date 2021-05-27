@@ -147,6 +147,9 @@ public class TileView extends QGraphicsView{
 				scale(1.0 / scaleFactor, 1.0 / scaleFactor);
 		}
 
+		//Read the new zoom value
+		zoom = this.matrix().m11();
+
 		// Get the position after scaling, in scene coords
 		QPointF pointAfterScale = mapToScene(event.pos());
 
