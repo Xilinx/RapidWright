@@ -734,7 +734,7 @@ public class EDIFTools {
 	public static EDIFNetlist readEdifFile(Path edifFileName){
 		EDIFNetlist edif;
 		File edifFile = edifFileName.toFile();
-		String edifDirectoryName = edifFile.getParent();
+		String edifDirectoryName = edifFileName.getParent().toFile().getAbsolutePath();
 		if(edifDirectoryName == null) {
 			try {
 				File canEdifFile = edifFile.getCanonicalFile();
@@ -758,9 +758,17 @@ public class EDIFTools {
 			}
 		}
 		if(edifDirectoryName != null) {
-			String[] ednFiles = new File(edifDirectoryName).list(FileTools.getEDNFilenameFilter()); 
+			File origDir = new File(edifDirectoryName);
 			edif.setOrigDirectory(edifDirectoryName);
-			edif.setEncryptedCells(ednFiles);
+			String[] ednFiles = origDir.list(FileTools.getEDNFilenameFilter()); 
+			if(ednFiles != null && ednFiles.length > 0) {
+				edifDirectoryName = edifDirectoryName + File.separator;
+				for(int i=0; i < ednFiles.length; i++) {
+					ednFiles[i] = edifDirectoryName + ednFiles[i];
+				}
+				
+			}
+			edif.setEncryptedCells(new ArrayList<>(Arrays.asList(ednFiles)));
 		}
 		
 		return edif;
@@ -800,7 +808,7 @@ public class EDIFTools {
 				edif.exportEDIF(bw);
 			}
 			if(dcpFileName != null && edif.getEncryptedCells() != null) {
-				if(edif.getEncryptedCells().length > 0) {
+				if(edif.getEncryptedCells().size() > 0) {
 					writeTclLoadScriptForPartialEncryptedDesigns(edif, dcpFileName, partName);
 				}				
 			}
@@ -830,11 +838,12 @@ public class EDIFTools {
 															Path dcpFileName, String partName) {
 		ArrayList<String> lines = new ArrayList<String>();
 		for(String cellName : edif.getEncryptedCells()) {
-			lines.add("read_edif " + edif.getOrigDirectory() + File.separator + cellName);
+			lines.add("read_edif " + cellName);
 		}
 		Path pathDCPFileName = dcpFileName.toAbsolutePath();
 		
 		lines.add("read_checkpoint " + pathDCPFileName);
+		lines.add("set_property top "+edif.getName()+" [current_fileset]");
 		lines.add("link_design -part " + partName);
 		Path tclFileName = FileTools.replaceExtension(pathDCPFileName, "_load.tcl");
 		try {

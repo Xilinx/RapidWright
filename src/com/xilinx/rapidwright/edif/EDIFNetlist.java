@@ -84,7 +84,7 @@ public class EDIFNetlist extends EDIFName {
 	
 	private String origDirectory;
 	
-	private String[] encryptedCells; 
+	private List<String> encryptedCells; 
 	
 	private boolean DEBUG = false;
 
@@ -1465,12 +1465,20 @@ public class EDIFNetlist extends EDIFName {
 	 * Vivado.
 	 * @return A list of EDN filenames that may populate encrypted cells within the netlist.
 	 */
-	public String[] getEncryptedCells() {
+	public List<String> getEncryptedCells() {
 		return encryptedCells;
 	}
 
-	protected void setEncryptedCells(String[] encryptedCells) {
+	protected void setEncryptedCells(List<String> encryptedCells) {
 		this.encryptedCells = encryptedCells;
+	}
+	
+	public void addEncryptedCells(List<String> encryptedCells) {
+		if(this.encryptedCells == null) {
+			setEncryptedCells(encryptedCells);
+			return;
+		}
+		this.encryptedCells.addAll(encryptedCells);
 	}
 
 	public static void main(String[] args) throws FileNotFoundException {

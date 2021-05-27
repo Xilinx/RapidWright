@@ -824,7 +824,7 @@ public class DesignTools {
 			return;
 		}
 		inst.getCellType().getLibrary().removeCell(inst.getCellType());
-		netlist.migrateCellAndSubCells(cell.getTopEDIFCell());
+		netlist.migrateCellAndSubCells(cell.getTopEDIFCell(), true);
 		inst.updateCellType(cell.getTopEDIFCell());
 		netlist.removeUnusedCellsFromAllWorkLibraries();
 		
@@ -845,9 +845,9 @@ public class DesignTools {
 			if(net.isStaticNet()){
 				Net staticNet = design.getStaticNet(net.getType());
 				staticNet.addPins((ArrayList<SitePinInst>)net.getPins());
-				for(PIP p : net.getPIPs()){
-					staticNet.addPIP(p);
-				}
+				HashSet<PIP> uniquePIPs = new HashSet<PIP>(net.getPIPs());
+				uniquePIPs.addAll(staticNet.getPIPs());
+				staticNet.setPIPs(uniquePIPs);
 			}else{
 				net.updateName(hierarchicalCellName + "/" + net.getName());
 				design.addNet(net);				
@@ -858,6 +858,11 @@ public class DesignTools {
 		netlist.resetParentNetMap();
 		
 		postBlackBoxCleanup(hierarchicalCellName, design);
+		
+		List<String> encryptedCells = cell.getNetlist().getEncryptedCells();
+		if(encryptedCells != null && encryptedCells.size() > 0) {
+			design.getNetlist().addEncryptedCells(encryptedCells);
+		}
 	}
 
 	/**
