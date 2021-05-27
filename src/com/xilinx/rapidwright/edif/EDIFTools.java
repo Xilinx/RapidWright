@@ -851,9 +851,10 @@ public class EDIFTools {
 		} catch (IOException e) {
 			throw new UncheckedIOException(e);
 		}
-		System.out.println("INFO: Design Checkpoint may contain encrypted cells. To reload design "
-				+ "into \n      Vivado, please source this Tcl script to load checkpoint: "
-				+ "\n\n        source " + tclFileName + "\n");
+		System.out.println("INFO: Design Checkpoint \'"+ pathDCPFileName + "\'" 
+				+ "\n      may contain encrypted cells. To correctly load the design into Vivado, "
+				+ "\n      please source this Tcl script to open the checkpoint: "
+				+ "\n\n      source " + tclFileName + "\n");
 	}
 
 	public static EDIFNetlist readEdifFromDcpFile(String dcpFileName){
