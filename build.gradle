@@ -22,6 +22,8 @@ test {
 
 tasks.withType(Test) {
   environment 'RAPIDWRIGHT_PATH',file('.')
+  //We need to rerun tests when the data files change
+  inputs.dir file('data')
 }
 
 sourceCompatibility = 8
