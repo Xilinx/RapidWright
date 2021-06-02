@@ -1,12 +1,13 @@
 apply plugin: 'application'
+apply plugin: 'java-library'
 mainClassName = "com.xilinx.rapidwright.MainEntrypoint"
 
 sourceSets {
   main {
-    java.outputDir = file('bin')
+    java.destinationDirectory.fileValue(file('bin'))
     java {
       srcDirs = ['src']
-    }    
+    }
   }
 }
 
@@ -14,7 +15,6 @@ sourceCompatibility = 8
 targetCompatibility = 8
 
 dependencies {
-  compile fileTree(dir: 'jars', include: ['*.jar'])
-
+  api fileTree(dir: 'jars', include: ['*.jar'])
 }
 
