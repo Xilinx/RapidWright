@@ -9,12 +9,26 @@ sourceSets {
       srcDirs = ['src']
     }
   }
+  test {
+    java {
+      srcDirs = ['test']
+    }
+  }
+}
+
+test {
+    useJUnitPlatform()
+}
+
+tasks.withType(Test) {
+  environment 'RAPIDWRIGHT_PATH',file('.')
 }
 
 sourceCompatibility = 8
 targetCompatibility = 8
 
 dependencies {
-  api fileTree(dir: 'jars', include: ['*.jar'])
+  api fileTree(dir: 'jars', include: ['*.jar'], exclude: ['junit*.jar'])
+  testImplementation fileTree(dir: 'jars', include: ['junit-jupiter-*.jar', 'junit-platform-*.jar'])
 }
 
