@@ -54,8 +54,16 @@ fi
 # Set the CLASSPATH to include RapidWright jars.
 source "${RAPIDWRIGHT_PATH}/bin/rapidwright_classpath.sh"
 
+# If we have a Java version that supports --add-exports, then set it in
+# order to avoid issues with Kryo accessing sun.nio.ch
+EXTRA_JAVA_OPTS=
+if ("${JAVA}" --add-exports 2>&1 | grep 'requires modules to be specified' > /dev/null); then
+    # This text inside the error means it is supported as an option
+    EXTRA_JAVA_OPTS="--add-exports=java.base/sun.nio.ch=ALL-UNNAMED"
+fi
+
 # Invoke JRE with specified entry point and arguments.  Return the exit code
 # from java to caller of script.
 set +e
-"${JAVA}" "$@"
+"${JAVA}" ${EXTRA_JAVA_OPTS} "$@"
 exit $?
