@@ -88,10 +88,15 @@ RapidWright (Apache 2.0)
   - Gradle Wrapper 5.4.1 (Apache 2.0)
   - JUnit 5
     - Junit Platform Commons 1.7.1 (EPL 2.0)
+      - Source files available: http://www.rapidwright.io/docs/_static/junit-platform-commons-1.7.1-sources.jar
     - JUnit Platform Engine API 1.7.1 (EPL 2.0)
+      - Source files available: http://www.rapidwright.io/docs/_static/junit-platform-engine-1.7.1-sources.jar
     - JUnit Jupiter API	5.7.1 (EPL 2.0)
+      - Source files available: http://www.rapidwright.io/docs/_static/junit-jupiter-api-5.7.1-sources.jar
     - JUnit Jupiter Params 5.7.1 (EPL 2.0)
+      - Source files available: http://www.rapidwright.io/docs/_static/junit-jupiter-params-5.7.1-sources.jar
     - JUnit Jupiter Engine 5.7.1 (EPL 2.0)
+      - Source files available: http://www.rapidwright.io/docs/_static/junit-jupiter-engine-5.7.1-sources.jar
       - Apiguardian API 1.1.0 (Apache 2.0)
       - Opentest4j 1.2.0 (Apache 2.0)
   - JetBrains Java Annotations 20.1.0 (Apache 2.0)
