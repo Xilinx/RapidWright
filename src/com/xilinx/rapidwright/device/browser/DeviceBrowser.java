@@ -87,7 +87,13 @@ public class DeviceBrowser extends QMainWindow{
 	public static void main(String[] args){
 		QApplication.setGraphicsSystem("raster");
 		QApplication.initialize(args);
-		DeviceBrowser testPTB = new DeviceBrowser(null);
+
+		String defaultPart = null;
+		if (args.length>0) {
+			defaultPart = args[0];
+		}
+
+		DeviceBrowser testPTB = new DeviceBrowser(null, defaultPart);
 		testPTB.show();
 		QApplication.exec();
 	}
@@ -96,7 +102,7 @@ public class DeviceBrowser extends QMainWindow{
 	 * Constructor which initializes the GUI and loads the first part found.
 	 * @param parent The Parent widget, used to add this window into other GUIs.
 	 */
-	public DeviceBrowser(QWidget parent){
+	public DeviceBrowser(QWidget parent, String defaultPart){
 		super(parent);
 		
 		// set the title of the window
@@ -110,11 +116,15 @@ public class DeviceBrowser extends QMainWindow{
 			MessageGenerator.briefErrorAndExit("Error: No available parts. " +
 					"Please generate part database files.");
 		}
-		if(parts.contains("xcku040-ffva1156")){
-			currPart = "xcku040-ffva1156";
+
+		if (defaultPart == null) {
+			defaultPart = "xcku040";
 		}
-		else{
+		if(parts.contains(defaultPart)){
+			currPart = defaultPart;
+		} else{
 			currPart = parts.get(0);
+			System.out.println(defaultPart+" not available, showing "+currPart);
 		}
 		
 		device = Device.getDevice(currPart);
@@ -137,6 +147,10 @@ public class DeviceBrowser extends QMainWindow{
 		
 		// Set the opening default window size to 1024x768 pixels
 		resize(1024, 768);
+	}
+
+	public DeviceBrowser(QWidget parent) {
+		this(parent, null);
 	}
 
 	/**

@@ -22,6 +22,7 @@
  */
 package com.xilinx.rapidwright.gui;
 
+import java.util.Comparator;
 import java.util.HashMap;
 
 import com.trolltech.qt.core.Qt.ItemDataRole;
@@ -40,24 +41,27 @@ public class WidgetMaker {
 		treeWidget.setHeaderLabel(header);
 		
 		HashMap<String, QTreeWidgetItem> familyItems = new HashMap<String, QTreeWidgetItem>();
-		
-		for(String partName : Device.getAvailableDevices()){
-			Part p = PartNameTools.getPart(partName);
-			//FamilyType type = p.getArchitecture();
-			String type = PartNameTools.getFullArchitectureName(p.getArchitecture());
-			QTreeWidgetItem familyItem = familyItems.get(type);
-			if(familyItem == null){
-				familyItem = new QTreeWidgetItem(treeWidget);
-				familyItem.setText(0, type);
-				familyItems.put(type, familyItem);
-			}
-			QTreeWidgetItem partItem = null;
-			QTreeWidgetItem parent = familyItem;
 
-			partItem = new QTreeWidgetItem(parent);
-			partItem.setText(0, partName);
-	        partItem.setData(0, ItemDataRole.AccessibleDescriptionRole, partName);
-		}
+		Device.getAvailableDevices().stream()
+				.map(PartNameTools::getPart)
+				.sorted(Comparator.comparing((Part p) -> PartNameTools.getFullArchitectureName(p.getArchitecture())).thenComparing(Part::getName))
+				.forEach(p -> {
+					//FamilyType type = p.getArchitecture();
+					String type = PartNameTools.getFullArchitectureName(p.getArchitecture());
+					QTreeWidgetItem familyItem = familyItems.get(type);
+					if(familyItem == null){
+						familyItem = new QTreeWidgetItem(treeWidget);
+						familyItem.setText(0, type);
+						familyItems.put(type, familyItem);
+					}
+					QTreeWidgetItem partItem = null;
+					QTreeWidgetItem parent = familyItem;
+
+					partItem = new QTreeWidgetItem(parent);
+					partItem.setText(0, p.getDevice());
+					partItem.setData(0, ItemDataRole.AccessibleDescriptionRole, p.getDevice());
+				});
+
 		return treeWidget;
 	}
 }
