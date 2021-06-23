@@ -734,7 +734,11 @@ public class EDIFTools {
 	public static EDIFNetlist readEdifFile(Path edifFileName){
 		EDIFNetlist edif;
 		File edifFile = edifFileName.toFile();
-		String edifDirectoryName = edifFileName.getParent().toFile().getAbsolutePath();
+		File parent = edifFile.getParentFile();
+		if(parent == null) {
+			parent = new File(System.getProperty("user.dir"));
+		}
+		String edifDirectoryName = parent.getAbsolutePath();
 		if(edifDirectoryName == null) {
 			try {
 				File canEdifFile = edifFile.getCanonicalFile();
