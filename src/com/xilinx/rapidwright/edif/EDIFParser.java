@@ -453,6 +453,12 @@ public class EDIFParser {
 							inst.removePortInst(portInst);
 						}
 						String newPortInstName = portInst.getPortInstNameFromPort();
+						String unique = stringPool.get(newPortInstName);
+						if(unique == null){
+							stringPool.put(newPortInstName, newPortInstName);
+						}else{
+							newPortInstName = unique;
+						}
 						portInst.setName(newPortInstName);
 						if(inst != null){
 							inst.addPortInst(portInst);
@@ -460,7 +466,14 @@ public class EDIFParser {
 					}
 					net.getPortInstMap().clear();
 					for(EDIFPortInst portInst : portInsts){
-						net.addPortInst(portInst);
+						String fullName = portInst.getFullName();
+						String unique = stringPool.get(fullName);
+						if(unique == null){
+							stringPool.put(fullName, fullName);
+						}else{
+							fullName = unique;
+						}
+						net.addPortInst(portInst, fullName);
 					}
 				}
 			}

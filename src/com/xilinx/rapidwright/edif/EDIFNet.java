@@ -72,6 +72,15 @@ public class EDIFNet extends EDIFPropertyObject {
 		return portInsts.put(portInst.getFullName(), portInst);
 	}
 	
+	public EDIFPortInst addPortInst(EDIFPortInst portInst, String fullName){
+		if(portInsts == null) portInsts = getNewMap();
+		portInst.setParentNet(this);
+		if(parentCell != null && portInst.getCellInst() == null) {
+			parentCell.addInternalPortMapEntry(portInst.getName(), this);
+		}
+		return portInsts.put(fullName, portInst);
+	}
+	
 	public EDIFPortInst createPortInst(EDIFPort port){
 		return new EDIFPortInst(port, this, null);
 	}
