@@ -1,3 +1,23 @@
+============= RapidWright 2020.2.6-beta released on 2021-06-23 ================
+Notes: 
+ * Updates Cap'n Proto Java Runtime from 0.1.4 to 0.1.7
+ * Updates Gradle wrapper to point to 7.1 (#189)
+ * Updates the singleton Device map to have soft references.  Allows
+   unused device objects to be garbage collected without having to call Device.releaseDeviceReferences().
+ * Includes a fix and some performance enhancements around module relocation.
+ * Interchange node discovery optimization (#184)
+ * Fixes tile caching issue in GUI (#185) and other device browser improvements (#187)
+ * Workaround for Java 16 and Kryo library (#191 - issue #190)
+ * Includes fixes for #183, #186
+ - API Additions:
+    - com.xilinx.rapidwright.device.Device "public Tile getTile(String nameRoot, int xCoordinate, int yCoordinate)"
+    - com.xilinx.rapidwright.device.Device "public Tile[][] getTilesByNameRoot(String nameRoot)"
+    - com.xilinx.rapidwright.device.Module "public static Tile getCorrespondingTile(Tile templateTile, Tile newAnchorTile, Tile originalAnchor, Tile[][] tiles)"
+    - com.xilinx.rapidwright.device.Tile "public String getNameRoot()"
+ - API Deprecations:
+    - com.xilinx.rapidwright.device.Device "public static void releaseDeviceReferences()"
+    - com.xilinx.rapidwright.device.Tile "public String getTileNamePrefix()"
+
 ============= RapidWright 2020.2.5-beta released on 2021-05-18 ================
 Notes: 
  * License updates:
