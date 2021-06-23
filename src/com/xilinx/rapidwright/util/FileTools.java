@@ -105,10 +105,6 @@ public class FileTools {
 	public static final String DEVICE_FOLDER_NAME = DATA_FOLDER_NAME + File.separator + "devices";
 	/** File name of the UnisimManager initialization data file (replaced HDI_PRIMITIVES_FILE_NAME and VALID_CELL_PLACEMENTS_FILE_NAME) */
 	public static final String UNISIM_DATA_FILE_NAME = DATA_FOLDER_NAME + File.separator + "unisim_data.dat";
-	/** File name of the EDIF library containing all Uniprims -- Will be removed in 2019.2 */
-	public static final String HDI_PRIMITIVES_FILE_NAME = DATA_FOLDER_NAME + File.separator + "hdi_primitives.edf";
-	/** File name of containing a kryo compressed map of valid cell placements per family type -- Will be removed in 2019.2 */
-	public static final String VALID_CELL_PLACEMENTS_FILE_NAME = DATA_FOLDER_NAME + File.separator + "valid_cell_placements.dat";
 	/** File name created from Vivado for all supported parts for RapidWright */
 	public static final String PART_DUMP_FILE_NAME = DATA_FOLDER_NAME + File.separator + "partdump.csv";
 	/** Location of the main parts database file */
@@ -123,7 +119,10 @@ public class FileTools {
 	public static short[] emptyShortArray = new short[0];
 	/** Static empty array to save on memory */
 	public static String[] emptyStringArray = new String[0];
-	
+	/** Part Database File Version */
+	public static final int PART_DB_FILE_VERSION = 1;
+	/** Unisim Data File Version */
+	public static final int UNISIM_DATA_FILE_VERSION = 1;
 
 	static {
 		// TODO - This turns off illegal reflective access warnings in Java 9+
@@ -911,25 +910,6 @@ public class FileTools {
 		}
 		
 		return null;
-	}
-	
-	/**
-	 * Gets the HDIPrimitivesResource (FileTools.HDI_PRIMITIVES_FILE_NAME) 
-	 * as an InputStream.  
-	 * @return Returns the input stream for the HDI Primitives resource 
-	 * @deprecated
-	 */
-	public static InputStream getHDIPrimitivesResourceStream(){
-		return getRapidWrightResourceInputStream(HDI_PRIMITIVES_FILE_NAME);
-	}
-	
-	/**
-	 * Gets an input stream to the file containing valid cell placements of the hdi primitives.
-	 * @return An input stream to the valid cell placements map file.
-	 * @deprecated
-	 */
-	public static InputStream getValidCellPlacementsResourceStream(){
-		return getRapidWrightResourceInputStream(VALID_CELL_PLACEMENTS_FILE_NAME);
 	}
 
 	/**

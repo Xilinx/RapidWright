@@ -35,7 +35,7 @@ import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.util.FileTools;
 
 /**
- * Generated on: Mon Apr 26 22:14:08 2021
+ * Generated on: Wed Jun 02 21:00:46 2021
  * by: com.xilinx.rapidwright.release.PartNamePopulator
  * 
  * Class to hold utility APIs dealing with Parts and device names.
@@ -48,6 +48,13 @@ public class PartNameTools {
 	static {
 		partMap = new HashMap<String,Part>();
 		UnsafeInput his = FileTools.getUnsafeInputStream(FileTools.getRapidWrightResourceInputStream(FileTools.PART_DB_PATH));
+		
+		int version = his.readInt();
+		if(version != FileTools.PART_DB_FILE_VERSION) {
+			throw new RuntimeException("ERROR: " + FileTools.PART_DB_PATH
+				+ " file version is incorrect.  Expecting version "
+				+ FileTools.PART_DB_FILE_VERSION + ", found " + version + ".");
+		}
 		String[] strings = FileTools.readStringArray(his);
 		int partCount = 0;
 		partCount = his.readInt();
