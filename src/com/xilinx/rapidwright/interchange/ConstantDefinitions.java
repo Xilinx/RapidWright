@@ -148,6 +148,10 @@ public class ConstantDefinitions {
         if(exceptionalVccNodes.contains(key)) {
             return true;
         }
+        if(exceptionalGndNodes.contains(key)) {
+        	return false;
+        }
+        
 
         for(Wire wire : node.getAllWiresInNode()) {
             TileTypeEnum tileType = wire.getTile().getTileTypeEnum();
@@ -164,6 +168,9 @@ public class ConstantDefinitions {
         Map.Entry<String, String> key = new AbstractMap.SimpleEntry<String, String>(tile.getName(), node.getWireName());
         if(exceptionalGndNodes.contains(key)) {
             return true;
+        }
+        if(exceptionalVccNodes.contains(key)) {
+        	return false;
         }
 
         for(Wire wire : node.getAllWiresInNode()) {
