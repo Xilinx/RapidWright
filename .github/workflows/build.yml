@@ -30,10 +30,28 @@ jobs:
           key: rapidwright-${{ env.RAPIDWRIGHT_VERSION }}
           restore-keys: |
             rapidwright-
+      - name: Cache Gradle
+        id: cache-gradle
+        uses: actions/cache@v2
+        with:
+          path: |
+              ~/.gradle/caches
+              ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+            gradle-
 
       - name: Install RapidWright
         if: steps.cache-rapidwright.outputs.cache-hit != 'true'
         run: wget https://github.com/Xilinx/RapidWright/releases/download/${{ env.RAPIDWRIGHT_VERSION }}/rapidwright_jars.zip && unzip rapidwright_jars.zip && wget https://github.com/Xilinx/RapidWright/releases/download/${{ env.RAPIDWRIGHT_VERSION }}/rapidwright_data.zip && unzip rapidwright_data.zip
+
       - name: Compile & Test RapidWright
         run: ./gradlew build
+      - name: Cleanup Gradle Cache
+        # Remove some files from the Gradle cache, so they aren't cached by GitHub Actions.
+        # Restoring these files from a GitHub Actions cache might cause problems for future builds.
+        run: |
+          rm -f ~/.gradle/caches/modules-2/modules-2.lock
+          rm -f ~/.gradle/caches/modules-2/gc.properties
 
