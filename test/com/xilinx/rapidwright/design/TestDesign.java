@@ -6,6 +6,7 @@ import java.nio.file.Path;
 
 import com.xilinx.rapidwright.checker.CheckOpenFiles;
 import com.xilinx.rapidwright.device.BEL;
+import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import org.junit.jupiter.api.Assertions;
@@ -38,6 +39,9 @@ public class TestDesign {
     @Test
     @CheckOpenFiles
     public void checkDcpRoundtrip(@TempDir Path tempDir) throws IOException {
+        //Keep a reference to the device to avoid it being garbage collected during testcase execution
+        Device device = Device.getDevice(TestRelocation.DEVICE_ULTRASCALE);
+
         //Use separate files for writing/reading so we can identify identify leaking file handles by filename
         final Path filenameWrite = tempDir.resolve("testWrite.dcp");
         final Path filenameRead = tempDir.resolve("testRead.dcp");
