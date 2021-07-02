@@ -461,16 +461,12 @@ public class FileTools {
 	 */
 	public static ArrayList<String> getLinesFromTextFile(String fileName){
 		String line = null;
-		BufferedReader br;
+
 		ArrayList<String> lines = new ArrayList<String>();
-		try{
-			br = new BufferedReader(new FileReader(fileName));
-			
+		try (BufferedReader br = new BufferedReader(new FileReader(fileName))){
 			while((line = br.readLine()) != null){
 				lines.add(line);
 			}
-			
-			br.close();
 		}
 		catch(FileNotFoundException e){
 			MessageGenerator.briefErrorAndExit("ERROR: Could not find file: " + fileName);
@@ -1038,53 +1034,56 @@ public class FileTools {
 		return System.getenv("CYGWIN") != null;
 	}
 	
-	public static void writeObjectToKryoFile(String fileName, Object o){
+	public static void writeObjectToKryoFile(Path fileName, Object o){
 		writeObjectToKryoFile(fileName, o, false);
 	}
-	
-	public static void writeObjectToKryoFile(String fileName, Object o, boolean writeClass){
+
+	public static void writeObjectToKryoFile(String fileName, Object o){
+		writeObjectToKryoFile(Paths.get(fileName), o);
+	}
+
+
+	public static void writeObjectToKryoFile(Path fileName, Object o, boolean writeClass){
 		Kryo kryo = getKryoInstance();
-		Output out;
-		try {
-			out = new Output(new FileOutputStream(fileName));
+		try (Output out = new Output(Files.newOutputStream(fileName))){
 			if(writeClass)
 				kryo.writeClassAndObject(out, o);
 			else
 				kryo.writeObject(out, o);
-			out.close();
-		} catch (FileNotFoundException e1) {
-			e1.printStackTrace();
+		} catch (IOException e) {
+			throw new UncheckedIOException(e);
 		}
 	}
+
+	public static void writeObjectToKryoFile(String fileName, Object o, boolean writeClass) {
+		writeObjectToKryoFile(Paths.get(fileName), o, writeClass);
+	}
 	
-	public static Object readObjectFromKryoFile(String fileName){
+	public static Object readObjectFromKryoFile(Path fileName){
 		Kryo kryo = getKryoInstance();
-		Object o = null;
-		try {
-			Input i = new Input(new FileInputStream(fileName));
-			o = kryo.readClassAndObject(i);
-			i.close();
-		} catch (FileNotFoundException e1) {
-			e1.printStackTrace();
+		try (Input i = new Input(Files.newInputStream(fileName))){
+			return kryo.readClassAndObject(i);
+		} catch (IOException e) {
+			throw new UncheckedIOException(e);
 		}
-		return o;
 	}
 	
-	public static <T> T readObjectFromKryoFile(String fileName, Class<T> c){
-		try {
-			return readObjectFromKryoFile(new FileInputStream(fileName), c);
-		} catch (FileNotFoundException e) {
-			return null;
+	public static <T> T readObjectFromKryoFile(String fileName, Class<T> c) {
+		return readObjectFromKryoFile(Paths.get(fileName), c);
+	}
+	public static <T> T readObjectFromKryoFile(Path fileName, Class<T> c){
+		try (InputStream is = Files.newInputStream(fileName)) {
+			return readObjectFromKryoFile(is, c);
+		} catch (IOException e) {
+			throw new UncheckedIOException(e);
 		}
 	}
 
 	public static <T> T readObjectFromKryoFile(InputStream in, Class<T> c){
 		Kryo kryo = getKryoInstance();
-		T o = null;
-		Input i = new Input(in);
-		o = kryo.readObject(i, c);
-		i.close();
-		return o;
+		try (Input i = new Input(in)) {
+			return kryo.readObject(i, c);
+		}
 	}
 
 	
