@@ -9,10 +9,7 @@ import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFDesign;
 import com.xilinx.rapidwright.edif.EDIFLibrary;
-import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
-import com.xilinx.rapidwright.edif.EDIFPort;
-import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -31,7 +28,7 @@ public class TestEDIF {
         final EDIFCell topCell = new EDIFCell(workLibrary, "myTestCell");
         netlist.getDesign().setTopCell(topCell);
 
-        EDIFTools.ensureCorrectPartInEDIF(netlist, TestRelocation.DEVICE_ULTRASCALE);
+        EDIFTools.ensureCorrectPartInEDIF(netlist, TestDesign.DEVICE);
 
         return netlist;
     }
@@ -51,11 +48,11 @@ public class TestEDIF {
 
         final EDIFNetlist netlist = EDIFTools.readEdifFile(filenameRead);
 
-        verifyNetlist(netlist);
+        verifyNetlist(netlist, "inst");
 
     }
 
-    public static void verifyNetlist(EDIFNetlist netlist) {
+    public static void verifyNetlist(EDIFNetlist netlist, String expectedName) {
         final EDIFLibrary workLibrary = netlist.getWorkLibrary();
         Assertions.assertNotNull(workLibrary);
 
@@ -65,6 +62,6 @@ public class TestEDIF {
 
         Assertions.assertEquals(cell.getCellInsts().size(),1);
         final EDIFCellInst inst = cell.getCellInsts().iterator().next();
-        Assertions.assertEquals("inst", inst.getName());
+        Assertions.assertEquals(expectedName, inst.getName());
     }
 }

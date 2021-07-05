@@ -18,17 +18,18 @@ import org.junit.jupiter.api.io.TempDir;
  * so we just try to catch obvious issues.
  */
 public class TestDesign {
+    public static final String DEVICE = "xc7a12t";
 
-    private static final String SITE = "SLICE_X42Y42";
+    private static final String SITE = "SLICE_X20Y42";
 
     private Design createSampleDesign() {
         final EDIFNetlist netlist = TestEDIF.createEmptyNetlist();
         final Design design = new Design(netlist);
 
         final Cell myCell = design.createCell("myCell", Unisim.FDRE);
-        System.out.println("myCell.getBEL() = " + myCell.getBEL());
+
         final Site site = design.getDevice().getSite(SITE);
-        final SiteInst siteInst = design.createSiteInst(site);
+        design.createSiteInst(site);
         final BEL bel = site.getBEL("AFF");
         Assertions.assertNotNull(bel);
         design.placeCell(myCell, site, bel);
@@ -40,7 +41,7 @@ public class TestDesign {
     @CheckOpenFiles
     public void checkDcpRoundtrip(@TempDir Path tempDir) throws IOException {
         //Keep a reference to the device to avoid it being garbage collected during testcase execution
-        Device device = Device.getDevice(TestRelocation.DEVICE_ULTRASCALE);
+        Device device = Device.getDevice(DEVICE);
 
         //Use separate files for writing/reading so we can identify identify leaking file handles by filename
         final Path filenameWrite = tempDir.resolve("testWrite.dcp");
@@ -50,7 +51,7 @@ public class TestDesign {
         Files.copy(filenameWrite, filenameRead);
 
         Design design = Design.readCheckpoint(filenameRead);
-        TestEDIF.verifyNetlist(design.getNetlist());
+        TestEDIF.verifyNetlist(design.getNetlist(), "myCell");
 
         final Cell cell = design.getCell("myCell");
         Assertions.assertNotNull(cell);
