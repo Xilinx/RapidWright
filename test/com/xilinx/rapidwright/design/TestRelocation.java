@@ -25,8 +25,8 @@ import org.junit.jupiter.params.provider.MethodSource;
 public class TestRelocation {
 
 
-    public static final String DEVICE_VERSAL = "xcvc1902";
-    public static final String DEVICE_ULTRASCALE = "xcvu3p";
+    private static final String DEVICE_VERSAL = "xcvc1902";
+    private static final String DEVICE_ULTRASCALE = "xcvu3p";
 
     private void testRelocateTile(Device device, String templateStr, String newAnchorStr, String oldAnchorStr, String expectedResultStr) {
         Tile template = device.getTile(templateStr);

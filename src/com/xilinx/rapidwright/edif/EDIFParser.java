@@ -51,7 +51,7 @@ import com.xilinx.rapidwright.util.MessageGenerator;
  * RapidWright, load it into Vivado first and then write it out from Vivado.
  * Created on: May 10, 2017
  */
-public class EDIFParser {
+public class EDIFParser implements AutoCloseable{
 
 	private Path fileName;
 	
@@ -785,5 +785,12 @@ public class EDIFParser {
 		p.stop().start("Write EDIF");
 		if(args.length > 1) n.exportEDIF(args[1]);
 		p.stop().printSummary();
+	}
+
+	@Override
+	public void close() throws IOException {
+		if(in!=null) {
+			in.close();
+		}
 	}
 }

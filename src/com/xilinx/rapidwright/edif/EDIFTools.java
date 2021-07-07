@@ -695,13 +695,11 @@ public class EDIFTools {
 	}
 
 	public static EDIFNetlist loadEDIFFile(Path fileName) {
-		EDIFParser p = null;
-		try {
-			p = new EDIFParser(fileName);
+		try (EDIFParser p = new EDIFParser(fileName)) {
+			return p.parseEDIFNetlist();
 		} catch (IOException e) {
 			throw new UncheckedIOException("ERROR: Couldn't read file : " + fileName, e);
 		}
-		return p.parseEDIFNetlist();
 	}
 
 	public static EDIFNetlist loadEDIFFile(String fileName){
@@ -753,12 +751,13 @@ public class EDIFTools {
 					+ "be passed to resulting DCP load script.");
 			}
 		}
-		if(EDIFTools.EDIF_DEBUG && FileTools.isFileNewer(FileTools.appendExtension(edifFileName , ".dat"), edifFileName)){
-			edif = FileTools.readObjectFromKryoFile(edifFileName + ".dat", EDIFNetlist.class);
+		Path kryoFile = FileTools.appendExtension(edifFileName , ".dat");
+		if(EDIFTools.EDIF_DEBUG && FileTools.isFileNewer(kryoFile, edifFileName)){
+			edif = FileTools.readObjectFromKryoFile(kryoFile, EDIFNetlist.class);
 		}else{
 			edif = loadEDIFFile(edifFileName);
-			if(!(new File(edifFileName + ".dat").exists()) || FileTools.isFileNewer(edifFileName, FileTools.appendExtension(edifFileName , ".dat")) ){
-				if(EDIFTools.EDIF_DEBUG) FileTools.writeObjectToKryoFile(edifFileName + ".dat", edif);			
+			if(!Files.exists(kryoFile) || FileTools.isFileNewer(edifFileName, kryoFile)){
+				if(EDIFTools.EDIF_DEBUG) FileTools.writeObjectToKryoFile(kryoFile, edif);
 			}
 		}
 		if(edifDirectoryName != null) {
