@@ -390,7 +390,13 @@ public class EDIFTools {
 		if(bracket == -1) return name;
 		return name.substring(0, bracket);
 	}
-	
+
+	/**
+	 * Get the previous level of hierarchy
+	 *
+	 * This cannot handle slashes within names and is therefore deprecated. Use {@link EDIFHierCellInst} instead.
+	 */
+	@Deprecated
 	public static String getHierarchicalRootFromPinName(String s){
 		int idx = s.lastIndexOf(EDIF_HIER_SEP);
 		if(idx < 0) return "";
@@ -428,7 +434,7 @@ public class EDIFTools {
 	
 	/**
 	 * 
-	 * @param portName
+	 * @param name
 	 * @return
 	 */
 	public static int getWidthOfPortFromName(String name){
@@ -538,7 +544,7 @@ public class EDIFTools {
 	public static void connectDebugProbe(EDIFNet topPortNet, String routedNetName, String newPortName, 
 			EDIFHierCellInst parentInst, EDIFNetlist netlist, HashMap<EDIFCell, ArrayList<EDIFCellInst>> instMap){
 		EDIFNet currNet = topPortNet;
-		String currParentName = parentInst.getHierarchicalInstName();
+		String currParentName = parentInst.getParent().getFullHierarchicalInstName();
 		EDIFCellInst currInst = parentInst.getInst();
 		// Need to check if we need to move up levels of hierarchy before we move down
 		while(!routedNetName.startsWith(currParentName)){
@@ -960,7 +966,7 @@ public class EDIFTools {
 	
 	/**
 	 * Traverse all connected EDIFNets to find all leaf sink portrefs as part of the physical net. 
-	 * @param startingInput Search begins at this portref and searches below in higher levels of hierarchy.  Doesn't search backwards.
+	 * @param startingInput Search begins at this portref and searches below in inner levels of hierarchy.  Doesn't search backwards.
 	 * @return The list of all leaf cell pin (portrefs) found below the provided starting input pin. Or null if the portref provided is not an input.
 	 */
 	public static ArrayList<EDIFHierPortInst> findSinks(EDIFHierPortInst startingInput){
@@ -970,11 +976,13 @@ public class EDIFTools {
 		ArrayList<EDIFHierPortInst> sinks = new ArrayList<>();
 		while(!q.isEmpty()){
 			EDIFHierPortInst curr = q.poll();
-			EDIFNet internalNet = curr.getPortInst().getCellInst().getCellType().getInternalNet(curr.getPortInst());
-			for(EDIFPortInst p : internalNet.getPortInsts()){
+			final EDIFHierCellInst cellInst = curr.getHierarchicalInst().getChild(curr.getPortInst().getCellInst());
+
+			EDIFHierNet internalNet = curr.getInternalNet();
+			for(EDIFPortInst p : internalNet.getNet().getPortInsts()){
 				if(!p.isInput()) continue;
 				if(p.getCellInst() == null) continue;
-				EDIFHierPortInst newPortInst = new EDIFHierPortInst(curr.getFullHierarchicalInstName(), p);
+				EDIFHierPortInst newPortInst = new EDIFHierPortInst(cellInst, p);
 				if(p.getCellInst().getCellType().isPrimitive()){					
 					sinks.add(newPortInst);
 				}else {
@@ -1044,7 +1052,7 @@ public class EDIFTools {
 	public static List<String> getMacroLeafCellNames(EDIFCell cell) {
 		Queue<EDIFHierCellInst> q = new LinkedList<>();
 		for(EDIFCellInst inst : cell.getCellInsts()) {
-			q.add(new EDIFHierCellInst("", inst));
+			q.add(EDIFHierCellInst.createRelative(inst));
 		}
 		ArrayList<String> leafCells = new ArrayList<String>();
 		while(!q.isEmpty()) {
@@ -1053,7 +1061,7 @@ public class EDIFTools {
 				leafCells.add(inst.getFullHierarchicalInstName());
 			}else {
 				for(EDIFCellInst i : inst.getCellType().getCellInsts()) {
-					q.add(new EDIFHierCellInst(inst.getHierarchicalInstName(), i));
+					q.add(inst.getChild(i));
 				}
 			}
 		}
@@ -1072,37 +1080,23 @@ public class EDIFTools {
 				new HashMap<EDIFLibrary, HashMap<EDIFCell, ArrayList<EDIFHierCellInst>>>();
 		
 		Queue<EDIFHierCellInst> toProcess = new LinkedList<EDIFHierCellInst>();
-		Collection<EDIFCellInst> topInstances = netlist.getTopCell().getCellInsts(); 
-		if(topInstances != null){
-			for(EDIFCellInst i : topInstances){
-				toProcess.add(new EDIFHierCellInst("",i));			
-			}			
-		}
+		netlist.getTopHierCellInst().addChildren(toProcess);
 		
 		while(!toProcess.isEmpty()){
 			EDIFHierCellInst curr = toProcess.poll();
 			
 			EDIFLibrary lib = curr.getCellType().getLibrary();
-			HashMap<EDIFCell, ArrayList<EDIFHierCellInst>> cellMap = cellInstMap.get(lib);
-			if(cellMap == null) {
-				cellMap = new HashMap<EDIFCell, ArrayList<EDIFHierCellInst>>();
-				cellInstMap.put(lib, cellMap);
-			}
-			
+			HashMap<EDIFCell, ArrayList<EDIFHierCellInst>> cellMap = cellInstMap.computeIfAbsent(lib, k -> new HashMap<>());
+
 			EDIFCell cell = curr.getCellType();
-			ArrayList<EDIFHierCellInst> insts = cellMap.get(cell);
-			if(insts == null) {
-				insts = new ArrayList<EDIFHierCellInst>();
-				cellMap.put(cell, insts);
-			}
+			ArrayList<EDIFHierCellInst> insts = cellMap.computeIfAbsent(cell, k -> new ArrayList<>());
 			insts.add(curr);
-			
-			String parentName = curr.getFullHierarchicalInstName(); 
+
 			if(curr.getInst().getCellType().getCellInsts() == null) {
 				continue;
 			}
 			for(EDIFCellInst i : curr.getInst().getCellType().getCellInsts()){
-				toProcess.add(new EDIFHierCellInst(parentName, i));
+				toProcess.add(curr.getChild(i));
 			}
 		}
 	
@@ -1215,7 +1209,10 @@ public class EDIFTools {
 	/**
 	 * Connects an existing logical net to another instances by creating intermediate logical
 	 * nets and ports.  Design must be fully flattened (see {@link EDIFTools#flattenNetlist(Design)}.
-	 * 
+	 *
+	 * Note: EDIF cell instances and nets can contain '/' within their name. This function currently does not support
+	 * designs containing these constructs.
+	 *
 	 * @param sinkParentInstName Hierarchical name of destination parent instance for net 
 	 * @param srcParentInstName Hierarchical name of source parent instance of net
 	 * @param parentInstNameToLogNet A map from hierarchical instance name to equivalent logical net
@@ -1288,14 +1285,14 @@ public class EDIFTools {
 		}
 		
 		// Update Parent Net Map after creating new nets
-		Map<String,String> parentNetMap = netlist.getParentNetMap();
-		String srcNetName = srcParentInstName + EDIF_HIER_SEP + srcDupNetName;
-		String parentNetName = parentNetMap.get(srcNetName);
+		Map<EDIFHierNet,EDIFHierNet> parentNetMap = netlist.getParentNetMap();
+		EDIFHierNet srcNetName = netlist.getHierCellInstFromName(srcParentInstName).getNet(srcDupNetName);
+		EDIFHierNet parentNetName = parentNetMap.get(srcNetName);
 		if(parentNetName == null) {
 			parentNetName = srcNetName;
 		}
 		for(Entry<String,EDIFNet> e : parentInstNameToLogNet.entrySet()) {
-			String currNetName = e.getKey() + EDIF_HIER_SEP + e.getValue().getName();
+			EDIFHierNet currNetName = netlist.getHierCellInstFromName(e.getKey()).getNet(e.getValue().getName());
 			parentNetMap.put(currNetName, parentNetName);
 		}
 

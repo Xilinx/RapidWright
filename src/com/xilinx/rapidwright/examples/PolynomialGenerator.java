@@ -50,7 +50,6 @@ import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.router.Router;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
-import com.xilinx.rapidwright.util.MessageGenerator;
 import com.xilinx.rapidwright.util.StringTools;
 
 public class PolynomialGenerator {
@@ -385,7 +384,7 @@ public class PolynomialGenerator {
 		t.stop().start("Final Route");
 		
 		
-		Map<String,String> parentNetMap = n.getParentNetMap();
+		Map<String,String> parentNetMap = n.getParentNetMapNames();
 		for(Net net : new ArrayList<>(d.getNets())){
 			if(net.getPins().size() > 0 && net.getSource() == null){
 				if(net.isStaticNet()) continue;

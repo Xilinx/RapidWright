@@ -35,6 +35,7 @@ import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.Wire;
+import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.util.FileTools;
@@ -164,11 +165,12 @@ public class SATRouter {
 	
 	public void updateSitePinInsts(){
 		EDIFNetlist n = design.getNetlist();
-		Map<String,ArrayList<EDIFHierPortInst>> physNetPinMap = n.getPhysicalNetPinMap();
-		nextNet: for(Entry<String,ArrayList<EDIFHierPortInst>> netPins : physNetPinMap.entrySet()){
-			Net net = design.getNet(netPins.getKey());
+		Map<EDIFHierNet,List<EDIFHierPortInst>> physNetPinMap = n.getPhysicalNetPinMap();
+		nextNet: for(Entry<EDIFHierNet,List<EDIFHierPortInst>> netPins : physNetPinMap.entrySet()){
+
+			Net net = n.getPhysicalNetFromPin(netPins.getValue().iterator().next(), design);
 			if(net == null){
-				net = design.createNet(netPins.getKey());
+				net = design.createNet(netPins.getKey().getHierarchicalNetName());
 			}
 			EDIFHierPortInst output = null;
 			Site outputSite = null;
@@ -265,7 +267,7 @@ public class SATRouter {
 	 * for the SAT solver. 
 	 */
 	private void populateNetsToRoute(){
-		Map<String,String> parentNetMap = design.getNetlist().getParentNetMap();
+		Map<String,String> parentNetMap = design.getNetlist().getParentNetMapNames();
 		for(SiteInst i : design.getSiteInsts()){
 			for(Entry<String,Net> e : i.getNetSiteWireMap().entrySet()){
 				Net n = e.getValue();

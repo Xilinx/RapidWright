@@ -33,7 +33,6 @@ import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFTools;
-import com.xilinx.rapidwright.util.MessageGenerator;
 
 /**
  * This example enumerates all cell instances in an EDIF netlist
@@ -48,15 +47,14 @@ public class PrintEDIFInstances {
 			PrintWriter pw = new PrintWriter(fileName);
 			pw.println("DESIGN NAME: " + ee.getName());
 			Queue<EDIFHierCellInst> queue = new LinkedList<EDIFHierCellInst>();
-			queue.add(new EDIFHierCellInst("", ee.getTopCellInst()));
+			queue.add(ee.getTopHierCellInst());
 			while(!queue.isEmpty()){
 				EDIFHierCellInst p = queue.poll();
 				EDIFCellInst i = p.getInst();
-				String path = p.getHierarchicalInstName();
-				String curr = path + "/" + i.getName();
+				String curr = p.getFullHierarchicalInstName();
 				pw.println(curr + " (" + i.getCellType() + ") from library " + i.getCellType().getLibrary());
 				for(EDIFCellInst i2 : i.getCellType().getCellInsts()){
-					queue.add(new EDIFHierCellInst(curr, i2));
+					queue.add(p.getChild(i2));
 				}
 			}
 			

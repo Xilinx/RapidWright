@@ -155,7 +155,7 @@ public class DesignInstrumentor {
 				String debugNetName = portPrefix + "_debug_net_" + probeCount;
 				EDIFNet debugNet = EDIFTools.addDebugPortAndNet(debugNetName, topCell, currDebugPort, debugCore);
 				String debugPortName = portPrefix + "_debug_port_" + probeCount;
-				EDIFHierCellInst topInst = new EDIFHierCellInst("", design.getNetlist().getTopCellInst());
+				EDIFHierCellInst topInst = design.getNetlist().getTopHierCellInst();
 				EDIFTools.connectDebugProbe(debugNet, routedNetName, debugPortName, topInst, design.getNetlist(), instMap);				
 			}
 
@@ -182,7 +182,7 @@ public class DesignInstrumentor {
 			edifClockNet = EDIFTools.addDebugPortAndNet(clkDebugNet, topCell, clkPort, debugCore);
 			clockNet = clockPin.getNet();
 			String routedClkNetName = clockNet.getName();
-			EDIFHierCellInst topInst = new EDIFHierCellInst("", design.getNetlist().getTopCellInst());
+			EDIFHierCellInst topInst = design.getNetlist().getTopHierCellInst();
 			EDIFTools.connectDebugProbe(edifClockNet, routedClkNetName, clkDebugPort, topInst, design.getNetlist(), instMap);
 			
 			// Connect clock

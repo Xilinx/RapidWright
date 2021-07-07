@@ -25,6 +25,10 @@
  */
 package com.xilinx.rapidwright.edif;
 
+import java.util.Objects;
+
+import org.jetbrains.annotations.NotNull;
+
 /**
  * Combines an {@link EDIFNet} with a full hierarchical
  * instance name to uniquely identify a net in a netlist.
@@ -33,33 +37,26 @@ package com.xilinx.rapidwright.edif;
  */
 public class EDIFHierNet {
 
-	private String hierarchicalInstName;
-	
-	private EDIFNet net;
+	@NotNull
+	private final EDIFHierCellInst hierarchicalInst;
+	@NotNull
+	private final EDIFNet net;
 
 	/**
 	 * Constructor 
-	 * @param hierarchicalInstName Parent instance cell that contains this net
+	 * @param hierarchicalInst Parent instance cell that contains this net
 	 * @param net The actual net object
 	 */
-	public EDIFHierNet(String hierarchicalInstName, EDIFNet net) {
-		super();
-		this.hierarchicalInstName = hierarchicalInstName;
-		this.net = net;
+	public EDIFHierNet(@NotNull EDIFHierCellInst hierarchicalInst, @NotNull EDIFNet net) {
+		this.hierarchicalInst = Objects.requireNonNull(hierarchicalInst);
+		this.net = Objects.requireNonNull(net);
 	}
 
 	/**
 	 * @return the hierarchicalInstName
 	 */
 	public String getHierarchicalInstName() {
-		return hierarchicalInstName;
-	}
-
-	/**
-	 * @param hierarchicalInstName the hierarchicalInstName to set
-	 */
-	public void setHierarchicalInstName(String hierarchicalInstName) {
-		this.hierarchicalInstName = hierarchicalInstName;
+		return hierarchicalInst.getFullHierarchicalInstName();
 	}
 
 	/**
@@ -67,13 +64,6 @@ public class EDIFHierNet {
 	 */
 	public EDIFNet getNet() {
 		return net;
-	}
-
-	/**
-	 * @param net the net to set
-	 */
-	public void setNet(EDIFNet net) {
-		this.net = net;
 	}
 	
 	/**
@@ -83,17 +73,21 @@ public class EDIFHierNet {
 	 * @return Full hierarchical name of the instance attached to the port.
 	 */
 	public String getHierarchicalInstName(EDIFPortInst port){
-		if(this.hierarchicalInstName.isEmpty()){
-			return port.getCellInst().getName();
+		StringBuilder sb = new StringBuilder();
+		if (hierarchicalInst.enterHierarchicalName(sb)) {
+			sb.append(EDIFTools.EDIF_HIER_SEP);
 		}
-		return this.hierarchicalInstName + EDIFTools.EDIF_HIER_SEP + port.getCellInst().getName();
+		sb.append(port.getCellInst().getName());
+		return sb.toString();
 	}
 	
 	public String getHierarchicalNetName(){
-		if(this.hierarchicalInstName.length() == 0){
-			return net.getName();
+		StringBuilder sb = new StringBuilder();
+		if (hierarchicalInst.enterHierarchicalName(sb)) {
+			sb.append(EDIFTools.EDIF_HIER_SEP);
 		}
-		return this.hierarchicalInstName + EDIFTools.EDIF_HIER_SEP + net.getName();
+		sb.append(net.getName());
+		return sb.toString();
 	}
 
 	/**
@@ -101,8 +95,7 @@ public class EDIFHierNet {
 	 * @return The parent cell instance of this net.
 	 */
 	public EDIFCellInst getParentInst() {
-	    EDIFNetlist netlist = net.getParentCell().getLibrary().getNetlist();
-	    return netlist.getCellInstFromHierName(hierarchicalInstName);
+	    return hierarchicalInst.getInst();
 	}
 	
 	/* (non-Javadoc)
@@ -112,7 +105,8 @@ public class EDIFHierNet {
 	public int hashCode() {
 		final int prime = 31;
 		int result = 1;
-		result = prime * result + ((hierarchicalInstName == null) ? 0 : hierarchicalInstName.hashCode());
+		//TODO does it make sense for hierarchicalInst or net to be null?
+		result = prime * result + ((hierarchicalInst == null) ? 0 : hierarchicalInst.hashCode());
 		result = prime * result + ((net == null) ? 0 : net.hashCode());
 		return result;
 	}
@@ -129,10 +123,10 @@ public class EDIFHierNet {
 		if (getClass() != obj.getClass())
 			return false;
 		EDIFHierNet other = (EDIFHierNet) obj;
-		if (hierarchicalInstName == null) {
-			if (other.hierarchicalInstName != null)
+		if (hierarchicalInst == null) {
+			if (other.hierarchicalInst != null)
 				return false;
-		} else if (!hierarchicalInstName.equals(other.hierarchicalInstName))
+		} else if (!hierarchicalInst.equals(other.hierarchicalInst))
 			return false;
 		if (net == null) {
 			if (other.net != null)
@@ -147,8 +141,11 @@ public class EDIFHierNet {
 	 */
 	@Override
 	public String toString() {
-		return "EDIFHierNet [hierarchicalInstName=" + hierarchicalInstName + ", net=" + net + "]";
+		return "EDIFHierNet [hierarchicalInstName=" + hierarchicalInst + ", net=" + net + "]";
 	}
-	
-	
+
+
+	public EDIFHierCellInst getHierarchicalInst() {
+		return hierarchicalInst;
+	}
 }

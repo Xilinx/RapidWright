@@ -115,7 +115,7 @@ public class BlockStitcher {
 				}
 				continue;
 			}
-			EDIFHierPortInst passThru = new EDIFHierPortInst(curr.getHierarchicalInstName(), passThruInst);
+			EDIFHierPortInst passThru = new EDIFHierPortInst(curr.getHierarchicalInst(), passThruInst);
 			list.add(passThru);
 		}
 		return list;
@@ -139,32 +139,28 @@ public class BlockStitcher {
 		boolean debug = false;
 		EDIFNetlist n = design.getNetlist();
 		// Create a reverse parent net map (Parent Net -> Children Nets: all logical nets that are physically equivalent) 
-		HashMap<String,ArrayList<String>> reverseMap = new HashMap<>();		
-		for(Entry<String,String> e : n.getParentNetMap().entrySet()){
-			ArrayList<String> l = reverseMap.get(e.getValue());
-			if(l == null){
-				l = new ArrayList<>();
-				reverseMap.put(e.getValue(), l);
-			}
+		HashMap<EDIFHierNet,ArrayList<EDIFHierNet>> reverseMap = new HashMap<>();
+		for(Entry<EDIFHierNet,EDIFHierNet> e : n.getParentNetMap().entrySet()){
+			ArrayList<EDIFHierNet> l = reverseMap.computeIfAbsent(e.getValue(), k -> new ArrayList<>());
 			l.add(e.getKey());
 		}
 		
 		HashSet<String> addedPorts = new HashSet<>();
 		HashMap<String,ArrayList<EDIFHierPortInst>> portGroups = new HashMap<>();
 		// For each parent (physical) net...
-		for(Entry<String,ArrayList<String>> e : reverseMap.entrySet()){
+		for(Entry<EDIFHierNet,ArrayList<EDIFHierNet>> e : reverseMap.entrySet()){
 			if(debug) System.out.println(e.getKey() + ":");
 			ArrayList<EDIFHierPortInst> absPortInsts = new ArrayList<>();
-			EDIFHierNet absNet = n.getHierNetFromName(e.getKey());
+			EDIFHierNet absNet = e.getKey();
 			if(absNet == null){
 				throw new RuntimeException("ERROR: Couldn't find net named " + e.getKey());
 			}
 			// For each child (physically equivalent) net...
-			for(String netName : e.getValue()){
-				absNet = n.getHierNetFromName(netName);
+			for(EDIFHierNet netName : e.getValue()){
+				absNet = netName;
 				// Get all the port instances that belong to these nets
 				for(EDIFPortInst p : absNet.getNet().getPortInsts()){
-					EDIFHierPortInst absPort = new EDIFHierPortInst(absNet.getHierarchicalInstName(), p);
+					EDIFHierPortInst absPort = new EDIFHierPortInst(absNet.getHierarchicalInst(), p);
 					if(addedPorts.contains(absPort.toString())) continue;
 					addedPorts.add(absPort.toString());
 					absPortInsts.add(absPort);
@@ -226,7 +222,7 @@ public class BlockStitcher {
 						EDIFHierPortInst portInst = n.getHierPortInstFromName(passThruName);
 						passThruGroup = new ArrayList<>();
 						for(EDIFPortInst pi : portInst.getPortInst().getNet().getPortInsts()){
-							passThruGroup.add(new EDIFHierPortInst(portInst.getHierarchicalInstName(), pi));
+							passThruGroup.add(new EDIFHierPortInst(portInst.getHierarchicalInst(), pi));
 						}
 						
 					}
@@ -419,22 +415,15 @@ public class BlockStitcher {
 		return names;
 	}
 	
-	private void populateModuleInstMaps(EDIFCell top){
+	private void populateModuleInstMaps(EDIFNetlist netlist){
 		Queue<EDIFHierCellInst> queue = new LinkedList<EDIFHierCellInst>();
-		for(EDIFCellInst i : top.getCellInsts()){
-			queue.add(new EDIFHierCellInst("", i));
-		}
+		netlist.getTopHierCellInst().addChildren(queue);
 		while(!queue.isEmpty()){
 			EDIFHierCellInst p = queue.poll();
 			EDIFCellInst i = p.getInst();
 			if(i.getName().equals("VCC") || i.getName().equals("GND")) continue;
-			String sep = p.getHierarchicalInstName().isEmpty() ? "" : "/";
-			String curr = p.getHierarchicalInstName() + sep + i.getName();
-			instNameToInst.put(curr, i);
-			if(i.getCellType().getCellInsts() == null) continue;
-			for(EDIFCellInst i2 : i.getCellType().getCellInsts()){
-				queue.add(new EDIFHierCellInst(curr, i2));
-			}
+			instNameToInst.put(p.getFullHierarchicalInstName(), i);
+			p.addChildren(queue);
 		}
 	}
 	
@@ -475,7 +464,7 @@ public class BlockStitcher {
 		Design stitched = new Design("top_stitched", stitcher.partName);
 		stitched.setNetlist(topEdifNetlist);
 		t.stop().start("Implement Blocks");
-		stitcher.populateModuleInstMaps(topEdifNetlist.getTopCell());
+		stitcher.populateModuleInstMaps(topEdifNetlist);
 		
 		if(!FileTools.isVivadoOnPath()){
 			MessageGenerator.briefError("WARNING: Vivado executable is not on path.  All BlockStitcher implementation builds will fail.");

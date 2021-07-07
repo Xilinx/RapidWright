@@ -40,19 +40,18 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-
 import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.Set;
 
 import com.xilinx.rapidwright.design.blocks.UtilizationType;
+import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELClass;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
-import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.SitePIP;
 import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
@@ -267,7 +266,7 @@ public class DesignTools {
 	
 	/**
 	 * TODO - Work in progress
-	 * @param outputPin
+	 * @param inputPin
 	 * @param inst
 	 * @return
 	 */
@@ -783,7 +782,7 @@ public class DesignTools {
 	 */
 	public static String resolveNetNameFromSiteWire(SiteInst inst, int siteWire){
 		String parentNetName = null;
-		Map<String,String> parentNetMap = inst.getDesign().getNetlist().getParentNetMap();
+		Map<String,String> parentNetMap = inst.getDesign().getNetlist().getParentNetMapNames();
 		BELPin[] pins = inst.getSite().getBELPins(siteWire);
 		for(BELPin pin : pins){
 			if(pin.isSitePort()) continue;
@@ -793,7 +792,7 @@ public class DesignTools {
 				if(currNet == null) {
 					continue;
 				} else {
-					return parentNetMap.get(currNet.getName()); 
+					return parentNetMap.get(currNet.getName());
 				}
 			} 
 			String logPinName = c.getLogicalPinMapping(pin.getName());
@@ -873,26 +872,25 @@ public class DesignTools {
 	 */
 	public static void postBlackBoxCleanup(String hierCellName, Design design) {		
 		EDIFNetlist netlist = design.getNetlist();
-		EDIFCellInst inst = netlist.getCellInstFromHierName(hierCellName);
+		EDIFHierCellInst inst = netlist.getHierCellInstFromName(hierCellName);
+		final EDIFHierCellInst parentInst = inst.getParent();
 		
 		// for each port on the black box, 
 		//   iterate over all the nets and regularize on the proper net name for the physical
 		//   net.  Put all physical pins on the correct physical net once the black box has been
 		//   updated.
-		for(EDIFPortInst portInst : inst.getPortInstMap().values()) {
+		for(EDIFPortInst portInst : inst.getInst().getPortInstMap().values()) {
 			EDIFNet net = portInst.getNet();
-			String parentInstName = EDIFNetlist.getHierParentName(hierCellName);
-			String netName = parentInstName.length() == 0 ? net.getName() : 
-				parentInstName + EDIFTools.EDIF_HIER_SEP + net.getName();
-			String parentNetAlias = netlist.getParentNetName(netName);
-			Net parentNet = design.getNet(parentNetAlias);
+			EDIFHierNet netName = new EDIFHierNet(parentInst, net);
+			EDIFHierNet parentNetName = netlist.getParentNet(netName);
+			Net parentNet = design.getNet(parentNetName.getHierarchicalNetName());
 			if(parentNet == null) {
-				if(parentNetAlias == null) parentNetAlias = netName;
-				parentNet = new Net(parentNetAlias,netlist.getNetFromHierName(parentNetAlias));
+				if(parentNetName == null) parentNetName = netName;
+				parentNet = new Net(parentNetName.getHierarchicalInstName(),parentNetName.getNet());
 			}
-			for(String netAlias : netlist.getNetAliases(netName)) {
-				if(parentNetAlias.equals(netAlias)) continue;
-				Net alias = design.getNet(netAlias);
+			for(EDIFHierNet netAlias : netlist.getNetAliases(netName)) {
+				if(parentNet.equals(netAlias)) continue;
+				Net alias = design.getNet(netAlias.getHierarchicalNetName());
 				if(alias != null) {
 					// Move this non-parent net physical information to the parent
 					for(SiteInst si : alias.getSiteInsts()) {
@@ -983,33 +981,46 @@ public class DesignTools {
 		
 		return true;
 	}
-	
+
 	/**
-	 * Turns the cell named hierarchicalCellName into a blackbox and removes any 
+	 * Turns the cell named hierarchicalCellName into a blackbox and removes any
+	 * associated placement and routing information associated with that instance. In Vivado,
+	 * this can be accomplished by running: (1) 'update_design -cells <name> -black_box' or (2)
+	 * by deleting all of the cells and nets insides of a cell instance.  Method (2) is
+	 * more likely to have complications.
+	 * @param d The current design
+	 * @param hierarchicalCellName The name of the hierarchical cell to become a black box.
+	 */
+	public static void makeBlackBox(Design d, String hierarchicalCellName) {
+		makeBlackBox(d, d.getNetlist().getHierCellInstFromName(hierarchicalCellName));
+	}
+	/**
+	 * Turns the cell named hierarchicalCell into a blackbox and removes any
 	 * associated placement and routing information associated with that instance. In Vivado,
 	 * this can be accomplished by running: (1) 'update_design -cells <name> -black_box' or (2)
 	 * by deleting all of the cells and nets insides of a cell instance.  Method (2) is 
 	 * more likely to have complications.  
 	 * @param d The current design 
-	 * @param hierarchicalCellName The name of the hierarchical cell to become a black box.
+	 * @param hierarchicalCell The hierarchical cell to become a black box.
 	 */
-	public static void makeBlackBox(Design d, String hierarchicalCellName){
+	public static void makeBlackBox(Design d, EDIFHierCellInst hierarchicalCell){
 		CodePerfTracker t = CodePerfTracker.SILENT;//  new CodePerfTracker("makeBlackBox", true);
 		t.start("Init");
-		EDIFCellInst futureBlackBox = d.getNetlist().getCellInstFromHierName(hierarchicalCellName);
-		if(futureBlackBox == null) throw new RuntimeException("ERROR: Couldn't find cell " + hierarchicalCellName + " in source design " + d.getName());
+		EDIFCellInst futureBlackBox = hierarchicalCell.getInst();
+		if(futureBlackBox == null) throw new RuntimeException("ERROR: Couldn't find cell " + hierarchicalCell + " in source design " + d.getName());
 		
 		Set<SiteInst> touched = new HashSet<>();
 		Map<String,String> boundaryNets = new HashMap<>();
 		
 		t.stop().start("Find border nets");
 		// Find all the nets that connect to the cell (keep them)
-		for(EDIFPortInst portInst : futureBlackBox.getPortInsts()){		
+		for(EDIFPortInst portInst : futureBlackBox.getPortInsts()){
+			final EDIFHierPortInst hierPortInst = new EDIFHierPortInst(hierarchicalCell, portInst);
+
 			EDIFNet net = portInst.getNet();
-			String hierParentName = EDIFTools.getHierarchicalRootFromPinName(hierarchicalCellName);
-			String hierNetName = hierParentName.length() == 0 ? net.getName() : hierParentName + EDIFTools.EDIF_HIER_SEP + net.getName();
-			String parentNetName = d.getNetlist().getParentNetName(hierNetName);
-			boundaryNets.put(parentNetName, portInst.isOutput() ? hierNetName : null);
+			EDIFHierCellInst hierParentName =hierarchicalCell.getParent();
+			String parentNetName = hierPortInst.getPortInParent().getNet().getName();
+			boundaryNets.put(parentNetName, portInst.isOutput() ? hierPortInst.getHierarchicalNet().getHierarchicalNetName() : null);
 
 			// Remove parts of routed GND/VCC nets exiting the black box
 			if(portInst.isInput()) continue;
@@ -1042,7 +1053,7 @@ public class DesignTools {
 		
 		t.stop().start("Remove p&r");
 
-		List<EDIFHierCellInst> allLeafs = d.getNetlist().getAllLeafDescendants(hierarchicalCellName);
+		List<EDIFHierCellInst> allLeafs = d.getNetlist().getAllLeafDescendants(hierarchicalCell);
 
 		// Remove all placement and routing information related to the cell to be blackboxed
 		for(EDIFHierCellInst i : allLeafs){
@@ -1084,7 +1095,7 @@ public class DesignTools {
 		// Clean up any cells from Transformed Prims
 		for(SiteInst si : d.getSiteInsts()){
 			for(Cell c : si.getCells()){
-				if(c.getName().startsWith(hierarchicalCellName + EDIFTools.EDIF_HIER_SEP)){
+				if(c.getName().startsWith(hierarchicalCell.getFullHierarchicalInstName() + EDIFTools.EDIF_HIER_SEP)){
 					touched.add(si);
 				}
 			}
@@ -1334,7 +1345,7 @@ public class DesignTools {
 	 */
 	public static List<SitePinInst> createMissingSitePinInsts(Design design, Net net) {
 		EDIFNetlist n = design.getNetlist();
-		List<EDIFHierPortInst> physPins = n.getPhysicalPins(net.getName());
+		List<EDIFHierPortInst> physPins = n.getPhysicalPins(net);
 		List<SitePinInst> newPins = new ArrayList<>();
 		if(physPins == null) {
 			// Likely net inside encrypted IP, let's see if we can infer anything from existing
@@ -1738,8 +1749,9 @@ public class DesignTools {
 		String logPinName = targetCell.getLogicalPinMapping(belPin.getName());
 		if(logPinName == null) return null;
 		EDIFPortInst portInst = targetCell.getEDIFCellInst().getPortInst(logPinName);
+		final EDIFNetlist netlist = targetCell.getSiteInst().getDesign().getNetlist();
 		EDIFHierPortInst hierPortInst = 
-				new EDIFHierPortInst(targetCell.getParentHierarchicalInstName(), portInst); 
+				new EDIFHierPortInst(netlist.getHierCellInstFromName(targetCell.getParentHierarchicalInstName()), portInst);
 		return hierPortInst;
 	}
 	
@@ -1829,7 +1841,7 @@ public class DesignTools {
 		// Identify nets to copy routing
 		for(Net net : src.getNets()) {
 			if(net.isStaticNet()) continue;
-			List<EDIFHierPortInst> pins = src.getNetlist().getPhysicalPins(net.getName());
+			List<EDIFHierPortInst> pins = src.getNetlist().getPhysicalPins(net);
 			if(pins == null) continue;
 			// Identify the kinds of routes to preserve:
 			//  - Has the source in the preservation zone
@@ -1937,8 +1949,8 @@ public class DesignTools {
 			EDIFPortInst portInst = cellInst.getInst().getPortInst(e.getValue());
 			if(portInst == null) continue;
 			EDIFNet edifNet = portInst.getNet();
-			String netName = cellInst.getHierarchicalInstName() + EDIFTools.EDIF_HIER_SEP 
-					+ edifNet.getName();
+
+			String netName = new EDIFHierNet(cellInst.getParent(), edifNet).getHierarchicalNetName();
 
 			String siteWireName = orig.getSiteWireNameFromPhysicalPin(e.getKey());
 			Net origNet = origSiteInst.getNetFromSiteWire(siteWireName);

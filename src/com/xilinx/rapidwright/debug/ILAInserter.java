@@ -42,14 +42,13 @@ import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFDirection;
+import com.xilinx.rapidwright.edif.EDIFHierCellInst;
+import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPort;
-import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.edif.EDIFPropertyValue;
 import com.xilinx.rapidwright.util.FileTools;
-import com.xilinx.rapidwright.util.MessageGenerator;
-import com.xilinx.rapidwright.util.StringTools;
 
 
 /**
@@ -158,55 +157,33 @@ public class ILAInserter {
 		// Logical netlist
 		EDIFNetlist netlist = original.getNetlist();
 		EDIFCell top = netlist.getTopCell();
-		
-		// Need to bring out clk net to top level
-		EDIFNet clk = null;
+
 		
 		String ilaClkPort = "ila_clk_out";
-		int lastSep = clkName.lastIndexOf(EDIFTools.EDIF_HIER_SEP);
-		if(lastSep > -1) {
-
-			// Find clock net closes to the top level cell
-			int minNum = Integer.MAX_VALUE;
-			String minAlias = null;
-			for(String clkNetAlias : netlist.getNetAliases(clkName)) {
-				int level = StringTools.countOccurrences(clkNetAlias, EDIFTools.EDIF_HIER_SEP.charAt(0));
-				if(level < minNum) {
-					minNum = level;
-					minAlias = clkNetAlias;
-				}
+		EDIFHierNet clkNet = netlist.getHierNetFromName(clkName);
+		// Find clock net closest to the top level cell
+		List<EDIFHierNet> aliases = netlist.getNetAliases(clkNet);
+		for (EDIFHierNet alias : aliases) {
+			if (alias.getHierarchicalInst().getDepth() < clkNet.getHierarchicalInst().getDepth()) {
+				clkNet = alias;
 			}
-			
-			// Create new ports to wire clock to top level in order to connect it to the ILA
-			lastSep = minAlias.lastIndexOf(EDIFTools.EDIF_HIER_SEP);
-			if(lastSep > -1) {
-				clk = netlist.getNetFromHierName(minAlias); 
-				EDIFCellInst currInst = null;
-				String currInstName = minAlias.substring(0, lastSep);
-				// Drill up to the top level cell
-				do {
-					currInst = netlist.getCellInstFromHierName(currInstName);
-					EDIFPort port = null;
-					// Create port on the instance
-					port = currInst.getCellType().createPort(ilaClkPort, EDIFDirection.OUTPUT, 1);
-					// Connect the net to the port
-					clk.createPortInst(port);
-					// Pop up to next level
-					lastSep = currInstName.lastIndexOf(EDIFTools.EDIF_HIER_SEP);
-					currInstName = lastSep > -1 ? currInstName.substring(0, lastSep) : "";
-					EDIFCellInst prevInst = currInst;
-					currInst = netlist.getCellInstFromHierName(currInstName);
-					// Create a new net in the parent cell, connect it to the port
-					clk = currInst.getCellType().createNet(ilaClkPort);
-					clk.createPortInst(port, prevInst);
-				} while(!currInst.getCellType().equals(top));
-			} else {
-				clk = top.getNet(minAlias);
-			}
-		} else {
-			clk = top.getNet(clkName);
 		}
-		
+		// Create new ports to wire clock to top level in order to connect it to the ILA
+		while(!clkNet.getHierarchicalInst().isTopLevelInst()) {
+			// Create port on the instance
+			EDIFPort port = clkNet.getHierarchicalInst().getCellType().createPort(ilaClkPort, EDIFDirection.OUTPUT, 1);
+			// Connect the net to the port
+			clkNet.getNet().createPortInst(port);
+			// Pop up to next level
+			EDIFCellInst prevInst = clkNet.getHierarchicalInst().getInst();
+			EDIFHierCellInst currInst = clkNet.getHierarchicalInst().getParent();
+			// Create a new net in the parent cell, connect it to the port
+			clkNet = new EDIFHierNet(currInst, currInst.getCellType().createNet(ilaClkPort));
+			clkNet.getNet().createPortInst(port, prevInst);
+
+		}
+
+		EDIFNet clk = clkNet.getNet();
 		// Connect the clock (assumes all probed signals are synchronous)
 		clk.createPortInst("clk", mi.getCellInst());
 		

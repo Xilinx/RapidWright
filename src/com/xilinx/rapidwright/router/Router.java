@@ -750,7 +750,7 @@ public class Router extends AbstractRouter {
 	/**
 	 * Looks backwards from an input pin depth number of hops to see if there
 	 * exists at least one free path.
-	 * @param p Input pin to check routability
+	 * @param rn Input pin to check routability
 	 * @param depth Number of PIP hops to check
 	 * @return True if there exists at least one path depth PIP hops free, false otherwise.
 	 */
@@ -1921,7 +1921,7 @@ public class Router extends AbstractRouter {
 		Design d = getDesign();
 		EDIFNetlist n = d.getNetlist();
 		d.getNetlist().resetParentNetMap();
-		Map<String,String> parentNetMap = getDesign().getNetlist().getParentNetMap();
+		Map<String,String> parentNetMap = getDesign().getNetlist().getParentNetMapNames();
 		
 		// Build a reverse net (Parent Net -> Net Aliases)
 		Map<String,HashSet<String>> reverseNetMap = new HashMap<>();
