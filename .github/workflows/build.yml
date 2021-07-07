@@ -56,3 +56,15 @@ jobs:
           rm -f ~/.gradle/caches/modules-2/modules-2.lock
           rm -f ~/.gradle/caches/modules-2/gc.properties
 
+      - name: Archive Test Report
+        uses: actions/upload-artifact@v2
+        if: always()
+        with:
+          name: test-report
+          path: build/reports/tests/test
+
+      - name: Publish Unit Test Results
+        uses: EnricoMi/publish-unit-test-result-action@v1.18
+        if: always()
+        with:
+          files: build/test-results/**/*.xml
