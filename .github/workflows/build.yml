@@ -63,8 +63,19 @@ jobs:
           name: test-report
           path: build/reports/tests/test
 
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v2
+        with:
+          name: Unit Test Results
+          path: |
+            build/test-results/test/*.xml
+
       - name: Publish Unit Test Results
         uses: EnricoMi/publish-unit-test-result-action@v1.18
-        if: always()
+        if: >
+          always() &&
+          github.event.sender.login != 'dependabot[bot]' &&
+          ( github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository )
         with:
           files: build/test-results/**/*.xml
