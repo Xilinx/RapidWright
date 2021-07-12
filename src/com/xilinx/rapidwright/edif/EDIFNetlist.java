@@ -35,6 +35,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -50,10 +51,12 @@ import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.IOStandard;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.MessageGenerator;
+import com.xilinx.rapidwright.util.Pair;
 
 /**
  * Top level object for a (logical) EDIF netlist. 
@@ -88,17 +91,62 @@ public class EDIFNetlist extends EDIFName {
 	
 	private boolean DEBUG = false;
 
-	public static final Map<String,String> macroExpandExceptionMap;
-	public static final Map<String,String> macroCollapseExceptionMap;
+	/**
+	 * Map that stores prim->macro expansions conditional based on IOStandards
+	 * (Start Prim -> (End Macro if set IOStandard is in set))
+	 */
+	public static final Map<String,Pair<String,EnumSet<IOStandard>>> macroExpandExceptionMap;
+	/**
+     * Reverse map that stores macro->prim collapse conditional based on IOStandards
+     * (Macro -> (Prim if set IOStandard is in set))
+     */
+	public static final Map<String,Pair<String,EnumSet<IOStandard>>> macroCollapseExceptionMap;
+
+	public static final String IOSTANDARD_PROP = "IOStandard";
 	
 	static {
+	    EnumSet<IOStandard> obufExpansion = EnumSet.of(
+                                	            IOStandard.BLVDS_25,
+                                	            IOStandard.DIFF_HSTL_I,
+                                	            IOStandard.DIFF_HSTL_I_12,
+                                	            IOStandard.DIFF_HSTL_I_18,
+                                	            IOStandard.DIFF_HSTL_I_DCI,
+                                	            IOStandard.DIFF_HSTL_I_DCI_12,
+                                	            IOStandard.DIFF_HSTL_I_DCI_18,
+                                	            IOStandard.DIFF_HSTL_II,
+                                	            IOStandard.DIFF_HSTL_II_18,
+                                	            IOStandard.DIFF_HSUL_12,
+                                	            IOStandard.DIFF_HSUL_12_DCI,
+                                	            IOStandard.DIFF_MOBILE_DDR,
+                                	            IOStandard.DIFF_POD10,
+                                	            IOStandard.DIFF_POD10_DCI,
+                                	            IOStandard.DIFF_POD12,
+                                	            IOStandard.DIFF_POD12_DCI,
+                                	            IOStandard.DIFF_SSTL12,
+                                	            IOStandard.DIFF_SSTL12_DCI,
+                                	            IOStandard.DIFF_SSTL135,
+                                	            IOStandard.DIFF_SSTL135_DCI,
+                                	            IOStandard.DIFF_SSTL135_II,
+                                	            IOStandard.DIFF_SSTL135_R,
+                                	            IOStandard.DIFF_SSTL15,
+                                	            IOStandard.DIFF_SSTL15_DCI,
+                                	            IOStandard.DIFF_SSTL15_II,
+                                	            IOStandard.DIFF_SSTL15_R,
+                                	            IOStandard.DIFF_SSTL18_I,
+                                	            IOStandard.DIFF_SSTL18_I_DCI,
+                                	            IOStandard.DIFF_SSTL18_II,
+                                	            IOStandard.MIPI_DPHY_DCI
+	                                        );
+	    
 	    macroExpandExceptionMap = new HashMap<>();
-	    // Prim -> Macro (when name is not same)
-	    macroExpandExceptionMap.put("OBUFTDS", "OBUFTDS_DUAL_BUF");
+	    // Prim -> Macro (when set IOStandard matches expansion set)
+	    macroExpandExceptionMap.put("OBUFDS", new Pair<>("OBUFDS_DUAL_BUF", obufExpansion));
+	    macroExpandExceptionMap.put("OBUFTDS", new Pair<>("OBUFTDS_DUAL_BUF", obufExpansion));
 	    
 	    macroCollapseExceptionMap = new HashMap<>();
-	    for(Entry<String,String> e : macroExpandExceptionMap.entrySet()) {
-	    	macroCollapseExceptionMap.put(e.getValue(), e.getKey());
+	    for(Entry<String,Pair<String,EnumSet<IOStandard>>> e : macroExpandExceptionMap.entrySet()) {
+	        Pair<String,EnumSet<IOStandard>> newPair = new Pair<>(e.getKey(), e.getValue().getSecond());
+	    	macroCollapseExceptionMap.put(e.getValue().getFirst(), newPair);
 	    }
 	}
 	
@@ -188,8 +236,11 @@ public class EDIFNetlist extends EDIFName {
 		this.updateEDIFRename();
 		design.setName(newName);
 		design.updateEDIFRename();
-		design.getTopCell().setName(newName);
-		design.getTopCell().updateEDIFRename();
+		EDIFLibrary topLib = design.getTopCell().getLibrary();
+		EDIFCell top = topLib.removeCell(design.getTopCell());
+		top.setName(newName);
+		top.updateEDIFRename();
+		topLib.addCell(top);
 		if(topCellInstance != null){
 			topCellInstance.setName(newName);
 			topCellInstance.updateEDIFRename();
@@ -1383,7 +1434,7 @@ public class EDIFNetlist extends EDIFName {
 		// Replace macro primitives in library and import pre-requisite cells if needed
 		for(String cellName : toReplace) {
 			if(macroExpandExceptionMap.containsKey(cellName)) {
-				cellName = macroExpandExceptionMap.get(cellName);
+				cellName = macroExpandExceptionMap.get(cellName).getFirst();
 			}
 			EDIFCell removed = netlistPrims.removeCell(cellName);
 			if(removed == null) {
@@ -1405,7 +1456,16 @@ public class EDIFNetlist extends EDIFName {
 					String cellName = inst.getCellType().getName();
 					if(toReplace.contains(cellName)) {
 						if(!isHDILib) {
-							cellName = macroExpandExceptionMap.getOrDefault(cellName, cellName); 
+						    Pair<String, EnumSet<IOStandard>> exception = macroExpandExceptionMap.get(cellName);
+						    if(exception != null) {
+						        EDIFPropertyValue value = inst.getProperty(IOSTANDARD_PROP); 
+						        if(value != null) {
+                                    IOStandard ioStandard = IOStandard.valueOf(value.getValue());
+						            if(exception.getSecond().contains(ioStandard)) {
+						                cellName = exception.getFirst();
+						            }
+						        }
+						    } 
 						}
 						EDIFCell newCell = netlistPrims.getCell(cellName);
 						inst.setCellType(newCell);
@@ -1432,7 +1492,7 @@ public class EDIFNetlist extends EDIFName {
 			if(macros.containsCell(cell.getName())) {
 				cell.makePrimitive();
 				if(macroCollapseExceptionMap.containsKey(cell.getName())) {
-					cell.rename(macroCollapseExceptionMap.get(cell.getName()));
+					cell.rename(macroCollapseExceptionMap.get(cell.getName()).getFirst());
 					reinsert.add(cell);
 				}
 			}
