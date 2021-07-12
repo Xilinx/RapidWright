@@ -1331,4 +1331,16 @@ public class EDIFTools {
 			}
 		}
 	}
+	
+	public static void printLibraries(EDIFNetlist netlist) {
+	    for(EDIFLibrary lib : netlist.getLibraries()) {
+	        System.out.println("LIBRARY: " + lib.getName());
+	        for(Entry<String,EDIFCell> entry : lib.getCellMap().entrySet()) {
+	            System.out.println("  CELL: " + entry.getValue().getLegalEDIFName() + " /// " + entry.getKey());
+	            for(EDIFCellInst inst : entry.getValue().getCellInsts()) {
+	                System.out.println("    INST: " + inst.getCellType().getLegalEDIFName() + "("+inst.getLegalEDIFName()+")");
+	            }
+	        }
+	    }
+	}
 }
