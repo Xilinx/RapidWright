@@ -4,6 +4,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.AbstractMap;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -33,6 +34,7 @@ import com.xilinx.rapidwright.device.BELClass;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Grade;
+import com.xilinx.rapidwright.device.IOStandard;
 import com.xilinx.rapidwright.device.Package;
 import com.xilinx.rapidwright.device.PackagePin;
 import com.xilinx.rapidwright.device.PIP;
@@ -69,6 +71,7 @@ import com.xilinx.rapidwright.interchange.DeviceResources.Device.ParameterFormat
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.Direction;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.PropertyMap;
+import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.interchange.LogNetlistWriter;
 
 public class DeviceResourcesVerifier {
@@ -485,9 +488,9 @@ public class DeviceResourcesVerifier {
 
             for(String cellName : reference.getCellMap().keySet()) {
                 if(!lib.isHDIPrimitivesLibrary()) {
-                    String primName = EDIFNetlist.macroCollapseExceptionMap.get(cellName);
-                    if(primName != null) {
-                        cellName = primName;
+                    Pair<String,EnumSet<IOStandard>> entry = EDIFNetlist.macroCollapseExceptionMap.get(cellName);
+                    if(entry != null) {
+                        cellName = entry.getFirst();
                     }
                 }
 
@@ -526,10 +529,27 @@ public class DeviceResourcesVerifier {
             PrimToMacroExpansion.Reader entry = exceptionMap.get(i);
             String primName = allStrings.get(entry.getPrimName());
             String macroName = allStrings.get(entry.getMacroName());
-            if(!EDIFNetlist.macroExpandExceptionMap.get(primName).equals(macroName)) {
+            Pair<String,EnumSet<IOStandard>> mapping = EDIFNetlist.macroExpandExceptionMap.get(primName);
+            EnumSet<IOStandard> ioStdSet = mapping.getSecond();
+            if(!mapping.getFirst().equals(macroName)) {
                 throw new RuntimeException("Exception map mismatch: " +
                         "("+ primName+"-->" +macroName+") does not match expected mapping ("+
                         primName+"-->"+EDIFNetlist.macroExpandExceptionMap.get(primName)+")");
+            }
+            
+            Reader<PropertyMap.Entry.Reader> parameterReader = entry.getParameters();
+            if(ioStdSet.size() != parameterReader.size()) {
+                throw new RuntimeException("Exception map parameter set mismatch: differing number "
+                    + "of IOStandard property values, found " + parameterReader.size() 
+                    + ", expected " + mapping.getSecond().size() );
+            }
+            for(PropertyMap.Entry.Reader paramReader : entry.getParameters()) {
+                expect(EDIFNetlist.IOSTANDARD_PROP, allStrings.get(paramReader.getKey()));
+                IOStandard ioStandardValue = IOStandard.valueOf(allStrings.get(paramReader.getTextValue()));
+                if(!ioStdSet.contains(ioStandardValue)) {
+                    throw new RuntimeException("ERROR: IOStandard " + ioStandardValue 
+                            + " not found in exception map." );
+                }
             }
         }
 

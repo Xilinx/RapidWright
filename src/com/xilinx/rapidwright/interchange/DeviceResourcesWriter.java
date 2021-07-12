@@ -4,6 +4,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -39,6 +40,7 @@ import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Package;
 import com.xilinx.rapidwright.device.Grade;
+import com.xilinx.rapidwright.device.IOStandard;
 import com.xilinx.rapidwright.device.PackagePin;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.PIPType;
@@ -54,9 +56,11 @@ import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFDesign;
 import com.xilinx.rapidwright.edif.EDIFLibrary;
+import com.xilinx.rapidwright.edif.EDIFName;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
+import com.xilinx.rapidwright.edif.EDIFPropertyValue;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.interchange.EnumerateCellBelMapping;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.BELCategory;
@@ -80,6 +84,7 @@ import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.Direction;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.PropertyMap;
 import com.xilinx.rapidwright.interchange.WireType;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
+import com.xilinx.rapidwright.util.Pair;
 
 public class DeviceResourcesWriter {
     private static Enumerator<String> allStrings;
@@ -149,9 +154,12 @@ public class DeviceResourcesWriter {
             }
 
         }
-        for(Entry<String,String> e : EDIFNetlist.macroExpandExceptionMap.entrySet()) {
+        for(Entry<String,Pair<String, EnumSet<IOStandard>>> e : EDIFNetlist.macroExpandExceptionMap.entrySet()) {
             allStrings.addObject(e.getKey());
-            allStrings.addObject(e.getValue());
+            allStrings.addObject(e.getValue().getFirst());
+            for(IOStandard ioStd : e.getValue().getSecond()) {
+                allStrings.addObject(ioStd.name());
+            }
         }
         
         for(Entry<SiteTypeEnum, Site> altSiteType : allAltSiteTypeEnums.entrySet()) {
@@ -314,9 +322,9 @@ public class DeviceResourcesWriter {
         List<Unisim> unisims = new ArrayList<Unisim>();
         for(EDIFCell cell : macros.getCells()) {
             String cellName = cell.getName();
-            String primName = EDIFNetlist.macroCollapseExceptionMap.get(cellName);
-            if(primName != null) {
-                cellName = primName;
+            Pair<String, EnumSet<IOStandard>> entry = EDIFNetlist.macroCollapseExceptionMap.get(cellName);
+            if(entry != null) {
+                cellName = entry.getFirst();
             }
             Unisim unisim = Unisim.valueOf(cellName);
             Map<String,String> invertiblePins = DesignTools.getInvertiblePinMap(device.getSeries(), unisim);
@@ -379,10 +387,21 @@ public class DeviceResourcesWriter {
         StructList.Builder<PrimToMacroExpansion.Builder> exceptionMap =
                 devBuilder.initExceptionMap(size);
         int i=0;
-        for(Entry<String, String> entry : EDIFNetlist.macroExpandExceptionMap.entrySet()) {
+        int ioStdPropIdx = allStrings.getIndex(EDIFNetlist.IOSTANDARD_PROP);
+        for(Entry<String, Pair<String, EnumSet<IOStandard>>> entry : EDIFNetlist.macroExpandExceptionMap.entrySet()) {
             PrimToMacroExpansion.Builder entryBuilder = exceptionMap.get(i);
-            entryBuilder.setMacroName(allStrings.getIndex(entry.getValue()));
+            entryBuilder.setMacroName(allStrings.getIndex(entry.getValue().getFirst()));
             entryBuilder.setPrimName(allStrings.getIndex(entry.getKey()));
+
+            StructList.Builder<PropertyMap.Entry.Builder> ioStdEntries =
+                    entryBuilder.initParameters(entry.getValue().getSecond().size());
+            int j=0;
+            for(IOStandard ioStd : entry.getValue().getSecond()) {
+                PropertyMap.Entry.Builder ioStdEntry = ioStdEntries.get(j);
+                ioStdEntry.setKey(ioStdPropIdx);
+                ioStdEntry.setTextValue(allStrings.getIndex(ioStd.name()));
+                j++;
+            }
             i++;
         }
 
