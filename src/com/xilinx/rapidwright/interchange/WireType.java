@@ -9,6 +9,7 @@ public class WireType {
             case NODE_OUTPUT:
             case NODE_DEDICATED:
             case NODE_PINFEED:
+            case NODE_LOCAL:
             case NODE_PINBOUNCE:
             case NODE_OPTDELAY:
             case NODE_CLE_OUTPUT:
@@ -36,6 +37,7 @@ public class WireType {
             case NODE_INTF_CTRL:
             case NODE_OPTDELAY_MUX:
             case NODE_CLE_LNODE:
+            case INTENT_DEFAULT:
                 return WireCategory.SPECIAL;
             case NODE_GLOBAL_VDISTR:
             case NODE_GLOBAL_HROUTE:
