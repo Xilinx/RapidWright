@@ -139,6 +139,13 @@ public class EDIFNet extends EDIFPropertyObject {
 		return portInsts == null ? Collections.emptyList() : portInsts.values();
 	}
 	
+	public void rename(String newName) {
+	    this.parentCell.removeNet(this);
+	    setName(newName);
+	    updateEDIFRename();
+	    this.parentCell.addNet(this);
+	}
+	
 	/**
 	 * This returns all sources on the net, either output ports of the 
 	 * cell instances in the cell or the top level input ports.
