@@ -1279,7 +1279,7 @@ public class FileTools {
 	}
 	
 	public static String getUniqueProcessAndHostID(){
-		return ManagementFactory.getRuntimeMXBean().getName();
+		return ManagementFactory.getRuntimeMXBean().getName() + "_" + Thread.currentThread().getId();
 	}
 	
 	/**
