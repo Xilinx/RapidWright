@@ -140,6 +140,8 @@ public class EDIFTools {
 	public static final String LOGICAL_VCC_NET_NAME = "<const1>";
 	public static final String LOGICAL_GND_NET_NAME = "<const0>";
 
+	public static final String LOAD_TCL_SUFFIX = "_load.tcl";
+	
 	/** Flag to switch EDIF files to KRYO files to make Java debugging faster  (must run once without debugging mode first, once set to true) */
 	public static final boolean EDIF_DEBUG = false;
 
@@ -849,7 +851,7 @@ public class EDIFTools {
 		lines.add("read_checkpoint " + pathDCPFileName);
 		lines.add("set_property top "+edif.getName()+" [current_fileset]");
 		lines.add("link_design -part " + partName);
-		Path tclFileName = FileTools.replaceExtension(pathDCPFileName, "_load.tcl");
+		Path tclFileName = FileTools.replaceExtension(pathDCPFileName, LOAD_TCL_SUFFIX);
 		try {
 			Files.write(tclFileName, lines);
 		} catch (IOException e) {
