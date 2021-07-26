@@ -439,7 +439,7 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
 	}
 	
 	public boolean isPrimitive(){
-		return getLibrary().getName().equals(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME) && (instances == null || instances.size() == 0) && (nets == null || nets.size() == 0);
+		return getLibrary().getName().equals(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME) && isLeafCellOrBlackBox();
 	}
 	
 	public boolean isLeafCellOrBlackBox() {
@@ -492,26 +492,31 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
         
 	/**
 	 * Recursively finds all leaf cell descendants of this cell
+	 *
+	 * The returned EDIFHierCellInsts are relative to this cell.
 	 * @return A list of all leaf cell descendants of this cell
 	 */
     public List<EDIFHierCellInst> getAllLeafDescendants() {
-    	return getAllLeafDescendants("");
+    	return getAllLeafDescendants(null);
     }
     
     /**
      * Recursively finds all leaf cell descendants of this cell
-     * @param parentInstanceName Parent name or prefix name for all leaf cell descendants to be 
+     * @param parentInstance Parent name or prefix name for all leaf cell descendants to be
      * added.  Is not error checked against netlist because the context is not available.
      * @return A list of all leaf cell descendants of this cell
      */
-    public List<EDIFHierCellInst> getAllLeafDescendants(String parentInstanceName) {
+    public List<EDIFHierCellInst> getAllLeafDescendants(EDIFHierCellInst parentInstance) {
 		List<EDIFHierCellInst> leafCells = new ArrayList<>();
 		
 		if(!hasContents()) return leafCells;
 		
 		Queue<EDIFHierCellInst> toProcess = new LinkedList<EDIFHierCellInst>();
+		if (parentInstance == null) {
+			parentInstance = EDIFHierCellInst.createRelative();
+		}
 		for(EDIFCellInst inst : getCellInsts()) {
-			toProcess.add(new EDIFHierCellInst(parentInstanceName, inst));
+			toProcess.add(parentInstance.getChild(inst));
 		}
 		
 		while(!toProcess.isEmpty()){
@@ -519,9 +524,7 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
 			if(curr.getCellType().isPrimitive()){
 				leafCells.add(curr);
 			}else{
-				for(EDIFCellInst i : curr.getInst().getCellType().getCellInsts()){
-					toProcess.add(new EDIFHierCellInst(curr.getFullHierarchicalInstName(), i));
-				}
+				curr.addChildren(toProcess);
 			}
 		}
 		return leafCells;

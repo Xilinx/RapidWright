@@ -220,7 +220,6 @@ public class EDIFPortInst {
 	}
 
 	public EDIFNet getInternalNet(){
-		EDIFCellInst cellInst = getCellInst();
 		if(cellInst == null) return null;
 		return cellInst.getCellType().getInternalNet(this);
 	}

@@ -274,14 +274,14 @@ public class SLRCrosserGenerator {
 			int lagunaStartX = start.getInstanceX();
 			int lagunaStartY = start.getInstanceY();
 			for(int i=0; i < width; i++){
-				EDIFNet net = d.getNetlist().getNetFromHierName(busName + "[" + i + "]");
+				EDIFHierNet net = d.getNetlist().getHierNetFromName(busName + "[" + i + "]");
 				int x = ((i / 12) % 2) + lagunaStartX;
 				int y = lagunaStartY + ((i/(LAGUNA_FLOPS_PER_SITE*LAGUNA_SITES_PER_TILE))*2) 
 									 + ((i/LAGUNA_FLOPS_PER_SITE % 2) == 1 ? 1 : 0);
 
 				Site txSite = d.getDevice().getSite("LAGUNA_X" + x + "Y" + y);
 				String txElementName = "TX_REG" + (i % LAGUNA_FLOPS_PER_SITE);
-				placeAndRouteLagunaFlopPair(d, new EDIFHierNet("", net), txSite, txElementName);
+				placeAndRouteLagunaFlopPair(d, net, txSite, txElementName);
 			}
 		}
 		
