@@ -382,6 +382,7 @@ public class PhysNetlistReader {
                 }
 
                 pip.setIsPIPFixed(pReader.getIsFixed());
+                pip.setIsReversed(!pReader.getForward());
                 net.addPIP(pip);
                 break;
             }
