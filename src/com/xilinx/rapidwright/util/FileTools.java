@@ -1059,6 +1059,10 @@ public class FileTools {
 		writeObjectToKryoFile(Paths.get(fileName), o, writeClass);
 	}
 	
+	public static Object readObjectFromKryoFile(String fileName) {
+	    return readObjectFromKryoFile(Paths.get(fileName));
+	}
+	
 	public static Object readObjectFromKryoFile(Path fileName){
 		Kryo kryo = getKryoInstance();
 		try (Input i = new Input(Files.newInputStream(fileName))){

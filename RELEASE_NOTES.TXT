@@ -1,3 +1,22 @@
+============= RapidWright 2020.2.7-beta released on 2021-07-26 ================
+Notes: 
+ * Several fixes for RapidWright API Lib:
+   - Resolves left over antennas from mishandled bi-directional PIPs
+   - Resolves issue in module instance creation due to AltPinmapping
+     cell names not being updated.
+   - Fixes range issue with BUFCE_ROW instance in Net.setBufferDelay()
+   - Fixes when anchor is null when writing out metadata for module
+     instance in DCP.
+   - Fixes issue when reloading a DCP with encrypted cells back into
+     RapidWright and EDN file paths not being propagated.
+   - Patch for dual output net situation where incorrect routing flags
+     caused Vivado to crash.
+ * Includes EDIFHier updates to reduce memory and improve runtime.
+   Avoids use of a String for hierarchical representation and instead
+   uses an array of EDIFCellInst
+ * Includes fixes for #193, #194 and partial for #206
+ * Includes JUnit tests
+
 ============= RapidWright 2020.2.6-beta released on 2021-06-23 ================
 Notes: 
  * Updates Cap'n Proto Java Runtime from 0.1.4 to 0.1.7
