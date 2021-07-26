@@ -35,9 +35,9 @@ import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.device.BELPin;
+import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierPortInst;
-import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
@@ -45,7 +45,6 @@ import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.router.Router;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.FileTools;
-import com.xilinx.rapidwright.util.MessageGenerator;
 
 public class ProbeRouter {
 
@@ -64,7 +63,6 @@ public class ProbeRouter {
 	 * that already exist in a design.  
 	 * @param d The existing placed and routed design with an ILA.
 	 * @param probeToTargetNets A map from probe names to desired net names (full hierarchical names).
-	 * @param pblock An optional pblock (area constraint) to contain routing within a certain area.
 	 */	
 	public static void updateProbeConnections(Design d, Map<String,String> probeToTargetNets){
 		updateProbeConnections(d, probeToTargetNets, null);
@@ -91,7 +89,7 @@ public class ProbeRouter {
 			
 			// Find the sink flop
 			String hierInstName = cellInstName.contains(EDIFTools.EDIF_HIER_SEP) ? cellInstName.substring(0, cellInstName.lastIndexOf('/')) : ""; 
-			EDIFHierPortInst startingPoint = new EDIFHierPortInst(hierInstName, portInst);
+			EDIFHierPortInst startingPoint = new EDIFHierPortInst(d.getNetlist().getHierCellInstFromName(hierInstName), portInst);
 			ArrayList<EDIFHierPortInst> sinks = EDIFTools.findSinks(startingPoint);
 			if(sinks.size() != 1) {
 				System.err.println("ERROR: Currently we only support a single flip flop "
@@ -114,8 +112,9 @@ public class ProbeRouter {
 			EDIFNet newNet = net.getParentCell().createNet(newPortName);
 			newNet.addPortInst(portInst);
 
-			EDIFCellInst parent = d.getNetlist().getCellInstFromHierName(parentCellInstName);
-			EDIFHierCellInst parentInst = new EDIFHierCellInst(parentCellInstName, parent);
+
+
+			EDIFHierCellInst parentInst = d.getNetlist().getHierCellInstFromName(parentCellInstName);
 			EDIFTools.connectDebugProbe(newNet, e.getValue(), newPortName, parentInst, d.getNetlist(), null);
 			
 			String parentNet = d.getNetlist().getParentNetName(e.getValue());

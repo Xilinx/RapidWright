@@ -26,11 +26,12 @@
 package com.xilinx.rapidwright.edif;
 
 import java.util.List;
+import java.util.Objects;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.SitePinInst;
-import com.xilinx.rapidwright.device.Node;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Combines an {@link EDIFHierPortInst} with a full hierarchical
@@ -40,19 +41,20 @@ import com.xilinx.rapidwright.device.Node;
  */
 public class EDIFHierPortInst {
 
-	private String hierarchicalInstName;
-	
-	private EDIFPortInst portInst;
+	@NotNull
+	private final EDIFHierCellInst hierarchicalInst;
+
+	@NotNull
+	private final EDIFPortInst portInst;
 
 	/**
 	 * Constructor
-	 * @param hierarchicalInstName The hierarchical parent instance cell name of the port 
+	 * @param hierarchicalInst The hierarchical parent instance cell of the port
 	 * @param portInst The actual port ref object
 	 */
-	public EDIFHierPortInst(String hierarchicalInstName, EDIFPortInst portInst) {
-		super();
-		this.hierarchicalInstName = hierarchicalInstName;
-		this.portInst = portInst;
+	public EDIFHierPortInst(@NotNull EDIFHierCellInst hierarchicalInst, @NotNull EDIFPortInst portInst) {
+		this.hierarchicalInst = Objects.requireNonNull(hierarchicalInst);
+		this.portInst = Objects.requireNonNull(portInst);
 	}
 
 	/**
@@ -61,7 +63,7 @@ public class EDIFHierPortInst {
 	 * @return the hierarchicalInstanceName
 	 */
 	public String getHierarchicalInstName() {
-		return hierarchicalInstName;
+		return hierarchicalInst.getFullHierarchicalInstName();
 		
 	}
 
@@ -70,7 +72,6 @@ public class EDIFHierPortInst {
 	 * @return The net on the port inst
 	 */
 	public EDIFNet getNet() {
-	    if(portInst == null) return null;
 	    return portInst.getNet();
 	}
 	
@@ -81,40 +82,35 @@ public class EDIFHierPortInst {
 	public String getFullHierarchicalInstName(){
 		if(portInst.getCellInst() == null){
 			// Internal (inward-facing) side of a cell port
-			return hierarchicalInstName;
+			return hierarchicalInst.getFullHierarchicalInstName();
 		}
+
 		EDIFCellInst topCellInst = portInst.getCellInst().getCellType().getLibrary().getNetlist().getTopCellInst();
-		if(hierarchicalInstName.isEmpty())
-			return portInst.getCellInst().equals(topCellInst) ? "" : portInst.getCellInst().getName(); 
-		return hierarchicalInstName + EDIFTools.EDIF_HIER_SEP + portInst.getCellInst().getName();
-	}
-	
-	/**
-	 * @param hierarchicalInstanceName the hierarchicalInstanceName to set
-	 */
-	public void setHierarchicalInstName(String hierarchicalInstanceName) {
-		this.hierarchicalInstName = hierarchicalInstanceName;
+		if (portInst.getCellInst() == topCellInst) {
+			//Outward side of top
+			return "";
+		}
+
+		StringBuilder sb = new StringBuilder();
+		if (hierarchicalInst.enterHierarchicalName(sb)) {
+			sb.append(EDIFTools.EDIF_HIER_SEP);
+		}
+		sb.append(portInst.getCellInst().getName());
+		return sb.toString();
 	}
 
 	/**
 	 * @return the portInst
 	 */
-	public EDIFPortInst getPortInst() {
+	public @NotNull EDIFPortInst getPortInst() {
 		return portInst;
 	}
 
 	public EDIFCell getCellType() {
-		if(portInst == null) return null;
 		if(portInst.getCellInst() == null) return null;
 		return portInst.getCellInst().getCellType();
 	}
-	
-	/**
-	 * @param portInst the port instance to set
-	 */
-	public void setPortInst(EDIFPortInst portInst) {
-		this.portInst = portInst;
-	}
+
 
 	/* (non-Javadoc)
 	 * @see java.lang.Object#hashCode()
@@ -123,7 +119,7 @@ public class EDIFHierPortInst {
 	public int hashCode() {
 		final int prime = 31;
 		int result = 1;
-		result = prime * result + ((hierarchicalInstName == null) ? 0 : hierarchicalInstName.hashCode());
+		result = prime * result + ((hierarchicalInst == null) ? 0 : hierarchicalInst.hashCode());
 		result = prime * result + ((portInst == null) ? 0 : portInst.hashCode());
 		return result;
 	}
@@ -140,10 +136,10 @@ public class EDIFHierPortInst {
 		if (getClass() != obj.getClass())
 			return false;
 		EDIFHierPortInst other = (EDIFHierPortInst) obj;
-		if (hierarchicalInstName == null) {
-			if (other.hierarchicalInstName != null)
+		if (hierarchicalInst == null) {
+			if (other.hierarchicalInst != null)
 				return false;
-		} else if (!hierarchicalInstName.equals(other.hierarchicalInstName))
+		} else if (!hierarchicalInst.equals(other.hierarchicalInst))
 			return false;
 		if (portInst == null) {
 			if (other.portInst != null)
@@ -158,31 +154,21 @@ public class EDIFHierPortInst {
 	 */
 	@Override
 	public String toString() {
-		if(hierarchicalInstName.isEmpty()) return portInst.getFullName();
-		return hierarchicalInstName + "/" + portInst.getFullName();
+		if(hierarchicalInst.isTopLevelInst()) return portInst.getFullName();
+		return hierarchicalInst + "/" + portInst.getFullName();
 	}
 
 	public String getHierarchicalNetName(){
-		if(hierarchicalInstName.isEmpty()) return portInst.getNet().getName();
-		return hierarchicalInstName + EDIFTools.EDIF_HIER_SEP + portInst.getNet();
-	}
-	
-	public String getTransformedNetName(){
-		String portName = null;
-		if(portInst.getPort().getWidth() > 1){
-			EDIFCellInst eci = portInst.getCellInst();
-			int idx = portInst.getIndex();
-			if(portInst.getPort().isLittleEndian()){
-				idx = (portInst.getPort().getWidth()-1) - idx;
-			}
-			portName = portInst.getPort().getBusName() + idx;
-			if(eci != null) 
-				portName = portInst.getCellInst().getName() + EDIFTools.EDIF_HIER_SEP + portName;  
-		}else{
-			portName = portInst.getFullName();
+		StringBuilder sb = new StringBuilder();
+		if (hierarchicalInst.enterHierarchicalName(sb)) {
+			sb.append(EDIFTools.EDIF_HIER_SEP);
 		}
-		if(hierarchicalInstName.isEmpty()) return portName;
-		return hierarchicalInstName + "/" + portName;
+		sb.append(portInst.getNet().getName());
+		return sb.toString();
+	}
+
+	public EDIFHierNet getHierarchicalNet() {
+		return new EDIFHierNet(hierarchicalInst, portInst.getNet());
 	}
 	
 	public boolean isOutput(){
@@ -215,5 +201,41 @@ public class EDIFHierPortInst {
 		Cell cell = design.getCell(cellName);
 		if(cell == null) return null;
 		return cell.getAllSitePinsFromPortInst(getPortInst(), null);
+	}
+
+	public EDIFHierCellInst getHierarchicalInst() {
+		return hierarchicalInst;
+	}
+
+	/**
+	 * For Ports that represent connections to the parent (portInst.getCellInst()==null), get the parent's portInst
+	 * that connects to this port.
+	 */
+	public EDIFHierPortInst getPortInParent() {
+		if (portInst.getCellInst() != null) {
+			throw new IllegalStateException("This method is only valid for PortInsts that represent connections to the parent");
+		}
+		if (hierarchicalInst.isTopLevelInst()) {
+			throw new IllegalStateException("Cannot get Port in Parent of Root Port "+this);
+		}
+		final EDIFPortInst portInst = hierarchicalInst.getInst().getPortInst(this.portInst.getPortInstNameFromPort());
+		if (portInst == null) {
+			//throw new IllegalStateException("Trying to find port "+this+" in parent but got null!");
+			return null;
+		}
+		return new EDIFHierPortInst(hierarchicalInst.getParent(), portInst);
+	}
+
+	/**
+	 * FOr Ports that represent connections to inner cells, get the connected Net that is connected within the cell
+	 */
+	public EDIFHierNet getInternalNet() {
+
+		final EDIFNet internalNet = portInst.getInternalNet();
+		if (internalNet == null) {
+			return null;
+		}
+		return new EDIFHierNet(hierarchicalInst.getChild(portInst.getCellInst()), internalNet);
+
 	}
 }

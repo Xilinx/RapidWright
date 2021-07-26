@@ -51,6 +51,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -229,8 +230,8 @@ public class Installer {
 		Path root = FileSystems.getDefault().getPath(dir);
 		List<String> javaSrcs = null;
 		
-		try{
-			javaSrcs = Files.walk(root)
+		try (final Stream<Path> walk = Files.walk(root)){
+			javaSrcs = walk
 			        .filter(foundPath -> foundPath.toString().endsWith(".java"))
 			        .map(javaPath -> javaPath.toAbsolutePath().toString())
 			        .collect(Collectors.toList());			

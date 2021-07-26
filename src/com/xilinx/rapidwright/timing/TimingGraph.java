@@ -20,6 +20,19 @@
 
 package com.xilinx.rapidwright.timing;
 
+import java.io.FileNotFoundException;
+import java.io.PrintStream;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Queue;
+import java.util.Set;
+
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
@@ -34,26 +47,12 @@ import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
-
 import org.jgrapht.GraphPath;
 import org.jgrapht.alg.shortestpath.AllDirectedPaths;
 import org.jgrapht.alg.shortestpath.BellmanFordShortestPath;
 import org.jgrapht.alg.shortestpath.KShortestSimplePaths;
 import org.jgrapht.graph.DefaultDirectedWeightedGraph;
 import org.jgrapht.graph.GraphWalk;
-
-import java.io.FileNotFoundException;
-import java.io.PrintStream;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.Queue;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.LinkedHashSet;
-import java.util.Set;
-import java.util.Collection;
 
 
 /**
@@ -130,7 +129,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         determineLogicDelaysFromEDIFCellInsts();
         set = new ArrayList<>();
         Queue<EDIFHierCellInst> q = new LinkedList<>();
-        q.add(new EDIFHierCellInst("", top));
+        q.add(design.getNetlist().getTopHierCellInst());
         while (!q.isEmpty()) {
             EDIFHierCellInst i = q.poll();
             for (EDIFCellInst child : i.getInst().getCellType().getCellInsts()) {
@@ -138,7 +137,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                 if (!i.isTopLevelInst()) {
                     fullName = i.getFullHierarchicalInstName();// + EDIFTools.EDIF_HIER_SEP + child.getName();
                 }
-                EDIFHierCellInst newCell = new EDIFHierCellInst(fullName, child);
+                EDIFHierCellInst newCell = i.getChild(child);
                 if (newCell.getInst().getCellType().isPrimitive()) {
                     set.add(newCell);
                 } else {
@@ -1077,7 +1076,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
             return -1;
         }
         List<EDIFHierPortInst> hports = null;
-        hports = design.getNetlist().getPhysicalPins(netName);
+        hports = design.getNetlist().getPhysicalPins(n);
 
         if (hports == null) {
             return 0;
