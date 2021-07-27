@@ -512,11 +512,12 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
 		if(!hasContents()) return leafCells;
 		
 		Queue<EDIFHierCellInst> toProcess = new LinkedList<EDIFHierCellInst>();
-		if (parentInstance == null) {
-			parentInstance = EDIFHierCellInst.createRelative();
-		}
 		for(EDIFCellInst inst : getCellInsts()) {
-			toProcess.add(parentInstance.getChild(inst));
+			if (parentInstance == null) {
+				toProcess.add(EDIFHierCellInst.createRelative(inst));
+			} else {
+				toProcess.add(parentInstance.getChild(inst));
+			}
 		}
 		
 		while(!toProcess.isEmpty()){
