@@ -29,8 +29,6 @@ jobs:
               bin
               build
           key: rapidwright-${{ env.RAPIDWRIGHT_VERSION }}
-          restore-keys: |
-            rapidwright-
       - name: Cache Gradle
         id: cache-gradle
         uses: actions/cache@v2
