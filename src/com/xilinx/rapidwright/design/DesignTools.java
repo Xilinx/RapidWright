@@ -1015,16 +1015,15 @@ public class DesignTools {
 		t.stop().start("Find border nets");
 		// Find all the nets that connect to the cell (keep them)
 		for(EDIFPortInst portInst : futureBlackBox.getPortInsts()){
-			final EDIFHierPortInst hierPortInst = new EDIFHierPortInst(hierarchicalCell, portInst);
-
 			EDIFNet net = portInst.getNet();
 			EDIFHierCellInst hierParentName =hierarchicalCell.getParent();
-			String parentNetName = hierPortInst.getPortInParent().getNet().getName();
-			boundaryNets.put(parentNetName, portInst.isOutput() ? hierPortInst.getHierarchicalNet().getHierarchicalNetName() : null);
+			EDIFHierNet hierNetName = new EDIFHierNet(hierParentName, net);
+			EDIFHierNet parentNetName = d.getNetlist().getParentNet(hierNetName);
+			boundaryNets.put(parentNetName.getHierarchicalNetName(), portInst.isOutput() ? hierNetName.getHierarchicalNetName() : null);
 
 			// Remove parts of routed GND/VCC nets exiting the black box
 			if(portInst.isInput()) continue;
-			NetType netType = NetType.getNetTypeFromNetName(parentNetName);
+			NetType netType = NetType.getNetTypeFromNetName(parentNetName.getHierarchicalNetName());
 			if(netType.isStaticNetType()){
 				// Black box is supplying VCC/GND, we must unroute connected tree
 				EDIFHierNet hierNet = new EDIFHierNet(hierParentName, net);
