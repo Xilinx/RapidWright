@@ -323,6 +323,18 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
 		return inst;
 	}
 	
+    public void removePort(EDIFPort port) {
+        List<String> portObjectsToRemove = new ArrayList<>();
+        for(Entry<String,EDIFPort> p : getPortMap().entrySet()) {
+            if(p.getValue() == port || p.getValue().getName().equals(port.getName())) {
+                portObjectsToRemove.add(p.getKey());
+            }
+        }
+        for(String s : portObjectsToRemove) {
+            getPortMap().remove(s);
+        }
+    }
+	
 	public void moveToLibrary(EDIFLibrary newLibrary){
 		if(library != null) library.removeCell(this);
 		newLibrary.addCell(this);		
