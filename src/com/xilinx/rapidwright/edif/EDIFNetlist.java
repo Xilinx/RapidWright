@@ -921,7 +921,7 @@ public class EDIFNetlist extends EDIFName {
 			}
 			// If size is 0, assume top level port in an OOC design
 
-			n = d.createNet(parentNetName.toString());
+			n = d.createNet(parentNetName.getHierarchicalNetName());
 			n.setLogicalNet(logicalNet);
 		}
 		return n;
@@ -1254,7 +1254,7 @@ public class EDIFNetlist extends EDIFName {
 				}
 			}
 		}
-		
+
 		for(EDIFHierPortInst pr : queue){
 			EDIFHierNet parentNetName = pr.getHierarchicalNet();
 			for(EDIFHierNet alias : getNetAliases(parentNetName)){
