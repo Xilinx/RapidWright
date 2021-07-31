@@ -1425,6 +1425,23 @@ public class FileTools {
 	}
 	
 	/**
+	 * Gets the current version of Vivado on the system PATH.  
+	 * @return The string version representation of the Vivado version available on the system PATH.
+	 */
+	public static String getVivadoVersion() {
+	    if(isVivadoOnPath()){
+            List<String> lines = execCommandGetOutput(true, "vivado", "-version");
+            for(String line : lines){
+                if(line.startsWith("Vivado ")){
+                    String[] tokens = line.split("\\s+");
+                    return tokens[1];
+                }
+            }
+	    }
+	    return null;
+	}
+	
+	/**
 	 * Gets the full path to the vivado executable if it is set in the PATH
 	 * environment variable. Works for Windows and Linux.
 	 * @return Full path to vivado executable, or throws RuntimeException if not found.  
