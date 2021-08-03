@@ -1,0 +1,144 @@
+#property ACASCREG 0
+#property ADREG 1
+#property ALUMODEREG 0
+#property AMULTSEL A
+#property AREG 0
+#property AUTORESET_PATDET NO_RESET
+#property AUTORESET_PRIORITY RESET
+#property A_INPUT DIRECT
+#property BCASCREG 0
+#property BMULTSEL B
+#property BREG 0
+#property B_INPUT DIRECT
+#property CARRYINREG 0
+#property CARRYINSELREG 0
+#property CREG 1
+#property DREG 1
+#property INMODEREG 0
+#property IS_ALUMODE_INVERTED 4'b0000
+#property IS_CARRYIN_INVERTED 1'b0
+#property IS_CLK_INVERTED 1'b0
+#property IS_INMODE_INVERTED 5'b00000
+#property IS_MATCHED 1
+#property IS_OPMODE_INVERTED 9'b000000000
+#property IS_RSTALLCARRYIN_INVERTED 1'b0
+#property IS_RSTALUMODE_INVERTED 1'b0
+#property IS_RSTA_INVERTED 1'b0
+#property IS_RSTB_INVERTED 1'b0
+#property IS_RSTCTRL_INVERTED 1'b0
+#property IS_RSTC_INVERTED 1'b0
+#property IS_RSTD_INVERTED 1'b0
+#property IS_RSTINMODE_INVERTED 1'b0
+#property IS_RSTM_INVERTED 1'b0
+#property IS_RSTP_INVERTED 1'b0
+#property MASK 48'h3FFFFFFFFFFF
+#property MREG 0
+#property OPMODEREG 0
+#property OPT_MODIFIED SWEEP
+#property PATTERN 48'h000000000000
+#property PREADDINSEL A
+#property PREG 1
+#property RND 48'h000000000000
+#property SEL_MASK MASK
+#property SEL_PATTERN PATTERN
+#property USE_MULT MULTIPLY
+#property USE_PATTERN_DETECT NO_PATDET
+#property USE_SIMD ONE48
+#property USE_WIDEXOR FALSE
+#property XORSIMD XOR24_48_96
+#
+clk    P[17]            0.28
+A[26]    clk       1.40      -0.01
+A[25]    clk       1.41      -0.01
+A[24]    clk       1.40      -0.01
+A[23]    clk       1.41      -0.01
+A[22]    clk       1.40      -0.01
+A[21]    clk       1.41      -0.01
+A[20]    clk       1.41      -0.01
+A[19]    clk       1.41      -0.01
+A[18]    clk       1.41      -0.01
+A[17]    clk       1.41      -0.01
+A[16]    clk       1.41      -0.01
+A[15]    clk       1.41      -0.01
+A[14]    clk       1.41      -0.01
+A[13]    clk       1.40      -0.01
+A[12]    clk       1.41      -0.01
+A[11]    clk       1.40      -0.01
+A[10]    clk       1.40      -0.01
+A[9]     clk       1.41      -0.01
+A[8]     clk       1.41      -0.01
+A[7]     clk       1.41      -0.01
+A[6]     clk       1.41      -0.01
+A[5]     clk       1.41      -0.01
+A[4]     clk       1.40      -0.01
+A[3]     clk       1.41      -0.01
+A[2]     clk       1.41      -0.01
+A[1]     clk       1.41      -0.01
+A[0]     clk       1.41      -0.01
+B[17]    clk       1.45      -0.01
+B[16]    clk       1.45      -0.01
+B[15]    clk       1.45      -0.01
+B[14]    clk       1.45      -0.01
+B[13]    clk       1.45      -0.01
+B[12]    clk       1.45      -0.01
+B[11]    clk       1.45      -0.01
+B[10]    clk       1.45      -0.01
+B[9]     clk       1.45      -0.01
+B[8]     clk       1.45      -0.01
+B[7]     clk       1.45      -0.01
+B[6]     clk       1.45      -0.01
+B[5]     clk       1.45      -0.01
+B[4]     clk       1.45      -0.01
+B[3]     clk       1.45      -0.01
+B[2]     clk       1.45      -0.01
+B[1]     clk       1.45      -0.01
+B[0]     clk       1.45      -0.01
+CEP      clk       0.00       0.22
+PCIN[47]    clk       0.55      -0.01
+PCIN[46]    clk       0.55      -0.01
+PCIN[45]    clk       0.55      -0.01
+PCIN[44]    clk       0.55      -0.01
+PCIN[43]    clk       0.55      -0.01
+PCIN[42]    clk       0.55      -0.01
+PCIN[41]    clk       0.55      -0.01
+PCIN[40]    clk       0.55      -0.01
+PCIN[39]    clk       0.55      -0.01
+PCIN[38]    clk       0.55      -0.01
+PCIN[37]    clk       0.55      -0.01
+PCIN[36]    clk       0.55      -0.01
+PCIN[35]    clk       0.55      -0.01
+PCIN[34]    clk       0.55      -0.01
+PCIN[33]    clk       0.55      -0.01
+PCIN[32]    clk       0.55      -0.01
+PCIN[31]    clk       0.55      -0.01
+PCIN[30]    clk       0.55      -0.01
+PCIN[29]    clk       0.55      -0.01
+PCIN[28]    clk       0.55      -0.01
+PCIN[27]    clk       0.55      -0.01
+PCIN[26]    clk       0.55      -0.01
+PCIN[25]    clk       0.55      -0.01
+PCIN[24]    clk       0.55      -0.01
+PCIN[23]    clk       0.55      -0.01
+PCIN[22]    clk       0.55      -0.01
+PCIN[21]    clk       0.55      -0.01
+PCIN[20]    clk       0.55      -0.01
+PCIN[19]    clk       0.55      -0.01
+PCIN[18]    clk       0.55      -0.01
+PCIN[17]    clk       0.55      -0.01
+PCIN[16]    clk       0.55      -0.01
+PCIN[15]    clk       0.55      -0.01
+PCIN[14]    clk       0.55      -0.01
+PCIN[13]    clk       0.55      -0.01
+PCIN[12]    clk       0.55      -0.01
+PCIN[11]    clk       0.55      -0.01
+PCIN[10]    clk       0.55      -0.01
+PCIN[9]    clk       0.55      -0.01
+PCIN[8]    clk       0.55      -0.01
+PCIN[7]    clk       0.55      -0.01
+PCIN[6]    clk       0.55      -0.01
+PCIN[5]    clk       0.55      -0.01
+PCIN[4]    clk       0.55      -0.01
+PCIN[3]    clk       0.55      -0.01
+PCIN[2]    clk       0.55      -0.01
+PCIN[1]    clk       0.55      -0.01
+PCIN[0]    clk       0.55      -0.01
