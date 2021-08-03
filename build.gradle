@@ -18,6 +18,7 @@ sourceSets {
 
 test {
     useJUnitPlatform()
+    maxHeapSize = "5G"
 }
 
 tasks.withType(Test) {
