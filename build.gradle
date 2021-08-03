@@ -16,9 +16,16 @@ sourceSets {
   }
 }
 
+//Kryo needs to access sun.nio.ch.DirectBuffer. This is forbidden by default in Java 16 and up. Check if we need to add a jvm arg.
+if (org.gradle.api.JavaVersion.current().isJava10Compatible()) {
+	applicationDefaultJvmArgs = ["--add-exports=java.base/sun.nio.ch=ALL-UNNAMED"]
+}
+
 test {
     useJUnitPlatform()
     maxHeapSize = "5G"
+    //Propagate JVM settings to test JVM
+    jvmArgs applicationDefaultJvmArgs
 }
 
 tasks.withType(Test) {
