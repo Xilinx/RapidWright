@@ -2198,4 +2198,126 @@ public class DesignTools {
 	        }
 	    }
 	}
+
+	public static void createPossiblePinsToStaticNets(Design design) {
+		createA1A6ToStaticNets(design);
+		createCeSrRstPinsToVCC(design);
+	}
+
+	public static void createA1A6ToStaticNets(Design design) {
+		// TODO: 2020.2.7 0731 optical-flow_placed: some A6 should connect to VCC, some to GND, when the recognized nets are GND, how to detect?
+		for(SiteInst si : design.getSiteInsts()) {
+			for(Cell cell : si.getCells()) {
+				BEL bel = cell.getBEL();
+				if(bel == null) continue;
+				if(!bel.getName().contains("LUT")) continue;
+				if(bel.getName().contains("5LUT")) {
+					bel = si.getBEL(bel.getName().replace("5", "6"));
+				}
+				for(String belPinName : lut6BELPins) {
+					if(belPinName.equals("A1")) {
+						EDIFCellInst edfCellInst = cell.getEDIFCellInst();
+						EDIFCell edfCell = edfCellInst != null? edfCellInst.getCellType() : null;
+						if(edfCell != null && !edfCell.toString().equals("SRL16E"))	continue;
+					}
+					BELPin belPin = bel.getPin(belPinName);
+					if(belPin != null) {
+						createAddSitePinInstToStaticNet(belPin, si, design);
+					}
+				}
+			}
+		}
+	}
+
+	public static void createCeSrRstPinsToVCC(Design design) {
+		//note: after updating to 2020.2.5, we need to add a check to see if the spi already exists
+		for(Cell cell : design.getCells()) {
+			if(isUnisimFlipFlopType(cell.getType())) {
+				BEL bel = cell.getBEL();
+				Pair<String, String> sitePinNames = BELNametoSitePinNameMapping.get(bel.getBELType());
+				String[] pins = new String[] {"CE", "SR"};
+				for(String pin : pins) {
+					BELPin belPin = cell.getBEL().getPin(pin);
+					SiteInst si = cell.getSiteInst();
+					Net net = si.getNetFromSiteWire(belPin.getSiteWireName());
+					if(net == null) {
+						String sitePinName;
+						if(pin.equals("CE")){ // CKEN
+							sitePinName = sitePinNames.getFirst();
+						}else { //SRST
+							sitePinName = sitePinNames.getSecond();
+						}
+						net = design.getVccNet();
+						if(!si.getSitePinInstNames().contains(sitePinName)) net.createPin(sitePinName, si);
+					}
+				}
+			}else if(cell.getType().equals("RAMB36E2") && cell.getAllPhysicalPinMappings("RSTREGB") == null) {
+				//cell.getEDIFCellInst().getProperty("DOB_REG")): integer(0)
+				String siteWire = cell.getSiteWireNameFromLogicalPin("RSTREGB");
+				Net net = cell.getSiteInst().getNetFromSiteWire(siteWire);
+				if(net == null) {
+					net = design.getVccNet();
+					SiteInst si = cell.getSiteInst();
+					if(!si.getSitePinInstNames().contains("RSTREGBU")) net.createPin("RSTREGBU", si);
+					if(!si.getSitePinInstNames().contains("RSTREGBL")) net.createPin("RSTREGBL", si);
+				}
+		    }
+		}
+	}
+
+	public static void createAddSitePinInstToStaticNet(BELPin belPin, SiteInst si, Design design) {
+		SitePin sitePin = belPin.getSitePin(si.getSite());
+		Net net = si.getNetFromSiteWire(belPin.getSiteWireName());// vcc returned based on the site wire, site pins are not stored in dcp
+		//TODO net mapped incorrectly? recognized as GLOBAL_LOGIC1, while Vivado 2020.1 says it is GND
+		String [] belPinChars = belPin.toString().split("");
+		String spiName = belPinChars[0] + belPinChars[belPinChars.length - 1];
+		if(net == null) {
+			net = design.getVccNet();
+			if(!si.getSitePinInstNames().contains(spiName)) net.createPin(sitePin.getPinName(), si);
+		}else {
+			if(net.isStaticNet()) {
+				if(!si.getSitePinInstNames().contains(spiName)) net.createPin(sitePin.getPinName(), si);
+			}
+		}
+	}
+
+	//NOTE: SRL16E (reference name SRL16E, EDIFCell in RW) uses A2-A5, so we need to connect A1 & A6 to VCC,
+	//however, when SitePinInsts (e.g. A3) are already in GND, adding those again will cause problems to A1
+	static String[] lut6BELPins = new String[] {"A1", "A6"};
+	static HashSet<String> unisimFlipFlopTypes;
+	static {
+        unisimFlipFlopTypes = new HashSet<>();
+        unisimFlipFlopTypes.add("FDSE");//S CE, logical cell
+        unisimFlipFlopTypes.add("FDPE");//PRE CE
+        unisimFlipFlopTypes.add("FDRE");//R and CE
+        unisimFlipFlopTypes.add("FDCE");//CLR CE
+	}
+
+	private static boolean isUnisimFlipFlopType(String cellType) {
+        return unisimFlipFlopTypes.contains(cellType);
+    }
+
+	static Map<String, Pair<String, String>> BELNametoSitePinNameMapping;
+	static{
+		BELNametoSitePinNameMapping = new HashMap<>();
+
+		BELNametoSitePinNameMapping.put("AFF", new Pair<>("CKEN1", "SRST1"));
+		BELNametoSitePinNameMapping.put("BFF", new Pair<>("CKEN1", "SRST1"));
+		BELNametoSitePinNameMapping.put("CFF", new Pair<>("CKEN1", "SRST1"));
+		BELNametoSitePinNameMapping.put("DFF", new Pair<>("CKEN1", "SRST1"));
+		BELNametoSitePinNameMapping.put("AFF2", new Pair<>("CKEN2", "SRST1"));
+		BELNametoSitePinNameMapping.put("BFF2", new Pair<>("CKEN2", "SRST1"));
+		BELNametoSitePinNameMapping.put("CFF2", new Pair<>("CKEN2", "SRST1"));
+		BELNametoSitePinNameMapping.put("DFF2", new Pair<>("CKEN2", "SRST1"));
+
+		BELNametoSitePinNameMapping.put("EFF", new Pair<>("CKEN3", "SRST2"));
+		BELNametoSitePinNameMapping.put("FFF", new Pair<>("CKEN3", "SRST2"));
+		BELNametoSitePinNameMapping.put("GFF", new Pair<>("CKEN3", "SRST2"));
+		BELNametoSitePinNameMapping.put("HFF", new Pair<>("CKEN3", "SRST2"));
+		BELNametoSitePinNameMapping.put("EFF2", new Pair<>("CKEN4", "SRST2"));
+		BELNametoSitePinNameMapping.put("FFF2", new Pair<>("CKEN4", "SRST2"));
+		BELNametoSitePinNameMapping.put("GFF2", new Pair<>("CKEN4", "SRST2"));
+		BELNametoSitePinNameMapping.put("HFF2", new Pair<>("CKEN4", "SRST2"));
+	}
+
 }
