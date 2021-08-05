@@ -46,12 +46,12 @@ class SmallDelayModel implements DelayModel {
      */
     private Map<String, Short> site2IdxMap;
 
-    private HashMap<String, List<Short[]>> logicDelays;
+    private HashMap<String, List<int[]>> logicDelays;
     private HashMap<String, Short> intraSiteDelays;
     /**
      * Mapping between config value of a bel to a one-hot binary.
      */
-    private Map<String, Short> configCodeMap;
+    private Map<String, Integer> configCodeMap;
 
     /**
      *  Implement the method with the same signature defined in DelayModel interface.
@@ -90,13 +90,13 @@ class SmallDelayModel implements DelayModel {
      */
     public short getLogicDelay(String belName, String frBelPin, String toBelPin, List<String> config) {
         boolean verbose = false;
-        Short encodedConfig = 0;
+        int encodedConfig = 0;
         for (String s : config) {
-            Short e = configCodeMap.get(belName + ":" + s);
-            encodedConfig = (short) (encodedConfig | e);
+            int e = configCodeMap.getOrDefault(belName + ":" + s, 0);
+            encodedConfig = (int) (encodedConfig | e);
         }
 
-        List<Short[]> entries = null;
+        List<int[]> entries = null;
         Short idx = bel2IdxMap.get(belName);
         if (idx == null) {
             throw new IllegalArgumentException("SmallDelayModel: Unknown site/belName to getLogicDelay."
@@ -109,11 +109,11 @@ class SmallDelayModel implements DelayModel {
             entries = logicDelays.get(key);
 
             if (entries != null) {
-                for (Short[] entry : entries) {
+                for (int[] entry : entries) {
                     assert entry.length == 2 :
                             " Wrong number of elements in an entry of logicDelay. " + entry.length + " expect 2.";
                     if ((encodedConfig & entry[1]) == encodedConfig) {
-                        delay = entry[0];
+                        delay = (short) entry[0];
                         break;
                     }
                 }
@@ -137,7 +137,7 @@ class SmallDelayModel implements DelayModel {
      * @param delay    the delay of the intra-site connection
      * @param siteName the site name to be used in case of exception
      */
-    private void storeIntraSiteDelay(Short idx, String fr, String to, Short delay, String siteName) {
+    private void storeIntraSiteDelay(Short idx, String fr, String to, short delay, String siteName) {
         String key = idx + fr + to;
         if (intraSiteDelays.containsKey(key)) {
             throw new IllegalArgumentException("SmallDelayModel: Duplicate entry found for " +
@@ -170,18 +170,18 @@ class SmallDelayModel implements DelayModel {
     // As config is not in the key, values of an arc cen be a List, one element for a distinct delay value.
     // As a result, there is a small runtime overhead to go through the list.
     // However, the size of these lists is only 3. Thus, the overhead of this is much less than 2x.
-    private void storeLogicDelay(Short idx, String fr, String to, Short delay, Short config) {
+    private void storeLogicDelay(short idx, String fr, String to, short delay, int config) {
         String key = idx + fr + to;
         // Is there a shortcut for this?
-        Short[] t = new Short[2];
+        int[] t = new int[2];
         t[0] = delay;
         t[1] = config;
 
-        List<Short[]> entries = null;
+        List<int[]> entries = null;
         if (logicDelays.containsKey(key)) {
             entries = logicDelays.get(key);
         } else {
-            entries = new ArrayList<Short[]>();
+            entries = new ArrayList<>();
         }
         entries.add(t);
         logicDelays.put(key, entries);
@@ -193,8 +193,8 @@ class SmallDelayModel implements DelayModel {
      */
     public SmallDelayModel(DelayModelSource src) {
 
-        logicDelays     = new HashMap<String, List<Short[]>>();
-        intraSiteDelays = new HashMap<String, Short>();
+        logicDelays     = new HashMap<>();
+        intraSiteDelays = new HashMap<>();
         bel2IdxMap      = src.getBEL2IdxMap();
         site2IdxMap     = src.getSite2IdxMap();
 
@@ -228,10 +228,19 @@ class SmallDelayModel implements DelayModel {
 
     private void printAllLogicDelays() {
         System.out.println("\nlogicDelays SmallDelayModel");
+        System.out.println("All configs");
         SortedSet<String> keys = new TreeSet<>(configCodeMap.keySet());
         for (String key : keys) {
             System.out.println("Key = " + key );
         }
         System.out.println("\n");
+
+        System.out.println("All delay entries");
+        for (Map.Entry<String, List<int[]>> entry : logicDelays.entrySet()) {
+            System.out.println(entry.getKey());
+            for (int[] arr : entry.getValue()) {
+                System.out.println(arr[0] + " " + String.format("0x%08x",arr[1]));
+            }
+        }
     }
 }
