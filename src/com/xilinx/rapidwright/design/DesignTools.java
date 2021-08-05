@@ -1392,7 +1392,9 @@ public class DesignTools {
 			if(c == null || c.getBEL() == null) continue;
 			String logicalPinName = p.getPortInst().getName();
 			String sitePinName = getRoutedSitePin(c, net, logicalPinName);
-			if(sitePinName == null) {
+			if(sitePinName == null) continue;
+			//TODO NOTE: The following if clause adds some unexpected pins to GND, e.g. SLICE.CIN
+			/*if(sitePinName == null) {
 				if(net.equals(design.getGndNet())) {
 					sitePinName = c.getCorrespondingSitePinName(logicalPinName);
 				}
@@ -1405,7 +1407,7 @@ public class DesignTools {
 						c.addPinMapping(physPinMapping, logicalPinName);
 					}					
 				}
-			}
+			}*/
 			SiteInst si = c.getSiteInst();
 			SitePinInst newPin = si.getSitePinInst(sitePinName);
 			if(newPin != null) continue;
