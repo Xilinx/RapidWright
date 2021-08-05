@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map.Entry;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -63,7 +64,8 @@ public class DesignInstrumentor {
 	
 	public static final String SAMPLE_DEPTH_KEYWORD = "SAMPLE_DEPTH";
 	
-	private int sampleDepth = -1;
+	@SuppressWarnings("unused")
+    private int sampleDepth = -1;
 	
 	private TreeMap<String,String> netNames = new TreeMap<String, String>(); 
 	
@@ -76,6 +78,36 @@ public class DesignInstrumentor {
 	private ArrayList<SitePinInst> pinsToRoute = null;
 	
 	public static final String DEBUG_CORE_PATH = FileTools.getRapidWrightPath() + "/debug";
+	
+	private static List<String> header;
+	
+	private static List<String> probe;
+	
+	private static List<String> footer;
+	
+	static {
+	    header = new ArrayList<>();
+	    probe = new ArrayList<>();
+	    footer = new ArrayList<>();
+	    
+	    header.add("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
+	    header.add("<probeData version=\"1\" minor=\"2\">");
+	    header.add("  <probeset name=\"EDA_PROBESET\" active=\"true\">");
+	    probe.add("    <probe type=\"ila\" busType=\"net\" source=\"netlist\" spec=\"ILA_V2_RT\">");
+	    probe.add("      <probeOptions Id=\"DebugProbeParams\">");
+	    probe.add("        <Option Id=\"CORE_LOCATION\" value=\"1:0\"/>");
+	    probe.add("        <Option Id=\"HW_ILA\" value=\"u_ila_0\"/>");
+	    probe.add("        <Option Id=\"PROBE_PORT\" value=\"0\"/>");
+	    probe.add("        <Option Id=\"PROBE_PORT_BITS\" value=\"0\"/>");
+	    probe.add("        <Option Id=\"PROBE_PORT_BIT_COUNT\" value=\"1\"/>");
+	    probe.add("      </probeOptions>");
+	    probe.add("      <nets>");
+	    probe.add("        <net name=\"base_microblaze_design_i/rst_clk_wiz_1_100M_mb_reset\"/>");
+	    probe.add("      </nets>");
+	    probe.add("    </probe>");
+	    footer.add("  </probeset>");
+	    footer.add("</probeData>");
+	}
 	
 	/**
 	 * This should load the instrumentation file details into
@@ -308,14 +340,11 @@ public class DesignInstrumentor {
 	* Uses list of signals marked for debug to produce debug netlist (.ltx) file for debugging.
 	*/
 	public void createLTX(String name){
-		// Path for template files.
-		String templatePath = FileTools.getRapidWrightPath() + "/ltx_templates/";
-		
 		// 1. Create list of strings that will make up .ltx, get header into it.
-		ArrayList<String> ltx_strings = FileTools.getLinesFromTextFile(templatePath + "header.ltx");
+		ArrayList<String> ltx_strings = new ArrayList<>(header);
 
 		// 2. Pull in and modify the probe template with list of signals marked for debug.
-		ArrayList<String> probe_template = FileTools.getLinesFromTextFile(templatePath + "probe.ltx");
+		ArrayList<String> probe_template = new ArrayList<>(probe);
 		
 		/** 
 		* Most lines will just be added right to the ltx; some need modding;
@@ -356,7 +385,7 @@ public class DesignInstrumentor {
 		}		
 		
 		// 3. Pull in and add the footer.
-		ltx_strings.addAll(FileTools.getLinesFromTextFile(templatePath + "footer.ltx"));
+		ltx_strings.addAll(footer);
 
 		// 4. Write it out. I'm hoping this will end up in the same location as the xpn and edf.
 		FileTools.writeLinesToTextFile(ltx_strings, name);
