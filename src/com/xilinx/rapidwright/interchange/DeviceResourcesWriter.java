@@ -397,12 +397,13 @@ public class DeviceResourcesWriter {
         int ioStdPropIdx = allStrings.getIndex(EDIFNetlist.IOSTANDARD_PROP);
         for(String macroName : exceptionMacros) {
             PrimToMacroExpansion.Builder entryBuilder = exceptionMap.get(i);
+            entryBuilder.setPrimName(allStrings.getIndex(macroName));
+            entryBuilder.setMacroName(allStrings.getIndex(macroName));
             
             // Check if this macro has an expansion exception
             if(expandMap.containsKey(macroName)) {
                 Pair<String, EnumSet<IOStandard>> expandException = expandMap.get(macroName);
                 entryBuilder.setMacroName(allStrings.getIndex(expandException.getFirst()));
-                entryBuilder.setPrimName(allStrings.getIndex(macroName));
 
                 StructList.Builder<PropertyMap.Entry.Builder> ioStdEntries =
                         entryBuilder.initParameters(expandException.getSecond().size());
