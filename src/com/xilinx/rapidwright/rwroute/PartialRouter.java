@@ -92,24 +92,5 @@ public class PartialRouter extends RouterBase{
 			this.numPreservedRoutableNets++;
 			this.numPreservedWire++;
 		}
-	}
-	
-	/**
-	 * Checks if a pinbounce is suitable to be used.
-	 * Note: This should be merged to RouterBase. 
-	 * We leave it like this for now to not break the submission results.
-	 */
-	@Override
-	protected boolean usablePINBounce(Routable pinBounce, Routable target){
-		int columnChild = pinBounce.getNode().getTile().getTileXCoordinate();
-		int rowChild = pinBounce.getNode().getTile().getTileYCoordinate();
-		int columnSink = target.getNode().getTile().getTileXCoordinate();
-		int rowSink = target.getNode().getTile().getTileYCoordinate();
-		if(columnChild == columnSink && Math.abs(rowChild - rowSink) <= 1){
-			return true;
-		}
-		return false;
-	}
-	
-	
+	}	
 }
