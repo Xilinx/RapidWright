@@ -122,10 +122,9 @@ public class Configuration {
 				
 			}else if(arguments[i].startsWith("--enlargeBoundingBox")){				
 				if(i+1 < arguments.length && (!arguments[i+1].startsWith("--verticalINTTiles") && !arguments[i+1].startsWith("--horizontalINTTiles"))) {
-					System.err.println("ERROR: --enlargeBoundingBox needs to be followed by --verticalINTTiles <arg> and / or --horizontalINTTiles <arg>");
-					this.setEnlargeBoundingBox(true);
-					continue;
+					throw new RuntimeException("ERROR: --enlargeBoundingBox needs to be followed by --verticalINTTiles <arg> and / or --horizontalINTTiles <arg>");
 				}		
+				this.setEnlargeBoundingBox(true);
 				
 			}else if(arguments[i].startsWith("--verticalINTTiles")){
 				this.setVerticalINTTiles(Short.parseShort(arguments[++i]));	
@@ -458,6 +457,10 @@ public class Configuration {
 		s.append(this.formatString("Mask nodes across RCLK: ", this.maskNodesCrossRCLK));
 		s.append(this.formatString("Include U-turn nodes: ", this.useUTurnNodes));
 		s.append(this.formatString("Enlarge bounding box: ", this.isEnlargeBoundingBox()));
+		if(this.isEnlargeBoundingBox()) {
+			s.append(this.formatString("Vertical INT tiles: ", this.verticalINTTiles));
+			s.append(this.formatString("Horizontal INT tiles ", this.horizontalINTTiles));
+		}
 		s.append(this.formatString("Initial present conges fac: ", this.initialPresentCongesFac));
 		s.append(this.formatString("Present conges fac mult: ", this.presentCongesMultiplier));
 		s.append(this.formatString("Historical conges fac: ", this.historicalCongesFac));
