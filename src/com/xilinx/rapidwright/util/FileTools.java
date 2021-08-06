@@ -452,10 +452,8 @@ public class FileTools {
 	 */
 	public static void writeStringToTextFile(String text, String fileName) {
 		String nl = System.getProperty("line.separator");
-		try{
-			BufferedWriter bw = new BufferedWriter(new FileWriter(fileName));
-				bw.write(text + nl);
-			bw.close();
+		try(BufferedWriter bw = new BufferedWriter(new FileWriter(fileName))){
+			bw.write(text + nl);
 		}
 		catch(IOException e){
 			MessageGenerator.briefErrorAndExit("Error writing file: " +
@@ -902,7 +900,7 @@ public class FileTools {
 	}
 	
 	private static String _downloadDataFile(String url, String dstFileName) {
-	    Installer.downloadFile(url, dstFileName);
+        Installer.downloadFile(url, dstFileName);
         String downloadedMD5 = Installer.calculateMD5OfFile(dstFileName);
         return downloadedMD5;
 	}

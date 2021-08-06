@@ -115,19 +115,18 @@ public class Installer {
 	 * @return Checksum result String or null if no file was found.
 	 */
 	public static String calculateMD5OfFile(String fileName){
-		try {
-			MessageDigest md5 = MessageDigest.getInstance("MD5");
-			InputStream in = Files.newInputStream(Paths.get(fileName)); 
-			DigestInputStream dig = new DigestInputStream(in, md5);
+	    MessageDigest md5 = null;
+        try {
+            md5 = MessageDigest.getInstance("MD5");
+        } catch (NoSuchAlgorithmException e1) {
+            e1.printStackTrace();
+        }
+		try (DigestInputStream dig = new DigestInputStream(Files.newInputStream(Paths.get(fileName)), md5)) {			 
 			byte[] buffer = new byte[1024];
 			while(dig.read(buffer) != -1){}
 			byte[] checksum = md5.digest();
 			return bytesToString(checksum);
-		} catch (NoSuchAlgorithmException e) {
-			e.printStackTrace();
-		} catch (IOException e) {
-			return null;
-		}
+		} catch (IOException e) {}
 		return null;
 	}
 	
