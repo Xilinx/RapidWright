@@ -75,6 +75,7 @@ import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.FamilyType;
 import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.PartNameTools;
+import com.xilinx.rapidwright.timing.TimingModel;
 
 /**
  * This class is specifically written to allow for efficient file import/export of different semi-primitive
@@ -112,7 +113,8 @@ public class FileTools {
 	/** Common instance of the Kryo class for serialization purposes */	
 	private static Kryo kryo;
 	/** Supporting data folders packed in standalone jars of RapidWright */ 
-	public static final String[] UNPACK_FOLDERS = new String[]{DATA_FOLDER_NAME, TCL_FOLDER_NAME, IMAGES_FOLDER_NAME};
+	public static final String[] UNPACK_FOLDERS = new String[]{DATA_FOLDER_NAME, TCL_FOLDER_NAME, 
+	        IMAGES_FOLDER_NAME, TimingModel.TIMING_DATA_DIR};
 	/** Static empty array to save on memory */
 	public static int[] emptyIntArray = new int[0];
 	/** Static empty array to save on memory */

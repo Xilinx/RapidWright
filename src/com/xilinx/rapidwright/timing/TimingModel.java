@@ -68,9 +68,8 @@ public class TimingModel {
     public boolean debugFile = false;
     public boolean verbose = false;
 
-    public static final String TIMING_DATA_DIR =
-            FileTools.DATA_FOLDER_NAME + File.separator + "timing";
-
+    public static final String TIMING_DATA_DIR = "timing";
+    
     boolean adjustQuadConnectedToQuadDelays = false;
     boolean adjustDoubleConnectedToDoubleDelays = false;
 
