@@ -58,6 +58,7 @@ import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.zip.DeflaterOutputStream;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
@@ -109,6 +110,8 @@ public class FileTools {
 	public static final String PART_DUMP_FILE_NAME = DATA_FOLDER_NAME + File.separator + "partdump.csv";
 	/** Location of the main parts database file */
 	public static final String PART_DB_PATH = DATA_FOLDER_NAME + File.separator + "parts.db";
+	/** Stores the intended version of each data file for this revision of RapidWright */
+	public static final String DATA_VERSION_FILE = ".data_versions";
 	/** Common instance of the Kryo class for serialization purposes */	
 	private static Kryo kryo;
 	/** Supporting data folders packed in standalone jars of RapidWright */ 
@@ -123,7 +126,15 @@ public class FileTools {
 	public static final int PART_DB_FILE_VERSION = 1;
 	/** Unisim Data File Version */
 	public static final int UNISIM_DATA_FILE_VERSION = 1;
-
+	/** Map created from the {@link #DATA_VERSION_FILE} */
+	private static Map<String,Pair<String,String>> dataVersionMap;
+	/** Keeps a cached timestamp of the {@link #DATA_VERSION_FILE} */
+	private static Long DATA_VERSION_FILE_LAST_MODIFIED = null; 
+	/** Base URL for download data files */
+	public static final String RAPIDWRIGHT_DATA_URL = "http://data.rapidwright.io/";
+	/** Suffix added to data file names to capture md5 status */
+	private static String MD5_DATA_FILE_SUFFIX = ".md5";
+	
 	static {
 		// TODO - This turns off illegal reflective access warnings in Java 9+
 		// This is due to reflective use in Kryo which is a direct dependency of this
@@ -795,8 +806,6 @@ public class FileTools {
 	/* Simple Device Load Methods & Helpers                                              */
 	//===================================================================================//
 	
-	private static boolean FIRST_TIME_WARN_INFERRED_RW_PATH = true;
-	
 	/**
 	 * Gets and returns the value of the environment variable RAPIDWRIGHT_PATH. If this
 	 * variable is not set, it searches the file system from where the RapidWright code
@@ -812,17 +821,8 @@ public class FileTools {
 			final File f = new File(FileTools.class.getProtectionDomain().getCodeSource().getLocation().getPath());
 			if(f.isDirectory()){
 				File rootFolder = f.getParentFile();
-				for(String dir : rootFolder.list()){
-					if(dir.equals(DATA_FOLDER_NAME)) {
-						if(FIRST_TIME_WARN_INFERRED_RW_PATH) {
-							MessageGenerator.briefMessage("WARNING: " + RAPIDWRIGHT_VARIABLE_NAME +
-									" is not set.  Proceeding with inferred location from Java "
-									+ "execution path: " + 
-									rootFolder.getAbsolutePath());
-							FIRST_TIME_WARN_INFERRED_RW_PATH = false;
-						}
-						return rootFolder.getAbsolutePath();
-					}
+				if(rootFolder != null) {
+				    return rootFolder.getAbsolutePath();
 				}
 			}
 			// This appears to be a jar file.
@@ -832,6 +832,106 @@ public class FileTools {
 			path.substring(0, path.length()-1);
 		}
 		return path;
+	}
+		
+	public static long getLastModifiedDataVersionFile() {
+	    if(DATA_VERSION_FILE_LAST_MODIFIED == null) {
+	        File dataVersionFile = new File(getRapidWrightPath() 
+	                + File.separator + DATA_VERSION_FILE);
+	        if(!dataVersionFile.exists()) {
+	            throw new RuntimeException("ERROR: Missing file " + dataVersionFile.getAbsolutePath() 
+	                + ", please update RapidWright or restore the file.");
+	        }
+	        DATA_VERSION_FILE_LAST_MODIFIED = dataVersionFile.lastModified();
+	    }
+	    return DATA_VERSION_FILE_LAST_MODIFIED;
+
+	}
+	
+	public static void updateAllDataFiles() {
+	    System.out.println("Updating all RapidWright data files (this may take several minutes)...");
+        for(String fileName : getDataVersionMap().keySet()) {
+            if(ensureCorrectDataFile(fileName) != null) {
+                System.out.println("  Downloaded " + fileName);
+            }
+        }
+        System.out.println("COMPLETED!");
+	}
+	
+	/**
+	 * RapidWright downloads data files on demand to avoid large downloads.  However, if a user 
+	 * wishes to download all necessary files upfront, this method will download and update all
+	 * necessary files. 
+	 */
+	public static void forceUpdateAllDataFiles() {
+	    System.out.println("Force update of all RapidWright data files "
+	            + "(this may take several minutes)...");
+	    int size = getDataVersionMap().keySet().size();
+	    int i=0; 
+	    for(String fileName : getDataVersionMap().keySet()) {
+	        downloadDataFile(fileName);
+	        System.out.println("  Downloaded ["+i+"/"+size+"] " + fileName);
+	        i++;
+	    }
+	    System.out.println("COMPLETED!");
+	}
+	
+	/**
+	 * Downloads the specified data file and version according to {@link #DATA_VERSION_FILE}.  This
+	 * will overwrite any existing file locally of the same name.  This also validates the download 
+	 * is correct by calculating the md5sum of the downloaded file and comparing it to the expected
+	 * one in {@link #DATA_VERSION_FILE}.  
+	 * @param fileName Name of the data file to download
+	 * @return The md5 checksum of the downloaded file
+	 */
+	private static String downloadDataFile(String fileName) {
+	    String md5 = getCurrentDataVersion(fileName);
+	    String url = RAPIDWRIGHT_DATA_URL + getContainerName(fileName) + "/" +
+	                md5;
+	    String dstFileName = getRapidWrightPath() + File.separator + fileName;
+	    String downloadedMD5 = _downloadDataFile(url, dstFileName);
+	    if(!md5.equals(downloadedMD5)) {
+	        System.err.println("WARNING: Download validation of file " + fileName + " failed.  Trying again...");
+	        downloadedMD5 = _downloadDataFile(url, dstFileName);
+	        if(!md5.equals(downloadedMD5)) {
+	            throw new RuntimeException("ERROR: Failed to reliably download file: " + fileName);
+	        }
+	    }
+	    FileTools.writeStringToTextFile(downloadedMD5, dstFileName + MD5_DATA_FILE_SUFFIX);
+	    return downloadedMD5;
+	}
+	
+	private static String _downloadDataFile(String url, String dstFileName) {
+	    Installer.downloadFile(url, dstFileName);
+        String downloadedMD5 = Installer.calculateMD5OfFile(dstFileName);
+        return downloadedMD5;
+	}
+	
+	private static String ensureCorrectDataFile(String name) {
+	    String fileName = getRapidWrightPath() + File.separator + name;
+	    File resourceFile = new File(fileName);
+	    if(resourceFile.exists()) {
+	        File md5File = new File(fileName + MD5_DATA_FILE_SUFFIX);
+	        if(md5File.exists()) {
+	            long md5LastModified = md5File.lastModified();
+	            if(md5LastModified > getLastModifiedDataVersionFile() 
+	                    && md5LastModified > resourceFile.lastModified()) {
+	                // File is up to date
+	                return null;
+	            }
+	        } else {
+	            // .md5 file is missing
+	            String currMD5 = Installer.calculateMD5OfFile(resourceFile.getAbsolutePath());
+	            String expectedMD5 = getCurrentDataVersion(name);
+	            if(expectedMD5.equals(currMD5)) {
+	                FileTools.writeStringToTextFile(currMD5, resourceFile.getAbsolutePath() 
+	                        + MD5_DATA_FILE_SUFFIX);
+	                // File matches expected md5
+	                return null;
+	            }
+	        }
+	    }
+	    return downloadDataFile(name);
 	}
 	
 	/**
@@ -843,7 +943,8 @@ public class FileTools {
 	 * @return An InputStream to the resource or null if it could not be found.
 	 */
 	public static InputStream getRapidWrightResourceInputStream(String name){
-		String rwPath = getRapidWrightPath();
+		ensureCorrectDataFile(name);
+	    String rwPath = getRapidWrightPath();
 		if(rwPath != null){
 			try {
 				File resourceFile = new File(rwPath + File.separator + name);
@@ -1625,6 +1726,46 @@ public class FileTools {
 		return path.resolveSibling(fn.substring(0, idx) + newExtension);
 	}
 	
+    /**
+     * Translates RapidWright data file names to Azure Blob Container-friendly names
+     * @param fileName Name of the RapidWright data file
+     * @return Azure blob container name for the provided RapidWright data file
+     */
+    public static String getContainerName(String fileName) {
+        String containerName = fileName.substring(fileName.lastIndexOf("/")+1);
+        return containerName.replace("_", "-").replace(".", "-").toLowerCase();
+    }
+    
+    /**
+     * Returns the expected MD5 sum of the named data file 
+     * @param dataFileName Name of the RapidWright data file name 
+     * (for example: data/devices/artix7/xa7a100t_db.dat)
+     * @return The MD5 sum of the expected file contents.
+     */
+    public static String getCurrentDataVersion(String dataFileName) {
+        Pair<String,String> result = getDataVersionMap().get(dataFileName);
+        return result != null ? result.getSecond() : null;
+    }
+    
+    public static Map<String,Pair<String,String>> getDataVersionMap(){
+        if(dataVersionMap == null) {
+            parseDataVersionFile();
+        }
+        return dataVersionMap;
+    }
+    
+    private static void parseDataVersionFile() {
+        if(dataVersionMap == null) {
+            dataVersionMap = new HashMap<>();
+        }
+        List<String> lines = getLinesFromTextFile(getRapidWrightPath() 
+                + File.separator + DATA_VERSION_FILE);
+        for(String line : lines) {
+            String[] tokens = line.split(" ");
+            dataVersionMap.put(tokens[0], new Pair<>(tokens[1], tokens[2]));
+        }
+    }
+    
 	public static void main(String[] args) {
 		if(args[0].equals("--get_vivado_path"))
 			System.out.println(getVivadoPath());

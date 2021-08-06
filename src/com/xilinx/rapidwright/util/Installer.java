@@ -28,6 +28,7 @@ package com.xilinx.rapidwright.util;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -35,6 +36,7 @@ import java.io.InputStream;
 import java.lang.ProcessBuilder.Redirect;
 import java.net.HttpURLConnection;
 import java.net.InetAddress;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.UnknownHostException;
 import java.nio.channels.Channels;
@@ -129,11 +131,41 @@ public class Installer {
 		return null;
 	}
 	
-	public static long downloadFile(String url, String dstFileName) throws IOException{
-		URL website = new URL(url);
-		ReadableByteChannel rbc = Channels.newChannel(website.openStream());
-		FileOutputStream fos = new FileOutputStream(dstFileName);
-		return fos.getChannel().transferFrom(rbc, 0, Long.MAX_VALUE);
+	public static long downloadFile(String url, String dstFileName) {
+		ReadableByteChannel rbc = null; 
+        try {
+            URL website = new URL(url);
+            rbc = Channels.newChannel(website.openStream());
+        } catch (MalformedURLException e) {
+            throw new RuntimeException("ERROR: Couldn't download file from url: " 
+                    + url + ", URL is not valid.");
+        } catch (IOException e) {
+            throw new RuntimeException("ERROR: Couldn't download file from url: " + url 
+                    + ", not able to establish connection.");
+        }
+		
+		File newFile = new File(dstFileName);
+		File parentDir = newFile.getParentFile();
+		if(!parentDir.exists()) {
+		    parentDir.mkdirs();
+		} else if(!parentDir.isDirectory()) {
+            throw new RuntimeException("ERROR: Existing file conflicts with RapidWright "
+                    + "directory structure: " + parentDir.getAbsolutePath() 
+                    + " please relocate or remove file and try again.");
+        }
+		
+		long transferred = -1;
+        try(FileOutputStream fos = new FileOutputStream(newFile)){
+            transferred = fos.getChannel().transferFrom(rbc, 0, Long.MAX_VALUE);
+        } catch (FileNotFoundException e) {
+            throw new RuntimeException("ERROR: Problem creating local file: " + dstFileName 
+                + ", please check permissions and/or that adequate disk space is available.");
+        } catch (IOException e) {
+            throw new RuntimeException("ERROR: Problem downloading file: " + dstFileName 
+                    + ", ensure a stable Internet connection.");
+
+        }
+		return transferred;
 	}
 	
     private static void unzipFile(String zipFile, String destDir) {
