@@ -168,7 +168,8 @@ public class UltraScaleClockRouting {
 				q.add(rn);
 			}
 			if(watchDog-- == 0) {
-				throw new RuntimeException("ERROR: Could not route to the given centroid: " + centroid);
+				throw new RuntimeException("ERROR: Could not route from " + startingRouteNode + "\n       to the given centroid: " + centroid 
+											+ ".\n       Please check if BUFGCE is correctly placed in line with the reference.");
 			}
 		}
 		return null;
