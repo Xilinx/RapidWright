@@ -68,6 +68,8 @@ import com.xilinx.rapidwright.interchange.DeviceResources.Device.ParameterDefini
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.CellParameterDefinition;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.ParameterDefinitions;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.ParameterFormat;
+import com.xilinx.rapidwright.interchange.DeviceResources.Device.ParameterMapEntry;
+import com.xilinx.rapidwright.interchange.DeviceResources.Device.ParameterMapRule;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.Direction;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.PropertyMap;
@@ -524,31 +526,61 @@ public class DeviceResourcesVerifier {
         verifyCellInversions(device, dReader, unisimsExpected);
 
         StructList.Reader<PrimToMacroExpansion.Reader> exceptionMap = dReader.getExceptionMap();
+        Map<String,MacroParamRule[]> rulesMap = MacroParamMappingRules.macroRules.get(device.getSeries());
         int mapSize = exceptionMap.size();
         for(int i=0; i < mapSize; i++) {
             PrimToMacroExpansion.Reader entry = exceptionMap.get(i);
-            String primName = allStrings.get(entry.getPrimName());
             String macroName = allStrings.get(entry.getMacroName());
-            Pair<String,EnumSet<IOStandard>> mapping = EDIFNetlist.macroExpandExceptionMap.get(primName);
-            EnumSet<IOStandard> ioStdSet = mapping.getSecond();
-            if(!mapping.getFirst().equals(macroName)) {
-                throw new RuntimeException("Exception map mismatch: " +
-                        "("+ primName+"-->" +macroName+") does not match expected mapping ("+
-                        primName+"-->"+EDIFNetlist.macroExpandExceptionMap.get(primName)+")");
+            if(entry.hasParameters()) {
+                String primName = allStrings.get(entry.getPrimName());
+                Pair<String,EnumSet<IOStandard>> mapping = EDIFNetlist.macroExpandExceptionMap.get(primName);
+                EnumSet<IOStandard> ioStdSet = mapping.getSecond();
+                if(!mapping.getFirst().equals(macroName)) {
+                    throw new RuntimeException("Exception map mismatch: " +
+                            "("+ primName+"-->" +macroName+") does not match expected mapping ("+
+                            primName+"-->"+EDIFNetlist.macroExpandExceptionMap.get(primName)+")");
+                }
+                
+                Reader<PropertyMap.Entry.Reader> parameterReader = entry.getParameters();
+                if(ioStdSet.size() != parameterReader.size()) {
+                    throw new RuntimeException("Exception map parameter set mismatch: differing number "
+                        + "of IOStandard property values, found " + parameterReader.size() 
+                        + ", expected " + mapping.getSecond().size() );
+                }
+                for(PropertyMap.Entry.Reader paramReader : entry.getParameters()) {
+                    expect(EDIFNetlist.IOSTANDARD_PROP, allStrings.get(paramReader.getKey()));
+                    IOStandard ioStandardValue = IOStandard.valueOf(allStrings.get(paramReader.getTextValue()));
+                    if(!ioStdSet.contains(ioStandardValue)) {
+                        throw new RuntimeException("ERROR: IOStandard " + ioStandardValue 
+                                + " not found in exception map." );
+                    }
+                }                
             }
-            
-            Reader<PropertyMap.Entry.Reader> parameterReader = entry.getParameters();
-            if(ioStdSet.size() != parameterReader.size()) {
-                throw new RuntimeException("Exception map parameter set mismatch: differing number "
-                    + "of IOStandard property values, found " + parameterReader.size() 
-                    + ", expected " + mapping.getSecond().size() );
-            }
-            for(PropertyMap.Entry.Reader paramReader : entry.getParameters()) {
-                expect(EDIFNetlist.IOSTANDARD_PROP, allStrings.get(paramReader.getKey()));
-                IOStandard ioStandardValue = IOStandard.valueOf(allStrings.get(paramReader.getTextValue()));
-                if(!ioStdSet.contains(ioStandardValue)) {
-                    throw new RuntimeException("ERROR: IOStandard " + ioStandardValue 
-                            + " not found in exception map." );
+            MacroParamRule[] rules = rulesMap.get(macroName);
+            if(entry.hasParamMapping() && rules != null) {
+                Reader<ParameterMapRule.Reader> rulesReader = entry.getParamMapping();
+                expect(rules.length, rulesReader.size());
+                for(int j=0; j < rules.length; j++) {
+                    MacroParamRule rule = rules[j];
+                    ParameterMapRule.Reader ruleReader = rulesReader.get(j);
+                    expect(rule.getInstParam(), allStrings.get(ruleReader.getInstParam()));
+                    expect(rule.getInstName(), allStrings.get(ruleReader.getInstName()));
+                    expect(rule.getPrimParam(), allStrings.get(ruleReader.getPrimParam()));
+                    if(rule.getBitSlice() != null) {
+                        PrimitiveList.Int.Reader bitSliceReader = ruleReader.getBitSlice();
+                        expect(rule.getBitSlice().length, bitSliceReader.size());
+                        for(int k=0; k < rule.getBitSlice().length; k++) {
+                            expect(rule.getBitSlice()[k], bitSliceReader.get(k));
+                        }
+                    } else if(rule.getTableLookup() != null) {
+                        Reader<ParameterMapEntry.Reader> tableReader = ruleReader.getTableLookup();
+                        expect(rule.getTableLookup().length, tableReader.size());
+                        for(int k=0; k < rule.getTableLookup().length; k++) {
+                            ParameterMapEntry.Reader tableEntry = tableReader.get(k);
+                            expect(rule.getTableLookup()[k].from, allStrings.get(tableEntry.getFrom()));
+                            expect(rule.getTableLookup()[k].to, allStrings.get(tableEntry.getTo()));
+                        }
+                    }
                 }
             }
         }

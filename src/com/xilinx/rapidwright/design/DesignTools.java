@@ -1345,6 +1345,20 @@ public class DesignTools {
 	public static List<SitePinInst> createMissingSitePinInsts(Design design, Net net) {
 		EDIFNetlist n = design.getNetlist();
 		List<EDIFHierPortInst> physPins = n.getPhysicalPins(net);
+		if(physPins == null) {
+		    // Perhaps net is not a parent net name
+		    final EDIFHierNet hierNet = n.getHierNetFromName(net.getName());
+		    if(hierNet != null) {
+	            final EDIFHierNet parentHierNet = n.getParentNet(hierNet);
+	            if(!hierNet.equals(parentHierNet)) {
+	                physPins = n.getPhysicalPins(parentHierNet);
+	                if(physPins != null) {
+	                    System.out.println("WARNING: Physical net '" + net.getName() +
+	                            "' is not the parent net but is treated as such." );
+	                }
+	            }		        
+		    }
+		}
 		List<SitePinInst> newPins = new ArrayList<>();
 		if(physPins == null) {
 			// Likely net inside encrypted IP, let's see if we can infer anything from existing
@@ -2154,4 +2168,34 @@ public class DesignTools {
 		}
 	}
 
+	public static void makePhysNetNamesConsistent(Design design) {
+	    Map<EDIFHierNet, EDIFHierNet> netParentMap = design.getNetlist().getParentNetMap();
+	    EDIFNetlist netlist = design.getNetlist();
+	    for(Net net : new ArrayList<>(design.getNets())) {
+	        if(net.isStaticNet()) continue;
+	        EDIFHierNet hierNet = netlist.getHierNetFromName(net.getName());
+	        if(hierNet == null) {
+	            // Likely an encrypted cell
+	            continue;
+	        }
+	        EDIFHierNet parentHierNet = netParentMap.get(hierNet);
+	        if(!hierNet.equals(parentHierNet)) {
+	            Net parentPhysNet = design.getNet(parentHierNet.getHierarchicalNetName());
+	            if(parentPhysNet != null) {
+	                // Merge both physical nets together
+	                for(SiteInst si : net.getSiteInsts()) {
+	                    List<String> siteWires = new ArrayList<>(si.getSiteWiresFromNet(net));
+	                    for(String siteWire : siteWires) {
+	                        BELPin[] pins = si.getSiteWirePins(siteWire);
+	                        si.unrouteIntraSiteNet(pins[0], pins[0]);
+	                        si.routeIntraSiteNet(parentPhysNet, pins[0], pins[0]);
+	                    }
+	                }
+                    design.removeNet(net);
+	            } else if(!net.rename(parentHierNet.getHierarchicalNetName())) {
+	                System.out.println("WARNING: Failed to adjust physical net name " + net.getName());
+	            }
+	        }
+	    }
+	}
 }

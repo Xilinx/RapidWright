@@ -1,0 +1,624 @@
+########################################################################
+# Delay Model v0.5
+#
+# Describe logic delays and intra-site net delays
+#
+#
+# Conventions:
+# A user see a cell with all its input and output pins. But, the user do NOT know
+# if a timing arc between each pair of input and output exists or not.
+# Thus, the user will call the delay model with each possible pair of input/output.
+# When the delay model was called with non-existent arc, it throws exception.
+# the user have to catch it and interpret it as an indicator that the arc DOES NOT exist.
+#
+# The model is not context-aware. This means
+# 1) a delay of an arc does  not change with load.
+# 2) there is an arc even when its input or output is not connected.
+#
+#
+# File format:
+# 1) A blank line or a line start with # will be ignored.
+# 2) There are two types of data: intra-site and logic delays.
+#    The section for intra-site must start with keyword "site" followed by site names, seperated by ','.
+#    All the site names after the keyword "site" will consider equivalent.
+#    Please beware that equivalent sites will be applied to bel as well.
+#    The section for logic delay must start with keyword "bel" followed by bel names, considered equivalent.
+#    It must contain keyword "in" and a list of site names where the bel delays are applicable.
+#    All the site names after the keyword "in" will consider equivalent for the list of bel names.
+#    The "site" and "bel" keywords are in effect until another keyword appears.
+# 3) An arc delay of an intra-site net delay is listed in one line, containing 3 fields:
+#    start pin, end pin and delay in ps. The pin can be either a site pin or a bel pin.
+#    A bel pin must include both bel name and pin name, seperated by '/'.
+#    Equivalent pin can be listed using ',' as seperators. The delay value field cannot be a list.
+# 4) Text substitution can be applied to each inter-site arc delay line.
+#    The text to be replaced follows by ':' and the list of desired substitutions.
+#    Only one substitution list per arc is supported.
+# 5) An arc delay of a logic delay is listed in one line.
+#    In the simplest case, it contains 3 fields: start pin, end pin and delay in ps.
+#    Both pins belong to the same bel and thus bel name are not used in the fields.
+# 6) An arc delay can be more complex because A bel may have different set of arcs for different configurations.
+#    Furthermore, the same arcs may have different delays depending on configurations.
+#    For such a bel, an optional list of configuration follow the keyword "bel" and the bel name.
+#    A configuration and its values are format as
+#          CARRY_TYPE: SINGLE_CY8 DUAL_CY4
+#    , where CARRY_TYPE is a valid configuration for the bel (CARRY8 in this example),
+#    SINGLE_CY8 and DUAL_CY4 are the valid value of CARRY_TYPE.
+#    Multiple configurations are separated by one or more ' '.
+#    An arc delay for such bel may contain more than 3 fields.
+#    The extra field list configurations and their values where the arc delay is applicable.
+#    If a configuration is not listed for an arc delay, the arc is assumed to exist for all value of the missing configuration.
+# 7) Each entry above must complete in one line. '\' CANNOT be used to continue on the next line.
+# 8) The arc delays representing inter-site delay of a site must be together.
+#    The arcs representing logic delays of a bel must be together.
+#
+########################################################################
+
+######################  special cases for inter-site ####################
+# Only valid between vertically adjacent sites. No check provided.
+#intersite SLICEM/COUT SLICEM/CIN 20
+# if cross rclk
+#intersite SLICEM/COUT SLICEM/CIN 45
+
+###################### inter-site delay ####################
+site SLICEM,SLICEL
+       A6   A6LUT/A6     0
+       A5   A6LUT/A5     0
+       A4   A6LUT/A4     0
+       A3   A6LUT/A3     0
+       A2   A6LUT/A2     0
+       A1   A6LUT/A1     0
+       A5   A5LUT/A5     0
+       A4   A5LUT/A4     0
+       A3   A5LUT/A3     0
+       A2   A5LUT/A2     0
+       A1   A5LUT/A1     0
+
+# possible to consolidate these
+       B6   B6LUT/A6     0
+       B5   B6LUT/A5     0
+       B4   B6LUT/A4     0
+       B3   B6LUT/A3     0
+       B2   B6LUT/A2     0
+       B1   B6LUT/A1     0
+       B5   B5LUT/A5     0
+       B4   B5LUT/A4     0
+       B3   B5LUT/A3     0
+       B2   B5LUT/A2     0
+       B1   B5LUT/A1     0
+
+       C6   C6LUT/A6     0
+       C5   C6LUT/A5     0
+       C4   C6LUT/A4     0
+       C3   C6LUT/A3     0
+       C2   C6LUT/A2     0
+       C1   C6LUT/A1     0
+       C5   C5LUT/A5     0
+       C4   C5LUT/A4     0
+       C3   C5LUT/A3     0
+       C2   C5LUT/A2     0
+       C1   C5LUT/A1     0
+
+       D6   D6LUT/A6     0
+       D5   D6LUT/A5     0
+       D4   D6LUT/A4     0
+       D3   D6LUT/A3     0
+       D2   D6LUT/A2     0
+       D1   D6LUT/A1     0
+       D5   D5LUT/A5     0
+       D4   D5LUT/A4     0
+       D3   D5LUT/A3     0
+       D2   D5LUT/A2     0
+       D1   D5LUT/A1     0
+
+       E6   E6LUT/A6     0
+       E5   E6LUT/A5     0
+       E4   E6LUT/A4     0
+       E3   E6LUT/A3     0
+       E2   E6LUT/A2     0
+       E1   E6LUT/A1     0
+       E5   E5LUT/A5     0
+       E4   E5LUT/A4     0
+       E3   E5LUT/A3     0
+       E2   E5LUT/A2     0
+       E1   E5LUT/A1     0
+
+       F6   F6LUT/A6     0
+       F5   F6LUT/A5     0
+       F4   F6LUT/A4     0
+       F3   F6LUT/A3     0
+       F2   F6LUT/A2     0
+       F1   F6LUT/A1     0
+       F5   F5LUT/A5     0
+       F4   F5LUT/A4     0
+       F3   F5LUT/A3     0
+       F2   F5LUT/A2     0
+       F1   F5LUT/A1     0
+
+       G6   G6LUT/A6     0
+       G5   G6LUT/A5     0
+       G4   G6LUT/A4     0
+       G3   G6LUT/A3     0
+       G2   G6LUT/A2     0
+       G1   G6LUT/A1     0
+       G5   G5LUT/A5     0
+       G4   G5LUT/A4     0
+       G3   G5LUT/A3     0
+       G2   G5LUT/A2     0
+       G1   G5LUT/A1     0
+
+       H6   H6LUT/A6     0
+       H5   H6LUT/A5     0
+       H4   H6LUT/A4     0
+       H3   H6LUT/A3     0
+       H2   H6LUT/A2     0
+       H1   H6LUT/A1     0
+       H5   H5LUT/A5     0
+       H4   H5LUT/A4     0
+       H3   H5LUT/A3     0
+       H2   H5LUT/A2     0
+       H1   H5LUT/A1     0
+
+
+# input site pins to FF
+       AX      AFF/D   100 A: A B C D E F G H
+      A_I     AFF2/D   100 A: A B C D E F G H
+# LUT to FF
+ A6LUT/O6     AFF2/D    50 A: A B C D E F G H
+ A6LUT/O6      AFF/D    50 A: A B C D E F G H
+ A5LUT/O5     AFF2/D    50 A: A B C D E F G H
+ A5LUT/O5      AFF/D    50 A: A B C D E F G H
+# LUT to output site pins
+ A6LUT/O6       AMUX    60 A: A B C D E F G H
+ A6LUT/O6        A_O     0 A: A B C D E F G H
+ A5LUT/O5       AMUX    60 A: A B C D E F G H
+# FF to output site pins
+    AFF/Q         AQ     0 A: A B C D E F G H
+   AFF2/Q        AQ2     0 A: A B C D E F G H
+
+# To/from muxf7
+          AX F7MUX_AB/S0   0
+    B6LUT/O6 F7MUX_AB/0   25
+    A6LUT/O6 F7MUX_AB/1   21
+F7MUX_AB/OUT BFF/D        32
+F7MUX_AB/OUT BFF2/D       32
+F7MUX_AB/OUT BMUX         32
+
+          CX F7MUX_CD/S0   0
+    D6LUT/O6 F7MUX_CD/0   25
+    C6LUT/O6 F7MUX_CD/1   21
+F7MUX_CD/OUT DFF/D        32
+F7MUX_CD/OUT DFF2/D       32
+F7MUX_CD/OUT DMUX         32
+
+          EX F7MUX_EF/S0   0
+    F6LUT/O6 F7MUX_EF/0   25
+    E6LUT/O6 F7MUX_EF/1   21
+F7MUX_EF/OUT FFF/D        32
+F7MUX_EF/OUT FFF2/D       32
+F7MUX_EF/OUT FMUX         32
+
+          GX F7MUX_GH/S0   0
+    H6LUT/O6 F7MUX_GH/0   25
+    G6LUT/O6 F7MUX_GH/1   21
+F7MUX_GH/OUT HFF/D        32
+F7MUX_GH/OUT HFF2/D       32
+F7MUX_GH/OUT HMUX         32
+
+# To carry
+         CIN  CARRY8/CIN  0
+          AX  CARRY8/AX   0
+          BX  CARRY8/BX   0
+          CX  CARRY8/CX   0
+          DX  CARRY8/DX   0
+          EX  CARRY8/EX   0
+          FX  CARRY8/FX   0
+          GX  CARRY8/GX   0
+          HX  CARRY8/HX   0
+    A6LUT/O6  CARRY8/S0   0
+    B6LUT/O6  CARRY8/S1   0
+    C6LUT/O6  CARRY8/S2   0
+    D6LUT/O6  CARRY8/S3   0
+    E6LUT/O6  CARRY8/S4   0
+    F6LUT/O6  CARRY8/S5   0
+    G6LUT/O6  CARRY8/S6   0
+    H6LUT/O6  CARRY8/S7   0
+    A5LUT/O5  CARRY8/DI0  0
+    B5LUT/O5  CARRY8/DI1  0
+    C5LUT/O5  CARRY8/DI2  0
+    D5LUT/O5  CARRY8/DI3  0
+    E5LUT/O5  CARRY8/DI4  0
+    F5LUT/O5  CARRY8/DI5  0
+    G5LUT/O5  CARRY8/DI6  0
+    H5LUT/O5  CARRY8/DI7  0
+
+# From carry
+   CARRY8/O0  AMUX      0
+   CARRY8/O1  BMUX      0
+   CARRY8/O2  CMUX      0
+   CARRY8/O3  DMUX      0
+   CARRY8/O4  EMUX      0
+   CARRY8/O5  FMUX      0
+   CARRY8/O6  GMUX      0
+   CARRY8/O7  HMUX      0
+   CARRY8/O0  AFF/D     0
+   CARRY8/O1  BFF/D     0
+   CARRY8/O2  CFF/D     0
+   CARRY8/O3  DFF/D     0
+   CARRY8/O4  EFF/D     0
+   CARRY8/O5  FFF/D     0
+   CARRY8/O6  GFF/D     0
+   CARRY8/O7  HFF/D     0
+   CARRY8/O0  AFF2/D    0
+   CARRY8/O1  BFF2/D    0
+   CARRY8/O2  CFF2/D    0
+   CARRY8/O3  DFF2/D    0
+   CARRY8/O4  EFF2/D    0
+   CARRY8/O5  FFF2/D    0
+   CARRY8/O6  GFF2/D    0
+   CARRY8/O7  HFF2/D    0
+
+# using FF as routethrough. TODO find delay
+# select_objects [get_cells microblaze_0/U0/MicroBlaze_Core_I/Performance.Core/Data_Flow_I/ALU_I/Using_FPGA.ALL_Bits[0].ALU_Bit_I1/Last_Bit.Pre_MUXCY_I/Using_FPGA.Native_CARRY4_CARRY8]
+   CARRY8/O0  AQ      0
+   CARRY8/O1  BQ      0
+   CARRY8/O2  CQ      0
+   CARRY8/O3  DQ      0
+   CARRY8/O4  EQ      0
+   CARRY8/O5  FQ      0
+   CARRY8/O6  GQ      0
+   CARRY8/O7  HQ      0
+
+
+  CARRY8/CO0  AMUX      0
+  CARRY8/CO1  BMUX      0
+  CARRY8/CO2  CMUX      0
+  CARRY8/CO3  DMUX      0
+  CARRY8/CO4  EMUX      0
+  CARRY8/CO5  FMUX      0
+  CARRY8/CO6  GMUX      0
+  CARRY8/CO7  HMUX      0
+  CARRY8/CO0  AFF/D     0
+  CARRY8/CO1  BFF/D     0
+  CARRY8/CO2  CFF/D     0
+  CARRY8/CO3  DFF/D     0
+  CARRY8/CO4  EFF/D     0
+  CARRY8/CO5  FFF/D     0
+  CARRY8/CO6  GFF/D     0
+  CARRY8/CO7  HFF/D     0
+  CARRY8/CO0  AFF2/D    0
+  CARRY8/CO1  BFF2/D    0
+  CARRY8/CO2  CFF2/D    0
+  CARRY8/CO3  DFF2/D    0
+  CARRY8/CO4  EFF2/D    0
+  CARRY8/CO5  FFF2/D    0
+  CARRY8/CO6  GFF2/D    0
+  CARRY8/CO7  HFF2/D    0
+  CARRY8/CO7  COUT      0
+
+# from CE
+  CKEN1 AFF/CE   0
+  CKEN1 BFF/CE   0
+  CKEN1 CFF/CE   0
+  CKEN1 DFF/CE   0
+  CKEN2 AFF2/CE  0
+  CKEN2 BFF2/CE  0
+  CKEN2 CFF2/CE  0
+  CKEN2 DFF2/CE  0
+  CKEN3 EFF/CE   0
+  CKEN3 FFF/CE   0
+  CKEN3 GFF/CE   0
+  CKEN3 HFF/CE   0
+  CKEN4 EFF2/CE  0
+  CKEN4 FFF2/CE  0
+  CKEN4 GFF2/CE  0
+  CKEN4 HFF2/CE  0
+
+# from rst
+  SRST1 AFF/SR   0 AFF: AFF BFF CFF DFF AFF2 BFF2 CFF2 DFF2
+  SRST2 EFF/SR   0 EFF: EFF FFF GFF HFF EFF2 FFF2 GFF2 HFF2
+
+# The followings actually are applicable to only SLICEM. But, current code can't handle the case
+# where some arcs are not common among SLICEM/L while other are.  However, this won't do any harm
+# as user would never ask for these arcs in SLICEL.
+#site SLICEM
+# to waddr of lutram
+  H1  A5LUT/WA1  0   A5LUT: A5LUT B5LUT C5LUT D5LUT E5LUT F5LUT G5LUT H5LUT A6LUT B6LUT C6LUT D6LUT E6LUT F6LUT G6LUT H6LUT
+  H2  A5LUT/WA2  0   A5LUT: A5LUT B5LUT C5LUT D5LUT E5LUT F5LUT G5LUT H5LUT A6LUT B6LUT C6LUT D6LUT E6LUT F6LUT G6LUT H6LUT
+  H3  A5LUT/WA3  0   A5LUT: A5LUT B5LUT C5LUT D5LUT E5LUT F5LUT G5LUT H5LUT A6LUT B6LUT C6LUT D6LUT E6LUT F6LUT G6LUT H6LUT
+  H4  A5LUT/WA4  0   A5LUT: A5LUT B5LUT C5LUT D5LUT E5LUT F5LUT G5LUT H5LUT A6LUT B6LUT C6LUT D6LUT E6LUT F6LUT G6LUT H6LUT
+  H5  A5LUT/WA5  0   A5LUT: A5LUT B5LUT C5LUT D5LUT E5LUT F5LUT G5LUT H5LUT A6LUT B6LUT C6LUT D6LUT E6LUT F6LUT G6LUT H6LUT
+  H6  A6LUT/WA6  0   A6LUT: A6LUT B6LUT C6LUT D6LUT E6LUT F6LUT G6LUT H6LUT
+
+# to we of lutram
+  WCKEN A5LUT/WE  0   A5LUT: A5LUT B5LUT C5LUT D5LUT E5LUT F5LUT G5LUT H5LUT A6LUT B6LUT C6LUT D6LUT E6LUT F6LUT G6LUT H6LUT
+
+# to D of SRL
+  AX  A6LUT/DI2 0
+  BX  B6LUT/DI2 0
+  CX  C6LUT/DI2 0
+  DX  D6LUT/DI2 0
+  EX  E6LUT/DI2 0
+  FX  F6LUT/DI2 0
+  GX  G6LUT/DI2 0
+  HX  H6LUT/DI2 0
+  A_I A5LUT/DI1 0
+  B_I B5LUT/DI1 0
+  C_I C5LUT/DI1 0
+  D_I D5LUT/DI1 0
+  E_I E5LUT/DI1 0
+  F_I F5LUT/DI1 0
+  G_I G5LUT/DI1 0
+  H_I H5LUT/DI1 0
+
+###################### logic delay ####################
+bel F7MUX_AB,F7MUX_CD,F7MUX_EF,F7MUX_GH in SLICEM,SLICEL
+S0 OUT 77
+0  OUT 70
+1  OUT 70
+
+
+bel A6LUT,B6LUT,C6LUT,D6LUT,E6LUT,F6LUT,G6LUT,H6LUT in SLICEM,SLICEL
+A1	O6	150
+A2	O6	125
+A3	O6	100
+A4	O6	90
+A5	O6	50
+A6	O6	35
+CLK	WA1	117
+CLK	WA2	114
+CLK	WA3	113
+CLK	WA4	112
+CLK	WA5	86
+CLK	WA6	96
+CLK	WE	180
+CLK	O6	312
+CLK	DI1	69
+# to be used when map to ramd32
+CLK	DI2	81
+
+
+bel A5LUT,B5LUT,C5LUT,D5LUT,E5LUT,F5LUT,G5LUT,H5LUT in SLICEM,SLICEL
+#A1	O5	150
+#A2	O5	125
+#A3	O5	100
+#A4	O5	90
+#A5	O5	50
+A1	O5	165
+A2	O5	140
+A3	O5	115
+A4	O5	100
+A5	O5	70
+CLK	WA1	117
+CLK	WA2	114
+CLK	WA3	113
+CLK	WA4	112
+CLK	WA5	86
+CLK	WE	180
+CLK	O5	295
+CLK	DI1	69
+
+
+bel AFF,BFF,CFF,DFF,EFF,FFF,GFF,HFF,AFF2,BFF2,CFF2,DFF2,EFF2,FFF2,GFF2,HFF2 in SLICEM,SLICEL
+CLK Q  77
+CLK D -25
+
+# delay for GND and VCC are the same. remove VCC
+bel CARRY8 CYINIT_BOT: AX CIN GND CYINIT_TOP: CIN EX GND CARRY_TYPE: SINGLE_CY8 DUAL_CY4 in SLICEM,SLICEL
+      EX   CO4     109   CYINIT_TOP: EX        CARRY_TYPE: DUAL_CY4
+      EX   CO5     105   CYINIT_TOP: EX        CARRY_TYPE: DUAL_CY4
+      EX   CO6     114   CYINIT_TOP: EX        CARRY_TYPE: DUAL_CY4
+      EX   CO7     117   CYINIT_TOP: EX        CARRY_TYPE: DUAL_CY4
+      EX    O4      99   CYINIT_TOP: EX        CARRY_TYPE: DUAL_CY4
+      EX    O5     134   CYINIT_TOP: EX        CARRY_TYPE: DUAL_CY4
+      EX    O6     132   CYINIT_TOP: EX        CARRY_TYPE: DUAL_CY4
+      EX    O7     139   CYINIT_TOP: EX        CARRY_TYPE: DUAL_CY4
+      AX   CO0      52   CYINIT_BOT: AX        CARRY_TYPE: DUAL_CY4
+      AX   CO1      42   CYINIT_BOT: AX        CARRY_TYPE: DUAL_CY4
+      AX   CO2      57   CYINIT_BOT: AX        CARRY_TYPE: DUAL_CY4
+      AX   CO3      60   CYINIT_BOT: AX        CARRY_TYPE: DUAL_CY4
+      AX    O0      56   CYINIT_BOT: AX        CARRY_TYPE: DUAL_CY4
+      AX    O1      76   CYINIT_BOT: AX        CARRY_TYPE: DUAL_CY4
+      AX    O2      67   CYINIT_BOT: AX        CARRY_TYPE: DUAL_CY4
+      AX    O3      82   CYINIT_BOT: AX        CARRY_TYPE: DUAL_CY4
+      # when belpin AX is used as CI pin of CARRY8
+      AX   CO0     107   CYINIT_BOT: AX        CARRY_TYPE: SINGLE_CY8
+      AX   CO1     105   CYINIT_BOT: AX        CARRY_TYPE: SINGLE_CY8
+      AX   CO2     110   CYINIT_BOT: AX        CARRY_TYPE: SINGLE_CY8
+      AX   CO3     177   CYINIT_BOT: AX        CARRY_TYPE: SINGLE_CY8
+      AX   CO4     203   CYINIT_BOT: AX        CARRY_TYPE: SINGLE_CY8
+      AX   CO5     191   CYINIT_BOT: AX        CARRY_TYPE: SINGLE_CY8
+      AX   CO6     206   CYINIT_BOT: AX        CARRY_TYPE: SINGLE_CY8
+      AX   CO7     160   CYINIT_BOT: AX        CARRY_TYPE: SINGLE_CY8
+      AX    O0     110   CYINIT_BOT: AX        CARRY_TYPE: SINGLE_CY8
+      AX    O1     132   CYINIT_BOT: AX        CARRY_TYPE: SINGLE_CY8
+      AX    O2     131   CYINIT_BOT: AX        CARRY_TYPE: SINGLE_CY8
+      AX    O3     135   CYINIT_BOT: AX        CARRY_TYPE: SINGLE_CY8
+      AX    O4     193   CYINIT_BOT: AX        CARRY_TYPE: SINGLE_CY8
+      AX    O5     228   CYINIT_BOT: AX        CARRY_TYPE: SINGLE_CY8
+      AX    O6     216   CYINIT_BOT: AX        CARRY_TYPE: SINGLE_CY8
+      AX    O7     231   CYINIT_BOT: AX        CARRY_TYPE: SINGLE_CY8
+     CIN   CO0      52
+     CIN   CO1      42
+     CIN   CO2      57
+     CIN   CO3      60
+     CIN   CO4      92   CARRY_TYPE: SINGLE_CY8
+     CIN   CO5      77   CARRY_TYPE: SINGLE_CY8
+     CIN   CO6      92   CARRY_TYPE: SINGLE_CY8
+     CIN   CO7      23   CARRY_TYPE: SINGLE_CY8
+     CIN    O0      56
+     CIN    O1      76
+     CIN    O2      67
+     CIN    O3      82
+     CIN    O4      86   CARRY_TYPE: SINGLE_CY8
+     CIN    O5     116   CARRY_TYPE: SINGLE_CY8
+     CIN    O6     103   CARRY_TYPE: SINGLE_CY8
+     CIN    O7     116   CARRY_TYPE: SINGLE_CY8
+     # for when belpin AX is used for DI0 pin of CARRY8
+      AX   CO0      57   CYINIT_BOT: GND CIN
+      AX   CO1      83   CYINIT_BOT: GND CIN
+      AX   CO2      90   CYINIT_BOT: GND CIN
+      AX   CO3     182   CYINIT_BOT: GND CIN
+      AX   CO4     184   CYINIT_BOT: GND CIN    CARRY_TYPE: SINGLE_CY8
+      AX   CO5     170   CYINIT_BOT: GND CIN    CARRY_TYPE: SINGLE_CY8
+      AX   CO6     186   CYINIT_BOT: GND CIN    CARRY_TYPE: SINGLE_CY8
+      AX   CO7     140   CYINIT_BOT: GND CIN    CARRY_TYPE: SINGLE_CY8
+      AX    O1      81   CYINIT_BOT: GND CIN
+      AX    O2     109   CYINIT_BOT: GND CIN
+      AX    O3     115   CYINIT_BOT: GND CIN
+      AX    O4     178   CYINIT_BOT: GND CIN    CARRY_TYPE: SINGLE_CY8
+      AX    O5     208   CYINIT_BOT: GND CIN    CARRY_TYPE: SINGLE_CY8
+      AX    O6     196   CYINIT_BOT: GND CIN    CARRY_TYPE: SINGLE_CY8
+      AX    O7     211   CYINIT_BOT: GND CIN    CARRY_TYPE: SINGLE_CY8
+     # when AX is used as DI0, belpin DI0 is generally not connected.
+     # leaving these arcs should not have negative impact.
+     DI0   CO0      57
+     DI0   CO1      83
+     DI0   CO2      90
+     DI0   CO3     182
+     DI0   CO4     184   CARRY_TYPE: SINGLE_CY8
+     DI0   CO5     170   CARRY_TYPE: SINGLE_CY8
+     DI0   CO6     186   CARRY_TYPE: SINGLE_CY8
+     DI0   CO7     140   CARRY_TYPE: SINGLE_CY8
+     DI0    O1      81
+     DI0    O2     109
+     DI0    O3     115
+     DI0    O4     178   CARRY_TYPE: SINGLE_CY8
+     DI0    O5     208   CARRY_TYPE: SINGLE_CY8
+     DI0    O6     196   CARRY_TYPE: SINGLE_CY8
+     DI0    O7     211   CARRY_TYPE: SINGLE_CY8
+# belpin BX and DI1 can be used for DI1 pin of CARRY8
+  BX,DI1   CO1      73
+  BX,DI1   CO2      78
+  BX,DI1   CO3     144
+  BX,DI1   CO4     172   CARRY_TYPE: SINGLE_CY8
+  BX,DI1   CO5     158   CARRY_TYPE: SINGLE_CY8
+  BX,DI1   CO6     173   CARRY_TYPE: SINGLE_CY8
+  BX,DI1   CO7     127   CARRY_TYPE: SINGLE_CY8
+  BX,DI1    O2      99
+  BX,DI1    O3     102
+  BX,DI1    O4     162   CARRY_TYPE: SINGLE_CY8
+  BX,DI1    O5     196   CARRY_TYPE: SINGLE_CY8
+  BX,DI1    O6     183   CARRY_TYPE: SINGLE_CY8
+  BX,DI1    O7     198   CARRY_TYPE: SINGLE_CY8
+  CX,DI2   CO2      69
+  CX,DI2   CO3     134
+  CX,DI2   CO4     160   CARRY_TYPE: SINGLE_CY8
+  CX,DI2   CO5     148   CARRY_TYPE: SINGLE_CY8
+  CX,DI2   CO6     163   CARRY_TYPE: SINGLE_CY8
+  CX,DI2   CO7     117   CARRY_TYPE: SINGLE_CY8
+  CX,DI2    O3      94
+  CX,DI2    O4     150   CARRY_TYPE: SINGLE_CY8
+  CX,DI2    O5     186   CARRY_TYPE: SINGLE_CY8
+  CX,DI2    O6     174   CARRY_TYPE: SINGLE_CY8
+  CX,DI2    O7     188   CARRY_TYPE: SINGLE_CY8
+  DX,DI3   CO3     131
+  DX,DI3   CO4     157   CARRY_TYPE: SINGLE_CY8
+  DX,DI3   CO5     144   CARRY_TYPE: SINGLE_CY8
+  DX,DI3   CO6     160   CARRY_TYPE: SINGLE_CY8
+  DX,DI3   CO7     113   CARRY_TYPE: SINGLE_CY8
+  DX,DI3    O4     147   CARRY_TYPE: SINGLE_CY8
+  DX,DI3    O5     182   CARRY_TYPE: SINGLE_CY8
+  DX,DI3    O6     170   CARRY_TYPE: SINGLE_CY8
+  DX,DI3    O7     185   CARRY_TYPE: SINGLE_CY8
+      EX   CO4      59   CYINIT_TOP: CIN GND        CARRY_TYPE: DUAL_CY4
+      EX   CO5      87   CYINIT_TOP: CIN GND        CARRY_TYPE: DUAL_CY4
+      EX   CO6      98   CYINIT_TOP: CIN GND        CARRY_TYPE: DUAL_CY4
+      EX   CO7     100   CYINIT_TOP: CIN GND        CARRY_TYPE: DUAL_CY4
+      EX    O5      84   CYINIT_TOP: CIN GND        CARRY_TYPE: DUAL_CY4
+      EX    O6     115   CYINIT_TOP: CIN GND        CARRY_TYPE: DUAL_CY4
+      EX    O7     123   CYINIT_TOP: CIN GND        CARRY_TYPE: DUAL_CY4
+      EX   CO4      59   CARRY_TYPE: SINGLE_CY8
+      EX   CO5      87   CARRY_TYPE: SINGLE_CY8
+      EX   CO6      98   CARRY_TYPE: SINGLE_CY8
+      EX   CO7     100   CARRY_TYPE: SINGLE_CY8
+      EX    O5      84   CARRY_TYPE: SINGLE_CY8
+      EX    O6     115   CARRY_TYPE: SINGLE_CY8
+      EX    O7     123
+     DI4   CO4      59
+     DI4   CO5      87
+     DI4   CO6      98
+     DI4   CO7     100
+     DI4    O5      84
+     DI4    O6     115
+     DI4    O7     123
+  FX,DI5   CO5      74
+  FX,DI5   CO6      82
+  FX,DI5   CO7      95
+  FX,DI5    O6     102
+  FX,DI5    O7     107
+  GX,DI6   CO6      69
+  GX,DI6   CO7      67
+  GX,DI6    O7      93
+  HX,DI7   CO7      60
+      S0   CO0      71
+      S0   CO1     109
+      S0   CO2     115
+      S0   CO3     186
+      S0   CO4     216   CARRY_TYPE: SINGLE_CY8
+      S0   CO5     201   CARRY_TYPE: SINGLE_CY8
+      S0   CO6     217   CARRY_TYPE: SINGLE_CY8
+      S0   CO7     199   CARRY_TYPE: SINGLE_CY8
+      S0    O0      65
+      S0    O1      96
+      S0    O2     134
+      S0    O3     139
+      S0    O4     206   CARRY_TYPE: SINGLE_CY8
+      S0    O5     240   CARRY_TYPE: SINGLE_CY8
+      S0    O6     226   CARRY_TYPE: SINGLE_CY8
+      S0    O7     241   CARRY_TYPE: SINGLE_CY8
+      S1   CO1      91
+      S1   CO2      98
+      S1   CO3     184
+      S1   CO4     213   CARRY_TYPE: SINGLE_CY8
+      S1   CO5     199   CARRY_TYPE: SINGLE_CY8
+      S1   CO6     214   CARRY_TYPE: SINGLE_CY8
+      S1   CO7     197   CARRY_TYPE: SINGLE_CY8
+      S1    O1      56
+      S1    O2     117
+      S1    O3     123
+      S1    O4     204   CARRY_TYPE: SINGLE_CY8
+      S1    O5     237   CARRY_TYPE: SINGLE_CY8
+      S1    O6     224   CARRY_TYPE: SINGLE_CY8
+      S1    O7     238   CARRY_TYPE: SINGLE_CY8
+      S2   CO2      63
+      S2   CO3     148
+      S2   CO4     176   CARRY_TYPE: SINGLE_CY8
+      S2   CO5     162   CARRY_TYPE: SINGLE_CY8
+      S2   CO6     177   CARRY_TYPE: SINGLE_CY8
+      S2   CO7     168   CARRY_TYPE: SINGLE_CY8
+      S2    O2      58
+      S2    O3      86
+      S2    O4     167   CARRY_TYPE: SINGLE_CY8
+      S2    O5     200   CARRY_TYPE: SINGLE_CY8
+      S2    O6     188   CARRY_TYPE: SINGLE_CY8
+      S2    O7     202   CARRY_TYPE: SINGLE_CY8
+      S3   CO3     133
+      S3   CO4     159   CARRY_TYPE: SINGLE_CY8
+      S3   CO5     146   CARRY_TYPE: SINGLE_CY8
+      S3   CO6     162   CARRY_TYPE: SINGLE_CY8
+      S3   CO7     170   CARRY_TYPE: SINGLE_CY8
+      S3    O3      61
+      S3    O4     149   CARRY_TYPE: SINGLE_CY8
+      S3    O5     184   CARRY_TYPE: SINGLE_CY8
+      S3    O6     172   CARRY_TYPE: SINGLE_CY8
+      S3    O7     187   CARRY_TYPE: SINGLE_CY8
+      S4   CO4      70
+      S4   CO5     103
+      S4   CO6     113
+      S4   CO7     163
+      S4    O4      63
+      S4    O5      95
+      S4    O6     129
+      S4    O7     137
+      S5   CO5     105
+      S5   CO6     113
+      S5   CO7     166
+      S5    O5      58
+      S5    O6     131
+      S5    O7     138
+      S6   CO6      61
+      S6   CO7     124
+      S6    O6      56
+      S6    O7      85
+      S7   CO7     124
+      S7    O7      56

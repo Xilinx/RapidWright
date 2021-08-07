@@ -10,6 +10,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.Map.Entry;
@@ -79,6 +80,8 @@ import com.xilinx.rapidwright.interchange.DeviceResources.Device.ParameterDefini
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.CellParameterDefinition;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.ParameterDefinitions;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.ParameterFormat;
+import com.xilinx.rapidwright.interchange.DeviceResources.Device.ParameterMapEntry;
+import com.xilinx.rapidwright.interchange.DeviceResources.Device.ParameterMapRule;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.Direction;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.PropertyMap;
@@ -383,24 +386,68 @@ public class DeviceResourcesWriter {
         writeCellParameterDefinitions(device.getSeries(), netlist, devBuilder.getParameterDefs());
 
         // Write macro exception map
-        int size = EDIFNetlist.macroExpandExceptionMap.size();
+        Map<String, Pair<String, EnumSet<IOStandard>>> expandMap = EDIFNetlist.macroExpandExceptionMap;
+        Map<String, MacroParamRule[]> paramRules = MacroParamMappingRules.macroRules.get(device.getSeries());
+        Set<String> exceptionMacros = new TreeSet<>(expandMap.keySet());
+        exceptionMacros.addAll(paramRules.keySet());
+        int size = exceptionMacros.size();
         StructList.Builder<PrimToMacroExpansion.Builder> exceptionMap =
                 devBuilder.initExceptionMap(size);
         int i=0;
         int ioStdPropIdx = allStrings.getIndex(EDIFNetlist.IOSTANDARD_PROP);
-        for(Entry<String, Pair<String, EnumSet<IOStandard>>> entry : EDIFNetlist.macroExpandExceptionMap.entrySet()) {
+        for(String macroName : exceptionMacros) {
             PrimToMacroExpansion.Builder entryBuilder = exceptionMap.get(i);
-            entryBuilder.setMacroName(allStrings.getIndex(entry.getValue().getFirst()));
-            entryBuilder.setPrimName(allStrings.getIndex(entry.getKey()));
+            entryBuilder.setPrimName(allStrings.getIndex(macroName));
+            entryBuilder.setMacroName(allStrings.getIndex(macroName));
+            
+            // Check if this macro has an expansion exception
+            if(expandMap.containsKey(macroName)) {
+                Pair<String, EnumSet<IOStandard>> expandException = expandMap.get(macroName);
+                entryBuilder.setMacroName(allStrings.getIndex(expandException.getFirst()));
 
-            StructList.Builder<PropertyMap.Entry.Builder> ioStdEntries =
-                    entryBuilder.initParameters(entry.getValue().getSecond().size());
-            int j=0;
-            for(IOStandard ioStd : entry.getValue().getSecond()) {
-                PropertyMap.Entry.Builder ioStdEntry = ioStdEntries.get(j);
-                ioStdEntry.setKey(ioStdPropIdx);
-                ioStdEntry.setTextValue(allStrings.getIndex(ioStd.name()));
-                j++;
+                StructList.Builder<PropertyMap.Entry.Builder> ioStdEntries =
+                        entryBuilder.initParameters(expandException.getSecond().size());
+                int j=0;
+                for(IOStandard ioStd : expandException.getSecond()) {
+                    PropertyMap.Entry.Builder ioStdEntry = ioStdEntries.get(j);
+                    ioStdEntry.setKey(ioStdPropIdx);
+                    ioStdEntry.setTextValue(allStrings.getIndex(ioStd.name()));
+                    j++;
+                }                
+            }
+            
+            // Check if this macro has a parameter propagation rule set
+            if(paramRules.containsKey(macroName)) {
+                MacroParamRule[] rules = paramRules.get(macroName);
+                StructList.Builder<ParameterMapRule.Builder> parameterMap = 
+                        entryBuilder.initParamMapping(rules.length);
+                int j=0;
+                for(MacroParamRule rule : rules) {
+                    ParameterMapRule.Builder ruleBuilder = parameterMap.get(j);
+                    ruleBuilder.setPrimParam(allStrings.getIndex(rule.getPrimParam()));
+                    ruleBuilder.setInstName(allStrings.getIndex(rule.getInstName()));
+                    ruleBuilder.setInstParam(allStrings.getIndex(rule.getInstParam()));
+                    if(rule.getBitSlice() != null) {
+                        PrimitiveList.Int.Builder bitsBuilder = 
+                                ruleBuilder.initBitSlice(rule.getBitSlice().length);
+                        for(int k = 0; k < rule.getBitSlice().length; k++) {
+                            bitsBuilder.set(k, rule.getBitSlice()[k]);
+                        }
+                    } else if(rule.getTableLookup() != null) {
+                        // Lookup table
+                        StructList.Builder<ParameterMapEntry.Builder> tableBuilder =
+                            ruleBuilder.initTableLookup(rule.getTableLookup().length);
+                        for (int k = 0; k < rule.getTableLookup().length; k++) {
+                            ParameterMapEntry.Builder itemBuilder = tableBuilder.get(k);
+                            MacroParamTableEntry tableEntry = rule.getTableLookup()[k];
+                            itemBuilder.setFrom(allStrings.getIndex(tableEntry.from));
+                            itemBuilder.setFrom(allStrings.getIndex(tableEntry.to));
+                        }
+                    } else {
+                        ruleBuilder.setCopyValue(Void.VOID);
+                    }
+                    j++;
+                }
             }
             i++;
         }
