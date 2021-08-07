@@ -45,7 +45,7 @@ public class RWRoute {
 		// Read in a design checkpoint 
 		Design design = Design.readCheckpoint(args[0]);
 		DesignTools.makePhysNetNamesConsistent(design);
-		if(!config.isPartialRouting()) {
+		if(!config.isPartialRouting() || (!design.getVccNet().hasPIPs() && !design.getGndNet().hasGapRouting())) {
 			DesignTools.createPossiblePinsToStaticNets(design);//TODO 0731 YZ: results in site pin conflicts of optical-flow-post-place dcp
 		}
 		DesignTools.createMissingSitePinInsts(design);
