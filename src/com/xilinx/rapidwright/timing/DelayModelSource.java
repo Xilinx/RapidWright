@@ -48,7 +48,7 @@ abstract class DelayModelSource {
     /**
      * Mapping between config value of a bel to a one-hot binary.
      */
-    protected Map<String, Short> configCodeMap;
+    protected Map<String, Integer> configCodeMap;
 
 
     // TODO: populate from files
@@ -95,6 +95,8 @@ abstract class DelayModelSource {
         aMap.put("F7MUX_CD",   (short) 4);
         aMap.put("F7MUX_EF",   (short) 4);
         aMap.put("F7MUX_GH",   (short) 4);
+        aMap.put("RAMB36E2", (short) 5);
+        aMap.put("URAM288", (short) 6);
         bel2IdxMap = Collections.unmodifiableMap(aMap);
     }
 
@@ -120,7 +122,7 @@ abstract class DelayModelSource {
     public List<DelayEntry> getIntraSiteDelayEntries() {
         return Collections.unmodifiableList(intraSiteDelays);
     }
-    public Map<String, Short> getConfigCodeMap() {
+    public Map<String, Integer> getConfigCodeMap() {
         return Collections.unmodifiableMap(configCodeMap);
     }
     public Map<String, Short> getBEL2IdxMap() {
