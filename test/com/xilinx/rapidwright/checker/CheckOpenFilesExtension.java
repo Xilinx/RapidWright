@@ -77,6 +77,7 @@ public class CheckOpenFilesExtension implements BeforeTestExecutionCallback, Aft
     @Override
     public void afterTestExecution(ExtensionContext extensionContext) {
         final List<String> afterList = getOpenFiles();
+        @SuppressWarnings("unchecked")
         List<String> beforeList = extensionContext.getStore(NAMESPACE).get(OPEN_FILES, List.class);
 
 
