@@ -128,7 +128,7 @@ public class DeviceBrowserScene extends TileScene{
 			RouteNode currNode = queue.poll();
 			Integer i = reachabilityMap.get(currNode.getTile());
 			if(i == null){
-				i = new Integer(1);
+				i = 1;
 				reachabilityMap.put(currNode.getTile(), i);
 			}
 			else{
