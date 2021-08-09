@@ -64,6 +64,10 @@ public class CheckOpenFilesExtension implements BeforeTestExecutionCallback, Aft
         if (path.startsWith("socket:")) {
             return false;
         }
+        //Ignore JDK internals (may need to load new code during execution)
+        if (path.startsWith(System.getProperty("java.home"))) {
+            return false;
+        }
         return true;
     }
 
@@ -73,6 +77,7 @@ public class CheckOpenFilesExtension implements BeforeTestExecutionCallback, Aft
     @Override
     public void afterTestExecution(ExtensionContext extensionContext) {
         final List<String> afterList = getOpenFiles();
+        @SuppressWarnings("unchecked")
         List<String> beforeList = extensionContext.getStore(NAMESPACE).get(OPEN_FILES, List.class);
 
 
