@@ -911,12 +911,24 @@ public class FileTools {
 	    if(resourceFile.exists()) {
 	        File md5File = new File(fileName + MD5_DATA_FILE_SUFFIX);
 	        if(md5File.exists()) {
-	            long md5LastModified = md5File.lastModified();
-	            if(md5LastModified > getLastModifiedDataVersionFile() 
-	                    && md5LastModified > resourceFile.lastModified()) {
-	                // File is up to date
+	            String currMD5 = null;
+                try {
+                    currMD5 = Files.readAllLines(md5File.toPath()).get(0);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+	            String expectedMD5 = getCurrentDataVersion(name);
+	            if(currMD5.equals(expectedMD5)) {
 	                return null;
 	            }
+
+	            // Check by timestamp
+//	            long md5LastModified = md5File.lastModified();
+//	            if(md5LastModified > getLastModifiedDataVersionFile() 
+//	                    && md5LastModified > resourceFile.lastModified()) {
+//	                // File is up to date
+//	                return null;
+//	            }
 	        } else {
 	            // .md5 file is missing
 	            String currMD5 = Installer.calculateMD5OfFile(resourceFile.getAbsolutePath());
@@ -929,7 +941,7 @@ public class FileTools {
 	            }
 	        }
 	    }
-	    return downloadDataFile(name);
+	    return downloadDataFile(name.replace("\\", "/"));
 	}
 	
 	/**
@@ -1741,6 +1753,9 @@ public class FileTools {
      * @return The MD5 sum of the expected file contents.
      */
     public static String getCurrentDataVersion(String dataFileName) {
+        if(File.separator.equals("\\")) {
+            dataFileName = dataFileName.replace(File.separator,"/");
+        }
         Pair<String,String> result = getDataVersionMap().get(dataFileName);
         return result != null ? result.getSecond() : null;
     }
