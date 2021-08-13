@@ -59,6 +59,8 @@ import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.SortedMap;
+import java.util.Map.Entry;
 import java.util.zip.DeflaterOutputStream;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
@@ -110,8 +112,6 @@ public class FileTools {
 	public static final String PART_DUMP_FILE_NAME = DATA_FOLDER_NAME + File.separator + "partdump.csv";
 	/** Location of the main parts database file */
 	public static final String PART_DB_PATH = DATA_FOLDER_NAME + File.separator + "parts.db";
-	/** Stores the intended version of each data file for this revision of RapidWright */
-	public static final String DATA_VERSION_FILE = ".data_versions";
 	/** Common instance of the Kryo class for serialization purposes */	
 	private static Kryo kryo;
 	/** Supporting data folders packed in standalone jars of RapidWright */ 
@@ -126,10 +126,6 @@ public class FileTools {
 	public static final int PART_DB_FILE_VERSION = 1;
 	/** Unisim Data File Version */
 	public static final int UNISIM_DATA_FILE_VERSION = 1;
-	/** Map created from the {@link #DATA_VERSION_FILE} */
-	private static Map<String,Pair<String,String>> dataVersionMap;
-	/** Keeps a cached timestamp of the {@link #DATA_VERSION_FILE} */
-	private static Long DATA_VERSION_FILE_LAST_MODIFIED = null; 
 	/** Base URL for download data files */
 	public static final String RAPIDWRIGHT_DATA_URL = "http://data.rapidwright.io/";
 	/** Suffix added to data file names to capture md5 status */
@@ -831,24 +827,10 @@ public class FileTools {
 		}
 		return path;
 	}
-		
-	public static long getLastModifiedDataVersionFile() {
-	    if(DATA_VERSION_FILE_LAST_MODIFIED == null) {
-	        File dataVersionFile = new File(getRapidWrightPath() 
-	                + File.separator + DATA_VERSION_FILE);
-	        if(!dataVersionFile.exists()) {
-	            throw new RuntimeException("ERROR: Missing file " + dataVersionFile.getAbsolutePath() 
-	                + ", please update RapidWright or restore the file.");
-	        }
-	        DATA_VERSION_FILE_LAST_MODIFIED = dataVersionFile.lastModified();
-	    }
-	    return DATA_VERSION_FILE_LAST_MODIFIED;
-
-	}
 	
 	public static void updateAllDataFiles() {
 	    System.out.println("Updating all RapidWright data files (this may take several minutes)...");
-        for(String fileName : getDataVersionMap().keySet()) {
+        for(String fileName : DataVersions.dataVersionMap.keySet()) {
             if(ensureCorrectDataFile(fileName) != null) {
                 System.out.println("  Downloaded " + fileName);
             }
@@ -864,9 +846,9 @@ public class FileTools {
 	public static void forceUpdateAllDataFiles() {
 	    System.out.println("Force update of all RapidWright data files "
 	            + "(this may take several minutes)...");
-	    int size = getDataVersionMap().keySet().size();
+	    int size = DataVersions.dataVersionMap.keySet().size();
 	    int i=0; 
-	    for(String fileName : getDataVersionMap().keySet()) {
+	    for(String fileName : DataVersions.dataVersionMap.keySet()) {
 	        downloadDataFile(fileName);
 	        System.out.println("  Downloaded ["+i+"/"+size+"] " + fileName);
 	        i++;
@@ -921,14 +903,6 @@ public class FileTools {
 	            if(currMD5.equals(expectedMD5)) {
 	                return null;
 	            }
-
-	            // Check by timestamp
-//	            long md5LastModified = md5File.lastModified();
-//	            if(md5LastModified > getLastModifiedDataVersionFile() 
-//	                    && md5LastModified > resourceFile.lastModified()) {
-//	                // File is up to date
-//	                return null;
-//	            }
 	        } else {
 	            // .md5 file is missing
 	            String currMD5 = Installer.calculateMD5OfFile(resourceFile.getAbsolutePath());
@@ -1756,27 +1730,9 @@ public class FileTools {
         if(File.separator.equals("\\")) {
             dataFileName = dataFileName.replace(File.separator,"/");
         }
-        Pair<String,String> result = getDataVersionMap().get(dataFileName);
+        
+        Pair<String,String> result = DataVersions.dataVersionMap.get(dataFileName);
         return result != null ? result.getSecond() : null;
-    }
-    
-    public static Map<String,Pair<String,String>> getDataVersionMap(){
-        if(dataVersionMap == null) {
-            parseDataVersionFile();
-        }
-        return dataVersionMap;
-    }
-    
-    private static void parseDataVersionFile() {
-        if(dataVersionMap == null) {
-            dataVersionMap = new HashMap<>();
-        }
-        List<String> lines = getLinesFromTextFile(getRapidWrightPath() 
-                + File.separator + DATA_VERSION_FILE);
-        for(String line : lines) {
-            String[] tokens = line.split(" ");
-            dataVersionMap.put(tokens[0], new Pair<>(tokens[1], tokens[2]));
-        }
     }
     
 	public static void main(String[] args) {
