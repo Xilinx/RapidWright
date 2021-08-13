@@ -33,6 +33,7 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -2198,4 +2199,30 @@ public class DesignTools {
 	        }
 	    }
 	}
+	
+	/**
+	 * Finds the essential PIPs which connect the provided sink pin to its source.
+	 * @param sinkPin A sink pin from a routed net.
+	 * @return The list of PIPs that for the routing connection from the sink to the source.
+	 */
+    public static List<PIP> getConnectionPIPs(SitePinInst sinkPin) {
+        if(sinkPin.isOutPin() || sinkPin.getNet() == null) return Collections.emptyList();
+        Map<Node, PIP> reverseNodeToPIPMap = new HashMap<>(); 
+        for(PIP p : sinkPin.getNet().getPIPs()) {
+            reverseNodeToPIPMap.put(p.getEndNode(), p);
+        }
+        
+        Node sinkNode = sinkPin.getConnectedNode();
+        Node srcNode = sinkPin.getNet().getSource().getConnectedNode();
+        Node curr = sinkNode;
+        
+        List<PIP> path = new ArrayList<>();
+        while(!curr.equals(srcNode)) {
+            PIP pip = reverseNodeToPIPMap.get(curr);
+            path.add(pip);
+            curr = pip.getStartNode();
+        }
+        
+        return path;
+    }
 }
