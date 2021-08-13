@@ -110,7 +110,9 @@ public class PicoBlazeArray {
 				if(impl == null) continue; // Laguna site
 				ModuleInst mi = design.createModuleInst("picoblaze_"+x+"_"+y, impl);
 				mi.getCellInst().setCellType(impl.getNetlist().getTopCell());
-				mi.place(bram);
+				if(!mi.place(bram)) {
+				    throw new RuntimeException("ERROR: Failed to place module instance " + mi);
+				}
 			}
 		}
 		
