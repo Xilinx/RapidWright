@@ -152,6 +152,31 @@ try {
 2. Javadocs are recommended for all other non-trivial methods and variables.
 3. Comments inside methods should use double forward slash style comments `// ` followed by a space
 4. Multi-line comments `/* ... */`, except in Javadoc and top file license inclusion, should be avoided.
+5. For Javadocs describing classes and method, the multiline Javadoc pattern should be used:
+   1. The first line of a Javadoc begins with `/**`, 
+   2. each following line is prefixed by ` * ` followed by descriptive text or tags,
+   3. The final line terminates with  ` */`
+6. For Javadocs describing a variable, if the description can fit on one line, the single line pattern can be used, however if the description exceeds one line, the multiline pattern should be used.
+
+Javadoc multiline pattern:
+```
+/**
+ * Convenience object for capturing a logical cell pin name
+ * with its respective cell.
+ */
+public class CellPin {
+    ...
+}
+```
+Javadoc single line pattern:
+```
+    ...
+    /** Suffix of the device part files */
+    public static final String DEVICE_FILE_SUFFIX = "_db.dat";
+    ...
+```
+
+
 
 ## 5. General Design Principles
 ### 5.1 DRY (Don't Repeat Yourself) / SSOT (Single Source of Truth)
