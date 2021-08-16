@@ -24,12 +24,23 @@
 package com.xilinx.rapidwright.rwroute;
 
 public enum RoutableType {
-	/** Routables corresponds to output SitePinInsts, typically the source rnodes of connections */
+	/** 
+	 * Denotes {@link Routable} Obejects that correspond to the output pins of {@link Net} Objects, 
+	 * typically the source {@link Routable} Objects of {@link Connection} Objects.
+	 */
 	PINFEED_O,
-	/** Routables corresponds to input SitePinInsts, typically the sink rnodes of connections */
+	/** 
+	 * Denotes {@link Routable} Obejects that correspond to input pins of {@link Net} Objects, 
+	 * typically the sink {@link Routable} Objects of {@link Connection} Objects. 
+	 */
 	PINFEED_I,
-	/** Routables with Nodes that have IntentCode.NODE_PINBOUNCE */
+	/** 
+	 * Denotes {@link Routable} Obejects that are created based on {@link Node} Objects 
+	 * that have an {@link IntentCode} of NODE_PINBOUNCE .
+	 */
 	PINBOUNCE,
-	/** Other wiring Routables created for routing connection */
+	/** Denotes other wiring {@link Routable} Objects 
+	 * that are created for routing {@link Connection} Objects.
+	 */
 	WIRE
 }

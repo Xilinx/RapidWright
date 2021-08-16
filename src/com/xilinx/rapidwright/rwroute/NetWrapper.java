@@ -31,21 +31,21 @@ import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
 
 /**
- * A wrapper class of Net with additional information for the router
+ * A wrapper class of {@link Net} with additional information for the router.
  */
 public class NetWrapper{
 	/** A unique index for this NetWrapepr */
 	private int id;
-	/** The associated Net */
+	/** The associated {@link Net} Object */
 	private Net net;
-	/** The list of connections of the net */
+	/** A list of {@link Connection} Objects of the net */
 	private List<Connection> connections;
-	/** Geometric center coordinates*/
-	private float x_geo;
-	private float y_geo;
-	/** The half-perimeter wirelength*/
+	/** Geometric center coordinates */
+	private float xCenter;
+	private float yCenter;
+	/** The half-perimeter wirelength */
 	private short hpwl;
-	/** A flag to indicate if the source has been swapped*/
+	/** A flag to indicate if the source has been swapped */
 	private boolean sourceChanged;
 	/** Stores the old source SitePinInst after output pin swapping */
 	private SitePinInst oldSource;
@@ -57,13 +57,13 @@ public class NetWrapper{
 		this.setSourceChanged(false, null);
 	}
 	
-	public void setBoundaryXYs(short bbRange){
-		short x_min = 1<<10;
-		short x_max = 0;
-		short y_min = 1<<10;
-		short y_max = 0;
-		float x_geo_sum = 0;
-		float y_geo_sum = 0;		
+	public void computeHPWLAndCenterCoordinates(short bbRange){
+		short xMin = 1<<10;
+		short xMax = 0;
+		short yMin = 1<<10;
+		short yMax = 0;
+		float xSum = 0;
+		float ySum = 0;		
 		List<Short> xArray = new ArrayList<>();
 		List<Short> yArray = new ArrayList<>();
 		
@@ -77,28 +77,28 @@ public class NetWrapper{
 				y = c.getSourceRnode().getY();
 				xArray.add(x);
 				yArray.add(y);
-				x_geo_sum += x;
-				y_geo_sum += y;		
+				xSum += x;
+				ySum += y;		
 				sourceRnodeAdded = true;
 			}	
 			x = c.getSinkRnode().getX();
 			y = c.getSinkRnode().getY();
 			xArray.add(x);
 			yArray.add(y);
-			x_geo_sum += x;
-			y_geo_sum += y;	
+			xSum += x;
+			ySum += y;	
 		}
 		
 		Collections.sort(xArray);
 		Collections.sort(yArray);
-		x_min = xArray.get(0);
-		x_max = xArray.get(xArray.size() - 1);
-		y_min = yArray.get(0);
-		y_max = yArray.get(xArray.size() - 1);
+		xMin = xArray.get(0);
+		xMax = xArray.get(xArray.size() - 1);
+		yMin = yArray.get(0);
+		yMax = yArray.get(xArray.size() - 1);
 		
-		this.setHpwl((short) ((x_max - x_min + 1) + (y_max - y_min + 1)));
-		this.setX_geo(x_geo_sum / xArray.size());
-		this.setY_geo(y_geo_sum / yArray.size());
+		this.setHpwl((short) ((xMax - xMin + 1) + (yMax - yMin + 1)));
+		this.setXCenter(xSum / xArray.size());
+		this.setYCenter(ySum / yArray.size());
 	}
 	
 	public Net getNet(){
@@ -110,7 +110,7 @@ public class NetWrapper{
 	}
 	
 	public void addCons(Connection c){
-		this.connections.add(c);
+		this.connections.add(c);	
 	}
 	
 	public List<Connection> getConnection(){
@@ -134,20 +134,20 @@ public class NetWrapper{
 		this.setOldSource(oldSource);
 	}
 
-	public float getY_geo() {
-		return y_geo;
+	public float getYCenter() {
+		return yCenter;
 	}
 
-	public void setY_geo(float y_geo) {
-		this.y_geo = y_geo;
+	public void setYCenter(float yCenter) {
+		this.yCenter = yCenter;
 	}
 
-	public float getX_geo() {
-		return x_geo;
+	public float getXCenter() {
+		return xCenter;
 	}
 
-	public void setX_geo(float x_geo) {
-		this.x_geo = x_geo;
+	public void setXCenter(float xCenter) {
+		this.xCenter = xCenter;
 	}
 	
 	public SitePinInst getOldSource() {

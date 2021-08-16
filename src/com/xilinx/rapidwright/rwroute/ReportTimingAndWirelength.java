@@ -1,6 +1,5 @@
 package com.xilinx.rapidwright.rwroute;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -8,126 +7,131 @@ import java.util.Map;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
+import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.rwroute.GlobalSignalRouting.RoutingNode;
+import com.xilinx.rapidwright.timing.TimingEdge;
+import com.xilinx.rapidwright.timing.TimingManager;
+import com.xilinx.rapidwright.timing.TimingVertex;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
+import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
+import com.xilinx.rapidwright.util.Pair;
 
-public class ReportTimingAndWirelength extends PartialRouter{
-	//TODO do not extend from the router, make the methods stand-alone
-	public Design design;
-	public int rnodeId;
-	public long wirelength = 0;
-	public long usedNodes = 0;
-	public int totalRoutableNets = 0;
+/**
+ * An example to report the critical path delay and total wirelength of a routed design.
+ * It is able to reproduce the same statistics as a {@link RWRoute} object reports after routing a design.
+ */
+public class ReportTimingAndWirelength{
+	private Design design;
+	private int rnodeId;
+	private long wirelength;
+	private long usedNodes;
+	private int numWireNetsToRoute;
+	private int numConnectionsToRoute;
+	private TimingManager timingManager;
+	private DelayEstimatorBase estimator;
+	private Map<TimingEdge, Connection> timingEdgeConnectionMap;
+	private Map<IntentCode, Long> nodeTypeUsage ;
+	private Map<IntentCode, Long> nodeTypeLength;
 	
-	public Map<IntentCode, Long> typeUsage = new HashMap<>();
-	public Map<IntentCode, Long> typeLength = new HashMap<>();
-	
-	public boolean timingDriven;
-	
-	public ReportTimingAndWirelength(Design design, Configuration config) {	
-		super(design, config);
-		this.timingDriven = config.isTimingDriven();
+	public ReportTimingAndWirelength(Design design, Configuration config) {
 		this.design = design;
+		RWRoute.setTimingData(config);	
+		this.timingManager = new TimingManager(this.design, true, null, config);		
+	    this.estimator = new DelayEstimatorBase(this.design.getDevice(), new InterconnectInfo(), config.isUseUTurnNodes(), 0);
+		RoutableNode.setTimingDriven(true, this.estimator);
+		this.wirelength = 0;
+		this.usedNodes = 0;
+		this.timingEdgeConnectionMap = new HashMap<>();
+		this.nodeTypeUsage = new HashMap<>();
+		this.nodeTypeLength = new HashMap<>();
 	}
 	
-	public static void main(String[] args) {
-		if(args.length < 2){
-			System.out.println("USAGE:\n <input.dcp> <string to indicate redirecting of timing model data path>");
-		}
+	/**
+	 * Computes the wirelength and delay for each net and reports the total wirelength and critical path delay.
+	 */
+	private void computeStatisticsAndReport() {	
+		this.computeWLDlyForEachNet();
 		
-		Design design = Design.readCheckpoint(args[0]);
+		Pair<Float, TimingVertex> maxDelayAndTimingVertex = this.timingManager.calculateArrivalRequireTimes();
+		System.out.println();
+		this.timingManager.getCriticalPathInfo(maxDelayAndTimingVertex, this.timingEdgeConnectionMap, false, null);
 		
-		Configuration config = new Configuration();
-		config.parseArguments(1, args);
-		config.setPartialRouting(true);
-		config.setTimingDriven(true);
-			
-		ReportTimingAndWirelength reporter = new ReportTimingAndWirelength(design, config);
-		
-		reporter.computeStatisticsToReport();
-		
-		reporter.printStatistics(reporter);
-		
-	}
-	
-	private void printStatistics(ReportTimingAndWirelength reporter) {
 		System.out.println("\n");
-		System.out.println("Total nodes: " + reporter.usedNodes);
-		System.out.println("Routable nets: " + reporter.totalRoutableNets);
-		System.out.println("Total wirelength: " + reporter.wirelength);
-		
-		System.out.println("\n INT_Nodes" + "\tUsage " + "\tLength ");
-		for(IntentCode ic : nodeTypes) {
-			long usage = reporter.typeUsage.getOrDefault(ic, (long)0);
-			long length = reporter.typeLength.getOrDefault(ic, (long)0);
-			System.out.println(" " + ic + "\t" + usage + "\t" + length);
-		}
+		System.out.println("Total nodes: " + this.usedNodes);
+		System.out.println("Total wirelength: " + this.wirelength);	
+		RWRoute.printNodeTypeUsageAndWirelength(true, this.nodeTypeUsage, this.nodeTypeLength);
 	}
 	
-	static List<IntentCode> nodeTypes = new ArrayList<>();
-	static {
-		nodeTypes.add(IntentCode.NODE_SINGLE);
-		nodeTypes.add(IntentCode.NODE_DOUBLE);
-		nodeTypes.add(IntentCode.NODE_VQUAD);
-		nodeTypes.add(IntentCode.NODE_HQUAD);
-		nodeTypes.add(IntentCode.NODE_VLONG);
-		nodeTypes.add(IntentCode.NODE_HLONG);
-		nodeTypes.add(IntentCode.NODE_LOCAL);
-		nodeTypes.add(IntentCode.NODE_PINBOUNCE);
-		nodeTypes.add(IntentCode.NODE_PINFEED);
-		
-	}
-	
-	private void computeStatisticsToReport() {	
-		this.computeWLDlyStatisticsForEachNet();
-		
-		if(this.timingDriven) {
-			this.maxDelayAndTimingVertex = this.timingManager.calculateArrivalRequireTimes();
-			System.out.println();
-			this.timingManager.getCriticalPathInfo(this.maxDelayAndTimingVertex, this.timingEdgeConnectionMap, false, null);
-			
-		}
-	}
-	
-	private void computeWLDlyStatisticsForEachNet() {		
+	/**
+	 * Computes the wirelength and delay for each net.
+	 */
+	private void computeWLDlyForEachNet() {
 		for(Net n : this.design.getNets()) {
-			if (!n.getType().equals(NetType.WIRE)) continue;
+			if (n.getType() != NetType.WIRE) continue;
 			if(!RouterHelper.isRoutableNetWithSourceSinks(n)) continue;
 			if(n.getSource().toString().contains("CLK")) continue;
-				
-			NetWrapper netplus = this.initializeNetAndCons(n, this.config.getBoundingBoxExtension(), false); 
-			
-			List<Node> netNodes = RouterHelper.getNodesOfNet(n);
-			
-			for(Node node:netNodes){
-				
+			NetWrapper netplus = this.createNetWrapper(n);		
+			List<Node> netNodes = RouterHelper.getNodesOfNet(n);			
+			for(Node node:netNodes){	
 				if(node.getTile().getTileTypeEnum() != TileTypeEnum.INT) continue;
-				usedNodes++;
-				
-				this.putWireLengthInfo(node, this.typeUsage, this.typeLength);
-				
-			}
-			
-			this.totalRoutableNets++;
-			
-			if(this.timingDriven) {
-				this.setTimingEdgesOfCons(netplus.getConnection());
-				this.setAccumulativeDelayOfNetNodes(netplus);
-			}
-			
+				usedNodes++;	
+				int wl = RouterHelper.getLengthOfNode(node);	
+				this.wirelength += wl;
+				RouterHelper.addNodeTypeLengthToMap(node, wl, this.nodeTypeUsage, this.nodeTypeLength);	
+			}			
+			RWRoute.setTimingEdgesOfConnections(netplus.getConnection(), this.timingManager, this.timingEdgeConnectionMap);
+			this.setAccumulativeDelayOfEachNetNode(netplus);
 		}
 	}
 	
-	private void setAccumulativeDelayOfNetNodes(NetWrapper netplus) {
-		List<PIP> pips = netplus.getNet().getPIPs();
-		
+	/**
+	 * Creates a {@link NetWrapper} object that consists of a list of {@link Connection} objects, based on a net.
+	 * @param net
+	 * @return
+	 */
+	private NetWrapper createNetWrapper(Net net) {
+		NetWrapper netWrapper = new NetWrapper(this.numWireNetsToRoute++, (short) 3, net);			
+		SitePinInst source = net.getSource();
+		Node sourceINTNode = null;
+		for(SitePinInst sink:net.getSinkPins()){
+			if(RouterHelper.isExternalConnectionToCout(source, sink)){
+				source = net.getAlternateSource();
+				if(source == null){
+					String errMsg = "Null alternate source is for COUT-CIN connection: " + net.toStringFull();
+					 throw new IllegalArgumentException(errMsg);
+				}
+			}
+			Connection c = new Connection(this.numConnectionsToRoute++, source, sink, netWrapper);	
+			List<Node> nodes = RouterHelper.projectInputPinToINTNode(sink);
+			if(nodes.isEmpty()) {	
+				c.setDirect(true);
+			}else {
+				c.setSinkRnode(new RoutableNode(this.rnodeId++, nodes.get(0), RoutableType.PINFEED_I));
+				if(sourceINTNode == null) {
+					sourceINTNode = RouterHelper.projectOutputPinToINTNode(source);
+				}
+				c.setSourceRnode(new RoutableNode(this.rnodeId++, sourceINTNode, RoutableType.PINFEED_O));
+				c.setDirect(false);
+			}
+		}
+		return netWrapper;
+	}
+	
+	/**
+	 * Using PIPs to calculate and set accumulative delay for each used node of a routed net that is represented by a {@link NetWrapper} object.
+	 * The delay of each node is the total route delay from the source to the node (inclusive).
+	 * @param netplus
+	 */
+	private void setAccumulativeDelayOfEachNetNode(NetWrapper netplus) {
+		List<PIP> pips = netplus.getNet().getPIPs();	
 		Map<Node, RoutingNode> nodeRoutingNodeMap = new HashMap<>();
 		boolean firstPIP = true;
 		for(PIP pip : pips) {
+			/** This approach works because we observed that the PIPs are in order */
 			Node startNode = pip.getStartNode();
 			RoutingNode startrn = RouterHelper.createRoutingNode(startNode, nodeRoutingNodeMap);
 			if(firstPIP) startrn.setDelayFromSource(0);
@@ -138,12 +142,10 @@ public class ReportTimingAndWirelength extends PartialRouter{
 			endrn.setPrev(startrn);
 			float delay = 0;
 			if(endNode.getTile().getTileTypeEnum() == TileTypeEnum.INT) {
-				delay = this.computeRoutingNodeDelay(endrn)
+				delay = RouterHelper.computeNodeDelay(this.estimator, endrn.getNode())
 						+ DelayEstimatorBase.getExtraDelay(endNode, DelayEstimatorBase.isLong(startNode));
 			}
-			
 			endrn.setDelayFromSource(startrn.getDelayFromSource() + delay);
-			
 		}
 		
 		for(Connection c : netplus.getConnection()) {
@@ -157,17 +159,15 @@ public class ReportTimingAndWirelength extends PartialRouter{
 		}	
 	}
 	
-	private float computeRoutingNodeDelay(RoutingNode routingNode) {
-		return RouterHelper.computeNodeDelay(estimator, routingNode.getNode());	
-	}
-	
-	
-	private void putWireLengthInfo(Node node, Map<IntentCode, Long> typeUsage, Map<IntentCode, Long> typeLength) {
-		int wl = RouterHelper.getLengthOfNode(node);
-		
-		this.wirelength += wl;
-		
-		RouterHelper.putNodeTypeLength(node, wl, this.typeUsage, this.typeLength);
-	}
-	
+	public static void main(String[] args) {
+		if(args.length < 1){
+			System.out.println("USAGE:\n <input.dcp>");
+		}
+		Design design = Design.readCheckpoint(args[0]);	
+		Configuration config = new Configuration(args);
+		config.setPartialRouting(false);
+		config.setTimingDriven(true);
+		ReportTimingAndWirelength reporter = new ReportTimingAndWirelength(design, config);	
+		reporter.computeStatisticsAndReport();
+	}	
 }

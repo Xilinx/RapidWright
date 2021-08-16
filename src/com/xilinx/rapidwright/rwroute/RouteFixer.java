@@ -34,7 +34,8 @@ import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 
 /**
- * A graph-based tool based on Depth-first Search to fix illegal routes, i.e. routed nets with path cycles or multi-driver nodes
+ * A graph-based tool based on Depth-first Search to fix illegal routes, 
+ * i.e. routed nets with path cycles or multi-driver nodes.
  */
 public class RouteFixer{
 	private NetWrapper netp;
@@ -80,7 +81,7 @@ public class RouteFixer{
 	}
 	
 	/**
-	 * Finalizes the route of each connection based on the delay-aware path merging
+	 * Finalizes the route of each connection based on the delay-aware path merging.
 	 */
 	public void finalizeRoutesOfConnections(){
 		this.setShortestToEachVertex();
@@ -117,7 +118,10 @@ public class RouteFixer{
 						+ DelayEstimatorBase.getExtraDelay(next.getNode(), DelayEstimatorBase.isLong(cur.getNode()));
 				
 				if(!next.isVisited() || (next.isVisited() && newCost < next.cost)) {
-					//the second condition is necessary, a smaller path delay from the source to the current "next" could be achieved later
+					/**
+					 * the second condition is necessary, 
+					 * a smaller path delay from the source to the current "next" could be achieved later.
+					 */
 					next.cost = newCost;
 					next.setPrev(cur);
 					next.setVisited(true);

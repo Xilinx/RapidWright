@@ -22,9 +22,11 @@
  */
 
 package com.xilinx.rapidwright.rwroute;
+
 /**
- * A collection of customizable routing parameters
- *
+ * A collection of customizable parameters for a {@link RWRoute} object or a {@link ReportTimingAndWirelength} object.
+ * Modification of default parameter values can be done by adding corresponding options with values to the arguments.
+ * Each option (i.e. one of the parameters) name must start with two dashes. Values of parameter do not need dashes.
  */
 public class Configuration {
 	/** Allowed max number of routing iterations */
@@ -83,14 +85,14 @@ public class Configuration {
 	/** true to display more info along the routing process */
 	private boolean verbose;
 	
-	/** The default configuration */
-	public Configuration() {
+	/** Constructs a Configuration object */
+	public Configuration(String[] arguments) {
 		this.maxIterations = (short) 100;
 		this.useBoundingBox = true;
 		this.boundingBoxExtension = (short) 3;
 		this.enlargeBoundingBox = false;
-		this.verticalINTTiles = 0;
-		this.horizontalINTTiles = 0;
+		this.verticalINTTiles = 2;
+		this.horizontalINTTiles = 1;
 		this.wirelengthWeight = 0.8f;
 		this.timingWeight = 0.35f;
 		this.timingMultiplier = 1f;
@@ -110,320 +112,704 @@ public class Configuration {
 		this.maskNodesCrossRCLK = false;
 		this.useUTurnNodes = false;
 		this.verbose = false;
+		if(arguments != null) {
+			this.parseArguments(arguments);
+		}
 	}
 
-	public void parseArguments(int startIndex, String[] arguments) {
-		for(int i = startIndex; i < arguments.length; i++) {
-			if(arguments[i].startsWith("--noBoundingBox")) {
+	private void parseArguments(String[] arguments) {
+		for(int i = 0; i < arguments.length; i++) {
+			String arg = arguments[i];
+			switch(arg) {
+			case "--maxIterations":
+				this.setMaxIterations(Short.parseShort(arguments[++i]));
+				break;
+			case "--noBoundingBox":
 				this.setUseBoundingBox(false);
-				
-			}else if(arguments[i].startsWith("--boundingBoxExtension")){
+				break;
+			case "--boundingBoxExtension":
 				this.setBoundingBoxExtension(Short.parseShort(arguments[++i]));
-				
-			}else if(arguments[i].startsWith("--enlargeBoundingBox")){				
+				break;
+			case "--enlargeBoundingBox":
 				if(i+1 < arguments.length && (!arguments[i+1].startsWith("--verticalINTTiles") && !arguments[i+1].startsWith("--horizontalINTTiles"))) {
-					throw new RuntimeException("ERROR: --enlargeBoundingBox needs to be followed by --verticalINTTiles <arg> and / or --horizontalINTTiles <arg>");
+					throw new IllegalArgumentException("ERROR: --enlargeBoundingBox needs to be followed by --verticalINTTiles <arg> and / or --horizontalINTTiles <arg>");
 				}		
 				this.setEnlargeBoundingBox(true);
-				
-			}else if(arguments[i].startsWith("--verticalINTTiles")){
-				this.setVerticalINTTiles(Short.parseShort(arguments[++i]));	
-			
-			}else if(arguments[i].startsWith("--horizontalINTTiles")){
-				this.setHorizontalINTTiles(Short.parseShort(arguments[++i]));	
-			
-			}else if(arguments[i].startsWith("--wirelengthWeight")){
+				break;
+			case "--verticalINTTiles":
+				this.setVerticalINTTiles(Short.parseShort(arguments[++i]));
+				break;
+			case "--horizontalINTTiles":
+				this.setHorizontalINTTiles(Short.parseShort(arguments[++i]));
+				break;
+			case "--wirelengthWeight":
 				this.setWirelengthWeight(Float.parseFloat(arguments[++i]));
-				
-			}else if(arguments[i].startsWith("--shareExponent")){
+				break;
+			case "--shareExponent":
 				this.setShareExponent(Float.parseFloat(arguments[++i]));
-				
-			}else if(arguments[i].startsWith("--timingWeight")){
+				break;
+			case "--timingWeight":
 				this.setTimingWeight(Float.parseFloat(arguments[++i]));
-				
-			}else if(arguments[i].startsWith("--timingMultiplier")){
+				break;
+			case "--timingMultiplier":
 				this.setTimingMultiplier(Float.parseFloat(arguments[++i]));
-				
-			}else if(arguments[i].startsWith("--criticalityExponent")) {
+				break;
+			case "--criticalityExponent":
 				this.setCriticalityExponent(Float.parseFloat(arguments[++i]));
-				
-			}else if(arguments[i].startsWith("--minRerouteCriticality")){
+				break;
+			case "--minRerouteCriticality":
 				this.setMinRerouteCriticality(Float.parseFloat(arguments[++i]));
-				
-			}else if(arguments[i].startsWith("--reroutePercentage")){
+				break;
+			case "--reroutePercentage":
 				this.setReroutePercentage(Short.parseShort(arguments[++i]));
-				
-			}else if(arguments[i].startsWith("--initialPresentCongesFac")){
+				break;
+			case "--initialPresentCongesFac":
 				this.setInitialPresentCongesFac(Float.parseFloat(arguments[++i]));
-				
-			}else if(arguments[i].startsWith("--presentCongesMultiplier")){
+				break;
+			case "--presentCongesMultiplier":
 				this.setPresentCongesMultiplier(Float.parseFloat(arguments[++i]));
-				
-			}else if(arguments[i].startsWith("--historicalCongesFac")){
+				break;
+			case "--historicalCongesFac":
 				this.setHistoricalCongesFac(Float.parseFloat(arguments[++i]));
-				
-			}else if(arguments[i].startsWith("--timingDriven")){
+				break;
+			case "--timingDriven":
 				this.setTimingDriven(true);
-				
-			}else if(arguments[i].startsWith("--nonTimingDriven")){
+				break;
+			case "--nonTimingDriven":
 				this.setTimingDriven(false);
-				
-			}else if(arguments[i].startsWith("--partialRouting")){
+				break;
+			case "--partialRouting":
 				this.setPartialRouting(true);
-				
-			}else if(arguments[i].startsWith("--softPreserve")){
+				break;
+			case "--softPreserve":
 				this.setSoftPreserve(true);
-				
-			}else if(arguments[i].startsWith("--dspTimingDataFolder")){
+				break;
+			case "--dspTimingDataFolder":
 				this.setDspTimingDataFolder(arguments[++i]);
-				
-			}else if(arguments[i].startsWith("--clkSkew")){
+				break;
+			case "--clkSkew":
 				this.setClkSkew(arguments[++i]);
-				
-			}else if(arguments[i].startsWith("--ceRouteTiming")){
+				break;
+			case "--ceRouteTiming":
 				this.setCeRouteTiming(arguments[++i]);
-				
-			}else if(arguments[i].startsWith("--symmetricClk")){
+				break;
+			case "--symmetricClk":
 				this.setSymmetricClkRouting(true);
-				
-			}else if(arguments[i].startsWith("--pessimismA")){
+				break;
+			case "--pessimismA":
 				this.setPessimismA(Float.parseFloat(arguments[++i]));
-				
-			}else if(arguments[i].startsWith("--pessimismB")){
+				break;
+			case "--pessimismB":
 				this.setPessimismB(Short.parseShort(arguments[++i]));
-				
-			}else if(arguments[i].startsWith("--maskNodesCrossRCLK")){
+				break;
+			case "--maskNodesCrossRCLK":
 				this.setMaskNodesCrossRCLK(true);
-				
-			}else if(arguments[i].startsWith("--useUTurnNodes")){
+				break;
+			case "--useUTurnNodes":
 				this.setUseUTurnNodes(true);
-				
-			}else if(arguments[i].startsWith("--verbose")){
+				break;
+			case "--verbose":
 				this.setVerbose(true);
+				break;
+			default:
+				break;
 			}
 		}
 	}	
-
+	
+	/**
+	 * Gets the allowed maximum number of routing iterations.
+	 * Default: 100
+	 * @return The allowed maximum number of routing iterations.
+	 */
 	public short getMaxIterations() {
-		return maxIterations;
+		return this.maxIterations;
 	}
-
+	
+	/**
+	 * Sets the maximum number of routing iterations.
+	 * Default: 100. 100 iterations should be enough for most routing cases. 
+	 * Otherwise, it is not promising that a design can be successfully routed.
+	 * To modify the value, please use "--maxIterations" option, e.g. "--maxIterations 60".
+	 * @param maxIterations The maximum number of routing iterations.
+	 */
 	public void setMaxIterations(short maxIterations) {
 		this.maxIterations = maxIterations;
 	}
-
+	
+	/** 
+	 * Checks if the routing bounding box constraint is used.
+	 * Default: true. To disable the bounding box constraint, please add "--noBoundingBox" to the arguments.
+	 * @return true, if the routing bounding box constraint is used.
+	 */
 	public boolean isUseBoundingBox() {
-		return useBoundingBox;
+		return this.useBoundingBox;
 	}
-
+	
+	/**
+	 * Sets if the router should route connections with the routing bounding box constraint.
+	 * Default: true. To disable the bounding box constraint, please add "--noBoundingBox" option to the arguments.
+	 * @param useBoundingBox true to let the router use the bounding box constraint to route connections.
+	 */
 	public void setUseBoundingBox(boolean useBoundingBox) {
 		this.useBoundingBox = useBoundingBox;
 	}
 
+	/**
+	 * Gets the bounding box extension range.
+	 * Default: 3. Can be modified by using use "--boundingBoxExtension" option, e.g. "--boundingBoxExtension 5".
+	 * @return The bounding box extension range.
+	 */
 	public short getBoundingBoxExtension() {
-		return boundingBoxExtension;
+		return this.boundingBoxExtension;
 	}
 
+	/**
+	 * Sets the bounding box extension range.
+	 * Default: 3. Can be modified by using use "--boundingBoxExtension" option, e.g. "--boundingBoxExtension 5".
+	 * @param boundingBoxExtension
+	 */
 	public void setBoundingBoxExtension(short boundingBoxExtension) {
 		this.boundingBoxExtension = boundingBoxExtension;
 	}
 
+	/**
+	 * Checks if the bounding boxes of connections would be expanded during routing.
+	 * Enlarging bounding boxes of connections helps resolve routability problems for some scenarios, 
+	 * such as partial routing and very congested placement of designs. 
+	 * Default: false for full routing, true for partial routing.
+	 * To enable enlarging bounding boxes, please add "--enlargeBoundingBox" to the arguments.
+	 * @return true, if enlarging bounding boxes of connections is allowed.
+	 */
 	public boolean isEnlargeBoundingBox() {
-		return enlargeBoundingBox;
+		return this.enlargeBoundingBox;
 	}
 
+	/**
+	 * Sets enlargeBoundingBox.
+	 * Enlarging bounding boxes of connections helps resolve routability problems for some scenarios, 
+	 * such as partial routing and very congested placement of designs. 
+	 * Default: false for full routing, true for partial routing.
+	 * To enable enlarging bounding boxes, please add "--enlargeBoundingBox" to the arguments.
+	 * @param enlargeBoundingBox A flag to indicate if connections' bounding boxes are allowed to be enlarged for routing.
+	 */
 	public void setEnlargeBoundingBox(boolean enlargeBoundingBox) {
+		if(this.isPartialRouting() && !enlargeBoundingBox) {
+			System.out.println("WARNING: enlargeBoundingBox should be true for partial routing to avoid routability problems. Sets to true automatically.");
+			enlargeBoundingBox= true;
+		}
 		this.enlargeBoundingBox = enlargeBoundingBox;
 	}
 
+	/**
+	 * Gets the number of INT Tiles that connections' bounding box should be enlarged vertically.
+	 * Default: 2. Can be modified by using "--verticalINTTiles" option, e.g. "--verticalINTTiles 3".
+	 * @return The number of INT Tiles that connections' bounding box should be enlarged vertically.
+	 */
 	public short getVerticalINTTiles() {
-		return verticalINTTiles;
+		return this.verticalINTTiles;
 	}
 
+	/**
+	 * Sets the number of INT Tiles that connections' bounding box should be enlarged vertically.
+	 * Default: 2. Can be modified by using "--verticalINTTiles" option, e.g. "--verticalINTTiles 3".
+	 * @param verticalINTTiles The number of INT Tiles that connections' bounding box should be enlarged vertically.
+	 */
 	public void setVerticalINTTiles(short verticalINTTiles) {
 		this.verticalINTTiles = verticalINTTiles;
 	}
 
+	/**
+	 * Gets the number of INT Tiles that connections' bounding box should be enlarged horizontally.
+	 * Default: 1. Can be modified by using "--horizontalINTTiles" option, e.g. "--horizontalINTTiles 2".
+	 * @return The number of INT Tiles that connections' bounding box should be enlarged horizontally.
+	 */
 	public short getHorizontalINTTiles() {
-		return horizontalINTTiles;
+		return this.horizontalINTTiles;
 	}
 
+	/**
+	 * Sets the number of INT Tiles that connections' bounding box should be enlarged horizontally.
+	 * Default: 1. Can be modified by using "--horizontalINTTiles" option, e.g. "--horizontalINTTiles 2".
+	 * @param horizontalINTTiles The number of INT Tiles that connections' bounding box should be enlarged horizontally. 
+	 */
 	public void setHorizontalINTTiles(short horizontalINTTiles) {
 		this.horizontalINTTiles = horizontalINTTiles;
 	}
 
+	/**
+	 * Gets the wirelength-driven weighting factor used in the cost function.
+	 * It should be within [0, 1]. The greater it is, the faster the router will run, at the cost of a greater total wirelength.
+	 * Default: 0.8. Can be modified by using "--wirelengthWeight", e.g. "--wirelengthWeight 0.7".
+	 * @return The wirelength-driven weighting factor used in the cost function
+	 */
 	public float getWirelengthWeight() {
-		return wirelengthWeight;
+		return this.wirelengthWeight;
 	}
 
+	/**
+	 * Sets the wirelength-driven weighting factor used in the cost function.
+	 * It should be within [0, 1]. The greater it is, the faster the router will run, at the cost of a greater total wirelength.
+	 * Default: 0.8. Can be modified by using "--wirelengthWeight", e.g. "--wirelengthWeight 0.7".
+	 * @param wirelengthWeight The wirelength-driven weighting factor used in the cost function
+	 */
 	public void setWirelengthWeight(float wirelengthWeight) {
+		if(wirelengthWeight < 0 || wirelengthWeight > 1)
+			throw new IllegalArgumentException("ERROR: wirelength-driven weighting factor wirelengthWeight should be within [0, 1].");
 		this.wirelengthWeight = wirelengthWeight;
 	}
 
+	/**
+	 * Gets the timing-driven weighting factor used in the cost function.
+	 * It should be within [0, 1]. The greater it is, the faster the router will run, at the cost of a greater critical path delay.
+	 * Default: 0.35. Can be modified by using "--timingWeight" option, e.g. "--timingWeight 0.4".
+	 * @return The timing-driven weighting factor used in the cost function
+	 */
 	public float getTimingWeight() {
-		return timingWeight;
+		return this.timingWeight;
 	}
 
+	/**
+	 * Sets the timing-driven weighting factor used in the cost function.
+	 * It should be within [0, 1]. The greater it is, the faster the router will run, at the cost of a greater critical path delay.
+	 * Default: 0.35. Can be modified by using "--timingWeight" option, e.g. "--timingWeight 0.4".
+	 * @param timingWeight The timing-driven weighting factor used in the cost function.
+	 */
 	public void setTimingWeight(float timingWeight) {
+		if(timingWeight < 0 || timingWeight > 1)
+			throw new IllegalArgumentException("ERROR: timing-driven weighting factor timingWeight cannot be negative or greater than 1.");
 		this.timingWeight = timingWeight;
 	}
 
+	/**
+	 * Gets the timing-driven weighting factor multiplier.
+	 * Default: 1. Can be modified by using "--timingMultiplier" option, e.g. "--timingMultiplier 1.02".
+	 * @return The timing-driven weighting factor multiplier.
+	 */
 	public float getTimingMultiplier() {
-		return timingMultiplier;
+		return this.timingMultiplier;
 	}
 
+	/**
+	 * Sets the multiplier for timingWeight. This is an experimental feature for future adaptive timingWeight.
+	 * The idea is to have less timingWeight in early routing iterations for faster runtime and put more weight on the timing cost
+	 * in late iterations for better timing performance.
+	 * Currently, the default timingMultiplier is 1.
+	 * Can be modified by using "--timingMultiplier" option, e.g. "--timingMultiplier 1.02".
+	 * @param timingMultiplier A multiplier greater than 1 to increase timingWeight along routing iterations.
+	 */
 	public void setTimingMultiplier(float timingMultiplier) {
+		if(timingMultiplier < 1)
+			throw new IllegalArgumentException("ERROR: timingMultiplier cannot be less than 1.");
 		this.timingMultiplier = timingMultiplier;
 	}
 
+	/**
+	 * Gets the sharing exponent that discourages resource sharing for timing-driven routing of critical connections.
+	 * It is no less than 0. Default: 2.
+	 * Can be modified by using "--shareExponent" option, e.g. "--shareExponent 4".
+	 * @return The sharing exponent that discourages resource sharing for timing-driven routing of critical connections.
+	 */
 	public float getShareExponent() {
-		return shareExponent;
+		return this.shareExponent;
 	}
 
+	/**
+	 * Sets the sharing exponent that discourages resource sharing for timing-driven routing of critical connections.
+	 * It is no less than 0. Default: 2.
+	 * Can be modified by using "--shareExponent" option, e.g. "--shareExponent 4".
+	 * @param shareExponent The sharing exponent that discourages resource sharing for timing-driven routing of critical connections.
+	 */
 	public void setShareExponent(float shareExponent) {
+		if(shareExponent < 0)
+			throw new IllegalArgumentException("ERROR: shareExponent cannot be negative.");
 		this.shareExponent = shareExponent;
 	}
 
+	/**
+	 * Gets the criticality exponent that is used in calculating connections' criticalities to 
+	 * spread the criticalities of less critical connections and more critical connections apart. 
+	 * It should be greater than 1. Default: 3.
+	 * Can be modified by using "--criticalityExponent" option, e.g. "--criticalityExponent 5".
+	 * @return The criticality exponent.
+	 */
 	public float getCriticalityExponent() {
-		return criticalityExponent;
+		return this.criticalityExponent;
 	}
 
+	/**
+	 * Sets the criticality exponent that is used in calculating connections' criticalities to 
+	 * spread the criticalities of less critical connections and more critical connections apart. 
+	 * It should be greater than 1. Default: 3.
+	 * Can be modified by using "--criticalityExponent" option, e.g. "--criticalityExponent 5".
+	 * @param criticalityExponent
+	 */
 	public void setCriticalityExponent(float criticalityExponent) {
+		if(criticalityExponent < 1)
+			throw new IllegalArgumentException("ERROR: criticalityExponent cannot be less than 1.");
 		this.criticalityExponent = criticalityExponent;
 	}
 
+	/**
+	 * Gets the criticality threshold for re-routing critical connections. 
+	 * It should be within (0.5, 0.99). A greater value means less critical connections to be ripped up and re-routed. 
+	 * Default: 0.85. Can be modified by using "--minRerouteCriticality" option, e.g. "--minRerouteCriticality 0.9".
+	 * @return
+	 */
 	public float getMinRerouteCriticality() {
-		return minRerouteCriticality;
+		return this.minRerouteCriticality;
 	}
 
+	/**
+	 * Sets the criticality threshold for re-routing critical connections. 
+	 * It should be within (0.5, 0.99). A greater value means less critical connections to be ripped up and re-routed. 
+	 * Default: 0.85. Can be modified by using "--minRerouteCriticality" option, e.g. "--minRerouteCriticality 0.9".
+	 * @param minRerouteCriticality
+	 */
 	public void setMinRerouteCriticality(float minRerouteCriticality) {
+		if(minRerouteCriticality <= 0.5)
+			throw new IllegalArgumentException("ERROR: minRerouteCriticality cannot be less than 0.5.");
 		this.minRerouteCriticality = minRerouteCriticality;
 	}
 
+	/**
+	 * Gets the maximum percentage of critical connections that should be re-routed.
+	 * It should be greater than 0. Default: 3.
+	 * Can be modified by using "--reroutePercentage" option, e.g. "--reroutePercentage 5".
+	 * @return
+	 */
 	public short getReroutePercentage() {
-		return reroutePercentage;
+		return this.reroutePercentage;
 	}
 
+	/**
+	 * Sets the maximum percentage of critical connections that should be re-routed.
+	 * It should be greater than 0. Default: 3.
+	 * Can be modified by using "--reroutePercentage" option, e.g. "--reroutePercentage 5".
+	 * @param reroutePercentage
+	 */
 	public void setReroutePercentage(short reroutePercentage) {
+		if(reroutePercentage < 0) 
+			throw new IllegalArgumentException("ERROR: reroutePercentage cannot be negative.");
 		this.reroutePercentage = reroutePercentage;
 	}
 
+	/**
+	 * Gets the initial present congestion cost penalty factor.
+	 * It should be greater than 0. Default: 0.5.
+	 * Can be modified by using "--initialPresentCongesFac" option, e.g. "--initialPresentCongesFac 1".
+	 * @return The initial present congestion cost penalty factor.
+	 */
 	public float getInitialPresentCongesFac() {
-		return initialPresentCongesFac;
+		return this.initialPresentCongesFac;
 	}
 
+	/**
+	 * Sets the initial present congestion cost penalty factor.
+	 * It should be greater than 0. Default: 0.5.
+	 * Can be modified by using "--initialPresentCongesFac" option, e.g. "--initialPresentCongesFac 1".
+	 * @param initialPresentCongesFac
+	 */
 	public void setInitialPresentCongesFac(float initialPresentCongesFac) {
+		if(initialPresentCongesFac < 0)
+			throw new IllegalArgumentException("ERROR: initialPresentCongesFac cannot be negative.");
 		this.initialPresentCongesFac = initialPresentCongesFac;
 	}
 
+	/**
+	 * Gets the present congestion factor multiplier.
+	 * It should be greater than 1. Default: 2.
+	 * Can be modified by using "--presentCongesMultiplier" option, e.g. "--presentCongesMultiplier 3".
+	 * @return
+	 */
 	public float getPresentCongesMultiplier() {
-		return presentCongesMultiplier;
+		return this.presentCongesMultiplier;
 	}
 
+	/**
+	 * Sets the present congestion factor multiplier.
+	 * It should be greater than 1. Default: 2.
+	 * Can be modified by using "--presentCongesMultiplier" option, e.g. "--presentCongesMultiplier 3".
+	 * @param presentCongesMultiplier
+	 */
 	public void setPresentCongesMultiplier(float presentCongesMultiplier) {
+		if(presentCongesMultiplier <= 1)
+			throw new IllegalArgumentException("ERROR: the present congestion factor multiplier cannot be less than 1.");
 		this.presentCongesMultiplier = presentCongesMultiplier;
 	}
 
+	/**
+	 * Gets the historical congestion cost penalty factor.
+	 * It should be greater than 0. Default: 1.
+	 * Can be modified by using "--historicalCongesFac" option, e.g. "--historicalCongesFac 2".
+	 * @return
+	 */
 	public float getHistoricalCongesFac() {
-		return historicalCongesFac;
+		return this.historicalCongesFac;
 	}
 
+	/**
+	 * Sets the historical congestion cost penalty factor.
+	 * It should be greater than 0. Default: 1.
+	 * Can be modified by using "--historicalCongesFac" option, e.g. "--historicalCongesFac 2".
+	 * @param historicalCongesFac
+	 */
 	public void setHistoricalCongesFac(float historicalCongesFac) {
+		if(historicalCongesFac <= 0)
+			throw new IllegalArgumentException("ERROR: historicalCongesFac cannot be less than 0.");
 		this.historicalCongesFac = historicalCongesFac;
 	}
 
+	/**
+	 * Checks if the router should run in the timing-driven mode.
+	 * Default: true.
+	 * For wirelength-driven routing only, please use "--nonTimingDriven" option to disable timing-driven routing.
+	 * @return true, if the router runs in the timing-driven mode.
+	 */
 	public boolean isTimingDriven() {
-		return timingDriven;
+		return this.timingDriven;
 	}
 
+	/**
+	 * Sets timingDriven.
+	 * Default: true. 
+	 * For wirelength-driven routing only, please use "--nonTimingDriven" option to disable timing-driven routing.
+	 * @param timingDriven
+	 */
 	public void setTimingDriven(boolean timingDriven) {
 		this.timingDriven = timingDriven;
 	}
 
+	/**
+	 * Checks if the router runs in the partial routing mode.
+	 * In the partial routing mode, nets that are already routed will be preserved and the router routes unrouted nets only.
+	 * Default: false. For partial routing, please add "--partialRouting" to the arguments.
+	 * @return true, if the router runs in the partial routing mode.
+	 */
 	public boolean isPartialRouting() {
-		return partialRouting;
+		return this.partialRouting;
 	}
 
+	/**
+	 * Sets partial routing.
+	 * In the partial routing mode, nets that are already routed will be preserved and the router routes unrouted nets only.
+	 * Default: false. For partial routing, please add "--partialRouting" to the arguments.
+	 * @param partialRouting 
+	 */
 	public void setPartialRouting(boolean partialRouting) {
 		this.partialRouting = partialRouting;
 	}
 
+	/**
+	 * Checks if the partial routing is in the soft preserve mode.
+	 * In the soft preserve mode, preserved routed nets can be unrouted and added to the routing targets of the router.
+	 * Default: false. To enable the soft preserve mode, please add "--softPreserve" to the arguments.
+	 * @return
+	 */
 	public boolean isSoftPreserve() {
-		return softPreserve;
+		return this.softPreserve;
 	}
 
+	/**
+	 * Sets softPreserve for partial routing.
+	 * In the soft preserve mode, preserved routed nets can be unrouted and added to the routing targets of the router.
+	 * Default: false. To enable the soft preserve mode, please add "--softPreserve" to the arguments.
+	 * @param softPreserve
+	 */
 	public void setSoftPreserve(boolean softPreserve) {
 		this.softPreserve = softPreserve;
 	}
 
+	/**
+	 * Gets the DSP timing data folder that contains DSP timing data files for the current design to be routed.
+	 * They are used for timing-driven routing of designs with DSPs.
+	 * They can be generated by running Vivado with the Tcl script provided under $RAPIDWRIGHT_PATH/tcl/rwroute.
+	 * Default: null.
+	 * @return
+	 */
 	public String getDspTimingDataFolder() {
-		return dspTimingDataFolder;
+		return this.dspTimingDataFolder;
 	}
 
+	/**
+	 * Sets the DSP timing data folder that contains DSP timing data files for the current design to be routed.
+	 * They are used for timing-driven routing of designs with DSPs.
+	 * They can be generated by running Vivado with the Tcl script provided under $RAPIDWRIGHT_PATH/tcl/rwroute.
+	 * Default: null. Can be modified by using "--dspTimingDataFolder" option, e.g. "--dspTimingDataFolder $RAPIDWRIGHT_PATH/DSPTimingFilesOfDesign/"
+	 * @param dspTimingDataFolder The directory that contains DSP timing data files for the current design to be routed.
+	 */
 	public void setDspTimingDataFolder(String dspTimingDataFolder) {
 		this.dspTimingDataFolder = dspTimingDataFolder;
 	}
 
+	/**
+	 * Gets the clock skew timing data file path.
+	 * The file can be generated by running Vivado with the tcl script provided under $RAPIDWRIGHT_PATH/tcl/rwroute.
+	 * Default: null. Can be modified by using "--dspTimingDataFolder" option, e.g. "--dspTimingDataFolder $RAPIDWRIGHT_PATH/DSPTimingFilesOfDesign/"
+	 * Can be modified by using "--clkSkew" option, e.g. "--clkSkew $RAPIDWRIGHT_PATH/clkskew.txt".
+	 * @return
+	 */
 	public String getClkSkew() {
-		return clkSkew;
+		return this.clkSkew;
 	}
 
+	/**
+	 * Sets the clock skew timing data file path.
+	 * The file can be generated by running Vivado with the tcl script provided under $RAPIDWRIGHT_PATH/tcl/rwroute.
+	 * Default: null.
+	 * Can be modified by using "--clkSkew" option, e.g. "--clkSkew $RAPIDWRIGHT_PATH/clkskew.txt".
+	 * @param clkSkew
+	 */
 	public void setClkSkew(String clkSkew) {
 		this.clkSkew = clkSkew;
 	}
 
+	/**
+	 * Sets the clock enable net timing data file.
+	 * The file can be generated by running Vivado with the tcl script provided under $RAPIDWRIGHT_PATH/tcl/rwroute.
+	 * Default: null.
+	 * Can be modified by using "--ceRouteTiming" option, e.g. "--ceRouteTiming $RAPIDWRIGHT_PATH/ceroute.txt".
+	 * @return
+	 */
 	public String getCeRouteTiming() {
-		return ceRouteTiming;
+		return this.ceRouteTiming;
 	}
 
+	/**
+	 * Sets the clock enable net timing data file.
+	 * The file can be generated by running Vivado with the tcl script provided under $RAPIDWRIGHT_PATH/tcl/rwroute.
+	 * Default: null.
+	 * Can be modified by using "--ceRouteTiming" option, e.g. "--ceRouteTiming $RAPIDWRIGHT_PATH/ceroute.txt".
+	 * @param ceRouteTiming
+	 */
 	public void setCeRouteTiming(String ceRouteTiming) {
 		this.ceRouteTiming = ceRouteTiming;
 	}
 
+	/**
+	 * Checks if the non-timing-driven clock routing should call the symmetric clock router.
+	 * Default: false. Can be modified by adding "--symmetricClk" to the arguments.
+	 * @return true, if the symmetric clock router should be used.
+	 */
 	public boolean isSymmetricClkRouting() {
-		return symmetricClkRouting;
+		return this.symmetricClkRouting;
 	}
 
+	/**
+	 * Sets symmetricClkRouting that indicate if the non-timing-driven clock routing should call the symmetric clock router.
+	 * Default: false. Can be modified by adding "--symmetricClk" to the arguments.
+	 * @param symmetricClkRouting
+	 */
 	public void setSymmetricClkRouting(boolean symmetricClkRouting) {
 		this.symmetricClkRouting = symmetricClkRouting;
 	}
 
+	/**
+	 * Gets the critical path delay pessimism factor a.
+	 * It should be greater than 0.99. Default: 1.03.
+	 * Can be modified by using "--pessimismA" option, e.g. "--pessimismA 1.05".
+	 * @return pessimismA
+	 */
 	public float getPessimismA() {
-		return pessimismA;
+		return this.pessimismA;
 	}
 
+	/**
+	 * Sets the critical path delay pessimism factor a.
+	 * It should be greater than 0.99. Default: 1.03.
+	 * Can be modified by using "--pessimismA" option, e.g. "--pessimismA 1.05".
+	 * @param pessimismA
+	 */
 	public void setPessimismA(float pessimismA) {
+		if(pessimismA < 0.99)
+			throw new IllegalArgumentException("ERROR: pessimismA cannot be less than 0.99");
 		this.pessimismA = pessimismA;
 	}
 
+	/**
+	 * Gets critical path delay factor b.
+	 * It should be greater than 0. Default: 100.
+	 * Can be modified by using "--pessimismB" option, e.g. "--pessimismB 50".
+	 * @return pessimismB
+	 */
 	public short getPessimismB() {
-		return pessimismB;
+		return this.pessimismB;
 	}
 
+	/**
+	 * Sets critical path delay pessimism factor b.
+	 * It should be greater than 0. Default: 100.
+	 * Can be modified by using "--pessimismB" option, e.g. "--pessimismB 50".
+	 * @param pessimismB 
+	 */
 	public void setPessimismB(short pessimismB) {
+		if(pessimismB < 0)
+			throw new IllegalArgumentException("ERROR: pessimismB cannot be negative.");
 		this.pessimismB = pessimismB;
 	}
 
+	/**
+	 * Checks if nodes cross RCLK are masked.
+	 * If should be set to true for full timing-driven routing to avoid delay optimism and false for partial timing-driven routing for routability. 
+	 * Default: false. Can be modified by adding "--maskNodesCrossRCLK" to the arguments.
+	 * @return true, if nodes cross RCLK are masked
+	 */
 	public boolean isMaskNodesCrossRCLK() {
 		return maskNodesCrossRCLK;
 	}
 
-	public void setMaskNodesCrossRCLK(boolean useNodesCrossRCLK) {
-		this.maskNodesCrossRCLK = useNodesCrossRCLK;
+	/**
+	 * Sets maskNodesCrossRCLK.
+	 * If should be set to true for full timing-driven routing to avoid delay optimism and false for partial timing-driven routing for routability. 
+	 * Default: false. Can be modified by adding "--maskNodesCrossRCLK" to the arguments.
+	 * @param maskNodesCrossRCLK A flag to indicate if masking nodes cross RCLK.
+	 */
+	public void setMaskNodesCrossRCLK(boolean maskNodesCrossRCLK) {
+		if(this.isPartialRouting() && maskNodesCrossRCLK) {
+			System.out.println("WARNING: Masking nodes cross RCLK for partial routing could result in routability problems.");
+		}
+		if(!this.isPartialRouting() && !maskNodesCrossRCLK) {
+			System.out.println("WARNING: Not masking nodes cross RCLK for partial routing could result in delay optimism.");
+		}
+		this.maskNodesCrossRCLK = maskNodesCrossRCLK;
 	}
 
+	/**
+	 * Checks if U-turn nodes at the device boundaries are considered to be used.
+	 * If the design is placed near the device boundaries, U-turn nodes should be considered to be used. Otherwise, there could be routability problems.
+	 * Default: false. Can be modified by adding "--useUTurnNodes" to the arguments.
+	 * @return true, if U-turn nodes are considered to be used
+	 */
 	public boolean isUseUTurnNodes() {
-		return useUTurnNodes;
+		return this.useUTurnNodes;
 	}
 
+	/**
+	 * Sets useUTurnNodes.
+	 * If the design is placed near the device boundaries, U-turn nodes should be considered to be used. Otherwise, there could be routability problems.
+	 * Default: false. Can be modified by adding "--useUTurnNodes" to the arguments.
+	 * @param useUTurnNodes A flag to indicate if U-turn nodes are considered to be used for routing.
+	 */
 	public void setUseUTurnNodes(boolean useUTurnNodes) {
 		this.useUTurnNodes = useUTurnNodes;
 	}
 
+	/**
+	 * Checks if verbose is enabled. 
+	 * If enabled, there will be more info in the routing log file regarding design netlist, routing statistics, and timing report.
+	 * Default: false. Can be modified by adding "--verbose" to the arguments.
+	 * @return true, if verbose is enabled.
+	 */
 	public boolean isVerbose() {
-		return verbose;
+		return this.verbose;
 	}
 
+	/**
+	 * Sets verbose.
+	 * If true, there will be more info in the routing log file regarding design netlist, routing statistics, and timing report.
+	 * Default: false. Can be modified by adding "--verbose" to the arguments.
+	 * @param verbose true to print more info in the routing log file.
+	 */
 	public void setVerbose(boolean verbose) {
 		this.verbose = verbose;
 	}
@@ -432,16 +818,17 @@ public class Configuration {
 	public String toString() {
 		StringBuilder s = new StringBuilder();
 		s.append(this.formatString("Router Configuration\n"));
+		s.append(this.formatString("Max routing iterations: ", this.maxIterations));
 		s.append(this.formatString("Timing-driven: ", this.timingDriven));
 		s.append(this.formatString("Partial routing: ", this.partialRouting));
-		s.append(this.formatString("Bounding box extension: ", this.boundingBoxExtension));
+		s.append(this.formatString("Use bounding boxes: ", this.isUseBoundingBox()));
 		if(this.isUseBoundingBox()) {
-			s.append(this.formatString("Connection bounding box: ", this.isUseBoundingBox()));
-		}
-		if(this.isEnlargeBoundingBox()) {
-			s.append(this.formatString("Enlarge bounding box: ", this.isEnlargeBoundingBox()));
-			s.append(this.formatString("Vertical INT tiles: ", this.verticalINTTiles));
-			s.append(this.formatString("Horizontal INT tiles: ", this.horizontalINTTiles));
+			s.append(this.formatString("Bounding box extension: ", this.boundingBoxExtension));
+			if(this.isEnlargeBoundingBox()) {
+				s.append(this.formatString("Enlarge bounding box: ", this.isEnlargeBoundingBox()));
+				s.append(this.formatString("Vertical INT tiles: ", this.verticalINTTiles));
+				s.append(this.formatString("Horizontal INT tiles: ", this.horizontalINTTiles));
+			}
 		}
 		s.append(this.formatString("Wirelength-driven weight: ", this.wirelengthWeight));
 		if(this.timingDriven) {

@@ -375,23 +375,23 @@ public class TimingManager {
      * @return Indication of successful completion.
      */
     private boolean build(boolean isPartialRouting) {
-    	if(this.routerTimer != null) this.routerTimer.createAddTimer("build timing model", "Initialization").start();
+    	if(this.routerTimer != null) this.routerTimer.createTimer("build timing model", "Initialization").start();
         timingModel.build();
-        if(this.routerTimer != null) this.routerTimer.createAddTimer("build timing model", "Initialization").stop();
+        if(this.routerTimer != null) this.routerTimer.getTimer("build timing model").stop();
         
-        if(this.routerTimer != null) this.routerTimer.createAddTimer("build timing graph", "Initialization").start();
+        if(this.routerTimer != null) this.routerTimer.createTimer("build timing graph", "Initialization").start();
         timingGraph.build(isPartialRouting);
-        if(this.routerTimer != null) this.routerTimer.createAddTimer("build timing graph", "Initialization").stop();
+        if(this.routerTimer != null) this.routerTimer.getTimer("build timing graph").stop();
         
         return postBuild();
     }
 
     private boolean postBuild() {
-    	if(this.routerTimer != null) this.routerTimer.createAddTimer("post graph build", "Initialization").start();
+    	if(this.routerTimer != null) this.routerTimer.createTimer("post graph build", "Initialization").start();
         timingGraph.removeClockCrossingPaths();
         timingGraph.buildSuperGraphPaths();
         timingGraph.setOrderedTimingVertexLists();
-        if(this.routerTimer != null) this.routerTimer.createAddTimer("post graph build", "Initialization").stop();
+        if(this.routerTimer != null) this.routerTimer.getTimer("post graph build").stop();
         return true;
     }
 

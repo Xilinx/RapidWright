@@ -30,7 +30,10 @@ import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
 
-public class PartialRouter extends RouterBase{
+/**
+ * A class extends {@link RWRoute} for partial routing.
+ */
+public class PartialRouter extends RWRoute{
 	public PartialRouter(Design design, Configuration config){
 		super(design, config);
 	}
@@ -39,16 +42,14 @@ public class PartialRouter extends RouterBase{
 	protected void addGlobalClkRoutingTargets(Net clk) {
 		if(!clk.hasPIPs()) {
 			if(RouterHelper.isRoutableNetWithSourceSinks(clk)) {
-				this.clkNets.add(clk);
-				this.numRoutableNets++;
+				this.addClkNet(clk);
 			}else {
-				this.numNotNeedingRoutingNets++;
+				this.increaseNumNotNeedingRouting();
 				System.err.println("ERROR: Incomplete clk net " + clk.getName());
 			}
 		}else {
 			this.preserveNet(clk);
-			this.numPreservedClks++;
-			this.numPreservedRoutableNets++;
+			this.increaseNumPreservedClks();
 		}
 	}
 	
@@ -65,32 +66,30 @@ public class PartialRouter extends RouterBase{
 				for(SitePinInst sink : sinks) {
 					this.addReservedNode(sink.getConnectedNode(), staticNet);
 				}
-				this.staticNetAndRoutingTargets.put(staticNet, sinks);
-				this.numRoutableNets++;
+				this.addStaticNetRoutingTargets(staticNet, sinks);
 			}else {
 				this.preserveNet(staticNet);
-				this.numRoutableNets++;
-				this.numPreservedStaticNets++;
-				this.numPreservedRoutableNets++;
+				this.increaseNumPreservedStaticNets();
 			}	
 			
-		}else {//internally routed (sinks.size = 0)
+		}else {/** internally routed (sinks.size = 0) */
 			this.preserveNet(staticNet);
-			this.numNotNeedingRoutingNets++;	
+			this.increaseNumNotNeedingRouting();
 		}
 	}
 	
 	@Override
 	protected void addNetConnectionToRoutingTargets(Net net, boolean multiSLR) {
 		if(!net.hasPIPs()) {
-			this.initializeNetAndCons(net, this.config.getBoundingBoxExtension(), multiSLR);
+			this.initializeNetAndItsConnections(net, this.config.getBoundingBoxExtension(), multiSLR);
 		}else{
-			// In partial routing mode, a net with PIPs is preserved.
-			// This means the routed net is supposed to be fully routed without conflicts.
-			// TODO detect partially routed nets and nets with possible conflicting nodes.
+			/**
+			 *  In partial routing mode, a net with PIPs is preserved.
+			 *  This means the routed net is supposed to be fully routed without conflicts.
+			 *  TODO detect partially routed nets and nets with possible conflicting nodes.
+			 */
 			this.preserveNet(net);
-			this.numPreservedRoutableNets++;
-			this.numPreservedWire++;
+			this.increaseNumPreservedWireNets();
 		}
 	}	
 }

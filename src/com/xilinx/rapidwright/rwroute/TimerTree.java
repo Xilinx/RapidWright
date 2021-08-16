@@ -23,12 +23,13 @@
 
 package com.xilinx.rapidwright.rwroute;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 
+/**
+ * A TimerTree object consists of {@link Timer} objects, 
+ * providing methods to create a tree of timers for the runtime breakdown of a program.
+ */
 public class TimerTree {
 	Map<String, Timer> timers;
 	private Timer root;
@@ -44,12 +45,13 @@ public class TimerTree {
 	}
 	
 	/**
-	 * Creates a timer with its name and its parent name
-	 * @param name Name of a timer
-	 * @param parent The parent timer name
-	 * @return A created timer under the name
+	 * Creates a timer with its name and its parent name. If a timer under the given name exists, returns it.
+	 * Otherwise, creates a new one and returns it. 
+	 * @param name Name of a timer.
+	 * @param parent The parent timer name.
+	 * @return A timer under the name.
 	 */
-	public Timer createAddTimer(String name, String parent) {
+	public Timer createTimer(String name, String parent) {
 		if(parent == null) {
 			throw new RuntimeException("ERROR: Null parent name.");
 		}
@@ -66,10 +68,30 @@ public class TimerTree {
 		return newTimer;
 	}
 	
-	public static Timer createStandAloneTimer(String name) {
-		return new Timer(name);
+	/**
+	 * Gets a created {@link Timer} instance corresponding to a name.
+	 * @param name The name of the timer.
+	 * @return A {@link Timer} instance under the name.
+	 */
+	public Timer getTimer(String name) {
+		Timer timer = this.timers.get(name);
+		if(timer == null) {
+			throw new IllegalArgumentException("ERROR: No Timer instance under name " + name + "." 
+						+ "\n Please check if the name is correct. Timer instances created: " + this.timers.keySet());
+		}
+		return timer;
+	}
+	
+	public Timer createStandAloneTimer(String name) {
+		Timer timer = new Timer(name);
+		this.timers.put(name, timer);
+		return timer;
 	}
 
+	/**
+	 * Gets the name of the root timer.
+	 * @return The name of the root timer.
+	 */
 	public String getRootTimer() {
 		return this.root.getName();
 	}
@@ -80,126 +102,5 @@ public class TimerTree {
 			return this.root.fullHierarchyTimerTree();
 		}
 		return this.root.timerTreeWithOneLevelChidren();
-	}
-
-	public static class Timer {
-		private String name;
-		private long time;
-		private long start;
-		private short level;
-		private List<Timer> children;
-		
-		public Timer(String name) {
-			this.name = name + ":";
-			this.time = 0;
-		}
-		
-		public Timer(String name, short level) {
-			this.name = name + ":";
-			this.time = 0;
-			this.level = level;
-			if(this.getLevel() * 3 + this.getName().length() > 31) {
-				System.out.println("\nWARNING: Timer name too long: " + name + ". Ideal max string length: " + (30 - this.getLevel() * 3));
-			}
-			this.children = new ArrayList<>();
-		}
-
-		public short getLevel() {
-			return level;
-		}
-
-		public void setLevel(short level) {
-			this.level = level;
-		}
-
-		public List<Timer> getChildren() {
-			return children;
-		}
-	
-		public void addChild(Timer timer) {
-			if(!this.children.contains(timer)) {
-				this.children.add(timer);
-			}
-		}
-		
-		public void start() {
-			this.start = System.nanoTime();
-		}
-		
-		public void stop() {
-			this.time += System.nanoTime() - this.start;
-		}
-		
-		public void setTime(long time) {
-			this.time = time;
-		}
-		
-		public long getTime() {
-			return this.time;
-		}
-		
-		public String getName() {
-			return name;
-		}
-		
-		@Override
-		public int hashCode() {
-			return name.hashCode();
-		}
-		
-		private String spaces(int length) {
-			StringBuilder s = new StringBuilder();
-			for(int i = 0; i < length; i++) {
-				s.append(" ");
-			}
-			return s.toString();
-		}
-		
-		@Override
-		public String toString() {
-			if(this.getLevel() == 0) {
-				for(Timer child : this.children) {
-					this.time += child.getTime();
-				}
-			}
-			int length = 31 - this.getLevel() * 3 - this.getName().length();
-			if(length < 0) length = 0;
-    		return this.name.replace(":", ":" + spaces(length) + String.format("%9.2fs\n", this.getTime()*1e-9));
-		}
-		
-		public String fullHierarchyTimerTree() {
-			StringBuilder buffer = new StringBuilder();
-			appendThisAndChildren(buffer, "", "");
-			return buffer.toString();
-		}
-		
-		private void appendThisAndChildren(StringBuilder buffer, String prefix, String childPrefix) {
-			buffer.append(prefix);
-	        buffer.append(this.toString());
-	        if(this.children != null) {
-	        	for (Iterator<Timer> it = children.iterator(); it.hasNext();) {
-	                Timer next = it.next();
-	                if (it.hasNext()) {
-	                    next.appendThisAndChildren(buffer, childPrefix + "├─ ", childPrefix + "│  ");
-	                } else {
-	                    next.appendThisAndChildren(buffer, childPrefix + "└─ ", childPrefix + "   ");
-	                }
-	            }
-	        }
-		}
-		
-		public String timerTreeWithOneLevelChidren() {
-			StringBuilder buffer = new StringBuilder();
-	        buffer.append(this.toString());
-	        if(this.children != null) {
-	        	int id = 0;
-	        	for(Timer child : this.children) {
-	        		if(id < this.children.size() - 1) buffer.append("├─ " + child);
-	        		else buffer.append("└─ " + child);
-	        		id++;
-	        	}
-	        }
-			return buffer.toString();
-		}
 	}
 }

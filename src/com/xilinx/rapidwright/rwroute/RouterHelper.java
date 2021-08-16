@@ -52,69 +52,69 @@ import com.xilinx.rapidwright.timing.TimingManager;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 import com.xilinx.rapidwright.util.Pair;
 /**
- * A collection of supportive methods
+ * A collection of supportive methods for the router.
  */
 public class RouterHelper {
 	/**
-	 * Checks if a net has source and sink pins to be a routable net
-	 * @param net The net to be checked
-	 * @return true, if the net has source and sink pins
+	 * Checks if a net has source and sink pins to be a routable net.
+	 * @param net The net to be checked.
+	 * @return true, if the net has source and sink pins.
 	 */
 	public static boolean isRoutableNetWithSourceSinks(Net net){
 		return net.getSource() != null && net.getSinkPins().size() > 0;
 	}
 	
 	/**
-	 * Checks if a net is driver-less or load-less
-	 * @param net The net to be checked
-	 * @return true, if the nets is dirver-less or load-less
+	 * Checks if a net is driver-less or load-less.
+	 * @param net The net to be checked.
+	 * @return true, if the nets is dirver-less or load-less.
 	 */
 	public static boolean isDriverLessOrLoadLessNet(Net net){
 		return (isDriverLessNet(net) || isLoadLessNet(net));
 	}
 	
 	/**
-	 * Checks if a net is driver-less
-	 * @param net The net to be checked
-	 * @return true, if the net does not have a source pin
+	 * Checks if a net is driver-less.
+	 * @param net The net to be checked.
+	 * @return true, if the net does not have a source pin.
 	 */
 	public static boolean isDriverLessNet(Net net) {
 		return (net.getSource() == null && net.getSinkPins().size() > 0);
 	}
 	
 	/**
-	 * Checks if a net is load-less
-	 * @param net The net to be checked
-	 * @return true, if the net does not have sink pins
+	 * Checks if a net is load-less.
+	 * @param net The net to be checked.
+	 * @return true, if the net does not have sink pins.
 	 */
 	public static boolean isLoadLessNet(Net net) {
 		return (net.getSource() != null && net.getSinkPins().size() == 0);
 	}
 	
 	/**
-	 * Checks if a net is internally routed net
-	 * @param net The net to be checked
-	 * @return true, if the net does not have pins
+	 * Checks if a net is internally routed net.
+	 * @param net The net to be checked.
+	 * @return true, if the net does not have pins.
 	 */
-	public static boolean isInternallyRoutedNets(Net net){
+	public static boolean isInternallyRoutedNet(Net net){
 		return net.getPins().size() == 0;
 	}
 	
 	/**
 	 * Checks if the source-sink connection is an external connection to COUT, which should have the source pin swapped,
-	 * because COUT only connects to CIN
-	 * @param source The source SitePinInst of this connection
-	 * @param sink The sink SitePinInst of this connection
-	 * @return true, if the source is a COUT while the sink is not CIN
+	 * because COUT only connects to CIN.
+	 * @param source The source SitePinInst of this connection.
+	 * @param sink The sink SitePinInst of this connection.
+	 * @return true, if the source is a COUT while the sink is not CIN.
 	 */
 	public static boolean isExternalConnectionToCout(SitePinInst source, SitePinInst sink){
 		return source.getName().equals("COUT") && (!sink.getName().equals("CIN"));
 	}
 	
 	/**
-	 * Gets a node that connects to an INT tile from an output pin
-	 * @param output The output SitePinInst of a net
-	 * @return A node that connects to an INT tile from an output pin
+	 * Gets a node that connects to an INT tile from an output pin.
+	 * @param output The output SitePinInst of a net.
+	 * @return A node that connects to an INT tile from an output pin.
 	 */
 	public static Node projectOutputPinToINTNode(SitePinInst output) {
 		Node intNode = output.getConnectedNode();
@@ -140,9 +140,9 @@ public class RouterHelper {
 	}
 	
 	/**
-	 * Gets a list of nodes that connect an input SitePinInst to an INT tile
-	 * @param input The input SitePinInst
-	 * @return A list of nodes from the input SitePinInst to an INT tile
+	 * Gets a list of nodes that connect an input SitePinInst to an INT tile.
+	 * @param input The input pin.
+	 * @return A list of nodes from the input SitePinInst to an INT tile.
 	 */
 	public static List<Node> projectInputPinToINTNode(SitePinInst input) {
 		List<Node> sinkToSwitchBoxPath = new ArrayList<>();		
@@ -194,9 +194,9 @@ public class RouterHelper {
 	}
 	
 	/**
-	 * Gets a list of PIPs from a list of nodes in a reversed order
-	 * @param connectionNodes The list of nodes
-	 * @return A list of PIPs generated from the list of nodes
+	 * Gets a list of PIPs from a list of nodes in a reversed order.
+	 * @param connectionNodes The list of nodes.
+	 * @return A list of PIPs generated from the list of nodes.
 	 */
 	public static List<PIP> getPIPsFromListOfReversedNodes(List<Node> connectionNodes){
 		List<PIP> conPIPs = new ArrayList<>();
@@ -232,11 +232,11 @@ public class RouterHelper {
 	}
 	
 	/**
-	 * Gets the PIP based on the load node tile, driver node wires and the load node wire
-	 * @param loadTile The base tile of the load node
-	 * @param driverWires All wires in the driver node
-	 * @param loadWire The wire of the load node
-	 * @return The PIP that connects one of the wires in the driver node and the wire of the load node
+	 * Gets the PIP based on the load node tile, driver node wires and the load node wire.
+	 * @param loadTile The base tile of the load node.
+	 * @param driverWires All wires in the driver node.
+	 * @param loadWire The wire of the load node.
+	 * @return The PIP that connects one of the wires in the driver node and the wire of the load node.
 	 */
 	public static PIP getPIP(Tile loadTile, Wire[] driverWires, int loadWire) {
 		PIP pip = null;
@@ -252,10 +252,10 @@ public class RouterHelper {
 	}
 	
 	/**
-	 * Gets the PIP from a driver node to a load node
-	 * @param driver The driver node
-	 * @param load The load node
-	 * @return The PIP from the driver node to the load node
+	 * Gets the PIP from a driver node to a load node.
+	 * @param driver The driver node.
+	 * @param load The load node.
+	 * @return The PIP from the driver node to the load node.
 	 */
 	public static PIP getPIP(Node driver, Node load) {
 		PIP pip = null;
@@ -271,9 +271,9 @@ public class RouterHelper {
 	}
 	
 	/**
-	 * Gets a list of a net from its PIPs, in the order of source pin node, sink pin nodes, and other intermediate nodes
-	 * @param net The target net
-	 * @return All nodes used by the net
+	 * Gets a list of a net from its PIPs, in the order of source pin node, sink pin nodes, and other intermediate nodes.
+	 * @param net The target net.
+	 * @return All nodes used by the net.
 	 */
 	public static List<Node> getNodesOfNet(Net net){
 		List<Node> nodes = new ArrayList<>();
@@ -297,9 +297,9 @@ public class RouterHelper {
 	}
 	
 	/**
-	 * Gets a set of nodes used by a net
-	 * @param net The target net
-	 * @return A set of nodes used by a net
+	 * Gets a set of nodes used by a net.
+	 * @param net The target net.
+	 * @return A set of nodes used by a net.
 	 */
 	public static Set<Node> getUsedNodesOfNet(Net net){
 		Set<Node> nodes = new HashSet<>();
@@ -336,11 +336,11 @@ public class RouterHelper {
 	}
 	
 	/** 
-	 * Constructs all the names of invertible DSP BELPin
-	 * @param name The short name of the BELPins
-	 * @param postfixes All possible string postfixes or indices after the short name
-	 * @param last The last string of invertible DSP BELPins
-	 * @return A list of constructed names of invertible DSP BELPins
+	 * Constructs all the names of invertible DSP BELPin.
+	 * @param name The short name of the BELPins.
+	 * @param postfixes All possible string postfixes or indices after the short name.
+	 * @param last The last string of invertible DSP BELPins.
+	 * @return A list of constructed names of invertible DSP BELPins.
 	 */
 	private static List<String> addPostfixes(String name, String[] postfixes, String last){
 		List<String> belNames = new ArrayList<>();
@@ -351,7 +351,7 @@ public class RouterHelper {
 	}
 	
 	/**
-	 * Checks if a DSP BELPin is invertible
+	 * Checks if a DSP BELPin is invertible.
 	 * @param belPin
 	 * @return
 	 */
@@ -360,9 +360,9 @@ public class RouterHelper {
 	}
 	
 	/**
-	 * Inverts all possible GND sink pins to VCC pins
-	 * @param design The target design
-	 * @param staticNet The static net, should be VCC only
+	 * Inverts all possible GND sink pins to VCC pins.
+	 * @param design The target design.
+	 * @param staticNet The static net, should be VCC only.
 	 */
 	public static void invertPossibleGndPinsToVccPins(Design design, Net staticNet) {
 		if(!staticNet.getName().equals(Net.GND_NET)) return;
@@ -400,9 +400,9 @@ public class RouterHelper {
 	}
 	
 	/**
-	 * Gets the wirelength of a node
-	 * @param node The target node
-	 * @return The wirelength of the node
+	 * Gets the wirelength of a node.
+	 * @param node The target node.
+	 * @return The wirelength of the node.
 	 */
 	public static int getLengthOfNode(Node node) {
 		Tile entry = node.getTile();	
@@ -426,13 +426,13 @@ public class RouterHelper {
 	}
 	
 	/**
-	 * Puts the info of a used node to the maps
-	 * @param node The target node
-	 * @param wlNode The wirelength of the node
-	 * @param typeUsage The map between each node type and the number of used nodes for the node type
-	 * @param typeLength The map between each node type and the total wirelength of used nodes for the node type
+	 * Adds the {@link IntentCode} and wirelength of an used node to the map.
+	 * @param node The target node.
+	 * @param wlNode The wirelength of the node.
+	 * @param typeUsage The map between each node type and the number of used nodes for the node type.
+	 * @param typeLength The map between each node type and the total wirelength of used nodes for the node type.
 	 */
-	public static void putNodeTypeLength(Node node, int wlNode, Map<IntentCode, Long> typeUsage, Map<IntentCode, Long> typeLength) {
+	public static void addNodeTypeLengthToMap(Node node, int wlNode, Map<IntentCode, Long> typeUsage, Map<IntentCode, Long> typeLength) {
 		IntentCode ic = node.getIntentCode();
 		Long counter = typeUsage.get(ic);
 		if(counter == null) {
@@ -452,10 +452,10 @@ public class RouterHelper {
 	}	
 	
 	/**
-	 * Gets a map containing net delay for each sink pin paired with an INT tile node of a routed net
-	 * @param net The target routed net
-	 * @param estimator An instantiation of DelayEstimatorBase
-	 * @return The map containing net delay for each sink pin paired with an INT tile node of a routed net
+	 * Gets a map containing net delay for each sink pin paired with an INT tile node of a routed net.
+	 * @param net The target routed net.
+	 * @param estimator An instantiation of DelayEstimatorBase.
+	 * @return The map containing net delay for each sink pin paired with an INT tile node of a routed net.
 	 */
 	public static Map<Pair<SitePinInst, Node>, Short> getSourceToSinkINTNodeDelays(Net net, DelayEstimatorBase estimator) {
 		List<PIP> pips = net.getPIPs();
@@ -497,7 +497,7 @@ public class RouterHelper {
 	}
 	
 	/**
-	 * Creates a RoutingNode based on a node, avoiding duplicates
+	 * Creates a RoutingNode Object based on a node, avoiding duplicates.
 	 * @param node
 	 * @param createdRoutingNodes
 	 * @return
@@ -512,10 +512,10 @@ public class RouterHelper {
 	}
 	
 	/**
-	 * Computes the delay of a node
-	 * @param estimator An instantiation of the DelayEstimatorBase
-	 * @param node The targe node
-	 * @return The delay of the node
+	 * Computes the delay of a node.
+	 * @param estimator An instantiation of the DelayEstimatorBase.
+	 * @param node The targe node.
+	 * @return The delay of the node.
 	 */
 	public static short computeNodeDelay(DelayEstimatorBase estimator, Node node) {
 		if(RoutableNode.isExitNode(node)) {
@@ -525,9 +525,9 @@ public class RouterHelper {
 	}
 	
 	/**
-	 * Routes and assigns nodes to a direct connection, e.g. carry chain connections and connections between cascaded BRAMs
-	 * @param directConnection The target direct connection
-	 * @return true, if the connection is successfully routed
+	 * Routes and assigns nodes to a direct connection, e.g. carry chain connections and connections between cascaded BRAMs.
+	 * @param directConnection The target direct connection.
+	 * @return true, if the connection is successfully routed.
 	 */
 	public static boolean routeDirectCon(Connection directConnection){
 		directConnection.newNodes();
@@ -536,10 +536,10 @@ public class RouterHelper {
 	}
 	
 	/**
-	 * Find a path from a source node to a sink node
-	 * @param source The source node
-	 * @param sink The sink node
-	 * @return A list of nodes making up the path
+	 * Find a path from a source node to a sink node.
+	 * @param source The source node.
+	 * @param sink The sink node.
+	 * @return A list of nodes making up the path.
 	 */
 	public static List<Node> findPathBetweenTwoNodes(Node source, Node sink){
 		List<Node> path = new ArrayList<>();		
@@ -604,13 +604,15 @@ public class RouterHelper {
 	
 	/**
 	 *  Gets the delay of a given path, using output pin only.
-	 *  The path format: superSource -> Q -> O -> --- -> D
+	 *  The path format: superSource -> Q -> O -> --- -> D.
 	 */
 	public static void getSamplePathDelay(String filePath, TimingManager timingManager,
 			Map<TimingEdge, Connection> timingEdgeConnectionMap, Map<Node, Routable> rnodesCreated) {
 		List<String> verticesOfVivadoPath = new ArrayList<>();
-		// include CLK if the first in the path is BRAM or DSP to check the logic delay
-		// NOTE: remember to change the pin names of DSPs from subblock to top-level block that is what we use
+		/** 
+		 * Include CLK if the first in the path is BRAM or DSP to check the logic delay
+		 * NOTE: remember to change the pin names of DSPs from subblock to top-level block that is what we use
+		 */
 		verticesOfVivadoPath.add("superSource");
 		
 		File vivadoReport = new File(filePath);
@@ -634,9 +636,9 @@ public class RouterHelper {
 	}
 
 	/**
-	 * Parses the data path from an input file indicating data path of a Vivado timing report
-	 * @param file The file contains a data path of a Vivado timing report
-	 * @return The data path
+	 * Parses the data path from an input file indicating data path of a Vivado timing report.
+	 * @param file The file contains a data path of a Vivado timing report.
+	 * @return The data path.
 	 * @throws IOException
 	 */
 	public static List<String> parseVivadoPathToStringList(File file) throws IOException{

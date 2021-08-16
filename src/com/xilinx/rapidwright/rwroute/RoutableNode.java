@@ -29,7 +29,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Tile;
@@ -39,8 +38,8 @@ import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 
 /**
- * A RoutableNode, also called rnode, is a vertex of the routing resource graph
- *
+ * A RoutableNode Object, denoted as rnode, is a vertex of the routing resource graph.
+ * It implements {@link Routable} and each Routable Object is created based on a {@link Node} Object.
  */
 public class RoutableNode implements Routable{
 	/** A uniques index of this RoutableNode */
@@ -251,7 +250,7 @@ public class RoutableNode implements Routable{
 	
 	@Override
 	public boolean isInConBoundingBox(Connection con) {		
-		return this.x > con.getX_min_b() && this.x < con.getX_max_b() && this.y > con.getY_min_b() && this.y < con.getY_max_b();
+		return this.x > con.getXMinBB() && this.x < con.getXMaxBB() && this.y > con.getYMinBB() && this.y < con.getYMaxBB();
 	}
 	
 	@Override

@@ -169,16 +169,16 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         }
         String[] netsArray = netsByName.keySet().toArray(new String[netsByName.size()]);
           
-        if(this.routerTimer != null) this.routerTimer.createAddTimer("determine logic dly", "build timing graph").start();
+        if(this.routerTimer != null) this.routerTimer.createTimer("determine logic dly", "build timing graph").start();
         myCellMap = design.getNetlist().generateCellInstMap();
         if(!isPartialRouting) {
         	determineLogicDelaysFromEDIFCellInsts(this.myCellMap);
         }else {
         	determineLogicDelaysFromEDIFCellInsts(this.generateCellMapOfUnoutedNets());
         }
-        if(this.routerTimer != null) this.routerTimer.createAddTimer("determine logic dly", "build timing graph").stop();
+        if(this.routerTimer != null) this.routerTimer.getTimer("determine logic dly").stop();
         
-        if(this.routerTimer != null) this.routerTimer.createAddTimer("add net dly edges", "build timing graph").start();
+        if(this.routerTimer != null) this.routerTimer.createTimer("add net dly edges", "build timing graph").start();
         for (String netName : netsArray) {
             this.netName = netName;
             this.net = netsByName.get(netName);
@@ -195,7 +195,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
             	}
             }
         }
-        if(this.routerTimer != null) this.routerTimer.createAddTimer("add net dly edges", "build timing graph").stop();
+        if(this.routerTimer != null) this.routerTimer.getTimer("add net dly edges").stop();
     }
     
     public void populateHierCellInstMap() {
