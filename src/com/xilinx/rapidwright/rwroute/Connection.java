@@ -33,7 +33,6 @@ import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 
 /**
  * A Connection instance represents a pair of source-sink {@link SitePinInst} instances of a {@link Net} instance.
- *
  */
 public class Connection implements Comparable<Connection>{
 	/** A unique index of this connection */
@@ -63,14 +62,14 @@ public class Connection implements Comparable<Connection>{
 	private short yMinBB;
 	private short yMaxBB;
 	
-    /** 
-     * TimingEdges associated to this connection.
-     * For LUT_6_2_* pins, there will be two timing edges mapped to the same pair of SitePinInsts.
-     */
+	/** 
+	 * TimingEdges associated to this connection.
+	 * For LUT_6_2_* pins, there will be two timing edges mapped to the same pair of SitePinInsts.
+	 */
 	private List<TimingEdge> timingEdges;
-    /** The criticality factor to indicate how timing-critical this connection is */
+	/** The criticality factor to indicate how timing-critical this connection is */
 	private float criticality;
-    /** List of Routable that make up of the route of this connection */
+	/** List of Routable that make up of the route of this connection */
 	private List<Routable> rnodes;
 	
 	/** To indicate if the route delay of this connection has been patched up, when there are consecutive long nodes */

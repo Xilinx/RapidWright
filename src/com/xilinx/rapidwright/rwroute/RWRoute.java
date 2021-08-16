@@ -291,21 +291,20 @@ public class RWRoute{
 				System.err.println("ERROR: Unknown net " + net.toString());
 			}
 		}
-		if(this.printConnectionSpan) this.printConnectionSpanStatistics();
+		if(this.config.isPrintConnectionSpan()) this.printConnectionSpanStatistics();
 	}
-	
-	private boolean printConnectionSpan = false;
 	
 	/**
 	 * A helper method for profiling the routing runtime v.s. average span of connections.
 	 */
 	private void printConnectionSpanStatistics() {
-		System.out.println("span" + "\t" + "counter" + "\t" + "percent");
+		System.out.println("\nConnection Span Info");
+		System.out.println(" Span" + "\t" + "# Connections" + "\t" + "Percent");
 		long sumSpan = 0;
 		short max = 0;
 		for(short span : this.connSpan.keySet()) {
 			int counter = this.connSpan.get(span);
-			System.out.println(span + "  \t" + counter + "  \t" + (float)counter / this.indirectConnections.size() * 100);
+			System.out.printf(String.format("%5d \t%12d \t%7.2f\n", span, counter, (float)counter / this.indirectConnections.size() * 100));
 			sumSpan += span*this.connSpan.get(span);
 			if(span > max) max = span;
 		}
@@ -318,8 +317,8 @@ public class RWRoute{
 			if(span <= avg) spanNoLongerThanAvg += this.connSpan.get(span);
 		}
 		
-		System.out.println("# connections no longer than avg: " + spanNoLongerThanAvg);
-		System.out.println("  acounts for: " + (float)spanNoLongerThanAvg / this.indirectConnections.size());
+		System.out.printf("# connections no longer than avg span: " + spanNoLongerThanAvg);
+		System.out.printf(" (" + String.format("%5.2f", (float)spanNoLongerThanAvg / this.indirectConnections.size() * 100) + "%%)\n");
 	}
 	
 	/**

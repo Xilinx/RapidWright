@@ -84,6 +84,8 @@ public class Configuration {
 	private boolean useUTurnNodes;
 	/** true to display more info along the routing process */
 	private boolean verbose;
+	/** true to display connection span statistics */
+	private boolean printConnectionSpan;
 	
 	/** Constructs a Configuration object */
 	public Configuration(String[] arguments) {
@@ -112,6 +114,7 @@ public class Configuration {
 		this.maskNodesCrossRCLK = false;
 		this.useUTurnNodes = false;
 		this.verbose = false;
+		this.printConnectionSpan = false;
 		if(arguments != null) {
 			this.parseArguments(arguments);
 		}
@@ -210,6 +213,9 @@ public class Configuration {
 				break;
 			case "--verbose":
 				this.setVerbose(true);
+				break;
+			case "--printConnectionSpan":
+				this.setPrintConnectionSpan(true);
 				break;
 			default:
 				break;
@@ -802,6 +808,14 @@ public class Configuration {
 	 */
 	public boolean isVerbose() {
 		return this.verbose;
+	}
+
+	public boolean isPrintConnectionSpan() {
+		return printConnectionSpan;
+	}
+
+	public void setPrintConnectionSpan(boolean printConnectionSpan) {
+		this.printConnectionSpan = printConnectionSpan;
 	}
 
 	/**
