@@ -1337,6 +1337,14 @@ public class FileTools {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+		// Extra check to not mistake encrypted EDIF as unencrypted
+		if(!isBinary 
+		        && binaryCheckData[0] == 'X' 
+		        && binaryCheckData[1] == 'l' 
+		        && binaryCheckData[2] == 'x' 
+		        && binaryCheckData[3] == 'V') {
+		    isBinary = true;
+		}
 		return isBinary;
 	}
 	
