@@ -30,15 +30,12 @@ import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.timing.GroupDelayType;
 import com.xilinx.rapidwright.timing.TimingModel;
-import com.xilinx.rapidwright.util.Pair;
 
 import static java.lang.Math.max;
 
@@ -178,103 +175,81 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
             return  (short) (start + (direction == InterconnectInfo.Direction.U ? delta : -delta));
         }
     }
-
     
-    private Pair<Short,Short> getIntTileXY(String intTileName) {
-        Pattern tilePattern = Pattern.compile("X([\\d]+)Y([\\d]+)");
-
-        Matcher tileMatcher = tilePattern.matcher(intTileName);
-        if (tileMatcher.find()) {
-            return new Pair<>(Short.valueOf(tileMatcher.group(1)), Short.valueOf(tileMatcher.group(2)));
-        } else {
-            System.out.println("getTermInfo coordinate matching error for IntTile " + intTileName);
-            return null;
-        }
+    private short getLengthFromIntentCode(IntentCode ic) {
+    	switch(ic) {
+    		case NODE_SINGLE:
+    			return 1;
+    		case NODE_DOUBLE:
+    			return 2;
+    		case NODE_VQUAD:
+    		case NODE_HQUAD:
+    			return 4;
+    		case NODE_HLONG:
+    		case NODE_VLONG:
+    			return 12;
+    		default:
+    			return 0;
+    	}
     }
-
-    // TODO: Make this faster by avoid using pattern matching.
+    
     // Currently, the default mode in DelayEstimatorTable is fastMode which use getClosetSrcDstSitePin. 
     private RoutingNode getTermInfo(Node node) {
+        IntentCode ic = node.getIntentCode();
+        RoutingNode rNode = new RoutingNode();
 
-        IntentCode ic = node.getAllWiresInNode()[0].getIntentCode();
-        Pattern EE          = Pattern.compile("EE([\\d]+)");
-        Pattern WW          = Pattern.compile("WW([\\d]+)");
-        Pattern NN          = Pattern.compile("NN([\\d]+)");
-        Pattern SS          = Pattern.compile("SS([\\d]+)");
-
-        // WW1_E is an exception. It is actually going north!
-        Pattern skip         = Pattern.compile("WW1_E");
-
-        RoutingNode res = new RoutingNode();
+        rNode.x = (short) node.getTile().getTileXCoordinate();
+        rNode.y = (short) node.getTile().getTileYCoordinate();
 
 
-        // TODO: should I use getTile and wire instead of splitting the name?
-        String[] int_node = node.toString().split("/");
-
-        Pair<Short,Short> xy = getIntTileXY(int_node[0]);
-        res.x = xy.getFirst();
-        res.y = xy.getSecond();
-
-
-        String nodeType = null;
-        if (skip.matcher(int_node[1]).find())
+        String nodeType = node.getWireName();
+        if (nodeType.contains("WW1_E")) {
             nodeType = "NN1_E";
-        else
-            nodeType = int_node[1];
-
-        String[] tg_side = nodeType.split("_");
+        }
 
         if (nodeType.startsWith("INT") && (ic == IntentCode.NODE_SINGLE)) {
             // Special for internal single such as INT_X0Y0/INT_INT_SDQ_33_INT_OUT1  - NODE_SINGLE
             // The exact orientation can be found, but it is slow. Setting wrong orientation for internal single has no harm.
-            res.direction = InterconnectInfo.Direction.U;
-            res.ng = T.NodeGroupType.valueOf("INTERNAL_SINGLE");
+            rNode.direction = InterconnectInfo.Direction.U;
+            rNode.ng = T.NodeGroupType.INTERNAL_SINGLE;
         } else {
-            // Can't use intendCode because there are two kinds of NODE_SINGLE, internal and not
-            Matcher EEMatcher = EE.matcher(tg_side[0]);
-            if (EEMatcher.find()) {
-                res.direction = InterconnectInfo.Direction.U;
-                res.setHorTG(Short.valueOf(EEMatcher.group(1)));
-            } else {
-                Matcher WWMatcher = WW.matcher(tg_side[0]);
-                if (WWMatcher.find()) {
-                    res.direction = InterconnectInfo.Direction.D;
-                    res.setHorTG(Short.valueOf(WWMatcher.group(1)));
-                } else {
-                    Matcher NNMatcher = NN.matcher(tg_side[0]);
-                    if (NNMatcher.find()) {
-                        res.direction = InterconnectInfo.Direction.U;
-                        res.setVerTG(Short.valueOf(NNMatcher.group(1)));
-                    } else {
-                        Matcher SSMatcher = SS.matcher(tg_side[0]);
-                        if (SSMatcher.find()) {
-                            res.direction = InterconnectInfo.Direction.D;
-                            res.setVerTG(Short.valueOf(SSMatcher.group(1)));
-                        } else {
-                            res.direction = InterconnectInfo.Direction.S;
-                            if (ic == IntentCode.NODE_PINBOUNCE)
-                                // FF input
-                                res.ng = T.NodeGroupType.valueOf("CLE_IN");
-                            else if (ic == IntentCode.NODE_PINFEED)
-                                // LUT input
-                                res.ng = T.NodeGroupType.valueOf("CLE_IN");
-                            else if (ic == IntentCode.NODE_LOCAL) {
-                                // the only exitNode that can be NODE_LOCAL is GLOBAL node
-                                res.ng = T.NodeGroupType.valueOf("GLOBAL");
-                                // have E_U_GLOBAL and E_D_GLOBAL (because reuse "SAME_SIDE" rule) connect to E_S_CLE_IN
-                                // always use U, and waste D node
-                                res.direction = InterconnectInfo.Direction.U;
-                            } else
-                                res.ng = T.NodeGroupType.valueOf("CLE_OUT");
-                        }
-                    }
-                }
+            String nodeGroupSide = nodeType.substring(0, nodeType.indexOf('_'));
+            switch(nodeGroupSide.charAt(0)) {
+            	case 'E':
+            		rNode.direction = InterconnectInfo.Direction.U;
+            		rNode.setHorTG(getLengthFromIntentCode(ic));
+            		break;
+            	case 'W':
+            		rNode.direction = InterconnectInfo.Direction.D;
+            		rNode.setHorTG(getLengthFromIntentCode(ic));
+            		break;
+            	case 'N':
+            		rNode.direction = InterconnectInfo.Direction.U;
+            		rNode.setVerTG(getLengthFromIntentCode(ic));
+            		break;
+            	case 'S':
+            		rNode.direction = InterconnectInfo.Direction.D;
+            		rNode.setVerTG(getLengthFromIntentCode(ic));
+            		break;
+            	default:
+            		rNode.direction = InterconnectInfo.Direction.S;
+            		switch(ic) {
+            			case NODE_PINBOUNCE:
+            			case NODE_PINFEED:
+            				rNode.ng = T.NodeGroupType.CLE_IN;
+            				break;
+            			case NODE_LOCAL:
+            				rNode.ng = T.NodeGroupType.GLOBAL;
+            				rNode.direction = InterconnectInfo.Direction.U;
+            				break;
+            			default:
+            				rNode.ng = T.NodeGroupType.CLE_OUT;
+            		}
             }
         }
 
-        return res;
+        return rNode;
     }
-
 
     @FunctionalInterface
     interface BuildAccumulativeList<T> {
