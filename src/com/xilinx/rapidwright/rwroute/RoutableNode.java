@@ -42,18 +42,18 @@ import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
  * It implements {@link Routable} and each Routable Object is created based on a {@link Node} Object.
  */
 public class RoutableNode implements Routable{
-	/** A uniques index of this RoutableNode */
+	/** A unique index of a rnode */
 	private int index;
-	/** The associated Node */
+	/** The associated {@link Node} instance */
 	private Node node;
-	/** The type of this Routable */
+	/** The type of a rnode*/
 	private RoutableType type;
-	/** The tileXCoordinate and tileYCoordinate of the INT tile that this rnode stops at */
+	/** The tileXCoordinate and tileYCoordinate of the INT tile that a rnode stops at */
 	private short x;
 	private short y;
-	/** The wirelength of this rnode */
+	/** The wirelength of a rnode */
 	private short length;
-	/** The base cost of this rnode */
+	/** The base cost of a rnode */
 	private float baseCost;
 	/** The delay of this rnode computed based on the timing model */
 	private short delay;
@@ -63,12 +63,12 @@ public class RoutableNode implements Routable{
 	private boolean target;
 	/** The children (downhill rnodes) of this rnode */
 	private List<Routable> children;
-	/** A flag to indiacate if the children have been set */
+	/** A flag to indicate if the children have been set */
 	private boolean childrenSet;
 	
 	/** Static variable to indicate if the routing is timing-driven */
 	static boolean timingDriven;
-	/** The instantiated delayEstimator to comupte delays */
+	/** The instantiated delayEstimator to compute delays */
 	static DelayEstimatorBase delayEstimator;
 	/** A flag to indicate if the routing resource exclusion should disable exclusion of nodes cross RCLK */
 	static boolean maskNodesCrossRCLK;
@@ -114,7 +114,7 @@ public class RoutableNode implements Routable{
 					child.setDelay(RouterHelper.computeNodeDelay(delayEstimator, node));
 				}		
 			}else {
-				this.children.add(child);//the sink routable of a target has been created up-front
+				this.children.add(child);//the sink rnode of a target connection has been created up-front
 			}		
 		}
 		this.childrenSet = true;		
@@ -128,7 +128,7 @@ public class RoutableNode implements Routable{
 			baseCost = 0.4f;
 		}else{
 			baseCost = 0.4f;
-			/** NOTE: IntentCode is device-dependent */
+			// NOTE: IntentCode is device-dependent
 			IntentCode ic = node.getIntentCode();
 			switch(ic) {
 			case NODE_PINBOUNCE:

@@ -35,13 +35,13 @@ import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
  * A Connection instance represents a pair of source-sink {@link SitePinInst} instances of a {@link Net} instance.
  */
 public class Connection implements Comparable<Connection>{
-	/** A unique index of this connection */
+	/** A unique index of a connection */
 	private final int id;
-	/** The source and sink {@link SitePinInst}s of this connection */
+	/** The source and sink {@link SitePinInst}s of a connection */
 	private SitePinInst source;
 	private final SitePinInst sink;
 	/** 
-	 * The source and sink {@link RoutableNode}s (rnodes) of this connection.
+	 * The source and sink {@link RoutableNode} instances (rnodes) of a connection.
 	 * They are created based on the INT tile nodes the source and sink SitePinInsts connect to, respectively.
 	 */
 	private Routable sourceRnode;
@@ -49,34 +49,36 @@ public class Connection implements Comparable<Connection>{
 	/** 
 	 * true to indicate the source and the sink are connected through dedicated resources, 
 	 * such as the carry chain connections and connections between cascaded BRAMs.
-	 * These connections only need to be routed once at the end of routing.
+	 * These connections only need to be routed once after the iterative routing of other connections.
 	 */
 	private boolean direct;
-	/** The net that this connection belongs to */
+	/** The {@link NetWrapper} instance indicating the net a connection belongs to */
 	private NetWrapper net;
-	/** The half-perimeter wirelength of connection based on the source and sink rnodes, used for sorting connection */
+	/** 
+	 * The half-perimeter wirelength of a connection based on the source and sink rnodes, 
+	 * used for sorting connection and statistics of connection span.
+	 */
 	private short hpwl;
-	/** Boundary coordinates of this connection's bounding box (BB), based on INT tile X and Y coordinates */
+	/** Boundary coordinates of a connection's bounding box (BB), based on INT tile X and Y coordinates */
 	private short xMinBB;
 	private short xMaxBB;
 	private short yMinBB;
-	private short yMaxBB;
-	
+	private short yMaxBB;	
 	/** 
-	 * TimingEdges associated to this connection.
+	 * TimingEdges associated to a connection.
 	 * For LUT_6_2_* pins, there will be two timing edges mapped to the same pair of SitePinInsts.
 	 */
 	private List<TimingEdge> timingEdges;
-	/** The criticality factor to indicate how timing-critical this connection is */
+	/** The criticality factor to indicate how timing-critical a connection is */
 	private float criticality;
-	/** List of Routable that make up of the route of this connection */
+	/** List of Routable instances that make up of the route of a connection */
 	private List<Routable> rnodes;
 	
-	/** To indicate if the route delay of this connection has been patched up, when there are consecutive long nodes */
+	/** To indicate if the route delay of a connection has been patched up, when there are consecutive long nodes */
 	private boolean dlyPatched;
-	/** true to indicate that this connection cross SLRs */
+	/** true to indicate that a connection cross SLRs */
 	private boolean crossSLR;
-	/** List of nodes assigned to this connection to form the path for generating PIPs */
+	/** List of nodes assigned to a connection to form the path for generating PIPs */
 	private List<Node> nodes;
 	
 	public Connection(int id, SitePinInst source, SitePinInst sink, NetWrapper netWrapper){
@@ -156,8 +158,8 @@ public class Connection implements Comparable<Connection>{
 	}
 	
 	/**
-	 * Computes criticality of this connection.
-	 * @param maxDelay The maximum delay to normalize the slack of this connection.
+	 * Computes criticality of a connection.
+	 * @param maxDelay The maximum delay to normalize the slack of a connection.
 	 * @param maxCriticality The maximum criticality.
 	 * @param criticalityExponent The exponent to separate critical connections and non-critical connections.
 	 */
@@ -178,8 +180,8 @@ public class Connection implements Comparable<Connection>{
 	}
 	
 	/**
-	 * Computes criticality of this connection, used when doing timing-driven routing .with clock skew data supplied.
-	 * @param maxDelay The maximum delay to normalize the slack of this connection
+	 * Computes criticality of a connection, used when doing timing-driven routing with clock skew data supplied.
+	 * @param maxDelay The maximum delay to normalize the slack of a connection
 	 * @param maxCriticality The maximum criticality.
 	 * @param criticalityExponent The exponent to separate critical connections and non-critical connections.
 	 * @param index The clock region index to indicate which bit of the required time and arrival time arrays should be used.
@@ -201,7 +203,7 @@ public class Connection implements Comparable<Connection>{
 	}
 	
 	/**
-	 * Checks if this connection has any overused rnodes to indicate the congestion status.
+	 * Checks if a connection has any overused rnodes to indicate the congestion status.
 	 * @return
 	 */
 	public boolean congested() {
@@ -214,7 +216,7 @@ public class Connection implements Comparable<Connection>{
 	}
 	
 	/**
-	 * Checks if this connection is routed through any rnodes that have multiple drivers.
+	 * Checks if a connection is routed through any rnodes that have multiple drivers.
 	 * @return
 	 */
 	public boolean useRnodesWithMultiDrivers() {

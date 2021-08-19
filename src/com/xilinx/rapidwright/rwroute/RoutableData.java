@@ -50,7 +50,7 @@ public class RoutableData {
 	private Routable prev;
 	/** A set of the source {@link SitePinInst} Objects of nets that are using the rnode */
 	private HashMultiset<SitePinInst> sourceSet;
-	/** A set of drivers (parents) of the rnode according to the routing paths of connetions */
+	/** A set of drivers (parents) of the rnode according to the routing paths of connections */
 	private HashMultiset<Routable> parentSet;
 	
 	public RoutableData(int index) {
@@ -168,7 +168,7 @@ public class RoutableData {
 	}
 	
 	/**
-	 * Adds a driver to the parant set of the associated rnode.
+	 * Adds a driver to the parent set of the associated rnode.
 	 * @param parent The driver to be added.
 	 */
 	public void addParent(Routable parent) {

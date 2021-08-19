@@ -51,7 +51,7 @@ import com.xilinx.rapidwright.placer.blockplacer.SmallestEnclosingCircle;
 import com.xilinx.rapidwright.router.RouteNode;
 import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.router.UltraScaleClockRouting;
-import com.xilinx.rapidwright.timing.CERouteTiming;
+import com.xilinx.rapidwright.timing.ClkRouteTiming;
 import com.xilinx.rapidwright.util.Pair;
 
 /**
@@ -71,7 +71,7 @@ public class GlobalSignalRouting {
 	
 	static Map<String, List<String>> dstINTtileRoutes;
 	static Map<String, Short> dstINTtileRoutey;
-	static CERouteTiming ceRouteTiming;
+	static ClkRouteTiming ceRouteTiming;
 	
 	public static Map<Node, RoutingNode> createdRoutingNodes;
 	static {
@@ -85,7 +85,7 @@ public class GlobalSignalRouting {
 		bufceRowTaps = delays;
 	}
 	
-	public static void setCERouteTiming(CERouteTiming ceTiming) {
+	public static void setCERouteTiming(ClkRouteTiming ceTiming) {
 		ceRouteTiming = ceTiming;
 		if(ceRouteTiming == null) {
 			System.err.println("CERouteTiming NOT EXIST");
@@ -171,10 +171,8 @@ public class GlobalSignalRouting {
 	}
 	
 	private static String getDominateClockRegion(Node node){
-		/** 
-		 * This is needed because a HDISTR for clock region X3Y2 can have a base tile in clock region X2Y2, 
-		 * seen from optical-flow design checkpoint.
-		 */
+		// This is needed because a HDISTR for clock region X3Y2 can have a base tile in clock region X2Y2, 
+		// seen from optical-flow design checkpoint.
 		Map<String, Integer> crCounts = new HashMap<>();
 		for(Wire w : node.getAllWiresInNode()) {
 			ClockRegion cr = w.getTile().getClockRegion();
@@ -216,7 +214,7 @@ public class GlobalSignalRouting {
 		}
 		if(debugPrintClkPIPs) System.out.println("CENTROID NODE: \n " + centroidNode);
 		
-		/** 1. route BUFG to nearest routing track */
+		// 1. route BUFG to nearest routing track
 		RouteNode startRoutingLine = UltraScaleClockRouting.routeBUFGToNearestRoutingTrack(clk);
 		if(debugPrintClkPIPs) {
 			System.out.println("ROUTE TO ROUTING TRACK: ");
@@ -225,12 +223,13 @@ public class GlobalSignalRouting {
 			System.out.println();
 		}
 		
-		/** 2. route from start routing line to the given centroid node */
+		// 2. route from start routing line to the given centroid node
 		RouteNode centroidRouteNode = UltraScaleClockRouting.routeToGivenCentroidNode(clk, startRoutingLine, centroidNode);	
-		/**
-		 *  For the gnl design with clk, vivado needs to use another BUFGCE to route from startRoutingLine to centroidNode
-		 *  Yet we could not find the path to centroid due to the searching condition assigned
-		 */
+		// When routing clock with this method, we need to make sure that the BUFGCE used in the design is exactly the one displayed in the file.
+		// Otherwise, it is possible that this clock router will fail. Because if can not find a path to the centroid.
+		// For instance, for a GNL design with a clock net, 
+		// Vivado needs to use another BUFGCE to route from startRoutingLine to centroidNode.
+		// But we do not have this option due to the searching condition.
 		if(debugPrintClkPIPs) {
 			System.out.println("PATH TO CENTROID FOUND: \n  " + centroidRouteNode);
 			System.out.println("ROUTE TO CENTROID: ");
@@ -238,10 +237,10 @@ public class GlobalSignalRouting {
 			System.out.println();
 		}
 		
-		/** 3.a. get SitePinInst - LCB mapping */
+		// 3.a. get SitePinInst - LCB mapping
 		Map<RouteNode, ArrayList<SitePinInst>> lcbMappings = getLCBPinMappings(clk);
 		
-		/** 3.b. copy given paths from centroid to horizontal distribution lines */
+		// 3.b. re-use the given paths from centroid to horizontal distribution lines
 		Map<String, RouteNode> horDistributionLines = routeCentroidToHorDistributionLines(clk, crPaths);	
 		if(debugPrintClkPIPs) {
 			System.out.println("HORIZONTAL DISTRIBUTION LINEs:");
@@ -250,7 +249,7 @@ public class GlobalSignalRouting {
 			}
 		}
 		
-		/** 3.c. route to LCBs */
+		// 3.c. route to LCBs
 		UltraScaleClockRouting.routeToLCBs(clk, getStartingPoint(horDistributionLines, device), lcbMappings.keySet());	
 		if(debugPrintClkPIPs) {
 			System.out.println("ROUTE DISTR TO LCBs: ");
@@ -258,7 +257,7 @@ public class GlobalSignalRouting {
 			System.out.println();
 		}
 		
-		/** 4. route LCBs to sink pins */
+		// 4. route LCBs to sink pins
 		UltraScaleClockRouting.routeLCBsToSinks(clk, lcbMappings);	
 		if(debugPrintClkPIPs) {
 			System.out.println("ROUTE LCB TO SINKs: ");
@@ -275,7 +274,7 @@ public class GlobalSignalRouting {
 			System.out.println();
 		}
 		
-		/** 5. set delay */
+		// 5. set delay
 		setBUFCERowLeafTap(clk, device);
 	}
 	
@@ -290,7 +289,7 @@ public class GlobalSignalRouting {
 		List<Site> sites = new ArrayList<>();
 		for(Pair<String, String> crSite: bufceRowTaps.keySet()) {
 			Site site = device.getSite(crSite.getSecond());
-			/** e.g. row_tap  leaf_tap	src_@0.3  src_@0.6  src_@0.9   dst_@0.3  dst_@0.6  dst_@0.9 */
+			// An example line from the file: row_tap  leaf_tap	src_@0.3  src_@0.6  src_@0.9   dst_@0.3  dst_@0.6  dst_@0.9
 			clk.setBufferDelay(site, bufceRowTaps.get(crSite).get(0));
 			sites.add(site);
 		}			
@@ -390,15 +389,15 @@ public class GlobalSignalRouting {
 		if(debug) System.out.println(" clk centroid route node is \n \t" + centroidRouteNode);
 		if(debugPrintPIPs) printCLKPIPs(clk);
 		
-		/** Transition centroid from routing track to vertical distribution track */
+		// Transition centroid from routing track to vertical distribution track
 		if(debug) System.out.println("transition Centroid To Distribution Line");
 		RouteNode centroidDistNode = UltraScaleClockRouting.transitionCentroidToDistributionLine(clk,centroidRouteNode);
 		if(debug) System.out.println(" centroid distribution node is \n \t" + centroidDistNode);
 		if(debugPrintPIPs) printCLKPIPs(clk);
 		
-		/** routeCentroidToVerticalDistributionLines and routeCentroidToHorizontalDistributionLines could result in duplicated PIPs */
+		// routeCentroidToVerticalDistributionLines and routeCentroidToHorizontalDistributionLines could result in duplicated PIPs
 		if(debug) System.out.println("route Centroid To Vertical Distribution Lines");
-		/** Each ClockRegion is not necessarily the one that each RouteNode value belongs to (same row is a must) */
+		// Each ClockRegion is not necessarily the one that each RouteNode value belongs to (same row is a must)
 		Map<ClockRegion, RouteNode> vertDistLines = UltraScaleClockRouting.routeCentroidToVerticalDistributionLines(clk,centroidDistNode, clockRegions);
 		if(debug) {
 			System.out.println(" clock region - vertical distribution node ");
@@ -412,7 +411,7 @@ public class GlobalSignalRouting {
 		if(debug) System.out.println(" dist lines are \n \t" + distLines);
 		if(debugPrintPIPs) printCLKPIPs(clk);
 		
-		/** I changed this method to just map connected node to SitePinInsts */
+		// I changed this method to just map connected node to SitePinInsts
 		if(debug) System.out.println("get LCB Pin mappings");
 		Map<RouteNode, ArrayList<SitePinInst>> lcbMappings = getLCBPinMappings(clk);
 		
@@ -464,7 +463,7 @@ public class GlobalSignalRouting {
 		
 		RouteNode vrouteUp;
 		RouteNode vrouteDown;	
-		/** Two VROUTEs going up and down */
+		// Two VROUTEs going up and down
 		vrouteUp = UltraScaleClockRouting.routeToCentroidHRouteOrVRouteAboveBelowCentroid(clk, centroidHRouteNode, centroid.getNeighborClockRegion(1, 0), false);	
 		if(clkDebug) {
 			System.out.println("GET VROUTE UP:       " + vrouteUp);}
@@ -476,7 +475,7 @@ public class GlobalSignalRouting {
 		}
 		if(debugPrintClkPIPs) printCLKPIPs(clk);
 		
-		/** get two sets of clock regions, pick UP set for sinks in the resions with the same row as the centroid clock region */
+		// get two sets of clock regions, pick UP set for sinks in the resions with the same row as the centroid clock region
 		upDownClockRegions(clockRegions, centroid);
 		
 		List<RouteNode> upDownDistLines = new ArrayList<>();
@@ -800,7 +799,7 @@ public class GlobalSignalRouting {
 	
 	/**
 	 * A lightweight useful class for different simple routing-related scenarios, 
-	 * each {@link RoutingNode} object is associated to a {@link Node} object.
+	 * each {@link RoutingNode} Object is associated to a {@link Node} Object.
 	 */
 	static class RoutingNode{
 		private Node node;

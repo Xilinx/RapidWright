@@ -22,7 +22,7 @@ import com.xilinx.rapidwright.util.Pair;
 
 /**
  * An example to report the critical path delay and total wirelength of a routed design.
- * It is able to reproduce the same statistics as a {@link RWRoute} object reports after routing a design.
+ * It is able to reproduce the same statistics as a {@link RWRoute} Object reports after routing a design.
  */
 public class ReportTimingAndWirelength{
 	private Design design;
@@ -89,7 +89,7 @@ public class ReportTimingAndWirelength{
 	}
 	
 	/**
-	 * Creates a {@link NetWrapper} object that consists of a list of {@link Connection} objects, based on a net.
+	 * Creates a {@link NetWrapper} Object that consists of a list of {@link Connection} Objects, based on a net.
 	 * @param net
 	 * @return
 	 */
@@ -122,7 +122,7 @@ public class ReportTimingAndWirelength{
 	}
 	
 	/**
-	 * Using PIPs to calculate and set accumulative delay for each used node of a routed net that is represented by a {@link NetWrapper} object.
+	 * Using PIPs to calculate and set accumulative delay for each used node of a routed net that is represented by a {@link NetWrapper} Object.
 	 * The delay of each node is the total route delay from the source to the node (inclusive).
 	 * @param netplus
 	 */
@@ -131,7 +131,7 @@ public class ReportTimingAndWirelength{
 		Map<Node, RoutingNode> nodeRoutingNodeMap = new HashMap<>();
 		boolean firstPIP = true;
 		for(PIP pip : pips) {
-			/** This approach works because we observed that the PIPs are in order */
+			// This approach works because we observed that the PIPs are in order
 			Node startNode = pip.getStartNode();
 			RoutingNode startrn = RouterHelper.createRoutingNode(startNode, nodeRoutingNodeMap);
 			if(firstPIP) startrn.setDelayFromSource(0);

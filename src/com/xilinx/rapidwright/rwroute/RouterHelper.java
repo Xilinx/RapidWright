@@ -56,7 +56,7 @@ import com.xilinx.rapidwright.util.Pair;
  */
 public class RouterHelper {
 	/**
-	 * Checks if a net has source and sink pins to be a routable net.
+	 * Checks if a {@link Net} instance has source and sink {@link SitePinInst} instances to be routable.
 	 * @param net The net to be checked.
 	 * @return true, if the net has source and sink pins.
 	 */
@@ -65,16 +65,16 @@ public class RouterHelper {
 	}
 	
 	/**
-	 * Checks if a net is driver-less or load-less.
+	 * Checks if a {@link Net} instance is driver-less or load-less.
 	 * @param net The net to be checked.
-	 * @return true, if the nets is dirver-less or load-less.
+	 * @return true, if the nets is driver-less or load-less.
 	 */
 	public static boolean isDriverLessOrLoadLessNet(Net net){
 		return (isDriverLessNet(net) || isLoadLessNet(net));
 	}
 	
 	/**
-	 * Checks if a net is driver-less.
+	 * Checks if a {@link Net} instance is driver-less.
 	 * @param net The net to be checked.
 	 * @return true, if the net does not have a source pin.
 	 */
@@ -83,7 +83,7 @@ public class RouterHelper {
 	}
 	
 	/**
-	 * Checks if a net is load-less.
+	 * Checks if a {@link Net} instance is load-less.
 	 * @param net The net to be checked.
 	 * @return true, if the net does not have sink pins.
 	 */
@@ -92,7 +92,7 @@ public class RouterHelper {
 	}
 	
 	/**
-	 * Checks if a net is internally routed net.
+	 * Checks if a {@link Net} instance is internally routed net.
 	 * @param net The net to be checked.
 	 * @return true, if the net does not have pins.
 	 */
@@ -101,8 +101,9 @@ public class RouterHelper {
 	}
 	
 	/**
-	 * Checks if the source-sink connection is an external connection to COUT, which should have the source pin swapped,
-	 * because COUT only connects to CIN.
+	 * Checks if the source-sink connection is an external connection driven by COUT.
+	 * If true, the source pin swapped to the alternative pin of the {@link Net} instance.
+	 * Because COUT only connects to CIN.
 	 * @param source The source SitePinInst of this connection.
 	 * @param sink The sink SitePinInst of this connection.
 	 * @return true, if the source is a COUT while the sink is not CIN.
@@ -112,8 +113,8 @@ public class RouterHelper {
 	}
 	
 	/**
-	 * Gets a node that connects to an INT tile from an output pin.
-	 * @param output The output SitePinInst of a net.
+	 * Gets a {@link Node} instance that connects to an INT {@link Tile} instance from an output {@link SitePinInst} instance.
+	 * @param output The output pin.
 	 * @return A node that connects to an INT tile from an output pin.
 	 */
 	public static Node projectOutputPinToINTNode(SitePinInst output) {
@@ -140,7 +141,7 @@ public class RouterHelper {
 	}
 	
 	/**
-	 * Gets a list of nodes that connect an input SitePinInst to an INT tile.
+	 * Gets a list of {@link Node} instances that connect an input {@link SitePinInst} instance to an INT {@link Tile} instance.
 	 * @param input The input pin.
 	 * @return A list of nodes from the input SitePinInst to an INT tile.
 	 */
@@ -185,23 +186,23 @@ public class RouterHelper {
 	}
 	
 	/**
-	 * Gets a list of PIPs for a connection
-	 * @param connection The connection with a list a nodes
-	 * @return A list of PIPs for the connection
+	 * Gets a list of {@link PIP} instances for routing a connection.
+	 * @param connection The {@link Connection} instance that has been routed with a list of {@link Node} instances.
+	 * @return A list of PIPs for the connection.
 	 */
 	public static List<PIP> connectionPIPs(Connection connection){
 		return getPIPsFromListOfReversedNodes(connection.getNodes());
 	}
 	
 	/**
-	 * Gets a list of PIPs from a list of nodes in a reversed order.
-	 * @param connectionNodes The list of nodes.
+	 * Gets a list of {@link PIP} instances from a list of {@link Node} instances in a reversed order.
+	 * @param connectionNodes The list of nodes of a routed {@link Connection} instance.
 	 * @return A list of PIPs generated from the list of nodes.
 	 */
 	public static List<PIP> getPIPsFromListOfReversedNodes(List<Node> connectionNodes){
 		List<PIP> conPIPs = new ArrayList<>();
 		if(connectionNodes == null) return conPIPs;
-		/** Nodes of a connection are added to the list starting from its sink to its source */
+		// Nodes of a connection are added to the list starting from its sink to its source
 		for(int i = connectionNodes.size() -1; i > 0; i--){
 			Node driver = connectionNodes.get(i);
 			Node load = connectionNodes.get(i-1);		
@@ -216,15 +217,15 @@ public class RouterHelper {
 	}
 	
 	/**
-	 * Finds the PIP between two nodes
-	 * @param driver The driver node
-	 * @param load The load node
-	 * @return The PIP between the two nodes
+	 * Finds the {@link PIP} instance that connects two {@link Node} instances.
+	 * @param driver The driver node.
+	 * @param load The load node.
+	 * @return The PIP connecting the two nodes.
 	 */
 	public static PIP findThePIPbetweenTwoNodes(Node driver, Node load){
 		PIP pip = getPIP(load.getTile(), driver.getAllWiresInNode(), load.getWire());
 		if(pip == null) {
-			/** for other scenarios regarding bidirectional nodes, such as LAG tile nodes, LAG_LAG_X12Y250/LAG_MUX_ATOM_0_TXOUT to node LAG_LAG_X12Y310/UBUMP0 */
+			// for other scenarios regarding bidirectional nodes, such as LAG tile nodes, LAG_LAG_X12Y250/LAG_MUX_ATOM_0_TXOUT to node LAG_LAG_X12Y310/UBUMP0 
 			pip = getPIP(driver, load);
 		}
 		
@@ -232,7 +233,7 @@ public class RouterHelper {
 	}
 	
 	/**
-	 * Gets the PIP based on the load node tile, driver node wires and the load node wire.
+	 * Gets the {@link PIP} instance based on the {@link Tile} instance of a node, its driver node wires and its base {@link Wire} instance.
 	 * @param loadTile The base tile of the load node.
 	 * @param driverWires All wires in the driver node.
 	 * @param loadWire The wire of the load node.
@@ -252,7 +253,7 @@ public class RouterHelper {
 	}
 	
 	/**
-	 * Gets the PIP from a driver node to a load node.
+	 * Gets the {@link PIP} instance from a driver {@link Node} instance to a load {@link Node} instance.
 	 * @param driver The driver node.
 	 * @param load The load node.
 	 * @return The PIP from the driver node to the load node.
@@ -271,7 +272,8 @@ public class RouterHelper {
 	}
 	
 	/**
-	 * Gets a list of a net from its PIPs, in the order of source pin node, sink pin nodes, and other intermediate nodes.
+	 * Gets {@link Node} instances of a {@link Net} instance from its {@link PIP} instances, 
+	 * in the order of source pin node, sink pin nodes, and other intermediate nodes.
 	 * @param net The target net.
 	 * @return All nodes used by the net.
 	 */
@@ -297,7 +299,7 @@ public class RouterHelper {
 	}
 	
 	/**
-	 * Gets a set of nodes used by a net.
+	 * Gets a set of {@link Node} instances used by a {@link Net} instance.
 	 * @param net The target net.
 	 * @return A set of nodes used by a net.
 	 */
@@ -336,7 +338,7 @@ public class RouterHelper {
 	}
 	
 	/** 
-	 * Constructs all the names of invertible DSP BELPin.
+	 * Constructs all the names of invertible DSP {@link BELPin} instances.
 	 * @param name The short name of the BELPins.
 	 * @param postfixes All possible string postfixes or indices after the short name.
 	 * @param last The last string of invertible DSP BELPins.
@@ -351,7 +353,7 @@ public class RouterHelper {
 	}
 	
 	/**
-	 * Checks if a DSP BELPin is invertible.
+	 * Checks if a DSP {@link BELPin} instance is invertible.
 	 * @param belPin
 	 * @return
 	 */
@@ -497,10 +499,10 @@ public class RouterHelper {
 	}
 	
 	/**
-	 * Creates a RoutingNode Object based on a node, avoiding duplicates.
-	 * @param node
-	 * @param createdRoutingNodes
-	 * @return
+	 * Creates a {@link RoutingNode} Object based on a {@link Node} Object, avoiding duplicates.
+	 * @param node The {@link Node} instance that is used to create a RoutingNode object.
+	 * @param createdRoutingNodes A map storing created {@link RoutingNode} instances and corresponding {@link Node} instances.
+	 * @return A created RoutingNode instance based on a node
 	 */
 	public static RoutingNode createRoutingNode(Node node, Map<Node, RoutingNode> createdRoutingNodes) {
 		RoutingNode resourceNode = createdRoutingNodes.get(node);
@@ -514,7 +516,7 @@ public class RouterHelper {
 	/**
 	 * Computes the delay of a node.
 	 * @param estimator An instantiation of the DelayEstimatorBase.
-	 * @param node The targe node.
+	 * @param node The node in question.
 	 * @return The delay of the node.
 	 */
 	public static short computeNodeDelay(DelayEstimatorBase estimator, Node node) {
@@ -598,8 +600,7 @@ public class RouterHelper {
 			//TODO checks if there are PIPs legally routing to every sink of the net
 		}
 		
-		return isFullyRouted;	
-		
+		return isFullyRouted;
 	}
 	
 	/**
@@ -609,19 +610,14 @@ public class RouterHelper {
 	public static void getSamplePathDelay(String filePath, TimingManager timingManager,
 			Map<TimingEdge, Connection> timingEdgeConnectionMap, Map<Node, Routable> rnodesCreated) {
 		List<String> verticesOfVivadoPath = new ArrayList<>();
-		/** 
-		 * Include CLK if the first in the path is BRAM or DSP to check the logic delay
-		 * NOTE: remember to change the pin names of DSPs from subblock to top-level block that is what we use
-		 */
-		verticesOfVivadoPath.add("superSource");
-		
-		File vivadoReport = new File(filePath);
-		
+		// Include CLK if the first in the path is BRAM or DSP to check the logic delay
+		// NOTE: remember to change the pin names of DSPs from subblock to top-level block that is what we use
+		verticesOfVivadoPath.add("superSource");	
+		File vivadoReport = new File(filePath);	
 		if(!vivadoReport.exists()) {
 			System.err.println("ERROR: Target file does not exist for getting the sample path delay");
 			return;
 		}
-		
 		try {
 			List<String> path = parseVivadoPathToStringList(vivadoReport);
 			System.out.println("INFO: Given path: " + path);
@@ -631,7 +627,6 @@ public class RouterHelper {
 			e.printStackTrace();
 		}
 		System.out.println(verticesOfVivadoPath);
-		
 		timingManager.getSamplePathDelayInfo(verticesOfVivadoPath, timingEdgeConnectionMap, true, rnodesCreated);
 	}
 

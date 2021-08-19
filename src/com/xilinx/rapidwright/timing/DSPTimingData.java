@@ -35,16 +35,25 @@ import java.util.Map;
 import com.xilinx.rapidwright.util.Pair;
 
 /**
- * A DSPTimingData is instantiated for getting logic timing info of a DSP
+ * A DSPTimingData instance stores logic delay of a DSP block in the design.
+ * The logic delay of each DSP block is parsed from a text file that can obtained 
+ * by running Vivado with the Tcl script dump_all_dsp_delay.tcl under $RAPIDWRIGHT_PATH/tcl/rwroute.
+ * For more information of how to generate DSP timing files of a design, please refer to the Tcl script.
+ * When the DSP timing files are ready, please use "--dspTimingDataFolder" option (see {@link Configuration}),
+ * so that the DSP timing info becomes accessible for RWRoute.
  */
 public class DSPTimingData{
 	/** Full hierarchical name of the DSP block */
 	private String blockName;
-	/** <<Input port name, output port name>, logic delay from the input port to the output port>,
-	 *  e.g. <A[1], PCOUT[1]>, 1527*/
+	/** 
+	 * <<Input port name, output port name>, logic delay from the input port to the output port>,
+	 *  e.g. <A[1], PCOUT[1]>, 1527
+	 */
 	private Map<Pair<String, String>, Short> inOutPortDelays;
-	/** Two separate lists of input and output EDIFPortInst names, 
-	 *  used for checking if an EDIFPortInst is included in the timing file */
+	/** 
+	 * Two separate lists of input and output EDIFPortInst names, 
+	 * used for checking if an EDIFPortInst is included in the timing file
+	 */
 	private List<String> inputPorts;//two lists used for checking if port name included in delay info
 	private List<String> outputPorts;
 	/** A pin mapping from sub-block cell pin to top level dsp pin */
@@ -52,29 +61,36 @@ public class DSPTimingData{
 	/** A flag to indicate if the input file of the DSP is valid */
 	private boolean valid;
 	
+	private static boolean pathWarningInfoGenerated = false;
+	private static boolean fileExistenceWarningInfo = false;
+	
 	static String dspTimingDataFolder = null;
 	public static void setDSPTimingFolder(String path) {
 		if(path != null && !path.endsWith("/")) path += "/";
 		dspTimingDataFolder = path;
-		if(path != null) System.out.println("INFO: DSP timing data folder set: " + dspTimingDataFolder);
+		if(path != null) System.out.println("INFO: DSP timing data folder set as: " + dspTimingDataFolder);
 	}
 	
 	public DSPTimingData(String fullName){
 		this.setBlockName(fullName);
 		String dspBlockName = fullName.replace("/", "-");
 		
-		if(dspTimingDataFolder == null) {
-			System.err.println("ERROR: DSP Timing data file path not set");
-			System.out.println("INFO: Please set the file path using --TimingDataFolder <path>");
+		if(dspTimingDataFolder == null && !pathWarningInfoGenerated) {
+			System.out.println("CRITICAL WARNING: The design contains DSP blocks, but the DSP logic delay file path has not been set.");
+			this.generateWarningInfo();
+			pathWarningInfoGenerated = true;
 		}
 		
 		File dspTimingFile = new File(dspTimingDataFolder + dspBlockName + ".txt");
-    	if(!dspTimingFile.exists()) {
-    		System.out.println(dspTimingDataFolder + dspBlockName + ".txt");
-        	System.err.println("ERROR: DSP Timing data file not found in given directory: " + dspBlockName + ".txt");
-        	this.valid = false;
-        }else {
+    	if(dspTimingFile.exists()) {
         	this.valid = true;
+        }else {
+        	this.valid = false;
+        	if(!fileExistenceWarningInfo && !pathWarningInfoGenerated) {
+        		System.out.println("CRITICAL WARNING: logic delay file does not exist: " + dspTimingFile);
+        		this.generateWarningInfo();
+        		fileExistenceWarningInfo = true;
+        	}
         }
     	this.setInOutPortDelays(new HashMap<>());
 		this.inputPorts = new ArrayList<>();
@@ -85,6 +101,12 @@ public class DSPTimingData{
 		}catch(Exception e) {
 			e.printStackTrace();
 		}
+	}
+	
+	private void generateWarningInfo() {
+		System.out.println("CRITICAL WARNING: RWRoute continues timing-driven routing. Due to the missing DSP timing info, there could be unexpected critical path delay optimism.");
+		System.out.println("INFO: To obtain DSP logic delay files, please refer to dump_all_dsp_delay.tcl under $RAPIDWRIGHT_PATH/tcl/rwroute.");
+		System.out.println("INFO: Please use --dspTimingDataFolder <DSP delay files path> to grant the router access to DSP timing files.");
 	}
 	
 	//Explicit:          PCOUT[47]
@@ -156,10 +178,10 @@ public class DSPTimingData{
 	}
 
 	/**
-	 * Adds the input, output port names and the delay
-	 * @param in The input port name
-	 * @param out The output port name
-	 * @param delay The delay from in to out
+	 * Adds the input, output port names and the delay.
+	 * @param in The input port name.
+	 * @param out The output port name.
+	 * @param delay The delay from in to out.
 	 */
 	private void addInputOutPutPorts(String in, String out, short delay) {	
 		this.inputPorts.add(in);
@@ -168,18 +190,18 @@ public class DSPTimingData{
 	}
 	
 	/**
-	 * Checks if the EDIFPortInst is included in the input and output lists by name
-	 * @param edifPortInstName The name of EDIFPortInst to be checked
-	 * @return true, if the EDIFPortInst is included in one of the lists
+	 * Checks if the EDIFPortInst is included in the input and output lists by name.
+	 * @param edifPortInstName The name of EDIFPortInst to be checked.
+	 * @return true, if the EDIFPortInst is included in one of the lists.
 	 */
 	public boolean containsPortInst(String edifPortInstName) {	
 		return this.inputPorts.contains(edifPortInstName) || this.outputPorts.contains(edifPortInstName);
 	}
 	
 	/**
-	 * Adds pin mapping to the map
-	 * @param subblockPortName The sub-block port name
-	 * @param toplevelPortName The top-level block port name
+	 * Adds pin mapping to the map.
+	 * @param subblockPortName The sub-block port name.
+	 * @param toplevelPortName The top-level block port name.
 	 */
 	public void addPinMapping(String subblockPortName, String toplevelPortName) {
 		if(this.getPinMapping() == null) {

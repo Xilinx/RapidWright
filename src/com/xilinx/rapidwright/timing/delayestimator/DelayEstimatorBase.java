@@ -431,7 +431,7 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
             d   = (short) Math.abs(sp-st);
         }else if (endLoc < 0 ) {
         	if (!useUTurnNodes) 
-        		return Short.MAX_VALUE/2;// remove negative delay of u-turn NodeGroups at the device boundries
+        		return Short.MAX_VALUE/2;// remove negative delay of u-turn NodeGroups at the device boundaries
         	else {
         		d = (short) (dArray.get(begLoc) - 2 * dArray.get(0) + dArray.get(-endLoc - 1));
         	}

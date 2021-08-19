@@ -93,29 +93,29 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     static HashSet<String> unisimFlipFlopTypes;
     static HashSet<String> ramTypes;
 
-    Map<Pair<SitePinInst, SitePinInst>, List<TimingEdge>> spiPairsAndTimingEdges = new HashMap<>();
+    Map<Pair<SitePinInst, SitePinInst>, List<TimingEdge>> spiPairsAndTimingEdges = new HashMap<>();//TODO simplify to sink spi only
     Map<EDIFHierPortInst, SitePinInst> spiEDIFHportMapFromTimingGraph = new HashMap<>();
     public List<TimingVertex> orderedTimingVertice = new ArrayList<>();
     public List<TimingVertex> reversedOrderedTimingVertice = new ArrayList<>();
-    static CLKSkewRouteDelay clkTimingOfDesign = null;
-    static CERouteTiming ceRouteTiming = null;
+    static CLKSkewRouteDelay clkSkewRouteDelay = null;
+    static ClkRouteTiming clkRouteTiming = null;
     
     /**
-     * Sets the CLKSkew object that represents the clock skew data
+     * Sets the {@link CLKSkewRouteDelay} object that represents the clock skew data.
      */
-    public static void setClkTiming(CLKSkewRouteDelay clkTiming) {
-    	clkTimingOfDesign = clkTiming;
+    public static void setClkTiming(CLKSkewRouteDelay clkSkewRouteDly) {
+    	clkSkewRouteDelay = clkSkewRouteDly;
     }
     
     /**
-     * checks if there is valid clock skew data
+     * Checks if there is valid clock skew data
      */
     public static boolean validClkSkew() {
-    	return clkTimingOfDesign != null;
+    	return clkSkewRouteDelay != null;
     }
     
-    public static void setCERouteTiming(CERouteTiming ceTiming) {
-    	ceRouteTiming = ceTiming;
+    public static void setClkRouteTiming(ClkRouteTiming ceTiming) {
+    	clkRouteTiming = ceTiming;
     }
     
     static {
@@ -191,7 +191,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
             	addNetDelayEdges(net);
             }else {
             	if(!net.hasPIPs()) {
-            		addNetDelayEdges(net);
+                    addNetDelayEdges(net);
             	}
             }
         }
@@ -340,7 +340,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     		if(v.getArrivalTimes()[i] == 0) continue;
     		short dlyPess = 0;
     		Pair<String, String> crPair = this.createCRPair(i, cr);
-    		List<Short> data = clkTimingOfDesign.getSkew().get(crPair);
+    		List<Short> data = clkSkewRouteDelay.getSkew().get(crPair);
     		dlyPess = (short) (-data.get(2) - data.get(3));
     		v.getArrivalTimes()[i] += dlyPess;
     	}
@@ -354,7 +354,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     		if(v.getRequiredTimes()[i] > 16000) continue;
     		short dlyPess = 0;
     		Pair<String, String> crPair = this.createCRPair(i, cr);
-    		List<Short> data = clkTimingOfDesign.getSkew().get(crPair);
+    		List<Short> data = clkSkewRouteDelay.getSkew().get(crPair);
     		dlyPess = (short) (data.get(2) + data.get(3));
     		v.getRequiredTimes()[i] += dlyPess;
     	}
@@ -1008,11 +1008,11 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         for (TimingVertex s : sources) {
         	TimingEdge e = new TimingEdge(this, superSource, s);
             addEdge(superSource, s, e);
-            if(clkTimingOfDesign == null) continue;
+            if(clkSkewRouteDelay == null) continue;
             String cr = getClockRegionOfCellPin(s.getName(), this.design);
-            for(Pair<String, String> ss : clkTimingOfDesign.getSkew().keySet()) {
+            for(Pair<String, String> ss : clkSkewRouteDelay.getSkew().keySet()) {
             	if(ss.getFirst().equals(cr)) {
-            		List<Short> skewData = clkTimingOfDesign.getSkew().get(ss);
+            		List<Short> skewData = clkSkewRouteDelay.getSkew().get(ss);
             		short srcDly = skewData.get(1);
             		e.setLogicDelay(srcDly);//Only include srcDly, i.e. launching time
             	}
@@ -1854,10 +1854,10 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         logicDelay = 0f;
         boolean updateLogicDelay = true;
         
-        if(ceRouteTiming == null) {
+        if(clkRouteTiming == null) {
         	this.overwriteBUGCEDelay = false;
         }else {
-        	if(n.getSource() != null && n.getSource().getName().equals("CLK_OUT") && n.getSource().toString().contains(ceRouteTiming.getBufgce())) {
+        	if(n.getSource() != null && n.getSource().getName().equals("CLK_OUT") && n.getSource().toString().contains(clkRouteTiming.getBufgce())) {
 	        	overwriteBUGCEDelay = true;
 	        }else {
 	        	this.overwriteBUGCEDelay = false;
@@ -2051,10 +2051,10 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                 	netDelay = timingModel.calcDelay(local_spi_source, spi_sink, source, sink, net);
                 	this.intraSiteDelay = this.timingModel.getIntraSiteDelay();
                     forceUpdateEdge = true;
-                    if(ceRouteTiming == null) {
+                    if(clkRouteTiming == null) {
                     	this.overwriteBUGCEDelay = false;
                     }else {
-                    	if(spi_sink.getName().equals("CLK_IN") && spi_sink.toString().contains(ceRouteTiming.getBufgce())) {
+                    	if(spi_sink.getName().equals("CLK_IN") && spi_sink.toString().contains(clkRouteTiming.getBufgce())) {
                     		this.overwriteBUGCEDelay = true;
                     	}else {
                     		this.overwriteBUGCEDelay = false;
@@ -2094,7 +2094,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     }
     
     private short getDstINTTileDelay(String intTile) {
-    	short delay = ceRouteTiming.getDstINTtileDelay().getOrDefault(intTile, (short) 0);
+    	short delay = clkRouteTiming.getDstINTtileDelay().getOrDefault(intTile, (short) 0);
     	if(delay == 0) {
     		System.out.println("NO delay data for tile " + intTile);
     	}

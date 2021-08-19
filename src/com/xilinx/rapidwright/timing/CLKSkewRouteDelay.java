@@ -35,7 +35,10 @@ import java.util.Map;
 import com.xilinx.rapidwright.util.Pair;
 
 /**
- * Instantiation of a CLKSkewRouteDelay parses a file to read and store clock skew, route, and delay data into maps
+ * Creating a CLKSkewRouteDelay instance parses a supplied text file and stores clock skew, route, and delay data into maps to use.
+ * To obtain the text file, please refer to find_clock_tree_template.tcl under $RAPIDWRIGHT_PATH/tcl/rwroute.
+ * When the file is ready, please use "--clkSkew>" option (see {@link Configuration})
+ * to enable RWRoute to use the file for clock skew-aware timing-driven clock routing.
  */
 public class CLKSkewRouteDelay {
 	/** Name of the file */
@@ -56,12 +59,10 @@ public class CLKSkewRouteDelay {
 	// X2Y3  BUFCE_ROW_FSR_X91Y3 	0       	0          0        	0        	0          0        	0        	0
 	
 	static String clkSkewRouteDelayFile = null;
-	public static void setClkTiming(String fileName) {
+	public static void setClkTSkewRouteDelayFile(String fileName) {
 		if(fileName != null) {
 			clkSkewRouteDelayFile = fileName;
-			System.out.println("INFO: CLK skew, route and delay data file: " + clkSkewRouteDelayFile);
-		}else {
-			System.out.println("INFO: No data file set for clock skew, route and delay");
+			System.out.println("INFO: Clock skew-route-delay file set as: " + clkSkewRouteDelayFile);
 		}
 	}
 	
@@ -80,8 +81,7 @@ public class CLKSkewRouteDelay {
 	private void parseDataFromFile() throws IOException {
 		File clkTimingFile = new File(this.name);
 		if(!clkTimingFile.exists()) {
-        	System.err.println("ERROR: CLK skew, route and data file does not exist: " + this.name);
-        	return;
+        	throw new IllegalArgumentException("ERROR: Specified clock skew-route-delay file does not exist.");
         }
 		BufferedReader reader = new BufferedReader(new FileReader(clkTimingFile));
 		// NOTE: Different data sections (skew, route, delay, etc) must be read into map following the same order as shown in the file
@@ -108,8 +108,7 @@ public class CLKSkewRouteDelay {
 		}
         
         if(!dataFound) {
-        	System.err.println("ERROR: No section header found in the file for " + section);
-        	return;
+        	throw new IllegalArgumentException("ERROR: No section header found in the supplied file for " + section);
         }
         if(section.equals("skew")) {
         	this.readSkewDelayToMap(reader, this.skew);
@@ -130,8 +129,7 @@ public class CLKSkewRouteDelay {
 			 }
 			String[] dataStrings = line.split("\\s+");
 			if(dataStrings.length <= 2) {
-				System.out.println("CRITICAL WARNING: Incomplete data of " + line);
-				continue;
+				throw new IllegalArgumentException("ERROR: Incomplete data of line: " + line);
 			}
 			Pair<String, String> key = new Pair<>(dataStrings[0], dataStrings[1]);
 			List<Short> values = new ArrayList<>();
@@ -152,8 +150,7 @@ public class CLKSkewRouteDelay {
 			if(line.startsWith("#")) continue;
 			String[] dataStrings = line.split("\\s+");
 			if(dataStrings.length <= 1) {
-				System.out.println("CRITICAL WARNING: Incomplete data of " + line);
-				continue;
+				throw new IllegalArgumentException("ERROR: Incomplete data of line: " + line);
 			}
 			
 			List<String> values = new ArrayList<>();

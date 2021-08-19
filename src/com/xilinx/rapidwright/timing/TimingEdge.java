@@ -49,8 +49,10 @@ public class TimingEdge extends DefaultEdge {
     private float logicDelay = 0.0f;
     private float netDelay = 0.0f;
     private float delay = 0.0f;
-    /** added for delay update of this edge, 
-     * intra-site delay does not change during routing, needs to be stored separately */
+    /** 
+     * Added for delay update of a timing edge, 
+     * because intra-site delay does not change during routing and needs to be stored separately
+     */
     private float intraSiteDelay = 0.0f;
     
     private SitePinInst first;

@@ -34,7 +34,7 @@ import com.xilinx.rapidwright.design.SitePinInst;
  * A wrapper class of {@link Net} with additional information for the router.
  */
 public class NetWrapper{
-	/** A unique index for this NetWrapepr */
+	/** A unique index for a NetWrapepr Object*/
 	private int id;
 	/** The associated {@link Net} Object */
 	private Net net;
@@ -44,7 +44,7 @@ public class NetWrapper{
 	private float xCenter;
 	private float yCenter;
 	/** The half-perimeter wirelength */
-	private short hpwl;
+	private short doubleHpwl;
 	/** A flag to indicate if the source has been swapped */
 	private boolean sourceChanged;
 	/** Stores the old source SitePinInst after output pin swapping */
@@ -96,7 +96,7 @@ public class NetWrapper{
 		yMin = yArray.get(0);
 		yMax = yArray.get(xArray.size() - 1);
 		
-		this.setHpwl((short) ((xMax - xMin + 1) + (yMax - yMin + 1)));
+		this.setDoubleHpwl((short) ((xMax - xMin + 1 + yMax - yMin + 1) * 2));
 		this.setXCenter(xSum / xArray.size());
 		this.setYCenter(ySum / yArray.size());
 	}
@@ -117,12 +117,12 @@ public class NetWrapper{
 		return this.connections;
 	}
 
-	public short getHpwl() {
-		return hpwl;
+	public short getDoubleHpwl() {
+		return doubleHpwl;
 	}
 
-	public void setHpwl(short hpwl) {
-		this.hpwl = hpwl;
+	public void setDoubleHpwl(short hpwl) {
+		this.doubleHpwl = hpwl;
 	}
 
 	public boolean isSourceChanged() {

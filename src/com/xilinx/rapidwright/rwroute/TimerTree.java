@@ -27,7 +27,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * A TimerTree object consists of {@link Timer} objects, 
+ * A TimerTree Object consists of {@link Timer} Objects, 
  * providing methods to create a tree of timers for the runtime breakdown of a program.
  */
 public class TimerTree {
@@ -45,7 +45,8 @@ public class TimerTree {
 	}
 	
 	/**
-	 * Creates a timer with its name and its parent name. If a timer under the given name exists, returns it.
+	 * Creates a {@link Timer} instance with its name and its parent name. 
+	 * If a timer under the given name exists, returns it.
 	 * Otherwise, creates a new one and returns it. 
 	 * @param name Name of a timer.
 	 * @param parent The parent timer name.

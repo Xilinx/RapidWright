@@ -6,8 +6,8 @@ import java.util.List;
 
 /**
  * A customized Timer class, providing start and stop methods for recording total elapsed time of a process. 
- * Each timer object should be created at least with a name. 
- * It also supports a user case of {@link TimerTree} for runtime analysis of an entire program.
+ * Each Timer Object should be created at least with a name. 
+ * It also supports a user case of {@link TimerTree} instance for runtime analysis of an entire program.
  */
 public class Timer {
 	private String name;
