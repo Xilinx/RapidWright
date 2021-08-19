@@ -58,9 +58,6 @@ import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.SortedMap;
-import java.util.Map.Entry;
 import java.util.zip.DeflaterOutputStream;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
@@ -821,8 +818,9 @@ public class FileTools {
 				    return rootFolder.getAbsolutePath();
 				}
 			}
-			// This appears to be a jar file.
-			return null;
+            // We appear to be running within a jar file, let's default to the current directory
+            unPackSupportingJarData();
+            return System.getProperty("user.dir");
 		}
 		if(path.endsWith(File.separator)){
 			path.substring(0, path.length()-1);
@@ -889,35 +887,49 @@ public class FileTools {
         return downloadedMD5;
 	}
 	
+	/**
+	 * Ensures that the specified RapidWright data file is the correct version and present based
+	 * on the MD5 hash in @link {@link DataVersions}
+	 * @param name Name of the RapidWright data file resource
+	 * @return The MD5 hash of a downloaded file, null if the file present is the correct version
+	 */
 	private static String ensureCorrectDataFile(String name) {
-	    String fileName = getRapidWrightPath() + File.separator + name;
+	    String rwPath = getRapidWrightPath();
+	    String fileName = rwPath + File.separator + name;
 	    File resourceFile = new File(fileName);
 	    if(resourceFile.exists()) {
-	        File md5File = new File(fileName + MD5_DATA_FILE_SUFFIX);
-	        if(md5File.exists()) {
-	            String currMD5 = null;
-                try {
-                    currMD5 = Files.readAllLines(md5File.toPath()).get(0);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-	            String expectedMD5 = getCurrentDataVersion(name);
-	            if(currMD5.equals(expectedMD5)) {
-	                return null;
-	            }
-	        } else {
-	            // .md5 file is missing
-	            String currMD5 = Installer.calculateMD5OfFile(resourceFile.getAbsolutePath());
-	            String expectedMD5 = getCurrentDataVersion(name);
-	            if(expectedMD5.equals(currMD5)) {
-	                FileTools.writeStringToTextFile(currMD5, resourceFile.getAbsolutePath() 
-	                        + MD5_DATA_FILE_SUFFIX);
-	                // File matches expected md5
-	                return null;
-	            }
-	        }
+	        if(expectedMD5Matches(name, fileName, resourceFile)) {
+                return null;
+            }
 	    }
 	    return downloadDataFile(name.replace("\\", "/"));
+	}
+	
+	private static boolean expectedMD5Matches(String name, String fileName, File resourceFile) {
+        File md5File = new File(fileName + MD5_DATA_FILE_SUFFIX);
+        if(md5File.exists()) {
+            String currMD5 = null;
+            try {
+                currMD5 = Files.readAllLines(md5File.toPath()).get(0);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            String expectedMD5 = getCurrentDataVersion(name);
+            if(currMD5.equals(expectedMD5)) {
+                return true;
+            }
+        } else {
+            // .md5 file is missing
+            String currMD5 = Installer.calculateMD5OfFile(resourceFile.getAbsolutePath());
+            String expectedMD5 = getCurrentDataVersion(name);
+            if(expectedMD5.equals(currMD5)) {
+                FileTools.writeStringToTextFile(currMD5, resourceFile.getAbsolutePath() 
+                        + MD5_DATA_FILE_SUFFIX);
+                // File matches expected md5
+                return true;
+            }
+        }
+	    return false;
 	}
 	
 	/**
@@ -931,30 +943,21 @@ public class FileTools {
 	public static InputStream getRapidWrightResourceInputStream(String name){
 		ensureCorrectDataFile(name);
 	    String rwPath = getRapidWrightPath();
-		if(rwPath != null){
-			try {
-				File resourceFile = new File(rwPath + File.separator + name);
-				if(resourceFile.exists()) {
-					return new FileInputStream(resourceFile);
-				} else {
-					System.err.println("WARNING: " + RAPIDWRIGHT_VARIABLE_NAME + " is set to " + rwPath
-							+ " but the resource " + name + " is not present, will attempt to load from jar...");
-				}
-			} catch (FileNotFoundException e) {
-				System.err.println("ERROR: Failed to find RapidWright resource file "
-						+ rwPath + File.separator + name + ". Please check the installation path "
-						+ "and/or RAPIDWRIGHT_PATH environment variable.");
-				e.printStackTrace();
-				return null;
+		try {
+			File resourceFile = new File(rwPath + File.separator + name);
+			if(resourceFile.exists()) {
+				return new FileInputStream(resourceFile);
+			} else {
+				System.err.println("WARNING: " + RAPIDWRIGHT_VARIABLE_NAME + " is set to " + rwPath
+						+ " but the resource " + name + " is not present, will attempt to load from jar...");
 			}
+		} catch (FileNotFoundException e) {
+			System.err.println("ERROR: Failed to find RapidWright resource file "
+					+ rwPath + File.separator + name + ". Please check the installation path "
+					+ "and/or RAPIDWRIGHT_PATH environment variable.");
+			e.printStackTrace();
 		}
-		// Try getting it from inside the jar (classpath)
-		InputStream res = FileTools.class.getResourceAsStream("/" + name.replace(File.separator, "/"));
-		if (res == null) {
-			System.err.println("ERROR: " + RAPIDWRIGHT_VARIABLE_NAME +
-					" is not set and Resource was not found in Classpath.");
-		}
-		return res;
+        return null;
 	}
 	
 	/**
@@ -964,6 +967,7 @@ public class FileTools {
 	 * the running class files.  
 	 * @param name Name of the RapidWright resource file.  
 	 * @return True if the resource exists, false otherwise.
+	 * @deprecated
 	 */
 	public static boolean checkIfRapidWrightResourceExists(String name) {
 		String rwPath = getRapidWrightPath();
@@ -982,12 +986,6 @@ public class FileTools {
 	 */
 	public static String getRapidWrightResourceFileName(String name){
 		String rwPath = getRapidWrightPath();
-		if(rwPath == null){
-			// Looks like we may be running from a jar, attempt to extract needed files from jar
-			unPackSupportingJarData();
-			// Try again
-			rwPath = getRapidWrightPath();
-		}
 		if(rwPath != null){
 			return rwPath + File.separator + name;
 		}
@@ -1642,7 +1640,7 @@ public class FileTools {
 	 */
 	public static boolean unPackSupportingJarData(){
 		for(String folderName : FileTools.UNPACK_FOLDERS){
-			if(!folderCheck(folderName)) return false;
+			if(new File(folderName).exists()) continue;
 			try{
 				CodeSource src = Device.class.getProtectionDomain().getCodeSource();
 				if(src == null) {
@@ -1683,13 +1681,10 @@ public class FileTools {
 	 * Check if file/folder name is available to be used
 	 * @param name Name of the file/directory to check
 	 * @return True if the the file/folder name is free (unused), false otherwise.
+	 * @deprecated
 	 */
 	public static boolean folderCheck(String name){
-		if(new File(name).exists()){
-			MessageGenerator.briefError("File/folder ./"+name+"/ already exists.");
-			return false;
-		}
-		return true;
+		return !(new File(name).exists());
 	}
 
 	/**
