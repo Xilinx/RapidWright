@@ -1311,13 +1311,12 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                 if (c == null) {
                     continue;
                 }
-
-                String ramType = "RTL_RAM_TYPE:RAM_TDP";// hardcoded
-                List<String> config = new ArrayList<String>();
-                config.add(ramType);
+   
+                // hardcoded
+                int encodedConfig = intrasiteAndLogicDelayModel.getEncodedConfigCode("RAMB36E2:RTL_RAM_TYPE:RAM_TDP");
                 for (Map.Entry<EDIFName, EDIFPropertyValue> entry : mycellInst.getProperties().entrySet()) {
                     String configString = entry.getKey() + ":" + entry.getValue().getValue().toString();
-                    config.add(configString);
+                    encodedConfig |= intrasiteAndLogicDelayModel.getEncodedConfigCode(configString);
                 }
                 
                 // TODO this loop should be consolidated with that of CARRY8.
@@ -1340,7 +1339,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                         		String property = mycellInst.getProperty("CASCADE_ORDER_A").getValue();
                         		int DOA_REG = Integer.parseInt(mycellInst.getProperty("DOA_REG").getValue());
                         		if(property.equals("FIRST") || property.equals("NONE") || (property.equals("LAST") && DOA_REG == 1)) {
-	                        		delay = (short) this.getCLKtoOutputDelay(s2, config);
+	                        		delay = (short) this.getCLKtoOutputDelay(s2, encodedConfig);
 	                        	}
                         	}
                         }else if(s1.startsWith("CLKB")) {
@@ -1348,12 +1347,12 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                         			String property = mycellInst.getProperty("CASCADE_ORDER_B").getValue();
                         			int DOB_REG = Integer.parseInt(mycellInst.getProperty("DOB_REG").getValue());
                         			if(property.equals("FIRST") || property.equals("NONE") || (property.equals("LAST") && DOB_REG == 1)) {
-    	                        		delay = (short) this.getCLKtoOutputDelay(s2, config);
+    	                        		delay = (short) this.getCLKtoOutputDelay(s2, encodedConfig);
     	                        	}
                         			
                         		}
                         }else {
-                        	delay = intrasiteAndLogicDelayModel.getLogicDelay("RAMB36E2", s1, s2, config);
+                        	delay = intrasiteAndLogicDelayModel.getLogicDelay("RAMB36E2", s1, s2, encodedConfig);
                         }
                         
                         if (delay < 0) {
@@ -1603,25 +1602,24 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
 
             }
             else if (mycellname.startsWith("CARRY")) {
-                List<String> config = new ArrayList<String>();
-
 
                 Cell c = design.getCell(k);
                 if (c == null) {
                     continue;
                 }
 
+                int encodedConfig = 0;
+                
                 if (c.getPhysicalPinMapping("CI") == null) {
-                    config.add("CYINIT_BOT:GND");
-                    config.add("CARRY_TYPE:SINGLE_CY8");
-                }
-                else if (c.getPhysicalPinMapping("CI_TOP") == null) {
-                    config.add("CYINIT_TOP:GND");
-                    config.add("CARRY_TYPE:SINGLE_CY8");
+                    encodedConfig |= intrasiteAndLogicDelayModel.getEncodedConfigCode("CARRY8:CYINIT_BOT:GND");
+                }else if (c.getPhysicalPinMapping("CI_TOP") == null) {
+                    encodedConfig |= intrasiteAndLogicDelayModel.getEncodedConfigCode("CARRY8:CYINIT_TOP:GND");
                 } else {
-                    config.add("CYINIT_BOT:CIN"); config.add("CARRY_TYPE:SINGLE_CY8");
+                    encodedConfig |= intrasiteAndLogicDelayModel.getEncodedConfigCode("CARRY8:CYINIT_BOT:CIN");
                 }
+                encodedConfig |= intrasiteAndLogicDelayModel.getEncodedConfigCode("CARRY8:CARRY_TYPE:SINGLE_CY8");
 
+                
                 for (EDIFPortInst ep1 : portInstList) {
                     if (!ep1.isInput()) {
                         continue;
@@ -1644,11 +1642,11 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                             String outputPhysPin = c.getPhysicalPinMapping(ep2.getName());
 
                             if (physPin == null || physPin.equals("null")) {
-                                config = new ArrayList<>();
+                                encodedConfig = 0;
                             }
 
                             float myLogicDelay = intrasiteAndLogicDelayModel.getLogicDelay(
-                                     mybel.getName(), physPin, outputPhysPin, config);
+                                     mybel.getName(), physPin, outputPhysPin, encodedConfig);
                             if (myLogicDelay < 0) {
                                 continue;
                             }
@@ -1818,10 +1816,10 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     	bramCLKPins.add("CLKBWRCLK");
     }
     
-    float getCLKtoOutputDelay(String portName, List<String> config) {
+    float getCLKtoOutputDelay(String portName, int encodedConfig) {
     	float delay = 0;
     	for(String clk : bramCLKPins) {
-    		delay = Math.max(delay, intrasiteAndLogicDelayModel.getLogicDelay("RAMB36E2", clk, portName, config));
+    		delay = Math.max(delay, intrasiteAndLogicDelayModel.getLogicDelay("RAMB36E2", clk, portName, encodedConfig));
     	}
     	return delay;
     }
@@ -2012,13 +2010,12 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                 } else {
                     param3 =  dstCell.getBELName() +"/" +sink_belpins.get(D).getName();
                 }
-                float tmpNetDelay;
-                try {
-                    tmpNetDelay = intrasiteAndLogicDelayModel.getIntraSiteDelay(
+                float tmpNetDelay = 0;
+                tmpNetDelay = intrasiteAndLogicDelayModel.getIntraSiteDelay(
                             si.getSiteTypeEnum(),
                             param2,
                             param3);
-                } catch (IllegalArgumentException iae) {
+                if(tmpNetDelay == 0) {
                     continue;
                 }
                 

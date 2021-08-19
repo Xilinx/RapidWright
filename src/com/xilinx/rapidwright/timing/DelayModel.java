@@ -69,7 +69,7 @@ public interface DelayModel {
      * @param belName  The name of the bel, such as A6LUT and CARRY8.
      * @param frBelPin An input bel pin. It must NOT include bel name.
      * @param toBelPin An output bel pin. It must NOT include bel name.
-     * @param config  A list of config_name:value of the bel, ie., {CYINIT_BOT:GND, CARRY_TYPE:SINGLE_CY8}.
+     * @param encodedConfig  The encoded version of a list of config_name:value of the bel, ie., {CYINIT_BOT:GND, CARRY_TYPE:SINGLE_CY8}.
      *                What is the possible config_name and its value?
      *                Ones need to look at the logic delay files used for DelayModelSource_text to find that out.
      *                Where to get the config's value from the design?
@@ -78,7 +78,7 @@ public interface DelayModel {
      * @return Logic delay in ps. Return -1 if the connection does not exist.
      * @throws  IllegalArgumentException if the given bel is not recognized by the model.
      */
-    public short getLogicDelay(String belName, String frBelPin, String toBelPin, List<String> config);
+    public short getLogicDelay(String belName, String frBelPin, String toBelPin, int encodedConfig);
     /**
      * Get the delay between input and output pins of a bel.
      *
@@ -86,6 +86,13 @@ public interface DelayModel {
      * please see getLogicDelay(String belName, String frBelPin, String toBelPin, List<String> config).
      */
      public short getLogicDelay(String belName, String frBelPin, String toBelPin);
+     
+     /**
+      * TODO - Revisit this as part of the DelayModel
+      * Gets the encoded config code for the value (belname:paramsetting) 
+      * @return The encoded value
+      */
+     public int getEncodedConfigCode(String value);
 }
 
 

@@ -130,6 +130,11 @@ class DelayModelBuilder {
             , String fileName) {
         int count = 0;
         int countNeg = 0;
+        
+        int encodedConfig = 0;
+        for(String cfgValue : config) {
+        	encodedConfig |= a.getEncodedConfigCode(cfgValue);
+        }
         try {
             BufferedWriter writer = null;
             if (fileName != null) {
@@ -138,7 +143,7 @@ class DelayModelBuilder {
             for (String s : src) {
                 for (String t : dst) {
 //                    System.out.println(s + " " + t);
-                    short dly = a.getLogicDelay(belName, s, t, config);
+                    short dly = a.getLogicDelay(belName, s, t, encodedConfig);
                     if (fileName != null) {
                         writer.write(s + " " + t + " " + dly + "\n");
                     }
