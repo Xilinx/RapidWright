@@ -61,15 +61,15 @@ public interface DelayModel {
      * @return Intra-site delay in ps. Return -1 if the connection does not exist.
      * @throws  IllegalArgumentException if the given siteTypeName is not recognized by the model.
      */
-    public short getIntraSiteDelay(SiteTypeEnum siteTypeName, String frBelPin, String toBelPin);
+    public Short getIntraSiteDelay(SiteTypeEnum siteTypeName, String frBelPin, String toBelPin);
 
     /**
      * Get the delay between input and output pins of a bel.
      *
-     * @param belName  The name of the bel, such as A6LUT and CARRY8.
+     * @param belIdx  The unique BEL timing model index, see {@link #getBELIndex(String)}.
      * @param frBelPin An input bel pin. It must NOT include bel name.
      * @param toBelPin An output bel pin. It must NOT include bel name.
-     * @param encodedConfig  The encoded version of a list of config_name:value of the bel, ie., {CYINIT_BOT:GND, CARRY_TYPE:SINGLE_CY8}.
+     * @param config  A list of config_name:value of the bel, ie., {CYINIT_BOT:GND, CARRY_TYPE:SINGLE_CY8}.
      *                What is the possible config_name and its value?
      *                Ones need to look at the logic delay files used for DelayModelSource_text to find that out.
      *                Where to get the config's value from the design?
@@ -78,14 +78,14 @@ public interface DelayModel {
      * @return Logic delay in ps. Return -1 if the connection does not exist.
      * @throws  IllegalArgumentException if the given bel is not recognized by the model.
      */
-    public short getLogicDelay(String belName, String frBelPin, String toBelPin, int encodedConfig);
+    public short getLogicDelay(short belIdx, String frBelPin, String toBelPin, int encodedConfig);
     /**
      * Get the delay between input and output pins of a bel.
      *
      * For parameters' description,
      * please see getLogicDelay(String belName, String frBelPin, String toBelPin, List<String> config).
      */
-     public short getLogicDelay(String belName, String frBelPin, String toBelPin);
+     public short getLogicDelay(short belIdx, String frBelPin, String toBelPin);
      
      /**
       * TODO - Revisit this as part of the DelayModel
@@ -93,6 +93,14 @@ public interface DelayModel {
       * @return The encoded value
       */
      public int getEncodedConfigCode(String value);
+     
+     /**
+      * TODO - Revisit this is part of the DelayModel
+      * Gets the equivalent timing model index for this BEL
+      * @param belName Name of the BEL
+      * @return The unique BEL timing model index
+      */
+     public short getBELIndex(String belName);
 }
 
 

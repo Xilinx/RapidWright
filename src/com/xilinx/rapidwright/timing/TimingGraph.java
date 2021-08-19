@@ -1300,24 +1300,22 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
      * TimingGraph representing logic delays from input pins to corresponding output pins.
      */
     void determineLogicDelaysFromEDIFCellInsts(Map<String, EDIFCellInst> myCellMap) {
-        for (String k : myCellMap.keySet()) {
-            EDIFCellInst mycellInst = myCellMap.get(k);
+        for (String cellName : myCellMap.keySet()) {
+            Cell c = design.getCell(cellName);
+            if (c == null) continue;
+
+        	EDIFCellInst mycellInst = myCellMap.get(cellName);
             EDIFCell mycellType = mycellInst.getCellType();
-            String mycellname = mycellType.getName();
+            String myCellName = mycellType.getName();
             Collection<EDIFPortInst> portInstList = mycellInst.getPortInsts();
             
-            if (mycellname.startsWith("RAMB")) {
-                Cell c = design.getCell(k);
-                if (c == null) {
-                    continue;
-                }
-   
-                // hardcoded
-                int encodedConfig = intrasiteAndLogicDelayModel.getEncodedConfigCode("RAMB36E2:RTL_RAM_TYPE:RAM_TDP");
+            if (myCellName.startsWith("RAMB")) {
+                int encodedConfig = 0;
+                encodedConfig |= intrasiteAndLogicDelayModel.getEncodedConfigCode("RAMB36E2:RTL_RAM_TYPE:RAM_TDP");
                 for (Map.Entry<EDIFName, EDIFPropertyValue> entry : mycellInst.getProperties().entrySet()) {
-                    String configString = entry.getKey() + ":" + entry.getValue().getValue().toString();
-                    encodedConfig |= intrasiteAndLogicDelayModel.getEncodedConfigCode(configString);
+                    encodedConfig |= intrasiteAndLogicDelayModel.getEncodedConfigCode("RAMB36E2:"+ entry.getKey() + ":" + entry.getValue().getValue().toString());
                 }
+                short belIdx = intrasiteAndLogicDelayModel.getBELIndex("RAMB36E2");
                 
                 // TODO this loop should be consolidated with that of CARRY8.
                 for (EDIFPortInst ep1 : portInstList) {
@@ -1352,15 +1350,15 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                         			
                         		}
                         }else {
-                        	delay = intrasiteAndLogicDelayModel.getLogicDelay("RAMB36E2", s1, s2, encodedConfig);
+                        	delay = intrasiteAndLogicDelayModel.getLogicDelay(belIdx, s1, s2, encodedConfig);
                         }
                         
                         if (delay < 0) {
                             continue;
                         }
                         
-                        TimingVertex v1 = newTimingVertex(k+"/"+s1);
-                        TimingVertex v2 = newTimingVertex(k+"/"+s2);
+                        TimingVertex v1 = newTimingVertex(cellName+"/"+s1);
+                        TimingVertex v2 = newTimingVertex(cellName+"/"+s2);
                         TimingEdge e = new TimingEdge(this, v1, v2, null, new Net());
                         
                         safeAddEdge(e.getSrc(), e.getDst(), e);
@@ -1369,10 +1367,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                     }
                 }
             }
-            else if (mycellname.startsWith("LUT") || mycellname.startsWith("RAM") || mycellname.startsWith("SRL")) {
-                Cell c = design.getCell(k);
-                if (c == null)
-                    continue;
+            else if (myCellName.startsWith("LUT") || myCellName.startsWith("RAM") || myCellName.startsWith("SRL")) {
                 EDIFCell parent = c.getParentCell();
                 boolean excludeSomeEdges = false;
                 boolean eqHasI0 = false;
@@ -1381,12 +1376,13 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                 boolean eqHasI3 = false;
                 boolean eqHasI4 = false;
                 boolean eqHasI5 = false;
+                short belIdx = intrasiteAndLogicDelayModel.getBELIndex(c.getBELName());
 
                 String thisCellEquation = "";
                 // in the case of LUT6_2, we found that we need to check the LUT equation in order to decide whether
                 // or not to add edges representing individual logic delays to the timing graph
                 if (parent != null && parent.getName().startsWith("LUT6_2")) {
-                    String [] parts = k.split("/");
+                    String [] parts = cellName.split("/");
                     String parentCell = parts[0];
                     for (int i =1; i < parts.length-1; i++) {
                         parentCell += "/"+parts[i];
@@ -1553,23 +1549,21 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                         if (ep1.getName().endsWith("I5") && !eqHasI5)
                             continue;
                     }
-                    String s1 = k + "/" + ep1.getName();
+                    String s1 = cellName + "/" + ep1.getName();
 
                     for (EDIFPortInst ep2 : portInstList) {
-                        String s2 = k + "/" + ep2.getName();
+                        String s2 = cellName + "/" + ep2.getName();
 
                         float logicDelay = 0.0f;
                         if (ep1 != ep2 && ep1.isInput() && ep2.isOutput()) {
-                            if (c == null)
-                                continue;
 
                             String physPin = c.getPhysicalPinMapping(ep1.getName());
                             String outputPhysPin = c.getPhysicalPinMapping(ep2.getName());
 
-                            BEL mybel = c.getBEL();
+
                             float myLogicDelay;
                             try {
-                                myLogicDelay = intrasiteAndLogicDelayModel.getLogicDelay(mybel.getName(), physPin, outputPhysPin);
+                                myLogicDelay = intrasiteAndLogicDelayModel.getLogicDelay(belIdx, physPin, outputPhysPin);
                             } catch (IllegalArgumentException e) {
                                 continue;
                             }
@@ -1601,52 +1595,42 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                 }
 
             }
-            else if (mycellname.startsWith("CARRY")) {
-
-                Cell c = design.getCell(k);
-                if (c == null) {
-                    continue;
-                }
-
+            else if (myCellName.startsWith("CARRY")) {
                 int encodedConfig = 0;
-                
                 if (c.getPhysicalPinMapping("CI") == null) {
-                    encodedConfig |= intrasiteAndLogicDelayModel.getEncodedConfigCode("CARRY8:CYINIT_BOT:GND");
-                }else if (c.getPhysicalPinMapping("CI_TOP") == null) {
-                    encodedConfig |= intrasiteAndLogicDelayModel.getEncodedConfigCode("CARRY8:CYINIT_TOP:GND");
+                	encodedConfig |= intrasiteAndLogicDelayModel.getEncodedConfigCode("CARRY8:CYINIT_BOT:GND");
+                } else if (c.getPhysicalPinMapping("CI_TOP") == null) {
+                	encodedConfig |= intrasiteAndLogicDelayModel.getEncodedConfigCode("CARRY8:CYINIT_TOP:GND");
                 } else {
-                    encodedConfig |= intrasiteAndLogicDelayModel.getEncodedConfigCode("CARRY8:CYINIT_BOT:CIN");
+                	encodedConfig |= intrasiteAndLogicDelayModel.getEncodedConfigCode("CARRY8:CYINIT_BOT:CIN"); 
                 }
-                encodedConfig |= intrasiteAndLogicDelayModel.getEncodedConfigCode("CARRY8:CARRY_TYPE:SINGLE_CY8");
-
-                
+            	encodedConfig |= intrasiteAndLogicDelayModel.getEncodedConfigCode("CARRY8:CARRY_TYPE:SINGLE_CY8");                
+            	short belIdx = intrasiteAndLogicDelayModel.getBELIndex("CARRY8");
+            	
                 for (EDIFPortInst ep1 : portInstList) {
                     if (!ep1.isInput()) {
                         continue;
                     }
 
-                    String s1 = k + "/" + ep1.getName();
+                    String s1 = cellName + "/" + ep1.getName();
                     for (EDIFPortInst ep2 : portInstList) {
 
                         if (!ep2.isOutput()) {
                             continue;
                         }
-                        String s2 = k + "/" + ep2.getName();
+                        String s2 = cellName + "/" + ep2.getName();
                         float logicDelay = 0.0f;
                         if (ep1 != ep2 && ep1.isInput() && ep2.isOutput()) {
-
-                            BEL mybel = c.getSiteInst().getBEL(mycellType.toString());
-                            c = c.getSiteInst().getCell(mybel);
-
                             String physPin = c.getPhysicalPinMapping(ep1.getName());
                             String outputPhysPin = c.getPhysicalPinMapping(ep2.getName());
 
                             if (physPin == null || physPin.equals("null")) {
-                                encodedConfig = 0;
+                            	// TODO - This is suspected to be buggy behavior
+                                encodedConfig = 0; 
                             }
-
+                            
                             float myLogicDelay = intrasiteAndLogicDelayModel.getLogicDelay(
-                                     mybel.getName(), physPin, outputPhysPin, encodedConfig);
+                                     belIdx, physPin, outputPhysPin, encodedConfig);
                             if (myLogicDelay < 0) {
                                 continue;
                             }
@@ -1664,8 +1648,8 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                                 if (ep1ContainsRange) {
                                     for (int j = 0; j < 8; j++) {
                                         for (int i = 0; i < 8; i++) {
-                                            TimingVertex v1 = newTimingVertex(k + "/" + ep1FirstLetter + j);
-                                            TimingVertex v2 = newTimingVertex(k + "/" + s2 + i);
+                                            TimingVertex v1 = newTimingVertex(cellName + "/" + ep1FirstLetter + j);
+                                            TimingVertex v2 = newTimingVertex(cellName + "/" + s2 + i);
                                             TimingEdge e = new TimingEdge(this, v1, v2, null, new Net());
                                             safeAddEdge(e.getSrc(), e.getDst(), e);
                                             e.setLogicDelay(logicDelay);
@@ -1674,8 +1658,8 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                                                 System.out.println("Adding v1:" + s1 + " and v2:" + s2 + " with edge:" + e + " to SG2");
 
                                         }
-                                        TimingVertex v1 = newTimingVertex(k + "/" + ep1FirstLetter + j);
-                                        TimingVertex v2 = newTimingVertex(k + "/" + "OUT1");
+                                        TimingVertex v1 = newTimingVertex(cellName + "/" + ep1FirstLetter + j);
+                                        TimingVertex v2 = newTimingVertex(cellName + "/" + "OUT1");
                                         TimingEdge e = new TimingEdge(this, v1, v2, null, new Net());
                                         safeAddEdge(e.getSrc(), e.getDst(), e);
                                         e.setLogicDelay(logicDelay);
@@ -1697,7 +1681,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
 
                                     }
                                     TimingVertex v1 = newTimingVertex(s1);
-                                    TimingVertex v2 = newTimingVertex(k + "/" + "OUT1");
+                                    TimingVertex v2 = newTimingVertex(cellName + "/" + "OUT1");
                                     TimingEdge e = new TimingEdge(this, v1, v2, null, new Net());
                                     safeAddEdge(e.getSrc(), e.getDst(), e);
                                     e.setLogicDelay(logicDelay);
@@ -1720,10 +1704,6 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                     }
                 }
             }else if(mycellInst.getCellType().toString().contains("DSP_")){//contains DSP_, and FD, VCC
-            	Cell c = design.getCell(k);
-                if (c == null) {
-                    continue;
-                }
                 String dspBlockFullHierName = c.getParentHierarchicalInstName();
                 DSPTimingData dspTimingData = dspNameDataMapping.get(dspBlockFullHierName);
                 if(dspTimingData == null) {
@@ -1752,9 +1732,9 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
 	                }
                 }
             }
-            else if(mycellname.startsWith("BUFGCE")) {//BUFGCE as mycellname, portInsts: [BUFGCE_inst/CE, BUFGCE_inst/I, BUFGCE_inst/O]
-            	String s1 = k + "/" + "I";
-            	String s2 = k + "/" + "O";
+            else if(myCellName.startsWith("BUFGCE")) {//BUFGCE as mycellname, portInsts: [BUFGCE_inst/CE, BUFGCE_inst/I, BUFGCE_inst/O]
+            	String s1 = cellName + "/" + "I";
+            	String s2 = cellName + "/" + "O";
             	TimingVertex v1 = newTimingVertex(s1);
                 TimingVertex v2 = newTimingVertex(s2);
                 TimingEdge e = new TimingEdge(this, v1, v2, null, new Net());
@@ -1818,8 +1798,9 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     
     float getCLKtoOutputDelay(String portName, int encodedConfig) {
     	float delay = 0;
+    	short belIdx = intrasiteAndLogicDelayModel.getBELIndex("RAMB36E2");
     	for(String clk : bramCLKPins) {
-    		delay = Math.max(delay, intrasiteAndLogicDelayModel.getLogicDelay("RAMB36E2", clk, portName, encodedConfig));
+    		delay = Math.max(delay, intrasiteAndLogicDelayModel.getLogicDelay(belIdx, clk, portName, encodedConfig));
     	}
     	return delay;
     }
@@ -2010,14 +1991,15 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                 } else {
                     param3 =  dstCell.getBELName() +"/" +sink_belpins.get(D).getName();
                 }
-                float tmpNetDelay = 0;
-                tmpNetDelay = intrasiteAndLogicDelayModel.getIntraSiteDelay(
+                float tmpNetDelay;
+                Short returnValue = intrasiteAndLogicDelayModel.getIntraSiteDelay(
                             si.getSiteTypeEnum(),
                             param2,
                             param3);
-                if(tmpNetDelay == 0) {
-                    continue;
+                if(returnValue == null) {
+                	continue;
                 }
+                tmpNetDelay = (float) returnValue;
                 
                 this.intraSiteDelay = Math.max(0f, tmpNetDelay);// YZhou: for intrasite net, its intrasite delay is equal to net delay
                 netDelay = Math.max(0f, tmpNetDelay);
