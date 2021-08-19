@@ -49,8 +49,10 @@ public class TimingEdge extends DefaultEdge {
     private float logicDelay = 0.0f;
     private float netDelay = 0.0f;
     private float delay = 0.0f;
-    /** added for delay update of this edge, 
-     * intra-site delay does not change during routing, needs to be stored separately */
+    /** 
+     * Added for delay update of a timing edge, 
+     * because intra-site delay does not change during routing and needs to be stored separately
+     */
     private float intraSiteDelay = 0.0f;
     
     private SitePinInst first;
@@ -297,15 +299,37 @@ public class TimingEdge extends DefaultEdge {
             timingGraph.setEdgeWeight(this, this.delay);
     }
 
-    /**
-     * Hash function specific to this object type for generating a hash code representation storing 
-     * this object type in hashtables, hashmaps, etc.
-     * @return HashCode specific to this object type.
-     */
-    public int hashCode() {
-        return toString().hashCode();
-    }
+    @Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = 1;
+		result = prime * result + ((dst == null) ? 0 : dst.hashCode());
+		result = prime * result + ((src == null) ? 0 : src.hashCode());
+		return result;
+	}
 
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		TimingEdge other = (TimingEdge) obj;
+		if (dst == null) {
+			if (other.dst != null)
+				return false;
+		} else if (!dst.equals(other.dst))
+			return false;
+		if (src == null) {
+			if (other.src != null)
+				return false;
+		} else if (!src.equals(other.src))
+			return false;
+		return true;
+	}
+    
     /**
      * Gets the first vertex of this edge.
      * @return First vertex of type TimingVertex.

@@ -50,7 +50,7 @@ import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.rwroute.Timer;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
-import com.xilinx.rapidwright.timing.CERouteTiming;
+import com.xilinx.rapidwright.timing.ClkRouteTiming;
 import com.xilinx.rapidwright.timing.CLKSkewRouteDelay;
 import com.xilinx.rapidwright.timing.DSPTimingData;
 import com.xilinx.rapidwright.timing.TimingEdge;
@@ -62,12 +62,12 @@ import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
 
 /**
  * RWRoute class provides the main methods for routing a design.
- * Creating a RWRoute object needs a {@link Design} object and a {@link Configuration} object.
+ * Creating a RWRoute Object needs a {@link Design} Object and a {@link Configuration} Object.
  */
 public class RWRoute{
 	/** The design to route */
 	private Design design;
-	/** Variable to indicate if the device of the design is multi-die */
+	/** A variable to indicate if the device of the design is multi-die */
 	private boolean multiSLRDevice;
 	/** Created NetWrappers */
 	private List<NetWrapper> nets;
@@ -91,7 +91,7 @@ public class RWRoute{
 	private int numNotNeedingRoutingNets;
 	private int numUnrecognizedNets;
 	
-	/** An instantiation of the router configuration consisting of a list of routing parameters */
+	/** A {@link Configuration} instance consisting of a list of routing parameters */
 	protected Configuration config;
 	/** The present congestion cost factor */
 	private float presentCongesFac;
@@ -110,15 +110,11 @@ public class RWRoute{
 	private int rnodeId;
 	/** The current routing iteration */
 	private int routeIteration;
-	/** Timers to store runtimes of different phases */
+	/** Timers to store runtime of different phases */
 	private TimerTree routerTimer;
 	private Timer rnodesTimer;
 	private Timer updateTimingTimer;
 	private Timer updateCongesFacCosts;
-	/** The start time of the current routing iteration */
-	private long iterationStartTime;
-	/** The end time of the current routing iteration, including routing of connections and timing update */
-	private long iterationEndTime;
 	/** An instantiation of RouteThruHelper to avoid route-thrus in the routing resource graph */
 	private RouteThruHelper routethruHelper;
 	
@@ -128,9 +124,9 @@ public class RWRoute{
 	private Map<Node, Net> preservedNodes;
 	/** A map of nodes to created rnodes */
 	private Map<Node, Routable> rnodesCreated;
-	/** Visted rnodes data during connection routing */
+	/** Visited rnodes data during connection routing */
 	private Collection<RoutableData> rnodesVisited;
-	/** The queue to store candinate nodes to route a connection */
+	/** The queue to store candidate nodes to route a connection */
 	private PriorityQueue<Pair<Routable, Float>> queue;
 	
 	/** Total wirelength of the routed design */
@@ -159,11 +155,11 @@ public class RWRoute{
 	private List<Connection> criticalConnections;
 	/** An instantiated delay estimator that is used to calculate delay of routing resources */
 	private DelayEstimatorBase estimator;
-	/** TimingManager */
+	/** A {@link TimingManager} instance to use that handles timing related tasks */
 	private TimingManager timingManager;
 	/** A map from nodes to delay values, used for timing update after fixing routes */
 	private Map<Node, Float> nodesDelays;
-	/** The maximum delay and associated TimingVertex */
+	/** The maximum delay and associated timing vertex */
 	private Pair<Float, TimingVertex> maxDelayAndTimingVertex;
 	/** A map from TimingEdges to connections */
 	private Map<TimingEdge, Connection> timingEdgeConnectionMap;
@@ -229,29 +225,30 @@ public class RWRoute{
 	
 	/**
 	 * Sets timing-driven routing related inputs based on the {@link Configuration} instance.
+	 * @param config The {@link Configuration} instance to use.
 	 */
 	public static void setTimingData(Configuration config) {
 		DSPTimingData.setDSPTimingFolder(config.getDspTimingDataFolder());
-		String clkSkew = config.getClkSkew();
-		String ceRouteTiming = config.getCeRouteTiming();
+		String clkSkewFile = config.getClkSkew();
+		String clkRouteTimingFile = config.getClkRouteTiming();
 		
-		if(clkSkew != null) {
-			CLKSkewRouteDelay.setClkTiming(clkSkew);
-			CLKSkewRouteDelay clkTimingData = new CLKSkewRouteDelay(clkSkew);
-			TimingGraph.setClkTiming(clkTimingData);
-			GlobalSignalRouting.setRouteMap(clkTimingData.getRoute(), clkTimingData.getDelay());
+		if(clkSkewFile != null) {
+			CLKSkewRouteDelay.setClkTSkewRouteDelayFile(clkSkewFile);
+			CLKSkewRouteDelay clkSkewData = new CLKSkewRouteDelay(clkSkewFile);
+			TimingGraph.setClkTiming(clkSkewData);
+			GlobalSignalRouting.setRouteMap(clkSkewData.getRoute(), clkSkewData.getDelay());
 		}
 		
-		if(ceRouteTiming != null) {
-			CERouteTiming.setCERouteTiming(ceRouteTiming);
-			CERouteTiming ceTiming = new CERouteTiming(ceRouteTiming);
-			TimingGraph.setCERouteTiming(ceTiming);
-			GlobalSignalRouting.setCERouteTiming(ceTiming);
+		if(clkRouteTimingFile != null) {
+			ClkRouteTiming.setClkRouteTimingFile(clkRouteTimingFile);
+			ClkRouteTiming clkTiming = new ClkRouteTiming(clkRouteTimingFile);
+			TimingGraph.setClkRouteTiming(clkTiming);
+			GlobalSignalRouting.setCERouteTiming(clkTiming);
 		}
 	}
 	
 	/**
-	 * Classifies {@link Net} objects into different categories: clocks, static nets,
+	 * Classifies {@link Net} Objects into different categories: clocks, static nets,
 	 * and regular signal nets (i.e. {@link NetType}.WIRE) and determines routing targets.
 	 */
 	private void determineRoutingTargets(){
@@ -298,7 +295,8 @@ public class RWRoute{
 	 * A helper method for profiling the routing runtime v.s. average span of connections.
 	 */
 	private void printConnectionSpanStatistics() {
-		System.out.println("\nConnection Span Info");
+		System.out.println("------------------------------------------------------------------------------");
+		System.out.println("Connection Span Info");
 		System.out.println(" Span" + "\t" + "# Connections" + "\t" + "Percent");
 		long sumSpan = 0;
 		short max = 0;
@@ -347,7 +345,7 @@ public class RWRoute{
 		}
 		connection.setTimingEdges(timingEdges);
 		for(TimingEdge e : connection.getTimingEdges()){
-			timingEdgeConnectionMap.put(e, connection); /** for getting timing info of critical path delay */
+			timingEdgeConnectionMap.put(e, connection); // for getting critical path delay breakdown in the timing report
 		}
 	}
 	
@@ -368,7 +366,7 @@ public class RWRoute{
 	}
 	
 	/**
-	 * Adds the clock net to the list of clock routing targets, if the clock has source and sink SitePinInsts.
+	 * Adds the clock net to the list of clock routing targets, if the clock has source and sink {@link SitePinInst} instances.
 	 * @param clk The clock net in question.
 	 */
 	protected void addGlobalClkRoutingTargets(Net clk) {
@@ -417,7 +415,7 @@ public class RWRoute{
 	protected void addNetConnectionToRoutingTargets(Net net, boolean multiSLR) {
 		net.unroute();
 		this.numWireNetsToRoute++;;
-		this.initializeNetAndItsConnections(net, this.config.getBoundingBoxExtension(), multiSLR);
+		this.createsNetWrapperAndConnections(net, this.config.getBoundingBoxExtension(), multiSLR);
 	}
 	
 	/**
@@ -463,7 +461,7 @@ public class RWRoute{
 		RouterHelper.invertPossibleGndPinsToVccPins(this.design, this.design.getGndNet());
 		
 		unavailableNodes.addAll(this.preservedNodes.keySet());
-		/** if connections are routed first, used resources should be preserved */
+		// if connections are routed first, used resources should be preserved
 		unavailableNodes.addAll(getAllUsedNodesOfRoutedConnections());
 		if(preservedConnectedNodesToPins != null) unavailableNodes.addAll(preservedConnectedNodesToPins);
 		unavailableNodes.addAll(this.rnodesCreated.keySet());
@@ -521,14 +519,13 @@ public class RWRoute{
 	
 	private Map<Short, Integer> connSpan = new HashMap<>();
 	/**
-	 * Initializes a net by creating a unique {@link NetWrapper} object and 
-	 * setting a list of {@link Connection} instances to the {@link NetWrapper} object.
+	 * Creates a unique {@link NetWrapper} instance and {@link Connection} instances based on a {@link Net} instance.
 	 * @param net The net to be initialized.
 	 * @param boundingBoxExtension The bounding box extension factor for restricting accessible routing resource of a connection.
 	 * @param multiSLR The flag to indicate if the device has multiple SLRs.
 	 * @return A {@link NetWrapper} instance.
 	 */
-	protected NetWrapper initializeNetAndItsConnections(Net net, short boundingBoxExtension, boolean multiSLR) {
+	protected NetWrapper createsNetWrapperAndConnections(Net net, short boundingBoxExtension, boolean multiSLR) {
 		NetWrapper netWrapper = new NetWrapper(this.numWireNetsToRoute, boundingBoxExtension, net);
 		this.nets.add(netWrapper);
 		
@@ -544,48 +541,55 @@ public class RWRoute{
 					 throw new IllegalArgumentException(errMsg);
 				}
 			}
-			Connection c = new Connection(this.numConnectionsToRoute, source, sink, netWrapper);
+			Connection connection = new Connection(this.numConnectionsToRoute, source, sink, netWrapper);
 			this.numConnectionsToRoute++;
 			
 			List<Node> nodes = RouterHelper.projectInputPinToINTNode(sink);
 			if(nodes.isEmpty()) {
-				this.directConnections.add(c);
-				c.setDirect(true);
+				this.directConnections.add(connection);
+				connection.setDirect(true);
 			}else {
 				Node sinkINTNode = nodes.get(0);
-				this.indirectConnections.add(c);
-				c.setSinkRnode(this.createAddRoutableNode(this.rnodeId, c.getSink(), sinkINTNode, RoutableType.PINFEED_I));
+				this.indirectConnections.add(connection);
+				connection.setSinkRnode(this.createAddRoutableNode(this.rnodeId, connection.getSink(), sinkINTNode, RoutableType.PINFEED_I));
 				if(sourceINTNode == null) {
 					sourceINTNode = RouterHelper.projectOutputPinToINTNode(source);
 					if(sourceINTNode == null) {
 						throw new RuntimeException("ERROR: Null projected INT node for the source of net " + net.toStringFull());
 					}
 				}
-				c.setSourceRnode(this.createAddRoutableNode(this.rnodeId, c.getSource(), sourceINTNode, RoutableType.PINFEED_O));
-				c.setDirect(false);
+				connection.setSourceRnode(this.createAddRoutableNode(this.rnodeId, connection.getSource(), sourceINTNode, RoutableType.PINFEED_O));
+				connection.setDirect(false);
 				indirect++;
-				c.computeHpwl();
-				
-				Integer counter = this.connSpan.get(c.getHpwl());
-				if(counter == null) {
-					counter = 1;
-				}else {
-					counter += 1;
-				}
-				this.connSpan.put(c.getHpwl(), counter);
+				connection.computeHpwl();
+				this.addConnectionSpanInfo(connection);
 			}
 		}
 		
 		if(indirect > 0) {
 			netWrapper.computeHPWLAndCenterCoordinates(boundingBoxExtension);
 			if(this.config.isUseBoundingBox()) {
-				for(Connection c : netWrapper.getConnection()) {
-					if(c.isDirect()) continue;
-					c.computeConnectionBoundingBox(boundingBoxExtension, multiSLR);
+				for(Connection connection : netWrapper.getConnection()) {
+					if(connection.isDirect()) continue;
+					connection.computeConnectionBoundingBox(boundingBoxExtension, multiSLR);
 				}
 			}
 		}
 		return netWrapper;
+	}
+	
+	/**
+	 * Adds span info of a connection.
+	 * @param connection A connection of which span info is to be added.
+	 */
+	private void addConnectionSpanInfo(Connection connection) {
+		Integer counter = this.connSpan.get(connection.getHpwl());
+		if(counter == null) {
+			counter = 1;
+		}else {
+			counter += 1;
+		}
+		this.connSpan.put(connection.getHpwl(), counter);
 	}
 	
 	/**
@@ -618,12 +622,12 @@ public class RWRoute{
 	}
 	
 	/**
-	 * Creates a {@link RoutableNode} object based on a {@link Node} instance and avoids duplicates, 
+	 * Creates a {@link RoutableNode} Object based on a {@link Node} instance and avoids duplicates,
 	 * used for creating the source and sink rnodes of {@link Connection} instances.
 	 * @param rnodeGlobalIndex The design-wise index of created {@link RoutableNode} instances.
 	 * @param sitePinInst The source or sink {@link SitePinInst} instance.
 	 * @param node The node associated to the {@link SitePinInst} instance.
-	 * @param type The {@link RoutableType} of the {@link RoutableNode} object.
+	 * @param type The {@link RoutableType} of the {@link RoutableNode} Object.
 	 * @return The created {@link RoutableNode} instance.
 	 */
 	private Routable createAddRoutableNode(int rnodeGlobalIndex, SitePinInst sitePinInst, Node node, RoutableType type){
@@ -647,7 +651,7 @@ public class RWRoute{
 	}
 	
 	/**
-	 * Initializes parameters for the router.
+	 * Initializes routing.
 	 */
 	private void initializeRouting(){
 		this.rnodesVisited.clear();
@@ -673,37 +677,33 @@ public class RWRoute{
 		this.routerTimer.getTimer("route clock").stop();
 		
 		this.routerTimer.createTimer("route static nets", "Routing").start();
-		/** 
-		 * Routes static nets (VCC and GND) before signals for now.
-		 * null could be replaced by a list of reserved nodes if static nets are routed after signals 
-		 */
+		// Routes static nets (VCC and GND) before signals for now.
+		// null could be replaced by a list of reserved nodes if static nets are routed after signals
 		this.routeStaticNets(null);
-		/** Connection-based router for indirectly connected pairs of output pin and input pin */
+		// Connection-based router for indirectly connected pairs of output pin and input pin */
 		this.routerTimer.getTimer("route static nets").stop();
 		
 		Timer routeWireNets = this.routerTimer.createTimer("route wire nets", "Routing");
 		routeWireNets.start();
 		this.preRoutingEstimation();
 		this.routeIndirectConnections();
-		/** 
-		 * NOTE: route direct connections after indirect connection.
-		 * The reason is that there maybe additional direct connections in the soft preserve mode for partial routing
-		 * and those direct connections should be included to be routed
-		 */
+		// NOTE: route direct connections after indirect connection.
+		// The reason is that there maybe additional direct connections in the soft preserve mode for partial routing,
+		// and those direct connections should be included to be routed
 		this.routeDirectConnections();
 		routeWireNets.stop();
-		/** Adds child timers to "route wire nets" */
+		// Adds child timers to "route wire nets" timer
 		routeWireNets.addChild(this.rnodesTimer);
-		/** Do not time the cost evaluation method for routing connections, the timer itself takes time */
+		// Do not time the cost evaluation method for routing connections, the timer itself takes time
 		this.routerTimer.createTimer("route connections", "route wire nets").setTime(routeWireNets.getTime() - this.rnodesTimer.getTime() - this.updateTimingTimer.getTime() - this.updateCongesFacCosts.getTime());
 		routeWireNets.addChild(this.updateTimingTimer);
 		routeWireNets.addChild(this.updateCongesFacCosts);
 		
 		this.routerTimer.createTimer("finalize routes", "Routing").start();
-		/** Assigns a list of nodes to each direct and indirect connection that has been routed and fix illegal routes if any */
+		// Assigns a list of nodes to each direct and indirect connection that has been routed and fix illegal routes if any
 		this.postRouteProcess();
-		/** Assigns net PIPs based on lists of connections */
-		this.pipsAssignment();
+		// Assigns net PIPs based on lists of connections
+		this.setPIPsOfNets();
 		this.routerTimer.getTimer("finalize routes").stop();
 		
 		this.routerTimer.getTimer("Routing").stop();
@@ -727,15 +727,13 @@ public class RWRoute{
 	private void estimateDelayOfConnections() {	
 		for(Connection con : this.indirectConnections) {
 			RoutableNode source = (RoutableNode) con.getSourceRnode();
-			
 			this.setChildrenOfRnode(source);			
 			if(source.getChildren().isEmpty()) {
-				/** output pin is blocked */
+				// output pin is blocked
 				this.swapOutputPin(con);
 				source = (RoutableNode) con.getSourceRnode();
 				this.setChildrenOfRnode(source);
 			}
-						
 			short estConDelay = (short) 10000;
 			for(Routable child : source.getChildren()) {				
 				short tmpConDelay = 113;
@@ -757,7 +755,7 @@ public class RWRoute{
 		System.out.println("\nINFO: Route " + this.directConnections.size() + " direct connections ");
 		for(Connection c : this.directConnections) {
 			boolean success = RouterHelper.routeDirectCon(c);
-			/** no need to update route delay of direct connection, because it would not be changed */
+			// no need to update route delay of direct connection, because it would not be changed
 			if(!success) System.err.println("ERROR: Failed to route direct connection " + c);
 		}
 	}
@@ -768,10 +766,9 @@ public class RWRoute{
 	public void routeIndirectConnections(){
 		this.sortConnections();
 		this.initializeRouting();
-		long overused =0;
 		
 		while(this.routeIteration < this.config.getMaxIterations()){
-			this.iterationStartTime = System.nanoTime();			
+			long startIteration = System.nanoTime();
 			this.connectionsRoutedIteration = 0;
 			if(this.config.isTimingDriven()) {
 				this.setRerouteCriticality(this.sortedIndirectConnections);
@@ -786,10 +783,9 @@ public class RWRoute{
 			}
 			
 			this.updateCostFactors();
-			this.iterationEndTime = System.nanoTime();
 			
-			overused = this.printStatisticsGetsOverusedRnodes();
-			if(overused == 0) {
+			this.printRoutingIterationStatisticsInfo(System.nanoTime() - startIteration, this.rnodeId, this.rnodesTimer.getTime());
+			if(this.overUsedRnodes.size() == 0) {
 				Set<Connection> unroutableCons = this.getUnroutedConnections();
 				if(unroutableCons.isEmpty()) {
 					break;
@@ -800,11 +796,13 @@ public class RWRoute{
 				}
 			}
 			this.routeIteration++;
+			this.lastIterationRnodeId = this.rnodeId;
+			this.lasterIterationRnodeTime = this.rnodesTimer.getTime();
 		}
 		if(this.routeIteration == this.config.getMaxIterations()) {
 			System.out.println("\nERROR: Routing terminated after " + (this.routeIteration -1 ) + " iterations.");
 			System.out.println("       Unrouted connections: " + this.getUnroutedConnections().size());
-			System.out.println("       Conflicting nodes: " + overused);
+			System.out.println("       Conflicting nodes: " + this.overUsedRnodes.size());
 		}
 	}
 	
@@ -828,7 +826,7 @@ public class RWRoute{
 	private void postRouteProcess() {
 		if(this.routeIteration <= this.config.getMaxIterations()){
 			this.assignNodesToConnections();
-			/** fix routes with cycles and / or multi-driver nodes */
+			// fix routes with cycles and / or multi-driver nodes
 			Set<NetWrapper> routes = this.fixRoutes();
 			if(this.config.isTimingDriven()) this.updateTimingAfterFixingRoutes(routes);
 		}
@@ -872,7 +870,7 @@ public class RWRoute{
 	 * @param connections The list of connections.
 	 */
 	private void setRerouteCriticality(List<Connection> connections) {
-		/** Limit number of critical connections to be routed */
+		// Limit the number of critical connections to be routed based on minRerouteCriticality and reroutePercentage
 		this.minRerouteCriticality = this.config.getMinRerouteCriticality();
 		this.criticalConnections.clear();
     	
@@ -961,33 +959,36 @@ public class RWRoute{
 		});
 	}
 	
-	/**
-	 * Prints statistics of each routing iteration and gets the number of overused rnodes.
-	 * @return The number of overused rnodes.
-	 */
-	private long printStatisticsGetsOverusedRnodes() {
-		return this.statisticsInfo(this.iterationStartTime, this.iterationEndTime, this.rnodeId, this.rnodesTimer.getTime());
+	private void printIterationHeader() {
+		System.out.printf("------------------------------------------------------------------------------\n");
+        System.out.printf("%9s  %9s    %9s  %12s  %6s    %9s    %4s\n",
+        		"", "Routed", "Total Run", "Created", "Used", "Congested", "CPD");
+        System.out.printf("%9s  %11s  %9s  %12s  %8s  %9s    %5s\n",
+        		"Iteration", "Connections", "Time (s)", "Rnodes", "Time (s)", "Rnodes", "(ps)");
+        System.out.printf("---------  -----------  ---------   -----------  --------  ---------    -----\n");
 	}
 	
+	private long lastIterationRnodeId = 0;
+	private long lasterIterationRnodeTime = 0;
 	/**
-	 * Prints statistics output in each routing iteration and returns the number of overused rnodes.
-	 * @param iterationStartTime The start time of this router iteration.
-	 * @param iterationEndTime The end time of this router iteration.
-	 * @param globalRnodeId The global index of created rnodes.
-	 * @param rnodesTacc The accumulative runtime of rnodes creation from the first iteration.
-	 * @return The number of overused rnodes.
+	 * Prints routing iteration statistics, including the iteration, number of connections routed in the iteration, 
+	 * total runtime of the iteration, number of created rnodes, time spent in creating rnodes that is included in the
+	 * total iteratin runtime, number of congested rnodes and the critical path delay achieved after the routing iteration.
+	 * @param iterationRuntime
+	 * @param globalRnodeId The global index for creating a rnode, used as the counter of created rnodes.
+	 * @param totalRnodesCreationTime The total rnodes creation runtime since the first iteration.
 	 */
-	private long statisticsInfo(long iterationStartTime, long iterationEndTime, int globalRnodeId, long rnodesTacc){		
+	private void printRoutingIterationStatisticsInfo(float iterationRuntime, int globalRnodeId, long totalRnodesCreationTime){
 		long overUsed = this.overUsedRnodes.size();
-		System.out.printf("%4d  %10d  %8.2f  %12d  %15.2f  %8d  %9d\n",
+		System.out.printf("%4d       %11d  %9.2f  %12d  %8.2f  %9d    %5d\n",
 				this.routeIteration,
 				this.connectionsRoutedIteration,
-				(iterationEndTime - iterationStartTime)*1e-9,
-				globalRnodeId,
-				rnodesTacc*1e-9,
+				iterationRuntime * 1e-9,
+				globalRnodeId - this.lastIterationRnodeId,
+				(totalRnodesCreationTime - this.lasterIterationRnodeTime)*1e-9,
 				overUsed,
 				(short)(this.maxDelayAndTimingVertex == null? 0 : this.maxDelayAndTimingVertex.getFirst()));
-		return overUsed;
+		if(overUsed == 0) System.out.printf("------------------------------------------------------------------------------\n");
 	}
 	
 	/**
@@ -1080,7 +1081,7 @@ public class RWRoute{
 	 */
 	private Set<NetWrapper> fixRoutes() {
 		Set<NetWrapper> illegalRoutes = this.findIllegalRoutes();
-		/** fix routes with cycles and / or multi-driver nodes */
+		// fix routes with cycles and / or multi-driver nodes
 		for(NetWrapper route:illegalRoutes){
 			for(Connection c:route.getConnection()){
 				try{
@@ -1182,9 +1183,9 @@ public class RWRoute{
 	}
 	
 	/**
-	 * Assigns PIPs to each net and sanity check of PIP usage.
+	 * Sets a list of {@link PIP} instances of each {@link Net} instance and checks if there is any PIP overlaps.
 	 */
-	private void pipsAssignment(){
+	private void setPIPsOfNets(){
 		for(NetWrapper np:this.nets){
 			Set<PIP> netPIPs = new HashSet<>();
 			
@@ -1329,7 +1330,7 @@ public class RWRoute{
 	 * @return The number of unrouted nets.
 	 */
 	private int unrouteReservedNetsToReleaseResources(Connection connection) {
-		/** find those reserved signals that are using uphill nodes of the target pin node */
+		// Find those reserved signals that are using uphill nodes of the target pin node
 		Set<Net> toRouteNets = new HashSet<>();
 		for(Node node : connection.getSinkRnode().getNode().getAllUphillNodes()) {
 			Net toRoute = this.preservedNodes.get(node);
@@ -1337,7 +1338,7 @@ public class RWRoute{
 			if(toRoute.isClockNet() || toRoute.isStaticNet()) continue;
 			toRouteNets.add(toRoute);
 		}
-		/** find those preserved nets that are using downhill nodes of the source pin node */
+		// Find those preserved nets that are using downhill nodes of the source pin node
 		for(Node node : connection.getSourceRnode().getNode().getAllDownhillNodes()) {
 			Net toRoute = this.preservedNodes.get(node);
 			if(toRoute == null) continue;
@@ -1356,7 +1357,7 @@ public class RWRoute{
 				this.preservedNodes.remove(toRemove);
 			}
 			
-			NetWrapper netnew = this.initializeNetAndItsConnections(n, this.config.getBoundingBoxExtension(), this.multiSLRDevice);
+			NetWrapper netnew = this.createsNetWrapperAndConnections(n, this.config.getBoundingBoxExtension(), this.multiSLRDevice);
 			
 			for(int i = 0; i < reservedNetNodes.size(); i ++) {
 				Node toBuild = reservedNetNodes.get(i);
@@ -1369,15 +1370,11 @@ public class RWRoute{
 						rnode.setDelay(RouterHelper.computeNodeDelay(this.estimator, toBuild));
 					}
 				}
-				/**
-				 * each rnode created above should be added to its parents if parent exists.
-				 * because children of an existing parent may have been set.
-				 */
+				// Each rnode created above should be added to its parents if parent exists,
+				// because children of an existing parent may have been set.
 				for(Node uphill : toBuild.getAllUphillNodes()) {
-					/** 
-					 * without this routethruHelper check, there will be Invalid Programming for Site error shown in Vivado.
-					 * do not use those nodes, because we do not know if the routethru is available or not
-					 */
+					// Without this routethru check, there will be Invalid Programming for Site error shown in Vivado.
+					// Do not use those nodes, because we do not know if the routethru is available or not
 					if(routethruHelper.isRouteThru(uphill, toBuild)) continue;
 					RoutableNode parent = (RoutableNode) this.rnodesCreated.get(uphill);
 					if(parent != null && parent.isChildrenSet()) {
@@ -1397,13 +1394,13 @@ public class RWRoute{
 	 * @param rnode The rnode in question.
 	 */
 	private void setChildrenOfRnode(Routable rnode) {
+		this.rnodesTimer.start();
 		if(!rnode.isChildrenSet()) {
-			this.rnodesTimer.start();
 			int rnodeCounter = rnode.setChildren(this.rnodeId, this.rnodesCreated,
 					this.preservedNodes.keySet(), this.routethruHelper);
 			this.rnodeId = rnodeCounter;
-			this.rnodesTimer.stop();
 		}
+		this.rnodesTimer.stop();
 	}
 	
 	/**
@@ -1472,11 +1469,9 @@ public class RWRoute{
 				
 			}else if(childRNode.getRoutableType() == RoutableType.WIRE) {
 				if(childRNode.getDelay() > 10000) {
-					/** 
-					 * to filter out those nodes that are considered to be excluded with the masking resource approach,
-					 * such as U-turn shape nodes near the boundary and some node cross RCLK
-					 */
-					continue;		
+					// To filter out those nodes that are considered to be excluded with the masking resource approach,
+					// such as U-turn shape nodes near the boundary and some node cross RCLK
+					continue;
 				}
 				if(this.isAccesible(childRNode, connection)){
 					this.evaluateCostAndPush(rnode, longParent, childRNode, connection, shareWeight, nonCriti);
@@ -1508,31 +1503,31 @@ public class RWRoute{
 		return true;
 	}
 	
-	/**
+	/** TODO NOT SKIP VISITED NODES, REDUCE COST CALCULATION INSTEAD
 	 * Evaluates the cost of a child of a rnode and pushes the child into the queue after cost evaluation.
 	 * @param rnode The parent rnode of the child in question.
 	 * @param childRnode The child rnode in question.
 	 * @param connection The target connection being routed.
 	 */
-	private void evaluateCostAndPush(Routable rnode, boolean longParent, Routable childRnode, Connection connection, float sharingWeight, float nonCriti) {
+	private void evaluateCostAndPush(Routable rnode, boolean longParent, Routable childRnode, Connection connection, float sharingWeight, float oneMinusCriticality) {
 		RoutableData childData = childRnode.getRoutableData();
 		int countSourceUses = childData.countSourceUses(connection.getSource());	
 		float sharingFactor = 1 + sharingWeight* countSourceUses;
 		
 		float upstreamPathCost = rnode.getRoutableData().getUpstreamPathCost();
 		float rnodeCost = this.getRoutableCost(childRnode, connection, countSourceUses, sharingFactor);
-		float newPartialPathCost = upstreamPathCost + nonCriti * rnodeCost
-								+ nonCriti * this.oneMinusWlWeight * childRnode.getLength() / sharingFactor
+		float newPartialPathCost = upstreamPathCost + oneMinusCriticality * rnodeCost
+								+ oneMinusCriticality * this.oneMinusWlWeight * childRnode.getLength() / sharingFactor
 								+ connection.getCriticality() * this.oneMinusTimingWeight * (childRnode.getDelay()
 								+ DelayEstimatorBase.getExtraDelay(childRnode.getNode(), longParent))/100f;
 
-		float newTotalPathCost = 0f;	
+		float newTotalPathCost = 0f;
 		if(!childRnode.isTarget()){
 			computeDeltaXY(childRnode, connection);
 			float expected_wire_cost = (float) this.distanceCostToSink() / sharingFactor;
 			
 			newTotalPathCost = (float) (newPartialPathCost
-							+ nonCriti * this.wlWeight * expected_wire_cost
+							+ oneMinusCriticality * this.wlWeight * expected_wire_cost
 							+ connection.getCriticality() * this.timingWeight * (this.deltaX * 0.32 + this.deltaY * 0.16));
 		}else{
 			newTotalPathCost = newPartialPathCost;
@@ -1570,7 +1565,7 @@ public class RWRoute{
 	 * @param rnode The rnode in question.
 	 * @param connection The connection being routed.
 	 * @param countSameSourceUsers The number of connections from the same net that are using rnode.
-	 * Note: a net is represented by its source {@link SitePinInst} object.
+	 * Note: a net is represented by its source {@link SitePinInst} Object.
 	 * @param sharingFactor The sharing factor.
 	 * @return The sum of the congestion cost and the bias cost of rnode.
 	 */
@@ -1578,9 +1573,10 @@ public class RWRoute{
 		boolean hasSameSourceUsers = countSameSourceUsers!= 0;	
 		float presentCongesCost;
 		
-		if(hasSameSourceUsers) {/** the rnode is used by other connection(s) from the same net */
+		if(hasSameSourceUsers) {// the rnode is used by other connection(s) from the same net
 			int overoccupancy = rnode.getOccupancy() - Routable.capacity;
-			presentCongesCost = 1 + overoccupancy * this.presentCongesFac;/** make it less expensive in congestion cost for the current connection */
+			// make the congestion cost less for the current connection
+			presentCongesCost = 1 + overoccupancy * this.presentCongesFac;
 		}else{
 			presentCongesCost = rnode.getPresentCongesCost();
 		}
@@ -1588,15 +1584,15 @@ public class RWRoute{
 		float biasCost = 0;
 		if(!rnode.isTarget()) {
 			NetWrapper net = connection.getNet();
-			biasCost = 0.5f * rnode.getBaseCost() / net.getConnection().size() *
-					(Math.abs(rnode.getX() - net.getXCenter()) + Math.abs(rnode.getY() - net.getYCenter())) / net.getHpwl();
+			biasCost = rnode.getBaseCost() / net.getConnection().size() *
+					(Math.abs(rnode.getX() - net.getXCenter()) + Math.abs(rnode.getY() - net.getYCenter())) / net.getDoubleHpwl();
 		}
 		
-		return rnode.getBaseCost() * rnode.getHistoricalCongesCost() * presentCongesCost / sharingFactor + biasCost*1f;
+		return rnode.getBaseCost() * rnode.getHistoricalCongesCost() * presentCongesCost / sharingFactor + biasCost;
 	}
 	
 	/**
-	 * * Sets the costs of a childRnode and adds it into queue.
+	 * Sets the costs of a rnode and pushes it to the queue.
 	 * @param childData The {@link RoutableData} instance of the childRnode.
 	 * @param childRnode A child rnode.
 	 * @param rnode The parent rnode of the childRnode.
@@ -1616,19 +1612,19 @@ public class RWRoute{
 	 * @param connection The target connection to be routed.
 	 */
 	private void prepareRouteConnection(Connection connection){
-		/** Rips up the connection */
+		// Rips up the connection
 		this.ripUp(connection);
 		
 		this.connectionsRouted++;
 		this.connectionsRoutedIteration++;
-		/** Clears previous route of the connection */
+		// Clears previous route of the connection
 		connection.resetRoute();
 		this.queue.clear();	
 		
-		/** Sets the sink rnode of the connection as the target */
+		// Sets the sink rnode of the connection as the target
 		connection.getSinkRnode().setTarget(true);
 		
-		/** Adds source to queue */
+		// Adds the source rnode to the queue
 		this.push(connection.getSourceRnode().getRoutableData(), connection.getSourceRnode(), null, 0, 0);
 	}
 	
@@ -1665,19 +1661,6 @@ public class RWRoute{
 		if(this.sortedIndirectConnections.size() > 0) {
 			this.timingManager.getCriticalPathInfo(this.maxDelayAndTimingVertex, this.timingEdgeConnectionMap, false, this.rnodesCreated);
 		}
-	}
-	
-	private void printIterationHeader() {
-		System.out.printf("------------------------------------------------------------------------------\n");
-        System.out.printf("%4s  %10s  %8s  %12s  %15s  %8s  %9s\n",
-        		"Iter",
-        		"Con routed",
-        		"Time (s)",
-        		"Total Rnodes",
-        		"Rnodes Tacc (s)",
-        		"Overused",
-        		"Dmax (ps)");
-        System.out.printf("----  ----------  --------  ------------  ---------------  --------  ---------\n");
 	}
 	
 	public static void printNodeTypeUsageAndWirelength(boolean verbose, Map<IntentCode, Long> nodeTypeUsage, Map<IntentCode, Long> nodeTypeLength) {
@@ -1747,6 +1730,8 @@ public class RWRoute{
 		
 	}
 	
+	//TODO add routeDesign() without args / tracker
+	
 	/**
 	 * Routes a {@link Design} instance.
 	 * @param design The {@link Design} instance to be routed.
@@ -1757,13 +1742,11 @@ public class RWRoute{
 	 * @return Routed design.
 	 */
 	public static Design routeDesign(Design design, String[] args, CodePerfTracker tracker) {
-		/** 
-		 * Instantiates a Configuration object and parses the arguments.
-		 * Uses the default configuration if basic usage only.
-		 **/	
+		// Instantiates a Configuration Object and parses the arguments.
+		// Uses the default configuration if basic usage only.
 		Configuration config = new Configuration(args);
 		DesignTools.makePhysNetNamesConsistent(design);
-		if(!config.isPartialRouting() || (!design.getVccNet().hasPIPs() && !design.getGndNet().hasGapRouting())) {
+		if(!config.isPartialRouting() || (!design.getVccNet().hasPIPs() && !design.getGndNet().hasPIPs())) {
 			DesignTools.createPossiblePinsToStaticNets(design);
 			//TODO 0731 YZ: results in site pin conflicts of optical-flow-post-place dcp
 		}
@@ -1776,12 +1759,12 @@ public class RWRoute{
 		}else {
 			router = new RWRoute(design, config);
 		}
-		/** Prints the design and configuration info, if "--verbose" is configured */
+		// Prints the design and configuration info, if "--verbose" is configured
 		router.printDesignNetsInfoAndConfiguration(config.isVerbose());
-		/** Routes the design */
+		// Routes the design
 		router.route();
 		if(tracker != null) tracker.stop();
-		/** Prints routing statistics, e.g. total wirelength, runtime and timing report */	
+		// Prints routing statistics, e.g. total wirelength, runtime and timing report
 		router.printRoutingStatistics();
 		
 		return router.getDesign();
@@ -1799,17 +1782,17 @@ public class RWRoute{
 			System.out.println("BASIC USAGE:\n <input.dcp>\n <directory for routed_input.dcp>");
 			return;
 		}
-		/** Reads the design checkpoint file name */
+		// Reads the design checkpoint file name
 		String dcpName = args[0].substring(args[0].lastIndexOf("/")+1);
-		/** Reads the output directory and set the output design checkpoint file name */
+		// Reads the output directory and set the output design checkpoint file name
 		String routedDCPfileName = args[1].endsWith("/")?args[1] + "routed_" + dcpName : args[1] + "/routed_" + dcpName;
 		
 		CodePerfTracker t = new CodePerfTracker("RWRoute", true);	
-		/** Reads in a design checkpoint */
+		// Reads in a design checkpoint */
 		Design design = Design.readCheckpoint(args[0]);
 		
 		Design routedDesign = RWRoute.routeDesign(design, args, t);
-		/** Writes out the routed design checkpoint */
+		// Writes out the routed design checkpoint
 		routedDesign.writeCheckpoint(routedDCPfileName,t);
 		System.out.println("\nINFO: Write routed design\n " + routedDCPfileName + "\n");	
 	}

@@ -201,7 +201,7 @@ public class TimingManager {
     	if(this.index >= 0) {// when there is valid clk skew data
     		String srcCR = this.getSrcClockRegion();
         	String dstCR = TimingGraph.getClockRegionOfCellPin(maxV.getName(), this.timingGraph.design);
-        	List<Short> skewData = TimingGraph.clkTimingOfDesign.getSkew().get(new Pair<>(srcCR, dstCR));
+        	List<Short> skewData = TimingGraph.clkSkewRouteDelay.getSkew().get(new Pair<>(srcCR, dstCR));
         	clkskew = (short) (skewData.get(2) - skewData.get(1) + skewData.get(3));
         	
         	System.out.printf("%-30s %10d %s\n\n", "Clock path skew (ps):", clkskew, "(" + srcCR + " -> " + dstCR + ")");
@@ -326,7 +326,7 @@ public class TimingManager {
 		float treq = 0;
 		String timingConstraint = null;
 		ConstraintGroup[] constraintGroups = {ConstraintGroup.NORMAL, ConstraintGroup.LATE};
-		
+		//TODO CHECK which constraint to use. The maximum one as default?
 		for(ConstraintGroup group : constraintGroups) {
 			List<String> constraints = design.getXDCConstraints(group);
 			for(String s : constraints) {

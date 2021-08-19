@@ -32,9 +32,12 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Clock enable net timing data
+ * A ClkRouteTiming instance stores the clock route and timing template data.
+ * To obtain a template file, please refer to find_clock_route_template.tcl under $RAPIDWRIGHT_PATH/tcl/rwroute.
+ * When a clock route timing template file is ready, please use "--clkRouteTiming>" option (see {@link Configuration})
+ * to enable RWRoute to use the file for timing-driven clock routing.
  */
-public class CERouteTiming {
+public class ClkRouteTiming {
 	/** Name of the BUFGCE */
 	private String bufgce;
 	/** Destination INT tiles of the BUFGE output and the routes */
@@ -46,17 +49,15 @@ public class CERouteTiming {
 	/** INT tile associated with the BUFGCE_CLK_IN and the route from the INT tile to the CLK_IN */
 	private List<String> intTileToBufgInRoute;
 	
-	static String ceRouteTiming = null;
-	public static void setCERouteTiming(String fileName) {
+	static String clkRouteTiming = null;
+	public static void setClkRouteTimingFile(String fileName) {
 		if(fileName != null) {
-			ceRouteTiming = fileName;
-			System.out.println("CE ROUTE TIMING IN FILE: " + ceRouteTiming);
-		}else {
-			System.out.println("NULL CE ROUTE TIMING");
+			clkRouteTiming = fileName;
+			System.out.println("INFO: Clock route timing file set as: " + clkRouteTiming);
 		}
 	}
 	
-	public CERouteTiming(String bufg) {
+	public ClkRouteTiming(String bufg) {
 		String[] ss = bufg.split("/");
 		this.bufgce = ss[ss.length - 1].replace(".txt", "");
 		
@@ -73,10 +74,9 @@ public class CERouteTiming {
 	}	
 	
 	private void parseDataFromFile() throws IOException {
-		File clkTimingFile = new File(ceRouteTiming);
+		File clkTimingFile = new File(clkRouteTiming);
 		if(!clkTimingFile.exists()) {
-        	System.err.println("CLK TIMING FILE NOT FOUND : " + this.bufgce);
-        	return;
+			throw new IllegalArgumentException("ERROR: Specified clock route timing file does not exist.");
         }
 		BufferedReader reader = new BufferedReader(new FileReader(clkTimingFile));
 		// NOTE: DATA TYPE (int_bufg, bufg_int, etc) MUST BE READ IN THE SAME ORDER AS IN THE FILE
@@ -102,8 +102,7 @@ public class CERouteTiming {
 		}
         
         if(!dataFound) {
-        	System.err.println("ERROR: No section header found in the file for " + section);
-        	return;
+        	throw new IllegalArgumentException("ERROR: No section header found in the file for " + section);
         }
         if(section.equals("int_bufg")) {
         	this.readINTToBufgDelay(reader);
@@ -125,8 +124,7 @@ public class CERouteTiming {
 			line = line.replace("{", "").replace("}", "");
 			String[] dataStrings = line.split("\\s+");
 			if(dataStrings.length < 4) {
-				System.out.println("CRITICAL WARNING: Incomplete data of line " + line);
-				continue;
+				throw new IllegalArgumentException("ERROR: Incomplete data of line " + line);
 			}
 			this.dstINTTilesDelays.put(dataStrings[0], Short.parseShort(dataStrings[2]));
 			this.intTileToBufgInDelay.put(dataStrings[0], Short.parseShort(dataStrings[2]));// check the index of INT tile and delay
@@ -149,8 +147,7 @@ public class CERouteTiming {
 			line = line.replace("{", "").replace("}", "");
 			String[] dataStrings = line.split("\\s+");
 			if(dataStrings.length < 3 || dataStrings.length < 4) {
-				System.out.println("CRITICAL WARNING: Incomplete data of line " + line);
-				continue;
+				throw new IllegalArgumentException("ERROR: Incomplete data of line " + line);
 			}
 			String intTile = dataStrings[1];
 			this.dstINTTilesDelays.put(intTile, Short.parseShort(dataStrings[2]));
@@ -181,7 +178,7 @@ public class CERouteTiming {
 	}
 
 	public static String getCeRouteTiming() {
-		return ceRouteTiming;
+		return clkRouteTiming;
 	}
 
 	public List<String> getIntTileToBufgInRoute() {
