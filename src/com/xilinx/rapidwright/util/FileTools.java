@@ -942,22 +942,13 @@ public class FileTools {
 	 */
 	public static InputStream getRapidWrightResourceInputStream(String name){
 		ensureCorrectDataFile(name);
-	    String rwPath = getRapidWrightPath();
+		File resourceFile = new File(getRapidWrightPath() + File.separator + name);
 		try {
-			File resourceFile = new File(rwPath + File.separator + name);
-			if(resourceFile.exists()) {
-				return new FileInputStream(resourceFile);
-			} else {
-				System.err.println("WARNING: " + RAPIDWRIGHT_VARIABLE_NAME + " is set to " + rwPath
-						+ " but the resource " + name + " is not present, will attempt to load from jar...");
-			}
-		} catch (FileNotFoundException e) {
-			System.err.println("ERROR: Failed to find RapidWright resource file "
-					+ rwPath + File.separator + name + ". Please check the installation path "
-					+ "and/or RAPIDWRIGHT_PATH environment variable.");
-			e.printStackTrace();
-		}
-        return null;
+            return new FileInputStream(resourceFile);
+        } catch (FileNotFoundException e) {
+            throw new UncheckedIOException("ERROR: Attempted to load RapidWright resource file: " 
+                    + resourceFile.getAbsolutePath() + " but it does not exist.", e);
+        }
 	}
 	
 	/**
