@@ -126,7 +126,7 @@ class DelayModelBuilder {
 //        return count;
 //    }
     
-    private static int testLogicDelay(DelayModel a, List<String> config, String belName, String[] src, String[] dst
+    private static int testLogicDelay(DelayModel delayModel, List<String> config, String belName, String[] src, String[] dst
             , String fileName) {
         int count = 0;
         int countNeg = 0;
@@ -135,10 +135,18 @@ class DelayModelBuilder {
             if (fileName != null) {
                 writer = new BufferedWriter(new FileWriter(fileName));
             }
+            
+          int encodedConfig = 0;
+          for (String s : config) {
+              int e = delayModel.getEncodedConfigCode(belName + ":"+ s);
+              encodedConfig = (int) (encodedConfig | e);
+          }
+          short belIdx = delayModel.getBELIndex(belName);
+            
             for (String s : src) {
                 for (String t : dst) {
 //                    System.out.println(s + " " + t);
-                    short dly = a.getLogicDelay(belName, s, t, config);
+                    short dly = delayModel.getLogicDelay(belIdx, s, t, encodedConfig);
                     if (fileName != null) {
                         writer.write(s + " " + t + " " + dly + "\n");
                     }

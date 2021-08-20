@@ -35,7 +35,7 @@ import com.xilinx.rapidwright.device.SiteTypeEnum;
 /**
  * Implement DelayModel using as small memory as possible.
  */
-class SmallDelayModel implements DelayModel {
+public class SmallDelayModel implements DelayModel {
 
     /**
      * Specify equivalent bels for logic delays. Equivalent bels map to the same index.
@@ -52,17 +52,26 @@ class SmallDelayModel implements DelayModel {
      * Mapping between config value of a bel to a one-hot binary.
      */
     private Map<String, Integer> configCodeMap;
+    
+    public int getEncodedConfigCode(String value) {
+        return configCodeMap.getOrDefault(value, 0);
+    }
 
+    public short getBELIndex(String belName) {
+    	return bel2IdxMap.get(belName);
+    }
+    
     /**
      *  Implement the method with the same signature defined in DelayModel interface.
      */
-    public short getIntraSiteDelay(SiteTypeEnum siteTypeName, String frBelPin, String toBelPin) {
+    public Short getIntraSiteDelay(SiteTypeEnum siteTypeName, String frBelPin, String toBelPin) {
         boolean verbose = false;
         Short delay = null;
         Short idx = site2IdxMap.get(siteTypeName.name());
         if (idx == null) {
-            throw new IllegalArgumentException("SmallDelayModel: Unknown site/belName to getIntraSiteDelay."
-                    + "  site/belName " + siteTypeName + "  frBelPin " + frBelPin + "  toBelPin " + toBelPin);
+        	return null;
+//            throw new IllegalArgumentException("SmallDelayModel: Unknown site/belName to getIntraSiteDelay."
+//                    + "  site/belName " + siteTypeName + "  frBelPin " + frBelPin + "  toBelPin " + toBelPin);
         } else {
             // Certain that the following combination do not cause duplication. Otherwise, separators must be added.
             String key = idx + frBelPin + toBelPin;
@@ -81,52 +90,31 @@ class SmallDelayModel implements DelayModel {
     /**
      *  Implement the method with the same signature defined in DelayModel interface.
      */
-    public short getLogicDelay(String belName, String frBelPin, String toBelPin) {
-        return getLogicDelay(belName, frBelPin, toBelPin, new ArrayList<>());
+    public short getLogicDelay(short belIdx, String frBelPin, String toBelPin) {
+        return getLogicDelay(belIdx, frBelPin, toBelPin, 0);
     }
 
     /**
      *  Implement the method with the same signature defined in DelayModel interface.
      */
-    public short getLogicDelay(String belName, String frBelPin, String toBelPin, List<String> config) {
-        boolean verbose = false;
-        int encodedConfig = 0;
-        for (String s : config) {
-            int e = configCodeMap.getOrDefault(belName + ":" + s, 0);
-            encodedConfig = (int) (encodedConfig | e);
-        }
+    public short getLogicDelay(short belIdx, String frBelPin, String toBelPin, int encodedConfig) {
+        Short delay = -2;
 
-        List<int[]> entries = null;
-        Short idx = bel2IdxMap.get(belName);
-        if (idx == null) {
-            throw new IllegalArgumentException("SmallDelayModel: Unknown site/belName to getLogicDelay."
-                    + "  site/belName " + belName + "  frBelPin " + frBelPin + "  toBelPin " + toBelPin);
-        } else {
-            Short delay = -2;
+        // Certain that the following combination do not cause duplication. Otherwise, separators must be added.
+        String key = belIdx + frBelPin + toBelPin;
+        List<int[]> entries = logicDelays.get(key);
 
-            // Certain that the following combination do not cause duplication. Otherwise, separators must be added.
-            String key = idx + frBelPin + toBelPin;
-            entries = logicDelays.get(key);
-
-            if (entries != null) {
-                for (int[] entry : entries) {
-                    assert entry.length == 2 :
-                            " Wrong number of elements in an entry of logicDelay. " + entry.length + " expect 2.";
-                    if ((encodedConfig & entry[1]) == encodedConfig) {
-                        delay = (short) entry[0];
-                        break;
-                    }
+        if (entries != null) {
+            for (int[] entry : entries) {
+                assert entry.length == 2 :
+                        " Wrong number of elements in an entry of logicDelay. " + entry.length + " expect 2.";
+                if ((encodedConfig & entry[1]) == encodedConfig) {
+                    delay = (short) entry[0];
+                    break;
                 }
             }
-
-            if (verbose && delay < 0) {
-                System.out.println("WARNING in SmallDelayModel: Unknown connection to getLogicDelay."
-                        + "  site/belName " + belName + "  frBelPin " + frBelPin + "  toBelPin " + toBelPin
-                        + "  config " + config);
-            }
-
-            return delay;
         }
+        return delay;
     }
 
     /**
