@@ -2238,7 +2238,7 @@ public class DesignTools {
 		for(Cell cell : design.getCells()) {
 			if(isUnisimFlipFlopType(cell.getType())) {
 				BEL bel = cell.getBEL();
-				Pair<String, String> sitePinNames = BELNametoSitePinNameMapping.get(bel.getBELType());
+				Pair<String, String> sitePinNames = belSitePinNameMapping.get(bel.getBELType());
 				String[] pins = new String[] {"CE", "SR"};
 				for(String pin : pins) {
 					BELPin belPin = cell.getBEL().getPin(pin);
@@ -2301,27 +2301,27 @@ public class DesignTools {
         return unisimFlipFlopTypes.contains(cellType);
     }
 
-	static Map<String, Pair<String, String>> BELNametoSitePinNameMapping;
+	static Map<String, Pair<String, String>> belSitePinNameMapping;
 	static{
-		BELNametoSitePinNameMapping = new HashMap<>();
+		belSitePinNameMapping = new HashMap<>();
 
-		BELNametoSitePinNameMapping.put("AFF", new Pair<>("CKEN1", "SRST1"));
-		BELNametoSitePinNameMapping.put("BFF", new Pair<>("CKEN1", "SRST1"));
-		BELNametoSitePinNameMapping.put("CFF", new Pair<>("CKEN1", "SRST1"));
-		BELNametoSitePinNameMapping.put("DFF", new Pair<>("CKEN1", "SRST1"));
-		BELNametoSitePinNameMapping.put("AFF2", new Pair<>("CKEN2", "SRST1"));
-		BELNametoSitePinNameMapping.put("BFF2", new Pair<>("CKEN2", "SRST1"));
-		BELNametoSitePinNameMapping.put("CFF2", new Pair<>("CKEN2", "SRST1"));
-		BELNametoSitePinNameMapping.put("DFF2", new Pair<>("CKEN2", "SRST1"));
+		belSitePinNameMapping.put("AFF", new Pair<>("CKEN1", "SRST1"));
+		belSitePinNameMapping.put("BFF", new Pair<>("CKEN1", "SRST1"));
+		belSitePinNameMapping.put("CFF", new Pair<>("CKEN1", "SRST1"));
+		belSitePinNameMapping.put("DFF", new Pair<>("CKEN1", "SRST1"));
+		belSitePinNameMapping.put("AFF2", new Pair<>("CKEN2", "SRST1"));
+		belSitePinNameMapping.put("BFF2", new Pair<>("CKEN2", "SRST1"));
+		belSitePinNameMapping.put("CFF2", new Pair<>("CKEN2", "SRST1"));
+		belSitePinNameMapping.put("DFF2", new Pair<>("CKEN2", "SRST1"));
 
-		BELNametoSitePinNameMapping.put("EFF", new Pair<>("CKEN3", "SRST2"));
-		BELNametoSitePinNameMapping.put("FFF", new Pair<>("CKEN3", "SRST2"));
-		BELNametoSitePinNameMapping.put("GFF", new Pair<>("CKEN3", "SRST2"));
-		BELNametoSitePinNameMapping.put("HFF", new Pair<>("CKEN3", "SRST2"));
-		BELNametoSitePinNameMapping.put("EFF2", new Pair<>("CKEN4", "SRST2"));
-		BELNametoSitePinNameMapping.put("FFF2", new Pair<>("CKEN4", "SRST2"));
-		BELNametoSitePinNameMapping.put("GFF2", new Pair<>("CKEN4", "SRST2"));
-		BELNametoSitePinNameMapping.put("HFF2", new Pair<>("CKEN4", "SRST2"));
+		belSitePinNameMapping.put("EFF", new Pair<>("CKEN3", "SRST2"));
+		belSitePinNameMapping.put("FFF", new Pair<>("CKEN3", "SRST2"));
+		belSitePinNameMapping.put("GFF", new Pair<>("CKEN3", "SRST2"));
+		belSitePinNameMapping.put("HFF", new Pair<>("CKEN3", "SRST2"));
+		belSitePinNameMapping.put("EFF2", new Pair<>("CKEN4", "SRST2"));
+		belSitePinNameMapping.put("FFF2", new Pair<>("CKEN4", "SRST2"));
+		belSitePinNameMapping.put("GFF2", new Pair<>("CKEN4", "SRST2"));
+		belSitePinNameMapping.put("HFF2", new Pair<>("CKEN4", "SRST2"));
 	}
 	
 	/**

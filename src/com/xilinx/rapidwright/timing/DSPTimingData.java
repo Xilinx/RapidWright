@@ -104,7 +104,7 @@ public class DSPTimingData{
 	}
 	
 	private void generateWarningInfo() {
-		System.out.println("CRITICAL WARNING: RWRoute continues timing-driven routing. Due to the missing DSP timing info, there could be unexpected critical path delay optimism.");
+		System.out.println("                  RWRoute continues timing-driven routing. Due to the missing DSP timing info, there could be unexpected critical path delay optimism.");
 		System.out.println("INFO: To obtain DSP logic delay files, please refer to dump_all_dsp_delay.tcl under $RAPIDWRIGHT_PATH/tcl/rwroute.");
 		System.out.println("INFO: Please use --dspTimingDataFolder <DSP delay files path> to grant the router access to DSP timing files.");
 	}

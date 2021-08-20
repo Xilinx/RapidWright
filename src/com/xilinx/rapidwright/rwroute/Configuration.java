@@ -71,8 +71,10 @@ public class Configuration {
 	private String clkSkew;
 	/** The text file containing clock enable partial route and timing data */
 	private String clkRouteTiming;
-	/** true to enable a symmetric clk routing approach for non-timing routing purpose.
-	 * false by default to enable the default clk routing for non-timing routing purpose */
+	/** 
+	 * true to enable a symmetric clk routing approach for non-timing routing purpose.
+	 * false by default to enable the default clk routing for non-timing routing purpose
+	 */
 	private boolean symmetricClkRouting;
 	/** Pessimism factor A for timing closure guarantee */
 	private float pessimismA;
@@ -855,54 +857,54 @@ public class Configuration {
 	@Override
 	public String toString() {
 		StringBuilder s = new StringBuilder();
-		s.append(this.formatString("Router Configuration\n"));
-		s.append(this.formatString("Max routing iterations: ", this.maxIterations));
-		s.append(this.formatString("Timing-driven: ", this.timingDriven));
-		s.append(this.formatString("Partial routing: ", this.partialRouting));
-		s.append(this.formatString("Use bounding boxes: ", this.isUseBoundingBox()));
+		s.append(formatString("Router Configuration\n"));
+		s.append(formatString("Max routing iterations: ", this.maxIterations));
+		s.append(formatString("Timing-driven: ", this.timingDriven));
+		s.append(formatString("Partial routing: ", this.partialRouting));
+		s.append(formatString("Use bounding boxes: ", this.isUseBoundingBox()));
 		if(this.isUseBoundingBox()) {
-			s.append(this.formatString("Bounding box extension: ", this.boundingBoxExtension));
+			s.append(formatString("Bounding box extension: ", this.boundingBoxExtension));
 			if(this.isEnlargeBoundingBox()) {
-				s.append(this.formatString("Enlarge bounding box: ", this.isEnlargeBoundingBox()));
-				s.append(this.formatString("Vertical INT tiles: ", this.verticalINTTiles));
-				s.append(this.formatString("Horizontal INT tiles: ", this.horizontalINTTiles));
+				s.append(formatString("Enlarge bounding box: ", this.isEnlargeBoundingBox()));
+				s.append(formatString("Vertical INT tiles: ", this.verticalINTTiles));
+				s.append(formatString("Horizontal INT tiles: ", this.horizontalINTTiles));
 			}
 		}
-		s.append(this.formatString("Wirelength-driven weight: ", this.wirelengthWeight));
+		s.append(formatString("Wirelength-driven weight: ", this.wirelengthWeight));
 		if(this.timingDriven) {
-			s.append(this.formatString("Sharing exponent: ", this.shareExponent));
-			s.append(this.formatString("Timing-driven weight: ", this.timingWeight));
-			s.append(this.formatString("Timing-driven mult fac: ", this.timingMultiplier));
-			s.append(this.formatString("Criticality exponent: ", this.criticalityExponent));
-			s.append(this.formatString("Reroute criticality threshold:", this.minRerouteCriticality));
-			s.append(this.formatString("Reroute percentage: ", this.reroutePercentage));
-			s.append(this.formatString("PessimismA: ", this.pessimismA));
-			s.append(this.formatString("PessimismB: ", this.pessimismB));
+			s.append(formatString("Sharing exponent: ", this.shareExponent));
+			s.append(formatString("Timing-driven weight: ", this.timingWeight));
+			s.append(formatString("Timing-driven mult fac: ", this.timingMultiplier));
+			s.append(formatString("Criticality exponent: ", this.criticalityExponent));
+			s.append(formatString("Reroute criticality threshold:", this.minRerouteCriticality));
+			s.append(formatString("Reroute percentage: ", this.reroutePercentage));
+			s.append(formatString("PessimismA: ", this.pessimismA));
+			s.append(formatString("PessimismB: ", this.pessimismB));
 		}
-		s.append(this.formatString("Mask nodes across RCLK: ", this.maskNodesCrossRCLK));
-		s.append(this.formatString("Include U-turn nodes: ", this.useUTurnNodes));
-		s.append(this.formatString("Enlarge bounding box: ", this.isEnlargeBoundingBox()));
-		s.append(this.formatString("Initial present conges fac: ", this.initialPresentCongesFac));
-		s.append(this.formatString("Present conges fac mult: ", this.presentCongesMultiplier));
-		s.append(this.formatString("Historical conges fac: ", this.historicalCongesFac));
-		s.append(this.formatString("Symmtric clk routing: ", this.isSymmetricClkRouting()));
+		s.append(formatString("Mask nodes across RCLK: ", this.maskNodesCrossRCLK));
+		s.append(formatString("Include U-turn nodes: ", this.useUTurnNodes));
+		s.append(formatString("Enlarge bounding box: ", this.isEnlargeBoundingBox()));
+		s.append(formatString("Initial present conges fac: ", this.initialPresentCongesFac));
+		s.append(formatString("Present conges fac mult: ", this.presentCongesMultiplier));
+		s.append(formatString("Historical conges fac: ", this.historicalCongesFac));
+		s.append(formatString("Symmtric clk routing: ", this.isSymmetricClkRouting()));
 		
 		return s.toString();
 	}
 	
-	private String formatString(String s1) {
+	private static String formatString(String s1) {
 		return String.format("%-30s\n", s1);
 	}
 	
-	private String formatString(String s, float value) {		
+	private static String formatString(String s, float value) {
 		return String.format("%-30s %10.2f\n", s, value);
 	}
 	
-	private String formatString(String s, short value) {		
+	private static String formatString(String s, short value) {
 		return String.format("%-30s %10d\n", s, value);
 	}
 	
-	private String formatString(String s, boolean value) {		
+	private static String formatString(String s, boolean value) {
 		return String.format("%-30s %10s\n", s, value);
 	}
 }

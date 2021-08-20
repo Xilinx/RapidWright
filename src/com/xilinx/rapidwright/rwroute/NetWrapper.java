@@ -73,16 +73,16 @@ public class NetWrapper{
 			short x = 0;
 			short y = 0;
 			if(!sourceRnodeAdded) {
-				x = c.getSourceRnode().getX();
-				y = c.getSourceRnode().getY();
+				x = c.getSourceRnode().getEndTileXCoordinate();
+				y = c.getSourceRnode().getEndTileYCoordinate();
 				xArray.add(x);
 				yArray.add(y);
 				xSum += x;
 				ySum += y;		
 				sourceRnodeAdded = true;
 			}	
-			x = c.getSinkRnode().getX();
-			y = c.getSinkRnode().getY();
+			x = c.getSinkRnode().getEndTileXCoordinate();
+			y = c.getSinkRnode().getEndTileYCoordinate();
 			xArray.add(x);
 			yArray.add(y);
 			xSum += x;

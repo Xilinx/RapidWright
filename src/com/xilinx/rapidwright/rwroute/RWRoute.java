@@ -205,7 +205,7 @@ public class RWRoute{
 		
 		this.routerTimer.createTimer("determine route targets", "Initialization").start();
 		this.determineRoutingTargets();
-		this.routerTimer.createTimer("determine route targets", "Initialization").stop();
+		this.routerTimer.getTimer("determine route targets").stop();
 		
 		if(this.config.isTimingDriven()) {
 			this.timingEdgeConnectionMap = new HashMap<>();
@@ -217,10 +217,10 @@ public class RWRoute{
 		this.connectionsRouted = 0;
 		this.connectionsRoutedIteration = 0;
 		this.nodesPushed = 0;
-		this.nodesPopped = 0;		
+		this.nodesPopped = 0;
 		this.overUsedRnodes = new HashSet<>();
 		
-		this.routerTimer.createTimer("Initialization", this.routerTimer.getRootTimer()).stop();
+		this.routerTimer.getTimer("Initialization").stop();
 	}
 	
 	/**
@@ -334,7 +334,7 @@ public class RWRoute{
 		EDIFHierPortInst hportSink = hportsFromSitePinInsts.get(0);
 		SitePinInst mappedSink = hportSpiMap.get(hportSink);
 		SitePinInst mappedSource = connection.getSource();	
-		if(connection.getNet().getNet().getSource().getName().contains("COUT")) {
+		if(connection.getNetWrapper().getNet().getSource().getName().contains("COUT")) {
 			EDIFHierPortInst hportSource = DesignTools.getPortInstsFromSitePinInst(connection.getSource()).get(0);
 			mappedSource = hportSpiMap.get(hportSource);
 		}
@@ -663,7 +663,7 @@ public class RWRoute{
 		this.wlWeight = this.config.getWirelengthWeight();
 		this.oneMinusTimingWeight = 1 - this.timingWeight;
 		this.oneMinusWlWeight = 1 - this.wlWeight;
-		this.printIterationHeader();
+		this.printIterationHeader(this.config.isTimingDriven());
 	}
 	
 	/**
@@ -784,7 +784,8 @@ public class RWRoute{
 			
 			this.updateCostFactors();
 			
-			this.printRoutingIterationStatisticsInfo(System.nanoTime() - startIteration, this.rnodeId, this.rnodesTimer.getTime());
+			this.printRoutingIterationStatisticsInfo(System.nanoTime() - startIteration, this.rnodeId,
+					this.rnodesTimer.getTime(), this.config.isTimingDriven());
 			if(this.overUsedRnodes.size() == 0) {
 				Set<Connection> unroutableCons = this.getUnroutedConnections();
 				if(unroutableCons.isEmpty()) {
@@ -861,7 +862,7 @@ public class RWRoute{
 	 */
 	private void printCongestedConnection(Connection connection) {
 		System.out.println(connection);
-		System.out.println("AltSource: " + DesignTools.getLegalAlternativeOutputPin(connection.getNet().getNet()));
+		System.out.println("AltSource: " + DesignTools.getLegalAlternativeOutputPin(connection.getNetWrapper().getNet()));
 		System.out.println();
 	}
 	
@@ -949,7 +950,7 @@ public class RWRoute{
 		this.sortedIndirectConnections.sort(new Comparator<Connection>() {
 			@Override
 			public int compare(Connection c1, Connection c2) {
-				int comp = c2.getNet().getConnection().size() - c1.getNet().getConnection().size();
+				int comp = c2.getNetWrapper().getConnection().size() - c1.getNetWrapper().getConnection().size();
 				if(comp == 0) {
 					return c1.getHpwl() > c2.getHpwl()? 1:c1.getHpwl() < c2.getHpwl() ? -1 :0;
 				}else {
@@ -959,13 +960,21 @@ public class RWRoute{
 		});
 	}
 	
-	private void printIterationHeader() {
+	private void printIterationHeader(boolean timingDriven) {
 		System.out.printf("------------------------------------------------------------------------------\n");
-        System.out.printf("%9s  %9s    %9s  %12s  %6s    %9s    %4s\n",
-        		"", "Routed", "Total Run", "Created", "Used", "Congested", "CPD");
-        System.out.printf("%9s  %11s  %9s  %12s  %8s  %9s    %5s\n",
-        		"Iteration", "Connections", "Time (s)", "Rnodes", "Time (s)", "Rnodes", "(ps)");
-        System.out.printf("---------  -----------  ---------   -----------  --------  ---------    -----\n");
+        if(timingDriven) {
+        	System.out.printf("%9s  %12s  %8s   %11s  %10s   %5s  %9s\n",
+            		"         ", "Generated", "  RRG",    "  Routed",   "Nodes With", "CPD", "Total Run");
+            System.out.printf("%9s  %12s  %8s   %11s  %10s   %5s  %9s\n",
+            		"Iteration", "RRG Nodes", "Time (s)", "Connections", "Overlapps", "(ps)", "Time (s)");
+            System.out.printf("---------  ----------------------   -----------  ----------   -----  ---------\n");
+        }else {
+        	System.out.printf("%9s  %12s  %8s   %11s  %10s   %5s  %9s\n",
+            		"         ", "Generated", "  RRG",    "  Routed",   "Nodes With", "    ", "Total Run");
+            System.out.printf("%9s  %12s  %8s   %11s  %10s   %5s  %9s\n",
+            		"Iteration", "RRG Nodes", "Time (s)", "Connections", "Overlapps", "    ", "Time (s)");
+            System.out.printf("---------  ----------------------   -----------  ----------   ----------------\n");
+        }
 	}
 	
 	private long lastIterationRnodeId = 0;
@@ -978,16 +987,28 @@ public class RWRoute{
 	 * @param globalRnodeId The global index for creating a rnode, used as the counter of created rnodes.
 	 * @param totalRnodesCreationTime The total rnodes creation runtime since the first iteration.
 	 */
-	private void printRoutingIterationStatisticsInfo(float iterationRuntime, int globalRnodeId, long totalRnodesCreationTime){
+	private void printRoutingIterationStatisticsInfo(float iterationRuntime, int globalRnodeId, long totalRnodesCreationTime,
+			boolean timingDriven){
 		long overUsed = this.overUsedRnodes.size();
-		System.out.printf("%4d       %11d  %9.2f  %12d  %8.2f  %9d    %5d\n",
-				this.routeIteration,
-				this.connectionsRoutedIteration,
-				iterationRuntime * 1e-9,
-				globalRnodeId - this.lastIterationRnodeId,
-				(totalRnodesCreationTime - this.lasterIterationRnodeTime)*1e-9,
-				overUsed,
-				(short)(this.maxDelayAndTimingVertex == null? 0 : this.maxDelayAndTimingVertex.getFirst()));
+		if(timingDriven) {
+			System.out.printf("%4d       %12d  %8.2f   %11d  %10d   %5d  %9.2f\n",
+					this.routeIteration,
+					globalRnodeId - this.lastIterationRnodeId,
+					(totalRnodesCreationTime - this.lasterIterationRnodeTime)*1e-9,
+					this.connectionsRoutedIteration,
+					overUsed,
+					(short)(this.maxDelayAndTimingVertex == null? 0 : this.maxDelayAndTimingVertex.getFirst()),
+					iterationRuntime * 1e-9);
+		}else {
+			System.out.printf("%4d       %12d  %8.2f   %11d  %10d   %5s  %9.2f\n",
+					this.routeIteration,
+					globalRnodeId - this.lastIterationRnodeId,
+					(totalRnodesCreationTime - this.lasterIterationRnodeTime)*1e-9,
+					this.connectionsRoutedIteration,
+					overUsed,
+					"",
+					iterationRuntime * 1e-9);
+		}
 		if(overUsed == 0) System.out.printf("------------------------------------------------------------------------------\n");
 	}
 	
@@ -1148,7 +1169,7 @@ public class RWRoute{
 			
 			rNodeData.removeSource(connection.getSource());
 			
-			rNodeData.removeSource(connection.getNet().getOldSource());
+			rNodeData.removeSource(connection.getNetWrapper().getOldSource());
 			
 			if(parent == null){
 				parent = rnode;
@@ -1297,7 +1318,7 @@ public class RWRoute{
 	 * @return true, if the output pin has been swapped.
 	 */
 	private boolean swapOutputPin(Connection connection) {	
-		NetWrapper np = connection.getNet();
+		NetWrapper np = connection.getNetWrapper();
 		Net n = np.getNet();
 		
 		SitePinInst altSource = DesignTools.getLegalAlternativeOutputPin(n);
@@ -1548,8 +1569,8 @@ public class RWRoute{
 	 * @param connection The connection being routed.
 	 */
 	private void computeDeltaXY(Routable childRNode, Connection connection) {
-		this.deltaX = (short) Math.abs(childRNode.getX() - connection.getSinkRnode().getX());
-		this.deltaY = (short) Math.abs(childRNode.getY() - connection.getSinkRnode().getY());
+		this.deltaX = (short) Math.abs(childRNode.getEndTileXCoordinate() - connection.getSinkRnode().getEndTileXCoordinate());
+		this.deltaY = (short) Math.abs(childRNode.getEndTileYCoordinate() - connection.getSinkRnode().getEndTileYCoordinate());
 	}
 	
 	/**
@@ -1583,9 +1604,9 @@ public class RWRoute{
 		
 		float biasCost = 0;
 		if(!rnode.isTarget()) {
-			NetWrapper net = connection.getNet();
+			NetWrapper net = connection.getNetWrapper();
 			biasCost = rnode.getBaseCost() / net.getConnection().size() *
-					(Math.abs(rnode.getX() - net.getXCenter()) + Math.abs(rnode.getY() - net.getYCenter())) / net.getDoubleHpwl();
+					(Math.abs(rnode.getEndTileXCoordinate() - net.getXCenter()) + Math.abs(rnode.getEndTileYCoordinate() - net.getYCenter())) / net.getDoubleHpwl();
 		}
 		
 		return rnode.getBaseCost() * rnode.getHistoricalCongesCost() * presentCongesCost / sharingFactor + biasCost;
@@ -1666,7 +1687,7 @@ public class RWRoute{
 	public static void printNodeTypeUsageAndWirelength(boolean verbose, Map<IntentCode, Long> nodeTypeUsage, Map<IntentCode, Long> nodeTypeLength) {
 		if(verbose) {
 			System.out.println("Node Usage Per Type\n");
-			System.out.print(String.format(" %-15s  %11s  %10s\n", "INT_Nodes", "Usage", "Length"));
+			System.out.print(String.format(" %-15s  %11s  %10s\n", "Node Type", "Usage", "Length"));
 			for(IntentCode ic : nodeTypes) {
 				long usage = nodeTypeUsage.getOrDefault(ic, (long)0);
 				long length = nodeTypeLength.getOrDefault(ic, (long)0);
@@ -1679,45 +1700,53 @@ public class RWRoute{
 	private void printDesignInfo(boolean verbose){
 		if(!verbose) return;
 		System.out.println("------------------------------------------------------------------------------");
-		System.out.printf("%-30s %10d\n", "Total nets: ", this.design.getNets().size());
-		System.out.printf("%-30s %10d\n", "Routable nets: ", this.numPreservedRoutableNets + this.numPreservedClks + this.numPreservedStaticNets + this.nets.size() +  this.staticNetAndRoutingTargets.size() + this.clkNets.size());
-		System.out.printf("%-30s %10d\n", "  Preserved routble nets: ", this.numPreservedRoutableNets);
-		System.out.printf("%-30s %10d\n", "    GLOBAL_CLOCK: ", this.numPreservedClks);
-		System.out.printf("%-30s %10d\n", "    Static nets: ", this.numPreservedStaticNets);
-		System.out.printf("%-30s %10d\n", "    WIRE: ", this.numPreservedWire);
-		System.out.printf("%-30s %10d\n", "  Nets to be routed: ", (this.nets.size() +  this.staticNetAndRoutingTargets.size() + this.clkNets.size()));
-		System.out.printf("%-30s %10d\n", "    GLOBAL_CLOCK: ", this.clkNets.size());
-		System.out.printf("%-30s %10d\n", "    Static nets: ", this.staticNetAndRoutingTargets.size());
-		System.out.printf("%-30s %10d\n", "    WIRE: ", this.nets.size());
+		printFormattedString("Total nets: ", this.design.getNets().size());
+		printFormattedString("Routable nets: ", this.numPreservedRoutableNets + this.numPreservedClks + this.numPreservedStaticNets + this.nets.size() +  this.staticNetAndRoutingTargets.size() + this.clkNets.size());
+		printFormattedString("  Preserved routble nets: ", this.numPreservedRoutableNets);
+		printFormattedString("    GLOBAL_CLOCK: ", this.numPreservedClks);
+		printFormattedString("    Static nets: ", this.numPreservedStaticNets);
+		printFormattedString("    WIRE: ", this.numPreservedWire);
+		printFormattedString("  Nets to be routed: ", (this.nets.size() +  this.staticNetAndRoutingTargets.size() + this.clkNets.size()));
+		printFormattedString("    GLOBAL_CLOCK: ", this.clkNets.size());
+		printFormattedString("    Static nets: ", this.staticNetAndRoutingTargets.size());
+		printFormattedString("    WIRE: ", this.nets.size());
 		int clkPins = 0;
 		for(Net clk : this.clkNets) {
 			clkPins += clk.getSinkPins().size();
 		}
-		System.out.printf("%-30s %10d\n", "  All site pins to be routed: ", (this.indirectConnections.size() + this.getNumSitePinOfStaticNets() + clkPins));	
-		System.out.printf("%-30s %10d\n", "    Connections to be routed: ", this.indirectConnections.size());
-		System.out.printf("%-30s %10d\n", "    Static net pins: ", this.getNumSitePinOfStaticNets());
-		System.out.printf("%-30s %10d\n", "    Clock pins: ", clkPins);
-		System.out.printf("%-30s %10d\n", "Nets not needing routing: ", this.numNotNeedingRoutingNets);
+		printFormattedString("  All site pins to be routed: ", (this.indirectConnections.size() + this.getNumSitePinOfStaticNets() + clkPins));	
+		printFormattedString("    Connections to be routed: ", this.indirectConnections.size());
+		printFormattedString("    Static net pins: ", this.getNumSitePinOfStaticNets());
+		printFormattedString("    Clock pins: ", clkPins);
+		printFormattedString("Nets not needing routing: ", this.numNotNeedingRoutingNets);
 		if(this.numUnrecognizedNets != 0)
-			System.out.printf("%-30s %10d\n", "Nets unrecognized: ", this.numUnrecognizedNets);
+			printFormattedString("Nets unrecognized: ", this.numUnrecognizedNets);
 		System.out.printf("------------------------------------------------------------------------------\n");
+	}
+	
+	private static void printFormattedString(String s, int value) {
+		System.out.printf(String.format("%-30s %10d\n", s, value));
+	}
+	
+	private static void printFormattedString(String s, long value) {
+		System.out.printf(String.format("%-30s %10d\n", s, value));
 	}
 	
 	private void printRoutingStatistics(){
 		MessageGenerator.printHeader("Statistics");
 		this.computesNodeUsageAndTotalWirelength();
 		printNodeTypeUsageAndWirelength(this.config.isVerbose(), this.nodeTypeUsage, this.nodeTypeLength);
-		System.out.printf("%-30s %10d\n", "Total wirelength:", this.totalWL);
+		printFormattedString("Total wirelength:", this.totalWL);
 		if(this.config.isVerbose()) {
-			System.out.printf("%-30s %10d\n", "Total INT tile nodes:", this.totalINTNodes);
-			System.out.printf("%-30s %10d\n", "Total rnodes created:", this.rnodeId);
-			System.out.printf("%-30s %10.1f\n", "Average #children per node:", this.comupteAverageChildren());
+			printFormattedString("Total INT tile nodes:", this.totalINTNodes);
+			printFormattedString("Total rnodes created:", this.rnodeId);
+			printFormattedString("Average #children per node:", Math.round(this.comupteAverageChildren()));
 			System.out.printf("------------------------------------------------------------------------------\n");	
-			System.out.printf("%-30s %10d\n", "Num iterations:", this.routeIteration);
-			System.out.printf("%-30s %10d\n", "Connections routed:", this.connectionsRouted);
-			System.out.printf("%-30s %10d\n", "Nodes evaluated:", this.nodesEvaluated);	
-			System.out.printf("%-30s %10d\n", "Nodes pushed:", this.nodesPushed);
-			System.out.printf("%-30s %10d\n", "Nodes poped:", this.nodesPopped);
+			printFormattedString("Num iterations:", this.routeIteration);
+			printFormattedString("Connections routed:", this.connectionsRouted);
+			printFormattedString("Nodes evaluated:", this.nodesEvaluated);
+			printFormattedString("Nodes pushed:", this.nodesPushed);
+			printFormattedString("Nodes poped:", this.nodesPopped);
 			System.out.printf("------------------------------------------------------------------------------\n");
 		}
 		

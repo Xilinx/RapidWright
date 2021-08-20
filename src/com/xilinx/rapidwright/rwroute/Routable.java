@@ -66,27 +66,27 @@ public interface Routable {
 	/**
 	 * Sets the x and y coordinates of the Interconnect (INT) tile that a Routable Object stops at.
 	 */
-	public void setXY();
+	public void setEndTileXYCoordinates();
 	/**
-	 * Sets x coordinate of the exit Interconnect (INT) tile.
+	 * Sets x coordinate of the end Interconnect (INT) tile.
 	 * @param x The tileXCoordinate of the INT tile that a Routable Object stops at.
 	 */
-	public void setX(short x);
+	public void setEndTileXCoordinate(short x);
 	/**
-	 * Sets y coordinate of the exit Interconnect (INT) tile.
+	 * Sets y coordinate of the end Interconnect (INT) tile.
 	 * @param y The tileYCoordinate of the INT tile that a Routable Object stops at.
 	 */
-	public void setY(short y);
+	public void setEndTileYCoordinate(short y);
 	/**
-	 * Gets x coordinate of the exit Interconnect (INT) tile.
+	 * Gets x coordinate of the end Interconnect (INT) tile.
 	 * @return The tileXCoordinate of the INT tile that a Routable Object stops at.
 	 */
-	public short getX();
+	public short getEndTileXCoordinate();
 	/**
-	 * Gets y coordinate of the exit Interconnect (INT) tile.
+	 * Gets y coordinate of the end Interconnect (INT) tile.
 	 * @return The tileYCoordinate of the INT tile that a Routable Object stops at.
 	 */
-	public short getY();
+	public short getEndTileYCoordinate();
 	/**
 	 * Gets the wirelength of a Routable Object.
 	 * @return The wirelength of a Routable Object, i.e. the number of INT tiles.

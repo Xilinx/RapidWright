@@ -39,7 +39,7 @@ import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 
 /**
  * A RoutableNode Object, denoted as rnode, is a vertex of the routing resource graph.
- * It implements {@link Routable} and each Routable Object is created based on a {@link Node} Object.
+ * It implements {@link Routable} and each RoutableNode Object is created based on a {@link Node} Object.
  */
 public class RoutableNode implements Routable{
 	/** A unique index of a rnode */
@@ -49,8 +49,8 @@ public class RoutableNode implements Routable{
 	/** The type of a rnode*/
 	private RoutableType type;
 	/** The tileXCoordinate and tileYCoordinate of the INT tile that a rnode stops at */
-	private short x;
-	private short y;
+	private short endTileXCoordinate;
+	private short endTileYCoordinate;
 	/** The wirelength of a rnode */
 	private short length;
 	/** The base cost of a rnode */
@@ -91,7 +91,7 @@ public class RoutableNode implements Routable{
 		this.rnodeData = new RoutableData(this.index);
 		this.childrenSet = false;
 		this.target = false;
-		this.setXY();
+		this.setEndTileXYCoordinates();
 		this.setBaseCost();
 	}
 	
@@ -139,7 +139,7 @@ public class RoutableNode implements Routable{
 				break;
 			
 			case NODE_DOUBLE:
-				if(this.x != this.getNode().getTile().getTileXCoordinate()) {
+				if(this.endTileXCoordinate != this.getNode().getTile().getTileXCoordinate()) {
 					baseCost = 0.4f*this.length;
 				}
 				break;
@@ -179,7 +179,7 @@ public class RoutableNode implements Routable{
 	}
 
 	@Override
-	public void setXY() {
+	public void setEndTileXYCoordinates() {
 		Wire[] wires = this.node.getAllWiresInNode();
 		List<Tile> intTiles = new ArrayList<>();
 		
@@ -190,18 +190,18 @@ public class RoutableNode implements Routable{
 		}
 		
 		if(intTiles.size() > 1) {
-			this.x = (short) intTiles.get(1).getTileXCoordinate();
-			this.y = (short) intTiles.get(1).getTileYCoordinate();
+			this.endTileXCoordinate = (short) intTiles.get(1).getTileXCoordinate();
+			this.endTileYCoordinate = (short) intTiles.get(1).getTileYCoordinate();
 		}else if(intTiles.size() == 1) {
-			this.x = (short) intTiles.get(0).getTileXCoordinate();
-			this.y = (short) intTiles.get(0).getTileYCoordinate();
+			this.endTileXCoordinate = (short) intTiles.get(0).getTileXCoordinate();
+			this.endTileYCoordinate = (short) intTiles.get(0).getTileYCoordinate();
 		}else {
-			this.x = (short) this.getNode().getTile().getTileXCoordinate();
-			this.y = (short) this.getNode().getTile().getTileYCoordinate();
+			this.endTileXCoordinate = (short) this.getNode().getTile().getTileXCoordinate();
+			this.endTileYCoordinate = (short) this.getNode().getTile().getTileYCoordinate();
 		}
 		Tile base = this.getNode().getTile();
-		this.length = (short) (Math.abs(this.x - base.getTileXCoordinate()) 
-				+ Math.abs(this.y - base.getTileYCoordinate()));
+		this.length = (short) (Math.abs(this.endTileXCoordinate - base.getTileXCoordinate()) 
+				+ Math.abs(this.endTileYCoordinate - base.getTileYCoordinate()));
 	}
 	
 	@Override
@@ -222,7 +222,7 @@ public class RoutableNode implements Routable{
 	@Override
 	public String toString(){
 		String coordinate = "";	
-		coordinate = "(" + this.x + "," + this.y + ")";
+		coordinate = "(" + this.endTileXCoordinate + "," + this.endTileYCoordinate + ")";
 		StringBuilder s = new StringBuilder();
 		s.append("id = " + this.index);
 		s.append(", ");
@@ -250,7 +250,7 @@ public class RoutableNode implements Routable{
 	
 	@Override
 	public boolean isInConBoundingBox(Connection con) {		
-		return this.x > con.getXMinBB() && this.x < con.getXMaxBB() && this.y > con.getYMinBB() && this.y < con.getYMaxBB();
+		return this.endTileXCoordinate > con.getXMinBB() && this.endTileXCoordinate < con.getXMaxBB() && this.endTileYCoordinate > con.getYMinBB() && this.endTileYCoordinate < con.getYMaxBB();
 	}
 	
 	@Override
@@ -304,23 +304,23 @@ public class RoutableNode implements Routable{
 		return this.delay;
 	}
 	@Override
-	public short getX() {
-		return this.x;
+	public short getEndTileXCoordinate() {
+		return this.endTileXCoordinate;
 	}
 
 	@Override
-	public void setX(short x) {
-		this.x = x;
+	public void setEndTileXCoordinate(short endTileXCoordinate) {
+		this.endTileXCoordinate = endTileXCoordinate;
 	}
 
 	@Override
-	public void setY(short y) {
-		this.y = y;
+	public void setEndTileYCoordinate(short endTileYCoordinate) {
+		this.endTileYCoordinate = endTileYCoordinate;
 	}
 
 	@Override
-	public short getY() {
-		return this.y;
+	public short getEndTileYCoordinate() {
+		return this.endTileYCoordinate;
 	}
 	
 	@Override
@@ -354,7 +354,7 @@ public class RoutableNode implements Routable{
 
 	@Override
 	public int manhattanDistToSink(Routable sink) {
-		return Math.abs(this.getX() - sink.getX()) + Math.abs(this.getY() - sink.getY());
+		return Math.abs(this.getEndTileXCoordinate() - sink.getEndTileXCoordinate()) + Math.abs(this.getEndTileYCoordinate() - sink.getEndTileYCoordinate());
 	}
 
 	@Override

@@ -53,7 +53,7 @@ public class Connection implements Comparable<Connection>{
 	 */
 	private boolean direct;
 	/** The {@link NetWrapper} instance indicating the net a connection belongs to */
-	private NetWrapper net;
+	private NetWrapper netWrapper;
 	/** 
 	 * The half-perimeter wirelength of a connection based on the source and sink rnodes, 
 	 * used for sorting connection and statistics of connection span.
@@ -87,16 +87,16 @@ public class Connection implements Comparable<Connection>{
 		this.sink = sink;
 		this.criticality = 0f;
 		this.rnodes = new ArrayList<>();
-		this.net = netWrapper;
-		this.net.addCons(this);
+		this.netWrapper = netWrapper;
+		this.netWrapper.addCons(this);
 	}
 	
 	/**
 	 * Computes the half-perimeter wirelength of connection based on the source and sink rnodes.
 	 */
 	public void computeHpwl() {
-		this.hpwl = (short) (Math.abs(this.sourceRnode.getX() - this.sinkRnode.getX()) + 1 
-				+ Math.abs(this.sourceRnode.getY() - this.sinkRnode.getY()) + 1);
+		this.hpwl = (short) (Math.abs(this.sourceRnode.getEndTileXCoordinate() - this.sinkRnode.getEndTileXCoordinate()) + 1 
+				+ Math.abs(this.sourceRnode.getEndTileYCoordinate() - this.sinkRnode.getEndTileYCoordinate()) + 1);
 	}
 	
 	/**
@@ -107,12 +107,12 @@ public class Connection implements Comparable<Connection>{
 	 */
 	public void computeConnectionBoundingBox(short boundingBoxExtension, boolean checkSLRCrossing) {
 		short xMin, xMax, yMin, yMax;
-		short xNetCenter = (short) Math.ceil(this.net.getXCenter());
-		short yNetCenter = (short) Math.ceil(this.net.getYCenter());
-		xMax = this.maxOfThree(this.sourceRnode.getX(), this.sinkRnode.getX(), xNetCenter);
-		xMin = this.minOfThree(this.sourceRnode.getX(), this.sinkRnode.getX(), xNetCenter);
-		yMax = this.maxOfThree(this.sourceRnode.getY(), this.sinkRnode.getY(), yNetCenter);
-		yMin = this.minOfThree(this.sourceRnode.getY(), this.sinkRnode.getY(), yNetCenter);
+		short xNetCenter = (short) Math.ceil(this.netWrapper.getXCenter());
+		short yNetCenter = (short) Math.ceil(this.netWrapper.getYCenter());
+		xMax = this.maxOfThree(this.sourceRnode.getEndTileXCoordinate(), this.sinkRnode.getEndTileXCoordinate(), xNetCenter);
+		xMin = this.minOfThree(this.sourceRnode.getEndTileXCoordinate(), this.sinkRnode.getEndTileXCoordinate(), xNetCenter);
+		yMax = this.maxOfThree(this.sourceRnode.getEndTileYCoordinate(), this.sinkRnode.getEndTileYCoordinate(), yNetCenter);
+		yMin = this.minOfThree(this.sourceRnode.getEndTileYCoordinate(), this.sinkRnode.getEndTileYCoordinate(), yNetCenter);
 		this.xMaxBB = (short) (xMax + boundingBoxExtension);
 		this.xMinBB = (short) (xMin - boundingBoxExtension);
 		this.yMaxBB = (short) (yMax + 5 * boundingBoxExtension);
@@ -318,12 +318,12 @@ public class Connection implements Comparable<Connection>{
 		this.yMaxBB = yMaxBB;
 	}
 
-	public void setNet(NetWrapper net){
-		this.net = net;
+	public void setNetWrapper(NetWrapper netWrapper){
+		this.netWrapper = netWrapper;
 	}
 	
-	public NetWrapper getNet(){
-		return this.net;
+	public NetWrapper getNetWrapper(){
+		return this.netWrapper;
 	}
 	
 	public SitePinInst getSource() {
@@ -418,9 +418,9 @@ public class Connection implements Comparable<Connection>{
 	
 	@Override
 	public int compareTo(Connection arg0) {
-		if(this.net.getConnection().size() > arg0.getNet().getConnection().size()) {
+		if(this.netWrapper.getConnection().size() > arg0.getNetWrapper().getConnection().size()) {
 			return 1;
-		}else if(this.net.getConnection().size() == arg0.getNet().getConnection().size()) {
+		}else if(this.netWrapper.getConnection().size() == arg0.getNetWrapper().getConnection().size()) {
 			if(this.getHpwl() > arg0.getHpwl()) {
 				return 1;
 			}else if(this.getHpwl() == arg0.getHpwl()) {
@@ -446,9 +446,9 @@ public class Connection implements Comparable<Connection>{
 		s.append(", ");
 		s.append("boundbox = " + this.bbRectangleString());
 		s.append(", ");
-		s.append("net = " + this.net.getNet().getName());
+		s.append("net = " + this.netWrapper.getNet().getName());
 		s.append(", ");
-		s.append(String.format("net fanout = %3s", this.net.getConnection().size()));
+		s.append(String.format("net fanout = %3s", this.netWrapper.getConnection().size()));
 		s.append(", ");
 		s.append(String.format("source = %s", this.getSource().getName()));
 		s.append(", ");
