@@ -27,8 +27,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.python.google.common.collect.HashMultiset;
-
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.router.RouteThruHelper;
@@ -232,13 +230,7 @@ public interface Routable {
 	 * @return The HashMultiset of the sources of nets that are using the associated rnode.
 	 * {@link SitePinInst}
 	 */
-	public HashMultiset<SitePinInst> getSourceSet();
-
-	/**
-	 * Sets a HashMultiset of the sources of nets that are using the associated rnode.
-	 * @param sourceSet The sources to be set.
-	 */
-	public void setSourceSet(HashMultiset<SitePinInst> sourceSet);
+	public Map<SitePinInst, Integer> getSourceSet();
 
 	/**
 	 * Adds a source SitePinInst to the source set.

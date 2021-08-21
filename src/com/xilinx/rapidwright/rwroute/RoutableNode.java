@@ -24,6 +24,7 @@
 package com.xilinx.rapidwright.rwroute;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -80,9 +81,9 @@ public class RoutableNode implements Routable{
 	/** The parent of the rnode for the routing of one connection */
 	private Routable prev;
 	/** A set of the source {@link SitePinInst} Objects of nets that are using the rnode */
-	private HashMultiset<SitePinInst> sourceSet;
+	private Map<SitePinInst, Integer> sourceSet;
 	/** A set of drivers (parents) of the rnode according to the routing paths of connections */
-	private HashMultiset<Routable> parentSet;
+	private Map<Routable, Integer> parentSet;
 	
 	/** Static variable to indicate if the routing is timing-driven */
 	static boolean timingDriven;
@@ -362,110 +363,135 @@ public class RoutableNode implements Routable{
 		return this.length;
 	}
 	
+	@Override
 	public void setLowerBoundTotalPathCost(float totalPathCost) {
 		this.lowerBoundTotalPathCost = totalPathCost;
 		this.setVisited(true);
 	}
 	
-	/**
-	 * Sets the upstream path cost.
-	 * @param newPartialPathCost The new value to be set.
-	 */
+	@Override
 	public void setUpstreamPathCost(float newPartialPathCost) {
 		this.upstreamPathCost = newPartialPathCost;
 	}
 	
+	@Override
 	public float getLowerBoundTotalPathCost() {
 		return this.lowerBoundTotalPathCost;
 	}
 	
+	@Override
 	public float getUpstreamPathCost() {
 		return this.upstreamPathCost;
 	}
 	
-	public HashMultiset<SitePinInst> getSourceSet() {
+	@Override
+	public Map<SitePinInst, Integer> getSourceSet() {
 		return sourceSet;
 	}
 	
-	public void setSourceSet(HashMultiset<SitePinInst> sourceSet) {
-		this.sourceSet = sourceSet;
-	}
-	
+	@Override
 	public void addSource(SitePinInst source) {
 		if(this.sourceSet == null) {
-			this.sourceSet = HashMultiset.create();
+			this.sourceSet = new HashMap<>();
 		}
-		this.sourceSet.add(source);
+		Integer users = this.sourceSet.getOrDefault(source, 0);
+		this.sourceSet.put(source, users + 1);
 	}
 	
+	@Override
 	public int numUniqueSources() {
 		if(this.sourceSet == null) {
 			return 0;
 		}
-		return this.sourceSet.elementSet().size();
+		return this.sourceSet.size();
 	}
 	
+	@Override
 	public void removeSource(SitePinInst source) {
-		this.sourceSet.remove(source);
+		Integer count = this.sourceSet.getOrDefault(source, 0);
+		if(count == 1) {
+			this.sourceSet.remove(source);
+		}else if(count > 1) {
+			this.sourceSet.put(source, count - 1);
+		}
 	}
 	
+	@Override
 	public int countSourceUses(SitePinInst source) {
 		if(this.sourceSet == null) {
 			return 0;
 		}
-		return this.sourceSet.count(source);
+		return this.sourceSet.getOrDefault(source, 0);
 	}
 	
+	@Override
 	public int numUniqueParents() {
 		if(this.parentSet == null) {
 			return 0;
 		}
-		return this.parentSet.elementSet().size();
+		return this.parentSet.size();
 	}
 	
+	@Override
 	public void addParent(Routable parent) {
 		if(this.parentSet == null) {
-			this.parentSet = HashMultiset.create();
+			this.parentSet = new HashMap<>();
 		}
-		this.parentSet.add(parent);
+		Integer drivers = this.parentSet.getOrDefault(parent, 0);
+		this.parentSet.put(parent, drivers + 1);
 	}
 	
+	@Override
 	public void removeParent(Routable parent) {
-		this.parentSet.remove(parent);
+		Integer count = this.parentSet.getOrDefault(parent, 0);
+		if(count == 1) {
+			this.parentSet.remove(parent);
+		}else if(count > 1) {
+			this.parentSet.put(parent, count - 1);
+		}
 	}
 	
+	@Override
 	public int getOccupancy() {
 		return this.numUniqueSources();
 	}
 	
+	@Override
 	public Routable getPrev() {
 		return prev;
 	}
 
+	@Override
 	public void setPrev(Routable prev) {
 		this.prev = prev;
 	}
 	
+	@Override
 	public float getPresentCongesCost() {
 		return presentCongesCost;
 	}
 
+	@Override
 	public void setPresentCongesCost(float presentCongesCost) {
 		this.presentCongesCost = presentCongesCost;
 	}
 
+	@Override
 	public float getHistoricalCongesCost() {
 		return historicalCongesCost;
 	}
 
+	@Override
 	public void setHistoricalCongesCost(float historicalCongesCost) {
 		this.historicalCongesCost = historicalCongesCost;
 	}
 
+	@Override
 	public boolean isVisited() {
 		return visited;
 	}
 
+	@Override
 	public void setVisited(boolean visited) {
 		this.visited = visited;
 	}
