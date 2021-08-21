@@ -32,7 +32,8 @@ import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.router.RouteThruHelper;
 
 /**
- * A Routable Object corresponds to a vertex of the routing resource graph. It is denoted as rnode.
+ * A Routable Object corresponds to a vertex of the routing resource graph.
+ * Each Routable instance is associated with a {@link Node} instance. It is denoted as rnode.
  * The routing resource graph is built "lazily", i.e., Routable Objects (rnodes) are created when needed.
  */
 
@@ -40,52 +41,57 @@ public interface Routable {
 	/** Each Routable Object can be legally used by one net only */
 	public static final short capacity = 1;
 	/** 
-	 * Checks if a Routable Object has been used by any net.
+	 * Checks if a Routable Object has been used.
 	 * @return true, if a Routable Object has been used.
 	 */
 	public boolean used();
 	/**
-	 * Checks if a Routable Object has been used by more than one net.
-	 * @return true, if a Routable Object has been used by multiple nets.
+	 * Checks if a Routable Object has been used by more than one users.
+	 * @return true, if a Routable Object has been used by multiple users.
 	 */
 	public boolean overUsed();
 	/**
 	 * Checks if a Routable Object are illegally driven by multiple drivers.
 	 * @return true, if a Routable Object has multiple drivers.
 	 */
-	public boolean hasMultiFanin();
+	public boolean hasMultiDrivers();
 	/**
-	 * Gets the number of nets that are using a Routable Object.
-	 * @return The number of nets using a Routable Object.
+	 * Gets the number of users.
+	 * @return The number of users.
 	 */
 	public int getOccupancy();
 	/**
-	 * Sets the x and y coordinates of the Interconnect (INT) tile that a Routable Object stops at.
+	 * Sets the x and y coordinates of the INT {@link TIle} instance
+	 * that the associated {@link Node} instance stops at.
 	 */
 	public void setEndTileXYCoordinates();
 	/**
-	 * Sets x coordinate of the end Interconnect (INT) tile.
-	 * @param x The tileXCoordinate of the INT tile that a Routable Object stops at.
+	 * Sets the x coordinate of the INT {@link TIle} instance
+	 * that the associated {@link Node} instance stops at.
+	 * @param x The tileXCoordinate of the INT tile that the associated {@link Node} instance stops at.
 	 */
 	public void setEndTileXCoordinate(short x);
 	/**
-	 * Sets y coordinate of the end Interconnect (INT) tile.
-	 * @param y The tileYCoordinate of the INT tile that a Routable Object stops at.
+	 * Sets the Y coordinate of the INT {@link TIle} instance
+	 * that the associated {@link Node} instance stops at.
+	 * @param y The tileYCoordinate of the INT tile that the associated {@link Node} instance stops at.
 	 */
 	public void setEndTileYCoordinate(short y);
 	/**
-	 * Gets x coordinate of the end Interconnect (INT) tile.
-	 * @return The tileXCoordinate of the INT tile that a Routable Object stops at.
+	 * Gets the x coordinate of the INT {@link TIle} instance
+	 * that the associated {@link Node} instance stops at.
+	 * @param x The tileXCoordinate of the INT tile that the associated {@link Node} instance stops at.
 	 */
 	public short getEndTileXCoordinate();
 	/**
-	 * Gets y coordinate of the end Interconnect (INT) tile.
-	 * @return The tileYCoordinate of the INT tile that a Routable Object stops at.
+	 * Gets the Y coordinate of the INT {@link TIle} instance
+	 * that the associated {@link Node} instance stops at.
+	 * @param y The tileYCoordinate of the INT tile that the associated {@link Node} instance stops at.
 	 */
 	public short getEndTileYCoordinate();
 	/**
-	 * Gets the wirelength of a Routable Object.
-	 * @return The wirelength of a Routable Object, i.e. the number of INT tiles.
+	 * Gets the wirelength.
+	 * @return The wirelength, i.e. the number of INT tiles that the associated {@link Node} instance spans.
 	 */
 	public short getLength();
 	/**
@@ -129,9 +135,9 @@ public interface Routable {
 	 */
 	public void setHistoricalCongesCost(float historicalCongesCost);
 	/**
-	 * Checks if a Routable Object is within the conncetion's bounding box.
+	 * Checks if coordinates of a Routable Object is within the conncetion's bounding box.
 	 * @param connetion The connection that is being routed.
-	 * @return true, if a Routable is within the connection's bounding box.
+	 * @return true, if coordinates of a Routable is within the connection's bounding box.
 	 */
 	public boolean isInConBoundingBox(Connection connection);
 	/**
@@ -170,17 +176,12 @@ public interface Routable {
 	 */
 	public float getDelay();
 	/**
-	 * Sets a boolean value to indicate if the children (i.e. downhill Routable Objects) of a Routable Object have been set.
-	 * @param childrenSet The boolean value to be set.
+	 * Checks if the children of a Routable Object have been set or not.
+	 * @return true, if the children have not been set.
 	 */
-	public void setChildrenSet(boolean childrenSet);
+	public boolean childrenNotSet();
 	/**
-	 * Checks if the children of a Routable Object have been set.
-	 * @return true, if the children have been set.
-	 */
-	public boolean isChildrenSet();
-	/**
-	 * Gets the Manhattan distance from a Routable Object to the target Routable Object , typically the sink Routable Object of a connection.
+	 * Gets the Manhattan distance from a Routable Object to the target Routable Object, typically the sink Routable Object of a connection.
 	 * @param sink The target Routable Object.
 	 * @return The Manhattan distance from a Routable Object to the target Routable Object.
 	 */
@@ -226,64 +227,68 @@ public interface Routable {
 	public float getUpstreamPathCost();
 
 	/**
-	 * Gets a HashMultiset of the sources of nets that are using the associated rnode.
-	 * @return The HashMultiset of the sources of nets that are using the associated rnode.
-	 * {@link SitePinInst}
+	 * Gets a map that records users of a {@link Routable} instance based on all routed connections.
+	 * Each user is a {@link Net} instance represented by its source.
+	 * It is often the case that multiple connections of a net are using a same rnode.
+	 * So we count connections of each user to facilitate the sharing mechanism of RWRoute.
+	 * @return A map between users, i.e., {@link Net} instances represented by their source {@link SitePinInst} instances,
+	 *  and numbers of connections from different users.
 	 */
-	public Map<SitePinInst, Integer> getSourceSet();
+	public Map<SitePinInst, Integer> getUsersConnectionCounts();
 
 	/**
-	 * Adds a source SitePinInst to the source set.
-	 * @param source The source of a net to be added.
+	 * Adds the source {@link SitePinInst} instance of a {@link Net} instance as a user.
+	 * @param source The source of a net to add.
 	 */
-	public void addSource(SitePinInst source);
+	public void addUser(SitePinInst source);
 	
 	/**
-	 * Gets the number of unique sources in the source set.
+	 * Gets the number of unique users.
 	 * @return The number of unique sources in the source set.
 	 */
-	public int numUniqueSources();
+	public int numUniqueUsers();
 	
 	/**
-	 * Removes a source from the source set.
+	 * Reduce the connection count of a user that is represented by the source.
+	 * {@link SitePinInst} instance of a {@link Net} instance.
+	 * If there is only one connection driven by the source that is using a Routable instance, remove the user.
 	 * @param source The source {@link SitePinInst} to be removed from the set.
 	 */
-	public void removeSource(SitePinInst source);
+	public void reduceConnectionCountOfUser(SitePinInst source);
 
 	/**
-	 * Counts the total number of a source included in the source set, 
-	 * which equals to the number of connections driven by the source that are using the rnode.
+	 * Counts the connections driven by a source that are using a Routable instance.
 	 * @param source The source {@link SitePinInst}.
 	 * @return The total number of a source included in the source set.
 	 */
-	public int countSourceUses(SitePinInst source);
+	public int countConnectionsOfUser(SitePinInst source);
 	
 	/**
 	 * Gets the number of unique drivers of the rnode.
 	 * @return The number of unique drivers of the rnode.
 	 */
-	public int numUniqueParents();
+	public int numUniqueDrivers();
 	
 	/**
 	 * Adds a driver to the parent set of the associated rnode.
 	 * @param parent The driver to be added.
 	 */
-	public void addParent(Routable parent);
+	public void addDriver(Routable parent);
 	
 	/**
-	 * Removes a parent from the parent set.
-	 * @param parent The parent to be removed.
+	 * Reduce the driver count of a Routable instance.
+	 * @param parent The driver that should have its count reduced
 	 */
-	public void removeParent(Routable parent);
+	public void reduceDriverCount(Routable parent);
 	
 	/**
-	 * Gets the driving Routable instance of a Routable instance for routing a connection.
+	 * Gets the parent Routable instance for routing a connection.
 	 * @return The driving Routable instance.
 	 */
 	public Routable getPrev();
 
 	/**
-	 * Sets the driving Routable instance of a Routable instance for routing a connection.
+	 * Sets the parent Routable instance for routing a connection.
 	 * @param prev The driving Routable instance to set.
 	 */
 	public void setPrev(Routable prev);

@@ -631,18 +631,14 @@ public class RWRoute{
 	 * @return The created {@link RoutableNode} instance.
 	 */
 	private Routable createAddRoutableNode(int rnodeGlobalIndex, SitePinInst sitePinInst, Node node, RoutableType type){
-		Routable rnode;
-		if(!this.rnodesCreated.containsKey(node)){
-			/** this is for initializing sources and sinks of those to-be-routed nets's connections */
+		Routable rnode = this.rnodesCreated.get(node);
+		if(rnode == null){
+			// this is for initializing sources and sinks of those to-be-routed nets's connections
 			rnode = new RoutableNode(rnodeGlobalIndex, node, type);
-			if(this.config.isTimingDriven()){
-				rnode.setDelay(RouterHelper.computeNodeDelay(this.estimator, node));
-			}
 			this.rnodesCreated.put(rnode.getNode(), rnode);
 			this.rnodeId++;
 		}else{
-			/** this is for checking preserved routing resource conflicts among routed nets */
-			rnode = this.rnodesCreated.get(node);
+			// this is for checking preserved routing resource conflicts among routed nets */
 			if(rnode.getRoutableType() == type && type == RoutableType.PINFEED_I) {
 				System.out.println("WARNING: Conflicting node: " + node + ", connected to sink " + sitePinInst);
 			}
@@ -1075,7 +1071,7 @@ public class RWRoute{
 		float sumChildren = 0;
 		float sumRNodes = 0;
 		for(Routable rn:this.rnodesCreated.values()){	
-			if(rn.isChildrenSet()){
+			if(!rn.childrenNotSet()){
 				sumChildren += rn.getChildren().size();
 				sumRNodes++;
 			}
@@ -1166,14 +1162,14 @@ public class RWRoute{
 		for(int i = connection.getRnodes().size() - 1; i >= 0; i--){
 			Routable rnode = connection.getRnodes().get(i);
 			
-			rnode.removeSource(connection.getSource());
+			rnode.reduceConnectionCountOfUser(connection.getSource());
 			
-			rnode.removeSource(connection.getNetWrapper().getOldSource());
+			rnode.reduceConnectionCountOfUser(connection.getNetWrapper().getOldSource());
 			
 			if(parent == null){
 				parent = rnode;
 			}else{
-				rnode.removeParent(parent);
+				rnode.reduceDriverCount(parent);
 				parent = rnode;
 			}
 			rnode.updatePresentCongesCost(this.presentCongesFac);
@@ -1189,12 +1185,12 @@ public class RWRoute{
 		for(int i = connection.getRnodes().size()-1; i >= 0; i--){
 			Routable rnode = connection.getRnodes().get(i);
 			
-			rnode.addSource(connection.getSource());
+			rnode.addUser(connection.getSource());
 			
 			if(parent == null){
 				parent = rnode;
 			}else{
-				rnode.addParent(parent);
+				rnode.addDriver(parent);
 				parent = rnode;
 			}
 			rnode.updatePresentCongesCost(this.presentCongesFac);
@@ -1340,7 +1336,7 @@ public class RWRoute{
 		Node sourceINTNode = RouterHelper.projectOutputPinToINTNode(altSource);
 		Routable sourceR = this.createAddRoutableNode(this.rnodeId, altSource, sourceINTNode, RoutableType.PINFEED_O);;
 		for(Connection c : np.getConnection()) {
-			c.setSource(altSource);					
+			c.setSource(altSource);
 			c.setSourceRnode(sourceR);
 		}
 			
@@ -1389,9 +1385,6 @@ public class RWRoute{
 					rnode = new RoutableNode(this.rnodeId, toBuild, RoutableType.WIRE);
 					this.rnodeId++;
 					this.rnodesCreated.put(toBuild, rnode);
-					if(this.config.isTimingDriven()) {
-						rnode.setDelay(RouterHelper.computeNodeDelay(this.estimator, toBuild));
-					}
 				}
 				// Each rnode created above should be added to its parents if parent exists,
 				// because children of an existing parent may have been set.
@@ -1400,7 +1393,7 @@ public class RWRoute{
 					// Do not use those nodes, because we do not know if the routethru is available or not
 					if(routethruHelper.isRouteThru(uphill, toBuild)) continue;
 					RoutableNode parent = (RoutableNode) this.rnodesCreated.get(uphill);
-					if(parent != null && parent.isChildrenSet()) {
+					if(parent != null && !parent.childrenNotSet()) {
 						if(!parent.getChildren().contains(rnode)) parent.getChildren().add(rnode);
 					}
 				}
@@ -1418,7 +1411,7 @@ public class RWRoute{
 	 */
 	private void setChildrenOfRnode(Routable rnode) {
 		this.rnodesTimer.start();
-		if(!rnode.isChildrenSet()) {
+		if(rnode.childrenNotSet()) {
 			int rnodeCounter = rnode.setChildren(this.rnodeId, this.rnodesCreated,
 					this.preservedNodes.keySet(), this.routethruHelper);
 			this.rnodeId = rnodeCounter;
@@ -1533,7 +1526,7 @@ public class RWRoute{
 	 * @param connection The target connection being routed.
 	 */
 	private void evaluateCostAndPush(Routable rnode, boolean longParent, Routable childRnode, Connection connection, float sharingWeight, float oneMinusCriticality) {
-		int countSourceUses = childRnode.countSourceUses(connection.getSource());	
+		int countSourceUses = childRnode.countConnectionsOfUser(connection.getSource());
 		float sharingFactor = 1 + sharingWeight* countSourceUses;
 		
 		float upstreamPathCost = rnode.getUpstreamPathCost();

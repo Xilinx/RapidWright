@@ -30,8 +30,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.python.google.common.collect.HashMultiset;
-
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
@@ -52,7 +50,7 @@ public class RoutableNode implements Routable{
 	private Node node;
 	/** The type of a rnode*/
 	private RoutableType type;
-	/** The tileXCoordinate and tileYCoordinate of the INT tile that a rnode stops at */
+	/** The tileXCoordinate and tileYCoordinate of the INT tile that the associated node stops at */
 	private short endTileXCoordinate;
 	private short endTileYCoordinate;
 	/** The wirelength of a rnode */
@@ -65,8 +63,6 @@ public class RoutableNode implements Routable{
 	private boolean target;
 	/** The children (downhill rnodes) of this rnode */
 	private List<Routable> children;
-	/** A flag to indicate if the children have been set */
-	private boolean childrenSet;
 	
 	/** Present congestion cost */
 	private float presentCongesCost;
@@ -78,12 +74,22 @@ public class RoutableNode implements Routable{
 	private float lowerBoundTotalPathCost;
 	/** A flag to indicate if the rnode has been visited or not during the expansion */
 	private boolean visited;
-	/** The parent of the rnode for the routing of one connection */
+	/** A variable that stores the parent of a rnode during expansion to facilitate tracing back */
 	private Routable prev;
-	/** A set of the source {@link SitePinInst} Objects of nets that are using the rnode */
-	private Map<SitePinInst, Integer> sourceSet;
-	/** A set of drivers (parents) of the rnode according to the routing paths of connections */
-	private Map<Routable, Integer> parentSet;
+	/**
+	 * A map that records users of a rnode based on all routed connections.
+	 * Each user is a {@link Net} instance represented by its source.
+	 * It is often the case that multiple connections of the net are using a same rnode.
+	 * We count the number of connections from a net.
+	 * The number is used for the sharing mechanism of RWRoute.
+	 */
+	private Map<SitePinInst, Integer> usersConnectionCounts;
+	/**
+	 * A map that records all the driver rnodes of a rnode based on all routed connections.
+	 * It is possible that a rnode are driven by different rnodes after routing of all connections of a net.
+	 * We count the drivers of a rnode to facilitate the route fixer at the end of routing.
+	 */ //TODO CHECK: REMOVE ADD AND REDUCE DRIVER COUNTS DURING ROUTING, ONLY DO IT ONCE BEFORE CALLING ROUTEFIXER
+	private Map<Routable, Integer> driversCounts;
 	
 	/** Static variable to indicate if the routing is timing-driven */
 	static boolean timingDriven;
@@ -107,16 +113,19 @@ public class RoutableNode implements Routable{
 		this.index = index;
 		this.type = type;
 		this.node = node;
-		this.childrenSet = false;
+		this.children = null;
 		this.target = false;
 		this.setEndTileXYCoordinates();
 		this.setBaseCost();
 		this.presentCongesCost = 1;
     	this.historicalCongesCost = 1;
     	this.setVisited(false);
-		this.sourceSet = null;
-		this.parentSet = null;
+		this.usersConnectionCounts = null;
+		this.driversCounts = null;
 		this.prev = null;
+		if(timingDriven){
+			this.setDelay(RouterHelper.computeNodeDelay(delayEstimator, node));
+		}
 	}
 	
 	public int setChildren(int globalIndex, Map<Node, Routable> createdRoutable, Set<Node> reserved, RouteThruHelper routethruHelper){
@@ -132,25 +141,15 @@ public class RoutableNode implements Routable{
 			if(child == null) {
 				RoutableType type = RoutableType.WIRE;		
 				child = new RoutableNode(globalIndex++, node, type);
-				this.children.add(child);
-				createdRoutable.put(node, child);		
-				if(timingDriven){
-					child.setDelay(RouterHelper.computeNodeDelay(delayEstimator, node));
-				}		
-			}else {
-				this.children.add(child);//the sink rnode of a target connection has been created up-front
-			}		
+				createdRoutable.put(node, child);
+			}
+			this.children.add(child);//the sink rnode of a target connection has been created up-front
 		}
-		this.childrenSet = true;		
 		return globalIndex;
 	}
 	
 	public void setBaseCost(){
-		if(this.type == RoutableType.PINFEED_O){
-			baseCost = 1f;
-		}else if(this.type == RoutableType.PINFEED_I){
-			baseCost = 0.4f;
-		}else{
+		if(this.type == RoutableType.WIRE){
 			baseCost = 0.4f;
 			// NOTE: IntentCode is device-dependent
 			IntentCode ic = node.getIntentCode();
@@ -184,6 +183,10 @@ public class RoutableNode implements Routable{
 				type = RoutableType.WIRE;
 				break;
 			}	
+		}else if(this.type == RoutableType.PINFEED_I){
+			baseCost = 0.4f;
+		}else if(this.type == RoutableType.PINFEED_O){
+			baseCost = 1f;
 		}
 	}
 
@@ -198,31 +201,29 @@ public class RoutableNode implements Routable{
 	}
 	
 	@Override
-	public boolean hasMultiFanin(){
-		return Routable.capacity < this.numUniqueParents();
+	public boolean hasMultiDrivers(){
+		return Routable.capacity < this.numUniqueDrivers();
 	}
 
 	@Override
 	public void setEndTileXYCoordinates() {
 		Wire[] wires = this.node.getAllWiresInNode();
 		List<Tile> intTiles = new ArrayList<>();
-		
 		for(Wire w : wires) {
 			if(w.getTile().getTileTypeEnum() == TileTypeEnum.INT) {
 				intTiles.add(w.getTile());
 			}
 		}
-		
+		Tile endTile = null;
 		if(intTiles.size() > 1) {
-			this.endTileXCoordinate = (short) intTiles.get(1).getTileXCoordinate();
-			this.endTileYCoordinate = (short) intTiles.get(1).getTileYCoordinate();
+			endTile = intTiles.get(1);
 		}else if(intTiles.size() == 1) {
-			this.endTileXCoordinate = (short) intTiles.get(0).getTileXCoordinate();
-			this.endTileYCoordinate = (short) intTiles.get(0).getTileYCoordinate();
+			endTile = intTiles.get(0);
 		}else {
-			this.endTileXCoordinate = (short) this.getNode().getTile().getTileXCoordinate();
-			this.endTileYCoordinate = (short) this.getNode().getTile().getTileYCoordinate();
+			endTile = this.getNode().getTile();
 		}
+		this.endTileXCoordinate = (short) endTile.getTileXCoordinate();
+		this.endTileYCoordinate = (short) endTile.getTileYCoordinate();
 		Tile base = this.getNode().getTile();
 		this.length = (short) (Math.abs(this.endTileXCoordinate - base.getTileXCoordinate()) 
 				+ Math.abs(this.endTileYCoordinate - base.getTileYCoordinate()));
@@ -230,7 +231,6 @@ public class RoutableNode implements Routable{
 	
 	@Override
 	public void updatePresentCongesCost(float pres_fac) {
-		
 		int occ = this.getOccupancy();
 		int cap = Routable.capacity;
 		
@@ -260,7 +260,7 @@ public class RoutableNode implements Routable{
 		s.append(", ");
 		s.append(String.format("user = %s", this.getOccupancy()));
 		s.append(", ");
-		s.append(this.getSourceSet());
+		s.append(this.getUsersConnectionCounts());
 		
 		return s.toString();
 	}
@@ -329,13 +329,8 @@ public class RoutableNode implements Routable{
 		return this.baseCost;
 	}
 
-	public boolean isChildrenSet() {
-		return childrenSet;
-	}
-
-	@Override
-	public void setChildrenSet(boolean childrenSet) {
-		this.childrenSet = childrenSet;
+	public boolean childrenNotSet() {
+		return this.children == null;
 	}
 
 	@Override
@@ -383,77 +378,77 @@ public class RoutableNode implements Routable{
 	public float getUpstreamPathCost() {
 		return this.upstreamPathCost;
 	}
-	
+
 	@Override
-	public Map<SitePinInst, Integer> getSourceSet() {
-		return sourceSet;
+	public Map<SitePinInst, Integer> getUsersConnectionCounts() {
+		return usersConnectionCounts;
 	}
 	
 	@Override
-	public void addSource(SitePinInst source) {
-		if(this.sourceSet == null) {
-			this.sourceSet = new HashMap<>();
+	public void addUser(SitePinInst source) {
+		if(this.usersConnectionCounts == null) {
+			this.usersConnectionCounts = new HashMap<>();
 		}
-		Integer users = this.sourceSet.getOrDefault(source, 0);
-		this.sourceSet.put(source, users + 1);
+		Integer users = this.usersConnectionCounts.getOrDefault(source, 0);
+		this.usersConnectionCounts.put(source, users + 1);
 	}
 	
 	@Override
-	public int numUniqueSources() {
-		if(this.sourceSet == null) {
+	public int numUniqueUsers() {
+		if(this.usersConnectionCounts == null) {
 			return 0;
 		}
-		return this.sourceSet.size();
+		return this.usersConnectionCounts.size();
 	}
 	
 	@Override
-	public void removeSource(SitePinInst source) {
-		Integer count = this.sourceSet.getOrDefault(source, 0);
+	public void reduceConnectionCountOfUser(SitePinInst source) {
+		Integer count = this.usersConnectionCounts.getOrDefault(source, 0);
 		if(count == 1) {
-			this.sourceSet.remove(source);
+			this.usersConnectionCounts.remove(source);
 		}else if(count > 1) {
-			this.sourceSet.put(source, count - 1);
+			this.usersConnectionCounts.put(source, count - 1);
 		}
 	}
 	
 	@Override
-	public int countSourceUses(SitePinInst source) {
-		if(this.sourceSet == null) {
+	public int countConnectionsOfUser(SitePinInst source) {
+		if(this.usersConnectionCounts == null) {
 			return 0;
 		}
-		return this.sourceSet.getOrDefault(source, 0);
+		return this.usersConnectionCounts.getOrDefault(source, 0);
 	}
 	
 	@Override
-	public int numUniqueParents() {
-		if(this.parentSet == null) {
+	public int numUniqueDrivers() {
+		if(this.driversCounts == null) {
 			return 0;
 		}
-		return this.parentSet.size();
+		return this.driversCounts.size();
 	}
 	
 	@Override
-	public void addParent(Routable parent) {
-		if(this.parentSet == null) {
-			this.parentSet = new HashMap<>();
+	public void addDriver(Routable parent) {
+		if(this.driversCounts == null) {
+			this.driversCounts = new HashMap<>();
 		}
-		Integer drivers = this.parentSet.getOrDefault(parent, 0);
-		this.parentSet.put(parent, drivers + 1);
+		Integer drivers = this.driversCounts.getOrDefault(parent, 0);
+		this.driversCounts.put(parent, drivers + 1);
 	}
 	
 	@Override
-	public void removeParent(Routable parent) {
-		Integer count = this.parentSet.getOrDefault(parent, 0);
+	public void reduceDriverCount(Routable parent) {
+		Integer count = this.driversCounts.getOrDefault(parent, 0);
 		if(count == 1) {
-			this.parentSet.remove(parent);
+			this.driversCounts.remove(parent);
 		}else if(count > 1) {
-			this.parentSet.put(parent, count - 1);
+			this.driversCounts.put(parent, count - 1);
 		}
 	}
 	
 	@Override
 	public int getOccupancy() {
-		return this.numUniqueSources();
+		return this.numUniqueUsers();
 	}
 	
 	@Override

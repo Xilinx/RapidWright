@@ -221,7 +221,7 @@ public class Connection implements Comparable<Connection>{
 	 */
 	public boolean useRnodesWithMultiDrivers() {
 		for(Routable rn : this.getRnodes()){
-			if(rn.hasMultiFanin()) {
+			if(rn.hasMultiDrivers()) {
 				return true;
 			}
 		}
@@ -459,6 +459,5 @@ public class Connection implements Comparable<Connection>{
 		s.append(String.format("criticality = %4.3f ", this.getCriticality()));
 		
 		return s.toString();
-		
 	}
 }
