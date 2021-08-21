@@ -44,7 +44,6 @@ import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELPin;
-import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
@@ -81,12 +80,6 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     DelayModel intrasiteAndLogicDelayModel;
     PrintStream graphVizPrintStream;
     HashMap<String, EDIFCellInst> myCellMap;
-    String netName;
-    Net net;
-    String prevNet;
-    EDIFNet edifNet;
-    boolean haveIntrasiteNet;
-    SitePinInst spi_source;
     Design design;
     ArrayList<EDIFHierCellInst> set;
     private HashMap<String, TimingVertex> safeVertexCheck = new HashMap<>();
@@ -163,11 +156,6 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         }
         String seriesName = design.getDevice().getSeries().name().toLowerCase();
         intrasiteAndLogicDelayModel = DelayModelBuilder.getDelayModel(seriesName);
-        HashMap<String, Net> netsByName = new LinkedHashMap<>();
-        for (Net n : design.getNets()) {
-            netsByName.put(n.getName(), n);
-        }
-        String[] netsArray = netsByName.keySet().toArray(new String[netsByName.size()]);
           
         if(this.routerTimer != null) this.routerTimer.createTimer("determine logic dly", "build timing graph").start();
         myCellMap = design.getNetlist().generateCellInstMap();
@@ -179,20 +167,11 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         if(this.routerTimer != null) this.routerTimer.getTimer("determine logic dly").stop();
         
         if(this.routerTimer != null) this.routerTimer.createTimer("add net dly edges", "build timing graph").start();
-        for (String netName : netsArray) {
-            this.netName = netName;
-            this.net = netsByName.get(netName);
-            this.edifNet = net.getLogicalNet();
-            this.haveIntrasiteNet = (net.getSinkPins().size() == 0);
-            this.spi_source = net.getSource();
-            if(this.net.isClockNet()) continue;//this is for getting rid of the problem in addNetDelayEdges() of clock net
-            if(this.net.isStaticNet()) continue;
-            if(!isPartialRouting) {
+        for (Net net : this.design.getNets()) {
+            if(net.isClockNet()) continue;//this is for getting rid of the problem in addNetDelayEdges() of clock net
+            if(net.isStaticNet()) continue;
+            if(!isPartialRouting || !net.hasPIPs()) {
             	addNetDelayEdges(net);
-            }else {
-            	if(!net.hasPIPs()) {
-                    addNetDelayEdges(net);
-            	}
             }
         }
         if(this.routerTimer != null) this.routerTimer.getTimer("add net dly edges").stop();
@@ -228,15 +207,12 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
      * Gets a map of hierarchical names to EDIFCellInsts of unrouted nets only
      * @return A map of hierarchical names to EdifCellInstances that use primitives in the library, for unrouted nets only
      */
-    private Set<Net> netsToAddDelayEdges;
     private Map<String, EDIFCellInst> generateCellMapOfUnoutedNets() {
     	Map<String, EDIFCellInst> partialCellMap = new HashMap<>();
     	Set<String> keys = new HashSet<>();
-    	this.netsToAddDelayEdges = new HashSet<>();
     	for(Net n : design.getNets()) {
     		if(n.isClockNet() || n.isStaticNet() || n.hasPIPs()) continue;
     		if(!RouterHelper.isRoutableNetWithSourceSinks(n)) continue;
-    		this.netsToAddDelayEdges.add(n);
     		List<EDIFHierPortInst> ehportInsts = design.getNetlist().getPhysicalPins(n.getName());
     		for(EDIFHierPortInst eportInst : ehportInsts) {
     			keys.add(eportInst.getFullHierarchicalInstName());
@@ -1774,10 +1750,6 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     private Cell dstCell;
     private BELPin source;
     private BELPin sink;
-    private SitePinInst spi_sink;
-    private SitePinInst local_spi_source;
-    private List<SitePinInst> spi_sources;
-    private List<SitePinInst> spi_sinks; // unused
     private SiteInst si;
     
     private float intraSiteDelay = 0.0f;
@@ -1806,19 +1778,16 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     }
     
     public boolean overwriteBUGCEDelay = false;
-    int addNetDelayEdges(Net n) {
+    int addNetDelayEdges(Net net) {
+    	EDIFNet edifNet = net.getLogicalNet();
+    	boolean haveIntrasiteNet = (net.getSinkPins().size() == 0);
+    	SitePinInst spi_source = net.getSource();
     	float logicDelay;
-        spi_sinks = new ArrayList<>();
-        local_spi_source = null;
-        spi_sources = new ArrayList<>();
-
-        String netName = n.getName();
-
-        if (netName.startsWith("GLOBAL_LOGIC") || netName.startsWith("GLOBAL_USED")) {
-            return -1;
-        }
+        SitePinInst local_spi_source = null;
+        List<SitePinInst> spi_sources = new ArrayList<>();
+        
         List<EDIFHierPortInst> hports = null;
-        hports = design.getNetlist().getPhysicalPins(n);
+        hports = design.getNetlist().getPhysicalPins(net);
 
         if (hports == null) {
             return 0;
@@ -1836,7 +1805,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         if(clkRouteTiming == null) {
         	this.overwriteBUGCEDelay = false;
         }else {
-        	if(n.getSource() != null && n.getSource().getName().equals("CLK_OUT") && n.getSource().toString().contains(clkRouteTiming.getBufgce())) {
+        	if(spi_source != null && spi_source.getName().equals("CLK_OUT") && spi_source.toString().contains(clkRouteTiming.getBufgce())) {
 	        	overwriteBUGCEDelay = true;
 	        }else {
 	        	this.overwriteBUGCEDelay = false;
@@ -1874,7 +1843,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
             } else {
                 physPinName = cell.getPhysicalPinMapping(portName);
                 // spi5 = cell.getSitePinFromLogicalPin(hport.getPortInst().getName(), null);
-                spi5 = cell.getSiteInst().getSitePinInst(DesignTools.getRoutedSitePin(cell, n, portName)); // use the new method to get over unmatched SitePinInst issue
+                spi5 = cell.getSiteInst().getSitePinInst(DesignTools.getRoutedSitePin(cell, net, portName)); // use the new method to get over unmatched SitePinInst issue
             }
            
            // if cell is dsp, and port name included in DSP pin mapping, override the fullName that is used to build timing edges
@@ -1931,8 +1900,6 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                 }
             } else {
                 mypin = spi5;
-                if (mypin != null)
-                    spi_sinks.add(mypin);
                 testDestCells.put(fullName, cell);
                 stringSinks.put(fullName, mypin);
                 sink_belpins.put(fullName, belpin);
@@ -1941,7 +1908,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         }
         
         if (stringSinks.size() == 0 || stringSources.size() == 0) {
-            int nPins = n.getPins().size();
+            int nPins = net.getPins().size();
             if (hports.size() != nPins) {
                 return 0;
             } else
@@ -1952,7 +1919,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         local_spi_source = spi_sources.size() > 0? spi_sources.get(0) : net.getSource() != null ? net.getSource() : local_spi_source;
 
         for (String D : stringSinks.keySet()) {
-            spi_sink = stringSinks.get(D);
+            SitePinInst spi_sink = stringSinks.get(D);
             srcCell = testSourceCell;
             dstCell = testDestCells.get(D);
             sink = sink_belpins.get(D);
