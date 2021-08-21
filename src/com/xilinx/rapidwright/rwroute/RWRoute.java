@@ -762,6 +762,8 @@ public class RWRoute{
 	public void routeIndirectConnections(){
 		this.sortConnections();
 		this.initializeRouting();
+		long lastIterationRnodeId = 0;
+		long lasterIterationRnodeTime = 0;
 		
 		while(this.routeIteration < this.config.getMaxIterations()){
 			long startIteration = System.nanoTime();
@@ -780,8 +782,9 @@ public class RWRoute{
 			
 			this.updateCostFactors();
 			
-			this.printRoutingIterationStatisticsInfo(System.nanoTime() - startIteration, this.rnodeId,
-					this.rnodesTimer.getTime(), this.config.isTimingDriven());
+			this.printRoutingIterationStatisticsInfo(System.nanoTime() - startIteration, this.rnodeId - lastIterationRnodeId,
+					(float) ((this.rnodesTimer.getTime() - lasterIterationRnodeTime) * 1e-9), this.config.isTimingDriven());
+			
 			if(this.overUsedRnodes.size() == 0) {
 				Set<Connection> unroutableCons = this.getUnroutedConnections();
 				if(unroutableCons.isEmpty()) {
@@ -793,8 +796,8 @@ public class RWRoute{
 				}
 			}
 			this.routeIteration++;
-			this.lastIterationRnodeId = this.rnodeId;
-			this.lasterIterationRnodeTime = this.rnodesTimer.getTime();
+			lastIterationRnodeId = this.rnodeId;
+			lasterIterationRnodeTime = this.rnodesTimer.getTime();
 		}
 		if(this.routeIteration == this.config.getMaxIterations()) {
 			System.out.println("\nERROR: Routing terminated after " + (this.routeIteration -1 ) + " iterations.");
@@ -973,24 +976,22 @@ public class RWRoute{
         }
 	}
 	
-	private long lastIterationRnodeId = 0;
-	private long lasterIterationRnodeTime = 0;
 	/**
 	 * Prints routing iteration statistics, including the iteration, number of connections routed in the iteration, 
 	 * total runtime of the iteration, number of created rnodes, time spent in creating rnodes that is included in the
 	 * total iteratin runtime, number of congested rnodes and the critical path delay achieved after the routing iteration.
 	 * @param iterationRuntime
-	 * @param globalRnodeId The global index for creating a rnode, used as the counter of created rnodes.
-	 * @param totalRnodesCreationTime The total rnodes creation runtime since the first iteration.
+	 * @param numRnodes Generated routing resource graph nodes.
+	 * @param rnodesCreationTime The runtime of generating routing resource graph nodes.
 	 */
-	private void printRoutingIterationStatisticsInfo(float iterationRuntime, int globalRnodeId, long totalRnodesCreationTime,
+	private void printRoutingIterationStatisticsInfo(float iterationRuntime, long numRnodes, float rnodesCreationTime,
 			boolean timingDriven){
 		long overUsed = this.overUsedRnodes.size();
 		if(timingDriven) {
 			System.out.printf("%4d       %12d  %8.2f   %11d  %10d   %5d  %9.2f\n",
 					this.routeIteration,
-					globalRnodeId - this.lastIterationRnodeId,
-					(totalRnodesCreationTime - this.lasterIterationRnodeTime)*1e-9,
+					numRnodes,
+					rnodesCreationTime,
 					this.connectionsRoutedIteration,
 					overUsed,
 					(short)(this.maxDelayAndTimingVertex == null? 0 : this.maxDelayAndTimingVertex.getFirst()),
@@ -998,8 +999,8 @@ public class RWRoute{
 		}else {
 			System.out.printf("%4d       %12d  %8.2f   %11d  %10d   %5s  %9.2f\n",
 					this.routeIteration,
-					globalRnodeId - this.lastIterationRnodeId,
-					(totalRnodesCreationTime - this.lasterIterationRnodeTime)*1e-9,
+					numRnodes,
+					rnodesCreationTime,
 					this.connectionsRoutedIteration,
 					overUsed,
 					"",
