@@ -125,7 +125,7 @@ public class RWRoute{
 	/** A map of nodes to created rnodes */
 	private Map<Node, Routable> rnodesCreated;
 	/** Visited rnodes data during connection routing */
-	private Collection<RoutableData> rnodesVisited;
+	private Collection<Routable> rnodesVisited;
 	/** The queue to store candidate nodes to route a connection */
 	private PriorityQueue<Pair<Routable, Float>> queue;
 	
@@ -1038,7 +1038,7 @@ public class RWRoute{
 			if(overuse == 0) {
 				rnode.setPresentCongesCost(1 + presentCongesFac);
 			} else if (overuse > 0) {
-				this.overUsedRnodes.add(rnode.hashCode());
+				this.overUsedRnodes.add(rnode.getIndex());
 				rnode.setPresentCongesCost(1 + (overuse + 1) * presentCongesFac);
 				rnode.setHistoricalCongesCost(rnode.getHistoricalCongesCost() + overuse * historicalCongesFac);
 			}
@@ -1165,16 +1165,15 @@ public class RWRoute{
 		Routable parent = null;
 		for(int i = connection.getRnodes().size() - 1; i >= 0; i--){
 			Routable rnode = connection.getRnodes().get(i);
-			RoutableData rNodeData = rnode.getRoutableData();
 			
-			rNodeData.removeSource(connection.getSource());
+			rnode.removeSource(connection.getSource());
 			
-			rNodeData.removeSource(connection.getNetWrapper().getOldSource());
+			rnode.removeSource(connection.getNetWrapper().getOldSource());
 			
 			if(parent == null){
 				parent = rnode;
 			}else{
-				rNodeData.removeParent(parent);
+				rnode.removeParent(parent);
 				parent = rnode;
 			}
 			rnode.updatePresentCongesCost(this.presentCongesFac);
@@ -1189,14 +1188,13 @@ public class RWRoute{
 		Routable parent = null;
 		for(int i = connection.getRnodes().size()-1; i >= 0; i--){
 			Routable rnode = connection.getRnodes().get(i);
-			RoutableData rNodeData = rnode.getRoutableData();
 			
-			rNodeData.addSource(connection.getSource());
+			rnode.addSource(connection.getSource());
 			
 			if(parent == null){
 				parent = rnode;
 			}else{
-				rNodeData.addParent(parent);
+				rnode.addParent(parent);
 				parent = rnode;
 			}
 			rnode.updatePresentCongesCost(this.presentCongesFac);
@@ -1272,6 +1270,10 @@ public class RWRoute{
 			if(!this.targetReached() && !successRoute) {
 				Pair<Routable, Float> queueElement = this.queue.poll();
 				Routable rnode = queueElement.getFirst();
+//				if(queueElement.getSecond() != rnode.getLowerBoundTotalPathCost()) {
+//					System.out.println(rnode);
+//					System.out.println(queueElement.getSecond() + " " + rnode.getLowerBoundTotalPathCost());
+//				}
 				this.nodesPopped++;
 				
 				this.setChildrenOfRnode(rnode);
@@ -1459,7 +1461,7 @@ public class RWRoute{
 		Routable rnode = connection.getSinkRnode();
 		while (rnode != null) {
 			connection.addRnode(rnode);
-			rnode = rnode.getRoutableData().getPrev();
+			rnode = rnode.getPrev();
 		}
 	}
 	
@@ -1467,7 +1469,7 @@ public class RWRoute{
 	 * Resets the expansion history.
 	 */
 	private void resetExpansion() {
-		for (RoutableData node : this.rnodesVisited) {
+		for (Routable node : this.rnodesVisited) {
 			node.setVisited(false);
 		}
 		this.rnodesVisited.clear();
@@ -1531,11 +1533,10 @@ public class RWRoute{
 	 * @param connection The target connection being routed.
 	 */
 	private void evaluateCostAndPush(Routable rnode, boolean longParent, Routable childRnode, Connection connection, float sharingWeight, float oneMinusCriticality) {
-		RoutableData childData = childRnode.getRoutableData();
-		int countSourceUses = childData.countSourceUses(connection.getSource());	
+		int countSourceUses = childRnode.countSourceUses(connection.getSource());	
 		float sharingFactor = 1 + sharingWeight* countSourceUses;
 		
-		float upstreamPathCost = rnode.getRoutableData().getUpstreamPathCost();
+		float upstreamPathCost = rnode.getUpstreamPathCost();
 		float rnodeCost = this.getRoutableCost(childRnode, connection, countSourceUses, sharingFactor);
 		float newPartialPathCost = upstreamPathCost + oneMinusCriticality * rnodeCost
 								+ oneMinusCriticality * this.oneMinusWlWeight * childRnode.getLength() / sharingFactor
@@ -1555,9 +1556,9 @@ public class RWRoute{
 		}
 		
 		this.nodesEvaluated++;
-		if(!childData.isVisited() || (childData.isVisited() && newTotalPathCost < childData.getLowerBoundTotalPathCost())) {
-			this.rnodesVisited.add(childData);
-			this.push(childData, childRnode, rnode, newPartialPathCost, newTotalPathCost);
+		if(!childRnode.isVisited() || (childRnode.isVisited() && newTotalPathCost < childRnode.getLowerBoundTotalPathCost())) {
+			this.rnodesVisited.add(childRnode);
+			this.push(childRnode, rnode, newPartialPathCost, newTotalPathCost);
 		}
 	}
 	
@@ -1620,10 +1621,10 @@ public class RWRoute{
 	 * @param newPartialPathCost The upstream path cost from childRnode to the source.
 	 * @param newLowerBoundTotalPathCost Total path cost of childRnode.
 	 */
-	private void push(RoutableData childData, Routable childRnode, Routable rnode, float newPartialPathCost, float newTotalPathCost) {
-		childData.setLowerBoundTotalPathCost(newTotalPathCost);
-		childData.setUpstreamPathCost(newPartialPathCost);
-		childData.setPrev(rnode);
+	private void push(Routable childRnode, Routable rnode, float newPartialPathCost, float newTotalPathCost) {
+		childRnode.setLowerBoundTotalPathCost(newTotalPathCost);
+		childRnode.setUpstreamPathCost(newPartialPathCost);
+		childRnode.setPrev(rnode);
 		this.queue.add(new Pair<Routable, Float>(childRnode, newTotalPathCost));
 		this.nodesPushed++;
 	}
@@ -1646,7 +1647,7 @@ public class RWRoute{
 		connection.getSinkRnode().setTarget(true);
 		
 		// Adds the source rnode to the queue
-		this.push(connection.getSourceRnode().getRoutableData(), connection.getSourceRnode(), null, 0, 0);
+		this.push(connection.getSourceRnode(), null, 0, 0);
 	}
 	
 	/**

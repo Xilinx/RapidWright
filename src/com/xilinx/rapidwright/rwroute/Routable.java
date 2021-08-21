@@ -27,6 +27,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.python.google.common.collect.HashMultiset;
+
+import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.router.RouteThruHelper;
 
@@ -38,11 +41,6 @@ import com.xilinx.rapidwright.router.RouteThruHelper;
 public interface Routable {
 	/** Each Routable Object can be legally used by one net only */
 	public static final short capacity = 1;
-	/** 
-	 * Gets the RoutableData Object of a Routable Object.
-	 * @return The RoutableData Object of a Routable Object.
-	 */
-	public RoutableData getRoutableData();
 	/** 
 	 * Checks if a Routable Object has been used by any net.
 	 * @return true, if a Routable Object has been used.
@@ -204,4 +202,115 @@ public interface Routable {
 	 * @return A list of Routable Objects.
 	 */
 	public List<Routable> getChildren();
+	
+	/**
+	 * Sets the lower bound total path cost.
+	 * @param totalPathCost The cost value to be set.
+	 */
+	public void setLowerBoundTotalPathCost(float totalPathCost);
+	
+	/**
+	 * Sets the upstream path cost.
+	 * @param newPartialPathCost The new value to be set.
+	 */
+	public void setUpstreamPathCost(float newPartialPathCost);
+	
+	/**
+	 * Gets the lower bound total path cost.
+	 * @return The lower bound total path cost.
+	 */
+	public float getLowerBoundTotalPathCost();
+	
+	/**
+	 * Gets the upstream path cost.
+	 * @return The upstream path cost.
+	 */
+	public float getUpstreamPathCost();
+
+	/**
+	 * Gets a HashMultiset of the sources of nets that are using the associated rnode.
+	 * @return The HashMultiset of the sources of nets that are using the associated rnode.
+	 * {@link SitePinInst}
+	 */
+	public HashMultiset<SitePinInst> getSourceSet();
+
+	/**
+	 * Sets a HashMultiset of the sources of nets that are using the associated rnode.
+	 * @param sourceSet The sources to be set.
+	 */
+	public void setSourceSet(HashMultiset<SitePinInst> sourceSet);
+
+	/**
+	 * Adds a source SitePinInst to the source set.
+	 * @param source The source of a net to be added.
+	 */
+	public void addSource(SitePinInst source);
+	
+	/**
+	 * Gets the number of unique sources in the source set.
+	 * @return The number of unique sources in the source set.
+	 */
+	public int numUniqueSources();
+	
+	/**
+	 * Removes a source from the source set.
+	 * @param source The source {@link SitePinInst} to be removed from the set.
+	 */
+	public void removeSource(SitePinInst source);
+
+	/**
+	 * Counts the total number of a source included in the source set, 
+	 * which equals to the number of connections driven by the source that are using the rnode.
+	 * @param source The source {@link SitePinInst}.
+	 * @return The total number of a source included in the source set.
+	 */
+	public int countSourceUses(SitePinInst source);
+	
+	/**
+	 * Gets the number of unique drivers of the rnode.
+	 * @return The number of unique drivers of the rnode.
+	 */
+	public int numUniqueParents();
+	
+	/**
+	 * Adds a driver to the parent set of the associated rnode.
+	 * @param parent The driver to be added.
+	 */
+	public void addParent(Routable parent);
+	
+	/**
+	 * Removes a parent from the parent set.
+	 * @param parent The parent to be removed.
+	 */
+	public void removeParent(Routable parent);
+	
+	/**
+	 * Gets the driving Routable instance of a Routable instance for routing a connection.
+	 * @return The driving Routable instance.
+	 */
+	public Routable getPrev();
+
+	/**
+	 * Sets the driving Routable instance of a Routable instance for routing a connection.
+	 * @param prev The driving Routable instance to set.
+	 */
+	public void setPrev(Routable prev);
+
+	/**
+	 * Checks if a Routable instance has been visited before when routing a connection.
+	 * @return true, if a Routable instance has been visited before.
+	 */
+	public boolean isVisited();
+
+	/**
+	 * Sets visited to indicate if a Routable instance has been visited before when routing a connection.
+	 * @param A boolean value to set.
+	 */
+	public void setVisited(boolean visited);
+	
+	/**
+	 * Gets the unique index of a Routable instance.
+	 * @return
+	 */
+	public int getIndex();
 }

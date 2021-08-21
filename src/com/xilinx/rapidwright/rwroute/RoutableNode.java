@@ -29,6 +29,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.python.google.common.collect.HashMultiset;
+
+import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Tile;
@@ -39,7 +42,7 @@ import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 
 /**
  * A RoutableNode Object, denoted as rnode, is a vertex of the routing resource graph.
- * It implements {@link Routable} and each RoutableNode Object is created based on a {@link Node} Object.
+ * It implements {@link Routable} and is created based on a {@link Node} Object.
  */
 public class RoutableNode implements Routable{
 	/** A unique index of a rnode */
@@ -57,14 +60,29 @@ public class RoutableNode implements Routable{
 	private float baseCost;
 	/** The delay of this rnode computed based on the timing model */
 	private short delay;
-	/** A set of data that are modified during the expansion steps of routing */
-	private final RoutableData rnodeData;
 	/** A flag to indicate if this rnode is the target */
 	private boolean target;
 	/** The children (downhill rnodes) of this rnode */
 	private List<Routable> children;
 	/** A flag to indicate if the children have been set */
 	private boolean childrenSet;
+	
+	/** Present congestion cost */
+	private float presentCongesCost;
+	/** Historical congestion cost */
+	private float historicalCongesCost;
+	/** Upstream path cost */
+	private float upstreamPathCost;
+	/** Lower bound of the total path cost */
+	private float lowerBoundTotalPathCost;
+	/** A flag to indicate if the rnode has been visited or not during the expansion */
+	private boolean visited;
+	/** The parent of the rnode for the routing of one connection */
+	private Routable prev;
+	/** A set of the source {@link SitePinInst} Objects of nets that are using the rnode */
+	private HashMultiset<SitePinInst> sourceSet;
+	/** A set of drivers (parents) of the rnode according to the routing paths of connections */
+	private HashMultiset<Routable> parentSet;
 	
 	/** Static variable to indicate if the routing is timing-driven */
 	static boolean timingDriven;
@@ -88,11 +106,16 @@ public class RoutableNode implements Routable{
 		this.index = index;
 		this.type = type;
 		this.node = node;
-		this.rnodeData = new RoutableData(this.index);
 		this.childrenSet = false;
 		this.target = false;
 		this.setEndTileXYCoordinates();
 		this.setBaseCost();
+		this.presentCongesCost = 1;
+    	this.historicalCongesCost = 1;
+    	this.setVisited(false);
+		this.sourceSet = null;
+		this.parentSet = null;
+		this.prev = null;
 	}
 	
 	public int setChildren(int globalIndex, Map<Node, Routable> createdRoutable, Set<Node> reserved, RouteThruHelper routethruHelper){
@@ -175,7 +198,7 @@ public class RoutableNode implements Routable{
 	
 	@Override
 	public boolean hasMultiFanin(){
-		return Routable.capacity < this.rnodeData.numUniqueParents();
+		return Routable.capacity < this.numUniqueParents();
 	}
 
 	@Override
@@ -207,15 +230,13 @@ public class RoutableNode implements Routable{
 	@Override
 	public void updatePresentCongesCost(float pres_fac) {
 		
-		RoutableData data = this.rnodeData;
-		
 		int occ = this.getOccupancy();
 		int cap = Routable.capacity;
 		
 		if (occ < cap) {
-			data.setPresentCongesCost(1);
+			this.setPresentCongesCost(1);
 		} else {
-			data.setPresentCongesCost(1 + (occ - cap + 1) * pres_fac);
+			this.setPresentCongesCost(1 + (occ - cap + 1) * pres_fac);
 		}
 	}
 	
@@ -238,13 +259,18 @@ public class RoutableNode implements Routable{
 		s.append(", ");
 		s.append(String.format("user = %s", this.getOccupancy()));
 		s.append(", ");
-		s.append(this.getRoutableData().getSourceSet());
+		s.append(this.getSourceSet());
 		
 		return s.toString();
 	}
 	
 	@Override
 	public int hashCode(){
+		return this.node.hashCode();
+	}
+	
+	@Override
+	public int getIndex() {
 		return this.index;
 	}
 	
@@ -274,32 +300,6 @@ public class RoutableNode implements Routable{
 	}
 
 	@Override
-	public int getOccupancy() {
-		
-		return this.rnodeData.getOccupancy();
-	}
-
-	@Override
-	public float getPresentCongesCost() {
-		return this.rnodeData.getPresentCongesCost();
-	}
-
-	@Override
-	public void setPresentCongesCost(float presCost) {	
-		this.rnodeData.setPresentCongesCost(presCost);
-	}
-
-	@Override
-	public float getHistoricalCongesCost() {
-		return this.rnodeData.getHistoricalCongesCost();
-	}
-
-	@Override
-	public void setHistoricalCongesCost(float histCost) {
-		this.rnodeData.setHistoricalCongesCost(histCost);	
-	}
-
-	@Override
 	public float getDelay() {
 		return this.delay;
 	}
@@ -326,11 +326,6 @@ public class RoutableNode implements Routable{
 	@Override
 	public float getBaseCost() {
 		return this.baseCost;
-	}
-
-	@Override
-	public RoutableData getRoutableData() {
-		return this.rnodeData;
 	}
 
 	public boolean isChildrenSet() {
@@ -367,6 +362,114 @@ public class RoutableNode implements Routable{
 		return this.length;
 	}
 	
+	public void setLowerBoundTotalPathCost(float totalPathCost) {
+		this.lowerBoundTotalPathCost = totalPathCost;
+		this.setVisited(true);
+	}
+	
+	/**
+	 * Sets the upstream path cost.
+	 * @param newPartialPathCost The new value to be set.
+	 */
+	public void setUpstreamPathCost(float newPartialPathCost) {
+		this.upstreamPathCost = newPartialPathCost;
+	}
+	
+	public float getLowerBoundTotalPathCost() {
+		return this.lowerBoundTotalPathCost;
+	}
+	
+	public float getUpstreamPathCost() {
+		return this.upstreamPathCost;
+	}
+	
+	public HashMultiset<SitePinInst> getSourceSet() {
+		return sourceSet;
+	}
+	
+	public void setSourceSet(HashMultiset<SitePinInst> sourceSet) {
+		this.sourceSet = sourceSet;
+	}
+	
+	public void addSource(SitePinInst source) {
+		if(this.sourceSet == null) {
+			this.sourceSet = HashMultiset.create();
+		}
+		this.sourceSet.add(source);
+	}
+	
+	public int numUniqueSources() {
+		if(this.sourceSet == null) {
+			return 0;
+		}
+		return this.sourceSet.elementSet().size();
+	}
+	
+	public void removeSource(SitePinInst source) {
+		this.sourceSet.remove(source);
+	}
+	
+	public int countSourceUses(SitePinInst source) {
+		if(this.sourceSet == null) {
+			return 0;
+		}
+		return this.sourceSet.count(source);
+	}
+	
+	public int numUniqueParents() {
+		if(this.parentSet == null) {
+			return 0;
+		}
+		return this.parentSet.elementSet().size();
+	}
+	
+	public void addParent(Routable parent) {
+		if(this.parentSet == null) {
+			this.parentSet = HashMultiset.create();
+		}
+		this.parentSet.add(parent);
+	}
+	
+	public void removeParent(Routable parent) {
+		this.parentSet.remove(parent);
+	}
+	
+	public int getOccupancy() {
+		return this.numUniqueSources();
+	}
+	
+	public Routable getPrev() {
+		return prev;
+	}
+
+	public void setPrev(Routable prev) {
+		this.prev = prev;
+	}
+	
+	public float getPresentCongesCost() {
+		return presentCongesCost;
+	}
+
+	public void setPresentCongesCost(float presentCongesCost) {
+		this.presentCongesCost = presentCongesCost;
+	}
+
+	public float getHistoricalCongesCost() {
+		return historicalCongesCost;
+	}
+
+	public void setHistoricalCongesCost(float historicalCongesCost) {
+		this.historicalCongesCost = historicalCongesCost;
+	}
+
+	public boolean isVisited() {
+		return visited;
+	}
+
+	public void setVisited(boolean visited) {
+		this.visited = visited;
+	}
+	
 	/**
 	 * Checks if a node is an exit node of a NodeGroup
 	 * @param node The node in question
@@ -393,10 +496,10 @@ public class RoutableNode implements Routable{
 	}
 	
 	/**
-	 * Checks if some routing resources are prevented from being used
-	 * @param node The routing resource in question
-	 * @param timingDriven To indicate if it targets timing-driven routing
-	 * @return true, if the node should be excluded from the routing resource graph
+	 * Checks if some routing resources are prevented from being used.
+	 * @param node The routing resource in question.
+	 * @param timingDriven To indicate if it targets timing-driven routing.
+	 * @return true, if the node should be excluded from the routing resource graph.
 	 */
 	public static boolean isExcluded(Node node, boolean timingDriven) {
 		Tile tile = node.getTile();
