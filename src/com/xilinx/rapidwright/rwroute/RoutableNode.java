@@ -88,7 +88,7 @@ public class RoutableNode implements Routable{
 	 * A map that records all the driver rnodes of a rnode based on all routed connections.
 	 * It is possible that a rnode are driven by different rnodes after routing of all connections of a net.
 	 * We count the drivers of a rnode to facilitate the route fixer at the end of routing.
-	 */ //TODO CHECK: REMOVE ADD AND REDUCE DRIVER COUNTS DURING ROUTING, ONLY DO IT ONCE BEFORE CALLING ROUTEFIXER
+	 */
 	private Map<Routable, Integer> driversCounts;
 	
 	/** Static variable to indicate if the routing is timing-driven */

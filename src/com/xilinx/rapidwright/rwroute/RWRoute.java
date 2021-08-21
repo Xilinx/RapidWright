@@ -1107,7 +1107,6 @@ public class RWRoute{
 					e.printStackTrace();
 				}
 			}
-			
 			RouteFixer graphHelper = new RouteFixer(route, this.rnodesCreated);
 			graphHelper.finalizeRoutesOfConnections();
 		}
@@ -1121,6 +1120,7 @@ public class RWRoute{
 	private Set<NetWrapper> findIllegalRoutes(){
 		Set<NetWrapper> illegalRoutes = new HashSet<>();
 		for(NetWrapper net : this.nets) {
+			this.buildDriverCountsOfRnodes(net);
 			for(Connection con : net.getConnection()) {
 				if(this.shouldMergePath(con)) {
 					illegalRoutes.add(net);
@@ -1130,6 +1130,25 @@ public class RWRoute{
 			}
 		}
 		return illegalRoutes;
+	}
+	
+	/**
+	 * Builds the driversCounts map of each {@link Routable} instance that is used by a net.
+	 * @param netWrapper A NetWrapper instance that represents a net.
+	 */
+	private void buildDriverCountsOfRnodes(NetWrapper netWrapper) {
+		for(Connection connection : netWrapper.getConnection()) {
+			Routable driver = null;
+			for(int i = connection.getRnodes().size() - 1; i >= 0; i--){
+				Routable rnode = connection.getRnodes().get(i);
+				if(driver == null){
+					driver = rnode;
+				}else{
+					rnode.addDriver(driver);
+					driver = rnode;
+				}
+			}
+		}
 	}
 	
 	/**
@@ -1158,20 +1177,10 @@ public class RWRoute{
 	 * @param connection The connection to be ripped up.
 	 */
 	private void ripUp(Connection connection){
-		Routable parent = null;
 		for(int i = connection.getRnodes().size() - 1; i >= 0; i--){
 			Routable rnode = connection.getRnodes().get(i);
-			
 			rnode.reduceConnectionCountOfUser(connection.getSource());
-			
 			rnode.reduceConnectionCountOfUser(connection.getNetWrapper().getOldSource());
-			
-			if(parent == null){
-				parent = rnode;
-			}else{
-				rnode.reduceDriverCount(parent);
-				parent = rnode;
-			}
 			rnode.updatePresentCongesCost(this.presentCongesFac);
 		}
 	}
@@ -1181,18 +1190,9 @@ public class RWRoute{
 	 * @param connection The routed connection.
 	 */
 	private void updateUsersAndPresentCongesCost(Connection connection){
-		Routable parent = null;
 		for(int i = connection.getRnodes().size()-1; i >= 0; i--){
 			Routable rnode = connection.getRnodes().get(i);
-			
 			rnode.addUser(connection.getSource());
-			
-			if(parent == null){
-				parent = rnode;
-			}else{
-				rnode.addDriver(parent);
-				parent = rnode;
-			}
 			rnode.updatePresentCongesCost(this.presentCongesFac);
 		}
 	}
@@ -1203,13 +1203,11 @@ public class RWRoute{
 	private void setPIPsOfNets(){
 		for(NetWrapper np:this.nets){
 			Set<PIP> netPIPs = new HashSet<>();
-			
 			for(Connection c:np.getConnection()){
-				netPIPs.addAll(RouterHelper.connectionPIPs(c));				
+				netPIPs.addAll(RouterHelper.connectionPIPs(c));
 			}
 			np.getNet().setPIPs(netPIPs);
 		}
-		
 		this.checkPIPsUsage();
 	}
 	
