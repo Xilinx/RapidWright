@@ -86,8 +86,8 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     static HashSet<String> unisimFlipFlopTypes;
     static HashSet<String> ramTypes;
 
-    Map<Pair<SitePinInst, SitePinInst>, List<TimingEdge>> spiPairsAndTimingEdges = new HashMap<>();//TODO simplify to sink spi only
-    Map<EDIFHierPortInst, SitePinInst> spiEDIFHportMapFromTimingGraph = new HashMap<>();
+    private Map<SitePinInst, List<TimingEdge>> sinkSitePinInstTimingEdges = new HashMap<>();
+    private Map<EDIFHierPortInst, SitePinInst> edifHPortMap = new HashMap<>();
     public List<TimingVertex> orderedTimingVertice = new ArrayList<>();
     public List<TimingVertex> reversedOrderedTimingVertice = new ArrayList<>();
     static CLKSkewRouteDelay clkSkewRouteDelay = null;
@@ -524,19 +524,12 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     	}
     	return null;
     }
-    
-    /**
-     * Gets the mapping between each pair of SitePinInsts and a list of the associated TimingEdges in the design
+
+	/**
+     * Gets the mapping between each EDIFHierPortInst (logical pin) and the SitePinInst physical pin.
      */
-    public Map<Pair<SitePinInst, SitePinInst>, List<TimingEdge>> getSpiAndTimingEdges(){
-    	return this.spiPairsAndTimingEdges;
-    }
-    
-    /**
-     * Gets the mapping between each EDIFHierPortInst (logical pin) and the SitePinInst physical pin in the design
-     */
-	public Map<EDIFHierPortInst, SitePinInst> getEDIFHportSpiMap(){
-    	return this.spiEDIFHportMapFromTimingGraph;
+	public Map<EDIFHierPortInst, SitePinInst> getEdifHPortMap(){
+    	return this.edifHPortMap;
     }
     
 	/**
@@ -1904,7 +1897,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                 stringSinks.put(fullName, mypin);
                 sink_belpins.put(fullName, belpin);
             }
-            this.spiEDIFHportMapFromTimingGraph.put(hport, mypin);// YZhou: added to get corresponding timing edges of connections
+            this.edifHPortMap.put(hport, mypin);// added to get corresponding timing edges of connections
         }
         
         if (stringSinks.size() == 0 || stringSources.size() == 0) {
@@ -2028,13 +2021,14 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
             safeAddEdge(vS, vD, e);
             setEdgeWeight(e, e.getDelay());
             
-            Pair<SitePinInst, SitePinInst> spiPair = new Pair<SitePinInst, SitePinInst>(local_spi_source, spi_sink);
-            List<TimingEdge> connectionEdges = this.spiPairsAndTimingEdges.get(spiPair);
-            if(connectionEdges == null) {
-            	connectionEdges = new ArrayList<>();
+            if(spi_sink != null) {
+                List<TimingEdge> connectionEdges = this.getSinkSitePinInstTimingEdges().get(spi_sink);
+                if(connectionEdges == null) {
+                	connectionEdges = new ArrayList<>();
+                }
+                connectionEdges.add(e);
+            	this.getSinkSitePinInstTimingEdges().put(spi_sink, connectionEdges);
             }
-            connectionEdges.add(e);
-        	this.spiPairsAndTimingEdges.put(spiPair, connectionEdges);
         }
         return 1;
     }
@@ -2106,4 +2100,10 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         return (int)(value >> bitIndex) & 0x1;
     }
 
+	/**
+     * Gets the mapping between each pair of SitePinInsts and a list of the associated TimingEdges in the design
+     */
+	public Map<SitePinInst, List<TimingEdge>> getSinkSitePinInstTimingEdges() {
+		return sinkSitePinInstTimingEdges;
+	}
 }

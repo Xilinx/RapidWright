@@ -29,6 +29,7 @@ import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Node;
+import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.rwroute.Configuration;
 import com.xilinx.rapidwright.rwroute.Connection;
 import com.xilinx.rapidwright.rwroute.NetWrapper;
@@ -99,12 +100,22 @@ public class TimingManager {
     }
     
     /**
-     * Gets and returns the map between each connection and its TimingEdges
+     * Gets the map between each sink {@link SitePinInst} instance and its associated {@link TimingEdge} instances
+     * from the {@link TimingGraph} instance.
+     * @return Mapping between each sink {@link SitePinInst} instance and its associated {@link TimingEdge} instances.
      */
-    public Map<Pair<SitePinInst, SitePinInst>, List<TimingEdge>> getSpiAndTimingEdgesMap(){
-    	return this.timingGraph.spiPairsAndTimingEdges;
+    public Map<SitePinInst, List<TimingEdge>> getSinkSitePinInstAndTimingEdgesMap(){
+    	return this.timingGraph.getSinkSitePinInstTimingEdges();
     }
     
+    /**
+     * Gets the map between each {@link EDIFHierPortInst} instance (logical pin) and {@link SitePinInst} instance (physical pin)
+     * from the {@link TimingGraph} instance.
+     * @return Mapping between each {@link EDIFHierPortInst} instance (logical pin) and {@link SitePinInst} instance
+     */
+    public Map<EDIFHierPortInst, SitePinInst> getEdifHPortMap(){
+    	return this.timingGraph.getEdifHPortMap();
+    }
     /**
      * Updates the delay of nets after the cycle removal and delay-aware path merging
      */

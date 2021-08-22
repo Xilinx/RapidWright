@@ -325,7 +325,7 @@ public class RWRoute{
 	 * @param spiAndTimingEdges Mapping between each pair of SitePinInsts and a list of timing edges recognized by the {@link TimingGraph} instance.
 	 * @param hportSpiMap Mapping between a logic pin and a SitePinInst recognized by the timing graph builder.
 	 */
-	private static void setConnectionTimingEdges(Connection connection, Map<Pair<SitePinInst, SitePinInst>, List<TimingEdge>> spiAndTimingEdges, 
+	private static void setConnectionTimingEdges(Connection connection, Map<SitePinInst, List<TimingEdge>> spiAndTimingEdges, 
 			Map<EDIFHierPortInst, SitePinInst> hportSpiMap, Map<TimingEdge, Connection> timingEdgeConnectionMap) {	
 		List<EDIFHierPortInst> hportsFromSitePinInsts = DesignTools.getPortInstsFromSitePinInst(connection.getSink());
 		if(hportsFromSitePinInsts.isEmpty()) {
@@ -333,13 +333,8 @@ public class RWRoute{
 		}
 		EDIFHierPortInst hportSink = hportsFromSitePinInsts.get(0);
 		SitePinInst mappedSink = hportSpiMap.get(hportSink);
-		SitePinInst mappedSource = connection.getSource();	
-		if(connection.getNetWrapper().getNet().getSource().getName().contains("COUT")) {
-			EDIFHierPortInst hportSource = DesignTools.getPortInstsFromSitePinInst(connection.getSource()).get(0);
-			mappedSource = hportSpiMap.get(hportSource);
-		}
 		
-		List<TimingEdge> timingEdges = spiAndTimingEdges.get(new Pair<>(mappedSource, mappedSink));	
+		List<TimingEdge> timingEdges = spiAndTimingEdges.get(mappedSink);
 		if(timingEdges == null) {
 			throw new RuntimeException("ERROR: No timing edges for connection from: " + connection.getSource() + " to " + connection.getSink());
 		}
@@ -356,9 +351,8 @@ public class RWRoute{
 	 * @param timingEdgeConnectionMap
 	 */
 	public static void setTimingEdgesOfConnections(List<Connection> connections, TimingManager timingManager, Map<TimingEdge, Connection> timingEdgeConnectionMap) {
-		Map<Pair<SitePinInst, SitePinInst>, List<TimingEdge>> spiAndTimingEdges = timingManager.getSpiAndTimingEdgesMap();
-		Map<EDIFHierPortInst, SitePinInst> hportSpiMap = timingManager.getTimingGraph().getEDIFHportSpiMap();
-		
+		Map<SitePinInst, List<TimingEdge>> spiAndTimingEdges = timingManager.getSinkSitePinInstAndTimingEdgesMap();
+		Map<EDIFHierPortInst, SitePinInst> hportSpiMap = timingManager.getEdifHPortMap();
 		for(Connection c : connections) {
 			if(c.isDirect()) continue;
 			setConnectionTimingEdges(c, spiAndTimingEdges, hportSpiMap, timingEdgeConnectionMap);
@@ -853,16 +847,6 @@ public class RWRoute{
 				return false;
 			}
 		}
-	}
-	
-	/**
-	 * Prints info of congested connection.
-	 * @param connection The target connection.
-	 */
-	private void printCongestedConnection(Connection connection) {
-		System.out.println(connection);
-		System.out.println("AltSource: " + DesignTools.getLegalAlternativeOutputPin(connection.getNetWrapper().getNet()));
-		System.out.println();
 	}
 	
 	/**
