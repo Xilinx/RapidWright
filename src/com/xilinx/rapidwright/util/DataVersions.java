@@ -7,6 +7,7 @@ public class DataVersions {
     public static Map<String,Pair<String,String>> dataVersionMap;
     static {
         dataVersionMap = new HashMap<>();
+        dataVersionMap.put("data/cell_pin_defaults.dat", new Pair<>("cell-pin-defaults-dat", "8198dbe5a2235ab2adf647dcbe10d895"));
         dataVersionMap.put("data/devices/artix7/xa7a100t_db.dat", new Pair<>("xa7a100t-db-dat", "e539013fcb7ad2d9e0dd7c4afeca7e2e"));
         dataVersionMap.put("data/devices/artix7/xa7a12t_db.dat", new Pair<>("xa7a12t-db-dat", "056b20cd84091bf909f4122a213edb60"));
         dataVersionMap.put("data/devices/artix7/xa7a15t_db.dat", new Pair<>("xa7a15t-db-dat", "dde41c92a416356e32be3485c1ccbe2c"));

@@ -110,6 +110,8 @@ public class FileTools {
 	public static final String PART_DUMP_FILE_NAME = DATA_FOLDER_NAME + File.separator + "partdump.csv";
 	/** Location of the main parts database file */
 	public static final String PART_DB_PATH = DATA_FOLDER_NAME + File.separator + "parts.db";
+	/** Location of the cell pins default data file */
+	public static final String CELL_PIN_DEFAULTS_FILE_NAME = DATA_FOLDER_NAME + File.separator + "cell_pin_defaults.dat";
 	/** Common instance of the Kryo class for serialization purposes */	
 	private static Kryo kryo;
 	/** Supporting data folders packed in standalone jars of RapidWright */ 
@@ -1166,6 +1168,12 @@ public class FileTools {
 		}
 	}
 
+    public static Object readObjectFromKryoFile(InputStream in){
+        Kryo kryo = getKryoInstance();
+        try (Input i = new Input(in)) {
+            return kryo.readClassAndObject(i);
+        }
+    }
 	
 	public static Kryo getKryoInstance(){
 		if(kryo == null){

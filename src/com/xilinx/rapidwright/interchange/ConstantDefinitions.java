@@ -2,7 +2,6 @@ package com.xilinx.rapidwright.interchange;
 
 import java.util.AbstractMap;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -12,15 +11,18 @@ import java.util.Set;
 
 import org.capnproto.PrimitiveList;
 import org.capnproto.StructList;
+import org.capnproto.StructList.Builder;
 
+import com.xilinx.rapidwright.design.CellPinStaticDefaults;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.SiteInst;
+import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Node;
-import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Site;
@@ -29,12 +31,12 @@ import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.Constants;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.ConstantType;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.Constants.SiteConstantSource;
-import com.xilinx.rapidwright.tests.CodePerfTracker;
+import com.xilinx.rapidwright.interchange.DeviceResources.Device.Constants.CellPinValue;
+import com.xilinx.rapidwright.interchange.DeviceResources.Device.Constants.DefaultCellConnection;
+import com.xilinx.rapidwright.interchange.DeviceResources.Device.Constants.DefaultCellConnections;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.Constants.NodeConstantSource;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.WireConstantSources;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.TileType;
-import com.xilinx.rapidwright.interchange.Enumerator;
-import com.xilinx.rapidwright.interchange.LongEnumerator;
 
 public class ConstantDefinitions {
     private Map<Map.Entry<SiteTypeEnum, String>, String> vccBels;
@@ -290,6 +292,31 @@ public class ConstantDefinitions {
 
             design.removeSiteInst(siteInst);
         }
+        
+        Map<Unisim, Map<String, NetType>> map = CellPinStaticDefaults.getCellPinDefaultsMap().get(device.getSeries());
+        StructList.Reader<DefaultCellConnections.Reader> defaultsReader = reader.getDefaultCellConns();
+        for(int i=0; i < defaultsReader.size(); i++) {
+            DefaultCellConnections.Reader defaultReader = defaultsReader.get(i);
+            String unisimName = allStrings.get(defaultReader.getCellType());
+            Unisim u = Unisim.valueOf(unisimName);
+            Map<String, NetType> pinMap = map.get(u);
+            if(pinMap == null) {
+                throw new RuntimeException("ERROR: " + u + " missing cell pin defaults");
+            }
+            StructList.Reader<DefaultCellConnection.Reader> pinDefaults = defaultReader.getPins();
+            if(pinDefaults.size() != pinMap.size()) {
+                throw new RuntimeException("ERROR: Mismatch cell pin defaults on " + u);
+            }
+            for(DefaultCellConnection.Reader r : pinDefaults) {
+                String pinName = allStrings.get(r.getName());
+                CellPinValue value = r.getValue();
+                NetType goldValue = pinMap.get(pinName);
+                if(value != getCellPinValue(goldValue)) {
+                    throw new RuntimeException("ERROR: Mismatch default on " + u + ", pin " 
+                            + pinName + ". Expected " + goldValue + ", found " + value);
+                }
+            }
+        }
     }
 
     private static long makeKey(Tile tile, int wire) {
@@ -497,6 +524,36 @@ public class ConstantDefinitions {
         }
     }
 
+    public static CellPinValue getCellPinValue(NetType netType) {
+        switch(netType) {
+            case GND:
+                return CellPinValue.GND;
+            case VCC:
+                return CellPinValue.VCC;
+            default:
+                return CellPinValue.FLOAT;
+        }
+    }
+    
+    private static void writeCellPinDefaults(Enumerator<String> allStrings, Device device, Constants.Builder builder) {
+        Map<Unisim,Map<String,NetType>> map = CellPinStaticDefaults.getCellPinDefaultsMap().get(device.getSeries());
+        Builder<DefaultCellConnections.Builder> defaultCellConnsBuilder = builder.initDefaultCellConns(map.keySet().size());
+        int i=0; 
+        for(Entry<Unisim,Map<String,NetType>> e : map.entrySet()) {
+            DefaultCellConnections.Builder defaultConnBuilder = defaultCellConnsBuilder.get(i);
+            defaultConnBuilder.setCellType(allStrings.getIndex(e.getKey().name()));
+            Builder<DefaultCellConnection.Builder> pinsDefaultBuilder = defaultConnBuilder.initPins(e.getValue().size());
+            int j = 0;
+            for(Entry<String,NetType> e2 : e.getValue().entrySet()) {
+                DefaultCellConnection.Builder pinDefault = pinsDefaultBuilder.get(j);
+                pinDefault.setName(allStrings.getIndex(e2.getKey()));
+                pinDefault.setValue(getCellPinValue(e2.getValue()));
+                j++;
+            }
+            i++;
+        }        
+    }
+    
     public static void writeConstants(Enumerator<String> allStrings, Device device, Constants.Builder builder, Design design, Map<SiteTypeEnum,Site> siteTypes, Map<TileTypeEnum, TileType.Builder> tileTypes) {
         builder.setDefaultBestConstant(ConstantType.VCC);
 
@@ -511,5 +568,6 @@ public class ConstantDefinitions {
 
         writeTiedWires(allStrings, device, builder, tileTypes);
         writeTiedBels(allStrings, device, builder, design, siteTypes);
+        writeCellPinDefaults(allStrings, device, builder);
     }
 }
