@@ -1242,12 +1242,12 @@ public class RWRoute{
 		this.prepareRouteConnection(connection);
 		
 		successRoute = false;
-		float oneMinusCriti = 1 - connection.getCriticality();
-		float shareWeight = (float) (Math.pow(oneMinusCriti, this.config.getShareExponent()));
-		float oneMinusCritiByOneMinusWlWeight = oneMinusCriti * this.oneMinusWlWeight;
-		float oneMinusCritiByWlWeight = oneMinusCriti * this.wlWeight;
-		float critiByOneMinusTimingWeight = connection.getCriticality() * this.oneMinusTimingWeight;
-		float critiByTimingWeight = connection.getCriticality() * this.timingWeight;
+		float rnodeCostWeight = 1 - connection.getCriticality();
+		float shareWeight = (float) (Math.pow(rnodeCostWeight, this.config.getShareExponent()));
+		float wlWeight = rnodeCostWeight * this.oneMinusWlWeight;
+		float estWlWeight = rnodeCostWeight * this.wlWeight;
+		float dlyWeight = connection.getCriticality() * this.oneMinusTimingWeight;
+		float estDlyWeight = connection.getCriticality() * this.timingWeight;
 		
 		while(!this.queue.isEmpty()){
 			if(!this.targetReached() && !successRoute) {
@@ -1255,8 +1255,8 @@ public class RWRoute{
 				this.nodesPopped++;
 				
 				this.setChildrenOfRnode(rnode);
-				this.exploreAndExpand(rnode, connection, shareWeight, oneMinusCriti,
-						oneMinusCritiByOneMinusWlWeight, oneMinusCritiByWlWeight, critiByOneMinusTimingWeight, critiByTimingWeight);
+				this.exploreAndExpand(rnode, connection, shareWeight, rnodeCostWeight,
+						wlWeight, estWlWeight, dlyWeight, estDlyWeight);
 			}else {
 				successRoute = true;
 				break;
@@ -1456,11 +1456,10 @@ public class RWRoute{
 	 * @param rnode The parent rnode popped out from the queue.
 	 * @param connection The connection that is being routed.
 	 * @param shareWeight The criticality-aware share weight for a new sharing factor.
-	 * @param sharingWeight The sharing weight based on a connection's criticality and the shareExponent for computing a new sharing factor.
 	 * @param rnodeCostWeight The cost weight of the childRnode
-	 * @param rnodeLengthWeight The wirelength weight.
+	 * @param rnodeLengthWeight The wirelength weight of childRnode's exact wirelength.
 	 * @param rnodeEstWlWeight The weight of estimated wirelength from childRnode to the connection's sink.
-	 * @param rnodeDelayWeight The weight of childRnode's delay.
+	 * @param rnodeDelayWeight The weight of childRnode's exact delay.
 	 * @param rnodeEstDlyWeight The weight of estimated delay to the target.
 	 */
 	private void exploreAndExpand(Routable rnode, Connection connection, float shareWeight, float rnodeCostWeight,
@@ -1516,14 +1515,15 @@ public class RWRoute{
 	/**
 	 * Evaluates the cost of a child of a rnode and pushes the child into the queue after cost evaluation.
 	 * @param rnode The parent rnode of the child in question.
+	 * @param longParent A boolean value to indicate if the parent is a Long node
 	 * @param childRnode The child rnode in question.
 	 * @param connection The target connection being routed.
 	 * @param sharingWeight The sharing weight based on a connection's criticality and the shareExponent for computing a new sharing factor.
 	 * @param rnodeCostWeight The cost weight of the childRnode
-	 * @param rnodeLengthWeight The wirelength weight.
+	 * @param rnodeLengthWeight The wirelength weight of childRnode's exact length.
 	 * @param rnodeEstWlWeight The weight of estimated wirelength from childRnode to the connection's sink.
-	 * @param rnodeDelayWeight The weight of childRnode's delay.
-	 * @param rnodeEstDlyWeight The weight of estimated delay to the target.
+	 * @param rnodeDelayWeight The weight of childRnode's exact delay.
+	 * @param rnodeEstDlyWeight The weight of estimated delay from childRnode to the target.
 	 */
 	private void evaluateCostAndPush(Routable rnode, boolean longParent, Routable childRnode, Connection connection, float sharingWeight, float rnodeCostWeight,
 			float rnodeLengthWeight, float rnodeEstWlWeight, float rnodeDelayWeight, float rnodeEstDlyWeight) {
