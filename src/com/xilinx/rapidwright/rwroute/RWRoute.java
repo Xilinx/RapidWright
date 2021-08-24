@@ -127,7 +127,7 @@ public class RWRoute{
 	/** Visited rnodes data during connection routing */
 	private Collection<Routable> rnodesVisited;
 	/** The queue to store candidate nodes to route a connection */
-	private PriorityQueue<Pair<Routable, Float>> queue;
+	private PriorityQueue<Routable> queue;
 	
 	/** Total wirelength of the routed design */
 	private int totalWL;
@@ -188,10 +188,10 @@ public class RWRoute{
 		this.minRerouteCriticality = config.getMinRerouteCriticality();
 		this.criticalConnections = new ArrayList<>();
 		
-		this.queue = new PriorityQueue<>(new Comparator<Pair<Routable, Float>>() {
+		this.queue = new PriorityQueue<>(new Comparator<Routable>() {
 			@Override
-			public int compare(Pair<Routable, Float> r1, Pair<Routable, Float> r2) {
-				if(r1.getSecond().floatValue() < r2.getSecond().floatValue()) {
+			public int compare(Routable r1, Routable r2) {
+				if(r1.getLowerBoundTotalPathCost() < r2.getLowerBoundTotalPathCost()) {
 					return -1;
 				}else {
 					return 1;
@@ -1230,7 +1230,7 @@ public class RWRoute{
 	 * @return true, if the peek element of queue is the target.
 	 */
 	private boolean targetReached(){
-		return this.queue.peek().getFirst().isTarget();
+		return this.queue.peek().isTarget();
 	}
 	
 	boolean successRoute = false;
@@ -1247,12 +1247,7 @@ public class RWRoute{
 		
 		while(!this.queue.isEmpty()){
 			if(!this.targetReached() && !successRoute) {
-				Pair<Routable, Float> queueElement = this.queue.poll();
-				Routable rnode = queueElement.getFirst();
-//				if(queueElement.getSecond() != rnode.getLowerBoundTotalPathCost()) {
-//					System.out.println(rnode);
-//					System.out.println(queueElement.getSecond() + " " + rnode.getLowerBoundTotalPathCost());
-//				}
+				Routable rnode = this.queue.poll();
 				this.nodesPopped++;
 				
 				this.setChildrenOfRnode(rnode);
@@ -1461,6 +1456,7 @@ public class RWRoute{
 	private void exploreAndExpand(Routable rnode, Connection connection, float shareWeight, float nonCriti){	
 		boolean longParent = DelayEstimatorBase.isLong(rnode.getNode());
 		for(Routable childRNode:rnode.getChildren()){
+			if(childRNode.isVisited()) continue;
 			if(childRNode.isTarget()){		
 				this.evaluateCostAndPush(rnode, longParent, childRNode, connection, shareWeight, nonCriti);
 				this.successRoute = true;
@@ -1502,7 +1498,7 @@ public class RWRoute{
 		return true;
 	}
 	
-	/** TODO NOT SKIP VISITED NODES, REDUCE COST CALCULATION INSTEAD
+	/**
 	 * Evaluates the cost of a child of a rnode and pushes the child into the queue after cost evaluation.
 	 * @param rnode The parent rnode of the child in question.
 	 * @param childRnode The child rnode in question.
@@ -1512,30 +1508,18 @@ public class RWRoute{
 		int countSourceUses = childRnode.countConnectionsOfUser(connection.getSource());
 		float sharingFactor = 1 + sharingWeight* countSourceUses;
 		
-		float upstreamPathCost = rnode.getUpstreamPathCost();
-		float rnodeCost = this.getRoutableCost(childRnode, connection, countSourceUses, sharingFactor);
-		float newPartialPathCost = upstreamPathCost + oneMinusCriticality * rnodeCost
+		float newPartialPathCost = rnode.getUpstreamPathCost() + oneMinusCriticality * this.getRoutableCost(childRnode, connection, countSourceUses, sharingFactor)
 								+ oneMinusCriticality * this.oneMinusWlWeight * childRnode.getLength() / sharingFactor
 								+ connection.getCriticality() * this.oneMinusTimingWeight * (childRnode.getDelay()
 								+ DelayEstimatorBase.getExtraDelay(childRnode.getNode(), longParent))/100f;
-
-		float newTotalPathCost = 0f;
-		if(!childRnode.isTarget()){
-			computeDeltaXY(childRnode, connection);
-			float expected_wire_cost = (float) this.distanceCostToSink() / sharingFactor;
-			
-			newTotalPathCost = (float) (newPartialPathCost
-							+ oneMinusCriticality * this.wlWeight * expected_wire_cost
-							+ connection.getCriticality() * this.timingWeight * (this.deltaX * 0.32 + this.deltaY * 0.16));
-		}else{
-			newTotalPathCost = newPartialPathCost;
-		}
+		//TODO multiplication operations can be reduced by 5, by moving constant part to the starting place of routing a connection
+		computeDeltaXY(childRnode, connection);
+		float newTotalPathCost = (float) (newPartialPathCost + oneMinusCriticality * this.wlWeight * this.distanceCostToSink() / sharingFactor
+								+ connection.getCriticality() * this.timingWeight * (this.deltaX * 0.32 + this.deltaY * 0.16));
 		
 		this.nodesEvaluated++;
-		if(!childRnode.isVisited() || (childRnode.isVisited() && newTotalPathCost < childRnode.getLowerBoundTotalPathCost())) {
-			this.rnodesVisited.add(childRnode);
-			this.push(childRnode, rnode, newPartialPathCost, newTotalPathCost);
-		}
+		this.rnodesVisited.add(childRnode);
+		this.push(childRnode, rnode, newPartialPathCost, newTotalPathCost);
 	}
 	
 	private short deltaX = 0;
@@ -1601,7 +1585,7 @@ public class RWRoute{
 		childRnode.setLowerBoundTotalPathCost(newTotalPathCost);
 		childRnode.setUpstreamPathCost(newPartialPathCost);
 		childRnode.setPrev(rnode);
-		this.queue.add(new Pair<Routable, Float>(childRnode, newTotalPathCost));
+		this.queue.add(childRnode);
 		this.nodesPushed++;
 	}
 	
