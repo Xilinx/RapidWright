@@ -1242,8 +1242,12 @@ public class RWRoute{
 		this.prepareRouteConnection(connection);
 		
 		successRoute = false;
-		float shareWeight = (float) (Math.pow(1 - connection.getCriticality(), this.config.getShareExponent()));
-		float nonCriti = 1 - connection.getCriticality();
+		float oneMinusCriti = 1 - connection.getCriticality();
+		float shareWeight = (float) (Math.pow(oneMinusCriti, this.config.getShareExponent()));
+		float oneMinusCritiByOneMinusWlWeight = oneMinusCriti * this.oneMinusWlWeight;
+		float oneMinusCritiByWlWeight = oneMinusCriti * this.wlWeight;
+		float critiByOneMinusTimingWeight = connection.getCriticality() * this.oneMinusTimingWeight;
+		float critiByTimingWeight = connection.getCriticality() * this.timingWeight;
 		
 		while(!this.queue.isEmpty()){
 			if(!this.targetReached() && !successRoute) {
@@ -1251,8 +1255,8 @@ public class RWRoute{
 				this.nodesPopped++;
 				
 				this.setChildrenOfRnode(rnode);
-				
-				this.exploreAndExpand(rnode, connection, shareWeight, nonCriti);
+				this.exploreAndExpand(rnode, connection, shareWeight, oneMinusCriti,
+						oneMinusCritiByOneMinusWlWeight, oneMinusCritiByWlWeight, critiByOneMinusTimingWeight, critiByTimingWeight);
 			}else {
 				successRoute = true;
 				break;
@@ -1452,13 +1456,21 @@ public class RWRoute{
 	 * @param rnode The parent rnode popped out from the queue.
 	 * @param connection The connection that is being routed.
 	 * @param shareWeight The criticality-aware share weight for a new sharing factor.
+	 * @param sharingWeight The sharing weight based on a connection's criticality and the shareExponent for computing a new sharing factor.
+	 * @param rnodeCostWeight The cost weight of the childRnode
+	 * @param rnodeLengthWeight The wirelength weight.
+	 * @param rnodeEstWlWeight The weight of estimated wirelength from childRnode to the connection's sink.
+	 * @param rnodeDelayWeight The weight of childRnode's delay.
+	 * @param rnodeEstDlyWeight The weight of estimated delay to the target.
 	 */
-	private void exploreAndExpand(Routable rnode, Connection connection, float shareWeight, float nonCriti){	
+	private void exploreAndExpand(Routable rnode, Connection connection, float shareWeight, float rnodeCostWeight,
+			float rnodeLengthWeight, float rnodeEstWlWeight, float rnodeDelayWeight, float rnodeEstDlyWeight){
 		boolean longParent = DelayEstimatorBase.isLong(rnode.getNode());
 		for(Routable childRNode:rnode.getChildren()){
 			if(childRNode.isVisited()) continue;
 			if(childRNode.isTarget()){		
-				this.evaluateCostAndPush(rnode, longParent, childRNode, connection, shareWeight, nonCriti);
+				this.evaluateCostAndPush(rnode, longParent, childRNode, connection, shareWeight, rnodeCostWeight,
+						rnodeLengthWeight, rnodeEstWlWeight, rnodeDelayWeight, rnodeEstDlyWeight);
 				this.successRoute = true;
 				return;
 				
@@ -1469,17 +1481,20 @@ public class RWRoute{
 					continue;
 				}
 				if(this.isAccesible(childRNode, connection)){
-					this.evaluateCostAndPush(rnode, longParent, childRNode, connection, shareWeight, nonCriti);
+					this.evaluateCostAndPush(rnode, longParent, childRNode, connection, shareWeight, rnodeCostWeight,
+							rnodeLengthWeight, rnodeEstWlWeight, rnodeDelayWeight, rnodeEstDlyWeight);
 				}
 			}else if(childRNode.getRoutableType() == RoutableType.PINBOUNCE) {			
 				if(this.isAccesible(childRNode, connection)) {				
 					if(this.usablePINBounce(childRNode, connection.getSinkRnode())) {
-						this.evaluateCostAndPush(rnode, longParent, childRNode, connection, shareWeight, nonCriti);
+						this.evaluateCostAndPush(rnode, longParent, childRNode, connection, shareWeight, rnodeCostWeight,
+								rnodeLengthWeight, rnodeEstWlWeight, rnodeDelayWeight, rnodeEstDlyWeight);
 					}					
 				}
 			}else if(childRNode.getRoutableType() == RoutableType.PINFEED_I) {
 				if(connection.isCrossSLR()) {
-					this.evaluateCostAndPush(rnode, longParent, childRNode, connection, shareWeight, nonCriti);
+					this.evaluateCostAndPush(rnode, longParent, childRNode, connection, shareWeight, rnodeCostWeight,
+							rnodeLengthWeight, rnodeEstWlWeight, rnodeDelayWeight, rnodeEstDlyWeight);
 				}
 			}
 		}
@@ -1503,20 +1518,23 @@ public class RWRoute{
 	 * @param rnode The parent rnode of the child in question.
 	 * @param childRnode The child rnode in question.
 	 * @param connection The target connection being routed.
+	 * @param sharingWeight The sharing weight based on a connection's criticality and the shareExponent for computing a new sharing factor.
+	 * @param rnodeCostWeight The cost weight of the childRnode
+	 * @param rnodeLengthWeight The wirelength weight.
+	 * @param rnodeEstWlWeight The weight of estimated wirelength from childRnode to the connection's sink.
+	 * @param rnodeDelayWeight The weight of childRnode's delay.
+	 * @param rnodeEstDlyWeight The weight of estimated delay to the target.
 	 */
-	private void evaluateCostAndPush(Routable rnode, boolean longParent, Routable childRnode, Connection connection, float sharingWeight, float oneMinusCriticality) {
+	private void evaluateCostAndPush(Routable rnode, boolean longParent, Routable childRnode, Connection connection, float sharingWeight, float rnodeCostWeight,
+			float rnodeLengthWeight, float rnodeEstWlWeight, float rnodeDelayWeight, float rnodeEstDlyWeight) {
 		int countSourceUses = childRnode.countConnectionsOfUser(connection.getSource());
 		float sharingFactor = 1 + sharingWeight* countSourceUses;
-		
-		float newPartialPathCost = rnode.getUpstreamPathCost() + oneMinusCriticality * this.getRoutableCost(childRnode, connection, countSourceUses, sharingFactor)
-								+ oneMinusCriticality * this.oneMinusWlWeight * childRnode.getLength() / sharingFactor
-								+ connection.getCriticality() * this.oneMinusTimingWeight * (childRnode.getDelay()
-								+ DelayEstimatorBase.getExtraDelay(childRnode.getNode(), longParent))/100f;
-		//TODO multiplication operations can be reduced by 5, by moving constant part to the starting place of routing a connection
+		float newPartialPathCost = rnode.getUpstreamPathCost() + rnodeCostWeight * this.getRoutableCost(childRnode, connection, countSourceUses, sharingFactor)
+								+ rnodeLengthWeight * childRnode.getLength() / sharingFactor
+								+ rnodeDelayWeight * (childRnode.getDelay() + DelayEstimatorBase.getExtraDelay(childRnode.getNode(), longParent)) / 100f;
 		computeDeltaXY(childRnode, connection);
-		float newTotalPathCost = (float) (newPartialPathCost + oneMinusCriticality * this.wlWeight * this.distanceCostToSink() / sharingFactor
-								+ connection.getCriticality() * this.timingWeight * (this.deltaX * 0.32 + this.deltaY * 0.16));
-		
+		float newTotalPathCost = (float) (newPartialPathCost + rnodeEstWlWeight * this.distanceCostToSink() / sharingFactor
+								+ rnodeEstDlyWeight * (this.deltaX * 0.32 + this.deltaY * 0.16));
 		this.nodesEvaluated++;
 		this.rnodesVisited.add(childRnode);
 		this.push(childRnode, rnode, newPartialPathCost, newTotalPathCost);
