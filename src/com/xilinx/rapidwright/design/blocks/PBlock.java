@@ -25,12 +25,14 @@
 package com.xilinx.rapidwright.design.blocks;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Set;
 
 import com.xilinx.rapidwright.device.Device;
@@ -130,12 +132,16 @@ public class PBlock extends ArrayList<PBlockRange> {
 	/**
 	 * Creates a pblock range for a specific site type namespace 
 	 * (all must be SLICE or DSP, no mixing).
+	 *
+	 * The returned PBlockRange forms a Rectangle around the given Sites. Due to irregularities
+	 * in the fabric, the corner Sites of the Rectangle may not actually exist. In this case,
+	 * an exception will be thrown.
 	 * @param dev The device onto which the pblock range should be created
 	 * @param sites The list of homogeneous sites (all must be same type namespace).
 	 * @return The minimum rectangle pblock range for the provided sites
-	 * or null if unable to generate a correct range.
+	 * or null if no sites were given.
 	 */
-	public static PBlockRange createPBlockRange(Device dev, List<Site> sites){
+	public static PBlockRange createPBlockRange(Device dev, Collection<Site> sites){
 		if(sites == null || sites.isEmpty()) return null;
 		
 		int xMin = Integer.MAX_VALUE;
@@ -158,11 +164,18 @@ public class PBlock extends ArrayList<PBlockRange> {
 			if(y > yMax) yMax = y;
 			if(y < yMin) yMin = y;
 		}
-		
-		Site lowerLeft = dev.getSite(namespace + "X" + xMin +"Y" + yMin);
-		Site upperRight = dev.getSite(namespace + "X" + xMax +"Y" + yMax);
-		PBlockRange range = new PBlockRange(lowerLeft,upperRight);
-		return range;
+
+		final String lowerLeftName = namespace + "X" + xMin + "Y" + yMin;
+		final String upperRightName = namespace + "X" + xMax + "Y" + yMax;
+		Site lowerLeft = Objects.requireNonNull(
+				dev.getSite(lowerLeftName),
+				()->"PBlock Lower Left Corner would be "+lowerLeftName+", but this Site does not exist."
+		);
+		Site upperRight = Objects.requireNonNull(
+				dev.getSite(upperRightName),
+				()->"PBlock Upper Right Corner would be "+upperRightName+", but this Site does not exist."
+		);
+		return new PBlockRange(lowerLeft,upperRight);
 	}
 	
 	
