@@ -365,12 +365,12 @@ public class DeviceResourcesWriter {
                 CellPinInversionParameter.Builder param = pinInversion.getNotInverting();
                 PropertyMap.Entry.Builder parameter = param.initParameter();
                 parameter.setKey(allStrings.getIndex(parameterStr));
-                parameter.setTextValue(allStrings.getIndex("FALSE"));
+                parameter.setTextValue(allStrings.getIndex("1'b0"));
 
                 param = pinInversion.getInverting();
                 parameter = param.initParameter();
                 parameter.setKey(allStrings.getIndex(parameterStr));
-                parameter.setTextValue(allStrings.getIndex("TRUE"));
+                parameter.setTextValue(allStrings.getIndex("1'b1"));
             }
         }
 
