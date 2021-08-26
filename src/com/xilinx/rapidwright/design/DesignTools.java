@@ -67,6 +67,7 @@ import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
+import com.xilinx.rapidwright.edif.EDIFPropertyValue;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.router.RouteNode;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
@@ -2209,24 +2210,18 @@ public class DesignTools {
 	}
 
 	public static void createA1A6ToStaticNets(Design design) {
-		// TODO: 2020.2.7 0731 optical-flow_placed: some A6 should connect to VCC, some to GND, when the recognized nets are GND, how to detect?
 		for(SiteInst si : design.getSiteInsts()) {
 			for(Cell cell : si.getCells()) {
 				BEL bel = cell.getBEL();
-				if(bel == null) continue;
-				if(!bel.getName().contains("LUT")) continue;
+				if(bel == null || !bel.getName().contains("LUT")) continue;
 				if(bel.getName().contains("5LUT")) {
 					bel = si.getBEL(bel.getName().replace("5", "6"));
 				}
 				for(String belPinName : lut6BELPins) {
-					if(belPinName.equals("A1")) {
-						EDIFCellInst edfCellInst = cell.getEDIFCellInst();
-						EDIFCell edfCell = edfCellInst != null? edfCellInst.getCellType() : null;
-						if(edfCell != null && !edfCell.toString().equals("SRL16E"))	continue;
-					}
+					if(belPinName.equals("A1") && !"SRL16E".equals(cell.getType())) continue;
 					BELPin belPin = bel.getPin(belPinName);
 					if(belPin != null) {
-						createAddSitePinInstToStaticNet(belPin, si, design);
+						createMissingStaticSitePins(belPin, si, cell);
 					}
 				}
 			}
@@ -2269,20 +2264,26 @@ public class DesignTools {
 		}
 	}
 
-	public static void createAddSitePinInstToStaticNet(BELPin belPin, SiteInst si, Design design) {
-		SitePin sitePin = belPin.getSitePin(si.getSite());
-		Net net = si.getNetFromSiteWire(belPin.getSiteWireName());// vcc returned based on the site wire, site pins are not stored in dcp
-		//TODO net mapped incorrectly? recognized as GLOBAL_LOGIC1, while Vivado 2020.1 says it is GND
-		String [] belPinChars = belPin.toString().split("");
-		String spiName = belPinChars[0] + belPinChars[belPinChars.length - 1];
+	public static void createMissingStaticSitePins(BELPin belPin, SiteInst si, Cell cell) {
+        // SiteWire and SitePin Name are the same for LUT inputs
+	    String siteWireName = belPin.getSiteWireName();
+        // VCC returned based on the site wire, site pins are not stored in dcp
+		Net net = si.getNetFromSiteWire(siteWireName);
 		if(net == null) {
-			net = design.getVccNet();
-			if(!si.getSitePinInstNames().contains(spiName)) net.createPin(sitePin.getPinName(), si);
-		}else {
-			if(net.isStaticNet()) {
-				if(!si.getSitePinInstNames().contains(spiName)) net.createPin(sitePin.getPinName(), si);
-			}
+		    net = si.getDesign().getVccNet();
 		}
+        if(net.isStaticNet()) {
+            // SRL16Es that have been transformed from SRLC32E require GND on their A6 pin
+            if(cell.getType().equals("SRL16E") && siteWireName.endsWith("6")) {
+                EDIFPropertyValue val = cell.getProperty("XILINX_LEGACY_PRIM");
+                if(val != null && val.getValue().equals("SRLC32E")) {
+                    net = si.getDesign().getGndNet();
+                }
+            }
+            if(si.getSitePinInst(siteWireName) == null) {
+                net.createPin(siteWireName, si);
+            }
+        }
 	}
 
 	//NOTE: SRL16E (reference name SRL16E, EDIFCell in RW) uses A2-A5, so we need to connect A1 & A6 to VCC,
