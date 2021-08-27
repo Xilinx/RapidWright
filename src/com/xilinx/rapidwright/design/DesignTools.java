@@ -2280,8 +2280,12 @@ public class DesignTools {
                     net = si.getDesign().getGndNet();
                 }
             }
-            if(si.getSitePinInst(siteWireName) == null) {
+            SitePinInst pin = si.getSitePinInst(siteWireName); 
+            if(pin == null) {
                 net.createPin(siteWireName, si);
+            } else if(!pin.getNet().equals(net)){
+                pin.getNet().removePin(pin);
+                net.addPin(pin);
             }
         }
 	}
