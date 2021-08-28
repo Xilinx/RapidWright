@@ -101,11 +101,12 @@ public class Connection implements Comparable<Connection>{
 	
 	/**
 	 * Computes the connection bounding box based on the geometric center of the net, source and sink rnodes.
-	 * @param boundingBoxExtension To indicate the extension on top of the minimum bounding box 
+	 * @param boundingBoxExtensionX To indicate the extension on top of the minimum bounding box in the horizontal direction.
+	 *  @param boundingBoxExtensionY To indicate the extension on top of the minimum bounding box in the vertical direction.
 	 * that contains the source rnode, sink rnode and the center of its {@link NetWrapper} Object.
 	 * @param checkSLRCrossing A flag to indicate if SLR-crossing check is needed.
 	 */
-	public void computeConnectionBoundingBox(short boundingBoxExtension, boolean checkSLRCrossing) {
+	public void computeConnectionBoundingBox(short boundingBoxExtensionX, short boundingBoxExtensionY, boolean checkSLRCrossing) {
 		short xMin, xMax, yMin, yMax;
 		short xNetCenter = (short) Math.ceil(this.netWrapper.getXCenter());
 		short yNetCenter = (short) Math.ceil(this.netWrapper.getYCenter());
@@ -113,16 +114,16 @@ public class Connection implements Comparable<Connection>{
 		xMin = this.minOfThree(this.sourceRnode.getEndTileXCoordinate(), this.sinkRnode.getEndTileXCoordinate(), xNetCenter);
 		yMax = this.maxOfThree(this.sourceRnode.getEndTileYCoordinate(), this.sinkRnode.getEndTileYCoordinate(), yNetCenter);
 		yMin = this.minOfThree(this.sourceRnode.getEndTileYCoordinate(), this.sinkRnode.getEndTileYCoordinate(), yNetCenter);
-		this.xMaxBB = (short) (xMax + boundingBoxExtension);
-		this.xMinBB = (short) (xMin - boundingBoxExtension);
-		this.yMaxBB = (short) (yMax + 5 * boundingBoxExtension);
-		this.yMinBB = (short) (yMin - 5 * boundingBoxExtension);
+		this.xMaxBB = (short) (xMax + boundingBoxExtensionX);
+		this.xMinBB = (short) (xMin - boundingBoxExtensionX);
+		this.yMaxBB = (short) (yMax + boundingBoxExtensionY);
+		this.yMinBB = (short) (yMin - boundingBoxExtensionY);
 		
 		/** allow more space for resource expansion of SLR-crossing connections */
 		if(checkSLRCrossing) {		
 			if(this.crossSLR()) {
-				this.yMaxBB += 10 * boundingBoxExtension;
-				this.yMinBB -= 10 * boundingBoxExtension;
+				this.yMaxBB += 2 * boundingBoxExtensionY;
+				this.yMinBB -= 2 * boundingBoxExtensionY;
 			}
 		}
 		this.xMinBB = this.xMinBB < 0? -1:this.xMinBB;

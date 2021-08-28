@@ -33,8 +33,10 @@ public class Configuration {
 	private short maxIterations;
 	/** Routing bounding box constraint */
 	private boolean useBoundingBox;
-	/** Bounding box extension range */
-	private short boundingBoxExtension;
+	/** Bounding box extension range to the left and right */
+	private short boundingBoxExtensionX;
+	/** Bounding box extension range to the top and bottom */
+	private short boundingBoxExtensionY;
 	/** Further enlarge the bounding box by the number of INT tiles during routing*/
 	private boolean enlargeBoundingBox;
 	private short verticalINTTiles;
@@ -93,7 +95,8 @@ public class Configuration {
 	public Configuration(String[] arguments) {
 		this.maxIterations = (short) 100;
 		this.useBoundingBox = true;
-		this.boundingBoxExtension = (short) 3;
+		this.boundingBoxExtensionX = (short) 3;
+		this.boundingBoxExtensionY = (short) 15;
 		this.enlargeBoundingBox = false;
 		this.verticalINTTiles = 2;
 		this.horizontalINTTiles = 1;
@@ -132,8 +135,11 @@ public class Configuration {
 			case "--noBoundingBox":
 				this.setUseBoundingBox(false);
 				break;
-			case "--boundingBoxExtension":
-				this.setBoundingBoxExtension(Short.parseShort(arguments[++i]));
+			case "--boundingBoxExtensionX":
+				this.setBoundingBoxExtensionX(Short.parseShort(arguments[++i]));
+				break;
+			case "--boundingBoxExtensionY":
+				this.setBoundingBoxExtensionY(Short.parseShort(arguments[++i]));
 				break;
 			case "--enlargeBoundingBox":
 				if(i+1 < arguments.length && (!arguments[i+1].startsWith("--verticalINTTiles") && !arguments[i+1].startsWith("--horizontalINTTiles"))) {
@@ -141,6 +147,13 @@ public class Configuration {
 					System.out.println("  Use default settings: verticalINTTiles = 2, horizontalINTTiles = 1.");
 				}
 				this.setEnlargeBoundingBox(true);
+				break;
+			case "--fixBoundingBox":
+				if(i+1 < arguments.length && (!arguments[i+1].startsWith("--boundingBoxExtensionX") && !arguments[i+1].startsWith("--boundingBoxExtensionY"))) {
+					System.out.println("WARNING: --fixBoundingBox option is not followed by --boundingBoxExtensionX <arg> or --boundingBoxExtensionY <arg>.");
+					System.out.println("  Use default settings: boundingBoxExtensionX = 3, boundingBoxExtensionY = 15.");
+				}
+				this.setEnlargeBoundingBox(false);
 				break;
 			case "--verticalINTTiles":
 				this.setVerticalINTTiles(Short.parseShort(arguments[++i]));
@@ -211,6 +224,9 @@ public class Configuration {
 			case "--maskNodesCrossRCLK":
 				this.setMaskNodesCrossRCLK(true);
 				break;
+			case "--maskUTurnNodes":
+				this.setUseUTurnNodes(false);
+				break;
 			case "--useUTurnNodes":
 				this.setUseUTurnNodes(true);
 				break;
@@ -265,21 +281,39 @@ public class Configuration {
 	}
 
 	/**
-	 * Gets the bounding box extension range.
-	 * Default: 3. Can be modified by using use "--boundingBoxExtension" option, e.g. "--boundingBoxExtension 5".
-	 * @return The bounding box extension range.
+	 * Gets the bounding box extension range in the horizontal direction.
+	 * Default: 3. Can be modified by using use "--boundingBoxExtensionX" option, e.g. "--boundingBoxExtensionX 5".
+	 * @return The bounding box extension range in the horizontal direction.
 	 */
-	public short getBoundingBoxExtension() {
-		return this.boundingBoxExtension;
+	public short getBoundingBoxExtensionX() {
+		return this.boundingBoxExtensionX;
 	}
 
 	/**
-	 * Sets the bounding box extension range.
-	 * Default: 3. Can be modified by using use "--boundingBoxExtension" option, e.g. "--boundingBoxExtension 5".
-	 * @param boundingBoxExtension
+	 * Sets the bounding box extension range in the horizontal direction.
+	 * Default: 3. Can be modified by using use "--boundingBoxExtensionX" option, e.g. "--boundingBoxExtensionX 5".
+	 * @param boundingBoxExtensionX
 	 */
-	public void setBoundingBoxExtension(short boundingBoxExtension) {
-		this.boundingBoxExtension = boundingBoxExtension;
+	public void setBoundingBoxExtensionX(short boundingBoxExtensionX) {
+		this.boundingBoxExtensionX = boundingBoxExtensionX;
+	}
+	
+	/**
+	 * Gets the bounding box extension range in the horizontal direction.
+	 * Default: 15. Can be modified by using use "--boundingBoxExtensionY" option, e.g. "--boundingBoxExtensionY 5".
+	 * @return The bounding box extension range in the horizontal direction.
+	 */
+	public short getBoundingBoxExtensionY() {
+		return this.boundingBoxExtensionY;
+	}
+
+	/**
+	 * Sets the bounding box extension range in the horizontal direction.
+	 * Default: 15. Can be modified by using use "--boundingBoxExtensionY" option, e.g. "--boundingBoxExtensionY 5".
+	 * @param boundingBoxExtensionY
+	 */
+	public void setBoundingBoxExtensionY(short boundingBoxExtensionY) {
+		this.boundingBoxExtensionY = boundingBoxExtensionY;
 	}
 
 	/**
@@ -863,11 +897,14 @@ public class Configuration {
 		s.append(formatString("Partial routing: ", this.partialRouting));
 		s.append(formatString("Use bounding boxes: ", this.isUseBoundingBox()));
 		if(this.isUseBoundingBox()) {
-			s.append(formatString("Bounding box extension: ", this.boundingBoxExtension));
+			s.append(formatString("Bounding box extension X: ", this.boundingBoxExtensionX));
+			s.append(formatString("Bounding box extension Y: ", this.boundingBoxExtensionY));
 			if(this.isEnlargeBoundingBox()) {
 				s.append(formatString("Enlarge bounding box: ", this.isEnlargeBoundingBox()));
 				s.append(formatString("Vertical INT tiles: ", this.verticalINTTiles));
 				s.append(formatString("Horizontal INT tiles: ", this.horizontalINTTiles));
+			}else {
+				s.append(formatString("Fixed bounding box: ", !this.isEnlargeBoundingBox()));
 			}
 		}
 		s.append(formatString("Wirelength-driven weight: ", this.wirelengthWeight));
@@ -883,7 +920,6 @@ public class Configuration {
 		}
 		s.append(formatString("Mask nodes across RCLK: ", this.maskNodesCrossRCLK));
 		s.append(formatString("Include U-turn nodes: ", this.useUTurnNodes));
-		s.append(formatString("Enlarge bounding box: ", this.isEnlargeBoundingBox()));
 		s.append(formatString("Initial present conges fac: ", this.initialPresentCongesFac));
 		s.append(formatString("Present conges fac mult: ", this.presentCongesMultiplier));
 		s.append(formatString("Historical conges fac: ", this.historicalCongesFac));

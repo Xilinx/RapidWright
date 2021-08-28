@@ -81,7 +81,7 @@ public class PartialRouter extends RWRoute{
 	@Override
 	protected void addNetConnectionToRoutingTargets(Net net, boolean multiSLR) {
 		if(!net.hasPIPs()) {
-			this.createsNetWrapperAndConnections(net, this.config.getBoundingBoxExtension(), multiSLR);
+			this.createsNetWrapperAndConnections(net, this.config.getBoundingBoxExtensionX(), this.config.getBoundingBoxExtensionY(),multiSLR);
 		}else{
 			// In partial routing mode, a net with PIPs is preserved.
 			// This means the routed net is supposed to be fully routed without conflicts.

@@ -409,7 +409,7 @@ public class RWRoute{
 	protected void addNetConnectionToRoutingTargets(Net net, boolean multiSLR) {
 		net.unroute();
 		this.numWireNetsToRoute++;;
-		this.createsNetWrapperAndConnections(net, this.config.getBoundingBoxExtension(), multiSLR);
+		this.createsNetWrapperAndConnections(net, this.config.getBoundingBoxExtensionX(), this.config.getBoundingBoxExtensionY(),multiSLR);
 	}
 	
 	/**
@@ -515,12 +515,13 @@ public class RWRoute{
 	/**
 	 * Creates a unique {@link NetWrapper} instance and {@link Connection} instances based on a {@link Net} instance.
 	 * @param net The net to be initialized.
-	 * @param boundingBoxExtension The bounding box extension factor for restricting accessible routing resource of a connection.
+	 * @param boundingBoxExtensionX The bounding box extension factor for restricting accessible routing resource of a connection in the horizontal direction.
+	 * * @param boundingBoxExtensionX The bounding box extension factor for restricting accessible routing resource of a connection in the vertical direction.
 	 * @param multiSLR The flag to indicate if the device has multiple SLRs.
 	 * @return A {@link NetWrapper} instance.
 	 */
-	protected NetWrapper createsNetWrapperAndConnections(Net net, short boundingBoxExtension, boolean multiSLR) {
-		NetWrapper netWrapper = new NetWrapper(this.numWireNetsToRoute, boundingBoxExtension, net);
+	protected NetWrapper createsNetWrapperAndConnections(Net net, short boundingBoxExtensionX, short boundingBoxExtensionY, boolean multiSLR) {
+		NetWrapper netWrapper = new NetWrapper(this.numWireNetsToRoute, boundingBoxExtensionX, net);
 		this.nets.add(netWrapper);
 		
 		SitePinInst source = net.getSource();
@@ -561,11 +562,11 @@ public class RWRoute{
 		}
 		
 		if(indirect > 0) {
-			netWrapper.computeHPWLAndCenterCoordinates(boundingBoxExtension);
+			netWrapper.computeHPWLAndCenterCoordinates(boundingBoxExtensionX);
 			if(this.config.isUseBoundingBox()) {
 				for(Connection connection : netWrapper.getConnection()) {
 					if(connection.isDirect()) continue;
-					connection.computeConnectionBoundingBox(boundingBoxExtension, multiSLR);
+					connection.computeConnectionBoundingBox(boundingBoxExtensionX, boundingBoxExtensionY,multiSLR);
 				}
 			}
 		}
@@ -1358,7 +1359,7 @@ public class RWRoute{
 				this.preservedNodes.remove(toRemove);
 			}
 			
-			NetWrapper netnew = this.createsNetWrapperAndConnections(n, this.config.getBoundingBoxExtension(), this.multiSLRDevice);
+			NetWrapper netnew = this.createsNetWrapperAndConnections(n, this.config.getBoundingBoxExtensionX(), this.config.getBoundingBoxExtensionY(), this.multiSLRDevice);
 			
 			for(int i = 0; i < reservedNetNodes.size(); i ++) {
 				Node toBuild = reservedNetNodes.get(i);
