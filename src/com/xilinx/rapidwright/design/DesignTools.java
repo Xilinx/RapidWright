@@ -2206,7 +2206,50 @@ public class DesignTools {
 
 	public static void createPossiblePinsToStaticNets(Design design) {
 		createA1A6ToStaticNets(design);
+		createCeClkOfRoutethruFFToVCC(design);
 		createCeSrRstPinsToVCC(design);
+	}
+	
+	public static void createCeClkOfRoutethruFFToVCC(Design design) {
+		Net vcc = design.getVccNet();
+        Net gnd = design.getGndNet();
+        for(SiteInst si : design.getSiteInsts()) {
+            if(!Utils.isSLICE(si)) continue;
+            for(BEL bel : si.getBELs()) {
+                if(si.getCell(bel) != null) continue;
+                BELPin q = bel.getPin("Q");
+                if(q != null) {
+                    Net netQ = si.getNetFromSiteWire(q.getSiteWireName());
+                    if(netQ == null) continue;
+                    BELPin dPin = bel.getPin("D");
+                    if(dPin != null) {
+                        Net netD = si.getNetFromSiteWire(dPin.getSiteWireName());
+                        if(netQ == netD) {
+                            //System.out.println(si.getSiteName() + "/" + bel + ": " + netQ);
+                            // Need VCC at CE
+                            BELPin ceInput = bel.getPin("CE");
+                            String ceInputSitePinName = ceInput.getConnectedSitePinName();
+                            SitePinInst ceSitePin = si.getSitePinInst(ceInputSitePinName);
+                            if(ceSitePin == null) {
+                                ceSitePin = vcc.createPin(ceInputSitePinName, si);
+                            }
+                            si.routeIntraSiteNet(vcc, ceSitePin.getBELPin(), ceInput);
+                            // ...and GND at CLK
+                            BELPin clkInput = bel.getPin("CLK");
+                            BELPin clkInvOut = clkInput.getSourcePin();
+                            si.routeIntraSiteNet(gnd, clkInvOut, clkInput);
+                            BELPin clkInvIn = clkInvOut.getBEL().getPin(0);
+                            String clkInputSitePinName = clkInvIn.getConnectedSitePinName();
+                            SitePinInst clkInputSitePin = si.getSitePinInst(clkInputSitePinName);
+                            if(clkInputSitePin == null) {
+                                clkInputSitePin = vcc.createPin(clkInputSitePinName, si);
+                            }
+                            si.routeIntraSiteNet(vcc, clkInputSitePin.getBELPin(), clkInvIn);
+                        }
+                    }
+                }
+            }
+        }
 	}
 
 	public static void createA1A6ToStaticNets(Design design) {
@@ -2218,7 +2261,7 @@ public class DesignTools {
 					bel = si.getBEL(bel.getName().replace("5", "6"));
 				}
 				for(String belPinName : lut6BELPins) {
-					if(belPinName.equals("A1") && !"SRL16E".equals(cell.getType())) continue;
+					if(belPinName.equals("A1") && !"SRL16E".equals(cell.getType()) && !"SRLC32E".equals(cell.getType())) continue;
 					BELPin belPin = bel.getPin(belPinName);
 					if(belPin != null) {
 						createMissingStaticSitePins(belPin, si, cell);
@@ -2229,7 +2272,6 @@ public class DesignTools {
 	}
 
 	public static void createCeSrRstPinsToVCC(Design design) {
-		//note: after updating to 2020.2.5, we need to add a check to see if the spi already exists
 		for(Cell cell : design.getCells()) {
 			if(isUnisimFlipFlopType(cell.getType())) {
 				BEL bel = cell.getBEL();
@@ -2260,6 +2302,30 @@ public class DesignTools {
 					if(!si.getSitePinInstNames().contains("RSTREGBU")) net.createPin("RSTREGBU", si);
 					if(!si.getSitePinInstNames().contains("RSTREGBL")) net.createPin("RSTREGBL", si);
 				}
+		    }else if(cell.getType().equals("RAMB18E2") && cell.getAllPhysicalPinMappings("RSTREGB") == null) {
+		    	SiteInst si = cell.getSiteInst();
+		    	// type RAMB180: L_O, type RAMB181: U_O
+		    	// TODO Type should be consistent with getPrimarySiteTypeEnum()?
+		    	// System.out.println(cell.getAllPhysicalPinMappings("RSTREGB") + ", " + si + ", " + cell.getSiteWireNameFromLogicalPin("RSTREGB") + ", " + si.getPrimarySiteTypeEnum());
+		    	// [RSTREGB], SiteInst(name="RAMB18_X5Y64", type="RAMB180", site="RAMB18_X5Y64"), OPTINV_RSTREGB_L_O, RAMBFIFO18
+		    	// [RSTREGB], SiteInst(name="RAMB18_X5Y31", type="RAMB181", site="RAMB18_X5Y31"), OPTINV_RSTREGB_U_O, RAMB181
+		    	// null, SiteInst(name="RAMB18_X6Y43", type="RAMB181", site="RAMB18_X6Y43"), null, RAMB181
+		    	// null, SiteInst(name="RAMB18_X5Y22", type="RAMB180", site="RAMB18_X5Y22"), null, RAMBFIFO18
+		    	// The following workaround solves the RAMB18 RSTREGB pin issue
+		    	String siteWire = cell.getBEL().getPin("RSTREGB").getSiteWireName();
+		    	Net net = si.getNetFromSiteWire(siteWire);
+		    	if(net == null) {
+		    		net = design.getVccNet();
+		    		String pinName = null;
+		    		if(siteWire.endsWith("L_O")) {
+		    			pinName = "RSTREGBL";
+		    		}else {
+		    			pinName = "RSTREGBU";
+		    		}
+		    		if(si.getSitePinInstNames().isEmpty() || !si.getSitePinInstNames().contains(pinName)) {
+		    			net.createPin(pinName, si);
+		    		}
+		    	}
 		    }
 		}
 	}
