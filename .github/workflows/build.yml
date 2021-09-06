@@ -28,7 +28,7 @@ jobs:
               jars
               bin
               build
-          key: rapidwright-${{ env.RAPIDWRIGHT_VERSION }}
+          key: rapidwright-clouddata-${{ env.RAPIDWRIGHT_VERSION }}
       - name: Cache Gradle
         id: cache-gradle
         uses: actions/cache@v2
@@ -43,7 +43,7 @@ jobs:
 
       - name: Install RapidWright
         if: steps.cache-rapidwright.outputs.cache-hit != 'true'
-        run: wget https://github.com/Xilinx/RapidWright/releases/download/${{ env.RAPIDWRIGHT_VERSION }}/rapidwright_jars.zip && unzip rapidwright_jars.zip && wget https://github.com/Xilinx/RapidWright/releases/download/${{ env.RAPIDWRIGHT_VERSION }}/rapidwright_data.zip && unzip rapidwright_data.zip
+        run: wget https://github.com/Xilinx/RapidWright/releases/download/${{ env.RAPIDWRIGHT_VERSION }}/rapidwright_jars.zip && unzip rapidwright_jars.zip
 
       - name: Compile & Test RapidWright
         run: ./gradlew build

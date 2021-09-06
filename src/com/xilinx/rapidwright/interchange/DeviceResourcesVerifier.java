@@ -1048,12 +1048,12 @@ public class DeviceResourcesVerifier {
                 PropertyMap.Entry.Reader parameter = pin.getNotInverting().getParameter();
                 expect(expectedParameter, allStrings.get(parameter.getKey()));
                 expect(true, parameter.isTextValue());
-                expect("FALSE", allStrings.get(parameter.getTextValue()));
+                expect("1'b0", allStrings.get(parameter.getTextValue()));
 
                 parameter = pin.getInverting().getParameter();
                 expect(expectedParameter, allStrings.get(parameter.getKey()));
                 expect(true, parameter.isTextValue());
-                expect("TRUE", allStrings.get(parameter.getTextValue()));
+                expect("1'b1", allStrings.get(parameter.getTextValue()));
             }
         }
 

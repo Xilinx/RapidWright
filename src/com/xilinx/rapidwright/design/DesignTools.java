@@ -30,6 +30,8 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.math.BigInteger;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -71,6 +73,10 @@ import com.xilinx.rapidwright.edif.EDIFPropertyValue;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.router.RouteNode;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
+import com.xilinx.rapidwright.util.FileTools;
+import com.xilinx.rapidwright.util.Job;
+import com.xilinx.rapidwright.util.JobQueue;
+import com.xilinx.rapidwright.util.LocalJob;
 import com.xilinx.rapidwright.util.MessageGenerator;
 import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.StringTools;
@@ -2420,4 +2426,52 @@ public class DesignTools {
         
         return path;
     }
+
+	/**
+	 * Create a Job running Vivado to create a readable version of
+	 * the EDIF inside the checkpoint to a separate file.
+	 * @param checkpoint the input checkpoint
+	 * @param edif the output EDIF
+	 * @return the created Job
+	 */
+	public static Job generateReadableEDIFJob(Path checkpoint, Path edif) {
+		try {
+
+			final Job job = new LocalJob();
+			job.setCommand(FileTools.getVivadoPath() + " -mode batch -source readable.tcl");
+
+			final Path runDir = Files.createTempDirectory(edif.toAbsolutePath().getParent(),edif.getFileName()+"_readable_edif_");
+			job.setRunDir(runDir.toString());
+
+			Files.write(runDir.resolve("readable.tcl"), Arrays.asList(
+					"open_checkpoint " + checkpoint.toAbsolutePath(),
+					"write_edif " + edif.toAbsolutePath()
+			));
+
+
+			return job;
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		}
+	}
+
+	/**
+	 * Use Vivado to create a readable version of the EDIF file inside a Checkpoint.
+	 * @param dcp the checkpoint
+	 * @param edfFileName filename to use or null if we should select a filename
+	 * @return the output edif filename
+	 */
+	public static Path generateReadableEDIF(Path dcp, Path edfFileName) {
+		if (edfFileName == null) {
+			edfFileName = FileTools.replaceExtension(dcp, ".edf");
+		}
+		JobQueue queue = new JobQueue();
+		Job job = generateReadableEDIFJob(dcp, edfFileName);
+		queue.addJob(job);
+		if (!queue.runAllToCompletion()) {
+			throw new RuntimeException("Generating Readable EDIF job failed");
+		}
+		FileTools.deleteFolder(job.getRunDir());
+		return edfFileName;
+	}
 }

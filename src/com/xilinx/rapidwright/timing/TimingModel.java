@@ -40,6 +40,8 @@ import com.xilinx.rapidwright.util.FileTools;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -497,10 +499,8 @@ public class TimingModel {
      * @return Boolean indication of completion.
      */
     protected boolean readDelayTerms(String filename) {
-        boolean result = true;
-        InputStream in = FileTools.getRapidWrightResourceInputStream(filename); 
-        try {
-            BufferedReader br = new BufferedReader(new InputStreamReader(in));
+        boolean result = true; 
+        try (BufferedReader br = new BufferedReader(new FileReader(FileTools.getRapidWrightPath() + File.separator + filename))){
             String line = "";
             int lineCntr = 0;
             while ((line=br.readLine()) != null) {// && line.length() != 0) {

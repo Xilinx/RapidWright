@@ -28,13 +28,14 @@ package com.xilinx.rapidwright.util;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.lang.ProcessBuilder.Redirect;
-import java.net.HttpURLConnection;
 import java.net.InetAddress;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.UnknownHostException;
 import java.nio.channels.Channels;
@@ -113,27 +114,52 @@ public class Installer {
 	 * @return Checksum result String or null if no file was found.
 	 */
 	public static String calculateMD5OfFile(String fileName){
-		try {
-			MessageDigest md5 = MessageDigest.getInstance("MD5");
-			InputStream in = Files.newInputStream(Paths.get(fileName)); 
-			DigestInputStream dig = new DigestInputStream(in, md5);
+	    MessageDigest md5 = null;
+        try {
+            md5 = MessageDigest.getInstance("MD5");
+        } catch (NoSuchAlgorithmException e1) {
+            throw new RuntimeException("ERROR: Couldn't find an MD5 algorithm provider "
+                    + "in current Java environment.");
+        }
+		try (DigestInputStream dig = new DigestInputStream(Files.newInputStream(Paths.get(fileName)), md5)) {			 
 			byte[] buffer = new byte[1024];
 			while(dig.read(buffer) != -1){}
 			byte[] checksum = md5.digest();
 			return bytesToString(checksum);
-		} catch (NoSuchAlgorithmException e) {
-			e.printStackTrace();
 		} catch (IOException e) {
-			return null;
+		    throw new UncheckedIOException(e);
 		}
-		return null;
 	}
 	
-	public static long downloadFile(String url, String dstFileName) throws IOException{
-		URL website = new URL(url);
-		ReadableByteChannel rbc = Channels.newChannel(website.openStream());
-		FileOutputStream fos = new FileOutputStream(dstFileName);
-		return fos.getChannel().transferFrom(rbc, 0, Long.MAX_VALUE);
+	public static long downloadFile(String url, String dstFileName) {
+        File newFile = new File(dstFileName);
+        File parentDir = newFile.getParentFile();
+        if(parentDir != null) {
+            if(!parentDir.exists()) {
+                parentDir.mkdirs();
+            } else if(!parentDir.isDirectory()) {
+                throw new RuntimeException("ERROR: Existing file conflicts with RapidWright "
+                        + "directory structure: " + parentDir.getAbsolutePath() 
+                        + " please relocate or remove file and try again.");
+            }            
+        }
+
+        long transferred = -1;
+	     
+        try(FileOutputStream fos = new FileOutputStream(newFile);
+            ReadableByteChannel rbc = Channels.newChannel(new URL(url).openStream()) ){
+            transferred = fos.getChannel().transferFrom(rbc, 0, Long.MAX_VALUE);
+        } catch (MalformedURLException e) {
+            throw new RuntimeException("ERROR: Couldn't download file from url: " 
+                    + url + ", URL is not valid.");
+        } catch (FileNotFoundException e) {
+            throw new UncheckedIOException("ERROR: Problem creating local file: " + dstFileName 
+                + ", please check permissions and/or that adequate disk space is available.", e);
+        } catch (IOException e) {
+            throw new UncheckedIOException("ERROR: Problem downloading file: " + dstFileName 
+                    + ", ensure a stable Internet connection.", e);
+        }
+		return transferred;
 	}
 	
     private static void unzipFile(String zipFile, String destDir) {
@@ -242,16 +268,12 @@ public class Installer {
 		return javaSrcs;
 	}
 	
-	
-	private static String getURLRedirect(String url) throws IOException{
-		HttpURLConnection con = (HttpURLConnection)(new URL( url ).openConnection());
-		con.setInstanceFollowRedirects( false );
-		con.connect();
-		return con.getHeaderField("Location");
-	}
-	
 	public static String getExpectedMD5(String releaseName, String fileName) throws IOException {
-		downloadFile(releaseName+"/"+MD5_FILE_NAME, MD5_FILE_NAME);
+		long downloaded = downloadFile(releaseName+"/"+MD5_FILE_NAME, MD5_FILE_NAME);
+		if(downloaded < 1) {
+		    throw new RuntimeException("ERROR: Problem downloading " + releaseName+"/"
+		            +MD5_FILE_NAME + ", only downloaded " + downloaded + " bytes.");
+		}
 		String md5sum = null;
 		for(String line : Files.readAllLines(Paths.get(MD5_FILE_NAME), Charset.forName("US-ASCII"))){
 			String[] parts = line.split("\\s+"); 
@@ -264,7 +286,7 @@ public class Installer {
 	}
 	
     public static final String REPO = "https://github.com/Xilinx/RapidWright.git";
-    public static final String RELEASE = "https://github.com/Xilinx/RapidWright/releases/latest";
+    public static final String RELEASE = "https://github.com/Xilinx/RapidWright/releases/latest/download";
     public static final String DATA_ZIP = "rapidwright_data.zip";
     public static final String JARS_ZIP = "rapidwright_jars.zip";
        
@@ -386,15 +408,12 @@ public class Installer {
 		System.out.println("  2. Download and unzip "+DATA_ZIP+" and "+JARS_ZIP+"");
 		System.out.println("================================================================================");
 		System.out.println("  Please be patient, download may take several minutes...");
-		String latestRelease = getURLRedirect(RELEASE);
-		latestRelease = latestRelease.replace("/tag/", "/download/");
-		
 		
 		for(String name : new String[]{DATA_ZIP,JARS_ZIP}){
 			boolean alreadyDownloaded = false;
 			if(new File(name).exists()){
 				System.out.println("Checking if existing "+name+" can be used...");
-				String md5sum = getExpectedMD5(latestRelease, name);
+				String md5sum = getExpectedMD5(RELEASE, name);
 				String calcMD5Sum = calculateMD5OfFile(name);
 				if(md5sum.equals(calcMD5Sum)){
 					System.out.println(name + " is valid, skipping download.");
@@ -411,7 +430,7 @@ public class Installer {
 					System.exit(1);
 				}
 			}else{
-				String url = latestRelease+"/"+name;
+				String url = RELEASE+"/"+name;
 				System.out.println("Downloading " + url + " ...");
 				long size = downloadFile(url, name);
 				if(size == 0){				
@@ -422,7 +441,7 @@ public class Installer {
 									 + "  for details on how to install manually.");
 					System.exit(1);
 				}
-				String md5sum = getExpectedMD5(latestRelease, name);
+				String md5sum = getExpectedMD5(RELEASE, name);
 				String calcMD5Sum = calculateMD5OfFile(name);
 				if(!md5sum.equals(calcMD5Sum)){
 					System.err.println("ERROR: md5sum of " + name + " invalid: " 

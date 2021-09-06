@@ -23,10 +23,11 @@
 
 package com.xilinx.rapidwright.timing;
 
-import com.xilinx.rapidwright.util.FileTools;
-
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -37,6 +38,8 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import com.xilinx.rapidwright.util.FileTools;
 
 /**
  * An implementation of DelayModelSource, used to provide data source to DelayModel class.
@@ -267,14 +270,13 @@ class DelayModelSourceFromText extends DelayModelSource {
      */
     private void readIntraSiteDelays(String fileName) {
 
-        InputStream inputStream = null;
+        
         Scanner sc = null;
 
         String siteName = null;
         String belName  = null;
 
-        try {
-            inputStream = FileTools.getRapidWrightResourceInputStream(fileName);
+        try(InputStream inputStream = new FileInputStream(FileTools.getRapidWrightPath() + File.separator + fileName)){
             sc = new Scanner(inputStream, "UTF-8");
             while (sc.hasNextLine()) {
                 // Make canonical from "," without spaces
@@ -315,19 +317,7 @@ class DelayModelSourceFromText extends DelayModelSource {
         } catch (IOException ex) {
             System.out.println (ex.toString());
             System.out.println("IOException during reading file " + fileName);
-        }
-
-        try {
-            if (inputStream != null) {
-                inputStream.close();
-            }
-        } catch (IOException ex) {
-            System.out.println (ex.toString());
-            System.out.println("IOException during reading file " + fileName);
-        } finally {
-            if (sc != null) {
-                sc.close();
-            }
+            throw new UncheckedIOException(ex);
         }
     }
 
