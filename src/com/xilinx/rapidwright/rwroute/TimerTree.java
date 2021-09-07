@@ -39,7 +39,6 @@ public class TimerTree {
 	public TimerTree(String rootName, boolean verbose) {
 		this.verbose = verbose;
 		this.timers = new HashMap<>();
-		/** three initialized timers*/
 		this.root = new Timer(rootName, (short) 0);
 		this.timers.put(this.root.getName(), this.root);
 	}

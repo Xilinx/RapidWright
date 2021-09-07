@@ -144,14 +144,14 @@ public class Configuration {
 			case "--enlargeBoundingBox":
 				if(i+1 < arguments.length && (!arguments[i+1].startsWith("--verticalINTTiles") && !arguments[i+1].startsWith("--horizontalINTTiles"))) {
 					System.out.println("WARNING: --enlargeBoundingBox option is not followed by --verticalINTTiles <arg> or --horizontalINTTiles <arg>.");
-					System.out.println("  Use default settings: verticalINTTiles = 2, horizontalINTTiles = 1.");
+					System.out.println("         Use default settings: verticalINTTiles = 2, horizontalINTTiles = 1.");
 				}
 				this.setEnlargeBoundingBox(true);
 				break;
 			case "--fixBoundingBox":
 				if(i+1 < arguments.length && (!arguments[i+1].startsWith("--boundingBoxExtensionX") && !arguments[i+1].startsWith("--boundingBoxExtensionY"))) {
 					System.out.println("WARNING: --fixBoundingBox option is not followed by --boundingBoxExtensionX <arg> or --boundingBoxExtensionY <arg>.");
-					System.out.println("  Use default settings: boundingBoxExtensionX = 3, boundingBoxExtensionY = 15.");
+					System.out.println("         Use default settings: boundingBoxExtensionX = 3, boundingBoxExtensionY = 15.");
 				}
 				this.setEnlargeBoundingBox(false);
 				break;
@@ -923,7 +923,7 @@ public class Configuration {
 		s.append(formatString("Initial present conges fac: ", this.initialPresentCongesFac));
 		s.append(formatString("Present conges fac mult: ", this.presentCongesMultiplier));
 		s.append(formatString("Historical conges fac: ", this.historicalCongesFac));
-		s.append(formatString("Symmtric clk routing: ", this.isSymmetricClkRouting()));
+		s.append(formatString("Symmetric clk routing: ", this.isSymmetricClkRouting()));
 		
 		return s.toString();
 	}

@@ -295,28 +295,30 @@ public class RWRoute{
 	 * A helper method for profiling the routing runtime v.s. average span of connections.
 	 */
 	private void printConnectionSpanStatistics() {
-		System.out.println("------------------------------------------------------------------------------");
-		System.out.println("Connection Span Info");
-		System.out.println(" Span" + "\t" + "# Connections" + "\t" + "Percent");
+		if(this.config.isPrintConnectionSpan()) {
+			System.out.println("------------------------------------------------------------------------------");
+			System.out.println("Connection Span Info");
+			System.out.println(" Span" + "\t" + "# Connections" + "\t" + "Percent");
+		}
 		long sumSpan = 0;
 		short max = 0;
 		for(short span : this.connSpan.keySet()) {
 			int counter = this.connSpan.get(span);
-			System.out.printf(String.format("%5d \t%12d \t%7.2f\n", span, counter, (float)counter / this.indirectConnections.size() * 100));
-			sumSpan += span*this.connSpan.get(span);
+			if(this.config.isPrintConnectionSpan()) System.out.printf(String.format("%5d \t%12d \t%7.2f\n", span, counter, (float)counter / this.indirectConnections.size() * 100));
+			sumSpan += span * counter;
 			if(span > max) max = span;
 		}
-		System.out.println();
+		if(this.config.isPrintConnectionSpan()) System.out.println();
 		long avg = (long) (sumSpan / ((float) this.indirectConnections.size()));
-		System.out.println("Max span of connections: " + max);
-		System.out.println("Avg span of connections: " + avg);
-		int spanNoLongerThanAvg = 0;
+		System.out.println("INFO: Max span of connections: " + max);
+		System.out.println("INFO: Avg span of connections: " + avg);
+		int numConnectionsLongerThanAvg = 0;
 		for(short span : this.connSpan.keySet()) {
-			if(span <= avg) spanNoLongerThanAvg += this.connSpan.get(span);
+			if(span <= avg) numConnectionsLongerThanAvg += this.connSpan.get(span);
 		}
 		
-		System.out.printf("# connections no longer than avg span: " + spanNoLongerThanAvg);
-		System.out.printf(" (" + String.format("%5.2f", (float)spanNoLongerThanAvg / this.indirectConnections.size() * 100) + "%%)\n");
+		System.out.printf("INFO: # connections longer than avg span: " + numConnectionsLongerThanAvg);
+		System.out.printf(" (" + String.format("%5.2f", (float)numConnectionsLongerThanAvg / this.indirectConnections.size() * 100) + "%%)\n");
 	}
 	
 	/**
