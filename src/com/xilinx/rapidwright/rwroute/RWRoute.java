@@ -663,6 +663,9 @@ public class RWRoute{
 	 * Routes the design in a few routing phases and times those phases.
 	 */
 	public void route(){
+		// Prints the design and configuration info, if "--verbose" is configured
+		this.printDesignNetsInfoAndConfiguration(this.config.isVerbose());
+		
 		this.routerTimer.createTimer("Routing", this.routerTimer.getRootTimer()).start();
 		
 		this.routerTimer.createTimer("route clock", "Routing").start();
@@ -700,6 +703,9 @@ public class RWRoute{
 		this.routerTimer.getTimer("finalize routes").stop();
 		
 		this.routerTimer.getTimer("Routing").stop();
+		
+		// Prints routing statistics, e.g. total wirelength, runtime and timing report
+		this.printRoutingStatistics();
 	}
 	
 	/**
@@ -1741,7 +1747,29 @@ public class RWRoute{
 		
 	}
 	
-	//TODO add routeDesign() without args / tracker
+	/**
+	 * Routes a design in the full timing-driven routing mode.
+	 * @param design The {@link Design} instance to be routed.
+	 */
+	public static void routeDesignFullTimingDriven(Design design) {
+		routeDesign(design, new Configuration(null));
+	}
+	
+	/**
+	 * Routes a design in the full non-timing-driven routing mode.
+	 * @param design The {@link Design} instance to be routed.
+	 */
+	public static void routeDesignFullNonTimingDriven(Design design) {
+		routeDesign(design, new Configuration(new String[] {"--nonTimingDriven", "--verbose"}));
+	}
+	
+	/**
+	 * Routes a design in the partial non-timing-driven routing mode.
+	 * @param design The {@link Design} instance to be routed.
+	 */
+	public static void routeDesignPartialNonTimingDriven(Design design) {
+		routeDesign(design, new Configuration(new String[] {"--partialRouting", "--fixBoundingBox", "--nonTimingDriven", "--verbose"}));
+	}
 	
 	/**
 	 * Routes a {@link Design} instance.
@@ -1749,35 +1777,37 @@ public class RWRoute{
 	 * @param args An array of string arguments, can be null. 
 	 * If null, the design will be routed in the full timing-driven routing mode with default a {@link Configuration} instance.
 	 * For more options of the configuration, please refer to the {@link Configuration} class.
-	 * @param tracker A {@link CodePerfTracker} instance to use, can be null.
 	 * @return Routed design.
 	 */
-	public static Design routeDesign(Design design, String[] args, CodePerfTracker tracker) {
+	public static void routeDesignWithUserDefinedArguments(Design design, String[] args) {
 		// Instantiates a Configuration Object and parses the arguments.
 		// Uses the default configuration if basic usage only.
-		Configuration config = new Configuration(args);
+		routeDesign(design, new Configuration(args));
+	}
+	
+	/**
+	 * Routes a design after pre-processing.
+	 * @param design The {@link Design} instance to be routed.
+	 * @param config A {@link Configuration} instance consisting of customizable parameters to use.
+	 */
+	private static void routeDesign(Design design, Configuration config) {
+		// Pre-processing of the design regarding physical net names pins
 		DesignTools.makePhysNetNamesConsistent(design);
 		if(!config.isPartialRouting() || (!design.getVccNet().hasPIPs() && !design.getGndNet().hasPIPs())) {
 			DesignTools.createPossiblePinsToStaticNets(design);
 		}
 		DesignTools.createMissingSitePinInsts(design);
 		
-		if(tracker != null) tracker.start("Route Design");
+		// Instantiates router object based on the partial routing option
 		RWRoute router;
 		if(config.isPartialRouting()) {
 			router = new PartialRouter(design, config);
 		}else {
 			router = new RWRoute(design, config);
 		}
-		// Prints the design and configuration info, if "--verbose" is configured
-		router.printDesignNetsInfoAndConfiguration(config.isVerbose());
+		
 		// Routes the design
 		router.route();
-		if(tracker != null) tracker.stop();
-		// Prints routing statistics, e.g. total wirelength, runtime and timing report
-		router.printRoutingStatistics();
-		
-		return router.getDesign();
 	}
 	
 	/**
@@ -1801,9 +1831,9 @@ public class RWRoute{
 		// Reads in a design checkpoint */
 		Design design = Design.readCheckpoint(args[0]);
 		
-		Design routedDesign = RWRoute.routeDesign(design, args, t);
+		RWRoute.routeDesignWithUserDefinedArguments(design, args);
 		// Writes out the routed design checkpoint
-		routedDesign.writeCheckpoint(routedDCPfileName,t);
+		design.writeCheckpoint(routedDCPfileName,t);
 		System.out.println("\nINFO: Write routed design\n " + routedDCPfileName + "\n");	
 	}
 }
