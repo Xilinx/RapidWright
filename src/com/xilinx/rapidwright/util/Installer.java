@@ -114,22 +114,32 @@ public class Installer {
 	 * @return Checksum result String or null if no file was found.
 	 */
 	public static String calculateMD5OfFile(String fileName){
-	    MessageDigest md5 = null;
+	    return calculateMD5OfFile(Paths.get(fileName));
+	}
+
+    /**
+     * Performs an MD5 checksum on the provided file and returns the result.
+     * @param path Path of the file on which to perform the checksum
+     * @return Checksum result String or null if no file was found.
+     */
+    public static String calculateMD5OfFile(Path path){
+        MessageDigest md5 = null;
         try {
             md5 = MessageDigest.getInstance("MD5");
         } catch (NoSuchAlgorithmException e1) {
             throw new RuntimeException("ERROR: Couldn't find an MD5 algorithm provider "
                     + "in current Java environment.");
         }
-		try (DigestInputStream dig = new DigestInputStream(Files.newInputStream(Paths.get(fileName)), md5)) {			 
-			byte[] buffer = new byte[1024];
-			while(dig.read(buffer) != -1){}
-			byte[] checksum = md5.digest();
-			return bytesToString(checksum);
-		} catch (IOException e) {
-		    throw new UncheckedIOException(e);
-		}
-	}
+        try (DigestInputStream dig = new DigestInputStream(Files.newInputStream(path), md5)) {            
+            byte[] buffer = new byte[1024];
+            while(dig.read(buffer) != -1){}
+            byte[] checksum = md5.digest();
+            return bytesToString(checksum);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+	
 	
 	public static long downloadFile(String url, String dstFileName) {
         File newFile = new File(dstFileName);
