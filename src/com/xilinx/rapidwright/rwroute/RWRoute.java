@@ -667,6 +667,7 @@ public class RWRoute{
 		this.printDesignNetsInfoAndConfiguration(this.config.isVerbose());
 		
 		this.routerTimer.createTimer("Routing", this.routerTimer.getRootTimer()).start();
+		MessageGenerator.printHeader("Route Design");
 		
 		this.routerTimer.createTimer("route clock", "Routing").start();
 		this.routeGlobalClkNets();
@@ -1751,24 +1752,24 @@ public class RWRoute{
 	 * Routes a design in the full timing-driven routing mode.
 	 * @param design The {@link Design} instance to be routed.
 	 */
-	public static void routeDesignFullTimingDriven(Design design) {
-		routeDesign(design, new Configuration(null));
+	public static Design routeDesignFullTimingDriven(Design design) {
+		return routeDesign(design, new Configuration(null));
 	}
 	
 	/**
 	 * Routes a design in the full non-timing-driven routing mode.
 	 * @param design The {@link Design} instance to be routed.
 	 */
-	public static void routeDesignFullNonTimingDriven(Design design) {
-		routeDesign(design, new Configuration(new String[] {"--nonTimingDriven", "--verbose"}));
+	public static Design routeDesignFullNonTimingDriven(Design design) {
+		return routeDesign(design, new Configuration(new String[] {"--nonTimingDriven", "--verbose"}));
 	}
 	
 	/**
 	 * Routes a design in the partial non-timing-driven routing mode.
 	 * @param design The {@link Design} instance to be routed.
 	 */
-	public static void routeDesignPartialNonTimingDriven(Design design) {
-		routeDesign(design, new Configuration(new String[] {"--partialRouting", "--fixBoundingBox", "--nonTimingDriven", "--verbose"}));
+	public static Design routeDesignPartialNonTimingDriven(Design design) {
+		return routeDesign(design, new Configuration(new String[] {"--partialRouting", "--fixBoundingBox", "--nonTimingDriven", "--verbose"}));
 	}
 	
 	/**
@@ -1779,10 +1780,10 @@ public class RWRoute{
 	 * For more options of the configuration, please refer to the {@link Configuration} class.
 	 * @return Routed design.
 	 */
-	public static void routeDesignWithUserDefinedArguments(Design design, String[] args) {
+	public static Design routeDesignWithUserDefinedArguments(Design design, String[] args) {
 		// Instantiates a Configuration Object and parses the arguments.
 		// Uses the default configuration if basic usage only.
-		routeDesign(design, new Configuration(args));
+		return routeDesign(design, new Configuration(args));
 	}
 	
 	/**
@@ -1790,7 +1791,7 @@ public class RWRoute{
 	 * @param design The {@link Design} instance to be routed.
 	 * @param config A {@link Configuration} instance consisting of customizable parameters to use.
 	 */
-	private static void routeDesign(Design design, Configuration config) {
+	private static Design routeDesign(Design design, Configuration config) {
 		// Pre-processing of the design regarding physical net names pins
 		DesignTools.makePhysNetNamesConsistent(design);
 		if(!config.isPartialRouting() || (!design.getVccNet().hasPIPs() && !design.getGndNet().hasPIPs())) {
@@ -1808,6 +1809,8 @@ public class RWRoute{
 		
 		// Routes the design
 		router.route();
+		
+		return router.getDesign();
 	}
 	
 	/**
@@ -1827,13 +1830,13 @@ public class RWRoute{
 		// Reads the output directory and set the output design checkpoint file name
 		String routedDCPfileName = args[1].endsWith("/")?args[1] + "routed_" + dcpName : args[1] + "/routed_" + dcpName;
 		
-		CodePerfTracker t = new CodePerfTracker("RWRoute", true);	
-		// Reads in a design checkpoint */
-		Design design = Design.readCheckpoint(args[0]);
+		CodePerfTracker t = new CodePerfTracker("RWRoute", true);
 		
-		RWRoute.routeDesignWithUserDefinedArguments(design, args);
+		// Reads in a design checkpoint and routes it		
+		Design routed = RWRoute.routeDesignWithUserDefinedArguments(Design.readCheckpoint(args[0]), args);
+		
 		// Writes out the routed design checkpoint
-		design.writeCheckpoint(routedDCPfileName,t);
+		routed.writeCheckpoint(routedDCPfileName,t);
 		System.out.println("\nINFO: Write routed design\n " + routedDCPfileName + "\n");	
 	}
 }
