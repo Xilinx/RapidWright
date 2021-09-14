@@ -1,3 +1,15 @@
+============= RapidWright 2021.1.0-beta released on 2021-09-14 ================
+Notes: 
+ * Updates device models to the public set released in Vivado 2021.1
+ * Provides a cloud data file download-on-demand model.  No longer need to
+   download large rapidwright_data.zip with each release.  Speeds up
+   install and enables easier packaging/distribution of RapidWright.
+ * Adds support to automatically invoke Vivado to create a missing
+   EDIF file when loading a DCP (if a compatible Vivado is on user's PATH).
+ * Moves timing model files into git repo (out of data directory)
+ * Includes fixes for #180, #217
+
+
 ============= RapidWright 2020.2.7-beta released on 2021-07-26 ================
 Notes: 
  * Several fixes for RapidWright API Lib:
