@@ -1,5 +1,5 @@
 /* 
- * Copyright (c) 2020 Xilinx, Inc. 
+ * Copyright (c) 2021 Xilinx, Inc. 
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -26,7 +26,7 @@ package com.xilinx.rapidwright.device;
 
 
 /**
- * Generated on: Wed Dec 16 09:47:52 2020
+ * Generated on: Thu Sep 02 22:37:09 2021
  * by: com.xilinx.rapidwright.release.PartNamePopulator
  * 
  * Set of all Supported Xilinx families in RapidWright
@@ -63,7 +63,6 @@ public enum FamilyType {
 		VIRTEXU,
 		VIRTEXUPLUS,
 		VIRTEXUPLUS58G,
-		VIRTEXUPLUS58GES1,
 		VIRTEXUPLUSHBM,
 		VIRTEXUPLUSHBMES1,
 		ZYNQ,

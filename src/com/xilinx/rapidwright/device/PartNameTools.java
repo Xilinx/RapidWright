@@ -35,7 +35,7 @@ import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.util.FileTools;
 
 /**
- * Generated on: Fri Jul 02 17:02:23 2021
+ * Generated on: Thu Sep 02 22:37:09 2021
  * by: com.xilinx.rapidwright.release.PartNamePopulator
  * 
  * Class to hold utility APIs dealing with Parts and device names.
@@ -155,7 +155,6 @@ public class PartNameTools {
 			case VIRTEXU: return FamilyType.VIRTEXU;
 			case VIRTEXUPLUS: return FamilyType.VIRTEXUPLUS;
 			case VIRTEXUPLUS58G: return FamilyType.VIRTEXUPLUS58G;
-			case VIRTEXUPLUS58GES1: return FamilyType.VIRTEXUPLUS58G;
 			case VIRTEXUPLUSHBM: return FamilyType.VIRTEXUPLUSHBM;
 			case VIRTEXUPLUSHBMES1: return FamilyType.VIRTEXUPLUSHBM;
 			case ZYNQ: return FamilyType.ZYNQ;
@@ -203,7 +202,6 @@ public class PartNameTools {
 			case VIRTEXU: return "Virtex UltraScale";
 			case VIRTEXUPLUS: return "Virtex UltraScale+";
 			case VIRTEXUPLUS58G: return "Virtex UltraScale+";
-			case VIRTEXUPLUS58GES1: return "Virtex UltraScale+";
 			case VIRTEXUPLUSHBM: return "Virtex UltraScale+";
 			case VIRTEXUPLUSHBMES1: return "Virtex UltraScale+";
 			case ZYNQ: return "Zynq-7000";
@@ -251,7 +249,6 @@ public class PartNameTools {
 			case VIRTEXU: return Series.UltraScale;
 			case VIRTEXUPLUS: return Series.UltraScalePlus;
 			case VIRTEXUPLUS58G: return Series.UltraScalePlus;
-			case VIRTEXUPLUS58GES1: return Series.UltraScalePlus;
 			case VIRTEXUPLUSHBM: return Series.UltraScalePlus;
 			case VIRTEXUPLUSHBMES1: return Series.UltraScalePlus;
 			case ZYNQ: return Series.Series7;

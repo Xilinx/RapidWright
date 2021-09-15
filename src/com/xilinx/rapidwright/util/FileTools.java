@@ -132,6 +132,8 @@ public class FileTools {
 	/** Suffix added to data file names to capture md5 status */
 	private static String MD5_DATA_FILE_SUFFIX = ".md5";
 	
+	private static boolean OVERRIDE_DATA_FILE_DOWNLOAD = false;
+	
 	static {
 		// TODO - This turns off illegal reflective access warnings in Java 9+
 		// This is due to reflective use in Kryo which is a direct dependency of this
@@ -896,10 +898,11 @@ public class FileTools {
 	 * @return The MD5 hash of a downloaded file, null if the file present is the correct version
 	 */
 	private static String ensureCorrectDataFile(String name) {
+	    if(overrideDataFileDownload()) return null; 
 	    String rwPath = getRapidWrightPath();
 	    String fileName = rwPath + File.separator + name;
-	    File resourceFile = new File(fileName);
-	    if(resourceFile.exists()) {
+	    Path resourceFile = Paths.get(fileName);
+	    if(Files.exists(resourceFile)) {
 	        if(expectedMD5Matches(name, fileName, resourceFile)) {
                 return null;
             }
@@ -907,8 +910,9 @@ public class FileTools {
 	    return downloadDataFile(name.replace("\\", "/"));
 	}
 	
-	private static boolean expectedMD5Matches(String name, String fileName, File resourceFile) {
+	private static boolean expectedMD5Matches(String name, String fileName, Path resourceFile) {
         File md5File = new File(fileName + MD5_DATA_FILE_SUFFIX);
+        String expectedMD5 = getCurrentDataVersion(name);
         if(md5File.exists()) {
             String currMD5 = null;
             try {
@@ -916,20 +920,17 @@ public class FileTools {
             } catch (IOException e) {
                 e.printStackTrace();
             }
-            String expectedMD5 = getCurrentDataVersion(name);
             if(currMD5.equals(expectedMD5)) {
                 return true;
             }
-        } else {
-            // .md5 file is missing
-            String currMD5 = Installer.calculateMD5OfFile(resourceFile.getAbsolutePath());
-            String expectedMD5 = getCurrentDataVersion(name);
-            if(expectedMD5.equals(currMD5)) {
-                FileTools.writeStringToTextFile(currMD5, resourceFile.getAbsolutePath() 
-                        + MD5_DATA_FILE_SUFFIX);
-                // File matches expected md5
-                return true;
-            }
+        } 
+        // .md5 file is missing
+        String currMD5 = Installer.calculateMD5OfFile(resourceFile);
+        if(expectedMD5.equals(currMD5)) {
+            FileTools.writeStringToTextFile(currMD5, resourceFile.toString() 
+                    + MD5_DATA_FILE_SUFFIX);
+            // File matches expected md5
+            return true;
         }
 	    return false;
 	}
@@ -1737,6 +1738,14 @@ public class FileTools {
         
         Pair<String,String> result = DataVersions.dataVersionMap.get(dataFileName);
         return result != null ? result.getSecond() : null;
+    }
+
+    public static void setOverrideDataFileDownload(boolean value) {
+        OVERRIDE_DATA_FILE_DOWNLOAD = value;
+    }
+    
+    public static boolean overrideDataFileDownload() {
+        return OVERRIDE_DATA_FILE_DOWNLOAD;
     }
     
 	public static void main(String[] args) {

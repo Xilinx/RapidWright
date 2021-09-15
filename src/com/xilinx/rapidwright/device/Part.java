@@ -1,5 +1,5 @@
 /* 
- * Copyright (c) 2020 Xilinx, Inc. 
+ * Copyright (c) 2021 Xilinx, Inc. 
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -29,7 +29,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 
 /**
- * Generated on: Wed Dec 16 09:47:52 2020
+ * Generated on: Thu Sep 02 22:37:02 2021
  * by: com.xilinx.rapidwright.release.PartNamePopulator
  * 
  * Class used to uniquely represent a Xilinx part.
@@ -249,7 +249,6 @@ public class Part {
 				FamilyType.QZYNQUPLUSRFSOC, 
 				FamilyType.VIRTEXUPLUS, 
 				FamilyType.VIRTEXUPLUS58G, 
-				FamilyType.VIRTEXUPLUS58GES1, 
 				FamilyType.VIRTEXUPLUSHBM, 
 				FamilyType.VIRTEXUPLUSHBMES1, 
 				FamilyType.ZYNQUPLUS, 
