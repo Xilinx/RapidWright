@@ -22,7 +22,7 @@ import org.junit.jupiter.params.provider.MethodSource;
  * Test Module.getCorrespondingTile
  * The testcases in this class are auto-generated. The main function in this class is the entry point for that.
  */
-public class TestRelocation {
+public class TestRelocateTile {
 
 
     private static final String DEVICE_VERSAL = "xcvc1902";
