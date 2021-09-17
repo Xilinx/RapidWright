@@ -181,7 +181,7 @@ public class RelocationTools {
     }
 
     private static void revertPlacement(Map<SiteInst, Site> oldSite) {
-        for (HashMap.Entry<SiteInst, Site> p : oldSite.entrySet()) {
+        for (Map.Entry<SiteInst, Site> p : oldSite.entrySet()) {
             p.getKey().unPlace();
             p.getKey().place(p.getValue());
         }
