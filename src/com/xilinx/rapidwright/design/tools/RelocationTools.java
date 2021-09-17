@@ -9,7 +9,7 @@ import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.Tile;
 
-public class RelocateSiteInsts {
+public class RelocationTools {
     public static boolean relocate(Design design,
                                    String hierarchyPrefix,
                                    int tileColOffset,

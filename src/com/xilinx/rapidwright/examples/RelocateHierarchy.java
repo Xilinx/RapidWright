@@ -1,7 +1,7 @@
 package com.xilinx.rapidwright.examples;
 
 import com.xilinx.rapidwright.design.*;
-import com.xilinx.rapidwright.design.tools.RelocateSiteInsts;
+import com.xilinx.rapidwright.design.tools.RelocationTools;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 
 public class RelocateHierarchy {
@@ -26,7 +26,7 @@ public class RelocateHierarchy {
         int colOffset = Integer.parseInt(args[2]);
         int rowOffset = Integer.parseInt(args[3]);
 
-        RelocateSiteInsts.relocate(design, hierarchyPrefix, colOffset, rowOffset);
+        RelocationTools.relocate(design, hierarchyPrefix, colOffset, rowOffset);
 
         t.stop().start("Write DCP");
 
