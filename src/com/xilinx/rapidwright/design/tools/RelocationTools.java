@@ -43,6 +43,7 @@ public class RelocationTools {
                                    int tileRowOffset) {
         Collection<SiteInst> matchingSiteInsts = new ArrayList<>();
         Predicate<Cell> matchLambda = (c) -> c.getName().startsWith(hierarchyPrefix);
+        boolean error = false;
 
         for (SiteInst si : design.getSiteInsts()) {
             Collection<Cell> cells = si.getCells();
@@ -55,13 +56,13 @@ public class RelocationTools {
                     matchingSiteInsts.add(si);
             }
             else {
-                System.out.println("FAILED to relocate SiteInst " + si.getName()
+                System.out.println("ERROR: Failed to relocate SiteInst " + si.getName()
                         + " as it contains both matching and non-matching Cells");
-                return false;
+                error = true;
             }
         }
 
-        return relocate(design, matchingSiteInsts, tileColOffset, tileRowOffset);
+        return !error && relocate(design, matchingSiteInsts, tileColOffset, tileRowOffset);
     }
 
     /**
@@ -87,6 +88,9 @@ public class RelocationTools {
                                    int tileColOffset,
                                    int tileRowOffset) {
         if (siteInsts.isEmpty())
+            return true;
+
+        if (tileColOffset == 0 && tileRowOffset == 0)
             return true;
 
         Map<SiteInst, Site> oldSite = new HashMap<>();
