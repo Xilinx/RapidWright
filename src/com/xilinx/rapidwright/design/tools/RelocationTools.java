@@ -3,39 +3,93 @@ package com.xilinx.rapidwright.design.tools;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.design.*;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.Tile;
+import com.xilinx.rapidwright.util.Pair;
 
+/**
+ * A collection of tools to help relocate designs.
+ *
+ * @author eddieh
+ *
+ */
 public class RelocationTools {
+
+    /**
+     * Relocate all SiteInsts containing exclusively Cells matching
+     * hierarchyPrefix (and all associated PIPs) in-place by
+     * tileColOffset/tileRowOffset tiles.
+     *
+     * Should a SiteInst contain matching and non-matching Cells,
+     * function will fail.
+     *
+     * @param design Parent design
+     * @param hierarchyPrefix Cell matches if hierarchical path starts with this value
+     *                        (empty string to match all Cells)
+     * @param tileColOffset Relocate this number of tile columns (X axis)
+     * @param tileRowOffset Relocate this number of tile rows (Y axis)
+     * @return True if successful, false otherwise.
+     */
     public static boolean relocate(Design design,
                                    String hierarchyPrefix,
                                    int tileColOffset,
                                    int tileRowOffset) {
         Collection<SiteInst> matchingSiteInsts = new ArrayList<>();
+        Predicate<Cell> matchLambda = (c) -> c.getName().startsWith(hierarchyPrefix);
 
         for (SiteInst si : design.getSiteInsts()) {
-            for (Cell c : si.getCells()) {
-                if (c.getName().startsWith(hierarchyPrefix)) {
-                    if (si.isPlaced()) {
-                        matchingSiteInsts.add(si);
-                    }
-                    break;
-                }
+            Collection<Cell> cells = si.getCells();
+            Cell firstCell = cells.iterator().next();
+            boolean firstCellMatches = matchLambda.test(firstCell);
+            // Check that all other cells in this site also match/don't match
+            if (cells.stream().skip(1).allMatch(c -> matchLambda.test(c) == firstCellMatches))
+            {
+                if (firstCellMatches)
+                    matchingSiteInsts.add(si);
+            }
+            else {
+                System.out.println("FAILED to relocate SiteInst " + si.getName()
+                        + " as it contains both matching and non-matching Cells");
+                return false;
             }
         }
 
         return relocate(design, matchingSiteInsts, tileColOffset, tileRowOffset);
     }
 
+    /**
+     * Relocate all given SiteInsts and PIPs in-place by
+     * tileColOffset/tileRowOffset tiles.
+     *
+     * Should any SiteInst or PIP not be relocatable to a tile at the specified
+     * offset (e.g. if a compatible tile does not exist) function will return
+     * false and design will be unmodified.
+     *
+     * Any net sourced from a SiteInst not in the given set will be fully
+     * unrouted; those destined for a SiteInst not in the given set will have
+     * their specific branch unrouted.
+     *
+     * @param design Parent design
+     * @param siteInsts List of SiteInsts to be relocated
+     * @param tileColOffset Relocate this number of tile columns (X axis)
+     * @param tileRowOffset Relocate this number of tile rows (Y axis)
+     * @return True if successful, false otherwise.
+     */
     public static boolean relocate(Design design,
                                    Collection<SiteInst> siteInsts,
                                    int tileColOffset,
                                    int tileRowOffset) {
+        if (siteInsts.isEmpty())
+            return true;
 
-        HashMap<SiteInst, Site> oldPlacementSite = new HashMap<>();
+        Map<SiteInst, Site> oldSite = new HashMap<>();
         boolean revertPlacement = false;
 
         for (SiteInst si : siteInsts) {
@@ -47,47 +101,62 @@ public class RelocationTools {
             if (dt == null || ds == null || ds == ss) {
                 String destTileName = st.getNameRoot() + "_X" + (st.getTileXCoordinate() + tileColOffset)
                         + "Y" + (st.getTileYCoordinate() + tileRowOffset);
-                System.out.println("FAILED to move SiteInst " + si.getName() + " from Tile " + st.getName()
+                System.out.println("ERROR: Failed to move SiteInst " + si.getName() + " from Tile " + st.getName()
                         + " to Tile " + destTileName);
                 revertPlacement = true;
             } else {
-                oldPlacementSite.put(si, ss);
+                oldSite.put(si, ss);
                 si.unPlace();
                 si.place(ds);
             }
         }
 
         if (revertPlacement) {
-            for (HashMap.Entry<SiteInst, Site> p : oldPlacementSite.entrySet()) {
-                p.getKey().unPlace();
-                p.getKey().place(p.getValue());
-            }
+            revertPlacement(oldSite);
             return false;
         }
 
-        foreachNet: for (Net n : design.getNets()) {
-            for (SitePinInst spi : n.getPins()) {
-                SiteInst si = spi.getSiteInst();
-                if (!oldPlacementSite.containsKey(si)) {
-                    // TODO: Unroute just this branch
-                    // n.unroutePin(spi);
+        List<Pair<Net, List<PIP>>> oldRoute = new ArrayList<>();
+        boolean revertRouting = false;
 
-                    System.out.println("Unrouting net " + n.getName() + " since SiteInstPin " + spi + " does not belong to selected hierarchy");
-                    n.unroute();
-                    continue foreachNet;
-                }
+        DesignTools.createMissingSitePinInsts(design);
+
+        for (Net n : design.getNets()) {
+            if (!n.hasPIPs()) {
+                continue;
             }
+
+            Collection<SitePinInst> pins = n.getPins();
+            Collection<SitePinInst> nonMatchingPins = pins.stream().filter(
+                    (spi) -> !oldSite.containsKey(spi.getSiteInst())).collect(Collectors.toList());
+            if (nonMatchingPins.size() == pins.size()) {
+                continue;
+            }
+
+            oldRoute.add(new Pair<>(n, n.getPIPs()));
+
+            if (!nonMatchingPins.isEmpty()) {
+                // TODO: Unroute just this branch
+                // nonMatchingPins.forEach((spi) -> n.unroutePin(spi));
+
+                SitePinInst spi = nonMatchingPins.iterator().next();
+                System.out.println("INFO: Unrouting net " + n.getName() + " since SiteInstPin " + spi + " does not belong to selected hierarchy");
+                n.unroute();
+                continue;
+            }
+
             boolean isClockNet = n.isClockNet() || n.hasGapRouting();
             for (PIP sp : n.getPIPs()) {
                 Tile st = sp.getTile();
                 Tile dt = st.getTileXYNeighbor(tileColOffset, tileRowOffset);
                 if (dt == null) {
                     if (isClockNet) {
-                        System.out.println("Skipping clock net PIP " + sp + " (Net " + n.getName() + ")");
+                        System.out.println("INFO: Skipping clock net PIP " + sp + " (Net " + n.getName() + ")");
                     } else {
                         String destTileName = st.getNameRoot() + "_X" + (st.getTileXCoordinate() + tileColOffset)
                                 + "Y" + (st.getTileYCoordinate() + tileRowOffset);
-                        System.out.println("FAILED to move PIP " + sp + " to Tile " + destTileName + "(Net " + n.getName() + ")");
+                        System.out.println("ERROR: Failed to move PIP " + sp + " to Tile " + destTileName + "(Net " + n.getName() + ")");
+                        revertRouting = true;
                     }
                 } else {
                     assert (st.getTileTypeEnum() == dt.getTileTypeEnum());
@@ -96,6 +165,25 @@ public class RelocationTools {
             }
         }
 
+        if (revertRouting) {
+            revertPlacement(oldSite);
+            revertRouting(oldRoute);
+            return false;
+        }
+
         return true;
+    }
+
+    private static void revertRouting(List<Pair<Net, List<PIP>>> oldRoute) {
+        for (Pair<Net,List<PIP>> r : oldRoute) {
+            r.getFirst().setPIPs(r.getSecond());
+        }
+    }
+
+    private static void revertPlacement(Map<SiteInst, Site> oldSite) {
+        for (HashMap.Entry<SiteInst, Site> p : oldSite.entrySet()) {
+            p.getKey().unPlace();
+            p.getKey().place(p.getValue());
+        }
     }
 }

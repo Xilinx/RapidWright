@@ -4,13 +4,21 @@ import com.xilinx.rapidwright.design.*;
 import com.xilinx.rapidwright.design.tools.RelocationTools;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 
+/**
+ * Given an input DCP, a hierarchy prefix (empty string to match entire design)
+ * and tile column/row offsets, move all matching cells (and the PIPs that
+ * connect between such cells) by this tile offset.
+ *
+ * Specifically, the SiteInst associated with a matching Cell is relocated;
+ * thus it is assumed that all
+ *
+ * @author eddieh
+ *
+ */
 public class RelocateHierarchy {
 
-    /**
-     * @param args
-     */
     public static void main(String[] args) {
-        if(args.length != 5) {
+        if (args.length != 5) {
             System.out.println("USAGE: <input_dcp> <hierarchy_prefix> <tile_col_offset> <tile_row_offset> <output_dcp>");
             return;
         }
@@ -26,7 +34,9 @@ public class RelocateHierarchy {
         int colOffset = Integer.parseInt(args[2]);
         int rowOffset = Integer.parseInt(args[3]);
 
-        RelocationTools.relocate(design, hierarchyPrefix, colOffset, rowOffset);
+        if (!RelocationTools.relocate(design, hierarchyPrefix, colOffset, rowOffset)) {
+            throw new RuntimeException("ERROR: Relocation failed");
+        }
 
         t.stop().start("Write DCP");
 
