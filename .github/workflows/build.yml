@@ -48,7 +48,7 @@ jobs:
         run: wget https://github.com/Xilinx/RapidWright/releases/download/${{ env.RAPIDWRIGHT_VERSION }}/rapidwright_jars.zip && unzip rapidwright_jars.zip
 
       - name: Compile & Test RapidWright
-        run: ./gradlew build
+        run: ./gradlew build --debug
       - name: Cleanup Gradle Cache
         # Remove some files from the Gradle cache, so they aren't cached by GitHub Actions.
         # Restoring these files from a GitHub Actions cache might cause problems for future builds.
