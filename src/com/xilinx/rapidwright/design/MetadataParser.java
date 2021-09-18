@@ -119,7 +119,7 @@ public class MetadataParser {
 		return null;
 	}
 	
-	public void parse(String metadataFileName){
+	public void parse(String metadataFileName) throws Exception {
 		String originalInstName = getOriginalInstName(metadataFileName);
 		this.fileName = metadataFileName;
 		int clockCount = -1;
@@ -420,6 +420,7 @@ public class MetadataParser {
 			}
 			getNextLine();
 		}
+		br.close();
 	}
 	
 	private boolean expect(String expected, String found){
