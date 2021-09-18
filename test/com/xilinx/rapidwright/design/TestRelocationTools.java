@@ -5,6 +5,7 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Stream;
 
+import com.xilinx.rapidwright.checker.CheckOpenFiles;
 import com.xilinx.rapidwright.design.tools.RelocationTools;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
@@ -20,6 +21,7 @@ public class TestRelocationTools {
 
     @ParameterizedTest(name = "Relocate PicoBlaze OOC '{0}' ({1},{2})")
     @MethodSource()
+    @CheckOpenFiles
     public void testPicoblazeOOC(String hierarchyPrefix, int colOffset, int rowOffset, boolean expectSuccess) {
         String dcpPath = "RapidWrightDCP/picoblaze_ooc_X9Y235.dcp";
         Design design1 = Design.readCheckpoint(dcpPath, CodePerfTracker.SILENT);
