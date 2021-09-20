@@ -162,7 +162,7 @@ public class TestRelocationTools {
 
     public static Stream<Arguments> testPicoblaze4OOC() {
         return Stream.of(
-                Arguments.of("", 0, 5, true)
+                  Arguments.of("", 0, 5, true)
                 , Arguments.of("picoblaze_6_65/", 0, 5, true)
                 , Arguments.of("picoblaze_6_60/", 0, 5, false) // placement conflict
         );
