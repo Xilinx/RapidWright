@@ -9,8 +9,9 @@ import com.xilinx.rapidwright.tests.CodePerfTracker;
  * and tile column/row offsets, move all matching cells (and the PIPs that
  * connect between such cells) by this tile offset.
  *
- * Specifically, the SiteInst associated with a matching Cell is relocated;
- * thus it is assumed that all
+ * Specifically, the SiteInst associated with a matching Cell is relocated.
+ * Should this SiteInst contain any Cell-s not matching the hierarchy prefix,
+ * relocation will fail.
  *
  * @author eddieh
  *
