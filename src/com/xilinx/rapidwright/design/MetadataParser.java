@@ -119,7 +119,7 @@ public class MetadataParser {
 		return null;
 	}
 	
-	public void parse(String metadataFileName) throws Exception {
+	public void parse(String metadataFileName){
 		String originalInstName = getOriginalInstName(metadataFileName);
 		this.fileName = metadataFileName;
 		int clockCount = -1;
@@ -420,7 +420,11 @@ public class MetadataParser {
 			}
 			getNextLine();
 		}
-		br.close();
+		try {
+			br.close();
+		} catch (IOException e){
+			throw new RuntimeException("ERROR: IOException encountered on closing file " + fileName + "\nStack Trace:");
+		}
 	}
 	
 	private boolean expect(String expected, String found){
