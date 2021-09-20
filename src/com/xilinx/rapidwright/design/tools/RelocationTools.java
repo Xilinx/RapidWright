@@ -54,8 +54,7 @@ public class RelocationTools {
             {
                 if (firstCellMatches)
                     matchingSiteInsts.add(si);
-            }
-            else {
+            } else {
                 System.out.println("ERROR: Failed to relocate SiteInst " + si.getName()
                         + " as it contains both matching and non-matching Cells");
                 error = true;
@@ -94,23 +93,31 @@ public class RelocationTools {
             return true;
 
         Map<SiteInst, Site> oldSite = new HashMap<>();
-        boolean revertPlacement = false;
-
         for (SiteInst si : siteInsts) {
             assert(si.isPlaced());
-            Site ss = si.getSite();
-            Tile st = si.getTile();
+            oldSite.put(si, si.getSite());
+            si.unPlace();
+        }
+
+        boolean revertPlacement = false;
+        for (Map.Entry<SiteInst, Site> e : oldSite.entrySet()) {
+            Site ss = e.getValue();
+            Tile st = ss.getTile();
             Tile dt = st.getTileXYNeighbor(tileColOffset, tileRowOffset);
-            Site ds = ss.getCorrespondingSite(si.getSiteTypeEnum(), dt);
-            if (dt == null || ds == null || ds == ss) {
+            Site ds = ss.getCorrespondingSite(ss.getSiteTypeEnum(), dt);
+            SiteInst si = e.getKey();
+            assert(ds != ss);
+            if (dt == null || ds == null) {
                 String destTileName = st.getNameRoot() + "_X" + (st.getTileXCoordinate() + tileColOffset)
                         + "Y" + (st.getTileYCoordinate() + tileRowOffset);
                 System.out.println("ERROR: Failed to move SiteInst " + si.getName() + " from Tile " + st.getName()
                         + " to Tile " + destTileName);
                 revertPlacement = true;
+            } else if (design.getSiteInstFromSite(ds) != null) {
+                System.out.println("ERROR: Failed to move SiteInst " + si.getName() + " from Tile " + st.getName()
+                        + " to Tile " + dt.getName() + " as its is already occupied");
+                revertPlacement = true;
             } else {
-                oldSite.put(si, ss);
-                si.unPlace();
                 si.place(ds);
             }
         }
@@ -179,15 +186,15 @@ public class RelocationTools {
     }
 
     private static void revertRouting(List<Pair<Net, List<PIP>>> oldRoute) {
-        for (Pair<Net,List<PIP>> r : oldRoute) {
-            r.getFirst().setPIPs(r.getSecond());
+        for (Pair<Net,List<PIP>> e : oldRoute) {
+            e.getFirst().setPIPs(e.getSecond());
         }
     }
 
     private static void revertPlacement(Map<SiteInst, Site> oldSite) {
-        for (Map.Entry<SiteInst, Site> p : oldSite.entrySet()) {
-            p.getKey().unPlace();
-            p.getKey().place(p.getValue());
+        for (Map.Entry<SiteInst, Site> e : oldSite.entrySet()) {
+            e.getKey().unPlace();
+            e.getKey().place(e.getValue());
         }
     }
 }
