@@ -113,7 +113,7 @@ public class RelocationTools {
                 System.out.println("ERROR: Failed to move SiteInst " + si.getName() + " from Tile " + st.getName()
                         + " to Tile " + destTileName);
                 revertPlacement = true;
-            } else if (design.getSiteInstFromSite(ds) != null) {
+            } else if (design.isSiteUsed(ds)) {
                 System.out.println("ERROR: Failed to move SiteInst " + si.getName() + " from Tile " + st.getName()
                         + " to Tile " + dt.getName() + " as its is already occupied");
                 revertPlacement = true;
