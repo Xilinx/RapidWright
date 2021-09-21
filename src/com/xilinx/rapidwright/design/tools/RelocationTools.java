@@ -147,13 +147,10 @@ public class RelocationTools {
             oldRoute.add(new Pair<>(n, n.getPIPs()));
 
             if (!nonMatchingPins.isEmpty()) {
-                // TODO: Unroute just this branch
-                // nonMatchingPins.forEach((spi) -> n.unroutePin(spi));
-
-                SitePinInst spi = nonMatchingPins.iterator().next();
-                System.out.println("INFO: Unrouting net " + n.getName() + " since SiteInstPin " + spi + " does not belong to selected hierarchy");
-                n.unroute();
-                continue;
+                for (SitePinInst spi : nonMatchingPins) {
+                    System.out.println("INFO: Unrouting net " + n.getName() + " since SiteInstPin " + spi + " does not belong to selected hierarchy");
+                    n.unroutePin(spi);
+                }
             }
 
             boolean isClockNet = n.isClockNet() || n.hasGapRouting();
