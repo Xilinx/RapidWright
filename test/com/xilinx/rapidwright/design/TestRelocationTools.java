@@ -27,13 +27,13 @@ public class TestRelocationTools {
     @MethodSource()
     @CheckOpenFiles
     public void testPicoblazeOOC(String hierarchyPrefix, int colOffset, int rowOffset, boolean expectSuccess) {
-        String dcpPath = "RapidWrightDCP/picoblaze_ooc_X9Y235.dcp";
+        String dcpPath = "RapidWrightDCP/picoblaze_ooc_X10Y235.dcp";
         Design design1 = Design.readCheckpoint(dcpPath, CodePerfTracker.SILENT);
 
         Assertions.assertEquals(RelocationTools.relocate(design1, hierarchyPrefix, colOffset, rowOffset),
                 expectSuccess);
 
-        String metaPath = "RapidWrightDCP/picoblaze_ooc_X9Y235.metadata";
+        String metaPath = "RapidWrightDCP/picoblaze_ooc_X10Y235.metadata";
         if (hierarchyPrefix.isEmpty()) {
             Design design2 = new Design("design2", design1.getPartName());
             Module module = new Module(Design.readCheckpoint(dcpPath, CodePerfTracker.SILENT), metaPath);
@@ -84,7 +84,6 @@ public class TestRelocationTools {
                 for (Net n2 : mi.getNets()) {
                     Net n1 = design1.getNet(n2.getName());
                     if (n1 == null && n2.getName().startsWith(mi.getName() + "/")) {
-                        System.out.println(n2.getName().substring(mi.getName().length() + 1));
                         // Retry without ModuleInst hierarchy in case it was flattened
                         n1 = design1.getNet(n2.getName().substring(mi.getName().length() + 1));
                     }
@@ -92,7 +91,6 @@ public class TestRelocationTools {
                         // Module relocation does not propagate static nets nor USED_NETs
                         continue;
                     }
-                    System.out.println(mi.getName() + " : " + n2);
                     Assertions.assertNotNull(n1);
 
                     if (n1.isClockNet() || n1.hasGapRouting()) {
@@ -163,8 +161,8 @@ public class TestRelocationTools {
     public static Stream<Arguments> testPicoblaze4OOC() {
         return Stream.of(
                   Arguments.of("", 0, 5, true)
-                , Arguments.of("picoblaze_6_65/", 0, 5, true)
-                , Arguments.of("picoblaze_6_60/", 0, 5, false) // placement conflict
+                , Arguments.of("picoblaze_0_13/", 0, 5, true)
+                , Arguments.of("picoblaze_0_12/", 0, 5, false) // placement conflict
         );
     }
 
