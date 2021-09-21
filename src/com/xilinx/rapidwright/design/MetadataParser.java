@@ -420,6 +420,11 @@ public class MetadataParser {
 			}
 			getNextLine();
 		}
+		try {
+			br.close();
+		} catch (IOException e){
+			throw new RuntimeException("ERROR: IOException encountered on closing file " + fileName + "\nStack Trace:");
+		}
 	}
 	
 	private boolean expect(String expected, String found){
