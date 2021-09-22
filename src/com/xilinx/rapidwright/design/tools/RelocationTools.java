@@ -1,17 +1,19 @@
 package com.xilinx.rapidwright.design.tools;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.function.Predicate;
+import java.util.*;
 import java.util.stream.Collectors;
 
-import com.xilinx.rapidwright.design.*;
+import com.xilinx.rapidwright.design.Cell;
+import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.DesignTools;
+import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.SiteInst;
+import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.Tile;
+import com.xilinx.rapidwright.edif.EDIFHierCellInst;
+import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.util.Pair;
 
 /**
@@ -31,37 +33,53 @@ public class RelocationTools {
      * function will fail.
      *
      * @param design Parent design
-     * @param hierarchyPrefix Cell matches if hierarchical path starts with this value
-     *                        (empty string to match all Cells)
+     * @param instanceName Full hierarchical instance name to logical cell
+     *                     (empty for top cell)
      * @param tileColOffset Relocate this number of tile columns (X axis)
      * @param tileRowOffset Relocate this number of tile rows (Y axis)
      * @return True if successful, false otherwise.
      */
     public static boolean relocate(Design design,
-                                   String hierarchyPrefix,
+                                   String instanceName,
                                    int tileColOffset,
                                    int tileRowOffset) {
-        Collection<SiteInst> matchingSiteInsts = new ArrayList<>();
-        Predicate<Cell> matchLambda = (c) -> c.getName().startsWith(hierarchyPrefix);
-        boolean error = false;
+        EDIFNetlist netlist = design.getNetlist();
+        EDIFHierCellInst instanceCell = netlist.getHierCellInstFromName(instanceName);
+        if (instanceCell == null) {
+            System.out.println("ERROR: Logical cell with instance name '" + instanceName + "' not found");
+            return false;
+        }
 
-        for (SiteInst si : design.getSiteInsts()) {
-            Collection<Cell> cells = si.getCells();
-            Cell firstCell = cells.iterator().next();
-            boolean firstCellMatches = matchLambda.test(firstCell);
-            // Check that all other cells in this site also match/don't match
-            if (cells.stream().skip(1).allMatch(c -> matchLambda.test(c) == firstCellMatches))
-            {
-                if (firstCellMatches)
-                    matchingSiteInsts.add(si);
-            } else {
-                System.out.println("ERROR: Failed to relocate SiteInst " + si.getName()
-                        + " as it contains both matching and non-matching Cells");
+        Set<Cell> cells = new HashSet<>();
+        Set<SiteInst> siteInsts = new HashSet<>();
+        for (EDIFHierCellInst leaf : netlist.getAllLeafDescendants(instanceCell)) {
+            String leafName = leaf.getCellName();
+            if (leafName.equals("GND") || leafName.equals("VCC")) {
+                continue;
+            }
+
+            Cell c = design.getCell(leaf.getFullHierarchicalInstName());
+            if (c == null) {
+                System.out.println("WARNING: Could not find physical cell corresponding to logical cell '" +
+                        leaf.getFullHierarchicalInstName() + "'; ignoring");
+                continue;
+            }
+
+            cells.add(c);
+            siteInsts.add(c.getSiteInst());
+        }
+
+        boolean error = false;
+        for (SiteInst si : siteInsts) {
+            Collection<Cell> siteCells = si.getCells();
+            if (!cells.containsAll(si.getCells()) && cells.contains(siteCells.iterator().next())) {
+                System.out.println("ERROR: Failed to relocate SiteInst '" + si.getName()
+                        + "' as it contains Cells both inside and outside of '" + instanceName + "'");
                 error = true;
             }
         }
 
-        return !error && relocate(design, matchingSiteInsts, tileColOffset, tileRowOffset);
+        return !error && relocate(design, siteInsts, tileColOffset, tileRowOffset);
     }
 
     /**
@@ -110,12 +128,12 @@ public class RelocationTools {
             if (dt == null || ds == null) {
                 String destTileName = st.getNameRoot() + "_X" + (st.getTileXCoordinate() + tileColOffset)
                         + "Y" + (st.getTileYCoordinate() + tileRowOffset);
-                System.out.println("ERROR: Failed to move SiteInst " + si.getName() + " from Tile " + st.getName()
-                        + " to Tile " + destTileName);
+                System.out.println("ERROR: Failed to move SiteInst '" + si.getName() + "' from Tile '" + st.getName()
+                        + "' to Tile '" + destTileName + "'");
                 revertPlacement = true;
             } else if (design.isSiteUsed(ds)) {
-                System.out.println("ERROR: Failed to move SiteInst " + si.getName() + " from Tile " + st.getName()
-                        + " to Tile " + dt.getName() + " as its is already occupied");
+                System.out.println("ERROR: Failed to move SiteInst '" + si.getName() + "' from Tile '" + st.getName()
+                        + "' to Tile '" + dt.getName() + "' as its is already occupied");
                 revertPlacement = true;
             } else {
                 si.place(ds);
@@ -148,7 +166,8 @@ public class RelocationTools {
 
             if (!nonMatchingPins.isEmpty()) {
                 for (SitePinInst spi : nonMatchingPins) {
-                    System.out.println("INFO: Unrouting net " + n.getName() + " since SiteInstPin " + spi + " does not belong to selected hierarchy");
+                    System.out.println("INFO: Unrouting net '" + n.getName() + "' since SiteInstPin '" + spi +
+                            "' does not belong to SiteInsts to be relocated");
                     n.unroutePin(spi);
                 }
             }
@@ -159,11 +178,12 @@ public class RelocationTools {
                 Tile dt = st.getTileXYNeighbor(tileColOffset, tileRowOffset);
                 if (dt == null) {
                     if (isClockNet) {
-                        System.out.println("INFO: Skipping clock net PIP " + sp + " (Net " + n.getName() + ")");
+                        System.out.println("INFO: Skipping clock net PIP '" + sp + "' (Net '" + n.getName() + "')");
                     } else {
                         String destTileName = st.getNameRoot() + "_X" + (st.getTileXCoordinate() + tileColOffset)
                                 + "Y" + (st.getTileYCoordinate() + tileRowOffset);
-                        System.out.println("ERROR: Failed to move PIP " + sp + " to Tile " + destTileName + "(Net " + n.getName() + ")");
+                        System.out.println("ERROR: Failed to move PIP '" + sp + "' to Tile " + destTileName +
+                                "(Net '" + n.getName() + "')");
                         revertRouting = true;
                     }
                 } else {

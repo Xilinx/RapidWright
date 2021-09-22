@@ -117,7 +117,7 @@ public class TestRelocationTools {
                 , Arguments.of("", 0, 1, false)     // Incompatible tile
                 , Arguments.of("", -100, 0, false)  // Out of X range
                 , Arguments.of("", 0, 200, false)   // Out of Y range
-                , Arguments.of("processor/", 9, 0, false) // SiteInsts contains matching and non-matching cells
+                , Arguments.of("processor", 9, 0, false) // SiteInsts contains matching and non-matching cells
         );
     }
 
@@ -161,8 +161,8 @@ public class TestRelocationTools {
     public static Stream<Arguments> testPicoblaze4OOC() {
         return Stream.of(
                   Arguments.of("", 0, 5, true)
-                , Arguments.of("picoblaze_0_13/", 0, 5, true)
-                , Arguments.of("picoblaze_0_12/", 0, 5, false) // placement conflict
+                , Arguments.of("picoblaze_0_13", 0, 5, true)
+                , Arguments.of("picoblaze_0_12", 0, 5, false) // placement conflict
         );
     }
 
