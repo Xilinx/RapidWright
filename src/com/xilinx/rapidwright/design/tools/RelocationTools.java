@@ -25,12 +25,11 @@ import com.xilinx.rapidwright.util.Pair;
 public class RelocationTools {
 
     /**
-     * Relocate all SiteInsts containing exclusively Cells matching
-     * hierarchyPrefix (and all associated PIPs) in-place by
-     * tileColOffset/tileRowOffset tiles.
+     * Relocate all SiteInsts (and all associated PIPs) belonging to the logical Cell at
+     * instanceName in-place by tileColOffset/tileRowOffset tiles.
      *
-     * Should a SiteInst contain matching and non-matching Cells,
-     * function will fail.
+     * Should a SiteInst contain a mix of physical Cells belonging to and outside of
+     * instanceName then this function will fail.
      *
      * @param design Parent design
      * @param instanceName Full hierarchical instance name to logical cell
