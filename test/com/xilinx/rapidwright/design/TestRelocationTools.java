@@ -185,9 +185,8 @@ public class TestRelocationTools {
                         "picoblaze_0_13", 0, 5, true)
                 , Arguments.of(new PBlock(Device.getDevice("xcvu3p-ffvc1517-2-i"), "SLICE_X8Y60:SLICE_X11Y64 RAMB18_X0Y24:RAMB18_X0Y25 RAMB36_X0Y12:RAMB36_X0Y12"),
                         "picoblaze_0_12", 0, 5, false) // placement conflict
-
-
         );
     }
+
 
 }
