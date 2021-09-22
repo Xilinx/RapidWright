@@ -9,7 +9,9 @@ import java.util.Set;
 import java.util.stream.Stream;
 
 import com.xilinx.rapidwright.checker.CheckOpenFiles;
+import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.design.tools.RelocationTools;
+import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
@@ -137,7 +139,6 @@ public class TestRelocationTools {
             moduleInsts = design2.getModuleInsts();
         } else {
             moduleInsts = new ArrayList<>();
-            // Strip trailing slashes
             ModuleInst mi = design2.getModuleInst(instanceName);
             Assertions.assertNotNull(mi);
             moduleInsts = Arrays.asList(mi);
@@ -151,6 +152,41 @@ public class TestRelocationTools {
                   Arguments.of("", 0, 5, true)
                 , Arguments.of("picoblaze_0_13", 0, 5, true)
                 , Arguments.of("picoblaze_0_12", 0, 5, false) // placement conflict
+        );
+    }
+
+    @ParameterizedTest(name = "Relocate PicoBlaze4 OOC PBlock '{0}' ({1},{2})")
+    @MethodSource()
+    @CheckOpenFiles
+    public void testPicoblaze4OOC_PBlock(PBlock pblock, String instanceName, int colOffset, int rowOffset, boolean expectSuccess) {
+        String dcpPath = "RapidWrightDCP/picoblaze4_ooc_X6Y60_X6Y65_X10Y60_X10Y65.dcp";
+        Design design1 = Design.readCheckpoint(dcpPath, CodePerfTracker.SILENT);
+
+        Assertions.assertEquals(RelocationTools.relocate(design1, pblock, colOffset, rowOffset),
+                expectSuccess);
+
+        Design design2 = Design.readCheckpoint(dcpPath, CodePerfTracker.SILENT);
+        Collection<ModuleInst> moduleInsts;
+        if (instanceName.isEmpty()) {
+            moduleInsts = design2.getModuleInsts();
+        } else {
+            moduleInsts = new ArrayList<>();
+            ModuleInst mi = design2.getModuleInst(instanceName);
+            Assertions.assertNotNull(mi);
+            moduleInsts = Arrays.asList(mi);
+        }
+
+        relocateModuleInstsAndCompare(colOffset, rowOffset, expectSuccess, design1, design2, moduleInsts);
+    }
+
+    public static Stream<Arguments> testPicoblaze4OOC_PBlock() {
+        return Stream.of(
+                Arguments.of(new PBlock(Device.getDevice("xcvu3p-ffvc1517-2-i"), "SLICE_X8Y65:SLICE_X11Y69 RAMB18_X0Y26:RAMB18_X0Y27 RAMB36_X0Y13:RAMB36_X0Y13"),
+                        "picoblaze_0_13", 0, 5, true)
+                , Arguments.of(new PBlock(Device.getDevice("xcvu3p-ffvc1517-2-i"), "SLICE_X8Y60:SLICE_X11Y64 RAMB18_X0Y24:RAMB18_X0Y25 RAMB36_X0Y12:RAMB36_X0Y12"),
+                        "picoblaze_0_12", 0, 5, false) // placement conflict
+
+
         );
     }
 

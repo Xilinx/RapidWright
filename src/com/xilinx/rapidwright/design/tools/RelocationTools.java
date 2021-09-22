@@ -9,6 +9,7 @@ import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.Tile;
@@ -79,6 +80,29 @@ public class RelocationTools {
         }
 
         return !error && relocate(design, siteInsts, tileColOffset, tileRowOffset);
+    }
+
+    /**
+     * Relocate all SiteInsts (and PIPs) within the Pblock in-place by tileColOffset/tileRowOffset tiles.
+     *
+     * @param design Parent design
+     * @param pblock PBlock
+     * @param tileColOffset Relocate this number of tile columns (X axis)
+     * @param tileRowOffset Relocate this number of tile rows (Y axis)
+     * @return True if successful, false otherwise.
+     */
+    public static boolean relocate(Design design,
+                                   PBlock pblock,
+                                   int tileColOffset,
+                                   int tileRowOffset) {
+        Set<Site> allSites = pblock.getAllSites(null);
+        Collection<SiteInst> siteInsts = new ArrayList<>();
+        for (Site s : allSites) {
+            SiteInst si = design.getSiteInstFromSite(s);
+            if (si != null)
+                siteInsts.add(si);
+        }
+        return relocate(design, siteInsts, tileColOffset, tileRowOffset);
     }
 
     /**
