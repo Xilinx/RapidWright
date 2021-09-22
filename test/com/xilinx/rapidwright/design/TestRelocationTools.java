@@ -26,15 +26,15 @@ public class TestRelocationTools {
     @ParameterizedTest(name = "Relocate PicoBlaze OOC '{0}' ({1},{2})")
     @MethodSource()
     @CheckOpenFiles
-    public void testPicoblazeOOC(String hierarchyPrefix, int colOffset, int rowOffset, boolean expectSuccess) {
+    public void testPicoblazeOOC(String instanceName, int colOffset, int rowOffset, boolean expectSuccess) {
         String dcpPath = "RapidWrightDCP/picoblaze_ooc_X10Y235.dcp";
         Design design1 = Design.readCheckpoint(dcpPath, CodePerfTracker.SILENT);
 
-        Assertions.assertEquals(RelocationTools.relocate(design1, hierarchyPrefix, colOffset, rowOffset),
+        Assertions.assertEquals(RelocationTools.relocate(design1, instanceName, colOffset, rowOffset),
                 expectSuccess);
 
         String metaPath = "RapidWrightDCP/picoblaze_ooc_X10Y235.metadata";
-        if (hierarchyPrefix.isEmpty()) {
+        if (instanceName.isEmpty()) {
             Design design2 = new Design("design2", design1.getPartName());
             Module module = new Module(Design.readCheckpoint(dcpPath, CodePerfTracker.SILENT), metaPath);
             ModuleInst mi = design2.createModuleInst("inst", module);
@@ -124,36 +124,24 @@ public class TestRelocationTools {
     @ParameterizedTest(name = "Relocate PicoBlaze4 OOC '{0}' ({1},{2})")
     @MethodSource()
     @CheckOpenFiles
-    public void testPicoblaze4OOC(String hierarchyPrefix, int colOffset, int rowOffset, boolean expectSuccess) {
+    public void testPicoblaze4OOC(String instanceName, int colOffset, int rowOffset, boolean expectSuccess) {
         String dcpPath = "RapidWrightDCP/picoblaze4_ooc_X6Y60_X6Y65_X10Y60_X10Y65.dcp";
         Design design1 = Design.readCheckpoint(dcpPath, CodePerfTracker.SILENT);
 
-        Assertions.assertEquals(RelocationTools.relocate(design1, hierarchyPrefix, colOffset, rowOffset),
+        Assertions.assertEquals(RelocationTools.relocate(design1, instanceName, colOffset, rowOffset),
                 expectSuccess);
 
         Design design2 = Design.readCheckpoint(dcpPath, CodePerfTracker.SILENT);
         Collection<ModuleInst> moduleInsts;
-        if (hierarchyPrefix.isEmpty()) {
+        if (instanceName.isEmpty()) {
             moduleInsts = design2.getModuleInsts();
         } else {
             moduleInsts = new ArrayList<>();
             // Strip trailing slashes
-            ModuleInst mi = design2.getModuleInst(hierarchyPrefix.replaceAll("/$", ""));
+            ModuleInst mi = design2.getModuleInst(instanceName);
             Assertions.assertNotNull(mi);
             moduleInsts = Arrays.asList(mi);
         }
-        // TODO: Workaround ModuleInst-s not having their anchor saved
-        moduleInsts.forEach((mi) -> {
-            if (mi.getAnchor() == null) {
-                for (SiteInst si : mi.getSiteInsts()) {
-                    if (si.getSite().getSiteTypeEnum() == SiteTypeEnum.RAMBFIFO36) {
-                        mi.setAnchor(si);
-                        break;
-                    }
-                }
-                Assertions.assertTrue(mi.isPlaced());
-            }
-        });
 
         relocateModuleInstsAndCompare(colOffset, rowOffset, expectSuccess, design1, design2, moduleInsts);
     }
