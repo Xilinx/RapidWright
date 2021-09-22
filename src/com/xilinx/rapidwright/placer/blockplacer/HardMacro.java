@@ -99,11 +99,6 @@ public class HardMacro extends ModuleInst implements Comparable<Object> {
 		validSiteSet = new HashSet<Site>(getValidPlacements());
 	}
 	
-	public void lockPlacement(Site anchorLocation) {
-	    validSiteSet = new HashSet<>();
-	    validSiteSet.add(anchorLocation);
-	}
-	
 	public void unsetTempAnchorSite(){
 		this.tempAnchorSite = null;
 	}
