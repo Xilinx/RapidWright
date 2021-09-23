@@ -338,14 +338,13 @@ public class Port implements Serializable, Cloneable{
 		boundingBox = null;
 	}
 
-	TileRectangle boundingBox = null;
-	public TileRectangle getBoundingBox() {
+	RelocatableTileRectangle boundingBox = null;
+	public RelocatableTileRectangle getBoundingBox() {
 		if (boundingBox == null) {
-			TileRectangle.MutableRectangle mut = new TileRectangle.MutableRectangle();
+			boundingBox = new RelocatableTileRectangle();
 			for (SitePinInst sitePinInst : getSitePinInsts()) {
-				mut.extendTo(sitePinInst.getTile());
+				boundingBox.extendTo(sitePinInst.getTile());
 			}
-			boundingBox = mut.toImmutable().orElseThrow(()->new IllegalStateException("Cannot get Bounding Box of Port without Pins"));
 		}
 		return boundingBox;
 	}
