@@ -7,6 +7,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Stream;
+import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.checker.CheckOpenFiles;
 import com.xilinx.rapidwright.design.blocks.PBlock;
@@ -24,28 +25,6 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 public class TestRelocationTools {
-
-    @ParameterizedTest(name = "Relocate PicoBlaze OOC '{0}' ({1},{2})")
-    @MethodSource()
-    @CheckOpenFiles
-    public void testPicoblazeOOC(String instanceName, int colOffset, int rowOffset, boolean expectSuccess) {
-        String dcpPath = "RapidWrightDCP/picoblaze_ooc_X10Y235.dcp";
-        Design design1 = Design.readCheckpoint(dcpPath, CodePerfTracker.SILENT);
-
-        Assertions.assertEquals(RelocationTools.relocate(design1, instanceName, colOffset, rowOffset),
-                expectSuccess);
-
-        String metaPath = "RapidWrightDCP/picoblaze_ooc_X10Y235.metadata";
-        if (instanceName.isEmpty()) {
-            Design design2 = new Design("design2", design1.getPartName());
-            Module module = new Module(Design.readCheckpoint(dcpPath, CodePerfTracker.SILENT), metaPath);
-            ModuleInst mi = design2.createModuleInst("inst", module);
-            mi.placeOnOriginalAnchor();
-            Collection<ModuleInst> moduleInsts = Arrays.asList(mi);
-
-            relocateModuleInstsAndCompare(colOffset, rowOffset, expectSuccess, design1, design2, moduleInsts);
-        }
-    }
 
     private void relocateModuleInstsAndCompare(int colOffset, int rowOffset, boolean expectSuccess, Design design1, Design design2, Collection<ModuleInst> moduleInsts) {
         List<Pair<ModuleInst,Site>> newSite = new ArrayList<>();
@@ -109,9 +88,31 @@ public class TestRelocationTools {
         }
     }
 
+    @ParameterizedTest(name = "Relocate PicoBlaze OOC '{0}' ({1},{2})")
+    @MethodSource()
+    @CheckOpenFiles
+    public void testPicoblazeOOC(String instanceName, int colOffset, int rowOffset, boolean expectSuccess) {
+        String dcpPath = "RapidWrightDCP/picoblaze_ooc_X10Y235.dcp";
+        Design design1 = Design.readCheckpoint(dcpPath, CodePerfTracker.SILENT);
+
+        Assertions.assertEquals(RelocationTools.relocate(design1, instanceName, colOffset, rowOffset),
+                expectSuccess);
+
+        String metaPath = "RapidWrightDCP/picoblaze_ooc_X10Y235.metadata";
+        if (instanceName.isEmpty()) {
+            Design design2 = new Design("design2", design1.getPartName());
+            Module module = new Module(Design.readCheckpoint(dcpPath, CodePerfTracker.SILENT), metaPath);
+            ModuleInst mi = design2.createModuleInst("inst", module);
+            mi.placeOnOriginalAnchor();
+            Collection<ModuleInst> moduleInsts = Arrays.asList(mi);
+
+            relocateModuleInstsAndCompare(colOffset, rowOffset, expectSuccess, design1, design2, moduleInsts);
+        }
+    }
+
     public static Stream<Arguments> testPicoblazeOOC() {
         return Stream.of(
-                  Arguments.of("", 0, 5, true)
+                Arguments.of("", 0, 5, true)
                 , Arguments.of("", 0, -5, true)
                 , Arguments.of("", 9, -5, true)
                 , Arguments.of("", 0, 0, true)
@@ -123,17 +124,19 @@ public class TestRelocationTools {
         );
     }
 
+
+    private static final String Picoblaze4OOCdcp = "RapidWrightDCP/picoblaze4_ooc_X6Y60_X6Y65_X10Y60_X10Y65.dcp";
+
     @ParameterizedTest(name = "Relocate PicoBlaze4 OOC '{0}' ({1},{2})")
     @MethodSource()
     @CheckOpenFiles
     public void testPicoblaze4OOC(String instanceName, int colOffset, int rowOffset, boolean expectSuccess) {
-        String dcpPath = "RapidWrightDCP/picoblaze4_ooc_X6Y60_X6Y65_X10Y60_X10Y65.dcp";
-        Design design1 = Design.readCheckpoint(dcpPath, CodePerfTracker.SILENT);
+        Design design1 = Design.readCheckpoint(Picoblaze4OOCdcp, CodePerfTracker.SILENT);
 
         Assertions.assertEquals(RelocationTools.relocate(design1, instanceName, colOffset, rowOffset),
                 expectSuccess);
 
-        Design design2 = Design.readCheckpoint(dcpPath, CodePerfTracker.SILENT);
+        Design design2 = Design.readCheckpoint(Picoblaze4OOCdcp, CodePerfTracker.SILENT);
         Collection<ModuleInst> moduleInsts;
         if (instanceName.isEmpty()) {
             moduleInsts = design2.getModuleInsts();
@@ -158,35 +161,60 @@ public class TestRelocationTools {
     @ParameterizedTest(name = "Relocate PicoBlaze4 OOC PBlock '{0}' ({1},{2})")
     @MethodSource()
     @CheckOpenFiles
-    public void testPicoblaze4OOC_PBlock(PBlock pblock, String instanceName, int colOffset, int rowOffset, boolean expectSuccess) {
-        String dcpPath = "RapidWrightDCP/picoblaze4_ooc_X6Y60_X6Y65_X10Y60_X10Y65.dcp";
-        Design design1 = Design.readCheckpoint(dcpPath, CodePerfTracker.SILENT);
+    public void testPicoblaze4OOC_PBlock(PBlock pblock, int colOffset, int rowOffset, boolean expectSuccess) {
+        Design design1 = Design.readCheckpoint(Picoblaze4OOCdcp, CodePerfTracker.SILENT);
 
         Assertions.assertEquals(RelocationTools.relocate(design1, pblock, colOffset, rowOffset),
                 expectSuccess);
 
-        Design design2 = Design.readCheckpoint(dcpPath, CodePerfTracker.SILENT);
-        Collection<ModuleInst> moduleInsts;
-        if (instanceName.isEmpty()) {
-            moduleInsts = design2.getModuleInsts();
-        } else {
-            moduleInsts = new ArrayList<>();
-            ModuleInst mi = design2.getModuleInst(instanceName);
-            Assertions.assertNotNull(mi);
-            moduleInsts = Arrays.asList(mi);
+        Design design2 = Design.readCheckpoint(Picoblaze4OOCdcp, CodePerfTracker.SILENT);
+
+        // Find the set of ModuleInsts
+        Set<ModuleInst> moduleInsts1 = new HashSet<>();
+        for (Site s : pblock.getAllSites(null)) {
+            SiteInst si = design1.getSiteInstFromSite(s);
+            if (si != null) {
+                ModuleInst mi = si.getModuleInst();
+                if (mi != null) {
+                    moduleInsts1.add(mi);
+                }
+            }
         }
 
-        relocateModuleInstsAndCompare(colOffset, rowOffset, expectSuccess, design1, design2, moduleInsts);
+        Collection<ModuleInst> moduleInsts2 = moduleInsts1.stream().map((mi) -> design2.getModuleInst(mi.getName()))
+                .collect(Collectors.toList());
+        relocateModuleInstsAndCompare(colOffset, rowOffset, expectSuccess, design1, design2, moduleInsts2);
     }
 
     public static Stream<Arguments> testPicoblaze4OOC_PBlock() {
+        final String partName = Design.getPartNameFromDCP(Picoblaze4OOCdcp);
         return Stream.of(
-                Arguments.of(new PBlock(Device.getDevice("xcvu3p-ffvc1517-2-i"), "SLICE_X8Y65:SLICE_X11Y69 RAMB18_X0Y26:RAMB18_X0Y27 RAMB36_X0Y13:RAMB36_X0Y13"),
-                        "picoblaze_0_13", 0, 5, true)
-                , Arguments.of(new PBlock(Device.getDevice("xcvu3p-ffvc1517-2-i"), "SLICE_X8Y60:SLICE_X11Y64 RAMB18_X0Y24:RAMB18_X0Y25 RAMB36_X0Y12:RAMB36_X0Y12"),
-                        "picoblaze_0_12", 0, 5, false) // placement conflict
+                  Arguments.of(new PBlock(Device.getDevice(partName), "SLICE_X8Y65:SLICE_X11Y69 RAMB18_X0Y26:RAMB18_X0Y27 RAMB36_X0Y13:RAMB36_X0Y13"),
+                        0, 5, true)
+                , Arguments.of(new PBlock(Device.getDevice(partName), "SLICE_X8Y60:SLICE_X11Y64 RAMB18_X0Y24:RAMB18_X0Y25 RAMB36_X0Y12:RAMB36_X0Y12"),
+                        0, 5, false) // placement conflict
         );
     }
 
+    @ParameterizedTest(name = "Relocate MicroBlazeAndILA '{0}' ({1},{2})")
+    @MethodSource()
+    @CheckOpenFiles
+    public void testMicroBlazeAndILA(String instanceName, int colOffset, int rowOffset, boolean expectSuccess) {
+        String dcpPath = "RapidWrightDCP/microblazeAndILA_3pblocks.dcp";
+        Design design1 = Design.readCheckpoint(dcpPath, CodePerfTracker.SILENT);
+
+        Assertions.assertEquals(RelocationTools.relocate(design1, instanceName, colOffset, rowOffset),
+                expectSuccess);
+    }
+
+    public static Stream<Arguments> testMicroBlazeAndILA() {
+        return Stream.of(
+                  Arguments.of("", 0, 5, true)
+                , Arguments.of("", 0, 60, true)
+                , Arguments.of("base_mb_i", 0, 10, true)
+                , Arguments.of("dbg_hub", 0, 20, true)
+                , Arguments.of("u_ila_0", 0, 20, true)
+        );
+    }
 
 }

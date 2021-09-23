@@ -12,9 +12,11 @@ import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
+import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.util.Pair;
 
 /**
@@ -58,24 +60,58 @@ public class RelocationTools {
                 continue;
             }
 
-            Cell c = design.getCell(leaf.getFullHierarchicalInstName());
-            if (c == null) {
-                System.out.println("WARNING: Could not find physical cell corresponding to logical cell '" +
-                        leaf.getFullHierarchicalInstName() + "'; ignoring");
-                continue;
+            Cell c;
+            // FIXME: Workaround the CFGLUT5 macro not being expanded correctly
+            if (leafName.equals("CFGLUT5")) {
+                Cell c1 = design.getCell(leaf.getFullHierarchicalInstName() + EDIFTools.EDIF_HIER_SEP + "S1");
+                Cell c2 = design.getCell(leaf.getFullHierarchicalInstName() + EDIFTools.EDIF_HIER_SEP + "S2");
+                assert(c1 != null && c2 != null);
+                assert(c1.getSiteInst() == c2.getSiteInst());
+                cells.add(c1);
+                c = c2;
+            }
+            else {
+                c = design.getCell(leaf.getFullHierarchicalInstName());
+                if (c == null) {
+                    System.out.println("WARNING: Could not find physical cell corresponding to logical cell '" +
+                            leaf.getFullHierarchicalInstName() + "'; ignoring");
+                    continue;
+                }
             }
 
             cells.add(c);
-            siteInsts.add(c.getSiteInst());
+
+            SiteInst si = c.getSiteInst();
+            if (si == null) {
+                continue;
+            }
+
+            // TODO: Is this whitelist sufficient?
+            if (!Arrays.asList(SiteTypeEnum.SLICEL, SiteTypeEnum.SLICEM,
+                    SiteTypeEnum.RAMB18_L, SiteTypeEnum.RAMB18_U, SiteTypeEnum.RAMB180, SiteTypeEnum.RAMB181,
+                    SiteTypeEnum.RAMB36, SiteTypeEnum.RAMB36E1,
+                    SiteTypeEnum.RAMBFIFO18, SiteTypeEnum.RAMBFIFO36, SiteTypeEnum.RAMBFIFO36E1,
+                    SiteTypeEnum.FIFO18E1, SiteTypeEnum.FIFO18_0, SiteTypeEnum.FIFO36, SiteTypeEnum.FIFO36E1,
+                    SiteTypeEnum.DSP48E1, SiteTypeEnum.DSP48E2,
+                    SiteTypeEnum.DSP58, SiteTypeEnum.DSP58_CPLX, SiteTypeEnum.DSP58_PRIMARY,
+                    SiteTypeEnum.DSPFP).contains(si.getSiteTypeEnum())) {
+                System.out.println("WARNING: Skipping cell '" + leaf.getFullHierarchicalInstName() +
+                        "' as it is placed onto a SiteInst type '" + si.getSiteTypeEnum() + "'");
+                continue;
+            }
+
+            siteInsts.add(si);
         }
 
+        // Check that every SiteInst only contains Cells part of the hierarchy
         boolean error = false;
         for (SiteInst si : siteInsts) {
-            Collection<Cell> siteCells = si.getCells();
-            if (!cells.containsAll(si.getCells()) && cells.contains(siteCells.iterator().next())) {
-                System.out.println("ERROR: Failed to relocate SiteInst '" + si.getName()
-                        + "' as it contains Cells both inside and outside of '" + instanceName + "'");
-                error = true;
+            for (Cell c : si.getCells()) {
+                if (!c.isLocked() && !cells.contains(c)) {
+                    System.out.println("ERROR: Failed to relocate SiteInst '" + si.getName()
+                            + "' as it contains Cells both inside and outside of '" + instanceName + "'");
+                    error = true;
+                }
             }
         }
 
@@ -95,12 +131,12 @@ public class RelocationTools {
                                    PBlock pblock,
                                    int tileColOffset,
                                    int tileRowOffset) {
-        Set<Site> allSites = pblock.getAllSites(null);
         Collection<SiteInst> siteInsts = new ArrayList<>();
-        for (Site s : allSites) {
+        for (Site s : pblock.getAllSites(null)) {
             SiteInst si = design.getSiteInstFromSite(s);
-            if (si != null)
+            if (si != null) {
                 siteInsts.add(si);
+            }
         }
         return relocate(design, siteInsts, tileColOffset, tileRowOffset);
     }
@@ -146,21 +182,29 @@ public class RelocationTools {
             Tile st = ss.getTile();
             Tile dt = st.getTileXYNeighbor(tileColOffset, tileRowOffset);
             Site ds = ss.getCorrespondingSite(ss.getSiteTypeEnum(), dt);
-            SiteInst si = e.getKey();
+            SiteInst ssi = e.getKey();
             assert(ds != ss);
             if (dt == null || ds == null) {
                 String destTileName = st.getNameRoot() + "_X" + (st.getTileXCoordinate() + tileColOffset)
                         + "Y" + (st.getTileYCoordinate() + tileRowOffset);
-                System.out.println("ERROR: Failed to move SiteInst '" + si.getName() + "' from Tile '" + st.getName()
+                System.out.println("ERROR: Failed to move SiteInst '" + ssi.getName() + "' from Tile '" + st.getName()
                         + "' to Tile '" + destTileName + "'");
                 revertPlacement = true;
-            } else if (design.isSiteUsed(ds)) {
-                System.out.println("ERROR: Failed to move SiteInst '" + si.getName() + "' from Tile '" + st.getName()
-                        + "' to Tile '" + dt.getName() + "' as its is already occupied");
-                revertPlacement = true;
-            } else {
-                si.place(ds);
+                continue;
             }
+            SiteInst dsi = design.getSiteInstFromSite(ds);
+            if (dsi != null) {
+                if (dsi.getName().startsWith("STATIC_SOURCE")) {
+                    dsi.unPlace();
+                } else {
+                    System.out.println("ERROR: Failed to move SiteInst '" + ssi.getName() + "' from Tile '" + st.getName()
+                            + "' to Tile '" + dt.getName() + "' as it is already occupied");
+                    revertPlacement = true;
+                    continue;
+                }
+            }
+
+            ssi.place(ds);
         }
 
         if (revertPlacement) {
@@ -178,6 +222,14 @@ public class RelocationTools {
                 continue;
             }
 
+            SitePinInst src = n.getSource();
+            if (src != null && !oldSite.containsKey(src.getSiteInst())) {
+                System.out.println("INFO: Unrouting Net '" + n.getName() + "' since output SiteInstPin '" +
+                        src + "' does not belong to SiteInsts to be relocated");
+                n.unroute();
+                continue;
+            }
+
             Collection<SitePinInst> pins = n.getPins();
             Collection<SitePinInst> nonMatchingPins = pins.stream().filter(
                     (spi) -> !oldSite.containsKey(spi.getSiteInst())).collect(Collectors.toList());
@@ -189,8 +241,8 @@ public class RelocationTools {
 
             if (!nonMatchingPins.isEmpty()) {
                 for (SitePinInst spi : nonMatchingPins) {
-                    System.out.println("INFO: Unrouting net '" + n.getName() + "' since SiteInstPin '" + spi +
-                            "' does not belong to SiteInsts to be relocated");
+                    System.out.println("INFO: Unrouting SitePinInst '" + spi + "' branch of Net '" + n.getName() +
+                            "' since it does not belong to SiteInsts to be relocated");
                     n.unroutePin(spi);
                 }
             }
@@ -205,9 +257,10 @@ public class RelocationTools {
                     } else {
                         String destTileName = st.getNameRoot() + "_X" + (st.getTileXCoordinate() + tileColOffset)
                                 + "Y" + (st.getTileYCoordinate() + tileRowOffset);
-                        System.out.println("ERROR: Failed to move PIP '" + sp + "' to Tile " + destTileName +
-                                "(Net '" + n.getName() + "')");
+                        System.out.println("ERROR: Failed to move PIP '" + sp + "' to Tile '" + destTileName +
+                                "' (Net '" + n.getName() + "')");
                         revertRouting = true;
+                        throw new RuntimeException();
                     }
                 } else {
                     assert (st.getTileTypeEnum() == dt.getTileTypeEnum());
