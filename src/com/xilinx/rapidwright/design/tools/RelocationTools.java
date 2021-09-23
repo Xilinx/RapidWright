@@ -12,12 +12,12 @@ import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
-import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.util.Pair;
+import com.xilinx.rapidwright.util.Utils;
 
 /**
  * A collection of tools to help relocate designs.
@@ -86,15 +86,7 @@ public class RelocationTools {
                 continue;
             }
 
-            // TODO: Is this whitelist sufficient?
-            if (!Arrays.asList(SiteTypeEnum.SLICEL, SiteTypeEnum.SLICEM,
-                    SiteTypeEnum.RAMB18_L, SiteTypeEnum.RAMB18_U, SiteTypeEnum.RAMB180, SiteTypeEnum.RAMB181,
-                    SiteTypeEnum.RAMB36, SiteTypeEnum.RAMB36E1,
-                    SiteTypeEnum.RAMBFIFO18, SiteTypeEnum.RAMBFIFO36, SiteTypeEnum.RAMBFIFO36E1,
-                    SiteTypeEnum.FIFO18E1, SiteTypeEnum.FIFO18_0, SiteTypeEnum.FIFO36, SiteTypeEnum.FIFO36E1,
-                    SiteTypeEnum.DSP48E1, SiteTypeEnum.DSP48E2,
-                    SiteTypeEnum.DSP58, SiteTypeEnum.DSP58_CPLX, SiteTypeEnum.DSP58_PRIMARY,
-                    SiteTypeEnum.DSPFP).contains(si.getSiteTypeEnum())) {
+            if (!Utils.sliceDspBramUramTypes.contains(si.getSiteTypeEnum())) {
                 System.out.println("WARNING: Skipping cell '" + leaf.getFullHierarchicalInstName() +
                         "' as it is placed onto a SiteInst type '" + si.getSiteTypeEnum() + "'");
                 continue;
