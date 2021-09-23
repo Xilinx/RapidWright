@@ -22,11 +22,11 @@
  */
 package com.xilinx.rapidwright.gui;
 
-import java.util.HashMap;
-
 import com.trolltech.qt.gui.QColor;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
+
+import java.util.HashMap;
 
 /**
  * This class is simply a suggested coloring of tile types for displaying
@@ -378,6 +378,8 @@ public class TileColors {
 		tileColors.put(TileTypeEnum.XIPHY_L_RBRK,QColor.black);
 		tileColors.put(TileTypeEnum.XIPHY_L_TERM_B,QColor.black);
 		tileColors.put(TileTypeEnum.XIPHY_L_TERM_T,QColor.black);
+		tileColors.put(TileTypeEnum.URAM_URAM_FT,QColor.darkMagenta);
+		tileColors.put(TileTypeEnum.URAM_URAM_DELAY_FT,QColor.darkMagenta);
 
 		// Versal
 		tileColors.put(TileTypeEnum.CLE_E_CORE, QColor.blue);
@@ -394,5 +396,11 @@ public class TileColors {
 		tileColors.put(TileTypeEnum.INTF_ROCF_TR_TILE,QColor.darkYellow);
 		tileColors.put(TileTypeEnum.CLE_BC_CORE, QColor.darkBlue);
 		tileColors.put(TileTypeEnum.CLE_BC_CORE_MX, QColor.darkBlue);
+		tileColors.put(TileTypeEnum.URAM_LOCF_TL_TILE, QColor.darkMagenta);
+		tileColors.put(TileTypeEnum.URAM_LOCF_BL_TILE, QColor.darkMagenta);
+		tileColors.put(TileTypeEnum.URAM_ROCF_TL_TILE, QColor.darkMagenta);
+		tileColors.put(TileTypeEnum.URAM_ROCF_BL_TILE, QColor.darkMagenta);
+		tileColors.put(TileTypeEnum.URAM_DELAY_ROCF_TL_TILE, QColor.darkMagenta);
+		tileColors.put(TileTypeEnum.URAM_DELAY_LOCF_TL_TILE, QColor.darkMagenta);
 	}
 }
