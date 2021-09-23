@@ -37,16 +37,22 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Module;
 import com.xilinx.rapidwright.design.ModuleCache;
 import com.xilinx.rapidwright.design.ModuleImpls;
+import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.Port;
 import com.xilinx.rapidwright.design.SiteInst;
+import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.blocks.BlockGuide;
 import com.xilinx.rapidwright.design.blocks.ImplGuide;
 import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.design.blocks.SubPBlock;
+import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFTools;
@@ -114,6 +120,9 @@ public class BlockCreator {
 
 			m.setDevice(d.getDevice());
 			m.calculateAllValidPlacements(d.getDevice());
+
+			fixupModuleOutputs(m);
+
 			modImpls.add(m);
 			
 			// Store PBlock with Module Here
@@ -122,12 +131,42 @@ public class BlockCreator {
 			if(lines == null || lines.size() == 0){
 				throw new RuntimeException("ERROR: Problem reading pblock from guided block file " + guidedPblockFile);
 			}
-			String pblockString = lines.get(0).trim(); 
+			String pblockString = lines.get(0).trim();
 			if(pblockString.length() > 0 && !pblockString.contains("Failed!")) m.setPBlock(pblockString);
 		}
 		return modImpls;
 	}
-	
+
+	/**
+	 * Vivado may create Module output ports on a Slice's COUT Pin. This is not routable, so we try to move to another
+	 * Slice Pin.
+	 * @param m Module
+	 */
+	private static void fixupModuleOutputs(Module m) {
+		final Map<SitePinInst, List<Port>> portsToChange = m.getPorts().stream()
+				.filter(port -> port.isOutPort())
+				.filter(port -> port.getSingleSitePinInst() != null)
+				.filter(port -> port.getSingleSitePinInst().getName().equals("COUT"))
+				.collect(Collectors.groupingBy(Port::getSingleSitePinInst));
+		portsToChange.forEach((sitePinInst, ports) -> {
+
+			final Net existingNet = sitePinInst.getSiteInst().getNetFromSiteWire("HMUX");
+			if (existingNet != null) {
+				throw new RuntimeException("Can not redirect carry out of "+ports+", sourced at "+sitePinInst+", because pin is already used for net "+existingNet);
+			}
+
+			sitePinInst.setPinName("HMUX");
+
+
+			BELPin srcPin = sitePinInst.getSiteInst().getBEL("CARRY8").getPin("CO7");
+			BELPin sinkPin = sitePinInst.getBELPin();
+
+			if (!sitePinInst.getSiteInst().routeIntraSiteNet(sitePinInst.getNet(), srcPin, sinkPin)) {
+				throw new RuntimeException("Failed to route in site");
+			}
+		});
+	}
+
 	private static ArrayList<String> getRoutedDCPFileNames(String routedDCPFileName, int blockImplCount){
 		ArrayList<String> routedDCPFileNames = new ArrayList<String>();
 		if(blockImplCount == 1){
@@ -266,7 +305,11 @@ public class BlockCreator {
 				// Create a run for each implementation of each module in pblock file
 				String pblockFileName = optDcpFileName.replace("_opt.dcp", "_pblock.txt");
 				if(new File(pblockFileName).exists()){
-					for(String pblock : FileTools.getLinesFromTextFile(pblockFileName)){
+					ArrayList<String> pBlockLines = FileTools.getLinesFromTextFile(pblockFileName);
+					if (pBlockLines.get(0).startsWith("PBlockGenerator Failed!")) {
+						throw new RuntimeException("in " + cacheID+" "+String.join("\n", pBlockLines) +"\n for "+pblockFileName);
+					}
+					for(String pblock : pBlockLines){
 						if(pblock.startsWith("#")) continue;
 						PBlock pblock2 = (pblock.trim().isEmpty() || pblock.contains("Failed!")) ? null : new PBlock(dev, pblock);
 						FileTools.writeStringToTextFile(pblock, optDcpFileName.replace("opt.dcp", +implIndex + USED_PBLOCK_FILE_SUFFIX));
@@ -280,7 +323,7 @@ public class BlockCreator {
 					Job job = createImplRun(optDcpFileName, null, implIndex, null);
 					jobs.addJob(job);
 					jobLocations.put(job.getJobNumber(), optDcpFileName + " " + implIndex);
-					implIndex++;					
+					implIndex++;
 				}
 			}
 			BlockGuide bg = implHelper == null ? null : implHelper.getBlock(cacheID);
@@ -353,7 +396,7 @@ public class BlockCreator {
 		}
 		
 		if(halt){
-		    throw new RuntimeException("ERROR: Failure to generate all necessary OOC DCPs.  "
+			throw new RuntimeException("ERROR: Failure to generate all necessary OOC DCPs.  "
 				+ "Please see error messages and logs above to resolve issues in order to continue.");
 		}
 	}
@@ -366,7 +409,7 @@ public class BlockCreator {
 		}
 		FileTools.writeLinesToTextFile(doneFileContents, fileName);
 	}
-	
+
 	private static void createTclScript(String scriptName, String optDcpFileName, PBlock pblock, int implIndex, BlockGuide blockGuide){
 		PrintWriter pw = null;
 		try {
@@ -378,7 +421,7 @@ public class BlockCreator {
 		if(FileTools.isWindows()){
 			optDcpFileName = optDcpFileName.replace("\\", "/");
 		}
-		
+
 		pw.println("if { [info procs rapid_compile_ipi] == \"\" } {");
 		pw.println("	if {[info exists env(RAPIDWRIGHT_PATH)]} {");
 		pw.println("		set rw_path $::env(RAPIDWRIGHT_PATH)");
@@ -388,7 +431,7 @@ public class BlockCreator {
 		pw.println("	}");
 		pw.println("}");
 		pw.println("puts \"RAPIDWRIGHT_PATH=$::env(RAPIDWRIGHT_PATH)\"");
-		
+
 		
 		pw.println("open_checkpoint " + optDcpFileName);
 		if(blockGuide != null){
@@ -481,6 +524,10 @@ public class BlockCreator {
 	 * @return The module corresponding 
 	 */
 	public static ModuleImpls createOrRetrieveBlock(String edifFileName, String routedDCPFileName, String cellInstanceName, String xciFileName, int blockImplCount){
+		Objects.requireNonNull(edifFileName);
+		Objects.requireNonNull(cellInstanceName);
+		Objects.requireNonNull(xciFileName);
+		Objects.requireNonNull(routedDCPFileName);
 		String uniqueFileName = getUniqueFileName(xciFileName);
 		String cacheID = xciFileName.replace(".xci", "");
 		cacheID = cacheID.substring(cacheID.lastIndexOf('/')+1, cacheID.length());

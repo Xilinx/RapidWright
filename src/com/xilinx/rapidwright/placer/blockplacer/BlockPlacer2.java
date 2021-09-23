@@ -1,72 +1,76 @@
-/* 
+/*
  * Original work: Copyright (c) 2010-2011 Brigham Young University
- * Modified work: Copyright (c) 2017 Xilinx, Inc. 
+ * Modified work: Copyright (c) 2017 Xilinx, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
- *  
- * This file is part of RapidWright. 
- * 
+ *
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 package com.xilinx.rapidwright.placer.blockplacer;
 
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Random;
+import java.util.Set;
 
+import com.xilinx.rapidwright.design.AbstractModuleInst;
 import com.xilinx.rapidwright.design.Design;
-import com.xilinx.rapidwright.design.Module;
-import com.xilinx.rapidwright.design.ModuleInst;
-import com.xilinx.rapidwright.design.Net;
-import com.xilinx.rapidwright.design.SitePinInst;
-import com.xilinx.rapidwright.design.SiteInst;
+import com.xilinx.rapidwright.design.SimpleTileRectangle;
+import com.xilinx.rapidwright.design.TileRectangle;
 import com.xilinx.rapidwright.device.Device;
-import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.util.MessageGenerator;
-import com.xilinx.rapidwright.util.Utils;
 
 /**
- * An alternate implementation of {@link BlockPlacer}.  This placer 
+ * An alternate implementation of {@link BlockPlacer}.  This placer
  * tends to do better but with longer runtime.
  * @author Chris Lavin
  */
-public class BlockPlacer2 {
+public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleInst<ModuleT, ?>, PlacementT, PathT extends AbstractPath<?, ModuleInstT>> extends AbstractBlockPlacer<ModuleInstT, PlacementT> {
+	/** Enable extra sanity checks? */
+	protected static final boolean PARANOID = false;
 	/** The current design */
-	private Design design;
+	protected final Design design;
 	/** The current device being targeted by the design */
-	private Device dev;
+	protected final Device dev;
 	/** A list of all the hard macros in the design */
-	private ArrayList<HardMacro> hardMacros;
+	protected List<ModuleInstT> hardMacros;
 	/** A set of all the paths between hard macros in the design */
-	private HashSet<Path> allPaths;
-	/** A map to go from module instance to hard macro objects */
-	private HashMap<ModuleInst, HardMacro> macroMap;
+	protected Set<PathT> allPaths;
 	/** The random number generator used throughout this class */
 	private Random rand;
 	/** The current move that is being evaluated */
-	private Move currentMove;
-	/** The current location of all hard macros */
-	private HashMap<Site, HardMacro> currentPlacements;
+	private Move<ModuleInstT, PlacementT> currentMove;
 	/** The current temperature of the simulated annealing schedule */
 	private double currentTemp;
 	/** Number of accepted moves in the current temperature step */
@@ -77,9 +81,9 @@ public class BlockPlacer2 {
 	private double moveAcceptanceRate = 1.0;
 	/** */
 	//private double goldenRate = 0.44;
-	private double goldenRate = 0.20;
+	private final double goldenRate = 0.20;
 	private long seed;
-	
+
 	// Final Results
 	/** */
 	public double finalSystemCost;
@@ -89,35 +93,55 @@ public class BlockPlacer2 {
 	public double placerRuntime;
 	/** */
 	/** */
-	private double rangeLimit;
+	protected double rangeLimit;
 	public boolean verbose = true;
 
 	public static int DEBUG_LEVEL = 1;
 	// DEBUG
 	//private HashMap<HardMacro, Integer> moveCount = new HashMap<HardMacro, Integer>();
-	private double alpha;
-	private double beta;
-    
+	private final double alpha;
+	private final double beta;
+
+	private final boolean ignoreMostUsedNets;
+
     // Update. Added variable to support partial .dcp
     public boolean save_partial_dcp = true;
-	
-    private Map<ModuleInst, Site> lockedPlacements = null;
-    
-	/** 
+
+    private PrintWriter graphDataWriter = null;
+	private double prevSystemCost;
+	private double currSystemCost;
+	private int moveCount;
+	private double bestSoFar;
+
+	private Map<ModuleT, AbstractPlacementCollection<PlacementT>> possiblePlacements;
+
+    private Map<ModuleInstT, Site> lockedPlacements = null;
+
+	/**
 	 * Empty Constructor
-	 * 
+	 *
 	 */
-	public BlockPlacer2(){
+	public BlockPlacer2(Design design, boolean ignoreMostUsedNets, Path graphData){
+		this.design = design;
+		this.dev = design.getDevice();
+		this.ignoreMostUsedNets = ignoreMostUsedNets;
 		alpha = 1.0;
 		beta = 1.0;
 		seed = 2;
+		if (graphData != null) {
+			try {
+				graphDataWriter = new PrintWriter(Files.newBufferedWriter(graphData));
+			} catch (IOException e) {
+				throw new UncheckedIOException(e);
+			}
+		}
 	}
-	
-	public BlockPlacer2(Map<ModuleInst, Site> lockedPlacements) {
-	    this();
+
+	public BlockPlacer2(Design design, boolean ignoreMostUsedNets, Path graphData, Map<ModuleInstT, Site> lockedPlacements) {
+	    this(design, ignoreMostUsedNets, graphData);
 	    this.lockedPlacements = lockedPlacements;
 	}
-	
+
 	/**
 	 * Sets the random seed to be used in this placer
 	 * @param seed
@@ -125,191 +149,115 @@ public class BlockPlacer2 {
 	private void setSeed(long seed){
 		this.seed = seed;
 	}
-	
+
+	abstract List<ModuleInstT> getModuleImpls(boolean debugFlow);
+
+	protected abstract void ignorePath(PathT path);
+	private void findPathsToIgnore() {
+		allPaths.removeIf(path -> {
+			double connectedRatio = (double)path.countConnectedModules()/hardMacros.size();
+			if (connectedRatio > 0.9) {
+				System.out.println("ignoring path "+path.getName()+", connects to "+path.countConnectedModules()+"/"+hardMacros.size()+" = "+connectedRatio);
+				ignorePath(path);
+				return true;
+			}
+			return false;
+		});
+	}
 	/**
 	 * Performs all of the initialization steps to prepare for placement
 	 */
-	private void initializePlacer(boolean debugFlow){
-		//currentPlacements = new HashMap<Site, HardMacro>();
-		currentMove = new Move();
+	public void initializePlacer(boolean debugFlow){
+		currentMove = new Move<>(this);
 		totalMoves = 0;
-		dev = design.getDevice();
-		allPaths = new HashSet<Path>();
-		hardMacros = new ArrayList<HardMacro>();
-		macroMap = new HashMap<ModuleInst, HardMacro>();
-				
-		// Find all valid placements for each module
-		for(ArrayList<Module> moduleImpls : design.getModules()){
-			for(Module module : moduleImpls){
-				ArrayList<Site> sites = module.getAllValidPlacements();
-				if(sites.size() == 0){
-					sites = module.calculateAllValidPlacements(dev);
-				}
-				if(debugFlow){
-					// Need to check if placements will work with existing implementation
-					ArrayList<Site> openSites = new ArrayList<Site>();
-					for(Site s : sites){
-						if(module.isValidPlacement(s, dev, design)){
-							openSites.add(s);
-						}
-					}
-					if(openSites.size() == 0){
-						throw new RuntimeException("ERROR: Couldn't find an open placement location for module: " + module.getName());
-					}
-					sites = openSites;
-				}							
-			}
-		}
-		
-		// Create Hard Macro objects from module instances
-		for(ModuleInst mi : design.getModuleInsts()){
-			HardMacro hm = new HardMacro(mi);
-			hardMacros.add(hm);
-			if(lockedPlacements != null && lockedPlacements.containsKey(mi)) {
-			    hm.lockPlacement(lockedPlacements.get(mi));
-			}else {
-			    hm.setValidPlacements();			    
-			}
-			macroMap.put(mi, hm);
-		}
-		/*
-		// Place hard macros for initial placement
-		for(HardMacro hm : hardMacros){			
-			for(Site site : hm.getValidPlacements()){
-				hm.setTempAnchorSite(site, currentPlacements);
-				if(checkValidPlacement(hm)){
-					hm.place(site, dev);
-					hm.calculateTileSize();
-					break;
-				}
-			}
-		}*/
-		
-		// Find all port wires
-		//readCriticalNets();
-		populateAllPaths();
-	}	
-	
-	private void initialPlacement(){
-		currentPlacements = new HashMap<Site, HardMacro>();
+		allPaths = new HashSet<PathT>();
+		hardMacros = getModuleImpls(debugFlow);
 
-		Device dev = design.getDevice(); 
-		Tile center = dev.getTile(dev.getRows()/2, dev.getColumns()/2);
-		PriorityQueue<Site> sites = new PriorityQueue<Site>(1024, new Comparator<Site>() {
-			public int compare(Site i, Site j) {return i.getTile().getManhattanDistance(center) - j.getTile().getManhattanDistance(center);}});
+		populateAllPaths();
+
+		if (ignoreMostUsedNets) {
+			findPathsToIgnore();
+		}
+	}
+
+	/**
+	 * All Placements of a hard macro. MUST BE SORTED BY TILE COLUMN!
+	 *
+	 * Order is used for speeding up applying the range limit
+	 * @param hm macro
+	 * @return possible placements, ordered by column
+	 */
+	abstract Collection<PlacementT> getAllPlacements(ModuleInstT hm);
+	abstract void unsetTempAnchorSite(ModuleInstT hm);
+	abstract Comparator<PlacementT> getInitialPlacementComparator();
+	abstract void placeHm(ModuleInstT hm, PlacementT placement);
+	abstract void unplaceHm(ModuleInstT hm);
+
+	protected void initialPlacement(){
+		if (hardMacros.stream().allMatch(hm->getCurrentPlacement(hm) != null)) {
+			for(PathT path : allPaths){
+				path.calculateLength();
+			}
+
+			System.out.println("Pre-placed design! Cost: "+currentSystemCost());
+			unplaceDesign();
+		}
+
+		possiblePlacements = new HashMap<>();
+
 		// Place hard macros for initial placement
-		for(HardMacro hm : hardMacros){
-			sites.clear();
-			sites.addAll(hm.getValidPlacements());
+		for(ModuleInstT hm : hardMacros){
+			PriorityQueue<PlacementT> sites = new PriorityQueue<>(1024, getInitialPlacementComparator());
+			final Collection<PlacementT> allPlacements = getAllPlacements(hm);
+
+			possiblePlacements.put(hm.getModule(), allPlacements.stream().collect(PlacementCollection.collector(this)));
+			sites.addAll(allPlacements);
+			boolean found = false;
 			while(!sites.isEmpty()){
-				Site site = sites.remove();
-				hm.setTempAnchorSite(site, currentPlacements);
+				PlacementT site = sites.remove();
+				setTempAnchorSite(hm, site);
 				if(checkValidPlacement(hm)){
-					if(!hm.place(site)){
-						throw new RuntimeException("ERROR: Failed to place " + hm.getName() + " at " + site.getName());
-					}
-					hm.calculateTileSize();
+					placeHm(hm, site);
+					found = true;
 					break;
 				}
 			}
-			/*for(Site site : hm.getValidPlacements()){
-				hm.setTempAnchorSite(site, currentPlacements);
-				if(checkValidPlacement(hm)){
-					if(!hm.place(site)){
-						throw new RuntimeException("ERROR: Failed to place " + hm.getName() + " at " + site.getName());
-					}
-					hm.calculateTileSize();
-					break;
-				}
-			}*/
+			if (!found) {
+				throw new RuntimeException("no initial place for "+hm.getName());
+			}
 		}
-		// We have p
-		for(Path path : allPaths){
+
+		for(PathT path : allPaths){
 			path.calculateLength();
 		}
-		
-		ArrayList<HardMacro> prunedList = new ArrayList<>();
-		for(HardMacro hm : new ArrayList<>(hardMacros)){
-			if(hm.getValidPlacements().size() > 2) prunedList.add(hm);
+
+		ArrayList<ModuleInstT> prunedList = new ArrayList<>();
+		for(ModuleInstT hm : new ArrayList<>(hardMacros)){
+			if(getAllPlacements(hm).size() > 2) prunedList.add(hm);
+			else {
+				System.err.println("Not adding HM since it only has one placement: "+hm.getName());
+			}
 		}
 		hardMacros = prunedList;
 	}
-	
+
 	private void unplaceDesign(){
-		//currentPlacements = new HashMap<Site, HardMacro>();
 		// Place hard macros for initial placement
-		currentMove = new Move();
+		currentMove = new Move<ModuleInstT, PlacementT>(this);
 		totalMoves = 0;
-		for(HardMacro hm : hardMacros){			
-			hm.setTileSize(0);
-			hm.unplace();
-			hm.unsetTempAnchorSite();
+		for(ModuleInstT hm : hardMacros){
+			unplaceHm(hm);
+			unsetTempAnchorSite(hm);
 		}
 	}
-	
+
 	/**
 	 * Finds all paths between unplaced components.
-	 * @throws Exception 
 	 */
-	private void populateAllPaths(){
-		for(Net net : design.getNets()){
-			/*if(checkCriticalNet(net.getName())){
-				System.out.println("found");
-				try{
-					System.in.read();
-				}
-				catch(IOException e){
-					e.printStackTrace();
-				}
-			}*/
-			if(net.isStaticNet() || net.isClockNet()) continue;
-			SitePinInst src = net.getSource();
-			ArrayList<SitePinInst> snks = new ArrayList<SitePinInst>();
-			if(src == null){
-				// TODO - This should not happen
-				//System.out.println("ERROR: Need to find out why net: " + net.getName() + " has no driver\n\n" + net.toString() );
-				continue;
-			}
-			String srcModInstName = src.getSiteInst().getModuleInst() == null ? "null" : src.getModuleInstName();
-			for(SitePinInst p : net.getPins()){
-				if(p.equals(src)) continue;
-				String snkModInstName = p.getSiteInst().getModuleInst() == null ? "null" : p.getModuleInstName();
-				if(!snkModInstName.equals(srcModInstName)){
-					snks.add(p);
-				}
-			}
-			
-			if(snks.size() > 0){
-				Path newPath = new Path();
-				newPath.addPin(src,macroMap);
-				for(SitePinInst snk : snks){
-					newPath.addPin(snk, macroMap);
-				}
-				allPaths.add(newPath);
-			}
-		}
-				
-		for(Path pa : allPaths){
-			for(PathPort po : pa){
-				if(po.getBlock() != null){
-					po.getBlock().addConnectedPath(pa);
-				}
-			}
-		}
-	}
-	
-	private boolean checkValidPlacement(HardMacro hm){
-		if(!hm.isValidPlacement()) return false;
-		for(HardMacro hardMacro : hardMacros){
-			if(hardMacro.equals(hm)) continue;
-			if(hm.getTempAnchorSite().equals(hardMacro.getTempAnchorSite())) return false;
-			if(hm.overlaps(hardMacro)){
-				return false;
-			}
-		}
-		return true;
-	}
-	
+	protected abstract void populateAllPaths();
+
+	protected abstract boolean checkValidPlacement(ModuleInstT hm);
+
 	public double calculateStartTemp(int numBlocks){
 		double stdDev = 0.0;
 		double myTemp = 1e30;// very high temperature to accept all moves
@@ -318,32 +266,46 @@ public class BlockPlacer2 {
 		double avgCost = 0.0;
 		double sqCost = 0.0;
 		double r;
-		ArrayList<Double> arrayCosts = new ArrayList<Double>();
+		ArrayList<Double> arrayCosts = new ArrayList<>();
 		int acceptedMoveCount = 0;
 		previousCost = currentSystemCost();
 		for(int i=0; i<numBlocks; i++){
-			HardMacro selectedHD = hardMacros.get(i);
+			ModuleInstT selectedHD = hardMacros.get(i);
+			saveAllCosts();
 			if (getNextMove(selectedHD)){
+				saveAllCosts();
 				currentCost = currentSystemCost();
 				arrayCosts.add(currentCost);
 				avgCost = avgCost + currentCost;
 				sqCost = sqCost + (currentCost*currentCost);
-				
-				
+
+
 				r = rand.nextDouble();
 				double costChange = currentCost - previousCost;
 				boolean acceptMove = (r < Math.exp(-costChange/myTemp));
-				
+
 				if(acceptMove){
+					//System.out.println("start temp accept for "+costChange+": "+r+"<"+Math.exp(-costChange/myTemp)+" curr: "+currentCost);
 					acceptedMoveCount++;
 					previousCost = currentCost;
 				}
 				else{
+					//System.out.println("start temp not accept");
 					// Undo the move, we are not accepting it
-					currentMove.undoMove(currentPlacements);
+					currentMove.undoMove();
+					for (PathT path : getConnectedPaths(currentMove.getBlock0())) {
+						path.calculateLength();
+					}
+					if (currentMove.getBlock1() != null) {
+						for (PathT path : getConnectedPaths(currentMove.getBlock1())) {
+							path.calculateLength();
+						}
+					}
+					saveAllCosts();
 					double testCost = currentSystemCost();
 					if(testCost != previousCost){
-						MessageGenerator.briefError("ERROR_startTemp: Undo move caused improper system cost change: prev=" + previousCost + " incorrect=" + testCost + " move= " + currentMove.toString());
+						dumpCostChanges();
+						MessageGenerator.briefError("ERROR_startTemp: gUndo move caused improper system cost change: prev=" + previousCost + " incorrect=" + testCost + " move= " + currentMove.toString());
 						MessageGenerator.waitOnAnyKeySilent();
 					}
 				}
@@ -354,9 +316,8 @@ public class BlockPlacer2 {
 		}else{
 			avgCost = 0;
 		}
-		double tmp = 0;
 		for(double c : arrayCosts){
-			tmp = c - avgCost;
+			double tmp = c - avgCost;
 			stdDev = stdDev + (tmp*tmp);
 		}
 		stdDev = Math.sqrt(stdDev/(Math.max(acceptedMoveCount-1,1)));
@@ -366,12 +327,71 @@ public class BlockPlacer2 {
 		//macroMap.clear();
 		return (20.0*stdDev);
 	}
-	
-	public Design placeDesign(Design design, boolean debugFlow){
-		this.design = design;
+
+	private String hmName(ModuleInstT hm) {
+		if (hm == null)
+			return "null";
+		return hm.getName();
+	}
+
+	private void printAllCosts(PrintWriter pw) {
+		pw.println(hmName(currentMove.getBlock0())+", "+hmName(currentMove.getBlock1()));
+		pw.println(currentMove.site0+", "+currentMove.site1);
+		hardMacros.stream().sorted(Comparator.comparing(hm->hm.getName()))
+				.forEach(hm -> pw.println(hm.getName()+": "+getCurrentPlacement(hm)));
+		allPaths.stream().sorted(Comparator.comparing(p->p.getName()))
+				.forEach(path -> {
+					pw.println(path.getName()+": "+path.getLength());
+					/*path.streamTiles().map(Object::toString).sorted()
+							.forEach(o->pw.println("    "+o));*/
+				});
+	}
+	List<String> costList = new ArrayList<>();
+	private void saveAllCosts() {
+		if (currentTemp > -1) {
+			return;
+		}
+		while (costList.size() > 4) {
+			costList.remove(0);
+		}
+		StringWriter sw = new StringWriter();
+		PrintWriter pw = new PrintWriter(sw);
+
+		printAllCosts(pw);
+
+		costList.add(sw.toString());
+	}
+
+	private void dumpCostChanges() {
+		for (int i=0;i<costList.size();i++) {
+			Path out = Paths.get("/tmp/costDump"+i+".txt");
+			try {
+				Files.write(out, costList.get(i).getBytes(StandardCharsets.UTF_8));
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+			System.out.println("dumped costs to "+out);
+		}
+	}
+
+	protected abstract void doFinalPlacement();
+
+	public void printMaxColumn(Design design, String stage) {
+
+		int newMax = hardMacros.stream().mapToInt(mi -> {
+			Tile tile = getCurrentAnchorTile(mi);
+			return tile.getColumn();
+		}).max().orElse(0);
+		System.out.println("max Column at "+stage+" = " + newMax);
+	}
+
+	protected abstract Tile getCurrentAnchorTile(ModuleInstT mi);
+
+	protected abstract PlacementT getTempAnchorSite(ModuleInstT mi);
+
+	public Design placeDesign(boolean debugFlow){
 		rand = new Random(seed);
 		boolean finished = false;
-		double changeInCost = 0.0;
 		int maxInnerIteration = 0;
 		double r;
 		//MessageGenerator.printHeader(this.getClass().getCanonicalName());
@@ -380,25 +400,28 @@ public class BlockPlacer2 {
 		start = System.currentTimeMillis();
 		initializePlacer(debugFlow);
 		initialPlacement();
+		printMaxColumn(design, "initial placement");
 		//HandPlacer.openDesign(design);
 		int totalFootprint = 0;
-		for(HardMacro hm : hardMacros){
-			totalFootprint += hm.getTileSize();
+		for(ModuleInstT hm : hardMacros){
+			totalFootprint += getTileSize(hm);
 		}
 		int squareWidth = (int) (Math.sqrt(totalFootprint) * 1.5);
-		
+
 		//rangeLimit = Math.max(dev.getColumns(), dev.getRows());
 		rangeLimit = Math.max(squareWidth, squareWidth);
 		currentTemp = calculateStartTemp(hardMacros.size());
 		if (Double.isNaN(currentTemp)) {
 			throw new RuntimeException("initialized to NAN temperature");
 		}
+		System.out.println("currentTemp = " + currentTemp);
+		System.out.println("hardMacros.size() = " + hardMacros.size());
 		//initializePlacer(debugFlow);
 		//unplaceDesign();
 		//initialPlacement();
-		double prevSystemCost = currentSystemCost();
-		double currSystemCost = prevSystemCost;
-		double bestSoFar = currSystemCost;
+		prevSystemCost = currentSystemCost();
+		currSystemCost = prevSystemCost;
+		bestSoFar = currSystemCost;
 		rangeLimit = Math.max(dev.getColumns(), dev.getRows());
 		maxInnerIteration = (int)(1 * Math.pow(hardMacros.size(), 1.3333));
 		//maxInnerIteration = (int)(Math.pow(Math.max(dev.getColumns(), dev.getRows()), 1.3333));
@@ -407,166 +430,46 @@ public class BlockPlacer2 {
 			maxInnerIteration = 0;
 		}
 		OUTER: while(!finished){
-			currentAcceptedMoveCount = 0;
-			int moveCount = 0;
-			int badMoveCount = 0;
-			int badAcceptedMoveCount = 0;
-			double totalMovesCost = 0.0;
-			for(int inner_iterate = 0; inner_iterate< (maxInnerIteration); inner_iterate++){				
-			//for(int inner_iterate = 0; inner_iterate< (10*rangeLimit); inner_iterate++){
-			//for(int inner_iterate = 0; inner_iterate< (dev.getColumns()*dev.getRows()); inner_iterate++){
-				HardMacro selectedHD = hardMacros.get(rand.nextInt(hardMacros.size()-1));
-				if (getNextMove(selectedHD)){
-					totalMoves++;
-					currSystemCost = currentSystemCost();
-					changeInCost = currSystemCost - prevSystemCost;
-					moveCount++;
-					totalMovesCost += changeInCost;
-					if(currSystemCost < bestSoFar){
-						bestSoFar = currSystemCost;
-						//if (bestSoFar==18875.0){
-							//break OUTER;
-						//}
-					}
-					
-					r = rand.nextDouble();
-					int numPath0 = 0;
-					int numPath1 = 0;
-					double tmp =0.0;
-					double AvgChange = 0.0;
-					if(currentMove.getBlock0() != null){
-						for(Path wire : currentMove.getBlock0().getConnectedPaths()){
-							wire.calculateLength();
-							tmp = tmp + wire.getLength();
-						}
-						numPath0 = currentMove.getBlock0().getConnectedPaths().size();
-						AvgChange = AvgChange + tmp/numPath0;
-					}
-					tmp =0.0;
-					if(currentMove.getBlock1() != null){
-						for(Path wire : currentMove.getBlock1().getConnectedPaths()){
-							wire.calculateLength();
-							tmp = tmp + wire.getLength();
-						}
-						numPath1 = currentMove.getBlock1().getConnectedPaths().size();
-						AvgChange = AvgChange + tmp/numPath1;
-					}
-					int numPaths = Math.max(numPath0, numPath1);
-					//double costChange = (changeInCost)*(numPath0+numPath1);
-					double costChange = (changeInCost);
-					//boolean acceptMove = (r < Math.exp(-changeInCost/(scaleFactor*currentTemp)));
-					//double test_value = Math.exp(-changeInCost/currentTemp);
-					//boolean acceptMove = (r < Math.exp(-changeInCost/currentTemp*numPaths));// good for Mcro with real changeInCost
-					// glodenRate = 0.3 and loop 10* & updateTemp has rangelimit parameter
-					//boolean acceptMove = (r < Math.exp(-changeInCost/currentTemp));
-					//boolean acceptMove = (r < Math.exp(-changeInCost*numPaths/currentTemp));
-					boolean acceptMove = (r < Math.exp(-costChange/currentTemp));
-					//boolean acceptMove = (randomDouble < Math.exp(-AvgChange/currentTemp*numPaths));
-					if(changeInCost > 0) badMoveCount++; 
-					
-					if(acceptMove){
-						currentAcceptedMoveCount++;
-						prevSystemCost = currSystemCost;
-						if(changeInCost > 0) badAcceptedMoveCount++;
-					}
-					else{
-						// Undo the move, we are not accepting it
-						currentMove.undoMove(currentPlacements);
-						double testCost = currentSystemCost();
-						if(testCost != prevSystemCost){
-							MessageGenerator.briefError("ERROR: Undo move caused improper system cost change: prev=" + prevSystemCost + " incorrect=" + testCost + " move= " + currentMove.toString());
-							MessageGenerator.waitOnAnyKeySilent();
-						}
-					}
-					//moveAcceptanceRate = ((double)currentAcceptedMoveCount) / moveCount;
-					//moveAcceptanceRate = ((double)currentAcceptedMoveCount) / (Math.min(moveCount, hardMacros.size()));
-				}// Move loop
-				
-			}//inner loop
-			if (moveCount>0){
-				moveAcceptanceRate = ((double)currentAcceptedMoveCount) / moveCount;
-			} else {
-				moveAcceptanceRate = 0;
-			}
-			//MOVES = ACCEPTED/TOTAL
-			if (Double.isNaN(currentTemp)) {
-				throw new RuntimeException("nan temperature!");
-			}
-			if(DEBUG_LEVEL > 0) System.out.printf("MOVES:%7d/%7d COST:%7.1f AVG_COST/MOVE:%7.1f TEMP:%7.1f ACCEPTANCE_RATE:%5.1f%% BEST:%7.1f BAD:%4.1f%%\n",currentAcceptedMoveCount,moveCount,prevSystemCost, totalMovesCost/moveCount, currentTemp, moveAcceptanceRate*100, bestSoFar, 100.0*badAcceptedMoveCount/badMoveCount);
-			
+			printMaxColumn(design, "loop");
+			temperatureStep(maxInnerIteration);
+
 			rangeLimit = rangeLimit * (1.0-goldenRate + moveAcceptanceRate);
 			double upperLimit = Math.max(dev.getColumns(), dev.getRows());
 			rangeLimit = Math.min(rangeLimit, upperLimit);
 			rangeLimit = Math.max(rangeLimit, 1.0);
-			
-			currentTemp = updateTemperature();		
-			
-			if (currentTemp < 0.005 * (prevSystemCost/allPaths.size())){
+
+			currentTemp = updateTemperature();
+
+			if (currentTemp < 0.005 * (prevSystemCost /allPaths.size())){
 				finished = true;
 				//WriteFinalCost(prevSystemCost);
 			}
 		} //Outer loop
-		
+
 		//Freezing phase
 		prevSystemCost = currentSystemCost();
 		currSystemCost = prevSystemCost;
-		int moveCount = 0;
 		currentTemp = 0.0;
-		for(int inner_iterate = 0; inner_iterate< maxInnerIteration; inner_iterate++){
-			HardMacro selectedHD = hardMacros.get(rand.nextInt(hardMacros.size()-1));
-			if (getNextMove(selectedHD)){
-				totalMoves++;
-				currSystemCost = currentSystemCost();
-				changeInCost = currSystemCost - prevSystemCost;
-				moveCount++;
-				r = rand.nextDouble();
-				
-				boolean acceptMove;
-				if (changeInCost<0){
-					acceptMove = true;
-				}else{
-					if(currentTemp==0.0){
-						acceptMove = false;
-					}else{
-						acceptMove = (r < Math.exp(-changeInCost/currentTemp));
-					}
-				}
-				
-				if(acceptMove){
-					currentAcceptedMoveCount++;
-					prevSystemCost = currSystemCost;
-				}
-				else{
-					// Undo the move, we are not accepting it
-					currentMove.undoMove(currentPlacements);
-					double testCost = currentSystemCost();
-					if(testCost != prevSystemCost){
-						MessageGenerator.briefError("ERROR: Undo move caused improper system cost change: prev=" + prevSystemCost + " incorrect=" + testCost + " move= " + currentMove.toString());
-						MessageGenerator.waitOnAnyKeySilent();
-					}
-				}
-				moveAcceptanceRate = ((double)currentAcceptedMoveCount) / moveCount;
-			}// Move loop
-			
-		}//End of Freezing
+
+		temperatureStep(maxInnerIteration);
 
 		// Store final results
 		finalSystemCost = prevSystemCost;
 		finalBestCost = bestSoFar;
 		placerRuntime  = ((System.currentTimeMillis()-start)/1000.0);
 		if(DEBUG_LEVEL > 0) System.out.println(seed + ": " + currSystemCost + " / " + bestSoFar + " Runtime: " + placerRuntime + "secs");
-		if(DEBUG_LEVEL > 0) System.out.printf("  Perturbation Time: %.3f secs (%9.0f moves/sec)\n", placerRuntime,(totalMoves/placerRuntime));	
-		
+		if(DEBUG_LEVEL > 0) System.out.printf("  Perturbation Time: %.3f secs (%9.0f moves/sec)\n", placerRuntime,(totalMoves/placerRuntime));
+
 		if(DEBUG_LEVEL > 0) System.out.println("Final System Cost: " + finalSystemCost);
 		/*
-		HashSet<HardMacro> fineTunePlacement = new HashSet<HardMacro>(); 
-		
+		HashSet<HardMacro> fineTunePlacement = new HashSet<HardMacro>();
+
 		for(HardMacro hm : hardMacros){
 			if(hm.tileSize < 60){
 				fineTunePlacement.add(hm);
 			}
 		}
-		
+
 		for(HardMacro hm : fineTunePlacement){
 			// Keep the original spot, in the case we suggest a worst spot
 			Site original = hm.getTempAnchorSite();
@@ -583,14 +486,14 @@ public class BlockPlacer2 {
 					}
 				}
 			}
-			
+
 			Point center = SmallestEnclosingCircle.getCenterPoint(pointsList);
 			Tile centroid = dev.getTile("INT_X" + center.x + "Y" + center.y);
 			Site newCandidateSite = null;
 			if(centroid != null && centroid.getSites() != null && centroid.getSites().length > 0){
 				newCandidateSite = centroid.getSites()[0];
 			}
-			
+
 
 			if(newCandidateSite != null){
 				if(DEBUG_LEVEL > 0) System.out.println("Moving " + hm.getName() + " from " + original.getTile() + " to " + newCandidateSite.getTile());
@@ -614,66 +517,180 @@ public class BlockPlacer2 {
 		System.out.println("Final System Cost (after fine tuning): " + this.currentSystemCost());
 		*/
 		//MessageGenerator.waitOnAnyKey();
-		
-		
-		// Sort hard macros, largest first to place them first
-		HardMacro[] array = new HardMacro[hardMacros.size()];
-		array = hardMacros.toArray(array);
-		Arrays.sort(array);
-		
-		HashSet<Tile> usedTiles = new HashSet<Tile>();
-        // Added variable for genreating partial dcp
-        boolean save_and_exit = false;
-		// Perform final placement of all hard macros
-		for(HardMacro hm : array){	
-			//System.out.println(moveCount.get(hm) + " " + hm.tileSize + " " + hm.getName());
-			HashSet<Tile> footPrint = isValidPlacement((ModuleInst)hm, hm.getModule().getAnchor().getSite(), hm.getTempAnchorSite().getTile(), usedTiles);
-			if(footPrint == null){
-				
-				if(!placeModuleNear((ModuleInst)hm, hm.getTempAnchorSite().getTile(), usedTiles)){
-					System.out.println("Saving as debug.");
-                    // Updated code. Goal: if placement fails, unplace that IP and generate .dcp in order to let vivado continue PAR
-					if(save_partial_dcp) {
-                        save_and_exit = true;
-                        System.out.println("ERROR: Placement failed for "+hm.getName());
-                        hm.unplace(); 
-                    } else
-                        throw new RuntimeException("ERROR: Placement failed, couldn't find valid site for " + hm.getName());	                   
-				}
-			}
-			else{
-				usedTiles.addAll(footPrint);
-				if(!hm.place(hm.getTempAnchorSite())){
-                    // Updated code. Goal: if placement fails, unplace that IP and generate .dcp in order to let vivado continue PAR
-					if(save_partial_dcp) {
-                        save_and_exit = true;
-                        System.out.println("ERROR: Placement failed for "+hm.getName());
-                        hm.unplace(); 
-                    } else 
-                        throw new RuntimeException("ERROR: Problem placing " + hm.getName() + " on site: " + hm.getTempAnchorSite());
-				}
-			}
+
+		printMaxColumn(design, "before final");
+		doFinalPlacement();
+
+		printMaxColumn(design, "after final");
+
+		if (graphDataWriter != null) {
+			graphDataWriter.close();
 		}
-		
-		design.clearUsedSites();
-		for(SiteInst i : design.getSiteInsts()){
-			i.place(i.getSite());
-		}
-		
-        // Updated code. Goal: if placement fails, unplace that IP and generate .dcp in order to let vivado continue PAR
-        if(save_and_exit) {
-			String placedDCPName = "partialy_placed.dcp";
-			design.writeCheckpoint(placedDCPName);
-			throw new RuntimeException("ERROR: Placement failed, couldn't find valid site for all the IPs. Partially placed .dcp saved for debug " );
-		}
-                
 		return design;
 	}
-	
+
+	private void temperatureStep(int maxInnerIteration) {
+		double r;
+		currentAcceptedMoveCount = 0;
+		moveCount = 0;
+		int badMoveCount = 0;
+		int badAcceptedMoveCount = 0;
+		double totalMovesCost = 0.0;
+		for(int inner_iterate = 0; inner_iterate< maxInnerIteration; inner_iterate++){
+		//for(int inner_iterate = 0; inner_iterate< (10*rangeLimit); inner_iterate++){
+		//for(int inner_iterate = 0; inner_iterate< (dev.getColumns()*dev.getRows()); inner_iterate++){
+			ModuleInstT selectedHD = hardMacros.get(rand.nextInt(hardMacros.size()-1));
+			saveAllCosts();
+
+
+			if (PARANOID) {
+				double testCost = currentSystemCost();
+				if (testCost != prevSystemCost) {
+					dumpCostChanges();
+					MessageGenerator.briefError("ERROR: Improper system cost before creating new move: prev=" + prevSystemCost + " incorrect=" + testCost);
+					MessageGenerator.waitOnAnyKeySilent();
+				}
+			}
+
+			if (getNextMove(selectedHD)){
+				saveAllCosts();
+				totalMoves++;
+				double changeInCost = currentMove.getDeltaCost() * alpha;
+				currSystemCost = prevSystemCost + changeInCost; //TODO Loss of precision?
+				if (PARANOID) {
+					double realCurrentSystemCost = currentSystemCost();
+					if (Math.abs(realCurrentSystemCost - currSystemCost) > 1E-6) {
+						throw new RuntimeException("cost not equal");
+					}
+					double changeInCostRecalc = currSystemCost - prevSystemCost;
+					if (Math.abs(changeInCost - changeInCostRecalc) > 1E-6) {
+						dumpCostChanges();
+						//calcConnectedCost(currentMove.getBlock0(), currentMove.getBlock1())
+						throw new RuntimeException("Cost change differs. Recalc: " + changeInCostRecalc + ", efficient: " + changeInCost + " at move " + totalMoves);
+					}
+				}
+
+
+
+				moveCount++;
+				totalMovesCost += changeInCost;
+				if(currSystemCost < bestSoFar){
+					bestSoFar = currSystemCost;
+					//if (bestSoFar==18875.0){
+						//break OUTER;
+					//}
+				}
+
+				r = rand.nextDouble();
+				int numPath0 = 0;
+				int numPath1 = 0;
+				double tmp =0.0;
+				double AvgChange = 0.0;
+				/*if(currentMove.getBlock0() != null){
+					for(PathT wire : getConnectedPaths(currentMove.getBlock0())){
+						wire.calculateLength();
+						tmp = tmp + wire.getLength();
+					}
+					numPath0 = getConnectedPaths(currentMove.getBlock0()).size();
+					AvgChange = AvgChange + tmp/numPath0;
+				}
+				tmp =0.0;
+				if(currentMove.getBlock1() != null){
+					for(PathT wire : getConnectedPaths(currentMove.getBlock1())){
+						wire.calculateLength();
+						tmp = tmp + wire.getLength();
+					}
+					numPath1 = getConnectedPaths(currentMove.getBlock1()).size();
+					AvgChange = AvgChange + tmp/numPath1;
+				}*/
+				int numPaths = Math.max(numPath0, numPath1);
+				//double costChange = (changeInCost)*(numPath0+numPath1);
+				double costChange = (changeInCost);
+				//boolean acceptMove = (r < Math.exp(-changeInCost/(scaleFactor*currentTemp)));
+				//double test_value = Math.exp(-changeInCost/currentTemp);
+				//boolean acceptMove = (r < Math.exp(-changeInCost/currentTemp*numPaths));// good for Mcro with real changeInCost
+				// glodenRate = 0.3 and loop 10* & updateTemp has rangelimit parameter
+				//boolean acceptMove = (r < Math.exp(-changeInCost/currentTemp));
+				//boolean acceptMove = (r < Math.exp(-changeInCost*numPaths/currentTemp));
+				//boolean acceptMove = (r < Math.exp(-costChange/currentTemp));
+				boolean acceptMove;
+				if (currentTemp == 0.0) {
+					acceptMove = changeInCost < 0;
+				} else {
+					acceptMove = (r < Math.exp(-changeInCost/currentTemp));
+				}
+				//boolean acceptMove = (randomDouble < Math.exp(-AvgChange/currentTemp*numPaths));
+				if(changeInCost > 0) badMoveCount++;
+
+				if(acceptMove){
+					currentAcceptedMoveCount++;
+					prevSystemCost = currSystemCost;
+					if(changeInCost > 0) badAcceptedMoveCount++;
+				}
+				else{
+					// Undo the move, we are not accepting it
+					currentMove.undoMove();
+					for (PathT path : getConnectedPaths(currentMove.getBlock0())) {
+						path.calculateLength();
+					}
+					if (currentMove.getBlock1() != null) {
+						for (PathT path : getConnectedPaths(currentMove.getBlock1())) {
+							path.calculateLength();
+						}
+					}
+					saveAllCosts();
+					if (PARANOID) {
+						double testCost = currentSystemCost();
+						if (testCost != prevSystemCost) {
+							dumpCostChanges();
+							MessageGenerator.briefError("ERROR: 3 Undo move caused improper system cost change: prev=" + prevSystemCost + " incorrect=" + testCost + " move= " + currentMove.toString());
+							MessageGenerator.waitOnAnyKeySilent();
+						}
+					}
+				}
+				//moveAcceptanceRate = ((double)currentAcceptedMoveCount) / moveCount;
+				//moveAcceptanceRate = ((double)currentAcceptedMoveCount) / (Math.min(moveCount, hardMacros.size()));
+			}// Move loop
+
+		}//inner loop
+		if (moveCount >0){
+			moveAcceptanceRate = ((double)currentAcceptedMoveCount) / moveCount;
+		} else {
+			moveAcceptanceRate = 0;
+		}
+		//MOVES = ACCEPTED/TOTAL
+		if (Double.isNaN(currentTemp)) {
+			throw new RuntimeException("nan temperature!");
+		}
+
+
+		if (graphDataWriter != null) {
+			graphDataWriter.printf(
+					"%7d\t%7d\t%7.1f\t%7.1f\t%7.1f\t%5.1f\t%7.1f\t%4.1f\t%f\n",
+					currentAcceptedMoveCount,
+					moveCount,
+					prevSystemCost,
+					totalMovesCost/ moveCount,
+					currentTemp,
+					moveAcceptanceRate*100,
+					bestSoFar,
+					100.0*badAcceptedMoveCount/badMoveCount,
+					rangeLimit
+			);
+		}
+		if(DEBUG_LEVEL > 0) System.out.printf("MOVES:%7d/%7d COST:%7.1f AVG_COST/MOVE:%7.1f TEMP:%7.1f ACCEPTANCE_RATE:%5.1f%% BEST:%7.1f BAD:%4.1f%%\n",currentAcceptedMoveCount, moveCount, prevSystemCost, totalMovesCost/ moveCount, currentTemp, moveAcceptanceRate*100, bestSoFar, 100.0*badAcceptedMoveCount/badMoveCount);
+	}
+
+	protected abstract int getTileSize(ModuleInstT hm);
+
+	public Collection<PathT> getPaths() {
+		return allPaths;
+	}
+
 	enum Direction{UP, DOWN, LEFT, RIGHT};
-	
-	
-	
+
+
+
 	public Site getPrimitiveSiteFromTile(Tile tile, SiteTypeEnum type){
 		for(Site p : tile.getSites()){
 			if(p.isCompatibleSiteType(type)){
@@ -682,174 +699,41 @@ public class BlockPlacer2 {
 		}
 		return null;
 	}
-	
-	public boolean placeModuleNear(ModuleInst modInst, Tile tile, HashSet<Tile> usedTiles){
-		Site anchorSite = modInst.getModule().getAnchor().getSite();
-		Tile proposedAnchorTile = tile;
-		Direction dir = Direction.UP;
-		HashSet<Tile> triedTiles = new HashSet<Tile>();
-		int column = tile.getColumn();
-		int row = tile.getRow();
-		int maxColumn = column+1;
-		int maxRow = row+1;
-		int minColumn = column-1;
-		int minRow = row;
-		HashSet<Tile> tiles = null;
-		while(proposedAnchorTile != null && tiles == null){
-			switch(dir){
-				case UP:
-					if(row == minRow){
-						dir = Direction.RIGHT;
-						minRow--;
-						column++;
-					}
-					else{
-						row--;
-					}
-					break;
-				case DOWN:
-					if(row == maxRow){
-						dir = Direction.LEFT;
-						maxRow++;
-						column--;
-					}
-					else{
-						row++;
-					}
-					break;
-				case LEFT:
-					if(column == minColumn){
-						dir = Direction.UP;
-						minColumn--;
-						row--;
-					}
-					else{
-						column--;
-					}
-					break;
-				case RIGHT:
-					if(column == maxColumn){
-						dir = Direction.DOWN;
-						maxColumn++;
-						row++;
-					}
-					else{
-						column++;
-					}
-					break;
-			}
-			proposedAnchorTile = dev.getTile(row, column);
-			if(proposedAnchorTile != null){
-				triedTiles.add(proposedAnchorTile);
-				tiles = isValidPlacement(modInst, anchorSite, proposedAnchorTile, usedTiles);
-				
-				Site newAnchorSite = anchorSite.getCorrespondingSite(modInst.getModule().getAnchor().getSiteTypeEnum(), proposedAnchorTile);
-				if(tiles != null && modInst.place(newAnchorSite)){
-					usedTiles.addAll(tiles);
-					return true;
+
+
+	protected abstract boolean isInRange(PlacementT current, PlacementT newPlacement);
+
+
+	private int calcConnectedCost(ModuleInstT hm0, ModuleInstT hm1) {
+		int cost = 0;
+		for (PathT objects : getConnectedPaths(hm0)) {
+			objects.calculateLength();
+			int length = objects.getLength();
+			cost+= length;
+		}
+		if (hm1 != null) {
+			for (PathT path : getConnectedPaths(hm1)) {
+				if (path.connectsTo(hm0)) {
+					//We have already counted the path in the above loop. Don't double count it!
+					continue;
 				}
-				else{
-					tiles = null;
-				}
+				path.calculateLength();
+				int length = path.getLength();
+				cost += length;
 			}
 		}
-		
-		if(proposedAnchorTile == null){
-			Site[] candidateSites = dev.getAllCompatibleSites(modInst .getAnchor().getSiteTypeEnum());
-			for(Site site : candidateSites){
-				proposedAnchorTile = site.getTile();
-				if(!triedTiles.contains(proposedAnchorTile)){
-					tiles = isValidPlacement(modInst, anchorSite, proposedAnchorTile, usedTiles);
-					if(tiles != null){
-						break;
-					}
-					triedTiles.add(proposedAnchorTile);
-				}
-			}
-		}
-		
-		
-		if(tiles == null){
-			if(DEBUG_LEVEL > 0) System.out.println("Placement failed: tiles==null " + modInst.getName());
-			return false;
-		}
-		Site newAnchorSite = anchorSite.getCorrespondingSite(modInst.getModule().getAnchor().getSiteTypeEnum(), proposedAnchorTile);
-		if(modInst.place(newAnchorSite)){
-			usedTiles.addAll(tiles);
-			return true;
-		}
-		if(DEBUG_LEVEL > 0) System.out.println("Placement failed: place() " + modInst.getName());
-		return false;
+		return cost;
 	}
-	
-	
-	private HashSet<Tile> isValidPlacement(ModuleInst modInst, Site anchorSite, Tile proposedAnchorTile, HashSet<Tile> usedTiles){
-		if(usedTiles.contains(proposedAnchorTile)){
-			return null;
-		}
-		
-		modInst.getAnchor().getSiteTypeEnum();
-		Site newSite2 = modInst.getAnchor().getSite().getCorrespondingSite(modInst.getAnchor().getSiteTypeEnum(), proposedAnchorTile);
-		
-		if(newSite2 == null){
-			return null;
-		}
-		
-		HashSet<Tile> footPrint = new HashSet<Tile>();
-		// Check instances
-		for(SiteInst i : modInst.getModule().getSiteInsts()){
-			if(Utils.getLockedSiteTypes().contains(i.getSiteTypeEnum())){
-				continue;
-			}
-			Tile newTile = modInst.getCorrespondingTile(i.getTile(), proposedAnchorTile, dev);
-			if(newTile == null || usedTiles.contains(newTile)){
-				return null;
-			}
-			
-			Site newSite = i.getSite().getCorrespondingSite(i.getSiteTypeEnum(), newTile);
-			if(newSite == null){
-				return null;
-			}
-			
-			footPrint.add(newTile);
-		}
-		
-		// Check nets
-		for(Net n : modInst.getModule().getNets()){
-			for(PIP p : n.getPIPs()){
-				Tile newTile = modInst.getCorrespondingTile(p.getTile(), proposedAnchorTile, dev);
-				if(newTile == null || usedTiles.contains(newTile)){
-					return null;
-				}
-				if(!newTile.getTileTypeEnum().equals(p.getTile().getTileTypeEnum())){
-					boolean a = Utils.isInterConnect(p.getTile().getTileTypeEnum());
-					boolean b = Utils.isInterConnect(newTile.getTileTypeEnum());
-					if(a || b){
-						if(!(a && b)){
-							return null;
-						}
-					}
-					else{
-						return null;
-					}
-				}
-				footPrint.add(newTile);
-			}
-		}		
-		
-		return footPrint;
-	}
-	
-	
-	private boolean getNextMove(HardMacro selected){
+
+	protected abstract Tile getPlacementTile(PlacementT placement);
+
+	private boolean getNextMove(ModuleInstT selected){
 		//HardMacro selected = hardMacros.get(rand.nextInt(hardMacros.size()-1));
-		ArrayList<Site> validSites = selected.getValidPlacements();
-		ArrayList<Site> validSiteRange = new ArrayList<Site>();
-		
-		Site site0 = selected.getTempAnchorSite();
-		Site site1 = null;
-		HardMacro hm0 = selected;
-		HardMacro hm1 = null;
+
+		PlacementT site0 = getCurrentPlacement(selected);
+		PlacementT site1 = null;
+		ModuleInstT hm0 = selected;
+		ModuleInstT hm1 = null;
 		int iterations = 0;
 		/*int minX = 0;
 		int maxX = 0;
@@ -864,24 +748,15 @@ public class BlockPlacer2 {
 				validSiteRange.add(s);
 			}
 		}*/
-		int minX = 0;
-		int maxX = 0;
-		int minY = 0;
-		int maxY = 0;
-		minY = Math.max(1			     ,site0.getTile().getRow()-(int)rangeLimit);
-		maxY = Math.min(dev.getRows()    ,site0.getTile().getRow()+(int)rangeLimit);
-		minX = Math.max(1			     ,site0.getTile().getColumn()-(int)rangeLimit);
-		maxX = Math.min(dev.getColumns() ,site0.getTile().getColumn()+(int)rangeLimit);
-		for(Site s : validSites){
-			if (s.getTile().getColumn()>=minX && s.getTile().getColumn()<=maxX &&
-				s.getTile().getRow()>=minY && s.getTile().getRow()<=maxY){
-				validSiteRange.add(s);
-			}
-		}
+		List<PlacementT> validSiteRange = possiblePlacements.get(hm0.getModule()).getByRangeAround((int) rangeLimit, site0);
+
 
 		// Updated code. Store initial number of valid Sites
-        int nr_valid_sites = validSiteRange.size();
-        int rand_site = 0;
+		int nr_valid_sites = validSiteRange.size();
+		int rand_site = 0;
+
+		PlacementT site1Previous = null;
+		int costBefore = 0;
 		while(true){
 			/*if(iterations > 10*validSites.size()){
 				selected = hardMacros.get(rand.nextInt(hardMacros.size()-1));
@@ -891,14 +766,15 @@ public class BlockPlacer2 {
 				iterations = 0;
 			}*/
 			if(iterations >=  nr_valid_sites){  // Updated code. Maximum trial nr = nr valid Sites
+				//System.out.println("could not find placement 1");
                 return false;
 			}
 			iterations++;
-			
+
 			//site1 = validSites.get(rand.nextInt(validSites.size()-1));
 			if (validSiteRange.size()> 0){
 				if (validSiteRange.size()>1){
-                    rand_site = rand.nextInt(validSiteRange.size()-1);  
+                    rand_site = rand.nextInt(validSiteRange.size()-1);
 					site1 = validSiteRange.get(rand_site);
 				}else{
 					//site1 = validSiteRange.get(rand.nextInt(validSiteRange.size()));
@@ -913,25 +789,46 @@ public class BlockPlacer2 {
                 validSiteRange.remove(rand_site); // Updated code. Remove sites that were already checked
                 continue;
 			}
-			hm1 = currentPlacements.get(site1);
-				
+			//TODO this only works when the same anchor is chosen for the other module.
+			hm1 = getHmCurrentlyAtPlacement(site1);
+			if (hm1 == hm0) {
+				hm1 = null;
+			}
+
+			costBefore = calcConnectedCost(hm0, hm1);
+
 			if(hm1 != null){
-				hm1.setTempAnchorSite(site0, currentPlacements);
-				hm0.setTempAnchorSite(site1, currentPlacements);
+				site1Previous = getCurrentPlacement(hm1);
+				//System.out.println("swapping with "+hm1.getName()+", which is currently at "+site1Previous);
+
+				//Can we swap?
+				boolean newContains = possiblePlacements.get(hm1.getModule()).contains(site0);
+				/*boolean oldContains = getAllPlacements(hm1).contains(site0);
+				if (oldContains != newContains) {
+					throw new RuntimeException("contains bug");
+				}*/
+				if (!newContains) {
+					continue;
+				}
+				setTempAnchorSite(hm1, site0);
+				setTempAnchorSite(hm0, site1);
 				if((!checkValidPlacement(hm0)) || (!checkValidPlacement(hm1))){
-					hm1.setTempAnchorSite(site1, currentPlacements);
-					hm0.setTempAnchorSite(site0, currentPlacements);
+					setTempAnchorSite(hm1, site1Previous);
+					setTempAnchorSite(hm0, site0);
 					//if(DEBUG_LEVEL > 1) System.out.println("  BAD SWAP");
 					validSiteRange.remove(rand_site); // Updated code. Remove sites that were already checked
+					site1Previous = null;
                     continue;
 				}
 				//System.out.println(hm0.getName()+"<->"+hm1.getName());
 				break;
 			}
 			else{
-				hm0.setTempAnchorSite(site1, currentPlacements);
+				setTempAnchorSite(hm0, site1);
+				//hm0.setTempAnchorSite(site1, currentPlacements);
 				if(!checkValidPlacement(hm0)){
-					hm0.setTempAnchorSite(site0, currentPlacements);
+					setTempAnchorSite(hm0, site0);
+					//hm0.setTempAnchorSite(site0, currentPlacements);
 					//if(DEBUG_LEVEL > 1) System.out.println("  BAD SITE0");
                     validSiteRange.remove(rand_site); // Updated code. Remove sites that were already checked
                     continue;
@@ -940,10 +837,33 @@ public class BlockPlacer2 {
 				break;
 			}
 		}
-        currentMove.setMove(site0, site1, hm0, hm1);
+        currentMove.setMove(site0, site1, hm0, hm1, site1Previous);
+		int costAfter = calcConnectedCost(hm0, hm1);
+		currentMove.setDeltaCost(costAfter - costBefore);
 		return true;
 	}
-	
+
+	private Path printPlacements(String name, List<PlacementT> validSiteRange, PlacementT center) {
+		Path outPath = Paths.get("/tmp").resolve("placement_range_"+name+".txt");
+
+		try (PrintWriter pw = new PrintWriter(Files.newBufferedWriter(outPath))) {
+
+			validSiteRange.stream().sorted(
+					Comparator.<PlacementT, Integer>comparing(k -> getPlacementTile(k).getColumn()).thenComparing(k -> getPlacementTile(k).getRow())
+			).forEach(p -> pw.println(p+" "+isInRange(center, p)+" "+getDistance(getPlacementTile(center), getPlacementTile(p))));
+
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		}
+
+		return outPath;
+
+	}
+
+	protected abstract ModuleInstT getHmCurrentlyAtPlacement(PlacementT placement);
+
+	protected abstract PlacementT getCurrentPlacement(ModuleInstT selected);
+
 	private double updateTemperature(){
 		double tmpCurrentTemp = currentTemp;
 		if(moveAcceptanceRate>0.96){
@@ -958,27 +878,36 @@ public class BlockPlacer2 {
 		}
 		return tmpCurrentTemp;
 	}
-	
-	private double currentSystemCost(){
+
+	protected abstract Collection<PathT> getConnectedPaths(ModuleInstT module);
+
+	protected double currentSystemCost(){
 		int totalWireLength = 0;
-		double tmp = 0.0;
+		/*int tmp = 0;
 		if(currentMove.getBlock0() != null){
-			for(Path wire : currentMove.getBlock0().getConnectedPaths()){
+			for(PathT wire : getConnectedPaths(currentMove.getBlock0())){
 				wire.calculateLength();
 				tmp = tmp + wire.getLength();
 			}
 			//System.out.println(currentMove.block0.getName()+":"+currentMove.block0.getConnectedPaths().size());
 		}
-		tmp = 0.0;
+		tmp = 0;
 		if(currentMove.getBlock1() != null){
-			for(Path wire : currentMove.getBlock1().getConnectedPaths()){
+			for(PathT wire : getConnectedPaths(currentMove.getBlock1())){
 				wire.calculateLength();
 				tmp = tmp + wire.getLength();
 			}
 			//System.out.println(currentMove.block1.getName()+":"+currentMove.block1.getConnectedPaths().size());
-		}
+		}*/
 		int maxPathLength = 0;
-		for(Path path : allPaths){
+		for(PathT path : allPaths){
+			if (PARANOID) {
+				int prevLength = path.getLength();
+				path.calculateLength();
+				if (path.getLength() != prevLength) {
+					throw new RuntimeException("Path was not up to date: "+path.getName()+" was "+prevLength+", but changed to "+path.getLength()+" when recalculated");
+				}
+			}
 			totalWireLength += path.getLength();
 			if(path.getLength() > maxPathLength){
 				maxPathLength = path.getLength();
@@ -987,48 +916,11 @@ public class BlockPlacer2 {
 		return alpha * totalWireLength;
 	}
 
-	/**
-	 * WIP - Need a way to load modular designs
-	 * @param fileName
-	 */
-	private void measureCost(String fileName){
-		// Load Design TODO
-
-		currentPlacements = new HashMap<Site, HardMacro>();
-		currentMove = new Move();
-		totalMoves = 0;
-		rand = new Random(123456);
-		dev = design.getDevice();
-		allPaths = new HashSet<Path>();
-		hardMacros = new ArrayList<HardMacro>();
-		macroMap = new HashMap<ModuleInst, HardMacro>();
-		
-		
-		// Create Hard Macro objects from module instances
-		for(ModuleInst mi : design.getModuleInsts()){
-			HardMacro hm = new HardMacro(mi);
-			hardMacros.add(hm);
-			macroMap.put(mi, hm);
-		}
-
-		// Place hard macros for initial placement
-		for(HardMacro hm : hardMacros){
-			hm.setTempAnchorSite(hm.getAnchor().getSite(), currentPlacements);
-		}
-		
-		// Find all port wires
-		populateAllPaths();
-		
-		for(Path path : allPaths){
-			path.calculateLength();
-			System.out.printf("%4d ",path.getLength());
-			for(PathPort pp : path){
-				String name = pp.getBlock() == null ? "null" : pp.getBlock().getModule().getName(); 
-				System.out.print(name + "("+pp.getPortTile().getName()+")->");
-			}
-			System.out.println();
-		}
-		
-		System.out.println("System cost for file: " + fileName + " is " + currentSystemCost());
+	protected static int getDistance(Tile a, Tile b) {
+		TileRectangle rect = new SimpleTileRectangle();
+		rect.extendTo(a);
+		rect.extendTo(b);
+		final int largerDimension = rect.getLargerDimension();
+		return largerDimension;
 	}
 }
