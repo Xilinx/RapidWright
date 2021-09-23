@@ -24,19 +24,20 @@
  */
 package com.xilinx.rapidwright.device.helper;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map.Entry;
-
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.FamilyType;
+import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.util.Utils;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map.Entry;
 import java.util.TreeSet;
 
 /**
@@ -45,34 +46,33 @@ import java.util.TreeSet;
  */
 public class TileColumnPattern extends ArrayList<TileTypeEnum> implements Comparable<TileColumnPattern>{
 
+	private enum TypesOfInterest {
+		SLICEL,
+		SLICEM,
+		BRAM,
+		DSP,
+		URAM
+	}
+
 	private static final long serialVersionUID = 3453628493683591805L;
 
 	public static int MAX_PATTERN_LENGTH = 26;
 	/** The number of consecutive NULL columns for a pattern not to cross */
 	public static final int NULL_COLUMN_BREAK_SIZE = 3;
 	/** Packs a number of has___() flags for quick answers */
-	private int flags = 0;
+	private EnumSet<TypesOfInterest> flags = EnumSet.noneOf(TypesOfInterest.class);
 	/** Place holder for the number of occurrences of this tile column pattern in a particular device */
 	private int numInstances = 0;
-	
-	private static final int HAS_SLICEL = 0x1;
-	private static final int HAS_SLICEM = 0x2;
-	private static final int HAS_BRAM = 0x4;
-	private static final int HAS_DSP = 0x8;
+
 	
 	/** Contains the tile types to create patterns from (all other tile types are ignored) */
 	private static HashSet<TileTypeEnum> typesOfInterest;
 	static{
 		typesOfInterest = new HashSet<TileTypeEnum>();
-		for(TileTypeEnum t : Utils.getCLBTileTypes()){
-			typesOfInterest.add(t);
-		}
-		for(TileTypeEnum t : Utils.getDSPTileTypes()){
-			typesOfInterest.add(t);
-		}
-		for(TileTypeEnum t : Utils.getBRAMTileTypes()){
-			typesOfInterest.add(t);
-		}
+		typesOfInterest.addAll(Utils.getCLBTileTypes());
+		typesOfInterest.addAll(Utils.getDSPTileTypes());
+		typesOfInterest.addAll(Utils.getBRAMTileTypes());
+		typesOfInterest.addAll(Utils.getURAMTileTypes());
 	}
 	
 	public TileColumnPattern(){
@@ -102,16 +102,18 @@ public class TileColumnPattern extends ArrayList<TileTypeEnum> implements Compar
 	}
 
 	private void updateFlags(){
-		flags = 0;
+		flags = EnumSet.noneOf(TypesOfInterest.class);
 		for(TileTypeEnum t : this){
 			if(Utils.isCLBM(t)){
-				flags |= HAS_SLICEM;
+				flags.add(TypesOfInterest.SLICEM);
 			}else if(Utils.isCLB(t)){
-				flags |= HAS_SLICEL;
+				flags.add(TypesOfInterest.SLICEL);
 			}else if(Utils.isDSP(t)){
-				flags |= HAS_DSP;
+				flags.add(TypesOfInterest.DSP);
 			}else if(Utils.isBRAM(t)){
-				flags |= HAS_BRAM;
+				flags.add(TypesOfInterest.BRAM);
+			}else if(Utils.isURAM(t)){
+				flags.add(TypesOfInterest.URAM);
 			}else {
 				throw new RuntimeException("ERROR: Unexpected TileTypeEnum, please re-examine source code to properly handle " + t);
 			}
@@ -119,19 +121,22 @@ public class TileColumnPattern extends ArrayList<TileTypeEnum> implements Compar
 	}
 	
 	public boolean hasSLICEL(){
-		return (flags & HAS_SLICEL) != 0;
+		return flags.contains(TypesOfInterest.SLICEL);
 	}
 	
 	public boolean hasSLICEM(){
-		return (flags & HAS_SLICEM) != 0;
+		return flags.contains(TypesOfInterest.SLICEM);
 	}
 	
 	public boolean hasBRAM(){
-		return (flags & HAS_BRAM) != 0;
+		return flags.contains(TypesOfInterest.BRAM);
 	}
 	
 	public boolean hasDSP(){
-		return (flags & HAS_DSP) != 0;
+		return flags.contains(TypesOfInterest.DSP);
+	}
+	public boolean hasURAM(){
+		return flags.contains(TypesOfInterest.URAM);
 	}
 	
 	/**
@@ -149,31 +154,51 @@ public class TileColumnPattern extends ArrayList<TileTypeEnum> implements Compar
 	}
 
 	/**
-	 * Finds the first row that has a populated BRAM, DSP, and CLB tiles to help identify
+	 * Finds the first row that has populated BRAM, DSP, URAM, and CLB tiles to help identify
 	 * tile column types.  Can reliably iterate over this row and identify column types.
 	 * @param dev The device of interest
-	 * @return The row index that contains populated BRAM or DSP tiles.
+	 * @param wantLaguna true if we are interested in a row with laguna tiles, false if interested in one without
+	 * @return The row index that contains populated BRAM and DSP tiles.
 	 */
-	public static int getCommonRow(Device dev){
-		int rowIdx = 0;
-		boolean hasDSP, hasBRAM, hasCLB;
-		outer: for(int row=0; row < dev.getRows(); row++){
-			hasDSP = false;
-			hasBRAM = false;
-			hasCLB = false;
+	public static int getCommonRow(Device dev, boolean wantLaguna){
+		boolean devHasUram = Integer.parseInt(PartNameTools.getPart(dev.getName()).getUltraRams()) != 0;
+		for(int row=0; row < dev.getRows(); row++){
+			boolean hasDSP = false;
+			boolean hasBRAM = false;
+			boolean hasCLB = false;
+			boolean hasURAM = false;
+			boolean hasLaguna = false;
 			for(int col=0; col < dev.getColumns(); col++){
 				Tile t = dev.getTile(row, col);
 				TileTypeEnum tt = t.getTileTypeEnum();
 				if(Utils.isDSP(tt)) hasDSP = true;
 				if(Utils.isBRAM(tt)) hasBRAM = true;
 				if(Utils.isCLB(tt)) hasCLB = true;
-				if(hasDSP && hasBRAM && hasCLB) {
-					rowIdx = row;
-					break outer;
+				if (Utils.isURAM(tt)) hasURAM = true;
+				if (tt == TileTypeEnum.LAG_LAG) {
+					hasLaguna = true;
+					if (!wantLaguna) {
+						break;
+					}
 				}
 			}
+			//Cannot test inside loop since we may hit the first laguna tile after having satisfied all other conditions
+			if(hasDSP && hasBRAM && hasCLB && (!devHasUram || hasURAM) && (hasLaguna==wantLaguna)) {
+				return row;
+			}
 		}
-		return rowIdx;
+		throw new RuntimeException("Did not find any row that matched all conditions");
+	}
+
+
+	/**
+	 * Finds the first row that has populated BRAM, DSP, URAM, and CLB tiles but no Laguna tiles to help identify
+	 * tile column types.  Can reliably iterate over this row and identify column types.
+	 * @param dev The device of interest
+	 * @return The row index that contains populated BRAM and DSP tiles.
+	 */
+	public static int getCommonRow(Device dev) {
+		return getCommonRow(dev, false);
 	}
 	
 	/**
@@ -181,13 +206,14 @@ public class TileColumnPattern extends ArrayList<TileTypeEnum> implements Compar
 	 * the values are sets of occurrences/instances of those tile column patterns (represented
 	 * by the the column index of the start of the pattern).  
 	 * @param dev The device of interest
+	 * @param wantLaguna true if we are interested in a row with laguna tiles, false if interested in one without
 	 * @return The map between tile column patterns and their respective instances.
 	 */
-	public static HashMap<TileColumnPattern,TreeSet<Integer>> genColumnPatternMap(Device dev){
+	public static HashMap<TileColumnPattern,TreeSet<Integer>> genColumnPatternMap(Device dev, boolean wantLaguna){
 		HashMap<TileColumnPattern,TreeSet<Integer>> colPatternMap = new HashMap<TileColumnPattern, TreeSet<Integer>>();
 
 		// We need to know what row index to start from to avoid missing DSP/BRAM tiles with nulls
-		int rowIdx = getCommonRow(dev);
+		int rowIdx = getCommonRow(dev, wantLaguna);
 		
 		// First create a filtered list of columns of only the CLB/BRAM/DSP types of interest
 		ArrayList<TileTypeEnum> filteredTypes = new ArrayList<TileTypeEnum>();
@@ -238,6 +264,18 @@ public class TileColumnPattern extends ArrayList<TileTypeEnum> implements Compar
 		
 		
 		return colPatternMap;
+	}
+
+
+	/**
+	 * Creates a map where the keys are all tile column patterns for the given device and
+	 * the values are sets of occurrences/instances of those tile column patterns (represented
+	 * by the the column index of the start of the pattern).
+	 * @param dev The device of interest
+	 * @return The map between tile column patterns and their respective instances.
+	 */
+	public static HashMap<TileColumnPattern,TreeSet<Integer>> genColumnPatternMap(Device dev){
+		return genColumnPatternMap(dev, false);
 	}
 	
 	/**
