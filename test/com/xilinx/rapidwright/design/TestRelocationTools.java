@@ -213,7 +213,8 @@ public class TestRelocationTools {
                 , Arguments.of("", 0, 60, true)
                 , Arguments.of("base_mb_i", 0, 10, true)
                 , Arguments.of("dbg_hub", 0, 20, true)
-                , Arguments.of("u_ila_0", 0, 20, true)
+                , Arguments.of("u_ila_0", 0, 30, true)
+                , Arguments.of("dbg_hub", 16, 0, false) // placement conflict
         );
     }
 
