@@ -1378,8 +1378,8 @@ public class FileTools {
 	 * @return True if the file is considered binary, false otherwise.
 	 */
 	public static boolean isFileBinary(Path fileName){
-		try {
-			return isDataBinary(new BufferedInputStream(Files.newInputStream(fileName)));
+		try (BufferedInputStream br = new BufferedInputStream(Files.newInputStream(fileName))) {
+			return isDataBinary(br);
 		} catch (IOException e) {
 			throw new RuntimeException("ERROR: Trying to read file " + fileName + " and it errored.", e);
 		}
