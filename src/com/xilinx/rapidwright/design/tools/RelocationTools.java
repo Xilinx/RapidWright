@@ -60,25 +60,12 @@ public class RelocationTools {
                 continue;
             }
 
-            Cell c;
-            // FIXME: Workaround the CFGLUT5 macro not being expanded correctly
-            if (leafName.equals("CFGLUT5")) {
-                Cell c1 = design.getCell(leaf.getFullHierarchicalInstName() + EDIFTools.EDIF_HIER_SEP + "S1");
-                Cell c2 = design.getCell(leaf.getFullHierarchicalInstName() + EDIFTools.EDIF_HIER_SEP + "S2");
-                assert(c1 != null && c2 != null);
-                assert(c1.getSiteInst() == c2.getSiteInst());
-                cells.add(c1);
-                c = c2;
+            Cell c = design.getCell(leaf.getFullHierarchicalInstName());
+            if (c == null) {
+                System.out.println("WARNING: Could not find physical cell corresponding to logical cell '" +
+                        leaf.getFullHierarchicalInstName() + "'; ignoring");
+                continue;
             }
-            else {
-                c = design.getCell(leaf.getFullHierarchicalInstName());
-                if (c == null) {
-                    System.out.println("WARNING: Could not find physical cell corresponding to logical cell '" +
-                            leaf.getFullHierarchicalInstName() + "'; ignoring");
-                    continue;
-                }
-            }
-
             cells.add(c);
 
             SiteInst si = c.getSiteInst();
