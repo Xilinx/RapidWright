@@ -822,14 +822,30 @@ public class FileTools {
 				    return rootFolder.getAbsolutePath();
 				}
 			}
-            // We appear to be running within a jar file, let's default to the current directory
+            // We appear to be running within a jar file, let's default to os-specific dir
             unPackSupportingJarData();
-            return System.getProperty("user.dir");
+            return getExecJarStoragePath();
 		}
 		if(path.endsWith(File.separator)){
 			path.substring(0, path.length()-1);
 		}
 		return path;
+	}
+	
+	public static String getExecJarStoragePath() {
+	    String rootPath = "";
+	    if(isWindows()) {
+	        rootPath = System.getenv("APPDATA");
+	    } else {
+	        rootPath = System.getenv("XDG_DATA_HOME");
+	        if(rootPath == null || rootPath.length() == 0) {
+	            rootPath = System.getenv("HOME") + File.separator + ".local" + File.separator + "share";
+	        }
+	        // TODO for Mac OS, the default for XDG_DATA_HOME would be '~/Library/My App/'
+	    }
+	    rootPath += File.separator + "RapidWright";
+	    makeDirs(rootPath);
+	    return rootPath;
 	}
 	
 	public static void updateAllDataFiles() {
@@ -1647,8 +1663,9 @@ public class FileTools {
 	 * @return True if operation succeeds, false otherwise.
 	 */
 	public static boolean unPackSupportingJarData(){
+        String outputPath = getExecJarStoragePath();
 		for(String folderName : FileTools.UNPACK_FOLDERS){
-			if(new File(folderName).exists()) continue;
+			if(new File(outputPath + File.separator + folderName).exists()) continue;
 			try{
 				CodeSource src = Device.class.getProtectionDomain().getCodeSource();
 				if(src == null) {
@@ -1663,8 +1680,9 @@ public class FileTools {
 					String name = e.getName();
 					if(name.startsWith(folderName)){
 						if(!e.isDirectory()){
-							System.out.println("Unpacking " + e.getName());
-							File newFile = new File(e.getName());
+						    String fileName = outputPath + File.separator + e.getName();
+							System.out.println("Unpacking " + fileName);
+							File newFile = new File(fileName);
 							new File(newFile.getParent()).mkdirs();
 							FileOutputStream fos = new FileOutputStream(newFile);
 							
