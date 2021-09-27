@@ -158,7 +158,7 @@ public class TestEDIF {
     }
 
     @ParameterizedTest(name="Macro Unisim expansion of {0}")
-    @EnumSource(names = {"LUT6_2", "CFGLUT5"})
+    @EnumSource(names = {"LUT6_2", "CFGLUT5", "BUFG"})
     @CheckOpenFiles
     public void testMacroExpansion(Unisim unisim) {
         EDIFNetlist netlist = createEmptyNetlist();
@@ -172,8 +172,10 @@ public class TestEDIF {
         Assertions.assertTrue(!cellInst.getCellType().hasContents());
 
         netlist.expandMacroUnisims(Series.UltraScale);
+
         cellInst = netlist.getCellInstFromHierName("inst");
         Assertions.assertEquals(cellInst.getCellName(), unisim.toString());
-        Assertions.assertTrue(cellInst.getCellType().hasContents());
+        cell = cellInst.getCellType();
+        Assertions.assertTrue(cell.getAllLeafDescendants().size() >= 2);
     }
 }
