@@ -19,21 +19,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 ################################################################################
-from __future__ import absolute_import
-from __future__ import print_function
-
-import io
-import re
-from glob import glob
-from os.path import basename
-from os.path import dirname
-
 from setuptools import find_packages
 from setuptools import setup
 
 setup(
     name='rapidwright',
-    version='2021.1.0',
+    version='2021.1.6',
     license='Apache 2.0 and Others',
     description='Xilinx RapidWright Framework Wrapped for Python.',
     long_description='',
