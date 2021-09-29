@@ -21,7 +21,7 @@
  * 
  */
 
-package com.xilinx.rapidwright.rwroute;
+package com.xilinx.rapidwright.util;
 
 import java.util.HashMap;
 import java.util.Map;

@@ -34,9 +34,9 @@ import com.xilinx.rapidwright.rwroute.Configuration;
 import com.xilinx.rapidwright.rwroute.Connection;
 import com.xilinx.rapidwright.rwroute.NetWrapper;
 import com.xilinx.rapidwright.rwroute.Routable;
-import com.xilinx.rapidwright.rwroute.TimerTree;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 import com.xilinx.rapidwright.util.Pair;
+import com.xilinx.rapidwright.util.TimerTree;
 
 
 /**

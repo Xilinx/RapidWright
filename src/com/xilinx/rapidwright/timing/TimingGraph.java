@@ -53,8 +53,8 @@ import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFPropertyValue;
 import com.xilinx.rapidwright.rwroute.RouterHelper;
-import com.xilinx.rapidwright.rwroute.TimerTree;
 import com.xilinx.rapidwright.util.Pair;
+import com.xilinx.rapidwright.util.TimerTree;
 
 import org.jgrapht.GraphPath;
 import org.jgrapht.alg.shortestpath.AllDirectedPaths;
