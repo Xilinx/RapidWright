@@ -1,4 +1,4 @@
-============= RapidWright 2021.1.0-beta released on 2021-09-28 ================
+============= RapidWright 2021.1.1-beta released on 2021-09-28 ================
 Notes: 
  * Fixes ModuleInst anchor read issue when loading a RapidWright-generated DCP
  * Adds correct macro expansion for BUFG and CFGLUT5 primitives 
