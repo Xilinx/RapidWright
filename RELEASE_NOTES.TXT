@@ -1,3 +1,21 @@
+============= RapidWright 2021.1.0-beta released on 2021-09-28 ================
+Notes: 
+ * Fixes ModuleInst anchor read issue when loading a RapidWright-generated DCP
+ * Adds correct macro expansion for BUFG and CFGLUT5 primitives 
+ * For executable jars, the RapidWright default directory has been changed to ~/.local/share/RapidWright on Linux and %APPDATA%\RapidWright on Windows.
+ * Improvements in Utils and TileColumnPattern for URAM
+ * Adds dotty graph dump facilities for some logical and physical netlist classes
+ * Fixed an issue in PolynomialGenerator trying to create duplicate pins
+ * Various fixes around closing files and streams 
+ * Includes fixes for #228, #238, #244
+ * Changes return type of Module "public RelocatableTileRectangle getBoundingBox()" from TileRectangle
+ - API Additions:
+    - com.xilinx.rapidwright.bitstream.Block "public boolean copyFrameData(Block block)"
+    - com.xilinx.rapidwright.bitstream.Frame "public boolean copyWords(Frame frame)"
+    - com.xilinx.rapidwright.design.Cell "public Cell createCell(EDIFHierCellInst inst, BEL bel)"
+    - com.xilinx.rapidwright.design.Net "public void unroutePin(SitePinInst p)"
+
+
 ============= RapidWright 2021.1.0-beta released on 2021-09-14 ================
 Notes: 
  * Updates device models to the public set released in Vivado 2021.1
