@@ -834,7 +834,7 @@ public class GlobalSignalRouting {
 			return this.node;
 		}
 
-		public boolean isTareget() {
+		public boolean isTarget() {
 			return isTarget;
 		}
 
