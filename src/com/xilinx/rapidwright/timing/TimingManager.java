@@ -116,41 +116,45 @@ public class TimingManager {
     public Map<EDIFHierPortInst, SitePinInst> getEdifHPortMap(){
     	return this.timingGraph.getEdifHPortMap();
     }
+    
     /**
-     * Updates the delay of nets after the cycle removal and delay-aware path merging
+     * Updates the delay of nets after the cycle removal and delay-aware path merging.
+     * @param illegalNets {@link NetWrapper} instances in question.
+     * @param nodesDelays Stored nodes and their delay values.
      */
-    public void updateIllegalNetsDelays(Set<NetWrapper> illegalNets, Map<Node, Float> nodesDelays, List<Connection> cons){
-    	 for(NetWrapper n:illegalNets){
-    		 for(Connection c:n.getConnection()){
+    public void updateIllegalNetsDelays(Set<NetWrapper> illegalNets, Map<Node, Float> nodesDelays){
+    	 for(NetWrapper netWrapper:illegalNets){
+    		 for(Connection connection:netWrapper.getConnections()){
     			 float netDelay = 0;
-    			 if(c.isDirect()) continue;
-    			 for(int i = c.getNodes().size() - 2; i >= 0; i--) {
-    				 Node child = c.getNodes().get(i);
-    				 Node parent = c.getNodes().get(i+1);
+    			 if(connection.isDirect()) continue;
+    			 for(int i = connection.getNodes().size() - 2; i >= 0; i--) {
+    				 Node child = connection.getNodes().get(i);
+    				 Node parent = connection.getNodes().get(i+1);
     				 netDelay += nodesDelays.getOrDefault(child, 0f)
 							 + DelayEstimatorBase.getExtraDelay(child, DelayEstimatorBase.isLong(parent));
     			 }
-    			 c.setTimingEdgesDelay(netDelay);
-    			 c.setDlyPatched(true);
+    			 connection.setTimingEdgesDelay(netDelay);
+    			 connection.setDlyPatched(true);
     		 }
     	 }
     }
     
     /**
-     * Patches up the delay of consecutive Long nodes
+     * Patches up the delay of consecutive Long nodes for connections.
+     * @param connections Connections in question.
      */
-    public void patchUpDelayOfConnections(List<Connection> cons) {
-    	for(Connection c : cons) {
-    		if(c.isDirect()) continue;
-    		if(c.isDlyPatched()) continue;
+    public void patchUpDelayOfConnections(List<Connection> connections) {
+    	for(Connection connection : connections) {
+    		if(connection.isDirect()) continue;
+    		if(connection.isDlyPatched()) continue;
     		float netDelay = 0;
-    		for(int i = c.getRnodes().size() - 2; i >= 0; i--) {
-    			Routable child = c.getRnodes().get(i);
-				Routable parent = c.getRnodes().get(i+1);
+    		for(int i = connection.getRnodes().size() - 2; i >= 0; i--) {
+    			Routable child = connection.getRnodes().get(i);
+				Routable parent = connection.getRnodes().get(i+1);
 				netDelay += child.getDelay() + DelayEstimatorBase.getExtraDelay(child.getNode(), DelayEstimatorBase.isLong(parent.getNode()));
     		}
-    		c.setTimingEdgesDelay(netDelay);
-			c.setDlyPatched(true);
+    		connection.setTimingEdgesDelay(netDelay);
+			connection.setDlyPatched(true);
     	}
     }
     
@@ -231,7 +235,6 @@ public class TimingManager {
     	System.out.printf("%-30s %10d\n\n", "Slack (ps):", (short) (Treq - adjusted));
     	
     	this.printPathDelayBreakDown(arr, criticalEdges, timingEdgeConnctionMap, useRoutable, rnodesCreated);
-    	
     }
     
     private String getSrcClockRegion() {
@@ -256,8 +259,8 @@ public class TimingManager {
     public void getSamplePathDelayInfo(List<String> verticesOfVivadoPath, Map<TimingEdge, Connection> timingEdgeConnctionMap, boolean routableBased, Map<Node, Routable> rnodesCreated) {
     	List<TimingEdge> edges = this.timingGraph.getTimingEdgeOfPath(verticesOfVivadoPath);
     	short totalDelay = 0;
-    	for(TimingEdge e : edges) {
-    		totalDelay += e.getDelay();
+    	for(TimingEdge edge : edges) {
+    		totalDelay += edge.getDelay();
     	}
     	System.out.println("Total delay: " + totalDelay);
     	this.printPathDelayBreakDown(totalDelay, edges, timingEdgeConnctionMap, routableBased, rnodesCreated);
@@ -274,16 +277,16 @@ public class TimingManager {
     	this.printTimingPathInTable(criticalEdges, arr);
     	if(rnodesCreated == null) return;
     	if(!verbose) return;
-    	for(TimingEdge e : criticalEdges) {
-    		if(timingEdgeConnctionMap.containsKey(e)){
-    			System.out.println(timingEdgeConnctionMap.get(e));
+    	for(TimingEdge edge : criticalEdges) {
+    		if(timingEdgeConnctionMap.containsKey(edge)){
+    			System.out.println(timingEdgeConnctionMap.get(edge));
     			if(useRoutable) {
-    				List<Routable> groups = timingEdgeConnctionMap.get(e).getRnodes();
+    				List<Routable> groups = timingEdgeConnctionMap.get(edge).getRnodes();
         			for(int iGroup = groups.size() -1; iGroup >= 0; iGroup--) {
         				System.out.println("\t " + groups.get(iGroup));
         			}
     			}else {
-    				List<Node> nodes = timingEdgeConnctionMap.get(e).getNodes();
+    				List<Node> nodes = timingEdgeConnctionMap.get(edge).getNodes();
         			for(int iGroup = nodes.size() -1; iGroup >= 0; iGroup--) {
         				Routable rnode = rnodesCreated.get(nodes.get(iGroup));
         				if(rnode != null) {
@@ -340,9 +343,9 @@ public class TimingManager {
 		//TODO CHECK which constraint to use. The maximum one as default?
 		for(ConstraintGroup group : constraintGroups) {
 			List<String> constraints = design.getXDCConstraints(group);
-			for(String s : constraints) {
-				if(s.contains("-period")) {
-					timingConstraint = s;
+			for(String constraint : constraints) {
+				if(constraint.contains("-period")) {
+					timingConstraint = constraint;
 					break;
 				}
 			}
@@ -354,27 +357,30 @@ public class TimingManager {
 	}
     
     /**
-     * Calculates criticality for each connection
+     * Calculates criticality for each connection.
+     * @param connections Connections in question.
+     * @param maxCriticality The maximum criticality value.
+     * @param criticalityExponent The criticality exponent to use. For more information, please refer to the {@link Configuration} class file.
+     * @param maxDelay The maximum delay used to normalize the slack of a connection.
      */
-    public float calculateCriticality(List<Connection> cons, float maxCriticality, float criticalityExponent, float maxDelay){
-    	for(Connection c:cons){
-    		c.resetCriticality();
+    public void calculateCriticality(List<Connection> connections, float maxCriticality, float criticalityExponent, float maxDelay){
+    	for(Connection connection:connections){
+    		connection.resetCriticality();
     	}
     	float maxCriti = 0;
 		if(this.index >= 0) {
-			for(Connection c : cons){
-	    		c.calculateCriticalityFromVector(maxDelay, maxCriticality, criticalityExponent, this.index);
-	    		if(c.getCriticality() > maxCriti)
-	    			maxCriti = c.getCriticality();
+			for(Connection connection : connections){
+	    		connection.calculateCriticalityFromVector(maxDelay, maxCriticality, criticalityExponent, this.index);
+	    		if(connection.getCriticality() > maxCriti)
+	    			maxCriti = connection.getCriticality();
 	    	}
 		}else {
-			for(Connection c : cons){
-	    		c.calculateCriticality(maxDelay, maxCriticality, criticalityExponent);
-	    		if(c.getCriticality() > maxCriti)
-	    			maxCriti = c.getCriticality();
+			for(Connection connection : connections){
+	    		connection.calculateCriticality(maxDelay, maxCriticality, criticalityExponent);
+	    		if(connection.getCriticality() > maxCriti)
+	    			maxCriti = connection.getCriticality();
 	    	}
 		}
-    	return maxCriti;
     }
     
     public boolean comparableFloat(Float a, float b){

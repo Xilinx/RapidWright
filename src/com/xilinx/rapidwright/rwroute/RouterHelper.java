@@ -176,8 +176,8 @@ public class RouterHelper {
 		return sinkToSwitchBoxPath;
 	}
 	
-	public static Tile getUpstreamINTTileOfClkIn(SitePinInst clkin) {
-		List<Node> pathToINTTile = projectInputPinToINTNode(clkin);
+	public static Tile getUpstreamINTTileOfClkIn(SitePinInst clkIn) {
+		List<Node> pathToINTTile = projectInputPinToINTNode(clkIn);
 		if(pathToINTTile.isEmpty()) {
 			throw new RuntimeException("ERROR: CLK_IN does not connet to INT Tile directly");
 		}
@@ -200,20 +200,20 @@ public class RouterHelper {
 	 * @return A list of PIPs generated from the list of nodes.
 	 */
 	public static List<PIP> getPIPsFromListOfReversedNodes(List<Node> connectionNodes){
-		List<PIP> conPIPs = new ArrayList<>();
-		if(connectionNodes == null) return conPIPs;
+		List<PIP> connectionPIPs = new ArrayList<>();
+		if(connectionNodes == null) return connectionPIPs;
 		// Nodes of a connection are added to the list starting from its sink to its source
 		for(int i = connectionNodes.size() -1; i > 0; i--){
 			Node driver = connectionNodes.get(i);
 			Node load = connectionNodes.get(i-1);		
 			PIP pip = findThePIPbetweenTwoNodes(driver, load);		
 			if(pip != null){
-				conPIPs.add(pip);
+				connectionPIPs.add(pip);
 			}else{
 				System.err.println("ERROR: Null PIP connecting these two nodes: " + driver.toString() + ", " + load.toString());
 			}
 		}
-		return conPIPs;
+		return connectionPIPs;
 	}
 	
 	/**
@@ -531,7 +531,7 @@ public class RouterHelper {
 	 * @param directConnection The target direct connection.
 	 * @return true, if the connection is successfully routed.
 	 */
-	public static boolean routeDirectCon(Connection directConnection){
+	public static boolean routeDirectConnection(Connection directConnection){
 		directConnection.newNodes();
 		directConnection.setNodes(findPathBetweenTwoNodes(directConnection.getSource().getConnectedNode(), directConnection.getSink().getConnectedNode()));
 		return directConnection.getNodes() != null? true : false;
@@ -611,7 +611,7 @@ public class RouterHelper {
 			Map<TimingEdge, Connection> timingEdgeConnectionMap, Map<Node, Routable> rnodesCreated) {
 		List<String> verticesOfVivadoPath = new ArrayList<>();
 		// Include CLK if the first in the path is BRAM or DSP to check the logic delay
-		// NOTE: remember to change the pin names of DSPs from subblock to top-level block that is what we use
+		// NOTE: remember to change the pin names of DSPs from subblock to top-level block that we use
 		verticesOfVivadoPath.add("superSource");	
 		File vivadoReport = new File(filePath);	
 		if(!vivadoReport.exists()) {

@@ -174,8 +174,8 @@ public class GlobalSignalRouting {
 		// This is needed because a HDISTR for clock region X3Y2 can have a base tile in clock region X2Y2, 
 		// seen from optical-flow design checkpoint.
 		Map<String, Integer> crCounts = new HashMap<>();
-		for(Wire w : node.getAllWiresInNode()) {
-			ClockRegion cr = w.getTile().getClockRegion();
+		for(Wire wire : node.getAllWiresInNode()) {
+			ClockRegion cr = wire.getTile().getClockRegion();
 			if(cr == null) {
 				continue;
 			}
@@ -206,10 +206,10 @@ public class GlobalSignalRouting {
 	 * @param device The design device.
 	 */
 	public static void clkRouteWithClkSkewRouteDelays(Net clk, Device device) {
-		Map<String, List<Node>> crPaths = getListOfNodesFromRoutes(device, crRoutes);
+		Map<String, List<Node>> clockRegionPaths = getListOfNodesFromRoutes(device, crRoutes);
 		Node centroidNode = null;
-		for(String cr : crPaths.keySet()) {
-			centroidNode = crPaths.get(cr).get(0);
+		for(String clockRegion : clockRegionPaths.keySet()) {
+			centroidNode = clockRegionPaths.get(clockRegion).get(0);
 			break;
 		}
 		if(debugPrintClkPIPs) System.out.println("CENTROID NODE: \n " + centroidNode);
@@ -241,7 +241,7 @@ public class GlobalSignalRouting {
 		Map<RouteNode, ArrayList<SitePinInst>> lcbMappings = getLCBPinMappings(clk);
 		
 		// 3.b. re-use the given paths from centroid to horizontal distribution lines
-		Map<String, RouteNode> horDistributionLines = routeCentroidToHorDistributionLines(clk, crPaths);	
+		Map<String, RouteNode> horDistributionLines = routeCentroidToHorDistributionLines(clk, clockRegionPaths);	
 		if(debugPrintClkPIPs) {
 			System.out.println("HORIZONTAL DISTRIBUTION LINEs:");
 			for(String cr : horDistributionLines.keySet()) {

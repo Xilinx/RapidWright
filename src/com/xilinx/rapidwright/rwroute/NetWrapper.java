@@ -68,21 +68,21 @@ public class NetWrapper{
 		List<Short> yArray = new ArrayList<>();
 		
 		boolean sourceRnodeAdded = false;	
-		for(Connection c : this.connections) {
-			if(c.isDirect()) continue;
+		for(Connection connection : this.connections) {
+			if(connection.isDirect()) continue;
 			short x = 0;
 			short y = 0;
 			if(!sourceRnodeAdded) {
-				x = c.getSourceRnode().getEndTileXCoordinate();
-				y = c.getSourceRnode().getEndTileYCoordinate();
+				x = connection.getSourceRnode().getEndTileXCoordinate();
+				y = connection.getSourceRnode().getEndTileYCoordinate();
 				xArray.add(x);
 				yArray.add(y);
 				xSum += x;
 				ySum += y;		
 				sourceRnodeAdded = true;
 			}	
-			x = c.getSinkRnode().getEndTileXCoordinate();
-			y = c.getSinkRnode().getEndTileYCoordinate();
+			x = connection.getSinkRnode().getEndTileXCoordinate();
+			y = connection.getSinkRnode().getEndTileYCoordinate();
 			xArray.add(x);
 			yArray.add(y);
 			xSum += x;
@@ -109,11 +109,11 @@ public class NetWrapper{
 		return id;
 	}
 	
-	public void addCons(Connection c){
-		this.connections.add(c);	
+	public void addConnection(Connection connection){
+		this.connections.add(connection);	
 	}
 	
-	public List<Connection> getConnection(){
+	public List<Connection> getConnections(){
 		return this.connections;
 	}
 

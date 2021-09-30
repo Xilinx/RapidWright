@@ -85,7 +85,7 @@ public class PartialRouter extends RWRoute{
 		}else{
 			// In partial routing mode, a net with PIPs is preserved.
 			// This means the routed net is supposed to be fully routed without conflicts.
-			// TODO detect partially routed nets and nets with possible conflicting nodes.
+			// TODO detect partially routed nets.
 			this.preserveNet(net);
 			this.increaseNumPreservedWireNets();
 		}

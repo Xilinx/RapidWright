@@ -93,12 +93,12 @@ public class ReportTimingAndWirelength{
 	 * Computes the wirelength and delay for each net.
 	 */
 	private void computeWLDlyForEachNet() {
-		for(Net n : this.design.getNets()) {
-			if (n.getType() != NetType.WIRE) continue;
-			if(!RouterHelper.isRoutableNetWithSourceSinks(n)) continue;
-			if(n.getSource().toString().contains("CLK")) continue;
-			NetWrapper netplus = this.createNetWrapper(n);		
-			List<Node> netNodes = RouterHelper.getNodesOfNet(n);			
+		for(Net net : this.design.getNets()) {
+			if (net.getType() != NetType.WIRE) continue;
+			if(!RouterHelper.isRoutableNetWithSourceSinks(net)) continue;
+			if(net.getSource().toString().contains("CLK")) continue;
+			NetWrapper netplus = this.createNetWrapper(net);		
+			List<Node> netNodes = RouterHelper.getNodesOfNet(net);			
 			for(Node node:netNodes){	
 				if(node.getTile().getTileTypeEnum() != TileTypeEnum.INT) continue;
 				usedNodes++;	
@@ -106,7 +106,7 @@ public class ReportTimingAndWirelength{
 				this.wirelength += wl;
 				RouterHelper.addNodeTypeLengthToMap(node, wl, this.nodeTypeUsage, this.nodeTypeLength);	
 			}			
-			RWRoute.setTimingEdgesOfConnections(netplus.getConnection(), this.timingManager, this.timingEdgeConnectionMap);
+			RWRoute.setTimingEdgesOfConnections(netplus.getConnections(), this.timingManager, this.timingEdgeConnectionMap);
 			this.setAccumulativeDelayOfEachNetNode(netplus);
 		}
 	}
@@ -128,17 +128,17 @@ public class ReportTimingAndWirelength{
 					 throw new IllegalArgumentException(errMsg);
 				}
 			}
-			Connection c = new Connection(this.numConnectionsToRoute++, source, sink, netWrapper);	
+			Connection connection = new Connection(this.numConnectionsToRoute++, source, sink, netWrapper);	
 			List<Node> nodes = RouterHelper.projectInputPinToINTNode(sink);
 			if(nodes.isEmpty()) {	
-				c.setDirect(true);
+				connection.setDirect(true);
 			}else {
-				c.setSinkRnode(new RoutableNode(this.rnodeId++, nodes.get(0), RoutableType.PINFEED_I));
+				connection.setSinkRnode(new RoutableNode(this.rnodeId++, nodes.get(0), RoutableType.PINFEED_I));
 				if(sourceINTNode == null) {
 					sourceINTNode = RouterHelper.projectOutputPinToINTNode(source);
 				}
-				c.setSourceRnode(new RoutableNode(this.rnodeId++, sourceINTNode, RoutableType.PINFEED_O));
-				c.setDirect(false);
+				connection.setSourceRnode(new RoutableNode(this.rnodeId++, sourceINTNode, RoutableType.PINFEED_O));
+				connection.setDirect(false);
 			}
 		}
 		return netWrapper;
@@ -147,10 +147,10 @@ public class ReportTimingAndWirelength{
 	/**
 	 * Using PIPs to calculate and set accumulative delay for each used node of a routed net that is represented by a {@link NetWrapper} Object.
 	 * The delay of each node is the total route delay from the source to the node (inclusive).
-	 * @param netplus
+	 * @param netWrapper
 	 */
-	private void setAccumulativeDelayOfEachNetNode(NetWrapper netplus) {
-		List<PIP> pips = netplus.getNet().getPIPs();	
+	private void setAccumulativeDelayOfEachNetNode(NetWrapper netWrapper) {
+		List<PIP> pips = netWrapper.getNet().getPIPs();	
 		Map<Node, RoutingNode> nodeRoutingNodeMap = new HashMap<>();
 		boolean firstPIP = true;
 		for(PIP pip : pips) {
@@ -171,14 +171,14 @@ public class ReportTimingAndWirelength{
 			endrn.setDelayFromSource(startrn.getDelayFromSource() + delay);
 		}
 		
-		for(Connection c : netplus.getConnection()) {
-			if(c.isDirect()) continue;
-			Node sinkNode = c.getSinkRnode().getNode();
+		for(Connection connection : netWrapper.getConnections()) {
+			if(connection.isDirect()) continue;
+			Node sinkNode = connection.getSinkRnode().getNode();
 			RoutingNode sinkrn = nodeRoutingNodeMap.get(sinkNode);
 			if(sinkrn == null) continue;
-			float cdelay = sinkrn.getDelayFromSource();
-			if(c.getTimingEdges() == null) continue;
-			c.setTimingEdgesDelay(cdelay);	
+			float connectionDelay = sinkrn.getDelayFromSource();
+			if(connection.getTimingEdges() == null) continue;
+			connection.setTimingEdgesDelay(connectionDelay);	
 		}	
 	}
 	

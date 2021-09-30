@@ -88,7 +88,7 @@ public class Connection implements Comparable<Connection>{
 		this.criticality = 0f;
 		this.rnodes = new ArrayList<>();
 		this.netWrapper = netWrapper;
-		this.netWrapper.addCons(this);
+		this.netWrapper.addConnection(this);
 	}
 	
 	/**
@@ -419,9 +419,9 @@ public class Connection implements Comparable<Connection>{
 	
 	@Override
 	public int compareTo(Connection arg0) {
-		if(this.netWrapper.getConnection().size() > arg0.getNetWrapper().getConnection().size()) {
+		if(this.netWrapper.getConnections().size() > arg0.getNetWrapper().getConnections().size()) {
 			return 1;
-		}else if(this.netWrapper.getConnection().size() == arg0.getNetWrapper().getConnection().size()) {
+		}else if(this.netWrapper.getConnections().size() == arg0.getNetWrapper().getConnections().size()) {
 			if(this.getHpwl() > arg0.getHpwl()) {
 				return 1;
 			}else if(this.getHpwl() == arg0.getHpwl()) {
@@ -449,7 +449,7 @@ public class Connection implements Comparable<Connection>{
 		s.append(", ");
 		s.append("net = " + this.netWrapper.getNet().getName());
 		s.append(", ");
-		s.append(String.format("net fanout = %3s", this.netWrapper.getConnection().size()));
+		s.append(String.format("net fanout = %3s", this.netWrapper.getConnections().size()));
 		s.append(", ");
 		s.append(String.format("source = %s", this.getSource().getName()));
 		s.append(", ");

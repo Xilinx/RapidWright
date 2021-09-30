@@ -51,13 +51,13 @@ public class RouteFixer{
 		this.buildGraph(netp, rnodesCreated);
 	}
 	
-	private void buildGraph(NetWrapper netp, Map<Node, Routable> rnodesCreated){
-		for(Connection c:netp.getConnection()){
-			/** nodes of connections are in the order from sink to source */
-			int vertexSize = c.getNodes().size();
+	private void buildGraph(NetWrapper netWrapper, Map<Node, Routable> rnodesCreated){
+		for(Connection connection:netWrapper.getConnections()){
+			// nodes of connections are in the order from sink to source
+			int vertexSize = connection.getNodes().size();
 			for(int i = vertexSize - 1; i > 0; i--){
-				Node cur = c.getNodes().get(i);
-				Node next = c.getNodes().get(i - 1);
+				Node cur = connection.getNodes().get(i);
+				Node next = connection.getNodes().get(i - 1);
 				
 				Routable currRnode = rnodesCreated.get(cur);
 				Routable nextRnode = rnodesCreated.get(next);
@@ -71,10 +71,8 @@ public class RouteFixer{
 				
 				if(i == 1) {
 					newNext.setSink(true);
-				}
-				
+				}			
 				if(i == vertexSize - 1) this.source = newCur;
-				
 				newCur.addChildren(newNext);
 			}	
 		}	
@@ -86,19 +84,16 @@ public class RouteFixer{
 	public void finalizeRoutesOfConnections(){
 		this.setShortestToEachVertex();
 		
-		for(Connection c : this.netp.getConnection()) {
-			
-			NodeWithDelay csink = this.nodeMap.get(c.getNodes().get(0));
-			c.getNodes().clear();
-			
-			c.getNodes().add(csink.getNode());
+		for(Connection connection : this.netp.getConnections()) {
+			NodeWithDelay csink = this.nodeMap.get(connection.getNodes().get(0));
+			connection.getNodes().clear();	
+			connection.getNodes().add(csink.getNode());
 			NodeWithDelay prev = csink.getPrev();
 			while(prev != null) {
-				c.getNodes().add(prev.getNode());
+				connection.getNodes().add(prev.getNode());
 				prev = prev.getPrev();
 			}
 		}
-		
 	}
 	
 	private void setShortestToEachVertex() {
@@ -116,20 +111,15 @@ public class RouteFixer{
 			for(NodeWithDelay next : nexts) {
 				float newCost = cur.cost + next.getDelay()
 						+ DelayEstimatorBase.getExtraDelay(next.getNode(), DelayEstimatorBase.isLong(cur.getNode()));
-				
 				if(!next.isVisited() || (next.isVisited() && newCost < next.cost)) {
-					/**
-					 * the second condition is necessary, 
-					 * a smaller path delay from the source to the current "next" could be achieved later.
-					 */
+					// The second condition is necessary, 
+					// because a smaller path delay from the source to the current "next" could be achieved later.	
 					next.cost = newCost;
 					next.setPrev(cur);
 					next.setVisited(true);
 					queue.add(next);
 				}
-				
 			}
-			
 		}
 	}
 	
@@ -219,8 +209,4 @@ public class RouteFixer{
 			return this.id + ", " + this.node.toString() + ", delay = " + this.delay + ", sink? " + this.isSink;
 		}
 	}
-	
 }
-	
-	
-

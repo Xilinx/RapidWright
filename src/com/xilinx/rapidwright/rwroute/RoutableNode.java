@@ -276,8 +276,8 @@ public class RoutableNode implements Routable{
 	}
 	
 	@Override
-	public boolean isInConBoundingBox(Connection con) {		
-		return this.endTileXCoordinate > con.getXMinBB() && this.endTileXCoordinate < con.getXMaxBB() && this.endTileYCoordinate > con.getYMinBB() && this.endTileYCoordinate < con.getYMaxBB();
+	public boolean isInConnectionBoundingBox(Connection connection) {		
+		return this.endTileXCoordinate > connection.getXMinBB() && this.endTileXCoordinate < connection.getXMaxBB() && this.endTileYCoordinate > connection.getYMinBB() && this.endTileYCoordinate < connection.getYMaxBB();
 	}
 	
 	@Override

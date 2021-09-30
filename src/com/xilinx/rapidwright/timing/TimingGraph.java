@@ -1713,8 +1713,8 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
             }
         }
         
-        //add dsp timing edges here, because the above for loop deals with one cell a time
-        //the overall info of top level inputs and outputs of DSP blocks available after the loop
+        // add dsp timing edges here, because the above for loop deals with one cell a time
+        // the overall info of top level inputs and outputs of DSP blocks available after the loop
         // DSP delays CLK to Q, IN to CLK, IN to OUT are handled here
         for(DSPTimingData dspTimingData : dspTimingDataSet) {
         	for(Pair<String, String> inOut : dspTimingData.getInOutPortDelays().keySet()) {
