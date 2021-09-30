@@ -269,7 +269,9 @@ public class PolynomialGenerator {
 				if(p.getName().startsWith("CARRYCASCIN") || p.getName().startsWith("MULTSIGNIN") ) continue;
 				if(p.getNet().getName().equals(EDIFTools.LOGICAL_VCC_NET_NAME)){
 					String portName = p.getName().replace("[", "").replace("]", "");
-					d.getVccNet().createPin(false, portName, si);
+					if(si.getSitePinInst(portName) == null) {
+					    d.getVccNet().createPin(portName, si);
+					}
 				}
 			}
 		}

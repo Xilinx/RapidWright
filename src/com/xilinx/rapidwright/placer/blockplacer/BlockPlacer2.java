@@ -27,6 +27,7 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Random;
 
@@ -94,13 +95,14 @@ public class BlockPlacer2 {
 	public static int DEBUG_LEVEL = 1;
 	// DEBUG
 	//private HashMap<HardMacro, Integer> moveCount = new HashMap<HardMacro, Integer>();
-	private String inputXPNFileName;
 	private double alpha;
 	private double beta;
     
     // Update. Added variable to support partial .dcp
     public boolean save_partial_dcp = true;
 	
+    private Map<ModuleInst, Site> lockedPlacements = null;
+    
 	/** 
 	 * Empty Constructor
 	 * 
@@ -109,6 +111,11 @@ public class BlockPlacer2 {
 		alpha = 1.0;
 		beta = 1.0;
 		seed = 2;
+	}
+	
+	public BlockPlacer2(Map<ModuleInst, Site> lockedPlacements) {
+	    this();
+	    this.lockedPlacements = lockedPlacements;
 	}
 	
 	/**
@@ -158,7 +165,11 @@ public class BlockPlacer2 {
 		for(ModuleInst mi : design.getModuleInsts()){
 			HardMacro hm = new HardMacro(mi);
 			hardMacros.add(hm);
-			hm.setValidPlacements();
+			if(lockedPlacements != null && lockedPlacements.containsKey(mi)) {
+			    hm.lockPlacement(lockedPlacements.get(mi));
+			}else {
+			    hm.setValidPlacements();			    
+			}
 			macroMap.put(mi, hm);
 		}
 		/*
