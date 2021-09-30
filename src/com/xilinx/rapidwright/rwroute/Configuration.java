@@ -33,14 +33,16 @@ public class Configuration {
 	private short maxIterations;
 	/** Routing bounding box constraint */
 	private boolean useBoundingBox;
-	/** Bounding box extension range to the left and right */
+	/** Initial bounding box extension range to the left and right */
 	private short boundingBoxExtensionX;
-	/** Bounding box extension range to the top and bottom */
+	/** Initial bounding box extension range to the top and bottom */
 	private short boundingBoxExtensionY;
-	/** Further enlarge the bounding box by the number of INT tiles during routing*/
+	/** Further enlarge the bounding box along with routing iterations by the extension X and Y increments */
 	private boolean enlargeBoundingBox;
-	private short verticalINTTiles;
-	private short horizontalINTTiles;
+	/** Incremental extension of the bounding box in the vertical direction to the top and bottom */
+	private short extensionYIncrement;
+	/** Incremental extension of the bounding box in the horizontal direction to the left and right */
+	private short extensionXIncrement;
 	/** Wirelength-driven weighting factor */
 	private float wirelengthWeight;
 	/** Timing-driven weighting factor */
@@ -98,8 +100,8 @@ public class Configuration {
 		this.boundingBoxExtensionX = (short) 3;
 		this.boundingBoxExtensionY = (short) 15;
 		this.enlargeBoundingBox = false;
-		this.verticalINTTiles = 2;
-		this.horizontalINTTiles = 1;
+		this.extensionYIncrement = 2;
+		this.extensionXIncrement = 1;
 		this.wirelengthWeight = 0.8f;
 		this.timingWeight = 0.35f;
 		this.timingMultiplier = 1f;
@@ -142,8 +144,8 @@ public class Configuration {
 				this.setBoundingBoxExtensionY(Short.parseShort(arguments[++i]));
 				break;
 			case "--enlargeBoundingBox":
-				if(i+1 < arguments.length && (!arguments[i+1].startsWith("--verticalINTTiles") && !arguments[i+1].startsWith("--horizontalINTTiles"))) {
-					System.out.println("WARNING: --enlargeBoundingBox option is not followed by --verticalINTTiles <arg> or --horizontalINTTiles <arg>.");
+				if(i+1 < arguments.length && (!arguments[i+1].startsWith("--extensionYIncrement") && !arguments[i+1].startsWith("--extensionXIncrement"))) {
+					System.out.println("WARNING: --enlargeBoundingBox option is not followed by --extensionYIncrement <arg> or --extensionXIncrement <arg>.");
 					System.out.println("         Use default settings: verticalINTTiles = 2, horizontalINTTiles = 1.");
 				}
 				this.setEnlargeBoundingBox(true);
@@ -155,11 +157,11 @@ public class Configuration {
 				}
 				this.setEnlargeBoundingBox(false);
 				break;
-			case "--verticalINTTiles":
-				this.setVerticalINTTiles(Short.parseShort(arguments[++i]));
+			case "--extensionYIncrement":
+				this.setExtensionYIncrement(Short.parseShort(arguments[++i]));
 				break;
-			case "--horizontalINTTiles":
-				this.setHorizontalINTTiles(Short.parseShort(arguments[++i]));
+			case "--extensionXIncrement":
+				this.setExtensionXIncrement(Short.parseShort(arguments[++i]));
 				break;
 			case "--wirelengthWeight":
 				this.setWirelengthWeight(Float.parseFloat(arguments[++i]));
@@ -281,7 +283,7 @@ public class Configuration {
 	}
 
 	/**
-	 * Gets the bounding box extension range in the horizontal direction.
+	 * Gets the initial bounding box extension range in the horizontal direction.
 	 * Default: 3. Can be modified by using use "--boundingBoxExtensionX" option, e.g. "--boundingBoxExtensionX 5".
 	 * @return The bounding box extension range in the horizontal direction.
 	 */
@@ -290,7 +292,7 @@ public class Configuration {
 	}
 
 	/**
-	 * Sets the bounding box extension range in the horizontal direction.
+	 * Sets the initial bounding box extension range in the horizontal direction.
 	 * Default: 3. Can be modified by using use "--boundingBoxExtensionX" option, e.g. "--boundingBoxExtensionX 5".
 	 * @param boundingBoxExtensionX
 	 */
@@ -299,7 +301,7 @@ public class Configuration {
 	}
 	
 	/**
-	 * Gets the bounding box extension range in the horizontal direction.
+	 * Gets the initial bounding box extension range in the horizontal direction.
 	 * Default: 15. Can be modified by using use "--boundingBoxExtensionY" option, e.g. "--boundingBoxExtensionY 5".
 	 * @return The bounding box extension range in the horizontal direction.
 	 */
@@ -308,7 +310,7 @@ public class Configuration {
 	}
 
 	/**
-	 * Sets the bounding box extension range in the horizontal direction.
+	 * Sets the initial bounding box extension range in the horizontal direction.
 	 * Default: 15. Can be modified by using use "--boundingBoxExtensionY" option, e.g. "--boundingBoxExtensionY 5".
 	 * @param boundingBoxExtensionY
 	 */
@@ -341,39 +343,39 @@ public class Configuration {
 	}
 
 	/**
-	 * Gets the number of INT Tiles that connections' bounding box should be enlarged vertically.
-	 * Default: 2. Can be modified by using "--verticalINTTiles" option, e.g. "--verticalINTTiles 3".
-	 * @return The number of INT Tiles that connections' bounding box should be enlarged vertically.
+	 * Gets the extension increment that connections' bounding box should be enlarged by vertically.
+	 * Default: 2. Can be modified by using "--extensionYIncrement" option, e.g. "--extensionYIncrement 3".
+	 * @return The number of INT Tiles that connections' bounding box should be enlarged by vertically.
 	 */
-	public short getVerticalINTTiles() {
-		return this.verticalINTTiles;
+	public short getExtensionYIncrement() {
+		return this.extensionYIncrement;
 	}
 
 	/**
-	 * Sets the number of INT Tiles that connections' bounding box should be enlarged vertically.
-	 * Default: 2. Can be modified by using "--verticalINTTiles" option, e.g. "--verticalINTTiles 3".
-	 * @param verticalINTTiles The number of INT Tiles that connections' bounding box should be enlarged vertically.
+	 * Sets the extension increment that connections' bounding box should be enlarged by vertically.
+	 * Default: 2. Can be modified by using "--extensionYIncrement" option, e.g. "--extensionYIncrement 3".
+	 * @param extensionYIncrement The number of INT Tiles that connections' bounding box should be enlarged by vertically.
 	 */
-	public void setVerticalINTTiles(short verticalINTTiles) {
-		this.verticalINTTiles = verticalINTTiles;
+	public void setExtensionYIncrement(short extensionYIncrement) {
+		this.extensionYIncrement = extensionYIncrement;
 	}
 
 	/**
-	 * Gets the number of INT Tiles that connections' bounding box should be enlarged horizontally.
-	 * Default: 1. Can be modified by using "--horizontalINTTiles" option, e.g. "--horizontalINTTiles 2".
-	 * @return The number of INT Tiles that connections' bounding box should be enlarged horizontally.
+	 * Gets the extension increment that connections' bounding box should be enlarged by horizontally.
+	 * Default: 1. Can be modified by using "--extensionXIncrement" option, e.g. "--extensionXIncrement 2".
+	 * @return The number of INT Tiles that connections' bounding box should be enlarged by horizontally.
 	 */
-	public short getHorizontalINTTiles() {
-		return this.horizontalINTTiles;
+	public short getExtensionXIncrement() {
+		return this.extensionXIncrement;
 	}
 
 	/**
-	 * Sets the number of INT Tiles that connections' bounding box should be enlarged horizontally.
-	 * Default: 1. Can be modified by using "--horizontalINTTiles" option, e.g. "--horizontalINTTiles 2".
-	 * @param horizontalINTTiles The number of INT Tiles that connections' bounding box should be enlarged horizontally. 
+	 * Sets the extension increment that connections' bounding box should be enlarged by horizontally.
+	 * Default: 1. Can be modified by using "--extensionXIncrement" option, e.g. "--extensionXIncrement 2".
+	 * @param extensionXIncrement The number of INT Tiles that connections' bounding box should be enlarged by horizontally. 
 	 */
-	public void setHorizontalINTTiles(short horizontalINTTiles) {
-		this.horizontalINTTiles = horizontalINTTiles;
+	public void setExtensionXIncrement(short extensionXIncrement) {
+		this.extensionXIncrement = extensionXIncrement;
 	}
 
 	/**
@@ -642,8 +644,8 @@ public class Configuration {
 			// when enlargeBoundingBox is not set, use the default parameters as default
 			// can be overridden later if there are corresponding options included in the arguments
 			this.enlargeBoundingBox = true;
-			this.verticalINTTiles = 2;
-			this.horizontalINTTiles =1;
+			this.extensionYIncrement = 2;
+			this.extensionXIncrement =1;
 		}
 		// use U-turn nodes and no masking of nodes cross RCLK
 		// Pros: maximumly allows exploration of routing resources for routability
@@ -901,8 +903,8 @@ public class Configuration {
 			s.append(formatString("Bounding box extension Y: ", this.boundingBoxExtensionY));
 			if(this.isEnlargeBoundingBox()) {
 				s.append(formatString("Enlarge bounding box: ", this.isEnlargeBoundingBox()));
-				s.append(formatString("Vertical INT tiles: ", this.verticalINTTiles));
-				s.append(formatString("Horizontal INT tiles: ", this.horizontalINTTiles));
+				s.append(formatString("Vertical INT tiles: ", this.extensionYIncrement));
+				s.append(formatString("Horizontal INT tiles: ", this.extensionXIncrement));
 			}else {
 				s.append(formatString("Fixed bounding box: ", !this.isEnlargeBoundingBox()));
 			}

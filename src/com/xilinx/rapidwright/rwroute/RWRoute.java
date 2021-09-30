@@ -852,7 +852,7 @@ public class RWRoute{
 			}
 			if(connection.congested() || !connection.getSink().isRouted()) {
 				if(this.config.isEnlargeBoundingBox()) {
-					connection.enlargeBoundingBox(this.config.getHorizontalINTTiles(), this.config.getVerticalINTTiles());
+					connection.enlargeBoundingBox(this.config.getExtensionXIncrement(), this.config.getExtensionYIncrement());
 				}	
 				return true;
 			}else {
