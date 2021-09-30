@@ -50,7 +50,7 @@ public class NetWrapper{
 	/** Stores the old source SitePinInst after output pin swapping */
 	private SitePinInst oldSource;
 	
-	public NetWrapper(int id, short bbRange, Net net){
+	public NetWrapper(int id, Net net){
 		this.id = id;
 		this.net = net;
 		this.connections = new ArrayList<>();

@@ -658,7 +658,7 @@ public class GlobalSignalRouting {
 			int watchdog = 10000;	
 			if(debug) {
 				System.out.println("SINK: TILE = " + sink.getTile().getName() + " NODE = " + sink.getConnectedNode().toString());
-			}		
+			}
 			q.clear();
 			visitedRoutingNodes.clear();
 			List<Node> pathNodes = new ArrayList<>();			

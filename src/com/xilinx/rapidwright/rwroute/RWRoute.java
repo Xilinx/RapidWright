@@ -448,7 +448,6 @@ public class RWRoute{
 	private void routeStaticNets(List<Node> preservedConnectedNodesToPins){
 		GlobalSignalRouting.setDesignRoutethruHelper(this.design, this.routethruHelper);
 		
-		Set<Node> unavailableNodes = getAllUsedNodesOfRoutedConnections();
 		for(Net net : this.staticNetAndRoutingTargets.keySet()){
 			for(SitePinInst sink : this.staticNetAndRoutingTargets.get(net)) {
 				this.preservedNodes.remove(sink.getConnectedNode());
@@ -457,9 +456,11 @@ public class RWRoute{
 		
 		RouterHelper.invertPossibleGndPinsToVccPins(this.design, this.design.getGndNet());
 		
+		// If connections of other nets are routed first, used resources should be preserved.
+		Set<Node> unavailableNodes = getAllUsedNodesOfRoutedConnections();
 		unavailableNodes.addAll(this.preservedNodes.keySet());
-		// if connections are routed first, used resources should be preserved
-		unavailableNodes.addAll(getAllUsedNodesOfRoutedConnections());
+		// When the connections of other nets are not routed yet, 
+		// the nodes connected to pins of other nets should be supplied and preserved.
 		if(preservedConnectedNodesToPins != null) unavailableNodes.addAll(preservedConnectedNodesToPins);
 		unavailableNodes.addAll(this.rnodesCreated.keySet());
 		
@@ -476,7 +477,7 @@ public class RWRoute{
 	}
 	
 	/**
-	 * Gets a set of nodes used by all the connections.
+	 * Gets a set of nodes used by all the routed connections.
 	 * @return A set of used nodes.
 	 */
 	private Set<Node> getAllUsedNodesOfRoutedConnections(){
@@ -524,7 +525,7 @@ public class RWRoute{
 	 * @return A {@link NetWrapper} instance.
 	 */
 	protected NetWrapper createsNetWrapperAndConnections(Net net, short boundingBoxExtensionX, short boundingBoxExtensionY, boolean multiSLR) {
-		NetWrapper netWrapper = new NetWrapper(this.numWireNetsToRoute, boundingBoxExtensionX, net);
+		NetWrapper netWrapper = new NetWrapper(this.numWireNetsToRoute, net);
 		this.nets.add(netWrapper);
 		
 		SitePinInst source = net.getSource();
@@ -1173,8 +1174,7 @@ public class RWRoute{
 	 * @param connection The connection to be ripped up.
 	 */
 	private void ripUp(Connection connection){
-		for(int i = connection.getRnodes().size() - 1; i >= 0; i--){
-			Routable rnode = connection.getRnodes().get(i);
+		for(Routable rnode : connection.getRnodes()) {
 			rnode.reduceConnectionCountOfUser(connection.getSource());
 			rnode.reduceConnectionCountOfUser(connection.getNetWrapper().getOldSource());
 			rnode.updatePresentCongesCost(this.presentCongesFac);
@@ -1186,8 +1186,7 @@ public class RWRoute{
 	 * @param connection The routed connection.
 	 */
 	private void updateUsersAndPresentCongesCost(Connection connection){
-		for(int i = connection.getRnodes().size()-1; i >= 0; i--){
-			Routable rnode = connection.getRnodes().get(i);
+		for(Routable rnode : connection.getRnodes()) {
 			rnode.addUser(connection.getSource());
 			rnode.updatePresentCongesCost(this.presentCongesFac);
 		}

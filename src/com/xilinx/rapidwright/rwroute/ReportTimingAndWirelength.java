@@ -117,7 +117,7 @@ public class ReportTimingAndWirelength{
 	 * @return
 	 */
 	private NetWrapper createNetWrapper(Net net) {
-		NetWrapper netWrapper = new NetWrapper(this.numWireNetsToRoute++, (short) 3, net);			
+		NetWrapper netWrapper = new NetWrapper(this.numWireNetsToRoute++, net);			
 		SitePinInst source = net.getSource();
 		Node sourceINTNode = null;
 		for(SitePinInst sink:net.getSinkPins()){

@@ -136,7 +136,7 @@ public interface Routable {
 	public void setHistoricalCongesCost(float historicalCongesCost);
 	/**
 	 * Checks if coordinates of a Routable Object is within the connection's bounding box.
-	 * @param connetion The connection that is being routed.
+	 * @param connection The connection that is being routed.
 	 * @return true, if coordinates of a Routable is within the connection's bounding box.
 	 */
 	public boolean isInConnectionBoundingBox(Connection connection);
