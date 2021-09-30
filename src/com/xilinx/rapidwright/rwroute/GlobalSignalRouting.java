@@ -639,7 +639,6 @@ public class GlobalSignalRouting {
 	 * Routes a static net (GND or VCC).
 	 * @param currNet The current static net to be routed.
 	 * @param unavailableNodes A set of unavailable nodes.
-	 * @param routethruHelper Instantiated RoutethruHelper to exclude routethru nodes.
 	 */
 	public static Map<SitePinInst, List<Node>> routeStaticNet(Net currNet, Set<Node> unavailableNodes){
 		NetType netType = currNet.getType();
@@ -729,15 +728,15 @@ public class GlobalSignalRouting {
 	}
 	
 	/**
-	 * Checks if a RoutingNode should be pruned.
+	 * Checks if a {@link RoutingNode} instance that represents a {@link Node} object should be pruned.
 	 * @param routingNode The RoutingNode in question.
-	 * @param unavailableNodes A set of unavailable nodes.
-	 * @param visitedRoutingNodes
-	 * @return true, if the RoutingNode should not be considered as an available resource.
+	 * @param unavailableNodes A set of unavailable Node instances.
+	 * @param visitedRoutingNodes RoutingNode instances that have been visited.
+	 * @return true, if the RoutingNode instance should not be considered as an available resource.
 	 */
 	private static boolean pruneNode(RoutingNode routingNode, Set<Node> unavailableNodes, Set<RoutingNode> visitedRoutingNodes){
-		Node n = routingNode.getNode();
-		IntentCode ic = n.getTile().getWireIntentCode(n.getWire());
+		Node node = routingNode.getNode();
+		IntentCode ic = node.getTile().getWireIntentCode(node.getWire());
 		switch(ic){
 			case NODE_GLOBAL_VDISTR:
 			case NODE_GLOBAL_HROUTE:
@@ -750,7 +749,7 @@ public class GlobalSignalRouting {
 				return true;
 			default:
 		}
-		if(unavailableNodes.contains(n)) return true;
+		if(unavailableNodes.contains(node)) return true;
 		if(visitedRoutingNodes.contains(routingNode)) return true;
 		return false;
 	}
@@ -804,14 +803,14 @@ public class GlobalSignalRouting {
 	static class RoutingNode{
 		private Node node;
 		private RoutingNode prev;
-		private boolean isTareget;
+		private boolean isTarget;
 		
 		private float delayFromSource;
 		
 		RoutingNode (Node node){
 			this.node = node;
 			this.prev = null;
-			this.isTareget = false;
+			this.isTarget = false;
 			this.delayFromSource = 0;
 		}
 				
@@ -836,11 +835,11 @@ public class GlobalSignalRouting {
 		}
 
 		public boolean isTareget() {
-			return isTareget;
+			return isTarget;
 		}
 
-		public void setTareget(boolean isTareget) {
-			this.isTareget = isTareget;
+		public void setTarget(boolean isTarget) {
+			this.isTarget = isTarget;
 		}
 		
 		public int hashCode() {

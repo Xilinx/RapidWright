@@ -102,7 +102,7 @@ public class Connection implements Comparable<Connection>{
 	/**
 	 * Computes the connection bounding box based on the geometric center of the net, source and sink rnodes.
 	 * @param boundingBoxExtensionX To indicate the extension on top of the minimum bounding box in the horizontal direction.
-	 *  @param boundingBoxExtensionY To indicate the extension on top of the minimum bounding box in the vertical direction.
+	 * @param boundingBoxExtensionY To indicate the extension on top of the minimum bounding box in the vertical direction.
 	 * that contains the source rnode, sink rnode and the center of its {@link NetWrapper} Object.
 	 * @param checkSLRCrossing A flag to indicate if SLR-crossing check is needed.
 	 */

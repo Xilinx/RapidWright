@@ -519,7 +519,7 @@ public class RWRoute{
 	 * Creates a unique {@link NetWrapper} instance and {@link Connection} instances based on a {@link Net} instance.
 	 * @param net The net to be initialized.
 	 * @param boundingBoxExtensionX The bounding box extension factor for restricting accessible routing resource of a connection in the horizontal direction.
-	 * * @param boundingBoxExtensionX The bounding box extension factor for restricting accessible routing resource of a connection in the vertical direction.
+	 * @param boundingBoxExtensionY The bounding box extension factor for restricting accessible routing resource of a connection in the vertical direction.
 	 * @param multiSLR The flag to indicate if the device has multiple SLRs.
 	 * @return A {@link NetWrapper} instance.
 	 */
@@ -960,13 +960,13 @@ public class RWRoute{
         	System.out.printf("%9s  %12s  %8s   %11s  %10s   %5s  %9s\n",
             		"         ", "Generated", "  RRG",    "  Routed",   "Nodes With", "CPD", "Total Run");
             System.out.printf("%9s  %12s  %8s   %11s  %10s   %5s  %9s\n",
-            		"Iteration", "RRG Nodes", "Time (s)", "Connections", "Overlapps", "(ps)", "Time (s)");
+            		"Iteration", "RRG Nodes", "Time (s)", "Connections", "Overlaps", "(ps)", "Time (s)");
             System.out.printf("---------  ----------------------   -----------  ----------   -----  ---------\n");
         }else {
         	System.out.printf("%9s  %12s  %8s   %11s  %10s   %5s  %9s\n",
             		"         ", "Generated", "  RRG",    "  Routed",   "Nodes With", "    ", "Total Run");
             System.out.printf("%9s  %12s  %8s   %11s  %10s   %5s  %9s\n",
-            		"Iteration", "RRG Nodes", "Time (s)", "Connections", "Overlapps", "    ", "Time (s)");
+            		"Iteration", "RRG Nodes", "Time (s)", "Connections", "Overlaps", "    ", "Time (s)");
             System.out.printf("---------  ----------------------   -----------  ----------   ----------------\n");
         }
 	}
@@ -1489,12 +1489,12 @@ public class RWRoute{
 					// such as U-turn shape nodes near the boundary and some node cross RCLK
 					continue;
 				}
-				if(this.isAccesible(childRNode, connection)){
+				if(this.isAccessible(childRNode, connection)){
 					this.evaluateCostAndPush(rnode, longParent, childRNode, connection, shareWeight, rnodeCostWeight,
 							rnodeLengthWeight, rnodeEstWlWeight, rnodeDelayWeight, rnodeEstDlyWeight);
 				}
 			}else if(childRNode.getRoutableType() == RoutableType.PINBOUNCE) {			
-				if(this.isAccesible(childRNode, connection)) {				
+				if(this.isAccessible(childRNode, connection)) {				
 					if(this.usablePINBounce(childRNode, connection.getSinkRnode())) {
 						this.evaluateCostAndPush(rnode, longParent, childRNode, connection, shareWeight, rnodeCostWeight,
 								rnodeLengthWeight, rnodeEstWlWeight, rnodeDelayWeight, rnodeEstDlyWeight);
@@ -1515,7 +1515,7 @@ public class RWRoute{
 	 * @param connection The connection to route.
 	 * @return true, if no bounding box constraints, or if the routing resource is within the connection's bounding box when use the bounding box constraint.
 	 */
-	private boolean isAccesible(Routable child, Connection connection) {
+	private boolean isAccessible(Routable child, Connection connection) {
 		if(this.config.isUseBoundingBox()) {
 			return child.isInConnectionBoundingBox(connection);
 		}
@@ -1691,7 +1691,7 @@ public class RWRoute{
 		System.out.println("------------------------------------------------------------------------------");
 		printFormattedString("Total nets: ", this.design.getNets().size());
 		printFormattedString("Routable nets: ", this.numPreservedRoutableNets + this.numPreservedClks + this.numPreservedStaticNets + this.nets.size() +  this.staticNetAndRoutingTargets.size() + this.clkNets.size());
-		printFormattedString("  Preserved routble nets: ", this.numPreservedRoutableNets);
+		printFormattedString("  Preserved routable nets: ", this.numPreservedRoutableNets);
 		printFormattedString("    GLOBAL_CLOCK: ", this.numPreservedClks);
 		printFormattedString("    Static nets: ", this.numPreservedStaticNets);
 		printFormattedString("    WIRE: ", this.numPreservedWire);
@@ -1735,7 +1735,7 @@ public class RWRoute{
 			printFormattedString("Connections routed:", this.connectionsRouted);
 			printFormattedString("Nodes evaluated:", this.nodesEvaluated);
 			printFormattedString("Nodes pushed:", this.nodesPushed);
-			printFormattedString("Nodes poped:", this.nodesPopped);
+			printFormattedString("Nodes popped:", this.nodesPopped);
 			System.out.printf("------------------------------------------------------------------------------\n");
 		}
 		
