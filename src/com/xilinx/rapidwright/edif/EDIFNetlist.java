@@ -1410,7 +1410,10 @@ public class EDIFNetlist extends EDIFName {
 						continue;
 					}else{
 						// Going down in hierarchy
-						q.add(hierPort.getInternalNet());
+						EDIFHierNet internalNet = hierPort.getInternalNet();
+						if(internalNet != null) {
+							q.add(internalNet);
+ 						}
 					}
 				}
 			}
