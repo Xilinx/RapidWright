@@ -22,11 +22,12 @@
  */
 package com.xilinx.rapidwright.util;
 
-import java.util.HashSet;
-
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.TileTypeEnum;
+
+import java.util.EnumSet;
+import java.util.Set;
 
 /**
  * This is a helper class for creating PrimitiveTypes and TileTypes
@@ -34,33 +35,35 @@ import com.xilinx.rapidwright.device.TileTypeEnum;
  */
 public class Utils{
 
-	private static HashSet<TileTypeEnum> clbs;
+	private static Set<TileTypeEnum> clbs;
 	
-	private static HashSet<TileTypeEnum> clbms;
+	private static Set<TileTypeEnum> clbms;
 	
-	private static HashSet<TileTypeEnum> dsps;
+	private static Set<TileTypeEnum> dsps;
 	
-	private static HashSet<TileTypeEnum> brams;
+	private static Set<TileTypeEnum> brams;
 	
-	private static HashSet<TileTypeEnum> ints;
+	private static Set<TileTypeEnum> ints;
 	
-	private static HashSet<TileTypeEnum> gts;
+	private static Set<TileTypeEnum> gts;
 	
-	private static HashSet<TileTypeEnum> interconnects;
+	private static Set<TileTypeEnum> interconnects;
 
-	private static HashSet<SiteTypeEnum> lockedSiteTypes;
-
-	private static HashSet<SiteTypeEnum> moduleSiteTypes;
-
-	private static HashSet<SiteTypeEnum> sliceTypes;
+	private static Set<TileTypeEnum> urams;
 	
-	public static HashSet<SiteTypeEnum> dspTypes;
+	private static Set<SiteTypeEnum> lockedSiteTypes;
 
-	public static HashSet<SiteTypeEnum> bramTypes;
+	private static Set<SiteTypeEnum> moduleSiteTypes;
+
+	private static Set<SiteTypeEnum> sliceTypes;
 	
-	public static HashSet<SiteTypeEnum> iobTypes;
+	public static Set<SiteTypeEnum> dspTypes;
 
-	public static HashSet<SiteTypeEnum> uramTypes;
+	public static Set<SiteTypeEnum> bramTypes;
+	
+	public static Set<SiteTypeEnum> iobTypes;
+
+	public static Set<SiteTypeEnum> uramTypes;
 	
 	/**
 	 * Returns a SiteTypeEnum enum based on the given string. If such
@@ -150,6 +153,10 @@ public class Utils{
 	public static boolean isInterConnect(TileTypeEnum type){
 		return interconnects.contains(type);
 	}
+
+	public static boolean isURAM(TileTypeEnum type) {
+		return urams.contains(type);
+	}
 	
 	public static boolean isLockedSiteType(SiteTypeEnum type){
 		return lockedSiteTypes.contains(type);
@@ -159,31 +166,35 @@ public class Utils{
 		return moduleSiteTypes.contains(type);
 	}
 	
-	public static HashSet<TileTypeEnum> getIntTileTypes(){
+	public static Set<TileTypeEnum> getIntTileTypes(){
 		return interconnects;
 	}
 	
-	public static HashSet<TileTypeEnum> getCLBTileTypes(){
+	public static Set<TileTypeEnum> getCLBTileTypes(){
 		return clbs;
 	}
 
-	public static HashSet<TileTypeEnum> getCLBMTileTypes(){
+	public static Set<TileTypeEnum> getCLBMTileTypes(){
 		return clbms;
 	}
 	
-	public static HashSet<TileTypeEnum> getDSPTileTypes(){
+	public static Set<TileTypeEnum> getDSPTileTypes(){
 		return dsps;
 	}
 
-	public static HashSet<TileTypeEnum> getBRAMTileTypes(){
+	public static Set<TileTypeEnum> getBRAMTileTypes(){
 		return brams;
 	}
+
+	public static Set<TileTypeEnum> getURAMTileTypes(){
+		return urams;
+	}
 	
-	public static HashSet<SiteTypeEnum> getLockedSiteTypes(){
+	public static Set<SiteTypeEnum> getLockedSiteTypes(){
 		return lockedSiteTypes;
 	}
 
-	public static HashSet<SiteTypeEnum> getModuleSiteTypes(){
+	public static Set<SiteTypeEnum> getModuleSiteTypes(){
 		return moduleSiteTypes;
 	}
 	
@@ -210,137 +221,164 @@ public class Utils{
 
 	
 	static{
-		clbs = new HashSet<TileTypeEnum>();
-		clbs.add(TileTypeEnum.CLBLL_L);
-		clbs.add(TileTypeEnum.CLBLL_R);
-		clbs.add(TileTypeEnum.CLBLM_L);
-		clbs.add(TileTypeEnum.CLBLM_R);
-		clbs.add(TileTypeEnum.CLEL_L);
-		clbs.add(TileTypeEnum.CLEL_R);
-		clbs.add(TileTypeEnum.CLE_M);
-		clbs.add(TileTypeEnum.CLE_M_R);
-		clbs.add(TileTypeEnum.CLEM);
-		clbs.add(TileTypeEnum.CLEM_R);
-		clbs.add(TileTypeEnum.CLE_E_CORE);
-		clbs.add(TileTypeEnum.CLE_W_CORE);
+		clbs = EnumSet.of(
+			TileTypeEnum.CLBLL_L,
+			TileTypeEnum.CLBLL_R,
+			TileTypeEnum.CLBLM_L,
+			TileTypeEnum.CLBLM_R,
+			TileTypeEnum.CLEL_L,
+			TileTypeEnum.CLEL_R,
+			TileTypeEnum.CLE_M,
+			TileTypeEnum.CLE_M_R,
+			TileTypeEnum.CLEM,
+			TileTypeEnum.CLEM_R,
+			TileTypeEnum.CLE_E_CORE,
+			TileTypeEnum.CLE_W_CORE
+		);
 		
-		clbms = new HashSet<TileTypeEnum>();
-		clbms.add(TileTypeEnum.CLBLM_L);
-		clbms.add(TileTypeEnum.CLBLM_R);
-		clbms.add(TileTypeEnum.CLE_M);
-		clbms.add(TileTypeEnum.CLE_M_R);
-		clbms.add(TileTypeEnum.CLEM);
-		clbms.add(TileTypeEnum.CLEM_R);
+		clbms = EnumSet.of(
+			TileTypeEnum.CLBLM_L,
+			TileTypeEnum.CLBLM_R,
+			TileTypeEnum.CLE_M,
+			TileTypeEnum.CLE_M_R,
+			TileTypeEnum.CLEM,
+			TileTypeEnum.CLEM_R
+		);
 		
-		dsps = new HashSet<TileTypeEnum>();
-		dsps.add(TileTypeEnum.DSP);
-		dsps.add(TileTypeEnum.DSP_L);
-		dsps.add(TileTypeEnum.DSP_R);
-		dsps.add(TileTypeEnum.DSP_ROCF_B_TILE);
-		dsps.add(TileTypeEnum.DSP_ROCF_T_TILE);
+		dsps = EnumSet.of(
+			TileTypeEnum.DSP,
+			TileTypeEnum.DSP_L,
+			TileTypeEnum.DSP_R,
+			TileTypeEnum.DSP_ROCF_B_TILE,
+			TileTypeEnum.DSP_ROCF_T_TILE
+		);
 		
-		brams = new HashSet<TileTypeEnum>();
-		brams.add(TileTypeEnum.BRAM);
-		brams.add(TileTypeEnum.BRAM_L);
-		brams.add(TileTypeEnum.BRAM_R);
-		brams.add(TileTypeEnum.BRAM_ROCF_BL_TILE);
-		brams.add(TileTypeEnum.BRAM_ROCF_BR_TILE);
-		brams.add(TileTypeEnum.BRAM_ROCF_TL_TILE);
-		brams.add(TileTypeEnum.BRAM_ROCF_TR_TILE);
+		brams = EnumSet.of(
+			TileTypeEnum.BRAM,
+			TileTypeEnum.BRAM_L,
+			TileTypeEnum.BRAM_R,
+			TileTypeEnum.BRAM_ROCF_BL_TILE,
+			TileTypeEnum.BRAM_ROCF_BR_TILE,
+			TileTypeEnum.BRAM_ROCF_TL_TILE,
+			TileTypeEnum.BRAM_ROCF_TR_TILE
+		);
 
-		ints = new HashSet<TileTypeEnum>();
-		ints.add(TileTypeEnum.INT);
-		ints.add(TileTypeEnum.INT_L);
-		ints.add(TileTypeEnum.INT_R);
-		ints.add(TileTypeEnum.INT_L_SLV);
-		ints.add(TileTypeEnum.INT_R_SLV);
-		ints.add(TileTypeEnum.INT_L_SLV_FLY);
-		ints.add(TileTypeEnum.INT_R_SLV_FLY);
+		ints = EnumSet.of(
+			TileTypeEnum.INT,
+			TileTypeEnum.INT_L,
+			TileTypeEnum.INT_R,
+			TileTypeEnum.INT_L_SLV,
+			TileTypeEnum.INT_R_SLV,
+			TileTypeEnum.INT_L_SLV_FLY,
+			TileTypeEnum.INT_R_SLV_FLY,
+			TileTypeEnum.INT_INTF_R,
+			TileTypeEnum.INT_INTF_L
+		);
 		
-		gts = new HashSet<TileTypeEnum>();
-		gts.add(TileTypeEnum.GTZ_TOP);
-		gts.add(TileTypeEnum.GTZ_BOT);
-		gts.add(TileTypeEnum.GTX_CHANNEL_0);
-		gts.add(TileTypeEnum.GTX_CHANNEL_1);
-		gts.add(TileTypeEnum.GTX_CHANNEL_2);
-		gts.add(TileTypeEnum.GTX_CHANNEL_3);
-		gts.add(TileTypeEnum.GTX_COMMON);
-		gts.add(TileTypeEnum.GTH_CHANNEL_0);
-		gts.add(TileTypeEnum.GTH_CHANNEL_1);
-		gts.add(TileTypeEnum.GTH_CHANNEL_2);
-		gts.add(TileTypeEnum.GTH_CHANNEL_3);
-		gts.add(TileTypeEnum.GTH_COMMON);
+		gts = EnumSet.of(
+			TileTypeEnum.GTZ_TOP,
+			TileTypeEnum.GTZ_BOT,
+			TileTypeEnum.GTX_CHANNEL_0,
+			TileTypeEnum.GTX_CHANNEL_1,
+			TileTypeEnum.GTX_CHANNEL_2,
+			TileTypeEnum.GTX_CHANNEL_3,
+			TileTypeEnum.GTX_COMMON,
+			TileTypeEnum.GTH_CHANNEL_0,
+			TileTypeEnum.GTH_CHANNEL_1,
+			TileTypeEnum.GTH_CHANNEL_2,
+			TileTypeEnum.GTH_CHANNEL_3,
+			TileTypeEnum.GTH_COMMON
+		);
 	   
-		interconnects = new HashSet<TileTypeEnum>();
-		interconnects.add(TileTypeEnum.INT);
-		interconnects.add(TileTypeEnum.INT_L);
-		//interconnects.add(TileTypeEnum.INT_L_SLV);
-		//interconnects.add(TileTypeEnum.INT_L_SLV_FLY);
-		interconnects.add(TileTypeEnum.INT_R);
-		//interconnects.add(TileTypeEnum.INT_R_SLV);
-		//interconnects.add(TileTypeEnum.INT_R_SLV_FLY);
+		interconnects = EnumSet.of(
+			TileTypeEnum.INT,
+			TileTypeEnum.INT_L,
+			//TileTypeEnum.INT_L_SLV,
+			//TileTypeEnum.INT_L_SLV_FLY,
+			TileTypeEnum.INT_R
+			//TileTypeEnum.INT_R_SLV,
+			//TileTypeEnum.INT_R_SLV_FLY,
+		);
+
+		urams = EnumSet.of(
+			TileTypeEnum.URAM_URAM_FT,
+			TileTypeEnum.URAM_URAM_DELAY_FT,
+			TileTypeEnum.URAM_LOCF_TL_TILE,
+			TileTypeEnum.URAM_LOCF_BL_TILE,
+			TileTypeEnum.URAM_ROCF_TL_TILE,
+			TileTypeEnum.URAM_ROCF_BL_TILE,
+			TileTypeEnum.URAM_DELAY_LOCF_TL_TILE,
+			TileTypeEnum.URAM_DELAY_ROCF_TL_TILE
+		);
 		
-		lockedSiteTypes = new HashSet<SiteTypeEnum>();
-		lockedSiteTypes.add(SiteTypeEnum.CONFIG_SITE);
-		lockedSiteTypes.add(SiteTypeEnum.BUFG);
-		lockedSiteTypes.add(SiteTypeEnum.BUFGCE);
-		lockedSiteTypes.add(SiteTypeEnum.BUFGCTRL);
+		lockedSiteTypes = EnumSet.of(
+			SiteTypeEnum.CONFIG_SITE,
+			SiteTypeEnum.BUFG,
+			SiteTypeEnum.BUFGCE,
+			SiteTypeEnum.BUFGCTRL
+		);
 		
 
-		moduleSiteTypes = new HashSet<SiteTypeEnum>();
-		moduleSiteTypes.add(SiteTypeEnum.LAGUNA);
-		moduleSiteTypes.add(SiteTypeEnum.SLICEL);
-		moduleSiteTypes.add(SiteTypeEnum.SLICEM);
-		moduleSiteTypes.add(SiteTypeEnum.RAMB180);
-		moduleSiteTypes.add(SiteTypeEnum.RAMB181);
-		moduleSiteTypes.add(SiteTypeEnum.RAMB18E1);
-		moduleSiteTypes.add(SiteTypeEnum.RAMB36);
-		moduleSiteTypes.add(SiteTypeEnum.RAMB36E1);
-		moduleSiteTypes.add(SiteTypeEnum.RAMBFIFO18);
-		moduleSiteTypes.add(SiteTypeEnum.RAMBFIFO36);
-		moduleSiteTypes.add(SiteTypeEnum.RAMBFIFO36E1);
-		moduleSiteTypes.add(SiteTypeEnum.FIFO18_0);
-		moduleSiteTypes.add(SiteTypeEnum.FIFO18E1);
-		moduleSiteTypes.add(SiteTypeEnum.FIFO36);
-		moduleSiteTypes.add(SiteTypeEnum.FIFO36E1);
-		moduleSiteTypes.add(SiteTypeEnum.DSP48E1);
-		moduleSiteTypes.add(SiteTypeEnum.DSP48E2);
-		moduleSiteTypes.add(SiteTypeEnum.BUFGCE);
-//		moduleSiteTypes.add(SiteTypeEnum.PS7);	
+		moduleSiteTypes = EnumSet.of(
+			SiteTypeEnum.LAGUNA,
+			SiteTypeEnum.SLICEL,
+			SiteTypeEnum.SLICEM,
+			SiteTypeEnum.RAMB180,
+			SiteTypeEnum.RAMB181,
+			SiteTypeEnum.RAMB18E1,
+			SiteTypeEnum.RAMB36,
+			SiteTypeEnum.RAMB36E1,
+			SiteTypeEnum.RAMBFIFO18,
+			SiteTypeEnum.RAMBFIFO36,
+			SiteTypeEnum.RAMBFIFO36E1,
+			SiteTypeEnum.FIFO18_0,
+			SiteTypeEnum.FIFO18E1,
+			SiteTypeEnum.FIFO36,
+			SiteTypeEnum.FIFO36E1,
+			SiteTypeEnum.DSP48E1,
+			SiteTypeEnum.DSP48E2,
+			SiteTypeEnum.BUFGCE
+	//		SiteTypeEnum.PS7
+		);
 		
-		sliceTypes = new HashSet<SiteTypeEnum>();
-		sliceTypes.add(SiteTypeEnum.SLICEL);
-		sliceTypes.add(SiteTypeEnum.SLICEM);
+		sliceTypes = EnumSet.of(
+			SiteTypeEnum.SLICEL,
+			SiteTypeEnum.SLICEM
+		);
 		
-		dspTypes = new HashSet<SiteTypeEnum>();
-		dspTypes.add(SiteTypeEnum.DSP48E1);
-		dspTypes.add(SiteTypeEnum.DSP48E2);
-		dspTypes.add(SiteTypeEnum.DSP58);
-		dspTypes.add(SiteTypeEnum.DSP58_CPLX);
-		dspTypes.add(SiteTypeEnum.DSPFP);
+		dspTypes = EnumSet.of(
+			SiteTypeEnum.DSP48E1,
+			SiteTypeEnum.DSP48E2,
+			SiteTypeEnum.DSP58,
+			SiteTypeEnum.DSP58_CPLX,
+			SiteTypeEnum.DSPFP
+		);
 		
-		bramTypes = new HashSet<SiteTypeEnum>();
-		bramTypes.add(SiteTypeEnum.FIFO18E1);
-		bramTypes.add(SiteTypeEnum.FIFO36E1);		
-		bramTypes.add(SiteTypeEnum.RAMB18E1);
-		bramTypes.add(SiteTypeEnum.RAMB36);
-		bramTypes.add(SiteTypeEnum.RAMB36E1);
-		bramTypes.add(SiteTypeEnum.RAMBFIFO18);
-		bramTypes.add(SiteTypeEnum.RAMBFIFO36);
-		bramTypes.add(SiteTypeEnum.RAMBFIFO36E1);
-		bramTypes.add(SiteTypeEnum.RAMB18_L);
-		bramTypes.add(SiteTypeEnum.RAMB18_U);
+		bramTypes = EnumSet.of(
+			SiteTypeEnum.FIFO18E1,
+			SiteTypeEnum.FIFO36E1,		
+			SiteTypeEnum.RAMB18E1,
+			SiteTypeEnum.RAMB36,
+			SiteTypeEnum.RAMB36E1,
+			SiteTypeEnum.RAMBFIFO18,
+			SiteTypeEnum.RAMBFIFO36,
+			SiteTypeEnum.RAMBFIFO36E1,
+			SiteTypeEnum.RAMB18_L,
+			SiteTypeEnum.RAMB18_U
+		);
 		
-		iobTypes = new HashSet<SiteTypeEnum>();
-		iobTypes.add(SiteTypeEnum.IOB18);
-		iobTypes.add(SiteTypeEnum.IOB18M);
-		iobTypes.add(SiteTypeEnum.IOB18S);
-		iobTypes.add(SiteTypeEnum.IOB33);
-		iobTypes.add(SiteTypeEnum.IOB33M);
-		iobTypes.add(SiteTypeEnum.IOB33S);
+		iobTypes = EnumSet.of(
+			SiteTypeEnum.IOB18,
+			SiteTypeEnum.IOB18M,
+			SiteTypeEnum.IOB18S,
+			SiteTypeEnum.IOB33,
+			SiteTypeEnum.IOB33M,
+			SiteTypeEnum.IOB33S
+		);
 		
-		uramTypes = new HashSet<>();
-		uramTypes.add(SiteTypeEnum.URAM288);
+		uramTypes = EnumSet.of(
+			SiteTypeEnum.URAM288
+		);
 
 	}
 

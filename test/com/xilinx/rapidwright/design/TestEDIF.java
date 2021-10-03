@@ -8,6 +8,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import com.xilinx.rapidwright.checker.CheckOpenFiles;
+import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFDesign;
@@ -21,6 +22,8 @@ import com.xilinx.rapidwright.edif.EDIFTools;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 /**
  * Test that we can write an EDIF file and read it back in. We currently don't have a way to check designs for equality,
@@ -152,5 +155,27 @@ public class TestEDIF {
             wrappedRegisterDesign = new SoftReference<>(netlist);
         }
         return netlist;
+    }
+
+    @ParameterizedTest(name="Macro Unisim expansion of {0}")
+    @EnumSource(names = {"LUT6_2", "CFGLUT5", "BUFG"})
+    @CheckOpenFiles
+    public void testMacroExpansion(Unisim unisim) {
+        EDIFNetlist netlist = createEmptyNetlist();
+
+        EDIFCell cell = netlist.getHDIPrimitive(unisim);
+        cell.createCellInst("inst", netlist.getTopCell());
+
+        EDIFCellInst cellInst = netlist.getCellInstFromHierName("inst");
+        Assertions.assertNotNull(cellInst);
+        Assertions.assertEquals(cellInst.getCellName(), unisim.toString());
+        Assertions.assertTrue(!cellInst.getCellType().hasContents());
+
+        netlist.expandMacroUnisims(Series.UltraScale);
+
+        cellInst = netlist.getCellInstFromHierName("inst");
+        Assertions.assertEquals(cellInst.getCellName(), unisim.toString());
+        cell = cellInst.getCellType();
+        Assertions.assertTrue(cell.getAllLeafDescendants().size() >= 2);
     }
 }

@@ -1157,7 +1157,7 @@ public class EDIFNetlist extends EDIFName {
 	 * @return The physical/parent net name or null if none could be found.
 	 */
 	public String getParentNetName(String netAlias){
-		return getParentNetMap().get(getHierNetFromName(netAlias)).toString();
+		return getParentNetMap().get(getHierNetFromName(netAlias)).getHierarchicalNetName();
 	}
 	/**
 	 * Gets the canonical net for this net name.  This corresponds to the driving net
@@ -1410,7 +1410,10 @@ public class EDIFNetlist extends EDIFName {
 						continue;
 					}else{
 						// Going down in hierarchy
-						q.add(hierPort.getInternalNet());
+						EDIFHierNet internalNet = hierPort.getInternalNet();
+						if(internalNet != null) {
+							q.add(internalNet);
+ 						}
 					}
 				}
 			}

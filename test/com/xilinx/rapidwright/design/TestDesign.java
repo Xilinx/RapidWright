@@ -58,4 +58,33 @@ public class TestDesign {
         Assertions.assertEquals(SITE, cell.getSiteInst().getSite().getName());
 
     }
+
+    @Test
+    @CheckOpenFiles
+    public void checkDcpRoundtripModuleInstAnchor(@TempDir Path tempDir) throws IOException {
+        //Keep a reference to the device to avoid it being garbage collected during testcase execution
+        Device device = Device.getDevice(DEVICE);
+
+        //Use separate files for writing/reading so we can identify identify leaking file handles by filename
+        final Path filenameWrite = tempDir.resolve("testWrite.dcp");
+        final Path filenameRead = tempDir.resolve("testRead.dcp");
+
+        Module module = new Module(createSampleDesign());
+
+        Design design = new Design("top", device.getDeviceName());
+        EDIFNetlist netlist = design.getNetlist();
+        netlist.migrateCellAndSubCells(module.getNetlist().getTopCell());
+
+        ModuleInst mi = design.createModuleInst("inst", module);
+        mi.getCellInst().setCellType(module.getNetlist().getTopCell());
+        mi.placeOnOriginalAnchor();
+        String oldAnchor = mi.getAnchor().toString();
+
+        design.writeCheckpoint(filenameWrite);
+        Files.copy(filenameWrite, filenameRead);
+
+        design = Design.readCheckpoint(filenameRead);
+        mi = design.getModuleInst("inst");
+        Assertions.assertEquals(oldAnchor, mi.getAnchor().toString());
+    }
 }
