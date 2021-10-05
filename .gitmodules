@@ -1,0 +1,3 @@
+[submodule "RapidWrightDCP"]
+	path = RapidWrightDCP
+	url = git@github.com:eddieh-xlnx/RapidWrightDCP
