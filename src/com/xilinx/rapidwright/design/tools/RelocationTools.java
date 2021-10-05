@@ -1,6 +1,34 @@
+/*
+ * Copyright (c) 2021 Xilinx, Inc.
+ * All rights reserved.
+ *
+ * Author: Eddie Hung, Xilinx Research Labs.
+ *
+ * This file is part of RapidWright.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
 package com.xilinx.rapidwright.design.tools;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.design.Cell;
@@ -15,7 +43,6 @@ import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
-import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.Utils;
 
@@ -157,33 +184,33 @@ public class RelocationTools {
 
         boolean revertPlacement = false;
         for (Map.Entry<SiteInst, Site> e : oldSite.entrySet()) {
-            Site ss = e.getValue();
-            Tile st = ss.getTile();
-            Tile dt = st.getTileXYNeighbor(tileColOffset, tileRowOffset);
-            Site ds = ss.getCorrespondingSite(ss.getSiteTypeEnum(), dt);
-            SiteInst ssi = e.getKey();
-            assert(ds != ss);
-            if (dt == null || ds == null) {
-                String destTileName = st.getNameRoot() + "_X" + (st.getTileXCoordinate() + tileColOffset)
-                        + "Y" + (st.getTileYCoordinate() + tileRowOffset);
-                System.out.println("ERROR: Failed to move SiteInst '" + ssi.getName() + "' from Tile '" + st.getName()
+            Site srcSite = e.getValue();
+            Tile srcTile = srcSite.getTile();
+            Tile destTile = srcTile.getTileXYNeighbor(tileColOffset, tileRowOffset);
+            Site destSite = srcSite.getCorrespondingSite(srcSite.getSiteTypeEnum(), destTile);
+            SiteInst srcSiteInst = e.getKey();
+            assert(destSite != srcSite);
+            if (destTile == null || destSite == null) {
+                String destTileName = srcTile.getNameRoot() + "_X" + (srcTile.getTileXCoordinate() + tileColOffset)
+                        + "Y" + (srcTile.getTileYCoordinate() + tileRowOffset);
+                System.out.println("ERROR: Failed to move SiteInst '" + srcSiteInst.getName() + "' from Tile '" + srcTile.getName()
                         + "' to Tile '" + destTileName + "'");
                 revertPlacement = true;
                 continue;
             }
-            SiteInst dsi = design.getSiteInstFromSite(ds);
-            if (dsi != null) {
-                if (dsi.getName().startsWith("STATIC_SOURCE")) {
-                    dsi.unPlace();
+            SiteInst destSiteInst = design.getSiteInstFromSite(destSite);
+            if (destSiteInst != null) {
+                if (destSiteInst.getName().startsWith("STATIC_SOURCE")) {
+                    destSiteInst.unPlace();
                 } else {
-                    System.out.println("ERROR: Failed to move SiteInst '" + ssi.getName() + "' from Tile '" + st.getName()
-                            + "' to Tile '" + dt.getName() + "' as it is already occupied");
+                    System.out.println("ERROR: Failed to move SiteInst '" + srcSiteInst.getName() + "' from Tile '" + srcTile.getName()
+                            + "' to Tile '" + destTile.getName() + "' as it is already occupied");
                     revertPlacement = true;
                     continue;
                 }
             }
 
-            ssi.place(ds);
+            srcSiteInst.place(destSite);
         }
 
         if (revertPlacement) {
