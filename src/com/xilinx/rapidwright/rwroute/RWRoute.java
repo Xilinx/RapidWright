@@ -849,7 +849,7 @@ public class RWRoute{
 			if(connection.getCriticality() > this.minRerouteCriticality) {
 				return true;
 			}
-			if(connection.congested() || !connection.getSink().isRouted()) {
+			if(connection.isCongested() || !connection.getSink().isRouted()) {
 				if(this.config.isEnlargeBoundingBox()) {
 					connection.enlargeBoundingBox(this.config.getExtensionXIncrement(), this.config.getExtensionYIncrement());
 				}	

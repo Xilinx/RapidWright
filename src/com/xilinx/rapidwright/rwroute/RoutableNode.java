@@ -191,12 +191,12 @@ public class RoutableNode implements Routable{
 	}
 
 	@Override
-	public boolean overUsed() {
+	public boolean isOverUsed() {
 		return Routable.capacity < this.getOccupancy();
 	}
 	
 	@Override
-	public boolean used(){
+	public boolean isUsed(){
 		return this.getOccupancy() > 0;
 	}
 	

@@ -44,12 +44,12 @@ public interface Routable {
 	 * Checks if a Routable Object has been used.
 	 * @return true, if a Routable Object has been used.
 	 */
-	public boolean used();
+	public boolean isUsed();
 	/**
 	 * Checks if a Routable Object has been used by more than one users.
 	 * @return true, if a Routable Object has been used by multiple users.
 	 */
-	public boolean overUsed();
+	public boolean isOverUsed();
 	/**
 	 * Checks if a Routable Object are illegally driven by multiple drivers.
 	 * @return true, if a Routable Object has multiple drivers.

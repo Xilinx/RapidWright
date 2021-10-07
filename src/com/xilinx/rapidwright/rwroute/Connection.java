@@ -207,9 +207,9 @@ public class Connection implements Comparable<Connection>{
 	 * Checks if a connection has any overused rnodes to indicate the congestion status.
 	 * @return
 	 */
-	public boolean congested() {
+	public boolean isCongested() {
 		for(Routable rn : this.getRnodes()){
-			if(rn.overUsed()) {
+			if(rn.isOverUsed()) {
 				return true;
 			}
 		}
