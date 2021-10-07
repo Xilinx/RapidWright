@@ -202,7 +202,7 @@ public class RoutableNode implements Routable{
 	
 	@Override
 	public boolean hasMultiDrivers(){
-		return Routable.capacity < this.numUniqueDrivers();
+		return Routable.capacity < this.uniqueDriverCount();
 	}
 
 	@Override
@@ -385,16 +385,16 @@ public class RoutableNode implements Routable{
 	}
 	
 	@Override
-	public void addUser(SitePinInst source) {
+	public void incrementUser(SitePinInst source) {
 		if(this.usersConnectionCounts == null) {
 			this.usersConnectionCounts = new HashMap<>();
 		}
-		Integer users = this.usersConnectionCounts.getOrDefault(source, 0);
-		this.usersConnectionCounts.put(source, users + 1);
+		Integer connectionCount = this.usersConnectionCounts.getOrDefault(source, 0);
+		this.usersConnectionCounts.put(source, connectionCount + 1);
 	}
 	
 	@Override
-	public int numUniqueUsers() {
+	public int uniqueUserCount() {
 		if(this.usersConnectionCounts == null) {
 			return 0;
 		}
@@ -402,7 +402,7 @@ public class RoutableNode implements Routable{
 	}
 	
 	@Override
-	public void reduceConnectionCountOfUser(SitePinInst source) {
+	public void decrementUser(SitePinInst source) {
 		Integer count = this.usersConnectionCounts.getOrDefault(source, 0);
 		if(count == 1) {
 			this.usersConnectionCounts.remove(source);
@@ -420,7 +420,7 @@ public class RoutableNode implements Routable{
 	}
 	
 	@Override
-	public int numUniqueDrivers() {
+	public int uniqueDriverCount() {
 		if(this.driversCounts == null) {
 			return 0;
 		}
@@ -428,7 +428,7 @@ public class RoutableNode implements Routable{
 	}
 	
 	@Override
-	public void addDriver(Routable parent) {
+	public void incrementDriver(Routable parent) {
 		if(this.driversCounts == null) {
 			this.driversCounts = new HashMap<>();
 		}
@@ -437,7 +437,7 @@ public class RoutableNode implements Routable{
 	}
 	
 	@Override
-	public void reduceDriverCount(Routable parent) {
+	public void decrementDriver(Routable parent) {
 		Integer count = this.driversCounts.getOrDefault(parent, 0);
 		if(count == 1) {
 			this.driversCounts.remove(parent);
@@ -448,7 +448,7 @@ public class RoutableNode implements Routable{
 	
 	@Override
 	public int getOccupancy() {
-		return this.numUniqueUsers();
+		return this.uniqueUserCount();
 	}
 	
 	@Override

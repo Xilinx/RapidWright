@@ -134,7 +134,7 @@ public class UltraScaleClockRouting {
 	 * @param centroid The given centroid node
 	 * @return
 	 */
-	public static RouteNode routeToGivenCentroidNode(Net clk, RouteNode startingRouteNode, Node centroid) {
+	public static RouteNode routeToCentroidNode(Net clk, RouteNode startingRouteNode, Node centroid) {
 		Queue<RouteNode> q = new PriorityQueue<RouteNode>(16, new Comparator<RouteNode>() {
 			public int compare(RouteNode i, RouteNode j) {return i.getCost() - j.getCost();}});
 		HashSet<RouteNode> visited = new HashSet<>();
@@ -183,7 +183,6 @@ public class UltraScaleClockRouting {
 	 * @param clockRegion The center clock region or the clock region that is one row above or below the center
 	 * @param findCentroidHroute The flag to indicate the returned RouteNode should be HROUTE in the center or VROUTE going up or down
 	 */
-	public static RouteNode centroidHRouteNode = null;
 	public static RouteNode routeToCentroidHRouteOrVRouteAboveBelowCentroid(Net clk, RouteNode startingRouteNode, ClockRegion clockRegion, boolean findCentroidHroute) {
 		Queue<RouteNode> q = new PriorityQueue<RouteNode>(16, new Comparator<RouteNode>() {
 			public int compare(RouteNode i, RouteNode j) {return i.getCost() - j.getCost();}});
@@ -192,12 +191,15 @@ public class UltraScaleClockRouting {
 		q.add(startingRouteNode);
 		Tile approxTarget = clockRegion.getApproximateCenter();
 		int watchDog = 10000;
+		
+		RouteNode centroidHRouteNode = null;
+		
 		while(!q.isEmpty()){
 			RouteNode curr = q.poll();
 			visited.add(curr);
 
 			for(Wire w : curr.getWireConnections()){
-				RouteNode parent = curr.getParent(); 
+				RouteNode parent = curr.getParent();
 				if(parent != null){
 					if(w.getIntentCode()      == IntentCode.NODE_GLOBAL_VDISTR &&
 					   curr.getIntentCode()   == IntentCode.NODE_GLOBAL_VROUTE && 

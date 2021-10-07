@@ -240,13 +240,13 @@ public interface Routable {
 	 * Adds the source {@link SitePinInst} instance of a {@link Net} instance as a user.
 	 * @param source The source of a net to add.
 	 */
-	public void addUser(SitePinInst source);
+	public void incrementUser(SitePinInst source);
 	
 	/**
 	 * Gets the number of unique users.
 	 * @return The number of unique sources in the source set.
 	 */
-	public int numUniqueUsers();
+	public int uniqueUserCount();
 	
 	/**
 	 * Reduce the connection count of a user that is represented by the source.
@@ -254,7 +254,7 @@ public interface Routable {
 	 * If there is only one connection driven by the source that is using a Routable instance, remove the user.
 	 * @param source The source {@link SitePinInst} to be removed from the set.
 	 */
-	public void reduceConnectionCountOfUser(SitePinInst source);
+	public void decrementUser(SitePinInst source);
 
 	/**
 	 * Counts the connections driven by a source that are using a Routable instance.
@@ -267,19 +267,19 @@ public interface Routable {
 	 * Gets the number of unique drivers of the rnode.
 	 * @return The number of unique drivers of the rnode.
 	 */
-	public int numUniqueDrivers();
+	public int uniqueDriverCount();
 	
 	/**
 	 * Adds a driver to the parent set of the associated rnode.
 	 * @param parent The driver to be added.
 	 */
-	public void addDriver(Routable parent);
+	public void incrementDriver(Routable parent);
 	
 	/**
 	 * Reduce the driver count of a Routable instance.
 	 * @param parent The driver that should have its count reduced
 	 */
-	public void reduceDriverCount(Routable parent);
+	public void decrementDriver(Routable parent);
 	
 	/**
 	 * Gets the parent Routable instance for routing a connection.

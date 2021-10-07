@@ -443,9 +443,8 @@ public class RWRoute{
 	
 	/**
 	 * Routes static nets with preserved resources list supplied to avoid conflicting nodes.
-	 * @param preservedConnectedNodesToPins The list of preserved nodes for other nets.
 	 */
-	private void routeStaticNets(List<Node> preservedConnectedNodesToPins){
+	private void routeStaticNets(){
 		GlobalSignalRouting.setDesignRoutethruHelper(this.design, this.routethruHelper);
 		
 		for(Net net : this.staticNetAndRoutingTargets.keySet()){
@@ -459,9 +458,8 @@ public class RWRoute{
 		// If connections of other nets are routed first, used resources should be preserved.
 		Set<Node> unavailableNodes = getAllUsedNodesOfRoutedConnections();
 		unavailableNodes.addAll(this.preservedNodes.keySet());
-		// When the connections of other nets are not routed yet, 
-		// the nodes connected to pins of other nets should be supplied and preserved.
-		if(preservedConnectedNodesToPins != null) unavailableNodes.addAll(preservedConnectedNodesToPins);
+		// If the connections of other nets are not routed yet, 
+		// the nodes connected to pins of other nets must be preserved.
 		unavailableNodes.addAll(this.rnodesCreated.keySet());
 		
 		for(Net net : this.staticNetAndRoutingTargets.keySet()){
@@ -532,7 +530,7 @@ public class RWRoute{
 		int indirect = 0;
 		Node sourceINTNode = null;
 		
-		for(SitePinInst sink:net.getSinkPins()){
+		for(SitePinInst sink : net.getSinkPins()){
 			if(RouterHelper.isExternalConnectionToCout(source, sink)){
 				source = net.getAlternateSource();
 				if(source == null){
@@ -623,6 +621,7 @@ public class RWRoute{
 	/**
 	 * Creates a {@link RoutableNode} Object based on a {@link Node} instance and avoids duplicates,
 	 * used for creating the source and sink rnodes of {@link Connection} instances.
+	 * NOTE: This method does not consider the preserved nodes.
 	 * @param rnodeGlobalIndex The design-wise index of created {@link RoutableNode} instances.
 	 * @param sitePinInst The source or sink {@link SitePinInst} instance.
 	 * @param node The node associated to the {@link SitePinInst} instance.
@@ -677,8 +676,8 @@ public class RWRoute{
 		
 		this.routerTimer.createTimer("route static nets", "Routing").start();
 		// Routes static nets (VCC and GND) before signals for now.
-		// null could be replaced by a list of reserved nodes if static nets are routed after signals
-		this.routeStaticNets(null);
+		// All the used nodes by other nets should be marked as unavailable, if static nets are routed after signals.
+		this.routeStaticNets();
 		// Connection-based router for indirectly connected pairs of output pin and input pin */
 		this.routerTimer.getTimer("route static nets").stop();
 		
@@ -1141,7 +1140,7 @@ public class RWRoute{
 				if(driver == null){
 					driver = rnode;
 				}else{
-					rnode.addDriver(driver);
+					rnode.incrementDriver(driver);
 					driver = rnode;
 				}
 			}
@@ -1175,8 +1174,8 @@ public class RWRoute{
 	 */
 	private void ripUp(Connection connection){
 		for(Routable rnode : connection.getRnodes()) {
-			rnode.reduceConnectionCountOfUser(connection.getSource());
-			rnode.reduceConnectionCountOfUser(connection.getNetWrapper().getOldSource());
+			rnode.decrementUser(connection.getSource());
+			rnode.decrementUser(connection.getNetWrapper().getOldSource());
 			rnode.updatePresentCongesCost(this.presentCongesFac);
 		}
 	}
@@ -1187,7 +1186,7 @@ public class RWRoute{
 	 */
 	private void updateUsersAndPresentCongesCost(Connection connection){
 		for(Routable rnode : connection.getRnodes()) {
-			rnode.addUser(connection.getSource());
+			rnode.incrementUser(connection.getSource());
 			rnode.updatePresentCongesCost(this.presentCongesFac);
 		}
 	}
@@ -1337,6 +1336,9 @@ public class RWRoute{
 	
 	/**
 	 * Unroutes preserved nets to release routing resource to resolve congestion that blocks the routablity of a connection.
+	 * NOTE: This is a primary method to enable the experimental soft preserve feature of partial routing. 
+	 * It only unroutes nets that are using resources immediately downhill of the source and 
+	 * immediately uphill of the sink of a connection.
 	 * @param connection The connection in question.
 	 * @return The number of unrouted nets.
 	 */
@@ -1364,20 +1366,14 @@ public class RWRoute{
 		
 		for(Net n : toRouteNets) {
 			List<Node> reservedNetNodes = RouterHelper.getNodesOfNet(n);
-			for(Node toRemove : reservedNetNodes) {
-				this.preservedNodes.remove(toRemove);
-			}
 			
 			NetWrapper netnew = this.createsNetWrapperAndConnections(n, this.config.getBoundingBoxExtensionX(), this.config.getBoundingBoxExtensionY(), this.multiSLRDevice);
 			
-			for(int i = 0; i < reservedNetNodes.size(); i ++) {
-				Node toBuild = reservedNetNodes.get(i);
-				Routable rnode = this.rnodesCreated.get(toBuild);
-				if(rnode == null) {
-					rnode = new RoutableNode(this.rnodeId, toBuild, RoutableType.WIRE);
-					this.rnodeId++;
-					this.rnodesCreated.put(toBuild, rnode);
-				}
+			for(Node toBuild : reservedNetNodes) {
+				// remove the node from the preserved nodes
+				this.preservedNodes.remove(toBuild);	
+				// creates a RoutableNode with the node 
+				Routable rnode = this.createAddRoutableNode(this.rnodeId, null, toBuild, RoutableType.WIRE);
 				// Each rnode created above should be added to its parents if parent exists,
 				// because children of an existing parent may have been set.
 				for(Node uphill : toBuild.getAllUphillNodes()) {

@@ -63,7 +63,7 @@ public class Connection implements Comparable<Connection>{
 	private short xMinBB;
 	private short xMaxBB;
 	private short yMinBB;
-	private short yMaxBB;	
+	private short yMaxBB;
 	/** 
 	 * TimingEdges associated to a connection.
 	 * For LUT_6_2_* pins, there will be two timing edges mapped to the same pair of SitePinInsts.

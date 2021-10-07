@@ -224,7 +224,7 @@ public class GlobalSignalRouting {
 		}
 		
 		// 2. route from start routing line to the given centroid node
-		RouteNode centroidRouteNode = UltraScaleClockRouting.routeToGivenCentroidNode(clk, startRoutingLine, centroidNode);	
+		RouteNode centroidRouteNode = UltraScaleClockRouting.routeToCentroidNode(clk, startRoutingLine, centroidNode);	
 		// When routing clock with this method, we need to make sure that the BUFGCE used in the design is exactly the one displayed in the file.
 		// Otherwise, it is possible that this clock router will fail. Because if can not find a path to the centroid.
 		// For instance, for a GNL design with a clock net, 
