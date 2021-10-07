@@ -192,4 +192,5 @@ public class ReportTimingAndWirelength{
 		ReportTimingAndWirelength reporter = new ReportTimingAndWirelength(design, config);	
 		reporter.computeStatisticsAndReport();
 	}
+	
 }

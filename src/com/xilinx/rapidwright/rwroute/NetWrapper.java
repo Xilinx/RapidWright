@@ -162,4 +162,5 @@ public class NetWrapper{
 	public int hashCode(){
 		return this.id;
 	}
+	
 }
