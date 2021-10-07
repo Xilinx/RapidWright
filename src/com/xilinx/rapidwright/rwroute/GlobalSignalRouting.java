@@ -62,18 +62,16 @@ public class GlobalSignalRouting {
 	private static Design design;
 	private static RouteThruHelper routeThruHelper;
 	
-	static boolean clkDebug = false;
-	static boolean debugPrintClkPIPs = false;
+	private static boolean clkDebug = false;
+	private static boolean debugPrintClkPIPs = false;
 	
-	static Map<String, List<String>> crRoutes;
-	static Map<Pair<String, String>, List<Short>> bufceRowTaps;
-	static Device device;
+	private static Map<String, List<String>> crRoutes;
+	private static Map<Pair<String, String>, List<Short>> bufceRowTaps;
 	
-	static Map<String, List<String>> dstINTtileRoutes;
-	static Map<String, Short> dstINTtileRoutey;
-	static ClkRouteTiming ceRouteTiming;
+	private static Map<String, List<String>> dstINTtileRoutes;
+	private static ClkRouteTiming ceRouteTiming;
 	
-	public static Map<Node, RoutingNode> createdRoutingNodes;
+	private static Map<Node, RoutingNode> createdRoutingNodes;
 	static {
 		createdRoutingNodes = new HashMap<>();
 	}
@@ -112,7 +110,7 @@ public class GlobalSignalRouting {
 	 * @param device The design device.
 	 */
 	public static void clkEnableRoute(Net clockEnable, Device device) {
-		Map<String, List<Node>> dstINTtilePaths = getListOfNodesFromRoutes(device, dstINTtileRoutes);
+		Map<String, List<Node>> dstINTtilePaths = getListOfNodesFromRoutes(device, getDstINTtileRoutes());
 		// Not import path after HDSTR
 		Set<PIP> ceNetPIPs = new HashSet<>();
 		Map<String, RouteNode> horDistributionLines = new HashMap<>();
@@ -206,7 +204,7 @@ public class GlobalSignalRouting {
 	 * @param device The design device.
 	 */
 	public static void clkRouteWithClkSkewRouteDelays(Net clk, Device device) {
-		Map<String, List<Node>> clockRegionPaths = getListOfNodesFromRoutes(device, crRoutes);
+		Map<String, List<Node>> clockRegionPaths = getListOfNodesFromRoutes(device, getCrRoutes());
 		Node centroidNode = null;
 		for(String clockRegion : clockRegionPaths.keySet()) {
 			centroidNode = clockRegionPaths.get(clockRegion).get(0);
@@ -534,7 +532,7 @@ public class GlobalSignalRouting {
 	 * @return A list of RouteNodes indicating the reached horizontal distribution lines.
 	 */
 	private static List<RouteNode> routeFromDirectionalVRouteToHorizontalDistributionLines(Net clk, RouteNode vroute, List<ClockRegion> clockRegions, boolean down) {
-		RouteNode centroidDistNode = UltraScaleClockRouting.transitionCentroidToUpDownDistributionLine(clk, vroute, down);
+		RouteNode centroidDistNode = UltraScaleClockRouting.transitionCentroidToVerticalDistributionLine(clk, vroute, down);
 		if(clkDebug) System.out.println(" transition distribution node is \n \t = " + centroidDistNode);
 		
 		if(centroidDistNode == null) return null;
@@ -796,59 +794,12 @@ public class GlobalSignalRouting {
 		return false;
 	}
 	
-	/**
-	 * A lightweight useful class for different simple routing-related scenarios, 
-	 * each {@link RoutingNode} Object is associated to a {@link Node} Object.
-	 */
-	static class RoutingNode{
-		private Node node;
-		private RoutingNode prev;
-		private boolean isTarget;
-		
-		private float delayFromSource;
-		
-		RoutingNode (Node node){
-			this.node = node;
-			this.prev = null;
-			this.isTarget = false;
-			this.delayFromSource = 0;
-		}
-				
-		public float getDelayFromSource() {
-			return delayFromSource;
-		}
+	public static Map<String, List<String>> getCrRoutes() {
+		return crRoutes;
+	}
 
-		public void setDelayFromSource(float delayFromSource) {
-			this.delayFromSource = delayFromSource;
-		}
-
-		public void setPrev(RoutingNode prev) {
-			this.prev = prev;
-		}
-		
-		public RoutingNode getPrev() {
-			return this.prev;
-		}
-		
-		public Node getNode() {
-			return this.node;
-		}
-
-		public boolean isTarget() {
-			return isTarget;
-		}
-
-		public void setTarget(boolean isTarget) {
-			this.isTarget = isTarget;
-		}
-		
-		public int hashCode() {
-			return this.node.hashCode();
-		}
-		
-		public String toString() {
-			return this.node.toString() + ", accDly = " + this.delayFromSource;
-		}
+	public static Map<String, List<String>> getDstINTtileRoutes() {
+		return dstINTtileRoutes;
 	}
 	
 }

@@ -383,8 +383,8 @@ public class RWRoute{
  		if(this.clkNets.size() > 0) System.out.println("INFO: Route clock nets");
  		for(Net clk : this.clkNets) {
  			System.out.println(clk.getName());
- 			if(GlobalSignalRouting.crRoutes != null || GlobalSignalRouting.dstINTtileRoutes != null) {
- 				if(GlobalSignalRouting.dstINTtileRoutes == null) {
+ 			if(GlobalSignalRouting.getCrRoutes() != null || GlobalSignalRouting.getDstINTtileRoutes() != null) {
+ 				if(GlobalSignalRouting.getDstINTtileRoutes() == null) {
  					System.out.println("INFOR: Route with clock skew data reference");
  					GlobalSignalRouting.clkRouteWithClkSkewRouteDelays(clk, this.design.getDevice());
  				}else {

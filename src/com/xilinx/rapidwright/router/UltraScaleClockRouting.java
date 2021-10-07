@@ -256,7 +256,7 @@ public class UltraScaleClockRouting {
 		return transitionCentroidToDistributoinLine(clk, centroidRouteLine, currCR);
 	}
 	
-	public static RouteNode transitionCentroidToUpDownDistributionLine(Net clk, RouteNode centroidRouteLine, boolean down){
+	public static RouteNode transitionCentroidToVerticalDistributionLine(Net clk, RouteNode centroidRouteLine, boolean down){
 		centroidRouteLine.setParent(null);
 		if(centroidRouteLine.getIntentCode() == IntentCode.NODE_GLOBAL_VDISTR){
 			return centroidRouteLine;

@@ -35,7 +35,6 @@ import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.TileTypeEnum;
-import com.xilinx.rapidwright.rwroute.GlobalSignalRouting.RoutingNode;
 import com.xilinx.rapidwright.timing.TimingEdge;
 import com.xilinx.rapidwright.timing.TimingManager;
 import com.xilinx.rapidwright.timing.TimingVertex;
@@ -192,5 +191,5 @@ public class ReportTimingAndWirelength{
 		config.setTimingDriven(true);
 		ReportTimingAndWirelength reporter = new ReportTimingAndWirelength(design, config);	
 		reporter.computeStatisticsAndReport();
-	}	
+	}
 }
