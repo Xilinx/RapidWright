@@ -1067,7 +1067,7 @@ public class RWRoute{
 		float sumChildren = 0;
 		float sumRNodes = 0;
 		for(Routable rn:this.rnodesCreated.values()){	
-			if(!rn.childrenNotSet()){
+			if(!rn.isChildrenUnset()){
 				sumChildren += rn.getChildren().size();
 				sumRNodes++;
 			}
@@ -1174,8 +1174,7 @@ public class RWRoute{
 	 */
 	private void ripUp(Connection connection){
 		for(Routable rnode : connection.getRnodes()) {
-			rnode.decrementUser(connection.getSource());
-			rnode.decrementUser(connection.getNetWrapper().getOldSource());
+			rnode.decrementUser(connection.getNetWrapper());
 			rnode.updatePresentCongesCost(this.presentCongesFac);
 		}
 	}
@@ -1186,7 +1185,7 @@ public class RWRoute{
 	 */
 	private void updateUsersAndPresentCongesCost(Connection connection){
 		for(Routable rnode : connection.getRnodes()) {
-			rnode.incrementUser(connection.getSource());
+			rnode.incrementUser(connection.getNetWrapper());
 			rnode.updatePresentCongesCost(this.presentCongesFac);
 		}
 	}
@@ -1381,7 +1380,7 @@ public class RWRoute{
 					// Do not use those nodes, because we do not know if the routethru is available or not
 					if(routethruHelper.isRouteThru(uphill, toBuild)) continue;
 					RoutableNode parent = (RoutableNode) this.rnodesCreated.get(uphill);
-					if(parent != null && !parent.childrenNotSet()) {
+					if(parent != null && !parent.isChildrenUnset()) {
 						if(!parent.getChildren().contains(rnode)) parent.getChildren().add(rnode);
 					}
 				}
@@ -1399,7 +1398,7 @@ public class RWRoute{
 	 */
 	private void setChildrenOfRnode(Routable rnode) {
 		this.rnodesTimer.start();
-		if(rnode.childrenNotSet()) {
+		if(rnode.isChildrenUnset()) {
 			int rnodeCounter = rnode.setChildren(this.rnodeId, this.rnodesCreated,
 					this.preservedNodes.keySet(), this.routethruHelper);
 			this.rnodeId = rnodeCounter;
@@ -1532,7 +1531,7 @@ public class RWRoute{
 	 */
 	private void evaluateCostAndPush(Routable rnode, boolean longParent, Routable childRnode, Connection connection, float sharingWeight, float rnodeCostWeight,
 			float rnodeLengthWeight, float rnodeEstWlWeight, float rnodeDelayWeight, float rnodeEstDlyWeight) {
-		int countSourceUses = childRnode.countConnectionsOfUser(connection.getSource());
+		int countSourceUses = childRnode.countConnectionsOfUser(connection.getNetWrapper());
 		float sharingFactor = 1 + sharingWeight* countSourceUses;
 		float newPartialPathCost = rnode.getUpstreamPathCost() + rnodeCostWeight * this.getRoutableCost(childRnode, connection, countSourceUses, sharingFactor)
 								+ rnodeLengthWeight * childRnode.getLength() / sharingFactor

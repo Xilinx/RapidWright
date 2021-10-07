@@ -27,13 +27,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.router.RouteThruHelper;
 
 /**
  * A Routable Object corresponds to a vertex of the routing resource graph.
- * Each Routable instance is associated with a {@link Node} instance. It is denoted as rnode.
+ * Each Routable instance is associated with a {@link Node} instance. It is denoted as "rnode".
  * The routing resource graph is built "lazily", i.e., Routable Objects (rnodes) are created when needed.
  */
 
@@ -179,7 +178,7 @@ public interface Routable {
 	 * Checks if the children of a Routable Object have been set or not.
 	 * @return true, if the children have not been set.
 	 */
-	public boolean childrenNotSet();
+	public boolean isChildrenUnset();
 	/**
 	 * Gets the Manhattan distance from a Routable Object to the target Routable Object, typically the sink Routable Object of a connection.
 	 * @param sink The target Routable Object.
@@ -228,56 +227,60 @@ public interface Routable {
 
 	/**
 	 * Gets a map that records users of a {@link Routable} instance based on all routed connections.
-	 * Each user is a {@link Net} instance represented by its source.
+	 * Each user is a {@link NetWrapper} instance representing a {@link Net} instance.
 	 * It is often the case that multiple connections of a net are using a same rnode.
 	 * So we count connections of each user to facilitate the sharing mechanism of RWRoute.
-	 * @return A map between users, i.e., {@link Net} instances represented by their source {@link SitePinInst} instances,
+	 * @return A map between users, i.e., {@link NetWrapper} instances representing by {@link Net} instances,
 	 *  and numbers of connections from different users.
 	 */
-	public Map<SitePinInst, Integer> getUsersConnectionCounts();
+	public Map<NetWrapper, Integer> getUsersConnectionCounts();
 
 	/**
-	 * Adds the source {@link SitePinInst} instance of a {@link Net} instance as a user.
-	 * @param source The source of a net to add.
+	 * Adds an user {@link NetWrapper} instance to the user map, of which a key is a {@link NetWrapper} instance and
+	 * the value is the number of connections that are using a rnode.
+	 * If the user is already stored in the map, increment the connection count of the user by 1. Otherwise, put the user
+	 * into the map and initialize the connection count as 1. 
+	 * @param user The user in question.
 	 */
-	public void incrementUser(SitePinInst source);
+	public void incrementUser(NetWrapper user);
 	
 	/**
 	 * Gets the number of unique users.
-	 * @return The number of unique sources in the source set.
+	 * @return The number of unique {@link NetWrapper} instances in the user map, i.e, the key set size of the user map.
 	 */
 	public int uniqueUserCount();
 	
 	/**
-	 * Reduce the connection count of a user that is represented by the source.
-	 * {@link SitePinInst} instance of a {@link Net} instance.
-	 * If there is only one connection driven by the source that is using a Routable instance, remove the user.
-	 * @param source The source {@link SitePinInst} to be removed from the set.
+	 * Decrements the connection count of a user that is represented by a
+	 * {@link NetWrapper} instance corresponding to a {@link Net} instance.
+	 * If there is only one connection of the user that is using a Routable instance, remove the user from the map.
+	 * Otherwise, decrement the connection count by 1.
+	 * @param user The user to be decremented from the user map.
 	 */
-	public void decrementUser(SitePinInst source);
+	public void decrementUser(NetWrapper user);
 
 	/**
-	 * Counts the connections driven by a source that are using a Routable instance.
-	 * @param source The source {@link SitePinInst}.
-	 * @return The total number of a source included in the source set.
+	 * Counts the connections of a user that are using a rnode.
+	 * @param user The user in question indicated by a {@link NetWrapper} instance.
+	 * @return The total number of connections of the user.
 	 */
-	public int countConnectionsOfUser(SitePinInst source);
+	public int countConnectionsOfUser(NetWrapper user);
 	
 	/**
-	 * Gets the number of unique drivers of the rnode.
-	 * @return The number of unique drivers of the rnode.
+	 * Gets the number of unique drivers.
+	 * @return The number of unique drivers of a rnode, i.e., the key set size of the driver map
 	 */
 	public int uniqueDriverCount();
 	
 	/**
-	 * Adds a driver to the parent set of the associated rnode.
+	 * Adds a driver to the driver map.
 	 * @param parent The driver to be added.
 	 */
 	public void incrementDriver(Routable parent);
 	
 	/**
-	 * Reduce the driver count of a Routable instance.
-	 * @param parent The driver that should have its count reduced
+	 * Decrements the driver count of a Routable instance.
+	 * @param parent The driver that should have its count reduced by 1.
 	 */
 	public void decrementDriver(Routable parent);
 	
@@ -306,7 +309,7 @@ public interface Routable {
 	public void setVisited(boolean visited);
 	
 	/**
-	 * Gets the unique index of a Routable instance.
+	 * Gets the unique index of a rnode.
 	 * @return
 	 */
 	public int getIndex();

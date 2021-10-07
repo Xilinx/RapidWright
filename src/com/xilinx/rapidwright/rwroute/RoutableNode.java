@@ -78,12 +78,12 @@ public class RoutableNode implements Routable{
 	private Routable prev;
 	/**
 	 * A map that records users of a rnode based on all routed connections.
-	 * Each user is a {@link Net} instance represented by its source.
-	 * It is often the case that multiple connections of the net are using a same rnode.
-	 * We count the number of connections from a net.
+	 * Each user is a {@link NetWrapper} instance that corresponds to a {@link Net} instance.
+	 * It is often the case that multiple connections of the user are using a same rnode.
+	 * We count the number of connections from the net.
 	 * The number is used for the sharing mechanism of RWRoute.
 	 */
-	private Map<SitePinInst, Integer> usersConnectionCounts;
+	private Map<NetWrapper, Integer> usersConnectionCounts;
 	/**
 	 * A map that records all the driver rnodes of a rnode based on all routed connections.
 	 * It is possible that a rnode are driven by different rnodes after routing of all connections of a net.
@@ -329,7 +329,7 @@ public class RoutableNode implements Routable{
 		return this.baseCost;
 	}
 
-	public boolean childrenNotSet() {
+	public boolean isChildrenUnset() {
 		return this.children == null;
 	}
 
@@ -380,12 +380,12 @@ public class RoutableNode implements Routable{
 	}
 
 	@Override
-	public Map<SitePinInst, Integer> getUsersConnectionCounts() {
+	public Map<NetWrapper, Integer> getUsersConnectionCounts() {
 		return usersConnectionCounts;
 	}
 	
 	@Override
-	public void incrementUser(SitePinInst source) {
+	public void incrementUser(NetWrapper source) {
 		if(this.usersConnectionCounts == null) {
 			this.usersConnectionCounts = new HashMap<>();
 		}
@@ -402,7 +402,7 @@ public class RoutableNode implements Routable{
 	}
 	
 	@Override
-	public void decrementUser(SitePinInst source) {
+	public void decrementUser(NetWrapper source) {
 		Integer count = this.usersConnectionCounts.getOrDefault(source, 0);
 		if(count == 1) {
 			this.usersConnectionCounts.remove(source);
@@ -412,7 +412,7 @@ public class RoutableNode implements Routable{
 	}
 	
 	@Override
-	public int countConnectionsOfUser(SitePinInst source) {
+	public int countConnectionsOfUser(NetWrapper source) {
 		if(this.usersConnectionCounts == null) {
 			return 0;
 		}
