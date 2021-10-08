@@ -52,7 +52,7 @@ import com.xilinx.rapidwright.util.TimerTree;
 import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.timing.ClkRouteTiming;
-import com.xilinx.rapidwright.timing.ClkSkewRouteDelay;
+import com.xilinx.rapidwright.timing.ClkSkewsAndRouteDelays;
 import com.xilinx.rapidwright.timing.DSPTimingData;
 import com.xilinx.rapidwright.timing.TimingEdge;
 import com.xilinx.rapidwright.timing.TimingGraph;
@@ -241,7 +241,7 @@ public class RWRoute{
 		String clkRouteTimingFile = config.getClkRouteTiming();
 		
 		if(clkSkewFile != null) {
-			ClkSkewRouteDelay clkSkewData = new ClkSkewRouteDelay(clkSkewFile);
+			ClkSkewsAndRouteDelays clkSkewData = new ClkSkewsAndRouteDelays(clkSkewFile);
 			TimingGraph.setClkTiming(clkSkewData);
 			this.routesToClockRegions = clkSkewData.getRoute();
 			this.bufceRowTapsOfClockRegions = clkSkewData.getDelay();

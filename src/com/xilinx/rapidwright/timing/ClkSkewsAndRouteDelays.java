@@ -40,7 +40,7 @@ import com.xilinx.rapidwright.util.Pair;
  * When the file is ready, please use "--clkSkew>" option (see {@link Configuration})
  * to enable RWRoute to use the file for clock skew-aware timing-driven clock routing.
  */
-public class ClkSkewRouteDelay {
+public class ClkSkewsAndRouteDelays {
 	/** Name of the file */
 	private String name;
 	/** Mapping from pairs of clock regions (starting and ending clock regions of a timing path) and the skew data */
@@ -60,7 +60,7 @@ public class ClkSkewRouteDelay {
 	
 	private String clkSkewRouteDelayFile;
 	
-	public ClkSkewRouteDelay(String fileName) {
+	public ClkSkewsAndRouteDelays(String fileName) {
 		this.name = fileName;	
 		this.skew = new HashMap<>();
 		this.routesToDestinationClockRegions = new HashMap<>();
