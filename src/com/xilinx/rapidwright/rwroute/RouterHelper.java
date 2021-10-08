@@ -354,10 +354,10 @@ public class RouterHelper {
 	
 	/**
 	 * Checks if a DSP {@link BELPin} instance is invertible.
-	 * @param belPin
-	 * @return
+	 * @param belPin The bel pin in question.
+	 * @return true, if the bel pin is invertible.
 	 */
-	private static boolean invertibleDSPBELPin(BELPin belPin) {
+	private static boolean isInvertibleDSPBELPin(BELPin belPin) {
 		return invertibleDSPBELPins.contains(belPin.getBEL().getName());
 	}
 	
@@ -383,7 +383,7 @@ public class RouterHelper {
 							toInvertPins.add(currSitePinInst);
 		                }
 					}else if (currSitePinInst.toString().contains("DSP")) {
-						if(invertibleDSPBELPin(belPin)) {
+						if(isInvertibleDSPBELPin(belPin)) {
 							toInvertPins.add(currSitePinInst);
 						}
 					}
@@ -586,21 +586,6 @@ public class RouterHelper {
 			System.err.println("ERROR: Failed to find a path between two nodes: " + source + ", " + sink);
 		}
 		return path;
-	}
-	
-	// TODO checks if a net has been fully routed
-	public static boolean isFullyRouted(Net net) {
-		boolean isFullyRouted = true;
-		
-		if(!net.hasPIPs()) {
-			return false;
-		}
-		
-		for(PIP pip : net.getPIPs()) {
-			//TODO checks if there are PIPs legally routing to every sink of the net
-		}
-		
-		return isFullyRouted;
 	}
 	
 	/**
