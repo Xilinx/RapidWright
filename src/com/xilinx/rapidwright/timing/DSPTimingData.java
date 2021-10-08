@@ -64,7 +64,8 @@ public class DSPTimingData{
 	private static boolean pathWarningInfoGenerated = false;
 	private static boolean fileExistenceWarningInfo = false;
 	
-	static String dspTimingDataFolder = null;
+	private static String dspTimingDataFolder = null;
+	
 	public static void setDSPTimingFolder(String path) {
 		if(path != null && !path.endsWith("/")) path += "/";
 		dspTimingDataFolder = path;
