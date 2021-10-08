@@ -51,7 +51,6 @@ import com.xilinx.rapidwright.placer.blockplacer.SmallestEnclosingCircle;
 import com.xilinx.rapidwright.router.RouteNode;
 import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.router.UltraScaleClockRouting;
-import com.xilinx.rapidwright.timing.ClkRouteTiming;
 import com.xilinx.rapidwright.util.Pair;
 
 /**
@@ -59,43 +58,8 @@ import com.xilinx.rapidwright.util.Pair;
  * Adapted from RapidWright APIs.
  */
 public class GlobalSignalRouting {
-	private static Design design;
-	private static RouteThruHelper routeThruHelper;
-	
 	private static boolean clkDebug = false;
 	private static boolean debugPrintClkPIPs = false;
-	
-	private static Map<String, List<String>> crRoutes;
-	private static Map<Pair<String, String>, List<Short>> bufceRowTaps;
-	
-	private static Map<String, List<String>> dstINTtileRoutes;
-	private static ClkRouteTiming ceRouteTiming;
-	
-	private static Map<Node, RoutingNode> createdRoutingNodes;
-	static {
-		createdRoutingNodes = new HashMap<>();
-	}
-	
-	public static void setRouteMap(Map<String, List<String>> routeMap, Map<Pair<String, String>, List<Short>> delays) {
-		crRoutes = new HashMap<>();
-		crRoutes = routeMap;
-		bufceRowTaps = new HashMap<>();
-		bufceRowTaps = delays;
-	}
-	
-	public static void setCERouteTiming(ClkRouteTiming ceTiming) {
-		ceRouteTiming = ceTiming;
-		if(ceRouteTiming == null) {
-			System.err.println("CERouteTiming NOT EXIST");
-			return;
-		}
-		dstINTtileRoutes = ceRouteTiming.getDstINTtileRoute();
-	}
-	
-	public static void setDesignRoutethruHelper(Design design, RouteThruHelper routeThruHelper) {
-		GlobalSignalRouting.design = design;
-		GlobalSignalRouting.routeThruHelper = routeThruHelper;
-	}
 	
 	public static void setDebug() {
 		clkDebug = true;
@@ -104,13 +68,23 @@ public class GlobalSignalRouting {
 		debugPrintClkPIPs = true;
 	}
 	
+	private static HashSet<String> lutOutputPinNames;
+	static {
+		lutOutputPinNames = new HashSet<String>();
+		for(String cle : new String[]{"L", "M"}){
+			for(String pin : new String[]{"A", "B", "C", "D", "E", "F", "G", "H"}){
+				lutOutputPinNames.add("CLE_CLE_" + cle + "_SITE_0_" + pin + "_O");
+			}
+		}
+	}
+	
 	/**
 	 * Routes a clk enable net with input data.
 	 * @param clockEnable The net to be routed.
 	 * @param device The design device.
 	 */
-	public static void clkEnableRoute(Net clockEnable, Device device) {
-		Map<String, List<Node>> dstINTtilePaths = getListOfNodesFromRoutes(device, getDstINTtileRoutes());
+	public static void clkEnableRoute(Net clockEnable, Device device, Map<String, List<String>> routesToDestinationINTTiles) {
+		Map<String, List<Node>> dstINTtilePaths = getListOfNodesFromRoutes(device, routesToDestinationINTTiles);
 		// Not import path after HDSTR
 		Set<PIP> ceNetPIPs = new HashSet<>();
 		Map<String, RouteNode> horDistributionLines = new HashMap<>();
@@ -203,8 +177,8 @@ public class GlobalSignalRouting {
 	 * @param clk The clock net to be routed.
 	 * @param device The design device.
 	 */
-	public static void clkRouteWithClkSkewRouteDelays(Net clk, Device device) {
-		Map<String, List<Node>> clockRegionPaths = getListOfNodesFromRoutes(device, getCrRoutes());
+	public static void clkRouteWithClkSkewRouteDelays(Net clk, Device device, Map<String, List<String>> crRoutes, Map<Pair<String, String>, List<Short>> bufceRowTaps) {
+		Map<String, List<Node>> clockRegionPaths = getListOfNodesFromRoutes(device, crRoutes);
 		Node centroidNode = null;
 		for(String clockRegion : clockRegionPaths.keySet()) {
 			centroidNode = clockRegionPaths.get(clockRegion).get(0);
@@ -273,7 +247,7 @@ public class GlobalSignalRouting {
 		}
 		
 		// 5. set delay
-		setBUFCERowLeafTap(clk, device);
+		setBUFCERowLeafTap(clk, device, bufceRowTaps);
 	}
 	
 	/**
@@ -281,7 +255,7 @@ public class GlobalSignalRouting {
 	 * @param clk The target clock net.
 	 * @param device The design device.
 	 */
-	private static void setBUFCERowLeafTap(Net clk, Device device) {
+	private static void setBUFCERowLeafTap(Net clk, Device device, Map<Pair<String, String>, List<Short>> bufceRowTaps) {
 		if(bufceRowTaps.isEmpty()) return;		
 		if(debugPrintClkPIPs) System.out.println(bufceRowTaps);		
 		List<Site> sites = new ArrayList<>();
@@ -473,16 +447,18 @@ public class GlobalSignalRouting {
 		}
 		if(debugPrintClkPIPs) printCLKPIPs(clk);
 		
+		List<ClockRegion> upClockRegions = new ArrayList<>();
+		List<ClockRegion> downClockRegions = new ArrayList<>();
 		// get two sets of clock regions, pick UP set for sinks in the resions with the same row as the centroid clock region
-		upDownClockRegions(clockRegions, centroid);
+		upDownClockRegions(clockRegions, centroid, upClockRegions, downClockRegions);
 		
 		List<RouteNode> upDownDistLines = new ArrayList<>();
 		if(clkDebug) System.out.println("ROUTE UP VROUTE TO HDISTR LINEs:");
-		List<RouteNode> upLines = routeFromDirectionalVRouteToHorizontalDistributionLines(clk, vrouteUp, upClockRegions, false);
+		List<RouteNode> upLines = UltraScaleClockRouting.routeToHorizontalDistributionLines(clk, vrouteUp, upClockRegions, false);
 		if(upLines != null) upDownDistLines.addAll(upLines);
 		
 		if(clkDebug) System.out.println("ROUTE DOWN VROUTE TO HDISTR LINEs:");
-		List<RouteNode> downLines = routeFromDirectionalVRouteToHorizontalDistributionLines(clk, vrouteDown, downClockRegions, true);
+		List<RouteNode> downLines = UltraScaleClockRouting.routeToHorizontalDistributionLines(clk, vrouteDown, downClockRegions, true);
 		if(downLines != null) upDownDistLines.addAll(downLines);
 		
 		if(clkDebug) System.out.println("GET LCB PIN MAPPINGS");
@@ -523,36 +499,8 @@ public class GlobalSignalRouting {
 		return clockRegions;
 	}
 	
-	/**
-	 * Routes from a GLOBAL_VERTICAL_ROUTE to horizontal distribution lines.
-	 * @param clk The clock net to be routed.
-	 * @param vroute The node to start the route.
-	 * @param clockRegions Target clock regions.
-	 * @param down To indicate if is is routing to the group of top clock regions.
-	 * @return A list of RouteNodes indicating the reached horizontal distribution lines.
-	 */
-	private static List<RouteNode> routeFromDirectionalVRouteToHorizontalDistributionLines(Net clk, RouteNode vroute, List<ClockRegion> clockRegions, boolean down) {
-		RouteNode centroidDistNode = UltraScaleClockRouting.transitionCentroidToVerticalDistributionLine(clk, vroute, down);
-		if(clkDebug) System.out.println(" transition distribution node is \n \t = " + centroidDistNode);
-		
-		if(centroidDistNode == null) return null;
-		
-		Map<ClockRegion, RouteNode> vertDistLines = UltraScaleClockRouting.routeCentroidToVerticalDistributionLines(clk, centroidDistNode, clockRegions);
-		if(clkDebug) {
-			System.out.println(" clock region - vertical distribution node ");
-			for(ClockRegion cr : vertDistLines.keySet()) System.out.println(" \t" + cr + " \t " + vertDistLines.get(cr));
-		}
-		
-		List<RouteNode> distLines = new ArrayList<>();
-		distLines.addAll(UltraScaleClockRouting.routeCentroidToHorizontalDistributionLines(clk, centroidDistNode, vertDistLines));
-		if(clkDebug) System.out.println(" dist lines are \n \t" + distLines);
-		
-		return distLines;
-	}
-	
-	private static List<ClockRegion> upClockRegions = new ArrayList<>();
-	private static List<ClockRegion> downClockRegions = new ArrayList<>();	
-	private static void upDownClockRegions(List<ClockRegion> clockRegions, ClockRegion centroid){
+	private static void upDownClockRegions(List<ClockRegion> clockRegions, ClockRegion centroid, List<ClockRegion> upClockRegions,
+			List<ClockRegion> downClockRegions){
 		for(ClockRegion cr : clockRegions) {
 			if(cr.getInstanceY() >= centroid.getInstanceY()) {
 				upClockRegions.add(cr);
@@ -622,29 +570,19 @@ public class GlobalSignalRouting {
 		return c;
 	}
 	
-	
-	private static HashSet<String> lutOutputPinNames;
-	static {
-		lutOutputPinNames = new HashSet<String>();
-		for(String cle : new String[]{"L", "M"}){
-			for(String pin : new String[]{"A", "B", "C", "D", "E", "F", "G", "H"}){
-				lutOutputPinNames.add("CLE_CLE_"+cle+"_SITE_0_"+pin+"_O");
-			}
-		}
-	}
-	
 	/**
 	 * Routes a static net (GND or VCC).
 	 * @param currNet The current static net to be routed.
 	 * @param unavailableNodes A set of unavailable nodes.
 	 */
-	public static Map<SitePinInst, List<Node>> routeStaticNet(Net currNet, Set<Node> unavailableNodes){
+	public static Map<SitePinInst, List<Node>> routeStaticNet(Net currNet, Set<Node> unavailableNodes, Design design, RouteThruHelper routeThruHelper){
 		NetType netType = currNet.getType();
 		Set<PIP> netPIPs = new HashSet<>();
 		Map<SitePinInst, List<Node>> sinkPathNodes = new HashMap<>();
 		Queue<RoutingNode> q = new LinkedList<>();
 		Set<RoutingNode> visitedRoutingNodes = new HashSet<>();
 		Set<RoutingNode> usedRoutingNodes = new HashSet<>();
+		Map<Node, RoutingNode> createdRoutingNodes = new HashMap<>();
 		
 		boolean debug = false;
 		if(debug) {
@@ -792,14 +730,6 @@ public class GlobalSignalRouting {
 			return false;
 		}
 		return false;
-	}
-	
-	public static Map<String, List<String>> getCrRoutes() {
-		return crRoutes;
-	}
-
-	public static Map<String, List<String>> getDstINTtileRoutes() {
-		return dstINTtileRoutes;
 	}
 	
 }

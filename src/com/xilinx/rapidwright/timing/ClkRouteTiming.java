@@ -49,15 +49,9 @@ public class ClkRouteTiming {
 	/** INT tile associated with the BUFGCE_CLK_IN and the route from the INT tile to the CLK_IN */
 	private List<String> intTileToBufgInRoute;
 	
-	static String clkRouteTiming = null;
-	public static void setClkRouteTimingFile(String fileName) {
-		if(fileName != null) {
-			clkRouteTiming = fileName;
-			System.out.println("INFO: Clock route timing file set as: " + clkRouteTiming);
-		}
-	}
+	private String clkRouteTiming = null;
 	
-	public ClkRouteTiming(String bufg) {
+	public ClkRouteTiming(String bufg, String fileName) {
 		String[] ss = bufg.split("/");
 		this.bufgce = ss[ss.length - 1].replace(".txt", "");
 		
@@ -65,7 +59,12 @@ public class ClkRouteTiming {
 		this.dstINTTilesDelays = new HashMap<>();
 		this.intTileToBufgInDelay = new HashMap<>();
 		this.intTileToBufgInRoute = new ArrayList<>();
-			
+		
+		if(fileName != null) {
+			this.clkRouteTiming = fileName;
+			System.out.println("INFO: Clock route timing file set as: " + clkRouteTiming);
+		}
+		
 		try {
 			this.parseDataFromFile();
 		} catch (IOException e) {
@@ -74,7 +73,7 @@ public class ClkRouteTiming {
 	}	
 	
 	private void parseDataFromFile() throws IOException {
-		File clkTimingFile = new File(clkRouteTiming);
+		File clkTimingFile = new File(this.clkRouteTiming);
 		if(!clkTimingFile.exists()) {
 			throw new IllegalArgumentException("ERROR: Specified clock route timing file does not exist.");
         }
@@ -177,8 +176,8 @@ public class ClkRouteTiming {
 		return this.intTileToBufgInDelay;
 	}
 
-	public static String getCeRouteTiming() {
-		return clkRouteTiming;
+	public String getCeRouteTiming() {
+		return this.clkRouteTiming;
 	}
 
 	public List<String> getIntTileToBufgInRoute() {

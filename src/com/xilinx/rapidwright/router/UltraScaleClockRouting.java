@@ -486,4 +486,33 @@ public class UltraScaleClockRouting {
 			}
 		}
 	}
+	
+	/**
+	 * Routes from a GLOBAL_VERTICAL_ROUTE to horizontal distribution lines.
+	 * @param clk The clock net to be routed.
+	 * @param vroute The node to start the route.
+	 * @param clockRegions Target clock regions.
+	 * @param down To indicate if is is routing to the group of top clock regions.
+	 * @return A list of RouteNodes indicating the reached horizontal distribution lines.
+	 */
+	public static List<RouteNode> routeToHorizontalDistributionLines(Net clk, RouteNode vroute, List<ClockRegion> clockRegions, boolean down) {
+		boolean verbose = false;
+		RouteNode centroidDistNode = UltraScaleClockRouting.transitionCentroidToVerticalDistributionLine(clk, vroute, down);
+		if(verbose) System.out.println(" transition distribution node is \n \t = " + centroidDistNode);
+		
+		if(centroidDistNode == null) return null;
+		
+		Map<ClockRegion, RouteNode> vertDistLines = routeCentroidToVerticalDistributionLines(clk, centroidDistNode, clockRegions);
+		if(verbose) {
+			System.out.println(" clock region - vertical distribution node ");
+			for(ClockRegion cr : vertDistLines.keySet()) System.out.println(" \t" + cr + " \t " + vertDistLines.get(cr));
+		}
+		
+		List<RouteNode> distLines = new ArrayList<>();
+		distLines.addAll(routeCentroidToHorizontalDistributionLines(clk, centroidDistNode, vertDistLines));
+		if(verbose) System.out.println(" dist lines are \n \t" + distLines);
+		
+		return distLines;
+	}
+	
 }

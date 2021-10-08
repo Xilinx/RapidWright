@@ -49,7 +49,7 @@ public class CLKSkewRouteDelay {
 	// # src  	dst  	skew  	src_dly  	dst_dly  	pess
 	// X2Y3  	X3Y3    -14 	2889 		2439  		435
 	/** Partial route from BUFGCE out to each clock region */
-	private Map<String, List<String>> route;
+	private Map<String, List<String>> routesToDestinationClockRegions;
 	// route
 	// X2Y3  RCLK_CLEM_L_X52Y149/CLK_CMT_MUX_3TO1_1_CLK_OUT  RCLK_CLEM_L_X52Y209/CLK_VDISTR_BOT  ...
 	/** Settings of buffer delay taps */
@@ -58,19 +58,19 @@ public class CLKSkewRouteDelay {
 	// # to  row_buf (SITE)       	row_tap 	leaf_tap   src_@0.3 	src_@0.6 	src_@0.9   dst_@0.3 	dst_@0.6 	dst_@0.9
 	// X2Y3  BUFCE_ROW_FSR_X91Y3 	0       	0          0        	0        	0          0        	0        	0
 	
-	static String clkSkewRouteDelayFile = null;
-	public static void setClkTSkewRouteDelayFile(String fileName) {
-		if(fileName != null) {
-			clkSkewRouteDelayFile = fileName;
-			System.out.println("INFO: Clock skew-route-delay file set as: " + clkSkewRouteDelayFile);
-		}
-	}
+	private String clkSkewRouteDelayFile;
 	
 	public CLKSkewRouteDelay(String fileName) {
 		this.name = fileName;	
 		this.skew = new HashMap<>();
-		this.route = new HashMap<>();
-		this.delay = new HashMap<>();	
+		this.routesToDestinationClockRegions = new HashMap<>();
+		this.delay = new HashMap<>();
+		
+		if(fileName != null) {
+			clkSkewRouteDelayFile = fileName;
+			System.out.println("INFO: Clock skew-route-delay file set as: " + clkSkewRouteDelayFile);
+		}
+		
 		try {
 			this.parseDataFromFile();
 		} catch (IOException e) {
@@ -113,7 +113,7 @@ public class CLKSkewRouteDelay {
         if(section.equals("skew")) {
         	this.readSkewDelayToMap(reader, this.skew);
         }else if(section.equals("route")) {
-        	this.readRouteToMap(reader, this.route);
+        	this.readRouteToMap(reader, this.routesToDestinationClockRegions);
         }else if(section.equals("delay")) {
         	this.readSkewDelayToMap(reader, this.delay);
         } 
@@ -166,7 +166,7 @@ public class CLKSkewRouteDelay {
 	}
 
 	public Map<String, List<String>> getRoute() {
-		return route;
+		return routesToDestinationClockRegions;
 	}
 
 	public Map<Pair<String, String>, List<Short>> getDelay() {

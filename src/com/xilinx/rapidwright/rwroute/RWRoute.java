@@ -165,6 +165,11 @@ public class RWRoute{
 	/** A map from TimingEdges to connections */
 	private Map<TimingEdge, Connection> timingEdgeConnectionMap;
 	
+	//TODO clk routing needed data
+	Map<String, List<String>> routesToClockRegions;
+	Map<Pair<String, String>, List<Short>> bufceRowTapsBetweenClockRegions;
+	Map<String, List<String>> routesToINTTiles;
+	
 	public RWRoute(Design design, Configuration config){
 		this.design = design;
 		this.multiSLRDevice = this.design.getDevice().getSLRs().length > 1;
@@ -179,7 +184,7 @@ public class RWRoute{
 		RoutableNode.setMaskNodesCrossRCLK(this.config.isMaskNodesCrossRCLK());
 
 		if(this.config.isTimingDriven()) {
-			setTimingData(this.config);			
+			setDSPClkTimingData(this.config);			
 			this.timingManager = new TimingManager(this.design, true, this.routerTimer, this.config);		
 		    this.estimator = new DelayEstimatorBase(this.design.getDevice(), new InterconnectInfo(), this.config.isUseUTurnNodes(), 0);
 			RoutableNode.setTimingDriven(true, this.estimator);
@@ -228,23 +233,21 @@ public class RWRoute{
 	 * Sets timing-driven routing related inputs based on the {@link Configuration} instance.
 	 * @param config The {@link Configuration} instance to use.
 	 */
-	public static void setTimingData(Configuration config) {
+	public void setDSPClkTimingData(Configuration config) {
 		DSPTimingData.setDSPTimingFolder(config.getDspTimingDataFolder());
 		String clkSkewFile = config.getClkSkew();
 		String clkRouteTimingFile = config.getClkRouteTiming();
 		
 		if(clkSkewFile != null) {
-			CLKSkewRouteDelay.setClkTSkewRouteDelayFile(clkSkewFile);
 			CLKSkewRouteDelay clkSkewData = new CLKSkewRouteDelay(clkSkewFile);
 			TimingGraph.setClkTiming(clkSkewData);
-			GlobalSignalRouting.setRouteMap(clkSkewData.getRoute(), clkSkewData.getDelay());
+			this.routesToClockRegions = clkSkewData.getRoute();
+			this.bufceRowTapsBetweenClockRegions = clkSkewData.getDelay();
 		}
 		
 		if(clkRouteTimingFile != null) {
-			ClkRouteTiming.setClkRouteTimingFile(clkRouteTimingFile);
-			ClkRouteTiming clkTiming = new ClkRouteTiming(clkRouteTimingFile);
+			ClkRouteTiming clkTiming = new ClkRouteTiming(clkRouteTimingFile, clkRouteTimingFile);
 			TimingGraph.setClkRouteTiming(clkTiming);
-			GlobalSignalRouting.setCERouteTiming(clkTiming);
 		}
 	}
 	
@@ -373,7 +376,7 @@ public class RWRoute{
 		}else {
 			this.numNotNeedingRoutingNets++;
 			System.err.println("ERROR: Incomplete clock net " + clk);
-		}		
+		}
 	}
 	
 	/**
@@ -383,13 +386,13 @@ public class RWRoute{
  		if(this.clkNets.size() > 0) System.out.println("INFO: Route clock nets");
  		for(Net clk : this.clkNets) {
  			System.out.println(clk.getName());
- 			if(GlobalSignalRouting.getCrRoutes() != null || GlobalSignalRouting.getDstINTtileRoutes() != null) {
- 				if(GlobalSignalRouting.getDstINTtileRoutes() == null) {
+ 			if(this.routesToClockRegions != null || this.routesToINTTiles != null) {
+ 				if(this.routesToClockRegions != null) {
  					System.out.println("INFOR: Route with clock skew data reference");
- 					GlobalSignalRouting.clkRouteWithClkSkewRouteDelays(clk, this.design.getDevice());
- 				}else {
+ 					GlobalSignalRouting.clkRouteWithClkSkewRouteDelays(clk, this.design.getDevice(), this.routesToClockRegions, this.bufceRowTapsBetweenClockRegions);
+ 				}else if(this.routesToINTTiles != null) {
  					System.out.println("INFO: Route with clock route and timing data");
- 					GlobalSignalRouting.clkEnableRoute(clk, this.design.getDevice());
+ 					GlobalSignalRouting.clkEnableRoute(clk, this.design.getDevice(), this.routesToINTTiles);
  				}
  			}else {
  				if(this.config.isSymmetricClkRouting()) {
@@ -445,8 +448,6 @@ public class RWRoute{
 	 * Routes static nets with preserved resources list supplied to avoid conflicting nodes.
 	 */
 	private void routeStaticNets(){
-		GlobalSignalRouting.setDesignRoutethruHelper(this.design, this.routethruHelper);
-		
 		for(Net net : this.staticNetAndRoutingTargets.keySet()){
 			for(SitePinInst sink : this.staticNetAndRoutingTargets.get(net)) {
 				this.preservedNodes.remove(sink.getConnectedNode());
@@ -464,7 +465,7 @@ public class RWRoute{
 		
 		for(Net net : this.staticNetAndRoutingTargets.keySet()){
 			System.out.println("INFO: Route " + net.getSinkPins().size() + " pins of " + net);
-			Map<SitePinInst, List<Node>> spiRoutedNodes = GlobalSignalRouting.routeStaticNet(net, unavailableNodes);
+			Map<SitePinInst, List<Node>> spiRoutedNodes = GlobalSignalRouting.routeStaticNet(net, unavailableNodes, this.design, this.routethruHelper);
 			for(SitePinInst spi : spiRoutedNodes.keySet()) {
 				Set<Node> sinkPathNodes = new HashSet<>();
 				sinkPathNodes.addAll(spiRoutedNodes.get(spi));
