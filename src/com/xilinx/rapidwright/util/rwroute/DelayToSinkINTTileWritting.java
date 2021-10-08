@@ -44,7 +44,7 @@ import com.xilinx.rapidwright.util.Pair;
  * the source to the sinks (until the interconnect tile node) of the net under the name.
  * Otherwise, it is specifically for the CLK_IN sink of the net under the name.
  */
-public class GetDelayFromSourceToSinkINT {
+public class DelayToSinkINTTileWritting {
 	public static void main(String[] args) {
 		if(args.length < 4){
 			System.out.println("BASIC USAGE:\n <input.dcp> --net <net name> <output file> --allSinkDelay\n");

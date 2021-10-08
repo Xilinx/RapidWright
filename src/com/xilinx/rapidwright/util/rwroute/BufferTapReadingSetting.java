@@ -46,7 +46,7 @@ import com.xilinx.rapidwright.device.Site;
  * "input_file" is the file that contains buffers sites and tap levels.
  * "output_file_directory" is the path to store the output DCP file with tap levels of the buffer sites set.
  */
-public class ReadSetBufferTap {
+public class BufferTapReadingSetting {
 	public static void main(String[] args) {
 		if(args.length < 2){
 			System.out.println("BASIC USAGE:\n <input.dcp> <--read <file directory> or --set <file>> <output directory>\n");
