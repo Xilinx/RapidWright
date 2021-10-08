@@ -95,7 +95,7 @@ public class PhysNetlistReader {
         return design;
     }
 
-    private static Enumerator<String> readAllStrings(PhysNetlist.Reader physNetlist){
+    public static Enumerator<String> readAllStrings(PhysNetlist.Reader physNetlist){
         Enumerator<String> allStrings = new Enumerator<>();
         TextList.Reader strListReader = physNetlist.getStrList();
         int strCount = strListReader.size();
