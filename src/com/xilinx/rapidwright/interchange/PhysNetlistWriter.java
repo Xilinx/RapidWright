@@ -18,6 +18,7 @@ import org.capnproto.TextList;
 import org.capnproto.StructList.Builder;
 
 import com.xilinx.rapidwright.design.AltPinMapping;
+import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
@@ -86,6 +87,7 @@ public class PhysNetlistWriter {
         for(SiteInst siteInst : design.getSiteInsts()) {
         	if(!siteInst.isPlaced()) continue;
             for(Cell cell : siteInst.getCells()) {
+            	if(cell.isRoutethru()) continue;
             	allCells.add(cell);
             	if(!cell.isPlaced()) continue;
             	String cellName = cell.getName();
@@ -223,10 +225,24 @@ public class PhysNetlistWriter {
                     for(String siteWire : e.getValue()) {
 	                    BELPin[] belPins = siteInst.getSiteWirePins(siteWire);
 	                    for(BELPin belPin : belPins) {
-	                        if(belPin.isInput()) 
-	                            continue;
-                            segments.add(new RouteBranchNode(site,belPin));	                            
-	                        break;
+                            BEL bel = belPin.getBEL();
+                            Cell cell = siteInst.getCell(bel);
+                            boolean routethru = false;
+                            if(belPin.isInput()) {
+                                // Skip if no BEL placed here
+                                if (cell == null) {
+                                    continue;
+                                }
+                                // Skip if pin not used (e.g. A1 connects to A[56]LUT.A1;
+                                // both cells can exist but not both need be using this pin)
+                                if (cell.getLogicalPinMapping(belPin.getName()) == null) {
+                                    continue;
+                                }
+                            } else {
+                                routethru = cell != null && cell.isRoutethru();
+                            }
+                            RouteBranchNode rbn = new RouteBranchNode(site, belPin, routethru);
+                            segments.add(rbn);
 	                    }
                     }                	
                 }
