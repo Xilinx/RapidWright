@@ -26,6 +26,7 @@ package com.xilinx.rapidwright.util.rwroute;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
@@ -76,17 +77,20 @@ public class GetDelayFromSourceToSinkINT {
 			
 			if(writeAllSinkDelay) {
 				System.out.println("INFO: Write delay from source to all sink to file \n      " + outputFile);
-				for(Pair<SitePinInst, Node> sinkINTNode : sourceToSinkINTDelays.keySet()) {
-					myWriter.write(sinkINTNode.getSecond() + " \t\t" + sourceToSinkINTDelays.get(sinkINTNode) + "\n");
-					System.out.printf(String.format("      %-50s %5d\n", sinkINTNode.getSecond(), sourceToSinkINTDelays.get(sinkINTNode)));		
+				for(Entry<Pair<SitePinInst, Node>, Short> sinkINTNodeDelay : sourceToSinkINTDelays.entrySet()) {
+					Node node = sinkINTNodeDelay.getKey().getSecond();
+					Short delay = sinkINTNodeDelay.getValue();
+					myWriter.write(node + " \t\t" + delay + "\n");
+					System.out.printf(String.format("      %-50s %5d\n", node, delay));
 				}
 				
 			}else {
 				System.out.println("INFO: Write delay from source to IMUX node of CLK_IN to file \n      " + outputFile);
-				for(Pair<SitePinInst, Node> sinkINTNode : sourceToSinkINTDelays.keySet()) {
-					if(sinkINTNode.getFirst().toString().contains("CLK_IN")) {
-						myWriter.write(sinkINTNode.getSecond() + " \t\t" + sourceToSinkINTDelays.get(sinkINTNode) + "\n");
-						System.out.printf(String.format("      %-50s %5d\n", sinkINTNode.getSecond(), sourceToSinkINTDelays.get(sinkINTNode)));
+				for(Entry<Pair<SitePinInst, Node>, Short> sinkINTNodeDelay : sourceToSinkINTDelays.entrySet()) {
+					Node node = sinkINTNodeDelay.getKey().getSecond();
+					Short delay = sinkINTNodeDelay.getValue();
+					if(sinkINTNodeDelay.getKey().getFirst().toString().contains("CLK_IN")) {
+						myWriter.write(node + " \t\t" + delay + "\n");
 					}
 				}
 			}

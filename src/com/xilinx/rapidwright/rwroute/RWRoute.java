@@ -30,6 +30,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.PriorityQueue;
 import java.util.Set;
 
@@ -309,19 +310,21 @@ public class RWRoute{
 		}
 		long sumSpan = 0;
 		short max = 0;
-		for(short span : this.connectionSpan.keySet()) {
-			int counter = this.connectionSpan.get(span);
-			if(this.config.isPrintConnectionSpan()) System.out.printf(String.format("%5d \t%12d \t%7.2f\n", span, counter, (float)counter / this.indirectConnections.size() * 100));
-			sumSpan += span * counter;
+		for(Entry<Short, Integer> spanCount : this.connectionSpan.entrySet()) {
+			Short span = spanCount.getKey();
+			Integer count = spanCount.getValue();
+			if(this.config.isPrintConnectionSpan()) System.out.printf(String.format("%5d \t%12d \t%7.2f\n", span, count, (float)count / this.indirectConnections.size() * 100));
+			sumSpan += span * count;
 			if(span > max) max = span;
 		}
+		
 		if(this.config.isPrintConnectionSpan()) System.out.println();
 		long avg = (long) (sumSpan / ((float) this.indirectConnections.size()));
 		System.out.println("INFO: Max span of connections: " + max);
 		System.out.println("INFO: Avg span of connections: " + avg);
 		int numConnectionsLongerThanAvg = 0;
-		for(short span : this.connectionSpan.keySet()) {
-			if(span <= avg) numConnectionsLongerThanAvg += this.connectionSpan.get(span);
+		for(Entry<Short, Integer> spanCount : this.connectionSpan.entrySet()) {
+			if(spanCount.getKey() <= avg) numConnectionsLongerThanAvg += spanCount.getValue();
 		}
 		
 		System.out.printf("INFO: # connections longer than avg span: " + numConnectionsLongerThanAvg);
@@ -457,8 +460,8 @@ public class RWRoute{
 	 * Routes static nets with preserved resources list supplied to avoid conflicting nodes.
 	 */
 	private void routeStaticNets(){
-		for(Net net : this.staticNetAndRoutingTargets.keySet()){
-			for(SitePinInst sink : this.staticNetAndRoutingTargets.get(net)) {
+		for(List<SitePinInst> netRouteTargetPins : this.staticNetAndRoutingTargets.values()) {
+			for(SitePinInst sink : netRouteTargetPins) {
 				this.preservedNodes.remove(sink.getConnectedNode());
 			}
 		}
@@ -474,10 +477,11 @@ public class RWRoute{
 		
 		for(Net net : this.staticNetAndRoutingTargets.keySet()){
 			System.out.println("INFO: Route " + net.getSinkPins().size() + " pins of " + net);
-			Map<SitePinInst, List<Node>> spiRoutedNodes = GlobalSignalRouting.routeStaticNet(net, unavailableNodes, this.design, this.routethruHelper);
-			for(SitePinInst spi : spiRoutedNodes.keySet()) {
+			Map<SitePinInst, List<Node>> sinksRoutingPaths = GlobalSignalRouting.routeStaticNet(net, unavailableNodes, this.design, this.routethruHelper);
+			
+			for(Entry<SitePinInst, List<Node>> sinkPath : sinksRoutingPaths.entrySet()) {
 				Set<Node> sinkPathNodes = new HashSet<>();
-				sinkPathNodes.addAll(spiRoutedNodes.get(spi));
+				sinkPathNodes.addAll(sinkPath.getValue());
 				this.addPreservedNode(sinkPathNodes, net);
 				unavailableNodes.addAll(sinkPathNodes);
 			}
@@ -1229,10 +1233,10 @@ public class RWRoute{
 			}
 		}
 		int pipsError = 0;
-		for(PIP pip:pipsUsage.keySet()){
-			if(pipsUsage.get(pip).size() > 1){
+		for(Entry<PIP, Set<Net>> pipNets : pipsUsage.entrySet()){
+			if(pipNets.getValue().size() > 1){
 				if(pipsError < 10) {
-					System.out.println("pip " + pip + " users = " + pipsUsage.get(pip));
+					System.out.println("pip " + pipNets.getKey() + " users = " + pipsUsage.get(pipNets.getKey()));
 				}
 				pipsError++;
 			}
@@ -1656,8 +1660,8 @@ public class RWRoute{
 	
 	private int getNumSitePinOfStaticNets() {
 		int totalSitePins = 0;
-		for(Net n:this.staticNetAndRoutingTargets.keySet()) {
-			totalSitePins += this.staticNetAndRoutingTargets.get(n).size();
+		for(List<SitePinInst> pins : this.staticNetAndRoutingTargets.values()) {
+			totalSitePins += pins.size();
 		}
 		return totalSitePins;
 	}

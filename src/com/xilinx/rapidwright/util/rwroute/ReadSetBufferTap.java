@@ -30,6 +30,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
@@ -127,13 +128,14 @@ public class ReadSetBufferTap {
 		String outputDCP = args[3].endsWith("/")? args[3] : args[3] + "/";
 		outputDCP += inputDcpName.replace(".dcp", "_buffer_set.dcp");
 		
-		for(String siteName : siteTaps.keySet()) {
+		for(Entry<String, Integer> siteTap : siteTaps.entrySet()) {
+			String siteName = siteTap.getKey();
 			Site site = dev.getSite(siteName);
+			int tap = siteTap.getValue();
 			if(site == null) {
 				System.err.println("ERROR: No site found under name " + siteName);
 				continue;
 			}
-			int tap = siteTaps.get(siteName);
 			clock.setBufferDelay(site, tap);
 			System.out.println("INFO: Set " + site + " tap = " + tap);
 			System.out.println("INFO: Tap after setting: " + clock.getBufferDelay(site));

@@ -30,6 +30,7 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Queue;
 import java.util.Set;
 
@@ -91,8 +92,7 @@ public class GlobalSignalRouting {
 		Set<PIP> ceNetPIPs = new HashSet<>();
 		Map<String, RouteNode> horDistributionLines = new HashMap<>();
 		
-		for(String intTile : dstINTtilePaths.keySet()) {
-			List<Node> nodes = dstINTtilePaths.get(intTile);
+		for(List<Node> nodes : dstINTtilePaths.values()) {
 			Collections.reverse(nodes); // HDISTR to CLK_OUT
 			Node hDistr = nodes.get(0);
 			RouteNode hdistr = new RouteNode(hDistr.getTile(), hDistr.getWire());
@@ -132,14 +132,15 @@ public class GlobalSignalRouting {
 	
 	private static Map<ClockRegion, Set<RouteNode>> getStartingPoint(Map<String, RouteNode> crDistLines, Device dev) {
 		Map<ClockRegion, Set<RouteNode>> startingPoints = new HashMap<>();
-		for(String crName : crDistLines.keySet()) {
+		for(Entry<String, RouteNode> crRouteNode : crDistLines.entrySet()) {
+			String crName = crRouteNode.getKey();
 			ClockRegion cr = dev.getClockRegion(crName);
 			Set<RouteNode> routeNodes = startingPoints.get(cr);
 			if(routeNodes == null){
 				routeNodes = new HashSet<>();
 				startingPoints.put(cr, routeNodes);
 			}
-			routeNodes.add(crDistLines.get(crName));
+			routeNodes.add(crRouteNode.getValue());
 		}
 		return startingPoints;
 	}
@@ -164,9 +165,11 @@ public class GlobalSignalRouting {
 		
 		String dominate = null;
 		int max = 0;
-		for(String cr : crCounts.keySet()) {
-			if(crCounts.get(cr) > max) {
-				max = crCounts.get(cr);
+		for(Entry<String, Integer> crCount : crCounts.entrySet()) {
+			String cr = crCount.getKey();
+			Integer count = crCount.getValue();
+			if(count > max) {
+				max = count;
 				dominate = cr;
 			}
 		}
@@ -185,8 +188,8 @@ public class GlobalSignalRouting {
 			Map<Pair<String, String>, List<Short>> bufceRowTapsOfClockRegions) {
 		Map<String, List<Node>> clockRegionPaths = getListOfNodesFromRoutes(device, routesToClockRegions);
 		Node centroidNode = null;
-		for(String clockRegion : clockRegionPaths.keySet()) {
-			centroidNode = clockRegionPaths.get(clockRegion).get(0);
+		for(List<Node> path : clockRegionPaths.values()) {
+			centroidNode = path.get(0);
 			break;
 		}
 		if(debugPrintClkPIPs) System.out.println("CENTROID NODE: \n " + centroidNode);
@@ -221,8 +224,8 @@ public class GlobalSignalRouting {
 		Map<String, RouteNode> horDistributionLines = routeCentroidToHorDistributionLines(clk, clockRegionPaths);	
 		if(debugPrintClkPIPs) {
 			System.out.println("HORIZONTAL DISTRIBUTION LINEs:");
-			for(String cr : horDistributionLines.keySet()) {
-				System.out.println(cr + "  " + horDistributionLines.get(cr));
+			for(Entry<String, RouteNode> crRouteNode : horDistributionLines.entrySet()) {
+				System.out.println(crRouteNode.getKey() + "  " + crRouteNode.getValue());
 			}
 		}
 		
@@ -265,10 +268,10 @@ public class GlobalSignalRouting {
 		if(bufceRowTapsOfClockRegions.isEmpty()) return;		
 		if(debugPrintClkPIPs) System.out.println(bufceRowTapsOfClockRegions);		
 		List<Site> sites = new ArrayList<>();
-		for(Pair<String, String> crSite: bufceRowTapsOfClockRegions.keySet()) {
-			Site site = device.getSite(crSite.getSecond());
+		for(Entry<Pair<String, String>, List<Short>> crBufceRowTaps : bufceRowTapsOfClockRegions.entrySet()) {
+			Site site = device.getSite(crBufceRowTaps.getKey().getSecond());
 			// An example line from the file: row_tap  leaf_tap	src_@0.3  src_@0.6  src_@0.9   dst_@0.3  dst_@0.6  dst_@0.9
-			clk.setBufferDelay(site, bufceRowTapsOfClockRegions.get(crSite).get(0));
+			clk.setBufferDelay(site, crBufceRowTaps.getValue().get(0));
 			sites.add(site);
 		}			
 		
@@ -277,11 +280,13 @@ public class GlobalSignalRouting {
 				Site s = p.getStartNode().getSitePin().getSite();
 				String cr = s.getTile().getClockRegion().getName();		
 				List<Short> taps = null;
-				for(Pair<String, String> crRowbufSite : bufceRowTapsOfClockRegions.keySet()) {
-					if(crRowbufSite.getFirst().equals(cr)) {
-						taps = bufceRowTapsOfClockRegions.get(crRowbufSite);
+				
+				for(Entry<Pair<String, String>, List<Short>> crBufceRowTaps : bufceRowTapsOfClockRegions.entrySet()) {
+					if(crBufceRowTaps.getKey().getFirst().equals(cr)) {
+						taps = crBufceRowTaps.getValue();
 					}
-				}		
+				}
+				
 				if(taps != null) {
 					clk.setBufferDelay(s, taps.get(1));
 				}			
@@ -297,8 +302,9 @@ public class GlobalSignalRouting {
 	
 	private static Map<String, RouteNode> routeCentroidToHorDistributionLines(Net clk, Map<String, List<Node>> crPaths){
 		Map<String, RouteNode> crHorizontalDistributionLines = new HashMap<>();
-		for(String cr : crPaths.keySet()) {
-			List<Node> path = crPaths.get(cr);
+		for(Entry<String, List<Node>> crPath : crPaths.entrySet()) {
+			String cr = crPath.getKey();
+			List<Node> path = crPath.getValue();
 			Collections.reverse(path);
 			clk.getPIPs().addAll(RouterHelper.getPIPsFromListOfReversedNodes(path));
 			Node hdistr = path.get(0);
@@ -307,7 +313,7 @@ public class GlobalSignalRouting {
 				continue;
 			}
 			RouteNode hDistr = new RouteNode(hdistr.getTile(), hdistr.getWire());
-			crHorizontalDistributionLines.put(cr, hDistr);	
+			crHorizontalDistributionLines.put(cr, hDistr);
 		}
 		return crHorizontalDistributionLines;
 	}
@@ -320,9 +326,10 @@ public class GlobalSignalRouting {
 	 */
 	private static Map<String, List<Node>> getListOfNodesFromRoutes(Device device, Map<String, List<String>> routes){
 		Map<String, List<Node>> dstPaths = new HashMap<>();
-		for(String dst : routes.keySet()) {
+		for(Entry<String, List<String>> dstRoute : routes.entrySet()) {
+			String dst = dstRoute.getKey();
 			List<Node> pathNodes = new ArrayList<>();
-			for(String nodeName : routes.get(dst)) {
+			for(String nodeName : dstRoute.getValue()) {
 				Node node = Node.getNode(nodeName, device);
 				if(node != null) {
 					pathNodes.add(node);
@@ -332,7 +339,6 @@ public class GlobalSignalRouting {
 			}
 			dstPaths.put(dst, pathNodes);
 		}
-		
 		return dstPaths;
 	}
 	
