@@ -104,28 +104,6 @@ class DelayModelBuilder {
 
 
     // ************************    for testing     ***********************
-
-    /**
-     * For unit testing.
-     */
-//    private static int testLogicDelay(DelayModel a, String belName, List<String> config, 
-//            String[] src, String[] dst) {
-//
-//        int count = 0;
-//            for (String s : src) {
-//                for (String t : dst) {
-//                    try {
-//                        short dly = a.getLogicDelay(belName, s, t, config);
-//                     //   System.out.println(s + " " + t + " " + dly);
-//                        count++;
-//                    } catch (IllegalArgumentException ex) {
-//                        System.out.println("EXCEPTION: " + ex.getMessage());
-//                    }
-//                }
-//            }
-//        return count;
-//    }
-    
     private static int testLogicDelay(DelayModel delayModel, List<String> config, String belName, String[] src, String[] dst
             , String fileName) {
         int count = 0;
