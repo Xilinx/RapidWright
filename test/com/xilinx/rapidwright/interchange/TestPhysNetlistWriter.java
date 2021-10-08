@@ -83,11 +83,11 @@ public class TestPhysNetlistWriter {
         Enumerator<String> allStrings = PhysNetlistReader.readAllStrings(physNetlist);
 
         for (CellPlacement.Reader placement : physNetlist.getPlacements()) {
-            String bel = allStrings.get(placement.getBel());
-            if (!bel.endsWith("LUT")) {
-                continue;
-            }
             for (PinMapping.Reader pinMapping : placement.getPinMap()) {
+                String bel = allStrings.get(pinMapping.getBel());
+                if (!bel.endsWith("LUT")) {
+                    continue;
+                }
                 Assertions.assertEquals(pinMapping.getBelPin(), pinMapping.getCellPin());
             }
         }
