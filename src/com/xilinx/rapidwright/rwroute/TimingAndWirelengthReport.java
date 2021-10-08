@@ -50,7 +50,7 @@ import com.xilinx.rapidwright.util.Pair;
  * An example to report the critical path delay and total wirelength of a routed design.
  * It is able to reproduce the same statistics as a {@link RWRoute} Object reports after routing a design.
  */
-public class ReportTimingAndWirelength{
+public class TimingAndWirelengthReport{
 	private Design design;
 	private int rnodeId;
 	private long wirelength;
@@ -63,9 +63,9 @@ public class ReportTimingAndWirelength{
 	private Map<IntentCode, Long> nodeTypeUsage ;
 	private Map<IntentCode, Long> nodeTypeLength;
 	
-	public ReportTimingAndWirelength(Design design, Configuration config) {
+	public TimingAndWirelengthReport(Design design, Configuration config) {
 		this.design = design;
-		setTimingData(config);	//TODO check
+		setTimingData(config);
 		this.timingManager = new TimingManager(this.design, true, null, config);		
 	    this.estimator = new DelayEstimatorBase(this.design.getDevice(), new InterconnectInfo(), config.isUseUTurnNodes(), 0);
 		RoutableNode.setTimingDriven(true, this.estimator);
@@ -79,16 +79,12 @@ public class ReportTimingAndWirelength{
 	private void setTimingData(Configuration config) {
 		DSPTimingData.setDSPTimingFolder(config.getDspTimingDataFolder());
 		String clkSkewFile = config.getClkSkew();
-		String clkRouteTimingFile = config.getClkRouteTiming();
-		
+		String clkRouteTimingFile = config.getClkRouteTiming();	
 		if(clkSkewFile != null) {
-			ClkSkewRouteDelay clkSkewData = new ClkSkewRouteDelay(clkSkewFile);
-			TimingGraph.setClkTiming(clkSkewData);
-		}
-		
+			TimingGraph.setClkTiming(new ClkSkewRouteDelay(clkSkewFile));
+		}	
 		if(clkRouteTimingFile != null) {
-			ClkRouteTiming clkTiming = new ClkRouteTiming(clkRouteTimingFile);
-			TimingGraph.setClkRouteTiming(clkTiming);
+			TimingGraph.setClkRouteTiming(new ClkRouteTiming(clkRouteTimingFile));
 		}
 	}
 	
@@ -96,7 +92,7 @@ public class ReportTimingAndWirelength{
 	 * Computes the wirelength and delay for each net and reports the total wirelength and critical path delay.
 	 */
 	private void computeStatisticsAndReport() {	
-		this.computeWLDlyForEachNet();
+		this.computeNetsWirelengthAndDelay();
 		
 		Pair<Float, TimingVertex> maxDelayAndTimingVertex = this.timingManager.calculateArrivalRequireTimes();
 		System.out.println();
@@ -111,7 +107,7 @@ public class ReportTimingAndWirelength{
 	/**
 	 * Computes the wirelength and delay for each net.
 	 */
-	private void computeWLDlyForEachNet() {
+	private void computeNetsWirelengthAndDelay() {
 		for(Net net : this.design.getNets()) {
 			if (net.getType() != NetType.WIRE) continue;
 			if(!RouterHelper.isRoutableNetWithSourceSinks(net)) continue;
@@ -209,7 +205,7 @@ public class ReportTimingAndWirelength{
 		Configuration config = new Configuration(args);
 		config.setPartialRouting(false);
 		config.setTimingDriven(true);
-		ReportTimingAndWirelength reporter = new ReportTimingAndWirelength(design, config);	
+		TimingAndWirelengthReport reporter = new TimingAndWirelengthReport(design, config);	
 		reporter.computeStatisticsAndReport();
 	}
 	

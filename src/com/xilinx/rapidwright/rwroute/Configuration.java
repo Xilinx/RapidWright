@@ -24,7 +24,7 @@
 package com.xilinx.rapidwright.rwroute;
 
 /**
- * A collection of customizable parameters for a {@link RWRoute} Object or a {@link ReportTimingAndWirelength} Object.
+ * A collection of customizable parameters for a {@link RWRoute} Object or a {@link TimingAndWirelengthReport} Object.
  * Modifications of default parameter values can be done by adding corresponding options with values to the arguments.
  * Each option (i.e. one of the parameters) name must start with two dashes. Values of parameters do not need dashes.
  */
