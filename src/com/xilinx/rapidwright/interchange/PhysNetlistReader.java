@@ -58,6 +58,7 @@ import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.Property;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranch;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranch.RouteSegment;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.SiteInstance;
+import com.xilinx.rapidwright.util.Utils;
 
 public class PhysNetlistReader {
 
@@ -404,8 +405,7 @@ public class PhysNetlistReader {
                 }
 
                 // Examine BEL input pins from SLICEL/M only
-                if ((siteInst.getSiteTypeEnum() == SiteTypeEnum.SLICEL || siteInst.getSiteTypeEnum() == SiteTypeEnum.SLICEM) &&
-                        bel.getBELClass() == BELClass.BEL && belPin.isInput()) {
+                if (Utils.isSLICE(siteInst) && bel.getBELClass() == BELClass.BEL && belPin.isInput()) {
 
                     // If this route branch terminates here ...
                     if (branchesCount == 0) {
