@@ -52,7 +52,7 @@ import com.xilinx.rapidwright.util.TimerTree;
 import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.timing.ClkRouteTiming;
-import com.xilinx.rapidwright.timing.CLKSkewRouteDelay;
+import com.xilinx.rapidwright.timing.ClkSkewRouteDelay;
 import com.xilinx.rapidwright.timing.DSPTimingData;
 import com.xilinx.rapidwright.timing.TimingEdge;
 import com.xilinx.rapidwright.timing.TimingGraph;
@@ -165,10 +165,12 @@ public class RWRoute{
 	/** A map from TimingEdges to connections */
 	private Map<TimingEdge, Connection> timingEdgeConnectionMap;
 	
-	//TODO clk routing needed data
-	Map<String, List<String>> routesToClockRegions;
-	Map<Pair<String, String>, List<Short>> bufceRowTapsBetweenClockRegions;
-	Map<String, List<String>> routesToINTTiles;
+	/** A map storing routes from CLK_OUT to different clock regions, used in clock routing with clock skew timing data */
+	private Map<String, List<String>> routesToClockRegions;
+	/** A map storing tap data corresponding to a sink clock region and a bufce row of a global clock net */
+	private Map<Pair<String, String>, List<Short>> bufceRowTapsOfClockRegions;
+	/** A map storing routes from CLK_OUT to different INT tiles that connect to sink pins of a global clock net */
+	private Map<String, List<String>> routesToSinkINTTiles;
 	
 	public RWRoute(Design design, Configuration config){
 		this.design = design;
@@ -239,15 +241,16 @@ public class RWRoute{
 		String clkRouteTimingFile = config.getClkRouteTiming();
 		
 		if(clkSkewFile != null) {
-			CLKSkewRouteDelay clkSkewData = new CLKSkewRouteDelay(clkSkewFile);
+			ClkSkewRouteDelay clkSkewData = new ClkSkewRouteDelay(clkSkewFile);
 			TimingGraph.setClkTiming(clkSkewData);
 			this.routesToClockRegions = clkSkewData.getRoute();
-			this.bufceRowTapsBetweenClockRegions = clkSkewData.getDelay();
+			this.bufceRowTapsOfClockRegions = clkSkewData.getDelay();
 		}
 		
 		if(clkRouteTimingFile != null) {
-			ClkRouteTiming clkTiming = new ClkRouteTiming(clkRouteTimingFile, clkRouteTimingFile);
+			ClkRouteTiming clkTiming = new ClkRouteTiming(clkRouteTimingFile);
 			TimingGraph.setClkRouteTiming(clkTiming);
+			this.routesToSinkINTTiles = clkTiming.getRoutesToSinkINTTiles();
 		}
 	}
 	
@@ -381,26 +384,32 @@ public class RWRoute{
 	
 	/**
 	 * Routes clock nets by default or in a different way when corresponding timing info supplied.
+	 * NOTE: For an unrouted design, its clock nets must not contain any PIPs or nodes, i.e, completely unrouted.
+	 * Otherwise, there could be a critical warning of clock routing results, when loading the routed design into Vivado.
+	 * Vivado will unroute the global clock nets immediately when there is such warning.
+	 * TODO: fix the potential issue.
 	 */
 	private void routeGlobalClkNets() {
  		if(this.clkNets.size() > 0) System.out.println("INFO: Route clock nets");
  		for(Net clk : this.clkNets) {
  			System.out.println(clk.getName());
- 			if(this.routesToClockRegions != null || this.routesToINTTiles != null) {
+ 			if(this.routesToClockRegions != null || this.routesToSinkINTTiles != null) {
+ 				// routes clock nets with references of partial routes
  				if(this.routesToClockRegions != null) {
  					System.out.println("INFOR: Route with clock skew data reference");
- 					GlobalSignalRouting.clkRouteWithClkSkewRouteDelays(clk, this.design.getDevice(), this.routesToClockRegions, this.bufceRowTapsBetweenClockRegions);
- 				}else if(this.routesToINTTiles != null) {
+ 					GlobalSignalRouting.routeClkWithSkewAndRouteDelays(clk, this.design.getDevice(), this.routesToClockRegions, this.bufceRowTapsOfClockRegions);
+ 				}else if(this.routesToSinkINTTiles != null) {
  					System.out.println("INFO: Route with clock route and timing data");
- 					GlobalSignalRouting.clkEnableRoute(clk, this.design.getDevice(), this.routesToINTTiles);
+ 					GlobalSignalRouting.routeClkWithPartialRoutes(clk, this.routesToSinkINTTiles, this.design.getDevice());
  				}
  			}else {
+ 				// routes clock nets from scratch
  				if(this.config.isSymmetricClkRouting()) {
  					System.out.println("INFO: Route with symmetric non-timing-driven clock router");
  	 				GlobalSignalRouting.symmetricClkRouting(clk, this.design.getDevice());
  				}else {
  					System.out.println("INFO: Route with default non-timing-driven clock router");
- 	 				GlobalSignalRouting.defaultClkRoute(clk, this.design.getDevice());
+ 	 				GlobalSignalRouting.defaultClkRouting(clk, this.design.getDevice());
  				}
  			}
 			this.preserveNet(clk);

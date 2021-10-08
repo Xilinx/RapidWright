@@ -35,7 +35,7 @@ import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.TileTypeEnum;
-import com.xilinx.rapidwright.timing.CLKSkewRouteDelay;
+import com.xilinx.rapidwright.timing.ClkSkewRouteDelay;
 import com.xilinx.rapidwright.timing.ClkRouteTiming;
 import com.xilinx.rapidwright.timing.DSPTimingData;
 import com.xilinx.rapidwright.timing.TimingEdge;
@@ -82,12 +82,12 @@ public class ReportTimingAndWirelength{
 		String clkRouteTimingFile = config.getClkRouteTiming();
 		
 		if(clkSkewFile != null) {
-			CLKSkewRouteDelay clkSkewData = new CLKSkewRouteDelay(clkSkewFile);
+			ClkSkewRouteDelay clkSkewData = new ClkSkewRouteDelay(clkSkewFile);
 			TimingGraph.setClkTiming(clkSkewData);
 		}
 		
 		if(clkRouteTimingFile != null) {
-			ClkRouteTiming clkTiming = new ClkRouteTiming(clkRouteTimingFile, clkRouteTimingFile);
+			ClkRouteTiming clkTiming = new ClkRouteTiming(clkRouteTimingFile);
 			TimingGraph.setClkRouteTiming(clkTiming);
 		}
 	}

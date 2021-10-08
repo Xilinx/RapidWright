@@ -90,13 +90,13 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     private Map<EDIFHierPortInst, SitePinInst> edifHPortMap = new HashMap<>();
     public List<TimingVertex> orderedTimingVertice = new ArrayList<>();
     public List<TimingVertex> reversedOrderedTimingVertice = new ArrayList<>();
-    static CLKSkewRouteDelay clkSkewRouteDelay = null;
+    static ClkSkewRouteDelay clkSkewRouteDelay = null;
     static ClkRouteTiming clkRouteTiming = null;
     
     /**
-     * Sets the {@link CLKSkewRouteDelay} object that represents the clock skew data.
+     * Sets the {@link ClkSkewRouteDelay} object that represents the clock skew data.
      */
-    public static void setClkTiming(CLKSkewRouteDelay clkSkewRouteDly) {
+    public static void setClkTiming(ClkSkewRouteDelay clkSkewRouteDly) {
     	clkSkewRouteDelay = clkSkewRouteDly;
     }
     
@@ -2005,9 +2005,9 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
             if (e.getNetDelay() != 0f || forceUpdateEdge) {
             	 if(this.overwriteBUGCEDelay) {
             		 if(spi_sink.getName().equals("CLK_IN")) {
-            			 logicDelay += getDstINTTileDelay(RouterHelper.getUpstreamINTTileOfClkIn(spi_sink).getName());
+            			 logicDelay += getRouteDelayToSinkINTTile(RouterHelper.getUpstreamINTTileOfClkIn(spi_sink).getName());
             		 }else {
-            			 netDelay = getDstINTTileDelay(spi_sink.getConnectedNode().getTile().getName());
+            			 netDelay = getRouteDelayToSinkINTTile(spi_sink.getConnectedNode().getTile().getName());
             			 logicDelay = 0;
                 		 this.intraSiteDelay = 0;
             		 }
@@ -2033,10 +2033,10 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         return 1;
     }
     
-    private short getDstINTTileDelay(String intTile) {
-    	short delay = clkRouteTiming.getDstINTtileDelay().getOrDefault(intTile, (short) 0);
+    private short getRouteDelayToSinkINTTile(String intTile) {
+    	short delay = clkRouteTiming.getRouteDelaysToSinkINTTiles().getOrDefault(intTile, (short) 0);
     	if(delay == 0) {
-    		System.out.println("NO delay data for tile " + intTile);
+    		System.out.println("WARNING: No delay data for the sink INT tile: " + intTile);
     	}
     	return delay;
     }

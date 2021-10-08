@@ -80,11 +80,13 @@ public class GlobalSignalRouting {
 	
 	/**
 	 * Routes a clk enable net with input data.
-	 * @param clockEnable The net to be routed.
-	 * @param device The design device.
+	 * @param clk The net to be routed.
+	 * @param routesToSinkINTTiles A map storing routes from CLK_OUT to different INT tiles that 
+	 * connect to sink pins of a global clock net.
+	 * @param device The target device needed to get routing path representation with nodes from names.
 	 */
-	public static void clkEnableRoute(Net clockEnable, Device device, Map<String, List<String>> routesToDestinationINTTiles) {
-		Map<String, List<Node>> dstINTtilePaths = getListOfNodesFromRoutes(device, routesToDestinationINTTiles);
+	public static void routeClkWithPartialRoutes(Net clk, Map<String, List<String>> routesToSinkINTTiles, Device device) {
+		Map<String, List<Node>> dstINTtilePaths = getListOfNodesFromRoutes(device, routesToSinkINTTiles);
 		// Not import path after HDSTR
 		Set<PIP> ceNetPIPs = new HashSet<>();
 		Map<String, RouteNode> horDistributionLines = new HashMap<>();
@@ -97,33 +99,33 @@ public class GlobalSignalRouting {
 			
 			ceNetPIPs.addAll(RouterHelper.getPIPsFromListOfReversedNodes(nodes));
 			
-			horDistributionLines.put(getDominateClockRegion(hDistr), hdistr);
+			horDistributionLines.put(getDominateClockRegionOfNode(hDistr), hdistr);
 		}
-		clockEnable.setPIPs(ceNetPIPs);
+		clk.setPIPs(ceNetPIPs);
 		
-		Map<RouteNode, ArrayList<SitePinInst>> lcbMappings = getLCBPinMappings(clockEnable);		
+		Map<RouteNode, ArrayList<SitePinInst>> lcbMappings = getLCBPinMappings(clk);		
 		
-		UltraScaleClockRouting.routeToLCBs(clockEnable, getStartingPoint(horDistributionLines, device), lcbMappings.keySet());	
+		UltraScaleClockRouting.routeToLCBs(clk, getStartingPoint(horDistributionLines, device), lcbMappings.keySet());	
 		if(debugPrintClkPIPs) {
 			System.out.println("ROUTE DISTR TO LCBs: ");
-			printCLKPIPs(clockEnable);
+			printCLKPIPs(clk);
 			System.out.println();
 		}
 		
 		// route LCBs to sink pins
-		UltraScaleClockRouting.routeLCBsToSinks(clockEnable, lcbMappings);	
+		UltraScaleClockRouting.routeLCBsToSinks(clk, lcbMappings);	
 		if(debugPrintClkPIPs) {
 			System.out.println("ROUTE LCB TO SINKs: ");
-			printCLKPIPs(clockEnable);
+			printCLKPIPs(clk);
 			System.out.println();
 		} 
 		
 		Set<PIP> clkPIPsWithoutDuplication = new HashSet<>();
-		clkPIPsWithoutDuplication.addAll(clockEnable.getPIPs());
-		clockEnable.setPIPs(clkPIPsWithoutDuplication);
+		clkPIPsWithoutDuplication.addAll(clk.getPIPs());
+		clk.setPIPs(clkPIPsWithoutDuplication);
 		if(debugPrintClkPIPs) {
 			System.out.println("FINAL CLK PIPs: ");
-			printCLKPIPs(clockEnable);
+			printCLKPIPs(clk);
 			System.out.println();
 		}	
 	}
@@ -142,9 +144,9 @@ public class GlobalSignalRouting {
 		return startingPoints;
 	}
 	
-	private static String getDominateClockRegion(Node node){
+	private static String getDominateClockRegionOfNode(Node node){
 		// This is needed because a HDISTR for clock region X3Y2 can have a base tile in clock region X2Y2, 
-		// seen from optical-flow design checkpoint.
+		// observed with clock routing of the optical-flow design.
 		Map<String, Integer> crCounts = new HashMap<>();
 		for(Wire wire : node.getAllWiresInNode()) {
 			ClockRegion cr = wire.getTile().getClockRegion();
@@ -176,9 +178,12 @@ public class GlobalSignalRouting {
 	 * Route a clock net with clock skew data, routes and tap delays.
 	 * @param clk The clock net to be routed.
 	 * @param device The design device.
+	 * @param routesToClockRegions A map storing routes from CLK_OUT to different clock regions.
+	 * @param bufceRowTapsOfClockRegions A map storing tap data corresponding to a sink clock region and a bufce row of a global clock net.
 	 */
-	public static void clkRouteWithClkSkewRouteDelays(Net clk, Device device, Map<String, List<String>> crRoutes, Map<Pair<String, String>, List<Short>> bufceRowTaps) {
-		Map<String, List<Node>> clockRegionPaths = getListOfNodesFromRoutes(device, crRoutes);
+	public static void routeClkWithSkewAndRouteDelays(Net clk, Device device, Map<String, List<String>> routesToClockRegions,
+			Map<Pair<String, String>, List<Short>> bufceRowTapsOfClockRegions) {
+		Map<String, List<Node>> clockRegionPaths = getListOfNodesFromRoutes(device, routesToClockRegions);
 		Node centroidNode = null;
 		for(String clockRegion : clockRegionPaths.keySet()) {
 			centroidNode = clockRegionPaths.get(clockRegion).get(0);
@@ -247,22 +252,23 @@ public class GlobalSignalRouting {
 		}
 		
 		// 5. set delay
-		setBUFCERowLeafTap(clk, device, bufceRowTaps);
+		setBUFCERowLeafTap(clk, device, bufceRowTapsOfClockRegions);
 	}
 	
 	/**
 	 * Sets BUGCE row and leaf tap levels of a routed clock net.
 	 * @param clk The target clock net.
-	 * @param device The design device.
+	 * @param device The target device.
+	 * @param bufceRowTapsOfClockRegions A map storing tap data corresponding to a sink clock region and a bufce row of a global clock net.
 	 */
-	private static void setBUFCERowLeafTap(Net clk, Device device, Map<Pair<String, String>, List<Short>> bufceRowTaps) {
-		if(bufceRowTaps.isEmpty()) return;		
-		if(debugPrintClkPIPs) System.out.println(bufceRowTaps);		
+	private static void setBUFCERowLeafTap(Net clk, Device device, Map<Pair<String, String>, List<Short>> bufceRowTapsOfClockRegions) {
+		if(bufceRowTapsOfClockRegions.isEmpty()) return;		
+		if(debugPrintClkPIPs) System.out.println(bufceRowTapsOfClockRegions);		
 		List<Site> sites = new ArrayList<>();
-		for(Pair<String, String> crSite: bufceRowTaps.keySet()) {
+		for(Pair<String, String> crSite: bufceRowTapsOfClockRegions.keySet()) {
 			Site site = device.getSite(crSite.getSecond());
 			// An example line from the file: row_tap  leaf_tap	src_@0.3  src_@0.6  src_@0.9   dst_@0.3  dst_@0.6  dst_@0.9
-			clk.setBufferDelay(site, bufceRowTaps.get(crSite).get(0));
+			clk.setBufferDelay(site, bufceRowTapsOfClockRegions.get(crSite).get(0));
 			sites.add(site);
 		}			
 		
@@ -271,9 +277,9 @@ public class GlobalSignalRouting {
 				Site s = p.getStartNode().getSitePin().getSite();
 				String cr = s.getTile().getClockRegion().getName();		
 				List<Short> taps = null;
-				for(Pair<String, String> crRowbufSite : bufceRowTaps.keySet()) {
+				for(Pair<String, String> crRowbufSite : bufceRowTapsOfClockRegions.keySet()) {
 					if(crRowbufSite.getFirst().equals(cr)) {
-						taps = bufceRowTaps.get(crRowbufSite);
+						taps = bufceRowTapsOfClockRegions.get(crRowbufSite);
 					}
 				}		
 				if(taps != null) {
@@ -307,21 +313,21 @@ public class GlobalSignalRouting {
 	}
 	
 	/**
-	 * Gets a list of nodes for each clock region based on the names of nodes.
-	 * @param device
-	 * @param dstRoutes
-	 * @return
+	 * Gets a list of nodes for each destination, e.g. each clock region or sink INT tile, based on a list of the node names.
+	 * @param device The target device.
+	 * @param routes The given routes consisting of node names.
+	 * @return A map storing a list of nodes for each destination.
 	 */
-	private static Map<String, List<Node>> getListOfNodesFromRoutes(Device device, Map<String, List<String>> dstRoutes){
+	private static Map<String, List<Node>> getListOfNodesFromRoutes(Device device, Map<String, List<String>> routes){
 		Map<String, List<Node>> dstPaths = new HashMap<>();
-		for(String dst : dstRoutes.keySet()) {
+		for(String dst : routes.keySet()) {
 			List<Node> pathNodes = new ArrayList<>();
-			for(String nodeName : dstRoutes.get(dst)) {
+			for(String nodeName : routes.get(dst)) {
 				Node node = Node.getNode(nodeName, device);
 				if(node != null) {
 					pathNodes.add(node);
 				}else {
-					System.err.println("NULL NODE FOUND " + nodeName);
+					System.err.println("ERROR: Null Node found under name: " + nodeName);
 				}
 			}
 			dstPaths.put(dst, pathNodes);
@@ -335,7 +341,7 @@ public class GlobalSignalRouting {
 	 * @param clk The clock net to be routed.
 	 * @param device The design device.
 	 */
-	public static void defaultClkRoute(Net clk, Device device) {
+	public static void defaultClkRouting(Net clk, Device device) {
 		boolean debug = false;
  		boolean debugPrintPIPs = false;
  		if(debug) System.out.println("\nROUTE CLK NET...");

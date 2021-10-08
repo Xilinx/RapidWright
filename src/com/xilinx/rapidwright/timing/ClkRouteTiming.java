@@ -38,12 +38,12 @@ import java.util.Map;
  * to enable RWRoute to use the file for timing-driven clock routing.
  */
 public class ClkRouteTiming {
-	/** Name of the BUFGCE */
+	/** Name of the BUFGCE, or the name of the timing data file */
 	private String bufgce;
-	/** Destination INT tiles of the BUFGE output and the routes */
-	private Map<String, List<String>> dstINTTilesRoutes;
-	/** Destination INT tiles of the BUFGE output and the delays */
-	private Map<String, Short> dstINTTilesDelays;
+	/** A map storing routes from CLK_OUT to different INT tiles that connect to sink pins of a global clock net */
+	private Map<String, List<String>> routesToSinkINTTiles;
+	/** A map storing route delays from CLK_OUT to different INT tiles that connect to sink pins of a global clock net */
+	private Map<String, Short> routeDelaysToSinkINTTiles;
 	/** INT tile associated with the BUFGCE_CLK_IN and the delay from the INT tile to the CLK_IN */
 	private Map<String, Short> intTileToBufgInDelay;
 	/** INT tile associated with the BUFGCE_CLK_IN and the route from the INT tile to the CLK_IN */
@@ -51,12 +51,10 @@ public class ClkRouteTiming {
 	
 	private String clkRouteTiming = null;
 	
-	public ClkRouteTiming(String bufg, String fileName) {
-		String[] ss = bufg.split("/");
-		this.bufgce = ss[ss.length - 1].replace(".txt", "");
-		
-		this.dstINTTilesRoutes = new HashMap<>();
-		this.dstINTTilesDelays = new HashMap<>();
+	public ClkRouteTiming(String fileName) {
+		this.bufgce = fileName;
+		this.routesToSinkINTTiles = new HashMap<>();
+		this.routeDelaysToSinkINTTiles = new HashMap<>();
 		this.intTileToBufgInDelay = new HashMap<>();
 		this.intTileToBufgInRoute = new ArrayList<>();
 		
@@ -125,7 +123,7 @@ public class ClkRouteTiming {
 			if(dataStrings.length < 4) {
 				throw new IllegalArgumentException("ERROR: Incomplete data of line " + line);
 			}
-			this.dstINTTilesDelays.put(dataStrings[0], Short.parseShort(dataStrings[2]));
+			this.routeDelaysToSinkINTTiles.put(dataStrings[0], Short.parseShort(dataStrings[2]));
 			this.intTileToBufgInDelay.put(dataStrings[0], Short.parseShort(dataStrings[2]));// check the index of INT tile and delay
 			
 			for(int id = 3; id < dataStrings.length; id++) {
@@ -149,14 +147,14 @@ public class ClkRouteTiming {
 				throw new IllegalArgumentException("ERROR: Incomplete data of line " + line);
 			}
 			String intTile = dataStrings[1];
-			this.dstINTTilesDelays.put(intTile, Short.parseShort(dataStrings[2]));
+			this.routeDelaysToSinkINTTiles.put(intTile, Short.parseShort(dataStrings[2]));
 			
 			List<String> nodes = new ArrayList<>();
 			for(int i = 3; i < dataStrings.length; i++) {
 				nodes.add(dataStrings[i]);
 			}
 			
-			this.dstINTTilesRoutes.put(intTile, nodes);
+			this.routesToSinkINTTiles.put(intTile, nodes);
 		}
 	}
 	
@@ -164,19 +162,19 @@ public class ClkRouteTiming {
 		return this.bufgce;
 	}
 
-	public Map<String, List<String>> getDstINTtileRoute() {
-		return this.dstINTTilesRoutes;
+	public Map<String, List<String>> getRoutesToSinkINTTiles() {
+		return this.routesToSinkINTTiles;
 	}
 
-	public Map<String, Short> getDstINTtileDelay() {
-		return this.dstINTTilesDelays;
+	public Map<String, Short> getRouteDelaysToSinkINTTiles() {
+		return this.routeDelaysToSinkINTTiles;
 	}
 
 	public Map<String, Short> getIntTileToBufgInDelay() {
 		return this.intTileToBufgInDelay;
 	}
 
-	public String getCeRouteTiming() {
+	public String getClkRouteTiming() {
 		return this.clkRouteTiming;
 	}
 
