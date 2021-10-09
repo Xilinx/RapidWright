@@ -225,24 +225,23 @@ public class PhysNetlistWriter {
                     for(String siteWire : e.getValue()) {
 	                    BELPin[] belPins = siteInst.getSiteWirePins(siteWire);
 	                    for(BELPin belPin : belPins) {
-                            BEL bel = belPin.getBEL();
-                            Cell cell = siteInst.getCell(bel);
-                            boolean routethru = false;
-                            if(belPin.isInput()) {
-                                // Skip if no BEL placed here
-                                if (cell == null) {
-                                    continue;
-                                }
-                                // Skip if pin not used (e.g. A1 connects to A[56]LUT.A1;
-                                // both cells can exist but not both need be using this pin)
-                                if (cell.getLogicalPinMapping(belPin.getName()) == null) {
-                                    continue;
-                                }
+	                        BEL bel = belPin.getBEL();
+	                        Cell cell = siteInst.getCell(bel);
+	                        boolean routethru = false;
+	                        if(belPin.isInput()) {
+	                            // Skip if no BEL placed here
+	                            if (cell == null) {
+	                                continue;
+	                            }
+	                            // Skip if pin not used (e.g. A1 connects to A[56]LUT.A1;
+	                            // both cells can exist but not both need be using this pin)
+	                            if (cell.getLogicalPinMapping(belPin.getName()) == null) {
+	                                continue;
+	                            }
                             } else {
                                 routethru = cell != null && cell.isRoutethru();
                             }
-                            RouteBranchNode rbn = new RouteBranchNode(site, belPin, routethru);
-                            segments.add(rbn);
+                            segments.add(new RouteBranchNode(site, belPin, routethru));
 	                    }
                     }                	
                 }
