@@ -1,15 +1,12 @@
 package com.xilinx.rapidwright.interchange;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 
 import com.xilinx.rapidwright.checker.CheckOpenFiles;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.Cell;
-import com.xilinx.rapidwright.interchange.PhysNetlistReader;
-import com.xilinx.rapidwright.interchange.PhysNetlistWriter;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
