@@ -25,6 +25,7 @@
  */
 package com.xilinx.rapidwright.util;
 
+import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
@@ -32,6 +33,7 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.UncheckedIOException;
 import java.lang.ProcessBuilder.Redirect;
 import java.net.InetAddress;
@@ -50,6 +52,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -67,12 +70,10 @@ public class Installer {
 	public static boolean KEEP_ZIP_FILES = false;
 	public static boolean SKIP_ZIP_DOWNLOAD = false;
 	public static boolean SKIP_TEST = false;
-	
 
-	
 	private static String rwPathVarName = "RAPIDWRIGHT_PATH";
 	private static String classpathVarName = "CLASSPATH";
-	private static String MD5_FILE_NAME = "MD5SUM.TXT";
+	public static String MD5_FILE_NAME = "MD5SUM.TXT";
 	
 	/**
 	 * This is a simple method that writes the elements of an ArrayList of Strings
@@ -139,8 +140,30 @@ public class Installer {
             throw new UncheckedIOException(e);
         }
     }
+
+    /**
+     * Validates an already downloaded RapidWright release file using the MD5 hash
+     * @param releaseDir The URL of the release directory 
+     * @param downloadedFileName The name of the local file 
+     * @return True if the file is correct, false otherwise
+     */
+    public static boolean validateMD5OfDownloadedFile(String releaseDir, String downloadedFileName) {
+        String md5sum = getExpectedMD5(releaseDir, downloadedFileName);
+        String calcMD5Sum = calculateMD5OfFile(downloadedFileName);
+        boolean matches = md5sum.equals(calcMD5Sum);
+        if(!matches) {
+            System.out.println(downloadedFileName + " md5sum is invalid: " +
+                    calcMD5Sum + ", should be: " + md5sum);            
+        }
+        return matches;
+    }
 	
-	
+    /**
+     * Downloads a file specified by the URL to the local file dstFileName.
+     * @param url The target URL to download
+     * @param dstFileName The local file name
+     * @return The number of bytes downloaded into the file
+     */
 	public static long downloadFile(String url, String dstFileName) {
         File newFile = new File(dstFileName);
         File parentDir = newFile.getParentFile();
@@ -172,16 +195,19 @@ public class Installer {
 		return transferred;
 	}
 	
-    private static void unzipFile(String zipFile, String destDir) {
+	/**
+	 * Unzips a file into a specified directory
+	 * @param zipFile Name of the zip file to unzip
+	 * @param destDir The directory to receive the contents of the zip file
+	 */
+    public static void unzipFile(String zipFile, String destDir) {
         File dir = new File(destDir);
         // create output directory if it doesn't exist
         if(!dir.exists()) dir.mkdirs();
-        FileInputStream fis;
+        
         //buffer for read and write data to file
         byte[] buffer = new byte[1024];
-        try {
-            fis = new FileInputStream(zipFile);
-            ZipInputStream zis = new ZipInputStream(fis);
+        try (ZipInputStream zis = new ZipInputStream(new FileInputStream(zipFile))) {
             ZipEntry ze = zis.getNextEntry();
             while(ze != null){
                 String fileName = ze.getName();
@@ -203,8 +229,6 @@ public class Installer {
                 ze = zis.getNextEntry();
             }
             zis.closeEntry();
-            zis.close();
-            fis.close();
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -278,21 +302,75 @@ public class Installer {
 		return javaSrcs;
 	}
 	
-	public static String getExpectedMD5(String releaseName, String fileName) throws IOException {
+	public static String getExpectedMD5(String releaseName, String fileName) {
 		long downloaded = downloadFile(releaseName+"/"+MD5_FILE_NAME, MD5_FILE_NAME);
 		if(downloaded < 1) {
 		    throw new RuntimeException("ERROR: Problem downloading " + releaseName+"/"
 		            +MD5_FILE_NAME + ", only downloaded " + downloaded + " bytes.");
 		}
 		String md5sum = null;
-		for(String line : Files.readAllLines(Paths.get(MD5_FILE_NAME), Charset.forName("US-ASCII"))){
-			String[] parts = line.split("\\s+"); 
-			if(parts[1].trim().equals(fileName)){
-				md5sum = parts[0].trim();
-				break;
-			}
-		}
+		try {
+            for(String line : Files.readAllLines(Paths.get(MD5_FILE_NAME), Charset.forName("US-ASCII"))){
+            	String[] parts = line.split("\\s+"); 
+            	if(parts[1].trim().equals(fileName)){
+            		md5sum = parts[0].trim();
+            		break;
+            	}
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException("Problem reading file " + MD5_FILE_NAME, e);
+        }
 		return md5sum;
+	}
+	
+	public static void updateJars() {
+        URL url = null;
+        try{
+            url = new URL("https://api.github.com/repos/Xilinx/RapidWright/releases/latest");
+        } catch (MalformedURLException e) {
+            throw new UncheckedIOException(e);
+        }
+        String jarsZipUrl = null;
+        try(BufferedReader reader = new BufferedReader(new InputStreamReader(url.openStream()))){
+            String line = null;
+            while((line = reader.readLine()) != null) {
+                for(String s : line.split(",")){
+                    if(s.contains("browser_download_url") && s.contains(JARS_ZIP)) {
+                        String suffix = "_jars.zip";
+                        jarsZipUrl = s.substring(s.indexOf("http"), s.indexOf(suffix)+ suffix.length());
+                        break;
+                    }
+                }
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to download " + JARS_ZIP + ", please try again "
+                    + "or download and update manually by overwriting the 'jars' directory.", e);
+        }
+        String localFile = jarsZipUrl.substring(jarsZipUrl.lastIndexOf('/')+1);
+        downloadFile(jarsZipUrl, localFile);
+        String releaseDirUrl = jarsZipUrl.replace("/"+localFile, ""); 
+        if(!validateMD5OfDownloadedFile(releaseDirUrl, localFile)) {
+            throw new RuntimeException("ERROR: Download of " + JARS_ZIP + " was corrupted, "
+                    + "please try again.");
+        }
+        Path jarFolder = Paths.get("jars");
+        if(Files.exists(jarFolder)) {
+            try {
+                Files.walk(jarFolder).sorted(Comparator.reverseOrder()).map(Path::toFile)
+                    .forEach(File::delete);
+            } catch (IOException e) {
+                throw new UncheckedIOException("ERROR: Failed to delete 'jars' directory", e);
+            }
+        }
+        
+        unzipFile(localFile, System.getProperty("user.dir"));
+        if(!KEEP_ZIP_FILES){
+            System.out.print("Cleaning up files ...");
+            boolean success = new File(JARS_ZIP).delete();
+            success &= new File(MD5_FILE_NAME).delete();
+            if(success) System.out.println("Done.");
+            else System.out.println("Problem cleaning up files.");         
+        }
 	}
 	
     public static final String REPO = "https://github.com/Xilinx/RapidWright.git";
@@ -310,6 +388,9 @@ public class Installer {
 				SKIP_ZIP_DOWNLOAD = true;
 			}else if(arg.equals("-t") || arg.equals("--skip-test")){
 				SKIP_TEST = true;
+			}else if(arg.equals("-u") || arg.equals("--update-jars")){
+                updateJars();
+                return;
 			}else if(arg.equals("-h") || arg.equals("--help")){
 				System.out.println("================================================================================");
 				System.out.println(" RapidWright Installer");
@@ -325,6 +406,8 @@ public class Installer {
 								 + "                            same directory instead of downloading them.\n"
 								 + "  -t, --skip-test         : Skips the attempt to test RapidWright by opening\n"
 								 + "                            the DeviceBrowser (scripted installs).\n" 
+                                 + "  -u, --update-jars       : (Existing installs only) Gets the latest set of \n"
+                                 + "                            RapidWright jar dependencies from GitHub.\n"
 								 + "  -h, --help              : Prints this help message.");
 				return;
 			}
@@ -423,13 +506,9 @@ public class Installer {
 			boolean alreadyDownloaded = false;
 			if(new File(name).exists()){
 				System.out.println("Checking if existing "+name+" can be used...");
-				String md5sum = getExpectedMD5(RELEASE, name);
-				String calcMD5Sum = calculateMD5OfFile(name);
-				if(md5sum.equals(calcMD5Sum)){
+				if(validateMD5OfDownloadedFile(RELEASE, name)) {
 					System.out.println(name + " is valid, skipping download.");
 					alreadyDownloaded = true;
-				}else{
-					System.out.println(name + " md5sum is invalid: " + calcMD5Sum + ", should be: " + md5sum);
 				}
 			}
 			if(alreadyDownloaded || SKIP_ZIP_DOWNLOAD){
@@ -567,8 +646,7 @@ public class Installer {
 			success &= new File(cwd + JARS_ZIP).delete();
 			success &= new File(cwd + MD5_FILE_NAME).delete();
 			if(success) System.out.println("Done.");
-			else System.out.println("Problem deleting zip files.");
-			
+			else System.out.println("Problem deleting zip files.");			
 		}
 	}
 }

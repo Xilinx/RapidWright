@@ -44,3 +44,22 @@ dependencies {
   testImplementation fileTree(dir: 'jars', include: ['junit-jupiter-*.jar', 'junit-platform-*.jar'])
 }
 
+abstract class UpdateJarsTask extends DefaultTask {
+    @TaskAction
+    def updateJars() {
+    	def f = new File('rapidwright-installer.jar')
+        if (!f.exists()) {
+            println 'Downloading...'
+            new URL('https://www.rapidwright.io/docs/_downloads/rapidwright-installer.jar').withInputStream{ i -> f.withOutputStream{ it << i }}
+        }
+        def stdout = new StringBuilder(), stderr = new StringBuilder()
+        def proc = 'java -jar rapidwright-installer.jar -u'.execute() 
+        proc.consumeProcessOutput(stdout,stderr)
+        proc.waitForOrKill(1100000)
+        println "$stdout\n$stderr"
+        f.delete()
+    }
+}
+
+// Create a task using the task type
+tasks.register('update_jars', UpdateJarsTask)
