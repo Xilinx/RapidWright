@@ -925,13 +925,16 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
 		}
 		return shouldConnect;
     }
-    
-    /** Builds and returns a set of GraphPaths.
-     * @param n 0 will return all paths; 1 will return 1 path by using Bellman Ford algorithm with 
-     * negating the edges prior to running the shortest path algorithm.
-     * @return A List of GraphPaths that were just built by this command
-     */
-    public TimingVertex superSource = null;
+
+
+	/**
+	 * The superSource and superSink are used to consolidate all timing start and end points, respectively.
+	 * They simplify timing computations and data to compute clock skew will be annotated on the edges from superSource and to superSink.
+	 * For example, a FF will be represented both as a start and end points using two vertices, says source and sink.
+	 * The superSource will have no input, but fanout to all the start points nodes.
+	 * The superSink will have fanin from all the end point nodes and have no output.
+	 */
+	public TimingVertex superSource = null;
     public TimingVertex superSink = null;
     
     /**

@@ -114,20 +114,20 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
 
 
     public short getDelayOf(Node exitNode) {
-	    RoutingNode node = getTermInfo(exitNode);
+	    TermInfo termInfo = getTermInfo(exitNode);
 	    
 	    // Don't put this in calcTimingGroupDelay because it is called many times to estimate delay.
-	    if (node.ng == T.NodeGroupType.CLE_IN) {
+	    if (termInfo.ng == T.NodeGroupType.CLE_IN) {
 	    	return inputSitePinDelay.getOrDefault(exitNode.getWireName(), (short) 0);
 	    }
 	    
-	    return calcTimingGroupDelay(node.ng, node.begin(), node.end(), 0d);
+	    return calcTimingGroupDelay(termInfo.ng, termInfo.begin(), termInfo.end(), 0d);
     }
 
     /**
      * Represent a routing resource in the delay graph
      */
-    protected class RoutingNode {
+    protected class TermInfo {
         // INT_TILE coordinate
         short x;
         short y;
@@ -135,7 +135,7 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
         T.NodeGroupType ng;
 
 
-        RoutingNode() {
+        TermInfo() {
             this.ng = null;
         }
 
@@ -175,34 +175,19 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
             return  (short) (start + (direction == InterconnectInfo.Direction.U ? delta : -delta));
         }
     }
-    
-    private short getLengthFromIntentCode(IntentCode ic) {
-    	switch(ic) {
-    		case NODE_SINGLE:
-    			return 1;
-    		case NODE_DOUBLE:
-    			return 2;
-    		case NODE_VQUAD:
-    		case NODE_HQUAD:
-    			return 4;
-    		case NODE_HLONG:
-    		case NODE_VLONG:
-    			return 12;
-    		default:
-    			return 0;
-    	}
-    }
+
     
     // Currently, the default mode in DelayEstimatorTable is fastMode which use getClosetSrcDstSitePin. 
-    private RoutingNode getTermInfo(Node node) {
+    private TermInfo getTermInfo(Node node) {
         IntentCode ic = node.getIntentCode();
-        RoutingNode rNode = new RoutingNode();
+        TermInfo termInfo = new TermInfo();
 
-        rNode.x = (short) node.getTile().getTileXCoordinate();
-        rNode.y = (short) node.getTile().getTileYCoordinate();
+        termInfo.x = (short) node.getTile().getTileXCoordinate();
+        termInfo.y = (short) node.getTile().getTileYCoordinate();
 
 
         String nodeType = node.getWireName();
+        // Based on its name, WW1_E should go be horizontal single. However, it go to the north like NN1_E.
         if (nodeType.contains("WW1_E")) {
             nodeType = "NN1_E";
         }
@@ -210,45 +195,45 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
         if (nodeType.startsWith("INT") && (ic == IntentCode.NODE_SINGLE)) {
             // Special for internal single such as INT_X0Y0/INT_INT_SDQ_33_INT_OUT1  - NODE_SINGLE
             // The exact orientation can be found, but it is slow. Setting wrong orientation for internal single has no harm.
-            rNode.direction = InterconnectInfo.Direction.U;
-            rNode.ng = T.NodeGroupType.INTERNAL_SINGLE;
+            termInfo.direction = InterconnectInfo.Direction.U;
+            termInfo.ng = T.NodeGroupType.INTERNAL_SINGLE;
         } else {
             String nodeGroupSide = nodeType.substring(0, nodeType.indexOf('_'));
             switch(nodeGroupSide.charAt(0)) {
             	case 'E':
-            		rNode.direction = InterconnectInfo.Direction.U;
-            		rNode.setHorTG(getLengthFromIntentCode(ic));
+            		termInfo.direction = InterconnectInfo.Direction.U;
+            		termInfo.setHorTG(ic.getLength());
             		break;
             	case 'W':
-            		rNode.direction = InterconnectInfo.Direction.D;
-            		rNode.setHorTG(getLengthFromIntentCode(ic));
+            		termInfo.direction = InterconnectInfo.Direction.D;
+            		termInfo.setHorTG(ic.getLength());
             		break;
             	case 'N':
-            		rNode.direction = InterconnectInfo.Direction.U;
-            		rNode.setVerTG(getLengthFromIntentCode(ic));
+            		termInfo.direction = InterconnectInfo.Direction.U;
+            		termInfo.setVerTG(ic.getLength());
             		break;
             	case 'S':
-            		rNode.direction = InterconnectInfo.Direction.D;
-            		rNode.setVerTG(getLengthFromIntentCode(ic));
+            		termInfo.direction = InterconnectInfo.Direction.D;
+            		termInfo.setVerTG(ic.getLength());
             		break;
             	default:
-            		rNode.direction = InterconnectInfo.Direction.S;
+            		termInfo.direction = InterconnectInfo.Direction.S;
             		switch(ic) {
             			case NODE_PINBOUNCE:
             			case NODE_PINFEED:
-            				rNode.ng = T.NodeGroupType.CLE_IN;
+            				termInfo.ng = T.NodeGroupType.CLE_IN;
             				break;
             			case NODE_LOCAL:
-            				rNode.ng = T.NodeGroupType.GLOBAL;
-            				rNode.direction = InterconnectInfo.Direction.U;
+            				termInfo.ng = T.NodeGroupType.GLOBAL;
+            				termInfo.direction = InterconnectInfo.Direction.U;
             				break;
             			default:
-            				rNode.ng = T.NodeGroupType.CLE_OUT;
+            				termInfo.ng = T.NodeGroupType.CLE_OUT;
             		}
             }
         }
 
-        return rNode;
+        return termInfo;
     }
 
     @FunctionalInterface
@@ -429,33 +414,3 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
         return (short) (k0 + k1 * l + k2 * d);
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
