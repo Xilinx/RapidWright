@@ -125,26 +125,6 @@ public enum IntentCode {
     NODE_GLOBAL_HDISTR_HSR,
     NODE_GLOBAL_HDISTR_LOCAL;
 
-    /**
-     *
-     * @return
-     */
-    public short getLength() {
-        switch(this) {
-            case NODE_SINGLE:
-                return 1;
-            case NODE_DOUBLE:
-                return 2;
-            case NODE_VQUAD:
-            case NODE_HQUAD:
-                return 4;
-            case NODE_HLONG:
-            case NODE_VLONG:
-                return 12;
-            default:
-                return 0;
-        }
-    }
 
     public static boolean isLongWire(Tile tile, int wire){
     	return isLongWire(tile.getWireIntentCode(wire).ordinal());

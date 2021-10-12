@@ -135,32 +135,41 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
         T.NodeGroupType ng;
 
 
-        TermInfo() {
-            this.ng = null;
+        TermInfo(short x, short y, T.Direction dir, IntentCode ic) {
+            this.x = x;
+            this.y = y;
+            this.direction = dir;
+
+            switch(ic) {
+                case NODE_SINGLE:
+                    if (dir == T.Direction.U || dir == T.Direction.D)
+                        this.ng = T.NodeGroupType.valueOf("VERT_SINGLE");
+                    else
+                        this.ng = T.NodeGroupType.valueOf("HORT_SINGLE");
+                    break;
+                case NODE_DOUBLE:
+                    if (dir == T.Direction.U || dir == T.Direction.D)
+                        this.ng = T.NodeGroupType.valueOf("VERT_DOUBLE");
+                    else
+                        this.ng = T.NodeGroupType.valueOf("HORT_DOUBLE");
+                    break;
+                case NODE_VQUAD:
+                    this.ng = T.NodeGroupType.valueOf("VERT_QUAD");
+                    break;
+                case NODE_HQUAD:
+                    this.ng = T.NodeGroupType.valueOf("HORT_QUAD");
+                    break;
+                case NODE_VLONG:
+                    this.ng = T.NodeGroupType.valueOf("VERT_LONG");
+                    break;
+                case NODE_HLONG:
+                    this.ng = T.NodeGroupType.valueOf("HORT_LONG");
+                    break;
+                default:
+                    this.ng = null;
+            }
         }
 
-        void setHorTG(short len) {
-            if (len == 1)
-                this.ng = T.NodeGroupType.valueOf("HORT_SINGLE");
-            else if (len == 2)
-                this.ng = T.NodeGroupType.valueOf("HORT_DOUBLE");
-            else if (len == 4)
-                this.ng = T.NodeGroupType.valueOf("HORT_QUAD");
-            else
-                this.ng = T.NodeGroupType.valueOf("HORT_LONG");
-        }
-
-        void setVerTG(short len) {
-            if (len == 1)
-                this.ng = T.NodeGroupType.valueOf("VERT_SINGLE");
-            else if (len == 2)
-                this.ng = T.NodeGroupType.valueOf("VERT_DOUBLE");
-            else if (len == 4)
-                this.ng = T.NodeGroupType.valueOf("VERT_QUAD");
-            else
-                this.ng = T.NodeGroupType.valueOf("VERT_LONG");
-        }
-        
         public String toString() {
             return String.format("x:%d y:%d %s %s", x,y, ng.name(), direction.name());
         }
@@ -180,10 +189,10 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
     // Currently, the default mode in DelayEstimatorTable is fastMode which use getClosetSrcDstSitePin. 
     private TermInfo getTermInfo(Node node) {
         IntentCode ic = node.getIntentCode();
-        TermInfo termInfo = new TermInfo();
+        TermInfo termInfo = null;
 
-        termInfo.x = (short) node.getTile().getTileXCoordinate();
-        termInfo.y = (short) node.getTile().getTileYCoordinate();
+        short x = (short) node.getTile().getTileXCoordinate();
+        short y = (short) node.getTile().getTileYCoordinate();
 
 
         String nodeType = node.getWireName();
@@ -195,29 +204,35 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
         if (nodeType.startsWith("INT") && (ic == IntentCode.NODE_SINGLE)) {
             // Special for internal single such as INT_X0Y0/INT_INT_SDQ_33_INT_OUT1  - NODE_SINGLE
             // The exact orientation can be found, but it is slow. Setting wrong orientation for internal single has no harm.
-            termInfo.direction = InterconnectInfo.Direction.U;
+            termInfo.direction = T.Direction.U;
             termInfo.ng = T.NodeGroupType.INTERNAL_SINGLE;
         } else {
+            // IntendCode alone is not enough to determine the direction.
+            // For example, for US+, NODE_SINGLE and NODE_DOUBLE are used for both vertical and horizontal ones.
             String nodeGroupSide = nodeType.substring(0, nodeType.indexOf('_'));
             switch(nodeGroupSide.charAt(0)) {
             	case 'E':
-            		termInfo.direction = InterconnectInfo.Direction.U;
-            		termInfo.setHorTG(ic.getLength());
+//            		termInfo.direction = InterconnectInfo.Direction.U;
+//            		termInfo.setHorTG(ic.getLength());
+            		termInfo = new TermInfo(x,y,T.Direction.U, ic);
             		break;
             	case 'W':
-            		termInfo.direction = InterconnectInfo.Direction.D;
-            		termInfo.setHorTG(ic.getLength());
+//            		termInfo.direction = InterconnectInfo.Direction.D;
+//            		termInfo.setHorTG(ic.getLength());
+                    termInfo = new TermInfo(x,y,T.Direction.D, ic);
             		break;
             	case 'N':
-            		termInfo.direction = InterconnectInfo.Direction.U;
-            		termInfo.setVerTG(ic.getLength());
+//            		termInfo.direction = InterconnectInfo.Direction.U;
+//            		termInfo.setVerTG(ic.getLength());
+                    termInfo = new TermInfo(x,y,T.Direction.U, ic);
             		break;
             	case 'S':
-            		termInfo.direction = InterconnectInfo.Direction.D;
-            		termInfo.setVerTG(ic.getLength());
+//            		termInfo.direction = InterconnectInfo.Direction.D;
+//            		termInfo.setVerTG(ic.getLength());
+                    termInfo = new TermInfo(x,y,T.Direction.D, ic);
             		break;
             	default:
-            		termInfo.direction = InterconnectInfo.Direction.S;
+            		termInfo.direction = T.Direction.S;
             		switch(ic) {
             			case NODE_PINBOUNCE:
             			case NODE_PINFEED:
