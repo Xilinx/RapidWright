@@ -21,6 +21,7 @@ import com.xilinx.rapidwright.design.AltPinMapping;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
@@ -87,7 +88,12 @@ public class PhysNetlistWriter {
         for(SiteInst siteInst : design.getSiteInsts()) {
         	if(!siteInst.isPlaced()) continue;
             for(Cell cell : siteInst.getCells()) {
-            	if(cell.isRoutethru()) continue;
+            	if(cell.isRoutethru()) {
+                    if (!DesignTools.isBELALut(cell.getBELName())) {
+                        throw new RuntimeException("Unexpected routethru BEL: " + cell);
+                    }
+                    continue;
+                }
             	allCells.add(cell);
             	if(!cell.isPlaced()) continue;
             	String cellName = cell.getName();
