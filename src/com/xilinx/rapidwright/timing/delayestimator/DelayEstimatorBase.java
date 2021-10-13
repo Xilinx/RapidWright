@@ -107,12 +107,18 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
     	
     	IntentCode icChild = child.getIntentCode();
     	if((icChild == IntentCode.NODE_VLONG) || (icChild == IntentCode.NODE_HLONG)) {
+    	    // TODO: this should come from a delay file
     		return 45;
     	}
     	return 0;
     }
 
 
+    /**
+     * Get delay of the node group of the given exit node.
+     * @param exitNode the exit node of the node group
+     * @return  delay in ps
+     */
     public short getDelayOf(Node exitNode) {
 	    TermInfo termInfo = getTermInfo(exitNode);
 	    
@@ -131,24 +137,31 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
         // INT_TILE coordinate
         short x;
         short y;
-        InterconnectInfo.Direction direction;
+        T.Direction direction;
         T.NodeGroupType ng;
 
 
-        TermInfo(short x, short y, T.Direction dir, IntentCode ic) {
+        TermInfo(short x, short y, T.Direction dir, T.NodeGroupType ng) {
+            this.x = x;
+            this.y = y;
+            this.direction = dir;
+            this.ng = ng;
+        }
+
+        TermInfo(short x, short y, T.Direction dir, IntentCode ic, T.Orientation orientation) {
             this.x = x;
             this.y = y;
             this.direction = dir;
 
             switch(ic) {
                 case NODE_SINGLE:
-                    if (dir == T.Direction.U || dir == T.Direction.D)
+                    if (orientation == T.Orientation.VERTICAL)
                         this.ng = T.NodeGroupType.valueOf("VERT_SINGLE");
                     else
                         this.ng = T.NodeGroupType.valueOf("HORT_SINGLE");
                     break;
                 case NODE_DOUBLE:
-                    if (dir == T.Direction.U || dir == T.Direction.D)
+                    if (orientation == T.Orientation.VERTICAL)
                         this.ng = T.NodeGroupType.valueOf("VERT_DOUBLE");
                     else
                         this.ng = T.NodeGroupType.valueOf("HORT_DOUBLE");
@@ -186,14 +199,7 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
     }
 
     
-    // Currently, the default mode in DelayEstimatorTable is fastMode which use getClosetSrcDstSitePin. 
     private TermInfo getTermInfo(Node node) {
-        IntentCode ic = node.getIntentCode();
-        TermInfo termInfo = null;
-
-        short x = (short) node.getTile().getTileXCoordinate();
-        short y = (short) node.getTile().getTileYCoordinate();
-
 
         String nodeType = node.getWireName();
         // Based on its name, WW1_E should go be horizontal single. However, it go to the north like NN1_E.
@@ -201,49 +207,43 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
             nodeType = "NN1_E";
         }
 
+        TermInfo termInfo = null;
+        short x = (short) node.getTile().getTileXCoordinate();
+        short y = (short) node.getTile().getTileYCoordinate();
+        IntentCode ic = node.getIntentCode();
+
         if (nodeType.startsWith("INT") && (ic == IntentCode.NODE_SINGLE)) {
             // Special for internal single such as INT_X0Y0/INT_INT_SDQ_33_INT_OUT1  - NODE_SINGLE
             // The exact orientation can be found, but it is slow. Setting wrong orientation for internal single has no harm.
-            termInfo.direction = T.Direction.U;
-            termInfo.ng = T.NodeGroupType.INTERNAL_SINGLE;
+            termInfo = new TermInfo(x,y,T.Direction.U, T.NodeGroupType.INTERNAL_SINGLE);
         } else {
             // IntendCode alone is not enough to determine the direction.
             // For example, for US+, NODE_SINGLE and NODE_DOUBLE are used for both vertical and horizontal ones.
             String nodeGroupSide = nodeType.substring(0, nodeType.indexOf('_'));
             switch(nodeGroupSide.charAt(0)) {
             	case 'E':
-//            		termInfo.direction = InterconnectInfo.Direction.U;
-//            		termInfo.setHorTG(ic.getLength());
-            		termInfo = new TermInfo(x,y,T.Direction.U, ic);
+                    termInfo = new TermInfo(x,y,T.Direction.U, ic, T.Orientation.HORIZONTAL);
+                    break;
+                case 'N':
+            		termInfo = new TermInfo(x,y,T.Direction.U, ic, T.Orientation.VERTICAL);
             		break;
             	case 'W':
-//            		termInfo.direction = InterconnectInfo.Direction.D;
-//            		termInfo.setHorTG(ic.getLength());
-                    termInfo = new TermInfo(x,y,T.Direction.D, ic);
-            		break;
-            	case 'N':
-//            		termInfo.direction = InterconnectInfo.Direction.U;
-//            		termInfo.setVerTG(ic.getLength());
-                    termInfo = new TermInfo(x,y,T.Direction.U, ic);
-            		break;
-            	case 'S':
-//            		termInfo.direction = InterconnectInfo.Direction.D;
-//            		termInfo.setVerTG(ic.getLength());
-                    termInfo = new TermInfo(x,y,T.Direction.D, ic);
+                    termInfo = new TermInfo(x,y,T.Direction.D, ic, T.Orientation.HORIZONTAL);
+                    break;
+                case 'S':
+                    termInfo = new TermInfo(x,y,T.Direction.D, ic, T.Orientation.VERTICAL);
             		break;
             	default:
-            		termInfo.direction = T.Direction.S;
             		switch(ic) {
             			case NODE_PINBOUNCE:
             			case NODE_PINFEED:
-            				termInfo.ng = T.NodeGroupType.CLE_IN;
+                            termInfo = new TermInfo(x,y,T.Direction.S, T.NodeGroupType.CLE_IN);
             				break;
             			case NODE_LOCAL:
-            				termInfo.ng = T.NodeGroupType.GLOBAL;
-            				termInfo.direction = InterconnectInfo.Direction.U;
+                            termInfo = new TermInfo(x,y,T.Direction.U, T.NodeGroupType.GLOBAL);
             				break;
             			default:
-            				termInfo.ng = T.NodeGroupType.CLE_OUT;
+                            termInfo = new TermInfo(x,y,T.Direction.S, T.NodeGroupType.CLE_OUT);
             		}
             }
         }
