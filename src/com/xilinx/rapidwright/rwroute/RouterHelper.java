@@ -325,40 +325,17 @@ public class RouterHelper {
 		return nodes;
 	}
 	
-	/** Names of DSP BELPins that should be inverted */
-	public static Set<String> invertibleDSPBELPins;
-	static {
-		invertibleDSPBELPins = new HashSet<>();
-		invertibleDSPBELPins.addAll(addPostfixes("RST", new String[] {"P", "M", "INMODE", "CTRL", "C", "D", "B", "ALUMODE", "ALLCARRYIN", "A"}, "INV"));
-		invertibleDSPBELPins.addAll(addPostfixes("OPMODE", new String[] {"8", "7", "6", "5", "4", "3", "2", "1", "0"}, "INV"));
-		invertibleDSPBELPins.addAll(addPostfixes("INMODE", new String[] {"4", "3", "2", "1", "0"}, "INV"));
-		invertibleDSPBELPins.addAll(addPostfixes("ALUMODE", new String[] {"3", "2", "1", "0"}, "INV"));
-		invertibleDSPBELPins.add("CARRYININV");
-		invertibleDSPBELPins.add("CLKINV");
-	}
-	
-	/** 
-	 * Constructs all the names of invertible DSP {@link BELPin} instances.
-	 * @param name The short name of the BELPins.
-	 * @param postfixes All possible string postfixes or indices after the short name.
-	 * @param last The last string of invertible DSP BELPins.
-	 * @return A list of constructed names of invertible DSP BELPins.
-	 */
-	private static List<String> addPostfixes(String name, String[] postfixes, String last){
-		List<String> belNames = new ArrayList<>();
-		for(String s : postfixes) {
-			belNames.add(name + s + last);
-		}
-		return belNames;
-	}
-	
 	/**
 	 * Checks if a DSP {@link BELPin} instance is invertible.
 	 * @param belPin The bel pin in question.
 	 * @return true, if the bel pin is invertible.
 	 */
 	private static boolean isInvertibleDSPBELPin(BELPin belPin) {
-		return invertibleDSPBELPins.contains(belPin.getBEL().getName());
+		if(belPin.getBELName().equals("CLKINV")) {
+			//NEED TO BE INVERTED when BEL.canInvert returns false
+			return true;
+		}
+		return belPin.getBEL().canInvert();
 	}
 	
 	/**
