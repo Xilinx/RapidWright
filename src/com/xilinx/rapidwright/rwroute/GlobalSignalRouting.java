@@ -89,7 +89,7 @@ public class GlobalSignalRouting {
 	public static void routeClkWithPartialRoutes(Net clk, Map<String, List<String>> routesToSinkINTTiles, Device device) {
 		Map<String, List<Node>> dstINTtilePaths = getListOfNodesFromRoutes(device, routesToSinkINTTiles);
 		// Not import path after HDSTR
-		Set<PIP> ceNetPIPs = new HashSet<>();
+		Set<PIP> clkPIPs = new HashSet<>();
 		Map<String, RouteNode> horDistributionLines = new HashMap<>();
 		
 		for(List<Node> nodes : dstINTtilePaths.values()) {
@@ -97,11 +97,11 @@ public class GlobalSignalRouting {
 			Node hDistr = nodes.get(0);
 			RouteNode hdistr = new RouteNode(hDistr.getTile(), hDistr.getWire());
 			
-			ceNetPIPs.addAll(RouterHelper.getPIPsFromListOfReversedNodes(nodes));
+			clkPIPs.addAll(RouterHelper.getPIPsFromListOfReversedNodes(nodes));
 			
 			horDistributionLines.put(getDominateClockRegionOfNode(hDistr), hdistr);
 		}
-		clk.setPIPs(ceNetPIPs);
+		clk.setPIPs(clkPIPs);
 		
 		Map<RouteNode, ArrayList<SitePinInst>> lcbMappings = getLCBPinMappings(clk);		
 		
