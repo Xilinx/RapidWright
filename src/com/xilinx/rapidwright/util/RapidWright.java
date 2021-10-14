@@ -200,7 +200,7 @@ public class RapidWright {
 						return;
 					}
 					else {
-						MessageGenerator.briefErrorAndExit("ERROR: Couldn't unpack ./data directory "
+						throw new RuntimeException("ERROR: Couldn't unpack ./data directory "
 							+ "from RapidWright jar.");
 					}
 					

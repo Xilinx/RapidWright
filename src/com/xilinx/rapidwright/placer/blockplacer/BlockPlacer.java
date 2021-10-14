@@ -426,13 +426,13 @@ public class BlockPlacer {
 				
 				if(!placeModuleNear((ModuleInst)hm, hm.getTempAnchorSite().getTile(), usedTiles)){
 					System.out.println("Saving as debug.");
-					MessageGenerator.briefErrorAndExit("ERROR: Placement failed, couldn't find valid site for " + hm.getName());					
+					throw new RuntimeException("ERROR: Placement failed, couldn't find valid site for " + hm.getName());					
 				}
 			}
 			else{
 				usedTiles.addAll(footPrint);
 				if(!hm.place(hm.getTempAnchorSite())){
-					MessageGenerator.briefErrorAndExit("ERROR: Problem placing " + hm.getName() + " on site: " + hm.getTempAnchorSite());
+				    throw new RuntimeException("ERROR: Problem placing " + hm.getName() + " on site: " + hm.getTempAnchorSite());
 				}
 			}
 		}

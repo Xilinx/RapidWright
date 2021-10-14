@@ -43,7 +43,7 @@ public class DeviceLoader {
 		}
 		Part p = PartNameTools.getPart(args[0]);
 		if(p == null){
-			MessageGenerator.briefErrorAndExit("The partname " + args[0] + " is invalid or unrecognized, cannot load device.");
+		    throw new RuntimeException("The partname " + args[0] + " is invalid or unrecognized, cannot load device.");
 		}
 		CodePerfTracker track = new CodePerfTracker("Load Device for Part " + p.getName());
 		track.start("Load file");
