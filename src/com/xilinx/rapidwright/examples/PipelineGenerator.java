@@ -23,10 +23,27 @@
 
 package com.xilinx.rapidwright.examples;
 
-import com.xilinx.rapidwright.design.*;
+import com.xilinx.rapidwright.design.Cell;
+import com.xilinx.rapidwright.design.ConstraintGroup;
+import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.NetType;
+import com.xilinx.rapidwright.design.SiteInst;
+import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.design.blocks.PBlock;
-import com.xilinx.rapidwright.device.*;
-import com.xilinx.rapidwright.edif.*;
+import com.xilinx.rapidwright.device.BEL;
+import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.Part;
+import com.xilinx.rapidwright.device.PartNameTools;
+import com.xilinx.rapidwright.device.Site;
+import com.xilinx.rapidwright.device.SiteTypeEnum;
+import com.xilinx.rapidwright.device.Tile;
+import com.xilinx.rapidwright.edif.EDIFCell;
+import com.xilinx.rapidwright.edif.EDIFDirection;
+import com.xilinx.rapidwright.edif.EDIFNet;
+import com.xilinx.rapidwright.edif.EDIFPort;
+import com.xilinx.rapidwright.edif.EDIFTools;
+import com.xilinx.rapidwright.edif.EDIFValueType;
 import com.xilinx.rapidwright.router.Router;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.MessageGenerator;
@@ -35,7 +52,9 @@ import joptsimple.OptionSet;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.*;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Generates a delay of <depth> cycles for a bus of <width> w
@@ -382,7 +401,7 @@ public class PipelineGenerator {
 		// Perform some error checking on inputs
 		Part part = PartNameTools.getPart(partName);
 		if(part == null || part.isSeries7()){
-			MessageGenerator.briefErrorAndExit("ERROR: Invalid/unsupported part " + partName + ".  This example was coded "+
+		    throw new RuntimeException("ERROR: Invalid/unsupported part " + partName + ".  This example was coded "+
 							  "for UltraScale or UltraScale+ devices.");
 		}
 		

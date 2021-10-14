@@ -353,7 +353,7 @@ public class BlockCreator {
 		}
 		
 		if(halt){
-			MessageGenerator.briefErrorAndExit("ERROR: Failure to generate all necessary OOC DCPs.  "
+		    throw new RuntimeException("ERROR: Failure to generate all necessary OOC DCPs.  "
 				+ "Please see error messages and logs above to resolve issues in order to continue.");
 		}
 	}

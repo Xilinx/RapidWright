@@ -203,10 +203,10 @@ public class FileTools {
 			}			
 		}
 		catch(FileNotFoundException e){
-			MessageGenerator.briefErrorAndExit("ERROR: Could not find file: " + fileName);
+		    throw new UncheckedIOException("ERROR: Could not find file: " + fileName, e);
 		}
 		catch(IOException e){
-			e.printStackTrace();
+		    throw new UncheckedIOException("ERROR: Problem reading file: " + fileName, e);
 		}
 
 		return in;
@@ -439,8 +439,8 @@ public class FileTools {
 			bw.close();
 		}
 		catch(IOException e){
-			MessageGenerator.briefErrorAndExit("Error writing file: " +
-				fileName + File.separator + e.getMessage());
+			throw new UncheckedIOException("Error writing file: " +
+				fileName + File.separator + e.getMessage(), e);
 		}
 	}
 	
@@ -455,8 +455,8 @@ public class FileTools {
 			bw.write(text + nl);
 		}
 		catch(IOException e){
-			MessageGenerator.briefErrorAndExit("Error writing file: " +
-				fileName + File.separator + e.getMessage());
+			throw new UncheckedIOException("Error writing file: " +
+				fileName + File.separator + e.getMessage(), e);
 		}
 	}
 	
@@ -477,10 +477,10 @@ public class FileTools {
 			}
 		}
 		catch(FileNotFoundException e){
-			MessageGenerator.briefErrorAndExit("ERROR: Could not find file: " + fileName);
+		    throw new UncheckedIOException("ERROR: Could not find file: " + fileName, e);
 		} 
 		catch(IOException e){
-			MessageGenerator.briefErrorAndExit("ERROR: Could not read from file: " + fileName);
+		    throw new UncheckedIOException("ERROR: Could not read from file: " + fileName, e);
 		}
 		
 		return lines;
