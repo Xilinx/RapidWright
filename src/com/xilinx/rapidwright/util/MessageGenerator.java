@@ -23,6 +23,7 @@
 package com.xilinx.rapidwright.util;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 
 /**
  * Common class for generating messages.
@@ -57,6 +58,7 @@ public class MessageGenerator{
 	 * Used as a general way to create an error message and send it to
 	 * std.err. Exits the program.
 	 * @param msg The message to print to standard error
+	 * @deprecated
 	 */
 	public static void briefErrorAndExit(String msg){
 		briefError(msg);
@@ -180,7 +182,7 @@ public class MessageGenerator{
 			}
 		}
 		catch(IOException e){
-			briefErrorAndExit("Error reading user input");
+			throw new UncheckedIOException("Error reading user input", e);
 		}
 	}
 	
@@ -206,7 +208,7 @@ public class MessageGenerator{
 			}
 		}
 		catch(IOException e){
-			briefErrorAndExit("Error reading user input");
+		    throw new UncheckedIOException("Error reading user input", e);
 		}
 	}
 }

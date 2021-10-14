@@ -49,8 +49,6 @@ import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.VivadoProp;
 
-import com.xilinx.rapidwright.util.MessageGenerator;
-
 public class PinMapTester {
 
     public static void main(String[] args) {
@@ -61,7 +59,7 @@ public class PinMapTester {
         String partName = args[0];
         Part part = PartNameTools.getPart(partName);
         if(part == null){
-            MessageGenerator.briefErrorAndExit("The partname " + args[0] + " is invalid or unrecognized, cannot load device.");
+            throw new RuntimeException("The partname " + args[0] + " is invalid or unrecognized, cannot load device.");
         }
 
         Device device = Device.getDevice(part);
@@ -87,7 +85,7 @@ public class PinMapTester {
         String siteName = args[2];
         Site site = device.getSite(siteName);
         if(site == null) {
-            MessageGenerator.briefErrorAndExit("Site " + siteName + " is not found in specified part.");
+            throw new RuntimeException("Site " + siteName + " is not found in specified part.");
         }
 
         String siteTypeName = args[3];
@@ -98,7 +96,7 @@ public class PinMapTester {
 
         BEL bel = siteInst.getBEL(belName);
         if(bel == null) {
-            MessageGenerator.briefErrorAndExit("BEL " + belName + " is not found in within specified site.");
+            throw new RuntimeException("BEL " + belName + " is not found in within specified site.");
         }
 
         //List<String> parameters = new ArrayList<String>();
@@ -112,7 +110,7 @@ public class PinMapTester {
         for(int i = 5; i < args.length; ++i) {
             String[] parameterSplit = args[i].split("=", 2);
             if(parameterSplit.length != 2) {
-                MessageGenerator.briefErrorAndExit("Invalid parameter " + args[i]);
+                throw new RuntimeException("Invalid parameter " + args[i]);
             }
 
             parameterMap.put(parameterSplit[0], parameterSplit[1]);

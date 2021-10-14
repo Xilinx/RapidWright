@@ -363,7 +363,7 @@ public class AddSubGenerator extends ArithmeticGenerator {
 		// Perform some error checking on inputs
 		Part part = PartNameTools.getPart(partName);
 		if(part == null || part.isSeries7()){
-			MessageGenerator.briefErrorAndExit("ERROR: Invalid/unsupport part " + partName + ".");
+			throw new RuntimeException("ERROR: Invalid/unsupport part " + partName + ".");
 		}
 		
 		Design d = new Design(designName,partName);

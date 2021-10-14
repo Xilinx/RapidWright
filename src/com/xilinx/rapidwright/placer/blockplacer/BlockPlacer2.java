@@ -638,7 +638,7 @@ public class BlockPlacer2 {
                         System.out.println("ERROR: Placement failed for "+hm.getName());
                         hm.unplace(); 
                     } else
-                        MessageGenerator.briefErrorAndExit("ERROR: Placement failed, couldn't find valid site for " + hm.getName());	                   
+                        throw new RuntimeException("ERROR: Placement failed, couldn't find valid site for " + hm.getName());	                   
 				}
 			}
 			else{
@@ -650,7 +650,7 @@ public class BlockPlacer2 {
                         System.out.println("ERROR: Placement failed for "+hm.getName());
                         hm.unplace(); 
                     } else 
-                        MessageGenerator.briefErrorAndExit("ERROR: Problem placing " + hm.getName() + " on site: " + hm.getTempAnchorSite());
+                        throw new RuntimeException("ERROR: Problem placing " + hm.getName() + " on site: " + hm.getTempAnchorSite());
 				}
 			}
 		}
@@ -664,7 +664,7 @@ public class BlockPlacer2 {
         if(save_and_exit) {
 			String placedDCPName = "partialy_placed.dcp";
 			design.writeCheckpoint(placedDCPName);
-			MessageGenerator.briefErrorAndExit("ERROR: Placement failed, couldn't find valid site for all the IPs. Partially placed .dcp saved for debug " );
+			throw new RuntimeException("ERROR: Placement failed, couldn't find valid site for all the IPs. Partially placed .dcp saved for debug " );
 		}
                 
 		return design;

@@ -26,12 +26,10 @@
 package com.xilinx.rapidwright.util;
 
 import java.io.BufferedReader;
-import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.UncheckedIOException;
@@ -75,27 +73,6 @@ public class Installer {
 	private static String classpathVarName = "CLASSPATH";
 	public static String MD5_FILE_NAME = "MD5SUM.TXT";
 	
-	/**
-	 * This is a simple method that writes the elements of an ArrayList of Strings
-	 * into lines in the text file fileName.
-	 * @param lines The ArrayList of Strings to be written
-	 * @param fileName Name of the text file to save the ArrayList to
-	 */
-	public static void writeLinesToTextFile(List<String> lines, String fileName) {
-		String nl = System.getProperty("line.separator");
-		try{
-			BufferedWriter bw = new BufferedWriter(new FileWriter(fileName));
-			for(String line : lines) {
-				bw.write(line + nl);
-			}
-			bw.close();
-		}
-		catch(IOException e){
-			MessageGenerator.briefErrorAndExit("Error writing file: " +
-				fileName + File.separator + e.getMessage());
-		}
-	}
-
 	/**
 	 * Convert bytes of an MD5 checksum into common alpha-numeric String representation.
 	 * @param checksum The digested result from an MD5 instance.
@@ -610,7 +587,7 @@ public class Installer {
 		lines.add("else");
 		lines.add("  export " + classpathVarName +"=" + classpath +":$" + classpathVarName);
 		lines.add("fi");
-		writeLinesToTextFile(lines, bash);
+		Files.write(Paths.get(bash), lines);
 		new File(bash).setExecutable(true);
 		
 		// CSH
@@ -622,7 +599,7 @@ public class Installer {
 		lines.add("else");
 		lines.add("  setenv "+classpathVarName+" "+classpath);
 		lines.add("endif");
-		writeLinesToTextFile(lines, csh);
+		Files.write(Paths.get(csh), lines);
 		new File(csh).setExecutable(true);
 		
 		// BAT
@@ -630,7 +607,7 @@ public class Installer {
 		String bat = "rapidwright.bat";
 		lines.add("SETX " + rwPathVarName + " \"" + rwDir + "\"");		
 		lines.add("SETX "+classpathVarName+" "+classpath+";%" + classpathVarName + "%");
-		writeLinesToTextFile(lines, bat);
+		Files.write(Paths.get(bat), lines);
 		new File(bat).setExecutable(true);
 		
 		System.out.println("  As a convenience, here are some scripts that can be sourced/run to set those");
