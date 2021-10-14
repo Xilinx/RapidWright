@@ -47,14 +47,12 @@ public class NetWrapper{
 	private short doubleHpwl;
 	/** A flag to indicate if the source has been swapped */
 	private boolean sourceChanged;
-	/** Stores the old source SitePinInst after output pin swapping */
-	private SitePinInst oldSource;
 	
 	public NetWrapper(int id, Net net){
 		this.id = id;
 		this.net = net;
 		this.connections = new ArrayList<>();
-		this.setSourceChanged(false, null);
+		this.setSourceChanged(false);
 	}
 	
 	public void computeHPWLAndCenterCoordinates(){
@@ -129,9 +127,8 @@ public class NetWrapper{
 		return sourceChanged;
 	}
 
-	public void setSourceChanged(boolean sourceChanged, SitePinInst oldSource) {
+	public void setSourceChanged(boolean sourceChanged) {
 		this.sourceChanged = sourceChanged;
-		this.setOldSource(oldSource);
 	}
 
 	public float getYCenter() {
@@ -148,14 +145,6 @@ public class NetWrapper{
 
 	public void setXCenter(float xCenter) {
 		this.xCenter = xCenter;
-	}
-	
-	public SitePinInst getOldSource() {
-		return oldSource;
-	}
-
-	public void setOldSource(SitePinInst oldSource) {
-		this.oldSource = oldSource;
 	}
 	
 	@Override
