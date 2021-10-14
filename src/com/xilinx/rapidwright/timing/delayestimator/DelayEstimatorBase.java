@@ -23,7 +23,6 @@
 
 package com.xilinx.rapidwright.timing.delayestimator;
 
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
@@ -31,13 +30,15 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static java.lang.Math.max;
+
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
+import com.xilinx.rapidwright.device.Site;
+import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.timing.GroupDelayType;
 import com.xilinx.rapidwright.timing.TimingModel;
-
-import static java.lang.Math.max;
 
 
 /**
@@ -50,16 +51,16 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
     // single and double have their own arrays although their values are the same.
     // Using enum as keys to simplify coding. Some types have empty arrays because those types will never be used.
     // distArrays are cumulative and inclusive, ie., for a segment spanning x-y, d[y] is included in d of the segment.
-    protected Map<T.Orientation,Map<GroupDelayType, List<Short>>> distArrays;
+    protected Map<T.Orientation,Map<GroupDelayType,List<Short>>> distArrays;
     protected int numCol;
     protected int numRow;
     
     // These data are sourced from TimingModel.
     // TODO: Consider to move these to TimingModel.
-    protected Map<T.Orientation,Map<GroupDelayType, Float>> K0;
-    protected Map<T.Orientation,Map<GroupDelayType, Float>> K1;
-    protected Map<T.Orientation,Map<GroupDelayType, Float>> K2;
-    protected Map<T.Orientation,Map<GroupDelayType, Short>> L;
+    protected Map<T.Orientation,Map<GroupDelayType,Float>> K0;
+    protected Map<T.Orientation,Map<GroupDelayType,Float>> K1;
+    protected Map<T.Orientation,Map<GroupDelayType,Float>> K2;
+    protected Map<T.Orientation,Map<GroupDelayType,Short>> L;
     protected Map<String, Short>  inputSitePinDelay;
 
     protected T     ictInfo;
@@ -264,10 +265,21 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
     private void loadInputSitePinDelay(TimingModel tm) {
         inputSitePinDelay = new HashMap<>();
 
+        Tile refIntTile = tm.getRefIntTile();
+        Tile leftTile   = refIntTile.getTileNeighbor(-1,0);
+        Tile rightTile  = refIntTile.getTileNeighbor( 1,0);
+
         // Translate from a site pin name to node connected to the site pin.
         Map<String, Short> sitePinDelay = tm.getInputSitePinDelay();
-        for (Map.Entry<String,String> nodeSitePin : ictInfo.getNodeToSitePin().entrySet()) {
-            inputSitePinDelay.put(nodeSitePin.getKey(), sitePinDelay.get(nodeSitePin.getValue()));
+        for (Site site : new ArrayList<Site>() {{add(leftTile.getSites()[0]);add(rightTile.getSites()[0]);}}) {
+            for (int i = 0; i < site.getSitePinCount(); i++) {
+                if (site.isOutputPin(i)) continue;
+                String name = site.getPinName(i);
+                Node node = site.getConnectedNode(i);
+                if (sitePinDelay.containsKey(name)) {
+                    inputSitePinDelay.put(node.getWireName(), sitePinDelay.get(name));
+                }
+            }
         }
     };
 
@@ -291,7 +303,7 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
             return res;
         };
 
-        distArrays = new EnumMap<> (T.Orientation.class);
+        distArrays = new EnumMap<>(T.Orientation.class);
         for (T.Orientation d : T.Orientation.values()) {
             distArrays.put(d, new EnumMap<> (GroupDelayType.class));
             // Intentionally populated only these types so that accidentally access other types will cause runtime error.
