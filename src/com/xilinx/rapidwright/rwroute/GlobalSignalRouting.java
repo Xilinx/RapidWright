@@ -586,6 +586,8 @@ public class GlobalSignalRouting {
 	 * Routes a static net (GND or VCC).
 	 * @param currNet The current static net to be routed.
 	 * @param unavailableNodes A set of unavailable nodes.
+	 * @param design The {@link Design} instance to use.
+	 * @param routeThruHelper The {@link RouteThruHelper} instance to use.
 	 */
 	public static Map<SitePinInst, List<Node>> routeStaticNet(Net currNet, Set<Node> unavailableNodes, Design design, RouteThruHelper routeThruHelper){
 		NetType netType = currNet.getType();
@@ -703,9 +705,10 @@ public class GlobalSignalRouting {
 	}
 	
 	/**
-	 * Determines if the given RoutingNode can serve as our sink.
-	 * @param routingNode The RoutingNode in question.
+	 * Determines if the given {@link RoutingNode} instance that represents a {@link Node} instance can serve as our sink.
+	 * @param routingNode The {@link RoutingNode} instance in question.
 	 * @param type The net type to designate the static source type.
+	 * @param usedRoutingNodes The used RoutingNode instances by of the given net type representing the VCC or GND net.
 	 * @return true if this sources is usable, false otherwise. 
 	 */
 	private static boolean isThisOurStaticSource(Design design, RoutingNode routingNode, NetType type, Set<RoutingNode> usedRoutingNodes){
@@ -718,8 +721,9 @@ public class GlobalSignalRouting {
 	/**
 	 * This method handles queries during the static source routing process. 
 	 * It determines if the node in question can be used as a source for the current NetType.
-	 * @param routingNode The ResourceNode in question.
-	 * @param type The NetType to indicate what kind of static source we need (GND/VCC).
+	 * @param node The node in question.
+	 * @param type The {@link NetType} instance to indicate what kind of static source we need (GND/VCC).
+	 * @param design The design instance to use for getting corresponding {@link SiteInst} instance info. 
 	 * @return True if the pin is a hard source or an unused LUT output that can be repurposed as a source.
 	 */
 	private static boolean isNodeUsableStaticSource(Node node, NetType type, Design design){
