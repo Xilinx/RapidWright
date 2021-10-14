@@ -578,7 +578,7 @@ public class RWRoute{
 		}
 		
 		if(indirect > 0) {
-			netWrapper.computeHPWLAndCenterCoordinates(boundingBoxExtensionX);
+			netWrapper.computeHPWLAndCenterCoordinates();
 			if(this.config.isUseBoundingBox()) {
 				for(Connection connection : netWrapper.getConnections()) {
 					if(connection.isDirect()) continue;

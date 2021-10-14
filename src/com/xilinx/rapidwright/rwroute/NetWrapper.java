@@ -57,7 +57,7 @@ public class NetWrapper{
 		this.setSourceChanged(false, null);
 	}
 	
-	public void computeHPWLAndCenterCoordinates(short bbRange){
+	public void computeHPWLAndCenterCoordinates(){
 		short xMin = 1<<10;
 		short xMax = 0;
 		short yMin = 1<<10;
