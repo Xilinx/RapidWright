@@ -104,14 +104,14 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
      * @return             the extra delay if any
      */
     public static short getExtraDelay(Node child, boolean longParent) {
-    	if(!longParent) return 0;
-    	
-    	IntentCode icChild = child.getIntentCode();
-    	if((icChild == IntentCode.NODE_VLONG) || (icChild == IntentCode.NODE_HLONG)) {
-    	    // TODO: this should come from a delay file
-    		return 45;
-    	}
-    	return 0;
+        if(!longParent) return 0;
+
+        IntentCode icChild = child.getIntentCode();
+        if((icChild == IntentCode.NODE_VLONG) || (icChild == IntentCode.NODE_HLONG)) {
+            // TODO: this should come from a delay file
+            return 45;
+        }
+        return 0;
     }
 
 
@@ -121,14 +121,14 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
      * @return  delay in ps
      */
     public short getDelayOf(Node exitNode) {
-	    TermInfo termInfo = getTermInfo(exitNode);
-	    
-	    // Don't put this in calcTimingGroupDelay because it is called many times to estimate delay.
-	    if (termInfo.ng == T.NodeGroupType.CLE_IN) {
-	    	return inputSitePinDelay.getOrDefault(exitNode.getWireName(), (short) 0);
-	    }
-	    
-	    return calcTimingGroupDelay(termInfo.ng, termInfo.begin(), termInfo.end(), 0d);
+        TermInfo termInfo = getTermInfo(exitNode);
+
+        // Don't put this in calcTimingGroupDelay because it is called many times to estimate delay.
+        if (termInfo.ng == T.NodeGroupType.CLE_IN) {
+            return inputSitePinDelay.getOrDefault(exitNode.getWireName(), (short) 0);
+        }
+
+        return calcTimingGroupDelay(termInfo.ng, termInfo.begin(), termInfo.end(), 0d);
     }
 
     /**
@@ -222,30 +222,30 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
             // For example, for US+, NODE_SINGLE and NODE_DOUBLE are used for both vertical and horizontal ones.
             String nodeGroupSide = nodeType.substring(0, nodeType.indexOf('_'));
             switch(nodeGroupSide.charAt(0)) {
-            	case 'E':
+                case 'E':
                     termInfo = new TermInfo(x,y,T.Direction.U, ic, T.Orientation.HORIZONTAL);
                     break;
                 case 'N':
-            		termInfo = new TermInfo(x,y,T.Direction.U, ic, T.Orientation.VERTICAL);
-            		break;
-            	case 'W':
+                    termInfo = new TermInfo(x,y,T.Direction.U, ic, T.Orientation.VERTICAL);
+                    break;
+                case 'W':
                     termInfo = new TermInfo(x,y,T.Direction.D, ic, T.Orientation.HORIZONTAL);
                     break;
                 case 'S':
                     termInfo = new TermInfo(x,y,T.Direction.D, ic, T.Orientation.VERTICAL);
-            		break;
-            	default:
-            		switch(ic) {
-            			case NODE_PINBOUNCE:
-            			case NODE_PINFEED:
+                    break;
+                default:
+                    switch(ic) {
+                        case NODE_PINBOUNCE:
+                        case NODE_PINFEED:
                             termInfo = new TermInfo(x,y,T.Direction.S, T.NodeGroupType.CLE_IN);
-            				break;
-            			case NODE_LOCAL:
+                            break;
+                        case NODE_LOCAL:
                             termInfo = new TermInfo(x,y,T.Direction.U, T.NodeGroupType.GLOBAL);
-            				break;
-            			default:
+                            break;
+                        default:
                             termInfo = new TermInfo(x,y,T.Direction.S, T.NodeGroupType.CLE_OUT);
-            		}
+                    }
             }
         }
 
@@ -289,7 +289,7 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
      * Convert the arrays to INT tile coordinate.
      */
     private void buildDistanceArrays(TimingModel tm) {
-    	// Somehow I cannot use Function<T,R>. I get "target method is generic" error.
+        // Somehow I cannot use Function<T,R>. I get "target method is generic" error.
         BuildAccumulativeList<Short> buildAccumulativeList = (list) ->
         {
             // list[i] := d between int tile 1-1 and tile i
@@ -412,25 +412,25 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
         short d = 0;
         List<Short> dArray = distArrays.get(tg.orientation()).get(tg.type());
         if(endLoc >= 0 && endLoc < size) {
-        	short st  = dArray.get(begLoc);
-        	short sp  = dArray.get(endLoc);
+            short st  = dArray.get(begLoc);
+            short sp  = dArray.get(endLoc);
             // Need abs in case the tg is going to the left.
             d   = (short) Math.abs(sp-st);
         }else if (endLoc < 0 ) {
-        	if (!useUTurnNodes) 
-        		return Short.MAX_VALUE/2;// remove negative delay of u-turn NodeGroups at the device boundaries
-        	else {
-        		d = (short) (dArray.get(begLoc) - 2 * dArray.get(0) + dArray.get(-endLoc - 1));
-        	}
+            if (!useUTurnNodes)
+                return Short.MAX_VALUE/2;// remove negative delay of u-turn NodeGroups at the device boundaries
+            else {
+                d = (short) (dArray.get(begLoc) - 2 * dArray.get(0) + dArray.get(-endLoc - 1));
+            }
         }else if(endLoc >= size) {
-        	if(!useUTurnNodes) {
-        		return Short.MAX_VALUE / 2;
-        	}else {
-        		int index = Math.min(size - 1, endLoc);
-            	d = (short) (dArray.get(index) - dArray.get(begLoc));
-            	int endIndex = (size - 1) - (index - begLoc) - 1;
-            	d += dArray.get(size - 1) - dArray.get(endIndex); 
-        	}
+            if(!useUTurnNodes) {
+                return Short.MAX_VALUE / 2;
+            }else {
+                int index = Math.min(size - 1, endLoc);
+                d = (short) (dArray.get(index) - dArray.get(begLoc));
+                int endIndex = (size - 1) - (index - begLoc) - 1;
+                d += dArray.get(size - 1) - dArray.get(endIndex);
+            }
         }
 
         float k0 = K0.get(tg.orientation()).get(tg.type());
