@@ -152,5 +152,4 @@ public class BufferTapReadingSetting {
 		}
 		return null;
 	}
-	
 }
