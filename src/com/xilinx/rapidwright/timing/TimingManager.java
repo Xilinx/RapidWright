@@ -36,7 +36,7 @@ import com.xilinx.rapidwright.rwroute.NetWrapper;
 import com.xilinx.rapidwright.rwroute.Routable;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 import com.xilinx.rapidwright.util.Pair;
-import com.xilinx.rapidwright.util.TimerTree;
+import com.xilinx.rapidwright.util.RuntimeTrackerTree;
 
 
 /**
@@ -52,7 +52,7 @@ public class TimingManager {
 
     public static final int BUILD_GRAPH_PATHS_DEFAULT_PARAM = 1; // use 0 instead for all paths
     
-    public TimerTree routerTimer;
+    public RuntimeTrackerTree routerTimer;
     private boolean verbose;
     
     /**
@@ -83,7 +83,7 @@ public class TimingManager {
             build(false);
     }
     
-    public TimingManager(Design design, boolean doBuild, TimerTree timer, Configuration config) {
+    public TimingManager(Design design, boolean doBuild, RuntimeTrackerTree timer, Configuration config) {
     	this.design = design;
     	this.setTreq();
     	this.verbose = config.isVerbose();
@@ -392,23 +392,23 @@ public class TimingManager {
      * @return Indication of successful completion.
      */
     private boolean build(boolean isPartialRouting) {
-    	if(this.routerTimer != null) this.routerTimer.createTimer("build timing model", "Initialization").start();
+    	if(this.routerTimer != null) this.routerTimer.createRuntimeTracker("build timing model", "Initialization").start();
         timingModel.build();
-        if(this.routerTimer != null) this.routerTimer.getTimer("build timing model").stop();
+        if(this.routerTimer != null) this.routerTimer.getRuntimeTracker("build timing model").stop();
         
-        if(this.routerTimer != null) this.routerTimer.createTimer("build timing graph", "Initialization").start();
+        if(this.routerTimer != null) this.routerTimer.createRuntimeTracker("build timing graph", "Initialization").start();
         timingGraph.build(isPartialRouting);
-        if(this.routerTimer != null) this.routerTimer.getTimer("build timing graph").stop();
+        if(this.routerTimer != null) this.routerTimer.getRuntimeTracker("build timing graph").stop();
         
         return postBuild();
     }
 
     private boolean postBuild() {
-    	if(this.routerTimer != null) this.routerTimer.createTimer("post graph build", "Initialization").start();
+    	if(this.routerTimer != null) this.routerTimer.createRuntimeTracker("post graph build", "Initialization").start();
         timingGraph.removeClockCrossingPaths();
         timingGraph.buildSuperGraphPaths();
         timingGraph.setOrderedTimingVertexLists();
-        if(this.routerTimer != null) this.routerTimer.getTimer("post graph build").stop();
+        if(this.routerTimer != null) this.routerTimer.getRuntimeTracker("post graph build").stop();
         return true;
     }
 

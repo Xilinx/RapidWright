@@ -48,12 +48,12 @@ import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.util.MessageGenerator;
 import com.xilinx.rapidwright.util.Pair;
-import com.xilinx.rapidwright.util.Timer;
-import com.xilinx.rapidwright.util.TimerTree;
+import com.xilinx.rapidwright.util.RuntimeTracker;
+import com.xilinx.rapidwright.util.RuntimeTrackerTree;
 import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.timing.ClkRouteTiming;
-import com.xilinx.rapidwright.timing.ClkSkewsAndRouteDelays;
+import com.xilinx.rapidwright.timing.ClkSkewData;
 import com.xilinx.rapidwright.timing.DSPTimingData;
 import com.xilinx.rapidwright.timing.TimingEdge;
 import com.xilinx.rapidwright.timing.TimingGraph;
@@ -113,10 +113,10 @@ public class RWRoute{
 	/** The current routing iteration */
 	private int routeIteration;
 	/** Timers to store runtime of different phases */
-	private TimerTree routerTimer;
-	private Timer rnodesTimer;
-	private Timer updateTimingTimer;
-	private Timer updateCongesFacCosts;
+	private RuntimeTrackerTree routerTimer;
+	private RuntimeTracker rnodesTimer;
+	private RuntimeTracker updateTimingTimer;
+	private RuntimeTracker updateCongesFacCosts;
 	/** An instantiation of RouteThruHelper to avoid route-thrus in the routing resource graph */
 	private RouteThruHelper routethruHelper;
 	
@@ -178,11 +178,11 @@ public class RWRoute{
 		this.multiSLRDevice = this.design.getDevice().getSLRs().length > 1;
 		
 		this.config = config;
-		this.routerTimer = new TimerTree("Route design", this.config.isVerbose());
-		this.rnodesTimer = this.routerTimer.createStandAloneTimer("rnodes creation");
-		this.updateTimingTimer = this.routerTimer.createStandAloneTimer("update timing");
-		this.updateCongesFacCosts = this.routerTimer.createStandAloneTimer("update conges costs");
-		this.routerTimer.createTimer("Initialization", this.routerTimer.getRootTimer()).start();
+		this.routerTimer = new RuntimeTrackerTree("Route design", this.config.isVerbose());
+		this.rnodesTimer = this.routerTimer.createStandAloneRuntimeTracker("rnodes creation");
+		this.updateTimingTimer = this.routerTimer.createStandAloneRuntimeTracker("update timing");
+		this.updateCongesFacCosts = this.routerTimer.createStandAloneRuntimeTracker("update conges costs");
+		this.routerTimer.createRuntimeTracker("Initialization", this.routerTimer.getRootRuntimeTracker()).start();
 		
 		RoutableNode.setMaskNodesCrossRCLK(this.config.isMaskNodesCrossRCLK());
 
@@ -212,9 +212,9 @@ public class RWRoute{
 		this.rnodesCreated = new HashMap<>();		
 		this.rnodeId = 0;
 		
-		this.routerTimer.createTimer("determine route targets", "Initialization").start();
+		this.routerTimer.createRuntimeTracker("determine route targets", "Initialization").start();
 		this.determineRoutingTargets();
-		this.routerTimer.getTimer("determine route targets").stop();
+		this.routerTimer.getRuntimeTracker("determine route targets").stop();
 		
 		if(this.config.isTimingDriven()) {
 			this.timingEdgeConnectionMap = new HashMap<>();
@@ -229,7 +229,7 @@ public class RWRoute{
 		this.nodesPopped = 0;
 		this.overUsedRnodes = new HashSet<>();
 		
-		this.routerTimer.getTimer("Initialization").stop();
+		this.routerTimer.getRuntimeTracker("Initialization").stop();
 	}
 	
 	/**
@@ -242,9 +242,9 @@ public class RWRoute{
 		String clkRouteTimingFile = config.getClkRouteTiming();
 		
 		if(clkSkewFile != null) {
-			ClkSkewsAndRouteDelays clkSkewData = new ClkSkewsAndRouteDelays(clkSkewFile);
+			ClkSkewData clkSkewData = new ClkSkewData(clkSkewFile);
 			TimingGraph.setClkTiming(clkSkewData);
-			this.routesToClockRegions = clkSkewData.getRoute();
+			this.routesToClockRegions = clkSkewData.getRoutesToClockRegions();
 			this.bufceRowTapsOfClockRegions = clkSkewData.getDelay();
 		}
 		
@@ -578,7 +578,7 @@ public class RWRoute{
 		}
 		
 		if(indirect > 0) {
-			netWrapper.computeHPWLAndCenterCoordinates(boundingBoxExtensionX);
+			netWrapper.computeHPWLAndCenterCoordinates();
 			if(this.config.isUseBoundingBox()) {
 				for(Connection connection : netWrapper.getConnections()) {
 					if(connection.isDirect()) continue;
@@ -681,21 +681,21 @@ public class RWRoute{
 		// Prints the design and configuration info, if "--verbose" is configured
 		this.printDesignNetsInfoAndConfiguration(this.config.isVerbose());
 		
-		this.routerTimer.createTimer("Routing", this.routerTimer.getRootTimer()).start();
+		this.routerTimer.createRuntimeTracker("Routing", this.routerTimer.getRootRuntimeTracker()).start();
 		MessageGenerator.printHeader("Route Design");
 		
-		this.routerTimer.createTimer("route clock", "Routing").start();
+		this.routerTimer.createRuntimeTracker("route clock", "Routing").start();
 		this.routeGlobalClkNets();
-		this.routerTimer.getTimer("route clock").stop();
+		this.routerTimer.getRuntimeTracker("route clock").stop();
 		
-		this.routerTimer.createTimer("route static nets", "Routing").start();
+		this.routerTimer.createRuntimeTracker("route static nets", "Routing").start();
 		// Routes static nets (VCC and GND) before signals for now.
 		// All the used nodes by other nets should be marked as unavailable, if static nets are routed after signals.
 		this.routeStaticNets();
 		// Connection-based router for indirectly connected pairs of output pin and input pin */
-		this.routerTimer.getTimer("route static nets").stop();
+		this.routerTimer.getRuntimeTracker("route static nets").stop();
 		
-		Timer routeWireNets = this.routerTimer.createTimer("route wire nets", "Routing");
+		RuntimeTracker routeWireNets = this.routerTimer.createRuntimeTracker("route wire nets", "Routing");
 		routeWireNets.start();
 		this.preRoutingEstimation();
 		this.routeIndirectConnections();
@@ -707,18 +707,18 @@ public class RWRoute{
 		// Adds child timers to "route wire nets" timer
 		routeWireNets.addChild(this.rnodesTimer);
 		// Do not time the cost evaluation method for routing connections, the timer itself takes time
-		this.routerTimer.createTimer("route connections", "route wire nets").setTime(routeWireNets.getTime() - this.rnodesTimer.getTime() - this.updateTimingTimer.getTime() - this.updateCongesFacCosts.getTime());
+		this.routerTimer.createRuntimeTracker("route connections", "route wire nets").setTime(routeWireNets.getTime() - this.rnodesTimer.getTime() - this.updateTimingTimer.getTime() - this.updateCongesFacCosts.getTime());
 		routeWireNets.addChild(this.updateTimingTimer);
 		routeWireNets.addChild(this.updateCongesFacCosts);
 		
-		this.routerTimer.createTimer("finalize routes", "Routing").start();
+		this.routerTimer.createRuntimeTracker("finalize routes", "Routing").start();
 		// Assigns a list of nodes to each direct and indirect connection that has been routed and fix illegal routes if any
 		this.postRouteProcess();
 		// Assigns net PIPs based on lists of connections
 		this.setPIPsOfNets();
-		this.routerTimer.getTimer("finalize routes").stop();
+		this.routerTimer.getRuntimeTracker("finalize routes").stop();
 		
-		this.routerTimer.getTimer("Routing").stop();
+		this.routerTimer.getRuntimeTracker("Routing").stop();
 		
 		// Prints routing statistics, e.g. total wirelength, runtime and timing report
 		this.printRoutingStatistics();
@@ -1335,7 +1335,7 @@ public class RWRoute{
 		net.setSource(altSource);
 		net.setAlternateSource(connection.getSource());
 		DesignTools.routeAlternativeOutputSitePin(net, altSource);
-		netWrapper.setSourceChanged(true, connection.getSource());
+		netWrapper.setSourceChanged(true);
 		
 		Node sourceINTNode = RouterHelper.projectOutputPinToINTNode(altSource);
 		Routable sourceR = this.createAddRoutableNode(this.rnodeId, altSource, sourceINTNode, RoutableType.PINFEED_O);;
