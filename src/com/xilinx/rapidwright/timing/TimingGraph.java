@@ -90,13 +90,13 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     private Map<EDIFHierPortInst, SitePinInst> edifHPortMap = new HashMap<>();
     public List<TimingVertex> orderedTimingVertice = new ArrayList<>();
     public List<TimingVertex> reversedOrderedTimingVertice = new ArrayList<>();
-    static ClkSkewsAndRouteDelays clkSkewRouteDelay = null;
+    static ClkSkewData clkSkewRouteDelay = null;
     static ClkRouteTiming clkRouteTiming = null;
     
     /**
-     * Sets the {@link ClkSkewsAndRouteDelays} object that represents the clock skew data.
+     * Sets the {@link ClkSkewData} object that represents the clock skew data.
      */
-    public static void setClkTiming(ClkSkewsAndRouteDelays clkSkewRouteDly) {
+    public static void setClkTiming(ClkSkewData clkSkewRouteDly) {
     	clkSkewRouteDelay = clkSkewRouteDly;
     }
     

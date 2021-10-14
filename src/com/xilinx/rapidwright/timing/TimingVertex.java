@@ -39,7 +39,7 @@ public class TimingVertex {
     /** The parent TimingVertex that leads to the maximum arrival time of this one*/
     private TimingVertex prev;
     /** This is for an experimental router feature: route a design with clock skew data */
-    public static ClkSkewsAndRouteDelays clkSkew;
+    public static ClkSkewData clkSkew;
     /** array of src_dly - CPR for 4 CRs: in order of X2Y2, X2Y3, X3Y2, X3Y3 */
     private short[] arrivalTimes;//
     private short[] requiredTimes;
@@ -54,7 +54,7 @@ public class TimingVertex {
     	this.sinkD = isSinkD;
     }
     
-    public static void setCLKSkew(ClkSkewsAndRouteDelays clkskew) {
+    public static void setCLKSkew(ClkSkewData clkskew) {
     	clkSkew = clkskew;
     }
     

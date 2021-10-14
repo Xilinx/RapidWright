@@ -40,7 +40,7 @@ import com.xilinx.rapidwright.util.Pair;
  * When the file is ready, please use "--clkSkew>" option (see {@link Configuration})
  * to enable RWRoute to use the file for clock skew-aware timing-driven clock routing.
  */
-public class ClkSkewsAndRouteDelays {
+public class ClkSkewData {
 	/** Name of the file */
 	private String name;
 	/** Mapping from pairs of clock regions (starting and ending clock regions of a timing path) and the skew data */
@@ -49,7 +49,7 @@ public class ClkSkewsAndRouteDelays {
 	// # src  	dst  	skew  	src_dly  	dst_dly  	pess
 	// X2Y3  	X3Y3    -14 	2889 		2439  		435
 	/** Partial route from BUFGCE out to each clock region */
-	private Map<String, List<String>> routesToDestinationClockRegions;
+	private Map<String, List<String>> routesToClockRegions;
 	// route
 	// X2Y3  RCLK_CLEM_L_X52Y149/CLK_CMT_MUX_3TO1_1_CLK_OUT  RCLK_CLEM_L_X52Y209/CLK_VDISTR_BOT  ...
 	/** Settings of buffer delay taps */
@@ -60,10 +60,10 @@ public class ClkSkewsAndRouteDelays {
 	
 	private String clkSkewRouteDelayFile;
 	
-	public ClkSkewsAndRouteDelays(String fileName) {
+	public ClkSkewData(String fileName) {
 		this.name = fileName;	
 		this.skew = new HashMap<>();
-		this.routesToDestinationClockRegions = new HashMap<>();
+		this.routesToClockRegions = new HashMap<>();
 		this.delay = new HashMap<>();
 		
 		if(fileName != null) {
@@ -113,7 +113,7 @@ public class ClkSkewsAndRouteDelays {
         if(section.equals("skew")) {
         	this.readSkewDelayToMap(reader, this.skew);
         }else if(section.equals("route")) {
-        	this.readRouteToMap(reader, this.routesToDestinationClockRegions);
+        	this.readRouteToMap(reader, this.routesToClockRegions);
         }else if(section.equals("delay")) {
         	this.readSkewDelayToMap(reader, this.delay);
         } 
@@ -165,8 +165,8 @@ public class ClkSkewsAndRouteDelays {
 		return skew;
 	}
 
-	public Map<String, List<String>> getRoute() {
-		return routesToDestinationClockRegions;
+	public Map<String, List<String>> getRoutesToClockRegions() {
+		return routesToClockRegions;
 	}
 
 	public Map<Pair<String, String>, List<Short>> getDelay() {
