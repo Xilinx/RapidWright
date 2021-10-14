@@ -54,7 +54,7 @@ import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFPropertyValue;
 import com.xilinx.rapidwright.rwroute.RouterHelper;
 import com.xilinx.rapidwright.util.Pair;
-import com.xilinx.rapidwright.util.TimerTree;
+import com.xilinx.rapidwright.util.RuntimeTrackerTree;
 
 import org.jgrapht.GraphPath;
 import org.jgrapht.alg.shortestpath.AllDirectedPaths;
@@ -139,8 +139,8 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         this.design = design;
     }
     
-    public TimerTree routerTimer;
-    public TimingGraph(Design design, TimerTree timer) {
+    public RuntimeTrackerTree routerTimer;
+    public TimingGraph(Design design, RuntimeTrackerTree timer) {
         super(TimingEdge.class);
         this.design = design;
         this.routerTimer = timer;
@@ -157,16 +157,16 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         String seriesName = design.getDevice().getSeries().name().toLowerCase();
         intrasiteAndLogicDelayModel = DelayModelBuilder.getDelayModel(seriesName);
           
-        if(this.routerTimer != null) this.routerTimer.createTimer("determine logic dly", "build timing graph").start();
+        if(this.routerTimer != null) this.routerTimer.createRuntimeTracker("determine logic dly", "build timing graph").start();
         myCellMap = design.getNetlist().generateCellInstMap();
         if(!isPartialRouting) {
         	determineLogicDelaysFromEDIFCellInsts(this.myCellMap);
         }else {
         	determineLogicDelaysFromEDIFCellInsts(this.generateCellMapOfUnoutedNets());
         }
-        if(this.routerTimer != null) this.routerTimer.getTimer("determine logic dly").stop();
+        if(this.routerTimer != null) this.routerTimer.getRuntimeTracker("determine logic dly").stop();
         
-        if(this.routerTimer != null) this.routerTimer.createTimer("add net dly edges", "build timing graph").start();
+        if(this.routerTimer != null) this.routerTimer.createRuntimeTracker("add net dly edges", "build timing graph").start();
         for (Net net : this.design.getNets()) {
             if(net.isClockNet()) continue;//this is for getting rid of the problem in addNetDelayEdges() of clock net
             if(net.isStaticNet()) continue;
@@ -174,7 +174,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
             	addNetDelayEdges(net);
             }
         }
-        if(this.routerTimer != null) this.routerTimer.getTimer("add net dly edges").stop();
+        if(this.routerTimer != null) this.routerTimer.getRuntimeTracker("add net dly edges").stop();
     }
     
     public void populateHierCellInstMap() {

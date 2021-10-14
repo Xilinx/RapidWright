@@ -28,34 +28,34 @@ import java.util.Iterator;
 import java.util.List;
 
 /**
- * A customized Timer class, providing start and stop methods for recording total elapsed time of a process. 
- * Each Timer Object should be created at least with a name. 
- * It also supports a user case of {@link TimerTree} instance for runtime analysis of an entire program.
+ * A customized RuntimeTracker class, providing start and stop methods for recording total elapsed time of a process. 
+ * Each {@link RuntimeTracker} Object should be created at least with a name. 
+ * It also supports a user case of {@link RuntimeTrackerTree} instance for runtime analysis of an entire program.
  */
-public class Timer {
+public class RuntimeTracker {
 	private String name;
 	private long time;
 	private long start;
 	private short level;
-	private List<Timer> children;
+	private List<RuntimeTracker> children;
 	
-	public Timer(String name) {
+	public RuntimeTracker(String name) {
 		this.name = name + ":";
 		this.time = 0;
 	}
 	
-	public Timer(String name, short level) {
+	public RuntimeTracker(String name, short level) {
 		this.name = name + ":";
 		this.time = 0;
 		this.level = level;
 		if(this.getLevel() * 3 + this.getName().length() > 31) {
-			System.out.println("\nWARNING: Timer name too long: " + name + ". Ideal max string length: " + (30 - this.getLevel() * 3));
+			System.out.println("\nWARNING: RuntimeTracker name too long: " + name + ". Ideal max string length: " + (30 - this.getLevel() * 3));
 		}
 		this.children = new ArrayList<>();
 	}
 
 	/**
-	 * Gets the level of this timer.
+	 * Gets the level of a RuntimeTracker instance.
 	 * @return
 	 */
 	public short getLevel() {
@@ -63,7 +63,7 @@ public class Timer {
 	}
 
 	/**
-	 * Sets the level (depth) of this timer in the tree.
+	 * Sets the level (depth) of a RuntimeTracker instance if it is included in a tree.
 	 * @param level
 	 */
 	public void setLevel(short level) {
@@ -71,22 +71,22 @@ public class Timer {
 	}
 
 	/**
-	 * Gets the child timers.
+	 * Gets the child runtime trackers.
 	 * @return
 	 */
-	public List<Timer> getChildren() {
+	public List<RuntimeTracker> getChildren() {
 		return children;
 	}
 
 	/**
-	 * Adds a child timer.
-	 * @param timer The child timer.
+	 * Adds a child runtime tracker.
+	 * @param runtimeTracker The child runtime tracker.
 	 */
-	public void addChild(Timer timer) {
-		if(!this.children.contains(timer)) {
-			this.children.add(timer);
-			if(timer.level == 0) {
-				timer.setLevel((short) (this.getLevel() + 1));
+	public void addChild(RuntimeTracker runtimeTracker) {
+		if(!this.children.contains(runtimeTracker)) {
+			this.children.add(runtimeTracker);
+			if(runtimeTracker.level == 0) {
+				runtimeTracker.setLevel((short) (this.getLevel() + 1));
 			}
 		}
 	}
@@ -96,7 +96,7 @@ public class Timer {
 	}
 	
 	/**
-	 * Stops the timer and stores the total time elapsed in nanoseconds.
+	 * Stops the runtime tracker and stores the total time elapsed in nanoseconds.
 	 */
 	public void stop() {
 		this.time += System.nanoTime() - this.start;
@@ -120,8 +120,8 @@ public class Timer {
 	}
 	
 	/**
-	 * Gets the timer name.
-	 * @return The timer name.
+	 * Gets the runtime tracker name.
+	 * @return The runtime tracker name.
 	 */
 	public String getName() {
 		return name;
@@ -143,7 +143,7 @@ public class Timer {
 	@Override
 	public String toString() {
 		if(this.getLevel() == 0) {
-			for(Timer child : this.children) {
+			for(RuntimeTracker child : this.children) {
 				this.time += child.getTime();
 			}
 		}
@@ -153,40 +153,41 @@ public class Timer {
 	}
 	
 	/**
-	 * Returns a string that represents the full hierarchy of this timer, including all the downhill timers to the leaf timers.
+	 * Returns a string that represents the full hierarchy of a runtime tracker, 
+	 * including all the downhill runtime trackers to the leaf runtime trackers.
 	 * @return
 	 */
-	public String fullHierarchyTimerTree() {
+	public String trakerWithFullHierarchy() {
 		StringBuilder buffer = new StringBuilder();
-		appendThisAndChildren(buffer, "", "");
+		appendFullHierarchy(buffer, "", "");
 		return buffer.toString();
 	}
 	
-	private void appendThisAndChildren(StringBuilder buffer, String prefix, String childPrefix) {
+	private void appendFullHierarchy(StringBuilder buffer, String prefix, String childPrefix) {
 		buffer.append(prefix);
 		buffer.append(this.toString());
 		if(this.children != null) {
-			for (Iterator<Timer> it = children.iterator(); it.hasNext();) {
-				Timer next = it.next();
+			for (Iterator<RuntimeTracker> it = children.iterator(); it.hasNext();) {
+				RuntimeTracker next = it.next();
 				if (it.hasNext()) {
-					next.appendThisAndChildren(buffer, childPrefix + "├─ ", childPrefix + "│  ");
+					next.appendFullHierarchy(buffer, childPrefix + "├─ ", childPrefix + "│  ");
 				} else {
-					next.appendThisAndChildren(buffer, childPrefix + "└─ ", childPrefix + "   ");
+					next.appendFullHierarchy(buffer, childPrefix + "└─ ", childPrefix + "   ");
 				}
 			}
 		}
 	}
 	
 	/**
-	 * Returns a string representing this timer and its child timers.
+	 * Returns a string representing a runtime tracker and its child trackers.
 	 * @return
 	 */
-	public String timerTreeWithOneLevelChidren() {
+	public String trackerWithOneLevelChidren() {
 		StringBuilder buffer = new StringBuilder();
 		buffer.append(this.toString());
 		if(this.children != null) {
 			int id = 0;
-			for(Timer child : this.children) {
+			for(RuntimeTracker child : this.children) {
 				if(id < this.children.size() - 1) buffer.append("├─ " + child);
 				else buffer.append("└─ " + child);
 				id++;
