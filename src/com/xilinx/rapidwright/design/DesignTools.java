@@ -19,9 +19,7 @@
  * limitations under the License.
  * 
  */
-/**
- * 
- */
+
 package com.xilinx.rapidwright.design;
 
 import java.io.BufferedWriter;
