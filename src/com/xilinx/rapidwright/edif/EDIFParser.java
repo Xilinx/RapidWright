@@ -296,8 +296,8 @@ public class EDIFParser implements AutoCloseable{
 			}
 		}
 		catch(IOException e){
-			e.printStackTrace();
-			MessageGenerator.briefErrorAndExit("ERROR: IOException while reading EDIF file: " + fileName);
+			throw new UncheckedIOException("ERROR: IOException while reading EDIF file: " 
+			        + fileName, e);
 		} 
 		catch(ArrayIndexOutOfBoundsException e ){
 			if(idx >= buffer.length) 
@@ -771,8 +771,7 @@ public class EDIFParser implements AutoCloseable{
 	private void expect(String expectedString, String token){
 		if(!expectedString.equals(token)){
 			if(expectedString.equals(token.toLowerCase())) return;
-			new Exception().printStackTrace();
-			MessageGenerator.briefErrorAndExit("Parsing Error: Expected token: " + expectedString +
+			throw new RuntimeException("Parsing Error: Expected token: " + expectedString +
 					", encountered: " + token + " on line: " + lineNumber + ".");
 		}
 	}

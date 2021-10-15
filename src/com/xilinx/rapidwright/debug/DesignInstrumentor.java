@@ -223,7 +223,7 @@ public class DesignInstrumentor {
 			design.movePinsToNewNetDeleteOldNet(ilaClockNet, clockNet, true);
 			
 		}else{
-			MessageGenerator.briefErrorAndExit("ERROR: Couldn't find any clock nets in design. Exiting...");
+		    throw new RuntimeException("ERROR: Couldn't find any clock nets in design. Exiting...");
 		}
 	}
 	

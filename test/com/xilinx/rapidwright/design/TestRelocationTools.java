@@ -110,7 +110,7 @@ public class TestRelocationTools {
         }
     }
 
-    @ParameterizedTest(name = "Relocate PicoBlaze OOC '{0}' ({1},{2})")
+    @ParameterizedTest(name = "Relocate PicoBlaze OOC ''{0}'' ({1},{2})")
     @MethodSource()
     @CheckOpenFiles
     public void testPicoblazeOOC(String instanceName, int colOffset, int rowOffset, boolean expectSuccess) {
@@ -149,7 +149,7 @@ public class TestRelocationTools {
 
     private static final String Picoblaze4OOCdcp = "RapidWrightDCP/picoblaze4_ooc_X6Y60_X6Y65_X10Y60_X10Y65.dcp";
 
-    @ParameterizedTest(name = "Relocate PicoBlaze4 OOC '{0}' ({1},{2})")
+    @ParameterizedTest(name = "Relocate PicoBlaze4 OOC ''{0}'' ({1},{2})")
     @MethodSource()
     @CheckOpenFiles
     public void testPicoblaze4OOC(String instanceName, int colOffset, int rowOffset, boolean expectSuccess) {
@@ -180,7 +180,7 @@ public class TestRelocationTools {
         );
     }
 
-    @ParameterizedTest(name = "Relocate PicoBlaze4 OOC PBlock '{0}' ({1},{2})")
+    @ParameterizedTest(name = "Relocate PicoBlaze4 OOC PBlock ''{0}'' ({1},{2})")
     @MethodSource()
     @CheckOpenFiles
     public void testPicoblaze4OOC_PBlock(PBlock pblock, int colOffset, int rowOffset, boolean expectSuccess) {
@@ -218,7 +218,7 @@ public class TestRelocationTools {
         );
     }
 
-    @ParameterizedTest(name = "Relocate MicroBlazeAndILA '{0}' ({1},{2})")
+    @ParameterizedTest(name = "Relocate MicroBlazeAndILA ''{0}'' ({1},{2})")
     @MethodSource()
     @CheckOpenFiles
     public void testMicroBlazeAndILA(String instanceName, int colOffset, int rowOffset, boolean expectSuccess) {

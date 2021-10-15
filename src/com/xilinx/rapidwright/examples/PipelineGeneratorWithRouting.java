@@ -855,7 +855,7 @@ public class PipelineGeneratorWithRouting {
 		// Perform some error checking on inputs
 		Part part = PartNameTools.getPart(partName);
 		if(part == null || part.isSeries7()){
-			MessageGenerator.briefErrorAndExit("ERROR: Invalid/unsupported part " + partName + 
+			throw new RuntimeException("ERROR: Invalid/unsupported part " + partName + 
 												".  This example was coded "+
 							  					"for UltraScale or UltraScale+ devices.");
 		}

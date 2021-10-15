@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.lang.management.RuntimeMXBean;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collections;
@@ -39,14 +40,17 @@ public class CheckOpenFilesExtension implements BeforeTestExecutionCallback, Aft
             return Collections.emptyList();
         }
         try (final Stream<Path> list = Files.list(fdList)) {
-            return list.map(p -> {
-                try {
-                    final Path linkTarget = Files.readSymbolicLink(p);
-                    return linkTarget.toString();
-                } catch (IOException e) {
-                    return p.toString();
-                }
-            })
+            // Since Files.list() '... does not freeze the directory while iterating, so it may
+            // (or may not) reflect updates to the directory that occur after returning from
+            // this method.'
+            return list.filter((p) -> Files.exists(p, LinkOption.NOFOLLOW_LINKS))
+                    .map(p -> {
+                        try {
+                            final Path linkTarget = Files.readSymbolicLink(p);
+                            return linkTarget.toString();
+                        } catch (IOException e) {
+                            return p.toString();
+                        }})
                     .filter(this::checkIgnore)
                     .sorted()
                     .collect(Collectors.toList());

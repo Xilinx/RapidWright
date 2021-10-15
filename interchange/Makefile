@@ -23,7 +23,7 @@ $(JAVA_SCHEMA):
 	wget https://raw.githubusercontent.com/capnproto/capnproto-java/master/compiler/src/main/schema/capnp/java.capnp -O $(JAVA_SCHEMA)
 
 $(INTERCHANGE_REPO_PATH):
-	cd $(dir $(INTERCHANGE_REPO_PATH)) && git clone https://github.com/SymbiFlow/$(INTERCHANGE_REPO_NAME).git
+	cd $(dir $(INTERCHANGE_REPO_PATH)) && git clone https://github.com/chipsalliance/$(INTERCHANGE_REPO_NAME).git
 
 update_interchange: | $(INTERCHANGE_REPO_PATH)
 	cd $(INTERCHANGE_REPO_PATH) && git pull
