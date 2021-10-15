@@ -26,14 +26,6 @@ unzip -j picoblaze_best.zip pblock0.dcp pblock0.edf -d .
 java com.xilinx.rapidwright.interchange.PhysicalNetlistExample pblock0.dcp pblock0_interchange.dcp
 ```
 
-## How to Update RapidWright to the Most Recent Release (Assumes Linux)
-```
-cd $RAPIDWRIGHT_PATH
-git pull
-# resolve any issues
-make update_jars
-```
-
 ## How to Re-generate Cap'n Proto Java Code from Schema
 ```
 cd interchange && make && cd ..
