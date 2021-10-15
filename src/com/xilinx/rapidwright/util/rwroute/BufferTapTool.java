@@ -46,7 +46,7 @@ import com.xilinx.rapidwright.device.Site;
  * "input_file" is the file that contains buffers sites and tap levels.
  * "output_file_directory" is the path to store the output DCP file with tap levels of the buffer sites set.
  */
-public class BufferTapReadingSetting {
+public class BufferTapTool {
 	public static void main(String[] args) {
 		if(args.length < 2){
 			System.out.println("BASIC USAGE:\n <input.dcp> <--read <file directory> or --set <file>> <output directory>\n");
@@ -71,9 +71,48 @@ public class BufferTapReadingSetting {
 			System.err.println("ERROR: No clock net found");
 		}
 		
+		Map<String, Integer> siteTaps = getBufferSiteTapsFromFile(args[2]);
+		if(siteTaps.isEmpty()) {
+			System.err.println("ERROR: No valid content found in " + args[2]);
+			return;
+		}
+		
+		if(read) {
+			String filePath = args[3].endsWith("/")? args[3] : args[3] + "/";
+			readBufferTapsToFile(inputDcpName, clock, siteTaps, dev, filePath);
+			return;
+		}
+		
+		// set	
+		setBufferTaps(siteTaps, clock, dev);
+		String outputDCP = args[3].endsWith("/")? args[3] : args[3] + "/";
+		outputDCP += inputDcpName.replace(".dcp", "_buffer_set.dcp");
+		design.writeCheckpoint(outputDCP);
+	}
+	
+	/**
+	 * Gets the clock net of a design.
+	 * @param design The design in question.
+	 * @return The clock net of the design.
+	 */
+	private static Net getClockNet(Design design) {
+		for(Net n : design.getNets()) {
+			if(n.isClockNet()) {
+				return n;
+			}
+		}
+		return null;
+	}
+	
+	/**
+	 * Gets buffer sites info from the input file.
+	 * @param file The file to use that contains buffer sites (and buffer taps in the set mode).
+	 * @return A map contains buffer site names and corresponding taps when taps provided.
+	 */
+	private static Map<String, Integer> getBufferSiteTapsFromFile(String file) {
 		Map<String, Integer> siteTaps = new HashMap<>();	
 		try {
-			BufferedReader myReader = new BufferedReader(new FileReader(args[2]));
+			BufferedReader myReader = new BufferedReader(new FileReader(file));
 			String line;
 			try {
 				while((line = myReader.readLine()) != null) {
@@ -94,40 +133,46 @@ public class BufferTapReadingSetting {
 			e.printStackTrace();
 		}
 		
-		if(siteTaps.isEmpty()) {
-			System.err.println("ERROR: No valid content found in " + args[2]);
-			return;
-		}
-		
-		if(read) {
-			String readToFile = inputDcpName.replace(".dcp", "_buffer_tap.txt");
-			String filePath = args[3].endsWith("/")? args[3] : args[3] + "/";
-			try {
-				FileWriter myWriter = new FileWriter(filePath + readToFile);
-				
-				for(String s : siteTaps.keySet()) {
-					Site site = dev.getSite(s);
-					if(site == null) {
-						System.err.println("ERROR: No site found under name " + s);
-						continue;
-					}
-					int tap = clock.getBufferDelay(site);
-					myWriter.write(site + " \t\t" + tap + "\n");
-					System.out.println(site + " \t\t" + tap);
-				}
-				myWriter.close();
-				
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
+		return siteTaps;
+	}
+	
+	/**
+	 * Reads buffer taps of a clock net from the design checkpoint and write taps to a file.
+	 * @param inputDCPName The input design checkpoint file name.
+	 * @param clock The clock net in question.
+	 * @param siteTaps A map contains buffer site names.
+	 * @param dev The device instance to use.
+	 * @param filePath The file path of the output file.
+	 */
+	private static void readBufferTapsToFile(String inputDCPName, Net clock, Map<String, Integer> siteTaps, Device dev, String filePath) {
+		String readToFile = inputDCPName.replace(".dcp", "_buffer_tap.txt");
+		try {
+			FileWriter myWriter = new FileWriter(filePath + readToFile);
 			
-			return;
+			for(String s : siteTaps.keySet()) {
+				Site site = dev.getSite(s);
+				if(site == null) {
+					System.err.println("ERROR: No site found under name " + s);
+					continue;
+				}
+				int tap = clock.getBufferDelay(site);
+				myWriter.write(site + " \t\t" + tap + "\n");
+				System.out.println(site + " \t\t" + tap);
+			}
+			myWriter.close();
+			
+		} catch (IOException e) {
+			e.printStackTrace();
 		}
-		
-		// set	
-		String outputDCP = args[3].endsWith("/")? args[3] : args[3] + "/";
-		outputDCP += inputDcpName.replace(".dcp", "_buffer_set.dcp");
-		
+	}
+	
+	/**
+	 * Sets buffer taps of the clock net.
+	 * @param siteTaps A map contains buffer site names and buffer taps.
+	 * @param clock The clock net in question.
+	 * @param dev The device instance to use.
+	 */
+	private static void setBufferTaps(Map<String, Integer> siteTaps, Net clock, Device dev) {
 		for(Entry<String, Integer> siteTap : siteTaps.entrySet()) {
 			String siteName = siteTap.getKey();
 			Site site = dev.getSite(siteName);
@@ -140,16 +185,5 @@ public class BufferTapReadingSetting {
 			System.out.println("INFO: Set " + site + " tap = " + tap);
 			System.out.println("INFO: Tap after setting: " + clock.getBufferDelay(site));
 		}
-		
-		design.writeCheckpoint(outputDCP);
-	}
-	
-	private static Net getClockNet(Design design) {
-		for(Net n : design.getNets()) {
-			if(n.isClockNet()) {
-				return n;
-			}
-		}
-		return null;
 	}
 }
