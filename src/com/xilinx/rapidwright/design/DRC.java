@@ -36,9 +36,11 @@ public class DRC implements DesignRuleCheckInterface {
 
     @Override
     public int run(Design design) {
+        // DesignRuleCheckInterface::run() returns an int of how many checks failed,
+        // sum those up
         return checks.stream().map((c) -> {
                     try {
-                        DesignRuleCheckInterface i = (DesignRuleCheckInterface)c.newInstance();
+                        DesignRuleCheckInterface i = c.getDeclaredConstructor().newInstance();
                         return (int) c.getDeclaredMethod("run", Design.class).invoke(i, design);
                     } catch (Exception e) {
                         throw new RuntimeException(e);
