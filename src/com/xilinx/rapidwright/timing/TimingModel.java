@@ -40,11 +40,8 @@ import com.xilinx.rapidwright.util.FileTools;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -284,6 +281,16 @@ public class TimingModel {
         }
         buildDistArrays(tiles[0].length, tiles.length);
     }
+
+    /**
+     * Get the interconnect tile used as the starting point to point the model.
+     * The tile must have SLICE on both sides.
+     * @return an interconnect tile
+     */
+    public Tile getRefIntTile() {
+        return device.getTile(START_TILE_ROW, START_TILE_COL);
+    }
+
 
     /**
      * Calculates the delay in picoseconds between a pair of pins on a physical "Net" object.

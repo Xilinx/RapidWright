@@ -23,7 +23,6 @@
 
 package com.xilinx.rapidwright.timing.delayestimator;
 
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
@@ -31,13 +30,15 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static java.lang.Math.max;
+
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
+import com.xilinx.rapidwright.device.Site;
+import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.timing.GroupDelayType;
 import com.xilinx.rapidwright.timing.TimingModel;
-
-import static java.lang.Math.max;
 
 
 /**
@@ -50,16 +51,16 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
     // single and double have their own arrays although their values are the same.
     // Using enum as keys to simplify coding. Some types have empty arrays because those types will never be used.
     // distArrays are cumulative and inclusive, ie., for a segment spanning x-y, d[y] is included in d of the segment.
-    protected Map<T.Orientation,Map<GroupDelayType, List<Short>>> distArrays;
+    protected Map<T.Orientation,Map<GroupDelayType,List<Short>>> distArrays;
     protected int numCol;
     protected int numRow;
     
     // These data are sourced from TimingModel.
     // TODO: Consider to move these to TimingModel.
-    protected Map<T.Orientation,Map<GroupDelayType, Float>> K0;
-    protected Map<T.Orientation,Map<GroupDelayType, Float>> K1;
-    protected Map<T.Orientation,Map<GroupDelayType, Float>> K2;
-    protected Map<T.Orientation,Map<GroupDelayType, Short>> L;
+    protected Map<T.Orientation,Map<GroupDelayType,Float>> K0;
+    protected Map<T.Orientation,Map<GroupDelayType,Float>> K1;
+    protected Map<T.Orientation,Map<GroupDelayType,Float>> K2;
+    protected Map<T.Orientation,Map<GroupDelayType,Short>> L;
     protected Map<String, Short>  inputSitePinDelay;
 
     protected T     ictInfo;
@@ -103,25 +104,31 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
      * @return             the extra delay if any
      */
     public static short getExtraDelay(Node child, boolean longParent) {
-    	if(!longParent) return 0;
-    	
-    	IntentCode icChild = child.getIntentCode();
-    	if((icChild == IntentCode.NODE_VLONG) || (icChild == IntentCode.NODE_HLONG)) {
-    		return 45;
-    	}
-    	return 0;
+        if(!longParent) return 0;
+
+        IntentCode icChild = child.getIntentCode();
+        if((icChild == IntentCode.NODE_VLONG) || (icChild == IntentCode.NODE_HLONG)) {
+            // TODO: this should come from a delay file
+            return 45;
+        }
+        return 0;
     }
 
 
+    /**
+     * Get delay of the node group of the given exit node.
+     * @param exitNode the exit node of the node group
+     * @return  delay in ps
+     */
     public short getDelayOf(Node exitNode) {
-	    TermInfo termInfo = getTermInfo(exitNode);
-	    
-	    // Don't put this in calcTimingGroupDelay because it is called many times to estimate delay.
-	    if (termInfo.ng == T.NodeGroupType.CLE_IN) {
-	    	return inputSitePinDelay.getOrDefault(exitNode.getWireName(), (short) 0);
-	    }
-	    
-	    return calcTimingGroupDelay(termInfo.ng, termInfo.begin(), termInfo.end(), 0d);
+        TermInfo termInfo = getTermInfo(exitNode);
+
+        // Don't put this in calcTimingGroupDelay because it is called many times to estimate delay.
+        if (termInfo.ng == T.NodeGroupType.CLE_IN) {
+            return inputSitePinDelay.getOrDefault(exitNode.getWireName(), (short) 0);
+        }
+
+        return calcNodeGroupDelay(termInfo.ng, termInfo.begin(), termInfo.end(), 0d);
     }
 
     /**
@@ -131,36 +138,52 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
         // INT_TILE coordinate
         short x;
         short y;
-        InterconnectInfo.Direction direction;
+        T.Direction direction;
         T.NodeGroupType ng;
 
 
-        TermInfo() {
-            this.ng = null;
+        TermInfo(short x, short y, T.Direction dir, T.NodeGroupType ng) {
+            this.x = x;
+            this.y = y;
+            this.direction = dir;
+            this.ng = ng;
         }
 
-        void setHorTG(short len) {
-            if (len == 1)
-                this.ng = T.NodeGroupType.valueOf("HORT_SINGLE");
-            else if (len == 2)
-                this.ng = T.NodeGroupType.valueOf("HORT_DOUBLE");
-            else if (len == 4)
-                this.ng = T.NodeGroupType.valueOf("HORT_QUAD");
-            else
-                this.ng = T.NodeGroupType.valueOf("HORT_LONG");
+        TermInfo(short x, short y, T.Direction dir, IntentCode ic, T.Orientation orientation) {
+            this.x = x;
+            this.y = y;
+            this.direction = dir;
+
+            switch(ic) {
+                case NODE_SINGLE:
+                    if (orientation == T.Orientation.VERTICAL)
+                        this.ng = T.NodeGroupType.valueOf("VERT_SINGLE");
+                    else
+                        this.ng = T.NodeGroupType.valueOf("HORT_SINGLE");
+                    break;
+                case NODE_DOUBLE:
+                    if (orientation == T.Orientation.VERTICAL)
+                        this.ng = T.NodeGroupType.valueOf("VERT_DOUBLE");
+                    else
+                        this.ng = T.NodeGroupType.valueOf("HORT_DOUBLE");
+                    break;
+                case NODE_VQUAD:
+                    this.ng = T.NodeGroupType.valueOf("VERT_QUAD");
+                    break;
+                case NODE_HQUAD:
+                    this.ng = T.NodeGroupType.valueOf("HORT_QUAD");
+                    break;
+                case NODE_VLONG:
+                    this.ng = T.NodeGroupType.valueOf("VERT_LONG");
+                    break;
+                case NODE_HLONG:
+                    this.ng = T.NodeGroupType.valueOf("HORT_LONG");
+                    break;
+                default:
+                    this.ng = null;
+            }
         }
 
-        void setVerTG(short len) {
-            if (len == 1)
-                this.ng = T.NodeGroupType.valueOf("VERT_SINGLE");
-            else if (len == 2)
-                this.ng = T.NodeGroupType.valueOf("VERT_DOUBLE");
-            else if (len == 4)
-                this.ng = T.NodeGroupType.valueOf("VERT_QUAD");
-            else
-                this.ng = T.NodeGroupType.valueOf("VERT_LONG");
-        }
-        
         public String toString() {
             return String.format("x:%d y:%d %s %s", x,y, ng.name(), direction.name());
         }
@@ -177,14 +200,7 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
     }
 
     
-    // Currently, the default mode in DelayEstimatorTable is fastMode which use getClosetSrcDstSitePin. 
     private TermInfo getTermInfo(Node node) {
-        IntentCode ic = node.getIntentCode();
-        TermInfo termInfo = new TermInfo();
-
-        termInfo.x = (short) node.getTile().getTileXCoordinate();
-        termInfo.y = (short) node.getTile().getTileYCoordinate();
-
 
         String nodeType = node.getWireName();
         // Based on its name, WW1_E should go be horizontal single. However, it go to the north like NN1_E.
@@ -192,44 +208,44 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
             nodeType = "NN1_E";
         }
 
+        TermInfo termInfo = null;
+        short x = (short) node.getTile().getTileXCoordinate();
+        short y = (short) node.getTile().getTileYCoordinate();
+        IntentCode ic = node.getIntentCode();
+
         if (nodeType.startsWith("INT") && (ic == IntentCode.NODE_SINGLE)) {
             // Special for internal single such as INT_X0Y0/INT_INT_SDQ_33_INT_OUT1  - NODE_SINGLE
             // The exact orientation can be found, but it is slow. Setting wrong orientation for internal single has no harm.
-            termInfo.direction = InterconnectInfo.Direction.U;
-            termInfo.ng = T.NodeGroupType.INTERNAL_SINGLE;
+            termInfo = new TermInfo(x,y,T.Direction.U, T.NodeGroupType.INTERNAL_SINGLE);
         } else {
+            // IntendCode alone is not enough to determine the direction.
+            // For example, for US+, NODE_SINGLE and NODE_DOUBLE are used for both vertical and horizontal ones.
             String nodeGroupSide = nodeType.substring(0, nodeType.indexOf('_'));
             switch(nodeGroupSide.charAt(0)) {
-            	case 'E':
-            		termInfo.direction = InterconnectInfo.Direction.U;
-            		termInfo.setHorTG(ic.getLength());
-            		break;
-            	case 'W':
-            		termInfo.direction = InterconnectInfo.Direction.D;
-            		termInfo.setHorTG(ic.getLength());
-            		break;
-            	case 'N':
-            		termInfo.direction = InterconnectInfo.Direction.U;
-            		termInfo.setVerTG(ic.getLength());
-            		break;
-            	case 'S':
-            		termInfo.direction = InterconnectInfo.Direction.D;
-            		termInfo.setVerTG(ic.getLength());
-            		break;
-            	default:
-            		termInfo.direction = InterconnectInfo.Direction.S;
-            		switch(ic) {
-            			case NODE_PINBOUNCE:
-            			case NODE_PINFEED:
-            				termInfo.ng = T.NodeGroupType.CLE_IN;
-            				break;
-            			case NODE_LOCAL:
-            				termInfo.ng = T.NodeGroupType.GLOBAL;
-            				termInfo.direction = InterconnectInfo.Direction.U;
-            				break;
-            			default:
-            				termInfo.ng = T.NodeGroupType.CLE_OUT;
-            		}
+                case 'E':
+                    termInfo = new TermInfo(x,y,T.Direction.U, ic, T.Orientation.HORIZONTAL);
+                    break;
+                case 'N':
+                    termInfo = new TermInfo(x,y,T.Direction.U, ic, T.Orientation.VERTICAL);
+                    break;
+                case 'W':
+                    termInfo = new TermInfo(x,y,T.Direction.D, ic, T.Orientation.HORIZONTAL);
+                    break;
+                case 'S':
+                    termInfo = new TermInfo(x,y,T.Direction.D, ic, T.Orientation.VERTICAL);
+                    break;
+                default:
+                    switch(ic) {
+                        case NODE_PINBOUNCE:
+                        case NODE_PINFEED:
+                            termInfo = new TermInfo(x,y,T.Direction.S, T.NodeGroupType.CLE_IN);
+                            break;
+                        case NODE_LOCAL:
+                            termInfo = new TermInfo(x,y,T.Direction.U, T.NodeGroupType.GLOBAL);
+                            break;
+                        default:
+                            termInfo = new TermInfo(x,y,T.Direction.S, T.NodeGroupType.CLE_OUT);
+                    }
             }
         }
 
@@ -249,10 +265,21 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
     private void loadInputSitePinDelay(TimingModel tm) {
         inputSitePinDelay = new HashMap<>();
 
+        Tile refIntTile = tm.getRefIntTile();
+        Tile leftTile   = refIntTile.getTileNeighbor(-1,0);
+        Tile rightTile  = refIntTile.getTileNeighbor( 1,0);
+
         // Translate from a site pin name to node connected to the site pin.
         Map<String, Short> sitePinDelay = tm.getInputSitePinDelay();
-        for (Map.Entry<String,String> nodeSitePin : ictInfo.getNodeToSitePin().entrySet()) {
-            inputSitePinDelay.put(nodeSitePin.getKey(), sitePinDelay.get(nodeSitePin.getValue()));
+        for (Site site : new ArrayList<Site>() {{add(leftTile.getSites()[0]);add(rightTile.getSites()[0]);}}) {
+            for (int i = 0; i < site.getSitePinCount(); i++) {
+                if (site.isOutputPin(i)) continue;
+                String name = site.getPinName(i);
+                Node node = site.getConnectedNode(i);
+                if (sitePinDelay.containsKey(name)) {
+                    inputSitePinDelay.put(node.getWireName(), sitePinDelay.get(name));
+                }
+            }
         }
     };
 
@@ -262,7 +289,7 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
      * Convert the arrays to INT tile coordinate.
      */
     private void buildDistanceArrays(TimingModel tm) {
-    	// Somehow I cannot use Function<T,R>. I get "target method is generic" error.
+        // Somehow I cannot use Function<T,R>. I get "target method is generic" error.
         BuildAccumulativeList<Short> buildAccumulativeList = (list) ->
         {
             // list[i] := d between int tile 1-1 and tile i
@@ -276,7 +303,7 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
             return res;
         };
 
-        distArrays = new EnumMap<> (T.Orientation.class);
+        distArrays = new EnumMap<>(T.Orientation.class);
         for (T.Orientation d : T.Orientation.values()) {
             distArrays.put(d, new EnumMap<> (GroupDelayType.class));
             // Intentionally populated only these types so that accidentally access other types will cause runtime error.
@@ -380,30 +407,30 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
      * @return delay of the tg. When useUTurnNodes was set to false, return Short.MAX_VALUE/2 if the node graph is a U-turn.
      *         to indicate the node graph should be ignored.
      */
-    short calcTimingGroupDelay(T.NodeGroupType tg, short begLoc, short endLoc, Double dly) {
+    short calcNodeGroupDelay(T.NodeGroupType tg, short begLoc, short endLoc, Double dly) {
         int size = (tg.orientation() == T.Orientation.HORIZONTAL) ? numCol : numRow;
         short d = 0;
         List<Short> dArray = distArrays.get(tg.orientation()).get(tg.type());
         if(endLoc >= 0 && endLoc < size) {
-        	short st  = dArray.get(begLoc);
-        	short sp  = dArray.get(endLoc);
+            short st  = dArray.get(begLoc);
+            short sp  = dArray.get(endLoc);
             // Need abs in case the tg is going to the left.
             d   = (short) Math.abs(sp-st);
         }else if (endLoc < 0 ) {
-        	if (!useUTurnNodes) 
-        		return Short.MAX_VALUE/2;// remove negative delay of u-turn NodeGroups at the device boundaries
-        	else {
-        		d = (short) (dArray.get(begLoc) - 2 * dArray.get(0) + dArray.get(-endLoc - 1));
-        	}
+            if (!useUTurnNodes)
+                return Short.MAX_VALUE/2;// remove negative delay of u-turn NodeGroups at the device boundaries
+            else {
+                d = (short) (dArray.get(begLoc) - 2 * dArray.get(0) + dArray.get(-endLoc - 1));
+            }
         }else if(endLoc >= size) {
-        	if(!useUTurnNodes) {
-        		return Short.MAX_VALUE / 2;
-        	}else {
-        		int index = Math.min(size - 1, endLoc);
-            	d = (short) (dArray.get(index) - dArray.get(begLoc));
-            	int endIndex = (size - 1) - (index - begLoc) - 1;
-            	d += dArray.get(size - 1) - dArray.get(endIndex); 
-        	}
+            if(!useUTurnNodes) {
+                return Short.MAX_VALUE / 2;
+            }else {
+                int index = Math.min(size - 1, endLoc);
+                d = (short) (dArray.get(index) - dArray.get(begLoc));
+                int endIndex = (size - 1) - (index - begLoc) - 1;
+                d += dArray.get(size - 1) - dArray.get(endIndex);
+            }
         }
 
         float k0 = K0.get(tg.orientation()).get(tg.type());
