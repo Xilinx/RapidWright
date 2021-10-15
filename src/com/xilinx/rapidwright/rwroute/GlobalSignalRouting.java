@@ -58,17 +58,7 @@ import com.xilinx.rapidwright.util.Pair;
  * A collection of methods for routing global signals, i.e. GLOBAL_CLOCK, VCC and GND.
  * Adapted from RapidWright APIs.
  */
-public class GlobalSignalRouting {
-	private static boolean clkDebug = false;
-	private static boolean debugPrintClkPIPs = false;
-	
-	public static void setDebug() {
-		clkDebug = true;
-	}
-	public static void setPrintCLKPIPs() {
-		debugPrintClkPIPs = true;
-	}
-	
+public class GlobalSignalRouting {	
 	private static HashSet<String> lutOutputPinNames;
 	static {
 		lutOutputPinNames = new HashSet<String>();
@@ -103,31 +93,16 @@ public class GlobalSignalRouting {
 		}
 		clk.setPIPs(clkPIPs);
 		
-		Map<RouteNode, ArrayList<SitePinInst>> lcbMappings = getLCBPinMappings(clk);		
+		Map<RouteNode, ArrayList<SitePinInst>> lcbMappings = getLCBPinMappings(clk);
 		
-		UltraScaleClockRouting.routeToLCBs(clk, getStartingPoint(horDistributionLines, device), lcbMappings.keySet());	
-		if(debugPrintClkPIPs) {
-			System.out.println("ROUTE DISTR TO LCBs: ");
-			printCLKPIPs(clk);
-			System.out.println();
-		}
+		UltraScaleClockRouting.routeToLCBs(clk, getStartingPoint(horDistributionLines, device), lcbMappings.keySet());
 		
 		// route LCBs to sink pins
-		UltraScaleClockRouting.routeLCBsToSinks(clk, lcbMappings);	
-		if(debugPrintClkPIPs) {
-			System.out.println("ROUTE LCB TO SINKs: ");
-			printCLKPIPs(clk);
-			System.out.println();
-		} 
+		UltraScaleClockRouting.routeLCBsToSinks(clk, lcbMappings);
 		
 		Set<PIP> clkPIPsWithoutDuplication = new HashSet<>();
 		clkPIPsWithoutDuplication.addAll(clk.getPIPs());
-		clk.setPIPs(clkPIPsWithoutDuplication);
-		if(debugPrintClkPIPs) {
-			System.out.println("FINAL CLK PIPs: ");
-			printCLKPIPs(clk);
-			System.out.println();
-		}	
+		clk.setPIPs(clkPIPsWithoutDuplication);	
 	}
 	
 	private static Map<ClockRegion, Set<RouteNode>> getStartingPoint(Map<String, RouteNode> crDistLines, Device dev) {
@@ -192,67 +167,33 @@ public class GlobalSignalRouting {
 			centroidNode = path.get(0);
 			break;
 		}
-		if(debugPrintClkPIPs) System.out.println("CENTROID NODE: \n " + centroidNode);
 		
 		// 1. route BUFG to nearest routing track
 		RouteNode startRoutingLine = UltraScaleClockRouting.routeBUFGToNearestRoutingTrack(clk);
-		if(debugPrintClkPIPs) {
-			System.out.println("ROUTE TO ROUTING TRACK: ");
-			System.out.println( "  " + startRoutingLine);
-			printCLKPIPs(clk);
-			System.out.println();
-		}
 		
 		// 2. route from start routing line to the given centroid node
-		RouteNode centroidRouteNode = UltraScaleClockRouting.routeToCentroidNode(clk, startRoutingLine, centroidNode);	
+		UltraScaleClockRouting.routeToCentroidNode(clk, startRoutingLine, centroidNode);	
 		// When routing clock with this method, we need to make sure that the BUFGCE used in the design is exactly the one displayed in the file.
 		// Otherwise, it is possible that this clock router will fail. Because if can not find a path to the centroid.
 		// For instance, for a GNL design with a clock net, 
 		// Vivado needs to use another BUFGCE to route from startRoutingLine to centroidNode.
 		// But we do not have this option due to the searching condition.
-		if(debugPrintClkPIPs) {
-			System.out.println("PATH TO CENTROID FOUND: \n  " + centroidRouteNode);
-			System.out.println("ROUTE TO CENTROID: ");
-			printCLKPIPs(clk);
-			System.out.println();
-		}
 		
 		// 3.a. get SitePinInst - LCB mapping
 		Map<RouteNode, ArrayList<SitePinInst>> lcbMappings = getLCBPinMappings(clk);
 		
 		// 3.b. re-use the given paths from centroid to horizontal distribution lines
-		Map<String, RouteNode> horDistributionLines = routeCentroidToHorDistributionLines(clk, clockRegionPaths);	
-		if(debugPrintClkPIPs) {
-			System.out.println("HORIZONTAL DISTRIBUTION LINEs:");
-			for(Entry<String, RouteNode> crRouteNode : horDistributionLines.entrySet()) {
-				System.out.println(crRouteNode.getKey() + "  " + crRouteNode.getValue());
-			}
-		}
+		Map<String, RouteNode> horDistributionLines = routeCentroidToHorDistributionLines(clk, clockRegionPaths);
 		
 		// 3.c. route to LCBs
-		UltraScaleClockRouting.routeToLCBs(clk, getStartingPoint(horDistributionLines, device), lcbMappings.keySet());	
-		if(debugPrintClkPIPs) {
-			System.out.println("ROUTE DISTR TO LCBs: ");
-			printCLKPIPs(clk);
-			System.out.println();
-		}
+		UltraScaleClockRouting.routeToLCBs(clk, getStartingPoint(horDistributionLines, device), lcbMappings.keySet());
 		
 		// 4. route LCBs to sink pins
-		UltraScaleClockRouting.routeLCBsToSinks(clk, lcbMappings);	
-		if(debugPrintClkPIPs) {
-			System.out.println("ROUTE LCB TO SINKs: ");
-			printCLKPIPs(clk);
-			System.out.println();
-		} 
+		UltraScaleClockRouting.routeLCBsToSinks(clk, lcbMappings); 
 		
 		Set<PIP> clkPIPsWithoutDuplication = new HashSet<>();
 		clkPIPsWithoutDuplication.addAll(clk.getPIPs());
 		clk.setPIPs(clkPIPsWithoutDuplication);
-		if(debugPrintClkPIPs) {
-			System.out.println("FINAL CLK PIPs: ");
-			printCLKPIPs(clk);
-			System.out.println();
-		}
 		
 		// 5. set delay
 		setBUFCERowLeafTap(clk, device, bufceRowTapsOfClockRegions);
@@ -265,8 +206,7 @@ public class GlobalSignalRouting {
 	 * @param bufceRowTapsOfClockRegions A map storing tap data corresponding to a sink clock region and a bufce row of a global clock net.
 	 */
 	private static void setBUFCERowLeafTap(Net clk, Device device, Map<Pair<String, String>, List<Short>> bufceRowTapsOfClockRegions) {
-		if(bufceRowTapsOfClockRegions.isEmpty()) return;		
-		if(debugPrintClkPIPs) System.out.println(bufceRowTapsOfClockRegions);		
+		if(bufceRowTapsOfClockRegions.isEmpty()) return;	
 		List<Site> sites = new ArrayList<>();
 		for(Entry<Pair<String, String>, List<Short>> crBufceRowTaps : bufceRowTapsOfClockRegions.entrySet()) {
 			Site site = device.getSite(crBufceRowTaps.getKey().getSecond());
@@ -291,11 +231,6 @@ public class GlobalSignalRouting {
 					clk.setBufferDelay(s, taps.get(1));
 				}			
 				if(!sites.contains(s)) sites.add(s);
-			}
-		}	
-		if(debugPrintClkPIPs) {
-			for(Site site : sites) {
-				System.out.println(site + ", cr " + site.getTile().getClockRegion() + ", delay = " + clk.getBufferDelay(site));
 			}
 		}
 	}
@@ -347,11 +282,7 @@ public class GlobalSignalRouting {
 	 * @param clk The clock net to be routed.
 	 * @param device The design device.
 	 */
-	public static void defaultClkRouting(Net clk, Device device) {
-		boolean debug = false;
- 		boolean debugPrintPIPs = false;
- 		if(debug) System.out.println("\nROUTE CLK NET...");
- 		
+	public static void defaultClkRouting(Net clk, Device device) {	
 		List<ClockRegion> clockRegions = new ArrayList<>();
 		for(SitePinInst pin : clk.getPins()) {
 			if(pin.isOutPin()) continue;
@@ -359,63 +290,32 @@ public class GlobalSignalRouting {
 			ClockRegion cr = t.getClockRegion();
 			if(!clockRegions.contains(cr)) clockRegions.add(cr);
 		}
-		if(debug) System.out.println("clock regions " + clockRegions);
 		
 		ClockRegion centroid = findCentroid(clk, device);
-		if(debug) System.out.println(" centroid clock region is  \n \t" + centroid);
 		
 		RouteNode clkRoutingLine = UltraScaleClockRouting.routeBUFGToNearestRoutingTrack(clk);//HROUTE
-		if(debug) System.out.println("route BUFG to nearest routing track: \n \t" + clkRoutingLine);
-		if(debugPrintPIPs) printCLKPIPs(clk);
-		
-		if(debug) System.out.println("route To Centroid ");
 		RouteNode centroidRouteNode = UltraScaleClockRouting.routeToCentroid(clk, clkRoutingLine, centroid);//VROUTE
-		if(debug) System.out.println(" clk centroid route node is \n \t" + centroidRouteNode);
-		if(debugPrintPIPs) printCLKPIPs(clk);
 		
 		// Transition centroid from routing track to vertical distribution track
-		if(debug) System.out.println("transition Centroid To Distribution Line");
 		RouteNode centroidDistNode = UltraScaleClockRouting.transitionCentroidToDistributionLine(clk,centroidRouteNode);
-		if(debug) System.out.println(" centroid distribution node is \n \t" + centroidDistNode);
-		if(debugPrintPIPs) printCLKPIPs(clk);
 		
 		// routeCentroidToVerticalDistributionLines and routeCentroidToHorizontalDistributionLines could result in duplicated PIPs
-		if(debug) System.out.println("route Centroid To Vertical Distribution Lines");
 		// Each ClockRegion is not necessarily the one that each RouteNode value belongs to (same row is a must)
 		Map<ClockRegion, RouteNode> vertDistLines = UltraScaleClockRouting.routeCentroidToVerticalDistributionLines(clk,centroidDistNode, clockRegions);
-		if(debug) {
-			System.out.println(" clock region - vertical distribution node ");
-			for(ClockRegion cr : vertDistLines.keySet()) System.out.println(" \t" + cr + " \t " + vertDistLines.get(cr));
-		}
-		if(debugPrintPIPs) printCLKPIPs(clk);
-		
-		if(debug) System.out.println("route Centroid To Horizontal Distribution Lines");
 		List<RouteNode> distLines = new ArrayList<>();
 		distLines.addAll(UltraScaleClockRouting.routeCentroidToHorizontalDistributionLines(clk, centroidDistNode, vertDistLines));
-		if(debug) System.out.println(" dist lines are \n \t" + distLines);
-		if(debugPrintPIPs) printCLKPIPs(clk);
 		
 		// I changed this method to just map connected node to SitePinInsts
-		if(debug) System.out.println("get LCB Pin mappings");
 		Map<RouteNode, ArrayList<SitePinInst>> lcbMappings = getLCBPinMappings(clk);
 		
-		if(debug) System.out.println("route distribution to LCBs");
-		UltraScaleClockRouting.routeDistributionToLCBs(clk, distLines, lcbMappings.keySet());		
-		if(debugPrintPIPs) printCLKPIPs(clk);
-		
-		if(debug) System.out.println("route LCBs to sinks");
+		UltraScaleClockRouting.routeDistributionToLCBs(clk, distLines, lcbMappings.keySet());
 		UltraScaleClockRouting.routeLCBsToSinks(clk, lcbMappings);
-		if(debugPrintPIPs) printCLKPIPs(clk);
 		
 		Set<PIP> clkPIPsWithoutDuplication = new HashSet<>();
 		clkPIPsWithoutDuplication.addAll(clk.getPIPs());
 		clk.getPIPs().clear();
 		clk.setPIPs(clkPIPsWithoutDuplication);
 		
-		if(debugPrintPIPs) {
-			System.out.println("Final CLK routing");
-			printCLKPIPs(clk);
-		}
 	}
 	
 	/**
@@ -423,23 +323,12 @@ public class GlobalSignalRouting {
 	 * @param clk The clock to be routed.
 	 * @param device The design device.
 	 */
-	public static void symmetricClkRouting(Net clk, Device device) {	
- 		if(clkDebug) System.out.println("\nROUTE CLK NET...");
- 		
+	public static void symmetricClkRouting(Net clk, Device device) {
 		List<ClockRegion> clockRegions = getClockRegionsOfNet(clk);
-		if(clkDebug) System.out.println("CLOCK REGIONS: " + clockRegions);
-		
 		ClockRegion centroid = findCentroid(clk, device);
-		if(clkDebug) System.out.println(" centroid clock region is  \n \t" + centroid);
-		
 		RouteNode clkRoutingLine = UltraScaleClockRouting.routeBUFGToNearestRoutingTrack(clk);// first HROUTE
-		if(clkDebug) System.out.println("ROUTE BUFG TO NEAREST ROUTING TRACK via the first HROUTE: \n \t" + clkRoutingLine);
-		if(debugPrintClkPIPs) printCLKPIPs(clk);
 		
 		RouteNode centroidHRouteNode = UltraScaleClockRouting.routeToCentroid(clk, clkRoutingLine, centroid, true, true);
-		if(clkDebug) {
-			System.out.println("GET CENTROID HROUTE: " + centroidHRouteNode);}
-		if(debugPrintClkPIPs) printCLKPIPs(clk);
 		
 		Node hroute = Node.getNode(centroidHRouteNode.getTile(), centroidHRouteNode.getWire());
 		ClockRegion crHRoute = hroute.getTile().getClockRegion();
@@ -449,15 +338,8 @@ public class GlobalSignalRouting {
 		RouteNode vrouteDown;	
 		// Two VROUTEs going up and down
 		vrouteUp = UltraScaleClockRouting.routeToCentroid(clk, centroidHRouteNode, centroid.getNeighborClockRegion(1, 0), true, false);	
-		if(clkDebug) {
-			System.out.println("GET VROUTE UP:       " + vrouteUp);}
-		if(debugPrintClkPIPs) printCLKPIPs(clk);
 		
 		vrouteDown = UltraScaleClockRouting.routeToCentroid(clk, centroidHRouteNode, centroid.getNeighborClockRegion(0, 0), true, false);
-		if(clkDebug) {	
-			System.out.println("GET VROUTE DOWN:     " + vrouteDown);
-		}
-		if(debugPrintClkPIPs) printCLKPIPs(clk);
 		
 		List<ClockRegion> upClockRegions = new ArrayList<>();
 		List<ClockRegion> downClockRegions = new ArrayList<>();
@@ -465,34 +347,19 @@ public class GlobalSignalRouting {
 		upDownClockRegions(clockRegions, centroid, upClockRegions, downClockRegions);
 		
 		List<RouteNode> upDownDistLines = new ArrayList<>();
-		if(clkDebug) System.out.println("ROUTE UP VROUTE TO HDISTR LINEs:");
 		List<RouteNode> upLines = UltraScaleClockRouting.routeToHorizontalDistributionLines(clk, vrouteUp, upClockRegions, false);
 		if(upLines != null) upDownDistLines.addAll(upLines);
-		
-		if(clkDebug) System.out.println("ROUTE DOWN VROUTE TO HDISTR LINEs:");
 		List<RouteNode> downLines = UltraScaleClockRouting.routeToHorizontalDistributionLines(clk, vrouteDown, downClockRegions, true);
 		if(downLines != null) upDownDistLines.addAll(downLines);
 		
-		if(clkDebug) System.out.println("GET LCB PIN MAPPINGS");
 		Map<RouteNode, ArrayList<SitePinInst>> lcbMappings = getLCBPinMappings(clk);
-		
-		if(clkDebug) System.out.println("ROUTE HDISTRs TO LCBs");
-		UltraScaleClockRouting.routeDistributionToLCBs(clk, upDownDistLines, lcbMappings.keySet());		
-		if(debugPrintClkPIPs) printCLKPIPs(clk);
-		
-		if(clkDebug) System.out.println("ROUTE LCB TO SINKS");
+		UltraScaleClockRouting.routeDistributionToLCBs(clk, upDownDistLines, lcbMappings.keySet());
 		UltraScaleClockRouting.routeLCBsToSinks(clk, lcbMappings);
-		if(debugPrintClkPIPs) printCLKPIPs(clk);
 		
 		Set<PIP> clkPIPsWithoutDuplication = new HashSet<>();
 		clkPIPsWithoutDuplication.addAll(clk.getPIPs());
 		clk.getPIPs().clear();
 		clk.setPIPs(clkPIPsWithoutDuplication);
-		
-		if(debugPrintClkPIPs) {
-			System.out.println("FINAL CLK ROUTING");
-			printCLKPIPs(clk);
-		}
 	}
 	
 	/**
