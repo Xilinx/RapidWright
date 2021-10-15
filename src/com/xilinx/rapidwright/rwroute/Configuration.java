@@ -903,8 +903,8 @@ public class Configuration {
 			s.append(formatString("Bounding box extension Y: ", this.boundingBoxExtensionY));
 			if(this.isEnlargeBoundingBox()) {
 				s.append(formatString("Enlarge bounding box: ", this.isEnlargeBoundingBox()));
-				s.append(formatString("Vertical INT tiles: ", this.extensionYIncrement));
-				s.append(formatString("Horizontal INT tiles: ", this.extensionXIncrement));
+				s.append(formatString("Extension X increment: ", this.extensionXIncrement));
+				s.append(formatString("Extension Y increment: ", this.extensionYIncrement));
 			}else {
 				s.append(formatString("Fixed bounding box: ", !this.isEnlargeBoundingBox()));
 			}
