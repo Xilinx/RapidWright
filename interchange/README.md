@@ -17,7 +17,7 @@ http://www.rapidwright.io/docs/Automatic_Install.html#automatic-install
 
 ## How to Run Example
 ```
-cd interchange && make && cd ..
+make -C interchange
 make
 java com.xilinx.rapidwright.interchange.PhysicalNetlistExample
 # download an example DCP file
