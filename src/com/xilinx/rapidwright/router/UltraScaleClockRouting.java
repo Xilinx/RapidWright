@@ -85,46 +85,76 @@ public class UltraScaleClockRouting {
 	 * @param centroid ClockRegion/FSR considered to be the centroid target
 	 */
 	public static RouteNode routeToCentroid(Net clk, RouteNode clkRoutingLine, ClockRegion centroid) {
+		return routeToCentroid(clk, clkRoutingLine, centroid, false, false);
+	}
+	/**
+	 * Routes a clock from a routing track to a transition point where the clock.
+	 * fans out and transitions from clock routing tracks to clock distribution.
+	 * @param clk The current clock net to contribute routing.
+	 * @param startingRouteNode The intermediate start point of the clock route.
+	 * @param clockRegion The center clock region or the clock region that is one row above or below the center.
+	 * @param adjusted A flag to guard the default functionality when routing to centroid clock region.
+	 * @param findCentroidHroute The flag to indicate the returned RouteNode should be HROUTE in the center or VROUTE going up or down.
+	 */
+	public static RouteNode routeToCentroid(Net clk, RouteNode startingRouteNode, ClockRegion clockRegion, boolean adjusted, boolean findCentroidHroute) {
 		Queue<RouteNode> q = new PriorityQueue<RouteNode>(16, new Comparator<RouteNode>() {
 			public int compare(RouteNode i, RouteNode j) {return i.getCost() - j.getCost();}});
 		HashSet<RouteNode> visited = new HashSet<>();
-		clkRoutingLine.setParent(null);
-		q.add(clkRoutingLine);
-		Tile approxTarget = centroid.getApproximateCenter();
+		startingRouteNode.setParent(null);
+		q.add(startingRouteNode);
+		Tile approxTarget = clockRegion.getApproximateCenter();
 		int watchDog = 10000;
+		
+		RouteNode centroidHRouteNode = null;
+		
 		while(!q.isEmpty()){
 			RouteNode curr = q.poll();
 			visited.add(curr);
 
 			for(Wire w : curr.getWireConnections()){
-				RouteNode parent = curr.getParent(); 
+				RouteNode parent = curr.getParent();
 				if(parent != null){
 					if(w.getIntentCode()      == IntentCode.NODE_GLOBAL_VDISTR &&
-					   curr.getIntentCode()   == IntentCode.NODE_GLOBAL_VROUTE && 
-					   parent.getIntentCode() == IntentCode.NODE_GLOBAL_VROUTE && 
-					   centroid.equals(w.getTile().getClockRegion()) &&
-					   centroid.equals(curr.getTile().getClockRegion()) &&
-					   centroid.equals(parent.getTile().getClockRegion()) && 
+					   curr.getIntentCode()   == IntentCode.NODE_GLOBAL_VROUTE &&
+					   parent.getIntentCode() == IntentCode.NODE_GLOBAL_VROUTE &&
+					   clockRegion.equals(w.getTile().getClockRegion()) &&
+					   clockRegion.equals(curr.getTile().getClockRegion()) &&
+					   clockRegion.equals(parent.getTile().getClockRegion()) &&
 					   parent.getWireName().contains("BOT")){
-						clk.getPIPs().addAll(curr.getPIPsBackToSource());
-						return curr;
+						if(adjusted) {
+							if(findCentroidHroute) {
+								centroidHRouteNode = curr.getParent();
+								while(centroidHRouteNode.getIntentCode() != IntentCode.NODE_GLOBAL_HROUTE) {
+									centroidHRouteNode = centroidHRouteNode.getParent();
+								}
+								clk.getPIPs().addAll(centroidHRouteNode.getPIPsBackToSource());
+								return centroidHRouteNode;
+							}
+							// assign PIPs based on which RouteNode returned, instead of curr
+							clk.getPIPs().addAll(parent.getPIPsBackToSource());
+							return parent;
+						}else {
+							clk.getPIPs().addAll(curr.getPIPsBackToSource());
+							return curr;
+						}
 					}
 				}
 				
-				
-				
 				// Only using routing lines to get to centroid
 				if(!w.getIntentCode().isUltraScaleClockRouting()) continue;
+				if(adjusted && !findCentroidHroute && w.getIntentCode() == IntentCode.NODE_GLOBAL_HROUTE) {
+					continue;
+				}
 				RouteNode rn = new RouteNode(w.getTile(), w.getWireIndex(), curr, curr.getLevel()+1);
 				if(visited.contains(rn)) continue;
 				rn.setCost(rn.getTile().getManhattanDistance(approxTarget));
 				q.add(rn);
 			}
 			if(watchDog-- == 0) {
-				break;
+				throw new RuntimeException("ERROR: Could not route from " + startingRouteNode + " to clock region " + clockRegion);
 			}
 		}
-		return null;		
+		return null;
 	}
 	
 	/**
@@ -170,71 +200,6 @@ public class UltraScaleClockRouting {
 			if(watchDog-- == 0) {
 				throw new RuntimeException("ERROR: Could not route from " + startingRouteNode + "\n       to the given centroid: " + centroid 
 											+ ".\n       Please check if BUFGCE is correctly placed in line with the reference.");
-			}
-		}
-		return null;
-	}
-	
-	/**
-	 * Routes a clock from a routing track to a transition point where the clock 
-	 * fans out and transitions from clock routing tracks to clock distribution.
-	 * @param clk The current clock net to contribute routing
-	 * @param startingRouteNode The intermediate start point of the clock route
-	 * @param clockRegion The center clock region or the clock region that is one row above or below the center
-	 * @param findCentroidHroute The flag to indicate the returned RouteNode should be HROUTE in the center or VROUTE going up or down
-	 */
-	public static RouteNode routeToCentroidHRouteOrVRouteAboveBelowCentroid(Net clk, RouteNode startingRouteNode, ClockRegion clockRegion, boolean findCentroidHroute) {
-		Queue<RouteNode> q = new PriorityQueue<RouteNode>(16, new Comparator<RouteNode>() {
-			public int compare(RouteNode i, RouteNode j) {return i.getCost() - j.getCost();}});
-		HashSet<RouteNode> visited = new HashSet<>();
-		startingRouteNode.setParent(null);
-		q.add(startingRouteNode);
-		Tile approxTarget = clockRegion.getApproximateCenter();
-		int watchDog = 10000;
-		
-		RouteNode centroidHRouteNode = null;
-		
-		while(!q.isEmpty()){
-			RouteNode curr = q.poll();
-			visited.add(curr);
-
-			for(Wire w : curr.getWireConnections()){
-				RouteNode parent = curr.getParent();
-				if(parent != null){
-					if(w.getIntentCode()      == IntentCode.NODE_GLOBAL_VDISTR &&
-					   curr.getIntentCode()   == IntentCode.NODE_GLOBAL_VROUTE && 
-					   parent.getIntentCode() == IntentCode.NODE_GLOBAL_VROUTE && 					   
-					   clockRegion.equals(w.getTile().getClockRegion()) &&
-					   clockRegion.equals(curr.getTile().getClockRegion()) &&
-					   clockRegion.equals(parent.getTile().getClockRegion()) && 					   
-					   parent.getWireName().contains("BOT")){
-						
-						if(findCentroidHroute) {
-							centroidHRouteNode = curr.getParent();
-							while(centroidHRouteNode.getIntentCode() != IntentCode.NODE_GLOBAL_HROUTE) {
-								centroidHRouteNode = centroidHRouteNode.getParent(); 
-							}
-							clk.getPIPs().addAll(centroidHRouteNode.getPIPsBackToSource());
-							return centroidHRouteNode;
-						}		
-						// assign PIPs based on which RouteNode returned, instead of curr
-						clk.getPIPs().addAll(parent.getPIPsBackToSource());
-						return parent;
-					}
-				}
-					
-				// Only using routing lines to get to centroid
-				if(!w.getIntentCode().isUltraScaleClockRouting()) continue;	
-				if(!findCentroidHroute && w.getIntentCode() == IntentCode.NODE_GLOBAL_HROUTE) {
-					continue;
-				}
-				RouteNode rn = new RouteNode(w.getTile(), w.getWireIndex(), curr, curr.getLevel()+1);
-				if(visited.contains(rn)) continue;
-				rn.setCost(rn.getTile().getManhattanDistance(approxTarget));
-				q.add(rn);
-			}
-			if(watchDog-- == 0) {
-				throw new RuntimeException("ERROR: Could not route from " + startingRouteNode + " to clock region " + clockRegion);
 			}
 		}
 		return null;

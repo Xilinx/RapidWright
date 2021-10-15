@@ -436,7 +436,7 @@ public class GlobalSignalRouting {
 		if(clkDebug) System.out.println("ROUTE BUFG TO NEAREST ROUTING TRACK via the first HROUTE: \n \t" + clkRoutingLine);
 		if(debugPrintClkPIPs) printCLKPIPs(clk);
 		
-		RouteNode centroidHRouteNode = UltraScaleClockRouting.routeToCentroidHRouteOrVRouteAboveBelowCentroid(clk, clkRoutingLine, centroid, true);
+		RouteNode centroidHRouteNode = UltraScaleClockRouting.routeToCentroid(clk, clkRoutingLine, centroid, true, true);
 		if(clkDebug) {
 			System.out.println("GET CENTROID HROUTE: " + centroidHRouteNode);}
 		if(debugPrintClkPIPs) printCLKPIPs(clk);
@@ -448,12 +448,12 @@ public class GlobalSignalRouting {
 		RouteNode vrouteUp;
 		RouteNode vrouteDown;	
 		// Two VROUTEs going up and down
-		vrouteUp = UltraScaleClockRouting.routeToCentroidHRouteOrVRouteAboveBelowCentroid(clk, centroidHRouteNode, centroid.getNeighborClockRegion(1, 0), false);	
+		vrouteUp = UltraScaleClockRouting.routeToCentroid(clk, centroidHRouteNode, centroid.getNeighborClockRegion(1, 0), true, false);	
 		if(clkDebug) {
 			System.out.println("GET VROUTE UP:       " + vrouteUp);}
 		if(debugPrintClkPIPs) printCLKPIPs(clk);
 		
-		vrouteDown = UltraScaleClockRouting.routeToCentroidHRouteOrVRouteAboveBelowCentroid(clk, centroidHRouteNode, centroid.getNeighborClockRegion(0, 0), false);
+		vrouteDown = UltraScaleClockRouting.routeToCentroid(clk, centroidHRouteNode, centroid.getNeighborClockRegion(0, 0), true, false);
 		if(clkDebug) {	
 			System.out.println("GET VROUTE DOWN:     " + vrouteDown);
 		}
