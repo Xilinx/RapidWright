@@ -75,11 +75,6 @@ public class Configuration {
 	private String clkSkew;
 	/** The text file containing clock enable partial route and timing data */
 	private String clkRouteTiming;
-	/** 
-	 * true to enable a symmetric clk routing approach for non-timing routing purpose.
-	 * false by default to enable the default clk routing for non-timing routing purpose
-	 */
-	private boolean symmetricClkRouting;
 	/** Pessimism factor A for timing closure guarantee */
 	private float pessimismA;
 	/** Pessimism factor B for timing closure guarantee */
@@ -113,7 +108,6 @@ public class Configuration {
 		this.presentCongesMultiplier = 2f;
 		this.historicalCongesFac = 1f;
 		this.timingDriven = true;
-		this.symmetricClkRouting = false;
 		this.partialRouting = false;
 		this.softPreserve = false;
 		this.pessimismA = 1.03f;
@@ -213,9 +207,6 @@ public class Configuration {
 				break;
 			case "--clkRouteTiming":
 				this.setClkRouteTiming(arguments[++i]);
-				break;
-			case "--symmetricClk":
-				this.setSymmetricClkRouting(true);
 				break;
 			case "--pessimismA":
 				this.setPessimismA(Float.parseFloat(arguments[++i]));
@@ -743,24 +734,6 @@ public class Configuration {
 	}
 
 	/**
-	 * Checks if the non-timing-driven clock routing should call the symmetric clock router.
-	 * Default: false. Can be modified by adding "--symmetricClk" to the arguments.
-	 * @return true, if the symmetric clock router should be used.
-	 */
-	public boolean isSymmetricClkRouting() {
-		return this.symmetricClkRouting;
-	}
-
-	/**
-	 * Sets symmetricClkRouting that indicate if the non-timing-driven clock routing should call the symmetric clock router.
-	 * Default: false. Can be modified by adding "--symmetricClk" to the arguments.
-	 * @param symmetricClkRouting
-	 */
-	public void setSymmetricClkRouting(boolean symmetricClkRouting) {
-		this.symmetricClkRouting = symmetricClkRouting;
-	}
-
-	/**
 	 * Gets the critical path delay pessimism factor a.
 	 * It should be greater than 0.99. Default: 1.03.
 	 * Can be modified by using "--pessimismA" option, e.g. "--pessimismA 1.05".
@@ -925,7 +898,6 @@ public class Configuration {
 		s.append(formatString("Initial present conges fac: ", this.initialPresentCongesFac));
 		s.append(formatString("Present conges fac mult: ", this.presentCongesMultiplier));
 		s.append(formatString("Historical conges fac: ", this.historicalCongesFac));
-		s.append(formatString("Symmetric clk routing: ", this.isSymmetricClkRouting()));
 		
 		return s.toString();
 	}

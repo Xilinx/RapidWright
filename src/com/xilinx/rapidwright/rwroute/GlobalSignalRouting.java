@@ -278,47 +278,6 @@ public class GlobalSignalRouting {
 	}
 	
 	/**
-	 * Route a clock net with the default non-timing-driven approach.
-	 * @param clk The clock net to be routed.
-	 * @param device The design device.
-	 */
-	public static void defaultClkRouting(Net clk, Device device) {	
-		List<ClockRegion> clockRegions = new ArrayList<>();
-		for(SitePinInst pin : clk.getPins()) {
-			if(pin.isOutPin()) continue;
-			Tile t = pin.getTile();
-			ClockRegion cr = t.getClockRegion();
-			if(!clockRegions.contains(cr)) clockRegions.add(cr);
-		}
-		
-		ClockRegion centroid = findCentroid(clk, device);
-		
-		RouteNode clkRoutingLine = UltraScaleClockRouting.routeBUFGToNearestRoutingTrack(clk);//HROUTE
-		RouteNode centroidRouteNode = UltraScaleClockRouting.routeToCentroid(clk, clkRoutingLine, centroid);//VROUTE
-		
-		// Transition centroid from routing track to vertical distribution track
-		RouteNode centroidDistNode = UltraScaleClockRouting.transitionCentroidToDistributionLine(clk,centroidRouteNode);
-		
-		// routeCentroidToVerticalDistributionLines and routeCentroidToHorizontalDistributionLines could result in duplicated PIPs
-		// Each ClockRegion is not necessarily the one that each RouteNode value belongs to (same row is a must)
-		Map<ClockRegion, RouteNode> vertDistLines = UltraScaleClockRouting.routeCentroidToVerticalDistributionLines(clk,centroidDistNode, clockRegions);
-		List<RouteNode> distLines = new ArrayList<>();
-		distLines.addAll(UltraScaleClockRouting.routeCentroidToHorizontalDistributionLines(clk, centroidDistNode, vertDistLines));
-		
-		// I changed this method to just map connected node to SitePinInsts
-		Map<RouteNode, ArrayList<SitePinInst>> lcbMappings = getLCBPinMappings(clk);
-		
-		UltraScaleClockRouting.routeDistributionToLCBs(clk, distLines, lcbMappings.keySet());
-		UltraScaleClockRouting.routeLCBsToSinks(clk, lcbMappings);
-		
-		Set<PIP> clkPIPsWithoutDuplication = new HashSet<>();
-		clkPIPsWithoutDuplication.addAll(clk.getPIPs());
-		clk.getPIPs().clear();
-		clk.setPIPs(clkPIPsWithoutDuplication);
-		
-	}
-	
-	/**
 	 * Routes a clock net by dividing the target clock regions into two groups and routes to the two groups with different centroid nodes.
 	 * @param clk The clock to be routed.
 	 * @param device The design device.
@@ -344,7 +303,7 @@ public class GlobalSignalRouting {
 		List<ClockRegion> upClockRegions = new ArrayList<>();
 		List<ClockRegion> downClockRegions = new ArrayList<>();
 		// get two sets of clock regions, pick UP set for sinks in the resions with the same row as the centroid clock region
-		upDownClockRegions(clockRegions, centroid, upClockRegions, downClockRegions);
+		divideClockRegions(clockRegions, centroid, upClockRegions, downClockRegions);
 		
 		List<RouteNode> upDownDistLines = new ArrayList<>();
 		List<RouteNode> upLines = UltraScaleClockRouting.routeToHorizontalDistributionLines(clk, vrouteUp, upClockRegions, false);
@@ -378,7 +337,7 @@ public class GlobalSignalRouting {
 		return clockRegions;
 	}
 	
-	private static void upDownClockRegions(List<ClockRegion> clockRegions, ClockRegion centroid, List<ClockRegion> upClockRegions,
+	private static void divideClockRegions(List<ClockRegion> clockRegions, ClockRegion centroid, List<ClockRegion> upClockRegions,
 			List<ClockRegion> downClockRegions){
 		for(ClockRegion cr : clockRegions) {
 			if(cr.getInstanceY() >= centroid.getInstanceY()) {
@@ -421,14 +380,6 @@ public class GlobalSignalRouting {
 		}
 		
 		return lcbMappings;
-	}
-	
-	private static void printCLKPIPs(Net clk) {
-		System.out.println(" \t  used pips");
-		for(PIP pip : clk.getPIPs()) {
-			System.out.println(pip + ", bidirec? = " + pip.isBidirectional() + ", reversed? = " + pip.isReversed());
-		}
-		System.out.println();
 	}
 	
 	/**

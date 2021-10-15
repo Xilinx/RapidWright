@@ -407,13 +407,8 @@ public class RWRoute{
  				}
  			}else {
  				// routes clock nets from scratch
- 				if(this.config.isSymmetricClkRouting()) {
- 					System.out.println("INFO: Route with symmetric non-timing-driven clock router");
- 	 				GlobalSignalRouting.symmetricClkRouting(clk, this.design.getDevice());
- 				}else {
- 					System.out.println("INFO: Route with default non-timing-driven clock router");
- 	 				GlobalSignalRouting.defaultClkRouting(clk, this.design.getDevice());
- 				}
+				System.out.println("INFO: Route with symmetric non-timing-driven clock router");
+ 				GlobalSignalRouting.symmetricClkRouting(clk, this.design.getDevice());
  			}
 			this.preserveNet(clk);
  		}
