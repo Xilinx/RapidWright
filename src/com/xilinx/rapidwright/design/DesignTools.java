@@ -2261,6 +2261,11 @@ public class DesignTools {
 	public static void createA1A6ToStaticNets(Design design) {
 		for(SiteInst si : design.getSiteInsts()) {
 			for(Cell cell : si.getCells()) {
+				// SKIPPING <LOCKED> LUTs to resolve site pin conflicts between GND and VCC
+				// Without skipping <LOCKED>, some A6 pins of SRL16E LUTs (5LUT and 6LUT used) will be handled twice in createMissingStaticSitePins().
+				// In the second processing, those A6 pins are somehow added to VCC while they should stay in GND.
+				if(cell.getName().contains("LOCKED")) continue;// Are there better ways to identify this problem?
+				
 				BEL bel = cell.getBEL();
 				if(bel == null || !bel.getName().contains("LUT")) continue;
 				if(bel.getName().contains("5LUT")) {
@@ -2352,7 +2357,7 @@ public class DesignTools {
                     net = si.getDesign().getGndNet();
                 }
             }
-            SitePinInst pin = si.getSitePinInst(siteWireName); 
+            SitePinInst pin = si.getSitePinInst(siteWireName);
             if(pin == null) {
                 net.createPin(siteWireName, si);
             } else if(!pin.getNet().equals(net)){
