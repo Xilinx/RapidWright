@@ -161,7 +161,7 @@ public class TileColumnPattern extends ArrayList<TileTypeEnum> implements Compar
 	 * @return The row index that contains populated BRAM and DSP tiles.
 	 */
 	public static int getCommonRow(Device dev, boolean wantLaguna){
-		boolean devHasUram = Integer.parseInt(PartNameTools.getPart(dev.getName()).getUltraRams()) != 0;
+		boolean devHasUram = (PartNameTools.getPart(dev.getName()).getUltraRams() != 0);
 		for(int row=0; row < dev.getRows(); row++){
 			boolean hasDSP = false;
 			boolean hasBRAM = false;
