@@ -65,6 +65,7 @@ import java.util.zip.InflaterInputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipInputStream;
+import java.util.zip.ZipOutputStream;
 
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.io.Input;
@@ -930,12 +931,7 @@ public class FileTools {
         File md5File = new File(fileName + MD5_DATA_FILE_SUFFIX);
         String expectedMD5 = getCurrentDataVersion(name);
         if(md5File.exists()) {
-            String currMD5 = null;
-            try {
-                currMD5 = Files.readAllLines(md5File.toPath()).get(0);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+            String currMD5 = getStoredMD5FromFile(md5File.toPath());
             if(currMD5.equals(expectedMD5)) {
                 return true;
             }
@@ -949,6 +945,22 @@ public class FileTools {
             return true;
         }
 	    return false;
+	}
+	
+	/**
+	 * Extracts the md5 checksum from a previously created MD5 sum file.
+	 * @param md5File The path of the existing md5 sum file
+	 * @return the md5 checksum found in the file or null if no file existed or couldn't be read.
+	 */
+	public static String getStoredMD5FromFile(Path md5File) {
+	    if(Files.exists(md5File)) {
+	        try {
+	            return Files.readAllLines(md5File).get(0);
+	        } catch (IOException e) {
+	            return null;
+	        }
+	    }
+	    return null;
 	}
 	
 	/**
@@ -1412,7 +1424,7 @@ public class FileTools {
 		return isFileBinary(Paths.get(fileName));
 	}
 	
-	private static final int BINARY_CHECK_LENGTH = 8192;
+	public static final int BINARY_CHECK_LENGTH = 8192;
 	private static byte[] binaryCheckData; 
 
 	public static boolean isDataBinary(InputStream is){
@@ -1608,6 +1620,32 @@ public class FileTools {
 		} catch (IOException e1) {
 			e1.printStackTrace();
 		}
+	}
+	
+	/**
+	 * This method will zip all files (non-recursive, directories not included) in the specified
+	 * directory into a zip file.
+	 * @param destZipFile Path of the destination zip file
+	 * @param srcDir Path to the directory containing files to be zipped, directories are skipped
+	 */
+	public static void zipDirectoryOfFiles(Path destZipFile, Path srcDir) {
+	    try(ZipOutputStream zos = 
+	            new ZipOutputStream(Files.newOutputStream(Files.createFile(destZipFile)))){
+	        Files.walk(srcDir).filter(f -> !Files.isDirectory(f))
+	            .forEach(f -> {
+	                ZipEntry ze = new ZipEntry(srcDir.relativize(f).toString());
+	                try {
+	                    zos.putNextEntry(ze);
+	                    Files.copy(f, zos);
+	                    zos.closeEntry();
+	                } catch(IOException e) {
+	                    throw new UncheckedIOException("Failed to create zip file " 
+	                            + destZipFile, e);
+	                }
+	            });
+	    } catch (IOException e) {
+            throw new UncheckedIOException("Failed to create zip file " + destZipFile, e);
+        }
 	}
 	
 	private static FilenameFilter ednFilter = new FilenameFilter() {
