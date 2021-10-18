@@ -36,11 +36,9 @@ import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.TileTypeEnum;
-import com.xilinx.rapidwright.timing.ClkSkewData;
 import com.xilinx.rapidwright.timing.ClkRouteTiming;
 import com.xilinx.rapidwright.timing.DSPTimingData;
 import com.xilinx.rapidwright.timing.TimingEdge;
-import com.xilinx.rapidwright.timing.TimingGraph;
 import com.xilinx.rapidwright.timing.TimingManager;
 import com.xilinx.rapidwright.timing.TimingVertex;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
@@ -66,8 +64,8 @@ public class TimingAndWirelengthReport{
 	
 	public TimingAndWirelengthReport(Design design, Configuration config) {
 		this.design = design;
-		setTimingData(config);
-		this.timingManager = new TimingManager(this.design, true, null, config);		
+		DSPTimingData.setDSPTimingFolder(config.getDspTimingDataFolder());
+		this.timingManager = new TimingManager(this.design, true, null, config, new ClkRouteTiming(config.getClkRouteTiming()));		
 	    this.estimator = new DelayEstimatorBase(this.design.getDevice(), new InterconnectInfo(), config.isUseUTurnNodes(), 0);
 		RoutableNode.setTimingDriven(true, this.estimator);
 		this.wirelength = 0;
@@ -75,18 +73,6 @@ public class TimingAndWirelengthReport{
 		this.timingEdgeConnectionMap = new HashMap<>();
 		this.nodeTypeUsage = new HashMap<>();
 		this.nodeTypeLength = new HashMap<>();
-	}
-	
-	private void setTimingData(Configuration config) {
-		DSPTimingData.setDSPTimingFolder(config.getDspTimingDataFolder());
-		String clkSkewFile = config.getClkSkew();
-		String clkRouteTimingFile = config.getClkRouteTiming();	
-		if(clkSkewFile != null) {
-			TimingGraph.setClkTiming(new ClkSkewData(clkSkewFile));
-		}	
-		if(clkRouteTimingFile != null) {
-			TimingGraph.setClkRouteTiming(new ClkRouteTiming(clkRouteTimingFile));
-		}
 	}
 	
 	/**

@@ -181,29 +181,6 @@ public class Connection implements Comparable<Connection>{
 	}
 	
 	/**
-	 * Computes criticality of a connection, used when doing timing-driven routing with clock skew data supplied.
-	 * @param maxDelay The maximum delay to normalize the slack of a connection
-	 * @param maxCriticality The maximum criticality.
-	 * @param criticalityExponent The exponent to separate critical connections and non-critical connections.
-	 * @param index The clock region index to indicate which bit of the required time and arrival time arrays should be used.
-	 */
-	public void calculateCriticalityFromVector(float maxDelay, float maxCriticality, float criticalityExponent, short index){
-		float slackCon = Float.MAX_VALUE;
-		for(TimingEdge e : this.getTimingEdges()) {
-			float tmpslackCon = e.getDst().getRequiredTimes()[index] - e.getSrc().getArrivalTimes()[index] - e.getDelay();
-			if(tmpslackCon < slackCon)
-				slackCon = tmpslackCon;
-		}
-		
-		float tempCriticality  = Math.min((1 - slackCon / maxDelay), 1);
-		
-		tempCriticality = (float) Math.pow(tempCriticality, criticalityExponent) * maxCriticality;
-    	
-		if(tempCriticality > this.criticality)
-			this.setCriticality(tempCriticality);
-	}
-	
-	/**
 	 * Checks if a connection has any overused rnodes to indicate the congestion status.
 	 * @return
 	 */

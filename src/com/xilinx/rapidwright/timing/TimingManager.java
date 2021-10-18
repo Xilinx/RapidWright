@@ -44,7 +44,6 @@ import com.xilinx.rapidwright.util.RuntimeTrackerTree;
  * Design.
  */
 public class TimingManager {
-
     private TimingModel timingModel;
     private TimingGraph timingGraph;
     private Design design;
@@ -54,6 +53,10 @@ public class TimingManager {
     
     public RuntimeTrackerTree routerTimer;
     private boolean verbose;
+    
+    private short Treq;
+    private float pessimismA = (float) 1.03;
+    private float pessimismB = 100;
     
     /**
      * Default constructor: creates the TimingManager object, which the user needs to create for 
@@ -83,14 +86,14 @@ public class TimingManager {
             build(false);
     }
     
-    public TimingManager(Design design, boolean doBuild, RuntimeTrackerTree timer, Configuration config) {
+    public TimingManager(Design design, boolean doBuild, RuntimeTrackerTree timer, Configuration config, ClkRouteTiming clkTiming) {
     	this.design = design;
     	this.setTreq();
     	this.verbose = config.isVerbose();
     	setPessimismFactors(config.getPessimismA(), config.getPessimismB());
     	this.routerTimer = timer;
         timingModel = new TimingModel(this.design.getDevice());
-        timingGraph = new TimingGraph(this.design, this.routerTimer);
+        timingGraph = new TimingGraph(this.design, this.routerTimer, clkTiming);
         timingModel.setTimingManager(this);
         timingGraph.setTimingManager(this);
         timingGraph.setTimingModel(timingModel);
@@ -158,40 +161,24 @@ public class TimingManager {
     	}
     }
     
-    private short index = -1;
     /**
      * Calculates and returns the maximum arrival time and the associated TimingVertex
      */
     public Pair<Float, TimingVertex> calculateArrivalRequireTimes(){
     	Pair<Float, TimingVertex> maxs;
     	
-    	if(this.validClkSkew()) {
-    		this.timingGraph.resetRequiredAndArrivalTimeVectors();
-        	this.timingGraph.computeArrivalTimeVectorsTopologicalOrder();
-        	Pair<Pair<Short, Short>, TimingVertex> maxIdTimingVertex = this.timingGraph.getMaxArrivalTimeFromVector();
-        	float maxArrival = maxIdTimingVertex.getFirst().getFirst();
-        	this.index = maxIdTimingVertex.getFirst().getSecond();
-        	maxs = new Pair<>(maxArrival, maxIdTimingVertex.getSecond());
-        	this.timingGraph.setTimingRequiredTimesVecotrTopologicalOrder(maxArrival);
-    	}else {
-    		this.timingGraph.resetRequiredAndArrivalTime();//0.01s for 20k design
-    		this.timingGraph.computeArrivalTimesTopologicalOrder();//0.7s for 20k design
-        	maxs = this.timingGraph.getMaxDelay();
-        	this.timingGraph.setTimingRequirementTopologicalOrder(maxs.getFirst());//(Math.max(maxs.getFirst(), Treq - 500)); //0.8s for 20k design	
-    	}
+		this.timingGraph.resetRequiredAndArrivalTime();
+		this.timingGraph.computeArrivalTimesTopologicalOrder();
+    	maxs = this.timingGraph.getMaxDelay();
+    	this.timingGraph.setTimingRequirementTopologicalOrder(maxs.getFirst());
+    	
     	return maxs;
     }
     
-    private boolean validClkSkew() {
-    	return TimingGraph.validClkSkew();
-    }
-    
     /**
-     * Gets and prints the critical path
+     * Sets critical path delay pessimism factors.
      */
-    static float pessimismA = (float) 1.03;
-    static float pessimismB = 100;
-    public static void setPessimismFactors(float a, short b) {
+    private void setPessimismFactors(float a, short b) {
     	if(a > 1) {
     		pessimismA = a;
     	}
@@ -206,51 +193,19 @@ public class TimingManager {
     	float maxDelay = maxDelayTimingVertex.getFirst();
     	System.out.printf("%-30s %10d\n", "Timing requirement (ps):", Treq);
     	List<TimingEdge> criticalEdges = this.timingGraph.getCriticalTimingEdgesInOrder(maxV);
-    	
     	short arr = 0;
     	short clkskew = 0;
     	for(TimingEdge e : criticalEdges) {
     		arr += e.getDelay();
     	}
-    	
-    	if(this.index >= 0) {// when there is valid clk skew data
-    		String srcCR = this.getSrcClockRegion();
-        	String dstCR = TimingGraph.getClockRegionOfCellPin(maxV.getName(), this.timingGraph.design);
-        	List<Short> skewData = TimingGraph.clkSkewRouteDelay.getSkew().get(new Pair<>(srcCR, dstCR));
-        	clkskew = (short) (skewData.get(2) - skewData.get(1) + skewData.get(3));
-        	
-        	System.out.printf("%-30s %10d %s\n\n", "Clock path skew (ps):", clkskew, "(" + srcCR + " -> " + dstCR + ")");
-        	System.out.printf("%-30s %10d\n", "Critical path delay (ps):", (short) (arr - criticalEdges.get(0).getDst().getArrivalTimes()[this.index] - clkskew));
-    	}else {
-    		System.out.printf("%-30s %10d\n", "Critical path delay (ps):", (short) (arr - criticalEdges.get(0).getDelay() - clkskew));
-    	}
-    	
-    	
+    	System.out.printf("%-30s %10d\n", "Critical path delay (ps):", (short) (arr - criticalEdges.get(0).getDelay() - clkskew));
     	System.out.printf("%-30s %10d\n\n", "Slack (ps):", (short) (Treq - maxDelay));
-    	
-    	
     	System.out.printf("%-30s\n", "With timing closure guarantee:");
     	short adjusted = (short) (pessimismA * (arr - criticalEdges.get(0).getDelay() - clkskew) + pessimismB);
     	System.out.printf("%-30s %10d\n", "Critical path delay (ps):", (short)adjusted);
     	System.out.printf("%-30s %10d\n\n", "Slack (ps):", (short) (Treq - adjusted));
     	
     	this.printPathDelayBreakDown(arr, criticalEdges, timingEdgeConnctionMap, useRoutable, rnodesCreated);
-    }
-    
-    private String getSrcClockRegion() {
-    	if(this.index == 0) {
-    		return "X2Y2";
-    	}
-    	if(this.index == 1) {
-    		return "X2Y32";
-    	}
-    	if(this.index == 2) {
-    		return "X3Y2";
-    	}
-    	if(this.index == 3) {
-    		return "X3Y3";
-    	}
-    	return null;
     }
     
     /**
@@ -328,7 +283,7 @@ public class TimingManager {
     	System.out.println("------------------------------------------------------------------------------");
     }
     
-    static short Treq;
+    
     /**
      * Set the timing requirement of the design
      */
@@ -338,21 +293,19 @@ public class TimingManager {
     
     public static float getDesignTimingReq(Design design) {
 		float treq = 0;
-		String timingConstraint = null;
+		
 		ConstraintGroup[] constraintGroups = {ConstraintGroup.NORMAL, ConstraintGroup.LATE};
 		//TODO CHECK which constraint to use. The maximum one as default?
 		for(ConstraintGroup group : constraintGroups) {
 			List<String> constraints = design.getXDCConstraints(group);
 			for(String constraint : constraints) {
 				if(constraint.contains("-period")) {
-					timingConstraint = constraint;
-					break;
+					int startIndex = constraint.indexOf("-period");
+					treq = Math.max(treq, Float.valueOf(constraint.substring(startIndex+7, startIndex+13)));
 				}
 			}
 		}
 		
-		int startIndex = timingConstraint.indexOf("-period");
-		treq = Float.valueOf(timingConstraint.substring(startIndex+7, startIndex+13));
 		return treq;
 	}
     
@@ -368,23 +321,11 @@ public class TimingManager {
     		connection.resetCriticality();
     	}
     	float maxCriti = 0;
-		if(this.index >= 0) {
-			for(Connection connection : connections){
-	    		connection.calculateCriticalityFromVector(maxDelay, maxCriticality, criticalityExponent, this.index);
-	    		if(connection.getCriticality() > maxCriti)
-	    			maxCriti = connection.getCriticality();
-	    	}
-		}else {
-			for(Connection connection : connections){
-	    		connection.calculateCriticality(maxDelay, maxCriticality, criticalityExponent);
-	    		if(connection.getCriticality() > maxCriti)
-	    			maxCriti = connection.getCriticality();
-	    	}
-		}
-    }
-    
-    public boolean comparableFloat(Float a, float b){
-    	return Math.abs(a - b) < Math.pow(10, -9);
+		for(Connection connection : connections){
+    		connection.calculateCriticality(maxDelay, maxCriticality, criticalityExponent);
+    		if(connection.getCriticality() > maxCriti)
+    			maxCriti = connection.getCriticality();
+    	}
     }
 
     /**

@@ -88,28 +88,10 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
 
     private Map<SitePinInst, List<TimingEdge>> sinkSitePinInstTimingEdges = new HashMap<>();
     private Map<EDIFHierPortInst, SitePinInst> edifHPortMap = new HashMap<>();
-    public List<TimingVertex> orderedTimingVertice = new ArrayList<>();
-    public List<TimingVertex> reversedOrderedTimingVertice = new ArrayList<>();
-    static ClkSkewData clkSkewRouteDelay = null;
-    static ClkRouteTiming clkRouteTiming = null;
-    
-    /**
-     * Sets the {@link ClkSkewData} object that represents the clock skew data.
-     */
-    public static void setClkTiming(ClkSkewData clkSkewRouteDly) {
-    	clkSkewRouteDelay = clkSkewRouteDly;
-    }
-    
-    /**
-     * Checks if there is valid clock skew data
-     */
-    public static boolean validClkSkew() {
-    	return clkSkewRouteDelay != null;
-    }
-    
-    public static void setClkRouteTiming(ClkRouteTiming ceTiming) {
-    	clkRouteTiming = ceTiming;
-    }
+    private List<TimingVertex> orderedTimingVertice = new ArrayList<>();
+    private List<TimingVertex> reversedOrderedTimingVertice = new ArrayList<>();
+    private ClkRouteTiming clkRouteTiming = null;
+    private RuntimeTrackerTree routerTimer;
     
     static {
         
@@ -139,11 +121,12 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         this.design = design;
     }
     
-    public RuntimeTrackerTree routerTimer;
-    public TimingGraph(Design design, RuntimeTrackerTree timer) {
+    
+    public TimingGraph(Design design, RuntimeTrackerTree timer, ClkRouteTiming clkTiming) {
         super(TimingEdge.class);
         this.design = design;
         this.routerTimer = timer;
+        this.clkRouteTiming = clkTiming;
     }
 
     /**
@@ -279,76 +262,6 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
 	    	}
 		}
     }
-    
-    /**
-     * Computes the arrival time array for each TimingVetex
-     */
-    public void computeArrivalTimeVectorsTopologicalOrder() {
-    	TopologicalOrderIterator<TimingVertex, TimingEdge> orderIterator = new TopologicalOrderIterator<>(this);
-    	while(orderIterator.hasNext()){
-        	for (TimingEdge e : edgesOf(orderIterator.next())){
-        		TimingVertex eSrc = e.getSrc();
-        		if (inDegreeOf(eSrc) == 0) {
-        			eSrc.setArrivalTimeVector((short) 0);//must be superSource
-                }
-        		
-        		TimingVertex eDst = e.getDst();
-        		float arrival;
-        		
-        		if(!eSrc.getName().equals("superSource")) {
-        			eDst.setArrivalTimeVector(e.getSrc().getArrivalTimes(), e.getDelay(), e.getSrc());
-        		}else{
-        			//TimingVertex connected to superSource
-        			String cr = getClockRegionOfCellPin(eDst.getName(), this.design);
-        			arrival = eSrc.getArrivalTime() + e.getDelay();// not right to use getArrivalTime() for Q - D path, should get arr from the vector
-        			eDst.setArrivalTimeVector(cr, (short) arrival, eSrc);// superSource to Q, only set the value for the clock region that Q is in
-        		}
-        		eDst.setMaxArrivalTimePrevFromVector();// this is needed for tracing backward to get the critical timing edges
-        	}
-        	
-        }
-    }
-    
-    private void addNegativeDstDlyMinusPessToArrivalVector(TimingVertex v) {
-    	String cr = getClockRegionOfCellPin(v.getName(), this.design);
-    	
-    	for(int i = 0 ; i < 4; i++) {
-    		if(v.getArrivalTimes()[i] == 0) continue;
-    		short dlyPess = 0;
-    		Pair<String, String> crPair = this.createCRPair(i, cr);
-    		List<Short> data = clkSkewRouteDelay.getSkew().get(crPair);
-    		dlyPess = (short) (-data.get(2) - data.get(3));
-    		v.getArrivalTimes()[i] += dlyPess;
-    	}
-    	
-    }
-    
-    private void substractNegetiveDstDlyMinusPessToReqVector(TimingVertex v) {
-    	String cr = getClockRegionOfCellPin(v.getName(), this.design);
-    	
-    	for(int i = 0 ; i < 4; i++) {
-    		if(v.getRequiredTimes()[i] > 16000) continue;
-    		short dlyPess = 0;
-    		Pair<String, String> crPair = this.createCRPair(i, cr);
-    		List<Short> data = clkSkewRouteDelay.getSkew().get(crPair);
-    		dlyPess = (short) (data.get(2) + data.get(3));
-    		v.getRequiredTimes()[i] += dlyPess;
-    	}
-    }
-    
-    private Pair<String, String> createCRPair(int i, String cr){
-    	switch(i) {
-    	case 0:
-    		return new Pair<>("X2Y2", cr);
-    	case 1:
-    		return new Pair<>("X2Y3", cr);
-    	case 2:
-    		return new Pair<>("X3Y2", cr);
-    	case 3:
-    		return new Pair<>("X3Y3", cr);
-    	default: return null;
-    	}
-    }
 
     /**
      * Get the clock region that the cell pin resides in
@@ -393,35 +306,6 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     }
     
     /**
-     * Sets the required time of each timing vertex for each clock region
-     * @param requirement, the required time of the design
-     */
-    public void setTimingRequiredTimesVecotrTopologicalOrder(float requirement){
-    	List<TimingVertex> reversedOrderedTimingVertices = this.getReversedOrder();
-    	for(TimingVertex v : reversedOrderedTimingVertices){
-    		for (TimingEdge e : edgesOf(v)){
-    			TimingVertex dst = e.getDst();
-    			if(outDegreeOf(dst) == 0){
-    				if(dst.equals(this.superSink)) {
-    					//for gnl designs, D - superSink timing edges have delay of 0
-    					e.getDst().setRequiredTimeVector((short) requirement);
-    					e.getDst().setMinRequiredTime(requirement);
-    				}else {
-    					e.getDst().setRequiredTimeVector(Short.MAX_VALUE);//NOTE: there are dangling timing vertices not connected to super sink
-    					e.getDst().setMinRequiredTime(Short.MAX_VALUE);
-    				}
-    			}
-    			TimingVertex src = e.getSrc();
-    			src.setRequiredVector(e.getDst().getRequiredTimes(), (short) e.getDelay());
-    			if(src.isSinkD()) {
-        			this.substractNegetiveDstDlyMinusPessToReqVector(src);
-    			}
-    			src.setMinRequiredTime(src.getMinReqTimeFromVector());//store the min req to requiredTime of TimingVertex
-    		}
-    	}
-    }
-    
-    /**
      * Reset the required and arrival time to be null
      */
     public void resetRequiredAndArrivalTime(){
@@ -433,57 +317,10 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     }
     
     /**
-     * Reset the required and arrival time vectors to be null
-     */
-    public void resetRequiredAndArrivalTimeVectors(){
-    	for(TimingVertex v : this.vertexSet()){
-    		v.resetArrivalTimes();//null is assigned, as the indicator
-    		v.resetRequiredTimes();
-    		v.resetPrevs();
-    	}
-    }
-    
-    /**
      * Get the maximum delay, i.e., the maximum arrival time, and corresponding timing path sink of the design
      */
     public Pair<Float, TimingVertex> getMaxDelay(){
     	return new Pair<>(this.superSink.getArrivalTime(), this.superSink);
-    }
-    
-    /**
-     * Get the maximum arrival time through the vectors
-     * @return the maximum arrival time (Short) and its index in the array (Short), and the TimingVertex
-     */
-    public Pair<Pair<Short, Short>, TimingVertex> getMaxArrivalTimeFromVector(){
-    	//use sinkD to compute max delay, taking skew into account
-    	TimingVertex maxV = null;
-    	Pair<Short, Short> maxArrivalAndIndex = new Pair<>((short)0, (short) 0);
-    	for(TimingVertex v : this.vertexSet()){
-    		if(v.isSinkD()) {
-    			this.addNegativeDstDlyMinusPessToArrivalVector(v);
-    			Pair<Short, Short> maxOfV = this.getMaxArrivalIndexOfTimingVertext(v);
-    			if(maxOfV.getFirst() >= maxArrivalAndIndex.getFirst()) {
-    				maxArrivalAndIndex = maxOfV;
-    				maxV = v;
-    			}
-    		}
-    	}
-    	
-    	return new Pair<Pair<Short, Short>, TimingVertex>(maxArrivalAndIndex, maxV);
-    }
-    
-    private Pair<Short, Short> getMaxArrivalIndexOfTimingVertext(TimingVertex v){
-    	short id = 0;
-    	short max = 0;
-    	
-    	for(int index = 0; index < v.getArrivalTimes().length; index++) {
-    		short value = v.getArrivalTimes()[index];
-    		if(value >= max) {
-    			max = value;
-    			id = (short) index;
-    		}
-    	}
-    	return new Pair<Short, Short>(max, id);
     }
     
     private List<TimingVertex> getReversedOrder(){
@@ -980,22 +817,10 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         for (TimingVertex s : sources) {
         	TimingEdge e = new TimingEdge(this, superSource, s);
             addEdge(superSource, s, e);
-            if(clkSkewRouteDelay == null) continue;
-            String cr = getClockRegionOfCellPin(s.getName(), this.design);
-            for(Pair<String, String> ss : clkSkewRouteDelay.getSkew().keySet()) {
-            	if(ss.getFirst().equals(cr)) {
-            		List<Short> skewData = clkSkewRouteDelay.getSkew().get(ss);
-            		short srcDly = skewData.get(1);
-            		e.setLogicDelay(srcDly);//Only include srcDly, i.e. launching time
-            	}
-            }
         }
         for (TimingVertex s : sinks) {
         	TimingEdge e = new TimingEdge(this, s, superSink);
             addEdge(s, superSink, e);
-            if(s.getName().endsWith("/D")) {
-            	s.setSinkD(true);//for vector implementation of routing with clk skew data
-            }
         }
     }
     

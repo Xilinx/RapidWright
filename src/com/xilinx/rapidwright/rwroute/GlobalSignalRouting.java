@@ -52,7 +52,6 @@ import com.xilinx.rapidwright.placer.blockplacer.SmallestEnclosingCircle;
 import com.xilinx.rapidwright.router.RouteNode;
 import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.router.UltraScaleClockRouting;
-import com.xilinx.rapidwright.util.Pair;
 
 /**
  * A collection of methods for routing global signals, i.e. GLOBAL_CLOCK, VCC and GND.
@@ -150,107 +149,6 @@ public class GlobalSignalRouting {
 		}
 		
 		return dominate;
-	}
-	
-	/**
-	 * Route a clock net with clock skew data, routes and tap delays.
-	 * @param clk The clock net to be routed.
-	 * @param device The design device.
-	 * @param routesToClockRegions A map storing routes from CLK_OUT to different clock regions.
-	 * @param bufceRowTapsOfClockRegions A map storing tap data corresponding to a sink clock region and a bufce row of a global clock net.
-	 */
-	public static void routeClkWithSkewAndRouteDelays(Net clk, Device device, Map<String, List<String>> routesToClockRegions,
-			Map<Pair<String, String>, List<Short>> bufceRowTapsOfClockRegions) {
-		Map<String, List<Node>> clockRegionPaths = getListOfNodesFromRoutes(device, routesToClockRegions);
-		Node centroidNode = null;
-		for(List<Node> path : clockRegionPaths.values()) {
-			centroidNode = path.get(0);
-			break;
-		}
-		
-		// 1. route BUFG to nearest routing track
-		RouteNode startRoutingLine = UltraScaleClockRouting.routeBUFGToNearestRoutingTrack(clk);
-		
-		// 2. route from start routing line to the given centroid node
-		UltraScaleClockRouting.routeToCentroidNode(clk, startRoutingLine, centroidNode);	
-		// When routing clock with this method, we need to make sure that the BUFGCE used in the design is exactly the one displayed in the file.
-		// Otherwise, it is possible that this clock router will fail. Because if can not find a path to the centroid.
-		// For instance, for a GNL design with a clock net, 
-		// Vivado needs to use another BUFGCE to route from startRoutingLine to centroidNode.
-		// But we do not have this option due to the searching condition.
-		
-		// 3.a. get SitePinInst - LCB mapping
-		Map<RouteNode, ArrayList<SitePinInst>> lcbMappings = getLCBPinMappings(clk);
-		
-		// 3.b. re-use the given paths from centroid to horizontal distribution lines
-		Map<String, RouteNode> horDistributionLines = routeCentroidToHorDistributionLines(clk, clockRegionPaths);
-		
-		// 3.c. route to LCBs
-		UltraScaleClockRouting.routeToLCBs(clk, getStartingPoint(horDistributionLines, device), lcbMappings.keySet());
-		
-		// 4. route LCBs to sink pins
-		UltraScaleClockRouting.routeLCBsToSinks(clk, lcbMappings); 
-		
-		Set<PIP> clkPIPsWithoutDuplication = new HashSet<>();
-		clkPIPsWithoutDuplication.addAll(clk.getPIPs());
-		clk.setPIPs(clkPIPsWithoutDuplication);
-		
-		// 5. set delay
-		setBUFCERowLeafTap(clk, device, bufceRowTapsOfClockRegions);
-	}
-	
-	/**
-	 * Sets BUGCE row and leaf tap levels of a routed clock net.
-	 * @param clk The target clock net.
-	 * @param device The target device.
-	 * @param bufceRowTapsOfClockRegions A map storing tap data corresponding to a sink clock region and a bufce row of a global clock net.
-	 */
-	private static void setBUFCERowLeafTap(Net clk, Device device, Map<Pair<String, String>, List<Short>> bufceRowTapsOfClockRegions) {
-		if(bufceRowTapsOfClockRegions.isEmpty()) return;	
-		List<Site> sites = new ArrayList<>();
-		for(Entry<Pair<String, String>, List<Short>> crBufceRowTaps : bufceRowTapsOfClockRegions.entrySet()) {
-			Site site = device.getSite(crBufceRowTaps.getKey().getSecond());
-			// An example line from the file: row_tap  leaf_tap	src_@0.3  src_@0.6  src_@0.9   dst_@0.3  dst_@0.6  dst_@0.9
-			clk.setBufferDelay(site, crBufceRowTaps.getValue().get(0));
-			sites.add(site);
-		}			
-		
-		for(PIP p:clk.getPIPs()) {
-			if(p.getStartNode().toString().contains("_CLK_IN") && p.getEndNode().toString().contains("_CLK_LEAF")) {
-				Site s = p.getStartNode().getSitePin().getSite();
-				String cr = s.getTile().getClockRegion().getName();		
-				List<Short> taps = null;
-				
-				for(Entry<Pair<String, String>, List<Short>> crBufceRowTaps : bufceRowTapsOfClockRegions.entrySet()) {
-					if(crBufceRowTaps.getKey().getFirst().equals(cr)) {
-						taps = crBufceRowTaps.getValue();
-					}
-				}
-				
-				if(taps != null) {
-					clk.setBufferDelay(s, taps.get(1));
-				}			
-				if(!sites.contains(s)) sites.add(s);
-			}
-		}
-	}
-	
-	private static Map<String, RouteNode> routeCentroidToHorDistributionLines(Net clk, Map<String, List<Node>> crPaths){
-		Map<String, RouteNode> crHorizontalDistributionLines = new HashMap<>();
-		for(Entry<String, List<Node>> crPath : crPaths.entrySet()) {
-			String cr = crPath.getKey();
-			List<Node> path = crPath.getValue();
-			Collections.reverse(path);
-			clk.getPIPs().addAll(RouterHelper.getPIPsFromListOfReversedNodes(path));
-			Node hdistr = path.get(0);
-			if(hdistr.getIntentCode() != IntentCode.NODE_GLOBAL_HDISTR) {
-				System.err.println("ERROR: The last node of the path is not HDISTR");
-				continue;
-			}
-			RouteNode hDistr = new RouteNode(hdistr.getTile(), hdistr.getWire());
-			crHorizontalDistributionLines.put(cr, hDistr);
-		}
-		return crHorizontalDistributionLines;
 	}
 	
 	/**
@@ -357,7 +255,7 @@ public class GlobalSignalRouting {
 		Map<RouteNode, ArrayList<SitePinInst>> lcbMappings = new HashMap<>();
 		for(SitePinInst p : clk.getPins()){
 			if(p.isOutPin()) continue;
-			Node n = null;/** n should be a node whose name ends with "CLK_LEAF" */
+			Node n = null;// n should be a node whose name ends with "CLK_LEAF"
 			for(Node prev : p.getConnectedNode().getAllUphillNodes()) {
 				if(prev.getTile().equals(p.getSite().getIntTile())) {
 					for(Node prevPrev : prev.getAllUphillNodes()) {

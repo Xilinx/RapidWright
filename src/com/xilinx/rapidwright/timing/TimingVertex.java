@@ -38,113 +38,6 @@ public class TimingVertex {
     private boolean printed;
     /** The parent TimingVertex that leads to the maximum arrival time of this one*/
     private TimingVertex prev;
-    /** This is for an experimental router feature: route a design with clock skew data */
-    public static ClkSkewData clkSkew;
-    /** array of src_dly - CPR for 4 CRs: in order of X2Y2, X2Y3, X3Y2, X3Y3 */
-    private short[] arrivalTimes;//
-    private short[] requiredTimes;
-    private TimingVertex[] prevs;
-    private boolean sinkD;
-    
-    public boolean isSinkD() {
-    	return this.sinkD;
-    }
-    
-    public void setSinkD(boolean isSinkD) {
-    	this.sinkD = isSinkD;
-    }
-    
-    public static void setCLKSkew(ClkSkewData clkskew) {
-    	clkSkew = clkskew;
-    }
-    
-    public void setArrivalTimeVector(short value) {
-    	if(arrivalTimes == null) {
-    		arrivalTimes = new short[4];
-    	}
-    	Arrays.fill(arrivalTimes, value);
-    }
-    
-    public void setArrivalTimeVector(String cr, short value, TimingVertex prev) {
-    	if(arrivalTimes == null) {
-    		arrivalTimes = new short[4];
-    		Arrays.fill(arrivalTimes, (short)0);
-    	}
-    	
-    	if(prevs == null) {
-    		prevs = new TimingVertex[4];
-    	}
-    	
-    	switch(cr) {
-    	case "X2Y2":
-    		if(value > arrivalTimes[0]) {
-    			arrivalTimes[0] = value;
-    			prevs[0] = prev;
-    		}
-    		break;
-    	case "X2Y3":
-    		if(value > arrivalTimes[1]) {
-    			arrivalTimes[1] = value;
-    			prevs[1] = prev;
-    		}
-    		break;
-    	case "X3Y2":
-    		if(value > arrivalTimes[2]) {
-    			arrivalTimes[2] = value;
-    			prevs[2] = prev;
-    		}
-    		break;
-    	case "X3Y3":
-    		if(value > arrivalTimes[3]) {
-    			arrivalTimes[3] = value;
-    			prevs[3] = prev;
-    		}
-    		break;
-    	default:
-    		break;
-    	}
-    	
-    }
-    
-    public void setArrivalTimeVector(short[] srcArrs, float edgeDly, TimingVertex src) {
-    	if(arrivalTimes == null) {
-    		arrivalTimes = new short[4];
-    		Arrays.fill(arrivalTimes, (short)0);
-    	}
-    	
-    	if(this.prevs == null) {
-    		this.prevs = new TimingVertex[4];
-    	}
-    	
-    	for(int i = 0; i < 4; i++) {
-    		if(srcArrs[i] == 0) continue;//do not bother with those that have not been assigned values, which means there is no corresponding source CR
-    		short newarr = (short) (srcArrs[i] + edgeDly);
-    		if(newarr > this.arrivalTimes[i]) {
-    			this.arrivalTimes[i] = newarr;
-    			this.prevs[i] = src;
-    		}
-    	}
-    	
-    }
-    
-    public void setRequiredTimeVector(short value) {
-    	if(requiredTimes == null) {
-    		requiredTimes = new short[4];
-    	}
-    	Arrays.fill(requiredTimes, value);
-    }
-    
-    public void setRequiredVector(short[] dstReqs, short edgeDly) {
-    	if(requiredTimes == null) {
-    		requiredTimes = new short[4];
-    		Arrays.fill(requiredTimes, (short) (Short.MAX_VALUE/2));
-    	}
-    	for(int i = 0; i < 4; i++) {
-    		if(this.arrivalTimes[i] == 0) continue;
-    		short newreq = (short) (dstReqs[i] - edgeDly);
-    		if(newreq < requiredTimes[i]) requiredTimes[i] = newreq;
-    	}
-    }
 
     /**
      * Creates a vertex for insertion into the TimingGraph.
@@ -156,7 +49,6 @@ public class TimingVertex {
      */
     public TimingVertex(String name) {
         this.name = name;
-        this.arrivalTimes = new short[4];
         this.isFlopInput = false;
         this.isFlopOutput = false;
         this.printed = false;
@@ -275,20 +167,9 @@ public class TimingVertex {
     	this.requiredTime = null;
     }
     
-    public void resetRequiredTimes(){
-    	this.requiredTimes = null;
-    }
     
     public void resetArrivalTime(){
     	this.arrivalTime = null;
-    }
-    
-    public void resetArrivalTimes(){
-    	this.arrivalTimes = null;
-    }
-    
-    public void resetPrevs() {
-    	this.prevs = null;
     }
     
     /**
@@ -322,36 +203,6 @@ public class TimingVertex {
         } else {
             return arrivalTime;
         }
-    }
-    
-    public void setMaxArrivalTimePrevFromVector() {
-   	
-    	if(this.arrivalTimes != null) {
-    		short max = 0;
-    		TimingVertex tmpPrev = null;
-	    	for(int i = 0; i < 4; i++) {
-	    		if(this.arrivalTimes[i] >= max) {
-	    			max = this.arrivalTimes[i];
-	    			tmpPrev = this.prevs[i];
-	    		}
-	    	}
-	    	
-	    	this.arrivalTime = (float) max;
-	    	this.prev = tmpPrev;
-    	}
-    }
-    
-    public short getMinReqTimeFromVector() {
-    	if(this.requiredTimes == null) {
-    		return 0;
-    	}
-    	short min = Short.MAX_VALUE;
-    	for(int i = 0; i < 4; i++) {
-    		if(this.requiredTimes[i] < min) {
-    			min = this.requiredTimes[i];
-    		}
-    	}
-    	return min;
     }
     
     /**
@@ -438,14 +289,6 @@ public class TimingVertex {
     public void setFlopOutput() {
         isFlopOutput = true;
     }
-
-	public short[] getArrivalTimes() {
-		return arrivalTimes;
-	}
-
-	public short[] getRequiredTimes() {
-		return requiredTimes;
-	}
 
 	public TimingVertex getPrev() {
 		return prev;

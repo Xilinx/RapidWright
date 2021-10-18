@@ -53,7 +53,6 @@ import com.xilinx.rapidwright.util.RuntimeTrackerTree;
 import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.timing.ClkRouteTiming;
-import com.xilinx.rapidwright.timing.ClkSkewData;
 import com.xilinx.rapidwright.timing.DSPTimingData;
 import com.xilinx.rapidwright.timing.TimingEdge;
 import com.xilinx.rapidwright.timing.TimingGraph;
@@ -187,8 +186,9 @@ public class RWRoute{
 		RoutableNode.setMaskNodesCrossRCLK(this.config.isMaskNodesCrossRCLK());
 
 		if(this.config.isTimingDriven()) {
-			setDSPClkTimingData(this.config);			
-			this.timingManager = new TimingManager(this.design, true, this.routerTimer, this.config);		
+			DSPTimingData.setDSPTimingFolder(config.getDspTimingDataFolder());
+			ClkRouteTiming clkTiming = this.createClkTimingData(config);
+			this.timingManager = new TimingManager(this.design, true, this.routerTimer, this.config, clkTiming);		
 		    this.estimator = new DelayEstimatorBase(this.design.getDevice(), new InterconnectInfo(), this.config.isUseUTurnNodes(), 0);
 			RoutableNode.setTimingDriven(true, this.estimator);
 			this.nodesDelays = new HashMap<>();
@@ -233,26 +233,17 @@ public class RWRoute{
 	}
 	
 	/**
-	 * Sets timing-driven routing related inputs based on the {@link Configuration} instance.
+	 * Creates clock routing related inputs based on the {@link Configuration} instance.
 	 * @param config The {@link Configuration} instance to use.
 	 */
-	public void setDSPClkTimingData(Configuration config) {
-		DSPTimingData.setDSPTimingFolder(config.getDspTimingDataFolder());
-		String clkSkewFile = config.getClkSkew();
+	public ClkRouteTiming createClkTimingData(Configuration config) {
 		String clkRouteTimingFile = config.getClkRouteTiming();
-		
-		if(clkSkewFile != null) {
-			ClkSkewData clkSkewData = new ClkSkewData(clkSkewFile);
-			TimingGraph.setClkTiming(clkSkewData);
-			this.routesToClockRegions = clkSkewData.getRoutesToClockRegions();
-			this.bufceRowTapsOfClockRegions = clkSkewData.getDelay();
-		}
-		
 		if(clkRouteTimingFile != null) {
 			ClkRouteTiming clkTiming = new ClkRouteTiming(clkRouteTimingFile);
-			TimingGraph.setClkRouteTiming(clkTiming);
 			this.routesToSinkINTTiles = clkTiming.getRoutesToSinkINTTiles();
+			return clkTiming;
 		}
+		return null;
 	}
 	
 	/**
@@ -396,15 +387,10 @@ public class RWRoute{
  		if(this.clkNets.size() > 0) System.out.println("INFO: Route clock nets");
  		for(Net clk : this.clkNets) {
  			System.out.println(clk.getName());
- 			if(this.routesToClockRegions != null || this.routesToSinkINTTiles != null) {
+ 			if(this.routesToSinkINTTiles != null) {
  				// routes clock nets with references of partial routes
- 				if(this.routesToClockRegions != null) {
- 					System.out.println("INFOR: Route with clock skew data reference");
- 					GlobalSignalRouting.routeClkWithSkewAndRouteDelays(clk, this.design.getDevice(), this.routesToClockRegions, this.bufceRowTapsOfClockRegions);
- 				}else if(this.routesToSinkINTTiles != null) {
- 					System.out.println("INFO: Route with clock route and timing data");
- 					GlobalSignalRouting.routeClkWithPartialRoutes(clk, this.routesToSinkINTTiles, this.design.getDevice());
- 				}
+				System.out.println("INFO: Route with clock route and timing data");
+				GlobalSignalRouting.routeClkWithPartialRoutes(clk, this.routesToSinkINTTiles, this.design.getDevice());
  			}else {
  				// routes clock nets from scratch
 				System.out.println("INFO: Route with symmetric non-timing-driven clock router");
