@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SitePinInst;
@@ -201,7 +202,10 @@ public class TimingAndWirelengthReport{
 		if(args.length < 1){
 			System.out.println("USAGE:\n <input.dcp>");
 		}
-		Design design = Design.readCheckpoint(args[0]);	
+		Design design = Design.readCheckpoint(args[0]);
+		//design manipulations are necessary, otherwise there will be problems in associating timing edges with connections.
+		DesignTools.makePhysNetNamesConsistent(design);
+		DesignTools.createMissingSitePinInsts(design);
 		Configuration config = new Configuration(args);
 		config.setPartialRouting(false);
 		config.setTimingDriven(true);
