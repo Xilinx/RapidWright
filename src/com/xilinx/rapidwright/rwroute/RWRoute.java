@@ -386,7 +386,6 @@ public class RWRoute{
 	private void routeGlobalClkNets() {
  		if(this.clkNets.size() > 0) System.out.println("INFO: Route clock nets");
  		for(Net clk : this.clkNets) {
- 			System.out.println(clk.getName());
  			if(this.routesToSinkINTTiles != null) {
  				// routes clock nets with references of partial routes
 				System.out.println("INFO: Route with clock route and timing data");
