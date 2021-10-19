@@ -1622,32 +1622,6 @@ public class FileTools {
 		}
 	}
 	
-	/**
-	 * This method will zip all files (non-recursive, directories not included) in the specified
-	 * directory into a zip file.
-	 * @param destZipFile Path of the destination zip file
-	 * @param srcDir Path to the directory containing files to be zipped, directories are skipped
-	 */
-	public static void zipDirectoryOfFiles(Path destZipFile, Path srcDir) {
-	    try(ZipOutputStream zos = 
-	            new ZipOutputStream(Files.newOutputStream(Files.createFile(destZipFile)))){
-	        Files.walk(srcDir).filter(f -> !Files.isDirectory(f))
-	            .forEach(f -> {
-	                ZipEntry ze = new ZipEntry(srcDir.relativize(f).toString());
-	                try {
-	                    zos.putNextEntry(ze);
-	                    Files.copy(f, zos);
-	                    zos.closeEntry();
-	                } catch(IOException e) {
-	                    throw new UncheckedIOException("Failed to create zip file " 
-	                            + destZipFile, e);
-	                }
-	            });
-	    } catch (IOException e) {
-            throw new UncheckedIOException("Failed to create zip file " + destZipFile, e);
-        }
-	}
-	
 	private static FilenameFilter ednFilter = new FilenameFilter() {
 		@Override
 		public boolean accept(File dir, String name){
