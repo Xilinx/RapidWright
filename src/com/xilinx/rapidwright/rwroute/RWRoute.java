@@ -129,6 +129,12 @@ public class RWRoute{
 	private Collection<Routable> rnodesVisited;
 	/** The queue to store candidate nodes to route a connection */
 	private PriorityQueue<Routable> queue;
+	/** An indicator for the success / failed route of a connection */
+	private boolean successRoute;
+	/** The horizontal distance from a rnode to the sink rnode of a connection */
+	private short deltaX;
+	/** The vertical distance from a rnode to the sink rnode of a connection */
+	private short deltaY;
 	
 	/** Total wirelength of the routed design */
 	private int totalWL;
@@ -1014,19 +1020,19 @@ public class RWRoute{
 	
 	/**
 	 * Updates present congestion cost and historical congestion cost of rnodes.
-	 * @param presentCongesFac Present congestion cost factor.
-	 * @param historicalCongesFac Historical congestion cost factor.
+	 * @param presentCongestionFac Present congestion cost factor.
+	 * @param historicalCongestionFac Historical congestion cost factor.
 	 */
-	private void updateCost(float presentCongesFac, float historicalCongesFac) {
+	private void updateCost(float presentCongestionFac, float historicalCongestionFac) {
 		this.overUsedRnodes.clear();
 		for(Routable rnode:this.rnodesCreated.values()){
 			int overuse =rnode.getOccupancy() - Routable.capacity;
 			if(overuse == 0) {
-				rnode.setPresentCongestionCost(1 + presentCongesFac);
+				rnode.setPresentCongestionCost(1 + presentCongestionFac);
 			} else if (overuse > 0) {
 				this.overUsedRnodes.add(rnode.getIndex());
-				rnode.setPresentCongestionCost(1 + (overuse + 1) * presentCongesFac);
-				rnode.setHistoricalCongestionCost(rnode.getHistoricalCongestionCost() + overuse * historicalCongesFac);
+				rnode.setPresentCongestionCost(1 + (overuse + 1) * presentCongestionFac);
+				rnode.setHistoricalCongestionCost(rnode.getHistoricalCongestionCost() + overuse * historicalCongestionFac);
 			}
 		}
 	}
@@ -1209,7 +1215,6 @@ public class RWRoute{
 				if(users == null) users = new HashSet<>();
 				users.add(net);
 				pipsUsage.put(pip, users);
-				
 			}
 		}
 		int pipsError = 0;
@@ -1235,7 +1240,6 @@ public class RWRoute{
 		return this.queue.peek().isTarget();
 	}
 	
-	boolean successRoute = false;
 	/**
 	 * Routes a connection.
 	 * @param connection The connection to route.
@@ -1538,8 +1542,6 @@ public class RWRoute{
 		this.push(childRnode, rnode, newPartialPathCost, newTotalPathCost);
 	}
 	
-	private short deltaX = 0;
-	private short deltaY = 0;
 	/**
 	 * Computes the distance from a childRnode to the sink of a connection in the horizontal and vertical direction.
 	 * @param childRNode The childRnode being evaluated.

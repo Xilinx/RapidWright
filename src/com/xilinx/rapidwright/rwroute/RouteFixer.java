@@ -71,22 +71,22 @@ public class RouteFixer{
 				
 				if(i == 1) {
 					newNext.setSink(true);
-				}			
+				}
 				if(i == vertexSize - 1) this.source = newCur;
 				newCur.addChildren(newNext);
-			}	
-		}	
+			}
+		}
 	}
 	
 	/**
 	 * Finalizes the route of each connection based on the delay-aware path merging.
 	 */
 	public void finalizeRoutesOfConnections(){
-		this.setShortestToEachVertex();
+		this.setShortestPathToEachVertex();
 		
 		for(Connection connection : this.netp.getConnections()) {
 			NodeWithDelay csink = this.nodeMap.get(connection.getNodes().get(0));
-			connection.getNodes().clear();	
+			connection.getNodes().clear();
 			connection.getNodes().add(csink.getNode());
 			NodeWithDelay prev = csink.getPrev();
 			while(prev != null) {
@@ -96,7 +96,7 @@ public class RouteFixer{
 		}
 	}
 	
-	private void setShortestToEachVertex() {
+	private void setShortestPathToEachVertex() {
 		PriorityQueue<NodeWithDelay> queue = new PriorityQueue<NodeWithDelay>(NodeWithDelayComparator);
 
 		queue.clear();

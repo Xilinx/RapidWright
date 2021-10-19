@@ -37,7 +37,7 @@ import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 public class Connection implements Comparable<Connection>{
 	/** A unique index of a connection */
 	private final int id;
-	/** The source and sink {@link SitePinInst}s of a connection */
+	/** The source and sink {@link SitePinInst} instances of a connection */
 	private SitePinInst source;
 	private final SitePinInst sink;
 	/** 
@@ -65,8 +65,8 @@ public class Connection implements Comparable<Connection>{
 	private short yMinBB;
 	private short yMaxBB;
 	/** 
-	 * TimingEdges associated to a connection.
-	 * For LUT_6_2_* pins, there will be two timing edges mapped to the same pair of SitePinInsts.
+	 * {@link TimingEdge} instances associated to a connection.
+	 * For LUT_6_2_* pins, there will be two timing edges mapped to the same connection.
 	 */
 	private List<TimingEdge> timingEdges;
 	/** The criticality factor to indicate how timing-critical a connection is */
@@ -119,7 +119,7 @@ public class Connection implements Comparable<Connection>{
 		this.yMaxBB = (short) (yMax + boundingBoxExtensionY);
 		this.yMinBB = (short) (yMin - boundingBoxExtensionY);
 		
-		/** allow more space for resource expansion of SLR-crossing connections */
+		// allow more space for resource expansion of SLR-crossing connections
 		if(checkSLRCrossing) {		
 			if(this.crossSLR()) {
 				this.yMaxBB += 2 * boundingBoxExtensionY;

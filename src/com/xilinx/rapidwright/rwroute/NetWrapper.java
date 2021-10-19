@@ -28,7 +28,6 @@ import java.util.Collections;
 import java.util.List;
 
 import com.xilinx.rapidwright.design.Net;
-import com.xilinx.rapidwright.design.SitePinInst;
 
 /**
  * A wrapper class of {@link Net} with additional information for the router.
