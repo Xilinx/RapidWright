@@ -22,6 +22,7 @@
 
 package com.xilinx.rapidwright.design;
 
+import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -39,10 +40,11 @@ public class DRC implements DesignRuleCheckInterface {
         // DesignRuleCheckInterface::run() returns an int of how many checks failed,
         // sum those up
         return checks.stream().map((c) -> {
+                    DesignRuleCheckInterface i = null;
                     try {
-                        DesignRuleCheckInterface i = c.getDeclaredConstructor().newInstance();
+                        i = c.getDeclaredConstructor().newInstance();
                         return (int) c.getDeclaredMethod("run", Design.class).invoke(i, design);
-                    } catch (Exception e) {
+                    } catch (InstantiationException|IllegalAccessException|InvocationTargetException|NoSuchMethodException e) {
                         throw new RuntimeException(e);
                     }
                 })
