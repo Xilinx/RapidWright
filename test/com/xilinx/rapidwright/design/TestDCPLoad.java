@@ -37,14 +37,11 @@ public class TestDCPLoad {
     
     @Test
     @CheckOpenFiles
-    public void checkAutoEDIFGenerationFailure(@TempDir Path tempDir) {
+    public void checkAutoEDIFGenerationFailure(@TempDir Path tempDir) throws IOException {
         Path dcpPath = Paths.get("RapidWrightDCP/picoblaze_ooc_X10Y235.dcp");
         final Path dcpCopy = tempDir.resolve(dcpPath.getFileName());
-        try {
-            Files.copy(dcpPath, dcpCopy);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e); 
-        }
+        Files.copy(dcpPath, dcpCopy);
+
         Path binEdfFile = tempDir.resolve(FileTools.replaceExtension(dcpPath.getFileName(), ".edf"));
         createSimulatedBinaryEDIF(binEdfFile, FileTools.BINARY_CHECK_LENGTH+1); 
         assert(Design.replaceEDIFinDCP(dcpCopy.toString(), binEdfFile.toString()));
@@ -59,15 +56,11 @@ public class TestDCPLoad {
 
     @Test
     @CheckOpenFiles
-    public void checkAutoEDIFGenerationSuccess(@TempDir Path tempDir) {
+    public void checkAutoEDIFGenerationSuccess(@TempDir Path tempDir) throws IOException {
         Path dcpPath = Paths.get("RapidWrightDCP/picoblaze_ooc_X10Y235.dcp");
         final Path dcpCopy = tempDir.resolve(dcpPath.getFileName());
-        try {
-            Files.copy(dcpPath, dcpCopy);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e); 
-        }
-        
+        Files.copy(dcpPath, dcpCopy);
+
         Path readableEDIFDir = DesignTools.getDefaultReadableEDIFDir(dcpCopy);
         Path readableEDIF = DesignTools.getEDFAutoGenFilePath(dcpCopy, readableEDIFDir);
         Design design = Design.readCheckpoint(dcpPath, CodePerfTracker.SILENT);
@@ -76,24 +69,20 @@ public class TestDCPLoad {
         FileTools.writeStringToTextFile(Installer.calculateMD5OfFile(dcpCopy), 
                 DesignTools.getDCPAutoGenMD5FilePath(dcpCopy, readableEDIFDir).toString());
         
-        try {
-            Design.setAutoGenerateReadableEdif(true);
-            Design.readCheckpoint(dcpCopy, CodePerfTracker.SILENT);
-        }catch(RuntimeException e) {
-            Assertions.fail();
-        }
+        Design.setAutoGenerateReadableEdif(true);
+        Design.readCheckpoint(dcpCopy, CodePerfTracker.SILENT);
     }
     
     @Test
     @CheckOpenFiles
-    public void checkAutoEDIFGenerationWithVivado(@TempDir Path tempDir) {
+    public void checkAutoEDIFGenerationWithVivado(@TempDir Path tempDir) throws IOException {
+        // This test won't run in CI as Vivado is not available
+        Assumptions.assumeTrue(FileTools.isVivadoOnPath());
+        
         Path dcpPath = Paths.get("RapidWrightDCP/picoblaze_ooc_X10Y235.dcp");
         final Path dcpCopy = tempDir.resolve(dcpPath.getFileName());
-        try {
-            Files.copy(dcpPath, dcpCopy);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e); 
-        }
+        Files.copy(dcpPath, dcpCopy);
+
         Path binEdfFile = tempDir.resolve(FileTools.replaceExtension(dcpPath.getFileName(), ".edf"));
         createSimulatedBinaryEDIF(binEdfFile, FileTools.BINARY_CHECK_LENGTH+1); 
         assert(Design.replaceEDIFinDCP(dcpCopy.toString(), binEdfFile.toString()));
@@ -101,22 +90,14 @@ public class TestDCPLoad {
         Path readableEDIFDir = DesignTools.getDefaultReadableEDIFDir(dcpCopy);
         Path readableEDIF = DesignTools.getEDFAutoGenFilePath(dcpCopy, readableEDIFDir);
 
-        
-        // This test won't run in CI as Vivado is not available
-        Assumptions.assumeTrue(FileTools.isVivadoOnPath());
-
         // Modify DCP with a different binary EDIF
         createSimulatedBinaryEDIF(binEdfFile, FileTools.BINARY_CHECK_LENGTH+2); 
         assert(Design.replaceEDIFinDCP(dcpCopy.toString(), binEdfFile.toString()));
         FileTools.deleteFile(binEdfFile.toString());
         FileTools.deleteFile(readableEDIF.toString());
-        try {
-            Design.setAutoGenerateReadableEdif(true);
-            Design.readCheckpoint(dcpCopy, CodePerfTracker.SILENT);
-            Assertions.assertTrue(Files.getLastModifiedTime(readableEDIF).toMillis() >
-            Files.getLastModifiedTime(dcpPath).toMillis());
-        } catch (RuntimeException | IOException e) {
-            Assertions.fail("Exception during readCheckpoint()", e);
-        }
+        Design.setAutoGenerateReadableEdif(true);
+        Design.readCheckpoint(dcpCopy, CodePerfTracker.SILENT);
+        Assertions.assertTrue(Files.getLastModifiedTime(readableEDIF).toMillis() >
+        Files.getLastModifiedTime(dcpPath).toMillis());
     }
 }
