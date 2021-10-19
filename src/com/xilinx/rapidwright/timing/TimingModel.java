@@ -1367,7 +1367,28 @@ public class TimingModel {
 
                 if (checkNode.getSitePin() != null && checkNode.getSitePin().isInput()) {
                     String pinName = checkNode.getSitePin().getPinName();
-                    if (pinName.endsWith("1")) {
+                    if (pinName.endsWith("CKEN1")) {
+                        group.delay += SITEPIN_CKEN1_DELAY;
+                        sitepin_delay += SITEPIN_CKEN1_DELAY;
+                     } else if (pinName.endsWith("CKEN2")) {
+                        group.delay += SITEPIN_CKEN2_DELAY;
+                        sitepin_delay += SITEPIN_CKEN2_DELAY;
+                     } else if (pinName.endsWith("CKEN3")) {
+                        group.delay += SITEPIN_CKEN3_DELAY;
+                        sitepin_delay += SITEPIN_CKEN3_DELAY;
+                     } else if (pinName.endsWith("CKEN4")) {
+                        group.delay += SITEPIN_CKEN4_DELAY;
+                        sitepin_delay += SITEPIN_CKEN4_DELAY;
+                     } else if (pinName.endsWith("SRST1")) {
+                        group.delay += SITEPIN_SRST1_DELAY;
+                        sitepin_delay += SITEPIN_SRST1_DELAY;
+                     } else if (pinName.endsWith("SRST2")) {
+                        group.delay += SITEPIN_SRST2_DELAY;
+                        sitepin_delay += SITEPIN_SRST2_DELAY;
+                     } else if (pinName.endsWith("WCKEN")) {
+                        group.delay += SITEPIN_WCKEN_DELAY;
+                        sitepin_delay += SITEPIN_WCKEN_DELAY;
+                    }else if (pinName.endsWith("1")) {
                         group.delay += SITEPIN_A1_DELAY;
                         sitepin_delay += SITEPIN_A1_DELAY;
                     } else if (pinName.endsWith("2")) {
