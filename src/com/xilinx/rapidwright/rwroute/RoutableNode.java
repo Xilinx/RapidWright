@@ -65,9 +65,9 @@ public class RoutableNode implements Routable{
 	private List<Routable> children;
 	
 	/** Present congestion cost */
-	private float presentCongesCost;
+	private float presentCongestionCost;
 	/** Historical congestion cost */
-	private float historicalCongesCost;
+	private float historicalCongestionCost;
 	/** Upstream path cost */
 	private float upstreamPathCost;
 	/** Lower bound of the total path cost */
@@ -117,8 +117,8 @@ public class RoutableNode implements Routable{
 		this.target = false;
 		this.setEndTileXYCoordinates();
 		this.setBaseCost();
-		this.presentCongesCost = 1;
-    	this.historicalCongesCost = 1;
+		this.presentCongestionCost = 1;
+    	this.historicalCongestionCost = 1;
     	this.setVisited(false);
 		this.usersConnectionCounts = null;
 		this.driversCounts = null;
@@ -230,14 +230,14 @@ public class RoutableNode implements Routable{
 	}
 	
 	@Override
-	public void updatePresentCongesCost(float pres_fac) {
+	public void updatePresentCongestionCost(float pres_fac) {
 		int occ = this.getOccupancy();
 		int cap = Routable.capacity;
 		
 		if (occ < cap) {
-			this.setPresentCongesCost(1);
+			this.setPresentCongestionCost(1);
 		} else {
-			this.setPresentCongesCost(1 + (occ - cap + 1) * pres_fac);
+			this.setPresentCongestionCost(1 + (occ - cap + 1) * pres_fac);
 		}
 	}
 	
@@ -462,23 +462,23 @@ public class RoutableNode implements Routable{
 	}
 	
 	@Override
-	public float getPresentCongesCost() {
-		return presentCongesCost;
+	public float getPresentCongestionCost() {
+		return presentCongestionCost;
 	}
 
 	@Override
-	public void setPresentCongesCost(float presentCongesCost) {
-		this.presentCongesCost = presentCongesCost;
+	public void setPresentCongestionCost(float presentCongestionCost) {
+		this.presentCongestionCost = presentCongestionCost;
 	}
 
 	@Override
-	public float getHistoricalCongesCost() {
-		return historicalCongesCost;
+	public float getHistoricalCongestionCost() {
+		return historicalCongestionCost;
 	}
 
 	@Override
-	public void setHistoricalCongesCost(float historicalCongesCost) {
-		this.historicalCongesCost = historicalCongesCost;
+	public void setHistoricalCongestionCost(float historicalCongestionCost) {
+		this.historicalCongestionCost = historicalCongestionCost;
 	}
 
 	@Override

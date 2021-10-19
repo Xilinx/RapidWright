@@ -187,30 +187,27 @@ public class GlobalSignalRouting {
 		
 		RouteNode centroidHRouteNode = UltraScaleClockRouting.routeToCentroid(clk, clkRoutingLine, centroid, true, true);
 		
-		Node hroute = Node.getNode(centroidHRouteNode.getTile(), centroidHRouteNode.getWire());
-		ClockRegion crHRoute = hroute.getTile().getClockRegion();
-		System.out.println("clock region of the hroute: " + crHRoute);
-		
 		RouteNode vrouteUp;
 		RouteNode vrouteDown;	
 		// Two VROUTEs going up and down
 		vrouteUp = UltraScaleClockRouting.routeToCentroid(clk, centroidHRouteNode, centroid.getNeighborClockRegion(1, 0), true, false);	
-		
 		vrouteDown = UltraScaleClockRouting.routeToCentroid(clk, centroidHRouteNode, centroid.getNeighborClockRegion(0, 0), true, false);
 		
 		List<ClockRegion> upClockRegions = new ArrayList<>();
 		List<ClockRegion> downClockRegions = new ArrayList<>();
-		// get two sets of clock regions, pick UP set for sinks in the resions with the same row as the centroid clock region
+		// divides clock regions into two groups
 		divideClockRegions(clockRegions, centroid, upClockRegions, downClockRegions);
 		
 		List<RouteNode> upDownDistLines = new ArrayList<>();
 		List<RouteNode> upLines = UltraScaleClockRouting.routeToHorizontalDistributionLines(clk, vrouteUp, upClockRegions, false);
 		if(upLines != null) upDownDistLines.addAll(upLines);
-		List<RouteNode> downLines = UltraScaleClockRouting.routeToHorizontalDistributionLines(clk, vrouteDown, downClockRegions, true);
+		
+		List<RouteNode> downLines = UltraScaleClockRouting.routeToHorizontalDistributionLines(clk, vrouteDown, downClockRegions, true);//TODO this is where the antenna node shows up
 		if(downLines != null) upDownDistLines.addAll(downLines);
 		
 		Map<RouteNode, ArrayList<SitePinInst>> lcbMappings = getLCBPinMappings(clk);
 		UltraScaleClockRouting.routeDistributionToLCBs(clk, upDownDistLines, lcbMappings.keySet());
+		
 		UltraScaleClockRouting.routeLCBsToSinks(clk, lcbMappings);
 		
 		Set<PIP> clkPIPsWithoutDuplication = new HashSet<>();

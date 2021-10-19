@@ -30,7 +30,7 @@ import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.edif.EDIFHierPortInst;
-import com.xilinx.rapidwright.rwroute.Configuration;
+import com.xilinx.rapidwright.rwroute.RWRouteConfig;
 import com.xilinx.rapidwright.rwroute.Connection;
 import com.xilinx.rapidwright.rwroute.NetWrapper;
 import com.xilinx.rapidwright.rwroute.Routable;
@@ -54,7 +54,7 @@ public class TimingManager {
     public RuntimeTrackerTree routerTimer;
     private boolean verbose;
     
-    private short Treq;
+    private short timingRequirement;
     private float pessimismA = (float) 1.03;
     private float pessimismB = 100;
     
@@ -86,9 +86,9 @@ public class TimingManager {
             build(false);
     }
     
-    public TimingManager(Design design, boolean doBuild, RuntimeTrackerTree timer, Configuration config, ClkRouteTiming clkTiming) {
+    public TimingManager(Design design, boolean doBuild, RuntimeTrackerTree timer, RWRouteConfig config, ClkRouteTiming clkTiming) {
     	this.design = design;
-    	this.setTreq();
+    	this.setTimingRequirement();
     	this.verbose = config.isVerbose();
     	setPessimismFactors(config.getPessimismA(), config.getPessimismB());
     	this.routerTimer = timer;
@@ -191,7 +191,7 @@ public class TimingManager {
     		boolean useRoutable, Map<Node, Routable> rnodesCreated){
     	TimingVertex maxV = maxDelayTimingVertex.getSecond();
     	float maxDelay = maxDelayTimingVertex.getFirst();
-    	System.out.printf("%-30s %10d\n", "Timing requirement (ps):", Treq);
+    	System.out.printf("%-30s %10d\n", "Timing requirement (ps):", timingRequirement);
     	List<TimingEdge> criticalEdges = this.timingGraph.getCriticalTimingEdgesInOrder(maxV);
     	short arr = 0;
     	short clkskew = 0;
@@ -199,11 +199,11 @@ public class TimingManager {
     		arr += e.getDelay();
     	}
     	System.out.printf("%-30s %10d\n", "Critical path delay (ps):", (short) (arr - criticalEdges.get(0).getDelay() - clkskew));
-    	System.out.printf("%-30s %10d\n\n", "Slack (ps):", (short) (Treq - maxDelay));
+    	System.out.printf("%-30s %10d\n\n", "Slack (ps):", (short) (timingRequirement - maxDelay));
     	System.out.printf("%-30s\n", "With timing closure guarantee:");
     	short adjusted = (short) (pessimismA * (arr - criticalEdges.get(0).getDelay() - clkskew) + pessimismB);
     	System.out.printf("%-30s %10d\n", "Critical path delay (ps):", (short)adjusted);
-    	System.out.printf("%-30s %10d\n\n", "Slack (ps):", (short) (Treq - adjusted));
+    	System.out.printf("%-30s %10d\n\n", "Slack (ps):", (short) (timingRequirement - adjusted));
     	
     	this.printPathDelayBreakDown(arr, criticalEdges, timingEdgeConnctionMap, useRoutable, rnodesCreated);
     }
@@ -287,11 +287,11 @@ public class TimingManager {
     /**
      * Set the timing requirement of the design
      */
-    public void setTreq() {
-    	Treq = (short) (getDesignTimingReq(this.design) * 1000);
+    public void setTimingRequirement() {
+    	timingRequirement = (short) (getDesignTimingRequirement(this.design) * 1000);
     }
     
-    public static float getDesignTimingReq(Design design) {
+    public static float getDesignTimingRequirement(Design design) {
 		float treq = 0;
 		
 		ConstraintGroup[] constraintGroups = {ConstraintGroup.NORMAL, ConstraintGroup.LATE};
@@ -313,7 +313,7 @@ public class TimingManager {
      * Calculates criticality for each connection.
      * @param connections Connections in question.
      * @param maxCriticality The maximum criticality value.
-     * @param criticalityExponent The criticality exponent to use. For more information, please refer to the {@link Configuration} class file.
+     * @param criticalityExponent The criticality exponent to use. For more information, please refer to the {@link RWRouteConfig} class file.
      * @param maxDelay The maximum delay used to normalize the slack of a connection.
      */
     public void calculateCriticality(List<Connection> connections, float maxCriticality, float criticalityExponent, float maxDelay){

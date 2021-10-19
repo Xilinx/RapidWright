@@ -39,7 +39,7 @@ import com.xilinx.rapidwright.util.Pair;
  * The logic delay of each DSP block is parsed from a text file that can obtained 
  * by running Vivado with the Tcl script dump_all_dsp_delay.tcl under $RAPIDWRIGHT_PATH/tcl/rwroute.
  * For more information of how to generate DSP timing files of a design, please refer to the Tcl script.
- * When the DSP timing files are ready, please use "--dspTimingDataFolder" option (see {@link Configuration}),
+ * When the DSP timing files are ready, please use "--dspTimingDataFolder" option (see {@link RWRouteConfig}),
  * so that the DSP timing info becomes accessible for RWRoute.
  */
 public class DSPTimingData{
@@ -49,7 +49,7 @@ public class DSPTimingData{
 	 * <<Input port name, output port name>, logic delay from the input port to the output port>,
 	 *  e.g. <A[1], PCOUT[1]>, 1527
 	 */
-	private Map<Pair<String, String>, Short> inOutPortDelays;
+	private Map<Pair<String, String>, Short> inputOutputDelays;
 	/** 
 	 * Two separate lists of input and output EDIFPortInst names, 
 	 * used for checking if an EDIFPortInst is included in the timing file
@@ -93,7 +93,7 @@ public class DSPTimingData{
         		fileExistenceWarningInfo = true;
         	}
         }
-    	this.setInOutPortDelays(new HashMap<>());
+    	this.setInputOutputDelays(new HashMap<>());
 		this.inputPorts = new ArrayList<>();
 		this.outputPorts = new ArrayList<>();
 		
@@ -139,11 +139,11 @@ public class DSPTimingData{
 					String[] s = line.split("\\s+");
 					if(s.length == 3) {
 						// clk    P[10]            1.62
-						this.addInputOutPutPorts("CLK", s[1], (short) (Float.parseFloat(s[2])*1000));
+						this.addInputOutputPortDelay("CLK", s[1], (short) (Float.parseFloat(s[2])*1000));
 					}else {
 						// CEA2     clk       0.00       0.16
 						// introducing virtual clk: VCLK, which is connected to superSink in timing graph
-						this.addInputOutPutPorts(s[0], "VCLK", (short) (Float.parseFloat(s[2])*1000 + Float.parseFloat(s[3])*1000));
+						this.addInputOutputPortDelay(s[0], "VCLK", (short) (Float.parseFloat(s[2])*1000 + Float.parseFloat(s[3])*1000));
 					}
 					
 				}else if(line.contains(":")) {
@@ -154,13 +154,13 @@ public class DSPTimingData{
 						for(short ido = idin; ido <= Short.parseShort(s[5]); ido++) {
 							String in = s[0]+"[" + idin + "]";
 							String out = s[3]+"[" + ido + "]";
-							this.addInputOutPutPorts(in, out, (short) (Float.parseFloat(s[6])*1000));
+							this.addInputOutputPortDelay(in, out, (short) (Float.parseFloat(s[6])*1000));
 						}
 					}
 					
 				}else if(line.contains("[")) {
 					String[] s = line.split("\\s+");
-					this.addInputOutPutPorts(s[0], s[1], (short) (Float.parseFloat(s[2])*1000));
+					this.addInputOutputPortDelay(s[0], s[1], (short) (Float.parseFloat(s[2])*1000));
 				}
 			}
 		}
@@ -184,10 +184,10 @@ public class DSPTimingData{
 	 * @param out The output port name.
 	 * @param delay The delay from in to out.
 	 */
-	private void addInputOutPutPorts(String in, String out, short delay) {	
+	private void addInputOutputPortDelay(String in, String out, short delay) {	
 		this.inputPorts.add(in);
 		this.outputPorts.add(out);
-		this.getInOutPortDelays().put(new Pair<>(in, out), delay);
+		this.getInputOutputDelays().put(new Pair<>(in, out), delay);
 	}
 	
 	/**
@@ -218,12 +218,12 @@ public class DSPTimingData{
 		return this.getBlockName().hashCode();
 	}
 
-	public Map<Pair<String, String>, Short> getInOutPortDelays() {
-		return inOutPortDelays;
+	public Map<Pair<String, String>, Short> getInputOutputDelays() {
+		return inputOutputDelays;
 	}
 
-	public void setInOutPortDelays(Map<Pair<String, String>, Short> inOutPortDelays) {
-		this.inOutPortDelays = inOutPortDelays;
+	public void setInputOutputDelays(Map<Pair<String, String>, Short> inOutPortDelays) {
+		this.inputOutputDelays = inOutPortDelays;
 	}
 
 	public String getBlockName() {

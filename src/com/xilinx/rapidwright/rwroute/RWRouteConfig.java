@@ -28,7 +28,7 @@ package com.xilinx.rapidwright.rwroute;
  * Modifications of default parameter values can be done by adding corresponding options with values to the arguments.
  * Each option (i.e. one of the parameters) name must start with two dashes. Values of parameters do not need dashes.
  */
-public class Configuration {
+public class RWRouteConfig {
 	/** Allowed max number of routing iterations */
 	private short maxIterations;
 	/** Routing bounding box constraint */
@@ -58,11 +58,11 @@ public class Configuration {
 	/** The maximum percentage of critical connections to be rerouted */
 	private short reroutePercentage;
 	/** Initial present congestion penalty factor */
-	private float initialPresentCongesFac; 
+	private float initialPresentCongestionFac; 
 	/** The multiplier factor for present congestion update */
-	private float presentCongesMultiplier; 
+	private float presentCongestionMultiplier; 
 	/** Historical congestion penalty factor */
-	private float historicalCongesFac;
+	private float historicalCongestionFac;
 	/** true to enable timing-aware routing */
 	private boolean timingDriven;
 	/** true to enable partial routing */
@@ -87,7 +87,7 @@ public class Configuration {
 	private boolean printConnectionSpan;
 	
 	/** Constructs a Configuration Object */
-	public Configuration(String[] arguments) {
+	public RWRouteConfig(String[] arguments) {
 		this.maxIterations = (short) 100;
 		this.useBoundingBox = true;
 		this.boundingBoxExtensionX = (short) 3;
@@ -102,12 +102,13 @@ public class Configuration {
 		this.criticalityExponent = 3;
 		this.minRerouteCriticality = 0.85f;
 		this.reroutePercentage = (short) 3;
-		this.initialPresentCongesFac = 0.5f;
-		this.presentCongesMultiplier = 2f;
-		this.historicalCongesFac = 1f;
+		this.initialPresentCongestionFac = 0.5f;
+		this.presentCongestionMultiplier = 2f;
+		this.historicalCongestionFac = 1f;
 		this.timingDriven = true;
 		this.partialRouting = false;
 		this.softPreserve = false;
+		this.clkRouteTiming = null;
 		this.pessimismA = 1.03f;
 		this.pessimismB = (short) 100;
 		this.maskNodesCrossRCLK = false;
@@ -176,14 +177,14 @@ public class Configuration {
 			case "--reroutePercentage":
 				this.setReroutePercentage(Short.parseShort(arguments[++i]));
 				break;
-			case "--initialPresentCongesFac":
-				this.setInitialPresentCongesFac(Float.parseFloat(arguments[++i]));
+			case "--initialPresentCongestionFac":
+				this.setInitialPresentCongestionFac(Float.parseFloat(arguments[++i]));
 				break;
-			case "--presentCongesMultiplier":
-				this.setPresentCongesMultiplier(Float.parseFloat(arguments[++i]));
+			case "--presentCongestionMultiplier":
+				this.setPresentCongestionMultiplier(Float.parseFloat(arguments[++i]));
 				break;
-			case "--historicalCongesFac":
-				this.setHistoricalCongesFac(Float.parseFloat(arguments[++i]));
+			case "--historicalCongestionFac":
+				this.setHistoricalCongestionFac(Float.parseFloat(arguments[++i]));
 				break;
 			case "--timingDriven":
 				this.setTimingDriven(true);
@@ -527,20 +528,20 @@ public class Configuration {
 	 * Can be modified by using "--initialPresentCongesFac" option, e.g. "--initialPresentCongesFac 1".
 	 * @return The initial present congestion cost penalty factor.
 	 */
-	public float getInitialPresentCongesFac() {
-		return this.initialPresentCongesFac;
+	public float getInitialPresentCongestionFac() {
+		return this.initialPresentCongestionFac;
 	}
 
 	/**
 	 * Sets the initial present congestion cost penalty factor.
 	 * It should be greater than 0. Default: 0.5.
 	 * Can be modified by using "--initialPresentCongesFac" option, e.g. "--initialPresentCongesFac 1".
-	 * @param initialPresentCongesFac
+	 * @param initialPresentCongestionFac
 	 */
-	public void setInitialPresentCongesFac(float initialPresentCongesFac) {
-		if(initialPresentCongesFac < 0)
+	public void setInitialPresentCongestionFac(float initialPresentCongestionFac) {
+		if(initialPresentCongestionFac < 0)
 			throw new IllegalArgumentException("ERROR: initialPresentCongesFac cannot be negative.");
-		this.initialPresentCongesFac = initialPresentCongesFac;
+		this.initialPresentCongestionFac = initialPresentCongestionFac;
 	}
 
 	/**
@@ -549,20 +550,20 @@ public class Configuration {
 	 * Can be modified by using "--presentCongesMultiplier" option, e.g. "--presentCongesMultiplier 3".
 	 * @return
 	 */
-	public float getPresentCongesMultiplier() {
-		return this.presentCongesMultiplier;
+	public float getPresentCongestionMultiplier() {
+		return this.presentCongestionMultiplier;
 	}
 
 	/**
 	 * Sets the present congestion factor multiplier.
 	 * It should be greater than 1. Default: 2.
 	 * Can be modified by using "--presentCongesMultiplier" option, e.g. "--presentCongesMultiplier 3".
-	 * @param presentCongesMultiplier
+	 * @param presentCongestionMultiplier
 	 */
-	public void setPresentCongesMultiplier(float presentCongesMultiplier) {
-		if(presentCongesMultiplier <= 1)
+	public void setPresentCongestionMultiplier(float presentCongestionMultiplier) {
+		if(presentCongestionMultiplier <= 1)
 			throw new IllegalArgumentException("ERROR: the present congestion factor multiplier cannot be less than 1.");
-		this.presentCongesMultiplier = presentCongesMultiplier;
+		this.presentCongestionMultiplier = presentCongestionMultiplier;
 	}
 
 	/**
@@ -571,8 +572,8 @@ public class Configuration {
 	 * Can be modified by using "--historicalCongesFac" option, e.g. "--historicalCongesFac 2".
 	 * @return
 	 */
-	public float getHistoricalCongesFac() {
-		return this.historicalCongesFac;
+	public float getHistoricalCongestionFac() {
+		return this.historicalCongestionFac;
 	}
 
 	/**
@@ -581,10 +582,10 @@ public class Configuration {
 	 * Can be modified by using "--historicalCongesFac" option, e.g. "--historicalCongesFac 2".
 	 * @param historicalCongesFac
 	 */
-	public void setHistoricalCongesFac(float historicalCongesFac) {
+	public void setHistoricalCongestionFac(float historicalCongesFac) {
 		if(historicalCongesFac <= 0)
 			throw new IllegalArgumentException("ERROR: historicalCongesFac cannot be less than 0.");
-		this.historicalCongesFac = historicalCongesFac;
+		this.historicalCongestionFac = historicalCongesFac;
 	}
 
 	/**
@@ -868,9 +869,9 @@ public class Configuration {
 		}
 		s.append(formatString("Mask nodes across RCLK: ", this.maskNodesCrossRCLK));
 		s.append(formatString("Include U-turn nodes: ", this.useUTurnNodes));
-		s.append(formatString("Initial present conges fac: ", this.initialPresentCongesFac));
-		s.append(formatString("Present conges fac mult: ", this.presentCongesMultiplier));
-		s.append(formatString("Historical conges fac: ", this.historicalCongesFac));
+		s.append(formatString("Initial present conges fac: ", this.initialPresentCongestionFac));
+		s.append(formatString("Present conges fac mult: ", this.presentCongestionMultiplier));
+		s.append(formatString("Historical conges fac: ", this.historicalCongestionFac));
 		
 		return s.toString();
 	}

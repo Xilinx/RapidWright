@@ -62,10 +62,10 @@ public class TimingAndWirelengthReport{
 	private Map<IntentCode, Long> nodeTypeUsage ;
 	private Map<IntentCode, Long> nodeTypeLength;
 	
-	public TimingAndWirelengthReport(Design design, Configuration config) {
+	public TimingAndWirelengthReport(Design design, RWRouteConfig config) {
 		this.design = design;
 		DSPTimingData.setDSPTimingFolder(config.getDspTimingDataFolder());
-		this.timingManager = new TimingManager(this.design, true, null, config, new ClkRouteTiming(config.getClkRouteTiming()));		
+		this.timingManager = new TimingManager(this.design, true, null, config, RWRoute.createClkTimingData(config));		
 	    this.estimator = new DelayEstimatorBase(this.design.getDevice(), new InterconnectInfo(), config.isUseUTurnNodes(), 0);
 		RoutableNode.setTimingDriven(true, this.estimator);
 		this.wirelength = 0;
@@ -192,7 +192,7 @@ public class TimingAndWirelengthReport{
 		//design manipulations are necessary, otherwise there will be problems in associating timing edges with connections.
 		DesignTools.makePhysNetNamesConsistent(design);
 		DesignTools.createMissingSitePinInsts(design);
-		Configuration config = new Configuration(args);
+		RWRouteConfig config = new RWRouteConfig(args);
 		config.setPartialRouting(false);
 		config.setTimingDriven(true);
 		TimingAndWirelengthReport reporter = new TimingAndWirelengthReport(design, config);	

@@ -63,7 +63,7 @@ import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
 
 /**
  * RWRoute class provides the main methods for routing a design.
- * Creating a RWRoute Object needs a {@link Design} Object and a {@link Configuration} Object.
+ * Creating a RWRoute Object needs a {@link Design} Object and a {@link RWRouteConfig} Object.
  */
 public class RWRoute{
 	/** The design to route */
@@ -92,12 +92,12 @@ public class RWRoute{
 	private int numNotNeedingRoutingNets;
 	private int numUnrecognizedNets;
 	
-	/** A {@link Configuration} instance consisting of a list of routing parameters */
-	protected Configuration config;
+	/** A {@link RWRouteConfig} instance consisting of a list of routing parameters */
+	protected RWRouteConfig config;
 	/** The present congestion cost factor */
-	private float presentCongesFac;
+	private float presentCongestionFac;
 	/** The historical congestion cost factor */
-	private float historicalCongesFac;
+	private float historicalCongestionFac;
 	/** Wirelength-driven weighting factor */
 	private float wlWeight;
 	/** 1 - wlWeight */
@@ -115,7 +115,7 @@ public class RWRoute{
 	private RuntimeTrackerTree routerTimer;
 	private RuntimeTracker rnodesTimer;
 	private RuntimeTracker updateTimingTimer;
-	private RuntimeTracker updateCongesFacCosts;
+	private RuntimeTracker updateCongestionFacCosts;
 	/** An instantiation of RouteThruHelper to avoid route-thrus in the routing resource graph */
 	private RouteThruHelper routethruHelper;
 	
@@ -172,7 +172,7 @@ public class RWRoute{
 	/** A map storing routes from CLK_OUT to different INT tiles that connect to sink pins of a global clock net */
 	private Map<String, List<String>> routesToSinkINTTiles;
 	
-	public RWRoute(Design design, Configuration config){
+	public RWRoute(Design design, RWRouteConfig config){
 		this.design = design;
 		this.multiSLRDevice = this.design.getDevice().getSLRs().length > 1;
 		
@@ -180,7 +180,7 @@ public class RWRoute{
 		this.routerTimer = new RuntimeTrackerTree("Route design", this.config.isVerbose());
 		this.rnodesTimer = this.routerTimer.createStandAloneRuntimeTracker("rnodes creation");
 		this.updateTimingTimer = this.routerTimer.createStandAloneRuntimeTracker("update timing");
-		this.updateCongesFacCosts = this.routerTimer.createStandAloneRuntimeTracker("update conges costs");
+		this.updateCongestionFacCosts = this.routerTimer.createStandAloneRuntimeTracker("update conges costs");
 		this.routerTimer.createRuntimeTracker("Initialization", this.routerTimer.getRootRuntimeTracker()).start();
 		
 		RoutableNode.setMaskNodesCrossRCLK(this.config.isMaskNodesCrossRCLK());
@@ -188,6 +188,7 @@ public class RWRoute{
 		if(this.config.isTimingDriven()) {
 			DSPTimingData.setDSPTimingFolder(config.getDspTimingDataFolder());
 			ClkRouteTiming clkTiming = this.createClkTimingData(config);
+			this.routesToSinkINTTiles = clkTiming == null? null : clkTiming.getRoutesToSinkINTTiles();
 			this.timingManager = new TimingManager(this.design, true, this.routerTimer, this.config, clkTiming);		
 		    this.estimator = new DelayEstimatorBase(this.design.getDevice(), new InterconnectInfo(), this.config.isUseUTurnNodes(), 0);
 			RoutableNode.setTimingDriven(true, this.estimator);
@@ -233,14 +234,13 @@ public class RWRoute{
 	}
 	
 	/**
-	 * Creates clock routing related inputs based on the {@link Configuration} instance.
-	 * @param config The {@link Configuration} instance to use.
+	 * Creates clock routing related inputs based on the {@link RWRouteConfig} instance.
+	 * @param config The {@link RWRouteConfig} instance to use.
 	 */
-	public ClkRouteTiming createClkTimingData(Configuration config) {
+	public static ClkRouteTiming createClkTimingData(RWRouteConfig config) {
 		String clkRouteTimingFile = config.getClkRouteTiming();
 		if(clkRouteTimingFile != null) {
 			ClkRouteTiming clkTiming = new ClkRouteTiming(clkRouteTimingFile);
-			this.routesToSinkINTTiles = clkTiming.getRoutesToSinkINTTiles();
 			return clkTiming;
 		}
 		return null;
@@ -645,8 +645,8 @@ public class RWRoute{
 		this.rnodesVisited.clear();
 		this.queue.clear(); 	
 		this.routeIteration = 1;
-		this.historicalCongesFac = this.config.getHistoricalCongesFac();
-		this.presentCongesFac = this.config.getInitialPresentCongesFac();
+		this.historicalCongestionFac = this.config.getHistoricalCongestionFac();
+		this.presentCongestionFac = this.config.getInitialPresentCongestionFac();
 		this.timingWeight = this.config.getTimingWeight();
 		this.wlWeight = this.config.getWirelengthWeight();
 		this.oneMinusTimingWeight = 1 - this.timingWeight;
@@ -659,7 +659,7 @@ public class RWRoute{
 	 */
 	public void route(){
 		// Prints the design and configuration info, if "--verbose" is configured
-		this.printDesignNetsInfoAndConfiguration(this.config.isVerbose());
+		this.printDesignNetsAndConfigurationInfo(this.config.isVerbose());
 		
 		this.routerTimer.createRuntimeTracker("Routing", this.routerTimer.getRootRuntimeTracker()).start();
 		MessageGenerator.printHeader("Route Design");
@@ -687,9 +687,9 @@ public class RWRoute{
 		// Adds child timers to "route wire nets" timer
 		routeWireNets.addChild(this.rnodesTimer);
 		// Do not time the cost evaluation method for routing connections, the timer itself takes time
-		this.routerTimer.createRuntimeTracker("route connections", "route wire nets").setTime(routeWireNets.getTime() - this.rnodesTimer.getTime() - this.updateTimingTimer.getTime() - this.updateCongesFacCosts.getTime());
+		this.routerTimer.createRuntimeTracker("route connections", "route wire nets").setTime(routeWireNets.getTime() - this.rnodesTimer.getTime() - this.updateTimingTimer.getTime() - this.updateCongestionFacCosts.getTime());
 		routeWireNets.addChild(this.updateTimingTimer);
-		routeWireNets.addChild(this.updateCongesFacCosts);
+		routeWireNets.addChild(this.updateCongestionFacCosts);
 		
 		this.routerTimer.createRuntimeTracker("finalize routes", "Routing").start();
 		// Assigns a list of nodes to each direct and indirect connection that has been routed and fix illegal routes if any
@@ -909,7 +909,7 @@ public class RWRoute{
 	private void assignNodesToConnections() {
 		for(Connection connection:this.sortedIndirectConnections){
 			connection.newNodes();
-			List<Node> switchBoxToSink = RouterHelper.findPathBetweenTwoNodes(connection.getSinkRnode().getNode(), connection.getSink().getConnectedNode());
+			List<Node> switchBoxToSink = RouterHelper.findPathBetweenNodes(connection.getSinkRnode().getNode(), connection.getSink().getConnectedNode());
 			if(switchBoxToSink.size() >= 2) {			
 				for(int i = 0; i < switchBoxToSink.size() -1; i++) {
 					connection.addNode(switchBoxToSink.get(i));
@@ -920,7 +920,7 @@ public class RWRoute{
 				connection.addNode(rnode.getNode());
 			}
 			
-			List<Node> sourceToSwitchBox = RouterHelper.findPathBetweenTwoNodes(connection.getSource().getConnectedNode(), connection.getSourceRnode().getNode());
+			List<Node> sourceToSwitchBox = RouterHelper.findPathBetweenNodes(connection.getSource().getConnectedNode(), connection.getSourceRnode().getNode());
 			if(sourceToSwitchBox.size() >= 2) {
 				for(int i = 1; i <= sourceToSwitchBox.size() - 1; i++) {
 					connection.addNode(sourceToSwitchBox.get(i));
@@ -1002,14 +1002,14 @@ public class RWRoute{
 	 * Updates the congestion cost factors.
 	 */
 	private void updateCostFactors(){
-		this.updateCongesFacCosts.start();
+		this.updateCongestionFacCosts.start();
 		if (this.routeIteration == 1) {
-			this.presentCongesFac = this.config.getInitialPresentCongesFac();
+			this.presentCongestionFac = this.config.getInitialPresentCongestionFac();
 		} else {
-			this.presentCongesFac *= this.config.getPresentCongesMultiplier();
+			this.presentCongestionFac *= this.config.getPresentCongestionMultiplier();
 		}
-		this.updateCost(this.presentCongesFac, this.historicalCongesFac);
-		this.updateCongesFacCosts.stop();
+		this.updateCost(this.presentCongestionFac, this.historicalCongestionFac);
+		this.updateCongestionFacCosts.stop();
 	}
 	
 	/**
@@ -1022,11 +1022,11 @@ public class RWRoute{
 		for(Routable rnode:this.rnodesCreated.values()){
 			int overuse =rnode.getOccupancy() - Routable.capacity;
 			if(overuse == 0) {
-				rnode.setPresentCongesCost(1 + presentCongesFac);
+				rnode.setPresentCongestionCost(1 + presentCongesFac);
 			} else if (overuse > 0) {
 				this.overUsedRnodes.add(rnode.getIndex());
-				rnode.setPresentCongesCost(1 + (overuse + 1) * presentCongesFac);
-				rnode.setHistoricalCongesCost(rnode.getHistoricalCongesCost() + overuse * historicalCongesFac);
+				rnode.setPresentCongestionCost(1 + (overuse + 1) * presentCongesFac);
+				rnode.setHistoricalCongestionCost(rnode.getHistoricalCongestionCost() + overuse * historicalCongesFac);
 			}
 		}
 	}
@@ -1169,7 +1169,7 @@ public class RWRoute{
 	private void ripUp(Connection connection){
 		for(Routable rnode : connection.getRnodes()) {
 			rnode.decrementUser(connection.getNetWrapper());
-			rnode.updatePresentCongesCost(this.presentCongesFac);
+			rnode.updatePresentCongestionCost(this.presentCongestionFac);
 		}
 	}
 	
@@ -1180,7 +1180,7 @@ public class RWRoute{
 	private void updateUsersAndPresentCongesCost(Connection connection){
 		for(Routable rnode : connection.getRnodes()) {
 			rnode.incrementUser(connection.getNetWrapper());
-			rnode.updatePresentCongesCost(this.presentCongesFac);
+			rnode.updatePresentCongestionCost(this.presentCongestionFac);
 		}
 	}
 	
@@ -1191,7 +1191,7 @@ public class RWRoute{
 		for(NetWrapper netWrapper:this.nets){
 			Set<PIP> netPIPs = new HashSet<>();
 			for(Connection connection:netWrapper.getConnections()){
-				netPIPs.addAll(RouterHelper.connectionPIPs(connection));
+				netPIPs.addAll(RouterHelper.getConnectionPIPs(connection));
 			}
 			netWrapper.getNet().setPIPs(netPIPs);
 		}
@@ -1574,9 +1574,9 @@ public class RWRoute{
 		if(hasSameSourceUsers) {// the rnode is used by other connection(s) from the same net
 			int overoccupancy = rnode.getOccupancy() - Routable.capacity;
 			// make the congestion cost less for the current connection
-			presentCongesCost = 1 + overoccupancy * this.presentCongesFac;
+			presentCongesCost = 1 + overoccupancy * this.presentCongestionFac;
 		}else{
-			presentCongesCost = rnode.getPresentCongesCost();
+			presentCongesCost = rnode.getPresentCongestionCost();
 		}
 		
 		float biasCost = 0;
@@ -1586,7 +1586,7 @@ public class RWRoute{
 					(Math.abs(rnode.getEndTileXCoordinate() - net.getXCenter()) + Math.abs(rnode.getEndTileYCoordinate() - net.getYCenter())) / net.getDoubleHpwl();
 		}
 		
-		return rnode.getBaseCost() * rnode.getHistoricalCongesCost() * presentCongesCost / sharingFactor + biasCost;
+		return rnode.getBaseCost() * rnode.getHistoricalCongestionCost() * presentCongesCost / sharingFactor + biasCost;
 	}
 	
 	/**
@@ -1646,7 +1646,7 @@ public class RWRoute{
 		return totalSitePins;
 	}
 	
-	private void printDesignNetsInfoAndConfiguration(boolean verbose) {
+	private void printDesignNetsAndConfigurationInfo(boolean verbose) {
 		this.printDesignInfo(verbose);
 		this.printConfiguration(verbose);
 	}
@@ -1741,7 +1741,7 @@ public class RWRoute{
 	 * @param design The {@link Design} instance to be routed.
 	 */
 	public static Design routeDesignFullTimingDriven(Design design) {
-		return routeDesign(design, new Configuration(null));
+		return routeDesign(design, new RWRouteConfig(null));
 	}
 	
 	/**
@@ -1749,7 +1749,7 @@ public class RWRoute{
 	 * @param design The {@link Design} instance to be routed.
 	 */
 	public static Design routeDesignFullNonTimingDriven(Design design) {
-		return routeDesign(design, new Configuration(new String[] {"--nonTimingDriven", "--verbose"}));
+		return routeDesign(design, new RWRouteConfig(new String[] {"--nonTimingDriven", "--verbose"}));
 	}
 	
 	/**
@@ -1757,29 +1757,29 @@ public class RWRoute{
 	 * @param design The {@link Design} instance to be routed.
 	 */
 	public static Design routeDesignPartialNonTimingDriven(Design design) {
-		return routeDesign(design, new Configuration(new String[] {"--partialRouting", "--fixBoundingBox", "--nonTimingDriven", "--verbose"}));
+		return routeDesign(design, new RWRouteConfig(new String[] {"--partialRouting", "--fixBoundingBox", "--nonTimingDriven", "--verbose"}));
 	}
 	
 	/**
 	 * Routes a {@link Design} instance.
 	 * @param design The {@link Design} instance to be routed.
 	 * @param args An array of string arguments, can be null. 
-	 * If null, the design will be routed in the full timing-driven routing mode with default a {@link Configuration} instance.
-	 * For more options of the configuration, please refer to the {@link Configuration} class.
+	 * If null, the design will be routed in the full timing-driven routing mode with default a {@link RWRouteConfig} instance.
+	 * For more options of the configuration, please refer to the {@link RWRouteConfig} class.
 	 * @return Routed design.
 	 */
 	public static Design routeDesignWithUserDefinedArguments(Design design, String[] args) {
-		// Instantiates a Configuration Object and parses the arguments.
+		// Instantiates a RWRouteConfig Object and parses the arguments.
 		// Uses the default configuration if basic usage only.
-		return routeDesign(design, new Configuration(args));
+		return routeDesign(design, new RWRouteConfig(args));
 	}
 	
 	/**
 	 * Routes a design after pre-processing.
 	 * @param design The {@link Design} instance to be routed.
-	 * @param config A {@link Configuration} instance consisting of customizable parameters to use.
+	 * @param config A {@link RWRouteConfig} instance consisting of customizable parameters to use.
 	 */
-	private static Design routeDesign(Design design, Configuration config) {
+	private static Design routeDesign(Design design, RWRouteConfig config) {
 		// Pre-processing of the design regarding physical net names pins
 		DesignTools.makePhysNetNamesConsistent(design);
 		if(!config.isPartialRouting() || (!design.getVccNet().hasPIPs() && !design.getGndNet().hasPIPs())) {
@@ -1803,10 +1803,10 @@ public class RWRoute{
 	
 	/**
 	 * The main interface of {@link RWRoute} that reads in a {@link Design} checkpoint, 
-	 * and parses the arguments for the {@link Configuration} Object of the router.
+	 * and parses the arguments for the {@link RWRouteConfig} Object of the router.
 	 * It also instantiates a {@link RWRoute} Object or a {@link PartialRouter}
 	 * based on the partialRouting parameter and calls the route method to route the design.
-	 * @param args An array of strings that are used to create a {@link Configuration} Object for the router.
+	 * @param args An array of strings that are used to create a {@link RWRouteConfig} Object for the router.
 	 */
 	public static void main(String[] args) {
 		if(args.length < 2){

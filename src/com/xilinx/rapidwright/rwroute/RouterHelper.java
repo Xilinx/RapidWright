@@ -190,7 +190,7 @@ public class RouterHelper {
 	 * @param connection The {@link Connection} instance that has been routed with a list of {@link Node} instances.
 	 * @return A list of PIPs for the connection.
 	 */
-	public static List<PIP> connectionPIPs(Connection connection){
+	public static List<PIP> getConnectionPIPs(Connection connection){
 		return getPIPsFromListOfReversedNodes(connection.getNodes());
 	}
 	
@@ -206,7 +206,7 @@ public class RouterHelper {
 		for(int i = connectionNodes.size() -1; i > 0; i--){
 			Node driver = connectionNodes.get(i);
 			Node load = connectionNodes.get(i-1);		
-			PIP pip = findThePIPbetweenTwoNodes(driver, load);		
+			PIP pip = findPIPbetweenNodes(driver, load);	
 			if(pip != null){
 				connectionPIPs.add(pip);
 			}else{
@@ -222,7 +222,7 @@ public class RouterHelper {
 	 * @param load The load node.
 	 * @return The PIP connecting the two nodes.
 	 */
-	public static PIP findThePIPbetweenTwoNodes(Node driver, Node load){
+	public static PIP findPIPbetweenNodes(Node driver, Node load){
 		PIP pip = getPIP(load.getTile(), driver.getAllWiresInNode(), load.getWire());
 		if(pip == null) {
 			// for other scenarios regarding bidirectional nodes, such as LAG tile nodes, LAG_LAG_X12Y250/LAG_MUX_ATOM_0_TXOUT to node LAG_LAG_X12Y310/UBUMP0 
@@ -510,7 +510,7 @@ public class RouterHelper {
 	 */
 	public static boolean routeDirectConnection(Connection directConnection){
 		directConnection.newNodes();
-		directConnection.setNodes(findPathBetweenTwoNodes(directConnection.getSource().getConnectedNode(), directConnection.getSink().getConnectedNode()));
+		directConnection.setNodes(findPathBetweenNodes(directConnection.getSource().getConnectedNode(), directConnection.getSink().getConnectedNode()));
 		return directConnection.getNodes() != null? true : false;
 	}
 	
@@ -520,7 +520,7 @@ public class RouterHelper {
 	 * @param sink The sink node.
 	 * @return A list of nodes making up the path.
 	 */
-	public static List<Node> findPathBetweenTwoNodes(Node source, Node sink){
+	public static List<Node> findPathBetweenNodes(Node source, Node sink){
 		List<Node> path = new ArrayList<>();		
 		if(source.equals(sink)) {
 			return path; // for pins without additional projected int_node	

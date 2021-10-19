@@ -34,7 +34,7 @@ import com.xilinx.rapidwright.design.SitePinInst;
  * A class extends {@link RWRoute} for partial routing.
  */
 public class PartialRouter extends RWRoute{
-	public PartialRouter(Design design, Configuration config){
+	public PartialRouter(Design design, RWRouteConfig config){
 		super(design, config);
 	}
 	

@@ -105,9 +105,9 @@ public interface Routable {
 	public void setTarget(boolean isTarget);
 	/**
 	 * Updates the present congestion cost based on the present congestion penalty factor.
-	 * @param presentCongesFac The present congestion penalty factor .
+	 * @param presentCongestionFac The present congestion penalty factor .
 	 */
-	public void updatePresentCongesCost(float presentCongesFac);
+	public void updatePresentCongestionCost(float presentCongestionFac);
 	/**
 	 * Gets the base cost of a Routable Object.
 	 * @return The base cost of a Routable Object.
@@ -117,22 +117,22 @@ public interface Routable {
 	 * Gets the present congestion cost of a Routable Object.
 	 * @return The present congestion of a Routable Object.
 	 */
-	public float getPresentCongesCost();
+	public float getPresentCongestionCost();
 	/**
 	 * Sets the present congestion cost of a Routable Object.
-	 * @param presentCongesCost The present congestion cost to be set.
+	 * @param presentCongestionCost The present congestion cost to be set.
 	 */
-	public void setPresentCongesCost(float presentCongesCost);
+	public void setPresentCongestionCost(float presentCongestionCost);
 	/**
 	 * Gets the historical congestion cost of a Routable Object.
 	 * @return The historical congestion cost of a Routable Object.
 	 */
-	public float getHistoricalCongesCost();
+	public float getHistoricalCongestionCost();
 	/**
 	 * Gets the historical congestion cost of a Routable Object.
-	 * @param historicalCongesCost The historical congestion cost to be set.
+	 * @param historicalCongestionCost The historical congestion cost to be set.
 	 */
-	public void setHistoricalCongesCost(float historicalCongesCost);
+	public void setHistoricalCongestionCost(float historicalCongestionCost);
 	/**
 	 * Checks if coordinates of a Routable Object is within the connection's bounding box.
 	 * @param connection The connection that is being routed.

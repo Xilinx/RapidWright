@@ -34,7 +34,7 @@ import java.util.Map;
 /**
  * A ClkRouteTiming instance stores the clock route and timing template data.
  * To obtain a template file, please refer to find_clock_route_template.tcl under $RAPIDWRIGHT_PATH/tcl/rwroute.
- * When a clock route timing template file is ready, please use "--clkRouteTiming>" option (see {@link Configuration})
+ * When a clock route timing template file is ready, please use "--clkRouteTiming>" option (see {@link RWRouteConfig})
  * to enable RWRoute to use the file for timing-driven clock routing.
  */
 public class ClkRouteTiming {

@@ -1545,13 +1545,13 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         // the overall info of top level inputs and outputs of DSP blocks available after the loop
         // DSP delays CLK to Q, IN to CLK, IN to OUT are handled here
         for(DSPTimingData dspTimingData : dspTimingDataSet) {
-        	for(Pair<String, String> inOut : dspTimingData.getInOutPortDelays().keySet()) {
+        	for(Pair<String, String> inOut : dspTimingData.getInputOutputDelays().keySet()) {
         		TimingVertex v1 = newTimingVertex(dspTimingData.getBlockName() + "/" + inOut.getFirst());
                 TimingVertex v2 = newTimingVertex(dspTimingData.getBlockName() + "/" + inOut.getSecond());
                 TimingEdge e = new TimingEdge(this, v1, v2, null, new Net());
                
                 safeAddEdge(e.getSrc(), e.getDst(), e);
-                e.setLogicDelay(dspTimingData.getInOutPortDelays().get(inOut));
+                e.setLogicDelay(dspTimingData.getInputOutputDelays().get(inOut));
                 setEdgeWeight(e, e.getDelay());
         	}
         }   
