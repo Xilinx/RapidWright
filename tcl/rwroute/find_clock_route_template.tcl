@@ -52,7 +52,7 @@
 #   1) Specify BUFG location (bufg_site)
 #   2) Specify an INT tile to access BUFG. (src_int_tiles) (TODO: better enforce this access point.)
 #   3) Specify the list of sink INT tiles (dst_int_tiles)
-#   4) Run the script.
+#   4) Run the script in Vivado from tcl/rwroute directory.  (Otherwise, an appropriate prefix must be added to reach the Tcl file.)
 #      - source find_clock_route_template.tcl -notrace
 #      - find_clock_route_template  $bufg_site  $src_int_tiles  $dst_int_tiles  X36Y157-X36Y157_X0Y58_X44Y150-X52Y270.txt
 # 
@@ -61,8 +61,8 @@
 #   2) bufg delay can be added to either its input or output net. Add to output net for easy visual inspection of the delay of input nets.
 #
 #
-# 
-
+# Prerequisite:
+# set environment variables RAPIDWRIGHT_PATH and CLASSPATH as mentioned in step 4 and 5 of the installation guide  https://www.rapidwright.io/docs/Manual_Install.html#manual-install
 
 
 ################################################## Necessary Inputs #####################################################
@@ -151,8 +151,10 @@ proc find_clock_route_template {bufg_site src_int_tiles dst_int_tiles fname {v 0
       write_checkpoint $name.dcp -quiet -force
       write_edif       $name.edf -quiet -force 
 
+      set RW $::env(RAPIDWRIGHT_PATH)
+      exec javac $RW/src/com/xilinx/rapidwright/util/rwroute/SourceToSinkINTTileDelayWriter.java
+      exec java -cp $RW/src -cp $::env(CLASSPATH) com/xilinx/rapidwright/util/rwroute/SourceToSinkINTTileDelayWriter  $name.dcp --net ff[0] ./
 
-      exec java com.xilinx.rapidwright.util.rwroute.GetDelayFromSourceToSinkINT $name.dcp --net ff[0] ./
       set delay_to_int [read_delay_to_bufg $name]
 
 

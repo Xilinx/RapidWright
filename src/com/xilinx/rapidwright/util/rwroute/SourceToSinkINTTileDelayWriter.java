@@ -45,6 +45,7 @@ import com.xilinx.rapidwright.util.Pair;
  * Otherwise, it is specifically for the CLK_IN sink of the net under the name.
  */
 public class SourceToSinkINTTileDelayWriter {
+	@SuppressWarnings("unchecked")
 	public static void main(String[] args) {
 		if(args.length < 4){
 			System.out.println("BASIC USAGE:\n <input.dcp> --net <net name> <output file> --allSinkDelay\n");
