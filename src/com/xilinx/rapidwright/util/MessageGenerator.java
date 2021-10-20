@@ -209,4 +209,28 @@ public class MessageGenerator{
 			briefErrorAndExit("Error reading user input");
 		}
 	}
+	
+	public static String formatString(String s1) {
+		return String.format("%-35s\n", s1);
+	}
+	
+	public static String formatString(String s, float value) {
+		return String.format("%-35s %10.2f\n", s, value);
+	}
+	
+	public static String formatString(String s, short value) {
+		return String.format("%-35s %10d\n", s, value);
+	}
+	
+	public static String formatString(String s, boolean value) {
+		return String.format("%-35s %10s\n", s, value);
+	}
+
+	public static String printFormattedString(String s, int value) {
+		return String.format("%-35s %10d\n", s, value);
+	}
+	
+	public static String printFormattedString(String s, long value) {
+		return String.format("%-35s %10d\n", s, value);
+	}
 }

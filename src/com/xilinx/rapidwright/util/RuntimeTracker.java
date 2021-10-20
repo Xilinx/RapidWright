@@ -48,8 +48,8 @@ public class RuntimeTracker {
 		this.name = name + ":";
 		this.time = 0;
 		this.level = level;
-		if(this.getLevel() * 3 + this.getName().length() > 31) {
-			System.out.println("\nWARNING: RuntimeTracker name too long: " + name + ". Ideal max string length: " + (30 - this.getLevel() * 3));
+		if(this.getLevel() * 3 + this.getName().length() > 36) {
+			System.out.println("\nWARNING: RuntimeTracker name too long: " + name + ". Ideal max string length: " + (35 - this.getLevel() * 3));
 		}
 		this.children = new ArrayList<>();
 	}
@@ -147,7 +147,7 @@ public class RuntimeTracker {
 				this.time += child.getTime();
 			}
 		}
-		int length = 31 - this.getLevel() * 3 - this.getName().length();
+		int length = 36 - this.getLevel() * 3 - this.getName().length();
 		if(length < 0) length = 0;
 		return this.name.replace(":", ":" + spaces(length) + String.format("%9.2fs\n", this.getTime()*1e-9));
 	}

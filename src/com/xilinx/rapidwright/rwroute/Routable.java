@@ -105,9 +105,9 @@ public interface Routable {
 	public void setTarget(boolean isTarget);
 	/**
 	 * Updates the present congestion cost based on the present congestion penalty factor.
-	 * @param presentCongestionFac The present congestion penalty factor .
+	 * @param presentCongestionFactor The present congestion penalty factor .
 	 */
-	public void updatePresentCongestionCost(float presentCongestionFac);
+	public void updatePresentCongestionCost(float presentCongestionFactor);
 	/**
 	 * Gets the base cost of a Routable Object.
 	 * @return The base cost of a Routable Object.

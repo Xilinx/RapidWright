@@ -35,6 +35,7 @@ import com.xilinx.rapidwright.rwroute.Connection;
 import com.xilinx.rapidwright.rwroute.NetWrapper;
 import com.xilinx.rapidwright.rwroute.Routable;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
+import com.xilinx.rapidwright.util.MessageGenerator;
 import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.RuntimeTrackerTree;
 
@@ -191,19 +192,19 @@ public class TimingManager {
     		boolean useRoutable, Map<Node, Routable> rnodesCreated){
     	TimingVertex maxV = maxDelayTimingVertex.getSecond();
     	float maxDelay = maxDelayTimingVertex.getFirst();
-    	System.out.printf("%-30s %10d\n", "Timing requirement (ps):", timingRequirement);
+    	System.out.printf(MessageGenerator.formatString("Timing requirement (ps):", timingRequirement));
     	List<TimingEdge> criticalEdges = this.timingGraph.getCriticalTimingEdgesInOrder(maxV);
     	short arr = 0;
     	short clkskew = 0;
     	for(TimingEdge e : criticalEdges) {
     		arr += e.getDelay();
     	}
-    	System.out.printf("%-30s %10d\n", "Critical path delay (ps):", (short) (arr - criticalEdges.get(0).getDelay() - clkskew));
-    	System.out.printf("%-30s %10d\n\n", "Slack (ps):", (short) (timingRequirement - maxDelay));
-    	System.out.printf("%-30s\n", "With timing closure guarantee:");
+    	System.out.printf(MessageGenerator.formatString("Critical path delay (ps):", (short) (arr - criticalEdges.get(0).getDelay() - clkskew)));
+    	System.out.printf(MessageGenerator.formatString("Slack (ps):", (short) (timingRequirement - maxDelay)));
+    	System.out.printf(MessageGenerator.formatString("With timing closure guarantee:"));
     	short adjusted = (short) (pessimismA * (arr - criticalEdges.get(0).getDelay() - clkskew) + pessimismB);
-    	System.out.printf("%-30s %10d\n", "Critical path delay (ps):", (short)adjusted);
-    	System.out.printf("%-30s %10d\n\n", "Slack (ps):", (short) (timingRequirement - adjusted));
+    	System.out.printf(MessageGenerator.formatString("Critical path delay (ps):", (short)adjusted));
+    	System.out.printf(MessageGenerator.formatString("Slack (ps):", (short) (timingRequirement - adjusted)));
     	
     	this.printPathDelayBreakDown(arr, criticalEdges, timingEdgeConnctionMap, useRoutable, rnodesCreated);
     }

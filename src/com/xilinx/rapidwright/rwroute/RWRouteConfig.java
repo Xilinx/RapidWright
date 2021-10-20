@@ -23,6 +23,8 @@
 
 package com.xilinx.rapidwright.rwroute;
 
+import com.xilinx.rapidwright.util.MessageGenerator;
+
 /**
  * A collection of customizable parameters for a {@link RWRoute} Object or a {@link TimingAndWirelengthReport} Object.
  * Modifications of default parameter values can be done by adding corresponding options with values to the arguments.
@@ -58,11 +60,11 @@ public class RWRouteConfig {
 	/** The maximum percentage of critical connections to be rerouted */
 	private short reroutePercentage;
 	/** Initial present congestion penalty factor */
-	private float initialPresentCongestionFac; 
+	private float initialPresentCongestionFactor; 
 	/** The multiplier factor for present congestion update */
 	private float presentCongestionMultiplier; 
 	/** Historical congestion penalty factor */
-	private float historicalCongestionFac;
+	private float historicalCongestionFactor;
 	/** true to enable timing-aware routing */
 	private boolean timingDriven;
 	/** true to enable partial routing */
@@ -102,9 +104,9 @@ public class RWRouteConfig {
 		this.criticalityExponent = 3;
 		this.minRerouteCriticality = 0.85f;
 		this.reroutePercentage = (short) 3;
-		this.initialPresentCongestionFac = 0.5f;
+		this.initialPresentCongestionFactor = 0.5f;
 		this.presentCongestionMultiplier = 2f;
-		this.historicalCongestionFac = 1f;
+		this.historicalCongestionFactor = 1f;
 		this.timingDriven = true;
 		this.partialRouting = false;
 		this.softPreserve = false;
@@ -177,14 +179,14 @@ public class RWRouteConfig {
 			case "--reroutePercentage":
 				this.setReroutePercentage(Short.parseShort(arguments[++i]));
 				break;
-			case "--initialPresentCongestionFac":
-				this.setInitialPresentCongestionFac(Float.parseFloat(arguments[++i]));
+			case "--initialPresentCongestionFactor":
+				this.setInitialPresentCongestionFactor(Float.parseFloat(arguments[++i]));
 				break;
 			case "--presentCongestionMultiplier":
 				this.setPresentCongestionMultiplier(Float.parseFloat(arguments[++i]));
 				break;
-			case "--historicalCongestionFac":
-				this.setHistoricalCongestionFac(Float.parseFloat(arguments[++i]));
+			case "--historicalCongestionFactor":
+				this.setHistoricalCongestionFactor(Float.parseFloat(arguments[++i]));
 				break;
 			case "--timingDriven":
 				this.setTimingDriven(true);
@@ -525,29 +527,29 @@ public class RWRouteConfig {
 	/**
 	 * Gets the initial present congestion cost penalty factor.
 	 * It should be greater than 0. Default: 0.5.
-	 * Can be modified by using "--initialPresentCongesFac" option, e.g. "--initialPresentCongesFac 1".
+	 * Can be modified by using "--initialPresentCongestionFactor" option, e.g. "--initialPresentCongestionFactor 1".
 	 * @return The initial present congestion cost penalty factor.
 	 */
-	public float getInitialPresentCongestionFac() {
-		return this.initialPresentCongestionFac;
+	public float getInitialPresentCongestionFactor() {
+		return this.initialPresentCongestionFactor;
 	}
 
 	/**
 	 * Sets the initial present congestion cost penalty factor.
 	 * It should be greater than 0. Default: 0.5.
-	 * Can be modified by using "--initialPresentCongesFac" option, e.g. "--initialPresentCongesFac 1".
-	 * @param initialPresentCongestionFac
+	 * Can be modified by using "--initialPresentCongestionFactor" option, e.g. "--initialPresentCongestionFactor 1".
+	 * @param initialPresentCongestionFactor The value to set.
 	 */
-	public void setInitialPresentCongestionFac(float initialPresentCongestionFac) {
-		if(initialPresentCongestionFac < 0)
-			throw new IllegalArgumentException("ERROR: initialPresentCongesFac cannot be negative.");
-		this.initialPresentCongestionFac = initialPresentCongestionFac;
+	public void setInitialPresentCongestionFactor(float initialPresentCongestionFactor) {
+		if(initialPresentCongestionFactor < 0)
+			throw new IllegalArgumentException("ERROR: initialPresentCongesFactor cannot be negative.");
+		this.initialPresentCongestionFactor = initialPresentCongestionFactor;
 	}
 
 	/**
 	 * Gets the present congestion factor multiplier.
 	 * It should be greater than 1. Default: 2.
-	 * Can be modified by using "--presentCongesMultiplier" option, e.g. "--presentCongesMultiplier 3".
+	 * Can be modified by using "--presentCongestionMultiplier" option, e.g. "--presentCongestionMultiplier 3".
 	 * @return
 	 */
 	public float getPresentCongestionMultiplier() {
@@ -557,7 +559,7 @@ public class RWRouteConfig {
 	/**
 	 * Sets the present congestion factor multiplier.
 	 * It should be greater than 1. Default: 2.
-	 * Can be modified by using "--presentCongesMultiplier" option, e.g. "--presentCongesMultiplier 3".
+	 * Can be modified by using "--presentCongestionMultiplier" option, e.g. "--presentCongestionMultiplier 3".
 	 * @param presentCongestionMultiplier
 	 */
 	public void setPresentCongestionMultiplier(float presentCongestionMultiplier) {
@@ -569,23 +571,23 @@ public class RWRouteConfig {
 	/**
 	 * Gets the historical congestion cost penalty factor.
 	 * It should be greater than 0. Default: 1.
-	 * Can be modified by using "--historicalCongesFac" option, e.g. "--historicalCongesFac 2".
+	 * Can be modified by using "--historicalCongestionFactor" option, e.g. "--historicalCongestionFactor 2".
 	 * @return
 	 */
-	public float getHistoricalCongestionFac() {
-		return this.historicalCongestionFac;
+	public float getHistoricalCongestionFactor() {
+		return this.historicalCongestionFactor;
 	}
 
 	/**
 	 * Sets the historical congestion cost penalty factor.
 	 * It should be greater than 0. Default: 1.
-	 * Can be modified by using "--historicalCongesFac" option, e.g. "--historicalCongesFac 2".
-	 * @param historicalCongesFac
+	 * Can be modified by using "--historicalCongestionFactor" option, e.g. "--historicalCongestionFactor 2".
+	 * @param historicalCongestionFactor
 	 */
-	public void setHistoricalCongestionFac(float historicalCongesFac) {
-		if(historicalCongesFac <= 0)
-			throw new IllegalArgumentException("ERROR: historicalCongesFac cannot be less than 0.");
-		this.historicalCongestionFac = historicalCongesFac;
+	public void setHistoricalCongestionFactor(float historicalCongestionFactor) {
+		if(historicalCongestionFactor <= 0)
+			throw new IllegalArgumentException("ERROR: historicalCongestionFactor cannot be less than 0.");
+		this.historicalCongestionFactor = historicalCongestionFactor;
 	}
 
 	/**
@@ -840,56 +842,39 @@ public class RWRouteConfig {
 	@Override
 	public String toString() {
 		StringBuilder s = new StringBuilder();
-		s.append(formatString("Router Configuration\n"));
-		s.append(formatString("Max routing iterations: ", this.maxIterations));
-		s.append(formatString("Timing-driven: ", this.timingDriven));
-		s.append(formatString("Partial routing: ", this.partialRouting));
-		s.append(formatString("Use bounding boxes: ", this.isUseBoundingBox()));
+		s.append(MessageGenerator.formatString("Router Configuration\n"));
+		s.append(MessageGenerator.formatString("Max routing iterations: ", this.maxIterations));
+		s.append(MessageGenerator.formatString("Timing-driven: ", this.timingDriven));
+		s.append(MessageGenerator.formatString("Partial routing: ", this.partialRouting));
+		s.append(MessageGenerator.formatString("Use bounding boxes: ", this.isUseBoundingBox()));
 		if(this.isUseBoundingBox()) {
-			s.append(formatString("Bounding box extension X: ", this.boundingBoxExtensionX));
-			s.append(formatString("Bounding box extension Y: ", this.boundingBoxExtensionY));
+			s.append(MessageGenerator.formatString("Bounding box extension X: ", this.boundingBoxExtensionX));
+			s.append(MessageGenerator.formatString("Bounding box extension Y: ", this.boundingBoxExtensionY));
 			if(this.isEnlargeBoundingBox()) {
-				s.append(formatString("Enlarge bounding box: ", this.isEnlargeBoundingBox()));
-				s.append(formatString("Extension X increment: ", this.extensionXIncrement));
-				s.append(formatString("Extension Y increment: ", this.extensionYIncrement));
+				s.append(MessageGenerator.formatString("Enlarge bounding box: ", this.isEnlargeBoundingBox()));
+				s.append(MessageGenerator.formatString("Extension X increment: ", this.extensionXIncrement));
+				s.append(MessageGenerator.formatString("Extension Y increment: ", this.extensionYIncrement));
 			}else {
-				s.append(formatString("Fixed bounding box: ", !this.isEnlargeBoundingBox()));
+				s.append(MessageGenerator.formatString("Fixed bounding box: ", !this.isEnlargeBoundingBox()));
 			}
 		}
-		s.append(formatString("Wirelength-driven weight: ", this.wirelengthWeight));
+		s.append(MessageGenerator.formatString("Wirelength-driven weight: ", this.wirelengthWeight));
 		if(this.timingDriven) {
-			s.append(formatString("Sharing exponent: ", this.shareExponent));
-			s.append(formatString("Timing-driven weight: ", this.timingWeight));
-			s.append(formatString("Timing-driven mult fac: ", this.timingMultiplier));
-			s.append(formatString("Criticality exponent: ", this.criticalityExponent));
-			s.append(formatString("Reroute criticality threshold:", this.minRerouteCriticality));
-			s.append(formatString("Reroute percentage: ", this.reroutePercentage));
-			s.append(formatString("PessimismA: ", this.pessimismA));
-			s.append(formatString("PessimismB: ", this.pessimismB));
+			s.append(MessageGenerator.formatString("Sharing exponent: ", this.shareExponent));
+			s.append(MessageGenerator.formatString("Timing-driven weight: ", this.timingWeight));
+			s.append(MessageGenerator.formatString("Timing-driven mult fac: ", this.timingMultiplier));
+			s.append(MessageGenerator.formatString("Criticality exponent: ", this.criticalityExponent));
+			s.append(MessageGenerator.formatString("Reroute criticality threshold:", this.minRerouteCriticality));
+			s.append(MessageGenerator.formatString("Reroute percentage: ", this.reroutePercentage));
+			s.append(MessageGenerator.formatString("PessimismA: ", this.pessimismA));
+			s.append(MessageGenerator.formatString("PessimismB: ", this.pessimismB));
 		}
-		s.append(formatString("Mask nodes across RCLK: ", this.maskNodesCrossRCLK));
-		s.append(formatString("Include U-turn nodes: ", this.useUTurnNodes));
-		s.append(formatString("Initial present conges fac: ", this.initialPresentCongestionFac));
-		s.append(formatString("Present conges fac mult: ", this.presentCongestionMultiplier));
-		s.append(formatString("Historical conges fac: ", this.historicalCongestionFac));
+		s.append(MessageGenerator.formatString("Mask nodes across RCLK: ", this.maskNodesCrossRCLK));
+		s.append(MessageGenerator.formatString("Include U-turn nodes: ", this.useUTurnNodes));
+		s.append(MessageGenerator.formatString("Initial present congestion factor: ", this.initialPresentCongestionFactor));
+		s.append(MessageGenerator.formatString("Present congestion multiplier: ", this.presentCongestionMultiplier));
+		s.append(MessageGenerator.formatString("Historical congestion factor ", this.historicalCongestionFactor));
 		
 		return s.toString();
 	}
-	
-	private static String formatString(String s1) {
-		return String.format("%-30s\n", s1);
-	}
-	
-	private static String formatString(String s, float value) {
-		return String.format("%-30s %10.2f\n", s, value);
-	}
-	
-	private static String formatString(String s, short value) {
-		return String.format("%-30s %10d\n", s, value);
-	}
-	
-	private static String formatString(String s, boolean value) {
-		return String.format("%-30s %10s\n", s, value);
-	}
-	
 }

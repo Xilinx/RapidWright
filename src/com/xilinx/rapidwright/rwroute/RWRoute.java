@@ -95,9 +95,9 @@ public class RWRoute{
 	/** A {@link RWRouteConfig} instance consisting of a list of routing parameters */
 	protected RWRouteConfig config;
 	/** The present congestion cost factor */
-	private float presentCongestionFac;
+	private float presentCongestionFactor;
 	/** The historical congestion cost factor */
-	private float historicalCongestionFac;
+	private float historicalCongestionFactor;
 	/** Wirelength-driven weighting factor */
 	private float wlWeight;
 	/** 1 - wlWeight */
@@ -115,7 +115,7 @@ public class RWRoute{
 	private RuntimeTrackerTree routerTimer;
 	private RuntimeTracker rnodesTimer;
 	private RuntimeTracker updateTimingTimer;
-	private RuntimeTracker updateCongestionFacCosts;
+	private RuntimeTracker updateCongestionCosts;
 	/** An instantiation of RouteThruHelper to avoid route-thrus in the routing resource graph */
 	private RouteThruHelper routethruHelper;
 	
@@ -186,7 +186,7 @@ public class RWRoute{
 		this.routerTimer = new RuntimeTrackerTree("Route design", this.config.isVerbose());
 		this.rnodesTimer = this.routerTimer.createStandAloneRuntimeTracker("rnodes creation");
 		this.updateTimingTimer = this.routerTimer.createStandAloneRuntimeTracker("update timing");
-		this.updateCongestionFacCosts = this.routerTimer.createStandAloneRuntimeTracker("update conges costs");
+		this.updateCongestionCosts = this.routerTimer.createStandAloneRuntimeTracker("update congestion costs");
 		this.routerTimer.createRuntimeTracker("Initialization", this.routerTimer.getRootRuntimeTracker()).start();
 		
 		RoutableNode.setMaskNodesCrossRCLK(this.config.isMaskNodesCrossRCLK());
@@ -651,8 +651,8 @@ public class RWRoute{
 		this.rnodesVisited.clear();
 		this.queue.clear(); 	
 		this.routeIteration = 1;
-		this.historicalCongestionFac = this.config.getHistoricalCongestionFac();
-		this.presentCongestionFac = this.config.getInitialPresentCongestionFac();
+		this.historicalCongestionFactor = this.config.getHistoricalCongestionFactor();
+		this.presentCongestionFactor = this.config.getInitialPresentCongestionFactor();
 		this.timingWeight = this.config.getTimingWeight();
 		this.wlWeight = this.config.getWirelengthWeight();
 		this.oneMinusTimingWeight = 1 - this.timingWeight;
@@ -693,9 +693,9 @@ public class RWRoute{
 		// Adds child timers to "route wire nets" timer
 		routeWireNets.addChild(this.rnodesTimer);
 		// Do not time the cost evaluation method for routing connections, the timer itself takes time
-		this.routerTimer.createRuntimeTracker("route connections", "route wire nets").setTime(routeWireNets.getTime() - this.rnodesTimer.getTime() - this.updateTimingTimer.getTime() - this.updateCongestionFacCosts.getTime());
+		this.routerTimer.createRuntimeTracker("route connections", "route wire nets").setTime(routeWireNets.getTime() - this.rnodesTimer.getTime() - this.updateTimingTimer.getTime() - this.updateCongestionCosts.getTime());
 		routeWireNets.addChild(this.updateTimingTimer);
-		routeWireNets.addChild(this.updateCongestionFacCosts);
+		routeWireNets.addChild(this.updateCongestionCosts);
 		
 		this.routerTimer.createRuntimeTracker("finalize routes", "Routing").start();
 		// Assigns a list of nodes to each direct and indirect connection that has been routed and fix illegal routes if any
@@ -1008,31 +1008,31 @@ public class RWRoute{
 	 * Updates the congestion cost factors.
 	 */
 	private void updateCostFactors(){
-		this.updateCongestionFacCosts.start();
+		this.updateCongestionCosts.start();
 		if (this.routeIteration == 1) {
-			this.presentCongestionFac = this.config.getInitialPresentCongestionFac();
+			this.presentCongestionFactor = this.config.getInitialPresentCongestionFactor();
 		} else {
-			this.presentCongestionFac *= this.config.getPresentCongestionMultiplier();
+			this.presentCongestionFactor *= this.config.getPresentCongestionMultiplier();
 		}
-		this.updateCost(this.presentCongestionFac, this.historicalCongestionFac);
-		this.updateCongestionFacCosts.stop();
+		this.updateCost(this.presentCongestionFactor, this.historicalCongestionFactor);
+		this.updateCongestionCosts.stop();
 	}
 	
 	/**
 	 * Updates present congestion cost and historical congestion cost of rnodes.
-	 * @param presentCongestionFac Present congestion cost factor.
-	 * @param historicalCongestionFac Historical congestion cost factor.
+	 * @param presentCongestionFactor Present congestion cost factor.
+	 * @param historicalCongestionFactor Historical congestion cost factor.
 	 */
-	private void updateCost(float presentCongestionFac, float historicalCongestionFac) {
+	private void updateCost(float presentCongestionFactor, float historicalCongestionFactor) {
 		this.overUsedRnodes.clear();
 		for(Routable rnode:this.rnodesCreated.values()){
 			int overuse =rnode.getOccupancy() - Routable.capacity;
 			if(overuse == 0) {
-				rnode.setPresentCongestionCost(1 + presentCongestionFac);
+				rnode.setPresentCongestionCost(1 + presentCongestionFactor);
 			} else if (overuse > 0) {
 				this.overUsedRnodes.add(rnode.getIndex());
-				rnode.setPresentCongestionCost(1 + (overuse + 1) * presentCongestionFac);
-				rnode.setHistoricalCongestionCost(rnode.getHistoricalCongestionCost() + overuse * historicalCongestionFac);
+				rnode.setPresentCongestionCost(1 + (overuse + 1) * presentCongestionFactor);
+				rnode.setHistoricalCongestionCost(rnode.getHistoricalCongestionCost() + overuse * historicalCongestionFactor);
 			}
 		}
 	}
@@ -1175,7 +1175,7 @@ public class RWRoute{
 	private void ripUp(Connection connection){
 		for(Routable rnode : connection.getRnodes()) {
 			rnode.decrementUser(connection.getNetWrapper());
-			rnode.updatePresentCongestionCost(this.presentCongestionFac);
+			rnode.updatePresentCongestionCost(this.presentCongestionFactor);
 		}
 	}
 	
@@ -1183,10 +1183,10 @@ public class RWRoute{
 	 * Updates the users and present congestion cost of rnodes used by a routed connection.
 	 * @param connection The routed connection.
 	 */
-	private void updateUsersAndPresentCongesCost(Connection connection){
+	private void updateUsersAndPresentCongestionCost(Connection connection){
 		for(Routable rnode : connection.getRnodes()) {
 			rnode.incrementUser(connection.getNetWrapper());
-			rnode.updatePresentCongestionCost(this.presentCongestionFac);
+			rnode.updatePresentCongestionCost(this.presentCongestionFactor);
 		}
 	}
 	
@@ -1427,7 +1427,7 @@ public class RWRoute{
 		this.saveRouting(connection);	
 		connection.getSinkRnode().setTarget(false);		
 		this.resetExpansion();		
-		this.updateUsersAndPresentCongesCost(connection);
+		this.updateUsersAndPresentCongestionCost(connection);
 	}
 	
 	/**
@@ -1571,14 +1571,14 @@ public class RWRoute{
 	 */
 	private float getRoutableCost(Routable rnode, Connection connection, int countSameSourceUsers, float sharingFactor) {		
 		boolean hasSameSourceUsers = countSameSourceUsers!= 0;	
-		float presentCongesCost;
+		float presentCongestionCost;
 		
 		if(hasSameSourceUsers) {// the rnode is used by other connection(s) from the same net
 			int overoccupancy = rnode.getOccupancy() - Routable.capacity;
 			// make the congestion cost less for the current connection
-			presentCongesCost = 1 + overoccupancy * this.presentCongestionFac;
+			presentCongestionCost = 1 + overoccupancy * this.presentCongestionFactor;
 		}else{
-			presentCongesCost = rnode.getPresentCongestionCost();
+			presentCongestionCost = rnode.getPresentCongestionCost();
 		}
 		
 		float biasCost = 0;
@@ -1588,7 +1588,7 @@ public class RWRoute{
 					(Math.abs(rnode.getEndTileXCoordinate() - net.getXCenter()) + Math.abs(rnode.getEndTileYCoordinate() - net.getYCenter())) / net.getDoubleHpwl();
 		}
 		
-		return rnode.getBaseCost() * rnode.getHistoricalCongestionCost() * presentCongesCost / sharingFactor + biasCost;
+		return rnode.getBaseCost() * rnode.getHistoricalCongestionCost() * presentCongestionCost / sharingFactor + biasCost;
 	}
 	
 	/**
@@ -1666,11 +1666,11 @@ public class RWRoute{
 	public static void printNodeTypeUsageAndWirelength(boolean verbose, Map<IntentCode, Long> nodeTypeUsage, Map<IntentCode, Long> nodeTypeLength) {
 		if(verbose) {
 			System.out.println("Node Usage Per Type\n");
-			System.out.print(String.format(" %-15s  %11s  %10s\n", "Node Type", "Usage", "Length"));
+			System.out.print(String.format(" %-15s  %14s  %12s\n", "Node Type", "Usage", "Length"));
 			for(IntentCode ic : nodeTypes) {
 				long usage = nodeTypeUsage.getOrDefault(ic, (long)0);
 				long length = nodeTypeLength.getOrDefault(ic, (long)0);
-				System.out.printf(String.format(" %-15s  %11d  %10d\n", ic, usage, length));
+				System.out.printf(String.format(" %-15s  %14d  %12d\n", ic, usage, length));
 			}
 			System.out.println();
 		}
@@ -1704,11 +1704,11 @@ public class RWRoute{
 	}
 	
 	private static void printFormattedString(String s, int value) {
-		System.out.printf(String.format("%-30s %10d\n", s, value));
+		System.out.printf(MessageGenerator.formatString(s, value));
 	}
 	
 	private static void printFormattedString(String s, long value) {
-		System.out.printf(String.format("%-30s %10d\n", s, value));
+		System.out.printf(MessageGenerator.formatString(s, value));
 	}
 	
 	private void printRoutingStatistics(){
