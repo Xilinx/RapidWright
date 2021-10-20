@@ -29,7 +29,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 
 /**
- * Generated on: Thu Sep 02 22:37:02 2021
+ * Generated on: Fri Oct 15 15:54:24 2021
  * by: com.xilinx.rapidwright.release.PartNamePopulator
  * 
  * Class used to uniquely represent a Xilinx part.
@@ -54,25 +54,25 @@ public class Part {
 	/** Vivado part attribute REVISION */
 	String revision;
 	/** Vivado part attribute AVAILABLE_IOBS */
-	String availableIobs;
+	int availableIobs;
 	/** Vivado part attribute BLOCK_RAMS */
-	String blockRams;
+	int blockRams;
 	/** Vivado part attribute DSP */
-	String dsp;
+	int dsp;
 	/** Vivado part attribute FLIPFLOPS */
-	String flipflops;
+	int flipflops;
 	/** Vivado part attribute GB_TRANSCEIVERS */
-	String gbTransceivers;
+	int gbTransceivers;
 	/** Vivado part attribute LUT_ELEMENTS */
-	String lutElements;
+	int lutElements;
 	/** Vivado part attribute MMCM */
-	String mmcm;
+	int mmcm;
 	/** Vivado part attribute ULTRA_RAMS */
-	String ultraRams;
+	int ultraRams;
 	/** Vivado part attribute SERIES */
 	Series series;
 
-	public Part(String name, FamilyType architecture, String architectureFullName, FamilyType family, String device, String pkg, String speed, String temperatureGradeLetter, String revision, String availableIobs, String blockRams, String dsp, String flipflops, String gbTransceivers, String lutElements, String mmcm, String ultraRams, Series series) {
+	public Part(String name, FamilyType architecture, String architectureFullName, FamilyType family, String device, String pkg, String speed, String temperatureGradeLetter, String revision, int availableIobs, int blockRams, int dsp, int flipflops, int gbTransceivers, int lutElements, int mmcm, int ultraRams, Series series) {
 		this.name = name;
 		this.architecture = architecture;
 		this.architectureFullName = architectureFullName;
@@ -153,49 +153,49 @@ public class Part {
 	/**
 	 * @return the availableIobs
 	 */
-	public String getAvailableIobs() {
+	public int getAvailableIobs() {
 		return availableIobs;
 	}
 	/**
 	 * @return the blockRams
 	 */
-	public String getBlockRams() {
+	public int getBlockRams() {
 		return blockRams;
 	}
 	/**
 	 * @return the dsp
 	 */
-	public String getDsp() {
+	public int getDsp() {
 		return dsp;
 	}
 	/**
 	 * @return the flipflops
 	 */
-	public String getFlipflops() {
+	public int getFlipflops() {
 		return flipflops;
 	}
 	/**
 	 * @return the gbTransceivers
 	 */
-	public String getGbTransceivers() {
+	public int getGbTransceivers() {
 		return gbTransceivers;
 	}
 	/**
 	 * @return the lutElements
 	 */
-	public String getLutElements() {
+	public int getLutElements() {
 		return lutElements;
 	}
 	/**
 	 * @return the mmcm
 	 */
-	public String getMmcm() {
+	public int getMmcm() {
 		return mmcm;
 	}
 	/**
 	 * @return the ultraRams
 	 */
-	public String getUltraRams() {
+	public int getUltraRams() {
 		return ultraRams;
 	}
 	/**
