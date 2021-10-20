@@ -36,6 +36,7 @@ import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Site;
+import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.timing.GroupDelayType;
 import com.xilinx.rapidwright.timing.TimingModel;
@@ -51,20 +52,20 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
     // single and double have their own arrays although their values are the same.
     // Using enum as keys to simplify coding. Some types have empty arrays because those types will never be used.
     // distArrays are cumulative and inclusive, ie., for a segment spanning x-y, d[y] is included in d of the segment.
-    protected Map<T.Orientation,Map<GroupDelayType,List<Short>>> distArrays;
+    protected Map<T.Orientation, Map<GroupDelayType, List<Short>>> distArrays;
     protected int numCol;
     protected int numRow;
-    
+
     // These data are sourced from TimingModel.
     // TODO: Consider to move these to TimingModel.
-    protected Map<T.Orientation,Map<GroupDelayType,Float>> K0;
-    protected Map<T.Orientation,Map<GroupDelayType,Float>> K1;
-    protected Map<T.Orientation,Map<GroupDelayType,Float>> K2;
-    protected Map<T.Orientation,Map<GroupDelayType,Short>> L;
-    protected Map<String, Short>  inputSitePinDelay;
+    protected Map<T.Orientation, Map<GroupDelayType, Float>> K0;
+    protected Map<T.Orientation, Map<GroupDelayType, Float>> K1;
+    protected Map<T.Orientation, Map<GroupDelayType, Float>> K2;
+    protected Map<T.Orientation, Map<GroupDelayType, Short>> L;
+    protected Map<String, Short> inputSitePinDelay;
 
-    protected T     ictInfo;
-    protected int   verbose;
+    protected T ictInfo;
+    protected int verbose;
     protected transient Device device;
     protected boolean useUTurnNodes;
 
@@ -73,10 +74,11 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
      * Constructor from a device.
      * Package scope to disable creating DelayEstimatorBase by a user.
      * Create one using DelayEstimatorBuilder instead.
+     *
      * @param device target device.
      */
     public DelayEstimatorBase(Device device, T ictInfo, boolean useUTurnNodes, int verbose) {
-        this.device  = device;
+        this.device = device;
         this.verbose = verbose;
         this.ictInfo = ictInfo;
         this.useUTurnNodes = useUTurnNodes;
@@ -89,25 +91,27 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
 
     /**
      * Check if the node is a long node or not
-     * @param node  the node to be checked
-     * @return      true if the node is a long node
+     *
+     * @param node the node to be checked
+     * @return true if the node is a long node
      */
     public static boolean isLong(Node node) {
-        return node.getIntentCode() == IntentCode.NODE_VLONG || node.getIntentCode() ==IntentCode.NODE_HLONG;
+        return node.getIntentCode() == IntentCode.NODE_VLONG || node.getIntentCode() == IntentCode.NODE_HLONG;
     }
 
 
     /**
      * Return an extra delay if both parent and child are long node.
-     * @param child        a child node
-     * @param longParent   an indicator if the parent is a long node
-     * @return             the extra delay if any
+     *
+     * @param child      a child node
+     * @param longParent an indicator if the parent is a long node
+     * @return the extra delay if any
      */
     public static short getExtraDelay(Node child, boolean longParent) {
-        if(!longParent) return 0;
+        if (!longParent) return 0;
 
         IntentCode icChild = child.getIntentCode();
-        if((icChild == IntentCode.NODE_VLONG) || (icChild == IntentCode.NODE_HLONG)) {
+        if ((icChild == IntentCode.NODE_VLONG) || (icChild == IntentCode.NODE_HLONG)) {
             // TODO: this should come from a delay file
             return 45;
         }
@@ -117,8 +121,9 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
 
     /**
      * Get delay of the node group of the given exit node.
+     *
      * @param exitNode the exit node of the node group
-     * @return  delay in ps
+     * @return delay in ps
      */
     public short getDelayOf(Node exitNode) {
         TermInfo termInfo = getTermInfo(exitNode);
@@ -154,7 +159,7 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
             this.y = y;
             this.direction = dir;
 
-            switch(ic) {
+            switch (ic) {
                 case NODE_SINGLE:
                     if (orientation == T.Orientation.VERTICAL)
                         this.ng = T.NodeGroupType.valueOf("VERT_SINGLE");
@@ -185,7 +190,7 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
         }
 
         public String toString() {
-            return String.format("x:%d y:%d %s %s", x,y, ng.name(), direction.name());
+            return String.format("x:%d y:%d %s %s", x, y, ng.name(), direction.name());
         }
 
         public short begin() {
@@ -195,11 +200,11 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
         public short end() {
             short delta = ng.length();
             short start = ng.orientation() == T.Orientation.HORIZONTAL ? x : y;
-            return  (short) (start + (direction == InterconnectInfo.Direction.U ? delta : -delta));
+            return (short) (start + (direction == InterconnectInfo.Direction.U ? delta : -delta));
         }
     }
 
-    
+
     private TermInfo getTermInfo(Node node) {
 
         String nodeType = node.getWireName();
@@ -216,35 +221,35 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
         if (nodeType.startsWith("INT") && (ic == IntentCode.NODE_SINGLE)) {
             // Special for internal single such as INT_X0Y0/INT_INT_SDQ_33_INT_OUT1  - NODE_SINGLE
             // The exact orientation can be found, but it is slow. Setting wrong orientation for internal single has no harm.
-            termInfo = new TermInfo(x,y,T.Direction.U, T.NodeGroupType.INTERNAL_SINGLE);
+            termInfo = new TermInfo(x, y, T.Direction.U, T.NodeGroupType.INTERNAL_SINGLE);
         } else {
             // IntendCode alone is not enough to determine the direction.
             // For example, for US+, NODE_SINGLE and NODE_DOUBLE are used for both vertical and horizontal ones.
             String nodeGroupSide = nodeType.substring(0, nodeType.indexOf('_'));
-            switch(nodeGroupSide.charAt(0)) {
+            switch (nodeGroupSide.charAt(0)) {
                 case 'E':
-                    termInfo = new TermInfo(x,y,T.Direction.U, ic, T.Orientation.HORIZONTAL);
+                    termInfo = new TermInfo(x, y, T.Direction.U, ic, T.Orientation.HORIZONTAL);
                     break;
                 case 'N':
-                    termInfo = new TermInfo(x,y,T.Direction.U, ic, T.Orientation.VERTICAL);
+                    termInfo = new TermInfo(x, y, T.Direction.U, ic, T.Orientation.VERTICAL);
                     break;
                 case 'W':
-                    termInfo = new TermInfo(x,y,T.Direction.D, ic, T.Orientation.HORIZONTAL);
+                    termInfo = new TermInfo(x, y, T.Direction.D, ic, T.Orientation.HORIZONTAL);
                     break;
                 case 'S':
-                    termInfo = new TermInfo(x,y,T.Direction.D, ic, T.Orientation.VERTICAL);
+                    termInfo = new TermInfo(x, y, T.Direction.D, ic, T.Orientation.VERTICAL);
                     break;
                 default:
-                    switch(ic) {
+                    switch (ic) {
                         case NODE_PINBOUNCE:
                         case NODE_PINFEED:
-                            termInfo = new TermInfo(x,y,T.Direction.S, T.NodeGroupType.CLE_IN);
+                            termInfo = new TermInfo(x, y, T.Direction.S, T.NodeGroupType.CLE_IN);
                             break;
                         case NODE_LOCAL:
-                            termInfo = new TermInfo(x,y,T.Direction.U, T.NodeGroupType.GLOBAL);
+                            termInfo = new TermInfo(x, y, T.Direction.U, T.NodeGroupType.GLOBAL);
                             break;
                         default:
-                            termInfo = new TermInfo(x,y,T.Direction.S, T.NodeGroupType.CLE_OUT);
+                            termInfo = new TermInfo(x, y, T.Direction.S, T.NodeGroupType.CLE_OUT);
                     }
             }
         }
@@ -260,22 +265,34 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
 
     /**
      * Load input site pin from the model. Need to do only once in ctor.
+     *
      * @param tm a timing model
      */
     private void loadInputSitePinDelay(TimingModel tm) {
         inputSitePinDelay = new HashMap<>();
 
         Tile refIntTile = tm.getRefIntTile();
-        Tile leftTile   = refIntTile.getTileNeighbor(-1,0);
-        Tile rightTile  = refIntTile.getTileNeighbor( 1,0);
+        Tile leftTile   = refIntTile.getTileNeighbor(-1, 0);
+        Tile rightTile  = refIntTile.getTileNeighbor(1, 0);
+        Site leftSite   = (leftTile == null) ? null : leftTile.getSites().length  == 0 ? null :  leftTile.getSites()[0];
+        Site rightSite  = (leftTile == null) ? null : rightTile.getSites().length == 0 ? null :  rightTile.getSites()[0];
+
+        // Check requirement on the refIntTile
+        if (leftTile == null || rightTile == null || leftSite == null || rightSite == null ||
+           (leftSite.getSiteTypeEnum()  != SiteTypeEnum.SLICEL && leftSite.getSiteTypeEnum()  != SiteTypeEnum.SLICEM) ||
+           (rightSite.getSiteTypeEnum() != SiteTypeEnum.SLICEL && rightSite.getSiteTypeEnum() != SiteTypeEnum.SLICEM)) {
+            throw new RuntimeException("Invalid values of START_TILE_COL and START_TILE_ROW " +
+                  "in timing/ultrascaleplus/intersite_delay_terms.txt. They must specify an interconnect tile with SLICE on both sides.");
+        }
+
 
         // Translate from a site pin name to node connected to the site pin.
         Map<String, Short> sitePinDelay = tm.getInputSitePinDelay();
-        for (Site site : new ArrayList<Site>() {{add(leftTile.getSites()[0]);add(rightTile.getSites()[0]);}}) {
+        for (Site site : new ArrayList<Site>() {{add(leftSite);add(rightSite);}}) {
             for (int i = 0; i < site.getSitePinCount(); i++) {
                 if (site.isOutputPin(i)) continue;
                 String name = site.getPinName(i);
-                Node node = site.getConnectedNode(i);
+                Node node   = site.getConnectedNode(i);
                 if (sitePinDelay.containsKey(name)) {
                     inputSitePinDelay.put(node.getWireName(), sitePinDelay.get(name));
                 }
