@@ -21,11 +21,6 @@
  */
 package com.xilinx.rapidwright.gui;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.stream.Stream;
-
 import com.trolltech.qt.core.QRect;
 import com.trolltech.qt.core.QRectF;
 import com.trolltech.qt.core.Qt;
@@ -34,19 +29,28 @@ import com.trolltech.qt.gui.QColor;
 import com.trolltech.qt.gui.QFont;
 import com.trolltech.qt.gui.QPainter;
 import com.xilinx.rapidwright.design.Design;
-import com.xilinx.rapidwright.design.SimpleTileRectangle;
 import com.xilinx.rapidwright.design.TileRectangle;
 import com.xilinx.rapidwright.device.Tile;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.function.BiConsumer;
+import java.util.stream.Stream;
+
+
+/**
+ * UI Scene that can show named PBlocks
+ */
 public class PblockScene extends TileScene {
     private List<UiPBlock> blocks;
     private int blockOpacity = 200;
 
-    public void setDrawInt(boolean drawInt) {
-        this.drawInt = drawInt;
+    public void setDrawIntConnections(boolean drawIntConnections) {
+        this.drawIntConnections = drawIntConnections;
     }
 
-    private boolean drawInt = false;
+    private boolean drawIntConnections = false;
 
     public PblockScene(Design design) {
         super(design, false, true);
@@ -66,7 +70,7 @@ public class PblockScene extends TileScene {
         super.drawFPGAFabric(painter);
     }
 
-    private void drawIntArrows(QPainter painter) {
+    private void drawIntConnections(QPainter painter) {
         painter.setPen(QColor.white);
         for (Tile tile: device.getAllTiles()) {
             Arrays.stream(tile.getSites())
@@ -79,10 +83,6 @@ public class PblockScene extends TileScene {
                     })
                     .distinct()
                     .forEach(intTile -> {
-                        final SimpleTileRectangle rect = new SimpleTileRectangle();
-                        rect.extendTo(intTile);
-                        rect.extendTo(tile);
-                        if (rect.hpwl() < 10)
                         painter.drawLine(
                                tile.getColumn() * tileSize + tileSize/2,
                                tile.getRow() * tileSize + tileSize/2,
@@ -97,8 +97,8 @@ public class PblockScene extends TileScene {
     public void drawBackground(QPainter painter, QRectF rect) {
         super.drawBackground(painter, rect);
 
-        if (drawInt) {
-            drawIntArrows(painter);
+        if (drawIntConnections) {
+            drawIntConnections(painter);
         }
         drawBlocks(painter);
     }
@@ -108,38 +108,25 @@ public class PblockScene extends TileScene {
         this.blockOpacity = blockOpacity;
     }
 
-    /*private QColor getColor(Pair<? extends TileRectangle, String> block, int i) {
-        QColor[] colors = {QColor.red, QColor.green, QColor.blue, QColor.yellow};
-        //final Iterator<QColor> color = IntStream.iterate(0, i -> i + 1).map(i -> i % colors.length).mapToObj(i -> colors[i]).iterator();
 
-        Random rnd = new Random((long) block.getSecond().hashCode() * i);
-        return colors[rnd.nextInt(colors.length)];
-    }*/
-
-
-
+    private void forAllRects(BiConsumer<UiPBlock, QRect> consumer) {
+        for (final UiPBlock block : blocks) {
+            final QRect qRect = tileRectToQRect(block.rect);
+            consumer.accept(block, qRect);
+        }
+    }
     abstract class ForAllRects {
-        abstract void doPaint(UiPBlock block , int i, QRect rect);
+        abstract void doPaint(UiPBlock block, QRect rect);
         void run() {
-            for (int i = 0; i < blocks.size(); i++) {
+            for (final UiPBlock block : blocks) {
 
-                final UiPBlock block = blocks.get(i);
                 final TileRectangle rect = block.rect;
                 final QRect qRect = tileRectToQRect(rect);
 
-                doPaint(block, i ,qRect);
+                doPaint(block, qRect);
             }
 
         }
-    }
-
-    public QRect tileRectToQRect(TileRectangle rect) {
-        return new QRect(
-                rect.getMinColumn() * tileSize,
-                (rect.getMinRow()) * tileSize,
-                (rect.getWidth()+1) * tileSize-1,
-                (rect.getHeight()+1) * tileSize-1
-        );
     }
 
     private void drawBlocks(QPainter painter) {
@@ -151,39 +138,38 @@ public class PblockScene extends TileScene {
 
         //We draw all backgrounds, all outlines and then all texts to better support overlapped pblocks.
 
-        //Backgrounds
-        new ForAllRects(){
-            @Override
-            void doPaint(UiPBlock block, int i, QRect rect) {
-                final QColor transparent = block.color.clone();
-                if (block.opacity == null) {
-                    transparent.setAlpha(blockOpacity);
-                } else {
-                    transparent.setAlpha(block.opacity);
-                }
-                painter.fillRect(rect, new QBrush(transparent));
+        forAllRects((block, rect) -> {
+            final QColor transparent = block.color.clone();
+            if (block.opacity == null) {
+                transparent.setAlpha(blockOpacity);
+            } else {
+                transparent.setAlpha(block.opacity);
             }
-        }.run();
+            painter.fillRect(rect, new QBrush(transparent));
+        });
 
-        new ForAllRects() {
-            @Override
-            void doPaint(UiPBlock block, int i, QRect rect) {
-                painter.setPen(block.color);
-                painter.drawRect(rect);
-            }
-        }.run();
-        new ForAllRects() {
-            @Override
-            void doPaint(UiPBlock block, int i, QRect rect) {
-                painter.setPen(block.color);
+        forAllRects((block, rect) -> {
+            painter.setPen(block.color);
+            painter.drawRect(rect);
+        });
+        forAllRects((block, rect) -> {
+            painter.setPen(block.color);
 
-                painter.drawText(
-                        rect,
-                        Qt.AlignmentFlag.createQFlags(Qt.AlignmentFlag.AlignVCenter, Qt.AlignmentFlag.AlignCenter).value(),
-                        block.name
-                );
-            }
-        }.run();
+            painter.drawText(
+                    rect,
+                    Qt.AlignmentFlag.createQFlags(Qt.AlignmentFlag.AlignVCenter, Qt.AlignmentFlag.AlignCenter).value(),
+                    block.name
+            );
+        });
 
+    }
+
+    public QRect tileRectToQRect(TileRectangle rect) {
+        return new QRect(
+                rect.getMinColumn() * tileSize,
+                (rect.getMinRow()) * tileSize,
+                (rect.getWidth()+1) * tileSize-1,
+                (rect.getHeight()+1) * tileSize-1
+        );
     }
 }
