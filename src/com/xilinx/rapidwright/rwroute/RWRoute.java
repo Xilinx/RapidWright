@@ -171,10 +171,6 @@ public class RWRoute{
 	/** A map from TimingEdges to connections */
 	private Map<TimingEdge, Connection> timingEdgeConnectionMap;
 	
-	/** A map storing routes from CLK_OUT to different clock regions, used in clock routing with clock skew timing data */
-	private Map<String, List<String>> routesToClockRegions;
-	/** A map storing tap data corresponding to a sink clock region and a bufce row of a global clock net */
-	private Map<Pair<String, String>, List<Short>> bufceRowTapsOfClockRegions;
 	/** A map storing routes from CLK_OUT to different INT tiles that connect to sink pins of a global clock net */
 	private Map<String, List<String>> routesToSinkINTTiles;
 	
@@ -193,7 +189,7 @@ public class RWRoute{
 
 		if(this.config.isTimingDriven()) {
 			DSPTimingData.setDSPTimingFolder(config.getDspTimingDataFolder());
-			ClkRouteTiming clkTiming = this.createClkTimingData(config);
+			ClkRouteTiming clkTiming = createClkTimingData(config);
 			this.routesToSinkINTTiles = clkTiming == null? null : clkTiming.getRoutesToSinkINTTiles();
 			this.timingManager = new TimingManager(this.design, true, this.routerTimer, this.config, clkTiming);		
 		    this.estimator = new DelayEstimatorBase(this.design.getDevice(), new InterconnectInfo(), this.config.isUseUTurnNodes(), 0);
