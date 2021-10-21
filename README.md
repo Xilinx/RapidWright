@@ -45,11 +45,11 @@ More details here:
 http://www.rapidwright.io/docs/Automatic_Install.html#automatic-install
 
 
-### How to Update RapidWright to the Most Recent Release (Assumes Linux)
+### How to Update RapidWright to the Most Recent Release
 
 ```
 cd $RAPIDWRIGHT_PATH
 git pull
 # resolve any issues
-make update_jars
+gradlew update_jars
 ```

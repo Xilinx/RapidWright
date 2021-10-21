@@ -89,7 +89,7 @@ public class PartTileBrowser extends QMainWindow{
 		createTreeView();
 		List<String> parts = Device.getAvailableDevices();
 		if(parts.size() < 1){
-			MessageGenerator.briefErrorAndExit("Error: No available parts. Please generate part database files.");
+			throw new RuntimeException("Error: No available parts. Please generate part database files.");
 		}
 		currPartName = parts.get(0);
 		device = Device.getDevice(currPartName);

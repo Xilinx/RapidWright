@@ -31,6 +31,7 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -253,7 +254,8 @@ public class PBlockGenerator {
 		int cStart = -1;
 		
 		if(startingPoint == null){
-			MessageGenerator.briefErrorAndExit("PBlock Generator Error: Could not find a valid starting tile for constraint generation.");
+		    throw new RuntimeException("PBlock Generator Error: Could not find a valid "
+		            + "starting tile for constraint generation.");
 		}else{
 			rStart = startingPoint.getTile().getRow();
 			cStart = startingPoint.getTile().getColumn();
@@ -382,7 +384,8 @@ public class PBlockGenerator {
 			
 			// check to see if the maximum bounds of the spiral have exceeded the tile dimensions
 			}else if(minR < 0 && minC < 0 && maxR >= totalRows && maxC >=totalColumns){
-				MessageGenerator.briefErrorAndExit("PBlock Generator Error: Design is too large to be constrained on the device " + dev.getName());
+			    throw new RuntimeException("PBlock Generator Error: Design is too large to be "
+			            + "constrained on the device " + dev.getName());
 			}
 			
 			// Let's keep tabs on how many NULL tile columns we are including
@@ -1026,7 +1029,8 @@ public class PBlockGenerator {
 								for(int stringNr = 0; stringNr<WritePBlocks.size();stringNr++)
 									out.println(WritePBlocks.get(stringNr)+" "+nrInstances);
 								} catch (IOException e) {
-									MessageGenerator.briefErrorAndExit("Problem appending all the pblocks to the " + GLOBAL_PBLOCK +" file");
+								    throw new UncheckedIOException("Problem appending all the "
+								            + "pblocks to the " + GLOBAL_PBLOCK +" file", e);
 								}					
 					} else {
 						if(key == storeBestPattern.lastKey())
@@ -1428,7 +1432,7 @@ public class PBlockGenerator {
 	 */
 	public int getAlreadyGenPBlocks ( HashMap<Integer, Integer> xl, HashMap<Integer, Integer> xr,HashMap<Integer, Integer> yd, HashMap<Integer, Integer> yu, HashMap<Integer, Integer> nrInst ) {
 		if(GLOBAL_PBLOCK.contentEquals("")) {
-			MessageGenerator.briefErrorAndExit(" ERROR: Name of the PBlock file not given.");
+			throw new RuntimeException(" ERROR: Name of the PBlock file not given.");
 		}
 			
 		ArrayList<String> lines = new ArrayList<String>();

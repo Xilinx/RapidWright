@@ -17,21 +17,13 @@ http://www.rapidwright.io/docs/Automatic_Install.html#automatic-install
 
 ## How to Run Example
 ```
-cd interchange && make && cd ..
+make -C interchange
 make
 java com.xilinx.rapidwright.interchange.PhysicalNetlistExample
 # download an example DCP file
 wget http://www.rapidwright.io/docs/_downloads/picoblaze_best.zip
 unzip -j picoblaze_best.zip pblock0.dcp pblock0.edf -d .
 java com.xilinx.rapidwright.interchange.PhysicalNetlistExample pblock0.dcp pblock0_interchange.dcp
-```
-
-## How to Update RapidWright to the Most Recent Release (Assumes Linux)
-```
-cd $RAPIDWRIGHT_PATH
-git pull
-# resolve any issues
-make update_jars
 ```
 
 ## How to Re-generate Cap'n Proto Java Code from Schema

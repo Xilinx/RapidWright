@@ -64,7 +64,9 @@ public class Utils{
 	public static Set<SiteTypeEnum> iobTypes;
 
 	public static Set<SiteTypeEnum> uramTypes;
-	
+
+	public static Set<SiteTypeEnum> sliceDspBramUramTypes;
+
 	/**
 	 * Returns a SiteTypeEnum enum based on the given string. If such
 	 * an enum does not exist, it will return null.
@@ -380,6 +382,11 @@ public class Utils{
 			SiteTypeEnum.URAM288
 		);
 
+		sliceDspBramUramTypes = EnumSet.noneOf(SiteTypeEnum.class);
+		sliceDspBramUramTypes.addAll(sliceTypes);
+		sliceDspBramUramTypes.addAll(dspTypes);
+		sliceDspBramUramTypes.addAll(bramTypes);
+		sliceDspBramUramTypes.addAll(uramTypes);
 	}
 
 }
