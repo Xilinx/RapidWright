@@ -46,5 +46,11 @@ Output:
 ------------------------------------------------------------------------------
          [No GC] *Total*:     0.065s
 [and2(BEL: A6LUT), led0(BEL: OUTBUF), button0(BEL: INBUF_EN), button1(BEL: INBUF_EN)]
-
 ```
+
+By default, RapidWright for Python will download the corresponding 'standalone' Java
+package from [Releases](https://github.com/Xilinx/RapidWright/releases) and use that.
+However, for developers, if the `RAPIDWRIGHT_PATH` environment variable is set then
+the Java VM will use the version of RapidWright found according to the standard
+`CLASSPATH` environment variable instead.
+
