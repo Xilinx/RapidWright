@@ -6,7 +6,7 @@ pip install rapidwright
 ```
 
 # How it Works
-RapidWright is written in Java, however, a project called [jpype](https://github.com/jpype-project/jpype) allows Python to natively access the JVM and provide access to Java libraries.  Here is how you can use RapidWright in your Python scripts and programs:
+RapidWright is written in Java, however, a project called [JPype](https://github.com/jpype-project/jpype) allows Python to natively access the JVM and provide access to Java libraries.  Here is how you can use RapidWright in your Python scripts and programs:
 ```
 # This will start a JVM instance 
 import rapidwright
