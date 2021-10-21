@@ -226,11 +226,11 @@ public class MessageGenerator{
 		return String.format("%-35s %10s\n", s, value);
 	}
 
-	public static String printFormattedString(String s, int value) {
+	public static String formatString(String s, int value) {
 		return String.format("%-35s %10d\n", s, value);
 	}
 	
-	public static String printFormattedString(String s, long value) {
+	public static String formatString(String s, long value) {
 		return String.format("%-35s %10d\n", s, value);
 	}
 }
