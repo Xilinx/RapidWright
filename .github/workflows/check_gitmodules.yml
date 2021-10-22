@@ -1,0 +1,18 @@
+name: Check .gitmodules not modified
+
+on:
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 2
+
+      - run: |
+          git diff --name-only --diff-filter=DM ${{ github.event.pull_request.base.sha }} --exit-code -- .gitmodules || exit 1
+
