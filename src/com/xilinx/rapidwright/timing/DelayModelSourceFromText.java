@@ -69,7 +69,7 @@ class DelayModelSourceFromText extends DelayModelSource {
      * @return The bel name.
      */
     private String collectConfigs(String line) {
-        final short max_num_configs = 32; // size of positive part of short
+        final short max_num_configs = 32;
         short num_configs = 0;
 
         configName2Idx = new HashMap<String,Integer>();
