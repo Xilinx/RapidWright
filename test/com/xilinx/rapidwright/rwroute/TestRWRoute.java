@@ -29,7 +29,6 @@ public class TestRWRoute {
 	 * This test takes around 20s on a machine with a CPU @ 2.5GHz.
 	 */
 	@Test
-	@Disabled("Disabled because of the data type error reported in DelayModelSourceFromText: line #109")
 	public void testTimingDrivenFullRouting() {
 		Design design = Design.readCheckpoint("RapidWrightDCP/bnn.dcp");
 		RWRoute.routeDesignFullTimingDriven(design);
