@@ -12,9 +12,10 @@ public class TestRWRoute {
 	}
 	
 	@Test
+	@Disabled("Disabled because ...")
 	public void testTimingDrivenFullRouting() {
-//		Design design = Design.readCheckpoint("RapidWrightDCP/bnn.dcp");
-//		RWRoute.routeDesignFullTimingDriven(design);
+		Design design = Design.readCheckpoint("RapidWrightDCP/bnn.dcp");
+		RWRoute.routeDesignFullTimingDriven(design);
 	}
 	
 	@Test
