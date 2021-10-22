@@ -20,8 +20,8 @@ performance.
 
 If you run into issues, feel free to file an issue on the [Github
 issue tracker](https://github.com/Xilinx/RapidWright/issues/new), or,
-for more broad questions/requests, post on our [support
-forum](https://groups.google.com/forum/#!forum/rapidwright). [Documentation](http://www.rapidwright.io/docs/index.html)
+for more broad questions/requests, post on our [discussion
+forum](https://github.com/Xilinx/RapidWright/discussions). [Documentation](http://www.rapidwright.io/docs/index.html)
 and [Javadoc](http://www.rapidwright.io/javadoc/index.html) reference is also available.
 
 For more information, please see http://www.rapidwright.io.
