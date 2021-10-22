@@ -106,7 +106,7 @@ class DelayModelSourceFromText extends DelayModelSource {
                 configCodeMap.put(belName + ":" + configName + e, (int) (1<<num_configs));
                 num_configs++;
                 values.add(e);
-                assert num_configs < max_num_configs :
+                assert num_configs <= max_num_configs :
                         "num_configs is too high. Please change data type to accommodate " + num_configs + ".";
             }
         }
