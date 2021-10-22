@@ -2,7 +2,7 @@
 # v 0.4
 
 START_TILE_ROW		1.
-START_TILE_COL		52.
+START_TILE_COL		61.
 
 # input site pin delay
 # FIXED_DELAY is obsolete and should be replaced by A1-A6 below
@@ -16,6 +16,13 @@ SITEPIN_A5_DELAY       44.
 SITEPIN_A6_DELAY       43.
 SITEPIN_A_I_DELAY      65.
 SITEPIN_AX_DELAY       65.
+SITEPIN_CKEN1_DELAY     5.
+SITEPIN_CKEN2_DELAY     5.
+SITEPIN_CKEN3_DELAY     5.
+SITEPIN_CKEN4_DELAY     5.
+SITEPIN_SRST1_DELAY     5.
+SITEPIN_SRST2_DELAY     5.
+SITEPIN_WCKEN_DELAY    65.
 # Intrasite delay depend on the sink bel. For LUT, this should be 0. For FF, please use 100.
 INTRASITE_DELAY_SITEPIN_TO_LUT_INPUT        0.
 INTRASITE_DELAY_LUT_OUTPUT_TO_O_SITEPIN     0.

@@ -104,28 +104,48 @@ class DelayModelBuilder {
 
 
     // ************************    for testing     ***********************
-
-    /**
-     * For unit testing.
-     */
-    private static int testLogicDelay(DelayModel a, String belName, List<String> config, 
-            String[] src, String[] dst) {
-
+    private static int testLogicDelay(DelayModel delayModel, List<String> config, String belName, String[] src, String[] dst
+            , String fileName) {
         int count = 0;
+        int countNeg = 0;
+        try {
+            BufferedWriter writer = null;
+            if (fileName != null) {
+                writer = new BufferedWriter(new FileWriter(fileName));
+            }
+            
+          int encodedConfig = 0;
+          for (String s : config) {
+              int e = delayModel.getEncodedConfigCode(belName + ":"+ s);
+              encodedConfig = (int) (encodedConfig | e);
+          }
+          short belIdx = delayModel.getBELIndex(belName);
+            
             for (String s : src) {
                 for (String t : dst) {
-                    try {
-                        short dly = a.getLogicDelay(belName, s, t, config);
-                     //   System.out.println(s + " " + t + " " + dly);
+//                    System.out.println(s + " " + t);
+                    short dly = delayModel.getLogicDelay(belIdx, s, t, encodedConfig);
+                    if (fileName != null) {
+                        writer.write(s + " " + t + " " + dly + "\n");
+                    }
+                    System.out.println(s + " " + t + " " + dly);
+                    if (dly >= 0) {
                         count++;
-                    } catch (IllegalArgumentException ex) {
-                        System.out.println("EXCEPTION: " + ex.getMessage());
+                    } else {
+                        countNeg++;
                     }
                 }
             }
+            if (fileName != null) {
+                writer.close();
+            }
+        }  catch (IOException ex) {
+            System.out.println("EXCEPTION: " + ex.getMessage());
+        }
+        System.out.println("testLogicDelay found " + countNeg + " negative entries.");
         return count;
     }
-
+    
     /**
      * For unit testing.
      */
@@ -136,27 +156,15 @@ class DelayModelBuilder {
         String[] dst = {"CO0", "CO1", "CO2", "CO3", "CO4", "CO5", "CO6", "CO7",
                 "O0", "O1", "O2", "O3", "O4", "O5", "O6", "O7"};
 
-        int count = 0;
-        try {
-            BufferedWriter writer = new BufferedWriter(new FileWriter(fileName));
-            for (String s : src) {
-                for (String t : dst) {
-//                    System.out.println(s + " " + t);
-                    short dly = a.getLogicDelay("CARRY8", s, t, config);
-                    writer.write(s + " " + t + " " + dly + "\n");
-//                    System.out.println(s + " " + t + " " + dly);
-                    if (dly >= 0) {
-                        count++;
-                    }
-                }
-            }
-            writer.close();
-        }  catch (IOException ex) {
-            System.out.println("EXCEPTION: " + ex.getMessage());
-        }
-        return count;
+        return testLogicDelay(a, config, "CARRY8", src, dst, fileName);
     }
 
+    private static int testLogicDelayRAMB(DelayModel a, List<String> config, String fileName) {
+        String[] src = {"CLKARDCLK"};
+        String[] dst = {"ENARDEN"};
+
+        return testLogicDelay(a, config, "RAMB36E2", src, dst, fileName);
+    }
     /**
      * For unit testing.
      */
@@ -303,7 +311,8 @@ class DelayModelBuilder {
             List<String> config = new ArrayList<String>();
             String[] src = {"A6", "A5", "A4", "A3", "A2", "A1"};
             String[] dst = {"O6"};
-            testLogicDelay(a, belName, config, src, dst);
+
+            testLogicDelay(a, config, belName, src, dst, "");
         }
         // A5LUT
         if (false) {
@@ -312,7 +321,7 @@ class DelayModelBuilder {
             List<String> config = new ArrayList<String>();
             String[] src = {"A5", "A4", "A3", "A2", "A1"};
             String[] dst = {"O5"};
-            testLogicDelay(a, belName, config, src, dst);
+            testLogicDelay(a, config, belName, src, dst, "");
         }
         // E6LUT
         if (false) {
@@ -321,7 +330,7 @@ class DelayModelBuilder {
             List<String> config = new ArrayList<String>();
             String[] src = {"A6", "A5", "A4", "A3", "A2", "A1"};
             String[] dst = {"O6"};
-            testLogicDelay(a, belName, config, src, dst);
+            testLogicDelay(a, config, belName, src, dst, "");
         }
         // E5LUT
         if (false) {
@@ -330,7 +339,7 @@ class DelayModelBuilder {
             List<String> config = new ArrayList<String>();
             String[] src = {"A5", "A4", "A3", "A2", "A1"};
             String[] dst = {"O5"};
-            testLogicDelay(a, belName, config, src, dst);
+            testLogicDelay(a, config, belName, src, dst, "");
         }
         // AFF
         if (false) {
@@ -339,7 +348,7 @@ class DelayModelBuilder {
             List<String> config = new ArrayList<String>();
             String[] src = {"CLK"};
             String[] dst = {"D", "Q"};
-            testLogicDelay(a, belName, config, src, dst);
+            testLogicDelay(a, config, belName, src, dst, "");
         }
         //AFF2
         if (false) {
@@ -348,7 +357,7 @@ class DelayModelBuilder {
             List<String> config = new ArrayList<String>();
             String[] src = {"CLK"};
             String[] dst = {"D", "Q"};
-            testLogicDelay(a, belName, config, src, dst);
+            testLogicDelay(a, config, belName, src, dst, "");
         }
         // HFF
         if (false) {
@@ -357,7 +366,7 @@ class DelayModelBuilder {
             List<String> config = new ArrayList<String>();
             String[] src = {"CLK"};
             String[] dst = {"D", "Q"};
-            testLogicDelay(a, belName, config, src, dst);
+            testLogicDelay(a, config, belName, src, dst, "");
         }
         //HFF2
         if (false) {
@@ -366,7 +375,7 @@ class DelayModelBuilder {
             List<String> config = new ArrayList<String>();
             String[] src = {"CLK"};
             String[] dst = {"D", "Q"};
-            testLogicDelay(a, belName, config, src, dst);
+            testLogicDelay(a, config, belName, src, dst, "");
         }
         // test SINGLE_CY8
         if (false) {
@@ -429,7 +438,7 @@ class DelayModelBuilder {
         }
 
         // measure runtime for looking up logic delays
-        if (true) {
+        if (false) {
             int count = 0;
             // time measurement
             long startTime = System.nanoTime();
@@ -445,7 +454,24 @@ class DelayModelBuilder {
             System.out.print("Execution time of " + count + " lookups is " + elapsedTime / 1000000 + " ms.");
             System.out.println(" (" +  1.0*elapsedTime / (count * 1000) + " us. per lookup.)");
         }
+        if (true) {
+            int count = 0;
+            // time measurement
+            long startTime = System.nanoTime();
+            for (int i = 0; i < 10 ; i++) {
+                List<String> config = new ArrayList<String>();
+                config.add("RTL_RAM_TYPE:RAM_SP"); 
+                config.add("CASCADE_ORDER_A:NONE");
+                config.add("DOA_REG:1");
+                count += testLogicDelayRAMB(a, config, "ramb.dly");
+            }
+            long endTime = System.nanoTime();
+            long elapsedTime = endTime - startTime;
 
+            // 880000 9129 ms = 10 us / lookup
+            System.out.print("Execution time of " + count + " lookups is " + elapsedTime / 1000000 + " ms.");
+            System.out.println(" (" +  1.0*elapsedTime / (count * 1000) + " us. per lookup.)");
+        }
 
         long total_after= Runtime.getRuntime().totalMemory();
         long free_after = Runtime.getRuntime().freeMemory();

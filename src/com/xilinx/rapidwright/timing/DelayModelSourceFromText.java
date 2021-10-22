@@ -69,7 +69,7 @@ class DelayModelSourceFromText extends DelayModelSource {
      * @return The bel name.
      */
     private String collectConfigs(String line) {
-        final short max_num_configs = 15; // size of positive part of short
+        final short max_num_configs = 32;
         short num_configs = 0;
 
         configName2Idx = new HashMap<String,Integer>();
@@ -103,9 +103,10 @@ class DelayModelSourceFromText extends DelayModelSource {
                 }
                 values  = new ArrayList<String>();
             } else { // this is value of a config
-                configCodeMap.put(belName + ":" + configName + e, (short) Math.pow(2, num_configs++));
+                configCodeMap.put(belName + ":" + configName + e, (int) (1<<num_configs));
+                num_configs++;
                 values.add(e);
-                assert num_configs < max_num_configs :
+                assert num_configs <= max_num_configs :
                         "num_configs is too high. Please change data type to accommodate " + num_configs + ".";
             }
         }
@@ -114,6 +115,15 @@ class DelayModelSourceFromText extends DelayModelSource {
         }
 
         return belName;
+    }
+
+    public static boolean isNumeric(String str) {
+        try {
+            Integer.parseInt(str);
+            return true;
+        } catch(NumberFormatException e){
+            return false;
+        }
     }
 
     /**
@@ -129,15 +139,48 @@ class DelayModelSourceFromText extends DelayModelSource {
         String dst = items.get(1);
         Short  dly = Short.parseShort(items.get(2));
 
-        Short  config = -1; // all 1
+        int  config = -1; // all 1
+
+
+        String key = null;
+        List<String> vals = new ArrayList<>();
 
         if (items.size() > 3) {
             Short[] cfgArray  = new Short[configNames.size()]; // initialize to null
             String configName = null;
             config = 0;
+            int configStartAt = 3;
+
+            // check if the first item after delay is for substitution
+            if (!configName2Idx.containsKey(items.get(configStartAt))) {
+                // this is not a config, it must be a substitution
+                key = items.get(configStartAt).replaceAll(":", "");
+
+
+                configStartAt++;
+                for (; configStartAt < items.size(); configStartAt++) {
+                    String val = items.get(configStartAt);
+                    if (val.contains(":"))
+                        break;
+
+                    if (val.contains("-")) {
+                        List<String> ranges = Arrays.asList(val.split("-"));
+                        if (!isNumeric(ranges.get(0)) || !isNumeric(ranges.get(1))) {
+                            throw new IllegalArgumentException("Range " + val + " contain non-numeric value.!");
+                        }
+                        int beg = Integer.parseInt(ranges.get(0));
+                        int end = Integer.parseInt(ranges.get(1));
+                        for (int i = beg; i <= end; i++) {
+                            vals.add(Integer.toString(i));
+                        }
+                    } else {
+                        vals.add(val);
+                    }
+                }
+            }
 
             // fill out config listed for this arc
-            for (int i = 3; i < items.size(); i++) {
+            for (int i = configStartAt; i < items.size(); i++) {
                 String e = items.get(i);
                 if (e.matches("(.*):")) {
                     configName = e;
@@ -148,8 +191,8 @@ class DelayModelSourceFromText extends DelayModelSource {
                         cfgArray[idx] = 1;
                     }
                 } else { // this is value of a config
-                    Short tconfig = configCodeMap.get(belName + ":" + configName + e);
-                    config = (short) (config | tconfig);
+                    int tconfig = configCodeMap.get(belName + ":" + configName + e);
+                    config = (int) (config | tconfig);
                 }
             }
 
@@ -158,18 +201,28 @@ class DelayModelSourceFromText extends DelayModelSource {
                 if (cfgArray[i] == null) {
                     configName = configNames.get(i);
                     for (String e : configValues.get(i)) {
-                        Short tconfig = configCodeMap.get(belName + ":" + configName + e);
-                        config = (short) (config | tconfig);
+                        int tconfig = configCodeMap.get(belName + ":" + configName + e);
+                        config = (int) (config | tconfig);
                     }
                 }
             }
+        }
+
+        if (key == null) {
+            // insert "no op" substitute. a valid source will not contain a space.
+            key = " ";
+            vals.add(" ");
         }
 
         List<String> srcs = Arrays.asList(src.trim().split(","));
         List<String> dsts = Arrays.asList(dst.trim().split(","));
         for (String s : srcs) {
             for (String t : dsts) {
-                logicDelays.add(new DelayEntry(belName, s, t, dly, config));
+                for (String val : vals) {
+                    String ss  = s.replaceAll(key, val);
+                    String st  = t.replaceAll(key, val);
+                    logicDelays.add(new DelayEntry(belName, ss, st, dly, config));
+                }
             }
         }
     }
@@ -191,7 +244,7 @@ class DelayModelSourceFromText extends DelayModelSource {
             key = items[3].substring(0, items[3].length()-1); // remove trailing :
         }
 
-        Short  config = -1; // all 1
+        int  config = -1; // all 1
 
         for ( String f : src) {
             for (String t : dst) {
@@ -274,9 +327,9 @@ class DelayModelSourceFromText extends DelayModelSource {
      * @param fileName Specify the text file to load logic and intra-site delays from.
      */
     public DelayModelSourceFromText(String fileName) {
-        logicDelays     = new ArrayList<DelayEntry>();
-        intraSiteDelays = new ArrayList<DelayEntry>();
-        configCodeMap   = new HashMap<String, Short>();
+        logicDelays     = new ArrayList<>();
+        intraSiteDelays = new ArrayList<>();
+        configCodeMap   = new HashMap<>();
         readIntraSiteDelays(fileName);
     }
 

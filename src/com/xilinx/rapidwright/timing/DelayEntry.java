@@ -46,7 +46,7 @@ class DelayEntry {
     /**
      * Valid configs of for this entry.
      */
-    public short  config;
+    public int  config;
 
     /**
      * Constructor with config parameter.
@@ -56,7 +56,7 @@ class DelayEntry {
      * @param d Delay of the arc.
      * @param c Valid configuration of the arc.
      */
-    public DelayEntry(String s, String f, String t, short d, short c) {
+    public DelayEntry(String s, String f, String t, short d, int c) {
         scope  = s;
         fr     = f;
         to     = t;

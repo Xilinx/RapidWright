@@ -24,17 +24,20 @@ import java.io.FileNotFoundException;
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
@@ -45,15 +48,21 @@ import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierPortInst;
+import com.xilinx.rapidwright.edif.EDIFName;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
+import com.xilinx.rapidwright.edif.EDIFPropertyValue;
+import com.xilinx.rapidwright.rwroute.RouterHelper;
+import com.xilinx.rapidwright.util.Pair;
+import com.xilinx.rapidwright.util.RuntimeTrackerTree;
+
 import org.jgrapht.GraphPath;
 import org.jgrapht.alg.shortestpath.AllDirectedPaths;
 import org.jgrapht.alg.shortestpath.BellmanFordShortestPath;
 import org.jgrapht.alg.shortestpath.KShortestSimplePaths;
 import org.jgrapht.graph.DefaultDirectedWeightedGraph;
 import org.jgrapht.graph.GraphWalk;
-
+import org.jgrapht.traverse.TopologicalOrderIterator;
 
 /**
  * A TimingGraph is an acyclic weighted-directed graph representing logic delays and physical net 
@@ -71,17 +80,19 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     DelayModel intrasiteAndLogicDelayModel;
     PrintStream graphVizPrintStream;
     HashMap<String, EDIFCellInst> myCellMap;
-    String netName;
-    Net net;
-    String prevNet;
-    EDIFNet edifNet;
-    boolean haveIntrasiteNet;
-    SitePinInst spi_source;
     Design design;
     ArrayList<EDIFHierCellInst> set;
     private HashMap<String, TimingVertex> safeVertexCheck = new HashMap<>();
     static HashSet<String> unisimFlipFlopTypes;
+    static HashSet<String> ramTypes;
 
+    private Map<SitePinInst, List<TimingEdge>> sinkSitePinInstTimingEdges = new HashMap<>();
+    private Map<EDIFHierPortInst, SitePinInst> edifHPortMap = new HashMap<>();
+    private List<TimingVertex> orderedTimingVertice = new ArrayList<>();
+    private List<TimingVertex> reversedOrderedTimingVertice = new ArrayList<>();
+    private ClkRouteTiming clkRouteTiming = null;
+    private RuntimeTrackerTree routerTimer;
+    
     static {
         
         unisimFlipFlopTypes = new HashSet<>();
@@ -91,6 +102,12 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         unisimFlipFlopTypes.add("FDPE");
         unisimFlipFlopTypes.add("FDRE");
         unisimFlipFlopTypes.add("FDCE");
+    }
+    
+    static {
+    	ramTypes = new HashSet<>();
+    	ramTypes.add("RAMB18E2");
+    	ramTypes.add("RAMB36E2");
     }
     
     /**
@@ -103,32 +120,51 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         super(TimingEdge.class);
         this.design = design;
     }
+    
+    
+    public TimingGraph(Design design, RuntimeTrackerTree timer, ClkRouteTiming clkTiming) {
+        super(TimingEdge.class);
+        this.design = design;
+        this.routerTimer = timer;
+        this.clkRouteTiming = clkTiming;
+    }
 
     /**
      * Builds the TimingGraph based on analyzing nets within a {@link Design} object.
      */
-    public void build() {
-        if (timingModel == null) {
+    public void build(boolean isPartialRouting) {
+    	if (timingModel == null) {
             throw new RuntimeException("Error: The TimingModel is not properly set for the "
                     + "TimingGraph prior to building.");
         }
         String seriesName = design.getDevice().getSeries().name().toLowerCase();
         intrasiteAndLogicDelayModel = DelayModelBuilder.getDelayModel(seriesName);
-        HashMap<String, Net> netsByName = new LinkedHashMap<>();
-        for (Net n : design.getNets()) {
-            netsByName.put(n.getName(), n);
-        }        String[] netsArray = netsByName.keySet().toArray(new String[netsByName.size()]);
-        //Arrays.sort(netsArray);
-        for (Net n : design.getNets()) {
-            netsByName.put(n.getName(), n);
-        }
-        hierCellInstMap = new LinkedHashMap<>();
-        EDIFCellInst top = design.getNetlist().getTopCellInst();
-        hierCellInstMap.put(top, top.getName());
+          
+        if(this.routerTimer != null) this.routerTimer.createRuntimeTracker("determine logic dly", "build timing graph").start();
         myCellMap = design.getNetlist().generateCellInstMap();
-        determineLogicDelaysFromEDIFCellInsts();
-        set = new ArrayList<>();
-        Queue<EDIFHierCellInst> q = new LinkedList<>();
+        if(!isPartialRouting) {
+        	determineLogicDelaysFromEDIFCellInsts(this.myCellMap);
+        }else {
+        	determineLogicDelaysFromEDIFCellInsts(this.generateCellMapOfUnoutedNets());
+        }
+        if(this.routerTimer != null) this.routerTimer.getRuntimeTracker("determine logic dly").stop();
+        
+        if(this.routerTimer != null) this.routerTimer.createRuntimeTracker("add net dly edges", "build timing graph").start();
+        for (Net net : this.design.getNets()) {
+            if(net.isClockNet()) continue;//this is for getting rid of the problem in addNetDelayEdges() of clock net
+            if(net.isStaticNet()) continue;
+            if(!isPartialRouting || !net.hasPIPs()) {
+            	addNetDelayEdges(net);
+            }
+        }
+        if(this.routerTimer != null) this.routerTimer.getRuntimeTracker("add net dly edges").stop();
+    }
+    
+    public void populateHierCellInstMap() {
+    	hierCellInstMap = new LinkedHashMap<>();
+    	EDIFCellInst top = design.getNetlist().getTopCellInst();
+        hierCellInstMap.put(top, top.getName());
+    	Queue<EDIFHierCellInst> q = new LinkedList<>();
         q.add(design.getNetlist().getTopHierCellInst());
         while (!q.isEmpty()) {
             EDIFHierCellInst i = q.poll();
@@ -148,15 +184,33 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                 hierCellInstMap.put(child, fullName);
             }
         }
-        prevNet = "";
-        for (String netName : netsArray) {
-            this.netName = netName;
-            this.net = netsByName.get(netName);
-            this.edifNet = net.getLogicalNet();
-            this.haveIntrasiteNet = (net.getSinkPins().size() == 0);
-            this.spi_source = net.getSource();
-            addNetDelayEdges(net);
-        }
+    }
+    
+    /**
+     * Gets a map of hierarchical names to EDIFCellInsts of unrouted nets only
+     * @return A map of hierarchical names to EdifCellInstances that use primitives in the library, for unrouted nets only
+     */
+    private Map<String, EDIFCellInst> generateCellMapOfUnoutedNets() {
+    	Map<String, EDIFCellInst> partialCellMap = new HashMap<>();
+    	Set<String> keys = new HashSet<>();
+    	for(Net n : design.getNets()) {
+    		if(n.isClockNet() || n.isStaticNet() || n.hasPIPs()) continue;
+    		if(!RouterHelper.isRoutableNetWithSourceSinks(n)) continue;
+    		List<EDIFHierPortInst> ehportInsts = design.getNetlist().getPhysicalPins(n.getName());
+    		for(EDIFHierPortInst eportInst : ehportInsts) {
+    			keys.add(eportInst.getFullHierarchicalInstName());
+    		}
+    	}
+    	
+    	for(String fullHierInstName : keys) {
+    		EDIFCellInst edifCellInst = this.myCellMap.get(fullHierInstName);
+    		if(edifCellInst == null) {
+    			System.out.println("WARNING: Null EDIFCellInst under name " + fullHierInstName);
+    			continue;
+    		}
+    		partialCellMap.put(fullHierInstName, edifCellInst);
+    	}
+    	return partialCellMap;
     }
 
     /**
@@ -179,7 +233,203 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         }
         computeArrivalTimes();
     }
+    
+    /**
+     * Creates and Sets the lists of ordered TimingVertices
+     */
+    public void setOrderedTimingVertexLists() {
+    	TopologicalOrderIterator<TimingVertex, TimingEdge> orderIterator = new TopologicalOrderIterator<>(this);
+    	while(orderIterator.hasNext()){
+    		TimingVertex v = orderIterator.next();
+    		orderedTimingVertice.add(v);
+    	}
+    	reversedOrderedTimingVertice = this.getReversedOrder();
+    }
+    
+    /**
+     * Computes/recomputes the arrival time stored at each vertex of the graph using TopologicalOrderIterator
+     */
+    public void computeArrivalTimesTopologicalOrder() {
+    	if(orderedTimingVertice.isEmpty()) {
+    		this.setOrderedTimingVertexLists();
+    	}
+		for(TimingVertex v : orderedTimingVertice) {
+			Set<TimingEdge> outgoings = this.outgoingEdgesOf(v);
+			if(this.inDegreeOf(v) == 0) v.setArrivalTime(0);
+			for (TimingEdge e : outgoings){
+	    		float arrival = e.getSrc().getArrivalTime() + e.getDelay();
+	    		e.getDst().setMaxArrivalTime(arrival, v);
+	    	}
+		}
+    }
 
+    /**
+     * Get the clock region that the cell pin resides in
+     * @param cellPinName, the name of the cell pin
+     * @param design
+     * @return clock region name
+     */
+    public static String getClockRegionOfCellPin(String cellPinName, Design design) {
+    	int indexOfLastSlash = cellPinName.lastIndexOf("/");
+    	String cellName = cellPinName.substring(0, indexOfLastSlash);
+    	Cell cell = design.getCell(cellName);
+    	if(cell == null) {
+    		System.out.println("NULL CELL FOUND FOR " + cellPinName);
+    		return null;
+    	}
+    	return cell.getTile().getClockRegion().getName();
+    }
+    
+    /**
+     * Set the required time of each timing vertex in the graph
+     * @param requirement, the required time of the design
+     */
+    public void setTimingRequirementTopologicalOrder(float requirement){
+    	if(reversedOrderedTimingVertice.isEmpty()) {
+    		reversedOrderedTimingVertice = this.getReversedOrder();
+    	}
+    	for(TimingVertex v : reversedOrderedTimingVertice){
+    		Set<TimingEdge> incomings = this.incomingEdgesOf(v);
+    		if(this.outDegreeOf(v) == 0){
+				if(v.equals(this.superSink)) {
+					v.setMinRequiredTime(requirement);
+				}else {
+					v.setMinRequiredTime(Short.MAX_VALUE);//NOTE: there are dangling timing vertices not connected to super sink
+				}
+			}
+    		
+    		for (TimingEdge e : incomings){
+    			float remainingRequiredTime = e.getDst().getRequiredTime() - e.getDelay();
+    			e.getSrc().setMinRequiredTime(remainingRequiredTime);
+    		}
+    	}
+    }
+    
+    /**
+     * Reset the required and arrival time to be null
+     */
+    public void resetRequiredAndArrivalTime(){
+    	for(TimingVertex v : this.vertexSet()){
+    		v.resetArrivalTime();
+    		v.resetRequiredTime();
+    		v.setPrev(null);
+    	}
+    }
+    
+    /**
+     * Get the maximum delay, i.e., the maximum arrival time, and corresponding timing path sink of the design
+     */
+    public Pair<Float, TimingVertex> getMaxDelay(){
+    	return new Pair<>(this.superSink.getArrivalTime(), this.superSink);
+    }
+    
+    private List<TimingVertex> getReversedOrder(){
+    	List<TimingVertex> reversedOrderedTimingVertices = new ArrayList<>();
+    	reversedOrderedTimingVertices.addAll(orderedTimingVertice);
+
+    	Collections.reverse(reversedOrderedTimingVertices);
+    	return reversedOrderedTimingVertices;
+    }
+    
+    /**
+     * Get a list of timing edges consisting of the critical path
+     * @param maxV The timing vertex with the maximum arrival time
+     * @return A list of timing edges consisting of the critical path
+     */
+    public List<TimingEdge> getCriticalTimingEdgesInOrder(TimingVertex maxV){
+    	List<TimingEdge> criticalTimingEdges = new ArrayList<>();
+    	TimingVertex timingVertex = maxV;
+    	
+    	while(incomingEdgesOf(timingVertex).size() != 0){
+    		TimingEdge e = this.getCriticalSourceTimingVertex(timingVertex);
+    		if(e == null) break;
+    		timingVertex = e.getSrc();
+    		criticalTimingEdges.add(e);
+    	}
+    	
+    	Collections.reverse(criticalTimingEdges);
+    	return criticalTimingEdges;
+    }
+    
+    private TimingEdge getCriticalSourceTimingVertex(TimingVertex sinkV){
+    	Set<TimingEdge> incomingEdges = incomingEdgesOf(sinkV);
+    	
+    	for(TimingEdge e : incomingEdges){
+    		if(e.getSrc().equals(sinkV.getPrev())) {
+    			return e;
+    		}
+    	}
+    	return null;
+    }
+
+	/**
+     * Gets the mapping between each EDIFHierPortInst (logical pin) and the SitePinInst physical pin.
+     */
+	public Map<EDIFHierPortInst, SitePinInst> getEdifHPortMap(){
+    	return this.edifHPortMap;
+    }
+    
+	/**
+	 * Finds the given critical path in the timing graph and reports the delay detail
+	 * @param verticesNames, the given TimingVertices
+	 * @return A list of TimingEdges associated with the given TimingVertices
+	 */
+	// output vertices only
+	// return null if path not found in the graph
+    public List<TimingEdge> getTimingEdgeOfPath(List<String> verticesNames){
+    	boolean verbose = true;
+    	
+    	if(verbose) System.out.println("\nGET DELAY OF GIVEN PATH:\n");
+    	List<TimingVertex> vertices = new ArrayList<>();
+    	for(String str : verticesNames){
+    		TimingVertex v = this.safeVertexCheck.get(str);
+    		if(v != null){
+    			vertices.add(v);
+    		}else{
+    			System.err.println("graph does not contain: " + str);
+    		}
+    	}
+    	if(verbose) System.out.println(vertices.size() + " / " + verticesNames.size() + " vertices from the path found in TimingGraph");
+    	List<TimingEdge> edges = new ArrayList<>();
+    	// Q -> O -> O -> --- -> D
+    	for(int i = 0; i < vertices.size() - 1; i++){
+    		if(verbose) {
+    			if(i > 0) {//skip superSource outgoing timing edges printout as there are too many
+    				System.out.println(vertices.get(i) + " outgoing timing eges:\n " + outgoingEdgesOf(vertices.get(i)));
+    			}
+    		}
+    		boolean found = false;
+    		for(TimingEdge e : outgoingEdgesOf(vertices.get(i))){
+    			if(found) {
+    				break;
+    			}
+    			if(outgoingEdgesOf(e.getDst()).size() == 0)
+    				System.out.println(e.getDst() + " no outgoing edges, delay =  " + e.getDelay());
+				for(TimingEdge nexte : outgoingEdgesOf(e.getDst())){
+					// this means the hops between adjacent pins could be more than two
+					// otherwise, it will report as NULL TimingEdge found
+    				if(nexte.getDst().equals(vertices.get(i+1))){
+    					if(verbose) System.out.println("TimingEdge found between: \n  " + vertices.get(i) + ", " + vertices.get(i+1));
+    					edges.add(e);
+    					edges.add(nexte);
+    					found = true;
+    					break;
+    				}
+    			}
+				if(e.getDst().equals(vertices.get(i+1))) {
+					edges.add(e);
+					found = true;
+					break;
+				}
+    		}
+    		if(!found) {
+    			System.out.println("NULL TimingEdge found between: \n  " + vertices.get(i) + ", " + vertices.get(i+1));
+    		}
+    		if(verbose) System.out.println();
+    	}
+    	return edges;
+    }
+        
     /**
      * Sets the same specified timing requirement on a specified GraphPath.
      * @param requirement The required time in picoseconds at the sink of the path.
@@ -192,10 +442,10 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         int sz = edgeList.size();
         for(int i=sz-1; i>=0; i-- ) {
             TimingEdge e = edgeList.get(i);
-            e.getDst().setRequiredTime(remainingRequiredTime);
+            e.getDst().setMinRequiredTime(remainingRequiredTime);
             remainingRequiredTime = remainingRequiredTime - e.getDelay();
             if (inDegreeOf(e.getSrc()) ==0) {
-                e.getSrc().setRequiredTime(remainingRequiredTime);
+                e.getSrc().setMinRequiredTime(remainingRequiredTime);
             }
         }
     }
@@ -346,6 +596,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         return result/ graphPathHashSet.size();
     }
 */
+    
     /**
      * Finds and returns the path from the TimingGraph having maximum delay.
      * @return The GraphPath that is the critical path found in the TimingGraph, which might be null
@@ -354,6 +605,10 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     public GraphPath<TimingVertex, TimingEdge> getMaxDelayPath() {
         GraphPath<TimingVertex, TimingEdge> result = null;
         float maxWeight = 0;
+        this.computeArrivalTimesTopologicalOrder();
+        if(graphPathHashSet == null) {
+        	this.buildGraphPaths(1);
+        }
         for (GraphPath<TimingVertex, TimingEdge> p : graphPathHashSet) {
             float w = (float)p.getWeight();
             if (Math.abs(w) > maxWeight) {
@@ -438,13 +693,139 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         return buildGraphPaths(0);
     }
 
-    /** Builds and returns a set of GraphPaths.
-     * @param n 0 will return all paths; 1 will return 1 path by using Bellman Ford algorithm with 
-     * negating the edges prior to running the shortest path algorithm.
-     * @return A List of GraphPaths that were just built by this command
+    static Set<String> bramPinsToSuperSink;
+    static {
+    	bramPinsToSuperSink = new HashSet<>();
+    	bramPinsToSuperSink.add("ADDRARDADDR");//EN, ADDR, WE, DIN
+    	bramPinsToSuperSink.add("ADDRBWRADDR");
+    	bramPinsToSuperSink.add("ADDRENA");
+    	bramPinsToSuperSink.add("ADDRENB");
+    	bramPinsToSuperSink.add("CASDOMUXA");
+    	bramPinsToSuperSink.add("CASDOMUXB");
+    	bramPinsToSuperSink.add("CASDOMUXEN_A");
+    	bramPinsToSuperSink.add("CASDOMUXEN_B");
+    	bramPinsToSuperSink.add("CASOREGIMUXA");
+    	bramPinsToSuperSink.add("CASOREGIMUXB");
+    	bramPinsToSuperSink.add("CASOREGIMUXEN_A");
+    	bramPinsToSuperSink.add("CASOREGIMUXEN_B");
+    	bramPinsToSuperSink.add("DINADIN");
+    	bramPinsToSuperSink.add("DINBDIN");
+    	bramPinsToSuperSink.add("ENARDEN");
+    	bramPinsToSuperSink.add("ENBWREN");
+    	bramPinsToSuperSink.add("WEA");
+    	bramPinsToSuperSink.add("WEBWE");
+    	// that CASDIN goes to FF or not depends on the MUX
+    	// CASOREGIMUX == 1 (vcc) { CASDOMUX == 0 (gnd), do not connect, otherwise connect to superSink}
+    	// CASOREGIMUX && CASDOMUX from signals (not vcc/gnd), connect to superSink
+    }
+    
+    private boolean shouldBRAMInputConnectToSuperSink(Cell cell, String cellPinName) {
+    	boolean shouldConnect = false;
+    	boolean debug = false;
+    	
+    	int indexOfLastSlash = cellPinName.lastIndexOf("/");
+		int length = cellPinName.length();
+    	String pinName = cellPinName.substring(indexOfLastSlash + 1, length);
+    	String portString =pinName;
+    	if(pinName.contains("[")) {
+    		portString = pinName.substring(0, pinName.lastIndexOf("["));
+    	}
+    	
+    	if(bramPinsToSuperSink.contains(portString)) {
+    		shouldConnect = true;
+    	}else if(pinName.startsWith("CASDINA") || pinName.startsWith("CASDINPA")) {
+    		// check CASOREGIMUXA and CASDOMUXA
+    		shouldConnect = shouldCASCADINConnectToSuperSink(cell, "CASOREGIMUXA", "CASDOMUXA");
+    	}else if(pinName.startsWith("CASDINB") || pinName.startsWith("CASDINPB")) {
+    		// check CASOREGIMUXB and CASDOMUXB
+    		shouldConnect = shouldCASCADINConnectToSuperSink(cell, "CASOREGIMUXB", "CASDOMUXB");
+    	}
+    	
+    	if(debug && shouldConnect) System.out.println(cellPinName + ", should connect? " + shouldConnect);
+    	//TODO add setup time of BRAM
+    	return shouldConnect;
+    }
+    
+    private boolean shouldCASCADINConnectToSuperSink(Cell cell, String oregimux, String domux) {
+    	boolean shouldConnect = false;
+    	String siteWireI = cell.getSiteWireNameFromLogicalPin(oregimux);
+		Net netIMUX = cell.getSiteInst().getNetFromSiteWire(siteWireI);
+		String siteWireO = cell.getSiteWireNameFromLogicalPin(domux);
+		Net netOMUX = cell.getSiteInst().getNetFromSiteWire(siteWireO);
+		if(netIMUX.equals(design.getVccNet())) {
+			if(!netOMUX.equals(design.getGndNet())) {
+				shouldConnect = true;
+			}
+		}
+		if(!netIMUX.isStaticNet() && !netOMUX.isStaticNet()) {
+			shouldConnect = true;
+		}
+		return shouldConnect;
+    }
+
+
+	/**
+	 * The superSource and superSink are used to consolidate all timing start and end points, respectively.
+	 * They simplify timing computations and data to compute clock skew will be annotated on the edges from superSource and to superSink.
+	 * For example, a FF will be represented both as a start and end points using two vertices, says source and sink.
+	 * The superSource will have no input, but fanout to all the start points nodes.
+	 * The superSink will have fanin from all the end point nodes and have no output.
+	 */
+	public TimingVertex superSource = null;
+    public TimingVertex superSink = null;
+    
+    /**
+     * Connects the sources and sinks of timing paths to a superSource and a superSink, respectively
      */
-    public List<GraphPath<TimingVertex, TimingEdge>> buildGraphPaths(int n) {
-        graphPathHashSet = new LinkedHashSet<>();
+    public void buildSuperGraphPaths() {
+        Set<TimingVertex> sources = new LinkedHashSet<>();
+        Set<TimingVertex> sinks = new LinkedHashSet<>();  
+        for (TimingVertex s1 : this.vertexSet()) {
+            if (this.inDegreeOf(s1) == 0 && this.outDegreeOf(s1) > 0 ) {
+                sources.add(s1);
+            } else if (s1.getFlopInput() && this.outDegreeOf(s1) == 0 && this.inDegreeOf(s1) > 0) {
+                sinks.add(s1);
+            }else if(s1.getName().endsWith("VCLK")){// for DSP
+            	sinks.add(s1);
+            }else {
+            	// All pins to "D" of BRAM must go to super sink, if it goes somewhere else, something is wrong
+            	String cellPinName = s1.getName();
+            	int indexOfLastSlash = cellPinName.lastIndexOf("/");
+            	String cellName = cellPinName.substring(0, indexOfLastSlash);
+            	EDIFCellInst mycellInst = myCellMap.get(cellName);
+            	Cell cell = this.design.getCell(cellName);
+            	if(cell != null && mycellInst.getCellType() != null) {
+	            	if(mycellInst.getCellType().getName().startsWith("RAMB")) {
+	            		if(this.shouldBRAMInputConnectToSuperSink(cell, cellPinName)) {
+	            			sinks.add(s1);
+	            		}
+	            	}
+            	}
+            }
+        }      
+        if (superSource == null) {
+            superSource = new TimingVertex("superSource");
+            superSink = new TimingVertex("superSink");
+        }
+        if (!vertexSet().contains(superSource))
+        	safeAddVertex(superSource);
+        if (!vertexSet().contains(superSink))
+        	safeAddVertex(superSink);
+        
+        // superSource has initial arrival times as zero, do not need to be set again
+        // add clk skew here
+        for (TimingVertex s : sources) {
+        	TimingEdge e = new TimingEdge(this, superSource, s);
+            addEdge(superSource, s, e);
+        }
+        for (TimingVertex s : sinks) {
+        	TimingEdge e = new TimingEdge(this, s, superSink);
+            addEdge(s, superSink, e);
+        }
+    }
+    
+    private List<GraphPath<TimingVertex, TimingEdge>> buildGraphPaths(int n) {
+    	graphPathHashSet = new LinkedHashSet<>();
         Set<TimingVertex> sources = new LinkedHashSet<>();
         Set<TimingVertex> sinks = new LinkedHashSet<>();
         List<GraphPath<TimingVertex, TimingEdge>> result = new ArrayList<>();
@@ -469,24 +850,23 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
             Integer maxPathLen = 1000;
             paths = allAlg.getAllPaths(sources, sinks, true, maxPathLen);
         } else {
+        	
             for(TimingEdge e : edgeSet()) {
                 setEdgeWeight(e,-1*e.getDelay());
             }
-            TimingVertex superSource = null;
-            TimingVertex superSink = null;
+            
             if (superSource == null) {
                 superSource = new TimingVertex("superSource");
                 superSink = new TimingVertex("superSink");
             }
             if (!vertexSet().contains(superSource))
-                addVertex(superSource);
+            	safeAddVertex(superSource);
             if (!vertexSet().contains(superSink))
-                addVertex(superSink);
-            for (TimingVertex s : sources) {
-                addEdge(superSource, s, new TimingEdge(superSource, s));
-            }
+            	safeAddVertex(superSink);
+            
             for (TimingVertex s : sinks) {
-                addEdge(s, superSink, new TimingEdge(s, superSink));
+            	TimingEdge e = new TimingEdge(this, s, superSink);
+                addEdge(s, superSink, e);
             }
             boolean bellmanFord = true;
             if (bellmanFord) {
@@ -518,32 +898,32 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                 paths.addAll(shortest);
             }
         }
-        paths.size();
+        
         for (GraphPath<TimingVertex, TimingEdge> path : paths) {
             //System.out.println("Path between: src:" + s1 + " and sink:" + s2 + " is: " + path + " w:" + path.getWeight());
             result.add(path);
             graphPathHashSet.add(path);
         }
+        
         return result;
     }
 
     /**
-     * Computes/recomputes the arrival times stored at the vertices of the graph based on the edge 
-     * delays.
+     * Computes/recomputes the arrival times stored at the vertices of the graph based on the edges
      */
     public void computeArrivalTimes() {
         for (GraphPath<TimingVertex, TimingEdge> p : graphPathHashSet) {
             float arrival = 0;
             for (TimingEdge e : (List<TimingEdge>) p.getEdgeList()) {
                 arrival += e.getDelay();
-                e.getDst().setArrivalTime(arrival);
+                e.getDst().setMaxArrivalTime(arrival);// should have a check on arrival time to set the max one
                 if (inDegreeOf(e.getSrc())==0) {
-                    e.getSrc().setArrivalTime(0);
+                    e.getSrc().setMaxArrivalTime(0);
                 }
             }
         }
     }
-
+    
     /**
      * Computes/recomputes the slack stored at vertices of the graph based on comparing required 
      * times and arrival times.
@@ -553,7 +933,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
             v.setSlack(v.getRequiredTime() - v.getArrivalTime());
         }
     }
-
+    
     /**
      * This helper function is used to avoid duplicate insertions of vertices within the TimingGraph.  
      * To avoid duplicates, the helper function first checks if a vertex with the same name already 
@@ -677,23 +1057,114 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     private boolean isUnisimFlipFlopType(String cellType) {
         return unisimFlipFlopTypes.contains(cellType);
     }
-
+    
+    private boolean isRamType(String cellType) {
+    	return ramTypes.contains(cellType);
+    }
+    
+    static Set<String> bramOutPortsA = new HashSet<>();
+    static {
+    	bramOutPortsA.add("CASDOUTA");
+    	bramOutPortsA.add("DOUTADOUT");
+    	bramOutPortsA.add("CASDOUTPA");
+    	bramOutPortsA.add("DOUTPADOUTP");
+    }
+    
+    static Set<String> bramOutPortsB = new HashSet<>();
+    static {
+    	bramOutPortsB.add("CASDOUTB");
+    	bramOutPortsB.add("DOUTBDOUT");
+    	bramOutPortsB.add("CASDOUTPB");
+    	bramOutPortsB.add("DOUTPBDOUTP");
+    }
+    
+    private boolean isBramOutPortA(String portName) {
+    	for(String s : bramOutPortsA) {
+    		if(portName.startsWith(s)) return true;
+    	}
+    	return false;
+    }
+    
+    private boolean isBramOutPortB(String portName) {
+    	for(String s : bramOutPortsB) {
+    		if(portName.startsWith(s)) return true;
+    	}
+    	return false;
+    }
+    
     /**
      * Steps through the Physical "Cells" within the design and effectively adds TimingEdges to the 
      * TimingGraph representing logic delays from input pins to corresponding output pins.
      */
-    void determineLogicDelaysFromEDIFCellInsts() {
-        for (String k : myCellMap.keySet()) {
-            EDIFCellInst mycellInst = myCellMap.get(k);
+    void determineLogicDelaysFromEDIFCellInsts(Map<String, EDIFCellInst> myCellMap) {
+        for (String cellName : myCellMap.keySet()) {
+            Cell c = design.getCell(cellName);
+            if (c == null) continue;
+
+        	EDIFCellInst mycellInst = myCellMap.get(cellName);
             EDIFCell mycellType = mycellInst.getCellType();
-            String mycellname = mycellType.getName();
+            String myCellName = mycellType.getName();
             Collection<EDIFPortInst> portInstList = mycellInst.getPortInsts();
+            
+            if (myCellName.startsWith("RAMB")) {
+                int encodedConfig = 0;
+                encodedConfig |= intrasiteAndLogicDelayModel.getEncodedConfigCode("RAMB36E2:RTL_RAM_TYPE:RAM_TDP");
+                for (Map.Entry<EDIFName, EDIFPropertyValue> entry : mycellInst.getProperties().entrySet()) {
+                    encodedConfig |= intrasiteAndLogicDelayModel.getEncodedConfigCode("RAMB36E2:"+ entry.getKey() + ":" + entry.getValue().getValue().toString());
+                }
+                short belIdx = intrasiteAndLogicDelayModel.getBELIndex("RAMB36E2");
+                
+                // TODO this loop should be consolidated with that of CARRY8.
+                for (EDIFPortInst ep1 : portInstList) {
+                    if (!ep1.isInput()) {
+                        continue;
+                    }
+                    String s1 = ep1.getName();
+                    for (EDIFPortInst ep2 : portInstList) {
+                        if (!ep2.isOutput()) {
+                            continue;
+                        }
+                        String s2 = ep2.getName();
 
-
-            if (mycellname.startsWith("LUT") || mycellname.startsWith("RAM") || mycellname.startsWith("SRL")) {
-                Cell c = design.getCell(k);
-                if (c == null)
-                    continue;
+                        // RAMB36E2 and RAMB18E2 have the same delay, only that RAMB18E2 will have less pins
+                        short delay = 0;
+                        if(s1.startsWith("CLKA")) { // for DSP, we need to look up in the text file
+                        	// check order_a for A pin, order_b for B pin
+                        	if(this.isBramOutPortA(s2)) {
+                        		String property = mycellInst.getProperty("CASCADE_ORDER_A").getValue();
+                        		int DOA_REG = Integer.parseInt(mycellInst.getProperty("DOA_REG").getValue());
+                        		if(property.equals("FIRST") || property.equals("NONE") || (property.equals("LAST") && DOA_REG == 1)) {
+	                        		delay = (short) this.getCLKtoOutputDelay(s2, encodedConfig);
+	                        	}
+                        	}
+                        }else if(s1.startsWith("CLKB")) {
+                        		if(this.isBramOutPortB(s2)) {
+                        			String property = mycellInst.getProperty("CASCADE_ORDER_B").getValue();
+                        			int DOB_REG = Integer.parseInt(mycellInst.getProperty("DOB_REG").getValue());
+                        			if(property.equals("FIRST") || property.equals("NONE") || (property.equals("LAST") && DOB_REG == 1)) {
+    	                        		delay = (short) this.getCLKtoOutputDelay(s2, encodedConfig);
+    	                        	}
+                        			
+                        		}
+                        }else {
+                        	delay = intrasiteAndLogicDelayModel.getLogicDelay(belIdx, s1, s2, encodedConfig);
+                        }
+                        
+                        if (delay < 0) {
+                            continue;
+                        }
+                        
+                        TimingVertex v1 = newTimingVertex(cellName+"/"+s1);
+                        TimingVertex v2 = newTimingVertex(cellName+"/"+s2);
+                        TimingEdge e = new TimingEdge(this, v1, v2, null, new Net());
+                        
+                        safeAddEdge(e.getSrc(), e.getDst(), e);
+                        e.setLogicDelay(delay);
+                        setEdgeWeight(e, e.getDelay());
+                    }
+                }
+            }
+            else if (myCellName.startsWith("LUT") || myCellName.startsWith("RAM") || myCellName.startsWith("SRL")) {
                 EDIFCell parent = c.getParentCell();
                 boolean excludeSomeEdges = false;
                 boolean eqHasI0 = false;
@@ -702,13 +1173,13 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                 boolean eqHasI3 = false;
                 boolean eqHasI4 = false;
                 boolean eqHasI5 = false;
-
+                short belIdx = intrasiteAndLogicDelayModel.getBELIndex(c.getBELName());
 
                 String thisCellEquation = "";
                 // in the case of LUT6_2, we found that we need to check the LUT equation in order to decide whether
                 // or not to add edges representing individual logic delays to the timing graph
                 if (parent != null && parent.getName().startsWith("LUT6_2")) {
-                    String [] parts = k.split("/");
+                    String [] parts = cellName.split("/");
                     String parentCell = parts[0];
                     for (int i =1; i < parts.length-1; i++) {
                         parentCell += "/"+parts[i];
@@ -875,23 +1346,21 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                         if (ep1.getName().endsWith("I5") && !eqHasI5)
                             continue;
                     }
-                    String s1 = k + "/" + ep1.getName();
+                    String s1 = cellName + "/" + ep1.getName();
 
                     for (EDIFPortInst ep2 : portInstList) {
-                        String s2 = k + "/" + ep2.getName();
+                        String s2 = cellName + "/" + ep2.getName();
 
                         float logicDelay = 0.0f;
                         if (ep1 != ep2 && ep1.isInput() && ep2.isOutput()) {
-                            if (c == null)
-                                continue;
 
                             String physPin = c.getPhysicalPinMapping(ep1.getName());
                             String outputPhysPin = c.getPhysicalPinMapping(ep2.getName());
 
-                            BEL mybel = c.getBEL();
+
                             float myLogicDelay;
                             try {
-                                myLogicDelay = intrasiteAndLogicDelayModel.getLogicDelay(mybel.getName(), physPin, outputPhysPin);
+                                myLogicDelay = intrasiteAndLogicDelayModel.getLogicDelay(belIdx, physPin, outputPhysPin);
                             } catch (IllegalArgumentException e) {
                                 continue;
                             }
@@ -915,7 +1384,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                             setEdgeWeight(e, e.getDelay());
                             if (debug) {
                                 System.out.println("Adding v1:" + s1 + " and v2:" + s2 + 
-                                                   " with edge:" + e + " to SG2");
+                                                   " with edge:" + e + " to SG2, logic delay: " + logicDelay);
                             }
 
                         }
@@ -923,52 +1392,42 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                 }
 
             }
-            else if (mycellname.startsWith("CARRY")) {
-                List<String> config = new ArrayList<String>();
-
-
-                Cell c = design.getCell(k);
-                if (c == null) {
-                    continue;
-                }
-
+            else if (myCellName.startsWith("CARRY")) {
+                int encodedConfig = 0;
                 if (c.getPhysicalPinMapping("CI") == null) {
-                    config.add("CYINIT_BOT:GND");
-                    config.add("CARRY_TYPE:SINGLE_CY8");
-                }
-                else if (c.getPhysicalPinMapping("CI_TOP") == null) {
-                    config.add("CYINIT_TOP:GND");
-                    config.add("CARRY_TYPE:SINGLE_CY8");
+                	encodedConfig |= intrasiteAndLogicDelayModel.getEncodedConfigCode("CARRY8:CYINIT_BOT:GND");
+                } else if (c.getPhysicalPinMapping("CI_TOP") == null) {
+                	encodedConfig |= intrasiteAndLogicDelayModel.getEncodedConfigCode("CARRY8:CYINIT_TOP:GND");
                 } else {
-                    config.add("CYINIT_BOT:CIN"); config.add("CARRY_TYPE:SINGLE_CY8");
+                	encodedConfig |= intrasiteAndLogicDelayModel.getEncodedConfigCode("CARRY8:CYINIT_BOT:CIN"); 
                 }
-
+            	encodedConfig |= intrasiteAndLogicDelayModel.getEncodedConfigCode("CARRY8:CARRY_TYPE:SINGLE_CY8");                
+            	short belIdx = intrasiteAndLogicDelayModel.getBELIndex("CARRY8");
+            	
                 for (EDIFPortInst ep1 : portInstList) {
                     if (!ep1.isInput()) {
                         continue;
                     }
-                    String s1 = k + "/" + ep1.getName();
+
+                    String s1 = cellName + "/" + ep1.getName();
                     for (EDIFPortInst ep2 : portInstList) {
 
                         if (!ep2.isOutput()) {
                             continue;
                         }
-                        String s2 = k + "/" + ep2.getName();
+                        String s2 = cellName + "/" + ep2.getName();
                         float logicDelay = 0.0f;
                         if (ep1 != ep2 && ep1.isInput() && ep2.isOutput()) {
-
-                            BEL mybel = c.getSiteInst().getBEL(mycellType.toString());
-                            c = c.getSiteInst().getCell(mybel);
-
                             String physPin = c.getPhysicalPinMapping(ep1.getName());
                             String outputPhysPin = c.getPhysicalPinMapping(ep2.getName());
 
                             if (physPin == null || physPin.equals("null")) {
-                                config = new ArrayList<>();
+                            	// TODO - This is suspected to be buggy behavior
+                                encodedConfig = 0; 
                             }
-
+                            
                             float myLogicDelay = intrasiteAndLogicDelayModel.getLogicDelay(
-                                     mybel.getName(), physPin, outputPhysPin, config);
+                                     belIdx, physPin, outputPhysPin, encodedConfig);
                             if (myLogicDelay < 0) {
                                 continue;
                             }
@@ -986,8 +1445,8 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                                 if (ep1ContainsRange) {
                                     for (int j = 0; j < 8; j++) {
                                         for (int i = 0; i < 8; i++) {
-                                            TimingVertex v1 = newTimingVertex(k + "/" + ep1FirstLetter + j);
-                                            TimingVertex v2 = newTimingVertex(k + "/" + s2 + i);
+                                            TimingVertex v1 = newTimingVertex(cellName + "/" + ep1FirstLetter + j);
+                                            TimingVertex v2 = newTimingVertex(cellName + "/" + s2 + i);
                                             TimingEdge e = new TimingEdge(this, v1, v2, null, new Net());
                                             safeAddEdge(e.getSrc(), e.getDst(), e);
                                             e.setLogicDelay(logicDelay);
@@ -996,8 +1455,8 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                                                 System.out.println("Adding v1:" + s1 + " and v2:" + s2 + " with edge:" + e + " to SG2");
 
                                         }
-                                        TimingVertex v1 = newTimingVertex(k + "/" + ep1FirstLetter + j);
-                                        TimingVertex v2 = newTimingVertex(k + "/" + "OUT1");
+                                        TimingVertex v1 = newTimingVertex(cellName + "/" + ep1FirstLetter + j);
+                                        TimingVertex v2 = newTimingVertex(cellName + "/" + "OUT1");
                                         TimingEdge e = new TimingEdge(this, v1, v2, null, new Net());
                                         safeAddEdge(e.getSrc(), e.getDst(), e);
                                         e.setLogicDelay(logicDelay);
@@ -1019,7 +1478,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
 
                                     }
                                     TimingVertex v1 = newTimingVertex(s1);
-                                    TimingVertex v2 = newTimingVertex(k + "/" + "OUT1");
+                                    TimingVertex v2 = newTimingVertex(cellName + "/" + "OUT1");
                                     TimingEdge e = new TimingEdge(this, v1, v2, null, new Net());
                                     safeAddEdge(e.getSrc(), e.getDst(), e);
                                     e.setLogicDelay(logicDelay);
@@ -1041,21 +1500,80 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                         }
                     }
                 }
+            }else if(mycellInst.getCellType().toString().contains("DSP_")){//contains DSP_, and FD, VCC
+                String dspBlockFullHierName = c.getParentHierarchicalInstName();
+                DSPTimingData dspTimingData = dspNameDataMapping.get(dspBlockFullHierName);
+                if(dspTimingData == null) {
+            		dspTimingData = new DSPTimingData(dspBlockFullHierName);//check if data processed previously
+            		if(dspTimingData.isValid()) {
+            			addDSPDataMapping(dspBlockFullHierName, dspTimingData);
+            		}
+                }
+                for(EDIFPortInst portInst : portInstList) {
+                	String s1 = portInst.getName();
+        		    if(s1.endsWith(("CLK"))) {
+        		    	if(dspTimingData.containsPortInst(portInst.getName())){
+        				    dspTimingData.addPinMapping("CLK", portInst.getName());
+        				    addDSPTimingData(dspTimingData);
+        			    }
+        		    }
+            	   
+	                EDIFNet en = portInst.getNet();
+	                for(EDIFPortInst portInstOfNet : en.getPortInsts()) {
+	            	    if(portInstOfNet.isTopLevelPort()) {
+	            	    	if(dspTimingData.containsPortInst(portInstOfNet.getName())) {
+	            			    dspTimingData.addPinMapping(portInst.getFullName(), portInstOfNet.getName());
+	            			    addDSPTimingData(dspTimingData);//saved for adding timing edges with logic delay
+	            		    }
+	            	    }
+	                }
+                }
+            }
+            else if(myCellName.startsWith("BUFGCE")) {//BUFGCE as mycellname, portInsts: [BUFGCE_inst/CE, BUFGCE_inst/I, BUFGCE_inst/O]
+            	String s1 = cellName + "/" + "I";
+            	String s2 = cellName + "/" + "O";
+            	TimingVertex v1 = newTimingVertex(s1);
+                TimingVertex v2 = newTimingVertex(s2);
+                TimingEdge e = new TimingEdge(this, v1, v2, null, new Net());
+                safeAddEdge(e.getSrc(), e.getDst(), e);
+                e.setLogicDelay(0);
+                setEdgeWeight(e, e.getDelay());
             }
         }
+        
+        // add dsp timing edges here, because the above for loop deals with one cell a time
+        // the overall info of top level inputs and outputs of DSP blocks available after the loop
+        // DSP delays CLK to Q, IN to CLK, IN to OUT are handled here
+        for(DSPTimingData dspTimingData : dspTimingDataSet) {
+        	for(Pair<String, String> inOut : dspTimingData.getInputOutputDelays().keySet()) {
+        		TimingVertex v1 = newTimingVertex(dspTimingData.getBlockName() + "/" + inOut.getFirst());
+                TimingVertex v2 = newTimingVertex(dspTimingData.getBlockName() + "/" + inOut.getSecond());
+                TimingEdge e = new TimingEdge(this, v1, v2, null, new Net());
+               
+                safeAddEdge(e.getSrc(), e.getDst(), e);
+                e.setLogicDelay(dspTimingData.getInputOutputDelays().get(inOut));
+                setEdgeWeight(e, e.getDelay());
+        	}
+        }   
     }
-
-
+    
+    static Map<String, DSPTimingData> dspNameDataMapping = new HashMap<>();
+    private void addDSPDataMapping(String name, DSPTimingData data) {
+    	dspNameDataMapping.put(name, data);
+    }
+    
+    static Set<DSPTimingData> dspTimingDataSet = new HashSet<>();
+    private void addDSPTimingData(DSPTimingData data) {
+    	dspTimingDataSet.add(data);
+    }
+    
     private Cell srcCell;
     private Cell dstCell;
     private BELPin source;
     private BELPin sink;
-    private SitePinInst spi_sink;
-    private SitePinInst local_spi_source;
-    private List<SitePinInst> spi_sources;
-    private List<SitePinInst> spi_sinks;
     private SiteInst si;
-
+    
+    private float intraSiteDelay = 0.0f;
 
     /**
      * This method is called per physical "Net" object for adding TimingEdges into the TimingGraph 
@@ -1063,20 +1581,34 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
      * @param n Physical "Net" to be analyzed.
      * @return Returns -1 or 0 on failure.  Returns 1 on success.
      */
-    int addNetDelayEdges(Net n) {
-        float logicDelay;
-        spi_sinks = new ArrayList<>();
-        local_spi_source = null;
-        spi_sources = new ArrayList<>();
-
-
-        String netName = n.getName();
-
-        if (netName.startsWith("GLOBAL_LOGIC") || netName.startsWith("GLOBAL_USED")) {
-            return -1;
-        }
+    
+    static List<String> bramCLKPins;
+    static {
+    	bramCLKPins = new ArrayList<>();
+    	bramCLKPins.add("CLKARDCLK");
+    	bramCLKPins.add("CLKBWRCLK");
+    }
+    
+    float getCLKtoOutputDelay(String portName, int encodedConfig) {
+    	float delay = 0;
+    	short belIdx = intrasiteAndLogicDelayModel.getBELIndex("RAMB36E2");
+    	for(String clk : bramCLKPins) {
+    		delay = Math.max(delay, intrasiteAndLogicDelayModel.getLogicDelay(belIdx, clk, portName, encodedConfig));
+    	}
+    	return delay;
+    }
+    
+    public boolean overwriteBUGCEDelay = false;
+    int addNetDelayEdges(Net net) {
+    	EDIFNet edifNet = net.getLogicalNet();
+    	boolean haveIntrasiteNet = (net.getSinkPins().size() == 0);
+    	SitePinInst spi_source = net.getSource();
+    	float logicDelay;
+        SitePinInst local_spi_source = null;
+        List<SitePinInst> spi_sources = new ArrayList<>();
+        
         List<EDIFHierPortInst> hports = null;
-        hports = design.getNetlist().getPhysicalPins(n);
+        hports = design.getNetlist().getPhysicalPins(net);
 
         if (hports == null) {
             return 0;
@@ -1088,15 +1620,25 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         HashMap<String, BELPin> sink_belpins = new HashMap<>();
 
         Cell testSourceCell = null;
-
         logicDelay = 0f;
-
-
+        boolean updateLogicDelay = true;
+        
+        if(clkRouteTiming == null) {
+        	this.overwriteBUGCEDelay = false;
+        }else {
+        	if(spi_source != null && spi_source.getName().equals("CLK_OUT") && spi_source.toString().contains(clkRouteTiming.getBufgce())) {
+	        	overwriteBUGCEDelay = true;
+	        }else {
+	        	this.overwriteBUGCEDelay = false;
+	        }
+        }
+        
         for (EDIFHierPortInst hport : hports) {
             String portName = hport.getPortInst().getName();
             String cellName = hport.getFullHierarchicalInstName();
             Cell cell = design.getCell(cellName);
-            String fullName = cellName+"/"+portName;
+            String fullName = cellName+"/"+portName; // YZhou: CellPin Name, same as hport.toString()
+            
             SitePinInst spi5 = null;
             String physPinName = null;
             if (cell == null) {
@@ -1121,32 +1663,51 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                 }
             } else {
                 physPinName = cell.getPhysicalPinMapping(portName);
-                spi5 = cell.getSitePinFromLogicalPin(hport.getPortInst().getName(), null);
+                // spi5 = cell.getSitePinFromLogicalPin(hport.getPortInst().getName(), null);
+                spi5 = cell.getSiteInst().getSitePinInst(DesignTools.getRoutedSitePin(cell, net, portName)); // use the new method to get over unmatched SitePinInst issue
             }
+           
+           // if cell is dsp, and port name included in DSP pin mapping, override the fullName that is used to build timing edges
+           if(cell.getType().startsWith("DSP_")) {
+        	   String dspBlockFullHierName = cell.getParentHierarchicalInstName();
+               
+               DSPTimingData dspTimingData = dspNameDataMapping.get(dspBlockFullHierName);
+               if(dspTimingData != null) {
+            	   if(dspTimingData.getPinMapping() != null) { // null due to files that (mul_ln1371_fu_88_p2.txt) contains clk only, not processed yet -> fixed
+            		
+	                   String mappedfullName = dspTimingData.getPinMapping().get(fullName);
+	                   if(mappedfullName != null) {
+	                	   fullName = mappedfullName;
+	                   }
+            	   }
+               }
+           }
+            
+           si = cell.getSiteInst();
+           BEL bel = si.getBEL(cell.getBELName());
+           BELPin belpin =  null;
 
-            si = cell.getSiteInst();
-            BEL bel = si.getBEL(cell.getBELName());
-            BELPin belpin =  null;
-
-            if (bel != null  && physPinName != null)
-                belpin = bel.getPin(physPinName.replace("[", "").replace("]", ""));
-
-            SitePinInst mypin = spi5;
-            if (mypin == null) {
-                if (hport.isOutput()) {
-                    stringSources.put(fullName, null);
-                    testSourceCell = cell;
-                    if (isUnisimFlipFlopType(cell.getType())) {
-                        logicDelay = timingModel.LOGIC_FF_DELAY;
-                    }
-                    source = cell.getBEL().getPin(physPinName);
-                } else {
-                    stringSinks.put(fullName, null);
-                    testDestCells.put(fullName, cell);   
-                    sink_belpins.put(fullName, belpin);
-                }
-                continue;
-            }
+           if (bel != null  && physPinName != null)
+               belpin = bel.getPin(physPinName.replace("[", "").replace("]", ""));
+            
+           SitePinInst mypin = spi5;
+           if (mypin == null) {
+        	   if (hport.isOutput()) {
+        		   stringSources.put(fullName, null);
+        		   testSourceCell = cell;
+        		   if (isUnisimFlipFlopType(cell.getType())) {
+        			   logicDelay = timingModel.LOGIC_FF_DELAY;
+        		   }else if(isRamType(cell.getType())) {
+        			   updateLogicDelay = false;
+        		   }
+        		   source = cell.getBEL().getPin(physPinName);
+        	   } else {
+        		   stringSinks.put(fullName, null);
+        		   testDestCells.put(fullName, cell);
+        		   sink_belpins.put(fullName, belpin);
+        	   }
+        	   continue;
+           }
 
             if (hport.getPortInst().isOutput() || mypin.isOutPin()) {
                 spi_sources.add(mypin);
@@ -1155,34 +1716,37 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                 source = cell.getBEL().getPin(physPinName);
                 if (isUnisimFlipFlopType(cell.getType())) {
                     logicDelay = timingModel.LOGIC_FF_DELAY;
+                }else if(isRamType(cell.getType())) {
+                	updateLogicDelay = false;
                 }
             } else {
                 mypin = spi5;
-                if (mypin != null)
-                    spi_sinks.add(mypin);
                 testDestCells.put(fullName, cell);
                 stringSinks.put(fullName, mypin);
                 sink_belpins.put(fullName, belpin);
             }
+            this.edifHPortMap.put(hport, mypin);// added to get corresponding timing edges of connections
         }
+        
         if (stringSinks.size() == 0 || stringSources.size() == 0) {
-            int nPins = n.getPins().size();
+            int nPins = net.getPins().size();
             if (hports.size() != nPins) {
                 return 0;
             } else
                 return -1;
         }
         String S = stringSources.keySet().iterator().next();
+        
         local_spi_source = spi_sources.size() > 0? spi_sources.get(0) : net.getSource() != null ? net.getSource() : local_spi_source;
+
         for (String D : stringSinks.keySet()) {
-            spi_sink = stringSinks.get(D);
+            SitePinInst spi_sink = stringSinks.get(D);
             srcCell = testSourceCell;
             dstCell = testDestCells.get(D);
             sink = sink_belpins.get(D);
             TimingVertex vS = safeVertexCheck.get(S);
             if (vS == null)
                 vS = new TimingVertex(S);
-
 
             String vs_type = (srcCell != null) ? srcCell.getType() : null;
             if (vs_type != null && isUnisimFlipFlopType(vs_type)) {
@@ -1205,11 +1769,9 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
             if (e == null)
                 e = new TimingEdge(this, vS, vD, edifNet, net);
 
-
             boolean forceUpdateEdge = false;
             float netDelay = 0f;
-
-            if (haveIntrasiteNet) {
+            if (haveIntrasiteNet) {//LUT driving a FF is here
                 String param2 = srcCell.getBELName()+"/"+ source.getName();
                 String param3 = null;
                 if (sink_belpins.get(D) == null) {
@@ -1217,25 +1779,27 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                 } else {
                     param3 =  dstCell.getBELName() +"/" +sink_belpins.get(D).getName();
                 }
-
                 float tmpNetDelay;
-                try {
-                    tmpNetDelay = intrasiteAndLogicDelayModel.getIntraSiteDelay(
+                Short returnValue = intrasiteAndLogicDelayModel.getIntraSiteDelay(
                             si.getSiteTypeEnum(),
                             param2,
                             param3);
-                } catch (IllegalArgumentException iae) {
-                    continue;
+                if(returnValue == null) {
+                	continue;
                 }
+                tmpNetDelay = (float) returnValue;
+                
+                this.intraSiteDelay = Math.max(0f, tmpNetDelay);// YZhou: for intrasite net, its intrasite delay is equal to net delay
                 netDelay = Math.max(0f, tmpNetDelay);
                 forceUpdateEdge = true;
+                
             } else {
                 if (srcCell == null)
                     continue;
                 if (dstCell == null)
                     continue;
                 if (local_spi_source == null || spi_sink == null) {
-                    if (local_spi_source == null && spi_sink == null) {
+                    if (local_spi_source == null && spi_sink == null) {//source and sink are null
                         String param2 = srcCell.getBELName()+"/"+ source.getName();
                         String param3 =  dstCell.getBELName() +"/" +sink_belpins.get(D).getName();
                         float tmpNetDelay = intrasiteAndLogicDelayModel.getIntraSiteDelay(
@@ -1243,30 +1807,70 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                                 param2,
                                 param3);
                         netDelay = tmpNetDelay;
+                        this.intraSiteDelay = tmpNetDelay;
                         forceUpdateEdge = true;
+                    }else {
+                    	netDelay = timingModel.calcDelay(local_spi_source, spi_sink, source, sink, net); 
+                    	this.intraSiteDelay = this.timingModel.getIntraSiteDelay();
+                    	forceUpdateEdge = true;
                     }
-                    else {
-                        netDelay = timingModel.calcDelay(local_spi_source, spi_sink, source, sink, 
-                                local_spi_source.getSite(), null, net);
-                        forceUpdateEdge = true;
-                    }
-                }
-                else {
-                    netDelay = timingModel.calcDelay(local_spi_source, spi_sink, source, sink, 
-                            local_spi_source.getSite(), spi_sink.getSite(), net);
+                }else {                	
+                	netDelay = timingModel.calcDelay(local_spi_source, spi_sink, source, sink, net);
+                	this.intraSiteDelay = this.timingModel.getIntraSiteDelay();
                     forceUpdateEdge = true;
+                    if(clkRouteTiming == null) {
+                    	this.overwriteBUGCEDelay = false;
+                    }else {
+                    	if(spi_sink.getName().equals("CLK_IN") && spi_sink.toString().contains(clkRouteTiming.getBufgce())) {
+                    		this.overwriteBUGCEDelay = true;
+                    	}else {
+                    		this.overwriteBUGCEDelay = false;
+                    	}
+                    }
                 }
             }
+            
             if (e.getNetDelay() != 0f || forceUpdateEdge) {
+            	 if(this.overwriteBUGCEDelay) {
+            		 if(spi_sink.getName().equals("CLK_IN")) {
+            			 logicDelay += getRouteDelayToSinkINTTile(RouterHelper.getUpstreamINTTileOfClkIn(spi_sink).getName());
+            		 }else {
+            			 netDelay = getRouteDelayToSinkINTTile(spi_sink.getConnectedNode().getTile().getName());
+            			 logicDelay = 0;
+                		 this.intraSiteDelay = 0;
+            		 }
+            	 }
                 e.setNetDelay(netDelay);
-                e.setLogicDelay(logicDelay);
+                if(updateLogicDelay) e.setLogicDelay(logicDelay);
+                e.setIntraSiteDelay(this.intraSiteDelay);
             }
             e.setFirstSitePinInst(local_spi_source);
             e.setSecondSitePinInst(spi_sink);
             safeAddEdge(vS, vD, e);
             setEdgeWeight(e, e.getDelay());
+            
+            if(spi_sink != null) {
+                List<TimingEdge> connectionEdges = this.getSinkSitePinInstTimingEdges().get(spi_sink);
+                if(connectionEdges == null) {
+                	connectionEdges = new ArrayList<>();
+                }
+                connectionEdges.add(e);
+            	this.getSinkSitePinInstTimingEdges().put(spi_sink, connectionEdges);
+            }
         }
         return 1;
+    }
+    
+    private short getRouteDelayToSinkINTTile(String intTile) {
+    	short delay = clkRouteTiming.getRouteDelaysToSinkINTTiles().getOrDefault(intTile, (short) 0);
+    	if(delay == 0) {
+    		System.out.println("WARNING: No delay data for the sink INT tile: " + intTile);
+    	}
+    	return delay;
+    }
+    
+    public DelayModel getintraSiteAndLogicDelayModel(){
+    	return this.intrasiteAndLogicDelayModel;
     }
 
     /**
@@ -1324,4 +1928,10 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         return (int)(value >> bitIndex) & 0x1;
     }
 
+	/**
+     * Gets the mapping between each pair of SitePinInsts and a list of the associated TimingEdges in the design
+     */
+	public Map<SitePinInst, List<TimingEdge>> getSinkSitePinInstTimingEdges() {
+		return sinkSitePinInstTimingEdges;
+	}
 }

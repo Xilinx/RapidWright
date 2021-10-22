@@ -24,6 +24,10 @@ import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
+
+import java.util.ArrayList;
+import java.util.List;
+
 import org.jgrapht.graph.DefaultEdge;
 
 /**
@@ -45,7 +49,12 @@ public class TimingEdge extends DefaultEdge {
     private float logicDelay = 0.0f;
     private float netDelay = 0.0f;
     private float delay = 0.0f;
-
+    /** 
+     * Added for delay update of a timing edge, 
+     * because intra-site delay does not change during routing and needs to be stored separately
+     */
+    private float intraSiteDelay = 0.0f;
+    
     private SitePinInst first;
     private SitePinInst second;
 
@@ -57,6 +66,12 @@ public class TimingEdge extends DefaultEdge {
     public TimingEdge(TimingVertex u, TimingVertex v) {
         this.src = u;
         this.dst = v;
+    }
+    
+    public TimingEdge(TimingGraph graph, TimingVertex u, TimingVertex v) {
+        this.src = u;
+        this.dst = v;
+        this.timingGraph = graph;
     }
 
     /**
@@ -121,6 +136,9 @@ public class TimingEdge extends DefaultEdge {
     public String toString() {
         String result = "";
          if (hasEDIFPortInsts) {
+        	if(timingGraph.hierCellInstMap == null) {
+        		timingGraph.populateHierCellInstMap();
+        	}
             String sCellInst = (srcPort.getCellInst() != null) ? 
                     "" + timingGraph.hierCellInstMap.get(srcPort.getCellInst()) : "top";
             String dCellInst = (dstPort.getCellInst() != null) ? 
@@ -141,7 +159,7 @@ public class TimingEdge extends DefaultEdge {
 
         else {
             result += src;
-            result += "->";
+            result += " -> ";
             result += dst;
         }
 
@@ -233,14 +251,39 @@ public class TimingEdge extends DefaultEdge {
     public float getDelay() {
         return delay;
     }
+    
+    public float getIntraSiteDelay() {
+		return intraSiteDelay;
+	}
 
-    /**
+	public void setIntraSiteDelay(float intraSiteDelay) {
+		this.intraSiteDelay = intraSiteDelay;
+	}
+    
+    public String toStringOnSitePinInsts(){
+    	return this.getFirstPin().toString() + " -> " + this.getSecondPin().toString();
+    }
+    
+    public String delaysInfo(){
+    	return "logic = " + this.logicDelay + ", intrasite = " + this.intraSiteDelay + ", net = " + this.netDelay + ", total = " + this.delay;
+    }
+    
+    public void setRouteDelay(float routeDelay){
+    	this.netDelay = this.intraSiteDelay + routeDelay;
+    	this.delay = logicDelay + this.netDelay;
+    	if (timingGraph.containsEdge(this))
+            timingGraph.setEdgeWeight(this, this.delay);
+    	else
+    		System.err.println("timing graph does not contain timing edge");
+    }
+
+	/**
      * Sets the net-related component of the delay in ps for this edge.
      * @param netDelay Net delay in picoseconds.
      */
     public void setNetDelay(float netDelay) {
         this.netDelay = netDelay;
-        this.delay = logicDelay+netDelay;
+        this.delay = logicDelay + netDelay;
         if (timingGraph.containsEdge(this))
             timingGraph.setEdgeWeight(this, this.delay);
     }
@@ -256,15 +299,37 @@ public class TimingEdge extends DefaultEdge {
             timingGraph.setEdgeWeight(this, this.delay);
     }
 
-    /**
-     * Hash function specific to this object type for generating a hash code representation storing 
-     * this object type in hashtables, hashmaps, etc.
-     * @return HashCode specific to this object type.
-     */
-    public int hashCode() {
-        return toString().hashCode();
-    }
+    @Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = 1;
+		result = prime * result + ((dst == null) ? 0 : dst.hashCode());
+		result = prime * result + ((src == null) ? 0 : src.hashCode());
+		return result;
+	}
 
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		TimingEdge other = (TimingEdge) obj;
+		if (dst == null) {
+			if (other.dst != null)
+				return false;
+		} else if (!dst.equals(other.dst))
+			return false;
+		if (src == null) {
+			if (other.src != null)
+				return false;
+		} else if (!src.equals(other.src))
+			return false;
+		return true;
+	}
+    
     /**
      * Gets the first vertex of this edge.
      * @return First vertex of type TimingVertex.

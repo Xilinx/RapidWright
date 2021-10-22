@@ -126,7 +126,6 @@ public enum IntentCode {
     NODE_GLOBAL_HDISTR_LOCAL;
 
 
-
     public static boolean isLongWire(Tile tile, int wire){
     	return isLongWire(tile.getWireIntentCode(wire).ordinal());
     }

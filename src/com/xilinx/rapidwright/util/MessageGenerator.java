@@ -211,4 +211,28 @@ public class MessageGenerator{
 		    throw new UncheckedIOException("Error reading user input", e);
 		}
 	}
+	
+	public static String formatString(String s1) {
+		return String.format("%-35s\n", s1);
+	}
+	
+	public static String formatString(String s, float value) {
+		return String.format("%-35s %10.2f\n", s, value);
+	}
+	
+	public static String formatString(String s, short value) {
+		return String.format("%-35s %10d\n", s, value);
+	}
+	
+	public static String formatString(String s, boolean value) {
+		return String.format("%-35s %10s\n", s, value);
+	}
+
+	public static String formatString(String s, int value) {
+		return String.format("%-35s %10d\n", s, value);
+	}
+	
+	public static String formatString(String s, long value) {
+		return String.format("%-35s %10d\n", s, value);
+	}
 }

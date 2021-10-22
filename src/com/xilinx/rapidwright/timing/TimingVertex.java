@@ -20,6 +20,8 @@
 
 package com.xilinx.rapidwright.timing;
 
+import java.util.Arrays;
+
 /**
  * A TimingVertex represents a node within the TimingGraph.  It encapsulates slack, arrival time, 
  * required time, and whether it represents a pin on a flip flop.
@@ -34,6 +36,8 @@ public class TimingVertex {
     private boolean isFlopInput;
     private boolean isFlopOutput;
     private boolean printed;
+    /** The parent TimingVertex that leads to the maximum arrival time of this one*/
+    private TimingVertex prev;
 
     /**
      * Creates a vertex for insertion into the TimingGraph.
@@ -43,16 +47,22 @@ public class TimingVertex {
      * slices of a bus (for example some pins on CARRY8 have indices).  The physical name for pins 
      * do not contain square brackets.
      */
-    TimingVertex(String name) {
+    public TimingVertex(String name) {
         this.name = name;
-        //the lines below can be useful for debug
-        //if (name.startsWith("Parser_inst/stage_0/tupleForward_inst/PktEop_d_1_i_1__1/")) { //Parser_inst/stage_0/MUX_PKT_VLD_reg/Q")) {
-        //    System.out.println("exception on:"+name);
-        //    new Exception().printStackTrace();
-        //   System.exit(1);
-       // }
         this.isFlopInput = false;
         this.isFlopOutput = false;
+        this.printed = false;
+    }
+    
+    /**
+     * Create a timing vertex for insertion into the timing graph
+     * @param name - name is the cell name of an input or output pin
+     * @param isFlopInput - to indicate if it is an input or output
+     */
+    public TimingVertex(String name, boolean isFlopInput) {
+    	this.name = name;
+    	this.isFlopInput = isFlopInput;
+        this.isFlopOutput = !isFlopInput;
         this.printed = false;
     }
 
@@ -118,17 +128,59 @@ public class TimingVertex {
         }
         this.slack = requiredTime - arrivalTime;
     }
-
+    
+	public void setMinRequiredTime(float requiredTime){
+    	if(this.requiredTime == null){
+    		this.requiredTime = requiredTime;
+    	}else{
+    		if(this.requiredTime > requiredTime){
+    			this.requiredTime = requiredTime;
+    		}
+    	}
+    	
+    }
+    
+    /**
+     * Sets the arrival time stored at this vertex WHEN the new arrival time is larger than the current.
+     * @param arrivalTime Arrival time in picoseconds.  This is the sum of delay edges leading to 
+     * this vertex 
+     */
+    public void setMaxArrivalTime(float arrivalTime){
+    	if(this.arrivalTime == null){
+    		this.arrivalTime = arrivalTime;
+    	}else if(this.arrivalTime < arrivalTime){
+    		this.arrivalTime = arrivalTime;
+    	}
+    }
+    
+    public void setMaxArrivalTime(float arrivalTime, TimingVertex prev){
+    	if(this.arrivalTime == null){
+    		this.arrivalTime = arrivalTime;
+    		this.setPrev(prev);
+    	}else if(this.arrivalTime < arrivalTime){
+    		this.arrivalTime = arrivalTime;
+    		this.setPrev(prev);
+    	}
+    }
+    
+    public void resetRequiredTime(){
+    	this.requiredTime = null;
+    }
+    
+    
+    public void resetArrivalTime(){
+    	this.arrivalTime = null;
+    }
+    
     /**
      * Sets the arrival time stored at this vertex.
      * @param arrivalTime Arrival time in picoseconds.  This is the sum of delay edges leading to 
      * this vertex.
      */
     public void setArrivalTime(float arrivalTime) {
-        //System.out.println("Setting arrival time for "+this+" to:"+arrivalTime);
         this.arrivalTime = arrivalTime;
     }
-
+        
     /**
      * Gets the slack stored at this vertex.
      * @return Slack value in picoseconds.
@@ -147,12 +199,12 @@ public class TimingVertex {
      */
     public float getArrivalTime() {
         if (arrivalTime == null) {
-            return 0.f;
+            return 0f;
         } else {
             return arrivalTime;
         }
     }
-
+    
     /**
      * Gets the required time stored at this vertex.
      * @return Required time in picoseconds.
@@ -238,5 +290,11 @@ public class TimingVertex {
         isFlopOutput = true;
     }
 
+	public TimingVertex getPrev() {
+		return prev;
+	}
 
+	public void setPrev(TimingVertex prev) {
+		this.prev = prev;
+	}
 }
