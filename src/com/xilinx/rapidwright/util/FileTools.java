@@ -191,6 +191,12 @@ public class FileTools {
 		return useUnsafeStreams() ? new UnsafeInput(new InflaterInputStream(in)) 
 		                          : new Input(new InflaterInputStream(in)) ;
 	}
+
+    public static Input getKryoInputStreamWithoutInflater(InputStream in){
+        return useUnsafeStreams() ? new UnsafeInput(in) 
+                                  : new Input(in);
+    }
+	
 	
 	/**
 	 * Checks if Kryo Unsafe Streams can/should be used.  They provide a performance advantage
