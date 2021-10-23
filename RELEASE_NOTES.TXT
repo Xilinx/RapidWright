@@ -14,7 +14,7 @@ Notes:
    identify true fmax of a design.
  * Improves PartNameTools to return integer values of available
    resources of a part.
- * Fixes Issues #259, #246, #73, #251, 190
+ * Fixes Issues #259, #246, #73, #251, #190
  - API Additions:
     - com.xilinx.rapidwright.design.Design "public static boolean replaceEDIFinDCP(String dcpFileName, String edfFileName)"
 
