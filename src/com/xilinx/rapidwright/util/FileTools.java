@@ -176,6 +176,12 @@ public class FileTools {
 		return useUnsafeStreams() ? new UnsafeOutput(new DeflaterOutputStream(os)) 
 		                          : new Output(new DeflaterOutputStream(os));
 	}
+
+    public static Output getKryoOutputStreamWithoutDeflater(OutputStream os){
+        return useUnsafeStreams() ? new UnsafeOutput(os) 
+                                  : new Output(os);
+    }
+	
 	
 	public static Input getKryoInputStream(String fileName){
 		FileInputStream fis = null;
