@@ -170,9 +170,9 @@ public class RuntimeTracker {
 			for (Iterator<RuntimeTracker> it = children.iterator(); it.hasNext();) {
 				RuntimeTracker next = it.next();
 				if (it.hasNext()) {
-					next.appendFullHierarchy(buffer, childPrefix + "├─ ", childPrefix + "│  ");
+				    next.appendFullHierarchy(buffer, childPrefix + "\u251c\u2500 ", childPrefix + "\u2502  ");
 				} else {
-					next.appendFullHierarchy(buffer, childPrefix + "└─ ", childPrefix + "   ");
+				    next.appendFullHierarchy(buffer, childPrefix + "\u2514\u2500 ", childPrefix + "   ");
 				}
 			}
 		}
@@ -188,8 +188,8 @@ public class RuntimeTracker {
 		if(this.children != null) {
 			int id = 0;
 			for(RuntimeTracker child : this.children) {
-				if(id < this.children.size() - 1) buffer.append("├─ " + child);
-				else buffer.append("└─ " + child);
+                if(id < this.children.size() - 1) buffer.append("\u251c\u2500 " + child);
+                else buffer.append("\u2514\u2500 " + child);
 				id++;
 			}
 		}
