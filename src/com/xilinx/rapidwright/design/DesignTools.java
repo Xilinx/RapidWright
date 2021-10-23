@@ -30,6 +30,7 @@ import java.io.PrintStream;
 import java.math.BigInteger;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -72,6 +73,7 @@ import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.router.RouteNode;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.FileTools;
+import com.xilinx.rapidwright.util.Installer;
 import com.xilinx.rapidwright.util.Job;
 import com.xilinx.rapidwright.util.JobQueue;
 import com.xilinx.rapidwright.util.LocalJob;
@@ -2459,14 +2461,71 @@ public class DesignTools {
 	}
 
 	/**
-	 * Use Vivado to create a readable version of the EDIF file inside a Checkpoint.
+	 * Gets the corresponding EDIF directory created when auto generating EDIF from Vivado.
+	 * @param dcpFile The source DCP file path
+	 * @return The directory where auto generated .edf and .edn files go.
+	 */
+	public static Path getDefaultReadableEDIFDir(Path dcpFile) {
+	    return Paths.get(dcpFile.toString() + ".edf");
+	}
+	
+	/**
+	 * Gets the corresponding MD5 file path for a DCP that has had its EDIF file auto-generated
+	 * @param dcpFile The Path to the DCP source
+	 * @param edfDir The directory containing the auto-generated edf and md5 file
+	 * @return The path to the MD5 file
+	 */
+	public static Path getDCPAutoGenMD5FilePath(Path dcpFile, Path edfDir) {
+	    return edfDir.resolve(dcpFile.getFileName().toString() + ".md5");
+	}
+	
+	/**
+	 * Gets the path to the auto-generated EDIF file for the provided DCP and EDIF directory.
+	 * @param dcpFile The Path to the DCP source 
+	 * @param edfDir The directory where the auto-generated EDIF is stored 
+	 * @return The path to the auto-generated EDIF file
+	 */
+	public static Path getEDFAutoGenFilePath(Path dcpFile, Path edfDir) {
+	    return edfDir.resolve(FileTools.replaceExtension(dcpFile.getFileName(), ".edf"));
+	}
+	
+	/**
+	 * Use Vivado to create a readable version of the EDIF file inside a design checkpoint. If no
+	 * edf file name is provided (edfFileName=null), it will manage over-written DCPs with an md5 
+	 * hash so that edf can stay in sync with a DCP.  
 	 * @param dcp the checkpoint
 	 * @param edfFileName filename to use or null if we should select a filename
-	 * @return the output edif filename
+	 * @return the readable output edif filename
 	 */
 	public static Path generateReadableEDIF(Path dcp, Path edfFileName) {
+	    String currMD5 = null;
+	    Path existingMD5File = null;
 		if (edfFileName == null) {
-			edfFileName = FileTools.replaceExtension(dcp, ".edf");
+		    // We'll manage the creation and location of the edf file, DCP will be checked with 
+		    // an MD5 hash so that if it changes, we re-update the edf file
+		    currMD5 = Installer.calculateMD5OfFile(dcp);
+		    Path edfDir = getDefaultReadableEDIFDir(dcp);
+            existingMD5File = getDCPAutoGenMD5FilePath(dcp, edfDir);
+            edfFileName = getEDFAutoGenFilePath(dcp, edfDir);
+            if(!Files.exists(edfDir)) {
+                FileTools.makeDirs(edfDir.toString());
+            } 
+        
+            // Check if a previously auto-generated edf is still usable
+            String existingMD5 = FileTools.getStoredMD5FromFile(existingMD5File);
+            if(Files.exists(edfFileName)) {
+                if(currMD5.equals(existingMD5)) {
+                    return edfFileName; 
+                }else {
+                    try {
+                        Files.delete(edfFileName);
+                    } catch (IOException e) {
+                        throw new RuntimeException("ERROR: Couldn't auto-generate updated edf file"
+                                + " as the file appears to be in use or no permission to do so.");
+                    }
+                }
+            }
+            
 		}
 		JobQueue queue = new JobQueue();
 		Job job = generateReadableEDIFJob(dcp, edfFileName);
@@ -2475,6 +2534,9 @@ public class DesignTools {
 			throw new RuntimeException("Generating Readable EDIF job failed");
 		}
 		FileTools.deleteFolder(job.getRunDir());
+		if(currMD5 != null && existingMD5File != null) {
+	        FileTools.writeStringToTextFile(currMD5, existingMD5File.toString());		    
+		}
 		return edfFileName;
 	}
 }

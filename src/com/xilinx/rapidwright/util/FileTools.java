@@ -969,12 +969,7 @@ public class FileTools {
         File md5File = new File(fileName + MD5_DATA_FILE_SUFFIX);
         String expectedMD5 = getCurrentDataVersion(name);
         if(md5File.exists()) {
-            String currMD5 = null;
-            try {
-                currMD5 = Files.readAllLines(md5File.toPath()).get(0);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+            String currMD5 = getStoredMD5FromFile(md5File.toPath());
             if(currMD5.equals(expectedMD5)) {
                 return true;
             }
@@ -988,6 +983,22 @@ public class FileTools {
             return true;
         }
 	    return false;
+	}
+	
+	/**
+	 * Extracts the md5 checksum from a previously created MD5 sum file.
+	 * @param md5File The path of the existing md5 sum file
+	 * @return the md5 checksum found in the file or null if no file existed or couldn't be read.
+	 */
+	public static String getStoredMD5FromFile(Path md5File) {
+	    if(Files.exists(md5File)) {
+	        try {
+	            return Files.readAllLines(md5File).get(0);
+	        } catch (IOException e) {
+	            return null;
+	        }
+	    }
+	    return null;
 	}
 	
 	/**
@@ -1451,7 +1462,7 @@ public class FileTools {
 		return isFileBinary(Paths.get(fileName));
 	}
 	
-	private static final int BINARY_CHECK_LENGTH = 8192;
+	public static final int BINARY_CHECK_LENGTH = 8192;
 	private static byte[] binaryCheckData; 
 
 	public static boolean isDataBinary(InputStream is){
