@@ -28,7 +28,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
-import com.esotericsoftware.kryo.unsafe.UnsafeInput;
+
+import com.esotericsoftware.kryo.io.Input;
 import com.xilinx.rapidwright.device.FamilyType;
 import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.Series;
@@ -47,7 +48,7 @@ public class PartNameTools {
 	}
 	static {
 		partMap = new HashMap<String,Part>();
-		try (UnsafeInput his = FileTools.getUnsafeInputStream(FileTools.getRapidWrightResourceInputStream(FileTools.PART_DB_PATH))) {
+		try (Input his = FileTools.getKryoInputStream(FileTools.getRapidWrightResourceInputStream(FileTools.PART_DB_PATH))) {
 		
 			int version = his.readInt();
 			if(version != FileTools.PART_DB_FILE_VERSION) {

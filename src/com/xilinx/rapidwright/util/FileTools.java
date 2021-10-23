@@ -71,6 +71,7 @@ import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
 import com.esotericsoftware.kryo.unsafe.UnsafeInput;
 import com.esotericsoftware.kryo.unsafe.UnsafeOutput;
+import com.esotericsoftware.kryo.util.Util;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.FamilyType;
 import com.xilinx.rapidwright.device.Part;
@@ -133,6 +134,8 @@ public class FileTools {
 	private static String MD5_DATA_FILE_SUFFIX = ".md5";
 	
 	private static boolean OVERRIDE_DATA_FILE_DOWNLOAD = false;
+
+	private static Boolean useKryoUnsafeStreams = null;
 	
 	static {
 		// TODO - This turns off illegal reflective access warnings in Java 9+
@@ -159,32 +162,68 @@ public class FileTools {
 	//===================================================================================//
 	/* Get Streams                                                                       */
 	//===================================================================================//
-	public static UnsafeOutput getUnsafeOutputStream(String fileName){
+	public static Output getKryoOutputStream(String fileName){
 		FileOutputStream fos = null; 
 		try {
 			fos = new FileOutputStream(fileName);
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
 		}
-		return getUnsafeOutputStream(fos);
+		return getKryoOutputStream(fos);
 	}
 	
-	public static UnsafeOutput getUnsafeOutputStream(OutputStream os){
-		return new UnsafeOutput(new DeflaterOutputStream(os));
+	public static Output getKryoOutputStream(OutputStream os){
+		return useUnsafeStreams() ? new UnsafeOutput(new DeflaterOutputStream(os)) 
+		                          : new Output(new DeflaterOutputStream(os));
 	}
 	
-	public static UnsafeInput getUnsafeInputStream(String fileName){
+	public static Input getKryoInputStream(String fileName){
 		FileInputStream fis = null;
 		try {
 			fis = new FileInputStream(fileName);
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
 		}
-		return getUnsafeInputStream(fis);
+		return getKryoInputStream(fis);
 	}
 	
-	public static UnsafeInput getUnsafeInputStream(InputStream in){
-		return new UnsafeInput(new InflaterInputStream(in));
+	public static Input getKryoInputStream(InputStream in){
+		return useUnsafeStreams() ? new UnsafeInput(new InflaterInputStream(in)) 
+		                          : new Input(new InflaterInputStream(in)) ;
+	}
+	
+	/**
+	 * Checks if Kryo Unsafe Streams can/should be used.  They provide a performance advantage
+	 * but are not (as easily) available in Java 16+.  
+	 * @return True if unsafe streams are to be used, false otherwise.
+	 */
+	public static boolean useUnsafeStreams() {
+	    if(useKryoUnsafeStreams == null) {
+	        try {
+	            useKryoUnsafeStreams = Util.unsafe && getJavaVersion() < 16;	            
+	        } catch (Exception e) {
+	            // Don't crash on failure to check, just don't use them
+	            useKryoUnsafeStreams = false;
+	        }
+	    }
+	    return useKryoUnsafeStreams;
+	}
+	
+	/**
+	 * Gets the current runtime version number.  Correctly handles 1.8.x formats and Java 9+
+	 * @return The integer version of the Java version (8, 9, 10, 11, ...) 
+	 */
+	public static int getJavaVersion() {
+	    String ver = System.getProperty("java.version");
+	    if(ver.startsWith("1.")) {
+	        ver = ver.substring(2, 3);
+	    }else {
+	        int dotIdx = ver.indexOf('.');
+	        if(dotIdx != -1) {
+	            ver = ver.substring(0, dotIdx);
+	        }
+	    }
+	    return Integer.parseInt(ver);
 	}
 	
 	/**
@@ -240,7 +279,7 @@ public class FileTools {
 	//===================================================================================//
 	/* Custom Read/Write File Functions for Device/WireEnumeration Class                 */
 	//===================================================================================//
-	public static HashMap<String,Integer> readHashMap(UnsafeInput dis, Integer[] allInts){
+	public static HashMap<String,Integer> readHashMap(Input dis, Integer[] allInts){
 		int count;
 		HashMap<String,Integer> tileMap = null;
 		String[] keys;
@@ -256,7 +295,7 @@ public class FileTools {
 		return tileMap;
 	}
 
-	public static boolean writeHashMap(UnsafeOutput dos, HashMap<String,Integer> map){
+	public static boolean writeHashMap(Output dos, HashMap<String,Integer> map){
 		int size = map.size();
 		dos.writeInt(size);
 		ArrayList<Integer> values = new ArrayList<Integer>(map.size());
@@ -270,7 +309,7 @@ public class FileTools {
 		return true;
 	}
 	
-	public static boolean writeStringArray(UnsafeOutput dos, String[] stringArray){
+	public static boolean writeStringArray(Output dos, String[] stringArray){
 		/*int size = 0;
 		for(String s : stringArray){
 			size += s.length() + 1;
@@ -282,7 +321,7 @@ public class FileTools {
 		return true;
 	}
 		
-	public static String[] readStringArray(UnsafeInput dis){
+	public static String[] readStringArray(Input dis){
 		int size;
 		String[] wireArray = null;
 		size = dis.readInt();
@@ -296,7 +335,7 @@ public class FileTools {
 		return wireArray;
 	}
 	
-	public static boolean writeIntArray(UnsafeOutput dos, int[] intArray){
+	public static boolean writeIntArray(Output dos, int[] intArray){
 		if(intArray == null){
 			dos.writeInt(0);
 			return true;
@@ -306,7 +345,7 @@ public class FileTools {
 		return true;
 	}
 
-	public static boolean writeShortArray(UnsafeOutput dos, short[] intArray){
+	public static boolean writeShortArray(Output dos, short[] intArray){
 		if(intArray == null){
 			dos.writeShort(0);
 			return true;
@@ -316,13 +355,13 @@ public class FileTools {
 		return true;
 	}
 	
-	public static int[] readIntArray(UnsafeInput dis){
+	public static int[] readIntArray(Input dis){
 		int length = dis.readInt();
 		if(length == 0) return emptyIntArray;
 		return dis.readInts(length);
 	}
 
-	public static short[] readShortArray(UnsafeInput dis){
+	public static short[] readShortArray(Input dis){
 		int length = dis.readShort();
 		if(length == 0) return emptyShortArray;
 		return dis.readShorts(length);
