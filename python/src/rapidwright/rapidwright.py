@@ -24,7 +24,7 @@ from jpype.types import *
 from typing import List, Optional
 import os, urllib.request, platform
 
-version='2021.1.1'
+version='2021.1.2'
 
 def start_jvm():
     os_str = 'lin64'
