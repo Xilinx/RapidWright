@@ -37,8 +37,11 @@ jobs:
         if: steps.cache-rapidwright.outputs.cache-hit != 'true'
         run: wget https://github.com/Xilinx/RapidWright/releases/download/${{ env.RAPIDWRIGHT_VERSION }}/rapidwright_jars.zip && unzip rapidwright_jars.zip
 
-      - name: Compile & Test RapidWright
-        run: ./gradlew build
+      - name: Compile
+        run: ./gradlew assemble
+
+      - name: Test
+        run: ./gradlew test
 
       - name: Archive Test Report
         uses: actions/upload-artifact@v2
