@@ -1375,24 +1375,24 @@ public class FileTools {
 	public static Integer runCommand(String command, boolean verbose){
 		if(verbose) System.out.println(command);
 		int returnValue = 0;
+		Process p = null;
 		try {
-			Process p = Runtime.getRuntime().exec(command);
+			p = Runtime.getRuntime().exec(command);
 			StreamGobbler input = new StreamGobbler(p.getInputStream(), verbose);
 			StreamGobbler err = new StreamGobbler(p.getErrorStream(), verbose);
 			input.start();
 			err.start();
-			try {
-				returnValue = p.waitFor();
-				p.destroy();
-			} catch (InterruptedException e){
-				e.printStackTrace();
-				MessageGenerator.briefError("ERROR: The command was interrupted: \"" + command + "\"");
-				return null;
-			}
+			returnValue = p.waitFor();
 		} catch (IOException e){
 			e.printStackTrace();
 			MessageGenerator.briefError("ERROR: In running the command \"" + command + "\"");
 			return null;
+		} catch (InterruptedException e){
+		    e.printStackTrace();
+		    MessageGenerator.briefError("ERROR: The command was interrupted: \"" + command + "\"");
+		    return null;
+		} finally {
+            if(p != null) p.destroyForcibly();
 		}
 		return returnValue;
 	}
@@ -1418,30 +1418,9 @@ public class FileTools {
 		} catch (IOException | InterruptedException e) {
 			e.printStackTrace();
 		} finally {
-			p.destroyForcibly();
+			if(p != null) p.destroyForcibly();
 		}
 		return returnVal;
-		/*
-		try {
-			Process p = Runtime.getRuntime().exec(command);
-			StreamGobbler input = new StreamGobbler(p.getInputStream(), false);
-			StreamGobbler err = new StreamGobbler(p.getErrorStream(), false);
-			input.start();
-			err.start();
-			try {
-				returnValue = p.waitFor();
-				p.destroy();
-			} catch (InterruptedException e){
-				e.printStackTrace();
-				MessageGenerator.briefError("ERROR: The command was interrupted: \"" + command + "\"");
-				return null;
-			}
-		} catch (IOException e){
-			e.printStackTrace();
-			MessageGenerator.briefError("ERROR: In running the command \"" + command + "\"");
-			return null;
-		}
-		return returnValue;*/
 	}
 	
 	public static String getUniqueProcessAndHostID(){
@@ -1526,22 +1505,25 @@ public class FileTools {
 		try {
 			p = pb.start();
 			p.waitFor();  // wait for process to finish then continue.
-			BufferedReader bri = new BufferedReader(new InputStreamReader(p.getInputStream()));
-			while ((line = bri.readLine()) != null) {
-			    output.add(line);
-			}
+			try (BufferedReader bri = new BufferedReader(new InputStreamReader(p.getInputStream()))){
+	            while ((line = bri.readLine()) != null) {
+	                output.add(line);
+	            }
+			}		
 			if(includeError){
-				BufferedReader bre = new BufferedReader(new InputStreamReader(p.getErrorStream()));
-				while ((line = bre.readLine()) != null) {
-				    output.add(line);
-				}
+			    try (BufferedReader bre = new BufferedReader(new InputStreamReader(p.getErrorStream()))) {
+	                while ((line = bre.readLine()) != null) {
+	                    output.add(line);
+	                }			        
+			    }
 			}
-
 		} catch (IOException e1) {
 			e1.printStackTrace();
 		} catch (InterruptedException e) {
 			e.printStackTrace();
-		}  
+		} finally {
+		    if(p != null) p.destroyForcibly();
+		}
 
 		return output;
 	}
