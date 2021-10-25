@@ -1526,15 +1526,17 @@ public class FileTools {
 		try {
 			p = pb.start();
 			p.waitFor();  // wait for process to finish then continue.
-			BufferedReader bri = new BufferedReader(new InputStreamReader(p.getInputStream()));
-			while ((line = bri.readLine()) != null) {
-			    output.add(line);
-			}
+			try (BufferedReader bri = new BufferedReader(new InputStreamReader(p.getInputStream()))){
+	            while ((line = bri.readLine()) != null) {
+	                output.add(line);
+	            }
+			}		
 			if(includeError){
-				BufferedReader bre = new BufferedReader(new InputStreamReader(p.getErrorStream()));
-				while ((line = bre.readLine()) != null) {
-				    output.add(line);
-				}
+			    try (BufferedReader bre = new BufferedReader(new InputStreamReader(p.getErrorStream()))) {
+	                while ((line = bre.readLine()) != null) {
+	                    output.add(line);
+	                }			        
+			    }
 			}
 
 		} catch (IOException e1) {
