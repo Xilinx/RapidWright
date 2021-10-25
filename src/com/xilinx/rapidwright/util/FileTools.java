@@ -1538,7 +1538,7 @@ public class FileTools {
 	                }			        
 			    }
 			}
-
+			p.destroyForcibly();
 		} catch (IOException e1) {
 			e1.printStackTrace();
 		} catch (InterruptedException e) {
