@@ -45,7 +45,8 @@ public class TestDRC {
         Design design = Design.readCheckpoint(dcpPath);
 
         NetRoutesThruLutAtMostOnce drc = new NetRoutesThruLutAtMostOnce();
-        Assertions.assertEquals(drc.run(design), 0);
+        boolean strict = true;
+        Assertions.assertEquals(drc.run(design, strict), 0);
     }
 
     @Test
@@ -63,7 +64,8 @@ public class TestDRC {
         Design design = Design.readCheckpoint(dcpPath);
 
         NetRoutesThruLutAtMostOnce drc = new NetRoutesThruLutAtMostOnce();
-        Assertions.assertEquals(drc.run(design), 4);
+        boolean strict = true;
+        Assertions.assertEquals(drc.run(design, strict), 4);
     }
 
 }
