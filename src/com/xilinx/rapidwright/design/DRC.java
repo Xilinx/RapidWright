@@ -29,21 +29,26 @@ import java.util.List;
 import com.xilinx.rapidwright.design.drc.DesignRuleCheckInterface;
 import com.xilinx.rapidwright.design.drc.NetRoutesThruLutAtMostOnce;
 
+/**
+ * Parent DRC that executes a list of child DRCs, returning the sum of all failed checks.
+ * Both parent and child DRCs comply with the {@link DesignRuleCheckInterface}.
+ */
 public class DRC implements DesignRuleCheckInterface {
+    // Static list of all DRCs to be run
     public static final List<Class<? extends DesignRuleCheckInterface>> checks =
             new ArrayList<Class<? extends DesignRuleCheckInterface>>() {{
         add(NetRoutesThruLutAtMostOnce.class);
     }};
 
     @Override
-    public int run(Design design) {
+    public int run(Design design, boolean strict) {
         // DesignRuleCheckInterface::run() returns an int of how many checks failed,
         // sum those up
         return checks.stream().map((c) -> {
                     DesignRuleCheckInterface i = null;
                     try {
                         i = c.getDeclaredConstructor().newInstance();
-                        return (int) c.getDeclaredMethod("run", Design.class).invoke(i, design);
+                        return (int) c.getDeclaredMethod("run", Design.class, boolean.class).invoke(i, design, strict);
                     } catch (InstantiationException|IllegalAccessException|InvocationTargetException|NoSuchMethodException e) {
                         throw new RuntimeException(e);
                     }
@@ -71,15 +76,9 @@ public class DRC implements DesignRuleCheckInterface {
         }
 
         Design design = Design.readCheckpoint(args[0]);
-        int numFailed = new DRC().run(design);
+        int numFailed = new DRC().run(design, strict);
         if (numFailed > 0) {
-            String message = numFailed + " failed DRCs";
-            if (strict) {
-                throw new RuntimeException("ERROR: " + message);
-            } else {
-                System.out.println("WARNING: " + message);
-                System.exit(1);
-            }
+            throw new RuntimeException("ERROR: " + numFailed + " failed DRCs");
         }
     }
 }

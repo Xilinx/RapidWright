@@ -22,8 +22,13 @@
 
 package com.xilinx.rapidwright.design.drc;
 
+import com.xilinx.rapidwright.design.DRC;
 import com.xilinx.rapidwright.design.Design;
 
+/**
+ * Abstract base class for all Design Rule Checks supported by
+ * {@link DRC}.
+ */
 public interface DesignRuleCheckInterface {
-    abstract int run(Design design);
+    abstract int run(Design design, boolean strict);
 }

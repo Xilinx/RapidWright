@@ -38,15 +38,20 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+/**
+ * Check that each LUT contains at most one routethru of each net.
+ * Identifies occurrences of issue #226.
+ * Failed checks will print a warning and are not counted unless the strict parameter is true.
+ */
 public class NetRoutesThruLutAtMostOnce implements DesignRuleCheckInterface {
 
-    private String lutName(Net net, Node node) {
+    private String lutName(Node node) {
         String nodeWireName = node.getWireName();
         return node.getTile().getName() + "/" + nodeWireName.substring(0, nodeWireName.length() - 1);
     }
 
     @Override
-    public int run(Design design) {
+    public int run(Design design, boolean strict) {
         List<Pair<Net, List<Pair<String, Integer>>>> netToLutRoutethrus = design.getNets().stream()
                 .map((n) -> {
                     Map<String, Integer> lutRoutethrus = new HashMap<>();
@@ -54,7 +59,7 @@ public class NetRoutesThruLutAtMostOnce implements DesignRuleCheckInterface {
                     for (PIP p : n.getPIPs()) {
                         if (!p.isRouteThru()) continue;
                         // Set to 1 if not exist, increment by 1 if does exist
-                        lutRoutethrus.merge(lutName(n, p.getStartNode()), 1, Integer::sum);
+                        lutRoutethrus.merge(lutName(p.getStartNode()), 1, Integer::sum);
                     }
 
                     for (SitePinInst spi : n.getSinkPins()) {
@@ -69,7 +74,7 @@ public class NetRoutesThruLutAtMostOnce implements DesignRuleCheckInterface {
                             if (c.getLogicalPinMapping(bp.getName()) == null) continue;
 
                             // Set to 1 if not exist, increment by 1 if does exist
-                            lutRoutethrus.merge(lutName(spi.getNet(), spi.getConnectedNode()), 1, Integer::sum);
+                            lutRoutethrus.merge(lutName(spi.getConnectedNode()), 1, Integer::sum);
                         }
                     }
 
@@ -87,13 +92,18 @@ public class NetRoutesThruLutAtMostOnce implements DesignRuleCheckInterface {
                 ).collect(Collectors.toList());
 
         int numFails = 0;
-        for (Pair<Net, List<Pair<String, Integer>>> e : netToLutRoutethrus) {
-            for (Pair<String, Integer> l : e.getSecond()) {
-                System.out.println("Net '" + e.getFirst() + "' routes-thru this LUT more than once: " +
-                        l.getFirst() + "; this may not be faithfully representable to Vivado");
-                numFails += l.getSecond() - 1;
+
+        // Only count failures if in strict mode
+        if (strict) {
+            for (Pair<Net, List<Pair<String, Integer>>> e : netToLutRoutethrus) {
+                for (Pair<String, Integer> l : e.getSecond()) {
+                    System.out.println("Net '" + e.getFirst() + "' routes-thru this LUT more than once: " +
+                            l.getFirst() + "; this may not be faithfully representable to Vivado");
+                    numFails += l.getSecond() - 1;
+                }
             }
         }
+
         return numFails;
     }
 }

@@ -31,6 +31,16 @@ public class TestDRC {
     @Test
     @CheckOpenFiles
     public void testRoutethruPass() {
+        /*
+         * DCP created from:
+         *    module top(input [2:0] i);
+         *      (* DONT_TOUCH, LOC="SLICE_X0Y0" *) CARRY4 c4(.S(i[0]));
+         *      (* DONT_TOUCH, LOC="SLICE_X0Y0", BEL="A5FF"*) FDRE ff5(.D(i[1]));
+         *      (* DONT_TOUCH, LOC="SLICE_X0Y0", BEL="AFF" *) FDRE ff6(.D(i[2]));
+         *    endmodule
+         * containing A3 -> O6 -> S0 and A1 -> O5 -> AFF.D intra-site routethrus of
+         * different nets (along with AX -> A5FF.D)
+         */
         final String dcpPath = "RapidWrightDCP/routethru_luts.dcp";
         Design design = Design.readCheckpoint(dcpPath);
 
@@ -41,10 +51,14 @@ public class TestDRC {
     @Test
     @CheckOpenFiles
     public void testRoutethruFail() {
-        // DCP derived from https://github.com/Xilinx/RapidWright/issues/226#issuecomment-906164846
-        // (specifically, the interchange input has been re-converted into a new DCP after
-        // PRs #253 and #254)
-
+        /*
+         * DCP derived from https://github.com/Xilinx/RapidWright/issues/226#issuecomment-906164846
+         * (specifically, the interchange input has been re-converted into a new DCP after
+         * PRs #253 and #254)
+         *
+         * Contains an inter-site routethru PIP A4 -> A, and an intra-site A5 -> O5 -> AFF.D
+         * routethru of the *same* net.
+         */
         final String dcpPath = "RapidWrightDCP/bug226.dcp";
         Design design = Design.readCheckpoint(dcpPath);
 
