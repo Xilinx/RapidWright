@@ -22,7 +22,8 @@
 
 package com.xilinx.rapidwright.design;
 
-import com.xilinx.rapidwright.checker.CheckOpenFiles;
+import com.xilinx.rapidwright.support.CheckOpenFiles;
+import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.design.drc.NetRoutesThruLutAtMostOnce;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -41,7 +42,7 @@ public class TestDRC {
          * containing A3 -> O6 -> S0 and A1 -> O5 -> AFF.D intra-site routethrus of
          * different nets (along with AX -> A5FF.D)
          */
-        final String dcpPath = "RapidWrightDCP/routethru_luts.dcp";
+        final String dcpPath = RapidWrightDCP.getString("routethru_luts.dcp");
         Design design = Design.readCheckpoint(dcpPath);
 
         NetRoutesThruLutAtMostOnce drc = new NetRoutesThruLutAtMostOnce();
@@ -60,7 +61,7 @@ public class TestDRC {
          * Contains an inter-site routethru PIP A4 -> A, and an intra-site A5 -> O5 -> AFF.D
          * routethru of the *same* net.
          */
-        final String dcpPath = "RapidWrightDCP/bug226.dcp";
+        final String dcpPath = RapidWrightDCP.getString("bug226.dcp");
         Design design = Design.readCheckpoint(dcpPath);
 
         NetRoutesThruLutAtMostOnce drc = new NetRoutesThruLutAtMostOnce();
