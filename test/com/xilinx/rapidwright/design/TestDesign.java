@@ -4,7 +4,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-import com.xilinx.rapidwright.checker.CheckOpenFiles;
+import com.xilinx.rapidwright.support.CheckOpenFiles;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Site;
