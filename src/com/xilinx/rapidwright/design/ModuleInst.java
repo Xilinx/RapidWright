@@ -22,9 +22,14 @@
  */
 package com.xilinx.rapidwright.design;
 
+import java.io.BufferedWriter;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -40,6 +45,7 @@ import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.util.MessageGenerator;
+import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.Utils;
 
 /**
@@ -66,6 +72,12 @@ public class ModuleInst{
 	private ArrayList<Net> nets;
 	/** Reference to the logical cell instance in the netlist */
 	private EDIFCellInst cellInst;
+
+	private List<SiteInst> staticSources;
+	
+	private boolean hasBeenPlaced = false;
+	
+	private Map<NetType, List<Pair<PIP, Tile>>> staticPIPs;
 	
 	/**
 	 * Constructor initializing instance module name
@@ -353,10 +365,41 @@ public class ModuleInst{
 		//=======================================================//
 		/* Place net at new location                             */
 		//=======================================================//
+		boolean print = false;
 		nextnet: for(Net net : nets){
+		    print = false;
 			net.getPIPs().clear();
 			Net templateNet = net.getModuleTemplateNet();
+/*            if (templateNet.getName().startsWith("clock_mux/inst")) {
+                System.out.println("PM:PM 2 clock_mux/inst/");
+                System.out.println("PM:PM pip " + templateNet.getPIPs());
+                print = true;
+            }
+            if (templateNet.getName().startsWith("AES128Dec_0/inst/grp_updateKey_fu_127/ap_NS_fsm1")) {
+                System.out.println("PM:PM 1 ap_NS_fsm1");
+                System.out.println("PM:PM pip " + templateNet.getPIPs());
+                print = true;
+            }
+*/            
+/*			
+			if (templateNet.getName().contains("rp0_clk_bufgce")) {
+	               System.out.println("PM:PM 2 " + templateNet.getName());
+//	               System.out.println("PM:PM pip " + templateNet.getPIPs());
+	            }
+            if (templateNet.getName().contains("clock_mux/inst/O")) {
+                print = true; 
+               System.out.println("PM:PM 2 " + templateNet.getName());
+//               System.out.println("PM:PM pip " + templateNet.getPIPs());
+
+            }
+*/                        
 			for(PIP pip : templateNet.getPIPs()){
+//			    if (pip.toString().startsWith("RCLK_DSP_INTF_CLKBUF_L_X54Y269/RCLK_DSP_INTF_CLKBUF_L.CLK_HDISTR_L0<<->>CLK_HDISTR_R0")) {
+/*              if (pip.toString().contains("CLK_HDISTR")) {			    
+//			    if (pip.toString().startsWith("RCLK_INT_L_X55Y29/RCLK_INT_L.CLK_HDISTR_FT0_0->>CLK_LEAF_SITES_0_CLK_IN") ) {
+			        System.out.println("PM:PM 3 " + pip + " net " + templateNet.getName());
+			    }
+*/			    
 				Tile templatePipTile = pip.getTile();
 				Tile newPipTile = module.getCorrespondingTile(templatePipTile, newAnchorSite.getTile(), dev);
 				if(newPipTile == null){
@@ -375,7 +418,55 @@ public class ModuleInst{
 				//}
 				net.addPIP(newPip);
 			}
+			if (print) {
+                try {
+                    BufferedWriter writer = new BufferedWriter(new FileWriter(this.getName().replaceAll("/", "_") + "pipmuxclock_from.txt"));
+                    writer.write(templateNet.getPIPs().toString());               
+                    writer.close(); 
+                } catch (IOException e) {
+                    System.out.println("An error occurred.");
+                    e.printStackTrace();
+                }
+                try {
+                    BufferedWriter writer = new BufferedWriter(new FileWriter(this.getName().replaceAll("/", "_")  + "pipmuxclock_to.txt"));
+                    writer.write(net.getPIPs().toString());               
+                    writer.close(); 
+                } catch (IOException e) {
+                    System.out.println("An error occurred.");
+                    e.printStackTrace();
+                }
+			}
+			print = false;
 		}
+		
+		if(staticSources != null) {
+		    for(SiteInst staticSource : staticSources) {
+		        Site templateSite = staticSource.getModuleTemplateInst().getSite();
+	            Tile newTile = module.getCorrespondingTile(templateSite.getTile(), newAnchorSite.getTile(), dev);
+	            Site newSite = templateSite.getCorrespondingSite(staticSource.getSiteTypeEnum(), newTile);
+	            staticSource.place(newSite);
+		    }
+		}
+		if(staticPIPs != null) {
+		    for(Entry<NetType,List<Pair<PIP, Tile>>> e : staticPIPs.entrySet()) {
+		        if(!hasBeenPlaced) {
+		            Net topStaticNet = getDesign().getStaticNet(e.getKey());
+		            for(Pair<PIP, Tile> pair : e.getValue()) {
+		                topStaticNet.getPIPs().add(pair.getFirst());   
+		            }
+		        }
+		        for(Pair<PIP, Tile> pair : e.getValue()) {
+	                Tile templatePipTile = pair.getSecond();
+	                Tile newPipTile = module.getCorrespondingTile(templatePipTile, newAnchorSite.getTile(), dev);
+	                if(newPipTile == null){
+	                    throw new RuntimeException("ERROR: Problem relocating "+e.getKey()+" routing with PIP: " + pair );
+	                }
+	                pair.getFirst().setTile(newPipTile);
+		        }
+		    }
+		}
+		
+		hasBeenPlaced = true;
 		return true;
 	}
 	
@@ -745,5 +836,15 @@ public class ModuleInst{
 		for (SitePinInst inPin : getCorrespondingPins(inPort)) {
 			physicalNet.addPin(inPin);
 		}
+	}
+	
+	protected void addStaticSource(SiteInst staticSource) {
+	    if(staticSources == null) staticSources = new ArrayList<>();
+	    staticSources.add(staticSource);
+	}
+	
+	protected void addStaticPIPs(NetType type, List<Pair<PIP, Tile>> pips) {
+	    if(staticPIPs == null) staticPIPs = new HashMap<>();
+	    staticPIPs.put(type, pips);
 	}
 }
