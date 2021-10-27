@@ -56,13 +56,5 @@ jobs:
         with:
           name: Unit Test Results
           path: |
-            build/test-results/test/*.xml
+            build/test-results/**/*.xml
 
-      - name: Publish Unit Test Results
-        uses: EnricoMi/publish-unit-test-result-action@v1.18
-        if: >
-          always() &&
-          github.event.sender.login != 'dependabot[bot]' &&
-          ( github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository )
-        with:
-          files: build/test-results/**/*.xml
