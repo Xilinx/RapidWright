@@ -446,7 +446,6 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 			}
 		}
 		return null;
-		//throw new IllegalStateException(getName()+"."+p.getName()+" is an passthrough output of "+p.getPassThruPortNames()+". All of them are outputs?!");
 	}
 
 	/**
