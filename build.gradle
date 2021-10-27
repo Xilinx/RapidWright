@@ -67,3 +67,12 @@ abstract class UpdateJarsTask extends DefaultTask {
 
 // Create a task using the task type
 tasks.register('update_jars', UpdateJarsTask)
+
+task testPython(type:Exec) {
+  environment 'CLASSPATH', sourceSets.main.runtimeClasspath.getAsPath()
+  executable = 'python3'
+  args = ['-m', 'pytest', '--junitxml', "$buildDir/test-results/testPython/testPython.xml", '--rootdir', 'python/test']
+  // Workaround from https://github.com/jpype-project/jpype/issues/842#issuecomment-847027355
+  args += ['-p', 'no:faulthandler']
+}
+test.dependsOn testPython
