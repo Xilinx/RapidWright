@@ -43,15 +43,14 @@ import java.util.stream.Collectors;
  * Identifies occurrences of issue #226.
  * Failed checks will print a warning and are not counted unless the strict parameter is true.
  */
-public class NetRoutesThruLutAtMostOnce implements DesignRuleCheckInterface {
+public class NetRoutesThruLutAtMostOnce {
 
-    private String lutName(Node node) {
+    private static String lutName(Node node) {
         String nodeWireName = node.getWireName();
         return node.getTile().getName() + "/" + nodeWireName.substring(0, nodeWireName.length() - 1);
     }
 
-    @Override
-    public int run(Design design, boolean strict) {
+    public static int run(Design design, boolean strict) {
         List<Pair<Net, List<Pair<String, Integer>>>> netToLutRoutethrus = design.getNets().stream()
                 .map((n) -> {
                     Map<String, Integer> lutRoutethrus = new HashMap<>();

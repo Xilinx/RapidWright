@@ -22,37 +22,29 @@
 
 package com.xilinx.rapidwright.design;
 
-import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.xilinx.rapidwright.design.drc.DesignRuleCheckInterface;
 import com.xilinx.rapidwright.design.drc.NetRoutesThruLutAtMostOnce;
 
 /**
  * Parent DRC that executes a list of child DRCs, returning the sum of all failed checks.
- * Both parent and child DRCs comply with the {@link DesignRuleCheckInterface}.
  */
-public class DRC implements DesignRuleCheckInterface {
+public class DRC {
+    interface DrcStyleFunction {
+        int run(Design design, boolean strict);
+    }
+
     // Static list of all DRCs to be run
-    public static final List<Class<? extends DesignRuleCheckInterface>> checks =
-            new ArrayList<Class<? extends DesignRuleCheckInterface>>() {{
-        add(NetRoutesThruLutAtMostOnce.class);
+    public static final List<DrcStyleFunction> checks =
+            new ArrayList<DrcStyleFunction>() {{
+        add(NetRoutesThruLutAtMostOnce::run);
     }};
 
-    @Override
     public int run(Design design, boolean strict) {
-        // DesignRuleCheckInterface::run() returns an int of how many checks failed,
+        // Each check's run() returns an int of how many checks failed,
         // sum those up
-        return checks.stream().map((c) -> {
-                    DesignRuleCheckInterface i = null;
-                    try {
-                        i = c.getDeclaredConstructor().newInstance();
-                        return (int) c.getDeclaredMethod("run", Design.class, boolean.class).invoke(i, design, strict);
-                    } catch (InstantiationException|IllegalAccessException|InvocationTargetException|NoSuchMethodException e) {
-                        throw new RuntimeException(e);
-                    }
-                })
+        return checks.stream().map((f) -> f.run(design, strict))
                 .reduce(0, Integer::sum);
     }
 
