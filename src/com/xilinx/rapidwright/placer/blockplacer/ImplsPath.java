@@ -25,10 +25,13 @@ import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-import com.xilinx.rapidwright.design.ModuleImplsInstance;
+import com.xilinx.rapidwright.design.ModuleImplsInst;
 import com.xilinx.rapidwright.design.SimpleTileRectangle;
 
-public class ImplsPath extends AbstractPath<ImplsInstancePort, ModuleImplsInstance>{
+/**
+ * Net between Ports of {@link ModuleImplsInst}s
+ */
+public class ImplsPath extends AbstractPath<ImplsInstancePort, ModuleImplsInst>{
     int length;
 
     public ImplsPath(String name) {

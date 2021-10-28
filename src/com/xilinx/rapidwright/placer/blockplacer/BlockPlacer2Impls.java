@@ -41,7 +41,7 @@ import com.xilinx.rapidwright.design.AbstractModuleInst;
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.ModuleImpls;
-import com.xilinx.rapidwright.design.ModuleImplsInstance;
+import com.xilinx.rapidwright.design.ModuleImplsInst;
 import com.xilinx.rapidwright.design.ModulePlacement;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Site;
@@ -50,43 +50,43 @@ import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 
-public class BlockPlacer2Impls extends BlockPlacer2<ModuleImpls, ModuleImplsInstance, ModulePlacement, ImplsPath> {
+public class BlockPlacer2Impls extends BlockPlacer2<ModuleImpls, ModuleImplsInst, ModulePlacement, ImplsPath> {
 
-    private final List<ModuleImplsInstance> moduleInstances;
-    private Map<Site, ModuleImplsInstance> currentAnchors = new HashMap<>();
+    private final List<ModuleImplsInst> moduleInstances;
+    private Map<Site, ModuleImplsInst> currentAnchors = new HashMap<>();
 
     private final AbstractOverlapCache overlaps;
 
-    private final Map<ModuleImplsInstance, Set<ImplsPath>> modulesToPaths = new HashMap<>();
+    private final Map<ModuleImplsInst, Set<ImplsPath>> modulesToPaths = new HashMap<>();
 
-    public BlockPlacer2Impls(Design design, Collection<ModuleImplsInstance> moduleInstances, boolean ignoreMostUsedNets, Path graphData, int overlapSize) {
+    public BlockPlacer2Impls(Design design, Collection<ModuleImplsInst> moduleInstances, boolean ignoreMostUsedNets, Path graphData, int overlapSize) {
         super(design, ignoreMostUsedNets, graphData);
 
         this.moduleInstances = new ArrayList<>(moduleInstances);
         overlaps = new OverlapCache(design.getDevice(), moduleInstances, overlapSize);
     }
 
-    public BlockPlacer2Impls(Design design, Collection<ModuleImplsInstance> moduleInstances, boolean ignoreMostUsedNets, Path graphData) {
+    public BlockPlacer2Impls(Design design, Collection<ModuleImplsInst> moduleInstances, boolean ignoreMostUsedNets, Path graphData) {
         this(design, moduleInstances, ignoreMostUsedNets, graphData, OverlapCache.DEFAULT_SIZE);
     }
 
     @Override
-    public void setTempAnchorSite(ModuleImplsInstance hm, ModulePlacement placement) {
+    public void setTempAnchorSite(ModuleImplsInst hm, ModulePlacement placement) {
         placeHm(hm, placement);
     }
 
     @Override
-    List<ModuleImplsInstance> getModuleImpls(boolean debugFlow) {
+    List<ModuleImplsInst> getModuleImpls(boolean debugFlow) {
         return moduleInstances;
     }
 
     @Override
-    Collection<ModulePlacement> getAllPlacements(ModuleImplsInstance hm) {
+    Collection<ModulePlacement> getAllPlacements(ModuleImplsInst hm) {
         return hm.getModule().getAllPlacements();
     }
 
     @Override
-    void unsetTempAnchorSite(ModuleImplsInstance hm) {
+    void unsetTempAnchorSite(ModuleImplsInst hm) {
         unplaceHm(hm);
     }
 
@@ -97,36 +97,35 @@ public class BlockPlacer2Impls extends BlockPlacer2<ModuleImpls, ModuleImplsInst
     }
 
     @Override
-    void placeHm(ModuleImplsInstance hm, ModulePlacement placement) {
+    void placeHm(ModuleImplsInst hm, ModulePlacement placement) {
         if (hm.getPlacement() != null) {
             currentAnchors.remove(hm.getPlacement().placement);
-            overlaps.unPlace(hm);
+            overlaps.unplace(hm);
         }
         if (!currentAnchors.containsKey(placement.placement)) {
             currentAnchors.put(placement.placement, hm);
         }
-        /*ModuleImplsInstance alreadyAtAnchor = currentAnchors.put(placement.placement, hm);
-        if (alreadyAtAnchor != null && alreadyAtAnchor != hm) {
-            throw new RuntimeException("Placing module "+hm.getName()+" at anchor "+placement.placement+", but "+alreadyAtAnchor.getName()+" is already there");
-        }*/
         hm.place(placement);
         overlaps.place(hm);
     }
 
     @Override
-    void unplaceHm(ModuleImplsInstance hm) {
+    void unplaceHm(ModuleImplsInst hm) {
         if (hm.getPlacement() != null) {
-            overlaps.unPlace(hm);
+            overlaps.unplace(hm);
             currentAnchors.remove(hm.getPlacement().placement);
         }
-        hm.unPlace();
+        hm.unplace();
     }
 
-    private ImplsInstancePort toImplsInstancePort(EDIFPortInst portInst, Map<EDIFCellInst, Cell> edifToPhysical, Map<EDIFCellInst, ModuleImplsInstance> edifToModule) {
+    private ImplsInstancePort toImplsInstancePort(EDIFPortInst portInst, Map<EDIFCellInst, Cell> edifToPhysical, Map<EDIFCellInst, ModuleImplsInst> edifToModule) {
         if (portInst.getCellInst() != null) {
             EDIFCellInst cellInst = portInst.getCellInst();
+
+            //The EDIF cell can either be represented by a physical cell, or by a module. Checking both cases.
             Cell cell = edifToPhysical.get(cellInst);
-            ModuleImplsInstance module = edifToModule.get(cellInst);
+            ModuleImplsInst module = edifToModule.get(cellInst);
+
             if (cell == null && module == null) {
                 if (cellInst.getName().equals("VCC") || cellInst.getName().equals("GND")) {
                     return null;
@@ -137,24 +136,20 @@ public class BlockPlacer2Impls extends BlockPlacer2<ModuleImpls, ModuleImplsInst
             }
 
             if (cell != null) {
-                List<String> siteWires = new ArrayList<>();
-                SitePinInst spi = cell.getSitePinFromPortInst(portInst, siteWires);
+                SitePinInst spi = cell.getSitePinFromPortInst(portInst, null);
                 if (spi == null) {
-                    System.out.println(siteWires);
-                    System.out.println(cell.getAllSitePinsFromPortInst(portInst, siteWires));
-                    System.out.println(siteWires);
-                    System.out.println(cell.getSitePinFromPortInst(portInst, siteWires));
-                    System.out.println(siteWires);
-                    //TODO is this allowed to happen?
-                    System.err.println("while creating an ImplsInstancePort for "+portInst+", could not find the port in cell "+cell);
-                    return null;
+                    throw new RuntimeException("while creating an ImplsInstancePort for " + portInst
+                            + ", could not find the port in cell " + cell
+                            + ". Are physical net names consistent? Consider using DesignTools.makePhysNetNamesConsistent before placement"
+                    );
                 }
                 return new ImplsInstancePort.SitePinInstPort(spi);
             } else {
                 return module.getPort(portInst.getName());
             }
         } else {
-            return null; //TODO???
+            //Toplevel IO without an IOB, ignoring this
+            return null;
         }
     }
 
@@ -162,10 +157,10 @@ public class BlockPlacer2Impls extends BlockPlacer2<ModuleImpls, ModuleImplsInst
     protected void populateAllPaths() {
 
         Map<EDIFCellInst, Cell> edifToPhysical = design.getCells().stream().collect(Collectors.toMap(Cell::getEDIFCellInst, Function.identity()));
-        Map<EDIFCellInst, ModuleImplsInstance> edifToModule = moduleInstances.stream().collect(Collectors.toMap(AbstractModuleInst::getCellInst, Function.identity()));
+        Map<EDIFCellInst, ModuleImplsInst> edifToModule = moduleInstances.stream().collect(Collectors.toMap(AbstractModuleInst::getCellInst, Function.identity()));
         for (EDIFCellInst cellInst : design.getTopEDIFCell().getCellInsts()) {
             Cell cell = edifToPhysical.get(cellInst);
-            ModuleImplsInstance module = edifToModule.get(cellInst);
+            ModuleImplsInst module = edifToModule.get(cellInst);
             if (cell == null && module == null) {
                 if (!cellInst.getName().equals("VCC") && !cellInst.getName().equals("GND")) {
                     throw new RuntimeException("No physical representation of EDIF cellinst " + cellInst.getName());
@@ -191,7 +186,7 @@ public class BlockPlacer2Impls extends BlockPlacer2<ModuleImpls, ModuleImplsInst
                     if (!(port instanceof ImplsInstancePort.InstPort)) {
                         continue;
                     }
-                    ModuleImplsInstance instance = ((ImplsInstancePort.InstPort) port).getInstance();
+                    ModuleImplsInst instance = ((ImplsInstancePort.InstPort) port).getInstance();
                     modulesToPaths.computeIfAbsent(instance, x -> new HashSet<>()).add(path);
                 }
             }
@@ -199,26 +194,17 @@ public class BlockPlacer2Impls extends BlockPlacer2<ModuleImpls, ModuleImplsInst
     }
 
     @Override
-    protected boolean checkValidPlacement(ModuleImplsInstance hm) {
+    protected boolean checkValidPlacement(ModuleImplsInst hm) {
         if (hm.getPlacement() == null) {
             return false;
         }
 
-        final boolean newWay = overlaps.isValidPlacement(hm);
-
-        /*final boolean legacy = checkValidPlacementLegacy(hm);
-        if (legacy != newWay) {
-            System.out.println("Failed: "+legacy+" vs "+newWay);
-            overlaps.isValidPlacement(hm);
-            checkValidPlacementLegacy(hm);
-            throw new RuntimeException("oops");
-        }*/
-        return newWay;
+        return overlaps.isValidPlacement(hm);
     }
 
-    private boolean checkValidPlacementLegacy(ModuleImplsInstance hm) {
+    private boolean checkValidPlacementLegacy(ModuleImplsInst hm) {
         final boolean debugValidPlacement = false;
-        for(ModuleImplsInstance other : hardMacros){
+        for(ModuleImplsInst other : hardMacros){
             if (other == hm) {
                 continue;
             }
@@ -240,18 +226,16 @@ public class BlockPlacer2Impls extends BlockPlacer2<ModuleImpls, ModuleImplsInst
 
     @Override
     protected void doFinalPlacement() {
-
         overlaps.printStats();
-        //throw new RuntimeException("not implemented");
     }
 
     @Override
-    protected ModulePlacement getTempAnchorSite(ModuleImplsInstance mi) {
+    protected ModulePlacement getTempAnchorSite(ModuleImplsInst mi) {
         return mi.getPlacement();
     }
 
     @Override
-    protected int getTileSize(ModuleImplsInstance hm) {
+    protected int getTileSize(ModuleImplsInst hm) {
         if (hm.getCurrentModuleImplementation() == null) {
             return 0;
         }
@@ -269,22 +253,22 @@ public class BlockPlacer2Impls extends BlockPlacer2<ModuleImpls, ModuleImplsInst
     }
 
     @Override
-    protected ModuleImplsInstance getHmCurrentlyAtPlacement(ModulePlacement placement) {
+    protected ModuleImplsInst getHmCurrentlyAtPlacement(ModulePlacement placement) {
         return currentAnchors.get(placement.placement);
     }
 
     @Override
-    protected ModulePlacement getCurrentPlacement(ModuleImplsInstance selected) {
+    protected ModulePlacement getCurrentPlacement(ModuleImplsInst selected) {
         return selected.getPlacement();
     }
 
     @Override
-    protected Collection<ImplsPath> getConnectedPaths(ModuleImplsInstance module) {
+    protected Collection<ImplsPath> getConnectedPaths(ModuleImplsInst module) {
         return modulesToPaths.get(module);
     }
 
     @Override
-    protected Tile getCurrentAnchorTile(ModuleImplsInstance mi) {
+    protected Tile getCurrentAnchorTile(ModuleImplsInst mi) {
         return mi.getPlacement().placement.getTile();
     }
 

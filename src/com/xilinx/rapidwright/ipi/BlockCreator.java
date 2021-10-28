@@ -54,6 +54,7 @@ import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.design.blocks.SubPBlock;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.util.FileTools;
@@ -148,6 +149,18 @@ public class BlockCreator {
 				.filter(port -> port.getSingleSitePinInst() != null)
 				.filter(port -> port.getSingleSitePinInst().getName().equals("COUT"))
 				.collect(Collectors.groupingBy(Port::getSingleSitePinInst));
+
+		if (!portsToChange.isEmpty()) {
+			Series series = m.getDevice().getSeries();
+			if (series != Series.UltraScale && series != Series.UltraScalePlus) {
+				throw new RuntimeException(
+						"In Module " + m.getName() + ", output port(s) are sourced by Slice Carry Outputs: " + portsToChange
+								+ " This is not routable. Currently, we cannot automatically fix this on "
+								+ series + " devices."
+				);
+			}
+		}
+
 		portsToChange.forEach((sitePinInst, ports) -> {
 
 			final Net existingNet = sitePinInst.getSiteInst().getNetFromSiteWire("HMUX");

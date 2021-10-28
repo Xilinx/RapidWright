@@ -23,12 +23,17 @@ package com.xilinx.rapidwright.placer.blockplacer;
 
 import java.util.Objects;
 
-import com.xilinx.rapidwright.design.ModuleImplsInstance;
+import com.xilinx.rapidwright.design.ModuleImplsInst;
 import com.xilinx.rapidwright.design.Port;
 import com.xilinx.rapidwright.design.SimpleTileRectangle;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.TileRectangle;
 
+
+/**
+ * Port of a {@link ImplsPath}. Abstract, since we need to differentiate between ports of modules and outside non-module
+ * ports
+ */
 public abstract class ImplsInstancePort {
     private ImplsPath path;
 
@@ -47,7 +52,9 @@ public abstract class ImplsInstancePort {
     }
 
     /**
-f     */
+     * A port that represents a connection to something that is not contained in a module, like IO.
+     * These are not going to be moved around in the placer.
+     */
     public static class SitePinInstPort extends ImplsInstancePort {
         private final SitePinInst sitePinInst;
 
@@ -74,13 +81,17 @@ f     */
             return sitePinInst;
         }
     }
+
+    /**
+     * Port of a {@link ModuleImplsInst}
+     */
     public static class InstPort extends ImplsInstancePort {
-        private final ModuleImplsInstance instance;
+        private final ModuleImplsInst instance;
         private final String port;
         private boolean boundingBoxCalculated;
         private TileRectangle boundingBox;
 
-        public InstPort(ModuleImplsInstance instance, String port) {
+        public InstPort(ModuleImplsInst instance, String port) {
             this.instance = instance;
             this.port = port;
         }
@@ -120,7 +131,7 @@ f     */
             }
         }
 
-        public ModuleImplsInstance getInstance() {
+        public ModuleImplsInst getInstance() {
             return instance;
         }
 

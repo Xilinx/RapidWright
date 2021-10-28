@@ -22,6 +22,12 @@
  */
 package com.xilinx.rapidwright.design;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.design.blocks.PBlockRange;
 import com.xilinx.rapidwright.device.Device;
@@ -31,12 +37,6 @@ import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.util.MessageGenerator;
 import com.xilinx.rapidwright.util.Utils;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * There is no direct representation of a module instance in Vivado. Each member of
@@ -440,7 +440,7 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 
 	private Port findPassthruInput(Port p) {
 		for (String passthroughName : p.getPassThruPortNames()) {
-			Port ptPort = getModule().getPort(p.getPassThruPortNames().get(0));
+			Port ptPort = getModule().getPort(passthroughName);
 			if (!ptPort.isOutPort()) {
 				return ptPort;
 			}
@@ -461,7 +461,6 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 		}
 		// Get net of input port pass-thru
 		if(p.isOutPort() && p.getPassThruPortNames().size() > 0){
-			//TODO Passthrough outputs are bugged when we have multiple GND outputs?
 			Port input = findPassthruInput(p);
 			if (input == null) {
 				return null;
@@ -643,6 +642,7 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 		}
 	}
 
+	@Override
 	public RelocatableTileRectangle getBoundingBox() {
 		return module.getBoundingBox().getCorresponding(getAnchor().getTile(), module.getAnchor().getTile());
 	}

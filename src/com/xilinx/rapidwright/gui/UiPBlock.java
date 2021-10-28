@@ -24,6 +24,9 @@ package com.xilinx.rapidwright.gui;
 import com.trolltech.qt.gui.QColor;
 import com.xilinx.rapidwright.design.TileRectangle;
 
+/**
+ * A named and colored PBlock that can be shown in a {@link PblockScene}
+ */
 public class UiPBlock {
     public final TileRectangle rect;
     public final String name;

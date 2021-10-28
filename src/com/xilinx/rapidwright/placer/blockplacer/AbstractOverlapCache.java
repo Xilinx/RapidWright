@@ -23,20 +23,24 @@ package com.xilinx.rapidwright.placer.blockplacer;
 
 import java.util.Collection;
 
-import com.xilinx.rapidwright.design.ModuleImplsInstance;
+import com.xilinx.rapidwright.design.ModuleImplsInst;
 
+/**
+ * Manages overlap detection inside a Block Placer. This gets called to check if a moved module overlaps any other
+ * modules. It has callbacks to get notified of accepted/rejected moves.
+ */
 public abstract class AbstractOverlapCache {
-    public abstract void unPlace(ModuleImplsInstance mii);
+    public abstract void unplace(ModuleImplsInst mii);
 
-    public abstract void place(ModuleImplsInstance mii);
+    public abstract void place(ModuleImplsInst mii);
 
-    public abstract boolean isValidPlacement(ModuleImplsInstance mii);
+    public abstract boolean isValidPlacement(ModuleImplsInst mii);
 
-    protected boolean doesNotOverlapAny(ModuleImplsInstance mii, Collection<ModuleImplsInstance> l) {
+    protected boolean doesNotOverlapAny(ModuleImplsInst mii, Collection<ModuleImplsInst> l) {
         if (mii.getPlacement() == null) {
             return true;
         }
-        for (ModuleImplsInstance other : l) {
+        for (ModuleImplsInst other : l) {
             if (other == mii) {
                 continue;
             }

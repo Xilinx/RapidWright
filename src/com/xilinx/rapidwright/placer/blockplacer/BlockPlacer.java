@@ -29,8 +29,13 @@ import java.util.HashSet;
 import java.util.Random;
 import java.util.Set;
 
-import com.xilinx.rapidwright.design.*;
+import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Module;
+import com.xilinx.rapidwright.design.ModuleImpls;
+import com.xilinx.rapidwright.design.ModuleInst;
+import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.SiteInst;
+import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
@@ -319,7 +324,7 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
 					currentMove.undoMove();
 					double testCost = currentSystemCost();
 					if(testCost != prevSystemCost){
-						MessageGenerator.briefError("ERROR: 1 Undo move caused improper system cost change: prev=" + prevSystemCost + " incorrect=" + testCost + " move= " + currentMove.toString());
+						MessageGenerator.briefError("ERROR: Undo move caused improper system cost change: prev=" + prevSystemCost + " incorrect=" + testCost + " move= " + currentMove.toString());
 						MessageGenerator.waitOnAnyKeySilent();
 					}
 				}

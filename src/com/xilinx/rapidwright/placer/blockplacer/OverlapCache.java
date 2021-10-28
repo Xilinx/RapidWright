@@ -27,7 +27,7 @@ import java.util.HashSet;
 import java.util.IntSummaryStatistics;
 import java.util.function.Predicate;
 
-import com.xilinx.rapidwright.design.ModuleImplsInstance;
+import com.xilinx.rapidwright.design.ModuleImplsInst;
 import com.xilinx.rapidwright.design.RelocatableTileRectangle;
 import com.xilinx.rapidwright.device.Device;
 
@@ -40,8 +40,8 @@ import com.xilinx.rapidwright.device.Device;
  */
 public class OverlapCache extends AbstractOverlapCache {
     private final Device device;
-    private final Collection<ModuleImplsInstance> instances;
-    private final Collection<ModuleImplsInstance>[][] modulesInArea;
+    private final Collection<ModuleImplsInst> instances;
+    private final Collection<ModuleImplsInst>[][] modulesInArea;
 
     /**
      * Magic Size found by benchmarking
@@ -67,7 +67,7 @@ public class OverlapCache extends AbstractOverlapCache {
         return getRow(device.getRows()-1)+1;
     }
 
-    private boolean allTouchedRegionsMatch(ModuleImplsInstance mii, Predicate<Collection<ModuleImplsInstance>> predicate) {
+    private boolean allTouchedRegionsMatch(ModuleImplsInst mii, Predicate<Collection<ModuleImplsInst>> predicate) {
         final RelocatableTileRectangle bb = mii.getBoundingBox();
 
         final int crMinCol = getColumn(bb.getMinColumn());
@@ -91,7 +91,7 @@ public class OverlapCache extends AbstractOverlapCache {
      * @param mii  the instance
      */
     @Override
-    public void unPlace(ModuleImplsInstance mii) {
+    public void unplace(ModuleImplsInst mii) {
         allTouchedRegionsMatch(mii,l->{l.remove(mii); return true;});
     }
 
@@ -100,11 +100,11 @@ public class OverlapCache extends AbstractOverlapCache {
      * @param mii  the instance
      */
     @Override
-    public void place(ModuleImplsInstance mii) {
+    public void place(ModuleImplsInst mii) {
         allTouchedRegionsMatch(mii,l->{l.add(mii); return true;});
     }
 
-    public OverlapCache(Device device, Collection<ModuleImplsInstance> instances, int size) {
+    public OverlapCache(Device device, Collection<ModuleImplsInst> instances, int size) {
         this.device = device;
         this.instances = instances;
         this.columnDivider = size;
@@ -115,7 +115,7 @@ public class OverlapCache extends AbstractOverlapCache {
                 modulesInArea[col][row] = new HashSet<>();
             }
         }
-        for (ModuleImplsInstance instance : instances) {
+        for (ModuleImplsInst instance : instances) {
             if (instance.getPlacement()!= null) {
                 place(instance);
             }
@@ -123,7 +123,7 @@ public class OverlapCache extends AbstractOverlapCache {
     }
 
     @Override
-    public boolean isValidPlacement(ModuleImplsInstance mii) {
+    public boolean isValidPlacement(ModuleImplsInst mii) {
         return allTouchedRegionsMatch(mii, l-> doesNotOverlapAny(mii, l));
     }
 
@@ -131,23 +131,23 @@ public class OverlapCache extends AbstractOverlapCache {
         boolean error = false;
         for (int col = 0; col < modulesInArea.length; col++) {
             for (int row = 0; row < modulesInArea[col].length; row++) {
-                Collection<ModuleImplsInstance> c = modulesInArea[col][row];
-                for (ModuleImplsInstance moduleImplsInstance : c) {
+                Collection<ModuleImplsInst> c = modulesInArea[col][row];
+                for (ModuleImplsInst moduleImplsInst : c) {
 
-                    if (moduleImplsInstance.getPlacement() == null) {
-                        System.out.println(moduleImplsInstance+" is wrongly in "+col+"/"+row+", is not placed at all");
+                    if (moduleImplsInst.getPlacement() == null) {
+                        System.out.println(moduleImplsInst +" is wrongly in "+col+"/"+row+", is not placed at all");
                         error = true;
                         continue;
                     }
 
-                    final int minCol = getColumn(moduleImplsInstance.getBoundingBox().getMinColumn());
-                    final int maxCol = getColumn(moduleImplsInstance.getBoundingBox().getMaxColumn());
-                    final int minRow = getRow(moduleImplsInstance.getBoundingBox().getMinRow());
-                    final int maxRow = getRow(moduleImplsInstance.getBoundingBox().getMaxRow());
+                    final int minCol = getColumn(moduleImplsInst.getBoundingBox().getMinColumn());
+                    final int maxCol = getColumn(moduleImplsInst.getBoundingBox().getMaxColumn());
+                    final int minRow = getRow(moduleImplsInst.getBoundingBox().getMinRow());
+                    final int maxRow = getRow(moduleImplsInst.getBoundingBox().getMaxRow());
                     boolean shouldBeIn = minCol <= col && col <= maxCol && minRow <= row && row <= maxRow;
 
                     if (!shouldBeIn) {
-                        System.out.println(moduleImplsInstance+" is wrongly in "+col+"/"+row);
+                        System.out.println(moduleImplsInst +" is wrongly in "+col+"/"+row);
                         error = true;
                     }
                 }
@@ -155,20 +155,20 @@ public class OverlapCache extends AbstractOverlapCache {
             }
         }
 
-        for (ModuleImplsInstance moduleImplsInstance : instances) {
-            for (ModuleImplsInstance other : instances) {
-                if (other != moduleImplsInstance && other.overlaps(moduleImplsInstance)) {
-                    System.out.println(moduleImplsInstance+" overlaps "+other);
+        for (ModuleImplsInst moduleImplsInst : instances) {
+            for (ModuleImplsInst other : instances) {
+                if (other != moduleImplsInst && other.overlaps(moduleImplsInst)) {
+                    System.out.println(moduleImplsInst +" overlaps "+other);
                     error = true;
                 }
 
             }
 
-            if (moduleImplsInstance.getPlacement() == null) {
+            if (moduleImplsInst.getPlacement() == null) {
                 continue;
             }
 
-            final RelocatableTileRectangle bb = moduleImplsInstance.getBoundingBox();
+            final RelocatableTileRectangle bb = moduleImplsInst.getBoundingBox();
             final int crMinCol = getColumn(bb.getMinColumn());
             final int crMaxCol = getColumn(bb.getMaxColumn());
             final int crMinRow = getRow(bb.getMinRow());
@@ -176,9 +176,9 @@ public class OverlapCache extends AbstractOverlapCache {
 
             for (int col = crMinCol ; col <= crMaxCol; col++) {
                 for (int row = crMinRow; row <= crMaxRow; row++) {
-                    Collection<ModuleImplsInstance> c = modulesInArea[col][row];
-                    if (!c.contains(moduleImplsInstance)) {
-                        System.out.println(moduleImplsInstance+" should be in "+col+"/"+row);
+                    Collection<ModuleImplsInst> c = modulesInArea[col][row];
+                    if (!c.contains(moduleImplsInst)) {
+                        System.out.println(moduleImplsInst +" should be in "+col+"/"+row);
                         error = true;
                     }
                 }

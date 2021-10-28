@@ -2604,7 +2604,7 @@ public class DesignTools {
     }
 
 	/**
-	 * Create a {@link ModuleImplsInstance}, i.e. a Module instance with flexible implementation. If an edif cell inst
+	 * Create a {@link ModuleImplsInst}, i.e. a Module instance with flexible implementation. If an edif cell inst
 	 * of the given name already exists in the design hierarchy, it will be used for the module. Otherwise, a new
 	 * EDIF Cell Inst will be created.
 	 * @param design the design
@@ -2612,12 +2612,18 @@ public class DesignTools {
 	 * @param module the module to use
 	 * @return the newly created instance
 	 */
-	public static ModuleImplsInstance createModuleImplsInstance(Design design, String name, ModuleImpls module) {
+	public static ModuleImplsInst createModuleImplsInstance(Design design, String name, ModuleImpls module) {
 		EDIFCellInst cell = design.createOrFindEDIFCellInst(name, module.getNetlist().getTopCell());
-		return new ModuleImplsInstance(name, cell, module);
+		return new ModuleImplsInst(name, cell, module);
 	}
 
-	private static Net findPortNet(ImplsInstancePort port, Map<ModuleImplsInstance, ModuleInst> instanceMap) {
+	/**
+	 * Find the physical net corresponding to a {@link ModuleImplsInst}'s port
+	 * @param port the port to find the net for
+	 * @param instanceMap map from {@link ModuleImplsInst} to the corresponding real {@link ModuleInst}
+	 * @return the physical net. This can only be null if the port has no pins
+	 */
+	private static Net findPortNet(ImplsInstancePort port, Map<ModuleImplsInst, ModuleInst> instanceMap) {
 		if (port instanceof ImplsInstancePort.SitePinInstPort) {
 			SitePinInst spi = ((ImplsInstancePort.SitePinInstPort) port).getSitePinInst();
 			Net net = spi.getNet();
@@ -2654,15 +2660,15 @@ public class DesignTools {
 	}
 
 	/**
-	 * In a design containing {@link ModuleImplsInstance}s, convert them into {@link ModuleInst}s so that the design
+	 * In a design containing {@link ModuleImplsInst}s, convert them into {@link ModuleInst}s so that the design
 	 * can be exported to a checkpoint
 	 * @param design the design
 	 * @param instances the instances to be converted
 	 * @param paths nets connecting the instances as returned by {@link BlockPlacer2Impls#getPaths()}
 	 */
-	public static void createModuleInstsFromModuleImplsInsts(Design design, Collection<ModuleImplsInstance> instances, Collection<ImplsPath> paths) {
-		Map<ModuleImplsInstance, ModuleInst> instanceMap = new HashMap<>();
-		for (ModuleImplsInstance implsInst : instances) {
+	public static void createModuleInstsFromModuleImplsInsts(Design design, Collection<ModuleImplsInst> instances, Collection<ImplsPath> paths) {
+		Map<ModuleImplsInst, ModuleInst> instanceMap = new HashMap<>();
+		for (ModuleImplsInst implsInst : instances) {
 			ModuleInst modInst = design.createModuleInst(implsInst.getName(), implsInst.getCurrentModuleImplementation());
 			boolean success = modInst.place(implsInst.getPlacement().placement);
 			if (!success) {

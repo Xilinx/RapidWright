@@ -248,15 +248,6 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
     @Override
     protected void populateAllPaths(){
         for(Net net : design.getNets()){
-			/*if(checkCriticalNet(net.getName())){
-				System.out.println("found");
-				try{
-					System.in.read();
-				}
-				catch(IOException e){
-					e.printStackTrace();
-				}
-			}*/
             if(net.isStaticNet() || net.isClockNet()) continue;
             SitePinInst src = net.getSource();
             ArrayList<SitePinInst> snks = new ArrayList<SitePinInst>();

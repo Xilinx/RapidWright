@@ -29,9 +29,13 @@ import java.util.stream.Stream;
 
 import com.xilinx.rapidwright.debug.DotGraphDumper;
 import com.xilinx.rapidwright.design.Design;
-import com.xilinx.rapidwright.design.ModuleImplsInstance;
+import com.xilinx.rapidwright.design.ModuleImplsInst;
 
-public class DotModuleImplsDumper extends DotGraphDumper<ModuleImplsInstance, ImplsInstancePort, Void, ImplsPath, DotModuleImplsDumper.ModuleImplsDumpData> {
+
+/**
+ * Dump a Design's {@link ModuleImplsInst} representation to a Graphviz Dot Graph
+ */
+public class DotModuleImplsDumper extends DotGraphDumper<ModuleImplsInst, ImplsInstancePort, Void, ImplsPath, DotModuleImplsDumper.ModuleImplsDumpData> {
     public DotModuleImplsDumper(boolean makeNetNode) {
         super(makeNetNode);
     }
@@ -42,18 +46,18 @@ public class DotModuleImplsDumper extends DotGraphDumper<ModuleImplsInstance, Im
     }
 
     @Override
-    protected Stream<ModuleImplsInstance> getInstances(ModuleImplsDumpData design) {
+    protected Stream<ModuleImplsInst> getInstances(ModuleImplsDumpData design) {
         return design.modules.stream();
     }
 
 
     @Override
-    protected Stream<ImplsInstancePort.InstPort> getPorts(ModuleImplsInstance instance) {
+    protected Stream<ImplsInstancePort.InstPort> getPorts(ModuleImplsInst instance) {
         return instance.getPorts().stream();
     }
 
     @Override
-    protected Stream<Void> getPortTemplates(ModuleImplsInstance instance) {
+    protected Stream<Void> getPortTemplates(ModuleImplsInst instance) {
         return Stream.empty();
     }
 
@@ -78,7 +82,7 @@ public class DotModuleImplsDumper extends DotGraphDumper<ModuleImplsInstance, Im
     }
 
     @Override
-    protected String getInstanceName(ModuleImplsInstance instance) {
+    protected String getInstanceName(ModuleImplsInst instance) {
         return instance.getName();
     }
 
@@ -103,12 +107,12 @@ public class DotModuleImplsDumper extends DotGraphDumper<ModuleImplsInstance, Im
     }
 
     @Override
-    protected Map<?, ?> getInstanceProperties(ModuleImplsInstance instance, ModuleImplsDumpData design) {
+    protected Map<?, ?> getInstanceProperties(ModuleImplsInst instance, ModuleImplsDumpData design) {
         return null;
     }
 
     @Override
-    protected ModuleImplsInstance getPortInstance(ImplsInstancePort port) {
+    protected ModuleImplsInst getPortInstance(ImplsInstancePort port) {
         if (port instanceof ImplsInstancePort.InstPort) {
             return ((ImplsInstancePort.InstPort) port).getInstance();
         }
@@ -117,12 +121,12 @@ public class DotModuleImplsDumper extends DotGraphDumper<ModuleImplsInstance, Im
 
     public static class ModuleImplsDumpData {
         final Design design;
-        final List<ModuleImplsInstance> modules;
+        final List<ModuleImplsInst> modules;
         final Collection<ImplsPath> paths;
-        final Map<ModuleImplsInstance, Set<ImplsPath>> modulesToPaths;
+        final Map<ModuleImplsInst, Set<ImplsPath>> modulesToPaths;
 
 
-        public ModuleImplsDumpData(Design design, List<ModuleImplsInstance> modules, Collection<ImplsPath> paths, Map<ModuleImplsInstance, Set<ImplsPath>> modulesToPaths) {
+        public ModuleImplsDumpData(Design design, List<ModuleImplsInst> modules, Collection<ImplsPath> paths, Map<ModuleImplsInst, Set<ImplsPath>> modulesToPaths) {
             this.design = design;
             this.modules = modules;
             this.paths = paths;

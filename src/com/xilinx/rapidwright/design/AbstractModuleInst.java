@@ -45,6 +45,8 @@ public abstract class AbstractModuleInst<ModuleT, T extends AbstractModuleInst<M
         this.name = name;
     }
 
+    public abstract void unplace();
+
     public abstract ModuleT getModule();
 
     /**
@@ -175,14 +177,6 @@ public abstract class AbstractModuleInst<ModuleT, T extends AbstractModuleInst<M
      */
 
     public void connect(String portName, int busIndex0, T other, String otherPortName, int busIndex1){
-        String modName = other!=null ? other.getName() : "<root>";
-        String bus0Str = busIndex0 == -1 ? "" : ("["+busIndex0+"]");
-        String bus1Str = busIndex1 == -1 ? "" : ("["+busIndex1+"]");
-
-        //TODO same cell?
-        //EDIFCell top = design.getTopEDIFCell();
-        //EDIFCellInst eci0 = top.getCellInst(getName());
-
         EDIFCell top = cellInst.getParentCell();
         EDIFCellInst eci0 = cellInst;
         if(eci0 == null) throw new RuntimeException("ERROR: Couldn't find logical cell instance for " + getName());
@@ -202,7 +196,6 @@ public abstract class AbstractModuleInst<ModuleT, T extends AbstractModuleInst<M
 
             return;
         }
-        //EDIFCellInst eci1 = top.getCellInst(other.getName());
         EDIFCellInst eci1 = other.getCellInst();
         if(eci1 == null) throw new RuntimeException("ERROR: Couldn't find logical cell instance for " + getName());
 
@@ -211,4 +204,6 @@ public abstract class AbstractModuleInst<ModuleT, T extends AbstractModuleInst<M
         net.createPortInst(portName, busIndex0, eci0);
         net.createPortInst(otherPortName, busIndex1, eci1);
     }
+
+    public abstract RelocatableTileRectangle getBoundingBox();
 }

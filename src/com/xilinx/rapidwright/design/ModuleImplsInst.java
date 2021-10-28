@@ -38,25 +38,26 @@ import com.xilinx.rapidwright.placer.blockplacer.ImplsInstancePort;
  * This is achieved by calling {@link DesignTools#createModuleInstsFromModuleImplsInsts(Design, Collection, Collection)}
  *
  */
-public class ModuleImplsInstance extends AbstractModuleInst<ModuleImpls, ModuleImplsInstance> {
+public class ModuleImplsInst extends AbstractModuleInst<ModuleImpls, ModuleImplsInst> {
     final ModuleImpls module;
     private ModulePlacement placement;
 
     private final Map<String, ImplsInstancePort.InstPort> ports;
 
 
-    public ModuleImplsInstance(String name, EDIFCellInst cellInst, ModuleImpls module) {
+    public ModuleImplsInst(String name, EDIFCellInst cellInst, ModuleImpls module) {
         super(name, cellInst);
         this.module = module;
         ports = module.get(0).getPorts().stream()
                 .collect(Collectors.toMap(Port::getName, p->new ImplsInstancePort.InstPort(this, p.getName())));
     }
 
-    public ModuleImplsInstance(String name, ModuleImpls module) {
+    public ModuleImplsInst(String name, ModuleImpls module) {
         this(name, null, module);
     }
 
-    public void unPlace() {
+    @Override
+    public void unplace() {
         placement = null;
         boundingBox = null;
         for (ImplsInstancePort.InstPort port : ports.values()) {
@@ -69,7 +70,7 @@ public class ModuleImplsInstance extends AbstractModuleInst<ModuleImpls, ModuleI
     }
 
     public void place(ModulePlacement placement) {
-        unPlace();
+        unplace();
         this.placement = placement;
     }
 
@@ -85,7 +86,7 @@ public class ModuleImplsInstance extends AbstractModuleInst<ModuleImpls, ModuleI
         return module.get(getPlacement().implementationIndex);
     }
 
-    public boolean overlaps(ModuleImplsInstance other) {
+    public boolean overlaps(ModuleImplsInst other) {
         return getBoundingBox().overlaps(other.getBoundingBox());
     }
 

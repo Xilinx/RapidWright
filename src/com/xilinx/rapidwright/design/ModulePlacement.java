@@ -25,6 +25,10 @@ import java.util.Objects;
 
 import com.xilinx.rapidwright.device.Site;
 
+/**
+ * A placement of a {@link ModuleImplsInst}. This consists of implementation index (indexes into the list
+ * of implementations of the corresponding {@link ModuleImpls}) as well as an anchor Site.
+ */
 public class ModulePlacement {
     public final int implementationIndex;
     public final Site placement;
