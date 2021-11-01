@@ -45,6 +45,10 @@ dependencies {
 }
 
 abstract class UpdateJarsTask extends DefaultTask {
+    UpdateJarsTask() {
+        group = "build setup"
+        description = "Download Jar Dependencies"
+    }
     @TaskAction
     def updateJars() {
     	def f = new File('rapidwright-installer.jar')
