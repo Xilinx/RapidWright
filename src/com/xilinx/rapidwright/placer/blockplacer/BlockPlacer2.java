@@ -376,15 +376,6 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 
 	protected abstract void doFinalPlacement();
 
-	public void printMaxColumn(Design design, String stage) {
-
-		int newMax = hardMacros.stream().mapToInt(mi -> {
-			Tile tile = getCurrentAnchorTile(mi);
-			return tile.getColumn();
-		}).max().orElse(0);
-		System.out.println("max Column at "+stage+" = " + newMax);
-	}
-
 	protected abstract Tile getCurrentAnchorTile(ModuleInstT mi);
 
 	protected abstract PlacementT getTempAnchorSite(ModuleInstT mi);
@@ -400,7 +391,6 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 		start = System.currentTimeMillis();
 		initializePlacer(debugFlow);
 		initialPlacement();
-		printMaxColumn(design, "initial placement");
 		//HandPlacer.openDesign(design);
 		int totalFootprint = 0;
 		for(ModuleInstT hm : hardMacros){
@@ -430,7 +420,6 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 			maxInnerIteration = 0;
 		}
 		OUTER: while(!finished){
-			printMaxColumn(design, "loop");
 			temperatureStep(maxInnerIteration);
 
 			rangeLimit = rangeLimit * (1.0-goldenRate + moveAcceptanceRate);
@@ -518,10 +507,8 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 		*/
 		//MessageGenerator.waitOnAnyKey();
 
-		printMaxColumn(design, "before final");
 		doFinalPlacement();
 
-		printMaxColumn(design, "after final");
 
 		if (graphDataWriter != null) {
 			graphDataWriter.close();

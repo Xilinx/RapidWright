@@ -271,8 +271,6 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
                     newPath.addPin(snk, macroMap);
                 }
                 allPaths.add(newPath);
-            } else {
-                System.out.println("empty net: "+net.getName());
             }
         }
 
