@@ -1,12 +1,14 @@
 package com.xilinx.rapidwright.examples;
 
-import java.io.File;
-import java.io.FilenameFilter;
-import java.util.Arrays;
-
+import com.xilinx.rapidwright.design.AbstractModuleInst;
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Module;
+import com.xilinx.rapidwright.design.ModuleImpls;
+import com.xilinx.rapidwright.design.ModuleImplsInst;
 import com.xilinx.rapidwright.design.ModuleInst;
+import com.xilinx.rapidwright.design.ModulePlacement;
+import com.xilinx.rapidwright.design.RelocatableTileRectangle;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Site;
@@ -17,9 +19,29 @@ import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFDirection;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.placer.blockplacer.BlockPlacer2;
+import com.xilinx.rapidwright.placer.blockplacer.BlockPlacer2Impls;
+import com.xilinx.rapidwright.placer.blockplacer.BlockPlacer2Module;
 import com.xilinx.rapidwright.placer.handplacer.HandPlacer;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.FileTools;
+import joptsimple.ArgumentAcceptingOptionSpec;
+import joptsimple.OptionParser;
+import joptsimple.OptionSet;
+import joptsimple.OptionSpec;
+
+import java.io.File;
+import java.io.FilenameFilter;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class PicoBlazeArray {
 
@@ -54,122 +76,279 @@ public class PicoBlazeArray {
 			}
 		}
 	}
-	
+
+	public static abstract class PicoBlazeArrayCreator<T extends AbstractModuleInst<?,T>> {
+
+		public List<T> getInstances() {
+			return instances;
+		}
+
+		private final List<T> instances = new ArrayList<>();
+
+		private String makeName(int x, int y) {
+			return PICOBLAZE_PREFIX + x + "_" + y;
+		}
+
+		protected abstract T createInstance(Design design, String name, Module impl, ModuleImpls impls);
+		public Design createDesign(File srcDir, String deviceName, CodePerfTracker t) {
+
+			t.start("Creating design");
+			// Create a new design with references to device and netlist
+			Design design = new Design("top", deviceName);
+			Device device = design.getDevice();
+			EDIFNetlist netlist = design.getNetlist();
+			EDIFCell top = netlist.getTopCell();
+
+			// Load pre-implemented modules
+			FilenameFilter ff = FileTools.getFilenameFilter(PBLOCK_DCP_PREFIX+"[0-9]+.dcp");
+			int implementationCount = srcDir.list(ff).length;
+			ModuleImpls picoBlazeImpls = new ModuleImpls();
+
+			EDIFNetlist moduleNetlist = null;
+			for(int i=0; i < implementationCount; i++){
+				String dcpName = srcDir + File.separator + PBLOCK_DCP_PREFIX+i+".dcp";
+				String metaName = srcDir + File.separator + PBLOCK_DCP_PREFIX+i+"_"+i+"_metadata.txt";
+				t.stop().start("Loading " + PBLOCK_DCP_PREFIX+i+".dcp");
+
+				Design d;
+				//Make sure to only read the netlist once
+				if (moduleNetlist == null) {
+					d = Design.readCheckpoint(dcpName,CodePerfTracker.SILENT);
+					moduleNetlist = d.getNetlist();
+				} else {
+					d = new Design(moduleNetlist);
+					d.updateDesignWithCheckpointPlaceAndRoute(dcpName);
+				}
+
+				Module mod = new Module(d, metaName);
+				updateAnchorToBRAM(mod);
+				picoBlazeImpls.add(mod);
+			}
+			netlist.migrateCellAndSubCells(moduleNetlist.getTopCell());
+
+			t.stop().start("Place PicoBlaze modules");
+
+
+			// Specify placement of picoblaze modules
+			TileColumnPattern bramPattern = TileColumnPattern.createTileColumnPattern(Arrays.asList(TileTypeEnum.BRAM));
+			int bramColumns = TileColumnPattern.genColumnPatternMap(device).get(bramPattern).size();
+			int bramRows = design.getDevice().getNumOfClockRegionRows() * BRAMS_IN_CLOCK_REGION_HEIGHT;
+
+			Map<String, T> instances = new HashMap<>();
+
+			for(int x=0; x < bramColumns; x++){
+				// we will skip top and bottom clock region rows to avoid laguna tiles and U-turn routing
+				for(int y=BRAMS_IN_CLOCK_REGION_HEIGHT; y < bramRows-BRAMS_IN_CLOCK_REGION_HEIGHT; y++){
+					Site bram = device.getSite("RAMB36_X" + x + "Y" + y);
+					Module impl = null;
+					for(Module m : picoBlazeImpls){
+						if(canCreateModuleAtSite(design, bram, m, instances.values())){
+							impl = m;
+							break;
+						}
+					}
+					if(impl == null) continue; // Laguna site
+
+					T mi = createInstance(design, makeName(x,y), impl, picoBlazeImpls);
+
+					instances.put(mi.getName(), mi);
+					mi.getCellInst().setCellType(impl.getNetlist().getTopCell());
+
+					placeInArray(mi, bram, impl);
+
+					this.instances.add(mi);
+				}
+			}
+
+			t.stop().start("Stitch design");
+
+			// Create clk and rst
+			String bufgInstName = "bufgce_inst";
+			SLRCrosserGenerator.createBUFGCE(design, CLK, CLK + "in", CLK + "out", bufgInstName);
+			SLRCrosserGenerator.placeBUFGCE(design, device.getSite("BUFGCE_X0Y8"), bufgInstName);
+			EDIFNet clk = top.getNet(CLK);
+			top.createPort(RST, EDIFDirection.INPUT, 1);
+
+			// Connect pre-implemented modules together
+			String busRange = "["+(PICOBLAZE_BUS_WIDTH-1)+":0]";
+			for(int x=0; x < bramColumns; x++){
+				top.createPort(TOP_INPUT_PREFIX + x + busRange, EDIFDirection.INPUT, PICOBLAZE_BUS_WIDTH);
+				top.createPort(TOP_OUTPUT_PREFIX + x + busRange, EDIFDirection.OUTPUT, PICOBLAZE_BUS_WIDTH);
+				// we will skip top and bottom clock region rows to avoid laguna tiles and U-turn routing
+				for(int y=BRAMS_IN_CLOCK_REGION_HEIGHT; y < bramRows-BRAMS_IN_CLOCK_REGION_HEIGHT; y++){
+					T curr = instances.get(makeName(x, y));
+					if(curr==null) continue;
+
+					clk.createPortInst(CLK, curr.getCellInst());
+					curr.connect(RST, RST);
+
+					for(int i=0; i < PICOBLAZE_BUS_WIDTH; i++){
+						for(int j=0; j < CONN_ARRAY.length; j++){
+							T other = instances.get(makeName(x, y + CONN_ARRAY[j]));
+							if(other == null){
+								curr.connect(PICOBLAZE_INPUTS [j], TOP_INPUT_PREFIX  + x, i);
+								if(y == bramRows-BRAMS_IN_CLOCK_REGION_HEIGHT-1 && j==3){
+									curr.connect(PICOBLAZE_OUTPUTS[j], TOP_OUTPUT_PREFIX + x, i);
+								}
+							}else{
+								curr.connect(PICOBLAZE_INPUTS [j], other, PICOBLAZE_OUTPUTS[CONN_ARRAY.length-j-1], i);
+							}
+						}
+					}
+				}
+			}
+			return design;
+		}
+
+		protected boolean canCreateModuleAtSite(Design design, Site anchor, Module m, Collection<T> instances) {
+			//This already checks overlaps with other Module Instances. But not if we are using ModuleImplsInsts.
+			return m.isValidPlacement(anchor, design);
+		}
+
+		protected abstract void placeInArray(T mi, Site bram, Module impl);
+		public abstract BlockPlacer2<?, ? extends T, ?, ?> createPlacer(Design design, Path graphDataFile);
+
+		public abstract void lowerToModules(Design design, CodePerfTracker t);
+	}
+
 	/**
-	 * Part of an example tutorial of how to build an array of picoblaze modules. 
+	 * Part of an example tutorial of how to build an array of picoblaze modules.
 	 * @param args
 	 */
 	public static void main(String[] args) {
-		if(args.length != 3 && args.length != 4){
-			System.out.println("USAGE: <pblock dcp directory> <part> <output_dcp> [--no_hand_placer]");
-			return;
-		}
-		String srcDirName = args[0];
-		File srcDir = new File(srcDirName);
-		if(!srcDir.isDirectory()){
-			throw new RuntimeException("ERROR: Couldn't read directory: " + srcDir);
-		}
-		CodePerfTracker t = new CodePerfTracker("PicoBlaze Array", true).start("Creating design");
-		
-		// Create a new design with references to device and netlist
-		Design design = new Design("top", args[1]);
-		Device device = design.getDevice();
-		EDIFNetlist netlist = design.getNetlist();
-		EDIFCell top = netlist.getTopCell();
-		
-		// Load pre-implemented modules
-		FilenameFilter ff = FileTools.getFilenameFilter(PBLOCK_DCP_PREFIX+"[0-9]+.dcp");
-		int implementationCount = srcDir.list(ff).length;
-		Module[] picoBlazeImpls = new Module[implementationCount];
-		for(int i=0; i < implementationCount; i++){
-			String dcpName = srcDir + File.separator + PBLOCK_DCP_PREFIX+i+".dcp";
-			String metaName = srcDir + File.separator + PBLOCK_DCP_PREFIX+i+"_"+i+"_metadata.txt";
-			t.stop().start("Loading " + PBLOCK_DCP_PREFIX+i+".dcp");
-			picoBlazeImpls[i] = new Module(Design.readCheckpoint(dcpName,CodePerfTracker.SILENT), metaName);
-			updateAnchorToBRAM(picoBlazeImpls[i]);
-			netlist.migrateCellAndSubCells(picoBlazeImpls[i].getNetlist().getTopCell());
-		}
-		
-		t.stop().start("Place PicoBlaze modules");
-		
-		// Specify placement of picoblaze modules
-		TileColumnPattern bramPattern = TileColumnPattern.createTileColumnPattern(Arrays.asList(TileTypeEnum.BRAM));
-		int bramColumns = TileColumnPattern.genColumnPatternMap(device).get(bramPattern).size();
-		int bramRows = design.getDevice().getNumOfClockRegionRows() * BRAMS_IN_CLOCK_REGION_HEIGHT;
-		for(int x=0; x < bramColumns; x++){
-			// we will skip top and bottom clock region rows to avoid laguna tiles and U-turn routing
-			for(int y=BRAMS_IN_CLOCK_REGION_HEIGHT; y < bramRows-BRAMS_IN_CLOCK_REGION_HEIGHT; y++){ 
-				Site bram = device.getSite("RAMB36_X" + x + "Y" + y);
-				Module impl = null;
-				for(Module m : picoBlazeImpls){
-					if(m.isValidPlacement(bram, device, design)){
-						impl = m;
-						break;
-					}
-				}
-				if(impl == null) continue; // Laguna site
-				ModuleInst mi = design.createModuleInst("picoblaze_"+x+"_"+y, impl);
-				mi.getCellInst().setCellType(impl.getNetlist().getTopCell());
-				if(!mi.place(bram)) {
-				    throw new RuntimeException("ERROR: Failed to place module instance " + mi);
-				}
-			}
-		}
-		
-		t.stop().start("Stitch design");
-		
-		// Create clk and rst
-		String bufgInstName = "bufgce_inst";
-		SLRCrosserGenerator.createBUFGCE(design, CLK, CLK + "in", CLK + "out", bufgInstName);
-		SLRCrosserGenerator.placeBUFGCE(design, device.getSite("BUFGCE_X0Y8"), bufgInstName);
-		EDIFNet clk = top.getNet(CLK);
-		top.createPort(RST, EDIFDirection.INPUT, 1);		
-		
-		// Connect pre-implemented modules together
-		String busRange = "["+(PICOBLAZE_BUS_WIDTH-1)+":0]";
-		for(int x=0; x < bramColumns; x++){
-			top.createPort(TOP_INPUT_PREFIX + x + busRange, EDIFDirection.INPUT, PICOBLAZE_BUS_WIDTH);
-			top.createPort(TOP_OUTPUT_PREFIX + x + busRange, EDIFDirection.OUTPUT, PICOBLAZE_BUS_WIDTH);
-			// we will skip top and bottom clock region rows to avoid laguna tiles and U-turn routing
-			for(int y=BRAMS_IN_CLOCK_REGION_HEIGHT; y < bramRows-BRAMS_IN_CLOCK_REGION_HEIGHT; y++){ 
-				ModuleInst curr = getPicoblazeInst(design, x, y);
-				if(curr==null) continue;
-				
-				clk.createPortInst(CLK, curr.getCellInst());
-				curr.connect(RST, RST);
-				
-				for(int i=0; i < PICOBLAZE_BUS_WIDTH; i++){
-					for(int j=0; j < CONN_ARRAY.length; j++){
-						ModuleInst other = getPicoblazeInst(design, x, y+CONN_ARRAY[j]);
-						if(other == null){
-							curr.connect(PICOBLAZE_INPUTS [j], TOP_INPUT_PREFIX  + x, i);
-							if(y == bramRows-BRAMS_IN_CLOCK_REGION_HEIGHT-1 && j==3){
-								curr.connect(PICOBLAZE_OUTPUTS[j], TOP_OUTPUT_PREFIX + x, i);
-							}
-						}else{
-							curr.connect(PICOBLAZE_INPUTS [j], other, PICOBLAZE_OUTPUTS[CONN_ARRAY.length-j-1], i);
-						}						
-					}
-				}
-			}
-		}
-		
+		OptionParser optionParser = new OptionParser();
+		ArgumentAcceptingOptionSpec<String> dirOption = optionParser.accepts("dir", "Module Impls input dir").withRequiredArg().required();
+		ArgumentAcceptingOptionSpec<String> partOption = optionParser.accepts("part", "Part to use").withRequiredArg().required();
+		ArgumentAcceptingOptionSpec<String> outOption = optionParser.accepts("out", "Output DCP Filename").withRequiredArg().required();
+		OptionSpec<?> blockPlacerOption = optionParser.accepts("block_placer", "Place Instances via Block Placer");
+		OptionSpec<?> handPlacerOption = optionParser.accepts("hand_placer", "Enable Hand Placer");
+		OptionSpec<?> implsOption = optionParser.accepts("impls", "Use Impls instead of Modules");
 
-		
-		if(!(args.length == 4 && args[3].equals("--no_hand_placer"))){
-			t.stop().start("Hand Placer");
-			HandPlacer.openDesign(design);
+
+		OptionSet options;
+		try {
+			options = optionParser.parse(args);
+		} catch (RuntimeException e) {
+			try {
+				optionParser.printHelpOn(System.out);
+			} catch (IOException ioException) {
+				throw new UncheckedIOException(ioException);
+			}
+			throw e;
 		}
-		
+
+		String srcDirName = options.valueOf(dirOption);
+		File srcDir = new File(srcDirName);
+		if (!srcDir.isDirectory()) {
+						throw new RuntimeException("ERROR: Couldn't read directory: " + srcDir);
+		}
+		String part = options.valueOf(partOption);
+		Path outName = Paths.get(options.valueOf(outOption));
+		boolean handPlacer = options.has(handPlacerOption);
+		boolean useImpls = options.has(implsOption);
+		CodePerfTracker t = new CodePerfTracker("PicoBlaze Array", true);
+		t.useGCToTrackMemory(true);
+
+
+		PicoBlazeArrayCreator<?> creator;
+
+		if (useImpls) {
+			creator = makeImplsCreator();
+		} else {
+			creator = makeModuleCreator();
+		}
+
+		Design design = creator.createDesign(srcDir, part, t);
+
+		if (options.has(blockPlacerOption)) {
+			t.stop().start("BlockPlacer");
+			Path graphDataFile = FileTools.replaceExtension(outName, "_graph.tsv");
+			creator.createPlacer(design, graphDataFile).placeDesign(false);
+		}
+
+		creator.lowerToModules(design, t);
+
+		if (handPlacer) {
+			t.stop().start("Hand Placer");
+			System.out.println("start hand placer");
+			HandPlacer.openDesign(design);
+			System.out.println("finish hand placer");
+		}
+
 		t.stop().start("Write DCP");
-		
+
 		design.setAutoIOBuffers(false);
-		design.addXDCConstraint("create_clock -name "+CLK+" -period 2.850 [get_nets "+CLK+"]");
-		design.writeCheckpoint(args[2], CodePerfTracker.SILENT);
+		design.addXDCConstraint("create_clock -name " + CLK + " -period 2.850 [get_nets " + CLK + "]");
+		design.writeCheckpoint(outName, CodePerfTracker.SILENT);
 		t.stop().printSummary();
 	}
-	
-	private static ModuleInst getPicoblazeInst(Design design, int x, int y){
-		return design.getModuleInst(PICOBLAZE_PREFIX + x + "_" + y);
+
+	public static PicoBlazeArrayCreator<ModuleInst> makeModuleCreator() {
+		return new PicoBlazeArrayCreator<ModuleInst>() {
+			@Override
+			protected ModuleInst createInstance(Design design, String name, Module impl, ModuleImpls impls) {
+				return design.createModuleInst(name, impl);
+			}
+
+			@Override
+			protected void placeInArray(ModuleInst mi, Site bram, Module impl) {
+				mi.place(bram);
+			}
+
+			@Override
+			public BlockPlacer2<?, ? extends ModuleInst, ?, ?> createPlacer(Design design, Path graphDataFile) {
+				return new BlockPlacer2Module(design, true, graphDataFile);
+			}
+
+			@Override
+			public void lowerToModules(Design design, CodePerfTracker t) {
+				//Nothing to do
+			}
+		};
 	}
+
+	public static PicoBlazeArrayCreator<ModuleImplsInst> makeImplsCreator() {
+		return new PicoBlazeArrayCreator<ModuleImplsInst>() {
+
+			private BlockPlacer2Impls placer;
+
+			@Override
+			protected ModuleImplsInst createInstance(Design design, String name, Module impl, ModuleImpls impls) {
+				return DesignTools.createModuleImplsInstance(design, name, impls);
+			}
+
+			@Override
+			protected void placeInArray(ModuleImplsInst mi, Site bram, Module impl) {
+				mi.place(new ModulePlacement(impl.getImplementationIndex(), bram));
+			}
+
+			@Override
+			public BlockPlacer2<?, ModuleImplsInst, ?, ?> createPlacer(Design design, Path graphDataFile) {
+				placer = new BlockPlacer2Impls(design, getInstances(), true, graphDataFile);
+				return placer;
+			}
+
+			@Override
+			public void lowerToModules(Design design, CodePerfTracker t) {
+				t.stop().start("Lower to Modules");
+				if (placer == null) {
+					createPlacer(design, null);
+					placer.initializePlacer(false);
+				}
+				DesignTools.createModuleInstsFromModuleImplsInsts(design, getInstances(), placer.getPaths());
+			}
+
+			@Override
+			protected boolean canCreateModuleAtSite(Design design, Site anchor, Module m, Collection<ModuleImplsInst> instances) {
+				//Only checks if placement is possible at all, not taking overlaps into account
+				if (!super.canCreateModuleAtSite(design, anchor, m, instances)) {
+					return false;
+				}
+				//Check for overlaps
+				RelocatableTileRectangle bb = m.getBoundingBox().getCorresponding(anchor.getTile(), m.getAnchor().getTile());
+				return instances.stream().noneMatch(other -> other.getBoundingBox().overlaps(bb));
+			}
+		};
+	}
+
 }

@@ -380,7 +380,7 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 
 	protected abstract PlacementT getTempAnchorSite(ModuleInstT mi);
 
-	public Design placeDesign(boolean debugFlow){
+	public double placeDesign(boolean debugFlow){
 		rand = new Random(seed);
 		boolean finished = false;
 		int maxInnerIteration = 0;
@@ -513,7 +513,7 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 		if (graphDataWriter != null) {
 			graphDataWriter.close();
 		}
-		return design;
+		return finalSystemCost;
 	}
 
 	private void temperatureStep(int maxInnerIteration) {
