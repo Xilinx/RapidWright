@@ -1398,7 +1398,8 @@ public class EDIFNetlist extends EDIFName {
 				final EDIFHierPortInst hierPort = new EDIFHierPortInst(curr.getHierarchicalInst(), portInst);
 				if(portInst.isTopLevelPort()){
 					// Going up in hierarchy
-					final EDIFHierNet hierarchicalNet = hierPort.getPortInParent().getHierarchicalNet();
+					final EDIFHierNet hierarchicalNet = hierPort.getHierarchicalInst().isTopLevelInst() ?
+					        null : hierPort.getPortInParent().getHierarchicalNet();
 					if (hierarchicalNet == null) {
 						continue;
 					}
