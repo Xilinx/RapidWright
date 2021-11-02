@@ -1,5 +1,6 @@
 package com.xilinx.rapidwright.design;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -13,17 +14,16 @@ import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.Pair;
 
-public class TestSiteRoutingResolver {
+public class TestDesignTools {
 
     private Pair<String,String> inputSiteWire1 = new Pair<>("SLICE_X16Y238","A2"); 
     
     private Pair<String,String> inputSiteWire2 = new Pair<>("SLICE_X13Y237","F5");
     
-    @SuppressWarnings("unchecked")
     private Map<Pair<String,String>,String> mimicInContextInputPortNetSiteRouting(Design design) {
         Map<Pair<String,String>,String> initialState = new HashMap<>();
         
-        for(Pair<String,String> siteWire : new Pair[] {inputSiteWire1, inputSiteWire2}) {
+        for(Pair<String,String> siteWire : Arrays.asList(inputSiteWire1, inputSiteWire2)) {
             SiteInst i = design.getSiteInstFromSiteName(siteWire.getFirst());
             Net net = i.getNetFromSiteWire(siteWire.getSecond());
             initialState.put(siteWire, net.getName());
