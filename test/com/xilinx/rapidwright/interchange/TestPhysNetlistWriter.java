@@ -26,7 +26,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Arrays;
 
-import com.xilinx.rapidwright.checker.CheckOpenFiles;
+import com.xilinx.rapidwright.support.CheckOpenFiles;
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.SiteInst;
@@ -40,6 +40,7 @@ import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysNet;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PinMapping;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranch;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranch.RouteSegment;
+import com.xilinx.rapidwright.support.RapidWrightDCP;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -76,7 +77,7 @@ public class TestPhysNetlistWriter {
     @Test
     @CheckOpenFiles
     public void testAllRouteSegmentsEndInBELInputPins(@TempDir Path tempDir) throws IOException {
-        final String inputPath = "RapidWrightDCP/routethru_luts.dcp";
+        final String inputPath = RapidWrightDCP.getString("routethru_luts.dcp");
         Design design = Design.readCheckpoint(inputPath);
 
         final Path interchangePath = tempDir.resolve("routethru_luts.phys");
@@ -110,7 +111,7 @@ public class TestPhysNetlistWriter {
     @Test
     @CheckOpenFiles
     public void testNoLutRoutethruCells(@TempDir Path tempDir) throws IOException {
-        final String inputPath = "RapidWrightDCP/routethru_luts.dcp";
+        final String inputPath = RapidWrightDCP.getString("routethru_luts.dcp");
         Design design = Design.readCheckpoint(inputPath);
 
         final Path interchangePath = tempDir.resolve("routethru_luts.phys");
