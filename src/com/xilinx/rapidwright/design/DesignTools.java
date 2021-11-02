@@ -2539,4 +2539,58 @@ public class DesignTools {
 		}
 		return edfFileName;
 	}
+	
+	/**
+	 * When importing designs that have been taken from an in-context implementation 
+	 * (write_checkpoint -cell), often Vivado will write out residual nets that do not necessarily 
+	 * exist in the module or are retaining GND/VCC routing from the parent context.  This method 
+	 * will resolve conflicts by examining the site routing leading from input ports to the sinks
+	 * and update the site routing to the appropriate net as dictated in the new design.  GND and 
+	 * VCC will be replaced by the name of the source net being driven by the input ports.   
+	 * @param design The design of interest.
+	 */
+    public static void resolveSiteRoutingFromInContextPorts(Design design) {
+        EDIFNetlist netlist = design.getNetlist(); 
+        for(EDIFNet net : design.getTopEDIFCell().getNets()) {
+            EDIFHierNet parentNet = netlist.getHierNetFromName(net.getName());
+            Set<EDIFHierNet> aliases = null;
+            for(EDIFPortInst portInst : net.getSourcePortInsts(true)) {
+                // Identify top level inport ports
+                if(portInst.isTopLevelPort() && portInst.isInput()) {
+                    List<EDIFHierPortInst> portInsts = netlist.getSinksFromNet(parentNet);
+                    // Iterate over all sinks of the physical net to identify potential site routing
+                    // issues
+                    for(EDIFHierPortInst sink : portInsts){
+                        Cell c = design.getCell(sink.getFullHierarchicalInstName());
+                        if(c == null || !c.isPlaced()) continue;
+                        SiteInst i = c.getSiteInst();
+                        String logicalPinName = sink.getPortInst().getName();
+                        List<String> siteWires = new ArrayList<>();
+                        // Using this method just to get site wires along the path
+                        c.getSitePinFromLogicalPin(logicalPinName, siteWires);
+                        for(String siteWire : siteWires) {
+                            Net existingSiteRoutedNet = i.getNetFromSiteWire(siteWire);
+                            if(existingSiteRoutedNet == null) continue;
+                            EDIFHierNet currNet = netlist.getHierNetFromName(existingSiteRoutedNet.getName());
+                            if(aliases == null) {
+                                aliases = new HashSet<>(netlist.getNetAliases(parentNet));
+                            }
+                            if(aliases.contains(currNet)) continue;
+                            String updateNetName = parentNet.getHierarchicalNetName();
+                            Net updateNet = design.getNet(updateNetName);
+                            if(updateNet == null) {
+                                updateNet = design.createNet(updateNetName, parentNet.getNet());
+                            }
+                            BELPin belPin = i.getSiteWirePins(siteWire)[0];
+                            i.unrouteIntraSiteNet(belPin, belPin);
+                            if(i.getSiteWiresFromNet(existingSiteRoutedNet).size() == 0) {
+                                existingSiteRoutedNet.getSiteInsts().remove(i);
+                            }
+                            i.routeIntraSiteNet(updateNet, belPin, belPin);
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
