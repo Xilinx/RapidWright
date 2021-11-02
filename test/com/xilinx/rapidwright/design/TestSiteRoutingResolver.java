@@ -37,7 +37,7 @@ public class TestSiteRoutingResolver {
     
     @Test
     @CheckOpenFiles
-    public void testPicoblazeOOC() {
+    public void testResolveSiteRoutingFromInContextPorts() {
         String dcpPath = RapidWrightDCP.getString("picoblaze_ooc_X10Y235.dcp");
         Design design = Design.readCheckpoint(dcpPath, CodePerfTracker.SILENT);
 
