@@ -21,6 +21,12 @@
  */
 package com.xilinx.rapidwright.gui;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.function.BiConsumer;
+import java.util.stream.Stream;
+
 import com.trolltech.qt.core.QRect;
 import com.trolltech.qt.core.QRectF;
 import com.trolltech.qt.core.Qt;
@@ -32,17 +38,11 @@ import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.TileRectangle;
 import com.xilinx.rapidwright.device.Tile;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.function.BiConsumer;
-import java.util.stream.Stream;
-
 
 /**
  * UI Scene that can show named PBlocks
  */
-public class PblockScene extends TileScene {
+public class PBlockScene extends TileScene {
     private List<UiPBlock> blocks;
     private int blockOpacity = 200;
 
@@ -52,7 +52,7 @@ public class PblockScene extends TileScene {
 
     private boolean drawIntConnections = false;
 
-    public PblockScene(Design design) {
+    public PBlockScene(Design design) {
         super(design, false, true);
         this.blocks = new ArrayList<>();
     }

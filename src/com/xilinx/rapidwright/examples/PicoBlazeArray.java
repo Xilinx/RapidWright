@@ -1,5 +1,18 @@
 package com.xilinx.rapidwright.examples;
 
+import java.io.File;
+import java.io.FilenameFilter;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import com.xilinx.rapidwright.design.AbstractModuleInst;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
@@ -25,23 +38,10 @@ import com.xilinx.rapidwright.placer.blockplacer.BlockPlacer2Module;
 import com.xilinx.rapidwright.placer.handplacer.HandPlacer;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.FileTools;
-import joptsimple.ArgumentAcceptingOptionSpec;
+import joptsimple.NonOptionArgumentSpec;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 import joptsimple.OptionSpec;
-
-import java.io.File;
-import java.io.FilenameFilter;
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 public class PicoBlazeArray {
 
@@ -217,19 +217,23 @@ public class PicoBlazeArray {
 	 */
 	public static void main(String[] args) {
 		OptionParser optionParser = new OptionParser();
-		ArgumentAcceptingOptionSpec<String> dirOption = optionParser.accepts("dir", "Module Impls input dir").withRequiredArg().required();
-		ArgumentAcceptingOptionSpec<String> partOption = optionParser.accepts("part", "Part to use").withRequiredArg().required();
-		ArgumentAcceptingOptionSpec<String> outOption = optionParser.accepts("out", "Output DCP Filename").withRequiredArg().required();
+		NonOptionArgumentSpec<String> nonOptions = optionParser.nonOptions();
 		OptionSpec<?> blockPlacerOption = optionParser.accepts("block_placer", "Place Instances via Block Placer");
-		OptionSpec<?> handPlacerOption = optionParser.accepts("hand_placer", "Enable Hand Placer");
+		OptionSpec<?> handPlacerOption = optionParser.accepts("no_hand_placer", "Disable Hand Placer");
 		OptionSpec<?> implsOption = optionParser.accepts("impls", "Use Impls instead of Modules");
 
 
 		OptionSet options;
+		List<String> nonOptionValues;
 		try {
 			options = optionParser.parse(args);
+			nonOptionValues = options.valuesOf(nonOptions);
+			if (nonOptionValues.size()!=3) {
+				throw new RuntimeException("We need exactly three non-option values: modules Input Dir, Part, and output checkpoint filename. "+nonOptionValues.size()+" were given.");
+			}
 		} catch (RuntimeException e) {
 			try {
+				System.out.println("Usage: [options] [--] <input dir> <part> <output checkpoint>");
 				optionParser.printHelpOn(System.out);
 			} catch (IOException ioException) {
 				throw new UncheckedIOException(ioException);
@@ -237,13 +241,14 @@ public class PicoBlazeArray {
 			throw e;
 		}
 
-		String srcDirName = options.valueOf(dirOption);
+
+		String srcDirName = nonOptionValues.get(0);
 		File srcDir = new File(srcDirName);
 		if (!srcDir.isDirectory()) {
 						throw new RuntimeException("ERROR: Couldn't read directory: " + srcDir);
 		}
-		String part = options.valueOf(partOption);
-		Path outName = Paths.get(options.valueOf(outOption));
+		String part = nonOptionValues.get(1);
+		Path outName = Paths.get(nonOptionValues.get(2));
 		boolean handPlacer = options.has(handPlacerOption);
 		boolean useImpls = options.has(implsOption);
 		CodePerfTracker t = new CodePerfTracker("PicoBlaze Array", true);
@@ -268,7 +273,7 @@ public class PicoBlazeArray {
 
 		creator.lowerToModules(design, t);
 
-		if (handPlacer) {
+		if (!handPlacer) {
 			t.stop().start("Hand Placer");
 			System.out.println("start hand placer");
 			HandPlacer.openDesign(design);
@@ -314,7 +319,7 @@ public class PicoBlazeArray {
 
 			@Override
 			protected ModuleImplsInst createInstance(Design design, String name, Module impl, ModuleImpls impls) {
-				return DesignTools.createModuleImplsInstance(design, name, impls);
+				return DesignTools.createModuleImplsInst(design, name, impls);
 			}
 
 			@Override

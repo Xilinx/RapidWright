@@ -113,7 +113,7 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 	private int moveCount;
 	private double bestSoFar;
 
-	private Map<ModuleT, AbstractPlacementCollection<PlacementT>> possiblePlacements;
+	private Map<ModuleT, AbstractValidPlacementCache<PlacementT>> possiblePlacements;
 
     private Map<ModuleInstT, Site> lockedPlacements = null;
 
@@ -210,7 +210,7 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 			PriorityQueue<PlacementT> sites = new PriorityQueue<>(1024, getInitialPlacementComparator());
 			final Collection<PlacementT> allPlacements = getAllPlacements(hm);
 
-			possiblePlacements.put(hm.getModule(), allPlacements.stream().collect(PlacementCollection.collector(this)));
+			possiblePlacements.put(hm.getModule(), allPlacements.stream().collect(SortedValidPlacementCache.collector(this)));
 			sites.addAll(allPlacements);
 			boolean found = false;
 			while(!sites.isEmpty()){
@@ -258,7 +258,7 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 
 	protected abstract boolean checkValidPlacement(ModuleInstT hm);
 
-	public double calculateStartTemp(int numBlocks){
+	public double calculateStartTemp(){
 		double stdDev = 0.0;
 		double myTemp = 1e30;// very high temperature to accept all moves
 		double currentCost = 0.0;
@@ -269,8 +269,7 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 		ArrayList<Double> arrayCosts = new ArrayList<>();
 		int acceptedMoveCount = 0;
 		previousCost = currentSystemCost();
-		for(int i=0; i<numBlocks; i++){
-			ModuleInstT selectedHD = hardMacros.get(i);
+		for(ModuleInstT selectedHD : hardMacros) {
 			saveAllCosts();
 			if (getNextMove(selectedHD)){
 				saveAllCosts();
@@ -400,7 +399,7 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 
 		//rangeLimit = Math.max(dev.getColumns(), dev.getRows());
 		rangeLimit = Math.max(squareWidth, squareWidth);
-		currentTemp = calculateStartTemp(hardMacros.size());
+		currentTemp = calculateStartTemp();
 		if (Double.isNaN(currentTemp)) {
 			throw new RuntimeException("initialized to NAN temperature");
 		}

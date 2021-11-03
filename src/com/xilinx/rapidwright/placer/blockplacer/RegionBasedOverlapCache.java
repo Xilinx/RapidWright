@@ -25,6 +25,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.IntSummaryStatistics;
+import java.util.List;
 import java.util.function.Predicate;
 
 import com.xilinx.rapidwright.design.ModuleImplsInst;
@@ -38,15 +39,15 @@ import com.xilinx.rapidwright.device.Device;
  * the region are stored. When a module is moved, overlap detection only needs to be performed for modules that
  * touch the same regions as the module that is being moved.
  */
-public class OverlapCache extends AbstractOverlapCache {
+public class RegionBasedOverlapCache extends AbstractOverlapCache {
     private final Device device;
-    private final Collection<ModuleImplsInst> instances;
+    private final List<ModuleImplsInst> instances;
     private final Collection<ModuleImplsInst>[][] modulesInArea;
 
     /**
      * Magic Size found by benchmarking
      */
-    public static int DEFAULT_SIZE = 23;
+    public static int DEFAULT_REGION_SIZE = 23;
 
     private final int columnDivider;
     private final int rowDivider;
@@ -96,7 +97,7 @@ public class OverlapCache extends AbstractOverlapCache {
     }
 
     /**
-     * Remove an Instance from the cache. Has to be called before after placing the instance
+     * Add an Instance to the cache. Has to be called after placing the instance
      * @param mii  the instance
      */
     @Override
@@ -104,11 +105,11 @@ public class OverlapCache extends AbstractOverlapCache {
         allTouchedRegionsMatch(mii,l->{l.add(mii); return true;});
     }
 
-    public OverlapCache(Device device, Collection<ModuleImplsInst> instances, int size) {
+    public RegionBasedOverlapCache(Device device, List<ModuleImplsInst> instances, int regionSize) {
         this.device = device;
         this.instances = instances;
-        this.columnDivider = size;
-        this.rowDivider = size;
+        this.columnDivider = regionSize;
+        this.rowDivider = regionSize;
         modulesInArea = new Collection[getColumns()][getRows()];
         for (int col = 0; col < modulesInArea.length; col++) {
             for (int row = 0; row < modulesInArea[col].length; row++) {
@@ -120,6 +121,11 @@ public class OverlapCache extends AbstractOverlapCache {
                 place(instance);
             }
         }
+    }
+
+
+    public RegionBasedOverlapCache(Device device, List<ModuleImplsInst> instances) {
+        this(device, instances, DEFAULT_REGION_SIZE);
     }
 
     @Override

@@ -22,7 +22,6 @@
 package com.xilinx.rapidwright.placer.blockplacer;
 
 import java.util.Collection;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -121,12 +120,12 @@ public class DotModuleImplsDumper extends DotGraphDumper<ModuleImplsInst, ImplsI
 
     public static class ModuleImplsDumpData {
         final Design design;
-        final List<ModuleImplsInst> modules;
+        final Collection<ModuleImplsInst> modules;
         final Collection<ImplsPath> paths;
         final Map<ModuleImplsInst, Set<ImplsPath>> modulesToPaths;
 
 
-        public ModuleImplsDumpData(Design design, List<ModuleImplsInst> modules, Collection<ImplsPath> paths, Map<ModuleImplsInst, Set<ImplsPath>> modulesToPaths) {
+        public ModuleImplsDumpData(Design design, Collection<ModuleImplsInst> modules, Collection<ImplsPath> paths, Map<ModuleImplsInst, Set<ImplsPath>> modulesToPaths) {
             this.design = design;
             this.modules = modules;
             this.paths = paths;

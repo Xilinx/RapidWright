@@ -37,8 +37,8 @@ import com.xilinx.rapidwright.device.Tile;
  * This allows for optimized querying of placements near a central placement.
  * @param <PlacementT> The placement class
  */
-public class PlacementCollection<PlacementT> extends AbstractPlacementCollection<PlacementT> {
-    private static class PlacementCollection1D<T>{
+public class SortedValidPlacementCache<PlacementT> extends AbstractValidPlacementCache<PlacementT> {
+    private static class SortedValidPlacementCache1D<T>{
         /**
          * Actual Items
          */
@@ -62,7 +62,7 @@ public class PlacementCollection<PlacementT> extends AbstractPlacementCollection
          * @param items items, ordered by keys
          * @param keys the key values
          */
-        public PlacementCollection1D(List<T> items, int[] keys) {
+        public SortedValidPlacementCache1D(List<T> items, int[] keys) {
             this.items = items;
 
             int biggestKey = keys[keys.length-1];
@@ -102,11 +102,11 @@ public class PlacementCollection<PlacementT> extends AbstractPlacementCollection
             return fromArr(key, minIdx);
         }
 
-        public static <T,U>Collector<T,?,PlacementCollection1D<U>> collector(ToIntFunction<T> keyExtractor,  Collector<T,?,U> downstreamCollector) {
+        public static <T,U>Collector<T,?, SortedValidPlacementCache1D<U>> collector(ToIntFunction<T> keyExtractor, Collector<T,?,U> downstreamCollector) {
             return Collectors.collectingAndThen(Collectors.groupingBy(keyExtractor::applyAsInt, downstreamCollector), (Map<Integer, U> byKey) -> {
                 int[] keys = byKey.keySet().stream().sorted().mapToInt(x -> x).toArray();
                 List<U> items = Arrays.stream(keys).mapToObj(byKey::get).collect(Collectors.toList());
-                return new PlacementCollection1D<>(items, keys);
+                return new SortedValidPlacementCache1D<>(items, keys);
             });
         }
 
@@ -131,24 +131,24 @@ public class PlacementCollection<PlacementT> extends AbstractPlacementCollection
      *
      * When multiple module implementations are present, they may map to the same anchor location, so we store a list of items for each position.
      */
-    private final PlacementCollection1D<PlacementCollection1D<List<PlacementT>>> collection;
+    private final SortedValidPlacementCache1D<SortedValidPlacementCache1D<List<PlacementT>>> collection;
 
-    private PlacementCollection(BlockPlacer2<?, ?, PlacementT, ?> placer, PlacementCollection1D<PlacementCollection1D<List<PlacementT>>> collection) {
+    private SortedValidPlacementCache(BlockPlacer2<?, ?, PlacementT, ?> placer, SortedValidPlacementCache1D<SortedValidPlacementCache1D<List<PlacementT>>> collection) {
         this.placer = placer;
 
         this.collection = collection;
     }
 
-    public static <PlacementT> Collector<PlacementT, ?, PlacementCollection<PlacementT>> collector(BlockPlacer2<?,?,PlacementT, ?> placer) {
-        Collector<PlacementT, ?, PlacementCollection1D<PlacementCollection1D<List<PlacementT>>>> createColl =
-                PlacementCollection1D.collector(
+    public static <PlacementT> Collector<PlacementT, ?, SortedValidPlacementCache<PlacementT>> collector(BlockPlacer2<?,?,PlacementT, ?> placer) {
+        Collector<PlacementT, ?, SortedValidPlacementCache1D<SortedValidPlacementCache1D<List<PlacementT>>>> createColl =
+                SortedValidPlacementCache1D.collector(
                         p -> placer.getPlacementTile(p).getColumn(),
-                        PlacementCollection1D.collector(
+                        SortedValidPlacementCache1D.collector(
                                 p -> placer.getPlacementTile(p).getRow(),
                                 Collectors.toList()
                         )
                 );
-        return Collectors.collectingAndThen(createColl, c -> new PlacementCollection<>(placer, c));
+        return Collectors.collectingAndThen(createColl, c -> new SortedValidPlacementCache<>(placer, c));
     }
 
 
@@ -161,7 +161,7 @@ public class PlacementCollection<PlacementT> extends AbstractPlacementCollection
 
         final int maxColumn = collection.getMaxIdx(center.getColumn()+rangeLimit);
         for (int col = collection.getMinIdx(center.getColumn() - rangeLimit); col <= maxColumn; col++) {
-            final PlacementCollection1D<List<PlacementT>> currentCol = collection.get(col);
+            final SortedValidPlacementCache1D<List<PlacementT>> currentCol = collection.get(col);
 
             final int maxRow = currentCol.getMaxIdx(center.getRow()+rangeLimit);
             for (int row = currentCol.getMinIdx(center.getRow()-rangeLimit); row <= maxRow; row++) {
@@ -176,7 +176,7 @@ public class PlacementCollection<PlacementT> extends AbstractPlacementCollection
     public boolean contains(PlacementT placement) {
         final Tile tile = placer.getPlacementTile(placement);
 
-        final PlacementCollection1D<List<PlacementT>> column = collection.getByKey(tile.getColumn());
+        final SortedValidPlacementCache1D<List<PlacementT>> column = collection.getByKey(tile.getColumn());
         if (column == null) {
             return false;
         }

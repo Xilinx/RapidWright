@@ -26,7 +26,6 @@ import java.io.PrintWriter;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -59,15 +58,19 @@ public class BlockPlacer2Impls extends BlockPlacer2<ModuleImpls, ModuleImplsInst
 
     private final Map<ModuleImplsInst, Set<ImplsPath>> modulesToPaths = new HashMap<>();
 
-    public BlockPlacer2Impls(Design design, Collection<ModuleImplsInst> moduleInstances, boolean ignoreMostUsedNets, Path graphData, int overlapSize) {
+    public BlockPlacer2Impls(Design design, List<ModuleImplsInst> moduleInstances, boolean ignoreMostUsedNets, Path graphData, AbstractOverlapCache overlapCache) {
         super(design, ignoreMostUsedNets, graphData);
 
-        this.moduleInstances = new ArrayList<>(moduleInstances);
-        overlaps = new OverlapCache(design.getDevice(), moduleInstances, overlapSize);
+        this.moduleInstances = moduleInstances;
+        overlaps = overlapCache;
     }
 
-    public BlockPlacer2Impls(Design design, Collection<ModuleImplsInst> moduleInstances, boolean ignoreMostUsedNets, Path graphData) {
-        this(design, moduleInstances, ignoreMostUsedNets, graphData, OverlapCache.DEFAULT_SIZE);
+    public BlockPlacer2Impls(Design design, List<ModuleImplsInst> moduleInstances, boolean ignoreMostUsedNets, Path graphData) {
+        this(design, moduleInstances, ignoreMostUsedNets, graphData, new RegionBasedOverlapCache(design.getDevice(), moduleInstances));
+    }
+
+    public BlockPlacer2Impls(Design design, List<ModuleImplsInst> moduleInstances) {
+        this(design, moduleInstances, true, null);
     }
 
     @Override

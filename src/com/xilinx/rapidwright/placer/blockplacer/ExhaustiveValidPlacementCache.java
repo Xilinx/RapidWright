@@ -30,17 +30,17 @@ import java.util.stream.Collectors;
  * Naive implementation of placement collection
  * @param <PlacementT> The placement class
  */
-public class DumbPlacementCollection<PlacementT> extends AbstractPlacementCollection<PlacementT>{
+public class ExhaustiveValidPlacementCache<PlacementT> extends AbstractValidPlacementCache<PlacementT> {
     private final List<PlacementT> placements;
     private final BlockPlacer2<?,?,PlacementT, ?> placer;
 
-    public DumbPlacementCollection(List<PlacementT> placements, BlockPlacer2<?, ?, PlacementT, ?> placer) {
+    public ExhaustiveValidPlacementCache(List<PlacementT> placements, BlockPlacer2<?, ?, PlacementT, ?> placer) {
         this.placements = placements;
         this.placer = placer;
     }
 
-    public static <PlacementT> Collector<PlacementT, ?, DumbPlacementCollection<PlacementT>> collector(BlockPlacer2<?,?, PlacementT, ?> placer) {
-        return Collectors.collectingAndThen(Collectors.toList(), list-> new DumbPlacementCollection<>(list, placer));
+    public static <PlacementT> Collector<PlacementT, ?, ExhaustiveValidPlacementCache<PlacementT>> collector(BlockPlacer2<?,?, PlacementT, ?> placer) {
+        return Collectors.collectingAndThen(Collectors.toList(), list-> new ExhaustiveValidPlacementCache<>(list, placer));
     }
 
     @Override

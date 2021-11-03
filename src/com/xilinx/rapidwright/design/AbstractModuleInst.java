@@ -27,7 +27,7 @@ import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFPort;
 
 /**
- * Abstract base class for {@link ModuleInst} and {@link ModuleImplsInstance}/{@link ModuleImplsInst}
+ * Abstract base class for {@link ModuleInst} and {@link ModuleImplsInst}
  */
 public abstract class AbstractModuleInst<ModuleT, T extends AbstractModuleInst<ModuleT, T>> {
 

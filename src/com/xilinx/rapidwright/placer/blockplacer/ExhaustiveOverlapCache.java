@@ -28,10 +28,10 @@ import com.xilinx.rapidwright.design.ModuleImplsInst;
 /**
  * Naive implementation of overlap checking. Always checks against all other instances
  */
-public class DumbOverlapCache extends AbstractOverlapCache {
+public class ExhaustiveOverlapCache extends AbstractOverlapCache {
     private final Collection<ModuleImplsInst> instances;
 
-    public DumbOverlapCache(Collection<ModuleImplsInst> instances) {
+    public ExhaustiveOverlapCache(Collection<ModuleImplsInst> instances) {
         this.instances = instances;
     }
 

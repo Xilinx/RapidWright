@@ -2612,7 +2612,7 @@ public class DesignTools {
 	 * @param module the module to use
 	 * @return the newly created instance
 	 */
-	public static ModuleImplsInst createModuleImplsInstance(Design design, String name, ModuleImpls module) {
+	public static ModuleImplsInst createModuleImplsInst(Design design, String name, ModuleImpls module) {
 		EDIFCellInst cell = design.createOrFindEDIFCellInst(name, module.getNetlist().getTopCell());
 		return new ModuleImplsInst(name, cell, module);
 	}
