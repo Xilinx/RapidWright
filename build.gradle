@@ -69,6 +69,7 @@ abstract class UpdateJarsTask extends DefaultTask {
 tasks.register('update_jars', UpdateJarsTask)
 
 task testPython(type:Exec) {
+  environment 'RAPIDWRIGHT_PATH',file('.')
   environment 'CLASSPATH', sourceSets.main.runtimeClasspath.getAsPath()
   executable = 'python3'
   args = ['-m', 'pytest', '--junitxml', "$buildDir/test-results/testPython/testPython.xml", '--rootdir', 'python/test']
