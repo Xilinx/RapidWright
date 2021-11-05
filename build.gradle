@@ -69,6 +69,10 @@ abstract class UpdateJarsTask extends DefaultTask {
 tasks.register('update_jars', UpdateJarsTask)
 
 task testPython(type:Exec) {
+  testPython() {
+      group = "verification"
+      description = "Runs the Python unit tests."
+  }
   environment 'RAPIDWRIGHT_PATH',file('.')
   environment 'CLASSPATH', sourceSets.main.runtimeClasspath.getAsPath()
   executable = 'python3'
