@@ -1601,11 +1601,11 @@ public class FileTools {
 	 */
 	public static String getVivadoPath(){
 		String[] cmd = new String[]{isWindows() ? "where" : "which",isWindows() ? "vivado.bat" : "vivado"};
-		String output = execCommandGetOutput(true, cmd).get(0);
-		if(output.contains("INFO:") || output.contains("which: no")){
+		final List<String> fullOutput = execCommandGetOutput(true, cmd);
+		if(fullOutput.isEmpty() || fullOutput.get(0).contains("INFO:") || fullOutput.get(0).contains("which: no")){
 			throw new RuntimeException("ERROR: Couldn't find vivado on PATH");
 		}
-		return output.trim().replace("\\", "/");
+		return fullOutput.get(0).trim().replace("\\", "/");
 	}
 	
 	private static String currentOS = null;

@@ -35,10 +35,6 @@ import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
-import com.xilinx.rapidwright.edif.EDIFCell;
-import com.xilinx.rapidwright.edif.EDIFCellInst;
-import com.xilinx.rapidwright.edif.EDIFNet;
-import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.util.MessageGenerator;
 import com.xilinx.rapidwright.util.Utils;
 
@@ -50,10 +46,8 @@ import com.xilinx.rapidwright.util.Utils;
  * 
  * @author Chris Lavin Created on: Jun 22, 2010
  */
-public class ModuleInst{
+public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 
-	/** Name of the module instance */
-	private String name;
 	/** The design which contains this module instance */
 	private transient Design design;
 	/** The module of which this object is an instance of */
@@ -64,15 +58,13 @@ public class ModuleInst{
 	private ArrayList<SiteInst> instances;
 	/** A list of all nets internal to this module instance */
 	private ArrayList<Net> nets;
-	/** Reference to the logical cell instance in the netlist */
-	private EDIFCellInst cellInst;
 	
 	/**
 	 * Constructor initializing instance module name
 	 * @param name Name of the module instance
 	 */
 	public ModuleInst(String name, Design design){
-		this.name = name;
+		super(name);
 		this.setDesign(design);
 		if(design != null) {
 			design.getModuleInstMap().put(name, this);
@@ -87,15 +79,19 @@ public class ModuleInst{
 	 * This will initialize this module instance to the same attributes
 	 * as the module instance passed in.  This is primarily used for classes
 	 * which extend {@link ModuleInst}.
+	 *
+	 * This performs a shallow copy of the original Module Instance. It will point to the same cell and instances as the
+	 * original module.
 	 * @param moduleInst The module instance to mimic.
 	 */
 	public ModuleInst(ModuleInst moduleInst){
-		this.name = moduleInst.name;
+		super(moduleInst.getName());
 		this.setDesign(moduleInst.design);
 		this.module = moduleInst.module;
 		this.setAnchor(moduleInst.anchor);
 		instances =  moduleInst.instances;
-		nets = moduleInst.nets;	
+		nets = moduleInst.nets;
+		setCellInst(getCellInst());
 	}
 	
 	/**
@@ -117,20 +113,6 @@ public class ModuleInst{
 	 */
 	public void addNet(Net net){
 		nets.add(net);
-	}
-
-	/**
-	 * @return the name of this module instance
-	 */
-	public String getName(){
-		return name;
-	}
-
-	/**
-	 * @param name the name to set
-	 */
-	public void setName(String name){
-		this.name = name;
 	}
 
 	/**
@@ -182,14 +164,6 @@ public class ModuleInst{
 	 */
 	public void setInsts(ArrayList<SiteInst> instances){
 		this.instances = instances;
-	}
-
-	public EDIFCellInst getCellInst() {
-		return cellInst;
-	}
-
-	public void setCellInst(EDIFCellInst cellInst) {
-		this.cellInst = cellInst;
 	}
 
 	/**
@@ -308,7 +282,7 @@ public class ModuleInst{
 			}
 			
 			Site templateSite = inst.getModuleTemplateInst().getSite();
-			Tile newTile = module.getCorrespondingTile(templateSite.getTile(), newAnchorSite.getTile(), dev);
+			Tile newTile = module.getCorrespondingTile(templateSite.getTile(), newAnchorSite.getTile());
 			Site newSite = templateSite.getCorrespondingSite(inst.getSiteTypeEnum(), newTile);
 
 			if(newSite == null){
@@ -340,7 +314,7 @@ public class ModuleInst{
 					}
 				}
 				if(design.isSiteUsed(newSite)){
-					throw new RuntimeException("ERROR: BlockGuide ("+ name +") contains a BUFGCE that is already fully occupied in the tile specified.");					
+					throw new RuntimeException("ERROR: BlockGuide ("+ getName() +") contains a BUFGCE that is already fully occupied in the tile specified.");
 				}
 			}
 			
@@ -358,13 +332,13 @@ public class ModuleInst{
 			Net templateNet = net.getModuleTemplateNet();
 			for(PIP pip : templateNet.getPIPs()){
 				Tile templatePipTile = pip.getTile();
-				Tile newPipTile = module.getCorrespondingTile(templatePipTile, newAnchorSite.getTile(), dev);
+				Tile newPipTile = module.getCorrespondingTile(templatePipTile, newAnchorSite.getTile());
 				if(newPipTile == null){
 					if(skipIncompatible) {
 						continue nextnet;
 					}else {
 						unplace();
-						MessageGenerator.briefError("Warning: Unable to return module instance "+ name +" back to original placement.");
+						MessageGenerator.briefError("Warning: Unable to return module instance "+ getName() +" back to original placement.");
 						return false;
 					}					
 				}
@@ -402,8 +376,23 @@ public class ModuleInst{
 	 * @return The new tile of the module instance which corresponds to the templateTile, or null
 	 * if none exists.
 	 */
+	public Tile getCorrespondingTile(Tile templateTile, Tile newAnchorTile){
+		return module.getCorrespondingTile(templateTile, newAnchorTile);
+	}
+
+	/**
+	 * This method will calculate and return the corresponding tile of a module instance.
+	 * for a new anchor location.
+	 * @param templateTile The tile in the module which acts as a template.
+	 * @param newAnchorTile This is the tile of the new anchor instance of the module instance.
+	 * @param dev The device which corresponds to this module instance.
+	 * @return The new tile of the module instance which corresponds to the templateTile, or null
+	 * if none exists.
+	 * @deprecated Use {@link ModuleInst#getCorrespondingTile(Tile, Tile)} instead
+	 */
+	@Deprecated
 	public Tile getCorrespondingTile(Tile templateTile, Tile newAnchorTile, Device dev){
-		return module.getCorrespondingTile(templateTile, newAnchorTile, dev);
+		return module.getCorrespondingTile(templateTile, newAnchorTile);
 	}
 
 
@@ -449,6 +438,16 @@ public class ModuleInst{
 	}
 
 
+	private Port findPassthruInput(Port p) {
+		for (String passthroughName : p.getPassThruPortNames()) {
+			Port ptPort = getModule().getPort(passthroughName);
+			if (!ptPort.isOutPort()) {
+				return ptPort;
+			}
+		}
+		return null;
+	}
+
 	/**
 	 * Gets (if it exists), the corresponding net within the module instance of the port.
 	 * @param p The port on the module of interest
@@ -462,43 +461,15 @@ public class ModuleInst{
 		}
 		// Get net of input port pass-thru
 		if(p.isOutPort() && p.getPassThruPortNames().size() > 0){
-			Port input = getModule().getPort(p.getPassThruPortNames().get(0));
+			Port input = findPassthruInput(p);
+			if (input == null) {
+				return null;
+			}
 			return getCorrespondingNet(input);
 		}
 		return null;
 	}
-	
-	/* (non-Javadoc)
-	 * @see java.lang.Object#hashCode()
-	 */
-	@Override
-	public int hashCode(){
-		final int prime = 31;
-		int result = 1;
-		result = prime * result + ((name == null) ? 0 : name.hashCode());
-		return result;
-	}
 
-	/* (non-Javadoc)
-	 * @see java.lang.Object#equals(java.lang.Object)
-	 */
-	@Override
-	public boolean equals(Object obj){
-		if(this == obj)
-			return true;
-		if(obj == null)
-			return false;
-		if(getClass() != obj.getClass())
-			return false;
-		ModuleInst other = (ModuleInst) obj;
-		if(name == null){
-			if(other.name != null)
-				return false;
-		}
-		else if(!name.equals(other.name))
-			return false;
-		return true;
-	}
 	
 	/**
 	 * Get's the corresponding port on the module by name.
@@ -508,10 +479,7 @@ public class ModuleInst{
 	public Port getPort(String name){
 		return module.getPort(name);
 	}
-	
-	public String toString(){
-		return name;
-	}
+
 	
 	/**
 	 * Get's the current lower left site as used for a placement directive 
@@ -543,9 +511,9 @@ public class ModuleInst{
 		
 		// Get original lower left placement 
 		Tile origLowerLeft = getLowerLeftTile(type);
-		
-		String origTilePrefix = origLowerLeft.getTileNamePrefix();
-		String newSuffix = "X" + (origLowerLeft.getTileXCoordinate() + dx) + "Y" + (origLowerLeft.getTileYCoordinate() + dy);
+
+		String origTilePrefix = origLowerLeft.getNameRoot();
+		String newSuffix = "_X" + (origLowerLeft.getTileXCoordinate() + dx) + "Y" + (origLowerLeft.getTileYCoordinate() + dy);
 		
 		Tile newTile = origLowerLeft.getDevice().getTile(origTilePrefix + newSuffix);
 		if(type == null){
@@ -630,59 +598,6 @@ public class ModuleInst{
 		
 		if(!success) System.out.println("Failed placement attempt, TargetTile="+targetTile.getName()+" ipTile="+ipTile.getName());
 		return success;  
-	}		
-
-	/**
-	 * Connects two signals by port name between this module instance and a top-level port. 
-	 * This method will create a new net for the connection handling adding both
-	 * a logical net (EDIFNet) and physical net (Net).
-	 * @param portName This module instance's port name to connect.
-	 * @param otherPortName The top-level port of the the cell instance.
-	 * 
-	 */
-	public void connect(String portName, String otherPortName){
-		connect(portName, null, otherPortName, -1);
-	}
-	
-	/**
-	 * Connects two signals by port name between this module instance and a top-level port. 
-	 * This method will create a new net for the connection handling adding both
-	 * a logical net (EDIFNet) and physical net (Net).
-	 * @param portName This module instance's port name to connect.
-	 * @param otherPortName The top-level port of the the cell instance.
-	 * @param busIndex If the port is multi-bit, specify the index to connect or -1 if single bit bus.
-	 */
-	public void connect(String portName, String otherPortName, int busIndex){
-		connect(portName, null, otherPortName, busIndex);
-	}
-	
-	/**
-	 * Connects two signals by port name between this module instance and another. 
-	 * This method will create a new net for the connection handling adding both
-	 * a logical net (EDIFNet) and physical net (Net).
-	 * @param portName This module instance's port name to connect.
-	 * @param other The other module instance to connect to. If this is null, it will 
-	 * connect it to an existing parent cell port named otherPortName
-	 * @param otherPortName The port name on the other module instance to connect to or
-	 * the top-level port of the the cell instance.
-	 */
-	public void connect(String portName, ModuleInst other, String otherPortName){
-		connect(portName, other, otherPortName, -1);
-	}
-	
-	/**
-	 * Connects two signals by port name between this module instance and another. 
-	 * This method will create a new net for the connection handling adding both
-	 * a logical net (EDIFNet) and physical net (Net).
-	 * @param portName This module instance's port name to connect.
-	 * @param other The other module instance to connect to. If this is null, it will 
-	 * connect it to an existing parent cell port named otherPortName
-	 * @param otherPortName The port name on the other module instance to connect to or
-	 * the top-level port of the the cell instance.
-	 * @param busIndex If the port is multi-bit, specify the index to connect or -1 if single bit bus.
-	 */
-	public void connect(String portName, ModuleInst other, String otherPortName, int busIndex){
-		connect(portName, busIndex, other, otherPortName, busIndex);
 	}
 
 	/**
@@ -701,33 +616,13 @@ public class ModuleInst{
 	 * @param busIndex1 If the port (of the other module instance or the existing parent cell) is multi-bit,
 	 * specify the index to connect or -1 if single bit bus.
 	 */
+	@Override
 	public void connect(String portName, int busIndex0, ModuleInst other, String otherPortName, int busIndex1){
-		EDIFCell top = design.getTopEDIFCell();
-		EDIFCellInst eci0 = top.getCellInst(getName());
-		if(eci0 == null) throw new RuntimeException("ERROR: Couldn't find logical cell instance for " + getName());
-		if(other == null) {
-			// Connect to a top-level port
-			EDIFPort port = top.getPort(otherPortName);
+		super.connect(portName, busIndex0, other, otherPortName, busIndex1);
 
-			String netName = busIndex1 == -1 ? otherPortName : port.getBusName() + "[" + busIndex1 + "]";
-			EDIFNet net = top.getNet(netName);
-			if(net == null){
-				net = top.createNet(netName);
-			}
-			if(net.getPortInst(netName) == null){
-				net.createPortInst(port, busIndex1);
-			}
-			net.createPortInst(portName, busIndex0, eci0);
+		if (other == null) {
 			return;
 		}
-		EDIFCellInst eci1 = top.getCellInst(other.getName());
-		if(eci1 == null) throw new RuntimeException("ERROR: Couldn't find logical cell instance for " + getName());
-
-		String netName = busIndex0 == -1 ? getName() + "_" + portName : getName() + "_" + portName + "["+busIndex0+"]";
-		EDIFNet net = top.createNet(netName);
-		net.createPortInst(portName, busIndex0, eci0);
-		net.createPortInst(otherPortName, busIndex1, eci1);
-
 		// Connect physical pins
 		Port p0 = getPort(busIndex0 == -1 ? portName : portName + "[" + busIndex0 + "]");
 		Port p1 = other.getPort(busIndex1 == -1 ? otherPortName : otherPortName + "[" + busIndex1 + "]");
@@ -745,5 +640,10 @@ public class ModuleInst{
 		for (SitePinInst inPin : getCorrespondingPins(inPort)) {
 			physicalNet.addPin(inPin);
 		}
+	}
+
+	@Override
+	public RelocatableTileRectangle getBoundingBox() {
+		return module.getBoundingBox().getCorresponding(getAnchor().getTile(), module.getAnchor().getTile());
 	}
 }

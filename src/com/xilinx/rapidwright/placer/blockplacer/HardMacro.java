@@ -29,6 +29,7 @@ import java.util.HashSet;
 import com.xilinx.rapidwright.design.ModuleInst;
 //import com.xilinx.rapidwright.design.ModuleInst;
 import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.RelocatableTileRectangle;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
@@ -49,19 +50,11 @@ public class HardMacro extends ModuleInst implements Comparable<Object> {
 	private HashSet<Path> connectedPaths;
 	
 	private Site tempAnchorSite;
-	
-	protected int topReference = Integer.MIN_VALUE;
-	protected int bottomReference = Integer.MIN_VALUE;
-	protected int leftReference = Integer.MIN_VALUE;
-	protected int rightReference = Integer.MIN_VALUE;
+	private RelocatableTileRectangle tempAnchorBoundingBox;
+
 	
 	private int tileSize = 0;
-	
-	protected int top;
-	protected int bottom;
-	protected int left;
-	protected int right;
-	
+
 	public HardMacro(ModuleInst moduleInst) {
 		super(moduleInst);
 		setConnectedPortWires(new ArrayList<PortWire>());
@@ -119,50 +112,13 @@ public class HardMacro extends ModuleInst implements Comparable<Object> {
 	 * @param tempAnchorSite the tempAnchorSite to set
 	 */
 	public void setTempAnchorSite(Site tempAnchorSite, HashMap<Site, HardMacro> currentPlacements) {
-		Tile t = null;
-		
-		// calculate the bounding box for the module relative to the anchor
-		if(this.tempAnchorSite == null && topReference == Integer.MIN_VALUE){
-			t = getModule().getAnchor().getTile();
-			int topIndex = t.getRow();
-			int bottomIndex = topIndex;
-			int leftIndex = t.getColumn();
-			int rightIndex = leftIndex;
-			
-			for(SiteInst instance : getModule().getSiteInsts()){
-				t = instance.getTile();
-				if(topIndex > t.getRow()) topIndex = t.getRow();
-				if(bottomIndex < t.getRow()) bottomIndex = t.getRow();
-				if(leftIndex > t.getColumn()) leftIndex = t.getColumn();
-				if(rightIndex < t.getColumn()) rightIndex = t.getColumn();
-			}
-			for(Net net : getModule().getNets()){
-				for(PIP pip : net.getPIPs()){
-					t = pip.getTile();
-					if(topIndex > t.getRow()) topIndex = t.getRow();
-					if(bottomIndex < t.getRow()) bottomIndex = t.getRow();
-					if(leftIndex > t.getColumn()) leftIndex = t.getColumn();
-					if(rightIndex < t.getColumn()) rightIndex = t.getColumn();
-				}
-			}
-			t = getModule().getAnchor().getTile();
-			topReference = (t.getRow() - topIndex) + 0;
-			bottomReference = (t.getRow() - bottomIndex) - 0;
-			leftReference = (t.getColumn() - leftIndex) + 0;
-			rightReference = (t.getColumn() - rightIndex) + 0;
-		}
 
 		// perform the move
 		currentPlacements.remove(this.tempAnchorSite);
 		currentPlacements.put(tempAnchorSite, this);
-		
-		// update to the new absolute bounding box for the hard macro
-		t = tempAnchorSite.getTile();
-		top = t.getRow() - topReference;
-		bottom = t.getRow() - bottomReference;
-		left = t.getColumn() - leftReference;
-		right = t.getColumn() - rightReference;
+
 		this.tempAnchorSite = tempAnchorSite;
+		this.tempAnchorBoundingBox = getModule().getBoundingBox().getCorresponding(tempAnchorSite.getTile(), getModule().getAnchor().getTile());
 	}
 	
 	/**
@@ -190,9 +146,7 @@ public class HardMacro extends ModuleInst implements Comparable<Object> {
 	public HashSet<Path> getConnectedPaths(){
 		return connectedPaths;
 	}
-	
-	public static final int HALO = 1;
-	
+
 	/**
 	 * Determines if the hard macros overlap.  Hard macros are considered 
 	 * overlapping if their bounding boxes overlap.
@@ -203,19 +157,8 @@ public class HardMacro extends ModuleInst implements Comparable<Object> {
 		if(hm.getTempAnchorSite() == null){
 			return false;
 		}
-		if(left > hm.right+HALO){
-			return false;
-		} 
-		else if(right < hm.left+HALO){
-			return false;
-		}
-		else if(bottom < hm.top-HALO){
-			return false;
-		}
-		else if(top > hm.bottom+HALO){
-			return false;
-		}		
-		return true;
+
+		return tempAnchorBoundingBox.overlaps(hm.tempAnchorBoundingBox);
 	}
 
 	@Override
