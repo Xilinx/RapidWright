@@ -43,4 +43,9 @@ def start_jvm():
     if not jpype.isJVMStarted():
         jpype.startJVM(**kwargs)
 
+def block_system_exit_calls():
+    from com.xilinx.rapidwright.util import FileTools
+    FileTools.blockSystemExitCalls()
+
 start_jvm()
+block_system_exit_calls()

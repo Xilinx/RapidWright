@@ -1810,6 +1810,17 @@ public class FileTools {
         return OVERRIDE_DATA_FILE_DOWNLOAD;
     }
     
+    /**
+     * For Java 16 and below, calling this method will prevent {@link System.exit()} calls from 
+     * exiting the JVM and instead throws a {@link SecurityException} in its place.  This method
+     * allows for a check to avoid the JVM WARNING message in Java 17.
+     */
+    public static void blockSystemExitCalls() {
+        if(getJavaVersion() < 17) {
+            BlockExitSecurityManager.blockSystemExitCalls();
+        }
+    }
+    
 	public static void main(String[] args) {
 		if(args[0].equals("--get_vivado_path"))
 			System.out.println(getVivadoPath());
