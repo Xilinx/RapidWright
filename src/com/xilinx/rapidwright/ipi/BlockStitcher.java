@@ -61,7 +61,7 @@ import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFTools;
-import com.xilinx.rapidwright.placer.blockplacer.BlockPlacer2;
+import com.xilinx.rapidwright.placer.blockplacer.BlockPlacer2Module;
 import com.xilinx.rapidwright.placer.handplacer.HandPlacer;
 import com.xilinx.rapidwright.router.Router;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
@@ -656,8 +656,8 @@ public class BlockStitcher {
 			if(OPEN_HAND_PLACER) HandPlacer.openDesign(stitched);
 			return;
 		}else{
-			BlockPlacer2 placer = new BlockPlacer2();
-			placer.placeDesign(stitched, false);
+			BlockPlacer2Module placer = new BlockPlacer2Module(stitched);
+			placer.placeDesign(false);
 		}
 
 		// Create an example impl guide file
