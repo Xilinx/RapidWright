@@ -31,13 +31,13 @@ import com.xilinx.rapidwright.design.drc.NetRoutesThruLutAtMostOnce;
  * Parent DRC that executes a list of child DRCs, returning the sum of all failed checks.
  */
 public class DRC {
-    interface DrcStyleFunction {
+    interface DrcTypeSignature {
         int run(Design design, boolean strict);
     }
 
     // Static list of all DRCs to be run
-    public static final List<DrcStyleFunction> checks =
-            new ArrayList<DrcStyleFunction>() {{
+    public static final List<DrcTypeSignature> checks =
+            new ArrayList<DrcTypeSignature>() {{
         add(NetRoutesThruLutAtMostOnce::run);
     }};
 
