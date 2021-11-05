@@ -16,7 +16,7 @@ public class BlockExitSecurityManager extends SecurityManager {
     
     @Override 
     public void checkExit(int status) {
-        throw new SecurityException("Process Exited with Return Value: " + status);
+        throw new SecurityException("JVM attempted to exit with status: " + status);
     }
 
     @Override 
