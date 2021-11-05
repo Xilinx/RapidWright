@@ -69,7 +69,7 @@ public class NetRoutesThruLutAtMostOnce {
 
                             assert(DesignTools.isBELALut(bp.getBELName()));
 
-                            // Check that is pin is actually used by this BEL
+                            // Check that the pin is actually used by this BEL
                             if (c.getLogicalPinMapping(bp.getName()) == null) continue;
 
                             // Set to 1 if not exist, increment by 1 if does exist
