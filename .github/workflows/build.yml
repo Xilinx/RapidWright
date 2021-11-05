@@ -24,6 +24,11 @@ jobs:
           java-version: '11'
           cache: 'gradle'
 
+      - name: Setup Python 3.5
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.5
+
       - name: Cache Jars & Data
         id: cache-rapidwright
         uses: actions/cache@v2
@@ -33,7 +38,11 @@ jobs:
               jars
           key: rapidwright-clouddata-${{ env.RAPIDWRIGHT_VERSION }}
 
-      - name: Install RapidWright
+      - name: Install Python Dependencies
+        run: |
+          pip install pytest python/
+
+      - name: Download RapidWright Jars
         if: steps.cache-rapidwright.outputs.cache-hit != 'true'
         run: wget https://github.com/Xilinx/RapidWright/releases/download/${{ env.RAPIDWRIGHT_VERSION }}/rapidwright_jars.zip && unzip rapidwright_jars.zip
 
@@ -43,11 +52,11 @@ jobs:
       - name: Test
         run: ./gradlew test
 
-      - name: Archive Test Report
+      - name: Archive Java Test Report
         uses: actions/upload-artifact@v2
         if: always()
         with:
-          name: test-report
+          name: Java Test Report
           path: build/reports/tests/test
 
       - name: Upload Test Results
