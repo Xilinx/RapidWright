@@ -30,6 +30,7 @@ import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.util.Pair;
 
 import java.util.ArrayList;
@@ -45,9 +46,8 @@ import java.util.stream.Collectors;
  */
 public class NetRoutesThruLutAtMostOnce {
 
-    private static String lutName(Node node) {
-        String nodeWireName = node.getWireName();
-        return node.getTile().getName() + "/" + nodeWireName.substring(0, nodeWireName.length() - 1);
+    private static String getGlobalLutName(SitePin sp) {
+        return sp.getSite().getName() + "/" + sp.getPinName().charAt(0);
     }
 
     public static int run(Design design, boolean strict) {
@@ -57,8 +57,19 @@ public class NetRoutesThruLutAtMostOnce {
 
                     for (PIP p : n.getPIPs()) {
                         if (!p.isRouteThru()) continue;
+
+                        Node startNode = p.getStartNode();
+                        BELPin portPin = startNode.getSitePin().getBELPin();
+                        List<BELPin> connPins = portPin.getSiteConns();
+
+                        // Check that this BELPin is only connected to LUTs (e.g. as opposed to IOLOGIC)
+                        if (!connPins.stream()
+                                .allMatch((bp) -> DesignTools.isBELALut(bp.getBELName()))) {
+                            continue;
+                        }
+
                         // Set to 1 if not exist, increment by 1 if does exist
-                        lutRoutethrus.merge(lutName(p.getStartNode()), 1, Integer::sum);
+                        lutRoutethrus.merge(getGlobalLutName(startNode.getSitePin()), 1, Integer::sum);
                     }
 
                     for (SitePinInst spi : n.getSinkPins()) {
@@ -67,13 +78,19 @@ public class NetRoutesThruLutAtMostOnce {
                             // Filter out all non routethru cells
                             if (c == null || !c.isRoutethru()) continue;
 
-                            assert(DesignTools.isBELALut(bp.getBELName()));
-
                             // Check that the pin is actually used by this BEL
-                            if (c.getLogicalPinMapping(bp.getName()) == null) continue;
+                            if (c.getLogicalPinMapping(bp.getName()) == null) {
+                                continue;
+                            }
+
+                            // Verify this is a LUT
+                            if (!DesignTools.isBELALut(bp.getBELName())) {
+                                continue;
+                            }
 
                             // Set to 1 if not exist, increment by 1 if does exist
-                            lutRoutethrus.merge(lutName(spi.getConnectedNode()), 1, Integer::sum);
+                            SitePin sp = bp.getSitePin(spi.getSite());
+                            lutRoutethrus.merge(getGlobalLutName(sp), 1, Integer::sum);
                         }
                     }
 
