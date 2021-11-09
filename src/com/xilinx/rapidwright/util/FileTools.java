@@ -131,7 +131,7 @@ public class FileTools {
 	/** Base URL for download data files */
 	public static final String RAPIDWRIGHT_DATA_URL = "http://data.rapidwright.io/";
 	/** Suffix added to data file names to capture md5 status */
-	private static String MD5_DATA_FILE_SUFFIX = ".md5";
+	public static String MD5_DATA_FILE_SUFFIX = ".md5";
 	
 	private static boolean OVERRIDE_DATA_FILE_DOWNLOAD = false;
 
