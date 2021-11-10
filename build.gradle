@@ -24,6 +24,9 @@ if (org.gradle.api.JavaVersion.current().isJava10Compatible()) {
 }
 
 tasks.withType(Test) {
+  maxHeapSize = "5G"
+  //Propagate JVM settings to test JVM
+  jvmArgs applicationDefaultJvmArgs
   environment 'RAPIDWRIGHT_PATH',file('.')
   //We need to rerun tests when the data files change
   if (file('data').exists()) {
@@ -111,10 +114,6 @@ task testPython(type:Test) {
 testPython.dependsOn initSubmodules
 
 test {
-  maxHeapSize = "5G"
-  //Propagate JVM settings to test JVM
-  jvmArgs applicationDefaultJvmArgs
-
   dependsOn testJava
   dependsOn testPython
 }
