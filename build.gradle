@@ -63,7 +63,7 @@ task updateJars {
 
 task update_jars {
   group = "build setup"
-  description = "Alias for upateJars."
+  description = "Alias for 'updateJars'."
   dependsOn updateJars
 }
 
@@ -102,7 +102,9 @@ task testPython(type:Test) {
     exec {
       environment 'CLASSPATH', sourceSets.main.runtimeClasspath.getAsPath()
       executable = 'python3'
-      args = ['-m', 'pytest', '--import-mode=importlib', '--junitxml', "$buildDir/test-results/testPython/testPython.xml", '--rootdir', 'python/test']
+      args = ['-m', 'pytest', '--junitxml', "$buildDir/test-results/testPython/testPython.xml", '--rootdir', 'python/test']
+      // Prevent python/tests/... with the same namespace as in Java from clobbering
+      args += ['--import-mode=importlib']
       // Workaround from https://github.com/jpype-project/jpype/issues/842#issuecomment-847027355
       args += ['-p', 'no:faulthandler']
       if (!filter.commandLineIncludePatterns.isEmpty()) {
