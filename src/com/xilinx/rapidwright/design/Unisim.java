@@ -32,7 +32,7 @@ import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFLibrary;
 
 /**
- * Generated on: Thu Sep 02 22:54:36 2021
+ * Generated on: Thu Nov 04 18:28:41 2021
  * by: com.xilinx.rapidwright.release.UnisimParser
  * 
  * Enumerates supported Unisim primitives that map to Xilinx devices.
@@ -257,12 +257,18 @@ public enum Unisim {
 	GTYE5_QUAD,
 	GTYP_QUAD,
 	HARD_SYNC,
+	HBM_IO_CHNL,
+	HBM_IO_MS,
+	HBM_MC,
 	HBM_ONE_STACK_INTF,
+	HBM_PHY_CHNL,
+	HBM_PHY_MS,
 	HBM_REF_CLK,
 	HBM_SNGLBLI_INTF_APB,
 	HBM_SNGLBLI_INTF_AXI,
 	HBM_TWO_STACK_INTF,
 	HPIO_VREF,
+	HPLL,
 	HSADC,
 	HSDAC,
 	IBUF,
@@ -725,8 +731,11 @@ public enum Unisim {
 	NOC_NMU128,
 	NOC_NMU256,
 	NOC_NMU512,
+	NOC_NMU_HBM2E,
 	NOC_NPP_RPTR,
+	NOC_NPS4,
 	NOC_NPS5555,
+	NOC_NPS6,
 	NOC_NPS7575,
 	NOC_NPS_VNOC,
 	NOC_NSU128,
@@ -755,6 +764,7 @@ public enum Unisim {
 	OBUFDS_BLVDS_25,
 	OBUFDS_COMP,
 	OBUFDS_DPHY,
+	OBUFDS_DPHY_COMP,
 	OBUFDS_GTE3,
 	OBUFDS_GTE3_ADV,
 	OBUFDS_GTE4,
