@@ -1,4 +1,4 @@
-name: Build & Test Windows
+name: Build & Test
 
 on:
   push:
@@ -9,7 +9,10 @@ env:
 
 jobs:
   build:
-    runs-on: windows-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
 
@@ -52,16 +55,19 @@ jobs:
 
       - name: Archive Java Test Report
         uses: actions/upload-artifact@v2
-        if: always()
+        if: matrix.os == 'ubuntu-latest'
         with:
           name: Java Test Report
-          path: build/reports/tests/testJava
+          path: build/reports/tests/test
 
       - name: Upload Test Results
-        if: always()
+        if: matrix.os == 'ubuntu-latest'
         uses: actions/upload-artifact@v2
         with:
           name: Unit Test Results
           path: |
             build/test-results/**/*.xml
+
+      - name: Terminate Gradle to allow caching
+        run: ./gradlew --stop
 
