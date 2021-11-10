@@ -47,7 +47,7 @@ jobs:
 
       - name: Download RapidWright Jars
         if: steps.cache-rapidwright.outputs.cache-hit != 'true'
-        run: wget https://github.com/Xilinx/RapidWright/releases/download/${{ env.RAPIDWRIGHT_VERSION }}/rapidwright_jars.zip && unzip rapidwright_jars.zip
+        run: ./gradlew update_jars
 
       - name: Compile
         run: ./gradlew assemble
