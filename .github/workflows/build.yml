@@ -1,4 +1,4 @@
-name: Build & Test Windows
+name: Build & Test
 
 on:
   push:
@@ -9,9 +9,14 @@ env:
 
 jobs:
   build:
-    runs-on: windows-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
+        with:
+          submodules: recursive
 
       - uses: gradle/wrapper-validation-action@v1.0.4
 
@@ -42,7 +47,7 @@ jobs:
 
       - name: Download RapidWright Jars
         if: steps.cache-rapidwright.outputs.cache-hit != 'true'
-        run: ./gradlew update_jars
+        run: wget https://github.com/Xilinx/RapidWright/releases/download/${{ env.RAPIDWRIGHT_VERSION }}/rapidwright_jars.zip && unzip rapidwright_jars.zip
 
       - name: Compile
         run: ./gradlew assemble
@@ -55,7 +60,7 @@ jobs:
         if: always()
         with:
           name: Java Test Report
-          path: build/reports/tests/testJava
+          path: build/reports/tests/test
 
       - name: Upload Test Results
         if: always()
