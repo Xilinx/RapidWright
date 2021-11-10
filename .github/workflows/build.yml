@@ -15,8 +15,6 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
-        with:
-          submodules: recursive
 
       - uses: gradle/wrapper-validation-action@v1.0.4
 
