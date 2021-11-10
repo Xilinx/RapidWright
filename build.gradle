@@ -68,6 +68,16 @@ abstract class UpdateJarsTask extends DefaultTask {
 // Create a task using the task type
 tasks.register('update_jars', UpdateJarsTask)
 
+task updateSubmodules(type:Exec) {
+  updateSubmodules() {
+      group = "build setup"
+      description = "Update Git submodules"
+  }
+  executable = 'git'
+  args = ['submodule', 'update', '--init', '--recursive']
+}
+test.dependsOn updateSubmodules
+
 task testPython(type:Exec) {
   testPython() {
       group = "verification"
@@ -81,3 +91,5 @@ task testPython(type:Exec) {
   args += ['-p', 'no:faulthandler']
 }
 test.dependsOn testPython
+testPython.dependsOn assemble
+testPython.dependsOn updateSubmodules
