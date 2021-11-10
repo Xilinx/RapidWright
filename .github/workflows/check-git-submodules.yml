@@ -1,4 +1,4 @@
-name: Check Git submodules
+name: Submodule refs on origin
 
 on:
   pull_request:
