@@ -1,3 +1,30 @@
+============= RapidWright 2021.2.0-beta released on 2021-11-09 ================
+Notes: 
+ * Updates support for latest Vivado devices in 2021.2
+ * Adds flag information to BEL and BELPin objects (see API additions)
+ * Moves the RapidWrightDCP submodule to test/RapidWrightDCP
+ * Several Block Placer runtime and code improvements
+ * Adds a method to resolve site routing when combining designs built
+   from in-context builds into another design
+ * Adds Python support for CI
+ * Feature to catch System.exit() calls for Python REPL loops, not
+   turned on by default in Java 17 and later
+ * Adds DRC framework
+ * Fixes Issues: #195, #277, #283, #259
+ - API Additions:
+    - com.xilinx.rapidwright.device.BEL "public boolean isLUT()"
+    - com.xilinx.rapidwright.device.BEL "public boolean isFF()"
+    - com.xilinx.rapidwright.device.BEL "public boolean isCarry()"
+    - com.xilinx.rapidwright.device.BEL "public boolean isSRIMR()"
+    - com.xilinx.rapidwright.device.BEL "public boolean isSliceFFClkMod()"
+    - com.xilinx.rapidwright.device.BELPin "public boolean isPartOfBus()"
+    - com.xilinx.rapidwright.device.BELPin "public boolean isData()"
+    - com.xilinx.rapidwright.device.BELPin "public boolean isClock()"
+    - com.xilinx.rapidwright.device.BELPin "public boolean isEnable()"
+    - com.xilinx.rapidwright.device.BELPin "public boolean isSet()"
+    - com.xilinx.rapidwright.device.BELPin "public boolean isReset()"
+
+
 ============= RapidWright 2021.1.2-beta released on 2021-10-23 ================
 Notes: 
  * Includes RWRoute - a full design timing driven router
