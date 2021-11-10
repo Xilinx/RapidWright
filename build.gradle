@@ -39,29 +39,30 @@ dependencies {
   testImplementation fileTree(dir: 'jars', include: ['junit-jupiter-*.jar', 'junit-platform-*.jar'])
 }
 
-abstract class UpdateJarsTask extends DefaultTask {
-    UpdateJarsTask() {
-        group = "build setup"
-        description = "Download Jar Dependencies"
+task updateJars {
+  group = "build setup"
+  description = "Download Jar Dependencies."
+
+  doLast {
+    def f = new File('rapidwright-installer.jar')
+    if (!f.exists()) {
+        println 'Downloading...'
+        new URL('https://www.rapidwright.io/docs/_downloads/rapidwright-installer.jar').withInputStream{ i -> f.withOutputStream{ it << i }}
     }
-    @TaskAction
-    def updateJars() {
-    	def f = new File('rapidwright-installer.jar')
-        if (!f.exists()) {
-            println 'Downloading...'
-            new URL('https://www.rapidwright.io/docs/_downloads/rapidwright-installer.jar').withInputStream{ i -> f.withOutputStream{ it << i }}
-        }
-        def stdout = new StringBuilder(), stderr = new StringBuilder()
-        def proc = 'java -jar rapidwright-installer.jar -u'.execute() 
-        proc.consumeProcessOutput(stdout,stderr)
-        proc.waitForOrKill(1100000)
-        println "$stdout\n$stderr"
-        f.delete()
-    }
+    def stdout = new StringBuilder(), stderr = new StringBuilder()
+    def proc = 'java -jar rapidwright-installer.jar -u'.execute() 
+    proc.consumeProcessOutput(stdout,stderr)
+    proc.waitForOrKill(1100000)
+    println "$stdout\n$stderr"
+    f.delete()
+  }
 }
 
-// Create a task using the task type
-tasks.register('update_jars', UpdateJarsTask)
+task update_jars {
+  group = "build setup"
+  description = "Alias for upateJars."
+  dependsOn updateJars
+}
 
 task updateSubmodules(type:Exec) {
   group = "build setup"
@@ -80,20 +81,16 @@ task initSubmodules {
 test.dependsOn initSubmodules
 
 task testJava(type:Test) {
-  testJava() {
-      group = "verification"
-      description = "Runs the Java unit tests."
-  }
+  group = "verification"
+  description = "Runs the Java unit tests."
 
   useJUnitPlatform()
 }
 testJava.dependsOn updateSubmodules
 
 task testPython(type:Test) {
-  testPython() {
-      group = "verification"
-      description = "Runs the Python unit tests."
-  }
+  group = "verification"
+  description = "Runs the Python unit tests."
   doFirst {
     // Necessary because gradle will try and match against Java tests
     filter.setFailOnNoMatchingTests(false)
