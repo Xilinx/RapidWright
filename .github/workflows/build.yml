@@ -58,7 +58,7 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         with:
           name: Java Test Report
-          path: build/reports/tests/test
+          path: build/reports/tests/testJava
 
       - name: Upload Test Results
         if: matrix.os == 'ubuntu-latest'
