@@ -1,3 +1,5 @@
+import java.util.stream.Collectors
+
 apply plugin: 'application'
 apply plugin: 'java-library'
 mainClassName = "com.xilinx.rapidwright.MainEntrypoint"
@@ -19,13 +21,6 @@ sourceSets {
 //Kryo needs to access sun.nio.ch.DirectBuffer. This is forbidden by default in Java 16 and up. Check if we need to add a jvm arg.
 if (org.gradle.api.JavaVersion.current().isJava10Compatible()) {
 	applicationDefaultJvmArgs = ["--add-exports=java.base/sun.nio.ch=ALL-UNNAMED"]
-}
-
-test {
-    useJUnitPlatform()
-    maxHeapSize = "5G"
-    //Propagate JVM settings to test JVM
-    jvmArgs applicationDefaultJvmArgs
 }
 
 tasks.withType(Test) {
@@ -84,18 +79,54 @@ task initSubmodules {
 }
 test.dependsOn initSubmodules
 
-task testPython(type:Exec) {
+task testJava(type:Test) {
+  testJava() {
+      group = "verification"
+      description = "Runs the Java unit tests."
+  }
+
+  useJUnitPlatform()
+}
+testJava.dependsOn updateSubmodules
+
+task testPython(type:Test) {
   testPython() {
       group = "verification"
       description = "Runs the Python unit tests."
   }
-  environment 'RAPIDWRIGHT_PATH',file('.')
-  environment 'CLASSPATH', sourceSets.main.runtimeClasspath.getAsPath()
-  executable = 'python3'
-  args = ['-m', 'pytest', '--junitxml', "$buildDir/test-results/testPython/testPython.xml", '--rootdir', 'python/test']
-  // Workaround from https://github.com/jpype-project/jpype/issues/842#issuecomment-847027355
-  args += ['-p', 'no:faulthandler']
+  doFirst {
+    // Necessary because gradle will try and match against Java tests
+    filter.setFailOnNoMatchingTests(false)
+  }
+  doLast {
+    exec {
+      environment 'CLASSPATH', sourceSets.main.runtimeClasspath.getAsPath()
+      executable = 'python3'
+      args = ['-m', 'pytest', '--import-mode=importlib', '--junitxml', "$buildDir/test-results/testPython/testPython.xml", '--rootdir', 'python/test']
+      // Workaround from https://github.com/jpype-project/jpype/issues/842#issuecomment-847027355
+      args += ['-p', 'no:faulthandler']
+      if (!filter.commandLineIncludePatterns.isEmpty()) {
+        args += ['--pyargs'] + filter.commandLineIncludePatterns.stream().map((p) -> 'python.test.' + p).collect(Collectors.toList())
+      }
+    }
+  }
 }
-test.dependsOn testPython
-testPython.dependsOn assemble
 testPython.dependsOn initSubmodules
+
+test {
+  maxHeapSize = "5G"
+  //Propagate JVM settings to test JVM
+  jvmArgs applicationDefaultJvmArgs
+
+  dependsOn testJava
+  dependsOn testPython
+}
+
+tasks.named('test') {
+  doFirst {
+    if (!filter.commandLineIncludePatterns.isEmpty()) {
+      throw new InvalidUserDataException("'test' task cannot contain filters; apply filters directly to 'testJava'/'testPython' tasks instead.")
+    }
+  }
+}
+
