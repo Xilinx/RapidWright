@@ -42,13 +42,13 @@ jobs:
 
       - name: Download RapidWright Jars
         if: steps.cache-rapidwright.outputs.cache-hit != 'true'
-        run: gradlew update_jars
+        run: ./gradlew update_jars
 
       - name: Compile
-        run: gradlew assemble
+        run: ./gradlew assemble
 
       - name: Test
-        run: gradlew test
+        run: ./gradlew test
 
       - name: Archive Java Test Report
         uses: actions/upload-artifact@v2
