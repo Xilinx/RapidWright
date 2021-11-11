@@ -2,7 +2,7 @@ name: Publish Unit Test Results
 
 on:
   workflow_run:
-    workflows: ["Build & Test"]
+    workflows: ["Build"]
     types:
       - completed
 
