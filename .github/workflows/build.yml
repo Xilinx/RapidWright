@@ -9,7 +9,10 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
         with:
@@ -44,7 +47,7 @@ jobs:
 
       - name: Download RapidWright Jars
         if: steps.cache-rapidwright.outputs.cache-hit != 'true'
-        run: wget https://github.com/Xilinx/RapidWright/releases/download/${{ env.RAPIDWRIGHT_VERSION }}/rapidwright_jars.zip && unzip rapidwright_jars.zip
+        run: ./gradlew update_jars
 
       - name: Compile
         run: ./gradlew assemble
@@ -54,16 +57,19 @@ jobs:
 
       - name: Archive Java Test Report
         uses: actions/upload-artifact@v2
-        if: always()
+        if: matrix.os == 'ubuntu-latest'
         with:
           name: Java Test Report
           path: build/reports/tests/test
 
       - name: Upload Test Results
-        if: always()
+        if: matrix.os == 'ubuntu-latest'
         uses: actions/upload-artifact@v2
         with:
           name: Unit Test Results
           path: |
             build/test-results/**/*.xml
+
+      - name: Terminate Gradle to allow caching
+        run: ./gradlew --stop
 
