@@ -75,11 +75,12 @@ task updateSubmodules(type:Exec) {
   args = ['submodule', 'update', '--init', '--recursive']
 }
 
-task initSubmodules(type:Exec) {
+task initSubmodules {
   group = "build setup"
-  description = "Init Git submodules"
-  executable = 'git'
-  args = ['submodule', 'init']
+  description = "Init Git submodules (first time only)"
+  if (!file("test/RapidWrightDCP/.git").exists()) {
+    dependsOn updateSubmodules
+  }
 }
 test.dependsOn initSubmodules
 
