@@ -68,6 +68,22 @@ abstract class UpdateJarsTask extends DefaultTask {
 // Create a task using the task type
 tasks.register('update_jars', UpdateJarsTask)
 
+task updateSubmodules(type:Exec) {
+  group = "build setup"
+  description = "Update Git submodules"
+  executable = 'git'
+  args = ['submodule', 'update', '--init', '--recursive']
+}
+
+task initSubmodules {
+  group = "build setup"
+  description = "Init Git submodules (first time only)"
+  if (!file("test/RapidWrightDCP/.git").exists()) {
+    dependsOn updateSubmodules
+  }
+}
+test.dependsOn initSubmodules
+
 task testPython(type:Exec) {
   testPython() {
       group = "verification"
@@ -81,3 +97,5 @@ task testPython(type:Exec) {
   args += ['-p', 'no:faulthandler']
 }
 test.dependsOn testPython
+testPython.dependsOn assemble
+testPython.dependsOn initSubmodules
