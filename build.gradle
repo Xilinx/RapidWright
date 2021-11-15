@@ -67,29 +67,12 @@ task update_jars {
   dependsOn updateJars
 }
 
-task updateSubmodules(type:Exec) {
-  group = "build setup"
-  description = "Update Git submodules"
-  executable = 'git'
-  args = ['submodule', 'update', '--init', '--recursive']
-}
-
-task initSubmodules {
-  group = "build setup"
-  description = "Init Git submodules (first time only)"
-  if (!file("test/RapidWrightDCP/.git").exists()) {
-    dependsOn updateSubmodules
-  }
-}
-test.dependsOn initSubmodules
-
 task testJava(type:Test) {
   group = "verification"
   description = "Runs the Java unit tests."
 
   useJUnitPlatform()
 }
-testJava.dependsOn updateSubmodules
 
 task testPython(type:Test) {
   group = "verification"
@@ -113,18 +96,44 @@ task testPython(type:Test) {
     }
   }
 }
-testPython.dependsOn initSubmodules
 
 test {
   dependsOn testJava
   dependsOn testPython
 }
 
-tasks.named('test') {
-  doFirst {
-    if (!filter.commandLineIncludePatterns.isEmpty()) {
-      throw new InvalidUserDataException("'test' task cannot contain filters; apply filters directly to 'testJava'/'testPython' tasks instead.")
-    }
+gradle.taskGraph.whenReady {
+  if (!project.test.filter.commandLineIncludePatterns.isEmpty()) {
+    throw new InvalidUserDataException("'test' task cannot contain filters; apply filters directly to 'testJava'/'testPython' tasks instead.")
   }
+}
+
+task updateSubmodules(type:Exec) {
+  group = "build setup"
+  description = "Update Git submodules"
+  executable = 'git'
+  args = ['submodule', 'update', '--init', '--recursive']
+}
+
+task initSubmodules {
+  group = "build setup"
+  description = "Init Git submodules (first time only)"
+  if (!file("test/RapidWrightDCP/.git").exists()) {
+    dependsOn updateSubmodules
+  }
+}
+
+task remindSubmodules {
+  onlyIf {
+    testJava.state.failure != null || testPython.state.failure != null
+  }
+  doLast {
+    logger.warn('Failed tests detected. Consider checking submodule status and updating with \'./gradlew updateSubmodules\' where necessary.')
+  }
+}
+
+tasks.withType(Test) {
+  dependsOn initSubmodules
+  finalizedBy remindSubmodules
 }
 
