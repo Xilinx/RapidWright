@@ -40,6 +40,7 @@ import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
+import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
@@ -53,6 +54,12 @@ import com.xilinx.rapidwright.util.Utils;
  *
  */
 public class RelocationTools {
+
+    public static final Set<SiteTypeEnum> supportedTypes;
+    static {
+        supportedTypes = Utils.sliceDspBramUramTypes;
+        supportedTypes.add(SiteTypeEnum.BUFGCE);
+    }
 
     /**
      * Relocate all SiteInsts (and all associated PIPs) belonging to the logical Cell at
@@ -100,7 +107,7 @@ public class RelocationTools {
                 continue;
             }
 
-            if (!Utils.sliceDspBramUramTypes.contains(si.getSiteTypeEnum())) {
+            if (!supportedTypes.contains(si.getSiteTypeEnum())) {
                 System.out.println("WARNING: Skipping cell '" + leaf.getFullHierarchicalInstName() +
                         "' as it is placed onto a SiteInst type '" + si.getSiteTypeEnum() + "'");
                 continue;
