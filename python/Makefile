@@ -1,4 +1,19 @@
-
+###############################################################################
+# Notes on Release:
+# Test PyPi might already have some existing versions that conflict with the 
+# version to be released as past fix/update cycles consume future version
+# numbers.  Thus, to test a new release, consult:
+# https://test.pypi.org/manage/project/rapidwright/releases/
+# to find the next available release version.
+#  1. Run 'make update_version' to update the files with the version to release
+#  2. Modify setup.py to the Test PyPi available version number (if needed)
+#  3. Run 'make package'
+#  4. Run 'test_upload'
+#  5. Test the package download and install in a venv from Test PyPi to ensure
+#     The package and release is good.
+#  6. If step 2 was run, run 'make clean; make update_version; make package'
+#  7. Upload to PyPi with 'make upload_to_pypi'
+###############################################################################
 LIC_FILE=LICENSE.TXT
 RWVER=
 

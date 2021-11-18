@@ -6,7 +6,7 @@ pip install rapidwright
 ```
 
 # How it Works
-RapidWright is written in Java, however, a project called [jpype1](https://github.com/jpype-project/jpype) allows Python to natively access the JVM and provide access to Java libraries.  Here is how you can use RapidWright in your Python scripts and programs:
+RapidWright is written in Java, however, a project called [JPype](https://github.com/jpype-project/jpype) allows Python to natively access the JVM and provide access to Java libraries.  Here is how you can use RapidWright in your Python scripts and programs:
 ```
 # This will start a JVM instance 
 import rapidwright
@@ -46,5 +46,21 @@ Output:
 ------------------------------------------------------------------------------
          [No GC] *Total*:     0.065s
 [and2(BEL: A6LUT), led0(BEL: OUTBUF), button0(BEL: INBUF_EN), button1(BEL: INBUF_EN)]
+```
 
+By default, RapidWright for Python will download the corresponding 'standalone' Java
+package from [Releases](https://github.com/Xilinx/RapidWright/releases) and use that.
+However, for developers, if the `RAPIDWRIGHT_PATH` environment variable is set then
+the Java VM will use the version of RapidWright found according to the standard
+`CLASSPATH` environment variable instead.
+
+# Custom JVM Options
+`JAVA_TOOL_OPTIONS` can be used to add options to JPype's JVM, which is started automatically.  For example:
+
+```
+$python3 -c "import rapidwright; from java.lang import Runtime; print(Runtime.getRuntime().maxMemory() / 1024 / 1024)"
+14279.5
+$ JAVA_TOOL_OPTIONS="-Xmx32G" python3 -c "import rapidwright; from java.lang import Runtime; print(Runtime.getRuntime().maxMemory() / 1024 / 1024)"
+Picked up JAVA_TOOL_OPTIONS: -Xmx32G
+29127.5
 ```

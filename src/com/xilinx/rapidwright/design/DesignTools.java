@@ -30,6 +30,7 @@ import java.io.PrintStream;
 import java.math.BigInteger;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -44,6 +45,7 @@ import java.util.Map.Entry;
 import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.design.blocks.UtilizationType;
 import com.xilinx.rapidwright.device.BEL;
@@ -69,9 +71,13 @@ import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFPropertyValue;
 import com.xilinx.rapidwright.edif.EDIFTools;
+import com.xilinx.rapidwright.placer.blockplacer.BlockPlacer2Impls;
+import com.xilinx.rapidwright.placer.blockplacer.ImplsInstancePort;
+import com.xilinx.rapidwright.placer.blockplacer.ImplsPath;
 import com.xilinx.rapidwright.router.RouteNode;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.FileTools;
+import com.xilinx.rapidwright.util.Installer;
 import com.xilinx.rapidwright.util.Job;
 import com.xilinx.rapidwright.util.JobQueue;
 import com.xilinx.rapidwright.util.LocalJob;
@@ -88,6 +94,7 @@ import com.xilinx.rapidwright.util.Utils;
 public class DesignTools {
 
 	private static int uniqueBlackBoxCount = 0;
+	private static List<PIP> pips;
 
 	/**
 	 * Tries to identify the clock pin source for the given user signal output by
@@ -999,7 +1006,11 @@ public class DesignTools {
 	 * @param hierarchicalCellName The name of the hierarchical cell to become a black box.
 	 */
 	public static void makeBlackBox(Design d, String hierarchicalCellName) {
-		makeBlackBox(d, d.getNetlist().getHierCellInstFromName(hierarchicalCellName));
+		final EDIFHierCellInst inst = d.getNetlist().getHierCellInstFromName(hierarchicalCellName);
+		if (inst == null) {
+			throw new IllegalStateException("Did not find cell to make into a blackbox: "+hierarchicalCellName);
+		}
+		makeBlackBox(d, inst);
 	}
 	/**
 	 * Turns the cell named hierarchicalCell into a blackbox and removes any
@@ -2459,14 +2470,71 @@ public class DesignTools {
 	}
 
 	/**
-	 * Use Vivado to create a readable version of the EDIF file inside a Checkpoint.
+	 * Gets the corresponding EDIF directory created when auto generating EDIF from Vivado.
+	 * @param dcpFile The source DCP file path
+	 * @return The directory where auto generated .edf and .edn files go.
+	 */
+	public static Path getDefaultReadableEDIFDir(Path dcpFile) {
+	    return Paths.get(dcpFile.toString() + ".edf");
+	}
+	
+	/**
+	 * Gets the corresponding MD5 file path for a DCP that has had its EDIF file auto-generated
+	 * @param dcpFile The Path to the DCP source
+	 * @param edfDir The directory containing the auto-generated edf and md5 file
+	 * @return The path to the MD5 file
+	 */
+	public static Path getDCPAutoGenMD5FilePath(Path dcpFile, Path edfDir) {
+	    return edfDir.resolve(dcpFile.getFileName().toString() + ".md5");
+	}
+	
+	/**
+	 * Gets the path to the auto-generated EDIF file for the provided DCP and EDIF directory.
+	 * @param dcpFile The Path to the DCP source 
+	 * @param edfDir The directory where the auto-generated EDIF is stored 
+	 * @return The path to the auto-generated EDIF file
+	 */
+	public static Path getEDFAutoGenFilePath(Path dcpFile, Path edfDir) {
+	    return edfDir.resolve(FileTools.replaceExtension(dcpFile.getFileName(), ".edf"));
+	}
+	
+	/**
+	 * Use Vivado to create a readable version of the EDIF file inside a design checkpoint. If no
+	 * edf file name is provided (edfFileName=null), it will manage over-written DCPs with an md5 
+	 * hash so that edf can stay in sync with a DCP.  
 	 * @param dcp the checkpoint
 	 * @param edfFileName filename to use or null if we should select a filename
-	 * @return the output edif filename
+	 * @return the readable output edif filename
 	 */
 	public static Path generateReadableEDIF(Path dcp, Path edfFileName) {
+	    String currMD5 = null;
+	    Path existingMD5File = null;
 		if (edfFileName == null) {
-			edfFileName = FileTools.replaceExtension(dcp, ".edf");
+		    // We'll manage the creation and location of the edf file, DCP will be checked with 
+		    // an MD5 hash so that if it changes, we re-update the edf file
+		    currMD5 = Installer.calculateMD5OfFile(dcp);
+		    Path edfDir = getDefaultReadableEDIFDir(dcp);
+            existingMD5File = getDCPAutoGenMD5FilePath(dcp, edfDir);
+            edfFileName = getEDFAutoGenFilePath(dcp, edfDir);
+            if(!Files.exists(edfDir)) {
+                FileTools.makeDirs(edfDir.toString());
+            } 
+        
+            // Check if a previously auto-generated edf is still usable
+            String existingMD5 = FileTools.getStoredMD5FromFile(existingMD5File);
+            if(Files.exists(edfFileName)) {
+                if(currMD5.equals(existingMD5)) {
+                    return edfFileName; 
+                }else {
+                    try {
+                        Files.delete(edfFileName);
+                    } catch (IOException e) {
+                        throw new RuntimeException("ERROR: Couldn't auto-generate updated edf file"
+                                + " as the file appears to be in use or no permission to do so.");
+                    }
+                }
+            }
+            
 		}
 		JobQueue queue = new JobQueue();
 		Job job = generateReadableEDIFJob(dcp, edfFileName);
@@ -2475,6 +2543,156 @@ public class DesignTools {
 			throw new RuntimeException("Generating Readable EDIF job failed");
 		}
 		FileTools.deleteFolder(job.getRunDir());
+		if(currMD5 != null && existingMD5File != null) {
+	        FileTools.writeStringToTextFile(currMD5, existingMD5File.toString());		    
+		}
 		return edfFileName;
 	}
+
+	/**
+	 * When importing designs that have been taken from an in-context implementation
+	 * (write_checkpoint -cell), often Vivado will write out residual nets that do not necessarily
+	 * exist in the module or are retaining GND/VCC routing from the parent context.  This method
+	 * will resolve conflicts by examining the site routing leading from input ports to the sinks
+	 * and update the site routing to the appropriate net as dictated in the new design.  GND and
+	 * VCC will be replaced by the name of the source net being driven by the input ports.
+	 * @param design The design of interest.
+	 */
+    public static void resolveSiteRoutingFromInContextPorts(Design design) {
+        EDIFNetlist netlist = design.getNetlist();
+        for(EDIFNet net : design.getTopEDIFCell().getNets()) {
+            EDIFHierNet parentNet = netlist.getHierNetFromName(net.getName());
+            Set<EDIFHierNet> aliases = null;
+            for(EDIFPortInst portInst : net.getSourcePortInsts(true)) {
+                // Identify top level inport ports
+                if(portInst.isTopLevelPort() && portInst.isInput()) {
+                    List<EDIFHierPortInst> portInsts = netlist.getSinksFromNet(parentNet);
+                    // Iterate over all sinks of the physical net to identify potential site routing
+                    // issues
+                    for(EDIFHierPortInst sink : portInsts){
+                        Cell c = design.getCell(sink.getFullHierarchicalInstName());
+                        if(c == null || !c.isPlaced()) continue;
+                        SiteInst i = c.getSiteInst();
+                        String logicalPinName = sink.getPortInst().getName();
+                        List<String> siteWires = new ArrayList<>();
+                        // Using this method just to get site wires along the path
+                        c.getSitePinFromLogicalPin(logicalPinName, siteWires);
+                        for(String siteWire : siteWires) {
+                            Net existingSiteRoutedNet = i.getNetFromSiteWire(siteWire);
+                            if(existingSiteRoutedNet == null) continue;
+                            EDIFHierNet currNet = netlist.getHierNetFromName(existingSiteRoutedNet.getName());
+                            if(aliases == null) {
+                                aliases = new HashSet<>(netlist.getNetAliases(parentNet));
+                            }
+                            if(aliases.contains(currNet)) continue;
+                            String updateNetName = parentNet.getHierarchicalNetName();
+                            Net updateNet = design.getNet(updateNetName);
+                            if(updateNet == null) {
+                                updateNet = design.createNet(updateNetName, parentNet.getNet());
+                            }
+                            BELPin belPin = i.getSiteWirePins(siteWire)[0];
+                            i.unrouteIntraSiteNet(belPin, belPin);
+                            if(i.getSiteWiresFromNet(existingSiteRoutedNet).size() == 0) {
+                                existingSiteRoutedNet.getSiteInsts().remove(i);
+                            }
+                            i.routeIntraSiteNet(updateNet, belPin, belPin);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+	/**
+	 * Create a {@link ModuleImplsInst}, i.e. a Module instance with flexible implementation. If an edif cell inst
+	 * of the given name already exists in the design hierarchy, it will be used for the module. Otherwise, a new
+	 * EDIF Cell Inst will be created.
+	 * @param design the design
+	 * @param name name of the module instance
+	 * @param module the module to use
+	 * @return the newly created instance
+	 */
+	public static ModuleImplsInst createModuleImplsInst(Design design, String name, ModuleImpls module) {
+		EDIFCellInst cell = design.createOrFindEDIFCellInst(name, module.getNetlist().getTopCell());
+		return new ModuleImplsInst(name, cell, module);
+	}
+
+	/**
+	 * Find the physical net corresponding to a {@link ModuleImplsInst}'s port
+	 * @param port the port to find the net for
+	 * @param instanceMap map from {@link ModuleImplsInst} to the corresponding real {@link ModuleInst}
+	 * @return the physical net. This can only be null if the port has no pins
+	 */
+	private static Net findPortNet(ImplsInstancePort port, Map<ModuleImplsInst, ModuleInst> instanceMap) {
+		if (port instanceof ImplsInstancePort.SitePinInstPort) {
+			SitePinInst spi = ((ImplsInstancePort.SitePinInstPort) port).getSitePinInst();
+			Net net = spi.getNet();
+			if (net == null) {
+				throw new IllegalStateException("No net on SPI "+spi);
+			}
+			return net;
+		} else if (port instanceof ImplsInstancePort.InstPort) {
+			ImplsInstancePort.InstPort instPort = (ImplsInstancePort.InstPort) port;
+			final Module module = instPort.getInstance().getCurrentModuleImplementation();
+			Port modPort = module.getPort(instPort.getPort());
+			ModuleInst moduleInst = instanceMap.get(instPort.getInstance());
+			Net net = moduleInst.getCorrespondingNet(modPort);
+			if (net == null && !modPort.getSitePinInsts().isEmpty()) {
+				throw new IllegalStateException("No net on module port "+moduleInst+"."+modPort.getName()+" but we have pins");
+			}
+
+			if (!modPort.getPassThruPortNames().isEmpty() && port.isOutputPort()) {
+				final List<String> inPorts = modPort.getPassThruPortNames().stream().filter(p -> !module.getPort(p).isOutPort())
+						.collect(Collectors.toList());
+				if (inPorts.size()>1) {
+					throw new IllegalStateException("Multiple inputs connected to "+instPort.getInstance().getName()+"."+instPort.getName()+": "+inPorts);
+				} else if (inPorts.size() == 1) {
+					final ImplsInstancePort otherPort = instPort.getInstance().getPort(inPorts.get(0));
+					final ImplsInstancePort source = otherPort.getPath().findSource();
+					return findPortNet(source, instanceMap);
+				} //Else we only have multiple outs sourced by the same Pin internally, nothing to do
+			}
+
+			return net;
+		} else {
+			throw new IllegalStateException("unknown subtype!");
+		}
+	}
+
+	/**
+	 * In a design containing {@link ModuleImplsInst}s, convert them into {@link ModuleInst}s so that the design
+	 * can be exported to a checkpoint
+	 * @param design the design
+	 * @param instances the instances to be converted
+	 * @param paths nets connecting the instances as returned by {@link BlockPlacer2Impls#getPaths()}
+	 */
+	public static void createModuleInstsFromModuleImplsInsts(Design design, Collection<ModuleImplsInst> instances, Collection<ImplsPath> paths) {
+		Map<ModuleImplsInst, ModuleInst> instanceMap = new HashMap<>();
+		for (ModuleImplsInst implsInst : instances) {
+			ModuleInst modInst = design.createModuleInst(implsInst.getName(), implsInst.getCurrentModuleImplementation());
+			boolean success = modInst.place(implsInst.getPlacement().placement);
+			if (!success) {
+				throw new IllegalStateException("could not place module "+modInst.getName()+" at "+implsInst.getPlacement().placement);
+			}
+			instanceMap.put(implsInst, modInst);
+		}
+		for (ImplsPath path : paths) {
+			Net net = null;
+			for (ImplsInstancePort port : path) {
+				Net portNet = findPortNet(port, instanceMap);
+				if (portNet == null) {
+					continue;
+				}
+				if (net == null) {
+					net = portNet;
+				} else if (port.isOutputPort()) {
+					design.movePinsToNewNetDeleteOldNet(net, portNet, false);
+					net = portNet;
+				} else {
+					design.movePinsToNewNetDeleteOldNet(portNet, net, false);
+				}
+			}
+		}
+	}
+
 }

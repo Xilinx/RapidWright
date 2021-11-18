@@ -217,7 +217,7 @@ public class RapidWright {
 			}
 		}
 		
-		
+		FileTools.blockSystemExitCalls();
 		jython.main(args);
 	}
 }

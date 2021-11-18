@@ -45,6 +45,10 @@ dependencies {
 }
 
 abstract class UpdateJarsTask extends DefaultTask {
+    UpdateJarsTask() {
+        group = "build setup"
+        description = "Download Jar Dependencies"
+    }
     @TaskAction
     def updateJars() {
     	def f = new File('rapidwright-installer.jar')
@@ -63,3 +67,35 @@ abstract class UpdateJarsTask extends DefaultTask {
 
 // Create a task using the task type
 tasks.register('update_jars', UpdateJarsTask)
+
+task updateSubmodules(type:Exec) {
+  group = "build setup"
+  description = "Update Git submodules"
+  executable = 'git'
+  args = ['submodule', 'update', '--init', '--recursive']
+}
+
+task initSubmodules {
+  group = "build setup"
+  description = "Init Git submodules (first time only)"
+  if (!file("test/RapidWrightDCP/.git").exists()) {
+    dependsOn updateSubmodules
+  }
+}
+test.dependsOn initSubmodules
+
+task testPython(type:Exec) {
+  testPython() {
+      group = "verification"
+      description = "Runs the Python unit tests."
+  }
+  environment 'RAPIDWRIGHT_PATH',file('.')
+  environment 'CLASSPATH', sourceSets.main.runtimeClasspath.getAsPath()
+  executable = 'python3'
+  args = ['-m', 'pytest', '--junitxml', "$buildDir/test-results/testPython/testPython.xml", '--rootdir', 'python/test']
+  // Workaround from https://github.com/jpype-project/jpype/issues/842#issuecomment-847027355
+  args += ['-p', 'no:faulthandler']
+}
+test.dependsOn testPython
+testPython.dependsOn assemble
+testPython.dependsOn initSubmodules

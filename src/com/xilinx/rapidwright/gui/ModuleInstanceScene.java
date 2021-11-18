@@ -26,7 +26,7 @@ public class ModuleInstanceScene extends TileScene {
         return new QPointF(x*tileSize, y*tileSize);
     }
 
-    public ModuleInstanceScene(ModuleInst moduleInstance) {
+    public ModuleInstanceScene(ModuleInst moduleInstance, boolean showPlacements) {
         super(moduleInstance.getDesign(), false, true);
 
         this.moduleInstance = moduleInstance;
@@ -39,19 +39,25 @@ public class ModuleInstanceScene extends TileScene {
 
         validPlacements = moduleInstance.getAllValidPlacements();
 
-        for (Site placement : validPlacements) {
-            QPolygonF poly = ghmpi.getShape().clone();
-            QGraphicsPolygonItem polyItem = new QGraphicsPolygonItem();
-            polyItem.setPolygon(poly);
-            polyItem.setBrush(QBrush.NoBrush);
-            polyItem.setPen(new QPen(QColor.red, 5));
-            QPointF tilePos = getTilePos(placement.getTile());
-            polyItem.setPos(tilePos.subtract(ghmpi.getAnchorOffset()));
-            addItem(polyItem);
+        if (showPlacements) {
+            for (Site placement : validPlacements) {
+                QPolygonF poly = ghmpi.getShape().clone();
+                QGraphicsPolygonItem polyItem = new QGraphicsPolygonItem();
+                polyItem.setPolygon(poly);
+                polyItem.setBrush(QBrush.NoBrush);
+                polyItem.setPen(new QPen(QColor.red, 5));
+                QPointF tilePos = getTilePos(placement.getTile());
+                polyItem.setPos(tilePos.subtract(ghmpi.getAnchorOffset()));
+                addItem(polyItem);
+            }
         }
 
 
     }
+    public ModuleInstanceScene(ModuleInst moduleInstance) {
+        this(moduleInstance, true);
+    }
+
 
     public ArrayList<Site> getValidPlacements() {
         return validPlacements;

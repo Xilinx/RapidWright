@@ -1,4 +1,4 @@
-package com.xilinx.rapidwright.checker;
+package com.xilinx.rapidwright.support;
 
 import java.io.IOException;
 import java.lang.management.ManagementFactory;

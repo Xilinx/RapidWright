@@ -61,7 +61,7 @@ public abstract class DotGraphDumper<InstanceT, PortT, PortTemplateT, NetT, Desi
                 return true;
             }
 
-            Stream<PortT> ports = i != null ? getPorts(i) : getRootPorts(design);
+            Stream<? extends PortT> ports = i != null ? getPorts(i) : getRootPorts(design);
 
             return ports
                     .map(this::getPortNet)
@@ -82,17 +82,17 @@ public abstract class DotGraphDumper<InstanceT, PortT, PortTemplateT, NetT, Desi
 
     protected abstract NetT getPortNet(PortT p);
 
-    protected abstract Stream<InstanceT> getInstances(DesignT design);
-    protected abstract Stream<PortT> getPorts(InstanceT instance);
-    protected abstract Stream<PortTemplateT> getPortTemplates(InstanceT instance);
-    protected abstract Stream<NetT> getNets(DesignT design);
-    protected abstract Stream<PortT> getNetPorts(NetT net);
+    protected abstract Stream<? extends InstanceT> getInstances(DesignT design);
+    protected abstract Stream<? extends PortT> getPorts(InstanceT instance);
+    protected abstract Stream<? extends PortTemplateT> getPortTemplates(InstanceT instance);
+    protected abstract Stream<? extends NetT> getNets(DesignT design);
+    protected abstract Stream<? extends PortT> getNetPorts(NetT net);
     protected abstract boolean isOutputPort(PortT port);
     protected abstract boolean isOutputPortTemplate(PortTemplateT port);
     protected abstract String getInstanceName(InstanceT instance);
     protected abstract String getPortName(PortT port);
     protected abstract String getPortTemplateName(PortTemplateT port);
-    protected abstract Stream<PortT> getRootPorts(DesignT design);
+    protected abstract Stream<? extends PortT> getRootPorts(DesignT design);
     protected abstract String getNetName(NetT net);
     protected abstract Map<?, ?> getInstanceProperties(InstanceT instance, DesignT design);
     protected abstract InstanceT getPortInstance(PortT port);
@@ -199,7 +199,7 @@ public abstract class DotGraphDumper<InstanceT, PortT, PortTemplateT, NetT, Desi
 
     private Map<PortT, String> dumpCells(DesignT design, PrintWriter pw, BiPredicate<InstanceT, DesignT> filter) {
         PrimitiveIterator.OfInt ids = IntStream.iterate(0, i -> i + 1).iterator();
-        Stream<InstanceT> instances = getInstances(design)
+        Stream<? extends InstanceT> instances = getInstances(design)
                 .filter(i->filter.test(i, design));
         return instances
                 .map(inst -> dumpInstance(pw, ids, inst, design))
@@ -223,7 +223,7 @@ public abstract class DotGraphDumper<InstanceT, PortT, PortTemplateT, NetT, Desi
 
     private void dumpConnections(DesignT design, Map<PortT, String> portIds, PrintWriter pw, BiPredicate<InstanceT, DesignT> filter) {
 
-        Stream<NetT> nets = getNets(design)
+        Stream<? extends NetT> nets = getNets(design)
                 .filter(n->getNetPorts(n).anyMatch(port->filter.test(getPortInstance(port), design)));
 
         Iterator<String> netIdIter = IntStream.iterate(0, i -> i + 1).mapToObj(i -> "net" + i).iterator();
@@ -235,24 +235,37 @@ public abstract class DotGraphDumper<InstanceT, PortT, PortTemplateT, NetT, Desi
 
     }
 
-    private void dumpConnectionsDirect(DesignT design, Map<PortT, String> portIds, PrintWriter pw, BiPredicate<InstanceT, DesignT> filter, Stream<NetT> nets, Iterator<String> netIdIter) {
+    private static class SingleIteratorIterable<T>  implements Iterable<T>{
+        private final Iterator<T> iterator;
+
+        private SingleIteratorIterable(Iterator<T> iterator) {
+            this.iterator = iterator;
+        }
+
+        @Override
+        public Iterator<T> iterator() {
+            return iterator;
+        }
+    }
+
+    private void dumpConnectionsDirect(DesignT design, Map<PortT, String> portIds, PrintWriter pw, BiPredicate<InstanceT, DesignT> filter, Stream<? extends NetT> nets, Iterator<String> netIdIter) {
         nets
                 .forEach(net -> {
                     List<String> sourceIDs = new ArrayList<>();
                     List<String> sinkIDs = new ArrayList<>();
 
-                    int filteredOutSources = 0;
-                    int filteredOutSinks = 0;
+                    List<PortT> filteredOutSources = new ArrayList<>();
+                    List<PortT> filteredOutSinks = new ArrayList<>();
 
-                    for (PortT port : (Iterable<PortT>) getNetPorts(net)::iterator) {
+                    getNetPorts(net).forEach(port -> {
                         boolean isSource = isOutputPort(port);
                         boolean isShown = filter.test(getPortInstance(port), design);
 
                         if (!isShown) {
                             if (isSource) {
-                                filteredOutSources++;
+                                filteredOutSources.add(port);
                             } else {
-                                filteredOutSinks++;
+                                filteredOutSinks.add(port);
                             }
                         } else {
                             String id = portIds.get(port);
@@ -269,17 +282,17 @@ public abstract class DotGraphDumper<InstanceT, PortT, PortTemplateT, NetT, Desi
                                 sinkIDs.add(id);
                             }
                         }
-                    }
+                    });
 
 
-                    if (sinkIDs.size() > 1 && sourceIDs.isEmpty() && filteredOutSources > 0) {
+                    if (sinkIDs.size() > 1 && sourceIDs.isEmpty() && !filteredOutSources.isEmpty()) {
                         //There are multiple sinks, but all sources are hidden. Let's add a source node
                         String id = netIdIter.next();
                         pw.println(id + "[label=\"hidden Source of " + escapeText(getNetName(net)) + "\"];");
                         sourceIDs.add(id);
                     }
 
-                    if (sourceIDs.size() > 1 && sinkIDs.isEmpty() && filteredOutSinks > 0) {
+                    if (sourceIDs.size() > 1 && sinkIDs.isEmpty() && !filteredOutSinks.isEmpty()) {
                         //There are multiple sources, but all sinks are hidden. Let's add a sink node
                         String id = netIdIter.next();
                         pw.println(id + "[label=\"hidden Sink of " + escapeText(getNetName(net)) + "\", style=\"dashed\"];");
@@ -295,7 +308,7 @@ public abstract class DotGraphDumper<InstanceT, PortT, PortTemplateT, NetT, Desi
                 });
     }
 
-    private void dumpConnectionsNetNode(DesignT design, Map<PortT, String> portIds, PrintWriter pw, BiPredicate<InstanceT, DesignT> filter, Stream<NetT> nets, Iterator<String> netIdIter) {
+    private void dumpConnectionsNetNode(DesignT design, Map<PortT, String> portIds, PrintWriter pw, BiPredicate<InstanceT, DesignT> filter, Stream<? extends NetT> nets, Iterator<String> netIdIter) {
         nets
                 .forEach(net -> {
                     String nid = netIdIter.next();

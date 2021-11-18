@@ -1,3 +1,51 @@
+============= RapidWright 2021.2.0-beta released on 2021-11-09 ================
+Notes: 
+ * Updates support for latest Vivado devices in 2021.2
+ * Adds flag information to BEL and BELPin objects (see API additions)
+ * Moves the RapidWrightDCP submodule to test/RapidWrightDCP
+ * Several Block Placer runtime and code improvements
+ * Adds a method to resolve site routing when combining designs built
+   from in-context builds into another design
+ * Adds Python support for CI
+ * Feature to catch System.exit() calls for Python REPL loops, not
+   turned on by default in Java 17 and later
+ * Adds DRC framework
+ * Fixes Issues: #195, #277, #283, #259
+ - API Additions:
+    - com.xilinx.rapidwright.device.BEL "public boolean isLUT()"
+    - com.xilinx.rapidwright.device.BEL "public boolean isFF()"
+    - com.xilinx.rapidwright.device.BEL "public boolean isCarry()"
+    - com.xilinx.rapidwright.device.BEL "public boolean isSRIMR()"
+    - com.xilinx.rapidwright.device.BEL "public boolean isSliceFFClkMod()"
+    - com.xilinx.rapidwright.device.BELPin "public boolean isPartOfBus()"
+    - com.xilinx.rapidwright.device.BELPin "public boolean isData()"
+    - com.xilinx.rapidwright.device.BELPin "public boolean isClock()"
+    - com.xilinx.rapidwright.device.BELPin "public boolean isEnable()"
+    - com.xilinx.rapidwright.device.BELPin "public boolean isSet()"
+    - com.xilinx.rapidwright.device.BELPin "public boolean isReset()"
+
+
+============= RapidWright 2021.1.2-beta released on 2021-10-23 ================
+Notes: 
+ * Includes RWRoute - a full design timing driven router
+ * Moves online discussions and forum to GitHub Discussions
+   https://github.com/Xilinx/RapidWright/discussions (retiring Google Groups).
+ * Turns off Kryo Unsafe usage for Java 15 and above
+ * Better auto generation handling of readable EDIF files.  Creates an
+   MD5 checksum for DCPs and unique directory for EDIFs to avoid stale EDIFs.
+ * Includes Python packaging files and adds the option to use local
+   development RapidWright build when RAPIDWRIGHT_PATH is set (see #267)
+ * Adds RapidWright relocation tools - the ability to relocate
+   implementations without using Modules/ModuleInsts.
+ * Includes a performance evaluation tool to leverage Vivado to
+   identify true fmax of a design.
+ * Improves PartNameTools to return integer values of available
+   resources of a part.
+ * Fixes Issues #259, #246, #73, #251, #190
+ - API Additions:
+    - com.xilinx.rapidwright.design.Design "public static boolean replaceEDIFinDCP(String dcpFileName, String edfFileName)"
+
+
 ============= RapidWright 2021.1.1-beta released on 2021-09-28 ================
 Notes: 
  * Fixes ModuleInst anchor read issue when loading a RapidWright-generated DCP
@@ -26,6 +74,9 @@ Notes:
    EDIF file when loading a DCP (if a compatible Vivado is on user's PATH).
  * Moves timing model files into git repo (out of data directory)
  * Includes fixes for #180, #217
+ - API Additions:
+    - com.xilinx.rapidwright.design.Design "public static void setAutoGenerateReadableEdif(boolean autoGenerateReadableEdif)"
+    - com.xilinx.rapidwright.design.Design "public static boolean isAutoGenerateReadableEdif()"
 
 
 ============= RapidWright 2020.2.7-beta released on 2021-07-26 ================

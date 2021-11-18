@@ -5,8 +5,8 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map.Entry;
 
-import com.esotericsoftware.kryo.unsafe.UnsafeInput;
-import com.esotericsoftware.kryo.unsafe.UnsafeOutput;
+import com.esotericsoftware.kryo.io.Input;
+import com.esotericsoftware.kryo.io.Output;
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
@@ -44,7 +44,7 @@ public class RouteThruHelper {
     }
     
     private void writeFile() {
-        UnsafeOutput out = FileTools.getUnsafeOutputStream(getSerializedFileName(device));
+        Output out = FileTools.getKryoOutputStream(getSerializedFileName(device));
         out.writeInt(routeThrus.size());
         for(Entry<TileTypeEnum, HashSet<Integer>> e : routeThrus.entrySet()) {
             out.writeString(e.getKey().toString());
@@ -58,7 +58,7 @@ public class RouteThruHelper {
     
     private void readFile(){
         routeThrus = new HashMap<TileTypeEnum, HashSet<Integer>>();
-        UnsafeInput in = FileTools.getUnsafeInputStream(getSerializedFileName(device));
+        Input in = FileTools.getKryoInputStream(getSerializedFileName(device));
         int count = in.readInt();
         for(int i=0; i < count; i++) {
             TileTypeEnum type = TileTypeEnum.valueOf(in.readString());

@@ -71,6 +71,7 @@ import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
 import com.esotericsoftware.kryo.unsafe.UnsafeInput;
 import com.esotericsoftware.kryo.unsafe.UnsafeOutput;
+import com.esotericsoftware.kryo.util.Util;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.FamilyType;
 import com.xilinx.rapidwright.device.Part;
@@ -130,9 +131,11 @@ public class FileTools {
 	/** Base URL for download data files */
 	public static final String RAPIDWRIGHT_DATA_URL = "http://data.rapidwright.io/";
 	/** Suffix added to data file names to capture md5 status */
-	private static String MD5_DATA_FILE_SUFFIX = ".md5";
+	public static String MD5_DATA_FILE_SUFFIX = ".md5";
 	
 	private static boolean OVERRIDE_DATA_FILE_DOWNLOAD = false;
+
+	private static Boolean useKryoUnsafeStreams = null;
 	
 	static {
 		// TODO - This turns off illegal reflective access warnings in Java 9+
@@ -159,32 +162,80 @@ public class FileTools {
 	//===================================================================================//
 	/* Get Streams                                                                       */
 	//===================================================================================//
-	public static UnsafeOutput getUnsafeOutputStream(String fileName){
+	public static Output getKryoOutputStream(String fileName){
 		FileOutputStream fos = null; 
 		try {
 			fos = new FileOutputStream(fileName);
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
 		}
-		return getUnsafeOutputStream(fos);
+		return getKryoOutputStream(fos);
 	}
 	
-	public static UnsafeOutput getUnsafeOutputStream(OutputStream os){
-		return new UnsafeOutput(new DeflaterOutputStream(os));
+	public static Output getKryoOutputStream(OutputStream os){
+		return useUnsafeStreams() ? new UnsafeOutput(new DeflaterOutputStream(os)) 
+		                          : new Output(new DeflaterOutputStream(os));
 	}
+
+    public static Output getKryoOutputStreamWithoutDeflater(OutputStream os){
+        return useUnsafeStreams() ? new UnsafeOutput(os) 
+                                  : new Output(os);
+    }
 	
-	public static UnsafeInput getUnsafeInputStream(String fileName){
+	
+	public static Input getKryoInputStream(String fileName){
 		FileInputStream fis = null;
 		try {
 			fis = new FileInputStream(fileName);
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
 		}
-		return getUnsafeInputStream(fis);
+		return getKryoInputStream(fis);
 	}
 	
-	public static UnsafeInput getUnsafeInputStream(InputStream in){
-		return new UnsafeInput(new InflaterInputStream(in));
+	public static Input getKryoInputStream(InputStream in){
+		return useUnsafeStreams() ? new UnsafeInput(new InflaterInputStream(in)) 
+		                          : new Input(new InflaterInputStream(in)) ;
+	}
+
+    public static Input getKryoInputStreamWithoutInflater(InputStream in){
+        return useUnsafeStreams() ? new UnsafeInput(in) 
+                                  : new Input(in);
+    }
+	
+	
+	/**
+	 * Checks if Kryo Unsafe Streams can/should be used.  They provide a performance advantage
+	 * but are not (as easily) available in Java 16+.  
+	 * @return True if unsafe streams are to be used, false otherwise.
+	 */
+	public static boolean useUnsafeStreams() {
+	    if(useKryoUnsafeStreams == null) {
+	        try {
+	            useKryoUnsafeStreams = Util.unsafe && getJavaVersion() < 16;	            
+	        } catch (Exception e) {
+	            // Don't crash on failure to check, just don't use them
+	            useKryoUnsafeStreams = false;
+	        }
+	    }
+	    return useKryoUnsafeStreams;
+	}
+	
+	/**
+	 * Gets the current runtime version number.  Correctly handles 1.8.x formats and Java 9+
+	 * @return The integer version of the Java version (8, 9, 10, 11, ...) 
+	 */
+	public static int getJavaVersion() {
+	    String ver = System.getProperty("java.version");
+	    if(ver.startsWith("1.")) {
+	        ver = ver.substring(2, 3);
+	    }else {
+	        int dotIdx = ver.indexOf('.');
+	        if(dotIdx != -1) {
+	            ver = ver.substring(0, dotIdx);
+	        }
+	    }
+	    return Integer.parseInt(ver);
 	}
 	
 	/**
@@ -240,7 +291,7 @@ public class FileTools {
 	//===================================================================================//
 	/* Custom Read/Write File Functions for Device/WireEnumeration Class                 */
 	//===================================================================================//
-	public static HashMap<String,Integer> readHashMap(UnsafeInput dis, Integer[] allInts){
+	public static HashMap<String,Integer> readHashMap(Input dis, Integer[] allInts){
 		int count;
 		HashMap<String,Integer> tileMap = null;
 		String[] keys;
@@ -256,7 +307,7 @@ public class FileTools {
 		return tileMap;
 	}
 
-	public static boolean writeHashMap(UnsafeOutput dos, HashMap<String,Integer> map){
+	public static boolean writeHashMap(Output dos, HashMap<String,Integer> map){
 		int size = map.size();
 		dos.writeInt(size);
 		ArrayList<Integer> values = new ArrayList<Integer>(map.size());
@@ -270,7 +321,7 @@ public class FileTools {
 		return true;
 	}
 	
-	public static boolean writeStringArray(UnsafeOutput dos, String[] stringArray){
+	public static boolean writeStringArray(Output dos, String[] stringArray){
 		/*int size = 0;
 		for(String s : stringArray){
 			size += s.length() + 1;
@@ -282,7 +333,7 @@ public class FileTools {
 		return true;
 	}
 		
-	public static String[] readStringArray(UnsafeInput dis){
+	public static String[] readStringArray(Input dis){
 		int size;
 		String[] wireArray = null;
 		size = dis.readInt();
@@ -296,7 +347,7 @@ public class FileTools {
 		return wireArray;
 	}
 	
-	public static boolean writeIntArray(UnsafeOutput dos, int[] intArray){
+	public static boolean writeIntArray(Output dos, int[] intArray){
 		if(intArray == null){
 			dos.writeInt(0);
 			return true;
@@ -306,7 +357,7 @@ public class FileTools {
 		return true;
 	}
 
-	public static boolean writeShortArray(UnsafeOutput dos, short[] intArray){
+	public static boolean writeShortArray(Output dos, short[] intArray){
 		if(intArray == null){
 			dos.writeShort(0);
 			return true;
@@ -316,13 +367,13 @@ public class FileTools {
 		return true;
 	}
 	
-	public static int[] readIntArray(UnsafeInput dis){
+	public static int[] readIntArray(Input dis){
 		int length = dis.readInt();
 		if(length == 0) return emptyIntArray;
 		return dis.readInts(length);
 	}
 
-	public static short[] readShortArray(UnsafeInput dis){
+	public static short[] readShortArray(Input dis){
 		int length = dis.readShort();
 		if(length == 0) return emptyShortArray;
 		return dis.readShorts(length);
@@ -930,12 +981,7 @@ public class FileTools {
         File md5File = new File(fileName + MD5_DATA_FILE_SUFFIX);
         String expectedMD5 = getCurrentDataVersion(name);
         if(md5File.exists()) {
-            String currMD5 = null;
-            try {
-                currMD5 = Files.readAllLines(md5File.toPath()).get(0);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+            String currMD5 = getStoredMD5FromFile(md5File.toPath());
             if(currMD5.equals(expectedMD5)) {
                 return true;
             }
@@ -949,6 +995,22 @@ public class FileTools {
             return true;
         }
 	    return false;
+	}
+	
+	/**
+	 * Extracts the md5 checksum from a previously created MD5 sum file.
+	 * @param md5File The path of the existing md5 sum file
+	 * @return the md5 checksum found in the file or null if no file existed or couldn't be read.
+	 */
+	public static String getStoredMD5FromFile(Path md5File) {
+	    if(Files.exists(md5File)) {
+	        try {
+	            return Files.readAllLines(md5File).get(0);
+	        } catch (IOException e) {
+	            return null;
+	        }
+	    }
+	    return null;
 	}
 	
 	/**
@@ -1313,24 +1375,24 @@ public class FileTools {
 	public static Integer runCommand(String command, boolean verbose){
 		if(verbose) System.out.println(command);
 		int returnValue = 0;
+		Process p = null;
 		try {
-			Process p = Runtime.getRuntime().exec(command);
+			p = Runtime.getRuntime().exec(command);
 			StreamGobbler input = new StreamGobbler(p.getInputStream(), verbose);
 			StreamGobbler err = new StreamGobbler(p.getErrorStream(), verbose);
 			input.start();
 			err.start();
-			try {
-				returnValue = p.waitFor();
-				p.destroy();
-			} catch (InterruptedException e){
-				e.printStackTrace();
-				MessageGenerator.briefError("ERROR: The command was interrupted: \"" + command + "\"");
-				return null;
-			}
+			returnValue = p.waitFor();
 		} catch (IOException e){
 			e.printStackTrace();
 			MessageGenerator.briefError("ERROR: In running the command \"" + command + "\"");
 			return null;
+		} catch (InterruptedException e){
+		    e.printStackTrace();
+		    MessageGenerator.briefError("ERROR: The command was interrupted: \"" + command + "\"");
+		    return null;
+		} finally {
+            if(p != null) p.destroyForcibly();
 		}
 		return returnValue;
 	}
@@ -1356,30 +1418,9 @@ public class FileTools {
 		} catch (IOException | InterruptedException e) {
 			e.printStackTrace();
 		} finally {
-			p.destroyForcibly();
+			if(p != null) p.destroyForcibly();
 		}
 		return returnVal;
-		/*
-		try {
-			Process p = Runtime.getRuntime().exec(command);
-			StreamGobbler input = new StreamGobbler(p.getInputStream(), false);
-			StreamGobbler err = new StreamGobbler(p.getErrorStream(), false);
-			input.start();
-			err.start();
-			try {
-				returnValue = p.waitFor();
-				p.destroy();
-			} catch (InterruptedException e){
-				e.printStackTrace();
-				MessageGenerator.briefError("ERROR: The command was interrupted: \"" + command + "\"");
-				return null;
-			}
-		} catch (IOException e){
-			e.printStackTrace();
-			MessageGenerator.briefError("ERROR: In running the command \"" + command + "\"");
-			return null;
-		}
-		return returnValue;*/
 	}
 	
 	public static String getUniqueProcessAndHostID(){
@@ -1412,7 +1453,7 @@ public class FileTools {
 		return isFileBinary(Paths.get(fileName));
 	}
 	
-	private static final int BINARY_CHECK_LENGTH = 8192;
+	public static final int BINARY_CHECK_LENGTH = 8192;
 	private static byte[] binaryCheckData; 
 
 	public static boolean isDataBinary(InputStream is){
@@ -1464,22 +1505,25 @@ public class FileTools {
 		try {
 			p = pb.start();
 			p.waitFor();  // wait for process to finish then continue.
-			BufferedReader bri = new BufferedReader(new InputStreamReader(p.getInputStream()));
-			while ((line = bri.readLine()) != null) {
-			    output.add(line);
-			}
+			try (BufferedReader bri = new BufferedReader(new InputStreamReader(p.getInputStream()))){
+	            while ((line = bri.readLine()) != null) {
+	                output.add(line);
+	            }
+			}		
 			if(includeError){
-				BufferedReader bre = new BufferedReader(new InputStreamReader(p.getErrorStream()));
-				while ((line = bre.readLine()) != null) {
-				    output.add(line);
-				}
+			    try (BufferedReader bre = new BufferedReader(new InputStreamReader(p.getErrorStream()))) {
+	                while ((line = bre.readLine()) != null) {
+	                    output.add(line);
+	                }			        
+			    }
 			}
-
 		} catch (IOException e1) {
 			e1.printStackTrace();
 		} catch (InterruptedException e) {
 			e.printStackTrace();
-		}  
+		} finally {
+		    if(p != null) p.destroyForcibly();
+		}
 
 		return output;
 	}
@@ -1557,11 +1601,11 @@ public class FileTools {
 	 */
 	public static String getVivadoPath(){
 		String[] cmd = new String[]{isWindows() ? "where" : "which",isWindows() ? "vivado.bat" : "vivado"};
-		String output = execCommandGetOutput(true, cmd).get(0);
-		if(output.contains("INFO:") || output.contains("which: no")){
+		final List<String> fullOutput = execCommandGetOutput(true, cmd);
+		if(fullOutput.isEmpty() || fullOutput.get(0).contains("INFO:") || fullOutput.get(0).contains("which: no")){
 			throw new RuntimeException("ERROR: Couldn't find vivado on PATH");
 		}
-		return output.trim().replace("\\", "/");
+		return fullOutput.get(0).trim().replace("\\", "/");
 	}
 	
 	private static String currentOS = null;
@@ -1764,6 +1808,17 @@ public class FileTools {
     
     public static boolean overrideDataFileDownload() {
         return OVERRIDE_DATA_FILE_DOWNLOAD;
+    }
+    
+    /**
+     * For Java 16 and below, calling this method will prevent {@link System.exit()} calls from 
+     * exiting the JVM and instead throws a {@link SecurityException} in its place.  This method
+     * allows for a check to avoid the JVM WARNING message in Java 17.
+     */
+    public static void blockSystemExitCalls() {
+        if(getJavaVersion() < 17) {
+            BlockExitSecurityManager.blockSystemExitCalls();
+        }
     }
     
 	public static void main(String[] args) {
