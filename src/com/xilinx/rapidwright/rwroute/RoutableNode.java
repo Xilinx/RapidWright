@@ -401,21 +401,21 @@ public class RoutableNode implements Routable{
 	}
 	
 	@Override
-	public void decrementUser(NetWrapper source) {
-		Integer count = this.usersConnectionCounts.getOrDefault(source, 0);
+	public void decrementUser(NetWrapper user) {
+		Integer count = this.usersConnectionCounts.getOrDefault(user, 0);
 		if(count == 1) {
-			this.usersConnectionCounts.remove(source);
+			this.usersConnectionCounts.remove(user);
 		}else if(count > 1) {
-			this.usersConnectionCounts.put(source, count - 1);
+			this.usersConnectionCounts.put(user, count - 1);
 		}
 	}
 	
 	@Override
-	public int countConnectionsOfUser(NetWrapper source) {
+	public int countConnectionsOfUser(NetWrapper user) {
 		if(this.usersConnectionCounts == null) {
 			return 0;
 		}
-		return this.usersConnectionCounts.getOrDefault(source, 0);
+		return this.usersConnectionCounts.getOrDefault(user, 0);
 	}
 	
 	@Override
@@ -431,8 +431,8 @@ public class RoutableNode implements Routable{
 		if(this.driversCounts == null) {
 			this.driversCounts = new HashMap<>();
 		}
-		Integer drivers = this.driversCounts.getOrDefault(parent, 0);
-		this.driversCounts.put(parent, drivers + 1);
+		Integer count = this.driversCounts.getOrDefault(parent, 0);
+		this.driversCounts.put(parent, count + 1);
 	}
 	
 	@Override
