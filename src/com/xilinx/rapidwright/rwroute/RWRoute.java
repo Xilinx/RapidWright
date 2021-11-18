@@ -289,18 +289,17 @@ public class RWRoute{
 				System.err.println("ERROR: Unknown net " + net.toString());
 			}
 		}
-		if(this.config.isPrintConnectionSpan()) this.printConnectionSpanStatistics();
+		this.printConnectionSpanStatistics();
 	}
 	
 	/**
 	 * A helper method for profiling the routing runtime v.s. average span of connections.
 	 */
 	private void printConnectionSpanStatistics() {
-		if(this.config.isPrintConnectionSpan()) {
-			System.out.println("------------------------------------------------------------------------------");
-			System.out.println("Connection Span Info");
-			System.out.println(" Span" + "\t" + "# Connections" + "\t" + "Percent");
-		}
+		System.out.println("------------------------------------------------------------------------------");
+		System.out.println("Connection Span Info:");
+		if(this.config.isPrintConnectionSpan()) System.out.println(" Span" + "\t" + "# Connections" + "\t" + "Percent");
+		
 		long sumSpan = 0;
 		short max = 0;
 		for(Entry<Short, Integer> spanCount : this.connectionSpan.entrySet()) {
@@ -317,7 +316,7 @@ public class RWRoute{
 		System.out.println("INFO: Avg span of connections: " + avg);
 		int numConnectionsLongerThanAvg = 0;
 		for(Entry<Short, Integer> spanCount : this.connectionSpan.entrySet()) {
-			if(spanCount.getKey() <= avg) numConnectionsLongerThanAvg += spanCount.getValue();
+			if(spanCount.getKey() >= avg) numConnectionsLongerThanAvg += spanCount.getValue();
 		}
 		
 		System.out.printf("INFO: # connections longer than avg span: " + numConnectionsLongerThanAvg);
