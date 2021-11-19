@@ -22,9 +22,6 @@
  */
 package com.xilinx.rapidwright.design;
 
-import java.io.BufferedWriter;
-import java.io.FileWriter;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -365,41 +362,10 @@ public class ModuleInst{
 		//=======================================================//
 		/* Place net at new location                             */
 		//=======================================================//
-		boolean print = false;
 		nextnet: for(Net net : nets){
-		    print = false;
 			net.getPIPs().clear();
 			Net templateNet = net.getModuleTemplateNet();
-/*            if (templateNet.getName().startsWith("clock_mux/inst")) {
-                System.out.println("PM:PM 2 clock_mux/inst/");
-                System.out.println("PM:PM pip " + templateNet.getPIPs());
-                print = true;
-            }
-            if (templateNet.getName().startsWith("AES128Dec_0/inst/grp_updateKey_fu_127/ap_NS_fsm1")) {
-                System.out.println("PM:PM 1 ap_NS_fsm1");
-                System.out.println("PM:PM pip " + templateNet.getPIPs());
-                print = true;
-            }
-*/            
-/*			
-			if (templateNet.getName().contains("rp0_clk_bufgce")) {
-	               System.out.println("PM:PM 2 " + templateNet.getName());
-//	               System.out.println("PM:PM pip " + templateNet.getPIPs());
-	            }
-            if (templateNet.getName().contains("clock_mux/inst/O")) {
-                print = true; 
-               System.out.println("PM:PM 2 " + templateNet.getName());
-//               System.out.println("PM:PM pip " + templateNet.getPIPs());
-
-            }
-*/                        
 			for(PIP pip : templateNet.getPIPs()){
-//			    if (pip.toString().startsWith("RCLK_DSP_INTF_CLKBUF_L_X54Y269/RCLK_DSP_INTF_CLKBUF_L.CLK_HDISTR_L0<<->>CLK_HDISTR_R0")) {
-/*              if (pip.toString().contains("CLK_HDISTR")) {			    
-//			    if (pip.toString().startsWith("RCLK_INT_L_X55Y29/RCLK_INT_L.CLK_HDISTR_FT0_0->>CLK_LEAF_SITES_0_CLK_IN") ) {
-			        System.out.println("PM:PM 3 " + pip + " net " + templateNet.getName());
-			    }
-*/			    
 				Tile templatePipTile = pip.getTile();
 				Tile newPipTile = module.getCorrespondingTile(templatePipTile, newAnchorSite.getTile(), dev);
 				if(newPipTile == null){
@@ -418,25 +384,6 @@ public class ModuleInst{
 				//}
 				net.addPIP(newPip);
 			}
-			if (print) {
-                try {
-                    BufferedWriter writer = new BufferedWriter(new FileWriter(this.getName().replaceAll("/", "_") + "pipmuxclock_from.txt"));
-                    writer.write(templateNet.getPIPs().toString());               
-                    writer.close(); 
-                } catch (IOException e) {
-                    System.out.println("An error occurred.");
-                    e.printStackTrace();
-                }
-                try {
-                    BufferedWriter writer = new BufferedWriter(new FileWriter(this.getName().replaceAll("/", "_")  + "pipmuxclock_to.txt"));
-                    writer.write(net.getPIPs().toString());               
-                    writer.close(); 
-                } catch (IOException e) {
-                    System.out.println("An error occurred.");
-                    e.printStackTrace();
-                }
-			}
-			print = false;
 		}
 		
 		if(staticSources != null) {

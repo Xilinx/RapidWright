@@ -316,9 +316,6 @@ public class Utils{
 		lockedSiteTypes = EnumSet.of(
 			SiteTypeEnum.CONFIG_SITE,
 			SiteTypeEnum.BUFG
-// PM: need to relocate these BUF                         
-//			SiteTypeEnum.BUFGCE,
-//			SiteTypeEnum.BUFGCTRL
 		);
 		
 
