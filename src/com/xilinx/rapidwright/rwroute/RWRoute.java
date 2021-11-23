@@ -1808,13 +1808,11 @@ public class RWRoute{
 	 */
 	public static void main(String[] args) {
 		if(args.length < 2){
-			System.out.println("BASIC USAGE:\n <input.dcp>\n <directory for routed_input.dcp>");
+			System.out.println("USAGE: <input.dcp> <output.dcp>");
 			return;
 		}
-		// Reads the design checkpoint file name
-		String dcpName = args[0].substring(args[0].lastIndexOf("/")+1);
 		// Reads the output directory and set the output design checkpoint file name
-		String routedDCPfileName = args[1].endsWith("/")?args[1] + "routed_" + dcpName : args[1] + "/routed_" + dcpName;
+		String routedDCPfileName = args[1];
 		
 		CodePerfTracker t = new CodePerfTracker("RWRoute", true);
 		
