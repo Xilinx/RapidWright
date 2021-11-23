@@ -128,7 +128,7 @@ task remindSubmodules {
     testJava.state.failure != null || testPython.state.failure != null
   }
   doLast {
-    logger.warn('Failed tests detected. Consider checking submodule status and updating with \'./gradlew updateSubmodules\' where necessary.')
+    logger.warn('Failed tests detected. Some tests depend on DCPs from the git submodule at test/RapidWrightDCP, consider checking its status and updating with \'gradlew updateSubmodules\'')
   }
 }
 
