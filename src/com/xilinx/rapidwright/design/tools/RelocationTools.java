@@ -55,10 +55,16 @@ import com.xilinx.rapidwright.util.Utils;
  */
 public class RelocationTools {
 
-    public static final Set<SiteTypeEnum> supportedTypes;
+    public static final Set<SiteTypeEnum> defaultSiteTypes;
     static {
-        supportedTypes = Utils.sliceDspBramUramTypes;
-        supportedTypes.add(SiteTypeEnum.BUFGCE);
+        defaultSiteTypes = Utils.sliceDspBramUramTypes;
+    }
+
+    public static boolean relocate(Design design,
+                                   String instanceName,
+                                   int tileColOffset,
+                                   int tileRowOffset) {
+        return relocate(design, instanceName, tileColOffset, tileRowOffset, defaultSiteTypes);
     }
 
     /**
@@ -78,7 +84,8 @@ public class RelocationTools {
     public static boolean relocate(Design design,
                                    String instanceName,
                                    int tileColOffset,
-                                   int tileRowOffset) {
+                                   int tileRowOffset,
+                                   Set<SiteTypeEnum> siteTypes) {
         EDIFNetlist netlist = design.getNetlist();
         EDIFHierCellInst instanceCell = netlist.getHierCellInstFromName(instanceName);
         if (instanceCell == null) {
@@ -107,7 +114,7 @@ public class RelocationTools {
                 continue;
             }
 
-            if (!supportedTypes.contains(si.getSiteTypeEnum())) {
+            if (!siteTypes.contains(si.getSiteTypeEnum())) {
                 System.out.println("WARNING: Skipping cell '" + leaf.getFullHierarchicalInstName() +
                         "' as it is placed onto a SiteInst type '" + si.getSiteTypeEnum() + "'");
                 continue;
