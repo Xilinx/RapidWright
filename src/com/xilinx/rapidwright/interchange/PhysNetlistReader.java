@@ -68,16 +68,14 @@ public class PhysNetlistReader {
     private static final String STATIC_SOURCE = "STATIC_SOURCE";
     private static int tieoffInstanceCount = 0;
 
-    public static Design readPhysNetlist(String physNetlistFileName, EDIFNetlist netlist) throws IOException {
-        Design design = new Design();
-        design.setNetlist(netlist);
-        ReaderOptions rdOptions =
-                new ReaderOptions(ReaderOptions.DEFAULT_READER_OPTIONS.traversalLimitInWords * 64,
-                ReaderOptions.DEFAULT_READER_OPTIONS.nestingLimit * 128);
-        MessageReader readMsg = Interchange.readInterchangeFile(physNetlistFileName, rdOptions);
+    public static Design readPhysNetlist(PhysNetlist.Reader physNetlist, Design design) {
+        EDIFNetlist netlist = design.getNetlist();
 
-        PhysNetlist.Reader physNetlist = readMsg.getRoot(PhysNetlist.factory);
-        design.setPartName(physNetlist.getPart().toString());
+        if (physNetlist.hasPart()) {
+            design.setPartName(physNetlist.getPart().toString());
+        } else {
+            // TODO: Check is the same
+        }
 
         Enumerator<String> allStrings = readAllStrings(physNetlist);
 
@@ -94,6 +92,20 @@ public class PhysNetlistReader {
         readDesignProperties(physNetlist, design, allStrings);
 
         return design;
+    }
+
+    public static Design readPhysNetlist(String physNetlistFileName, EDIFNetlist netlist) throws IOException {
+        Design design = new Design();
+        design.setNetlist(netlist);
+
+        ReaderOptions rdOptions =
+                new ReaderOptions(ReaderOptions.DEFAULT_READER_OPTIONS.traversalLimitInWords * 64,
+                        ReaderOptions.DEFAULT_READER_OPTIONS.nestingLimit * 128);
+        MessageReader readMsg = Interchange.readInterchangeFile(physNetlistFileName, rdOptions);
+
+        PhysNetlist.Reader physNetlist = readMsg.getRoot(PhysNetlist.factory);
+
+        return readPhysNetlist(physNetlist, design);
     }
 
     public static Enumerator<String> readAllStrings(PhysNetlist.Reader physNetlist){
@@ -331,10 +343,14 @@ public class PhysNetlistReader {
         for(int i=0; i < netCount; i++) {
             PhysNet.Reader netReader = nets.get(i);
             String netName = strings.get(netReader.getName());
-            EDIFHierNet edifNet = netlist.getHierNetFromName(netName);
-            Net net = new Net(netName, edifNet == null ? null : edifNet.getNet());
-            design.addNet(net);
-            net.setType(getNetType(netReader, netName));
+
+            Net net = design.getNet(netName);
+            if (net == null) {
+                EDIFHierNet edifNet = netlist.getHierNetFromName(netName);
+                net = new Net(netName, edifNet == null ? null : edifNet.getNet());
+                design.addNet(net);
+                net.setType(getNetType(netReader, netName));
+            }
 
             // Sources
             StructList.Reader<RouteBranch.Reader> routeSrcs = netReader.getSources();
