@@ -22,9 +22,9 @@
  */
 package com.xilinx.rapidwright.gui;
 
-import com.trolltech.qt.gui.QFont;
-import com.trolltech.qt.gui.QGraphicsRectItem;
-import com.trolltech.qt.gui.QGraphicsTextItem;
+import io.qt.gui.QFont;
+import io.qt.widgets.QGraphicsRectItem;
+import io.qt.widgets.QGraphicsTextItem;
 import com.xilinx.rapidwright.device.Tile;
 
 public class NumberedHighlightedTile  extends QGraphicsRectItem{

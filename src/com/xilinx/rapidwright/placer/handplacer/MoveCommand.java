@@ -25,15 +25,18 @@
  */
 package com.xilinx.rapidwright.placer.handplacer;
 
-import java.util.*;
 
-import com.trolltech.qt.core.*;
-import com.trolltech.qt.gui.*;
+import java.util.ArrayList;
+import java.util.List;
+
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.gui.GUIModuleInst;
+
+import io.qt.core.QPointF;
+import io.qt.gui.QUndoCommand;
 
 /**
  * @author marc
@@ -81,7 +84,7 @@ class MoveCommand extends QUndoCommand {
 		}
 		myGhmList.get(0).scene().update();
 		undoDesign();
-		setText(tr("Move " + createCommandString(myGhmList, myPosList)));
+		setText("Move " + createCommandString(myGhmList, myPosList));
 	}
 
 	@Override
@@ -89,7 +92,7 @@ class MoveCommand extends QUndoCommand {
 		for (int i = 0; i < myGhmList.size(); i++)
 			myGhmList.get(i).setPos(newPosList.get(i));
 		redoDesign();
-		setText(tr("Move " + createCommandString(myGhmList, newPosList)));
+		setText("Move " + createCommandString(myGhmList, newPosList));
 	}
 
 	

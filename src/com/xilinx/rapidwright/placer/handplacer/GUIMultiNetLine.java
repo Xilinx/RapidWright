@@ -25,16 +25,16 @@
  */
 package com.xilinx.rapidwright.placer.handplacer;
 
-import com.trolltech.qt.core.QPointF;
-import com.trolltech.qt.core.Qt.PenCapStyle;
-import com.trolltech.qt.gui.QColor;
-import com.trolltech.qt.gui.QGraphicsItemInterface;
-import com.trolltech.qt.gui.QGraphicsLineItem;
-import com.trolltech.qt.gui.QLineF;
-import com.trolltech.qt.gui.QPainter;
-import com.trolltech.qt.gui.QPen;
-import com.trolltech.qt.gui.QStyleOptionGraphicsItem;
-import com.trolltech.qt.gui.QWidget;
+import io.qt.core.QPointF;
+import io.qt.core.Qt.PenCapStyle;
+import io.qt.gui.QColor;
+import io.qt.widgets.QGraphicsItem;
+import io.qt.widgets.QGraphicsLineItem;
+import io.qt.core.QLineF;
+import io.qt.gui.QPainter;
+import io.qt.gui.QPen;
+import io.qt.widgets.QStyleOptionGraphicsItem;
+import io.qt.widgets.QWidget;
 
 /**
  * @author marc
@@ -42,14 +42,14 @@ import com.trolltech.qt.gui.QWidget;
  */
 public class GUIMultiNetLine extends QGraphicsLineItem {
 
-	private QGraphicsItemInterface srcItem;
-	private QGraphicsItemInterface destItem;
+	private QGraphicsItem srcItem;
+	private QGraphicsItem destItem;
 	private int hue;
 	private int alpha;
 	
 	private static final int CEILING_LINE_WIDTH_SIZE = 128;
 
-	public GUIMultiNetLine(QGraphicsItemInterface srcItem, QGraphicsItemInterface destItem) {
+	public GUIMultiNetLine(QGraphicsItem srcItem, QGraphicsItem destItem) {
 		super();
 		this.srcItem = srcItem;
 		this.destItem = destItem;

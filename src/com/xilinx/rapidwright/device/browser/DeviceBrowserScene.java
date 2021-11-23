@@ -29,20 +29,22 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
 
-import com.trolltech.qt.core.Qt.MouseButton;
-import com.trolltech.qt.core.Qt.PenStyle;
-import com.trolltech.qt.gui.QAction;
-import com.trolltech.qt.gui.QBrush;
-import com.trolltech.qt.gui.QColor;
-import com.trolltech.qt.gui.QGraphicsLineItem;
-import com.trolltech.qt.gui.QGraphicsSceneMouseEvent;
-import com.trolltech.qt.gui.QMenu;
-import com.trolltech.qt.gui.QPen;
+import io.qt.core.Qt.GlobalColor;
+import io.qt.core.Qt.MouseButton;
+import io.qt.core.Qt.PenStyle;
+import io.qt.gui.QAction;
+import io.qt.gui.QBrush;
+import io.qt.gui.QColor;
+import io.qt.widgets.QGraphicsLineItem;
+import io.qt.widgets.QGraphicsSceneMouseEvent;
+import io.qt.widgets.QMenu;
+import io.qt.gui.QPen;
 import com.xilinx.rapidwright.router.RouteNode;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.gui.NumberedHighlightedTile;
+import com.xilinx.rapidwright.gui.TileColors;
 import com.xilinx.rapidwright.gui.TileScene;
 
 /**
@@ -67,7 +69,7 @@ public class DeviceBrowserScene extends TileScene{
 	public DeviceBrowserScene(Device device, boolean hideTiles, boolean drawPrimitives, DeviceBrowser browser){
 		super(device, hideTiles, drawPrimitives);
 		currLines = new ArrayList<QGraphicsLineItem>();
-		wirePen = new QPen(QColor.yellow, 0.25, PenStyle.SolidLine);
+		wirePen = new QPen(TileColors.getQColor(GlobalColor.yellow), 0.25, PenStyle.SolidLine);
 		this.browser = browser;
 	}
 	

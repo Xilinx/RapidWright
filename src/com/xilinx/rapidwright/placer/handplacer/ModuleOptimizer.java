@@ -28,41 +28,41 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 
-import com.trolltech.qt.core.QPointF;
-import com.trolltech.qt.core.Qt;
-import com.trolltech.qt.core.Qt.CursorShape;
-import com.trolltech.qt.core.Qt.DockWidgetArea;
-import com.trolltech.qt.core.Qt.MatchFlag;
-import com.trolltech.qt.core.Qt.MatchFlags;
-import com.trolltech.qt.core.Qt.WindowModality;
-import com.trolltech.qt.gui.QAction;
-import com.trolltech.qt.gui.QApplication;
-import com.trolltech.qt.gui.QComboBox;
-import com.trolltech.qt.gui.QCursor;
-import com.trolltech.qt.gui.QDockWidget;
-import com.trolltech.qt.gui.QFileDialog;
-import com.trolltech.qt.gui.QGraphicsItemInterface;
-import com.trolltech.qt.gui.QIcon;
-import com.trolltech.qt.gui.QKeySequence;
-import com.trolltech.qt.gui.QLabel;
-import com.trolltech.qt.gui.QMainWindow;
-import com.trolltech.qt.gui.QMenu;
-import com.trolltech.qt.gui.QMessageBox;
-import com.trolltech.qt.gui.QPainter;
-import com.trolltech.qt.gui.QPrinter;
-import com.trolltech.qt.gui.QProgressDialog;
-import com.trolltech.qt.gui.QStatusBar;
-import com.trolltech.qt.gui.QTableWidget;
-import com.trolltech.qt.gui.QTableWidgetItem;
-import com.trolltech.qt.gui.QToolBar;
-import com.trolltech.qt.gui.QTreeWidget;
-import com.trolltech.qt.gui.QTreeWidgetItem;
-import com.trolltech.qt.gui.QUndoStack;
-import com.trolltech.qt.gui.QWidget;
-import com.trolltech.qt.gui.QAbstractItemView.SelectionMode;
-import com.trolltech.qt.gui.QKeySequence.StandardKey;
-import com.trolltech.qt.gui.QPrinter.OutputFormat;
-import com.trolltech.qt.gui.QPrinter.PageSize;
+import io.qt.core.QPointF;
+import io.qt.core.Qt;
+import io.qt.core.Qt.CursorShape;
+import io.qt.core.Qt.DockWidgetArea;
+import io.qt.core.Qt.MatchFlag;
+import io.qt.core.Qt.MatchFlags;
+import io.qt.core.Qt.WindowModality;
+import io.qt.gui.QAction;
+import io.qt.widgets.QApplication;
+import io.qt.widgets.QComboBox;
+import io.qt.gui.QCursor;
+import io.qt.widgets.QDockWidget;
+import io.qt.widgets.QFileDialog;
+import io.qt.widgets.QGraphicsItem;
+import io.qt.gui.QIcon;
+import io.qt.gui.QKeySequence;
+import io.qt.gui.QPageSize;
+import io.qt.widgets.QLabel;
+import io.qt.widgets.QMainWindow;
+import io.qt.widgets.QMenu;
+import io.qt.widgets.QMessageBox;
+import io.qt.gui.QPainter;
+import io.qt.printsupport.QPrinter;
+import io.qt.widgets.QProgressDialog;
+import io.qt.widgets.QStatusBar;
+import io.qt.widgets.QTableWidget;
+import io.qt.widgets.QTableWidgetItem;
+import io.qt.widgets.QToolBar;
+import io.qt.widgets.QTreeWidget;
+import io.qt.widgets.QTreeWidgetItem;
+import io.qt.gui.QUndoStack;
+import io.qt.widgets.QWidget;
+import io.qt.widgets.QAbstractItemView.SelectionMode;
+import io.qt.gui.QKeySequence.StandardKey;
+import io.qt.printsupport.QPrinter.OutputFormat;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.blocks.UtilizationType;
@@ -97,7 +97,7 @@ public class ModuleOptimizer extends QMainWindow {
 		
 	
 	public static void main(String[] args) {
-		QApplication.setGraphicsSystem("raster");
+		//QApplication.setGraphicsSystem("raster");
 		QApplication.initialize(args);
 
 		boolean debugPlacer = false;
@@ -178,7 +178,7 @@ public class ModuleOptimizer extends QMainWindow {
 		if(macroList.hasFocus())
 			return;
 		macroList.clearSelection();
-		for(QGraphicsItemInterface item : scene.selectedItems()){
+		for(QGraphicsItem item : scene.selectedItems()){
 			String modInstName = ((GUIModuleInst)item).getModuleInst().getName();
 			List<QTreeWidgetItem> itemList = macroList.findItems(modInstName, new MatchFlags(MatchFlag.MatchExactly), 0);
 			if(itemList.size() > 0){
@@ -276,7 +276,7 @@ public class ModuleOptimizer extends QMainWindow {
 
 	protected void openDesign(){
 		String fileName = QFileDialog.getOpenFileName(this, "Choose a file...",
-				".", FileFilters.dcpFilter);
+				".", FileFilters.dcpFilter).result;
 		if(fileName.endsWith(".dcp")){
 			internalOpenDesign(fileName);
 		}
@@ -323,7 +323,7 @@ public class ModuleOptimizer extends QMainWindow {
 	protected void saveAsDesign(){
 		if(scene.getDesign() == null)
 			return;
-		String fileName = QFileDialog.getSaveFileName(this, tr("Save As"),".", FileFilters.dcpFilter);
+		String fileName = QFileDialog.getSaveFileName(this, tr("Save As"),".", FileFilters.dcpFilter).result;
         if (fileName.length() == 0)
             return;
         scene.getDesign().flattenDesign();
@@ -334,13 +334,13 @@ public class ModuleOptimizer extends QMainWindow {
 	protected void saveAsPDFDesign(){
 		if(scene.getDesign() == null)
 			return;
-		String fileName = QFileDialog.getSaveFileName(this, tr("Save As PDF"),".", FileFilters.pdfFilter);
+		String fileName = QFileDialog.getSaveFileName(this, tr("Save As PDF"),".", FileFilters.pdfFilter).result;
         if (fileName.length() == 0)
             return;
         QPrinter printer = new QPrinter();
         printer.setOutputFormat(OutputFormat.PdfFormat);
         printer.setOutputFileName(fileName);
-        printer.setPageSize(PageSize.Letter);
+        printer.setPageSize(new QPageSize(QPageSize.PageSizeId.Letter));
         QPainter pdfPainter = new QPainter(printer);
         scene.render(pdfPainter);
         pdfPainter.end();
@@ -442,7 +442,7 @@ public class ModuleOptimizer extends QMainWindow {
 	@SuppressWarnings("unused")
 	private void zoomselection(){
 		double top=-1,left=-1,right=-1,bottom=-1;
-		for(QGraphicsItemInterface item : scene.selectedItems()){
+		for(QGraphicsItem item : scene.selectedItems()){
 			QPointF gmiTL = item.pos();
 			QPointF gmiBR = item.pos().add(item.boundingRect().bottomRight());
 			if(top < 0 || gmiTL.y() < top)

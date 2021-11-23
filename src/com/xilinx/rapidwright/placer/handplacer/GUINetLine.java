@@ -25,16 +25,18 @@
  */
 package com.xilinx.rapidwright.placer.handplacer;
 
-import com.trolltech.qt.core.QPointF;
-import com.trolltech.qt.core.Qt.PenCapStyle;
-import com.trolltech.qt.gui.QColor;
-import com.trolltech.qt.gui.QGraphicsLineItem;
-import com.trolltech.qt.gui.QLineF;
-import com.trolltech.qt.gui.QPainter;
-import com.trolltech.qt.gui.QPen;
-import com.trolltech.qt.gui.QStyleOptionGraphicsItem;
-import com.trolltech.qt.gui.QWidget;
+import io.qt.core.QPointF;
+import io.qt.core.Qt.GlobalColor;
+import io.qt.core.Qt.PenCapStyle;
+import io.qt.gui.QColor;
+import io.qt.widgets.QGraphicsLineItem;
+import io.qt.core.QLineF;
+import io.qt.gui.QPainter;
+import io.qt.gui.QPen;
+import io.qt.widgets.QStyleOptionGraphicsItem;
+import io.qt.widgets.QWidget;
 import com.xilinx.rapidwright.gui.HMTile;
+import com.xilinx.rapidwright.gui.TileColors;
 
 
 /**
@@ -53,7 +55,7 @@ public class GUINetLine extends QGraphicsLineItem {
 		this.destTile = destTile;
 		updateLine();
 		alpha = 128;
-		QColor color = QColor.magenta;
+		QColor color = TileColors.getQColor(GlobalColor.magenta);
 		color.setAlpha(alpha);
 		QPen pen = new QPen(color, 1.0);
 		pen.setCapStyle(PenCapStyle.RoundCap);

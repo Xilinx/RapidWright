@@ -24,16 +24,19 @@
  */
 package com.xilinx.rapidwright.device.browser;
 
-import com.trolltech.qt.QSignalEmitter;
 import com.xilinx.rapidwright.device.Tile;
+
+import io.qt.core.QInstanceMemberSignals.Signal1;
+
+
 
 /**
  * WIP.
  * 
  * Created on: Jun 18, 2015
  */
-public class PBlockGenEmitter extends QSignalEmitter{
-	public Signal1<Tile> highlightTile = new Signal1<Tile>();
+public class PBlockGenEmitter {
+	public Signal1<Tile> highlightTile = new Signal1<Tile>(null);
 	
 	public void emitTile(Tile t){
 		highlightTile.emit(t);

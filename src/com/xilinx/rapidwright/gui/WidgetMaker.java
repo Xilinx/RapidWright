@@ -25,9 +25,9 @@ package com.xilinx.rapidwright.gui;
 import java.util.Comparator;
 import java.util.HashMap;
 
-import com.trolltech.qt.core.Qt.ItemDataRole;
-import com.trolltech.qt.gui.QTreeWidget;
-import com.trolltech.qt.gui.QTreeWidgetItem;
+import io.qt.core.Qt.ItemDataRole;
+import io.qt.widgets.QTreeWidget;
+import io.qt.widgets.QTreeWidgetItem;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.PartNameTools;

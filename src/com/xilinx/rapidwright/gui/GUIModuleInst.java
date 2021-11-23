@@ -26,17 +26,21 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 
-import com.trolltech.qt.QVariant;
-import com.trolltech.qt.core.QPointF;
-import com.trolltech.qt.core.QRectF;
-import com.trolltech.qt.gui.QBrush;
-import com.trolltech.qt.gui.QColor;
-import com.trolltech.qt.gui.QGraphicsPolygonItem;
-import com.trolltech.qt.gui.QGraphicsSceneMouseEvent;
-import com.trolltech.qt.gui.QPen;
-import com.trolltech.qt.gui.QPolygonF;
-import com.trolltech.qt.gui.QGraphicsItem.GraphicsItemChange;
-import com.trolltech.qt.gui.QGraphicsItem.GraphicsItemFlag;
+import io.qt.core.QVariant;
+import io.qt.core.Qt;
+import io.qt.core.Qt.GlobalColor;
+import io.qt.core.QDeclarableSignals.Signal0;
+import io.qt.core.QInstanceMemberSignals.Signal1;
+import io.qt.core.QPointF;
+import io.qt.core.QRectF;
+import io.qt.gui.QBrush;
+import io.qt.gui.QColor;
+import io.qt.widgets.QGraphicsPolygonItem;
+import io.qt.widgets.QGraphicsSceneMouseEvent;
+import io.qt.gui.QPen;
+import io.qt.gui.QPolygonF;
+import io.qt.widgets.QGraphicsItem.GraphicsItemChange;
+import io.qt.widgets.QGraphicsItem.GraphicsItemFlag;
 import com.xilinx.rapidwright.design.ModuleInst;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SiteInst;
@@ -50,7 +54,7 @@ import com.xilinx.rapidwright.util.Utils;
 
 public class GUIModuleInst extends QGraphicsPolygonItem {
 
-	public Signal1<Boolean> selected = new Signal1<Boolean>();
+	public Signal1<Boolean> selected = new Signal1<Boolean>(null);
 	public Signal0 moved = new Signal0();
 	private ModuleInst moduleInst;
 	private TileScene scene;
@@ -192,7 +196,7 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
 	private void addHMTile(Tile tile, int tileX, int tileY, boolean hasSLICEM, boolean isAnchor) {
 		HMTile hmTile = new HMTile(tile, scene, this, hasSLICEM, isAnchor);
 		hmTile.moveBy(tileX * scene.tileSize, tileY * scene.tileSize);
-		hmTile.setBrush(new QBrush(QColor.white));
+		hmTile.setBrush(new QBrush(TileColors.getQColor(GlobalColor.white)));
 		hmTiles.add(hmTile);
 
 	}
@@ -396,7 +400,7 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
 		for (HMTile hmTile : this.hmTiles) {
 			hmTile.show();
 		}
-		this.setBrush(new QBrush(QColor.transparent));
+		this.setBrush(new QBrush(TileColors.getQColor(GlobalColor.transparent)));
 		checkPlacement();
 	}
 	public void hideGuts(){
@@ -519,21 +523,21 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
 				if(gutsHidden)
 					this.setBrush(new QBrush(HMTile.GREEN));
 				else
-					this.setBrush(new QBrush(QColor.transparent));
+					this.setBrush(new QBrush(TileColors.getQColor(GlobalColor.transparent)));
 				break;
 			case COLLIDING:
 				this.setPen(new QPen(HMTile.ORANGE));
 				if(gutsHidden)
 					this.setBrush(new QBrush(HMTile.ORANGE));
 				else
-					this.setBrush(new QBrush(QColor.transparent));
+				    this.setBrush(new QBrush(TileColors.getQColor(GlobalColor.transparent)));
 				break;
 			case INVALID:
 				this.setPen(new QPen(HMTile.RED));
 				if(gutsHidden)
 					this.setBrush(new QBrush(HMTile.RED));
 				else
-					this.setBrush(new QBrush(QColor.transparent));
+				    this.setBrush(new QBrush(TileColors.getQColor(GlobalColor.transparent)));
 				break;
 			default:
 				break;

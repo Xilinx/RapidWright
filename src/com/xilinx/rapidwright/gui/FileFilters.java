@@ -22,25 +22,25 @@
  */
 package com.xilinx.rapidwright.gui;
 
-import com.trolltech.qt.gui.QFileDialog.Filter;
+import io.qt.core.QDir.Filter;
 
 public class FileFilters {
 	/** Xilinx Design Language File Filter */
-	public static Filter xpnFilter = new Filter("Xilinx Physical Netlist Files (*.xpn)");
+	public static String xpnFilter = "*.xpn";
 	/** Xilinx Design Language File Filter */
-	public static Filter xdlFilter = new Filter("Xilinx Design Language Files (*.xdl)");
+	public static String xdlFilter = "*.xdl";
 	/** Native Circuit Description File Filter */
-	public static Filter ncdFilter = new Filter("Design Files (*.ncd)");
+	public static String ncdFilter = "*.ncd";
 	/** Hard Macro File Filter */
-	public static Filter nmcFilter = new Filter("Hard Macro Files (*.nmc)");
+	public static String nmcFilter = "*.nmc";
 	/** Portable Document Format File Filter */
-	public static Filter pdfFilter = new Filter("Portable Document Format Files (*.pdf)");
+	public static String pdfFilter = "*.pdf";
 	/** Xilinx Trace Report File Filter */
-	public static Filter twrFilter = new Filter("Xilinx Trace Report Files (*.twr)");
+	public static String twrFilter = "*.twr";
 	/** EDK Microprocessor Hardware Specification File Filter */
-	public static Filter mhsFilter = new Filter("Microprocessor Hardware Specification Files (*.mhs)");
+	public static String mhsFilter = "*.mhs";
 	/** Design Checkpoint File Filter */ 
-	public static Filter dcpFilter = new Filter("Design Checkpoint Files (*.dcp)");
+	public static String dcpFilter = "*.dcp";
 	/** Impl Guide File Filter */
-	public static Filter igFilter = new Filter("Implementation Guide Files (*.igf)");
+	public static String igFilter = "*.igf";
 }

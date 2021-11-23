@@ -22,22 +22,23 @@
  */
 package com.xilinx.rapidwright.gui;
 
-import com.trolltech.qt.core.QPointF;
-import com.trolltech.qt.core.QRectF;
-import com.trolltech.qt.core.QSize;
-import com.trolltech.qt.core.QSizeF;
-import com.trolltech.qt.core.Qt.PenStyle;
-import com.trolltech.qt.gui.QBrush;
-import com.trolltech.qt.gui.QColor;
-import com.trolltech.qt.gui.QGraphicsPixmapItem;
-import com.trolltech.qt.gui.QGraphicsRectItem;
-import com.trolltech.qt.gui.QGraphicsScene;
-import com.trolltech.qt.gui.QGraphicsSceneMouseEvent;
-import com.trolltech.qt.gui.QImage;
-import com.trolltech.qt.gui.QImage.Format;
-import com.trolltech.qt.gui.QPainter;
-import com.trolltech.qt.gui.QPen;
-import com.trolltech.qt.gui.QPixmap;
+import io.qt.core.QPointF;
+import io.qt.core.QRectF;
+import io.qt.core.QSize;
+import io.qt.core.QSizeF;
+import io.qt.core.Qt.GlobalColor;
+import io.qt.core.Qt.PenStyle;
+import io.qt.gui.QBrush;
+import io.qt.gui.QColor;
+import io.qt.widgets.QGraphicsPixmapItem;
+import io.qt.widgets.QGraphicsRectItem;
+import io.qt.widgets.QGraphicsScene;
+import io.qt.widgets.QGraphicsSceneMouseEvent;
+import io.qt.gui.QImage;
+import io.qt.gui.QImage.Format;
+import io.qt.gui.QPainter;
+import io.qt.gui.QPen;
+import io.qt.gui.QPixmap;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Tile;
@@ -57,7 +58,7 @@ public class TileScene extends QGraphicsScene{
 	/** The actual square used to highlight a tile */
 	public QGraphicsRectItem highlit;
 	/** Pen used to draw tile cursor */
-	public QPen cursorPen = new QPen(QColor.yellow, 2);
+	public QPen cursorPen = new QPen(TileColors.getQColor(GlobalColor.yellow), 2);
 	/** The current X location of the mouse */
 	public int currX;
 	/** The current Y location of the mouse */
@@ -172,7 +173,7 @@ public class TileScene extends QGraphicsScene{
 			cols = device.getColumns();
 			sceneSize = new QSize((cols + 1) * (tileSize + 1), (rows + 1) * (tileSize + 1));
 			setSceneRect(new QRectF(new QPointF(0, 0), new QSizeF(sceneSize)));
-			setBackgroundBrush(new QBrush(QColor.black));
+			setBackgroundBrush(new QBrush(TileColors.getQColor(GlobalColor.black)));
 			calculateSkippedTiles();
 		}
 		else{
@@ -195,9 +196,9 @@ public class TileScene extends QGraphicsScene{
 		//Create transparent QPixmap that accepts hovers
 		//  so that moveMouseEvent is triggered
 		QPixmap pixelMap = new QPixmap(sceneSize);
-		pixelMap.fill(QColor.transparent);
+		pixelMap.fill(TileColors.getQColor(GlobalColor.transparent));
 		QGraphicsPixmapItem background = addPixmap(pixelMap);
-		background.setAcceptsHoverEvents(true);
+		background.setAcceptHoverEvents(true);
 		background.setZValue(-1);
 
 		// Draw colored tiles onto QPixMap
@@ -256,7 +257,7 @@ public class TileScene extends QGraphicsScene{
 		int i=0;
 
 		//Draw dashed lines where rows/columns have been removed
-		QPen missingTileLinePen = new QPen(QColor.lightGray, 2, PenStyle.DashLine);
+		QPen missingTileLinePen = new QPen(TileColors.getQColor(GlobalColor.lightGray), 2, PenStyle.DashLine);
 		painter.setPen(missingTileLinePen);
 		i = 0;
 		for(int col : colsToSkip){

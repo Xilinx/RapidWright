@@ -22,13 +22,15 @@
  */
 package com.xilinx.rapidwright.device.browser;
 
-import com.trolltech.qt.core.Qt.PenStyle;
-import com.trolltech.qt.gui.QColor;
-import com.trolltech.qt.gui.QGraphicsLineItem;
-import com.trolltech.qt.gui.QGraphicsSceneHoverEvent;
-import com.trolltech.qt.gui.QGraphicsSceneMouseEvent;
-import com.trolltech.qt.gui.QPen;
+import io.qt.core.Qt.GlobalColor;
+import io.qt.core.Qt.PenStyle;
+import io.qt.gui.QColor;
+import io.qt.widgets.QGraphicsLineItem;
+import io.qt.widgets.QGraphicsSceneHoverEvent;
+import io.qt.widgets.QGraphicsSceneMouseEvent;
+import io.qt.gui.QPen;
 import com.xilinx.rapidwright.device.Tile;
+import com.xilinx.rapidwright.gui.TileColors;
 import com.xilinx.rapidwright.gui.TileScene;
 
 /**
@@ -39,9 +41,9 @@ import com.xilinx.rapidwright.gui.TileScene;
  */
 public class WireConnectionLine extends QGraphicsLineItem{
 	/** Keeps a red pen handy for highlighting wire connections on mouse over */
-	private static QPen highlighted  = new QPen(QColor.red, 0.25, PenStyle.SolidLine);
+	private static QPen highlighted  = new QPen(TileColors.getQColor(GlobalColor.red), 0.25, PenStyle.SolidLine);
 	/** Keeps a yellow pen for drawing the wire connections */
-	private static QPen unHighlighted = new QPen(QColor.yellow, 0.25, PenStyle.SolidLine);
+	private static QPen unHighlighted = new QPen(TileColors.getQColor(GlobalColor.yellow), 0.25, PenStyle.SolidLine);
 	/** The current DeviceBrowser scene */
 	private TileScene scene;
 	/** The current tile */
@@ -65,7 +67,7 @@ public class WireConnectionLine extends QGraphicsLineItem{
 		this.scene = scene;
 		this.tile = tile;
 		this.wire = wire;
-		highlighted = new QPen(QColor.red, 0.25, PenStyle.SolidLine);
+		highlighted = new QPen(TileColors.getQColor(GlobalColor.red), 0.25, PenStyle.SolidLine);
 	}
 	
 	@Override

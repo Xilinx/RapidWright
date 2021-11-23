@@ -24,9 +24,9 @@
  */
 package com.xilinx.rapidwright.placer.handplacer;
 
-import com.trolltech.qt.core.QPointF;
-import com.trolltech.qt.gui.QGraphicsPolygonItem;
-import com.trolltech.qt.gui.QPolygonF;
+import io.qt.core.QPointF;
+import io.qt.widgets.QGraphicsPolygonItem;
+import io.qt.gui.QPolygonF;
 
 /**
  * Created on: Sep 16, 2015

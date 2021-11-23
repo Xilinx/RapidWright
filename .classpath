@@ -13,16 +13,6 @@
 	</classpathentry>
 	<classpathentry kind="lib" path="jars/reflectasm-1.11.6.jar"/>
 	<classpathentry kind="lib" path="jars/protobuf-java-3.11.4.jar"/>
-	<classpathentry kind="lib" path="jars/qtjambi-4.5.2_01.jar">
-		<attributes>
-			<attribute name="javadoc_location" value="jar:platform:/resource/rapidSmith/jars/qtjambi-4.5.2_01-javadoc.jar!/"/>
-		</attributes>
-	</classpathentry>
-	<classpathentry kind="lib" path="jars/qtjambi-linux64-gcc-4.5.2_01.jar">
-		<attributes>
-			<attribute name="javadoc_location" value="jar:platform:/resource/rapidSmith/jars/qtjambi-4.5.2_01-javadoc.jar!/"/>
-		</attributes>
-	</classpathentry>
 	<classpathentry kind="lib" path="jars/objenesis-2.6.jar"/>
 	<classpathentry kind="lib" path="jars/jopt-simple-5.0.4.jar"/>
 	<classpathentry kind="lib" path="jars/kryo-5.0.0-RC5.jar"/>
@@ -43,5 +33,9 @@
 	<classpathentry kind="lib" path="jars/junit-platform-commons-1.7.1.jar"/>
 	<classpathentry kind="lib" path="jars/junit-platform-engine-1.7.1.jar"/>
 	<classpathentry kind="lib" path="jars/opentest4j-1.2.0.jar"/>
+	<classpathentry kind="lib" path="jars/qtjambi-6.2.jar"/>
+	<classpathentry kind="lib" path="jars/qtjambi-native-windows-x64-6.2.jar"/>
+	<classpathentry kind="lib" path="jars/qtjambi-svg-6.2.jar"/>
+	<classpathentry kind="lib" path="jars/qtjambi-printsupport-6.2.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

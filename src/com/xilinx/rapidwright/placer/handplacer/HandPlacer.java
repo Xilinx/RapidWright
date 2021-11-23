@@ -26,33 +26,33 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.trolltech.qt.core.QPointF;
-import com.trolltech.qt.core.QRectF;
-import com.trolltech.qt.core.QSizeF;
-import com.trolltech.qt.core.Qt;
-import com.trolltech.qt.core.Qt.DockWidgetArea;
-import com.trolltech.qt.core.Qt.MatchFlag;
-import com.trolltech.qt.core.Qt.MatchFlags;
-import com.trolltech.qt.gui.QAbstractItemView.SelectionMode;
-import com.trolltech.qt.gui.QAction;
-import com.trolltech.qt.gui.QApplication;
-import com.trolltech.qt.gui.QComboBox;
-import com.trolltech.qt.gui.QDockWidget;
-import com.trolltech.qt.gui.QFileDialog;
-import com.trolltech.qt.gui.QGraphicsItemInterface;
-import com.trolltech.qt.gui.QIcon;
-import com.trolltech.qt.gui.QKeySequence;
-import com.trolltech.qt.gui.QKeySequence.StandardKey;
-import com.trolltech.qt.gui.QLabel;
-import com.trolltech.qt.gui.QMainWindow;
-import com.trolltech.qt.gui.QMenu;
-import com.trolltech.qt.gui.QMessageBox;
-import com.trolltech.qt.gui.QStatusBar;
-import com.trolltech.qt.gui.QToolBar;
-import com.trolltech.qt.gui.QTreeWidget;
-import com.trolltech.qt.gui.QTreeWidgetItem;
-import com.trolltech.qt.gui.QUndoStack;
-import com.trolltech.qt.gui.QWidget;
+import io.qt.core.QPointF;
+import io.qt.core.QRectF;
+import io.qt.core.QSizeF;
+import io.qt.core.Qt;
+import io.qt.core.Qt.DockWidgetArea;
+import io.qt.core.Qt.MatchFlag;
+import io.qt.core.Qt.MatchFlags;
+import io.qt.widgets.QAbstractItemView.SelectionMode;
+import io.qt.gui.QAction;
+import io.qt.widgets.QApplication;
+import io.qt.widgets.QComboBox;
+import io.qt.widgets.QDockWidget;
+import io.qt.widgets.QFileDialog;
+import io.qt.widgets.QGraphicsItem;
+import io.qt.gui.QIcon;
+import io.qt.gui.QKeySequence;
+import io.qt.gui.QKeySequence.StandardKey;
+import io.qt.widgets.QLabel;
+import io.qt.widgets.QMainWindow;
+import io.qt.widgets.QMenu;
+import io.qt.widgets.QMessageBox;
+import io.qt.widgets.QStatusBar;
+import io.qt.widgets.QToolBar;
+import io.qt.widgets.QTreeWidget;
+import io.qt.widgets.QTreeWidgetItem;
+import io.qt.gui.QUndoStack;
+import io.qt.widgets.QWidget;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Tile;
@@ -90,7 +90,7 @@ public class HandPlacer extends QMainWindow {
 	public QToolBar toolbar;
 	
 	public static void main(String[] args) {
-		QApplication.setGraphicsSystem("raster");
+		//QApplication.setGraphicsSystem("raster");
 		QApplication.initialize(args);
 
 		boolean debugPlacer = false;
@@ -111,7 +111,7 @@ public class HandPlacer extends QMainWindow {
 	}
 	
 	public static void openDesign(Design d){
-		QApplication.setGraphicsSystem("raster");
+		//QApplication.setGraphicsSystem("raster");
 		QApplication.initialize(new String[]{});
 		
 		HandPlacer handPlacer = new HandPlacer(null, d);
@@ -231,7 +231,7 @@ public class HandPlacer extends QMainWindow {
 		if(macroList.hasFocus())
 			return;
 		macroList.clearSelection();
-		for(QGraphicsItemInterface item : scene.selectedItems()){
+		for(QGraphicsItem item : scene.selectedItems()){
 			String modInstName = ((GUIModuleInst)item).getModuleInst().getName();
 			List<QTreeWidgetItem> itemList = macroList.findItems(modInstName, new MatchFlags(MatchFlag.MatchExactly), 0);
 			if(itemList.size() > 0){
@@ -313,7 +313,7 @@ public class HandPlacer extends QMainWindow {
 	
 	protected void openWithAutoPlacer(){
 		String fileName = QFileDialog.getOpenFileName(this, "Choose a file...",
-				".", FileFilters.xdlFilter);
+				".", FileFilters.xdlFilter).result;
 		if (fileName.endsWith(".xdl")){
 			debugPlacer = true;
 			scene.debugPlacer = true;
@@ -328,7 +328,7 @@ public class HandPlacer extends QMainWindow {
 	protected void saveAsDCPDesign(){
 		if(scene.getDesign() == null)
 			return;
-		String fileName = QFileDialog.getSaveFileName(this, tr("Save As"),".", FileFilters.dcpFilter);
+		String fileName = QFileDialog.getSaveFileName(this, tr("Save As"),".", FileFilters.dcpFilter).result;
         if (fileName.length() == 0)
             return;
         scene.getDesign().flattenDesign();
@@ -339,7 +339,7 @@ public class HandPlacer extends QMainWindow {
 	protected void saveAsPDFDesign(){
 		if(scene.getDesign() == null)
 			return;
-		String fileName = QFileDialog.getSaveFileName(this, tr("Save As PDF"),".", FileFilters.pdfFilter);
+		String fileName = QFileDialog.getSaveFileName(this, tr("Save As PDF"),".", FileFilters.pdfFilter).result;
         if (fileName.length() == 0)
             return;
         UiTools.saveAsPdf(scene, new File(fileName));
@@ -437,7 +437,7 @@ public class HandPlacer extends QMainWindow {
 	@SuppressWarnings("unused")
 	private void zoomselection(){
 		double top=-1,left=-1,right=-1,bottom=-1;
-		for(QGraphicsItemInterface item : scene.selectedItems()){
+		for(QGraphicsItem item : scene.selectedItems()){
 			QPointF gmiTL = item.pos();
 			QPointF gmiBR = item.pos().add(item.boundingRect().bottomRight());
 			if(top < 0 || gmiTL.y() < top)

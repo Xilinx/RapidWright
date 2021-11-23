@@ -27,13 +27,14 @@ import java.util.List;
 import java.util.function.BiConsumer;
 import java.util.stream.Stream;
 
-import com.trolltech.qt.core.QRect;
-import com.trolltech.qt.core.QRectF;
-import com.trolltech.qt.core.Qt;
-import com.trolltech.qt.gui.QBrush;
-import com.trolltech.qt.gui.QColor;
-import com.trolltech.qt.gui.QFont;
-import com.trolltech.qt.gui.QPainter;
+import io.qt.core.QRect;
+import io.qt.core.QRectF;
+import io.qt.core.Qt;
+import io.qt.core.Qt.GlobalColor;
+import io.qt.gui.QBrush;
+import io.qt.gui.QColor;
+import io.qt.gui.QFont;
+import io.qt.gui.QPainter;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.TileRectangle;
 import com.xilinx.rapidwright.device.Tile;
@@ -71,7 +72,7 @@ public class PBlockScene extends TileScene {
     }
 
     private void drawIntConnections(QPainter painter) {
-        painter.setPen(QColor.white);
+        painter.setPen(TileColors.getQColor(GlobalColor.white));
         for (Tile tile: device.getAllTiles()) {
             Arrays.stream(tile.getSites())
                     .flatMap(s-> {
@@ -155,9 +156,10 @@ public class PBlockScene extends TileScene {
         forAllRects((block, rect) -> {
             painter.setPen(block.color);
 
+            
             painter.drawText(
                     rect,
-                    Qt.AlignmentFlag.createQFlags(Qt.AlignmentFlag.AlignVCenter, Qt.AlignmentFlag.AlignCenter).value(),
+                    Qt.AlignmentFlag.AlignVCenter.value() | Qt.AlignmentFlag.AlignCenter.value(),
                     block.name
             );
         });
