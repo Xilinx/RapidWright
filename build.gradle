@@ -104,7 +104,7 @@ test {
 
 gradle.taskGraph.whenReady {
   if (!project.test.filter.commandLineIncludePatterns.isEmpty()) {
-    throw new InvalidUserDataException("'test' task cannot contain filters; apply filters directly to 'testJava'/'testPython' tasks instead.")
+    throw new InvalidUserDataException("'test' task does not support filters (i.e. '--tests' option); please apply filters directly to 'testJava'/'testPython' tasks instead.")
   }
 }
 
