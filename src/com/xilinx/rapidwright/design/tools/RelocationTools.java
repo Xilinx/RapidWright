@@ -79,6 +79,9 @@ public class RelocationTools {
      *                     (empty for top cell)
      * @param tileColOffset Relocate this number of tile columns (X axis)
      * @param tileRowOffset Relocate this number of tile rows (Y axis)
+     * @param siteTypes     Set of SiteTypeEnum-s to relocate
+     *                      (overload exists where this is emitted thus
+     *                      defaulting to RelocationTools.defaultSiteTypes)
      * @return True if successful, false otherwise.
      */
     public static boolean relocate(Design design,
