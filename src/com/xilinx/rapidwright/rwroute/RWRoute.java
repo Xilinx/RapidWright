@@ -289,7 +289,7 @@ public class RWRoute{
 				System.err.println("ERROR: Unknown net " + net.toString());
 			}
 		}
-		this.printConnectionSpanStatistics();
+		if(this.config.isVerbose()) this.printConnectionSpanStatistics();
 	}
 	
 	/**
