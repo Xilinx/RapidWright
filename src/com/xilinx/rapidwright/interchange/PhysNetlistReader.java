@@ -68,7 +68,7 @@ public class PhysNetlistReader {
     private static final String STATIC_SOURCE = "STATIC_SOURCE";
     private static int tieoffInstanceCount = 0;
 
-    public static Design readPhysNetlist(PhysNetlist.Reader physNetlist, Design design) {
+    public static Design readPhysNetlist(PhysNetlist.Reader physNetlist, Design design, boolean skipChecks) {
         EDIFNetlist netlist = design.getNetlist();
 
         if (physNetlist.hasPart()) {
@@ -79,14 +79,18 @@ public class PhysNetlistReader {
 
         Enumerator<String> allStrings = readAllStrings(physNetlist);
 
-        checkConstantRoutingAndNetNaming(physNetlist, netlist, allStrings);
+        if (!skipChecks) {
+            checkConstantRoutingAndNetNaming(physNetlist, netlist, allStrings);
+        }
 
         readSiteInsts(physNetlist, design, allStrings);
 
         readPlacement(physNetlist, design, allStrings);
 
-        checkMacros(design);
-        
+        if (!skipChecks) {
+            checkMacros(design);
+        }
+
         readRouting(physNetlist, design, allStrings);
 
         readDesignProperties(physNetlist, design, allStrings);
@@ -105,7 +109,7 @@ public class PhysNetlistReader {
 
         PhysNetlist.Reader physNetlist = readMsg.getRoot(PhysNetlist.factory);
 
-        return readPhysNetlist(physNetlist, design);
+        return readPhysNetlist(physNetlist, design, false);
     }
 
     public static Enumerator<String> readAllStrings(PhysNetlist.Reader physNetlist){
@@ -142,13 +146,11 @@ public class PhysNetlistReader {
             physCells.put(strings.get(reader.getCellName()), reader.getPhysType());
         }
 
-
         StructList.Reader<CellPlacement.Reader> placements = physNetlist.getPlacements();
         int placementCount = placements.size();
         Device device = design.getDevice();
-        EDIFNetlist netlist = design.getNetlist();
         EDIFLibrary macroPrims = Design.getMacroPrimitives(device.getSeries());
-        Map<String, List<String>> macroLeafChildren = new HashMap<>();
+        EDIFNetlist netlist = design.getNetlist();
         for(int i=0; i < placementCount; i++) {
             CellPlacement.Reader placement = placements.get(i);
             String cellName = strings.get(placement.getCellName());
@@ -282,38 +284,7 @@ public class PhysNetlistReader {
             }
         }
 
-        // Validate macro primitives are placed fully
-        HashSet<String> checked = new HashSet<>();
-        for(Cell c : design.getCells()) {
-            EDIFCell cellType = c.getParentCell();
-            if(cellType != null && macroPrims.containsCell(cellType)) {
-                String parentHierName = c.getParentHierarchicalInstName();
-                if(checked.contains(parentHierName)) continue;
-                List<String> missingPlacements = null;
-                List<String> childrenNames = macroLeafChildren.get(cellType.getName());
-                if(childrenNames == null) {
-                    childrenNames = EDIFTools.getMacroLeafCellNames(cellType);
-                    macroLeafChildren.put(cellType.getName(), childrenNames);
-                }
-                //for(EDIFCellInst inst : cellType.getCellInsts()) { // TODO - Fix up loop list
-                for(String childName : childrenNames) {
-                    String childCellName = parentHierName + EDIFTools.EDIF_HIER_SEP + childName;
-                    Cell child = design.getCell(childCellName);
-                    if(child == null) {
-                        if(missingPlacements == null) missingPlacements = new ArrayList<String>();
-                        missingPlacements.add(childName + " (" + childCellName + ")");
-                    }
-                }
-                if(missingPlacements != null && !cellType.getName().equals("IOBUFDS")) {
-                    throw new RuntimeException("ERROR: Macro primitive '"+ parentHierName
-                            + "' is not fully placed. Expected placements for all child cells: "
-                            + cellType.getCellInsts() + ", but missing placements "
-                            + "for cells: " + missingPlacements);
-                }
 
-                checked.add(parentHierName);
-            }
-        }
     }
 
     private static NetType getNetType(PhysNet.Reader netReader, String netName) {
@@ -698,6 +669,44 @@ public class PhysNetlistReader {
      */
     private static void checkMacros(Design design) {
     	EDIFNetlist netlist = design.getNetlist();
+
+        // Validate macro primitives are placed fully
+        Device device = design.getDevice();
+        EDIFLibrary macroPrims = Design.getMacroPrimitives(device.getSeries());
+        Map<String, List<String>> macroLeafChildren = new HashMap<>();
+
+        HashSet<String> checked = new HashSet<>();
+        for(Cell c : design.getCells()) {
+            EDIFCell cellType = c.getParentCell();
+            if(cellType != null && macroPrims.containsCell(cellType)) {
+                String parentHierName = c.getParentHierarchicalInstName();
+                if(checked.contains(parentHierName)) continue;
+                List<String> missingPlacements = null;
+                List<String> childrenNames = macroLeafChildren.get(cellType.getName());
+                if(childrenNames == null) {
+                    childrenNames = EDIFTools.getMacroLeafCellNames(cellType);
+                    macroLeafChildren.put(cellType.getName(), childrenNames);
+                }
+                //for(EDIFCellInst inst : cellType.getCellInsts()) { // TODO - Fix up loop list
+                for(String childName : childrenNames) {
+                    String childCellName = parentHierName + EDIFTools.EDIF_HIER_SEP + childName;
+                    Cell child = design.getCell(childCellName);
+                    if(child == null) {
+                        if(missingPlacements == null) missingPlacements = new ArrayList<String>();
+                        missingPlacements.add(childName + " (" + childCellName + ")");
+                    }
+                }
+                if(missingPlacements != null && !cellType.getName().equals("IOBUFDS")) {
+                    throw new RuntimeException("ERROR: Macro primitive '"+ parentHierName
+                            + "' is not fully placed. Expected placements for all child cells: "
+                            + cellType.getCellInsts() + ", but missing placements "
+                            + "for cells: " + missingPlacements);
+                }
+
+                checked.add(parentHierName);
+            }
+        }
+
     	List<EDIFHierCellInst> leaves = netlist.getTopCell().getAllLeafDescendants();
     	EDIFLibrary macros = Design.getMacroPrimitives(design.getDevice().getSeries());
     	for(EDIFHierCellInst leaf : leaves) {
