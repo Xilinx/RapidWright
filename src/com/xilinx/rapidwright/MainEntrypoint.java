@@ -55,6 +55,7 @@ import com.xilinx.rapidwright.placer.handplacer.HandPlacer;
 import com.xilinx.rapidwright.placer.handplacer.ModuleOptimizer;
 import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.router.Router;
+import com.xilinx.rapidwright.rwroute.RWRoute;
 import com.xilinx.rapidwright.tests.CheckAccuracyUsingGnlDesigns;
 import com.xilinx.rapidwright.tests.DeviceLoader;
 import com.xilinx.rapidwright.tests.PinMapTester;
@@ -143,6 +144,7 @@ public class MainEntrypoint {
         addFunction("Router", Router::main);
         addFunction("RouteThruHelper", RouteThruHelper::main);
         addFunction("RunSATRouterExample", RunSATRouterExample::main);
+        addFunction("RWRoute", RWRoute::main);
         addFunction("SLRCrosserGenerator", SLRCrosserGenerator::main);
         addFunction("SmallestEnclosingCircle", SmallestEnclosingCircle::main);
         addFunction("StampPlacement", StampPlacement::main);
