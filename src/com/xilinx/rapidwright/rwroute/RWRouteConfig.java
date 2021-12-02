@@ -141,7 +141,7 @@ public class RWRouteConfig {
 			case "--enlargeBoundingBox":
 				if(i+1 < arguments.length && (!arguments[i+1].startsWith("--extensionYIncrement") && !arguments[i+1].startsWith("--extensionXIncrement"))) {
 					System.out.println("WARNING: --enlargeBoundingBox option is not followed by --extensionYIncrement <arg> or --extensionXIncrement <arg>.");
-					System.out.println("         Use default settings: verticalINTTiles = 2, horizontalINTTiles = 1.");
+					System.out.println("         Use default settings: extensionYIncrement = 2, extensionXIncrement = 1.");
 				}
 				this.setEnlargeBoundingBox(true);
 				break;
@@ -290,16 +290,16 @@ public class RWRouteConfig {
 	}
 	
 	/**
-	 * Gets the initial bounding box extension range in the horizontal direction.
+	 * Gets the initial bounding box extension range in the vertical direction.
 	 * Default: 15. Can be modified by using use "--boundingBoxExtensionY" option, e.g. "--boundingBoxExtensionY 5".
-	 * @return The bounding box extension range in the horizontal direction.
+	 * @return The bounding box extension range in the vertical direction.
 	 */
 	public short getBoundingBoxExtensionY() {
 		return this.boundingBoxExtensionY;
 	}
 
 	/**
-	 * Sets the initial bounding box extension range in the horizontal direction.
+	 * Sets the initial bounding box extension range in the vertical direction.
 	 * Default: 15. Can be modified by using use "--boundingBoxExtensionY" option, e.g. "--boundingBoxExtensionY 5".
 	 * @param boundingBoxExtensionY
 	 */
@@ -332,36 +332,36 @@ public class RWRouteConfig {
 	}
 
 	/**
-	 * Gets the extension increment that connections' bounding box should be enlarged by vertically.
+	 * Gets the extension increment that connections' bounding boxes should be enlarged by vertically.
 	 * Default: 2. Can be modified by using "--extensionYIncrement" option, e.g. "--extensionYIncrement 3".
-	 * @return The number of INT Tiles that connections' bounding box should be enlarged by vertically.
+	 * @return The number of INT Tiles that connections' bounding boxes should be enlarged by vertically.
 	 */
 	public short getExtensionYIncrement() {
 		return this.extensionYIncrement;
 	}
 
 	/**
-	 * Sets the extension increment that connections' bounding box should be enlarged by vertically.
+	 * Sets the extension increment that connections' bounding boxes should be enlarged by vertically.
 	 * Default: 2. Can be modified by using "--extensionYIncrement" option, e.g. "--extensionYIncrement 3".
-	 * @param extensionYIncrement The number of INT Tiles that connections' bounding box should be enlarged by vertically.
+	 * @param extensionYIncrement The number of INT Tiles that connections' bounding boxes should be enlarged by vertically.
 	 */
 	public void setExtensionYIncrement(short extensionYIncrement) {
 		this.extensionYIncrement = extensionYIncrement;
 	}
 
 	/**
-	 * Gets the extension increment that connections' bounding box should be enlarged by horizontally.
+	 * Gets the extension increment that connections' bounding boxes should be enlarged by horizontally.
 	 * Default: 1. Can be modified by using "--extensionXIncrement" option, e.g. "--extensionXIncrement 2".
-	 * @return The number of INT Tiles that connections' bounding box should be enlarged by horizontally.
+	 * @return The number of INT Tiles that connections' bounding boxes should be enlarged by horizontally.
 	 */
 	public short getExtensionXIncrement() {
 		return this.extensionXIncrement;
 	}
 
 	/**
-	 * Sets the extension increment that connections' bounding box should be enlarged by horizontally.
+	 * Sets the extension increment that connections' bounding boxes should be enlarged by horizontally.
 	 * Default: 1. Can be modified by using "--extensionXIncrement" option, e.g. "--extensionXIncrement 2".
-	 * @param extensionXIncrement The number of INT Tiles that connections' bounding box should be enlarged by horizontally. 
+	 * @param extensionXIncrement The number of INT Tiles that connections' bounding boxes should be enlarged by horizontally. 
 	 */
 	public void setExtensionXIncrement(short extensionXIncrement) {
 		this.extensionXIncrement = extensionXIncrement;
