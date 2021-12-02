@@ -40,6 +40,7 @@ import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
+import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
@@ -54,6 +55,18 @@ import com.xilinx.rapidwright.util.Utils;
  */
 public class RelocationTools {
 
+    public static final Set<SiteTypeEnum> defaultSiteTypes;
+    static {
+        defaultSiteTypes = Utils.sliceDspBramUramTypes;
+    }
+
+    public static boolean relocate(Design design,
+                                   String instanceName,
+                                   int tileColOffset,
+                                   int tileRowOffset) {
+        return relocate(design, instanceName, tileColOffset, tileRowOffset, defaultSiteTypes);
+    }
+
     /**
      * Relocate all SiteInsts (and all associated PIPs) belonging to the logical Cell at
      * instanceName in-place by tileColOffset/tileRowOffset tiles.
@@ -66,12 +79,16 @@ public class RelocationTools {
      *                     (empty for top cell)
      * @param tileColOffset Relocate this number of tile columns (X axis)
      * @param tileRowOffset Relocate this number of tile rows (Y axis)
+     * @param siteTypes     Set of SiteTypeEnum-s to relocate
+     *                      (overload exists where this is emitted thus
+     *                      defaulting to RelocationTools.defaultSiteTypes)
      * @return True if successful, false otherwise.
      */
     public static boolean relocate(Design design,
                                    String instanceName,
                                    int tileColOffset,
-                                   int tileRowOffset) {
+                                   int tileRowOffset,
+                                   Set<SiteTypeEnum> siteTypes) {
         EDIFNetlist netlist = design.getNetlist();
         EDIFHierCellInst instanceCell = netlist.getHierCellInstFromName(instanceName);
         if (instanceCell == null) {
@@ -100,7 +117,7 @@ public class RelocationTools {
                 continue;
             }
 
-            if (!Utils.sliceDspBramUramTypes.contains(si.getSiteTypeEnum())) {
+            if (!siteTypes.contains(si.getSiteTypeEnum())) {
                 System.out.println("WARNING: Skipping cell '" + leaf.getFullHierarchicalInstName() +
                         "' as it is placed onto a SiteInst type '" + si.getSiteTypeEnum() + "'");
                 continue;

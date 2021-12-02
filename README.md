@@ -14,7 +14,7 @@ RapidWright also provides a new design methodology leveraging
 pre-implemented modules (modules that have been synthesized, placed
 and routed out-of-context).  These pre-implemented modules can be
 cached, replicated and relocated using the RapidWright framework. We
-see pre-implmented modules as a way to build systematic shells and
+see pre-implemented modules as a way to build systematic shells and
 overlays and a core piece of strategy in achieving near-spec
 performance.
 
