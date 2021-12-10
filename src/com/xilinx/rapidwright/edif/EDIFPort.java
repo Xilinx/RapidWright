@@ -27,6 +27,8 @@ package com.xilinx.rapidwright.edif;
 
 import java.io.IOException;
 import java.io.Writer;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Represents a port on an {@link EDIFCell} within an EDIF netlist.
@@ -167,6 +169,54 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
 		int rightBracket = getName().lastIndexOf(']');
 		int colon = getName().lastIndexOf(':');
 		return Integer.parseInt(getName().substring(colon+1, rightBracket));
+	}
+	
+	/**
+	 * Gets the list of internal nets connected to this port, indexed in the same way as the port.
+	 * A single bit port will only have one entry in the list, for example. 
+	 * @return The list of internal nets connected to this port.  If one or more bits is not 
+	 * connected (such as in a primitive cell), a null entry will be present at the corresponding 
+	 * index.
+	 */
+	public List<EDIFNet> getInternalNets(){
+	    List<EDIFNet> nets = new ArrayList<>(width);
+	    for(int i=0; i < width; i++) {
+	        nets.add(getInternalNet(i));
+	    }
+	    return nets;
+	}
+	
+	/**
+	 * Gets the internal net connected to this port at specified index of the port,
+	 * connected to the inside of the cell.  
+	 * @param index Index of port (0 if it is a single bit) 
+	 * @return The internal net connect to this port or null if not connect (such as a primitive).
+	 */
+	public EDIFNet getInternalNet(int index) {
+	    return parentCell.getInternalNet(getPortInstNameFromPort(index));
+	}
+	
+	/**
+	 * If the port is only one bit wide or the user only needs the 0th indexed net, this is
+	 * a convenience method to getting the internal net (inside the cell) connected to this port.  
+	 * @return The internal net connected to this port (single bit or 0th index only), 
+	 * or null if not connected (such as a primitive).
+	 */
+	public EDIFNet getInternalNet() {
+	    return getInternalNet(0);
+	}
+	
+	/**
+	 * Gets the PortInst name from this port and the specified index
+	 * @param index The index to get from the port 
+	 * @return The name of the PortInst for the specified index
+	 */
+	public String getPortInstNameFromPort(int index) {
+	    if(!isBus()) return getBusName();
+	    if(isLittleEndian()){
+	        index = (getWidth()-1) - index;
+	    }
+	    return getBusName() + "[" + index + "]";     
 	}
 	
 	public void exportEDIF(Writer wr, String indent) throws IOException{
