@@ -111,12 +111,7 @@ public class EDIFPortInst {
 	}
 	
 	protected String getPortInstNameFromPort(){
-		if(!port.isBus()) return port.getBusName();
-		int idx = index;
-		if(port.isLittleEndian()){
-			idx = (port.getWidth()-1) - idx;
-		}
-		return port.getBusName() + "[" + idx + "]";
+		return port.getPortInstNameFromPort(index);
 	}
 	
 	public String getName(){
