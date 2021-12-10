@@ -7,22 +7,22 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.support.CheckOpenFiles;
 
 class TestEDIFNetlist {
 
-    private static final String PART_NAME = "xcvu440-flga2892-2-e";
+    private static final String PART_NAME = Device.KCU105;
     
     private static final String TEST_MACRO = "IOBUFDS_INTERMDISABLE";
     
     private Design createSampleMacroDesign(String macro, Part part) {
         String designName = TEST_MACRO +"_design";
         final EDIFNetlist netlist = EDIFTools.createNewNetlist(designName);
-        final Design design = new Design(designName, PART_NAME);
+        final Design design = new Design(designName, part.getName());
         design.setNetlist(netlist);
-        design.setPartName(part.getName());
         
         final EDIFCell prototypeMacro = Design.getMacroPrimitives(part.getSeries()).getCell(macro); 
         
