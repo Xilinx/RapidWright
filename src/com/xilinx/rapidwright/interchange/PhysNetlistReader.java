@@ -72,9 +72,14 @@ public class PhysNetlistReader {
         EDIFNetlist netlist = design.getNetlist();
 
         if (physNetlist.hasPart()) {
-            design.setPartName(physNetlist.getPart().toString());
-        } else {
-            // TODO: Check is the same
+            if (design.getPartName() != null) {
+                design.setPartName(physNetlist.getPart().toString());
+            } else {
+                if (!physNetlist.getPart().toString().equals(design.getPartName())) {
+                    throw new RuntimeException("ERROR: Design targets '" + design.getPartName() +
+                            "' but PhysNetlist targets '" + physNetlist.getPart() + "'");
+                }
+            }
         }
 
         Enumerator<String> allStrings = readAllStrings(physNetlist);
