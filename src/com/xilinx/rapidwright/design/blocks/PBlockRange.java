@@ -43,7 +43,7 @@ public class PBlockRange {
 
 	private PBlockCorner upperRight;
 
-    public static final String CLOCK_REGION_RANGE_STR = "CLOCKREGION";
+	public static final String CLOCK_REGION_RANGE_STR = "CLOCKREGION";
 	
 	
 	public PBlockRange(Device dev, String range){
