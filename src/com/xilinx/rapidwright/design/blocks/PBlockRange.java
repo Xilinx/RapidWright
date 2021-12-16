@@ -42,6 +42,8 @@ public class PBlockRange {
 	private PBlockCorner lowerLeft;
 
 	private PBlockCorner upperRight;
+
+	public static final String CLOCK_REGION_RANGE_STR = "CLOCKREGION";
 	
 	
 	public PBlockRange(Device dev, String range){
@@ -49,7 +51,7 @@ public class PBlockRange {
 		if(colonIndex < 0) throw new RuntimeException("ERROR: Invalid pblock string '" + range + "'");
 		String lowerLeftName = range.substring(0, colonIndex);
 		String upperRightName = range.substring(colonIndex+1);
-		if(lowerLeftName.startsWith(PBlockCorner.CLOCK_REGION) && upperRightName.startsWith(PBlockCorner.CLOCK_REGION)){
+		if(lowerLeftName.startsWith(CLOCK_REGION_RANGE_STR) && upperRightName.startsWith(CLOCK_REGION_RANGE_STR)){
 			ClockRegion lowerLeftCR = dev.getClockRegion(lowerLeftName);
 			ClockRegion upperRightCR = dev.getClockRegion(upperRightName);
 			if(lowerLeftCR == null || upperRightCR == null){
