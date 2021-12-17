@@ -9,6 +9,7 @@ import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.support.RapidWrightDCP;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -86,5 +87,17 @@ public class TestDesign {
         design = Design.readCheckpoint(filenameRead);
         mi = design.getModuleInst("inst");
         Assertions.assertEquals(oldAnchor, mi.getAnchor().toString());
+    }
+
+    @Test
+    @CheckOpenFiles
+    public void testRouteThruPIPsSitePinInsts() {
+        final String inputPath = RapidWrightDCP.getString("routethru_pip.dcp");
+        Design design = Design.readCheckpoint(inputPath);
+
+        Net net = design.getNet("CO3_OBUF");
+        for (SitePinInst spi : net.getSinkPins()) {
+            Assertions.assertTrue(spi.getSite().isInputPin(spi.getName()));
+        }
     }
 }
