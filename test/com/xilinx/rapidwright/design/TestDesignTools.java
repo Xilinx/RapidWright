@@ -1,7 +1,9 @@
 package com.xilinx.rapidwright.design;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -50,6 +52,37 @@ public class TestDesignTools {
             SiteInst i = design.getSiteInstFromSiteName(e.getKey().getFirst());
             Net net = i.getNetFromSiteWire(e.getKey().getSecond());
             Assertions.assertEquals(net.getName(), e.getValue());
+        }
+    }
+    
+    @Test
+    public void testCopyImplementationRouteThruVCCPinCheck() {
+        String dcpPath = RapidWrightDCP.getString("bnn.dcp");
+        Design srcDesign = Design.readCheckpoint(dcpPath);
+        Design dstDesign = Design.readCheckpoint(dcpPath, true);
+        DesignTools.copyImplementation(srcDesign, dstDesign, "bd_0_i/hls_inst/inst");
+        
+        SiteInst srcSiteInst = srcDesign.getSiteInstFromSiteName("SLICE_X73Y155");
+        SiteInst dstSiteInst = dstDesign.getSiteInstFromSiteName(srcSiteInst.getSiteName());
+        List<Pair<String,Boolean>> routeThrus = new ArrayList<>();
+        routeThrus.add(new Pair<>("A6LUT", true)); // It has VCC pin
+        routeThrus.add(new Pair<>("B6LUT", false)); // It does not have a VCC pin
+        
+        for(Pair<String, Boolean> routeThru : routeThrus) {
+            Cell rtCell = dstSiteInst.getCell(routeThru.getFirst());
+            Assertions.assertTrue(rtCell.isRoutethru());
+            String siteWireName = rtCell.getBEL().getPin("A6").getSiteWireName();
+            
+            Assertions.assertEquals(srcSiteInst.getNetFromSiteWire(siteWireName).getName(),
+                                    dstSiteInst.getNetFromSiteWire(siteWireName).getName());
+            
+            if(routeThru.getSecond()) {
+                Assertions.assertEquals(dstSiteInst.getNetFromSiteWire(siteWireName), 
+                                        dstDesign.getVccNet());
+            }else {
+                Assertions.assertNotEquals(dstSiteInst.getNetFromSiteWire(siteWireName), 
+                                        dstDesign.getVccNet());
+            }
         }
     }
 }
