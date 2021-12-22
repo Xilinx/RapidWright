@@ -2048,7 +2048,16 @@ public class DesignTools {
 									curr = tmp;
 									break;
 								}
-							}	
+							}
+							if(rtCopy.getBELName().endsWith("6LUT")) {
+							    // Check A6 if it has VCC assignment
+							    BELPin a6 = rtCopy.getBEL().getPin("A6");
+							    Net isVcc = origSiteInst.getNetFromSiteWire(a6.getSiteWireName());
+							    if(isVcc != null && isVcc.getName().equals(Net.VCC_NET)) {
+							        dstSiteInst.routeIntraSiteNet(
+							                dstSiteInst.getDesign().getVccNet(), a6, a6);
+							    }                               
+							}
 						} else {
 							// We found the source
 							break;
