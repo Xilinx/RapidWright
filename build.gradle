@@ -7,6 +7,10 @@ mainClassName = "com.xilinx.rapidwright.MainEntrypoint"
 def os = System.getProperty("os.name").toLowerCase().contains("windows") ?
                                        "win64-msvc2005x64" : "linux64-gcc"
 
+configurations.implementation.canBeResolved = true
+configurations.testImplementation.canBeResolved = true
+configurations.api.canBeResolved = true
+
 sourceSets {
   main {
     java.destinationDirectory.fileValue(file('bin'))
@@ -86,6 +90,14 @@ task updateJars {
     f.delete()
   }
 }
+
+task copyJars(type: Copy) {
+  from configurations.implementation
+  into 'jars'
+  from configurations.testImplementation
+  into 'jars'
+}
+compileJava.dependsOn(copyJars)
 
 task update_jars {
   group = "build setup"
