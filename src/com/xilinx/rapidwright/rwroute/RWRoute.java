@@ -354,8 +354,6 @@ public class RWRoute{
 		for(EDIFHierPortInst eport : ehportInsts) {
 			if(eport.getFullHierarchicalInstName().contains(this.config.getAnchorNameKeyword())) {
 				//use the key word to identify target anchor nets
-				System.out.println(eport.toString());
-				System.out.println(eport.getFullHierarchicalInstName());
 				anchorNet = true;
 				if(eport.isInput()) input = true;
 				break;
