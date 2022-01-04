@@ -81,7 +81,7 @@ public class RWRoute{
 	private List<Net> clkNets;
 	/** Static nets */
 	private Map<Net, List<SitePinInst>> staticNetAndRoutingTargets;
-	/** Nets with conflicting nodes that should added to the routing targets */
+	/** Nets with conflicting nodes that should be added to the routing targets */
 	private Set<Net> conflictNets;
 	/** Several integers to indicate the netlist info */
 	private int numPreservedRoutableNets;
@@ -323,7 +323,7 @@ public class RWRoute{
 				continue;
 			}
 			
-			if(!this.isNonLagunaAnchorNet(net, design)) {
+			if(!this.isRegularAnchorNet(net, design)) {
 				toPreserveNets.add(net);
 				continue;
 			}
@@ -338,13 +338,13 @@ public class RWRoute{
 	}
 	
 	/**
-	 * Checks if a net is the routing targets, which are anchor nets that are not from / to LAGUNA tiles.
+	 * Checks if a net is an anchor net that is from / to a CLB tile.
 	 * Note: this is customized for the RapidStream use case.
 	 * @param net The net in question.
 	 * @param design The design to route.
-	 * @return true if the net is a non-laguna anchor net.
+	 * @return true if the net is an anchor net from / to a CLB tile.
 	 */
-	private boolean isNonLagunaAnchorNet(Net net, Design design) {
+	private boolean isRegularAnchorNet(Net net, Design design) {
 		boolean anchorNet = false;
 		List<EDIFHierPortInst> ehportInsts = design.getNetlist().getPhysicalPins(net.getName());
 		boolean input = false;
