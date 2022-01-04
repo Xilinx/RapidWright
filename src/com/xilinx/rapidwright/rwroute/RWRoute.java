@@ -53,7 +53,6 @@ import com.xilinx.rapidwright.util.RuntimeTrackerTree;
 import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.timing.ClkRouteTiming;
-import com.xilinx.rapidwright.timing.DSPTimingData;
 import com.xilinx.rapidwright.timing.TimingEdge;
 import com.xilinx.rapidwright.timing.TimingGraph;
 import com.xilinx.rapidwright.timing.TimingManager;
@@ -82,6 +81,8 @@ public class RWRoute{
 	private List<Net> clkNets;
 	/** Static nets */
 	private Map<Net, List<SitePinInst>> staticNetAndRoutingTargets;
+	/** Nets with conflicting nodes that should added to the routing targets */
+	private Set<Net> conflictNets;
 	/** Several integers to indicate the netlist info */
 	private int numPreservedRoutableNets;
 	private int numPreservedClks;
@@ -187,11 +188,7 @@ public class RWRoute{
 		
 		RoutableNode.setMaskNodesCrossRCLK(this.config.isMaskNodesCrossRCLK());
 
-		if(this.config.isTimingDriven()) {
-			DSPTimingData.setDSPTimingFolder(config.getDspTimingDataFolder());
-			ClkRouteTiming clkTiming = createClkTimingData(config);
-			this.routesToSinkINTTiles = clkTiming == null? null : clkTiming.getRoutesToSinkINTTiles();
-			this.timingManager = new TimingManager(this.design, true, this.routerTimer, this.config, clkTiming);		
+		if(this.config.isTimingDriven()) {		
 		    this.estimator = new DelayEstimatorBase(this.design.getDevice(), new InterconnectInfo(), this.config.isUseUTurnNodes(), 0);
 			RoutableNode.setTimingDriven(true, this.estimator);
 			this.nodesDelays = new HashMap<>();
@@ -220,6 +217,13 @@ public class RWRoute{
 		this.routerTimer.getRuntimeTracker("determine route targets").stop();
 		
 		if(this.config.isTimingDriven()) {
+			ClkRouteTiming clkTiming = createClkTimingData(config);
+			this.routesToSinkINTTiles = clkTiming == null? null : clkTiming.getRoutesToSinkINTTiles();
+			if(this.config.isResolveConflictNets()) {
+				this.timingManager = new TimingManager(this.design, true, this.routerTimer, this.config, clkTiming, this.getConflictNets());
+			}else {
+				this.timingManager = new TimingManager(this.design, true, this.routerTimer, this.config, clkTiming, this.design.getNets());
+			}
 			this.timingEdgeConnectionMap = new HashMap<>();
 			setTimingEdgesOfConnections(this.indirectConnections, this.timingManager, this.timingEdgeConnectionMap);
 		}
@@ -253,6 +257,12 @@ public class RWRoute{
 	 * and regular signal nets (i.e. {@link NetType}.WIRE) and determines routing targets.
 	 */
 	private void determineRoutingTargets(){
+		this.categorizeNets();
+		if(this.config.isResolveConflictNets()) this.handleConflictNets(design, this.getConflictNets());
+		if(this.config.isVerbose()) this.printConnectionSpanStatistics();
+	}
+	
+	protected void categorizeNets() {
 		this.numWireNetsToRoute = 0;
 		this.numConnectionsToRoute = 0;
 		this.numPreservedRoutableNets = 0;
@@ -264,6 +274,7 @@ public class RWRoute{
 		this.directConnections = new ArrayList<>();
 		this.clkNets = new ArrayList<>();
 		this.staticNetAndRoutingTargets = new HashMap<>();
+		this.conflictNets = new HashSet<>();
 		
 		for(Net net:this.design.getNets()){	
 			if(net.isClockNet()){
@@ -289,13 +300,81 @@ public class RWRoute{
 				System.err.println("ERROR: Unknown net " + net.toString());
 			}
 		}
-		if(this.config.isVerbose()) this.printConnectionSpanStatistics();
+	}
+	
+	/**
+	 * Deals with the conflicted nets.
+	 * Note: this is customized for the RapidStream use case. Other users will need to adapt this method.
+	 * @param design The design to route.
+	 * @param conflictNets A set of conflicted nets.
+	 */
+	private void handleConflictNets(Design design, Set<Net> conflictNets) {
+		List<Net> toPreserveNets = new ArrayList<>();
+		for(Net net : conflictNets) {
+			if(net.getType() != NetType.WIRE) {
+				// Skip successfully routed CLK, VCC, and GND nets
+				toPreserveNets.add(net);
+				continue;
+			}
+			
+			if(net.getSinkPins().size() > 1) {
+				// In the RapidStream flow, the target nets to route are 2-terminal FF-to-FF nets.
+				toPreserveNets.add(net);
+				continue;
+			}
+			
+			if(!this.isNonLagunaAnchorNet(net, design)) {
+				toPreserveNets.add(net);
+				continue;
+			}
+			
+			this.removeNetNodesFromPreservedNodes(net); // remove preserved nodes of a net from the map
+			this.createsNetWrapperAndConnections(net, this.config.getBoundingBoxExtensionX(), this.config.getBoundingBoxExtensionY(), this.isMultiSLRDevice());
+			net.unroute();//NOTE: no need to unroute if routing tree is reused, then toPreserveNets should be detected before createNetWrapperAndConnections
+		}
+		for(Net net : toPreserveNets) {
+			this.preserveNet(net);
+		}
+	}
+	
+	/**
+	 * Checks if a net is the routing targets, which are anchor nets that are not from / to LAGUNA tiles.
+	 * Note: this is customized for the RapidStream use case.
+	 * @param net The net in question.
+	 * @param design The design to route.
+	 * @return true if the net is a non-laguna anchor net.
+	 */
+	private boolean isNonLagunaAnchorNet(Net net, Design design) {
+		boolean anchorNet = false;
+		List<EDIFHierPortInst> ehportInsts = design.getNetlist().getPhysicalPins(net.getName());
+		boolean input = false;
+		if(ehportInsts == null) { // e.g. encrypted DSP related nets
+			return false;
+		}
+		for(EDIFHierPortInst eport : ehportInsts) {
+			if(eport.getFullHierarchicalInstName().contains(this.config.getAnchorNameKeyword())) {
+				//use the key word to identify target anchor nets
+				System.out.println(eport.toString());
+				System.out.println(eport.getFullHierarchicalInstName());
+				anchorNet = true;
+				if(eport.isInput()) input = true;
+				break;
+			}
+		}
+		Tile anchorTile = null;
+		if(input) {
+			anchorTile = net.getSinkPins().get(0).getTile();
+		}else {
+			anchorTile = net.getSource().getTile();
+		}
+		// Note: if laguna anchor nets are never conflicted, there will be no need to check tile names.
+		return anchorNet && anchorTile.getName().startsWith("CLE");
 	}
 	
 	/**
 	 * A helper method for profiling the routing runtime v.s. average span of connections.
 	 */
-	private void printConnectionSpanStatistics() {
+	protected void printConnectionSpanStatistics() {
 		System.out.println("------------------------------------------------------------------------------");
 		System.out.println("Connection Span Info:");
 		if(this.config.isPrintConnectionSpan()) System.out.println(" Span" + "\t" + "# Connections" + "\t" + "Percent");
@@ -599,18 +678,41 @@ public class RWRoute{
 		Net reserved = this.preservedNodes.get(node);
 		if(reserved == null) {
 			this.preservedNodes.put(node, netToPreserve);
-		}else if(!reserved.getName().equals(netToPreserve.getName())){
+		}else if(reserved.getSource() != null && netToPreserve.getSource() != null && !reserved.getName().equals(netToPreserve.getName())){
+			boolean generateWarning = this.conflictNets.size() < 5;
 			EDIFNet reservedLogical = reserved.getLogicalNet();
 			EDIFNet toReserveLogical = netToPreserve.getLogicalNet();
 			if(reservedLogical != null && toReserveLogical != null) {
-				if(!toReserveLogical.equals(reservedLogical))
-					System.out.println("WARNING: Conflicting node " + node + ":"); 
-					System.out.println("         " + netToPreserve.getName() + " \n         " + reserved.getName());
+				if(!toReserveLogical.equals(reservedLogical) && !toReserveLogical.equals(reservedLogical)) {
+					if(generateWarning) this.generateConflictInfo(node, reserved, netToPreserve);
+				}
 			}else {
-				System.out.println("WARNING: Conflicting node " + node + ":"); 
-				System.out.println("         " + netToPreserve.getName() + " \n         " + reserved.getName());;
+				if(generateWarning) this.generateConflictInfo(node, reserved, netToPreserve);
 			}
-		}	
+			this.conflictNets.add(reserved);
+			this.conflictNets.add(netToPreserve);
+		}
+	}
+	
+	private void generateConflictInfo(Node node, Net reserved, Net netToPreserve) {
+		System.out.println("WARNING: Conflicting node " + node + ":");
+		System.out.println("         " + netToPreserve.getName() + " \n         " + reserved.getName());
+	}
+	
+	public boolean isMultiSLRDevice() {
+		return this.multiSLRDevice;
+	}
+	
+	public Set<Net> getConflictNets() {
+		return this.conflictNets;
+	}
+	
+	private void removeNetNodesFromPreservedNodes(Net net) {
+		Set<Node> netNodes = RouterHelper.getUsedNodesOfNet(net);
+		for(Node node : netNodes) {
+			this.preservedNodes.remove(node);
+		}
+		this.numPreservedWire--;
 	}
 	
 	/**

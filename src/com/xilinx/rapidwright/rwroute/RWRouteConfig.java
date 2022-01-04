@@ -87,6 +87,10 @@ public class RWRouteConfig {
 	private boolean verbose;
 	/** true to display connection span statistics */
 	private boolean printConnectionSpan;
+	/** To indicate if the partial routing is for resolving conflict nets only */
+	private boolean resolveConflictNets;
+	/** A keyword to help recognize the target conflict nets */
+	private String anchorNameKeyword;
 	
 	/** Constructs a Configuration Object */
 	public RWRouteConfig(String[] arguments) {
@@ -117,6 +121,8 @@ public class RWRouteConfig {
 		this.useUTurnNodes = false;
 		this.verbose = false;
 		this.printConnectionSpan = false;
+		this.resolveConflictNets = false;
+		this.anchorNameKeyword = "q0_reg";
 		if(arguments != null) {
 			this.parseArguments(arguments);
 		}
@@ -226,6 +232,13 @@ public class RWRouteConfig {
 				break;
 			case "--printConnectionSpan":
 				this.setPrintConnectionSpan(true);
+				break;
+			case "--resolveConflictNets":
+				this.setResolveConflictNets(true);
+				this.setEnlargeBoundingBox(true);
+				break;
+			case "--anchorNameKeyword":
+				this.setAnchorNameKeyword(arguments[++i]);
 				break;
 			default:
 				break;
@@ -837,6 +850,43 @@ public class RWRouteConfig {
 	 */
 	public void setVerbose(boolean verbose) {
 		this.verbose = verbose;
+	}
+
+	/**
+	 * Gets resolveConflictNets.
+	 * True to call the customized conflict-resolving partial routing functionality, e.g. the timing-driven partial routing in the RapidStream flow.
+	 * Default: false.
+	 * @return
+	 */
+	public boolean isResolveConflictNets() {
+		return resolveConflictNets;
+	}
+
+	/**
+	 * Sets resolveConflictNets.
+	 * True to call the customized conflict-resolving partial routing functionality, e.g. the timing-driven partial routing in the RapidStream flow.
+	 * Default: false.
+	 * @param resolveConflictNets
+	 */
+	public void setResolveConflictNets(boolean resolveConflictNets) {
+		this.resolveConflictNets = resolveConflictNets;
+	}
+	
+	/**
+	 * Gets the keyword to help recognize the routing targets.
+	 * Default: q0_reg, which is customized for the RapidStream flow.
+	 * @return
+	 */
+	public String getAnchorNameKeyword() {
+		return anchorNameKeyword;
+	}
+
+	/**
+	 * Sets anchorNameKeyWord.
+	 * @param anchorNameKeyWord A keyword to help recognize the routing targets.
+	 */
+	public void setAnchorNameKeyword(String anchorNameKeyWord) {
+		this.anchorNameKeyword = anchorNameKeyWord;
 	}
 
 	@Override

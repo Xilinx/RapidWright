@@ -36,7 +36,6 @@ import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.TileTypeEnum;
-import com.xilinx.rapidwright.timing.DSPTimingData;
 import com.xilinx.rapidwright.timing.TimingEdge;
 import com.xilinx.rapidwright.timing.TimingManager;
 import com.xilinx.rapidwright.timing.TimingVertex;
@@ -63,8 +62,7 @@ public class TimingAndWirelengthReport{
 	
 	public TimingAndWirelengthReport(Design design, RWRouteConfig config) {
 		this.design = design;
-		DSPTimingData.setDSPTimingFolder(config.getDspTimingDataFolder());
-		this.timingManager = new TimingManager(this.design, true, null, config, RWRoute.createClkTimingData(config));		
+		this.timingManager = new TimingManager(this.design, true, null, config, RWRoute.createClkTimingData(config), this.design.getNets());
 	    this.estimator = new DelayEstimatorBase(this.design.getDevice(), new InterconnectInfo(), config.isUseUTurnNodes(), 0);
 		RoutableNode.setTimingDriven(true, this.estimator);
 		this.wirelength = 0;

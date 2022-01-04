@@ -20,12 +20,14 @@
 
 package com.xilinx.rapidwright.timing;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import com.xilinx.rapidwright.design.ConstraintGroup;
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Node;
@@ -84,23 +86,23 @@ public class TimingManager {
         timingGraph.setTimingModel(timingModel);
         this.device = this.design.getDevice();
         if (doBuild)
-            build(false);
+            build(false, this.design.getNets());
     }
     
-    public TimingManager(Design design, boolean doBuild, RuntimeTrackerTree timer, RWRouteConfig config, ClkRouteTiming clkTiming) {
+    public TimingManager(Design design, boolean doBuild, RuntimeTrackerTree timer, RWRouteConfig config, ClkRouteTiming clkTiming, Collection<Net> targetNets) {
     	this.design = design;
     	this.setTimingRequirement();
     	this.verbose = config.isVerbose();
     	setPessimismFactors(config.getPessimismA(), config.getPessimismB());
     	this.routerTimer = timer;
         timingModel = new TimingModel(this.design.getDevice());
-        timingGraph = new TimingGraph(this.design, this.routerTimer, clkTiming);
+        timingGraph = new TimingGraph(this.design, this.routerTimer, clkTiming, config.getDspTimingDataFolder());
         timingModel.setTimingManager(this);
         timingGraph.setTimingManager(this);
         timingGraph.setTimingModel(timingModel);
         this.device = this.design.getDevice();
         if (doBuild)
-            build(config.isPartialRouting());
+            build(config.isPartialRouting(), targetNets);
     }
     
     /**
@@ -333,13 +335,13 @@ public class TimingManager {
      * Builds the TimingModel and TimingGraph.
      * @return Indication of successful completion.
      */
-    private boolean build(boolean isPartialRouting) {
+    private boolean build(boolean isPartialRouting, Collection<Net> targetNets) {
     	if(this.routerTimer != null) this.routerTimer.createRuntimeTracker("build timing model", "Initialization").start();
         timingModel.build();
         if(this.routerTimer != null) this.routerTimer.getRuntimeTracker("build timing model").stop();
         
         if(this.routerTimer != null) this.routerTimer.createRuntimeTracker("build timing graph", "Initialization").start();
-        timingGraph.build(isPartialRouting);
+        timingGraph.build(isPartialRouting, targetNets);
         if(this.routerTimer != null) this.routerTimer.getRuntimeTracker("build timing graph").stop();
         
         return postBuild();
