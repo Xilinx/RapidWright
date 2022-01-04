@@ -32,8 +32,6 @@ import com.xilinx.rapidwright.device.Device;
  */
 public interface PBlockCorner {
 
-	public static final String CLOCK_REGION = "CLOCKREGION";
-			
 	public String getName();
 	
 	public int getInstanceX();

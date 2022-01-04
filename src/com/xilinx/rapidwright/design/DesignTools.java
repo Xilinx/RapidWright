@@ -2048,7 +2048,16 @@ public class DesignTools {
 									curr = tmp;
 									break;
 								}
-							}	
+							}
+							if(rtCopy.getBELName().endsWith("6LUT") && isUltraScale(rtCopy)) {
+							    // Check A6 if it has VCC assignment
+							    BELPin a6 = rtCopy.getBEL().getPin("A6");
+							    Net isVcc = origSiteInst.getNetFromSiteWire(a6.getSiteWireName());
+							    if(isVcc != null && isVcc.getName().equals(Net.VCC_NET)) {
+							        dstSiteInst.routeIntraSiteNet(
+							                dstSiteInst.getDesign().getVccNet(), a6, a6);
+							    }                               
+							}
 						} else {
 							// We found the source
 							break;
@@ -2072,6 +2081,13 @@ public class DesignTools {
 				}
 			}
 		}
+	}
+	
+	private static boolean isUltraScale(Cell cell) {
+	    SiteInst si = cell.getSiteInst();
+	    if(si == null) return false;
+	    Series s = si.getDesign().getDevice().getSeries();
+	    return s == Series.UltraScale || s == Series.UltraScalePlus;
 	}
 	
 	private static Set<PIP> unroutePin(SitePinInst pin, Net net){
