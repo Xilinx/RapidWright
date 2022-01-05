@@ -681,7 +681,7 @@ public class RWRoute{
 			EDIFNet reservedLogical = reserved.getLogicalNet();
 			EDIFNet toReserveLogical = netToPreserve.getLogicalNet();
 			if(reservedLogical != null && toReserveLogical != null) {
-				if(!toReserveLogical.equals(reservedLogical) && !toReserveLogical.equals(reservedLogical)) {
+				if(!toReserveLogical.equals(reservedLogical)) {
 					if(generateWarning) this.generateConflictInfo(node, reserved, netToPreserve);
 				}
 			}else {
