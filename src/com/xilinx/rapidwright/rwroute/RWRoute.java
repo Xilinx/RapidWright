@@ -259,7 +259,6 @@ public class RWRoute{
 	private void determineRoutingTargets(){
 		this.categorizeNets();
 		if(this.config.isResolveConflictNets()) this.handleConflictNets(design, this.getConflictNets());
-		if(this.config.isVerbose()) this.printConnectionSpanStatistics();
 	}
 	
 	protected void categorizeNets() {
@@ -373,7 +372,6 @@ public class RWRoute{
 	 * A helper method for profiling the routing runtime v.s. average span of connections.
 	 */
 	protected void printConnectionSpanStatistics() {
-		System.out.println("------------------------------------------------------------------------------");
 		System.out.println("Connection Span Info:");
 		if(this.config.isPrintConnectionSpan()) System.out.println(" Span" + "\t" + "# Connections" + "\t" + "Percent");
 		
@@ -398,6 +396,7 @@ public class RWRoute{
 		
 		System.out.printf("INFO: # connections longer than avg span: " + numConnectionsLongerThanAvg);
 		System.out.printf(" (" + String.format("%5.2f", (float)numConnectionsLongerThanAvg / this.indirectConnections.size() * 100) + "%%)\n");
+		System.out.println("------------------------------------------------------------------------------");
 	}
 	
 	/**
@@ -1745,6 +1744,7 @@ public class RWRoute{
 	
 	private void printDesignNetsAndConfigurationInfo(boolean verbose) {
 		this.printDesignInfo(verbose);
+		if(this.config.isVerbose()) this.printConnectionSpanStatistics();
 		this.printConfiguration(verbose);
 	}
 	
