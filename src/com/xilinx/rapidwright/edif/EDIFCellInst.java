@@ -101,7 +101,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
      * Helper method to help maintain port ref map.  Adds a new
      * port ref for this instance.
      * @param epr The port ref to add
-     * @returns Any previous port ref of the same name, null if none already exists.
+     * @return Any previous port ref of the same name, null if none already exists.
      */
     protected EDIFPortInst addPortInst(EDIFPortInst epr) {
         if(portInsts == null) portInsts = new HashMap<>();
@@ -163,7 +163,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
     }
 
     /**
-     * @param parentCell the parentCell to set
+     * @param parent the parentCell to set
      */
     public void setParentCell(EDIFCell parent) {
         this.parentCell = parent;

@@ -22,7 +22,7 @@ import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.util.FileTools;
 
 /**
- * Example of how to check if a node->node connection is a routethru
+ * Example of how to check if a node to node connection is a routethru
  */
 public class RouteThruHelper {
 

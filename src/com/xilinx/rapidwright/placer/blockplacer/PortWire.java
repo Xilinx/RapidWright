@@ -42,10 +42,6 @@ public class PortWire {
 	
 	private int length;
 	
-	/**
-	 * @param source
-	 * @param sink
-	 */
 	public PortWire(SitePinInst source, SitePinInst sink) {
 		setSource(source);
 		setSink(sink);

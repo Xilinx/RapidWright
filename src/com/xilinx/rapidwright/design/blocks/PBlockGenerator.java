@@ -125,7 +125,7 @@ public class PBlockGenerator {
 	public static boolean debug = false;
 	
 	/**
-	 * @return
+	 * @return A Qt Jambi-style emitter for the PBlockGenerator
 	 */
 	public PBlockGenEmitter getEmitter() {
 		return emitter;
@@ -1259,7 +1259,7 @@ public class PBlockGenerator {
 	/**
 	 * Construct all PBlocks
 	 * Create a map to store not only the first pblock, but all the pblocks for the other columns of a certain pattern. This is useful for example when determining whether the IP has enough space on the device.
-	 * @param CLBPBlock - Key is simply an integer to go over all patterns. 0 should always be the first one to be chosen in the main code, as it shall avoid edge effects. Value is an array holding all the pblocks for a given pattern
+	 * @param clbPBlock - Key is simply an integer to go over all patterns. 0 should always be the first one to be chosen in the main code, as it shall avoid edge effects. Value is an array holding all the pblocks for a given pattern
 	 * @param patMap - Map holding all patterns of a device. 
 	 * @param p - TileColumnPattern
 	 * @param numSLICEColumns - Number of required CLB resources
@@ -1268,7 +1268,14 @@ public class PBlockGenerator {
 	 * @param numDSPColumns - Number of required DSP resources
 	 * @param numSLICERows - Number of required rows in the pblock
 	 */
-	private void createAllPBlocks (HashMap<Integer, Integer []> CLBPBlock, HashMap<TileColumnPattern, TreeSet<Integer>> patMap, TileColumnPattern p, int numSLICEColumns, int numSLICEMColumns, int numBRAMColumns, int numDSPColumns, int numSLICERows) {
+	private void createAllPBlocks (HashMap<Integer, Integer []> clbPBlock, 
+	                               HashMap<TileColumnPattern, TreeSet<Integer>> patMap, 
+	                               TileColumnPattern p, 
+	                               int numSLICEColumns, 
+	                               int numSLICEMColumns, 
+	                               int numBRAMColumns, 
+	                               int numDSPColumns, 
+	                               int numSLICERows) {
 		int xr;  // right column
 		int xl;  // left column
 		int yu;  // upper row
@@ -1336,24 +1343,24 @@ public class PBlockGenerator {
 				if(dev.getSite(upperLeft.getName())!=null && dev.getSite("SLICE_X"+xr+"Y"+yd)!=null ) {
 					if(runNr==0) {
 						if(!avoidEdge) {
-							CLBPBlock.put(0, new Integer[] {xl,xr,yd,yu});
+							clbPBlock.put(0, new Integer[] {xl,xr,yd,yu});
 						} else {
-							 CLBPBlock.put(1, new Integer[] {xl,xr,yd,yu});
+							 clbPBlock.put(1, new Integer[] {xl,xr,yd,yu});
 						}
 					} else if((runNr==1)&&(avoidEdge)) { // actually run_nr==1 is enough, as avoid_edge is true in this case by default
-						CLBPBlock.put(0, new Integer[] {xl,xr,yd,yu});
+						clbPBlock.put(0, new Integer[] {xl,xr,yd,yu});
 					} else {
-						CLBPBlock.put(runNr, new Integer[] {xl,xr,yd,yu});
+						clbPBlock.put(runNr, new Integer[] {xl,xr,yd,yu});
 					}
 					runNr++;
 				}
 			}
 					
-			if(!(CLBPBlock.containsKey(0))) {			// if the next element was not a real one...copy value of key 1 into key 0
-				for(int key : CLBPBlock.keySet() ) {	// contains only 1 elem, probably key = 1. But to avoid special cases error, this 'for' was attached
-					Integer[] val = CLBPBlock.get(key);
-					CLBPBlock.remove(key);
-					CLBPBlock.put(0, val);
+			if(!(clbPBlock.containsKey(0))) {			// if the next element was not a real one...copy value of key 1 into key 0
+				for(int key : clbPBlock.keySet() ) {	// contains only 1 elem, probably key = 1. But to avoid special cases error, this 'for' was attached
+					Integer[] val = clbPBlock.get(key);
+					clbPBlock.remove(key);
+					clbPBlock.put(0, val);
 					break;
 				}
 			}
@@ -1391,30 +1398,38 @@ public class PBlockGenerator {
 	}
 	
 	/**
-	 * Function takes as input one pblock (multiple if pattern repeats) and checks whether this is already used by other IPs & How many free resources (= rows) are left  
-	 * @param clbPBlock - Key is simply an integer to go over all patterns. 0 should always be the first one to be chosen in the main code, as it shall avoid edge effects. Value is an array holding all the pblocks for a given pattern
-	 * @param xl - Leftmost columns of the pblocks
-	 * @param xr - Rightmost columns of the pblocks
-	 * @param yu - Upper rows of the pblocks
-	 * @param yd - Lowest rows of the pblocks
-	 * @param nrInst - Number of IP instances
+	 * Function takes as input one pblock (multiple if pattern repeats) and checks whether this is 
+	 * already used by other IPs and How many free resources (= rows) are left  
+	 * @param clbPBlock Key is simply an integer to go over all patterns. 0 should always be the 
+	 * first one to be chosen in the main code, as it shall avoid edge effects. Value is an array 
+	 * holding all the pblocks for a given pattern
+	 * @param xl Leftmost columns of the pblocks
+	 * @param xr Rightmost columns of the pblocks
+	 * @param yu Upper rows of the pblocks
+	 * @param yd Lowest rows of the pblocks
+	 * @param instCount Number of IP instances
 	 */
-	public int checkFreeResources (HashMap<Integer, Integer []> CLPBlock,HashMap<Integer, Integer> xl,HashMap<Integer, Integer> xr,HashMap<Integer, Integer> yu,HashMap<Integer, Integer> yd,HashMap<Integer, Integer> nrInst) {
+	public int checkFreeResources (HashMap<Integer, Integer []> clbPBlock,
+	                               HashMap<Integer, Integer> xl,
+	                               HashMap<Integer, Integer> xr,
+	                               HashMap<Integer, Integer> yu,
+	                               HashMap<Integer, Integer> yd,
+	                               HashMap<Integer, Integer> instCount) {
 		int myFreeRows = dev.getRows();     				// Tricky, xc7z has less rows on the left side of the device. Also, nr_rows could be bigger than nr of rows having slices. This needs to be improved!
-		int patternFreq = CLPBlock.size(); 					// How often the pattern of the current pblock repeats on the device
+		int patternFreq = clbPBlock.size(); 					// How often the pattern of the current pblock repeats on the device
 		myFreeRows = myFreeRows*patternFreq;				// My available resources = nr_rows * how often my pattern repeats
 		boolean overlap = false;
 		
 		for (int i : xl.keySet()) { 						// Go through all the pblocks in the global pblock file
-			for(int myPatternCol : CLPBlock.keySet()) { 	// Go through all my  pblocks. clb_pblock value:  Integer[] {x_l,x_r,y_d,y_u}
+			for(int myPatternCol : clbPBlock.keySet()) { 	// Go through all my  pblocks. clb_pblock value:  Integer[] {x_l,x_r,y_d,y_u}
 				overlap = false;
-				if(  ((CLPBlock.get(myPatternCol)[0]<=xl.get(i)) && (CLPBlock.get(myPatternCol)[1]>=xl.get(i))) ||
-					 ((CLPBlock.get(myPatternCol)[0]<=xr.get(i)) && (CLPBlock.get(myPatternCol)[1]>=xr.get(i))) ||
-					 ((CLPBlock.get(myPatternCol)[0]>=xl.get(i)) && (CLPBlock.get(myPatternCol)[1]<=xr.get(i)))  ) {
+				if(  ((clbPBlock.get(myPatternCol)[0]<=xl.get(i)) && (clbPBlock.get(myPatternCol)[1]>=xl.get(i))) ||
+					 ((clbPBlock.get(myPatternCol)[0]<=xr.get(i)) && (clbPBlock.get(myPatternCol)[1]>=xr.get(i))) ||
+					 ((clbPBlock.get(myPatternCol)[0]>=xl.get(i)) && (clbPBlock.get(myPatternCol)[1]<=xr.get(i)))  ) {
 					overlap = true;
 				}
 				if(overlap) {
-					myFreeRows -=  (yu.get(i)-yd.get(i)+1)*nrInst.get(i);
+					myFreeRows -=  (yu.get(i)-yd.get(i)+1)*instCount.get(i);
 					myFreeRows -= 5; 						// for each overlapp, add buffer between IPs 
 				}
 			}					
@@ -1424,13 +1439,18 @@ public class PBlockGenerator {
 	
 	/**
 	 * Read PBlock File for obtaining already generated pblocks
-	 * @param xl
-	 * @param xr
-	 * @param yd
-	 * @param yu
-	 * @param nrInst
+     * @param xl Leftmost columns of the pblocks
+     * @param xr Rightmost columns of the pblocks
+     * @param yd Lowest rows of the pblocks
+     * @param yu Upper rows of the pblocks
+	 * @param instCount
+	 * @return The line number of already generated pblocks
 	 */
-	public int getAlreadyGenPBlocks ( HashMap<Integer, Integer> xl, HashMap<Integer, Integer> xr,HashMap<Integer, Integer> yd, HashMap<Integer, Integer> yu, HashMap<Integer, Integer> nrInst ) {
+	public int getAlreadyGenPBlocks ( HashMap<Integer, Integer> xl, 
+	                                  HashMap<Integer, Integer> xr,
+	                                  HashMap<Integer, Integer> yd, 
+	                                  HashMap<Integer, Integer> yu, 
+	                                  HashMap<Integer, Integer> instCount ) {
 		if(GLOBAL_PBLOCK.contentEquals("")) {
 			throw new RuntimeException(" ERROR: Name of the PBlock file not given.");
 		}
@@ -1444,7 +1464,7 @@ public class PBlockGenerator {
 			}
 			String[] blocks = line.split(" ");
 			if(line.contains("SLICE")||line.contains("DSP")||line.contains("RAM")) {
-				nrInst.put(lineNr, Integer.parseInt(blocks[blocks.length-1])); // last value in the text line shall be instance nr. of the corresponding IP
+				instCount.put(lineNr, Integer.parseInt(blocks[blocks.length-1])); // last value in the text line shall be instance nr. of the corresponding IP
 			}
 			for (String block: blocks) {
 				if(block.startsWith("SLICE")) {

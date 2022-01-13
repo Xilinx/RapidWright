@@ -100,13 +100,13 @@ public class EDIFNetlist extends EDIFName {
 	private boolean DEBUG = false;
 
 	/**
-	 * Map that stores prim->macro expansions conditional based on IOStandards
-	 * (Start Prim -> (End Macro if set IOStandard is in set))
+	 * Map that stores prim to macro expansions conditional based on IOStandards
+	 * (Start Prim to End Macro (if set IOStandard is in set))
 	 */
 	public static final Map<String,Pair<String,EnumSet<IOStandard>>> macroExpandExceptionMap;
 	/**
-     * Reverse map that stores macro->prim collapse conditional based on IOStandards
-     * (Macro -> (Prim if set IOStandard is in set))
+     * Reverse map that stores macro to prim collapse conditional based on IOStandards
+     * (Macro to Prim (if set IOStandard is in set))
      */
 	public static final Map<String,Pair<String,EnumSet<IOStandard>>> macroCollapseExceptionMap;
 
@@ -715,7 +715,7 @@ public class EDIFNetlist extends EDIFName {
 	
 	/**
 	 * Looks at the hierarchical name and returns the parent or instance above.  For example:
-	 * "block0/operator0" -> "block0"; "block0" -> ""; "" -> ""
+	 * {@code "block0/operator0" -> "block0"; "block0" -> ""; "" -> ""}
 	 *
 	 * This cannot handle instance names with slashes and is therefore deprecated. Use {@link EDIFHierCellInst#getParent()} instead.
 	 *
@@ -734,20 +734,22 @@ public class EDIFNetlist extends EDIFName {
 	}
 	
 	/**
-	 * Gets the next level hierarchical child instance name from an ancestor. Assumes descendent is
+	 * Gets the next level hierarchical child instance name from an ancestor. Assumes descendant is
 	 * instantiated within ancestor at some level.  
 	 * 
 	 * For example:
+	 * {@code
 	 * getNextHierChildName("a/b/c", "a/b/c/d/e") returns "a/b/c/d"
 	 * getNextHierChildName("a/b/c", "a/b/c/d") returns "a/b/c/d"
 	 * getNextHierChildName("a/b/c", "a/b/d") returns null
 	 * getNextHierChildName("a/b/c", "a/b/c") returns null
+	 * }
 	 *
 	 * This cannot handle instance names with slashes and is therefore deprecated. Use {@link EDIFHierCellInst} instead.
 	 *
 	 * @param ancestor The parent or more shallow instance in a netlist
 	 * @param descendent The child or deeper instance in a netlist
-	 * @return The name of the next hierarchical child instance in the ancestor/descendent chain.  
+	 * @return The name of the next hierarchical child instance in the ancestor/descendant chain.  
 	 * Returns null if none could be found.  
 	 */
 	@Deprecated
@@ -1519,7 +1521,7 @@ public class EDIFNetlist extends EDIFName {
 	 * supporting the functionality of the macro unisim.  When writing out
 	 * EDIF in Vivado, these primitives are collapsed back down to their
 	 * primitive state.  This method compensates for this behavior by expanding
-	 * the macro primitives. As an example, IBUF => IBUF (IBUFCTRL, IBUF) for 
+	 * the macro primitives. As an example, {@code IBUF => IBUF (IBUFCTRL, IBUF)} for 
 	 * UltraScale devices.
 	 * @param series The architecture series targeted by this netlist.
 	 */

@@ -40,7 +40,7 @@ public class SmallestEnclosingCircle {
 	 * on points.  This minimizes the maximum distance from the new point to any
 	 * other point in points.
 	 * http://www.personal.kent.edu/~rmuhamma/Compgeometry/MyCG/CG-Applets/Center/centercli.htm
-	 * @param points the points in the set to consider.
+	 * @param pointsSet the points in the set to consider.
 	 * @return Point, the center of the smallest enclosing circle.
 	 */
 	public static Point getCenterPoint(HashSet<Point> pointsSet){
@@ -130,7 +130,7 @@ public class SmallestEnclosingCircle {
 	 * counterclockwise order.
 	 * http://en.wikibooks.org/wiki/Algorithm_Implementation/Geometry/Convex_hull/Monotone_chain
 	 * @param points the input set of points
-	 * @return ArrayList<Point>, the set of points in the convex hull
+	 * @return The set of points in the convex hull
 	 */
 	public static ArrayList<Point> convexHull(ArrayList<Point> points){
 		ArrayList<Point> convexHull = new ArrayList<Point>();
@@ -168,9 +168,9 @@ public class SmallestEnclosingCircle {
 	/**
 	 * Determines the circumcenter of a circle that circumscribes triangle abc.
 	 * http://en.wikipedia.org/wiki/Circumscribed_circle
-	 * @param a
-	 * @param b
-	 * @param c
+	 * @param a Point A of the triangle
+	 * @param b Point B of the triangle
+	 * @param c Point C of the triangle
 	 * @return Point, the circumcenter
 	 */
 	public static Point getCircumcenter(Point a, Point b, Point c){
@@ -189,9 +189,9 @@ public class SmallestEnclosingCircle {
 	 * OAB makes a counter-clockwise turn, negative for a clockwise turn, and zero if
 	 * the points are collinear.
 	 * http://en.wikibooks.org/wiki/Algorithm_Implementation/Geometry/Convex_hull/Monotone_chain
-	 * @param o
-	 * @param a
-	 * @param b
+	 * @param o Point O
+	 * @param a Point A
+	 * @param b Point B
 	 * @return int, the cross product
 	 */
 	public static int crossProduct(Point o, Point a, Point b){
@@ -207,9 +207,9 @@ public class SmallestEnclosingCircle {
 	/**
 	 * Computes the angle ABC from the points a, b, c.
 	 * http://forums.devx.com/archive/index.php/t-154064.html
-	 * @param a
-	 * @param b
-	 * @param c
+	 * @param a Point A
+	 * @param b Point B
+	 * @param c Point C
 	 * @return double, the angle
 	 */
 	public static double angle(Point a, Point b, Point c){
@@ -219,9 +219,9 @@ public class SmallestEnclosingCircle {
 	/**
 	 * Computes the dot product of the vectors ba, bc from the points a, b, c.
 	 * http://forums.devx.com/archive/index.php/t-154064.html
-	 * @param a
-	 * @param b
-	 * @param c
+	 * @param a Point A
+	 * @param b Point B
+	 * @param c Point C
 	 * @return double, the dot product
 	 */
 	public static double dotProduct(Point a, Point b, Point c){
@@ -234,7 +234,7 @@ public class SmallestEnclosingCircle {
 	
 	/**
 	 * Command line interface for debug.
-	 * @param args
+	 * @param args No args defined for this main()
 	 */
 	public static void main(String args[]){
 		HashSet<Point> testPoints = new HashSet<Point>();
