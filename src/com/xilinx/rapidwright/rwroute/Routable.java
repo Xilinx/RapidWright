@@ -27,7 +27,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.device.Node;
+import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.router.RouteThruHelper;
 
 /**
@@ -60,32 +62,32 @@ public interface Routable {
 	 */
 	public int getOccupancy();
 	/**
-	 * Sets the x and y coordinates of the INT {@link TIle} instance
+	 * Sets the x and y coordinates of the INT {@link Tile} instance
 	 * that the associated {@link Node} instance stops at.
 	 */
 	public void setEndTileXYCoordinates();
 	/**
-	 * Sets the x coordinate of the INT {@link TIle} instance
+	 * Sets the x coordinate of the INT {@link Tile} instance
 	 * that the associated {@link Node} instance stops at.
 	 * @param x The tileXCoordinate of the INT tile that the associated {@link Node} instance stops at.
 	 */
 	public void setEndTileXCoordinate(short x);
 	/**
-	 * Sets the Y coordinate of the INT {@link TIle} instance
+	 * Sets the Y coordinate of the INT {@link Tile} instance
 	 * that the associated {@link Node} instance stops at.
 	 * @param y The tileYCoordinate of the INT tile that the associated {@link Node} instance stops at.
 	 */
 	public void setEndTileYCoordinate(short y);
 	/**
-	 * Gets the x coordinate of the INT {@link TIle} instance
+	 * Gets the x coordinate of the INT {@link Tile} instance
 	 * that the associated {@link Node} instance stops at.
-	 * @param x The tileXCoordinate of the INT tile that the associated {@link Node} instance stops at.
+	 * @return The tileXCoordinate of the INT tile that the associated {@link Node} instance stops at.
 	 */
 	public short getEndTileXCoordinate();
 	/**
-	 * Gets the Y coordinate of the INT {@link TIle} instance
+	 * Gets the Y coordinate of the INT {@link Tile} instance
 	 * that the associated {@link Node} instance stops at.
-	 * @param y The tileYCoordinate of the INT tile that the associated {@link Node} instance stops at.
+	 * @return The tileYCoordinate of the INT tile that the associated {@link Node} instance stops at.
 	 */
 	public short getEndTileYCoordinate();
 	/**
@@ -304,7 +306,7 @@ public interface Routable {
 
 	/**
 	 * Sets visited to indicate if a Routable instance has been visited before when routing a connection.
-	 * @param A boolean value to set.
+	 * @param visited boolean value to set.
 	 */
 	public void setVisited(boolean visited);
 	

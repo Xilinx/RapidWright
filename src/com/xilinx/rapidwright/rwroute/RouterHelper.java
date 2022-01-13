@@ -567,7 +567,8 @@ public class RouterHelper {
 	
 	/**
 	 *  Gets the delay of a given path, using output pin only.
-	 *  The path format: superSource -> Q -> O -> --- -> D.
+	 *  The path format: 
+	 *  {@code superSource -> Q -> O -> --- -> D.}
 	 */
 	public static void getSamplePathDelay(String filePath, TimingManager timingManager,
 			Map<TimingEdge, Connection> timingEdgeConnectionMap, Map<Node, Routable> rnodesCreated) {
