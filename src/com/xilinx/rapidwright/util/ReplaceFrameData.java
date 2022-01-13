@@ -34,36 +34,34 @@ public class ReplaceFrameData {
     }
 
     public void extractForOpenDFX_ZCU104(Bitstream b) {
-        Pair<List<Integer>, List<Integer>> rowsCols = getAddressOpenDFX_ZCU104();
-        extract(b, rowsCols.getFirst(), rowsCols.getSecond());
-        incrementRowIndex(4); // extract from RP0 and use at RP2
+        ReplacementSpec spec = getAddressOpenDFX_ZCU104();
+        extract(b, spec.rows, spec.cols);
+        incrementRowIndex(spec.templateToTargetRowOffset);
     }
 
     public void replaceForOpenDFX_ZCU104(Bitstream b) {
-        Pair<List<Integer>, List<Integer>> rowsCols = getAddressOpenDFX_ZCU104();
-        List<Integer> rows = rowsCols.getFirst();
+        ReplacementSpec spec = getAddressOpenDFX_ZCU104();
+        List<Integer> rows = spec.rows;
         for (int i = 0; i < rows.size(); i += 1) {
-            rows.set(i, rows.get(i) + 4);
+            rows.set(i, rows.get(i) + spec.templateToTargetRowOffset);
         }
-        replace(b, rows, rowsCols.getSecond());
-//        replace(b, rowsCols.getFirst(), rowsCols.getSecond());
+        replace(b, rows, spec.cols);
     }
 
     public void extract(Bitstream b, List<Integer> rows, List<Integer> cols) {
-        FrameDataProcessor extractor = new FrameDataProcessor(b);
-        extractor.processPackets(rows, cols,
+        FrameDataProcessor processor = new FrameDataProcessor(b);
+        processor.processPackets(rows, cols,
                 (frameData, addr, data, frameIdx, wordsPerFrame) -> {
                     extractColumn(frameData, addr, data, frameIdx, wordsPerFrame);
                 }
         );
-        frameData = extractor.getFrameData();
+        frameData = processor.getFrameData();
     }
 
     public void replace(Bitstream b, List<Integer> rows, List<Integer> cols) {
-        FrameDataProcessor extractor = new FrameDataProcessor(b);
-//        extractor.setVerbose();
-        extractor.setFrameData(frameData);
-        extractor.processPackets(rows, cols,
+        FrameDataProcessor processor = new FrameDataProcessor(b);
+        processor.setFrameData(frameData);
+        processor.processPackets(rows, cols,
                 (frameData, addr, data, frameIdx, wordsPerFrame) -> {
                     replaceColumn(frameData, addr, data, frameIdx, wordsPerFrame);
                 }
@@ -122,29 +120,33 @@ public class ReplaceFrameData {
         }
     }
 
+    private class ReplacementSpec {
+        final List<Integer> rows;
+        final List<Integer> cols;
+        final int templateToTargetRowOffset;
+        public ReplacementSpec(List<Integer> rows, List<Integer> cols, int offset) {
+           this.rows = rows;
+           this.cols = cols;
+           this.templateToTargetRowOffset = offset;
+        }
+    }
+
+
     /**
      * Get list of target rows and cols to extract from bitstream for RP0
      */
-    private Pair<List<Integer>,List<Integer>> getAddressOpenDFX_ZCU104() {
+    private ReplacementSpec getAddressOpenDFX_ZCU104() {
         int row = 0; // either 0 or 2 because it was verified that the template at RP0 and RP1 are the same.
         List<Integer> rows = new ArrayList<Integer>() {{add(row);add(row+1);}};
         List<Integer> cols = new ArrayList<Integer>() {{add(191);add(192);add(193);}};
-        return new Pair<>(rows, cols);
-    }
-
-    private Pair<List<Integer>,List<Integer>> testFunc(List<Integer> test) {
-        int row = 0; // either 0 or 2 because it was verified that the template at RP0 and RP1 are the same.
-        List<Integer> rows = new ArrayList<Integer>() {{add(row);add(row+1);}};
-        List<Integer> cols = new ArrayList<Integer>() {{add(191);add(192);add(193);}};
-        test = new ArrayList<Integer>() {{add(row);add(row+1);}};
-        return new Pair<>(rows, cols);
+        int offsetFromRP0ToRP2 = 4;
+        return new ReplacementSpec(rows, cols, offsetFromRP0ToRP2);
     }
 
 
    //------------------------------ Helper --------------------------------------
 
 
-    //    // an entry with value -1 means "any".
     private class Address {
         final int row;
         final int col;
@@ -176,7 +178,6 @@ public class ReplaceFrameData {
      * Assumption: a packet contain only frame data of only one row. This is from observation.
      */
     private class FrameDataProcessor {
-//        private boolean verbose;
 
         private final int wordsPerFrame;
         private final int columnCounts;
@@ -189,7 +190,6 @@ public class ReplaceFrameData {
 
 
         private FrameDataProcessor(Bitstream b) {
-//            verbose = false;
             this.b = b;
             frameData = new HashMap<>();
             frameCounts = new EnumMap<>(BlockType.class);
@@ -203,9 +203,6 @@ public class ReplaceFrameData {
             buildNumFrameArray(cfgArray);
         }
 
-//        private void setVerbose() {
-//            verbose = true;
-//        }
         /**
          * Extract the frame data of the given addresses.
          * Every minor address of the given column will be extracted.
@@ -234,17 +231,11 @@ public class ReplaceFrameData {
                         && (packet.getOpCode() == OpCode.WRITE) && (packet.getWordCount() > 0)
                 ) {
                     if (targetRows.contains(far.getRow()) && (far.getBlockType() == BlockType.CLB.getBlockTypeEncoding())) {
-//                        System.out.println("row " + far.getRow() + " col " + far.getColumn() + " wc " + packet.getWordCount());
-//                        boolean test = false;
-//                        if ((far.getRow() == 4) && (far.getColumn() == 109) && (packet.getWordCount() == 340287))
-//                            test = true;
-
                         List<Integer> numFrames = getNumFramesInPacket(packet);
                         int beginColumn = far.getColumn();
                         // Use List to process in order with indexing to match endIndices
                         List<Integer> colToExtract = new ArrayList<>(targetColumns.subSet(beginColumn, beginColumn + numFrames.size() - 1));
                         if (!colToExtract.isEmpty()) {
-//                            System.out.println("to extract/repalce row " + far.getRow() + " col " + far.getColumn() + " last col " + (far.getColumn()+numFrames.size()-2) +" wc " + packet.getWordCount());
                             processColumns(far, packet, colToExtract, numFrames, wordsPerFrame, op);
                         }
                     }
@@ -256,10 +247,7 @@ public class ReplaceFrameData {
             int firstCol = far.getColumn();
             int row = far.getRow();
 
-//            System.out.println("firstCol " + firstCol);
-
             for (int col : colToOperate) {
-//                System.out.println("col " + col);
                 int minor = 0;
                 if (col == firstCol) {
                     // only the first col can have non-zero minor
@@ -271,7 +259,6 @@ public class ReplaceFrameData {
                 int[] data = packet.getData();
                 for (int j = numFrames.get(i); j < numFrames.get(i+1); j++, minor++) {
                     Address addr = new Address(row, col, minor);
-
                     op.operate(frameData, addr, data, j, wordsPerFrame);
                 }
                 packet.setData(data);
@@ -298,9 +285,8 @@ public class ReplaceFrameData {
                 for (int rowIdx = 0; rowIdx < c.getNumOfConfigRows() / 2; rowIdx++) {
                     ConfigRow row = c.getConfigRow(blkType.getBlockTypeEncoding(), 0, rowIdx);
                     if (row == null) {
-//                    System.out.println("null row " + rowIdx);
+                        throw new RuntimeException("Row " + rowIdx + " is NULL");
                     } else {
-//                    System.out.println("nonnull row " + rowIdx);
                         for (int colIdx = 0; colIdx < row.numOfBlocks(); colIdx++) {
                             array[rowIdx][colIdx] = row.getBlock(colIdx).getFrameCount();
                         }
@@ -360,7 +346,6 @@ public class ReplaceFrameData {
         }
 
         private int moveToNextCol(FAR far) {
-//            int orgRow = far.getRow();
             int orgCol = far.getColumn();
             int limit = 256; // the most I ever see is 256 frames in a column
             int count = 0;
@@ -385,7 +370,7 @@ public class ReplaceFrameData {
 
     public static void main(String[] args) {
         long startTotalTime = System.nanoTime();
-        ReplaceFrameData storage = new ReplaceFrameData();
+        ReplaceFrameData replacer = new ReplaceFrameData();
 
         long startTime = System.nanoTime();
         String templateSrcBit = "dcpreloc_aes128_pblock_0_partial.bit";
@@ -397,7 +382,7 @@ public class ReplaceFrameData {
 //        System.out.println("write templateSrcBit.txt took " + (System.nanoTime() - startTime)*1e-6 + " ms.\n");
 
         startTime = System.nanoTime();
-        storage.extractForOpenDFX_ZCU104(b); // get frame data stored in this.frameData
+        replacer.extractForOpenDFX_ZCU104(b); // get frame data stored in this.frameData
         System.out.println("extract template took " + (System.nanoTime() - startTime)*1e-6 + " ms.\n");
 
         startTime = System.nanoTime();
@@ -412,7 +397,7 @@ public class ReplaceFrameData {
 //        storage.setWrongDataForTest(); // to see if the replacement is in the right place.
 
         startTime = System.nanoTime();
-        storage.replaceForOpenDFX_ZCU104(a); // get frame data stored in this.frameData
+        replacer.replaceForOpenDFX_ZCU104(a); // get frame data stored in this.frameData
         a.writeBitstream(relocSrcBit.replace(".bit", "_withtemplate.bit"));
         System.out.println("replace with template took " + (System.nanoTime() - startTime)*1e-6 + " ms.\n");
 
