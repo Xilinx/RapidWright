@@ -221,6 +221,7 @@ public class EDIFHierCellInst {
 
     /**
      * Get a hierarchical port inst, viewed from external to this cell inst.
+     * @param portName name of the port to get.
      * @throws IllegalStateException if the port does not exist
      */
     public EDIFHierPortInst getPortInst(String portName) {

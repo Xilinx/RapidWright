@@ -38,13 +38,6 @@ import com.xilinx.rapidwright.device.Tile;
  */
 public class PBlockGenScene extends DeviceBrowserScene {
 
-	/**
-	 * @param device
-	 * @param we
-	 * @param hideTiles
-	 * @param drawPrimitives
-	 * @param browser
-	 */
 	public PBlockGenScene(Device device, boolean hideTiles,
 			boolean drawPrimitives, DeviceBrowser browser) {
 		super(device, hideTiles, drawPrimitives, browser);

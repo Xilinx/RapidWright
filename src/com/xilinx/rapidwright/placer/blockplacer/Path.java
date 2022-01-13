@@ -155,6 +155,7 @@ public class Path extends AbstractPath<PathPort, HardMacro>{
 	}
 	/**
 	 * Adds a pin the to path.
+	 * @param p The pin to add
 	 * @param map Map of module instance to hard macros
 	 */
 	public void addPin(SitePinInst p, Map<ModuleInst, HardMacro> map){

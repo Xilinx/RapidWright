@@ -372,7 +372,6 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 	 * for a new anchor location.
 	 * @param templateTile The tile in the module which acts as a template.
 	 * @param newAnchorTile This is the tile of the new anchor instance of the module instance.
-	 * @param dev The device which corresponds to this module instance.
 	 * @return The new tile of the module instance which corresponds to the templateTile, or null
 	 * if none exists.
 	 */

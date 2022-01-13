@@ -119,7 +119,7 @@ public class RouteNode{
 	}
 	
 	/**
-	 * Convenience constructor that takes the Node name "<Tile>/<Wire>" and 
+	 * Convenience constructor that takes the Node name {@code "<Tile>/<Wire>"} and 
 	 * creates the node.
 	 * @param nodeName Name of the node
 	 * @param dev Device to which the node belongs
