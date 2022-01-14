@@ -178,8 +178,8 @@ publishing {
     repositories {
         maven {
             credentials {
-                username = ossrhUsername
-                password = ossrhPassword
+                username = project.findProperty("ossrhUsername") ?: ""
+                password = project.findProperty("ossrhPassword") ?: ""
             }
             url = "https://oss.sonatype.org/service/local/staging/deploy/maven2/"
         }
