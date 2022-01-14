@@ -181,12 +181,16 @@ publishing {
                 username = project.findProperty("ossrhUsername") ?: ""
                 password = project.findProperty("ossrhPassword") ?: ""
             }
-            url = "https://oss.sonatype.org/service/local/staging/deploy/maven2/"
+            url = "https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/"
         }
     }
 }
 
 signing {
+    setRequired {
+        // signing is only required when publishing to maven central
+        gradle.taskGraph.allTasks.any { it.equals( publishMavenJavaPublicationToMavenRepository ) }
+    }
     sign configurations.archives
     sign publishing.publications.mavenJava
 }
