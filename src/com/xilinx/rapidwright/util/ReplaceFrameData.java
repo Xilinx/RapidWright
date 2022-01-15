@@ -1,5 +1,9 @@
 package com.xilinx.rapidwright.util;
 
+import com.esotericsoftware.kryo.Kryo;
+import com.esotericsoftware.kryo.io.Input;
+import com.esotericsoftware.kryo.io.Output;
+import com.esotericsoftware.kryo.serializers.MapSerializer;
 import com.xilinx.rapidwright.bitstream.Bitstream;
 import com.xilinx.rapidwright.bitstream.BlockType;
 import com.xilinx.rapidwright.bitstream.ConfigArray;
@@ -10,6 +14,9 @@ import com.xilinx.rapidwright.bitstream.OpCode;
 import com.xilinx.rapidwright.bitstream.Packet;
 import com.xilinx.rapidwright.bitstream.RegisterType;
 
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -21,6 +28,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 
 /**
  * Store and load sections of bitstream
@@ -36,12 +45,14 @@ public class ReplaceFrameData {
     public void extractForOpenDFX_ZCU104(Bitstream b) {
         ReplacementSpec spec = getAddressOpenDFX_ZCU104();
         extract(b, spec.rows, spec.cols);
-        incrementRowIndex(spec.templateToTargetRowOffset);
+        // extract from row 0,1, to be used at row 4,5
+        incFrameDataRowIndex(spec.templateToTargetRowOffset);
     }
 
     public void replaceForOpenDFX_ZCU104(Bitstream b) {
         ReplacementSpec spec = getAddressOpenDFX_ZCU104();
         List<Integer> rows = spec.rows;
+        // Need to adjust because the spec is set for extraction, not for replacement
         for (int i = 0; i < rows.size(); i += 1) {
             rows.set(i, rows.get(i) + spec.templateToTargetRowOffset);
         }
@@ -72,15 +83,39 @@ public class ReplaceFrameData {
      * Save the frame data to a file
      */
     public void save(String filename) {
+        try {
+            Output output = new Output(new FileOutputStream(filename));
+            Kryo kryo = new Kryo();
+            kryo.register(HashMap.class, new MapSerializer());
+            kryo.register(Address.class);
+            kryo.register(int[].class);
+            kryo.writeClassAndObject(output, frameData);
+            output.close();
+        } catch (IOException e) {
+            System.out.println("Cannot save to file " + filename);
+            e.printStackTrace();
+        }
     }
 
     /**
      * Load the frame data from a file
      */
     public void load(String filename) {
+        try {
+            Input input = new Input(new FileInputStream(filename));
+            Kryo kryo = new Kryo();
+            kryo.register(HashMap.class, new MapSerializer());
+            kryo.register(Address.class);
+            kryo.register(int[].class);
+            frameData = (Map<Address, int[]>) kryo.readClassAndObject(input);
+            input.close();
+        } catch (IOException e) {
+            System.out.println("Cannot read from file " + filename);
+            e.printStackTrace();
+        }
     }
 
-    private void incrementRowIndex(int inc) {
+    public void incFrameDataRowIndex(int inc) {
         Map<Address, int[]>  newFrameData = new HashMap<>();
         for (Map.Entry<Address, int[]> entry : frameData.entrySet()) {
             Address addr = entry.getKey();
@@ -147,7 +182,8 @@ public class ReplaceFrameData {
    //------------------------------ Helper --------------------------------------
 
 
-    private class Address {
+    // without static, can't serialize
+    private static class Address {
         final int row;
         final int col;
         final int minor;
@@ -155,6 +191,13 @@ public class ReplaceFrameData {
             this.row   = row;
             this.col   = col;
             this.minor = minor;
+        }
+
+        // need by serialization
+        public Address() {
+            row = -1;
+            col = -1;
+            minor = -1;
         }
 
         @Override
@@ -368,27 +411,276 @@ public class ReplaceFrameData {
             frameData.put(addr, data);
     }
 
-    public static void main(String[] args) {
-        long startTotalTime = System.nanoTime();
-        ReplaceFrameData replacer = new ReplaceFrameData();
 
-        long startTime = System.nanoTime();
-        String templateSrcBit = "dcpreloc_aes128_pblock_0_partial.bit";
-        Bitstream b = Bitstream.readBitstream(templateSrcBit);
-        System.out.println("\nread " + templateSrcBit + " took " + (System.nanoTime() - startTime)*1e-6 + " ms.\n");
+    public static void main(String[] args) {
+
+        String usage = String.join(System.getProperty("line.separator"),
+            " Replace or Extract frame data of a bitstream. It is used to replace the NOP frame contents for unused hard block columns.",
+            "",
+            "Usage",
+            " ReplaceFrameData [-extract, -replace] -in <bitfile> [-out <bitfile>] -template <file> [-platform <name>, -row <list> -col <list> -offset <int>]",
+            "",
+            " Examples:",
+            "   ReplaceFrameData -extract -in test.bit -template template.ser -row 0 1 -col 191 192 193 -offset 4",
+            "   ReplaceFrameData -replace -in test.bit -template template.ser -platform opendfx_zcu104",
+            "",
+            " There are 4 groups of required arguments, can be in any order.",
+            " 1) The operation to perform is either -extract or -replace.",
+            " 2) There are two way to specify the frames to operate on.",
+            "   a) Specify the predefined platform. Currently, there is only -platform opendfx_zcu104",
+            "   b) Specify the list of rows and the list of cols, along with the row offset, ie., row to use the tempalte - row to extract the template.",
+            " 3) The bit file to operate on is specified by -in <bitfile>. For -replace, -out <bitFile> is also required.",
+            " 4) The file to store the extract data or to retrieve for replacement is specified by -template <file>"
+        );
+/*
+correct
+-extract -in in.bit -template template.ser -row 0 1 -col 191 192 193 -offset 4
+-extract -in in.bit -template template.ser -platform opendfx_zcu104
+wrong
+*         -in in.bit -template template.ser -row 0 1 -col 191 192 193 -offset 4
+*-extract            -template template.ser -row 0 1 -col 191 192 193 -offset 4
+*-extract -in in.bit                        -row 0 1 -col 191 192 193 -offset 4
+*-extract -in in.bit -template template.ser          -col 191 192 193 -offset 4
+*-extract -in in.bit -template template.ser -row 0 1                  -offset 4
+*-extract -in in.bit -template template.ser -row 0 1 -col 191 192 193
+*-extract -in in.bit -template template.ser -row 0 1 -col 191 192 193 -platform opendfx_zcu104
+*-extract -in in.bit -template template.ser
+*-extract -in in.bit -template template.ser -platform notavail
+-extract -in in.bit -template template.ser -row 0 1 -col 191 192 193 -platform opendfx_zcu104 -out out.bit
+
+correct
+-replace -in in.bit -out out.bit -template template.ser -row 0 1 -col 191 192 193 -offset 4
+-replace -in in.bit -out out.bit -template template.ser -platform opendfx_zcu104
+wrong
+*         -in in.bit -out out.bit -template template.ser -row 0 1 -col 191 192 193 -offset 4
+*-replace            -out out.bit -template template.ser -row 0 1 -col 191 192 193 -offset 4
+*-replace -in in.bit              -template template.ser -row 0 1 -col 191 192 193 -offset 4
+*-replace -in in.bit -out out.bit                        -row 0 1 -col 191 192 193 -offset 4
+*-replace -in in.bit -out out.bit -template template.ser          -col 191 192 193 -offset 4
+*-replace -in in.bit -out out.bit -template template.ser -row 0 1                  -offset 4
+*-replace -in in.bit -out out.bit -template template.ser -row 0 1 -col 191 192 193 -platform opendfx_zcu104
+*-replace -in in.bit -out out.bit -template template.ser
+-replace -in in.bit -out out.bit -template template.ser -platform notavail
+ */
+
+
+        // scan for "-" token
+        List<Integer> token = new ArrayList<>();
+        for (int i = 0; i < args.length; i++) {
+            if (args[i].startsWith("-"))
+                token.add(i);
+        }
+        token.add(args.length); // mark the end
+
+        // set default argument values
+        String op = "";
+        String inBit = "";
+        String outBit = "";
+        String file = "";
+        String platform = "";
+        List<Integer> rows = new ArrayList<>();
+        List<Integer> cols = new ArrayList<>();
+        int offset = -255;
+        int dataIdx = 0;
+
+
+        Function reportThenExit = txt -> {
+            System.out.println(txt);
+            System.out.println("For more information please use \"ReplaceFrameData -help\".");
+            System.exit(1);
+            return 0;
+        };
+
+
+        // parse arguments
+        for (int i = 0; i < token.size()-1; i++) {
+            switch (args[token.get(i)]) {
+                case "-help":
+                case "-h":
+                    System.out.println(usage);
+                    System.exit(1);
+                    break;
+                case "-extract":
+                    op = "extract";
+                    break;
+                case "-replace":
+                    op = "replace";
+                    break;
+                case "-in":
+                    dataIdx = token.get(i)+1;
+                    if (token.contains(dataIdx))
+                        reportThenExit.apply("Missing bitstream file name for -in");
+                    inBit = args[dataIdx];
+                    break;
+                case "-out":
+                    dataIdx = token.get(i)+1;
+                    if (token.contains(dataIdx))
+                        reportThenExit.apply("Missing bitstream file name for -out");
+                    outBit = args[dataIdx];
+                    break;
+                case "-template":
+                    dataIdx = token.get(i)+1;
+                    if (token.contains(dataIdx))
+                        reportThenExit.apply("Missing template file name for -template");
+                    file = args[dataIdx];
+                    break;
+                case "-platform":
+                    dataIdx = token.get(i)+1;
+                    if (token.contains(dataIdx))
+                        reportThenExit.apply("Missing platform name for -platform");
+                    platform = args[dataIdx];
+                    break;
+                case "-row":
+                    dataIdx = token.get(i)+1;
+                    if (token.contains(dataIdx))
+                        reportThenExit.apply("Missing integer for -row");
+                    for (int j = dataIdx; j < token.get(i+1); j++) {
+                        rows.add(Integer.parseInt(args[j]));
+                    }
+                    break;
+                case "-col":
+                    dataIdx = token.get(i)+1;
+                    if (token.contains(dataIdx))
+                        reportThenExit.apply("Missing integer for -col");
+                    for (int j = dataIdx; j < token.get(i+1); j++) {
+                        cols.add(Integer.parseInt(args[j]));
+                    }
+                    break;
+                case "-offset":
+                    dataIdx = token.get(i)+1;
+                    if (token.contains(dataIdx))
+                        reportThenExit.apply("Missing integer for -offset");
+                    offset = Integer.parseInt(args[dataIdx]);
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        // report collected arguments
+        System.out.println("ReplaceFrameData");
+        if (!op.isEmpty())
+            System.out.println("-" + op);
+        if (!inBit.isEmpty())
+            System.out.println("-in       " + inBit);
+        if (!file.isEmpty())
+            System.out.println("-template " + file);
+        if (!platform.isEmpty())
+            System.out.println("-platform " + platform);
+        if (!rows.isEmpty())
+            System.out.println("-row      " + Arrays.toString(rows.toArray()));
+        if (!cols.isEmpty())
+            System.out.println("-col      " + Arrays.toString(cols.toArray()));
+        if (offset != -255)
+            System.out.println("-offset   " + offset);
+        System.out.println();
+
+        // check collected arguments
+        if ((platform != "") && ((!rows.isEmpty())||(!cols.isEmpty())||(offset!=-255)))
+            System.out.println("Warning: -platform is set. -row, -col and -offset will be ignored.");
+        if (op.equals("extract") && !outBit.isEmpty())
+            System.out.println("Warning: -extract does not needs -out. -out option is ignored.");
+        if (op.isEmpty())
+            reportThenExit.apply("Error: either -extract or -replace must be specified.");
+        if (inBit.isEmpty())
+            reportThenExit.apply("Error: -in must be specified.");
+        if (file.isEmpty())
+            reportThenExit.apply("Error: -template must be specified.");
+        if (platform.isEmpty() && ((rows.isEmpty())||(cols.isEmpty())||(offset==-255)))
+            reportThenExit.apply("Error: either -platform or the complete set of -row, -col and -offset must be set.");
+        if (!platform.isEmpty() && !platform.equals("opendfx_zcu104"))
+            reportThenExit.apply("Error: only opendfx_zcu104 option is available for -platform.");
+        if (op.equals("replace") && outBit.isEmpty())
+            reportThenExit.apply("Error: -replace needs -out to be specified.");
+        System.out.println();
+
+        // run
+        if (op.equals("extract")) {
+
+            long startExtract = System.nanoTime();
+            ReplaceFrameData extractor = new ReplaceFrameData();
+
+            long startTime = System.nanoTime();
+            Bitstream b = Bitstream.readBitstream(inBit);
+            System.out.println("\nread " + inBit + " took " + (System.nanoTime() - startTime) * 1e-6 + " ms.\n");
 
 //        startTime = System.nanoTime();
 //        b.writePacketsToTextFile("templateSrcBit.txt");
 //        System.out.println("write templateSrcBit.txt took " + (System.nanoTime() - startTime)*1e-6 + " ms.\n");
 
-        startTime = System.nanoTime();
-        replacer.extractForOpenDFX_ZCU104(b); // get frame data stored in this.frameData
-        System.out.println("extract template took " + (System.nanoTime() - startTime)*1e-6 + " ms.\n");
+            startTime = System.nanoTime();
+            if (platform == "opendfx_zcu104") {
+                // TODO: if more platforms are supported, passing platform forward
+                extractor.extractForOpenDFX_ZCU104(b); // get frame data stored in this.frameData
+            } else {
+                extractor.extract(b, rows, cols);
+                // extract from row 0,1, to be used at row 4,5
+                extractor.incFrameDataRowIndex(offset);
+            }
+            System.out.println("extract template took " + (System.nanoTime() - startTime) * 1e-6 + " ms.\n");
+            extractor.save(file);
+            System.out.println("Extraction  took " + (System.nanoTime() - startExtract) * 1e-6 + " ms.\n");
 
-        startTime = System.nanoTime();
-        String relocSrcBit = "dcpreloc_aes128_pblock_2_partial.bit";
-        Bitstream a = Bitstream.readBitstream(relocSrcBit);
-        System.out.println("read " + relocSrcBit + " took " + (System.nanoTime() - startTime)*1e-6 + " ms.\n");
+        } else if (op.equals("replace")) {
+
+            long startReplace = System.nanoTime();
+            ReplaceFrameData replacer = new ReplaceFrameData();
+            System.out.println("before loading frameData size is " + replacer.frameData.size());
+            replacer.load(file);
+            System.out.println("after loading  frameData size is " + replacer.frameData.size());
+
+            long startTime = System.nanoTime();
+            Bitstream a = Bitstream.readBitstream(inBit);
+            System.out.println("read " + inBit + " took " + (System.nanoTime() - startTime) * 1e-6 + " ms.\n");
+
+//        startTime = System.nanoTime();
+//        a.writePacketsToTextFile("relocSrcBit.txt");
+//        System.out.println("write relocSrcBit.txt took " + (System.nanoTime() - startTime)*1e-6 + " ms.\n");
+
+            startTime = System.nanoTime();
+            if (platform == "opendfx_zcu104") {
+                // TODO: if more platforms are supported, passing platform forward
+                replacer.replaceForOpenDFX_ZCU104(a); // get frame data stored in this.frameData
+            } else {
+                replacer.replace(a, rows, cols);
+            }
+            a.writeBitstream(outBit);
+            System.out.println("replace with template took " + (System.nanoTime() - startTime) * 1e-6 + " ms.\n");
+
+//        startTime = System.nanoTime();
+//        a.writePacketsToTextFile("newRelocSrcBit.txt");
+//        System.out.println("write newRelocSrcBit.txt took " + (System.nanoTime() - startTime)*1e-6 + " ms.\n");
+            System.out.println("Replacement  took " + (System.nanoTime() - startReplace) * 1e-6 + " ms.\n");
+        }
+
+    }
+
+}
+/*
+        boolean onesession = false;
+
+        if (onesession) {
+            System.out.println("Extract and Replace in one session");
+            long startTotalTime = System.nanoTime();
+            ReplaceFrameData replacer = new ReplaceFrameData();
+
+            long startTime = System.nanoTime();
+            String templateSrcBit = "dcpreloc_aes128_pblock_0_partial.bit";
+            Bitstream b = Bitstream.readBitstream(templateSrcBit);
+            System.out.println("\nread " + templateSrcBit + " took " + (System.nanoTime() - startTime) * 1e-6 + " ms.\n");
+
+//        startTime = System.nanoTime();
+//        b.writePacketsToTextFile("templateSrcBit.txt");
+//        System.out.println("write templateSrcBit.txt took " + (System.nanoTime() - startTime)*1e-6 + " ms.\n");
+
+            startTime = System.nanoTime();
+            replacer.extractForOpenDFX_ZCU104(b); // get frame data stored in this.frameData
+            System.out.println("extract template took " + (System.nanoTime() - startTime) * 1e-6 + " ms.\n");
+
+            startTime = System.nanoTime();
+            String relocSrcBit = "dcpreloc_aes128_pblock_2_partial.bit";
+            Bitstream a = Bitstream.readBitstream(relocSrcBit);
+            System.out.println("read " + relocSrcBit + " took " + (System.nanoTime() - startTime) * 1e-6 + " ms.\n");
 
 //        startTime = System.nanoTime();
 //        a.writePacketsToTextFile("relocSrcBit.txt");
@@ -396,16 +688,69 @@ public class ReplaceFrameData {
 
 //        storage.setWrongDataForTest(); // to see if the replacement is in the right place.
 
-        startTime = System.nanoTime();
-        replacer.replaceForOpenDFX_ZCU104(a); // get frame data stored in this.frameData
-        a.writeBitstream(relocSrcBit.replace(".bit", "_withtemplate.bit"));
-        System.out.println("replace with template took " + (System.nanoTime() - startTime)*1e-6 + " ms.\n");
+            startTime = System.nanoTime();
+            replacer.replaceForOpenDFX_ZCU104(a); // get frame data stored in this.frameData
+            a.writeBitstream(relocSrcBit.replace(".bit", "_withtemplate.bit"));
+            System.out.println("replace with template took " + (System.nanoTime() - startTime) * 1e-6 + " ms.\n");
 
 //        startTime = System.nanoTime();
 //        a.writePacketsToTextFile("newRelocSrcBit.txt");
 //        System.out.println("write newRelocSrcBit.txt took " + (System.nanoTime() - startTime)*1e-6 + " ms.\n");
 
-        System.out.println("\nTotal time " + (System.nanoTime() - startTotalTime)*1e-6 + " ms.\n");
-    }
+            System.out.println("\nTotal time " + (System.nanoTime() - startTotalTime) * 1e-6 + " ms.\n");
+        } else {
+            System.out.println("Extract and later Replace in two session");
+            long startTotalTime = System.nanoTime();
+            {
+                long startExtract = System.nanoTime();
+                ReplaceFrameData extractor = new ReplaceFrameData();
 
-}
+                long startTime = System.nanoTime();
+                String templateSrcBit = "dcpreloc_aes128_pblock_0_partial.bit";
+                Bitstream b = Bitstream.readBitstream(templateSrcBit);
+                System.out.println("\nread " + templateSrcBit + " took " + (System.nanoTime() - startTime) * 1e-6 + " ms.\n");
+
+//        startTime = System.nanoTime();
+//        b.writePacketsToTextFile("templateSrcBit.txt");
+//        System.out.println("write templateSrcBit.txt took " + (System.nanoTime() - startTime)*1e-6 + " ms.\n");
+
+                startTime = System.nanoTime();
+                extractor.extractForOpenDFX_ZCU104(b); // get frame data stored in this.frameData
+                System.out.println("extract template took " + (System.nanoTime() - startTime) * 1e-6 + " ms.\n");
+                extractor.save("opendfx_zcu104.ser");
+                System.out.println("Extraction  took " + (System.nanoTime() - startExtract) * 1e-6 + " ms.\n");
+            }
+
+            {
+                long startReplace = System.nanoTime();
+                ReplaceFrameData replacer = new ReplaceFrameData();
+                System.out.println("before loading frameData size is " + replacer.frameData.size());
+                replacer.load("opendfx_zcu104.ser");
+                System.out.println("after loading  frameData size is " + replacer.frameData.size());
+
+                long startTime = System.nanoTime();
+                String relocSrcBit = "dcpreloc_aes128_pblock_2_partial.bit";
+                Bitstream a = Bitstream.readBitstream(relocSrcBit);
+                System.out.println("read " + relocSrcBit + " took " + (System.nanoTime() - startTime) * 1e-6 + " ms.\n");
+
+//        startTime = System.nanoTime();
+//        a.writePacketsToTextFile("relocSrcBit.txt");
+//        System.out.println("write relocSrcBit.txt took " + (System.nanoTime() - startTime)*1e-6 + " ms.\n");
+
+//        storage.setWrongDataForTest(); // to see if the replacement is in the right place.
+
+                startTime = System.nanoTime();
+                replacer.replaceForOpenDFX_ZCU104(a); // get frame data stored in this.frameData
+                a.writeBitstream(relocSrcBit.replace(".bit", "_withtemplate.bit"));
+                System.out.println("replace with template took " + (System.nanoTime() - startTime) * 1e-6 + " ms.\n");
+
+//        startTime = System.nanoTime();
+//        a.writePacketsToTextFile("newRelocSrcBit.txt");
+//        System.out.println("write newRelocSrcBit.txt took " + (System.nanoTime() - startTime)*1e-6 + " ms.\n");
+                System.out.println("Replacement  took " + (System.nanoTime() - startReplace) * 1e-6 + " ms.\n");
+            }
+
+            System.out.println("\nTotal time " + (System.nanoTime() - startTotalTime) * 1e-6 + " ms.\n");
+        }
+
+ */
