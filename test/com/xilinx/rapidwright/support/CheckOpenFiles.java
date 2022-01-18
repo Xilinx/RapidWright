@@ -1,4 +1,4 @@
-package com.xilinx.rapidwright.checker;
+package com.xilinx.rapidwright.support;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

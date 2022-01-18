@@ -28,7 +28,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
-
 import com.esotericsoftware.kryo.io.Input;
 import com.xilinx.rapidwright.device.FamilyType;
 import com.xilinx.rapidwright.device.Part;
@@ -36,7 +35,7 @@ import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.util.FileTools;
 
 /**
- * Generated on: Fri Oct 15 15:54:24 2021
+ * Generated on: Thu Nov 04 18:03:17 2021
  * by: com.xilinx.rapidwright.release.PartNamePopulator
  * 
  * Class to hold utility APIs dealing with Parts and device names.
@@ -130,6 +129,7 @@ public class PartNameTools {
 			case AKINTEX7: return FamilyType.KINTEX7;
 			case ARTIX7: return FamilyType.ARTIX7;
 			case ARTIX7L: return FamilyType.ARTIX7;
+			case ARTIXUPLUS: return FamilyType.KINTEXUPLUS;
 			case ASPARTAN7: return FamilyType.SPARTAN7;
 			case AZYNQ: return FamilyType.ZYNQ;
 			case AZYNQUPLUS: return FamilyType.ZYNQUPLUS;
@@ -176,6 +176,7 @@ public class PartNameTools {
 			case AKINTEX7: return "Kintex-7";
 			case ARTIX7: return "Artix-7";
 			case ARTIX7L: return "Artix-7";
+			case ARTIXUPLUS: return "Kintex UltraScale+";
 			case ASPARTAN7: return "Spartan-7";
 			case AZYNQ: return "Zynq-7000";
 			case AZYNQUPLUS: return "Zynq UltraScale+";
@@ -223,6 +224,7 @@ public class PartNameTools {
 			case AKINTEX7: return Series.Series7;
 			case ARTIX7: return Series.Series7;
 			case ARTIX7L: return Series.Series7;
+			case ARTIXUPLUS: return Series.UltraScalePlus;
 			case ASPARTAN7: return Series.Series7;
 			case AZYNQ: return Series.Series7;
 			case AZYNQUPLUS: return Series.UltraScalePlus;

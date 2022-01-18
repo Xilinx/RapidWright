@@ -6,7 +6,7 @@ SRCS = LogicalNetlist.capnp DeviceResources.capnp PhysicalNetlist.capnp Referenc
 RAPIDWRIGHT_DIR = $(dir $(realpath .))
 DST = $(RAPIDWRIGHT_DIR)/src/com/xilinx/rapidwright/$(INTERCHANGE_NAME)
 JARS_DIR = $(RAPIDWRIGHT_DIR)/jars
-JAVA_CP_RUNTIME = $(JARS_DIR)/runtime-0.1.4.jar
+JAVA_CP_RUNTIME = $(JARS_DIR)/runtime-0.1.7.jar
 JAVA_SCHEMA_DIR = $(realpath .)/schema
 JAVA_SCHEMA = $(JAVA_SCHEMA_DIR)/capnp/java.capnp
 
@@ -16,7 +16,7 @@ all: $(JAVA_CP_RUNTIME) $(JAVA_SCHEMA) | $(INTERCHANGE_REPO_PATH)
 
 $(JAVA_CP_RUNTIME):
 	mkdir -p $(JARS_DIR)
-	wget https://search.maven.org/remotecontent?filepath=org/capnproto/runtime/0.1.4/runtime-0.1.4.jar -O $(JAVA_CP_RUNTIME)
+	wget https://search.maven.org/remotecontent?filepath=org/capnproto/runtime/0.1.7/runtime-0.1.7.jar -O $(JAVA_CP_RUNTIME)
 
 $(JAVA_SCHEMA):
 	mkdir -p $(JAVA_SCHEMA_DIR)/capnp

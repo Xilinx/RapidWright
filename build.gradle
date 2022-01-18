@@ -1,3 +1,5 @@
+import java.util.stream.Collectors
+
 apply plugin: 'application'
 apply plugin: 'java-library'
 mainClassName = "com.xilinx.rapidwright.MainEntrypoint"
@@ -21,14 +23,10 @@ if (org.gradle.api.JavaVersion.current().isJava10Compatible()) {
 	applicationDefaultJvmArgs = ["--add-exports=java.base/sun.nio.ch=ALL-UNNAMED"]
 }
 
-test {
-    useJUnitPlatform()
-    maxHeapSize = "5G"
-    //Propagate JVM settings to test JVM
-    jvmArgs applicationDefaultJvmArgs
-}
-
 tasks.withType(Test) {
+  maxHeapSize = "5G"
+  //Propagate JVM settings to test JVM
+  jvmArgs applicationDefaultJvmArgs
   environment 'RAPIDWRIGHT_PATH',file('.')
   //We need to rerun tests when the data files change
   if (file('data').exists()) {
@@ -44,22 +42,98 @@ dependencies {
   testImplementation fileTree(dir: 'jars', include: ['junit-jupiter-*.jar', 'junit-platform-*.jar'])
 }
 
-abstract class UpdateJarsTask extends DefaultTask {
-    @TaskAction
-    def updateJars() {
-    	def f = new File('rapidwright-installer.jar')
-        if (!f.exists()) {
-            println 'Downloading...'
-            new URL('https://www.rapidwright.io/docs/_downloads/rapidwright-installer.jar').withInputStream{ i -> f.withOutputStream{ it << i }}
-        }
-        def stdout = new StringBuilder(), stderr = new StringBuilder()
-        def proc = 'java -jar rapidwright-installer.jar -u'.execute() 
-        proc.consumeProcessOutput(stdout,stderr)
-        proc.waitForOrKill(1100000)
-        println "$stdout\n$stderr"
-        f.delete()
+task updateJars {
+  group = "build setup"
+  description = "Download Jar Dependencies."
+
+  doLast {
+    def f = new File('rapidwright-installer.jar')
+    if (!f.exists()) {
+        println 'Downloading...'
+        new URL('https://www.rapidwright.io/docs/_downloads/rapidwright-installer.jar').withInputStream{ i -> f.withOutputStream{ it << i }}
     }
+    def stdout = new StringBuilder(), stderr = new StringBuilder()
+    def proc = 'java -jar rapidwright-installer.jar -u'.execute() 
+    proc.consumeProcessOutput(stdout,stderr)
+    proc.waitForOrKill(1100000)
+    println "$stdout\n$stderr"
+    f.delete()
+  }
 }
 
-// Create a task using the task type
-tasks.register('update_jars', UpdateJarsTask)
+task update_jars {
+  group = "build setup"
+  description = "Alias for 'updateJars'."
+  dependsOn updateJars
+}
+
+task testJava(type:Test) {
+  group = "verification"
+  description = "Runs the Java unit tests."
+
+  useJUnitPlatform()
+}
+
+task testPython(type:Test) {
+  group = "verification"
+  description = "Runs the Python unit tests."
+  doFirst {
+    // Necessary because gradle will try and match against Java tests
+    filter.setFailOnNoMatchingTests(false)
+  }
+  doLast {
+    exec {
+      environment 'CLASSPATH', sourceSets.main.runtimeClasspath.getAsPath()
+      executable = 'python3'
+      args = ['-m', 'pytest', '--junitxml', "$buildDir/test-results/testPython/testPython.xml", '--rootdir', 'python/test']
+      // Prevent python/tests/... with the same namespace as in Java from clobbering
+      args += ['--import-mode=importlib']
+      // Workaround from https://github.com/jpype-project/jpype/issues/842#issuecomment-847027355
+      args += ['-p', 'no:faulthandler']
+      if (!filter.commandLineIncludePatterns.isEmpty()) {
+        args += ['--pyargs'] + filter.commandLineIncludePatterns.stream().map((p) -> 'python.test.' + p).collect(Collectors.toList())
+      }
+    }
+  }
+}
+
+test {
+  dependsOn testJava
+  dependsOn testPython
+}
+
+gradle.taskGraph.whenReady {
+  if (!project.test.filter.commandLineIncludePatterns.isEmpty()) {
+    throw new InvalidUserDataException("'test' task does not support filters (i.e. '--tests' option); please apply filters directly to 'testJava'/'testPython' tasks instead.")
+  }
+}
+
+task updateSubmodules(type:Exec) {
+  group = "build setup"
+  description = "Update Git submodules"
+  executable = 'git'
+  args = ['submodule', 'update', '--init', '--recursive']
+}
+
+task initSubmodules {
+  group = "build setup"
+  description = "Init Git submodules (first time only)"
+  if (!file("test/RapidWrightDCP/.git").exists()) {
+    dependsOn updateSubmodules
+  }
+}
+
+task remindSubmodules {
+  onlyIf {
+    testJava.state.failure != null || testPython.state.failure != null
+  }
+  doLast {
+    logger.warn('Failed tests detected. Some tests depend on DCPs from the git submodule at test/RapidWrightDCP, consider checking its status and updating with \'gradlew updateSubmodules\'')
+  }
+}
+
+tasks.withType(Test) {
+  dependsOn initSubmodules
+  finalizedBy remindSubmodules
+}
+

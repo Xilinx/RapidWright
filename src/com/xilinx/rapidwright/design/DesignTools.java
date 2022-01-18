@@ -45,6 +45,7 @@ import java.util.Map.Entry;
 import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.design.blocks.UtilizationType;
 import com.xilinx.rapidwright.device.BEL;
@@ -70,6 +71,9 @@ import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFPropertyValue;
 import com.xilinx.rapidwright.edif.EDIFTools;
+import com.xilinx.rapidwright.placer.blockplacer.BlockPlacer2Impls;
+import com.xilinx.rapidwright.placer.blockplacer.ImplsInstancePort;
+import com.xilinx.rapidwright.placer.blockplacer.ImplsPath;
 import com.xilinx.rapidwright.router.RouteNode;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.FileTools;
@@ -90,6 +94,7 @@ import com.xilinx.rapidwright.util.Utils;
 public class DesignTools {
 
 	private static int uniqueBlackBoxCount = 0;
+	private static List<PIP> pips;
 
 	/**
 	 * Tries to identify the clock pin source for the given user signal output by
@@ -1001,7 +1006,11 @@ public class DesignTools {
 	 * @param hierarchicalCellName The name of the hierarchical cell to become a black box.
 	 */
 	public static void makeBlackBox(Design d, String hierarchicalCellName) {
-		makeBlackBox(d, d.getNetlist().getHierCellInstFromName(hierarchicalCellName));
+		final EDIFHierCellInst inst = d.getNetlist().getHierCellInstFromName(hierarchicalCellName);
+		if (inst == null) {
+			throw new IllegalStateException("Did not find cell to make into a blackbox: "+hierarchicalCellName);
+		}
+		makeBlackBox(d, inst);
 	}
 	/**
 	 * Turns the cell named hierarchicalCell into a blackbox and removes any
@@ -2039,7 +2048,16 @@ public class DesignTools {
 									curr = tmp;
 									break;
 								}
-							}	
+							}
+							if(rtCopy.getBELName().endsWith("6LUT") && isUltraScale(rtCopy)) {
+							    // Check A6 if it has VCC assignment
+							    BELPin a6 = rtCopy.getBEL().getPin("A6");
+							    Net isVcc = origSiteInst.getNetFromSiteWire(a6.getSiteWireName());
+							    if(isVcc != null && isVcc.getName().equals(Net.VCC_NET)) {
+							        dstSiteInst.routeIntraSiteNet(
+							                dstSiteInst.getDesign().getVccNet(), a6, a6);
+							    }                               
+							}
 						} else {
 							// We found the source
 							break;
@@ -2063,6 +2081,13 @@ public class DesignTools {
 				}
 			}
 		}
+	}
+	
+	private static boolean isUltraScale(Cell cell) {
+	    SiteInst si = cell.getSiteInst();
+	    if(si == null) return false;
+	    Series s = si.getDesign().getDevice().getSeries();
+	    return s == Series.UltraScale || s == Series.UltraScalePlus;
 	}
 	
 	private static Set<PIP> unroutePin(SitePinInst pin, Net net){
@@ -2539,4 +2564,151 @@ public class DesignTools {
 		}
 		return edfFileName;
 	}
+
+	/**
+	 * When importing designs that have been taken from an in-context implementation
+	 * (write_checkpoint -cell), often Vivado will write out residual nets that do not necessarily
+	 * exist in the module or are retaining GND/VCC routing from the parent context.  This method
+	 * will resolve conflicts by examining the site routing leading from input ports to the sinks
+	 * and update the site routing to the appropriate net as dictated in the new design.  GND and
+	 * VCC will be replaced by the name of the source net being driven by the input ports.
+	 * @param design The design of interest.
+	 */
+    public static void resolveSiteRoutingFromInContextPorts(Design design) {
+        EDIFNetlist netlist = design.getNetlist();
+        for(EDIFNet net : design.getTopEDIFCell().getNets()) {
+            EDIFHierNet parentNet = netlist.getHierNetFromName(net.getName());
+            Set<EDIFHierNet> aliases = null;
+            for(EDIFPortInst portInst : net.getSourcePortInsts(true)) {
+                // Identify top level inport ports
+                if(portInst.isTopLevelPort() && portInst.isInput()) {
+                    List<EDIFHierPortInst> portInsts = netlist.getSinksFromNet(parentNet);
+                    // Iterate over all sinks of the physical net to identify potential site routing
+                    // issues
+                    for(EDIFHierPortInst sink : portInsts){
+                        Cell c = design.getCell(sink.getFullHierarchicalInstName());
+                        if(c == null || !c.isPlaced()) continue;
+                        SiteInst i = c.getSiteInst();
+                        String logicalPinName = sink.getPortInst().getName();
+                        List<String> siteWires = new ArrayList<>();
+                        // Using this method just to get site wires along the path
+                        c.getSitePinFromLogicalPin(logicalPinName, siteWires);
+                        for(String siteWire : siteWires) {
+                            Net existingSiteRoutedNet = i.getNetFromSiteWire(siteWire);
+                            if(existingSiteRoutedNet == null) continue;
+                            EDIFHierNet currNet = netlist.getHierNetFromName(existingSiteRoutedNet.getName());
+                            if(aliases == null) {
+                                aliases = new HashSet<>(netlist.getNetAliases(parentNet));
+                            }
+                            if(aliases.contains(currNet)) continue;
+                            String updateNetName = parentNet.getHierarchicalNetName();
+                            Net updateNet = design.getNet(updateNetName);
+                            if(updateNet == null) {
+                                updateNet = design.createNet(updateNetName, parentNet.getNet());
+                            }
+                            BELPin belPin = i.getSiteWirePins(siteWire)[0];
+                            i.unrouteIntraSiteNet(belPin, belPin);
+                            if(i.getSiteWiresFromNet(existingSiteRoutedNet).size() == 0) {
+                                existingSiteRoutedNet.getSiteInsts().remove(i);
+                            }
+                            i.routeIntraSiteNet(updateNet, belPin, belPin);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+	/**
+	 * Create a {@link ModuleImplsInst}, i.e. a Module instance with flexible implementation. If an edif cell inst
+	 * of the given name already exists in the design hierarchy, it will be used for the module. Otherwise, a new
+	 * EDIF Cell Inst will be created.
+	 * @param design the design
+	 * @param name name of the module instance
+	 * @param module the module to use
+	 * @return the newly created instance
+	 */
+	public static ModuleImplsInst createModuleImplsInst(Design design, String name, ModuleImpls module) {
+		EDIFCellInst cell = design.createOrFindEDIFCellInst(name, module.getNetlist().getTopCell());
+		return new ModuleImplsInst(name, cell, module);
+	}
+
+	/**
+	 * Find the physical net corresponding to a {@link ModuleImplsInst}'s port
+	 * @param port the port to find the net for
+	 * @param instanceMap map from {@link ModuleImplsInst} to the corresponding real {@link ModuleInst}
+	 * @return the physical net. This can only be null if the port has no pins
+	 */
+	private static Net findPortNet(ImplsInstancePort port, Map<ModuleImplsInst, ModuleInst> instanceMap) {
+		if (port instanceof ImplsInstancePort.SitePinInstPort) {
+			SitePinInst spi = ((ImplsInstancePort.SitePinInstPort) port).getSitePinInst();
+			Net net = spi.getNet();
+			if (net == null) {
+				throw new IllegalStateException("No net on SPI "+spi);
+			}
+			return net;
+		} else if (port instanceof ImplsInstancePort.InstPort) {
+			ImplsInstancePort.InstPort instPort = (ImplsInstancePort.InstPort) port;
+			final Module module = instPort.getInstance().getCurrentModuleImplementation();
+			Port modPort = module.getPort(instPort.getPort());
+			ModuleInst moduleInst = instanceMap.get(instPort.getInstance());
+			Net net = moduleInst.getCorrespondingNet(modPort);
+			if (net == null && !modPort.getSitePinInsts().isEmpty()) {
+				throw new IllegalStateException("No net on module port "+moduleInst+"."+modPort.getName()+" but we have pins");
+			}
+
+			if (!modPort.getPassThruPortNames().isEmpty() && port.isOutputPort()) {
+				final List<String> inPorts = modPort.getPassThruPortNames().stream().filter(p -> !module.getPort(p).isOutPort())
+						.collect(Collectors.toList());
+				if (inPorts.size()>1) {
+					throw new IllegalStateException("Multiple inputs connected to "+instPort.getInstance().getName()+"."+instPort.getName()+": "+inPorts);
+				} else if (inPorts.size() == 1) {
+					final ImplsInstancePort otherPort = instPort.getInstance().getPort(inPorts.get(0));
+					final ImplsInstancePort source = otherPort.getPath().findSource();
+					return findPortNet(source, instanceMap);
+				} //Else we only have multiple outs sourced by the same Pin internally, nothing to do
+			}
+
+			return net;
+		} else {
+			throw new IllegalStateException("unknown subtype!");
+		}
+	}
+
+	/**
+	 * In a design containing {@link ModuleImplsInst}s, convert them into {@link ModuleInst}s so that the design
+	 * can be exported to a checkpoint
+	 * @param design the design
+	 * @param instances the instances to be converted
+	 * @param paths nets connecting the instances as returned by {@link BlockPlacer2Impls#getPaths()}
+	 */
+	public static void createModuleInstsFromModuleImplsInsts(Design design, Collection<ModuleImplsInst> instances, Collection<ImplsPath> paths) {
+		Map<ModuleImplsInst, ModuleInst> instanceMap = new HashMap<>();
+		for (ModuleImplsInst implsInst : instances) {
+			ModuleInst modInst = design.createModuleInst(implsInst.getName(), implsInst.getCurrentModuleImplementation());
+			boolean success = modInst.place(implsInst.getPlacement().placement);
+			if (!success) {
+				throw new IllegalStateException("could not place module "+modInst.getName()+" at "+implsInst.getPlacement().placement);
+			}
+			instanceMap.put(implsInst, modInst);
+		}
+		for (ImplsPath path : paths) {
+			Net net = null;
+			for (ImplsInstancePort port : path) {
+				Net portNet = findPortNet(port, instanceMap);
+				if (portNet == null) {
+					continue;
+				}
+				if (net == null) {
+					net = portNet;
+				} else if (port.isOutputPort()) {
+					design.movePinsToNewNetDeleteOldNet(net, portNet, false);
+					net = portNet;
+				} else {
+					design.movePinsToNewNetDeleteOldNet(portNet, net, false);
+				}
+			}
+		}
+	}
+
 }

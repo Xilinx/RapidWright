@@ -131,7 +131,7 @@ public class FileTools {
 	/** Base URL for download data files */
 	public static final String RAPIDWRIGHT_DATA_URL = "http://data.rapidwright.io/";
 	/** Suffix added to data file names to capture md5 status */
-	private static String MD5_DATA_FILE_SUFFIX = ".md5";
+	public static String MD5_DATA_FILE_SUFFIX = ".md5";
 	
 	private static boolean OVERRIDE_DATA_FILE_DOWNLOAD = false;
 
@@ -1601,11 +1601,11 @@ public class FileTools {
 	 */
 	public static String getVivadoPath(){
 		String[] cmd = new String[]{isWindows() ? "where" : "which",isWindows() ? "vivado.bat" : "vivado"};
-		String output = execCommandGetOutput(true, cmd).get(0);
-		if(output.contains("INFO:") || output.contains("which: no")){
+		final List<String> fullOutput = execCommandGetOutput(true, cmd);
+		if(fullOutput.isEmpty() || fullOutput.get(0).contains("INFO:") || fullOutput.get(0).contains("which: no")){
 			throw new RuntimeException("ERROR: Couldn't find vivado on PATH");
 		}
-		return output.trim().replace("\\", "/");
+		return fullOutput.get(0).trim().replace("\\", "/");
 	}
 	
 	private static String currentOS = null;
@@ -1808,6 +1808,17 @@ public class FileTools {
     
     public static boolean overrideDataFileDownload() {
         return OVERRIDE_DATA_FILE_DOWNLOAD;
+    }
+    
+    /**
+     * For Java 16 and below, calling this method will prevent {@link System.exit()} calls from 
+     * exiting the JVM and instead throws a {@link SecurityException} in its place.  This method
+     * allows for a check to avoid the JVM WARNING message in Java 17.
+     */
+    public static void blockSystemExitCalls() {
+        if(getJavaVersion() < 17) {
+            BlockExitSecurityManager.blockSystemExitCalls();
+        }
     }
     
 	public static void main(String[] args) {

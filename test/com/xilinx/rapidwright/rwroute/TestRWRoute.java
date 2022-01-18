@@ -1,6 +1,6 @@
 package com.xilinx.rapidwright.rwroute;
 
-import org.junit.jupiter.api.Disabled;
+import com.xilinx.rapidwright.support.RapidWrightDCP;
 import org.junit.jupiter.api.Test;
 
 import com.xilinx.rapidwright.design.Design;
@@ -15,7 +15,8 @@ public class TestRWRoute {
 	 */
 	@Test
 	public void testNonTimingDrivenFullRouting() {
-		Design design = Design.readCheckpoint("RapidWrightDCP/bnn.dcp");
+		String dcpPath = RapidWrightDCP.getString("bnn.dcp");
+		Design design = Design.readCheckpoint(dcpPath);
 		RWRoute.routeDesignFullNonTimingDriven(design);
 	}
 	
@@ -30,7 +31,8 @@ public class TestRWRoute {
 	 */
 	@Test
 	public void testTimingDrivenFullRouting() {
-		Design design = Design.readCheckpoint("RapidWrightDCP/bnn.dcp");
+		String dcpPath = RapidWrightDCP.getString("bnn.dcp");
+		Design design = Design.readCheckpoint(dcpPath);
 		RWRoute.routeDesignFullTimingDriven(design);
 	}
 	
@@ -43,7 +45,8 @@ public class TestRWRoute {
 	 */
 	@Test
 	public void testNonTimingDrivenFullRoutingWithClkDesign() {
-		Design design = Design.readCheckpoint("RapidWrightDCP/optical-flow.dcp");
+		String dcpPath = RapidWrightDCP.getString("optical-flow.dcp");
+		Design design = Design.readCheckpoint(dcpPath);
 		RWRoute.routeDesignFullNonTimingDriven(design);
 	}
 	
@@ -55,7 +58,8 @@ public class TestRWRoute {
 	 */
 	@Test
 	public void testNonTimingDrivenPartialRouting() {
-		Design design = Design.readCheckpoint("RapidWrightDCP/picoblaze_partial.dcp");
+		String dcpPath = RapidWrightDCP.getString("picoblaze_partial.dcp");
+		Design design = Design.readCheckpoint(dcpPath);
 		RWRoute.routeDesignPartialNonTimingDriven(design);
 	}
 }

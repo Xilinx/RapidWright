@@ -31,10 +31,11 @@ import java.util.Set;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Module;
+import com.xilinx.rapidwright.design.ModuleImpls;
 import com.xilinx.rapidwright.design.ModuleInst;
 import com.xilinx.rapidwright.design.Net;
-import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.SiteInst;
+import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
@@ -50,7 +51,7 @@ import com.xilinx.rapidwright.util.Utils;
  * paths into both ends of the connections made between hard macros.
  * @author Chris Lavin
  */
-public class BlockPlacer {
+public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
 	/** The current design */
 	private Design design;
 	/** The current device being targeted by the design */
@@ -64,7 +65,7 @@ public class BlockPlacer {
 	/** The random number generator used throughout this class */
 	private Random rand;
 	/** The current move that is being evaluated */
-	private Move currentMove;
+	private Move<HardMacro, Site> currentMove;
 	/** The current location of all hard macros */
 	private HashMap<Site, HardMacro> currentPlacements;
 	/** The current temperature of the simulated annealing schedule */
@@ -141,7 +142,7 @@ public class BlockPlacer {
 	 */
 	private void initializePlacer(boolean debugFlow){
 		currentPlacements = new HashMap<Site, HardMacro>();
-		currentMove = new Move();
+		currentMove = new Move<>(this);
 		totalMoves = 0;
 		rand = new Random(seed);
 		dev = design.getDevice();
@@ -150,7 +151,7 @@ public class BlockPlacer {
 		macroMap = new HashMap<ModuleInst, HardMacro>();
 		
 		// Find all valid placements for each module
-		for(ArrayList<Module> moduleImpls : design.getModules()){
+		for(ModuleImpls moduleImpls : design.getModules()){
 			for(Module module : moduleImpls){
 				ArrayList<Site> sites = module.getAllValidPlacements();
 				if(sites.size() == 0){
@@ -224,7 +225,7 @@ public class BlockPlacer {
 			
 			if(snks.size() > 0){
 				Path newPath = new Path();
-				newPath.addPin(src,macroMap);
+				newPath.addPin(src, macroMap);
 				for(SitePinInst snk : snks){
 					newPath.addPin(snk, macroMap);
 				}
@@ -320,7 +321,7 @@ public class BlockPlacer {
 				}
 				else{
 					// Undo the move, we are not accepting it
-					currentMove.undoMove(currentPlacements);
+					currentMove.undoMove();
 					double testCost = currentSystemCost();
 					if(testCost != prevSystemCost){
 						MessageGenerator.briefError("ERROR: Undo move caused improper system cost change: prev=" + prevSystemCost + " incorrect=" + testCost + " move= " + currentMove.toString());
@@ -390,7 +391,7 @@ public class BlockPlacer {
 
 			if(newCandidateSite != null){
 				if(DEBUG_LEVEL > 0) System.out.println("Moving " + hm.getName() + " from " + original.getTile() + " to " + newCandidateSite.getTile());
-				currentMove.setMove(newCandidateSite, original, null, hm);
+				currentMove.setMove(newCandidateSite, original, null, hm, null);
 				hm.setTempAnchorSite(newCandidateSite, currentPlacements);
 				currentSystemCost();
 				int longestPath = 0;
@@ -401,7 +402,7 @@ public class BlockPlacer {
 				}
 				if(originalMaxLength+5 < longestPath){
 					if(DEBUG_LEVEL > 0) System.out.println("  Undo move: old max length: " + originalMaxLength + " new max length " + longestPath);
-					currentMove.undoMove(currentPlacements);
+					currentMove.undoMove();
 					currentSystemCost();
 				}
 			}
@@ -444,7 +445,12 @@ public class BlockPlacer {
 		
 		return design;
 	}
-	
+
+	@Override
+	public void setTempAnchorSite(HardMacro hm, Site placement) {
+		hm.setTempAnchorSite(placement, currentPlacements);
+	}
+
 	enum Direction{UP, DOWN, LEFT, RIGHT};
 	
 	public Site getPrimitiveSiteFromTile(Tile tile, SiteTypeEnum type){
@@ -701,7 +707,7 @@ public class BlockPlacer {
 		// Load Design TODO
 
 		currentPlacements = new HashMap<Site, HardMacro>();
-		currentMove = new Move();
+		currentMove = new Move<>(this);
 		totalMoves = 0;
 		rand = new Random(123456);
 		dev = design.getDevice();

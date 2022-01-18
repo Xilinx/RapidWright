@@ -54,3 +54,13 @@ However, for developers, if the `RAPIDWRIGHT_PATH` environment variable is set t
 the Java VM will use the version of RapidWright found according to the standard
 `CLASSPATH` environment variable instead.
 
+# Custom JVM Options
+`JAVA_TOOL_OPTIONS` can be used to add options to JPype's JVM, which is started automatically.  For example:
+
+```
+$python3 -c "import rapidwright; from java.lang import Runtime; print(Runtime.getRuntime().maxMemory() / 1024 / 1024)"
+14279.5
+$ JAVA_TOOL_OPTIONS="-Xmx32G" python3 -c "import rapidwright; from java.lang import Runtime; print(Runtime.getRuntime().maxMemory() / 1024 / 1024)"
+Picked up JAVA_TOOL_OPTIONS: -Xmx32G
+29127.5
+```

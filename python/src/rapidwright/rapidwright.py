@@ -24,7 +24,7 @@ from jpype.types import *
 from typing import List, Optional
 import os, urllib.request, platform
 
-version='2021.1.2'
+version='2021.2.0'
 
 def start_jvm():
     os_str = 'lin64'
@@ -43,4 +43,9 @@ def start_jvm():
     if not jpype.isJVMStarted():
         jpype.startJVM(**kwargs)
 
+def block_system_exit_calls():
+    from com.xilinx.rapidwright.util import FileTools
+    FileTools.blockSystemExitCalls()
+
 start_jvm()
+block_system_exit_calls()

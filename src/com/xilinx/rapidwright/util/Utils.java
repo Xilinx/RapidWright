@@ -317,30 +317,7 @@ public class Utils{
 			SiteTypeEnum.CONFIG_SITE,
 			SiteTypeEnum.BUFG
 		);
-		
 
-		moduleSiteTypes = EnumSet.of(
-			SiteTypeEnum.LAGUNA,
-			SiteTypeEnum.SLICEL,
-			SiteTypeEnum.SLICEM,
-			SiteTypeEnum.RAMB180,
-			SiteTypeEnum.RAMB181,
-			SiteTypeEnum.RAMB18E1,
-			SiteTypeEnum.RAMB36,
-			SiteTypeEnum.RAMB36E1,
-			SiteTypeEnum.RAMBFIFO18,
-			SiteTypeEnum.RAMBFIFO36,
-			SiteTypeEnum.RAMBFIFO36E1,
-			SiteTypeEnum.FIFO18_0,
-			SiteTypeEnum.FIFO18E1,
-			SiteTypeEnum.FIFO36,
-			SiteTypeEnum.FIFO36E1,
-			SiteTypeEnum.DSP48E1,
-			SiteTypeEnum.DSP48E2,
-			SiteTypeEnum.BUFGCE
-	//		SiteTypeEnum.PS7
-		);
-		
 		sliceTypes = EnumSet.of(
 			SiteTypeEnum.SLICEL,
 			SiteTypeEnum.SLICEM
@@ -355,8 +332,12 @@ public class Utils{
 		);
 		
 		bramTypes = EnumSet.of(
+			SiteTypeEnum.FIFO18_0,
 			SiteTypeEnum.FIFO18E1,
-			SiteTypeEnum.FIFO36E1,		
+			SiteTypeEnum.FIFO36,
+			SiteTypeEnum.FIFO36E1,
+			SiteTypeEnum.RAMB180,
+			SiteTypeEnum.RAMB181,
 			SiteTypeEnum.RAMB18E1,
 			SiteTypeEnum.RAMB36,
 			SiteTypeEnum.RAMB36E1,
@@ -385,6 +366,13 @@ public class Utils{
 		sliceDspBramUramTypes.addAll(dspTypes);
 		sliceDspBramUramTypes.addAll(bramTypes);
 		sliceDspBramUramTypes.addAll(uramTypes);
+
+		moduleSiteTypes = EnumSet.of(
+			SiteTypeEnum.LAGUNA,
+			SiteTypeEnum.BUFGCE
+			// SiteTypeEnum.PS7
+		);
+		moduleSiteTypes.addAll(sliceDspBramUramTypes);
 	}
 
 }
