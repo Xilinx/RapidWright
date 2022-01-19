@@ -43,16 +43,18 @@ repositories {
 }
 
 dependencies {
-    api 'com.esotericsoftware:kryo:5.0.0-RC5'
+    api 'com.esotericsoftware:kryo:5.2.1'
     api 'org.jgrapht:jgrapht-core:1.3.0'
-    api 'org.capnproto:runtime:0.1.7'
+    api 'org.capnproto:runtime:0.1.13'
     api 'net.sf.jopt-simple:jopt-simple:5.0.4'
     api 'org.python:jython-standalone:2.7.2'
     api 'com.google.protobuf:protobuf-java:3.11.4'
     api 'org.jetbrains:annotations:20.1.0'
-    api 'org.zeromq:jeromq:0.3.6'
+    api 'org.zeromq:jeromq:0.5.2'
     api 'commons-cli:commons-cli:1.2'
     api 'org.json:json:20160810'
+    api 'com.jcraft:jzlib:1.1.3'
+    api 'commons-io:commons-io:2.11.0'
     api 'com.xilinx.rapidwright:qtjambi-'+os+':4.5.2_01'
     api 'com.xilinx.rapidwright:jupyter-kernel-jsr223:1.0.0'
     api 'com.xilinx.rapidwright:rapidwright-api-lib:' + rapidwright_version
@@ -80,37 +82,30 @@ tasks.withType(Test) {
 sourceCompatibility = 8
 targetCompatibility = 8
 
-task updateJars {
-  group = "build setup"
-  description = "Download Jar Dependencies."
-
-  doLast {
-    def f = new File('rapidwright-installer.jar')
-    if (!f.exists()) {
-        println 'Downloading...'
-        new URL('https://www.rapidwright.io/docs/_downloads/rapidwright-installer.jar').withInputStream{ i -> f.withOutputStream{ it << i }}
-    }
-    def stdout = new StringBuilder(), stderr = new StringBuilder()
-    def proc = 'java -jar rapidwright-installer.jar -u'.execute() 
-    proc.consumeProcessOutput(stdout,stderr)
-    proc.waitForOrKill(1100000)
-    println "$stdout\n$stderr"
-    f.delete()
-  }
-}
-
 task copyJars(type: Copy) {
-  from configurations.implementation
-  into 'jars'
-  from configurations.testImplementation
-  into 'jars'
+    from configurations.implementation
+    into 'jars'
+    from configurations.testImplementation
+    into 'jars'
 }
 compileJava.dependsOn(copyJars)
 
-task update_jars {
+task deleteJars(type: Delete) {
+    delete fileTree('jars')
+}
+
+task updateJars {
   group = "build setup"
-  description = "Alias for 'updateJars'."
-  dependsOn updateJars
+  description = "Removes all jars from RapidWright/jars and replaces with only necessary dependencies."
+  dependsOn deleteJars
+  dependsOn copyJars
+  copyJars.mustRunAfter deleteJars
+}
+
+task update_jars {
+    group = "build setup"
+    description = "Alias for 'updateJars'."
+    dependsOn updateJars
 }
 
 task sourceJar(type: Jar) {
@@ -213,7 +208,7 @@ task testPython(type:Test) {
     exec {
       environment 'CLASSPATH', sourceSets.main.runtimeClasspath.getAsPath()
       executable = 'python3'
-      args = ['-m', 'pytest', '--junitxml', "$buildDir/test-results/testPython/testPython.xml", '--rootdir', 'python/test']
+      args = ['-m', 'pytest', '-v', '--junitxml', "$buildDir/test-results/testPython/testPython.xml", '--rootdir', 'python/test']
       // Prevent python/tests/... with the same namespace as in Java from clobbering
       args += ['--import-mode=importlib']
       // Workaround from https://github.com/jpype-project/jpype/issues/842#issuecomment-847027355
