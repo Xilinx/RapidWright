@@ -41,6 +41,7 @@ import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.PIPType;
 import com.xilinx.rapidwright.device.PIPWires;
 import com.xilinx.rapidwright.device.PseudoPIPHelper;
+import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePIP;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
@@ -737,6 +738,7 @@ public class DeviceResourcesVerifier {
             }
         }
 
+        Series series = design.getDevice().getSeries();
         design.removeCell(physCell);
         topLevelCell.removeCellInst(cellInst);
         physCell = null;
@@ -749,7 +751,7 @@ public class DeviceResourcesVerifier {
                 continue;
             }
 
-            for(List<String> parameters : EnumerateCellBelMapping.getParametersFor(cell.getName())) {
+            for(List<String> parameters : EnumerateCellBelMapping.getParametersFor(series, cell.getName())) {
                 String[] parameterArray = parameters.toArray(new String[parameters.size()]);
                 Map<String, String> pinMappingFromDev = cellBelMap.getPinMappingsP2L(
                         cell.getName(),
