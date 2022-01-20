@@ -36,16 +36,11 @@ jobs:
         with:
           path: |
               data
-              jars
-          key: rapidwright-clouddata-${{ env.RAPIDWRIGHT_VERSION }}
+          key: rapidwright-clouddata-v2-${{ env.RAPIDWRIGHT_VERSION }}
 
       - name: Install Python Dependencies
         run: |
           pip install pytest python/
-
-      - name: Download RapidWright Jars
-        if: steps.cache-rapidwright.outputs.cache-hit != 'true'
-        run: ./gradlew update_jars
 
       - name: Compile
         run: ./gradlew assemble
