@@ -25,6 +25,7 @@ import org.capnproto.StructList;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
@@ -477,142 +478,206 @@ public class EnumerateCellBelMapping {
         sites.add(site);
     }
 
-    public static List<List<String>> getParametersFor(String cellName) {
+    public static List<List<String>> getParametersFor(Series series, String cellName) {
         List<List<String>> parameterSets = new ArrayList<List<String>>();
-        if(cellName.equals("RAMB18E1") || cellName.equals("RAMB18E2")) {
-            int[] portWidths = {0, 1, 2, 4, 9, 18};
-            for(int writeWidthA : portWidths) {
-                for(int writeWidthB : portWidths) {
+        if(series == Series.Versal) {
+            if(cellName.equals("URAM288E5_BASE") || cellName.equals("URAM288E5")) {
+                int[] portWidths = {18, 36, 72};
+                String[] ports = {"A", "B"};
+                for(int portWidth : portWidths) {
                     List<String> parameters = new ArrayList<String>();
-                    parameters.add(String.format("WRITE_WIDTH_A=%d", writeWidthA));
-                    parameters.add(String.format("WRITE_WIDTH_B=%d", writeWidthB));
-                    parameters.add("RAM_MODE=TDP");
-                    parameters.add("DOA_REG=0");
-                    parameters.add("DOB_REG=0");
-
+                    for(String port : ports) {
+                        parameters.add("EN_ECC_RD_"+port+"=FALSE");
+                        parameters.add("EN_ECC_WR_"+port+"=FALSE");
+                        parameters.add("WRITE_WIDTH_" + port + "=" + portWidth);
+                    }
                     parameterSets.add(parameters);
                 }
-            }
-
-            {
-                List<String> parameters = new ArrayList<String>();
-                parameters.add("RAM_MODE=SDP");
-                parameters.add("WRITE_WIDTH_A=0");
-                parameters.add("WRITE_WIDTH_B=36");
-                parameters.add("DOA_REG=0");
-                parameters.add("DOB_REG=0");
-                parameterSets.add(parameters);
-            }
-
-            {
-                List<String> parameters = new ArrayList<String>();
-                parameters.add("RAM_MODE=TDP");
-                parameters.add("WRITE_WIDTH_A=0");
-                parameters.add("WRITE_WIDTH_B=0");
-                parameters.add("DOA_REG=1");
-                parameters.add("DOB_REG=0");
-                parameterSets.add(parameters);
-            }
-
-            {
-                List<String> parameters = new ArrayList<String>();
-                parameters.add("RAM_MODE=TDP");
-                parameters.add("WRITE_WIDTH_A=0");
-                parameters.add("WRITE_WIDTH_B=0");
-                parameters.add("DOA_REG=0");
-                parameters.add("DOB_REG=0");
-                parameterSets.add(parameters);
-            }
-
-            {
-                List<String> parameters = new ArrayList<String>();
-                parameters.add("RAM_MODE=TDP");
-                parameters.add("WRITE_WIDTH_A=0");
-                parameters.add("WRITE_WIDTH_B=0");
-                parameters.add("DOA_REG=0");
-                parameters.add("DOB_REG=1");
-                parameterSets.add(parameters);
-            }
-
-            {
-                List<String> parameters = new ArrayList<String>();
-                parameters.add("RAM_MODE=TDP");
-                parameters.add("WRITE_WIDTH_A=0");
-                parameters.add("WRITE_WIDTH_B=0");
-                parameters.add("DOA_REG=0");
-                parameters.add("DOB_REG=0");
-                parameterSets.add(parameters);
-            }
-        }
-        else if(cellName.equals("RAMB36E1") || cellName.equals("RAMB36E2")) {
-            int[] portWidths = {0, 1, 2, 4, 9, 18, 36};
-            int[] portWidthsNoZero = {1, 2, 4, 9, 18, 36};
-            for(int writeWidthA : portWidthsNoZero) {
-                for(int writeWidthB : portWidths) {
+            }else if(cellName.equals("DSP_PREADD_DATA58") || cellName.equals("DSP_SRCMX_OPTINV")) {
+                for(String mode : new String[] {"INT24", "INT8", "FP32", "CINT18"}){
                     List<String> parameters = new ArrayList<String>();
-                    parameters.add(String.format("WRITE_WIDTH_A=%d", writeWidthA));
-                    parameters.add(String.format("WRITE_WIDTH_B=%d", writeWidthB));
-                    parameters.add("RAM_MODE=TDP");
-                    parameters.add("DOA_REG=0");
-                    parameters.add("DOB_REG=0");
-
+                    parameters.add("DSP_MODE=" + mode);
                     parameterSets.add(parameters);
                 }
-            }
-
-            {
-                List<String> parameters = new ArrayList<String>();
-                parameters.add("RAM_MODE=SDP");
-                parameters.add("WRITE_WIDTH_A=0");
-                parameters.add("WRITE_WIDTH_B=72");
-                parameters.add("DOA_REG=0");
-                parameters.add("DOB_REG=0");
-                parameterSets.add(parameters);
-            }
-
-            {
-                List<String> parameters = new ArrayList<String>();
-                parameters.add("RAM_MODE=TDP");
-                parameters.add("WRITE_WIDTH_A=1");
-                parameters.add("WRITE_WIDTH_B=0");
-                parameters.add("DOA_REG=1");
-                parameters.add("DOB_REG=0");
-                parameterSets.add(parameters);
-            }
-
-            {
-                List<String> parameters = new ArrayList<String>();
-                parameters.add("RAM_MODE=TDP");
-                parameters.add("WRITE_WIDTH_A=1");
-                parameters.add("WRITE_WIDTH_B=0");
-                parameters.add("DOA_REG=0");
-                parameters.add("DOB_REG=0");
-                parameterSets.add(parameters);
-            }
-
-            {
-                List<String> parameters = new ArrayList<String>();
-                parameters.add("RAM_MODE=TDP");
-                parameters.add("WRITE_WIDTH_A=1");
-                parameters.add("WRITE_WIDTH_B=0");
-                parameters.add("DOA_REG=0");
-                parameters.add("DOB_REG=1");
-                parameterSets.add(parameters);
-            }
-
-
-            /* FIXME: https://github.com/SymbiFlow/RapidWright/issues/2
-             {
-                List<String> parameters = new ArrayList<String>();
-                parameters.add("RAM_MODE=TDP");
-                parameters.add("WRITE_WIDTH_A=0");
-                parameters.add("WRITE_WIDTH_B=0");
-                parameters.add("DOA_REG=0");
-                parameters.add("DOB_REG=0");
-                parameterSets.add(parameters);
-            }*/
+            }else if(cellName.equals("IBUF") || cellName.equals("IBUFE3") || 
+                     cellName.equals("IBUF_IBUFDISABLE") || cellName.equals("IOBUF") || 
+                     cellName.equals("IOBUFE3") || cellName.equals("IOBUF_DCIEN")) {
+                for(String mode : new String[] {"LVCMOS15", "LVCMOS12", "LVDCI_15"}){
+                    List<String> parameters = new ArrayList<String>();
+                    parameters.add("IOSTANDARD=" + mode);
+                    parameterSets.add(parameters);
+                }
+            } else {
+                parameterSets.add(new ArrayList<String>());
+            } 
         } else {
-            parameterSets.add(new ArrayList<String>());
+            if(cellName.equals("RAMB18E1") || cellName.equals("RAMB18E2")) {
+                int[] portWidths = {0, 1, 2, 4, 9, 18};
+                for(int writeWidthA : portWidths) {
+                    for(int writeWidthB : portWidths) {
+                        List<String> parameters = new ArrayList<String>();
+                        parameters.add(String.format("WRITE_WIDTH_A=%d", writeWidthA));
+                        parameters.add(String.format("WRITE_WIDTH_B=%d", writeWidthB));
+                        parameters.add("RAM_MODE=TDP");
+                        parameters.add("DOA_REG=0");
+                        parameters.add("DOB_REG=0");
+                        parameterSets.add(parameters);
+                    }
+                }
+
+                {
+                    List<String> parameters = new ArrayList<String>();
+                    parameters.add("RAM_MODE=SDP");
+                    parameters.add("WRITE_WIDTH_A=0");
+                    parameters.add("WRITE_WIDTH_B=36");
+                    parameters.add("DOA_REG=0");
+                    parameters.add("DOB_REG=0");
+                    parameterSets.add(parameters);
+                }
+
+                {
+                    List<String> parameters = new ArrayList<String>();
+                    parameters.add("RAM_MODE=TDP");
+                    parameters.add("WRITE_WIDTH_A=0");
+                    parameters.add("WRITE_WIDTH_B=0");
+                    parameters.add("DOA_REG=1");
+                    parameters.add("DOB_REG=0");
+                    parameterSets.add(parameters);
+                }
+
+                {
+                    List<String> parameters = new ArrayList<String>();
+                    parameters.add("RAM_MODE=TDP");
+                    parameters.add("WRITE_WIDTH_A=0");
+                    parameters.add("WRITE_WIDTH_B=0");
+                    parameters.add("DOA_REG=0");
+                    parameters.add("DOB_REG=0");
+                    parameterSets.add(parameters);
+                }
+
+                {
+                    List<String> parameters = new ArrayList<String>();
+                    parameters.add("RAM_MODE=TDP");
+                    parameters.add("WRITE_WIDTH_A=0");
+                    parameters.add("WRITE_WIDTH_B=0");
+                    parameters.add("DOA_REG=0");
+                    parameters.add("DOB_REG=1");
+                    parameterSets.add(parameters);
+                }
+
+                {
+                    List<String> parameters = new ArrayList<String>();
+                    parameters.add("RAM_MODE=TDP");
+                    parameters.add("WRITE_WIDTH_A=0");
+                    parameters.add("WRITE_WIDTH_B=0");
+                    parameters.add("DOA_REG=0");
+                    parameters.add("DOB_REG=0");
+                    parameterSets.add(parameters);
+                }
+            }
+            else if(cellName.equals("RAMB36E1") || cellName.equals("RAMB36E2")) {
+                int[] portWidths = {0, 1, 2, 4, 9, 18, 36};
+                int[] portWidthsNoZero = {1, 2, 4, 9, 18, 36};
+                for(int writeWidthA : portWidthsNoZero) {
+                    for(int writeWidthB : portWidths) {
+                        List<String> parameters = new ArrayList<String>();
+                        parameters.add(String.format("WRITE_WIDTH_A=%d", writeWidthA));
+                        parameters.add(String.format("WRITE_WIDTH_B=%d", writeWidthB));
+                        parameters.add("RAM_MODE=TDP");
+                        parameters.add("DOA_REG=0");
+                        parameters.add("DOB_REG=0");
+
+                        parameterSets.add(parameters);
+                    }
+                }
+
+                {
+                    List<String> parameters = new ArrayList<String>();
+                    parameters.add("RAM_MODE=SDP");
+                    parameters.add("WRITE_WIDTH_A=0");
+                    parameters.add("WRITE_WIDTH_B=72");
+                    parameters.add("DOA_REG=0");
+                    parameters.add("DOB_REG=0");
+                    parameterSets.add(parameters);
+                }
+
+                {
+                    List<String> parameters = new ArrayList<String>();
+                    parameters.add("RAM_MODE=TDP");
+                    parameters.add("WRITE_WIDTH_A=1");
+                    parameters.add("WRITE_WIDTH_B=0");
+                    parameters.add("DOA_REG=1");
+                    parameters.add("DOB_REG=0");
+                    parameterSets.add(parameters);
+                }
+
+                {
+                    List<String> parameters = new ArrayList<String>();
+                    parameters.add("RAM_MODE=TDP");
+                    parameters.add("WRITE_WIDTH_A=1");
+                    parameters.add("WRITE_WIDTH_B=0");
+                    parameters.add("DOA_REG=0");
+                    parameters.add("DOB_REG=0");
+                    parameterSets.add(parameters);
+                }
+
+                {
+                    List<String> parameters = new ArrayList<String>();
+                    parameters.add("RAM_MODE=TDP");
+                    parameters.add("WRITE_WIDTH_A=1");
+                    parameters.add("WRITE_WIDTH_B=0");
+                    parameters.add("DOA_REG=0");
+                    parameters.add("DOB_REG=1");
+                    parameterSets.add(parameters);
+                }
+
+
+                /* FIXME: https://github.com/SymbiFlow/RapidWright/issues/2
+                 {
+                    List<String> parameters = new ArrayList<String>();
+                    parameters.add("RAM_MODE=TDP");
+                    parameters.add("WRITE_WIDTH_A=0");
+                    parameters.add("WRITE_WIDTH_B=0");
+                    parameters.add("DOA_REG=0");
+                    parameters.add("DOB_REG=0");
+                    parameterSets.add(parameters);
+                }*/
+            } else if(cellName.equals("IDDR") || cellName.equals("IDDR_2CLK") || cellName.equals("ODDR")) {
+                {
+                    List<String> parameters = new ArrayList<String>();
+                    parameters.add("__SRVAL=FALSE");
+                    parameterSets.add(parameters);
+                }
+                {
+                    List<String> parameters = new ArrayList<String>();
+                    parameters.add("__SRVAL=TRUE");
+                    parameterSets.add(parameters);
+                }
+
+            } else if(cellName.equals("URAM288")) {
+                {
+                    List<String> parameters = new ArrayList<String>();
+                    parameters.add("EN_ECC_RD_A=FALSE");
+                    parameters.add("EN_ECC_WR_A=FALSE");
+                    parameterSets.add(parameters);
+                }
+                {
+                    List<String> parameters = new ArrayList<String>();
+                    parameters.add("EN_ECC_RD_B=FALSE");
+                    parameters.add("EN_ECC_WR_B=FALSE");
+                    parameterSets.add(parameters);
+                }
+                {
+                    List<String> parameters = new ArrayList<String>();
+                    parameters.add("EN_ECC_RD_A=FALSE");
+                    parameters.add("EN_ECC_WR_A=FALSE");
+                    parameters.add("EN_ECC_RD_B=FALSE");
+                    parameters.add("EN_ECC_WR_B=FALSE");
+                    parameterSets.add(parameters);
+                }
+            } else {
+                parameterSets.add(new ArrayList<String>());
+            }            
         }
 
         return parameterSets;
@@ -650,6 +715,7 @@ public class EnumerateCellBelMapping {
             }
         }
 
+        Series series = design.getDevice().getSeries();
         design.removeCell(physCell);
         topLevelCell.removeCellInst(cellInst);
         physCell = null;
@@ -664,7 +730,7 @@ public class EnumerateCellBelMapping {
                 continue;
             }
 
-            for(List<String> parameters : getParametersFor(cell.getName())) {
+            for(List<String> parameters : getParametersFor(series, cell.getName())) {
                 for(Site site : siteMap.get(siteType)) {
                     SiteInst siteInst = design.createSiteInst("test_site", siteType, site);
 
