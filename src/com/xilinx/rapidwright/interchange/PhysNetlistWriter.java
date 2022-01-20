@@ -65,8 +65,8 @@ public class PhysNetlistWriter {
         
     }
     
-    protected static final String LOCKED = "<LOCKED>";
-    protected static final String PORT = "<PORT>";
+    public static final String LOCKED = "<LOCKED>";
+    public static final String PORT = "<PORT>";
     
     protected static String getUniqueLockedCellName(Cell cell, HashMap<String,PhysCellType> physCells) {
         String cellName = cell.getName();

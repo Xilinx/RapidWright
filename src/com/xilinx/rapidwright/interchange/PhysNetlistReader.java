@@ -65,21 +65,12 @@ public class PhysNetlistReader {
     protected static final String DISABLE_AUTO_IO_BUFFERS = "DISABLE_AUTO_IO_BUFFERS";
     protected static final String OUT_OF_CONTEXT = "OUT_OF_CONTEXT";
 
-    private static final String STATIC_SOURCE = "STATIC_SOURCE";
-    private static int tieoffInstanceCount = 0;
-
-    public static Design readPhysNetlist(PhysNetlist.Reader physNetlist, Design design, boolean skipChecks) {
-        EDIFNetlist netlist = design.getNetlist();
+    public static Design readPhysNetlist(PhysNetlist.Reader physNetlist, EDIFNetlist netlist, boolean skipChecks) {
+        Design design = new Design();
+        design.setNetlist(netlist);
 
         if (physNetlist.hasPart()) {
-            if (design.getPartName() != null) {
-                design.setPartName(physNetlist.getPart().toString());
-            } else {
-                if (!physNetlist.getPart().toString().equals(design.getPartName())) {
-                    throw new RuntimeException("ERROR: Design targets '" + design.getPartName() +
-                            "' but PhysNetlist targets '" + physNetlist.getPart() + "'");
-                }
-            }
+            design.setPartName(physNetlist.getPart().toString());
         }
 
         Enumerator<String> allStrings = readAllStrings(physNetlist);
@@ -104,9 +95,6 @@ public class PhysNetlistReader {
     }
 
     public static Design readPhysNetlist(String physNetlistFileName, EDIFNetlist netlist) throws IOException {
-        Design design = new Design();
-        design.setNetlist(netlist);
-
         ReaderOptions rdOptions =
                 new ReaderOptions(ReaderOptions.DEFAULT_READER_OPTIONS.traversalLimitInWords * 64,
                         ReaderOptions.DEFAULT_READER_OPTIONS.nestingLimit * 128);
@@ -114,7 +102,7 @@ public class PhysNetlistReader {
 
         PhysNetlist.Reader physNetlist = readMsg.getRoot(PhysNetlist.factory);
 
-        return readPhysNetlist(physNetlist, design, false);
+        return readPhysNetlist(physNetlist, netlist, false);
     }
 
     public static Enumerator<String> readAllStrings(PhysNetlist.Reader physNetlist){
@@ -437,14 +425,8 @@ public class PhysNetlistReader {
             }
             case SITE_PIN: {
                 PhysSitePin.Reader spReader = segment.getSitePin();
-                SiteInst siteInst = getSiteInst(spReader.getSite(), design, strings);
+                SiteInst siteInst = getSiteInst(spReader.getSite(), design, strings, net.isStaticNet());
                 String pinName = strings.get(spReader.getPin());
-                if(siteInst == null && net.isStaticNet()){
-                    Site site = design.getDevice().getSite(strings.get(spReader.getSite()));
-                    siteInst = new SiteInst(STATIC_SOURCE + tieoffInstanceCount++, site.getSiteTypeEnum());
-                    siteInst.place(site);
-                }
-
                 net.addPin(new SitePinInst(pinName, siteInst), false);
 
                 assert(routeThruLutInput == null);
@@ -480,6 +462,10 @@ public class PhysNetlistReader {
     }
 
     private static SiteInst getSiteInst(int stringIdx, Design design, Enumerator<String> strings) {
+        return getSiteInst(stringIdx, design, strings, false);
+    }
+
+    private static SiteInst getSiteInst(int stringIdx, Design design, Enumerator<String> strings, boolean createIfNotFound) {
         String siteName = strings.get(stringIdx);
         Site site = design.getDevice().getSite(siteName);
         if(site == null) {
@@ -487,9 +473,9 @@ public class PhysNetlistReader {
                     " found while parsing routing");
         }
         SiteInst siteInst = design.getSiteInstFromSite(site);
-        if(siteInst == null && site.getSiteTypeEnum() == SiteTypeEnum.TIEOFF) {
+        if(siteInst == null && (site.getSiteTypeEnum() == SiteTypeEnum.TIEOFF || createIfNotFound)) {
             // Create a dummy TIEOFF SiteInst
-            siteInst = new SiteInst(STATIC_SOURCE + tieoffInstanceCount++, site.getSiteTypeEnum());
+            siteInst = new SiteInst(SiteInst.STATIC_SOURCE + "_" + site.getName(), site.getSiteTypeEnum());
             siteInst.place(site);
         }
         return siteInst;
