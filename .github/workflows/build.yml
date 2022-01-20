@@ -36,7 +36,6 @@ jobs:
         with:
           path: |
               data
-              jars
           key: rapidwright-clouddata-v2-${{ env.RAPIDWRIGHT_VERSION }}
 
       - name: Install Python Dependencies
