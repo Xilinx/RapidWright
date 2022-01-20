@@ -19,21 +19,23 @@ public class TestCellBELMappings {
         DeviceResources.Device.Builder devBuilder = message.initRoot(DeviceResources.Device.factory);
         EnumerateCellBelMapping.populateAllPinMappings(device.getName(), device, devBuilder, allStrings);
         
-        boolean foundIDDR = false;
+        boolean foundIDDRS = false;
+        boolean foundIDDRR = false;
         for(int i=0; i < devBuilder.getCellBelMap().size(); i++) {
             CellBelMapping.Builder mapping = devBuilder.getCellBelMap().get(i);
             if(allStrings.get(mapping.getCell()).equals("IDDR")) {
-                foundIDDR = true;
                 Assertions.assertTrue(mapping.hasParameterPins());
-                for(ParameterCellBelPinMaps.Builder paramPins : mapping.getParameterPins()) {
+               for(ParameterCellBelPinMaps.Builder paramPins : mapping.getParameterPins()) {
                     for(CellBelPinEntry.Builder pinObj : paramPins.getPins()) {
                         Assertions.assertEquals(allStrings.get(pinObj.getBelPin()), "SR");
                         String cellPinName = allStrings.get(pinObj.getCellPin());
-                        Assertions.assertTrue(cellPinName.equals("S") || cellPinName.equals("R"));  
+                        foundIDDRS = foundIDDRS || cellPinName.equals("S");
+                        foundIDDRR = foundIDDRR || cellPinName.equals("R");
                     }
                 }
             }
         }
-        Assertions.assertTrue(foundIDDR);
+        Assertions.assertTrue(foundIDDRS);
+        Assertions.assertTrue(foundIDDRR);
     }
 }
