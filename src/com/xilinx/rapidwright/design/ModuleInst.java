@@ -25,6 +25,8 @@ package com.xilinx.rapidwright.design;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -36,6 +38,7 @@ import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.util.MessageGenerator;
+import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.Utils;
 
 /**
@@ -58,6 +61,13 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 	private ArrayList<SiteInst> instances;
 	/** A list of all nets internal to this module instance */
 	private ArrayList<Net> nets;
+
+	private List<SiteInst> staticSources;
+	
+	private boolean hasBeenPlaced = false;
+	
+	private Map<NetType, List<Pair<PIP, Tile>>> staticPIPs;
+
 	
 	/**
 	 * Constructor initializing instance module name
@@ -350,6 +360,35 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 				net.addPIP(newPip);
 			}
 		}
+		
+		if(staticSources != null) {
+		    for(SiteInst staticSource : staticSources) {
+		        Site templateSite = staticSource.getModuleTemplateInst().getSite();
+	            Tile newTile = module.getCorrespondingTile(templateSite.getTile(), newAnchorSite.getTile(), dev);
+	            Site newSite = templateSite.getCorrespondingSite(staticSource.getSiteTypeEnum(), newTile);
+	            staticSource.place(newSite);
+		    }
+		}
+		if(staticPIPs != null) {
+		    for(Entry<NetType,List<Pair<PIP, Tile>>> e : staticPIPs.entrySet()) {
+		        if(!hasBeenPlaced) {
+		            Net topStaticNet = getDesign().getStaticNet(e.getKey());
+		            for(Pair<PIP, Tile> pair : e.getValue()) {
+		                topStaticNet.getPIPs().add(pair.getFirst());   
+		            }
+		        }
+		        for(Pair<PIP, Tile> pair : e.getValue()) {
+	                Tile templatePipTile = pair.getSecond();
+	                Tile newPipTile = module.getCorrespondingTile(templatePipTile, newAnchorSite.getTile(), dev);
+	                if(newPipTile == null){
+	                    throw new RuntimeException("ERROR: Problem relocating "+e.getKey()+" routing with PIP: " + pair );
+	                }
+	                pair.getFirst().setTile(newPipTile);
+		        }
+		    }
+		}
+		
+		hasBeenPlaced = true;
 		return true;
 	}
 	
@@ -372,6 +411,7 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 	 * for a new anchor location.
 	 * @param templateTile The tile in the module which acts as a template.
 	 * @param newAnchorTile This is the tile of the new anchor instance of the module instance.
+	 * @param dev The device which corresponds to this module instance.
 	 * @return The new tile of the module instance which corresponds to the templateTile, or null
 	 * if none exists.
 	 */
@@ -639,6 +679,16 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 		for (SitePinInst inPin : getCorrespondingPins(inPort)) {
 			physicalNet.addPin(inPin);
 		}
+	}
+
+	protected void addStaticSource(SiteInst staticSource) {
+	    if(staticSources == null) staticSources = new ArrayList<>();
+	    staticSources.add(staticSource);
+	}
+	
+	protected void addStaticPIPs(NetType type, List<Pair<PIP, Tile>> pips) {
+		if (staticPIPs == null) staticPIPs = new HashMap<>();
+		staticPIPs.put(type, pips);
 	}
 
 	@Override
