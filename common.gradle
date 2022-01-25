@@ -29,11 +29,6 @@ tasks.withType(Test) {
   maxHeapSize = "5G"
   //Propagate JVM settings to test JVM
   jvmArgs applicationDefaultJvmArgs
-  environment 'RAPIDWRIGHT_PATH',file('.')
-  //We need to rerun tests when the data files change
-  if (file('data').exists()) {
-    inputs.dir file('data')
-  }
 }
 
 task testJava(type:Test) {
@@ -43,34 +38,8 @@ task testJava(type:Test) {
   useJUnitPlatform()
 }
 
-task testPython(type:Test) {
-  group = "verification"
-  description = "Runs the Python unit tests."
-  doFirst {
-    // Necessary because gradle will try and match against Java tests
-    filter.setFailOnNoMatchingTests(false)
-  }
-  doLast {
-    exec {
-      environment 'CLASSPATH', sourceSets.main.runtimeClasspath.getAsPath()
-      executable = 'python3'
-      args = ['-m', 'pytest', '--junitxml', "$buildDir/test-results/testPython/testPython.xml", '--rootdir', 'python/test']
-      // Enable verbose flag which prints out a pass/fail for every test
-      args += ['-v']
-      // Prevent python/tests/... with the same namespace as in Java from clobbering
-      args += ['--import-mode=importlib']
-      // Workaround from https://github.com/jpype-project/jpype/issues/842#issuecomment-847027355
-      args += ['-p', 'no:faulthandler']
-      if (!filter.commandLineIncludePatterns.isEmpty()) {
-        args += ['--pyargs'] + filter.commandLineIncludePatterns.stream().map((p) -> 'python.test.' + p).collect(Collectors.toList())
-      }
-    }
-  }
-}
-
 test {
   dependsOn testJava
-  dependsOn testPython
 }
 
 gradle.taskGraph.whenReady {
@@ -96,7 +65,7 @@ task initSubmodules {
 
 task remindSubmodules {
   onlyIf {
-    testJava.state.failure != null || testPython.state.failure != null
+    testJava.state.failure != null || (project.tasks.findByName('testPython') && testPython.state.failure != null)
   }
   doLast {
     logger.warn('Failed tests detected. Some tests depend on DCPs from the git submodule at test/RapidWrightDCP, consider checking its status and updating with \'gradlew updateSubmodules\'')

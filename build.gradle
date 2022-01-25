@@ -8,20 +8,6 @@ apply from: 'common.gradle'
 
 mainClassName = "com.xilinx.rapidwright.MainEntrypoint"
 
-sourceSets {
-  main {
-    java.destinationDirectory.fileValue(file('bin'))
-    java {
-      srcDirs = ['src']
-    }
-  }
-  test {
-    java {
-      srcDirs = ['test']
-    }
-  }
-}
-
 def os = System.getProperty("os.name").toLowerCase().contains("windows") ?
                                        "win64-msvc2005x64" : "linux64-gcc"
 def sw = new StringWriter()
@@ -46,6 +32,28 @@ dependencies {
     api 'com.xilinx.rapidwright:qtjambi-'+os+':4.5.2_01'
     api 'com.xilinx.rapidwright:jupyter-kernel-jsr223:1.0.0'
     api 'com.xilinx.rapidwright:rapidwright-api-lib:' + rapidwright_version
+}
+
+sourceSets {
+  main {
+    java.destinationDirectory.fileValue(file('bin'))
+    java {
+      srcDirs = ['src']
+    }
+  }
+  test {
+    java {
+      srcDirs = ['test']
+    }
+  }
+}
+
+tasks.withType(Test) {
+  environment 'RAPIDWRIGHT_PATH',file('.')
+  //We need to rerun tests when the data files change
+  if (file('data').exists()) {
+    inputs.dir file('data')
+  }
 }
 
 task copyJars(type: Copy) {
@@ -156,5 +164,39 @@ signing {
     }
     sign configurations.archives
     sign publishing.publications.mavenJava
+}
+
+task testPython(type:Test) {
+  group = "verification"
+  description = "Runs the Python unit tests."
+  doFirst {
+    // Necessary because gradle will try and match against Java tests
+    filter.setFailOnNoMatchingTests(false)
+  }
+  doLast {
+    exec {
+      if (project.gradle.parent == null) {
+        environment 'CLASSPATH', sourceSets.main.runtimeClasspath.getAsPath()
+        executable = 'python3'
+        args = ['-m', 'pytest', '--junitxml', '$buildDir/test-results/testPython/testPython.xml']
+        args += ['--rootdir', 'python/test']
+        // Enable verbose flag which prints out a pass/fail for every test
+        args += ['-v']
+        // Prevent python/tests/... with the same namespace as in Java from clobbering
+        args += ['--import-mode=importlib']
+        // Workaround from https://github.com/jpype-project/jpype/issues/842#issuecomment-847027355
+        args += ['-p', 'no:faulthandler']
+        if (!filter.commandLineIncludePatterns.isEmpty()) {
+          args += ['--pyargs'] + filter.commandLineIncludePatterns.stream().map((p) -> 'python.test.' + p).collect(Collectors.toList())
+        }
+      } else {
+        logger.warn("'testPython' cannot be run within a composite build yet. Ignoring.")
+      }
+    }
+  }
+}
+
+test {
+  dependsOn testPython
 }
 
