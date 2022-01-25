@@ -37,7 +37,6 @@ public class DefaultDesignMerger extends AbstractDesignMerger {
             return false;
         }
         
-        
         if(!srcs0.get(0).getFullName().equals(srcs1.get(0).getFullName())) {
             if(!srcs0.get(0).isTopLevelPort() && !srcs1.get(0).isTopLevelPort()) {
                 return false;
@@ -48,9 +47,6 @@ public class DefaultDesignMerger extends AbstractDesignMerger {
 
     @Override
     public void mergePorts(EDIFPort p0, EDIFPort p1) {
-        if(p0.getName().startsWith("C_drain_IO_L1_out1020_U0_fifo_C_drain_out_V_V_din_pass_0")) {
-            System.out.println();
-        }
         if(!p0.isBusRangeEqual(p1)) {
             // TODO - Perhaps there are future use cases where disjoint ranges could be 
             // merged, but we'll leave that exercise for another day
@@ -137,9 +133,6 @@ public class DefaultDesignMerger extends AbstractDesignMerger {
 
     @Override
     public void mergeLogicalNets(EDIFNet n0, EDIFNet n1) {
-        if(n0.getName().equals("C_drain_IO_L1_out1020_U0_fifo_C_drain_out_V_V_din_pass_0_q0[27]")) {
-            System.out.println();
-        }
         if(!checkIfNetSourcesMergeCompatible(n0, n1)) {
             throw new RuntimeException("ERROR: Uncompatible nets to merge: " + n0);
         }
@@ -175,9 +168,6 @@ public class DefaultDesignMerger extends AbstractDesignMerger {
     
     @Override
     public void mergeCellInsts(EDIFCellInst i0, EDIFCellInst i1) {
-        if(i0.getName().equals("C_drain_IO_L1_out1020_U0_fifo_C_drain_out_V_V_din_pass_0_q0_reg[27]")) {
-            System.out.println();
-        }
         if(!i0.getCellType().getName().equals(i1.getCellType().getName())) {
             throw new RuntimeException("ERROR: Cell type mismatch for instance " + i0.getName());
         }
