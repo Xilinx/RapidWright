@@ -187,7 +187,7 @@ public class EDIFPortInst {
 		return port;
 	}
 	
-	protected void setPort(EDIFPort port){
+	public void setPort(EDIFPort port){
 		this.port = port;
 	}
 	
