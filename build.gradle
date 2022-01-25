@@ -1,28 +1,12 @@
-import java.util.stream.Collectors
-
 plugins {
     id 'java'
     id 'maven-publish'
-    id 'application'
-    id 'java-library'
     id 'signing'
 }
 
+apply from: 'common.gradle'
 
 mainClassName = "com.xilinx.rapidwright.MainEntrypoint"
-
-def os = System.getProperty("os.name").toLowerCase().contains("windows") ?
-                                       "win64-msvc2005x64" : "linux64-gcc"
-def sw = new StringWriter()
-def get_rapidwright_version_line = new File('.github/workflows/build.yml').filterLine(sw) { 
-    line -> line.contains('RAPIDWRIGHT_VERSION:') 
-}
-def rapidwright_version = sw.toString().replace("RAPIDWRIGHT_VERSION: v", "").replace("-beta", "").trim()
-
-
-configurations.implementation.canBeResolved = true
-configurations.testImplementation.canBeResolved = true
-configurations.api.canBeResolved = true
 
 sourceSets {
   main {
@@ -38,9 +22,13 @@ sourceSets {
   }
 }
 
-repositories {
-    mavenCentral()
+def os = System.getProperty("os.name").toLowerCase().contains("windows") ?
+                                       "win64-msvc2005x64" : "linux64-gcc"
+def sw = new StringWriter()
+def get_rapidwright_version_line = file('.github/workflows/build.yml').filterLine(sw) { 
+    line -> line.contains('RAPIDWRIGHT_VERSION:') 
 }
+def rapidwright_version = sw.toString().replace("RAPIDWRIGHT_VERSION: v", "").replace("-beta", "").trim()
 
 dependencies {
     api 'com.esotericsoftware:kryo:5.2.1'
@@ -58,29 +46,7 @@ dependencies {
     api 'com.xilinx.rapidwright:qtjambi-'+os+':4.5.2_01'
     api 'com.xilinx.rapidwright:jupyter-kernel-jsr223:1.0.0'
     api 'com.xilinx.rapidwright:rapidwright-api-lib:' + rapidwright_version
-    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.7.1'
-    testImplementation 'org.junit.jupiter:junit-jupiter-engine:5.7.1'
-    testImplementation 'org.junit.jupiter:junit-jupiter-params:5.7.1'
 }
-
-//Kryo needs to access sun.nio.ch.DirectBuffer. This is forbidden by default in Java 16 and up. Check if we need to add a jvm arg.
-if (org.gradle.api.JavaVersion.current().isJava10Compatible()) {
-	applicationDefaultJvmArgs = ["--add-exports=java.base/sun.nio.ch=ALL-UNNAMED"]
-}
-
-tasks.withType(Test) {
-  maxHeapSize = "5G"
-  //Propagate JVM settings to test JVM
-  jvmArgs applicationDefaultJvmArgs
-  environment 'RAPIDWRIGHT_PATH',file('.')
-  //We need to rerun tests when the data files change
-  if (file('data').exists()) {
-    inputs.dir file('data')
-  }
-}
-
-sourceCompatibility = 8
-targetCompatibility = 8
 
 task copyJars(type: Copy) {
     from configurations.implementation
@@ -123,6 +89,7 @@ task javadocJar(type: Jar) {
     from javadoc
     archiveClassifier = rapidwright_version + "-javadoc"
 }
+
 task standaloneJar (type: Jar) {
     duplicatesStrategy = DuplicatesStrategy.WARN
     manifest {
@@ -132,6 +99,7 @@ task standaloneJar (type: Jar) {
     from { configurations.implementation.collect { it.isDirectory() ? it : zipTree(it) } }
     with jar
 }
+
 artifacts {
     archives javadocJar
     archives sourceJar
@@ -188,77 +156,5 @@ signing {
     }
     sign configurations.archives
     sign publishing.publications.mavenJava
-}
-
-task testJava(type:Test) {
-  group = "verification"
-  description = "Runs the Java unit tests."
-
-  useJUnitPlatform()
-}
-
-task testPython(type:Test) {
-  group = "verification"
-  description = "Runs the Python unit tests."
-  doFirst {
-    // Necessary because gradle will try and match against Java tests
-    filter.setFailOnNoMatchingTests(false)
-  }
-  doLast {
-    exec {
-      environment 'CLASSPATH', sourceSets.main.runtimeClasspath.getAsPath()
-      executable = 'python3'
-      args = ['-m', 'pytest', '--junitxml', "$buildDir/test-results/testPython/testPython.xml", '--rootdir', 'python/test']
-      // Enable verbose flag which prints out a pass/fail for every test
-      args += ['-v']
-      // Prevent python/tests/... with the same namespace as in Java from clobbering
-      args += ['--import-mode=importlib']
-      // Workaround from https://github.com/jpype-project/jpype/issues/842#issuecomment-847027355
-      args += ['-p', 'no:faulthandler']
-      if (!filter.commandLineIncludePatterns.isEmpty()) {
-        args += ['--pyargs'] + filter.commandLineIncludePatterns.stream().map((p) -> 'python.test.' + p).collect(Collectors.toList())
-      }
-    }
-  }
-}
-
-test {
-  dependsOn testJava
-  dependsOn testPython
-}
-
-gradle.taskGraph.whenReady {
-  if (!project.test.filter.commandLineIncludePatterns.isEmpty()) {
-    throw new InvalidUserDataException("'test' task does not support filters (i.e. '--tests' option); please apply filters directly to 'testJava'/'testPython' tasks instead.")
-  }
-}
-
-task updateSubmodules(type:Exec) {
-  group = "build setup"
-  description = "Update Git submodules"
-  executable = 'git'
-  args = ['submodule', 'update', '--init', '--recursive']
-}
-
-task initSubmodules {
-  group = "build setup"
-  description = "Init Git submodules (first time only)"
-  if (!file("test/RapidWrightDCP/.git").exists()) {
-    dependsOn updateSubmodules
-  }
-}
-
-task remindSubmodules {
-  onlyIf {
-    testJava.state.failure != null || testPython.state.failure != null
-  }
-  doLast {
-    logger.warn('Failed tests detected. Some tests depend on DCPs from the git submodule at test/RapidWrightDCP, consider checking its status and updating with \'gradlew updateSubmodules\'')
-  }
-}
-
-tasks.withType(Test) {
-  dependsOn initSubmodules
-  finalizedBy remindSubmodules
 }
 
