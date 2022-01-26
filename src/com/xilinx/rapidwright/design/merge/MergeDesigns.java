@@ -7,6 +7,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -19,6 +20,7 @@ import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFPort;
+import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 
 /**
@@ -46,6 +48,11 @@ public class MergeDesigns {
             EDIFNet net0 = topCell0.getNet(net1);
             if(net0 == null) {
                 topCell0.addNet(net1);
+                for(EDIFPortInst inst : net1.getPortInsts()) {
+                    if(inst.isTopLevelPort() && inst.getPort().getParentCell() == topCell0) {
+                        topCell0.addInternalPortMapEntry(inst.getPortInstNameFromPort(), net1);
+                    }
+                }
             } else {
                 merger.mergeLogicalNets(net0, net1);
             }
@@ -90,7 +97,7 @@ public class MergeDesigns {
     }
 
     public static Design mergeDesigns(Design...designs) {
-        return mergeDesigns(new DefaultDesignMerger(), designs);
+        return mergeDesigns(() -> new DefaultDesignMerger(), designs);
     }
 
     /**
@@ -104,13 +111,13 @@ public class MergeDesigns {
      * @return The merged design that contains the superset of all logic, placement and routing of
      * the input designs.  
      */
-    public static Design mergeDesigns(AbstractDesignMerger merger, Design...designs) {
+    public static Design mergeDesigns(Supplier<AbstractDesignMerger> merger, Design...designs) {
         Design result = null;
         for(Design design : designs) {
             if(result == null) {
                 result = design;
             }else {
-                result = mergeDesigns(result, design, merger);
+                result = mergeDesigns(result, design, merger.get());
             }
         }
         

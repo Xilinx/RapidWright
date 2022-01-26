@@ -110,7 +110,7 @@ public class EDIFPortInst {
 		
 	}
 	
-	protected String getPortInstNameFromPort(){
+	public String getPortInstNameFromPort(){
 		return port.getPortInstNameFromPort(index);
 	}
 	
