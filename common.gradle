@@ -7,6 +7,10 @@ targetCompatibility = 8
 def rapidwrightDir = System.getenv("RAPIDWRIGHT_PATH")
 
 repositories {
+    if (project.hasProperty('useMavenLocal') && useMavenLocal == "True") {
+       project.logger.lifecycle('Using Maven Local Repository')
+       mavenLocal()
+    }
     mavenCentral()
 }
 
