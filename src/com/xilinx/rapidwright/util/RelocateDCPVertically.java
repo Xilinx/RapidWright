@@ -20,6 +20,7 @@ import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Module;
 import com.xilinx.rapidwright.design.ModuleInst;
 import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
@@ -76,7 +77,8 @@ public class RelocateDCPVertically {
             Tile toTile = frTile.getTileNeighbor(0,verticalMoveOffset);
             Site toSite = toTile.getSites()[frTile.getSiteIndex(frSite)];
             System.out.printf("     to %12s  y_offset %4d : anchor %14s  %14s\n", cell.getSecond(), verticalMoveOffset, toSite, toTile);
-            if(!mod.isValidPlacement(toSite, top, clearTgtSiteInst)){
+            clearTargetSiteInsts(mod, toSite, top);
+            if(!mod.isValidPlacement(toSite, top)){
                 System.out.println("Invalid placement.");
                 return false;
             }
@@ -89,6 +91,43 @@ public class RelocateDCPVertically {
         return true;
     }
 
+
+    private static Site getCorrespondingValidSite(Module mod, SiteInst inst, Site anchorSite) {
+        Site site = inst.getSite();
+        Tile newTile = mod.getCorrespondingTile(site.getTile(), anchorSite.getTile());
+        if(newTile == null){
+            return null;
+        }
+        Site newSite = site.getCorrespondingSite(inst.getSiteTypeEnum(), newTile);
+        if(newSite == null){
+            return null;
+        }
+        return newSite;
+    }
+
+    /**
+     * Unplace existing SiteInts already placed at the proposed locations.
+     * @param proposedAnchorSite The proposed new anchor site
+     * @param design The design to operate on
+     * @return False if an invalid Tile or Site is encountered. True otherwise.
+     */
+    private static boolean clearTargetSiteInsts(Module mod, Site proposedAnchorSite, Design design){
+
+        for(SiteInst inst : mod.getSiteInsts()){
+            if(Utils.isLockedSiteType(inst.getSiteTypeEnum())){
+                continue;
+            }
+
+            Site newSite = getCorrespondingValidSite(mod, inst, proposedAnchorSite);
+
+            SiteInst si = design.getSiteInstFromSite(newSite);
+            if(design != null &&  si != null){
+                design.removeSiteInst(si);
+            }
+        }
+
+        return true;
+    }
 
     public static boolean isClockNet(Net net) {
         for(SitePinInst sink : net.getSinkPins()) {
@@ -285,7 +324,7 @@ public class RelocateDCPVertically {
 
         // fill the black boxes
         Design top = Design.readCheckpoint(topDCPName + ".dcp", topDCPName + ".edf");
-        Module mod = new Module(Design.readCheckpoint(cellDCPName + ".dcp", cellDCPName + ".edf"));
+        Module mod = new Module(Design.readCheckpoint(cellDCPName + ".dcp", cellDCPName + ".edf"), false);
         if (relocateCell(top, mod, cellAnchor, targets)) {
 
             top.getNetlist().resetParentNetMap();
