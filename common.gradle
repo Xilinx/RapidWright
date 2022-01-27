@@ -4,7 +4,7 @@ apply plugin: 'java-library'
 sourceCompatibility = 8
 targetCompatibility = 8
 
-def rapidwrightDir = System.getenv("RAPIDWRIGHT_PATH")
+def rapidwrightDir = System.getenv("RAPIDWRIGHT_PATH") ? System.getenv("RAPIDWRIGHT_PATH") : file('.').toString()
 
 repositories {
     if (project.hasProperty('useMavenLocal') && useMavenLocal == "True") {

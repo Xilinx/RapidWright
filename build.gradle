@@ -4,10 +4,6 @@ plugins {
     id 'signing'
 }
 
-if (System.getenv('RAPIDWRIGHT_PATH') == null) {
-  throw new GradleException('RAPIDWRIGHT_PATH environment variable not set')
-}
-
 apply from: 'common.gradle'
 
 mainClassName = "com.xilinx.rapidwright.MainEntrypoint"
