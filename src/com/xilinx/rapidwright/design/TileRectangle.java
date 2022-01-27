@@ -12,7 +12,7 @@ import java.util.stream.Collector;
  * A Rectangle of tiles, i.e. a Bounding Box around some Set of Tiles.
  *
  * The tiles at the edge of the rectangle (e.g. at minX/minY and maxX/maxY) are all assumed to be inside the rectangle.
- * For both X and Y: min <= Tiles <= max
+ * For both X and Y: {@code min <= Tiles <= max}
  *
  * The way to store tiles is set by subclasses. Depending on the storage method, they may or may not be relocatable
  */

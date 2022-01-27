@@ -313,8 +313,8 @@ public class TimingModel {
      *
      * @param startPinInst Source SitePinInst from the Net.
      * @param endPinInst   A selected sink SitePinInst from the Net.
-     * @param startSite    The site containing the source SitePinInst.
-     * @param endSite      The site containing the sink SitePinInst.
+     * @param sourceBELPin    The site BELPin connected to the source SitePinInst.
+     * @param sinkBELPin      The site BELPin connected to the sink SitePinInst.
      * @param net          RapidWright physical "Net" object.
      * @return The estimated delay in picoseconds.
      */

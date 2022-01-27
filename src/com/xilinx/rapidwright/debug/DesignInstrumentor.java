@@ -135,7 +135,6 @@ public class DesignInstrumentor {
 	 * Stitches in the debug unit probes and clock into the user design.
 	 * Specifically, it add the input pin ports of the debug block onto
 	 * the user design nets of interest.
-	 * @return All the pins that will need routing 
 	 */
 	public void stitchProbesOnILA(ModuleInst mi, EDIFCellInst debugCore){
 		EDIFCell topCell = design.getNetlist().getTopCell();

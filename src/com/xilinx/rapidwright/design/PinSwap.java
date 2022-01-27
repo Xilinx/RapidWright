@@ -48,12 +48,14 @@ public class PinSwap {
 	private String newNetPinName;
 
 	/**
-	 * @param logicalName
-	 * @param oldPhysicalName
-	 * @param newPhysicalName
-	 * @param depopulatedLogicalName
-	 * @param net
-	 * @param newNetPinName
+	 * PinSwap constructor
+     * 
+	 * @param c The cell where the pin resides
+	 * @param logicalName The logical name of the pin
+	 * @param oldPhysicalName The previous physical pin mapping
+	 * @param newPhysicalName The new physical pin mapping
+	 * @param depopulatedLogicalName The previous logical pin name that occupied the new physical pin
+	 * @param newNetPinName The new SitePinInst name 
 	 */
 	public PinSwap(Cell c, String logicalName, String oldPhysicalName, String newPhysicalName, String depopulatedLogicalName,
 			String newNetPinName) {

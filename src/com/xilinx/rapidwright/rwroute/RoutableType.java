@@ -23,6 +23,10 @@
 
 package com.xilinx.rapidwright.rwroute;
 
+import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.device.IntentCode;
+import com.xilinx.rapidwright.device.Node;
+
 public enum RoutableType {
 	/** 
 	 * Denotes {@link Routable} Objects that correspond to the output pins of {@link Net} Objects, 
@@ -36,7 +40,7 @@ public enum RoutableType {
 	PINFEED_I,
 	/** 
 	 * Denotes {@link Routable} Objects that are created based on {@link Node} Objects 
-	 * that have an {@link IntentCode} of NODE_PINBOUNCE .
+	 * that have an {@link IntentCode} of NODE_PINBOUNCE.
 	 */
 	PINBOUNCE,
 	/** 

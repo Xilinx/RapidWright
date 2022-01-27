@@ -381,7 +381,7 @@ public class EDIFTools {
 	}
 
 	/**
-	 * Strips off bracket index in a bussed name (ex: "data[0]" --> "data").
+	 * Strips off bracket index in a bussed name (ex: {@code "data[0]" --> "data"}).
 	 * @param name Bracketed bussed name.
 	 * @return Name of bus with brackets removed
 	 */
@@ -910,7 +910,7 @@ public class EDIFTools {
 	}
 	
 	/**
-	 * Bit blasts the shorthand bus name (ex: "data[0:2]" --> ["data0", "data1", "data2"])
+	 * Bit blasts the shorthand bus name (ex: {@code "data[0:2]" --> ["data0", "data1", "data2"]})
 	 * @param bussedSignal The bussed name with bracketed indices
 	 * @return A fully expanded array of strings names or the original name if no brackets are present
 	 */

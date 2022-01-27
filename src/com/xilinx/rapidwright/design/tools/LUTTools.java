@@ -63,7 +63,7 @@ public class LUTTools {
 	
 	/**
 	 * Checks if this cell is a LUT (LUT1, LUT2, LUT3,...). A CFGLUT5 will return false.
-	 * @param c The cell in question
+	 * @param i The cell in question
 	 * @return True if this is a LUT[1-6], false otherwise.
 	 */
 	public static boolean isCellALUT(EDIFCellInst i){
@@ -211,7 +211,7 @@ public class LUTTools {
 	/**
 	 * Evaluates the provided equation in order to create the INIT string
 	 * of a LUT of the given size. Equation syntax:
-	 * 
+	 * {@code 
 	 * Operators: 
 	 *   XOR: @, ^
 	 *   AND: &, *, .
@@ -224,7 +224,7 @@ public class LUTTools {
 	 *   O = (I0 & I1) + (I2 & I3)
 	 *   O = I0 & !I1 & !I3
 	 * 
-	 * 
+	 * }
 	 *  
 	 * NOTE: XOR and AND have the same precedence and are evaluated from left 
 	 * to right. Vivado uses different rules for handling operators of the 

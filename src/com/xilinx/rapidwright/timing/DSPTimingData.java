@@ -32,6 +32,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.xilinx.rapidwright.rwroute.RWRouteConfig;
 import com.xilinx.rapidwright.util.Pair;
 
 /**

@@ -265,7 +265,7 @@ public class FileTools {
 	
 	/**
 	 * Creates a new BufferedWriter that will either write out text or a gzipped
-	 * compressed version of text based on the file extension (*.gz -> gzipped, all
+	 * compressed version of text based on the file extension (*.gz {@code ->} gzipped, all
 	 * others target an uncompressed output.
 	 * @param fileName Name of the output file.  Will be gzipped if has *.gz extension.
 	 * @return The opened BufferedWriter to the named file.
@@ -515,7 +515,7 @@ public class FileTools {
 	 * This is a simple method that will read in a text file and put each line in a
 	 * string and put all the lines in an ArrayList.  The user is cautioned not
 	 * to open extremely large files with this method.
-	 * @param fileName Name of the text file to load into the ArrayList<String>.
+	 * @param fileName Name of the text file to load.
 	 * @return An ArrayList containing strings of each line in the file. 
 	 */
 	public static ArrayList<String> getLinesFromTextFile(String fileName){
@@ -1084,7 +1084,7 @@ public class FileTools {
 	
 	/**
 	 * Gets and returns the path of the folder where the part files resides for deviceName.
-	 * @param deviceName Name of the part to get its corresponding folder path.
+	 * @param part The part to get its corresponding folder path.
 	 * @return The path of the folder where the parts files resides.
 	 */
 	public static String getPartFolderResourceName(Part part){
@@ -1400,8 +1400,7 @@ public class FileTools {
 	/**
 	 * A generic method to run a command from the system command line.
 	 * @param command The command to execute.  This method blocks until the command finishes.
-	 * @param verbose When true, it will first print to std.out the command and also all of the 
-	 * command's output (both std.out and std.err) to std.out.  
+	 * @param logFileName Name of the log file to produce that will capture stderr and stdout.  
 	 * @return The return value of the process if it terminated, if there was a problem it returns null.
 	 */
 	public static Integer runCommand(List<String> command, String logFileName){
@@ -1811,7 +1810,7 @@ public class FileTools {
     }
     
     /**
-     * For Java 16 and below, calling this method will prevent {@link System.exit()} calls from 
+     * For Java 16 and below, calling this method will prevent System.exit() calls from 
      * exiting the JVM and instead throws a {@link SecurityException} in its place.  This method
      * allows for a check to avoid the JVM WARNING message in Java 17.
      */

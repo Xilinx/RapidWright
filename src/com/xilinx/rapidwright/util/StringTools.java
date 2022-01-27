@@ -177,9 +177,9 @@ public class StringTools {
 	/**
 	 * Will insert angle brackets around indexing value
 	 * at the end of a String.  For example:
-	 * input0 --> input<0>
-	 * input10 --> input<10>
-	 * clk --> clk
+	 * {@code input0 --> input<0>}
+	 * {@code input10 --> input<10>}
+	 * {@code clk --> clk}
 	 * @param s The string to which potentially angle brackets will be added
 	 * @return The string with angle bracket around last integer or
 	 * no change if no integer is found.

@@ -57,8 +57,8 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * Generates a delay of <depth> cycles for a bus of <width> w
- * using flip flops.  Can specify <distance> in tiles and set a <direction>.
+ * Generates a delay of {@code <depth>} cycles for a bus of {@code <width>} w
+ * using flip flops.  Can specify {@code <distance>} in tiles and set a {@code <direction>}.
  * @author cneely
  *
  */
