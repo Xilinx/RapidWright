@@ -1,0 +1,106 @@
+apply plugin: 'application'
+apply plugin: 'java-library'
+
+sourceCompatibility = 8
+targetCompatibility = 8
+
+def rapidwrightDir = System.getenv("RAPIDWRIGHT_PATH") ?: file('.').toString()
+
+repositories {
+    if (project.hasProperty('useMavenLocal') && useMavenLocal == "True") {
+       project.logger.lifecycle('Using Maven Local Repository')
+       mavenLocal()
+    }
+    mavenCentral()
+}
+
+ext.os = System.getProperty("os.name").toLowerCase().contains("windows") ?
+                                       "win64-msvc2005x64" : "linux64-gcc"
+
+dependencies {
+  api 'com.esotericsoftware:kryo:5.2.1'
+  api 'org.jgrapht:jgrapht-core:1.3.0'
+  api 'org.capnproto:runtime:0.1.13'
+  api 'net.sf.jopt-simple:jopt-simple:5.0.4'
+  api 'org.python:jython-standalone:2.7.2'
+  api 'com.google.protobuf:protobuf-java:3.11.4'
+  api 'org.jetbrains:annotations:20.1.0'
+  api 'org.zeromq:jeromq:0.5.2'
+  api 'commons-cli:commons-cli:1.2'
+  api 'org.json:json:20160810'
+  api 'com.jcraft:jzlib:1.1.3'
+  api 'commons-io:commons-io:2.11.0'
+  api 'com.xilinx.rapidwright:qtjambi-'+os+':4.5.2_01'
+  api 'com.xilinx.rapidwright:jupyter-kernel-jsr223:1.0.0'
+  testImplementation 'org.junit.jupiter:junit-jupiter-api:5.7.1'
+  testImplementation 'org.junit.jupiter:junit-jupiter-engine:5.7.1'
+  testImplementation 'org.junit.jupiter:junit-jupiter-params:5.7.1'
+}
+
+import java.util.stream.Collectors
+
+//Kryo needs to access sun.nio.ch.DirectBuffer. This is forbidden by default in Java 16 and up. Check if we need to add a jvm arg.
+if (org.gradle.api.JavaVersion.current().isJava10Compatible()) {
+	applicationDefaultJvmArgs = ["--add-exports=java.base/sun.nio.ch=ALL-UNNAMED"]
+}
+
+configurations.implementation.canBeResolved = true
+configurations.testImplementation.canBeResolved = true
+configurations.api.canBeResolved = true
+
+tasks.withType(Test) {
+  maxHeapSize = "5G"
+  //Propagate JVM settings to test JVM
+  jvmArgs applicationDefaultJvmArgs
+  //We need to rerun tests when the data files change
+  if (file(rapidwrightDir + '/data').exists()) {
+    inputs.dir file(rapidwrightDir + '/data')
+  }
+}
+
+task testJava(type:Test) {
+  group = "verification"
+  description = "Runs the Java unit tests."
+
+  useJUnitPlatform()
+}
+
+test {
+  dependsOn testJava
+}
+
+gradle.taskGraph.whenReady {
+  if (!project.test.filter.commandLineIncludePatterns.isEmpty()) {
+    throw new InvalidUserDataException("'test' task does not support filters (i.e. '--tests' option); please apply filters directly to 'testJava'/'testPython' tasks instead.")
+  }
+}
+
+task updateSubmodules(type:Exec) {
+  group = "build setup"
+  description = "Update Git submodules"
+  executable = 'git'
+  args = ['submodule', 'update', '--init', '--recursive']
+}
+
+task initSubmodules {
+  group = "build setup"
+  description = "Init Git submodules (first time only)"
+  if (!file("test/RapidWrightDCP/.git").exists()) {
+    dependsOn updateSubmodules
+  }
+}
+
+task remindSubmodules {
+  onlyIf {
+    testJava.state.failure != null || (project.tasks.findByName('testPython') && testPython.state.failure != null)
+  }
+  doLast {
+    logger.warn('Failed tests detected. Some tests depend on DCPs from the git submodule at test/RapidWrightDCP, consider checking its status and updating with \'gradlew updateSubmodules\'')
+  }
+}
+
+tasks.withType(Test) {
+  dependsOn initSubmodules
+  finalizedBy remindSubmodules
+}
+
