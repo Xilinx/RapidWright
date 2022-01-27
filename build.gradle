@@ -8,8 +8,6 @@ apply from: 'common.gradle'
 
 mainClassName = "com.xilinx.rapidwright.MainEntrypoint"
 
-def os = System.getProperty("os.name").toLowerCase().contains("windows") ?
-                                       "win64-msvc2005x64" : "linux64-gcc"
 def sw = new StringWriter()
 def get_rapidwright_version_line = file('.github/workflows/build.yml').filterLine(sw) { 
     line -> line.contains('RAPIDWRIGHT_VERSION:') 
@@ -31,13 +29,6 @@ sourceSets {
     java {
       srcDirs = ['test']
     }
-  }
-}
-
-tasks.withType(Test) {
-  //We need to rerun tests when the data files change
-  if (file('data').exists()) {
-    inputs.dir file('data')
   }
 }
 

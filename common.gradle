@@ -14,13 +14,8 @@ repositories {
     mavenCentral()
 }
 
-def os = System.getProperty("os.name").toLowerCase().contains("windows") ?
+ext.os = System.getProperty("os.name").toLowerCase().contains("windows") ?
                                        "win64-msvc2005x64" : "linux64-gcc"
-def sw = new StringWriter()
-def get_rapidwright_version_line = new File(rapidwrightDir + '/.github/workflows/build.yml').filterLine(sw) { 
-    line -> line.contains('RAPIDWRIGHT_VERSION:') 
-}
-def rapidwright_version = sw.toString().replace("RAPIDWRIGHT_VERSION: v", "").replace("-beta", "").trim()
 
 dependencies {
   api 'com.esotericsoftware:kryo:5.2.1'
@@ -57,6 +52,10 @@ tasks.withType(Test) {
   maxHeapSize = "5G"
   //Propagate JVM settings to test JVM
   jvmArgs applicationDefaultJvmArgs
+  //We need to rerun tests when the data files change
+  if (file(rapidwrightDir + '/data').exists()) {
+    inputs.dir file(rapidwrightDir + '/data')
+  }
 }
 
 task testJava(type:Test) {
