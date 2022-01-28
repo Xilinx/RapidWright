@@ -80,7 +80,7 @@ public class TimingAndWirelengthReport{
 		
 		Pair<Float, TimingVertex> maxDelayAndTimingVertex = this.timingManager.calculateArrivalRequireTimes();
 		System.out.println();
-		this.timingManager.getCriticalPathInfo(maxDelayAndTimingVertex, this.timingEdgeConnectionMap, false, null);
+		this.timingManager.getCriticalPathInfo(maxDelayAndTimingVertex, false, null);
 		
 		System.out.println("\n");
 		System.out.println("Total nodes: " + this.usedNodes);
@@ -105,7 +105,7 @@ public class TimingAndWirelengthReport{
 				this.wirelength += wl;
 				RouterHelper.addNodeTypeLengthToMap(node, wl, this.nodeTypeUsage, this.nodeTypeLength);	
 			}			
-			RWRoute.setTimingEdgesOfConnections(netplus.getConnections(), this.timingManager, this.timingEdgeConnectionMap);
+			this.timingManager.setTimingEdgesOfConnections(netplus.getConnections());
 			this.setAccumulativeDelayOfEachNetNode(netplus);
 		}
 	}

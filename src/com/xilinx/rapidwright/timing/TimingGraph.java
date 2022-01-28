@@ -52,6 +52,7 @@ import com.xilinx.rapidwright.edif.EDIFName;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFPropertyValue;
+import com.xilinx.rapidwright.rwroute.Connection;
 import com.xilinx.rapidwright.rwroute.RouterHelper;
 import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.RuntimeTrackerTree;
@@ -86,7 +87,11 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     static HashSet<String> unisimFlipFlopTypes;
     static HashSet<String> ramTypes;
 
+    /** A map from TimingEdges to connections */
+	private Map<TimingEdge, Connection> timingEdgeConnectionMap = new HashMap<>();
+    /** Mapping between each sink {@link SitePinInst} instance and its associated {@link TimingEdge} instances */
     private Map<SitePinInst, List<TimingEdge>> sinkSitePinInstTimingEdges = new HashMap<>();
+    /** Mapping between a logic pin and a physical pin recognized by the timing graph builder */
     private Map<EDIFHierPortInst, SitePinInst> edifHPortMap = new HashMap<>();
     private List<TimingVertex> orderedTimingVertice = new ArrayList<>();
     private List<TimingVertex> reversedOrderedTimingVertice = new ArrayList<>();
@@ -382,13 +387,6 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     		}
     	}
     	return null;
-    }
-
-	/**
-     * Gets the mapping between each EDIFHierPortInst (logical pin) and the SitePinInst physical pin.
-     */
-	public Map<EDIFHierPortInst, SitePinInst> getEdifHPortMap(){
-    	return this.edifHPortMap;
     }
     
 	/**
@@ -1887,12 +1885,12 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
             setEdgeWeight(e, e.getDelay());
             
             if(spi_sink != null) {
-                List<TimingEdge> connectionEdges = this.getSinkSitePinInstTimingEdges().get(spi_sink);
+                List<TimingEdge> connectionEdges = this.sinkSitePinInstTimingEdges.get(spi_sink);
                 if(connectionEdges == null) {
                 	connectionEdges = new ArrayList<>();
                 }
                 connectionEdges.add(e);
-            	this.getSinkSitePinInstTimingEdges().put(spi_sink, connectionEdges);
+                this.sinkSitePinInstTimingEdges.put(spi_sink, connectionEdges);
             }
         }
         return 1;
@@ -1964,11 +1962,34 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     protected static int getBit(long value, int bitIndex){
         return (int)(value >> bitIndex) & 0x1;
     }
-
+    
+    public Map<TimingEdge, Connection> getTimingEdgeConnectionMap(){
+    	return this.timingEdgeConnectionMap;
+    }
+	
 	/**
-     * Gets the mapping between each pair of SitePinInsts and a list of the associated TimingEdges in the design
-     */
-	public Map<SitePinInst, List<TimingEdge>> getSinkSitePinInstTimingEdges() {
-		return sinkSitePinInstTimingEdges;
+	 * Assigns {@link TimingEdge} instances to each connection in the list.
+	 * @param connections A list of connections that should be associated with {@link TimingEdge} instances.
+	 * @param timingManager A {@link TimingManager} instance to use.
+	 */
+	public void setTimingEdgesOfConnections(List<Connection> connections) {
+		for(Connection connection : connections) {
+			if(connection.isDirect()) continue;
+			List<EDIFHierPortInst> hportsFromSitePinInsts = DesignTools.getPortInstsFromSitePinInst(connection.getSink());
+			if(hportsFromSitePinInsts.isEmpty()) {
+				throw new RuntimeException("ERROR: Unable to find hierarchical logical cell pins from: " + connection.getSink());
+			}
+			EDIFHierPortInst hportSink = hportsFromSitePinInsts.get(0);
+			SitePinInst mappedSink = this.edifHPortMap.get(hportSink);
+			
+			List<TimingEdge> timingEdges = this.sinkSitePinInstTimingEdges.get(mappedSink);
+			if(timingEdges == null) {
+				throw new RuntimeException("ERROR: No timing edges for connection from: " + connection.getSource() + " to " + connection.getSink());
+			}
+			connection.setTimingEdges(timingEdges);
+			for(TimingEdge edge : connection.getTimingEdges()){
+				this.timingEdgeConnectionMap.put(edge, connection); // for getting critical path delay breakdown in the timing report
+			}
+		}
 	}
 }

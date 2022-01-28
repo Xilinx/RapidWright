@@ -53,8 +53,6 @@ import com.xilinx.rapidwright.util.RuntimeTrackerTree;
 import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.timing.ClkRouteTiming;
-import com.xilinx.rapidwright.timing.TimingEdge;
-import com.xilinx.rapidwright.timing.TimingGraph;
 import com.xilinx.rapidwright.timing.TimingManager;
 import com.xilinx.rapidwright.timing.TimingVertex;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
@@ -67,7 +65,7 @@ import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
 public class RWRoute{
 	/** The design to route */
 	private Design design;
-	/** A variable to indicate if the device of the design is multi-die */
+	/** A flag to indicate if the device has multiple SLRs, for the sake of avoiding unnecessary check for single-SLR devices */
 	private boolean multiSLRDevice;
 	/** Created NetWrappers */
 	private List<NetWrapper> nets;
@@ -169,8 +167,6 @@ public class RWRoute{
 	private Map<Node, Float> nodesDelays;
 	/** The maximum delay and associated timing vertex */
 	private Pair<Float, TimingVertex> maxDelayAndTimingVertex;
-	/** A map from TimingEdges to connections */
-	private Map<TimingEdge, Connection> timingEdgeConnectionMap;
 	
 	/** A map storing routes from CLK_OUT to different INT tiles that connect to sink pins of a global clock net */
 	private Map<String, List<String>> routesToSinkINTTiles;
@@ -220,9 +216,8 @@ public class RWRoute{
 			ClkRouteTiming clkTiming = createClkTimingData(config);
 			this.routesToSinkINTTiles = clkTiming == null? null : clkTiming.getRoutesToSinkINTTiles();
 			this.timingManager = new TimingManager(this.design, true, this.routerTimer, this.config, clkTiming,
-				this.config.isResolveConflictNets() ? this.getConflictNets() : this.design.getNets());
-			this.timingEdgeConnectionMap = new HashMap<>();
-			setTimingEdgesOfConnections(this.indirectConnections, this.timingManager, this.timingEdgeConnectionMap);
+				this.config.isResolveConflictNets() ? this.conflictNets : this.design.getNets());
+			this.timingManager.setTimingEdgesOfConnections(this.indirectConnections);
 		}
 		
 		this.sortedIndirectConnections = new ArrayList<>();		
@@ -255,7 +250,7 @@ public class RWRoute{
 	 */
 	private void determineRoutingTargets(){
 		this.categorizeNets();
-		if(this.config.isResolveConflictNets()) this.handleConflictNets(design, this.getConflictNets());
+		if(this.config.isResolveConflictNets()) this.handleConflictNets();
 	}
 	
 	protected void categorizeNets() {
@@ -281,7 +276,7 @@ public class RWRoute{
 				
 			}else if (net.getType().equals(NetType.WIRE)){
 				if(RouterHelper.isRoutableNetWithSourceSinks(net)){
-					this.addNetConnectionToRoutingTargets(net, this.multiSLRDevice);
+					this.addNetConnectionToRoutingTargets(net);
 				}else if(RouterHelper.isDriverLessOrLoadLessNet(net)){
 					this.preserveNet(net);
 					this.numNotNeedingRoutingNets++;
@@ -301,15 +296,11 @@ public class RWRoute{
 	/**
 	 * Deals with the conflicted nets.
 	 * Note: this is customized for the RapidStream use case. Other users will need to adapt this method.
-	 * @param design The design to route.
-	 * @param conflictNets A set of conflicted nets.
 	 */
-	private void handleConflictNets(Design design, Set<Net> conflictNets) {
+	private void handleConflictNets() {
 		List<Net> toPreserveNets = new ArrayList<>();
-		for(Net net : conflictNets) {
-			if(net.getType() != NetType.WIRE || net.getSinkPins().size() > 1 || !this.isRegularAnchorNet(net, design)) {
-				// Skip successfully routed CLK, VCC, and GND nets
-				// In the RapidStream flow, the target nets to route are 2-terminal FF-to-FF nets.
+		for(Net net : this.conflictNets) {
+			if(!this.isRegularAnchorNet(net)) {
 				toPreserveNets.add(net);
 				continue;
 			}
@@ -327,12 +318,14 @@ public class RWRoute{
 	 * Checks if a net is an anchor net that is from / to a CLB tile.
 	 * Note: this is customized for the RapidStream use case.
 	 * @param net The net in question.
-	 * @param design The design to route.
 	 * @return true if the net is an anchor net from / to a CLB tile.
 	 */
-	private boolean isRegularAnchorNet(Net net, Design design) {
+	private boolean isRegularAnchorNet(Net net) {
+		// Skip successfully routed CLK, VCC, and GND nets
+		// In the RapidStream flow, the target nets to route are 2-terminal FF-to-FF nets. So nets with more than one sink pin are skipped as well.
+		if(net.getType() != NetType.WIRE || net.getSinkPins().size() > 1) return false;
 		boolean anchorNet = false;
-		List<EDIFHierPortInst> ehportInsts = design.getNetlist().getPhysicalPins(net.getName());
+		List<EDIFHierPortInst> ehportInsts = this.design.getNetlist().getPhysicalPins(net.getName());
 		boolean input = false;
 		if(ehportInsts == null) { // e.g. encrypted DSP related nets
 			return false;
@@ -387,46 +380,6 @@ public class RWRoute{
 	}
 	
 	/**
-	 * Sets a list of {@link TimingEdge} instances to a {@link Connection} instance.
-	 * @param connection The target connection.
-	 * @param spiAndTimingEdges Mapping between each pair of SitePinInsts and a list of timing edges recognized by the {@link TimingGraph} instance.
-	 * @param hportSpiMap Mapping between a logic pin and a SitePinInst recognized by the timing graph builder.
-	 */
-	private static void setConnectionTimingEdges(Connection connection, Map<SitePinInst, List<TimingEdge>> spiAndTimingEdges, 
-			Map<EDIFHierPortInst, SitePinInst> hportSpiMap, Map<TimingEdge, Connection> timingEdgeConnectionMap) {	
-		List<EDIFHierPortInst> hportsFromSitePinInsts = DesignTools.getPortInstsFromSitePinInst(connection.getSink());
-		if(hportsFromSitePinInsts.isEmpty()) {
-			throw new RuntimeException("ERROR: Unable to find hierarchical logical cell pins from: " + connection.getSink());
-		}
-		EDIFHierPortInst hportSink = hportsFromSitePinInsts.get(0);
-		SitePinInst mappedSink = hportSpiMap.get(hportSink);
-		
-		List<TimingEdge> timingEdges = spiAndTimingEdges.get(mappedSink);
-		if(timingEdges == null) {
-			throw new RuntimeException("ERROR: No timing edges for connection from: " + connection.getSource() + " to " + connection.getSink());
-		}
-		connection.setTimingEdges(timingEdges);
-		for(TimingEdge edge : connection.getTimingEdges()){
-			timingEdgeConnectionMap.put(edge, connection); // for getting critical path delay breakdown in the timing report
-		}
-	}
-	
-	/**
-	 * Assigns {@link TimingEdge} instances to each connection in the list.
-	 * @param connections A list of connections that should be associated with {@link TimingEdge} instances.
-	 * @param timingManager A {@link TimingManager} instance to use.
-	 * @param timingEdgeConnectionMap
-	 */
-	public static void setTimingEdgesOfConnections(List<Connection> connections, TimingManager timingManager, Map<TimingEdge, Connection> timingEdgeConnectionMap) {
-		Map<SitePinInst, List<TimingEdge>> spiAndTimingEdges = timingManager.getSinkSitePinInstAndTimingEdgesMap();
-		Map<EDIFHierPortInst, SitePinInst> hportSpiMap = timingManager.getEdifHPortMap();
-		for(Connection connection : connections) {
-			if(connection.isDirect()) continue;
-			setConnectionTimingEdges(connection, spiAndTimingEdges, hportSpiMap, timingEdgeConnectionMap);
-		}
-	}
-	
-	/**
 	 * Adds the clock net to the list of clock routing targets, if the clock has source and sink {@link SitePinInst} instances.
 	 * @param clk The clock net in question.
 	 */
@@ -466,12 +419,10 @@ public class RWRoute{
 	/**
 	 * Adds and initialize a regular signal net to the list of routing targets.
 	 * @param net The net to be added for routing.
-	 * @param multiSLR A flag to indicate if the device has multiple SLRs, for the sake of avoiding unnecessary check for single-SLR devices.
 	 */
-	protected void addNetConnectionToRoutingTargets(Net net, boolean multiSLR) {
+	protected void addNetConnectionToRoutingTargets(Net net) {
 		net.unroute();
-		this.numWireNetsToRoute++;;
-		this.createsNetWrapperAndConnections(net, this.config.getBoundingBoxExtensionX(), this.config.getBoundingBoxExtensionY(),multiSLR);
+		this.createsNetWrapperAndConnections(net, this.config.getBoundingBoxExtensionX(), this.config.getBoundingBoxExtensionY(), this.multiSLRDevice);
 	}
 	
 	/**
@@ -581,7 +532,7 @@ public class RWRoute{
 	 * @return A {@link NetWrapper} instance.
 	 */
 	protected NetWrapper createsNetWrapperAndConnections(Net net, short boundingBoxExtensionX, short boundingBoxExtensionY, boolean multiSLR) {
-		NetWrapper netWrapper = new NetWrapper(this.numWireNetsToRoute, net);
+		NetWrapper netWrapper = new NetWrapper(this.numWireNetsToRoute++, net);
 		this.nets.add(netWrapper);
 		
 		SitePinInst source = net.getSource();
@@ -596,8 +547,7 @@ public class RWRoute{
 					 throw new IllegalArgumentException(errMsg);
 				}
 			}
-			Connection connection = new Connection(this.numConnectionsToRoute, source, sink, netWrapper);
-			this.numConnectionsToRoute++;
+			Connection connection = new Connection(this.numConnectionsToRoute++, source, sink, netWrapper);
 			
 			List<Node> nodes = RouterHelper.projectInputPinToINTNode(sink);
 			if(nodes.isEmpty()) {
@@ -606,14 +556,14 @@ public class RWRoute{
 			}else {
 				Node sinkINTNode = nodes.get(0);
 				this.indirectConnections.add(connection);
-				connection.setSinkRnode(this.createAddRoutableNode(this.rnodeId, connection.getSink(), sinkINTNode, RoutableType.PINFEED_I));
+				connection.setSinkRnode(this.createAddRoutableNode(connection.getSink(), sinkINTNode, RoutableType.PINFEED_I));
 				if(sourceINTNode == null) {
 					sourceINTNode = RouterHelper.projectOutputPinToINTNode(source);
 					if(sourceINTNode == null) {
 						throw new RuntimeException("ERROR: Null projected INT node for the source of net " + net.toStringFull());
 					}
 				}
-				connection.setSourceRnode(this.createAddRoutableNode(this.rnodeId, connection.getSource(), sourceINTNode, RoutableType.PINFEED_O));
+				connection.setSourceRnode(this.createAddRoutableNode(connection.getSource(), sourceINTNode, RoutableType.PINFEED_O));
 				connection.setDirect(false);
 				indirect++;
 				connection.computeHpwl();
@@ -687,10 +637,6 @@ public class RWRoute{
 		return this.multiSLRDevice;
 	}
 	
-	public Set<Net> getConflictNets() {
-		return this.conflictNets;
-	}
-	
 	private void removeNetNodesFromPreservedNodes(Net net) {
 		Set<Node> netNodes = RouterHelper.getUsedNodesOfNet(net);
 		for(Node node : netNodes) {
@@ -703,19 +649,17 @@ public class RWRoute{
 	 * Creates a {@link RoutableNode} Object based on a {@link Node} instance and avoids duplicates,
 	 * used for creating the source and sink rnodes of {@link Connection} instances.
 	 * NOTE: This method does not consider the preserved nodes.
-	 * @param rnodeGlobalIndex The design-wise index of created {@link RoutableNode} instances.
 	 * @param sitePinInst The source or sink {@link SitePinInst} instance.
 	 * @param node The node associated to the {@link SitePinInst} instance.
 	 * @param type The {@link RoutableType} of the {@link RoutableNode} Object.
 	 * @return The created {@link RoutableNode} instance.
 	 */
-	private Routable createAddRoutableNode(int rnodeGlobalIndex, SitePinInst sitePinInst, Node node, RoutableType type){
+	private Routable createAddRoutableNode(SitePinInst sitePinInst, Node node, RoutableType type){
 		Routable rnode = this.rnodesCreated.get(node);
 		if(rnode == null){
 			// this is for initializing sources and sinks of those to-be-routed nets's connections
-			rnode = new RoutableNode(rnodeGlobalIndex, node, type);
+			rnode = new RoutableNode(this.rnodeId++, node, type);
 			this.rnodesCreated.put(rnode.getNode(), rnode);
-			this.rnodeId++;
 		}else{
 			// this is for checking preserved routing resource conflicts among routed nets */
 			if(rnode.getRoutableType() == type && type == RoutableType.PINFEED_I) {
@@ -855,7 +799,7 @@ public class RWRoute{
 			long startIteration = System.nanoTime();
 			this.connectionsRoutedIteration = 0;
 			if(this.config.isTimingDriven()) {
-				this.setRerouteCriticality(this.sortedIndirectConnections);
+				this.setRerouteCriticality();
 			}
 			for(Connection connection : this.sortedIndirectConnections) {
 				if(this.shouldRoute(connection)){
@@ -943,9 +887,8 @@ public class RWRoute{
 	
 	/**
 	 * Computes and sets the minimum reroute criticality for re-routing critical connections.
-	 * @param connections The list of connections.
 	 */
-	private void setRerouteCriticality(List<Connection> connections) {
+	private void setRerouteCriticality() {
 		// Limit the number of critical connections to be routed based on minRerouteCriticality and reroutePercentage
 		this.minRerouteCriticality = this.config.getMinRerouteCriticality();
 		this.criticalConnections.clear();
@@ -1095,25 +1038,23 @@ public class RWRoute{
 		} else {
 			this.presentCongestionFactor *= this.config.getPresentCongestionMultiplier();
 		}
-		this.updateCost(this.presentCongestionFactor, this.historicalCongestionFactor);
+		this.updateCost();
 		this.updateCongestionCosts.stop();
 	}
 	
 	/**
 	 * Updates present congestion cost and historical congestion cost of rnodes.
-	 * @param presentCongestionFactor Present congestion cost factor.
-	 * @param historicalCongestionFactor Historical congestion cost factor.
 	 */
-	private void updateCost(float presentCongestionFactor, float historicalCongestionFactor) {
+	private void updateCost() {
 		this.overUsedRnodes.clear();
 		for(Routable rnode:this.rnodesCreated.values()){
 			int overuse =rnode.getOccupancy() - Routable.capacity;
 			if(overuse == 0) {
-				rnode.setPresentCongestionCost(1 + presentCongestionFactor);
+				rnode.setPresentCongestionCost(1 + this.presentCongestionFactor);
 			} else if (overuse > 0) {
 				this.overUsedRnodes.add(rnode.getIndex());
-				rnode.setPresentCongestionCost(1 + (overuse + 1) * presentCongestionFactor);
-				rnode.setHistoricalCongestionCost(rnode.getHistoricalCongestionCost() + overuse * historicalCongestionFactor);
+				rnode.setPresentCongestionCost(1 + (overuse + 1) * this.presentCongestionFactor);
+				rnode.setHistoricalCongestionCost(rnode.getHistoricalCongestionCost() + overuse * this.historicalCongestionFactor);
 			}
 		}
 	}
@@ -1403,7 +1344,7 @@ public class RWRoute{
 		netWrapper.setSourceChanged(true);
 		
 		Node sourceINTNode = RouterHelper.projectOutputPinToINTNode(altSource);
-		Routable sourceR = this.createAddRoutableNode(this.rnodeId, altSource, sourceINTNode, RoutableType.PINFEED_O);;
+		Routable sourceR = this.createAddRoutableNode(altSource, sourceINTNode, RoutableType.PINFEED_O);;
 		for(Connection otherConnectionOfNet : netWrapper.getConnections()) {
 			otherConnectionOfNet.setSource(altSource);
 			otherConnectionOfNet.setSourceRnode(sourceR);
@@ -1451,7 +1392,7 @@ public class RWRoute{
 				// remove the node from the preserved nodes
 				this.preservedNodes.remove(toBuild);	
 				// creates a RoutableNode with the node 
-				Routable rnode = this.createAddRoutableNode(this.rnodeId, null, toBuild, RoutableType.WIRE);
+				Routable rnode = this.createAddRoutableNode(null, toBuild, RoutableType.WIRE);
 				// Each rnode created above should be added to its parents if parent exists,
 				// because children of an existing parent may have been set.
 				for(Node uphill : toBuild.getAllUphillNodes()) {
@@ -1464,7 +1405,7 @@ public class RWRoute{
 					}
 				}
 			}
-			if(this.config.isTimingDriven()) setTimingEdgesOfConnections(netnew.getConnections(), this.timingManager, this.timingEdgeConnectionMap);
+			if(this.config.isTimingDriven()) this.timingManager.setTimingEdgesOfConnections(netnew.getConnections());
 		}
 		
 		this.sortConnections();
@@ -1741,7 +1682,7 @@ public class RWRoute{
 	
 	private void printTimingInfo(){
 		if(this.sortedIndirectConnections.size() > 0) {
-			this.timingManager.getCriticalPathInfo(this.maxDelayAndTimingVertex, this.timingEdgeConnectionMap, false, this.rnodesCreated);
+			this.timingManager.getCriticalPathInfo(this.maxDelayAndTimingVertex, false, this.rnodesCreated);
 		}
 	}
 	

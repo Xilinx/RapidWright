@@ -28,10 +28,8 @@ import java.util.Set;
 import com.xilinx.rapidwright.design.ConstraintGroup;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
-import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Node;
-import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.rwroute.RWRouteConfig;
 import com.xilinx.rapidwright.rwroute.Connection;
 import com.xilinx.rapidwright.rwroute.NetWrapper;
@@ -106,24 +104,6 @@ public class TimingManager {
     }
     
     /**
-     * Gets the map between each sink {@link SitePinInst} instance and its associated {@link TimingEdge} instances
-     * from the {@link TimingGraph} instance.
-     * @return Mapping between each sink {@link SitePinInst} instance and its associated {@link TimingEdge} instances.
-     */
-    public Map<SitePinInst, List<TimingEdge>> getSinkSitePinInstAndTimingEdgesMap(){
-    	return this.timingGraph.getSinkSitePinInstTimingEdges();
-    }
-    
-    /**
-     * Gets the map between each {@link EDIFHierPortInst} instance (logical pin) and {@link SitePinInst} instance (physical pin)
-     * from the {@link TimingGraph} instance.
-     * @return Mapping between each {@link EDIFHierPortInst} instance (logical pin) and {@link SitePinInst} instance
-     */
-    public Map<EDIFHierPortInst, SitePinInst> getEdifHPortMap(){
-    	return this.timingGraph.getEdifHPortMap();
-    }
-    
-    /**
      * Updates the delay of nets after the cycle removal and delay-aware path merging.
      * @param illegalNets {@link NetWrapper} instances in question.
      * @param nodesDelays Stored nodes and their delay values.
@@ -190,8 +170,7 @@ public class TimingManager {
     	}
     }
     
-    public void getCriticalPathInfo(Pair<Float, TimingVertex> maxDelayTimingVertex, Map<TimingEdge, Connection> timingEdgeConnctionMap,
-    		boolean useRoutable, Map<Node, Routable> rnodesCreated){
+    public void getCriticalPathInfo(Pair<Float, TimingVertex> maxDelayTimingVertex, boolean useRoutable, Map<Node, Routable> rnodesCreated){
     	TimingVertex maxV = maxDelayTimingVertex.getSecond();
     	float maxDelay = maxDelayTimingVertex.getFirst();
     	System.out.printf(MessageGenerator.formatString("Timing requirement (ps):", timingRequirement));
@@ -208,7 +187,7 @@ public class TimingManager {
     	System.out.printf(MessageGenerator.formatString("Critical path delay (ps):", (short)adjusted));
     	System.out.printf(MessageGenerator.formatString("Slack (ps):", (short) (timingRequirement - adjusted)));
     	
-    	this.printPathDelayBreakDown(arr, criticalEdges, timingEdgeConnctionMap, useRoutable, rnodesCreated);
+    	this.printPathDelayBreakDown(arr, criticalEdges, this.timingGraph.getTimingEdgeConnectionMap(), useRoutable, rnodesCreated);
     }
     
     /**
@@ -387,4 +366,10 @@ public class TimingManager {
     public Device getDevice() {
         return device;
     }
+    
+    public void setTimingEdgesOfConnections(List<Connection> connections) {
+    	this.timingGraph.setTimingEdgesOfConnections(connections);
+    }
+    
+    
 }
