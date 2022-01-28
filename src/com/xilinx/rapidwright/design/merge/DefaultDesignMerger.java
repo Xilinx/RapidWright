@@ -18,6 +18,11 @@ import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 
+/**
+ * Provides a basic design merging behavior when merging designs.  If no other design merger is 
+ * implemented, {@link MergeDesigns#mergeDesigns(com.xilinx.rapidwright.design.Design...)} is used
+ * by default. 
+ */
 public class DefaultDesignMerger extends AbstractDesignMerger {
 
     private Map<String, String> replacedNets = new HashMap<>();

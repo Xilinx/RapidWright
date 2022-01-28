@@ -168,9 +168,9 @@ public class TestMergeDesigns {
     }
     
     @ParameterizedTest
-    @ValueSource(strings = {"False", "True"}) // Doesn't support boolean :(
-    public void testMergeDesign(String reverseDesignOrder) {
-        Pair<Design,Design> designs = createDesignsToMerge(reverseDesignOrder.equals("True"));
+    @ValueSource(booleans = {false, true}) 
+    public void testMergeDesign(boolean reverseDesignOrder) {
+        Pair<Design,Design> designs = createDesignsToMerge(reverseDesignOrder);
         Design merged = MergeDesigns.mergeDesigns(designs.getFirst(), designs.getSecond());
         
         EDIFCell top = merged.getNetlist().getTopCell();
