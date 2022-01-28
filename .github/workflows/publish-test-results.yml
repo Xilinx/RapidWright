@@ -33,7 +33,7 @@ jobs:
           done
 
       - name: Publish
-        uses: EnricoMi/publish-unit-test-result-action@v1.18
+        uses: EnricoMi/publish-unit-test-result-action@c6ffacdf2fce00e8222e3a373b87ec805a04bc46
         with:
           commit: ${{ github.event.workflow_run.head_sha }}
           files: "artifacts/**/*.xml"
