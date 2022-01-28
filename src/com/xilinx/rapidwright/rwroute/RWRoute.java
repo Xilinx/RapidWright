@@ -219,11 +219,8 @@ public class RWRoute{
 		if(this.config.isTimingDriven()) {
 			ClkRouteTiming clkTiming = createClkTimingData(config);
 			this.routesToSinkINTTiles = clkTiming == null? null : clkTiming.getRoutesToSinkINTTiles();
-			if(this.config.isResolveConflictNets()) {
-				this.timingManager = new TimingManager(this.design, true, this.routerTimer, this.config, clkTiming, this.getConflictNets());
-			}else {
-				this.timingManager = new TimingManager(this.design, true, this.routerTimer, this.config, clkTiming, this.design.getNets());
-			}
+			this.timingManager = new TimingManager(this.design, true, this.routerTimer, this.config, clkTiming,
+				this.config.isResolveConflictNets() ? this.getConflictNets() : this.design.getNets());
 			this.timingEdgeConnectionMap = new HashMap<>();
 			setTimingEdgesOfConnections(this.indirectConnections, this.timingManager, this.timingEdgeConnectionMap);
 		}
