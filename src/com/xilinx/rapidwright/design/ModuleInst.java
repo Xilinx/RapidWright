@@ -62,10 +62,12 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 	/** A list of all nets internal to this module instance */
 	private ArrayList<Net> nets;
 
+	/** A list of all SiteInsts that are the sources of static nets */
 	private List<SiteInst> staticSources;
 	
 	private boolean hasBeenPlaced = false;
-	
+
+	/** A map from a static net to the list of its PIPs */
 	private Map<NetType, List<Pair<PIP, Tile>>> staticPIPs;
 
 	
@@ -362,30 +364,30 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 		}
 		
 		if(staticSources != null) {
-		    for(SiteInst staticSource : staticSources) {
-		        Site templateSite = staticSource.getModuleTemplateInst().getSite();
-	            Tile newTile = module.getCorrespondingTile(templateSite.getTile(), newAnchorSite.getTile(), dev);
-	            Site newSite = templateSite.getCorrespondingSite(staticSource.getSiteTypeEnum(), newTile);
-	            staticSource.place(newSite);
-		    }
+			for(SiteInst staticSource : staticSources) {
+				Site templateSite = staticSource.getModuleTemplateInst().getSite();
+				Tile newTile = module.getCorrespondingTile(templateSite.getTile(), newAnchorSite.getTile(), dev);
+				Site newSite = templateSite.getCorrespondingSite(staticSource.getSiteTypeEnum(), newTile);
+				staticSource.place(newSite);
+			}
 		}
 		if(staticPIPs != null) {
-		    for(Entry<NetType,List<Pair<PIP, Tile>>> e : staticPIPs.entrySet()) {
-		        if(!hasBeenPlaced) {
-		            Net topStaticNet = getDesign().getStaticNet(e.getKey());
-		            for(Pair<PIP, Tile> pair : e.getValue()) {
-		                topStaticNet.getPIPs().add(pair.getFirst());   
-		            }
-		        }
-		        for(Pair<PIP, Tile> pair : e.getValue()) {
-	                Tile templatePipTile = pair.getSecond();
-	                Tile newPipTile = module.getCorrespondingTile(templatePipTile, newAnchorSite.getTile(), dev);
-	                if(newPipTile == null){
-	                    throw new RuntimeException("ERROR: Problem relocating "+e.getKey()+" routing with PIP: " + pair );
-	                }
-	                pair.getFirst().setTile(newPipTile);
-		        }
-		    }
+			for(Entry<NetType,List<Pair<PIP, Tile>>> e : staticPIPs.entrySet()) {
+				if(!hasBeenPlaced) {
+					Net topStaticNet = getDesign().getStaticNet(e.getKey());
+					for(Pair<PIP, Tile> pair : e.getValue()) {
+						topStaticNet.getPIPs().add(pair.getFirst());
+					}
+				}
+				for(Pair<PIP, Tile> pair : e.getValue()) {
+					Tile templatePipTile = pair.getSecond();
+					Tile newPipTile = module.getCorrespondingTile(templatePipTile, newAnchorSite.getTile(), dev);
+					if(newPipTile == null){
+						throw new RuntimeException("ERROR: Problem relocating "+e.getKey()+" routing with PIP: " + pair );
+					}
+					pair.getFirst().setTile(newPipTile);
+				}
+			}
 		}
 		
 		hasBeenPlaced = true;
@@ -680,11 +682,20 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 		}
 	}
 
+	/**
+	 * Add the SiteInst into the list of sources for a static net.
+	 * @param staticSource A SiteInst to add
+	 */
 	protected void addStaticSource(SiteInst staticSource) {
-	    if(staticSources == null) staticSources = new ArrayList<>();
-	    staticSources.add(staticSource);
+		if(staticSources == null) staticSources = new ArrayList<>();
+		staticSources.add(staticSource);
 	}
-	
+
+	/**
+	 * Add the list of PIPs to the given static net type
+	 * @param type The type of a static net
+	 * @param pips The list of PIPs to add
+	 */
 	protected void addStaticPIPs(NetType type, List<Pair<PIP, Tile>> pips) {
 		if (staticPIPs == null) staticPIPs = new HashMap<>();
 		staticPIPs.put(type, pips);
