@@ -307,19 +307,9 @@ public class RWRoute{
 	private void handleConflictNets(Design design, Set<Net> conflictNets) {
 		List<Net> toPreserveNets = new ArrayList<>();
 		for(Net net : conflictNets) {
-			if(net.getType() != NetType.WIRE) {
+			if(net.getType() != NetType.WIRE || net.getSinkPins().size() > 1 || !this.isRegularAnchorNet(net, design)) {
 				// Skip successfully routed CLK, VCC, and GND nets
-				toPreserveNets.add(net);
-				continue;
-			}
-			
-			if(net.getSinkPins().size() > 1) {
 				// In the RapidStream flow, the target nets to route are 2-terminal FF-to-FF nets.
-				toPreserveNets.add(net);
-				continue;
-			}
-			
-			if(!this.isRegularAnchorNet(net, design)) {
 				toPreserveNets.add(net);
 				continue;
 			}
