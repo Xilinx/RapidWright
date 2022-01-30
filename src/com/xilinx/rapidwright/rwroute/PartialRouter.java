@@ -42,14 +42,14 @@ public class PartialRouter extends RWRoute{
 	protected void addGlobalClkRoutingTargets(Net clk) {
 		if(!clk.hasPIPs()) {
 			if(RouterHelper.isRoutableNetWithSourceSinks(clk)) {
-				this.addClkNet(clk);
+				addClkNet(clk);
 			}else {
-				this.increaseNumNotNeedingRouting();
+				increaseNumNotNeedingRouting();
 				System.err.println("ERROR: Incomplete clk net " + clk.getName());
 			}
 		}else {
-			this.preserveNet(clk);
-			this.increaseNumPreservedClks();
+			preserveNet(clk);
+			increaseNumPreservedClks();
 		}
 	}
 	
@@ -64,30 +64,30 @@ public class PartialRouter extends RWRoute{
 		if(sinks.size() > 0 ) {
 			if(!staticNet.hasPIPs()) {
 				for(SitePinInst sink : sinks) {
-					this.addReservedNode(sink.getConnectedNode(), staticNet);
+					addReservedNode(sink.getConnectedNode(), staticNet);
 				}
-				this.addStaticNetRoutingTargets(staticNet, sinks);
+				addStaticNetRoutingTargets(staticNet, sinks);
 			}else {
-				this.preserveNet(staticNet);
-				this.increaseNumPreservedStaticNets();
+				preserveNet(staticNet);
+				increaseNumPreservedStaticNets();
 			}	
 			
 		}else {// internally routed (sinks.size = 0)
-			this.preserveNet(staticNet);
-			this.increaseNumNotNeedingRouting();
+			preserveNet(staticNet);
+			increaseNumNotNeedingRouting();
 		}
 	}
 	
 	@Override
 	protected void addNetConnectionToRoutingTargets(Net net) {
 		if(!net.hasPIPs()) {
-			this.createsNetWrapperAndConnections(net, this.config.getBoundingBoxExtensionX(), this.config.getBoundingBoxExtensionY(), this.isMultiSLRDevice());
+			createsNetWrapperAndConnections(net, config.getBoundingBoxExtensionX(), config.getBoundingBoxExtensionY(), isMultiSLRDevice());
 		}else{
 			// In partial routing mode, a net with PIPs is preserved.
 			// This means the routed net is supposed to be fully routed without conflicts.
 			// TODO detect partially routed nets.
-			this.preserveNet(net);
-			this.increaseNumPreservedWireNets();
+			preserveNet(net);
+			increaseNumPreservedWireNets();
 		}
 	}
 	

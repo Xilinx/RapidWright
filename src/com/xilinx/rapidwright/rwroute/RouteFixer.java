@@ -45,10 +45,10 @@ public class RouteFixer{
 	
 	public RouteFixer(NetWrapper netp, Map<Node, Routable> rnodesCreated){
 		this.netp = netp;
-		this.nodeMap = new HashMap<>();
-		this.source = null;
-		this.vertexId = 0;
-		this.buildGraph(netp, rnodesCreated);
+		nodeMap = new HashMap<>();
+		source = null;
+		vertexId = 0;
+		buildGraph(netp, rnodesCreated);
 	}
 	
 	private void buildGraph(NetWrapper netWrapper, Map<Node, Routable> rnodesCreated){
@@ -64,15 +64,15 @@ public class RouteFixer{
 				float currDly = currRnode == null? 0f : currRnode.getDelay();
 				float nextDly = nextRnode == null? 0f : nextRnode.getDelay();
 				
-				NodeWithDelay newCur = this.nodeMap.containsKey(cur) ? this.nodeMap.get(cur) : new NodeWithDelay(vertexId++, cur, currDly);
-				NodeWithDelay newNext = this.nodeMap.containsKey(next) ? this.nodeMap.get(next) : new NodeWithDelay(vertexId++, next, nextDly);
-				this.nodeMap.put(cur, newCur);
-				this.nodeMap.put(next, newNext);
+				NodeWithDelay newCur = nodeMap.containsKey(cur) ? nodeMap.get(cur) : new NodeWithDelay(vertexId++, cur, currDly);
+				NodeWithDelay newNext = nodeMap.containsKey(next) ? nodeMap.get(next) : new NodeWithDelay(vertexId++, next, nextDly);
+				nodeMap.put(cur, newCur);
+				nodeMap.put(next, newNext);
 				
 				if(i == 1) {
 					newNext.setSink(true);
 				}
-				if(i == vertexSize - 1) this.source = newCur;
+				if(i == vertexSize - 1) source = newCur;
 				newCur.addChildren(newNext);
 			}
 		}
@@ -82,10 +82,10 @@ public class RouteFixer{
 	 * Finalizes the route of each connection based on the delay-aware path merging.
 	 */
 	public void finalizeRoutesOfConnections(){
-		this.setShortestPathToEachVertex();
+		setShortestPathToEachVertex();
 		
-		for(Connection connection : this.netp.getConnections()) {
-			NodeWithDelay csink = this.nodeMap.get(connection.getNodes().get(0));
+		for(Connection connection : netp.getConnections()) {
+			NodeWithDelay csink = nodeMap.get(connection.getNodes().get(0));
 			connection.getNodes().clear();
 			connection.getNodes().add(csink.getNode());
 			NodeWithDelay prev = csink.getPrev();
@@ -148,15 +148,15 @@ public class RouteFixer{
 			this.id = id;
 			this.node = node;
 			this.delay = delay;
-			this.isSink = false;
-			this.prev = null;
-			this.cost = Short.MAX_VALUE;
-			this.visited = false;
-			this.children = new HashSet<>();
+			isSink = false;
+			prev = null;
+			cost = Short.MAX_VALUE;
+			visited = false;
+			children = new HashSet<>();
 		}
 		
 		public void addChildren(NodeWithDelay child) {
-			this.children.add(child);
+			children.add(child);
 		}
 		
 		public boolean isVisited() {
@@ -168,14 +168,14 @@ public class RouteFixer{
 		}
 
 		public NodeWithDelay getPrev() {
-			return this.prev;
+			return prev;
 		}
 		
 		public void setPrev(NodeWithDelay driver) {
-			if(this.prev == null) {
-				this.prev = driver;
-			}else if(driver.cost < this.prev.cost) {
-				this.prev = driver;
+			if(prev == null) {
+				prev = driver;
+			}else if(driver.cost < prev.cost) {
+				prev = driver;
 			}
 		}
 		
@@ -192,21 +192,21 @@ public class RouteFixer{
 		}
 		
 		public Node getNode(){
-			return this.node;
+			return node;
 		}
 		
 		public void setDelay(float f) {
-			this.delay = f;
+			delay = f;
 		}
 		
 		@Override
 		public int hashCode(){
-			return this.node.hashCode();
+			return node.hashCode();
 		}
 		
 		@Override
 		public String toString(){
-			return this.id + ", " + this.node.toString() + ", delay = " + this.delay + ", sink? " + this.isSink;
+			return id + ", " + node.toString() + ", delay = " + delay + ", sink? " + isSink;
 		}
 	}
 	
