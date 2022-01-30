@@ -64,7 +64,7 @@ import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
  */
 public class RWRoute{
 	/** The design to route */
-	private Design design;
+	protected Design design;
 	/** A flag to indicate if the device has multiple SLRs, for the sake of avoiding unnecessary check for single-SLR devices */
 	private boolean multiSLRDevice;
 	/** Created NetWrappers */
@@ -80,7 +80,7 @@ public class RWRoute{
 	/** Static nets */
 	private Map<Net, List<SitePinInst>> staticNetAndRoutingTargets;
 	/** Nets with conflicting nodes that should be added to the routing targets */
-	private Set<Net> conflictNets;
+	protected Set<Net> conflictNets;
 	/** Several integers to indicate the netlist info */
 	private int numPreservedRoutableNets;
 	private int numPreservedClks;
@@ -248,9 +248,8 @@ public class RWRoute{
 	 * Classifies {@link Net} Objects into different categories: clocks, static nets,
 	 * and regular signal nets (i.e. {@link NetType}.WIRE) and determines routing targets.
 	 */
-	private void determineRoutingTargets(){
+	protected void determineRoutingTargets(){
 		categorizeNets();
-		if(config.isResolveConflictNets()) handleConflictNets();
 	}
 	
 	protected void categorizeNets() {
@@ -291,61 +290,6 @@ public class RWRoute{
 				System.err.println("ERROR: Unknown net " + net.toString());
 			}
 		}
-	}
-	
-	/**
-	 * Deals with the conflicted nets.
-	 * Note: this is customized for the RapidStream use case. Other users will need to adapt this method.
-	 */
-	private void handleConflictNets() {
-		List<Net> toPreserveNets = new ArrayList<>();
-		for(Net net : conflictNets) {
-			if(!isRegularAnchorNet(net)) {
-				toPreserveNets.add(net);
-				continue;
-			}
-			
-			removeNetNodesFromPreservedNodes(net); // remove preserved nodes of a net from the map
-			createsNetWrapperAndConnections(net, config.getBoundingBoxExtensionX(), config.getBoundingBoxExtensionY(), multiSLRDevice);
-			net.unroute();//NOTE: no need to unroute if routing tree is reused, then toPreserveNets should be detected before createNetWrapperAndConnections
-		}
-		for(Net net : toPreserveNets) {
-			preserveNet(net);
-		}
-	}
-	
-	/**
-	 * Checks if a net is an anchor net that is from / to a CLB tile.
-	 * Note: this is customized for the RapidStream use case.
-	 * @param net The net in question.
-	 * @return true if the net is an anchor net from / to a CLB tile.
-	 */
-	private boolean isRegularAnchorNet(Net net) {
-		// Skip successfully routed CLK, VCC, and GND nets
-		// In the RapidStream flow, the target nets to route are 2-terminal FF-to-FF nets. So nets with more than one sink pin are skipped as well.
-		if(net.getType() != NetType.WIRE || net.getSinkPins().size() > 1) return false;
-		boolean anchorNet = false;
-		List<EDIFHierPortInst> ehportInsts = design.getNetlist().getPhysicalPins(net.getName());
-		boolean input = false;
-		if(ehportInsts == null) { // e.g. encrypted DSP related nets
-			return false;
-		}
-		for(EDIFHierPortInst eport : ehportInsts) {
-			if(eport.getFullHierarchicalInstName().contains(config.getAnchorNameKeyword())) {
-				//use the key word to identify target anchor nets
-				anchorNet = true;
-				if(eport.isInput()) input = true;
-				break;
-			}
-		}
-		Tile anchorTile = null;
-		if(input) {
-			anchorTile = net.getSinkPins().get(0).getTile();
-		}else {
-			anchorTile = net.getSource().getTile();
-		}
-		// Note: if laguna anchor nets are never conflicted, there will be no need to check tile names.
-		return anchorNet && anchorTile.getName().startsWith("CLE");
 	}
 	
 	/**
@@ -637,7 +581,7 @@ public class RWRoute{
 		return multiSLRDevice;
 	}
 	
-	private void removeNetNodesFromPreservedNodes(Net net) {
+	protected void removeNetNodesFromPreservedNodes(Net net) {
 		Set<Node> netNodes = RouterHelper.getUsedNodesOfNet(net);
 		for(Node node : netNodes) {
 			preservedNodes.remove(node);
