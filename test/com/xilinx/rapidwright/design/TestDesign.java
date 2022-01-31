@@ -9,6 +9,8 @@ import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.support.RapidWrightDCP;
+import com.xilinx.rapidwright.util.ParallelismTools;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -43,7 +45,7 @@ public class TestDesign {
         //Keep a reference to the device to avoid it being garbage collected during testcase execution
         Device device = Device.getDevice(DEVICE);
 
-        //Use separate files for writing/reading so we can identify identify leaking file handles by filename
+        //Use separate files for writing/reading so we can identify leaking file handles by filename
         final Path filenameWrite = tempDir.resolve("testWrite.dcp");
         final Path filenameRead = tempDir.resolve("testRead.dcp");
 
@@ -65,7 +67,7 @@ public class TestDesign {
         //Keep a reference to the device to avoid it being garbage collected during testcase execution
         Device device = Device.getDevice(DEVICE);
 
-        //Use separate files for writing/reading so we can identify identify leaking file handles by filename
+        //Use separate files for writing/reading so we can identify leaking file handles by filename
         final Path filenameWrite = tempDir.resolve("testWrite.dcp");
         final Path filenameRead = tempDir.resolve("testRead.dcp");
 
@@ -86,5 +88,23 @@ public class TestDesign {
         design = Design.readCheckpoint(filenameRead);
         mi = design.getModuleInst("inst");
         Assertions.assertEquals(oldAnchor, mi.getAnchor().toString());
+    }
+
+    @Test
+    @CheckOpenFiles
+    public void checkDcpRoundtripParallel(@TempDir Path tempDir) {
+        final Path filenameRead = RapidWrightDCP.getPath("optical-flow.dcp");
+        final Path filenameWrite = tempDir.resolve("testWrite.dcp");
+
+        Design before = Design.readCheckpoint(filenameRead);
+
+        ParallelismTools.setParallel(true);
+        before.writeCheckpoint(filenameWrite);
+
+        Design after = Design.readCheckpoint(filenameWrite);
+
+        Assertions.assertEquals(before.getNetlist(), after.getNetlist());
+        Assertions.assertEquals(before.getSiteInstMap(), after.getSiteInstMap());
+        Assertions.assertEquals(before.getNetMap(), after.getNetMap());
     }
 }
