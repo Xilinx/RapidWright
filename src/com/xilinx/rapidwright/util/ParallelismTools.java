@@ -26,7 +26,6 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Deque;
 import java.util.Iterator;
 import java.util.List;
@@ -52,10 +51,12 @@ import java.util.concurrent.TimeUnit;
 public class ParallelismTools {
     private static boolean parallel = false;
 
+    /** A fixed-size thread pool with as many threads as there are processors
+     * minus one, fed by a single task queue */
     private static final ThreadPoolExecutor pool = new ThreadPoolExecutor(
             Runtime.getRuntime().availableProcessors() - 1,
             Runtime.getRuntime().availableProcessors() - 1,
-            100, TimeUnit.MILLISECONDS,
+            0, TimeUnit.MILLISECONDS,
             new LinkedBlockingQueue<>(),
             (r) -> {
                 Thread t = Executors.defaultThreadFactory().newThread(r);
@@ -63,6 +64,10 @@ public class ParallelismTools {
                 return t;
             });
 
+    /**
+     * Global setter to control parallel processing.
+     * @param parallel Enable parallel processing.
+     */
     public static void setParallel(boolean parallel) {
         ParallelismTools.parallel = parallel;
         if (parallel) {
@@ -70,10 +75,20 @@ public class ParallelismTools {
         }
     }
 
+    /**
+     * Global getter for current parallel processing state.
+     * @return Current parallel processing state.
+     */
     public static boolean getParallel() {
         return parallel;
     }
 
+    /**
+     * Submit a task-with-return-value to the thread pool.
+     * @param task Task to be performed.
+     * @param <T> Type returned by task.
+     * @return A Future object holding the value returned by task.
+     */
     public static <T> Future<T> submit(Callable<T> task) {
         if (!getParallel()) {
             try {
@@ -87,6 +102,11 @@ public class ParallelismTools {
         return pool.submit(task);
     }
 
+    /**
+     * Submit a task-without-return-value to the thread pool.
+     * @param task Task to be performed.
+     * @return A Future object used only to determine task completion.
+     */
     public static Future<?> submit(Runnable task) {
         if (!getParallel()) {
             try {
@@ -101,16 +121,31 @@ public class ParallelismTools {
         return  pool.submit(task);
     }
 
-    public static <T> T get(Future<T> task) {
-        trySteal(task);
+    /**
+     * Block until the task behind the given Future is complete.
+     * If necessary, steal the task from the job queue for immediate execution
+     * on the current thread.
+     * @param future Future representing previously submitted task.
+     * @return Value returned by task.
+     */
+    public static <T> T get(Future<T> future) {
+        trySteal(future);
 
         try {
-            return task.get();
+            return future.get();
         } catch (InterruptedException | ExecutionException e) {
             throw new RuntimeException(e);
         }
     }
 
+    /**
+     * For a given list of value-returning-tasks, first submit all but the first task to
+     * the thread pool to be executed in parallel, then execute that first task with the
+     * current thread.
+     * @param tasks List of tasks to be executed.
+     * @param <T> Type returned by all tasks.
+     * @return A Deque of Future objects corresponding to each task (in order).
+     */
     public static <T> Deque<Future<T>> invokeFirstSubmitRest(@NotNull Callable<T>... tasks) {
         Deque<Future<T>> futures = new ArrayDeque<>(tasks.length);
 
@@ -133,6 +168,18 @@ public class ParallelismTools {
         return futures;
     }
 
+    /**
+     * For a given Deque of Futures, block until the first is complete and
+     * remove it from the deque.
+     * First, try and steal the task from the queue and execute it on this
+     * thread. If this is not possible (indicating another thread may
+     * already be working on it) then use this thread productively by trying
+     * to steal the next task to work on.
+     * @param futures A Deque of Future objects corresponding to previously
+     *                submitted tasks.
+     * @param <T> Type returned by all tasks.
+     * @return The value returned by the first task.
+     */
     public static <T> T joinFirst(Deque<Future<T>> futures) {
         Future<T> first = futures.removeFirst();
 
@@ -163,6 +210,29 @@ public class ParallelismTools {
         }
     }
 
+    /**
+     * For a given List of Futures, block until all are complete.
+     * The list is walked in reverse order and tasks are stolen from the
+     * queue so that they may be completed using the current thread.
+     * @param futures A List of Future objects corresponding to previously
+     *                submitted tasks.
+     * @param <T> Type returned by all tasks.
+     */
+    public static <T> void join(List<Future<T>> futures) {
+        if (getParallel()) {
+            // Walk backwards and try and steal those not done
+            ListIterator<Future<T>> it = futures.listIterator(futures.size());
+            while (it.hasPrevious()) {
+                trySteal(it.previous());
+            }
+        }
+
+        // Now block to wait for other threads to finish their tasks
+        for (Future<T> f : futures) {
+            get(f);
+        }
+    }
+
     private static <T> boolean trySteal(Future<T> future) {
         boolean doneOrStolen = future.isDone();
         if (!doneOrStolen && (future instanceof Runnable)) {
@@ -174,6 +244,11 @@ public class ParallelismTools {
         return doneOrStolen;
     }
 
+    /**
+     * Given a list of tasks-without-return-value, block until all tasks
+     * have been completed.
+     * @param tasks List of tasks-without-return-value.
+     */
     public static void invokeAll(@NotNull Runnable... tasks) {
         if (!getParallel()) {
             for (Runnable task : tasks) {
@@ -209,23 +284,15 @@ public class ParallelismTools {
         }
     }
 
-    public static <T> void join(List<Future<T>> futures) {
-        if (getParallel()) {
-            // Walk backwards and try and steal those not done
-            ListIterator<Future<T>> it = futures.listIterator(futures.size());
-            while (it.hasPrevious()) {
-                trySteal(it.previous());
-            }
-        }
-
-        // Now block
-        for (Future<T> f : futures) {
-            get(f);
-        }
-    }
-
-    public static <T> List<Future<T>> invokeAll(List<Callable<T>> tasks) {
-        List<Future<T>> futures = new ArrayList<>(tasks.size());
+    /**
+     * Given a list of tasks-with-return-value, block until all tasks
+     * have been completed.
+     * @param tasks List of tasks-with-return-value.
+     * @param <T> Type returned by all tasks.
+     * @return A list of Future objects used to hold returned data.
+     */
+    public static <T> List<Future<T>> invokeAll(Callable<T>... tasks) {
+        List<Future<T>> futures = new ArrayList<>(tasks.length);
 
         if (!getParallel()) {
             for (Callable<T> task : tasks) {
@@ -239,14 +306,14 @@ public class ParallelismTools {
             }
         } else {
             // Submit all but the last
-            for (int i = 0; i < tasks.size() - 1; i++) {
-                futures.add(submit(tasks.get(i)));
+            for (int i = 0; i < tasks.length - 1; i++) {
+                futures.add(submit(tasks[i]));
             }
 
             // Invoke the last
             CompletableFuture<T> f = new CompletableFuture<>();
             try {
-                f.complete(tasks.get(tasks.size() - 1).call());
+                f.complete(tasks[tasks.length - 1].call());
             } catch (Exception e) {
                 f.completeExceptionally(e);
             }
@@ -272,15 +339,15 @@ public class ParallelismTools {
         return futures;
     }
 
-    public static <T> List<Future<T>> invokeAll(@NotNull Callable<T>... tasks) {
-        return invokeAll(Arrays.asList(tasks));
-    }
-
+    /**
+     * Adapt a task-with-return value into a RunnableFuture object that implements
+     * the Future interface to be executed by the current thread (as opposed to
+     * submitting it to thread pool queue).
+     * @param task Task with return value.
+     * @param <T> Type returned by task.
+     * @return A RunnableFuture object representing the task.
+     */
     public static <T> RunnableFuture<T> adapt(Callable<T> task) {
         return new FutureTask<>(task);
-    }
-
-    public static RunnableFuture<?> adapt(Runnable task) {
-        return new FutureTask<>(task, null);
     }
 }
