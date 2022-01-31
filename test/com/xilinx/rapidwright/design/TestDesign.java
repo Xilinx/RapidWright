@@ -98,8 +98,12 @@ public class TestDesign {
 
         Design before = Design.readCheckpoint(filenameRead);
 
-        ParallelismTools.setParallel(true);
-        before.writeCheckpoint(filenameWrite);
+        try {
+            ParallelismTools.setParallel(true);
+            before.writeCheckpoint(filenameWrite);
+        } finally {
+            ParallelismTools.setParallel(false);
+        }
 
         Design after = Design.readCheckpoint(filenameWrite);
 
