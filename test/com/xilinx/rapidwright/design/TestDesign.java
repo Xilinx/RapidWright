@@ -6,6 +6,7 @@ import java.nio.file.Path;
 import java.util.HashSet;
 
 import com.xilinx.rapidwright.support.CheckOpenFiles;
+import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Site;
@@ -113,5 +114,21 @@ public class TestDesign {
                                 new HashSet<>(after.getSiteInsts()));
         Assertions.assertEquals(new HashSet<>(before.getNets()),
                                 new HashSet<>(after.getNets()));
+    }
+  
+    @Test
+    @CheckOpenFiles
+    public void testDcpSecondarySourcePins() {
+        final String inputPath = RapidWrightDCP.getString("ramb18.dcp");
+        Design design = Design.readCheckpoint(inputPath);
+
+        for (int i = 0; i < 18; i++) {
+            Net net = design.getNet("r/U0/inst_blk_mem_gen/gnbram.gnativebmg.native_blk_mem_gen/valid.cstr/ramloop[0].ram.r/prim_noinit.ram/douta[" + i + "]");
+            SitePinInst spi = net.getSource();
+            if (i == 8 || i == 17)
+                Assertions.assertEquals("DOPADOP" + i/9, spi.getName());
+            else
+                Assertions.assertEquals("DOADO" + (i - i/9), spi.getName());
+        }
     }
 }
