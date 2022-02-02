@@ -28,7 +28,8 @@ package com.xilinx.rapidwright.edif;
 import java.io.BufferedWriter;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.Writer;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -37,6 +38,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -47,6 +49,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.Future;
 import java.util.function.BiFunction;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -59,9 +62,12 @@ import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.IOStandard;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
+import com.xilinx.rapidwright.util.ParallelDCPInput;
+import com.xilinx.rapidwright.util.ParallelDCPOutput;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.MessageGenerator;
 import com.xilinx.rapidwright.util.Pair;
+import com.xilinx.rapidwright.util.ParallelismTools;
 
 /**
  * Top level object for a (logical) EDIF netlist. 
@@ -609,54 +615,82 @@ public class EDIFNetlist extends EDIFName {
 		return new ArrayList<>(toExport);
 	}
 
-	public void exportEDIF(Writer bw) throws IOException {
-		bw.write("(edif ");
-		exportEDIFName(bw);
-		bw.write("\n");
-		bw.write("  (edifversion 2 0 0)\n");
-		bw.write("  (edifLevel 0)\n");
-		bw.write("  (keywordmap (keywordlevel 0))\n");
-		bw.write("(status\n");
-		bw.write(" (written\n");
-		bw.write("  (timeStamp ");
-		SimpleDateFormat formatter = new SimpleDateFormat("yyyy MM dd HH mm ss");
-		bw.write(formatter.format(new java.util.Date()));
-		bw.write(")\n");
-		bw.write("  (program \""+Device.FRAMEWORK_NAME+"\" (version \"" + Device.RAPIDWRIGHT_VERSION + "\"))\n");
-		for(String comment : getComments()){
-			bw.write("  (comment \"");
-			bw.write(comment);
-			bw.write("\")\n");
-		}
-		for(Entry<String,EDIFPropertyValue> e : metax.entrySet()){
-			bw.write("(metax ");
-			bw.write(e.getKey());
-			bw.write(" ");
-			e.getValue().writeEDIFString(bw);
+	public void exportEDIF(OutputStream out) throws IOException {
+		try (BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(out))) {
+			bw.write("(edif ");
+			exportEDIFName(bw);
+			bw.write("\n");
+			bw.write("  (edifversion 2 0 0)\n");
+			bw.write("  (edifLevel 0)\n");
+			bw.write("  (keywordmap (keywordlevel 0))\n");
+			bw.write("(status\n");
+			bw.write(" (written\n");
+			bw.write("  (timeStamp ");
+			SimpleDateFormat formatter = new SimpleDateFormat("yyyy MM dd HH mm ss");
+			bw.write(formatter.format(new java.util.Date()));
+			bw.write(")\n");
+			bw.write("  (program \"" + Device.FRAMEWORK_NAME + "\" (version \"" + Device.RAPIDWRIGHT_VERSION + "\"))\n");
+			for (String comment : getComments()) {
+				bw.write("  (comment \"");
+				bw.write(comment);
+				bw.write("\")\n");
+			}
+			for (Entry<String, EDIFPropertyValue> e : metax.entrySet()) {
+				bw.write("(metax ");
+				bw.write(e.getKey());
+				bw.write(" ");
+				e.getValue().writeEDIFString(bw);
+				bw.write(")\n");
+			}
+			bw.write(" )\n");
+			bw.write(")\n");
+
+			List<EDIFLibrary> librariesToWrite = new ArrayList<>();
+			librariesToWrite.add(getHDIPrimitivesLibrary());
+			for(EDIFLibrary lib : getLibrariesMap().values()){
+				if(lib.getName().equals(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME)) continue;
+				librariesToWrite.add(lib);
+			}
+
+			final ParallelDCPOutput dos = ParallelismTools.getParallel() ?
+					ParallelDCPOutput.cast(out) : null;
+			if (dos != null) {
+				Deque<Future<ParallelDCPInput>> streamFutures = new ArrayDeque<>();
+				for (EDIFLibrary lib : librariesToWrite) {
+					streamFutures.addAll(lib.exportEDIF());
+				}
+
+				bw.flush();
+
+				while (!streamFutures.isEmpty()) {
+					try {
+						ParallelDCPInput dis = ParallelismTools.joinFirst(streamFutures);
+						dos.write(dis);
+					} catch (IOException e) {
+						throw new RuntimeException(e);
+					}
+				}
+			} else {
+				for (EDIFLibrary lib : librariesToWrite) {
+					lib.exportEDIF(bw);
+				}
+			}
+
+			bw.write("(comment \"Reference To The Cell Of Highest Level\")\n\n");
+			bw.write("  (design ");
+			EDIFDesign design = getDesign();
+			design.exportEDIFName(bw);
+			bw.write("\n    (cellref " + design.getTopCell().getLegalEDIFName() + " (libraryref ");
+			bw.write(design.getTopCell().getLibrary().getLegalEDIFName() + "))\n");
+			design.exportEDIFProperties(bw, "    ");
+			bw.write("  )\n");
 			bw.write(")\n");
 		}
-		bw.write(" )\n");
-		bw.write(")\n");
-
-		getHDIPrimitivesLibrary().exportEDIF(bw);
-		for(EDIFLibrary lib : getLibrariesMap().values()){
-			if(lib.getName().equals(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME)) continue;
-			lib.exportEDIF(bw);
-		}
-		bw.write("(comment \"Reference To The Cell Of Highest Level\")\n\n");
-		bw.write("  (design ");
-		EDIFDesign design = getDesign();
-		design.exportEDIFName(bw);
-		bw.write("\n    (cellref " + design.getTopCell().getLegalEDIFName() + " (libraryref ");
-		bw.write(design.getTopCell().getLibrary().getLegalEDIFName() +"))\n");
-		design.exportEDIFProperties(bw, "    ");
-		bw.write("  )\n");
-		bw.write(")\n");
 	}
 
 	public void exportEDIF(Path fileName){
-		try (BufferedWriter bw = Files.newBufferedWriter(fileName)){
-			exportEDIF(bw);
+		try (OutputStream out = Files.newOutputStream(fileName)){
+			exportEDIF(out);
 		} catch (IOException e) {
 			MessageGenerator.briefError("ERROR: Failed to export EDIF file " + fileName);
 			e.printStackTrace();
