@@ -1728,6 +1728,16 @@ public class RWRoute{
 	}
 	
 	/**
+	 * Routes a design for the RapidStream flow.
+	 * Note: Added to indicate the parameters for the use case.
+	 * @param design The design instance to route.
+	 * @return The routed design instance.
+	 */
+	public static Design routeDesignRapidStream(Design design) {
+		return routeDesign(design, new RWRouteConfig(new String[] {"--partialRouting", "--resolveConflictNets", "--useUTurnNodes", "--verbose"}));
+	}
+	
+	/**
 	 * Routes a {@link Design} instance.
 	 * @param design The {@link Design} instance to be routed.
 	 * @param args An array of string arguments, can be null. 
@@ -1757,7 +1767,7 @@ public class RWRoute{
 		// Instantiates router object based on the partial routing option
 		RWRoute router;
 		if(config.isPartialRouting()) {
-			router = new PartialRouter(design, config);
+			router = config.isResolveConflictNets()? new RapidStreamRoute(design, config) : new PartialRouter(design, config);
 		}else {
 			router = new RWRoute(design, config);
 		}
