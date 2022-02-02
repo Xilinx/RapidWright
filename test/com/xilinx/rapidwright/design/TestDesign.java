@@ -3,6 +3,7 @@ package com.xilinx.rapidwright.design;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashSet;
 
 import com.xilinx.rapidwright.support.CheckOpenFiles;
 import com.xilinx.rapidwright.device.BEL;
@@ -108,7 +109,9 @@ public class TestDesign {
         Design after = Design.readCheckpoint(filenameWrite);
 
         Assertions.assertEquals(before.getNetlist(), after.getNetlist());
-        Assertions.assertEquals(before.getSiteInstMap(), after.getSiteInstMap());
-        Assertions.assertEquals(before.getNetMap(), after.getNetMap());
+        Assertions.assertEquals(new HashSet<>(before.getSiteInsts()),
+                                new HashSet<>(after.getSiteInsts()));
+        Assertions.assertEquals(new HashSet<>(before.getNets()),
+                                new HashSet<>(after.getNets()));
     }
 }

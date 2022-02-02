@@ -62,8 +62,8 @@ import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.IOStandard;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
-import com.xilinx.rapidwright.util.ParallelDCPInputStream;
-import com.xilinx.rapidwright.util.ParallelDCPOutputStream;
+import com.xilinx.rapidwright.util.ParallelDCPInput;
+import com.xilinx.rapidwright.util.ParallelDCPOutput;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.MessageGenerator;
 import com.xilinx.rapidwright.util.Pair;
@@ -652,10 +652,10 @@ public class EDIFNetlist extends EDIFName {
 				librariesToWrite.add(lib);
 			}
 
-			final ParallelDCPOutputStream dos = ParallelismTools.getParallel() ?
-					ParallelDCPOutputStream.cast(out) : null;
+			final ParallelDCPOutput dos = ParallelismTools.getParallel() ?
+					ParallelDCPOutput.cast(out) : null;
 			if (dos != null) {
-				Deque<Future<ParallelDCPInputStream>> streamFutures = new ArrayDeque<>();
+				Deque<Future<ParallelDCPInput>> streamFutures = new ArrayDeque<>();
 				for (EDIFLibrary lib : librariesToWrite) {
 					streamFutures.addAll(lib.exportEDIF());
 				}
@@ -664,7 +664,7 @@ public class EDIFNetlist extends EDIFName {
 
 				while (!streamFutures.isEmpty()) {
 					try {
-						ParallelDCPInputStream dis = ParallelismTools.joinFirst(streamFutures);
+						ParallelDCPInput dis = ParallelismTools.joinFirst(streamFutures);
 						dos.write(dis);
 					} catch (IOException e) {
 						throw new RuntimeException(e);

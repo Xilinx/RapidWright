@@ -49,7 +49,12 @@ import java.util.concurrent.TimeUnit;
  * immediately (on the submitting thread).
  */
 public class ParallelismTools {
-    private static boolean parallel = false;
+    /**
+     * Name of the environment variable to enable parallel processing
+     */
+    public static final String RW_PARALLEL = "RW_PARALLEL";
+
+    private static boolean parallel = System.getenv(RW_PARALLEL) != null;
 
     /** A fixed-size thread pool with as many threads as there are processors
      * minus one, fed by a single task queue */

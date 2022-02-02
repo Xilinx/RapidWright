@@ -24,8 +24,8 @@ package com.xilinx.rapidwright.edif;
 
 import com.xilinx.rapidwright.util.NoCloseOutputStream;
 import com.xilinx.rapidwright.util.ParallelismTools;
-import com.xilinx.rapidwright.util.ParallelDCPInputStream;
-import com.xilinx.rapidwright.util.ParallelDCPOutputStream;
+import com.xilinx.rapidwright.util.ParallelDCPInput;
+import com.xilinx.rapidwright.util.ParallelDCPOutput;
 
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -283,7 +283,7 @@ public class EDIFLibrary extends EDIFName {
 		exportEDIF(getValidCellExportOrder(), bw, true, true);
 	}
 
-	public List<Future<ParallelDCPInputStream>> exportEDIF() throws IOException{
+	public List<Future<ParallelDCPInput>> exportEDIF() throws IOException{
 		if (!ParallelismTools.getParallel()) {
 			throw new RuntimeException();
 		}
@@ -291,14 +291,14 @@ public class EDIFLibrary extends EDIFName {
 		List<EDIFCell> validCellOrder = getValidCellExportOrder();
 		final int chunkSize = 256;
 
-		List<Future<ParallelDCPInputStream>> streamFutures = new ArrayList<>();
+		List<Future<ParallelDCPInput>> streamFutures = new ArrayList<>();
 		for (long i = 0; i < validCellOrder.size(); i += chunkSize) {
 			final boolean firstChunk = (i == 0);
 			final boolean lastChunk = (i + chunkSize >= validCellOrder.size());
 			List<EDIFCell> chunk = validCellOrder.subList((int) i, (int) (lastChunk ? validCellOrder.size() : i + chunkSize));
 
 			streamFutures.add(ParallelismTools.submit(
-					() -> ParallelDCPOutputStream.newStream((os) -> {
+					() -> ParallelDCPOutput.newStream((os) -> {
 						try (OutputStreamWriter ow = new OutputStreamWriter(new NoCloseOutputStream(os))) {
 							exportEDIF(chunk, ow, firstChunk, lastChunk);
 						} catch (IOException e) {
