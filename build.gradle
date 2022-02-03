@@ -60,7 +60,7 @@ task update_jars {
 
 task sourceJar(type: Jar) {
   from sourceSets.main.allJava
-  archiveClassifier = rapidwright_version + "-sources"
+  archiveClassifier = "sources"
 }
 
 javadoc {
@@ -71,7 +71,7 @@ javadoc {
 
 task javadocJar(type: Jar) {
     from javadoc
-    archiveClassifier = rapidwright_version + "-javadoc"
+    archiveClassifier = "javadoc"
 }
 
 task standaloneJar (type: Jar) {
