@@ -10,7 +10,15 @@
 #  3. Run 'make package'
 #  4. Run 'test_upload'
 #  5. Test the package download and install in a venv from Test PyPi to ensure
-#     The package and release is good.
+#     The package and release is good. For example:
+#     $ unset RAPIDWRIGHT_PATH
+#     $ unset CLASSPATH
+#     $ mkdir test_rapidwright_venv; cd test_rapidwright_venv
+#     $ python3 -mvenv env
+#     $ source env/bin/activate
+#     $ pip install jpype1
+#     $ python3 -m pip install --index-url https://test.pypi.org/simple/ rapidwright
+#     $ python3 <run test script>
 #  6. If step 2 was run, run 'make clean; make update_version; make package'
 #  7. Upload to PyPi with 'make upload_to_pypi'
 ###############################################################################
