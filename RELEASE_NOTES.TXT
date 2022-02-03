@@ -1,4 +1,4 @@
-============= RapidWright 2021.2.1-beta released on 2022-02-02 ================
+============= RapidWright 2021.2.1-beta released on 2022-02-03 ================
 Notes: 
  * 3-4X faster DCP write times using a new parallel, multi-threaded approach (See #337), Enable with:
    - ParallelismTools.setParallel(true) or 
