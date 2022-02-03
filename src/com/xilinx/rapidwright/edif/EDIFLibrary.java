@@ -20,12 +20,16 @@
  * limitations under the License.
  * 
  */
-/**
- * 
- */
 package com.xilinx.rapidwright.edif;
 
+import com.xilinx.rapidwright.util.NoCloseOutputStream;
+import com.xilinx.rapidwright.util.ParallelismTools;
+import com.xilinx.rapidwright.util.ParallelDCPInput;
+import com.xilinx.rapidwright.util.ParallelDCPOutput;
+
+import java.io.BufferedWriter;
 import java.io.IOException;
+import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -35,6 +39,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Future;
 
 /**
  * Keeps track of a set of {@link EDIFCell} objects 
@@ -259,15 +264,50 @@ public class EDIFLibrary extends EDIFName {
 		}
 	}
 	
-
-	public void exportEDIF(Writer bw) throws IOException{
-		bw.write("  (Library ");
-		exportEDIFName(bw);
-		bw.write("\n    (edifLevel 0)\n");
-		bw.write("    (technology (numberDefinition ))\n");
-		for(EDIFCell cell : getValidCellExportOrder()){
-			cell.exportEDIF(bw);
+	void exportEDIF(List<EDIFCell> cells, Writer w, boolean writeHeader, boolean writeFooter) throws IOException {
+		if (writeHeader) {
+			w.write("  (Library ");
+			exportEDIFName(w);
+			w.write("\n    (edifLevel 0)\n");
+			w.write("    (technology (numberDefinition ))\n");
 		}
-		bw.write("  )\n");
+		for (EDIFCell c : cells) {
+			c.exportEDIF(w);
+		}
+		if (writeFooter) {
+			w.write("  )\n");
+		}
+	}
+
+	public void exportEDIF(BufferedWriter bw) throws IOException {
+		exportEDIF(getValidCellExportOrder(), bw, true, true);
+	}
+
+	public List<Future<ParallelDCPInput>> exportEDIF() throws IOException{
+		if (!ParallelismTools.getParallel()) {
+			throw new RuntimeException();
+		}
+
+		List<EDIFCell> validCellOrder = getValidCellExportOrder();
+		final int chunkSize = 256;
+
+		List<Future<ParallelDCPInput>> streamFutures = new ArrayList<>();
+		for (long i = 0; i < validCellOrder.size(); i += chunkSize) {
+			final boolean firstChunk = (i == 0);
+			final boolean lastChunk = (i + chunkSize >= validCellOrder.size());
+			List<EDIFCell> chunk = validCellOrder.subList((int) i, (int) (lastChunk ? validCellOrder.size() : i + chunkSize));
+
+			streamFutures.add(ParallelismTools.submit(
+					() -> ParallelDCPOutput.newStream((os) -> {
+						try (OutputStreamWriter ow = new OutputStreamWriter(new NoCloseOutputStream(os))) {
+							exportEDIF(chunk, ow, firstChunk, lastChunk);
+						} catch (IOException e) {
+							throw new RuntimeException(e);
+						}
+					})
+			));
+		}
+
+		return streamFutures;
 	}
 }
