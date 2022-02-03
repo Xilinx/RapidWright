@@ -12,7 +12,7 @@ def sw = new StringWriter()
 def get_rapidwright_version_line = file('.github/workflows/build.yml').filterLine(sw) { 
     line -> line.contains('RAPIDWRIGHT_VERSION:') 
 }
-def rapidwright_version = sw.toString().replace("RAPIDWRIGHT_VERSION: v", "").replace("-beta", "").trim()
+def rapidwright_version = sw.toString().replace("RAPIDWRIGHT_VERSION: v", "").replace("-beta", "").trim() + "-rc1"
 
 dependencies {
     api 'com.xilinx.rapidwright:rapidwright-api-lib:' + rapidwright_version
