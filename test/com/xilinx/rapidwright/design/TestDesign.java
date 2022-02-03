@@ -131,4 +131,16 @@ public class TestDesign {
                 Assertions.assertEquals("DOADO" + (i - i/9), spi.getName());
         }
     }
+    
+    @Test
+    @CheckOpenFiles
+    public void testRouteThruPIPsSitePinInsts() {
+        final String inputPath = RapidWrightDCP.getString("routethru_pip.dcp");
+        Design design = Design.readCheckpoint(inputPath);
+
+        Net net = design.getNet("CO3_OBUF");
+        for (SitePinInst spi : net.getSinkPins()) {
+            Assertions.assertTrue(spi.getSite().isInputPin(spi.getName()));
+        }
+    }
 }
