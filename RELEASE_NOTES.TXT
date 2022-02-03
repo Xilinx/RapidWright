@@ -1,3 +1,22 @@
+============= RapidWright 2021.2.1-beta released on 2022-02-02 ================
+Notes: 
+ * 3-4X faster DCP write times using a new parallel, multi-threaded approach (See #337), Enable with:
+   - ParallelismTools.setParallel(true) or 
+   - Add the environment variable RW_PARALLEL to the environment.
+ * Multiple DCP read operations can now be initiated in parallel without errors
+ * Fixes a number of issues related to SitePinInst creation on DCP load (see #317, #318)
+ * Adds a new MergeDesign capability, allows users to merge two or more existing designs into a
+   single implementation (See #331)
+ * All RapidWright dependencies and itself are published on Maven Central.  Removes the need to 
+   manually download rapidwright_jars.zip, instead users can simply run './gradlew update_jars'  
+ * Includes PRs: #287, #291, #289, #297, #290 #300, #296, #294, #304, #305, #313, #319, #324, #328,
+                 #320, #332, #330, #336, #331, #333, #322, #318, #317
+ * Fixes Issues: #326, #298, #299, #312, #315, #326
+ - API Additions:
+   - com.xilinx.rapidwright.design.Design "public void setName(String name)"
+   - com.xilinx.rapidwright.device.Site "public ClockRegion getClockRegion()"
+ 
+ 
 ============= RapidWright 2021.2.0-beta released on 2021-11-09 ================
 Notes: 
  * Updates support for latest Vivado devices in 2021.2
