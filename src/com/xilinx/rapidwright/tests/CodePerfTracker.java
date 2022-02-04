@@ -130,7 +130,7 @@ public class CodePerfTracker {
 	}
 
 	public CodePerfTracker start(String segmentName){
-		if(!GLOBAL_DEBUG) return this;
+		if(!GLOBAL_DEBUG || this == SILENT) return this;
 		int idx = runtimes.size();
 		if(isUsingGCCallsToTrackMemory()) System.gc();
 		long currUsage = rt.totalMemory() - rt.freeMemory();
@@ -141,7 +141,7 @@ public class CodePerfTracker {
 	}
 
 	public CodePerfTracker stop(){
-		if(!GLOBAL_DEBUG) return this;
+		if(!GLOBAL_DEBUG || this == SILENT) return this;
 		long end = System.nanoTime();
 		int idx = runtimes.size()-1;
 		if(idx < 0) return null;
@@ -249,7 +249,7 @@ public class CodePerfTracker {
 	}
 	
 	public void printSummary(){
-		if(!GLOBAL_DEBUG) return;
+		if(!GLOBAL_DEBUG || this == SILENT) return;
 		if(!isVerbose()) return;
 		if(!printProgress) MessageGenerator.printHeader(name);
 		addTotalEntry();
