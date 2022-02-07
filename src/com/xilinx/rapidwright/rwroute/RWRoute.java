@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.PriorityQueue;
 import java.util.Set;
+import java.util.function.Supplier;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
@@ -1728,16 +1729,6 @@ public class RWRoute{
 	}
 	
 	/**
-	 * Routes a design for the RapidStream flow.
-	 * Note: Added to indicate the parameters for the use case.
-	 * @param design The design instance to route.
-	 * @return The routed design instance.
-	 */
-	public static Design routeDesignRapidStream(Design design) {
-		return routeDesign(design, new RWRouteConfig(new String[] {"--partialRouting", "--resolveConflictNets", "--useUTurnNodes", "--verbose"}));
-	}
-	
-	/**
 	 * Routes a {@link Design} instance.
 	 * @param design The {@link Design} instance to be routed.
 	 * @param args An array of string arguments, can be null. 
@@ -1757,6 +1748,21 @@ public class RWRoute{
 	 * @param config A {@link RWRouteConfig} instance consisting of customizable parameters to use.
 	 */
 	private static Design routeDesign(Design design, RWRouteConfig config) {
+		return routeDesign(design, config, () -> {
+			if(config.isPartialRouting()) {
+				return config.isResolveConflictNets()? new RapidStreamRoute(design, config) : new PartialRouter(design, config);
+			}
+			return new RWRoute(design, config);
+		});
+	}
+	
+	/**
+	 * Routes a design after pre-processing.
+	 * @param design The {@link Design} instance to be routed.
+	 * @param config A {@link RWRouteConfig} instance consisting of customizable parameters to use.
+	 * @param newRouter Supplier lambda for constructing a new RWRoute object.
+	 */
+	protected static Design routeDesign(Design design, RWRouteConfig config, Supplier<RWRoute> newRouter) {
 		// Pre-processing of the design regarding physical net names pins
 		DesignTools.makePhysNetNamesConsistent(design);
 		if(!config.isPartialRouting() || (!design.getVccNet().hasPIPs() && !design.getGndNet().hasPIPs())) {
@@ -1764,13 +1770,8 @@ public class RWRoute{
 		}
 		DesignTools.createMissingSitePinInsts(design);
 		
-		// Instantiates router object based on the partial routing option
-		RWRoute router;
-		if(config.isPartialRouting()) {
-			router = config.isResolveConflictNets()? new RapidStreamRoute(design, config) : new PartialRouter(design, config);
-		}else {
-			router = new RWRoute(design, config);
-		}
+		// Instantiates router object
+		RWRoute router = newRouter.get();
 		
 		// Routes the design
 		router.route();
