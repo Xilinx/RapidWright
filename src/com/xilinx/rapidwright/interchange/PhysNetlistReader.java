@@ -28,7 +28,6 @@ import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.device.BEL;
-import com.xilinx.rapidwright.device.BELClass;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.PIP;
@@ -59,7 +58,6 @@ import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.Property;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranch;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranch.RouteSegment;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.SiteInstance;
-import com.xilinx.rapidwright.util.Utils;
 
 public class PhysNetlistReader {
 
@@ -322,24 +320,22 @@ public class PhysNetlistReader {
             int routeSrcsCount = routeSrcs.size();
             for(int j=0; j < routeSrcsCount; j++) {
                 RouteBranch.Reader branchReader = routeSrcs.get(j);
-                readRouteBranch(branchReader, net, design, strings, null);
+                readRouteBranch(branchReader, net, design, strings);
             }
             // Stubs
             StructList.Reader<RouteBranch.Reader> routeStubs = netReader.getStubs();
             int routeStubsCount = routeStubs.size();
             for(int j=0; j < routeStubsCount; j++) {
                 RouteBranch.Reader branchReader = routeStubs.get(j);
-                readRouteBranch(branchReader, net, design, strings, null);
+                readRouteBranch(branchReader, net, design, strings);
             }
 
         }
     }
 
     private static void readRouteBranch(RouteBranch.Reader branchReader, Net net, Design design,
-                                        Enumerator<String> strings, BELPin routeThruLutInput) {
+                                        Enumerator<String> strings) {
         RouteBranch.RouteSegment.Reader segment = branchReader.getRouteSegment();
-        StructList.Reader<RouteBranch.Reader> branches = branchReader.getBranches();
-        int branchesCount = branches.size();
         Device device = design.getDevice();
         switch(segment.which()) {
             case PIP:{
@@ -384,36 +380,6 @@ public class PhysNetlistReader {
                 if(belPin == null) {
                     throw new RuntimeException(String.format("ERROR: Failed to get BEL pin %s/%s", belName, belPinName));
                 }
-
-                // Examine BEL input pins from SLICEL/M only
-                if (Utils.isSLICE(siteInst) && bel.getBELClass() == BELClass.BEL && belPin.isInput()) {
-
-                    // If this route branch terminates here ...
-                    if (branchesCount == 0) {
-                        // ... and it routed through a LUT along the way
-                        if (routeThruLutInput != null) {
-                            // Then place a route-thru LUT
-
-                            // Make sure nothing placed there already
-                            assert(siteInst.getCell(routeThruLutInput.getBEL()) == null);
-
-                            Cell belCell = siteInst.getCell(bel);
-                            EDIFCellInst cellInst = belCell.getEDIFCellInst();
-                            assert(cellInst != null);
-
-                            Cell c = new Cell(belCell.getName(), routeThruLutInput.getBEL(), cellInst);
-                            c.setSiteInst(siteInst);
-                            siteInst.getCellMap().put(routeThruLutInput.getBELName(), c);
-                            c.setRoutethru(true);
-                            c.addPinMapping(routeThruLutInput.getName(), belCell.getLogicalPinMapping(belPinName));
-                        }
-                    } else if (belName.endsWith("LUT")) {
-                        assert (routeThruLutInput == null);
-
-                        routeThruLutInput = belPin;
-                    }
-                }
-
                 siteInst.routeIntraSiteNet(net, belPin, belPin);
                 break;
             }
@@ -432,8 +398,6 @@ public class PhysNetlistReader {
                 SiteInst siteInst = getSiteInst(spReader.getSite(), design, strings, net.isStaticNet());
                 String pinName = strings.get(spReader.getPin());
                 net.addPin(new SitePinInst(pinName, siteInst), false);
-
-                assert(routeThruLutInput == null);
                 break;
             }
             case _NOT_IN_SCHEMA: {
@@ -441,9 +405,11 @@ public class PhysNetlistReader {
             }
         }
 
+        StructList.Reader<RouteBranch.Reader> branches = branchReader.getBranches();
+        int branchesCount = branches.size();
         for(int j=0; j < branchesCount; j++) {
             RouteBranch.Reader bReader = branches.get(j);
-            readRouteBranch(bReader, net, design, strings, routeThruLutInput);
+            readRouteBranch(bReader, net, design, strings);
         }
 
     }
