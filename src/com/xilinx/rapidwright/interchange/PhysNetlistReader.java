@@ -10,6 +10,7 @@ import java.util.Queue;
 import java.util.Map;
 import java.util.Set;
 
+import com.xilinx.rapidwright.device.SitePIP;
 import org.capnproto.MessageReader;
 import org.capnproto.PrimitiveList;
 import org.capnproto.ReaderOptions;
@@ -419,8 +420,11 @@ public class PhysNetlistReader {
             case SITE_P_I_P:{
                 PhysSitePIP.Reader spReader = segment.getSitePIP();
                 SiteInst siteInst = getSiteInst(spReader.getSite(), design, strings);
-                siteInst.addSitePIP(strings.get(spReader.getBel()),
-                                    strings.get(spReader.getPin()));
+                SitePIP sitePIP = siteInst.getSitePIP(strings.get(spReader.getBel()),
+                                                      strings.get(spReader.getPin()));
+                siteInst.addSitePIP(sitePIP);
+                String siteWire = sitePIP.getInputPin().getSiteWireName();
+                siteInst.addCTag(net, siteWire);
                 break;
             }
             case SITE_PIN: {

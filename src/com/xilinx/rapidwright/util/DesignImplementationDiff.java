@@ -27,11 +27,13 @@ package com.xilinx.rapidwright.util;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
+import java.util.Set;
+import java.util.function.Function;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
@@ -39,9 +41,14 @@ import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.BEL;
+import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
+import com.xilinx.rapidwright.device.SitePIP;
+import com.xilinx.rapidwright.device.SitePIPStatus;
 import com.xilinx.rapidwright.interchange.PhysNetlistWriter;
+import com.xilinx.rapidwright.interchange.SiteBELPin;
+import com.xilinx.rapidwright.interchange.SiteSitePIP;
 
 /**
  * This class takes as input two DCPs, one which is derived from the other and
@@ -102,8 +109,8 @@ public class DesignImplementationDiff {
 	}
 
 	public static void diffCells(Design lhs, Design rhs) {
-		int nleft = 0;
-		int nright = 0;
+		nleft = 0;
+		nright = 0;
 		for (Cell lc : lhs.getCells()) {
 			Cell rc = rhs.getCell(lc.getName());
 			if (rc == null) {
@@ -221,9 +228,99 @@ public class DesignImplementationDiff {
 		}
 	}
 
+	static int nleft;
+	static int nright;
+
+	private static <T> int diffCollections(Collection<T> lhs, Collection<T> rhs,
+										   String prefix) {
+		Set<T> lset = new HashSet<>(lhs);
+		Set<T> rset = new HashSet<>(rhs);
+
+		if (lset.size() != lhs.size()) {
+			System.out.println("< " + prefix + " has duplicates");
+		}
+		if (rset.size() != rhs.size()) {
+			System.out.println("> " + prefix + " has duplicates");
+		}
+
+		for (T l : lset) {
+			if (!rset.contains(l)) {
+				System.out.println("< " + prefix + "=" + l);
+				nleft++;
+			}
+		}
+		rset.removeAll(lset);
+		for (T r : rset) {
+			System.out.println("> " + prefix + "=" + r);
+			nright++;
+		}
+
+		return lset.size();
+	}
+
 	public static void diffNets(Design lhs, Design rhs, boolean ignoreLeftUnrouted) {
-		int nleft = 0;
-		int nright = 0;
+		Function<Design, Map<Net, Set<SiteSitePIP>>> netToSitePips = (Design design) -> {
+			Map<Net, Set<SiteSitePIP>> m = new HashMap<>();
+			for (SiteInst si : design.getSiteInsts()) {
+				for(SitePIP sp : si.getUsedSitePIPs()) {
+					String siteWire = sp.getInputPin().getSiteWireName();
+					Net net = si.getNetFromSiteWire(siteWire);
+					if(net == null) {
+						String sitePinName = sp.getInputPin().getConnectedSitePinName();
+						SitePinInst spi = si.getSitePinInst(sitePinName);
+						if(spi != null) {
+							net = spi.getNet();
+						}
+					}
+					SitePIPStatus status = si.getSitePIPStatus(sp);
+					if (!m.computeIfAbsent(net, (k) -> new HashSet<>()).add(
+							new SiteSitePIP(si.getSite(), sp, status.isFixed()))) {
+						// System.out.println("DUPE");
+					}
+				}
+			}
+			return m;
+		};
+		Map<Net, Set<SiteSitePIP>> lsitepips = netToSitePips.apply(lhs);
+		Map<Net, Set<SiteSitePIP>> rsitepips = netToSitePips.apply(rhs);
+
+		Function<Design, Map<Net, Set<SiteBELPin>>> netToBelPins = (Design design) -> {
+			Map<Net, Set<SiteBELPin>> m = new HashMap<>();
+			for (SiteInst si : design.getSiteInsts()) {
+				for(Map.Entry<Net,HashSet<String>> e : si.getSiteCTags().entrySet()) {
+					if(e.getValue() != null && e.getValue().size() > 0) {
+						for(String siteWire : e.getValue()) {
+							BELPin[] belPins = si.getSiteWirePins(siteWire);
+							Net net = si.getNetFromSiteWire(siteWire);
+							for(BELPin belPin : belPins) {
+								BEL bel = belPin.getBEL();
+								Cell cell = si.getCell(bel);
+								if(belPin.isInput()) {
+									// Skip if no BEL placed here
+									if (cell == null) {
+										continue;
+									}
+									// Skip if pin not used (e.g. A1 connects to A[56]LUT.A1;
+									// both cells can exist but not both need be using this pin)
+									if (cell.getLogicalPinMapping(belPin.getName()) == null) {
+										continue;
+									}
+								}
+
+								m.computeIfAbsent(net, (k) -> new HashSet<>()).add(
+										new SiteBELPin(si.getSite(), belPin));
+							}
+						}
+					}
+				}
+			}
+			return m;
+		};
+		Map<Net, Set<SiteBELPin>> lbelpins = netToBelPins.apply(lhs);
+		Map<Net, Set<SiteBELPin>> rbelpins = netToBelPins.apply(rhs);
+
+		nleft = 0;
+		nright = 0;
 		int npips = 0;
 		for (Net ln : lhs.getNets()) {
 			Net rn = rhs.getNet(ln.getName());
@@ -236,38 +333,20 @@ public class DesignImplementationDiff {
 				continue;
 			}
 
-			HashSet<SitePinInst> lspi = new HashSet<>(ln.getPins());
-			HashSet<SitePinInst> rspi = new HashSet<>(rn.getPins());
-			for (SitePinInst spi : lspi) {
-				if (!rspi.contains(spi)) {
-					System.out.println("< NetPin '" + ln.getName() + "'=" + spi + "/" + spi.getSiteInst());
-					nleft++;
-				}
-			}
-			rspi.removeAll(lspi);
-			for (SitePinInst spi : rspi) {
-				System.out.println("> NetPin '" + ln.getName() + "'=" + spi + "/" + spi.getSiteInst());
-				nright++;
-			}
+			diffCollections(ln.getPins(), rn.getPins(), "NetPin '" + ln.getName() + "'");
 
 			// HashSet<DeepEqualsPIP> lpips = new HashSet<>(DeepEqualsPIP.fromPIPs(ln.getPIPs()));
 			// HashSet<DeepEqualsPIP> rpips = new HashSet<>(DeepEqualsPIP.fromPIPs(rn.getPIPs()));
-			HashSet<PIP> lpips = new HashSet<>(ln.getPIPs());
-			HashSet<PIP> rpips = new HashSet<>(rn.getPIPs());
-			//for (DeepEqualsPIP lp : lpips) {
-			for (PIP lp : lpips) {
-				if (!rpips.contains(lp)) {
-					System.out.println("< NetPIP '" + ln.getName() + "'=" + lp);
-					nleft++;
-				}
-			}
-			rpips.removeAll(lpips);
-			//for (DeepEqualsPIP rp : rpips) {
-			for (PIP rp : rpips) {
-				System.out.println("> NetPIP '" + rn.getName() + "'=" + rp);
-				nright++;
-			}
-			npips += lpips.size();
+			npips += diffCollections(ln.getPIPs(), rn.getPIPs(), "NetPIP '" + ln.getName() + "'");
+
+			diffCollections(lsitepips.getOrDefault(ln, Collections.EMPTY_SET),
+					rsitepips.getOrDefault(rn, Collections.EMPTY_SET),
+					"NetSitePIP '" + ln.getName() + "'");
+
+			// TODO: Some BELPin-s on LUT routethrus not currently captured
+			diffCollections(lbelpins.getOrDefault(ln, Collections.EMPTY_SET),
+					rbelpins.getOrDefault(rn, Collections.EMPTY_SET),
+					"NetBELPin '" + ln.getName() + "'");
 		}
 
 		for (Net rn : rhs.getNets()) {
