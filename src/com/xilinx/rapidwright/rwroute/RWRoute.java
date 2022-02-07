@@ -1750,7 +1750,7 @@ public class RWRoute{
 	private static Design routeDesign(Design design, RWRouteConfig config) {
 		return routeDesign(design, config, () -> {
 			if(config.isPartialRouting()) {
-				return config.isResolveConflictNets()? new RapidStreamRoute(design, config) : new PartialRouter(design, config);
+				return new PartialRouter(design, config);
 			}
 			return new RWRoute(design, config);
 		});
