@@ -38,9 +38,9 @@ public class RoutingNode{
 	
 	RoutingNode (Node node){
 		this.node = node;
-		this.prev = null;
-		this.isTarget = false;
-		this.delayFromSource = 0;
+		prev = null;
+		isTarget = false;
+		delayFromSource = 0;
 	}
 	
 	/**
@@ -63,11 +63,11 @@ public class RoutingNode{
 	}
 	
 	public RoutingNode getPrev() {
-		return this.prev;
+		return prev;
 	}
 	
 	public Node getNode() {
-		return this.node;
+		return node;
 	}
 
 	public boolean isTarget() {
@@ -79,11 +79,11 @@ public class RoutingNode{
 	}
 	
 	public int hashCode() {
-		return this.node.hashCode();
+		return node.hashCode();
 	}
 	
 	public String toString() {
-		return this.node.toString() + ", accDly = " + this.delayFromSource;
+		return node.toString() + ", accDly = " + delayFromSource;
 	}
 	
 }

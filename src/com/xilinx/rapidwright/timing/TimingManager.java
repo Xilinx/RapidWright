@@ -20,16 +20,16 @@
 
 package com.xilinx.rapidwright.timing;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import com.xilinx.rapidwright.design.ConstraintGroup;
 import com.xilinx.rapidwright.design.Design;
-import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Node;
-import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.rwroute.RWRouteConfig;
 import com.xilinx.rapidwright.rwroute.Connection;
 import com.xilinx.rapidwright.rwroute.NetWrapper;
@@ -84,41 +84,23 @@ public class TimingManager {
         timingGraph.setTimingModel(timingModel);
         this.device = this.design.getDevice();
         if (doBuild)
-            build(false);
+            build(false, this.design.getNets());
     }
     
-    public TimingManager(Design design, boolean doBuild, RuntimeTrackerTree timer, RWRouteConfig config, ClkRouteTiming clkTiming) {
+    public TimingManager(Design design, boolean doBuild, RuntimeTrackerTree timer, RWRouteConfig config, ClkRouteTiming clkTiming, Collection<Net> targetNets) {
     	this.design = design;
     	this.setTimingRequirement();
     	this.verbose = config.isVerbose();
     	setPessimismFactors(config.getPessimismA(), config.getPessimismB());
     	this.routerTimer = timer;
         timingModel = new TimingModel(this.design.getDevice());
-        timingGraph = new TimingGraph(this.design, this.routerTimer, clkTiming);
+        timingGraph = new TimingGraph(this.design, this.routerTimer, clkTiming, config.getDspTimingDataFolder());
         timingModel.setTimingManager(this);
         timingGraph.setTimingManager(this);
         timingGraph.setTimingModel(timingModel);
         this.device = this.design.getDevice();
         if (doBuild)
-            build(config.isPartialRouting());
-    }
-    
-    /**
-     * Gets the map between each sink {@link SitePinInst} instance and its associated {@link TimingEdge} instances
-     * from the {@link TimingGraph} instance.
-     * @return Mapping between each sink {@link SitePinInst} instance and its associated {@link TimingEdge} instances.
-     */
-    public Map<SitePinInst, List<TimingEdge>> getSinkSitePinInstAndTimingEdgesMap(){
-    	return this.timingGraph.getSinkSitePinInstTimingEdges();
-    }
-    
-    /**
-     * Gets the map between each {@link EDIFHierPortInst} instance (logical pin) and {@link SitePinInst} instance (physical pin)
-     * from the {@link TimingGraph} instance.
-     * @return Mapping between each {@link EDIFHierPortInst} instance (logical pin) and {@link SitePinInst} instance
-     */
-    public Map<EDIFHierPortInst, SitePinInst> getEdifHPortMap(){
-    	return this.timingGraph.getEdifHPortMap();
+            build(config.isPartialRouting(), targetNets);
     }
     
     /**
@@ -188,8 +170,7 @@ public class TimingManager {
     	}
     }
     
-    public void getCriticalPathInfo(Pair<Float, TimingVertex> maxDelayTimingVertex, Map<TimingEdge, Connection> timingEdgeConnctionMap,
-    		boolean useRoutable, Map<Node, Routable> rnodesCreated){
+    public void getCriticalPathInfo(Pair<Float, TimingVertex> maxDelayTimingVertex, boolean useRoutable, Map<Node, Routable> rnodesCreated){
     	TimingVertex maxV = maxDelayTimingVertex.getSecond();
     	float maxDelay = maxDelayTimingVertex.getFirst();
     	System.out.printf(MessageGenerator.formatString("Timing requirement (ps):", timingRequirement));
@@ -206,7 +187,7 @@ public class TimingManager {
     	System.out.printf(MessageGenerator.formatString("Critical path delay (ps):", (short)adjusted));
     	System.out.printf(MessageGenerator.formatString("Slack (ps):", (short) (timingRequirement - adjusted)));
     	
-    	this.printPathDelayBreakDown(arr, criticalEdges, timingEdgeConnctionMap, useRoutable, rnodesCreated);
+    	this.printPathDelayBreakDown(arr, criticalEdges, this.timingGraph.getTimingEdgeConnectionMap(), useRoutable, rnodesCreated);
     }
     
     /**
@@ -333,13 +314,13 @@ public class TimingManager {
      * Builds the TimingModel and TimingGraph.
      * @return Indication of successful completion.
      */
-    private boolean build(boolean isPartialRouting) {
+    private boolean build(boolean isPartialRouting, Collection<Net> targetNets) {
     	if(this.routerTimer != null) this.routerTimer.createRuntimeTracker("build timing model", "Initialization").start();
         timingModel.build();
         if(this.routerTimer != null) this.routerTimer.getRuntimeTracker("build timing model").stop();
         
         if(this.routerTimer != null) this.routerTimer.createRuntimeTracker("build timing graph", "Initialization").start();
-        timingGraph.build(isPartialRouting);
+        timingGraph.build(isPartialRouting, targetNets);
         if(this.routerTimer != null) this.routerTimer.getRuntimeTracker("build timing graph").stop();
         
         return postBuild();
@@ -385,4 +366,10 @@ public class TimingManager {
     public Device getDevice() {
         return device;
     }
+    
+    public void setTimingEdgesOfConnections(List<Connection> connections) {
+    	this.timingGraph.setTimingEdgesOfConnections(connections);
+    }
+    
+    
 }

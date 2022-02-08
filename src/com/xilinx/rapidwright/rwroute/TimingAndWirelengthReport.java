@@ -36,7 +36,6 @@ import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.TileTypeEnum;
-import com.xilinx.rapidwright.timing.DSPTimingData;
 import com.xilinx.rapidwright.timing.TimingEdge;
 import com.xilinx.rapidwright.timing.TimingManager;
 import com.xilinx.rapidwright.timing.TimingVertex;
@@ -63,8 +62,7 @@ public class TimingAndWirelengthReport{
 	
 	public TimingAndWirelengthReport(Design design, RWRouteConfig config) {
 		this.design = design;
-		DSPTimingData.setDSPTimingFolder(config.getDspTimingDataFolder());
-		this.timingManager = new TimingManager(this.design, true, null, config, RWRoute.createClkTimingData(config));		
+		this.timingManager = new TimingManager(this.design, true, null, config, RWRoute.createClkTimingData(config), this.design.getNets());
 	    this.estimator = new DelayEstimatorBase(this.design.getDevice(), new InterconnectInfo(), config.isUseUTurnNodes(), 0);
 		RoutableNode.setTimingDriven(true, this.estimator);
 		this.wirelength = 0;
@@ -82,7 +80,7 @@ public class TimingAndWirelengthReport{
 		
 		Pair<Float, TimingVertex> maxDelayAndTimingVertex = this.timingManager.calculateArrivalRequireTimes();
 		System.out.println();
-		this.timingManager.getCriticalPathInfo(maxDelayAndTimingVertex, this.timingEdgeConnectionMap, false, null);
+		this.timingManager.getCriticalPathInfo(maxDelayAndTimingVertex, false, null);
 		
 		System.out.println("\n");
 		System.out.println("Total nodes: " + this.usedNodes);
@@ -107,7 +105,7 @@ public class TimingAndWirelengthReport{
 				this.wirelength += wl;
 				RouterHelper.addNodeTypeLengthToMap(node, wl, this.nodeTypeUsage, this.nodeTypeLength);	
 			}			
-			RWRoute.setTimingEdgesOfConnections(netplus.getConnections(), this.timingManager, this.timingEdgeConnectionMap);
+			this.timingManager.setTimingEdgesOfConnections(netplus.getConnections());
 			this.setAccumulativeDelayOfEachNetNode(netplus);
 		}
 	}

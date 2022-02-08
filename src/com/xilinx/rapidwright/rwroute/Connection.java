@@ -86,8 +86,8 @@ public class Connection implements Comparable<Connection>{
 		this.id = id;
 		this.source = source;
 		this.sink = sink;
-		this.criticality = 0f;
-		this.rnodes = new ArrayList<>();
+		criticality = 0f;
+		rnodes = new ArrayList<>();
 		this.netWrapper = netWrapper;
 		this.netWrapper.addConnection(this);
 	}
@@ -96,8 +96,8 @@ public class Connection implements Comparable<Connection>{
 	 * Computes the half-perimeter wirelength of connection based on the source and sink rnodes.
 	 */
 	public void computeHpwl() {
-		this.hpwl = (short) (Math.abs(this.sourceRnode.getEndTileXCoordinate() - this.sinkRnode.getEndTileXCoordinate()) + 1 
-				+ Math.abs(this.sourceRnode.getEndTileYCoordinate() - this.sinkRnode.getEndTileYCoordinate()) + 1);
+		hpwl = (short) (Math.abs(sourceRnode.getEndTileXCoordinate() - sinkRnode.getEndTileXCoordinate()) + 1 
+				+ Math.abs(sourceRnode.getEndTileYCoordinate() - sinkRnode.getEndTileYCoordinate()) + 1);
 	}
 	
 	/**
@@ -109,33 +109,33 @@ public class Connection implements Comparable<Connection>{
 	 */
 	public void computeConnectionBoundingBox(short boundingBoxExtensionX, short boundingBoxExtensionY, boolean checkSLRCrossing) {
 		short xMin, xMax, yMin, yMax;
-		short xNetCenter = (short) Math.ceil(this.netWrapper.getXCenter());
-		short yNetCenter = (short) Math.ceil(this.netWrapper.getYCenter());
-		xMax = this.maxOfThree(this.sourceRnode.getEndTileXCoordinate(), this.sinkRnode.getEndTileXCoordinate(), xNetCenter);
-		xMin = this.minOfThree(this.sourceRnode.getEndTileXCoordinate(), this.sinkRnode.getEndTileXCoordinate(), xNetCenter);
-		yMax = this.maxOfThree(this.sourceRnode.getEndTileYCoordinate(), this.sinkRnode.getEndTileYCoordinate(), yNetCenter);
-		yMin = this.minOfThree(this.sourceRnode.getEndTileYCoordinate(), this.sinkRnode.getEndTileYCoordinate(), yNetCenter);
-		this.xMaxBB = (short) (xMax + boundingBoxExtensionX);
-		this.xMinBB = (short) (xMin - boundingBoxExtensionX);
-		this.yMaxBB = (short) (yMax + boundingBoxExtensionY);
-		this.yMinBB = (short) (yMin - boundingBoxExtensionY);
+		short xNetCenter = (short) Math.ceil(netWrapper.getXCenter());
+		short yNetCenter = (short) Math.ceil(netWrapper.getYCenter());
+		xMax = maxOfThree(sourceRnode.getEndTileXCoordinate(), sinkRnode.getEndTileXCoordinate(), xNetCenter);
+		xMin = minOfThree(sourceRnode.getEndTileXCoordinate(), sinkRnode.getEndTileXCoordinate(), xNetCenter);
+		yMax = maxOfThree(sourceRnode.getEndTileYCoordinate(), sinkRnode.getEndTileYCoordinate(), yNetCenter);
+		yMin = minOfThree(sourceRnode.getEndTileYCoordinate(), sinkRnode.getEndTileYCoordinate(), yNetCenter);
+		xMaxBB = (short) (xMax + boundingBoxExtensionX);
+		xMinBB = (short) (xMin - boundingBoxExtensionX);
+		yMaxBB = (short) (yMax + boundingBoxExtensionY);
+		yMinBB = (short) (yMin - boundingBoxExtensionY);
 		
 		// allow more space for resource expansion of SLR-crossing connections
 		if(checkSLRCrossing) {		
-			if(this.crossSLR()) {
-				this.yMaxBB += 2 * boundingBoxExtensionY;
-				this.yMinBB -= 2 * boundingBoxExtensionY;
+			if(crossSLR()) {
+				yMaxBB += 2 * boundingBoxExtensionY;
+				yMinBB -= 2 * boundingBoxExtensionY;
 			}
 		}
-		this.xMinBB = this.xMinBB < 0? -1:this.xMinBB;
-		this.yMinBB = this.yMinBB < 0? -1:this.yMinBB;
+		xMinBB = xMinBB < 0? -1:xMinBB;
+		yMinBB = yMinBB < 0? -1:yMinBB;
 	}
 	
 	private boolean crossSLR() {
-		if(this.getSource().getTile().getSLR().equals(this.sink.getTile().getSLR())) {
+		if(getSource().getTile().getSLR().equals(sink.getTile().getSLR())) {
 			return false;
 		}
-		this.crossSLR = true;
+		crossSLR = true;
 		return true;
 	}
 	
@@ -167,7 +167,7 @@ public class Connection implements Comparable<Connection>{
 	 */
 	public void calculateCriticality(float maxDelay, float maxCriticality, float criticalityExponent){
 		float slackCon = Float.MAX_VALUE;
-		for(TimingEdge e : this.getTimingEdges()) {
+		for(TimingEdge e : getTimingEdges()) {
 			float tmpslackCon = e.getDst().getRequiredTime() - e.getSrc().getArrivalTime() - e.getDelay();
 			if(tmpslackCon < slackCon)
 				slackCon = tmpslackCon;
@@ -177,8 +177,8 @@ public class Connection implements Comparable<Connection>{
 		
 		tempCriticality = (float) Math.pow(tempCriticality, criticalityExponent) * maxCriticality;
     	
-		if(tempCriticality > this.criticality)
-			this.setCriticality(tempCriticality);
+		if(tempCriticality > criticality)
+			setCriticality(tempCriticality);
 	}
 	
 	/**
@@ -186,7 +186,7 @@ public class Connection implements Comparable<Connection>{
 	 * @return
 	 */
 	public boolean isCongested() {
-		for(Routable rn : this.getRnodes()){
+		for(Routable rn : getRnodes()){
 			if(rn.isOverUsed()) {
 				return true;
 			}
@@ -199,7 +199,7 @@ public class Connection implements Comparable<Connection>{
 	 * @return
 	 */
 	public boolean useRnodesWithMultiDrivers() {
-		for(Routable rn : this.getRnodes()){
+		for(Routable rn : getRnodes()){
 			if(rn.hasMultiDrivers()) {
 				return true;
 			}
@@ -208,24 +208,24 @@ public class Connection implements Comparable<Connection>{
 	}
 	
 	public void addRnode(Routable rn) {
-		this.rnodes.add(rn);	
+		rnodes.add(rn);	
 	}
 	
 	public void updateRouteDelay(){	
-		this.setTimingEdgesDelay(this.getRouteDelay());
+		setTimingEdgesDelay(getRouteDelay());
 	}
 	
 	public void setTimingEdgesDelay(float routeDelay){
-		for(TimingEdge e : this.getTimingEdges()){
+		for(TimingEdge e : getTimingEdges()){
 			e.setRouteDelay(routeDelay);
 		}
 	}
 	
 	private float getRouteDelay() {
-		float routeDelay = this.getRnodes().get(this.getRnodes().size() - 1).getDelay();
-		for(int i = this.getRnodes().size() - 2; i >= 0; i--) {
-			Routable rnode = this.getRnodes().get(i);
-			Routable parent = this.getRnodes().get(i+1);
+		float routeDelay = getRnodes().get(getRnodes().size() - 1).getDelay();
+		for(int i = getRnodes().size() - 2; i >= 0; i--) {
+			Routable rnode = getRnodes().get(i);
+			Routable parent = getRnodes().get(i+1);
 			routeDelay += rnode.getDelay() +
 					DelayEstimatorBase.getExtraDelay(rnode.getNode(), DelayEstimatorBase.isLong(parent.getNode()));
 		}
@@ -237,16 +237,16 @@ public class Connection implements Comparable<Connection>{
 	}
 	
 	public void resetCriticality(){
-		this.criticality = 0;
+		criticality = 0;
 	}
 	
 	public float getCriticality(){
-		return this.criticality;
+		return criticality;
 	}
 	
 	public void resetRoute(){
-		this.getRnodes().clear();
-		this.sink.setRouted(false);
+		getRnodes().clear();
+		sink.setRouted(false);
 	}
 	
 	public Routable getSourceRnode() {
@@ -254,7 +254,7 @@ public class Connection implements Comparable<Connection>{
 	}
 
 	public void setSourceRnode(Routable sourceNode) {
-		this.sourceRnode = sourceNode;
+		sourceRnode = sourceNode;
 	}
 
 	public Routable getSinkRnode() {
@@ -262,7 +262,7 @@ public class Connection implements Comparable<Connection>{
 	}
 
 	public void setSinkRnode(Routable childRnode) {
-		this.sinkRnode = childRnode;
+		sinkRnode = childRnode;
 	}
 	
 	public short getXMinBB() {
@@ -338,7 +338,7 @@ public class Connection implements Comparable<Connection>{
 	}
 
 	public void setHpwl(short conHpwl) {
-		this.hpwl = conHpwl;
+		hpwl = conHpwl;
 	}
 
 	public List<Routable> getRnodes() {
@@ -366,11 +366,11 @@ public class Connection implements Comparable<Connection>{
 	}
 	
 	public void newNodes(){
-		this.setNodes(new ArrayList<>());
+		setNodes(new ArrayList<>());
 	}
 	
 	public void addNode(Node node){
-		this.getNodes().add(node);
+		getNodes().add(node);
 	}
 	
 	public List<Node> getNodes() {
@@ -382,28 +382,28 @@ public class Connection implements Comparable<Connection>{
 	}
 	
 	public void enlargeBoundingBox(int horizontalIncrement, int verticalIncrement) {
-		this.xMinBB -= horizontalIncrement;
-		this.xMaxBB += horizontalIncrement;
-		this.yMinBB -= verticalIncrement;
-		this.yMaxBB += verticalIncrement;
-		this.xMinBB = this.xMinBB < 0? -1:this.xMinBB;
-		this.yMinBB = this.yMinBB < 0? -1:this.yMinBB;
+		xMinBB -= horizontalIncrement;
+		xMaxBB += horizontalIncrement;
+		yMinBB -= verticalIncrement;
+		yMaxBB += verticalIncrement;
+		xMinBB = xMinBB < 0? -1:xMinBB;
+		yMinBB = yMinBB < 0? -1:yMinBB;
 	}
 	
 	@Override
 	public int hashCode(){
-		return this.id;
+		return id;
 	}
 	
 	@Override
 	public int compareTo(Connection arg0) {
-		if(this.netWrapper.getConnections().size() > arg0.getNetWrapper().getConnections().size()) {
+		if(netWrapper.getConnections().size() > arg0.getNetWrapper().getConnections().size()) {
 			return 1;
-		}else if(this.netWrapper.getConnections().size() == arg0.getNetWrapper().getConnections().size()) {
+		}else if(netWrapper.getConnections().size() == arg0.getNetWrapper().getConnections().size()) {
 			if(this.getHpwl() > arg0.getHpwl()) {
 				return 1;
-			}else if(this.getHpwl() == arg0.getHpwl()) {
-				if(this.hashCode() > arg0.hashCode()) {
+			}else if(getHpwl() == arg0.getHpwl()) {
+				if(hashCode() > arg0.hashCode()) {
 					return -1;
 				}
 			}
@@ -414,28 +414,28 @@ public class Connection implements Comparable<Connection>{
 	}
 	
 	public String bbRectangleString() {
-		return "[( " + this.xMinBB + ", " + this.yMinBB + " ), -> ( " + this.xMaxBB + ", " + this.yMaxBB + " )]";
+		return "[( " + xMinBB + ", " + yMinBB + " ), -> ( " + xMaxBB + ", " + yMaxBB + " )]";
 	}
 	
 	@Override
 	public String toString() {
 		StringBuilder s = new StringBuilder();
 		s.append("Con ");
-		s.append(String.format("%6s", this.id));
+		s.append(String.format("%6s", id));
 		s.append(", ");
-		s.append("boundbox = " + this.bbRectangleString());
+		s.append("boundbox = " + bbRectangleString());
 		s.append(", ");
-		s.append("net = " + this.netWrapper.getNet().getName());
+		s.append("net = " + netWrapper.getNet().getName());
 		s.append(", ");
-		s.append(String.format("net fanout = %3s", this.netWrapper.getConnections().size()));
+		s.append(String.format("net fanout = %3s", netWrapper.getConnections().size()));
 		s.append(", ");
-		s.append(String.format("source = %s", this.getSource().getName()));
+		s.append(String.format("source = %s", getSource().getName()));
 		s.append(", ");
-		s.append("sink = " + this.getSink().getName());
+		s.append("sink = " + getSink().getName());
 		s.append(", ");
-		s.append(String.format("delay = %4d ", (short)(this.getTimingEdges() == null? 0:this.getTimingEdges().get(0).getNetDelay())));
+		s.append(String.format("delay = %4d ", (short)(getTimingEdges() == null? 0:getTimingEdges().get(0).getNetDelay())));
 		s.append(", ");
-		s.append(String.format("criticality = %4.3f ", this.getCriticality()));
+		s.append(String.format("criticality = %4.3f ", getCriticality()));
 		
 		return s.toString();
 	}

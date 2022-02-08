@@ -112,29 +112,29 @@ public class RoutableNode implements Routable{
 		this.index = index;
 		this.type = type;
 		this.node = node;
-		this.children = null;
-		this.target = false;
-		this.setEndTileXYCoordinates();
-		this.setBaseCost();
-		this.presentCongestionCost = 1;
-    	this.historicalCongestionCost = 1;
-    	this.setVisited(false);
-		this.usersConnectionCounts = null;
-		this.driversCounts = null;
-		this.prev = null;
+		children = null;
+		target = false;
+		setEndTileXYCoordinates();
+		setBaseCost();
+		presentCongestionCost = 1;
+    	historicalCongestionCost = 1;
+    	setVisited(false);
+		usersConnectionCounts = null;
+		driversCounts = null;
+		prev = null;
 		if(timingDriven){
-			this.setDelay(RouterHelper.computeNodeDelay(delayEstimator, node));
+			setDelay(RouterHelper.computeNodeDelay(delayEstimator, node));
 		}
 	}
 	
 	public int setChildren(int globalIndex, Map<Node, Routable> createdRoutable, Set<Node> reserved, RouteThruHelper routethruHelper){
-		this.children = new ArrayList<>();
-		List<Node> allDownHillNodes = this.node.getAllDownhillNodes();
+		children = new ArrayList<>();
+		List<Node> allDownHillNodes = node.getAllDownhillNodes();
 		
 		for(Node node:allDownHillNodes){		
 			if(reserved.contains(node)) continue;		
 			if(isExcluded(node, timingDriven)) continue;
-			if(routethruHelper.isRouteThru(this.node, node)) continue;
+			if(routethruHelper.isRouteThru(node, node)) continue;
 			
 			Routable child = createdRoutable.get(node);
 			if(child == null) {
@@ -142,13 +142,13 @@ public class RoutableNode implements Routable{
 				child = new RoutableNode(globalIndex++, node, type);
 				createdRoutable.put(node, child);
 			}
-			this.children.add(child);//the sink rnode of a target connection has been created up-front
+			children.add(child);//the sink rnode of a target connection has been created up-front
 		}
 		return globalIndex;
 	}
 	
 	public void setBaseCost(){
-		if(this.type == RoutableType.WIRE){
+		if(type == RoutableType.WIRE){
 			baseCost = 0.4f;
 			// NOTE: IntentCode is device-dependent
 			IntentCode ic = node.getIntentCode();
@@ -161,52 +161,52 @@ public class RoutableNode implements Routable{
 				break;
 			
 			case NODE_DOUBLE:
-				if(this.endTileXCoordinate != this.getNode().getTile().getTileXCoordinate()) {
-					baseCost = 0.4f*this.length;
+				if(endTileXCoordinate != getNode().getTile().getTileXCoordinate()) {
+					baseCost = 0.4f*length;
 				}
 				break;
 			case NODE_HQUAD:
-				baseCost = 0.35f*this.length;
+				baseCost = 0.35f*length;
 				break;
 			case NODE_VQUAD:
-				baseCost = 0.15f*this.length;// VQUADs have length 4 and 5
+				baseCost = 0.15f*length;// VQUADs have length 4 and 5
 				break;
 			case NODE_HLONG:
-				baseCost = 0.15f*this.length;// HLONGs have length 6 and 7
+				baseCost = 0.15f*length;// HLONGs have length 6 and 7
 				break;
 			case NODE_VLONG:
 				baseCost = 0.7f;
 				break;	
 			default:
-				if(this.length != 0) baseCost *= this.length;
+				if(length != 0) baseCost *= length;
 				type = RoutableType.WIRE;
 				break;
 			}	
-		}else if(this.type == RoutableType.PINFEED_I){
+		}else if(type == RoutableType.PINFEED_I){
 			baseCost = 0.4f;
-		}else if(this.type == RoutableType.PINFEED_O){
+		}else if(type == RoutableType.PINFEED_O){
 			baseCost = 1f;
 		}
 	}
 
 	@Override
 	public boolean isOverUsed() {
-		return Routable.capacity < this.getOccupancy();
+		return Routable.capacity < getOccupancy();
 	}
 	
 	@Override
 	public boolean isUsed(){
-		return this.getOccupancy() > 0;
+		return getOccupancy() > 0;
 	}
 	
 	@Override
 	public boolean hasMultiDrivers(){
-		return Routable.capacity < this.uniqueDriverCount();
+		return Routable.capacity < uniqueDriverCount();
 	}
 
 	@Override
 	public void setEndTileXYCoordinates() {
-		Wire[] wires = this.node.getAllWiresInNode();
+		Wire[] wires = node.getAllWiresInNode();
 		List<Tile> intTiles = new ArrayList<>();
 		for(Wire w : wires) {
 			if(w.getTile().getTileTypeEnum() == TileTypeEnum.INT) {
@@ -219,74 +219,74 @@ public class RoutableNode implements Routable{
 		}else if(intTiles.size() == 1) {
 			endTile = intTiles.get(0);
 		}else {
-			endTile = this.getNode().getTile();
+			endTile = getNode().getTile();
 		}
-		this.endTileXCoordinate = (short) endTile.getTileXCoordinate();
-		this.endTileYCoordinate = (short) endTile.getTileYCoordinate();
-		Tile base = this.getNode().getTile();
-		this.length = (short) (Math.abs(this.endTileXCoordinate - base.getTileXCoordinate()) 
-				+ Math.abs(this.endTileYCoordinate - base.getTileYCoordinate()));
+		endTileXCoordinate = (short) endTile.getTileXCoordinate();
+		endTileYCoordinate = (short) endTile.getTileYCoordinate();
+		Tile base = getNode().getTile();
+		length = (short) (Math.abs(endTileXCoordinate - base.getTileXCoordinate()) 
+				+ Math.abs(endTileYCoordinate - base.getTileYCoordinate()));
 	}
 	
 	@Override
 	public void updatePresentCongestionCost(float pres_fac) {
-		int occ = this.getOccupancy();
+		int occ = getOccupancy();
 		int cap = Routable.capacity;
 		
 		if (occ < cap) {
-			this.setPresentCongestionCost(1);
+			setPresentCongestionCost(1);
 		} else {
-			this.setPresentCongestionCost(1 + (occ - cap + 1) * pres_fac);
+			setPresentCongestionCost(1 + (occ - cap + 1) * pres_fac);
 		}
 	}
 	
 	@Override
 	public String toString(){
 		String coordinate = "";	
-		coordinate = "(" + this.endTileXCoordinate + "," + this.endTileYCoordinate + ")";
+		coordinate = "(" + endTileXCoordinate + "," + endTileYCoordinate + ")";
 		StringBuilder s = new StringBuilder();
-		s.append("id = " + this.index);
+		s.append("id = " + index);
 		s.append(", ");
-		s.append("node " + this.node.toString());
+		s.append("node " + node.toString());
 		s.append(", ");
 		s.append(coordinate);
 		s.append(", ");
-		s.append(String.format("type = %s", this.type));
+		s.append(String.format("type = %s", type));
 		s.append(", ");
-		s.append(String.format("ic = %s", this.getNode().getIntentCode()));
+		s.append(String.format("ic = %s", getNode().getIntentCode()));
 		s.append(", ");
-		s.append(String.format("dly = %d", this.delay));
+		s.append(String.format("dly = %d", delay));
 		s.append(", ");
-		s.append(String.format("user = %s", this.getOccupancy()));
+		s.append(String.format("user = %s", getOccupancy()));
 		s.append(", ");
-		s.append(this.getUsersConnectionCounts());
+		s.append(getUsersConnectionCounts());
 		
 		return s.toString();
 	}
 	
 	@Override
 	public int hashCode(){
-		return this.node.hashCode();
+		return node.hashCode();
 	}
 	
 	@Override
 	public int getIndex() {
-		return this.index;
+		return index;
 	}
 	
 	@Override
 	public boolean isInConnectionBoundingBox(Connection connection) {		
-		return this.endTileXCoordinate > connection.getXMinBB() && this.endTileXCoordinate < connection.getXMaxBB() && this.endTileYCoordinate > connection.getYMinBB() && this.endTileYCoordinate < connection.getYMaxBB();
+		return endTileXCoordinate > connection.getXMinBB() && endTileXCoordinate < connection.getXMaxBB() && endTileYCoordinate > connection.getYMinBB() && endTileYCoordinate < connection.getYMaxBB();
 	}
 	
 	@Override
 	public Node getNode() {
-		return this.node;
+		return node;
 	}
 
 	@Override
 	public boolean isTarget() {
-		return this.target;
+		return target;
 	}
 
 	@Override
@@ -296,16 +296,16 @@ public class RoutableNode implements Routable{
 
 	@Override
 	public RoutableType getRoutableType() {
-		return this.type;
+		return type;
 	}
 
 	@Override
 	public float getDelay() {
-		return this.delay;
+		return delay;
 	}
 	@Override
 	public short getEndTileXCoordinate() {
-		return this.endTileXCoordinate;
+		return endTileXCoordinate;
 	}
 
 	@Override
@@ -320,21 +320,21 @@ public class RoutableNode implements Routable{
 
 	@Override
 	public short getEndTileYCoordinate() {
-		return this.endTileYCoordinate;
+		return endTileYCoordinate;
 	}
 	
 	@Override
 	public float getBaseCost() {
-		return this.baseCost;
+		return baseCost;
 	}
 
 	public boolean isChildrenUnset() {
-		return this.children == null;
+		return children == null;
 	}
 
 	@Override
 	public List<Routable> getChildren() {
-		return this.children;
+		return children;
 	}
 
 	@Override
@@ -344,7 +344,7 @@ public class RoutableNode implements Routable{
 
 	@Override
 	public int manhattanDistToSink(Routable sink) {
-		return Math.abs(this.getEndTileXCoordinate() - sink.getEndTileXCoordinate()) + Math.abs(this.getEndTileYCoordinate() - sink.getEndTileYCoordinate());
+		return Math.abs(this.getEndTileXCoordinate() - sink.getEndTileXCoordinate()) + Math.abs(getEndTileYCoordinate() - sink.getEndTileYCoordinate());
 	}
 
 	@Override
@@ -354,13 +354,13 @@ public class RoutableNode implements Routable{
 
 	@Override
 	public short getLength() {
-		return this.length;
+		return length;
 	}
 	
 	@Override
 	public void setLowerBoundTotalPathCost(float totalPathCost) {
-		this.lowerBoundTotalPathCost = totalPathCost;
-		this.setVisited(true);
+		lowerBoundTotalPathCost = totalPathCost;
+		setVisited(true);
 	}
 	
 	@Override
@@ -370,12 +370,12 @@ public class RoutableNode implements Routable{
 	
 	@Override
 	public float getLowerBoundTotalPathCost() {
-		return this.lowerBoundTotalPathCost;
+		return lowerBoundTotalPathCost;
 	}
 	
 	@Override
 	public float getUpstreamPathCost() {
-		return this.upstreamPathCost;
+		return upstreamPathCost;
 	}
 
 	@Override
@@ -385,63 +385,63 @@ public class RoutableNode implements Routable{
 	
 	@Override
 	public void incrementUser(NetWrapper source) {
-		if(this.usersConnectionCounts == null) {
-			this.usersConnectionCounts = new HashMap<>();
+		if(usersConnectionCounts == null) {
+			usersConnectionCounts = new HashMap<>();
 		}
-		Integer connectionCount = this.usersConnectionCounts.getOrDefault(source, 0);
-		this.usersConnectionCounts.put(source, connectionCount + 1);
+		Integer connectionCount = usersConnectionCounts.getOrDefault(source, 0);
+		usersConnectionCounts.put(source, connectionCount + 1);
 	}
 	
 	@Override
 	public int uniqueUserCount() {
-		if(this.usersConnectionCounts == null) {
+		if(usersConnectionCounts == null) {
 			return 0;
 		}
-		return this.usersConnectionCounts.size();
+		return usersConnectionCounts.size();
 	}
 	
 	@Override
 	public void decrementUser(NetWrapper user) {
-		Integer count = this.usersConnectionCounts.getOrDefault(user, 0);
+		Integer count = usersConnectionCounts.getOrDefault(user, 0);
 		if(count == 1) {
-			this.usersConnectionCounts.remove(user);
+			usersConnectionCounts.remove(user);
 		}else if(count > 1) {
-			this.usersConnectionCounts.put(user, count - 1);
+			usersConnectionCounts.put(user, count - 1);
 		}
 	}
 	
 	@Override
 	public int countConnectionsOfUser(NetWrapper user) {
-		if(this.usersConnectionCounts == null) {
+		if(usersConnectionCounts == null) {
 			return 0;
 		}
-		return this.usersConnectionCounts.getOrDefault(user, 0);
+		return usersConnectionCounts.getOrDefault(user, 0);
 	}
 	
 	@Override
 	public int uniqueDriverCount() {
-		if(this.driversCounts == null) {
+		if(driversCounts == null) {
 			return 0;
 		}
-		return this.driversCounts.size();
+		return driversCounts.size();
 	}
 	
 	@Override
 	public void incrementDriver(Routable parent) {
-		if(this.driversCounts == null) {
-			this.driversCounts = new HashMap<>();
+		if(driversCounts == null) {
+			driversCounts = new HashMap<>();
 		}
-		Integer count = this.driversCounts.getOrDefault(parent, 0);
-		this.driversCounts.put(parent, count + 1);
+		Integer count = driversCounts.getOrDefault(parent, 0);
+		driversCounts.put(parent, count + 1);
 	}
 	
 	@Override
 	public void decrementDriver(Routable parent) {
-		Integer count = this.driversCounts.getOrDefault(parent, 0);
+		Integer count = driversCounts.getOrDefault(parent, 0);
 		if(count == 1) {
-			this.driversCounts.remove(parent);
+			driversCounts.remove(parent);
 		}else if(count > 1) {
-			this.driversCounts.put(parent, count - 1);
+			driversCounts.put(parent, count - 1);
 		}
 	}
 	
