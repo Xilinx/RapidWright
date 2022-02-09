@@ -107,36 +107,4 @@ public class TestPhysNetlistWriter {
             }
         }
     }
-
-    @Test
-    @CheckOpenFiles
-    public void testNoLutRoutethruCells(@TempDir Path tempDir) throws IOException {
-        final String inputPath = RapidWrightDCP.getString("routethru_luts.dcp");
-        Design design = Design.readCheckpoint(inputPath);
-
-        final Path interchangePath = tempDir.resolve("routethru_luts.phys");
-        PhysNetlistWriter.writePhysNetlist(design, interchangePath.toString());
-
-        ReaderOptions rdOptions =
-                new ReaderOptions(ReaderOptions.DEFAULT_READER_OPTIONS.traversalLimitInWords * 64,
-                        ReaderOptions.DEFAULT_READER_OPTIONS.nestingLimit * 128);
-        MessageReader readMsg = Interchange.readInterchangeFile(interchangePath.toString(), rdOptions);
-
-        PhysNetlist.Reader physNetlist = readMsg.getRoot(PhysNetlist.factory);
-
-        Enumerator<String> allStrings = PhysNetlistReader.readAllStrings(physNetlist);
-
-        for (CellPlacement.Reader placement : physNetlist.getPlacements()) {
-            SiteInst siteInst = design.getSiteInstFromSiteName(allStrings.get(placement.getSite()));
-            Assertions.assertNotNull(siteInst);
-
-            for (PinMapping.Reader pinMapping : placement.getPinMap()) {
-                Cell belCell = siteInst.getCell(allStrings.get(pinMapping.getBel()));
-                Assertions.assertNotNull(belCell);
-
-                Assertions.assertFalse(belCell.isRoutethru());
-            }
-        }
-    }
-
 }

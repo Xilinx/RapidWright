@@ -88,12 +88,6 @@ public class PhysNetlistWriter {
         for(SiteInst siteInst : design.getSiteInsts()) {
         	if(!siteInst.isPlaced()) continue;
             for(Cell cell : siteInst.getCells()) {
-            	if(cell.isRoutethru()) {
-                    if (!DesignTools.isBELALut(cell.getBELName())) {
-                        throw new RuntimeException("Unexpected routethru BEL: " + cell);
-                    }
-                    continue;
-                }
             	allCells.add(cell);
             	if(!cell.isPlaced()) continue;
             	String cellName = cell.getName();
