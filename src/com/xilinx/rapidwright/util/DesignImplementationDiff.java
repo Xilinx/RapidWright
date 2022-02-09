@@ -164,13 +164,13 @@ public class DesignImplementationDiff {
 				String lv = e.getValue();
 				String rv = rc.getLogicalPinMapping(e.getKey());
 				if (lv == null) {
-					System.out.println("< CellPinMapping" + e.getKey());
+					System.out.println("< CellPinMapping '" + lc.getName() + "':" + e.getKey());
 					nleft++;
 				}
 
 				if (!lv.equals(rv)) {
-					System.out.println("< CellPinMapping " + e.getKey() + "=" + lv);
-					System.out.println("> CellPinMapping " + e.getKey() + "=" + rv);
+					System.out.println("< CellPinMapping '" + lc.getName() + "':" + e.getKey() + "=" + lv);
+					System.out.println("> CellPinMapping '" + lc.getName() + "':" + e.getKey() + "=" + rv);
 					nleft++;
 					nright++;
 				}
@@ -179,7 +179,7 @@ public class DesignImplementationDiff {
 			for (Map.Entry<String, String> e : rc.getPinMappingsP2L().entrySet()) {
 				String lv = lc.getLogicalPinMapping(e.getKey());
 				if (lv == null) {
-					System.out.println("> CellPinMapping" + e.getKey());
+					System.out.println("> CellPinMapping '" + rc.getName() + "':" + e.getKey());
 					nright++;
 				}
 			}
@@ -343,7 +343,6 @@ public class DesignImplementationDiff {
 					rsitepips.getOrDefault(rn, Collections.EMPTY_SET),
 					"NetSitePIP '" + ln.getName() + "'");
 
-			// TODO: Some BELPin-s on LUT routethrus not currently captured
 			diffCollections(lbelpins.getOrDefault(ln, Collections.EMPTY_SET),
 					rbelpins.getOrDefault(rn, Collections.EMPTY_SET),
 					"NetBELPin '" + ln.getName() + "'");
