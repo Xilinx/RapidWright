@@ -46,6 +46,8 @@ import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePIP;
 import com.xilinx.rapidwright.device.SitePIPStatus;
+import com.xilinx.rapidwright.edif.EDIFNet;
+import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.interchange.PhysNetlistWriter;
 import com.xilinx.rapidwright.interchange.SiteBELPin;
 import com.xilinx.rapidwright.interchange.SiteSitePIP;
@@ -258,7 +260,7 @@ public class DesignImplementationDiff {
 		return lset.size();
 	}
 
-	public static void diffNets(Design lhs, Design rhs, boolean ignoreLeftUnrouted) {
+	public static void diffNets(Design lhs, Design rhs) {
 		Function<Design, Map<Net, Set<SiteSitePIP>>> netToSitePips = (Design design) -> {
 			Map<Net, Set<SiteSitePIP>> m = new HashMap<>();
 			for (SiteInst si : design.getSiteInsts()) {
@@ -285,6 +287,7 @@ public class DesignImplementationDiff {
 		Map<Net, Set<SiteSitePIP>> rsitepips = netToSitePips.apply(rhs);
 
 		Function<Design, Map<Net, Set<SiteBELPin>>> netToBelPins = (Design design) -> {
+			EDIFNetlist netlist = design.getNetlist();
 			Map<Net, Set<SiteBELPin>> m = new HashMap<>();
 			for (SiteInst si : design.getSiteInsts()) {
 				for(Map.Entry<Net,HashSet<String>> e : si.getSiteCTags().entrySet()) {
@@ -292,6 +295,14 @@ public class DesignImplementationDiff {
 						for(String siteWire : e.getValue()) {
 							BELPin[] belPins = si.getSiteWirePins(siteWire);
 							Net net = si.getNetFromSiteWire(siteWire);
+
+							// It is possible that an aliased net is present here;
+							// if so, move to the parent net
+							String parentNetName = netlist.getParentNetName(net.getName());
+							if (parentNetName != null && !parentNetName.equals(net.getName())) {
+								net = design.getNet(parentNetName);
+							}
+
 							for(BELPin belPin : belPins) {
 								BEL bel = belPin.getBEL();
 								Cell cell = si.getCell(bel);
@@ -322,12 +333,19 @@ public class DesignImplementationDiff {
 		nleft = 0;
 		nright = 0;
 		int npips = 0;
+		EDIFNetlist lnetlist = lhs.getNetlist();
 		for (Net ln : lhs.getNets()) {
 			Net rn = rhs.getNet(ln.getName());
 			if (rn == null) {
-				if (ignoreLeftUnrouted && !ln.hasPIPs()) {
-					continue;
+				// Ignore aliased nets that are completely empty
+				if (!ln.hasPIPs() && ln.getSource() == null && ln.getAlternateSource() == null &&
+						lsitepips.getOrDefault(ln, Collections.EMPTY_SET).isEmpty() &&
+						lbelpins.getOrDefault(ln, Collections.EMPTY_SET).isEmpty()) {
+					String parentNetName = lnetlist.getParentNetName(ln.getName());
+					if (!parentNetName.equals(ln.getName()))
+						continue;
 				}
+
 				System.out.println("< Net '" + ln.getName() + "'");
 				nleft++;
 				continue;
@@ -366,7 +384,7 @@ public class DesignImplementationDiff {
 		diffPart(lhs, rhs);
 		diffSiteInsts(lhs, rhs);
 		diffCells(lhs, rhs);
-		diffNets(lhs, rhs, false);
+		diffNets(lhs, rhs);
 	}
 
 	public static void main(String[] args) {
