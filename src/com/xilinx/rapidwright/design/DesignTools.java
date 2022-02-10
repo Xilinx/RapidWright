@@ -890,7 +890,7 @@ public class DesignTools {
 		//   iterate over all the nets and regularize on the proper net name for the physical
 		//   net.  Put all physical pins on the correct physical net once the black box has been
 		//   updated.
-		for(EDIFPortInst portInst : inst.getInst().getPortInstMap().values()) {
+		for(EDIFPortInst portInst : inst.getInst().getPortInsts()) {
 			EDIFNet net = portInst.getNet();
 			EDIFHierNet netName = new EDIFHierNet(parentInst, net);
 			EDIFHierNet parentNetName = netlist.getParentNet(netName);

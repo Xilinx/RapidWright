@@ -464,7 +464,7 @@ public class EDIFParser implements AutoCloseable{
 							inst.addPortInst(portInst);
 						}
 					}
-					net.getPortInstMap().clear();
+					net.getPortInsts().clear();
 					for(EDIFPortInst portInst : portInsts){
 						String fullName = portInst.getFullName();
 						String unique = stringPool.get(fullName);
@@ -473,7 +473,7 @@ public class EDIFParser implements AutoCloseable{
 						}else{
 							fullName = unique;
 						}
-						net.addPortInst(portInst, fullName);
+						net.addPortInst(portInst);
 					}
 				}
 			}

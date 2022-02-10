@@ -27,9 +27,11 @@ package com.xilinx.rapidwright.edif;
 
 import java.io.IOException;
 import java.io.Writer;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -51,7 +53,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
 	public static final String BLACK_BOX_PROP = "IS_IMPORTED";
 	public static final String BLACK_BOX_PROP_VERSAL = "black_box";
 	
-	private Map<String,EDIFPortInst> portInsts;
+	private List<EDIFPortInst> portInsts;
 
     protected EDIFCellInst(){
         
@@ -88,14 +90,6 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
     public void setViewref(EDIFName viewref) {
         this.viewref = viewref;
     }
-
-    /**
-     * This gets a map of all the port refs on the cell instance.  
-     * @return A map of port ref names to port ref objects.
-     */
-    public Map<String, EDIFPortInst> getPortInstMap(){
-        return portInsts == null ? Collections.emptyMap() : portInsts;
-    }
     
     /**
      * Helper method to help maintain port ref map.  Adds a new
@@ -103,12 +97,12 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
      * @param epr The port ref to add
      * @return Any previous port ref of the same name, null if none already exists.
      */
-    protected EDIFPortInst addPortInst(EDIFPortInst epr) {
-        if(portInsts == null) portInsts = new HashMap<>();
+    protected void addPortInst(EDIFPortInst epr) {
+        if(portInsts == null) portInsts = new ArrayList<>();
         if(!epr.getCellInst().equals(this)) 
             throw new RuntimeException("ERROR: Incorrect EDIFPortInst '"+
                 epr.getFullName()+"' being added to EDIFCellInst " + toString());
-        return portInsts.put(epr.getName(),epr);
+        portInsts.add(epr);
     }
     
     /**
@@ -118,17 +112,12 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
      */
     protected EDIFPortInst removePortInst(EDIFPortInst epr){
         if(portInsts == null) return null;
-        return portInsts.remove(epr.getName());
-    }
-    
-    /**
-     * Removes the named port ref.
-     * @param portName Name of the port ref to remove
-     * @return The removed port ref, or null if none existed by that name.
-     */
-    protected EDIFPortInst removePortInst(String portName){
-        if(portInsts == null) return null;
-        return portInsts.remove(portName);
+        for(int i=0; i < portInsts.size(); i++) {
+            if(portInsts.get(i).equals(epr)) {
+                return portInsts.remove(i);
+            }
+        }
+        return null;
     }
     
     /**
@@ -138,7 +127,13 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
      * @return A port ref by pin name.
      */
     public EDIFPortInst getPortInst(String name){
-        return getPortInstMap().get(name);
+        for(int i=0; i < portInsts.size(); i++) {
+            EDIFPortInst pi = portInsts.get(i);
+            if(pi.getName().equals(name)) {
+                return pi;
+            }
+        }
+        return null;
     }
     
     /**
@@ -152,7 +147,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
     }
     
     public Collection<EDIFPortInst> getPortInsts(){
-        return getPortInstMap().values();
+        return portInsts;
     }
     
     /**
