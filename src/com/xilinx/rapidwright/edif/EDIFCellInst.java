@@ -127,6 +127,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
      * @return A port ref by pin name.
      */
     public EDIFPortInst getPortInst(String name){
+        if(portInsts == null) return null;
         for(int i=0; i < portInsts.size(); i++) {
             EDIFPortInst pi = portInsts.get(i);
             if(pi.getName().equals(name)) {
@@ -147,7 +148,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
     }
     
     public Collection<EDIFPortInst> getPortInsts(){
-        return portInsts;
+        return portInsts == null ? Collections.emptyList() : portInsts;
     }
     
     /**
