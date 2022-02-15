@@ -1032,7 +1032,7 @@ public class EDIFTools {
 			portNet = d.getTopEDIFCell().createNet(name);
 		}
 		String portName = dir == PinType.IN ? "I" : "O";
-		EDIFPortInst bufPortInst = portNet.getPortInst(i.getName() + EDIFTools.EDIF_HIER_SEP + portName);
+		EDIFPortInst bufPortInst = portNet.getPortInst(i, portName);
 		if(bufPortInst == null)
 			portNet.createPortInst(portName, i);
 		if(pr.getNet() == null) 

@@ -30,6 +30,7 @@ import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -44,7 +45,7 @@ public class EDIFNet extends EDIFPropertyObject {
 	
 	private EDIFCell parentCell;
 	
-	private List<EDIFPortInst> portInsts;
+	private EDIFPortInstList portInsts;
 	
 	public EDIFNet(String name, EDIFCell parentCell){
 		super(name);
@@ -63,8 +64,13 @@ public class EDIFNet extends EDIFPropertyObject {
 		
 	}
 	
+	/**
+	 * Adds the EDIFPortInst to this logical net.  The net stores the port instances using a sorted
+	 * ArrayList (@link EDIFPortInstList).  Worst case O(n) to add. 
+	 * @param portInst The port instance to add to this net.
+	 */
 	public void addPortInst(EDIFPortInst portInst){
-		if(portInsts == null) portInsts = new ArrayList<>();
+		if(portInsts == null) portInsts = new EDIFPortInstList();
 		if(parentCell != null && portInst.getCellInst() == null) {
 			parentCell.addInternalPortMapEntry(portInst.getName(), this);
 		}
@@ -122,8 +128,35 @@ public class EDIFNet extends EDIFPropertyObject {
 		return new EDIFPortInst(port, this, index, cellInst);
 	}
 	
+	/**
+	 * Creates a new map of all the EDIFPortInst objects stored on this net.  The new map
+	 * contains a copy of EDIFPortInsts available at the time of invocation as returned from 
+	 * {@link #getPortInstList()}.      
+	 * @return A map of EDIFPortInst names ({@link EDIFPortInst#getName()} to the corresponding objects.
+	 */
+	public Map<String, EDIFPortInst> getPortInstMap(){
+	    if(portInsts == null) return Collections.emptyMap();
+	    HashMap<String, EDIFPortInst> map = new HashMap<>();
+	    for(EDIFPortInst e : getPortInstList()) {
+	        map.put(e.getFullName(), e);
+	    }
+	    return map;
+	}
+	
+	/**
+	 * Gets the sorted ArrayList of EDIFPortInsts on this net as a collection.
+	 * @return The collection of EDIFPortInsts on this net.
+	 */
 	public Collection<EDIFPortInst> getPortInsts(){
 		return portInsts == null ? Collections.emptyList() : portInsts;
+	}
+	
+	/**
+	 * Gets the sorted ArrayList of EDIFPortInsts on this net.
+	 * @return The sorted list of EDIFPortInst objects on this net.
+	 */
+	public EDIFPortInstList getPortInstList() {
+	    return portInsts == null ? EDIFPortInstList.EMPTY : portInsts;
 	}
 	
 	public void rename(String newName) {
@@ -149,28 +182,52 @@ public class EDIFNet extends EDIFPropertyObject {
 		return srcs;
 	}
 	
-	public EDIFPortInst getPortInst(String fullName){
-		if (portInsts == null) return null;
-		for(EDIFPortInst portInst : getPortInsts()) {
-		    if(portInst.getFullName().equals(fullName)) return portInst;
-		}
-		return null;
-	}
-
-	public EDIFPortInst removePortInst(EDIFPortInst portInst){
-		return removePortInst(portInst.getFullName()); 
+	/**
+	 * @deprecated
+	 * Poor performance, please use {@link #getPortInst(EDIFCellInst, String)}.
+	 * @param fullName Full name of the port instance {@link EDIFPortInst#getFullName()}
+	 * @return The port instance connected to this net, or null if none exists. 
+	 */
+	public EDIFPortInst getPortInst(String fullName) {
+	    return getPortInstMap().get(fullName);
 	}
 	
-	public EDIFPortInst removePortInst(String portInstFullName){
+	/**
+	 * Gets the port instance specified by the cell instance and name of the port instance.  If the
+	 * specified cell instance is null, this looks for a top level port instance on the parent cell.
+	 * The net stores the port instances using a sorted ArrayList (@link EDIFPortInstList).  Worst 
+	 * case O(log n) to get.
+	 * @param inst The cell instance where the EDIFPortInst resides.  If this is null, it gets the
+	 * top level port instance connected to the parent cell port.
+	 * @param portInstName Name of the port instance ({@link EDIFPortInst#getName()} to get
+	 * @return The port instance connected to this net, or null if none exists.
+	 */
+	public EDIFPortInst getPortInst(EDIFCellInst inst, String portInstName){
+	    if (portInsts == null) return null;
+	    return portInsts.get(inst, portInstName);
+	}
+
+	/**
+	 * Removes the port instance provided from the net. The net stores the port instances using a 
+	 * sorted ArrayList (@link EDIFPortInstList).  Worst case O(n) to remove.
+	 * @param portInst The port instance to remove from the net.
+	 * @return The port instance object that was removed or null if no changes were made.
+	 */
+	public EDIFPortInst removePortInst(EDIFPortInst portInst){
+		return removePortInst(portInst.getCellInst(), portInst.getName()); 
+	}
+	
+	/**
+	 * Removes the port instance specified from the net. The net stores the port instances using a
+	 * sorted ArrayList (@link EDIFPortInstList).  Worst case O(n) to remove. 
+	 * @param inst The cell instance where the EDIFPortInst resides.  If this is null, it removes 
+	 * the top level port instance connected to the parent cell port.
+	 * @param portInstName Name of the port instance ({@link EDIFPortInst#getName()} to remove
+	 * @return The port instance object that was removed or null if no changes were made.
+	 */
+	public EDIFPortInst removePortInst(EDIFCellInst inst, String portInstName){
         if (portInsts == null) return null;
-        EDIFPortInst tmp = null;
-        for(int i=0; i < portInsts.size(); i++) {
-            if(portInsts.get(i).getFullName().equals(portInstFullName)) {
-                tmp = portInsts.remove(i);
-                break;
-            }
-        }
-	    
+        EDIFPortInst tmp = portInsts.remove(inst, portInstName);
 		if(tmp != null) tmp.setParentNet(null);
 		return tmp;
 	}

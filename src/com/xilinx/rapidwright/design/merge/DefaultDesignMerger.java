@@ -185,7 +185,7 @@ public class DefaultDesignMerger extends AbstractDesignMerger {
         
         for(EDIFPortInst p1 : new ArrayList<>(n1.getPortInsts())) {
             if(p1.isOutput() || (p1.isTopLevelPort() && p1.isInput())) continue;
-            if(n0.getPortInst(p1.getFullName()) == null) {
+            if(n0.getPortInst(p1.getCellInst(), p1.getName()) == null) {
                 n1.removePortInst(p1);
                 n0.addPortInst(p1);
             }

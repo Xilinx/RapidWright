@@ -27,11 +27,9 @@ package com.xilinx.rapidwright.edif;
 
 import java.io.IOException;
 import java.io.Writer;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -53,7 +51,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
 	public static final String BLACK_BOX_PROP = "IS_IMPORTED";
 	public static final String BLACK_BOX_PROP_VERSAL = "black_box";
 	
-	private List<EDIFPortInst> portInsts;
+	private EDIFPortInstList portInsts;
 
     protected EDIFCellInst(){
         
@@ -92,13 +90,27 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
     }
     
     /**
-     * Helper method to help maintain port ref map.  Adds a new
-     * port ref for this instance.
-     * @param epr The port ref to add
-     * @return Any previous port ref of the same name, null if none already exists.
+     * Creates a new map of all the EDIFPortInst objects stored on this EDIFCellInst.  The new map
+     * contains a copy of EDIFPortInsts available at the time of invocation as returned from 
+     * {@link #getPortInstList()}.      
+     * @return A map of EDIFPortInst names ({@link EDIFPortInst#getName()} to the corresponding objects.
+     */
+    public Map<String, EDIFPortInst> getPortInstMap(){
+        if(portInsts == null) return Collections.emptyMap();
+        HashMap<String, EDIFPortInst> map = new HashMap<>();
+        for(EDIFPortInst e : getPortInstList()) {
+            map.put(e.getName(), e);
+        }
+        return map;
+    }
+    
+    /**
+     * Adds a new EDIFPortInst to this cell instance. The port instances
+     * are stored in a sorted ArrayList, so worst case is O(n).
+     * @param epr The port instance to add
      */
     protected void addPortInst(EDIFPortInst epr) {
-        if(portInsts == null) portInsts = new ArrayList<>();
+        if(portInsts == null) portInsts = new EDIFPortInstList();
         if(!epr.getCellInst().equals(this)) 
             throw new RuntimeException("ERROR: Incorrect EDIFPortInst '"+
                 epr.getFullName()+"' being added to EDIFCellInst " + toString());
@@ -106,35 +118,36 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
     }
     
     /**
-     * Removes the provided port ref, if it exists.
-     * @param epr The port ref to remove.
-     * @return The removed port ref, or null if none exists.
+     * Removes the provided port instance from the cell instance, if it exists.  The port instances
+     * are stored in a sorted ArrayList, so worst case is O(n).
+     * @param epr The port instance object to remove
+     * @return The removed port instance, or null if it was not found.
      */
     protected EDIFPortInst removePortInst(EDIFPortInst epr){
         if(portInsts == null) return null;
-        for(int i=0; i < portInsts.size(); i++) {
-            if(portInsts.get(i).equals(epr)) {
-                return portInsts.remove(i);
-            }
-        }
-        return null;
+        return portInsts.remove(epr);
     }
     
     /**
-     * Gets the port ref on this cell by pin name (not full
-     * port ref name).  
-     * @param name Name of the pin in the port ref to get. 
-     * @return A port ref by pin name.
+     * Removes the named port instance from the cell instance, if it exists. The port instances
+     * are stored in a sorted ArrayList, so worst case is O(n).
+     * @param portName Name of the port ref to remove ({@link EDIFPortInst#getName()})
+     * @return The removed port instance, or null if none found by that name.
+     */
+    protected EDIFPortInst removePortInst(String portName){
+        if(portInsts == null) return null;
+        return portInsts.remove(this, portName);
+    }
+    
+    /**
+     * Gets the port instance on this cell by pin name ({@link EDIFPortInst#getName()}). The port 
+     * instances are stored in a sorted ArrayList, so worst case is O(log n).
+     * @param name Name of the port instance to get. 
+     * @return The named port instance, or null if none found by that name. 
      */
     public EDIFPortInst getPortInst(String name){
         if(portInsts == null) return null;
-        for(int i=0; i < portInsts.size(); i++) {
-            EDIFPortInst pi = portInsts.get(i);
-            if(pi.getName().equals(name)) {
-                return pi;
-            }
-        }
-        return null;
+        return portInsts.get(this, name);
     }
     
     /**
@@ -147,8 +160,20 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
         return getCellType().getPort(name);
     }
     
+    /**
+     * Gets the sorted ArrayList of EDIFPortInsts on this cell instance as a collection.
+     * @return The collection of EDIFPortInsts on this cell.
+     */
     public Collection<EDIFPortInst> getPortInsts(){
         return portInsts == null ? Collections.emptyList() : portInsts;
+    }
+    
+    /**
+     * Gets the sorted ArrayList of EDIFPortInsts on this cell instance.
+     * @return The sorted list of EDIFPortInst objects on this cell.
+     */
+    public EDIFPortInstList getPortInstList() {
+        return portInsts == null ? EDIFPortInstList.EMPTY : portInsts;
     }
     
     /**
