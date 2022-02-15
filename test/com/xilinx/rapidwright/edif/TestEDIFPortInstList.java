@@ -2,6 +2,7 @@ package com.xilinx.rapidwright.edif;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -31,8 +32,7 @@ public class TestEDIFPortInstList {
         EDIFPortInstList list = new EDIFPortInstList();
  
         ArrayList<String> allNames = new ArrayList<>();
-        String[] names = new String[] //{"processor/z", "a", "processorc", "b", "y", "x"};
-        {
+        String[] names = new String[] {
             "processor/DOADO[0]",
             "processor/D[7]",
             "processor/D[0]",
@@ -152,7 +152,6 @@ public class TestEDIFPortInstList {
             "processor/write_strobe_flop_0[0]",
             "processor/write_strobe_flop_1[0]",
             "processor/write_strobe_flop_2[0]",
-
         };
         
         
@@ -164,18 +163,23 @@ public class TestEDIFPortInstList {
             allNames.add(name);
         }
         
+        HashSet<String> uniqueSet = new HashSet<>();
         for(String name : allNames) {
-            list.add(makeEDIFPortInst(name));
+            // Test to ensure duplicates are not allowed
+            boolean success = list.add(makeEDIFPortInst(name));
+            boolean isDuplicate = uniqueSet.add(name);
+            Assertions.assertEquals(success, isDuplicate);
         }
 
-        Assertions.assertEquals(allNames.size(), list.size());
-
+        Assertions.assertEquals(uniqueSet.size(), list.size());
+        allNames.clear();
+        allNames.addAll(uniqueSet);
+        
         Collections.sort(allNames);
         
         ArrayList<String> listSorted = new ArrayList<>();
         for(int i=0; i < allNames.size(); i++) {
             listSorted.add(list.get(i).getFullName());
-            System.out.println(listSorted.get(i) + " "+ allNames.get(i) );
         }
 
         Assertions.assertTrue(listSorted.containsAll(allNames) && allNames.containsAll(listSorted));
@@ -190,6 +194,5 @@ public class TestEDIFPortInstList {
             portInstGet = list.get(portInst.getCellInst(), portInst.getName());
             Assertions.assertEquals(portInst, portInstGet);
         }
-        
     }
 }

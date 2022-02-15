@@ -2,23 +2,24 @@ package com.xilinx.rapidwright.edif;
 
 import java.util.ArrayList;
 
+/**
+ * Customized ArrayList<EDIFPortInst> for the {@link EDIFNet} and {@link EDIFCellInst} classes. 
+ * Maintains a sorted list to allow for a O(log n) retrieval lookup by name.  Does not allow 
+ * duplicate entries. 
+ */
 public class EDIFPortInstList extends ArrayList<EDIFPortInst> {
 
     private static final long serialVersionUID = 8718591209309655922L;
-
+    
     public static final EDIFPortInstList EMPTY = new EDIFPortInstList();
     
     @Override
     public boolean add(EDIFPortInst e) {
-        if(e.getCellInst().getName().equals("processor") && e.getName().equals("DOADO[2]")) {
-            System.out.println(e);
-        }
-        
         int insertionPoint = binarySearch(e.getCellInst(), e.getName());
+        // Do not allow duplicates
         if(insertionPoint >= 0) {
-            System.out.println();
+            return false;
         }
-        // We allow duplicates during EDIF parsing
         super.add(insertionPoint >= 0 ? insertionPoint : ~insertionPoint, e);
         return true;
     }
@@ -57,6 +58,18 @@ public class EDIFPortInstList extends ArrayList<EDIFPortInst> {
         return ~left;
     }
     
+    /**
+     * Performs a 'compareTo' operation without having to create disposable Strings or EDIFPortInst 
+     * objects.  Performs the same operation as 'left.getFullName().compareTo(right.getFullName())'
+     *  where right is the EDIFPortInst represented by rightInstName and rightPortInstName.  
+     * @param left This is the existing EDIFPortInst within the lists that is being compared
+     * @param rightInstName This is the cell instance name {@link EDIFCellInst#getName()} of the 
+     * considered port instance to compare left against.  
+     * @param rightPortInstName This is the port instance name {@link EDIFPortInst#getName()} of the
+     * considered port instance to compare left against.
+     * @return 0 if the left and corresponding right Strings are equal.  A number less than 0 if
+     * left is lexicographically before right, or a number greater than 0 if left is after right. 
+     */
     private int compare(EDIFPortInst left, String rightInstName, String rightPortInstName) {
         String leftInstName = left.getCellInst() == null ? null : left.getCellInst().getName();
         if(leftInstName == null) {
