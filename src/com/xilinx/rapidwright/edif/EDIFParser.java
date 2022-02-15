@@ -38,6 +38,7 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Queue;
 import java.util.WeakHashMap;
 
@@ -76,8 +77,6 @@ public class EDIFParser implements AutoCloseable{
 	private Map<String,Map<String,EDIFCell>> edifInstCellMap;
 	
 	private Map<String, EDIFCellInst> instanceLookup;
-	
-	private Map<String,EDIFPort> portLookup;
 	
 	private static boolean debug = false;
 	
@@ -148,7 +147,6 @@ public class EDIFParser implements AutoCloseable{
 		nextTokens = new LinkedList<>();
 		stringPool = new WeakHashMap<>();
 		edifInstCellMap = new HashMap<String, Map<String,EDIFCell>>();
-		portLookup = new HashMap<>();
 	}
 	
 	/**
@@ -182,10 +180,9 @@ public class EDIFParser implements AutoCloseable{
 	 */
 	private EDIFCellInst getRefEDIFCellInst(String edifCellInstName){
 		EDIFCellInst inst = instanceLookup.get(edifCellInstName);
-		if(inst == null){
-			inst = new EDIFCellInst();
-			inst.setEDIFRename(edifCellInstName);
-			instanceLookup.put(edifCellInstName, inst);
+		if(inst == null || inst.getCellType() == null) {
+		    throw new RuntimeException("ERROR: Bad instance ref "+ edifCellInstName+" on line: " 
+		                               + lineNumber);
 		}
 		return inst;
 	}
@@ -437,48 +434,6 @@ public class EDIFParser implements AutoCloseable{
 		}
 		expect(RIGHT_PAREN, currToken);  // edif end
 		
-		// Update PortInsts
-		for(EDIFLibrary lib : currNetlist.getLibraries()){
-			for(EDIFCell cell : lib.getCells()){
-				for(EDIFNet net : cell.getNets()){
-					List<EDIFPortInst> portInsts = new ArrayList<>(net.getPortInsts());
-					for(EDIFPortInst portInst : portInsts){
-						EDIFCellInst inst = portInst.getCellInst();
-						EDIFCell c = inst == null ? portInst.getParentCell() : inst.getCellType();
-						String uid = getUniqueEDIFPortID(c.getLibrary(), c, portInst.getName());
-						portInst.setPort(portLookup.get(uid));
-						if(inst == null){
-							cell.addInternalPortMapEntry(portInst.getPortInstNameFromPort(), net);							
-						}else {
-							inst.removePortInst(portInst);
-						}
-						String newPortInstName = portInst.getPortInstNameFromPort();
-						String unique = stringPool.get(newPortInstName);
-						if(unique == null){
-							stringPool.put(newPortInstName, newPortInstName);
-						}else{
-							newPortInstName = unique;
-						}
-						portInst.setName(newPortInstName);
-						if(inst != null){
-							inst.addPortInst(portInst);
-						}
-					}
-					net.getPortInstMap().clear();
-					for(EDIFPortInst portInst : portInsts){
-						String fullName = portInst.getFullName();
-						String unique = stringPool.get(fullName);
-						if(unique == null){
-							stringPool.put(fullName, fullName);
-						}else{
-							fullName = unique;
-						}
-						net.addPortInst(portInst, fullName);
-					}
-				}
-			}
-		}
-		
 		return currNetlist;
 	}
 	
@@ -555,15 +510,6 @@ public class EDIFParser implements AutoCloseable{
 		return inst;
 	}
 	
-	/**
-	 * This method is used to uniquely help map portref names back to the
-	 * prototype port.
-	 * @return A unique EDIF identifier to enable portref lookup post EDIF parsing.
-	 */
-	private String getUniqueEDIFPortID(EDIFLibrary l, EDIFCell c, String edifPortName){
-		return l.getName() + "/" + c.getName() + "/" + edifPortName;
-	}
-	
 	private EDIFCell parseEDIFCell(EDIFLibrary lib){
 		expect(CELL, getNextToken());
 		EDIFCell cell = (EDIFCell) parseEDIFNameObject(new EDIFCell());
@@ -588,7 +534,6 @@ public class EDIFParser implements AutoCloseable{
 		while(LEFT_PAREN.equals(currToken = getNextToken())){
 			EDIFPort p = parseEDIFPort();
 			cell.addPort(p); 
-			portLookup.put(getUniqueEDIFPortID(lib, cell, p.getLegalEDIFName()), p);
 		}
 		expect(RIGHT_PAREN, currToken); // Interface end
 		
@@ -601,7 +546,7 @@ public class EDIFParser implements AutoCloseable{
 					if(nextToken.equals(INSTANCE)){
 						cell.addCellInst(parseEDIFCellInst(lib.getLegalEDIFName()));
 					} else if(nextToken.equals(NET)){
-						cell.addNet(parseEDIFNet(cell));
+						parseEDIFNet(cell);
 					} else {
 						expect(INSTANCE + " | " + NET, nextToken);
 					}
@@ -624,8 +569,9 @@ public class EDIFParser implements AutoCloseable{
 		expect(LEFT_PAREN, getNextToken());
 		expect(JOINED, getNextToken());
 		String currToken = null;
+		cell.addNet(net);
 		while(LEFT_PAREN.equals(currToken = getNextToken())){
-			net.addPortInst(parseEDIFPortInst());
+			net.addPortInst(parseEDIFPortInst(cell));
 		}
 		expect(RIGHT_PAREN, currToken);
 		while(LEFT_PAREN.equals(currToken = getNextToken())){
@@ -658,7 +604,7 @@ public class EDIFParser implements AutoCloseable{
 		return o;
 	}
 	
-	private EDIFPortInst parseEDIFPortInst(){
+	private EDIFPortInst parseEDIFPortInst(EDIFCell parentCell){
 		expect(PORTREF,getNextToken());
 		String currToken = getNextToken();
 		EDIFPortInst portInst = new EDIFPortInst();
@@ -672,17 +618,45 @@ public class EDIFParser implements AutoCloseable{
 		}
 		
 		currToken = getNextToken();
+		EDIFCell portCell = parentCell;
 		if(currToken.equals(LEFT_PAREN)){
 			expect(INSTANCEREF,getNextToken());
 			String instanceref = getNextToken();
-			portInst.setCellInst(getRefEDIFCellInst(instanceref));
+			portInst.setCellInstRaw(getRefEDIFCellInst(instanceref));
+			portCell = portInst.getCellInst().getCellType();
 			expect(RIGHT_PAREN,getNextToken());
 			expect(RIGHT_PAREN,getNextToken());
 		}else{
 			// This is a port to higher level
 			expect(RIGHT_PAREN,currToken);
 		}
+		EDIFPort port = portCell.getPort(portInst.getName());
+		if(port == null) {
+		    // Finding by EDIFName is O(n), but n is generally small and alternative to building
+		    // a map for this single search ends up taking longer 
+		    for(Entry<String,EDIFPort> e : portCell.getPortMap().entrySet()) {
+		        if(e.getValue().getLegalEDIFName().equals(portInst.getName())) {
+		            port = e.getValue();
+		            break;
+		        }
+		    }
+		}
 
+		if(port == null) {
+		    throw new RuntimeException("ERROR: Couldn't find EDIFPort for "
+		            + "EDIFPortInst " + portInst.getName() + " on line number " + lineNumber);
+		}
+		portInst.setPort(port);
+		String portInstName = portInst.getPortInstNameFromPort();
+		String dedupName = stringPool.get(portInstName); 
+		if(dedupName == null) {
+		    stringPool.put(portInstName, portInstName);
+		    dedupName = portInstName;
+		}
+		portInst.setName(dedupName);
+		if(portInst.getCellInst() != null) {
+		    portInst.getCellInst().addPortInst(portInst);
+		}
 		return portInst;
 	}
 	

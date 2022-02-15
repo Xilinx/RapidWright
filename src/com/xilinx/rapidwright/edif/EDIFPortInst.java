@@ -161,6 +161,10 @@ public class EDIFPortInst {
 		}
 	}
 	
+	protected void setCellInstRaw(EDIFCellInst cellInst) {
+	    this.cellInst = cellInst;
+	}
+	
 	/**
 	 * Checks if this is an output of a GND or VCC primitive cell.
 	 * @return True if the underlying cell is a static output from GND or VCC, false otherwise.
