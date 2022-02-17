@@ -10,6 +10,7 @@ import java.util.Queue;
 import java.util.Map;
 import java.util.Set;
 
+import com.xilinx.rapidwright.device.ArcType;
 import com.xilinx.rapidwright.device.SitePIP;
 import org.capnproto.MessageReader;
 import org.capnproto.PrimitiveList;
@@ -309,6 +310,11 @@ public class PhysNetlistReader {
 
             Net net = design.getNet(netName);
             if (net == null) {
+                // Ignore nets that are completely empty
+                if (!netReader.hasSources() && !netReader.hasStubs()) {
+                    continue;
+                }
+
                 EDIFHierNet edifNet = netlist.getHierNetFromName(netName);
                 net = new Net(netName, edifNet == null ? null : edifNet.getNet());
                 design.addNet(net);
@@ -317,32 +323,44 @@ public class PhysNetlistReader {
 
             // Sources
             StructList.Reader<RouteBranch.Reader> routeSrcs = netReader.getSources();
+            List<ArcType> prevNonGeneralArcTypes = new ArrayList<>();
             int routeSrcsCount = routeSrcs.size();
             for(int j=0; j < routeSrcsCount; j++) {
                 RouteBranch.Reader branchReader = routeSrcs.get(j);
-                readRouteBranch(branchReader, net, design, strings);
+                readRouteBranch(branchReader, net, design, strings, prevNonGeneralArcTypes);
             }
             // Stubs
             StructList.Reader<RouteBranch.Reader> routeStubs = netReader.getStubs();
             int routeStubsCount = routeStubs.size();
             for(int j=0; j < routeStubsCount; j++) {
                 RouteBranch.Reader branchReader = routeStubs.get(j);
-                readRouteBranch(branchReader, net, design, strings);
+                readRouteBranch(branchReader, net, design, strings, prevNonGeneralArcTypes);
             }
-
         }
     }
 
     private static void readRouteBranch(RouteBranch.Reader branchReader, Net net, Design design,
-                                        Enumerator<String> strings) {
+                                        Enumerator<String> strings, List<ArcType> prevNonGeneralArcTypes) {
         RouteBranch.RouteSegment.Reader segment = branchReader.getRouteSegment();
         Device device = design.getDevice();
         switch(segment.which()) {
             case PIP:{
                 PhysPIP.Reader pReader = segment.getPip();
-                Tile tile = device.getTile(strings.get(pReader.getTile()));
+                String tileName = strings.get(pReader.getTile());
                 String wire0 = strings.get(pReader.getWire0());
                 String wire1 = strings.get(pReader.getWire1());
+                // By comparing pointers, equivalent to comparing the originating int
+                // because they come from strings.get()
+                if (tileName == wire0 && wire0 == wire1) {
+                    if (tileName.equals("STUB_ARC")) {
+                        prevNonGeneralArcTypes.add(ArcType.STUB);
+                    }
+                    else throw new RuntimeException("ERROR: Invalid special PIP on net '" + net + "'");
+                    break;
+                }
+
+                Tile tile = device.getTile(tileName);
+
                 if(tile == null) {
                     throw new RuntimeException("ERROR: Tile " + tile + " for pip from wire " + wire0 + " to wire " + wire1 + " not found.");
                 }
@@ -360,6 +378,13 @@ public class PhysNetlistReader {
                 PIP pip = tile.getPIP(wire0Idx, wire1Idx);
                 if(pip == null) {
                     throw new RuntimeException("ERROR: PIP for tile " + tile + " from wire " + wire0 + " to wire " + wire1 + " not found.");
+                }
+
+                if (!prevNonGeneralArcTypes.isEmpty()) {
+                    for (ArcType at : prevNonGeneralArcTypes) {
+                        pip.updateArcType(at);
+                    }
+                    prevNonGeneralArcTypes.clear();
                 }
 
                 pip.setIsPIPFixed(pReader.getIsFixed());
@@ -380,6 +405,7 @@ public class PhysNetlistReader {
                 if(belPin == null) {
                     throw new RuntimeException(String.format("ERROR: Failed to get BEL pin %s/%s", belName, belPinName));
                 }
+
                 siteInst.routeIntraSiteNet(net, belPin, belPin);
                 break;
             }
@@ -405,13 +431,14 @@ public class PhysNetlistReader {
             }
         }
 
+        List<ArcType> nestedPrevNonGeneralArcTypes = new ArrayList<>();
+
         StructList.Reader<RouteBranch.Reader> branches = branchReader.getBranches();
         int branchesCount = branches.size();
         for(int j=0; j < branchesCount; j++) {
             RouteBranch.Reader bReader = branches.get(j);
-            readRouteBranch(bReader, net, design, strings);
+            readRouteBranch(bReader, net, design, strings, nestedPrevNonGeneralArcTypes);
         }
-
     }
 
     private static void readDesignProperties(PhysNetlist.Reader physNetlist, Design design,
@@ -457,7 +484,7 @@ public class PhysNetlistReader {
         //
         // It is harder to verify if the VCC/GND net type is correct, because
         // site local inverters may convert signals on a VCC to a GND net or
-        // vise versa.
+        // vice versa.
         //
         // If the full physical net is present and the inverting site pips are
         // labelled, then it would be possible to confirm if the NetType was
@@ -595,13 +622,13 @@ public class PhysNetlistReader {
 
         // Search the EDIFNetlist for sinks from VCC or GND nets.  Find the
         // EDIFPortInst sinks on those nets, and see if a physical net
-        // corrisponds to that cell pin.
+        // corresponds to that cell pin.
         //
         // If so, verify that the physical net is marked with either VCC or
         // GND.
         //
         // Note: Sink port instances on the VCC net may end up in the GND
-        // physical net, or vise versa. This can occur when a constant net is
+        // physical net, or vice versa. This can occur when a constant net is
         // run through a site local inverter.  Modelling these site local
         // inverters is not done here, hence why the requirement is only that
         // the net type be either VCC or GND.

@@ -339,8 +339,8 @@ public class DesignImplementationDiff {
 			if (rn == null) {
 				// Ignore aliased nets that are completely empty
 				if (!ln.hasPIPs() && ln.getSource() == null && ln.getAlternateSource() == null &&
-						lsitepips.getOrDefault(ln, Collections.EMPTY_SET).isEmpty() &&
-						lbelpins.getOrDefault(ln, Collections.EMPTY_SET).isEmpty()) {
+						ln.getPins().isEmpty() &&
+						lsitepips.get(ln) == null && lbelpins.get(ln) == null) {
 					String parentNetName = lnetlist.getParentNetName(ln.getName());
 					if (!parentNetName.equals(ln.getName()))
 						continue;
