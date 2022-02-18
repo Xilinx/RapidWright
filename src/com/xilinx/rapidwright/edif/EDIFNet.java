@@ -133,6 +133,7 @@ public class EDIFNet extends EDIFPropertyObject {
 	 * contains a copy of EDIFPortInsts available at the time of invocation as returned from 
 	 * {@link #getPortInstList()}.      
 	 * @return A map of EDIFPortInst names ({@link EDIFPortInst#getName()} to the corresponding objects.
+	 * @deprecated
 	 */
 	public Map<String, EDIFPortInst> getPortInstMap(){
 	    if(portInsts == null) return Collections.emptyMap();
@@ -215,6 +216,24 @@ public class EDIFNet extends EDIFPropertyObject {
 	 */
 	public EDIFPortInst removePortInst(EDIFPortInst portInst){
 		return removePortInst(portInst.getCellInst(), portInst.getName()); 
+	}
+	
+	/**
+	 * Removes the port instance by full name.  
+	 * @param portInstName Full name of the port instance (if its on a cell instance, it includes 
+	 * the instance name suffixed with '/' followed by bit-wise port name.
+	 * @return The removed port instance, or null if none removed.
+	 * @deprecated
+	 */
+	public EDIFPortInst removePortInst(String portInstName) {
+		int hierIdx = portInstName.lastIndexOf('/');
+		if(hierIdx == -1) {
+			return removePortInst(null, portInstName);
+		}
+		String instName = portInstName.substring(0, hierIdx);
+		EDIFCellInst inst = getParentCell().getCellInst(instName);
+		String pinName = portInstName.substring(hierIdx+1);
+		return removePortInst(inst,pinName);
 	}
 	
 	/**

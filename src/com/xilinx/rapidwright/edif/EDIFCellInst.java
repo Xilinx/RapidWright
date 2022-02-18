@@ -94,6 +94,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
      * contains a copy of EDIFPortInsts available at the time of invocation as returned from 
      * {@link #getPortInstList()}.      
      * @return A map of EDIFPortInst names ({@link EDIFPortInst#getName()} to the corresponding objects.
+     * @deprecated
      */
     public Map<String, EDIFPortInst> getPortInstMap(){
         if(portInsts == null) return Collections.emptyMap();
