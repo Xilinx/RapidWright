@@ -648,9 +648,8 @@ public class EDIFParser implements AutoCloseable{
 		}
 		portInst.setPort(port);
 		String portInstName = portInst.getPortInstNameFromPort();
-		String dedupName = stringPool.get(portInstName); 
+		String dedupName = stringPool.putIfAbsent(portInstName); 
 		if(dedupName == null) {
-		    stringPool.put(portInstName, portInstName);
 		    dedupName = portInstName;
 		}
 		portInst.setName(dedupName);
