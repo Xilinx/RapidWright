@@ -5,14 +5,21 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashSet;
 
+import com.xilinx.rapidwright.edif.EDIFCell;
+import com.xilinx.rapidwright.edif.EDIFDesign;
+import com.xilinx.rapidwright.edif.EDIFLibrary;
+import com.xilinx.rapidwright.edif.EDIFNet;
+import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.support.CheckOpenFiles;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.ParallelismTools;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -140,6 +147,59 @@ public class TestDesign {
         Net net = design.getNet("CO3_OBUF");
         for (SitePinInst spi : net.getSinkPins()) {
             Assertions.assertTrue(spi.getSite().isInputPin(spi.getName()));
+        }
+    }
+
+    private EDIFNetlist generateEDIF(String edifName, long numLibraries, long cellsPerLibrary, long netsPerCell) {
+        EDIFNetlist netlist = new EDIFNetlist(edifName);
+        EDIFDesign edifDesign = new EDIFDesign(edifName);
+        edifDesign.addProperty(EDIFTools.EDIF_PART_PROP.toLowerCase(), Device.AWS_F1);
+        netlist.setDesign(edifDesign);
+        EDIFCell topCell = null;
+        for (int libraryIdx = 0; libraryIdx < numLibraries; libraryIdx++) {
+            EDIFLibrary lib = new EDIFLibrary("library_" + libraryIdx);
+            for (int cellIdx = 0; cellIdx < cellsPerLibrary; cellIdx++) {
+                EDIFCell cell = new EDIFCell(lib, "cell_" + cellIdx);
+                for (int netIdx = 0; netIdx < netsPerCell; netIdx++) {
+                    new EDIFNet("net_" + netIdx, cell);
+                }
+                if (topCell == null) topCell = cell;
+            }
+            netlist.addLibrary(lib);
+        }
+        edifDesign.setTopCell(topCell);
+        return netlist;
+    }
+
+    @Test
+    @CheckOpenFiles
+    public void testEdifBiggerThan4GB(@TempDir Path tempDir) {
+        long maxMemoryNeeded = 1024L*1024L*1024L*20L;
+        Assumptions.assumeTrue(Runtime.getRuntime().maxMemory() >= maxMemoryNeeded);
+
+        final String edifName = "testEdifBiggerThan4GB";
+        final long numLibraries = 100;
+        final long cellsPerLibrary = 1000;
+        final long netsPerCell = 1000;
+        final Path outputPath = tempDir.resolve(edifName + ".dcp");
+
+        CodePerfTracker t = new CodePerfTracker("Generate EDIF", true);
+        t.start(numLibraries + " x " + cellsPerLibrary + " x " + netsPerCell);
+        EDIFNetlist netlist = generateEDIF(edifName, numLibraries, cellsPerLibrary, netsPerCell);
+        t.stop();
+
+        Design design = new Design(netlist);
+        design.writeCheckpoint(outputPath);
+    }
+
+    @Test
+    @CheckOpenFiles
+    public void testEdifBiggerThan4GBParallel(@TempDir Path tempDir) {
+        try {
+            ParallelismTools.setParallel(true);
+            testEdifBiggerThan4GB(tempDir);
+        } finally {
+            ParallelismTools.setParallel(false);
         }
     }
 }
