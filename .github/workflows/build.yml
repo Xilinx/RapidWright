@@ -25,10 +25,10 @@ jobs:
           java-version: '11'
           cache: 'gradle'
 
-      - name: Setup Python 3.5
+      - name: Setup Python 3.6
         uses: actions/setup-python@v2
         with:
-          python-version: 3.5
+          python-version: 3.6
 
       - name: Cache Jars & Data
         id: cache-rapidwright
