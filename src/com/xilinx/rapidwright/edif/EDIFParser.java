@@ -208,12 +208,7 @@ public class EDIFParser implements AutoCloseable{
 	
 	private String getUniqueString(char[] buffer, int offset, int count){
 		String tmp = new String(buffer, offset, count);
-		String curr = stringPool.get(tmp);
-		if(curr == null) {
-			stringPool.put(tmp, tmp);
-			return tmp;
-		}
-		return curr;
+		return stringPool.computeIfAbsent(tmp, k->tmp);
 	}
 	
 	public Map<String,String> getStringPool(){
@@ -315,13 +310,8 @@ public class EDIFParser implements AutoCloseable{
 			// Handle issue with names beginning with '[]'
 			String name = getNextToken();
 			if(name.charAt(0) == '[' && name.length() >= 2 &&  name.charAt(1) == ']'){
-				name = name.substring(2);
-				String unique = stringPool.get(name);
-				if(unique == null){
-					stringPool.put(name, name);
-				}else{
-					name = unique;
-				}
+				String tmpName = name.substring(2);
+				name = stringPool.computeIfAbsent(tmpName, k -> tmpName);
 			}
 			o.setName(name);
 			expect(RIGHT_PAREN, getNextToken());
@@ -648,12 +638,7 @@ public class EDIFParser implements AutoCloseable{
 		}
 		portInst.setPort(port);
 		String portInstName = portInst.getPortInstNameFromPort();
-		String dedupName = stringPool.get(portInstName); 
-		if(dedupName == null) {
-		    stringPool.put(portInstName, portInstName);
-		    dedupName = portInstName;
-		}
-		portInst.setName(dedupName);
+		portInst.setName(stringPool.computeIfAbsent(portInstName, k -> portInstName));
 		if(portInst.getCellInst() != null) {
 		    portInst.getCellInst().addPortInst(portInst);
 		}
