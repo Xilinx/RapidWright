@@ -701,10 +701,10 @@ public class EDIFParser implements AutoCloseable{
 			expect(LEFT_PAREN, getNextToken());
 			expect(LIBRARYREF, getNextToken());
 			String libraryref = getNextToken();
-			inst.setCellType(getRefEDIFCell(cellref, libraryref));
+			inst.setCellType(getRefEDIFCell(cellref, libraryref), false);
 			expect(RIGHT_PAREN, getNextToken());
 		} else {
-			inst.setCellType(getRefEDIFCell(cellref, currentLibraryName));
+			inst.setCellType(getRefEDIFCell(cellref, currentLibraryName), false);
 		}
 
 		expect(RIGHT_PAREN,getNextToken());

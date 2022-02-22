@@ -446,7 +446,7 @@ public class EDIFNetlist extends EDIFName {
 		if(existingCell == null){
 			destLib.addCell(cell);
 			for(EDIFCellInst inst : cell.getCellInsts()){
-				inst.updateCellType(migrateCellAndSubCellsWorker(inst.getCellType()));
+				inst.setCellType(migrateCellAndSubCellsWorker(inst.getCellType()), true);
 				//The view might have changed
 				inst.getViewref().setName(inst.getCellType().getView());
 			}
@@ -521,7 +521,7 @@ public class EDIFNetlist extends EDIFName {
 					instCellType.updateEDIFRename();
 					i++;
 				}
-				inst.setCellType(instCellType); // updating the celltype, which could be changed due to adding suffix
+				inst.setCellType(instCellType, false); // updating the celltype, which could be changed due to adding suffix
 				destLibSub.addCell(instCellType);
 				cells.add(instCellType);
 			}
@@ -1617,11 +1617,7 @@ public class EDIFNetlist extends EDIFName {
 						if (newCell == null) {
 							throw new RuntimeException("failed to find cell macro "+cellName+", we are in "+lib.getName());
 						}
-						inst.setCellType(newCell);
-						for(EDIFPortInst portInst : inst.getPortInsts()) {
-							String portName = portInst.getPort().getBusName();
-							portInst.setPort(newCell.getPort(portName));
-						}
+						inst.setCellType(newCell, true);
 					}
 				}
 			}

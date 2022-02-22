@@ -80,7 +80,7 @@ public class TestDesign {
         netlist.migrateCellAndSubCells(module.getNetlist().getTopCell());
 
         ModuleInst mi = design.createModuleInst("inst", module);
-        mi.getCellInst().setCellType(module.getNetlist().getTopCell());
+        mi.getCellInst().setCellType(module.getNetlist().getTopCell(), false);
         mi.placeOnOriginalAnchor();
         String oldAnchor = mi.getAnchor().toString();
 

@@ -1176,7 +1176,7 @@ public class EDIFTools {
 			EDIFCell origCell = cellInst.getCellType();
 			EDIFCell newCell = new EDIFCell(origCell.getLibrary(), origCell, origCell.getName() 
 					+ "_RW" + unique++);
-			cellInst.getInst().updateCellType(newCell);
+			cellInst.getInst().setCellType(newCell, true);
 			
 			// Update any physical cell references
 			for(EDIFCellInst inst : newCell.getCellInsts()) {

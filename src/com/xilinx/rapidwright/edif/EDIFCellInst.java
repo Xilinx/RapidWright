@@ -59,7 +59,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
     
     public EDIFCellInst(String name, EDIFCell cellType, EDIFCell parentCell){
         super(name);
-        setCellType(cellType);
+        setCellType(cellType, false);
         if(parentCell != null) parentCell.addCellInst(this);
         viewref = cellType != null ? cellType.getEDIFView() : DEFAULT_VIEWREF;
     }
@@ -185,13 +185,36 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
     }
 
     /**
-     * @param cellType the cellType to set
+     * Modify the cell being instantiated
+     * @param cellType the new cell type to be instantiated
+     * @param updatePortInsts update port references on portInst objects
+     */
+    public void setCellType(EDIFCell cellType, boolean updatePortInsts) {
+        this.cellType = cellType;
+        this.viewref = cellType != null ? cellType.getEDIFView() : null;
+        if (updatePortInsts) {
+            for (EDIFPortInst portInst : getPortInsts()) {
+                EDIFPort origPort = portInst.getPort();
+                EDIFPort port = cellType.getPort(origPort.getBusName());
+                if (port == null || port.getWidth() != origPort.getWidth()) {
+                    port = cellType.getPort(origPort.getName());
+                }
+                portInst.setPort(port);
+            }
+        }
+    }
+
+    /**
+     * @deprecated
      */
     public void setCellType(EDIFCell cellType) {
         this.cellType = cellType;
         this.viewref = cellType != null ? cellType.getEDIFView() : null;
     }
-    
+
+    /**
+     * @deprecated
+     */
     public void updateCellType(EDIFCell cellType) {
         setCellType(cellType);
         for(EDIFPortInst portInst : getPortInsts()) {

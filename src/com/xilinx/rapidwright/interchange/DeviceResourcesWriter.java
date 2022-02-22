@@ -309,7 +309,7 @@ public class DeviceResourcesWriter {
                 EDIFCell macroCell = macros.getCell(instCell.getName());
                 if(macroCell != null && !unsupportedMacros.contains(macroCell)) {
                     // remap cell definition to macro library
-                    inst.updateCellType(macroCell);
+                    inst.setCellType(macroCell, true);
                 }
             }
         }

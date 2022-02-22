@@ -586,7 +586,7 @@ public class BlockStitcher {
 			if(inst == null) throw new RuntimeException("ERROR: Couldn't update EDIF cell instance.");
 			EDIFCell cellType = work.getCell(e.getValue().getName() + "_" + e.getValue().getName());
 			if(cellType == null) throw new RuntimeException("ERROR: Couldn't update EDIF cell type " + e.getValue().getName());
-			inst.setCellType(cellType);
+			inst.setCellType(cellType, false);
 		}
 		
 		for(EDIFCell c : stitched.getNetlist().getLibrary("IP_Integrator_Lib").getCells()){

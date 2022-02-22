@@ -835,7 +835,7 @@ public class DesignTools {
 		}
 		inst.getCellType().getLibrary().removeCell(inst.getCellType());
 		netlist.migrateCellAndSubCells(cell.getTopEDIFCell(), true);
-		inst.updateCellType(cell.getTopEDIFCell());
+		inst.setCellType(cell.getTopEDIFCell(), true);
 		netlist.removeUnusedCellsFromAllWorkLibraries();
 		
 		// Add placement information
@@ -1146,7 +1146,7 @@ public class DesignTools {
 		for(EDIFPort port : futureBlackBox.getCellType().getPorts()){
 			blackBox.addPort(port);
 		}
-		futureBlackBox.setCellType(blackBox);
+		futureBlackBox.setCellType(blackBox, false);
 		futureBlackBox.addProperty(EDIFCellInst.BLACK_BOX_PROP, true);
 		
 		t.stop().printSummary();
@@ -1832,7 +1832,7 @@ public class DesignTools {
 			EDIFHierCellInst cellInst = src.getNetlist().getHierCellInstFromName(e.getKey());
 			destNetlist.migrateCellAndSubCells(cellInst.getCellType());
 			EDIFHierCellInst bbInst = destNetlist.getHierCellInstFromName(e.getValue());
-			bbInst.getInst().setCellType(cellInst.getCellType());
+			bbInst.getInst().setCellType(cellInst.getCellType(), false);
             for(EDIFPortInst portInst : bbInst.getInst().getPortInsts()) {
             	portInst.getPort().setParentCell(cellInst.getCellType());
             }

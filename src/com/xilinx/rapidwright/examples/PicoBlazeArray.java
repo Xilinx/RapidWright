@@ -152,7 +152,7 @@ public class PicoBlazeArray {
 					T mi = createInstance(design, makeName(x,y), impl, picoBlazeImpls);
 
 					instances.put(mi.getName(), mi);
-					mi.getCellInst().setCellType(impl.getNetlist().getTopCell());
+					mi.getCellInst().setCellType(impl.getNetlist().getTopCell(), false);
 
 					placeInArray(mi, bram, impl);
 

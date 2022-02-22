@@ -138,7 +138,7 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
 	public EDIFCellInst addNewCellInstUniqueName(String suggestedName, EDIFCell reference){
 		EDIFCellInst i = new EDIFCellInst();
 		i.setName(suggestedName);
-		i.setCellType(reference);
+		i.setCellType(reference, false);
 		return addCellInstUniqueName(i);
 	}
 	
