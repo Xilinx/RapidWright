@@ -42,6 +42,7 @@ import java.util.Deque;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -174,7 +175,7 @@ public class EDIFNetlist extends EDIFName {
 	}
 	
 	private void init(){
-		libraries = getNewMap();
+		libraries = new LinkedHashMap<>();
 		comments = new ArrayList<>();
 		metax = getNewMap();
 	}
