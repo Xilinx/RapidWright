@@ -73,6 +73,7 @@ public class EDIFPortInstList extends ArrayList<EDIFPortInst> {
     private int compare(EDIFPortInst left, String rightInstName, String rightPortInstName) {
         if(left.getCellInst() == null) {
             if(rightInstName == null) {
+                // left and right are both a top-level port insts, compare their port insts name only
                 return left.getName().compareTo(rightPortInstName);
             }
             int compare = left.getName().compareTo(rightInstName);
