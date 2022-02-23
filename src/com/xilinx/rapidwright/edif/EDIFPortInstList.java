@@ -79,7 +79,9 @@ public class EDIFPortInstList extends ArrayList<EDIFPortInst> {
             int compare = left.getName().compareTo(rightInstName);
             return compare == 0 ? (-1*rightPortInstName.length()) : compare;
         } else if(rightInstName == null) {
+            // right is a top-level port inst, but left is not. Compare left's inst name with right's port inst name.
             int compare = left.getCellInst().getName().compareTo(rightPortInstName);
+            // If the two happen to be equal, then right's full name is a prefix of left's full name and thus left should go after right.
             return compare == 0 ? left.getName().length() : compare;
         }
         int compare = left.getCellInst().getName().compareTo(rightInstName);
