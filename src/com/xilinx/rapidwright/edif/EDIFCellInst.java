@@ -99,7 +99,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
     public Map<String, EDIFPortInst> getPortInstMap(){
         if(portInsts == null) return Collections.emptyMap();
         HashMap<String, EDIFPortInst> map = new HashMap<>();
-        for(EDIFPortInst e : getPortInstList()) {
+        for(EDIFPortInst e : getPortInsts()) {
             map.put(e.getName(), e);
         }
         return map;
@@ -167,14 +167,6 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
      */
     public Collection<EDIFPortInst> getPortInsts(){
         return portInsts == null ? Collections.emptyList() : portInsts;
-    }
-    
-    /**
-     * Gets the sorted ArrayList of EDIFPortInsts on this cell instance.
-     * @return The sorted list of EDIFPortInst objects on this cell.
-     */
-    public EDIFPortInstList getPortInstList() {
-        return portInsts == null ? EDIFPortInstList.EMPTY : portInsts;
     }
     
     /**

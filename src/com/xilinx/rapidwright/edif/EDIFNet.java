@@ -138,7 +138,7 @@ public class EDIFNet extends EDIFPropertyObject {
 	public Map<String, EDIFPortInst> getPortInstMap(){
 	    if(portInsts == null) return Collections.emptyMap();
 	    HashMap<String, EDIFPortInst> map = new HashMap<>();
-	    for(EDIFPortInst e : getPortInstList()) {
+	    for(EDIFPortInst e : getPortInsts()) {
 	        map.put(e.getFullName(), e);
 	    }
 	    return map;
@@ -150,14 +150,6 @@ public class EDIFNet extends EDIFPropertyObject {
 	 */
 	public Collection<EDIFPortInst> getPortInsts(){
 		return portInsts == null ? Collections.emptyList() : portInsts;
-	}
-	
-	/**
-	 * Gets the sorted ArrayList of EDIFPortInsts on this net.
-	 * @return The sorted list of EDIFPortInst objects on this net.
-	 */
-	public EDIFPortInstList getPortInstList() {
-	    return portInsts == null ? EDIFPortInstList.EMPTY : portInsts;
 	}
 	
 	public void rename(String newName) {
