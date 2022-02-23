@@ -152,6 +152,8 @@ public class TestEDIFPortInstList {
             "processor/write_strobe_flop_0[0]",
             "processor/write_strobe_flop_1[0]",
             "processor/write_strobe_flop_2[0]",
+            "port_name", 
+            "port_name/Q"
         };
         
         

@@ -71,13 +71,17 @@ public class EDIFPortInstList extends ArrayList<EDIFPortInst> {
      * left is lexicographically before right, or a number greater than 0 if left is after right. 
      */
     private int compare(EDIFPortInst left, String rightInstName, String rightPortInstName) {
-        String leftInstName = left.getCellInst() == null ? null : left.getCellInst().getName();
-        if(leftInstName == null) {
-            return left.getName().compareTo(rightInstName == null ? rightPortInstName : rightInstName);
+        if(left.getCellInst() == null) {
+            if(rightInstName == null) {
+                return left.getName().compareTo(rightPortInstName);
+            }
+            int compare = left.getName().compareTo(rightInstName);
+            return compare == 0 ? (-1*rightPortInstName.length()) : compare;
         } else if(rightInstName == null) {
-            return leftInstName.compareTo(rightPortInstName);
+            int compare = left.getCellInst().getName().compareTo(rightPortInstName);
+            return compare == 0 ? left.getName().length() : compare;
         }
-        int compare = leftInstName.compareTo(rightInstName);
+        int compare = left.getCellInst().getName().compareTo(rightInstName);
         return compare == 0 ? left.getName().compareTo(rightPortInstName) : compare; 
     }
 }
