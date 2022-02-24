@@ -227,9 +227,7 @@ public class EDIFTools {
 	}
 	
 	public static void connectPortBus(EDIFCell topCell, EDIFCellInst src, EDIFCellInst snk, 
-									  String srcPrefix, String snkPrefix, int width,
-									  Map<String,EDIFPortInst> srcPortMap,
-									  Map<String,EDIFPortInst> snkPortMap){
+									  String srcPrefix, String snkPrefix, int width){
 		for(int i=0; i < width; i++){
 			String suffix = "["+i+"]";
 			String outputPortName = srcPrefix + suffix;
@@ -238,16 +236,13 @@ public class EDIFTools {
 			EDIFNet net = null;
 			net = new EDIFNet("conn_net_" + EDIFTools.makeNameEDIFCompatible(outputPortName), topCell);
 
-			EDIFPortInst outputPortInst = srcPortMap.get(outputPortName);
-			EDIFPortInst inputPortInst = snkPortMap.get(inputPortName);
+			EDIFPortInst outputPortInst = src.getPortInst(outputPortName);
+			EDIFPortInst inputPortInst = snk.getPortInst(inputPortName);
 			
 			@SuppressWarnings("unused")
 			EDIFPortInst outputPort = new EDIFPortInst(outputPortInst.getPort(),net,outputPortInst.getIndex(),src);
 			@SuppressWarnings("unused")
 			EDIFPortInst inputPort = new EDIFPortInst(inputPortInst.getPort(),net,inputPortInst.getIndex(),snk);
-			
-			//net.addPortInst(outputPort);
-			//net.addPortInst(inputPort);
 		}
 	}
 	
@@ -657,7 +652,7 @@ public class EDIFTools {
 			staticInst = new EDIFCellInst(staticTypeName, staticSrc, cell);
 			cell.addCellInst(staticInst);
 		}
-		EDIFPortInst outputPortInst = staticInst.getPortInstMap().get(portName);
+		EDIFPortInst outputPortInst = staticInst.getPortInst(portName);
 		if(outputPortInst == null){
 			outputPortInst = new EDIFPortInst(staticInst.getPort(portName),null,staticInst);
 		}
@@ -1037,7 +1032,7 @@ public class EDIFTools {
 			portNet = d.getTopEDIFCell().createNet(name);
 		}
 		String portName = dir == PinType.IN ? "I" : "O";
-		EDIFPortInst bufPortInst = portNet.getPortInst(i.getName() + EDIFTools.EDIF_HIER_SEP + portName);
+		EDIFPortInst bufPortInst = portNet.getPortInst(i, portName);
 		if(bufPortInst == null)
 			portNet.createPortInst(portName, i);
 		if(pr.getNet() == null) 

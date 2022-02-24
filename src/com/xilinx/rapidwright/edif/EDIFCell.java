@@ -101,8 +101,7 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
 		if(orig.nets != null) {
 			for(Entry<String, EDIFNet> e : orig.nets.entrySet()) {
 				EDIFNet net = addNet(new EDIFNet(e.getValue()));
-				for(Entry<String, EDIFPortInst> e2 : e.getValue().getPortInstMap().entrySet()) {
-					EDIFPortInst prototype = e2.getValue();
+				for(EDIFPortInst prototype : e.getValue().getPortInsts()) {
 					EDIFPortInst newPortInst = new EDIFPortInst(prototype);
 					EDIFPort newPort = null;
 					if(prototype.getCellInst() != null) {

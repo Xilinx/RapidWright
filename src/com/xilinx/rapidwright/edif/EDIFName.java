@@ -27,7 +27,7 @@ package com.xilinx.rapidwright.edif;
 
 import java.io.IOException;
 import java.io.Writer;
-import java.util.LinkedHashMap;
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -163,7 +163,7 @@ public class EDIFName implements Comparable<EDIFName> {
 	}
 	
 	public <K, V> Map<K, V> getNewMap(){
-		return new LinkedHashMap<K,V>();
+		return new HashMap<K,V>();
 	}
 
 	public int compareTo(EDIFName o) {
