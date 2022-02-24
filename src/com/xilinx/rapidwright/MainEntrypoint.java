@@ -44,6 +44,7 @@ import com.xilinx.rapidwright.examples.UpdateRoutingUsingSATRouter;
 import com.xilinx.rapidwright.examples.tilebrowser.PartTileBrowser;
 import com.xilinx.rapidwright.interchange.DeviceResourcesExample;
 import com.xilinx.rapidwright.interchange.EnumerateCellBelMapping;
+import com.xilinx.rapidwright.interchange.GenerateInterchangeDevices;
 import com.xilinx.rapidwright.interchange.Interchange;
 import com.xilinx.rapidwright.interchange.LogicalNetlistExample;
 import com.xilinx.rapidwright.interchange.PhysicalNetlistExample;
@@ -109,6 +110,7 @@ public class MainEntrypoint {
         addFunction("EnumerateCellBelMapping", EnumerateCellBelMapping::main);
         addFunction("ExampleNetlistCreation", ExampleNetlistCreation::main);
         addFunction("FileTools", FileTools::main);
+        addFunction("GenerateInterchangeDevices", GenerateInterchangeDevices::main);
         addFunction("HandPlacer", HandPlacer::main);
         addFunction("ILAInserter", ILAInserter::main);
         addFunction("ImplGuide", ImplGuide::main);
