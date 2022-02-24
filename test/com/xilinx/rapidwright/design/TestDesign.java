@@ -173,8 +173,8 @@ public class TestDesign {
 
     @Test
     @CheckOpenFiles
-    public void testEdifBiggerThan4GB(@TempDir Path tempDir) {
-        long maxMemoryNeeded = 1024L*1024L*1024L*20L;
+    public void testDcpEdifBiggerThan4GB(@TempDir Path tempDir) {
+        long maxMemoryNeeded = 1024L*1024L*1024L*16L;
         Assumptions.assumeTrue(Runtime.getRuntime().maxMemory() >= maxMemoryNeeded);
 
         final String edifName = "testEdifBiggerThan4GB";
@@ -194,10 +194,10 @@ public class TestDesign {
 
     @Test
     @CheckOpenFiles
-    public void testEdifBiggerThan4GBParallel(@TempDir Path tempDir) {
+    public void testDcpEdifBiggerThan4GBParallel(@TempDir Path tempDir) {
         try {
             ParallelismTools.setParallel(true);
-            testEdifBiggerThan4GB(tempDir);
+            testDcpEdifBiggerThan4GB(tempDir);
         } finally {
             ParallelismTools.setParallel(false);
         }
