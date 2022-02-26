@@ -68,7 +68,6 @@ public class CodePerfTracker {
 	
 	
 	public CodePerfTracker(String name){
-		super();
 		init(name,true);
 	}
 	
@@ -79,7 +78,7 @@ public class CodePerfTracker {
 	public CodePerfTracker(String name, boolean printProgress, boolean isVerbose){
 		super();
 		verbose = isVerbose;
-		init(name,true);
+		init(name,printProgress);
 	}
 	
 	public void init(String name, boolean printProgress){
