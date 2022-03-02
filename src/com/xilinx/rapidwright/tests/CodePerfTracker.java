@@ -25,6 +25,8 @@
 package com.xilinx.rapidwright.tests;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 
 import com.xilinx.rapidwright.util.MessageGenerator;
 
@@ -41,7 +43,9 @@ public class CodePerfTracker {
 	
 	private ArrayList<Long> memUsages;
 	
-	private ArrayList<String> segmentNames; 
+	private ArrayList<String> segmentNames;
+
+	private Map<String,Long> inflightTimes;
 	
 	private Runtime rt;
 	
@@ -85,8 +89,9 @@ public class CodePerfTracker {
 		runtimes = new ArrayList<Long>();
 		memUsages = new ArrayList<Long>();
 		segmentNames = new ArrayList<String>();
+		inflightTimes = new HashMap<>();
 		rt = Runtime.getRuntime();		
-		if(this.printProgress && isVerbose()){
+		if(this.printProgress && isVerbose() && name != null){
 			MessageGenerator.printHeader(name);
 		}
 	}
@@ -125,7 +130,7 @@ public class CodePerfTracker {
 	}
 
 	public CodePerfTracker start(String segmentName){
-		if(!GLOBAL_DEBUG) return this;
+		if(!GLOBAL_DEBUG || this == SILENT) return this;
 		int idx = runtimes.size();
 		if(isUsingGCCallsToTrackMemory()) System.gc();
 		long currUsage = rt.totalMemory() - rt.freeMemory();
@@ -134,9 +139,9 @@ public class CodePerfTracker {
 		runtimes.add(System.nanoTime());
 		return this;
 	}
-	
+
 	public CodePerfTracker stop(){
-		if(!GLOBAL_DEBUG) return this;
+		if(!GLOBAL_DEBUG || this == SILENT) return this;
 		long end = System.nanoTime();
 		int idx = runtimes.size()-1;
 		if(idx < 0) return null;
@@ -153,18 +158,55 @@ public class CodePerfTracker {
 		}
 		return this;
 	}
-	
-	private void print(int idx){
+
+	public synchronized CodePerfTracker start(String segmentName, boolean nested) {
+		if (!nested) {
+			return start(segmentName);
+		}
+
+		inflightTimes.put(segmentName, System.nanoTime());
+		return this;
+	}
+
+	public synchronized CodePerfTracker stop(String segmentName) {
+		Long start = inflightTimes.remove(segmentName);
+		if (start == null) {
+			return stop();
+		}
+
+		long end = System.nanoTime();
+		if (printProgress && isVerbose()) {
+			print("(" + segmentName + ")", end-start, null, true);
+		}
+		return this;
+	}
+
+	private void print(String segmentName, Long runtime, Long memUsage) {
+		print(segmentName, runtime, memUsage, false);
+	}
+
+	private void print(String segmentName, Long runtime, Long memUsage, boolean nested){
 		if(isUsingGCCallsToTrackMemory()){
 			System.out.printf("%"+maxSegmentNameSize+"s: %"+maxRuntimeSize+".3fs %"+maxUsageSize+".3fMBs\n", 
-				segmentNames.get(idx), 
-				(runtimes.get(idx))/1000000000.0,
-				(memUsages.get(idx))/(1024.0*1024.0));
+				segmentName,
+				(runtime)/1000000000.0,
+				(memUsage)/(1024.0*1024.0));
 		} else {
-			System.out.printf("%"+maxSegmentNameSize+"s: %"+maxRuntimeSize+".3fs\n", 
-					segmentNames.get(idx), 
-					(runtimes.get(idx))/1000000000.0);
+			if (nested) {
+				System.out.printf("%" + maxSegmentNameSize + "s: %" + maxRuntimeSize + "s  (%" + maxRuntimeSize + ".3fs)\n",
+						segmentName,
+						"",
+						(runtime) / 1000000000.0);
+			} else {
+				System.out.printf("%" + maxSegmentNameSize + "s: %" + maxRuntimeSize + ".3fs\n",
+						segmentName,
+						(runtime) / 1000000000.0);
+			}
 		}
+	}
+
+	private void print(int idx) {
+		print(segmentNames.get(idx), runtimes.get(idx), memUsages.get(idx));
 	}
 	
 	/**
@@ -207,7 +249,7 @@ public class CodePerfTracker {
 	}
 	
 	public void printSummary(){
-		if(!GLOBAL_DEBUG) return;
+		if(!GLOBAL_DEBUG || this == SILENT) return;
 		if(!isVerbose()) return;
 		if(!printProgress) MessageGenerator.printHeader(name);
 		addTotalEntry();

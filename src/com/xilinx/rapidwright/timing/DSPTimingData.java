@@ -62,39 +62,15 @@ public class DSPTimingData{
 	/** A flag to indicate if the input file of the DSP is valid */
 	private boolean valid;
 	
-	private static boolean pathWarningInfoGenerated = false;
-	private static boolean fileExistenceWarningInfo = false;
-	
-	private static String dspTimingDataFolder = null;
-	
-	public static void setDSPTimingFolder(String path) {
-		if(path != null && !path.endsWith("/")) path += "/";
-		dspTimingDataFolder = path;
-		if(path != null) System.out.println("INFO: DSP timing data folder set as: " + dspTimingDataFolder);
-	}
-	
-	public DSPTimingData(String fullName){
+	public DSPTimingData(String fullName, String dspTimingDataFolder){
 		this.setBlockName(fullName);
-		String dspBlockName = fullName.replace("/", "-");
-		
-		if(dspTimingDataFolder == null && !pathWarningInfoGenerated) {
-			System.out.println("CRITICAL WARNING: The design contains DSP blocks, but the DSP logic delay file path has not been set.");
-			this.generateWarningInfo();
-			pathWarningInfoGenerated = true;
-		}
-		
-		File dspTimingFile = new File(dspTimingDataFolder + dspBlockName + ".txt");
-    	if(dspTimingFile.exists()) {
+		File dspTimingFile = new File(dspTimingDataFolder + fullName.replace("/", "-") + ".txt");
+		if(dspTimingFile.exists()) {
         	this.valid = true;
-        }else {
-        	this.valid = false;
-        	if(!fileExistenceWarningInfo && !pathWarningInfoGenerated) {
-        		System.out.println("CRITICAL WARNING: logic delay file does not exist: " + dspTimingFile);
-        		this.generateWarningInfo();
-        		fileExistenceWarningInfo = true;
-        	}
-        }
-    	this.setInputOutputDelays(new HashMap<>());
+		}else {
+			this.valid = false;
+		}
+		this.setInputOutputDelays(new HashMap<>());
 		this.inputPorts = new ArrayList<>();
 		this.outputPorts = new ArrayList<>();
 		
@@ -105,7 +81,7 @@ public class DSPTimingData{
 		}
 	}
 	
-	private void generateWarningInfo() {
+	public static void generateWarningInfo() {
 		System.out.println("                  The tool continues in the timing-driven mode. Due to the missing DSP timing info, there could be unexpected critical path delay optimism.");
 		System.out.println("INFO: To obtain DSP logic delay files, please refer to dump_all_dsp_delay.tcl under $RAPIDWRIGHT_PATH/tcl/rwroute.");
 		System.out.println("INFO: Please use --dspTimingDataFolder <DSP delay files path> to grant the tool access to DSP timing files.");

@@ -52,6 +52,7 @@ import com.xilinx.rapidwright.edif.EDIFName;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFPropertyValue;
+import com.xilinx.rapidwright.rwroute.Connection;
 import com.xilinx.rapidwright.rwroute.RouterHelper;
 import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.RuntimeTrackerTree;
@@ -86,12 +87,23 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     static HashSet<String> unisimFlipFlopTypes;
     static HashSet<String> ramTypes;
 
+    /** A map from TimingEdges to connections */
+	private Map<TimingEdge, Connection> timingEdgeConnectionMap = new HashMap<>();
+    /** Mapping between each sink {@link SitePinInst} instance and its associated {@link TimingEdge} instances */
     private Map<SitePinInst, List<TimingEdge>> sinkSitePinInstTimingEdges = new HashMap<>();
+    /** Mapping between a logic pin and a physical pin recognized by the timing graph builder */
     private Map<EDIFHierPortInst, SitePinInst> edifHPortMap = new HashMap<>();
     private List<TimingVertex> orderedTimingVertice = new ArrayList<>();
     private List<TimingVertex> reversedOrderedTimingVertice = new ArrayList<>();
     private ClkRouteTiming clkRouteTiming = null;
     private RuntimeTrackerTree routerTimer;
+    
+    /** DSP timing data related variables */
+    private String dspTimingDataFolder;
+    private boolean dspTimingDataFolderWarning;
+    private boolean dspTimingFileExistenceWarning;
+    private Map<String, DSPTimingData> dspNameDataMapping = new HashMap<>();
+    private Set<DSPTimingData> dspTimingDataSet = new HashSet<>();
     
     static {
         
@@ -122,17 +134,18 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     }
     
     
-    public TimingGraph(Design design, RuntimeTrackerTree timer, ClkRouteTiming clkTiming) {
+    public TimingGraph(Design design, RuntimeTrackerTree timer, ClkRouteTiming clkTiming, String dspTimingDataFolder) {
         super(TimingEdge.class);
         this.design = design;
         this.routerTimer = timer;
         this.clkRouteTiming = clkTiming;
+        this.dspTimingDataFolder = dspTimingDataFolder;
     }
 
     /**
      * Builds the TimingGraph based on analyzing nets within a {@link Design} object.
      */
-    public void build(boolean isPartialRouting) {
+    public void build(boolean isPartialRouting, Collection<Net> targetNets) {
     	if (timingModel == null) {
             throw new RuntimeException("Error: The TimingModel is not properly set for the "
                     + "TimingGraph prior to building.");
@@ -145,7 +158,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         if(!isPartialRouting) {
         	determineLogicDelaysFromEDIFCellInsts(this.myCellMap);
         }else {
-        	determineLogicDelaysFromEDIFCellInsts(this.generateCellMapOfUnoutedNets());
+        	determineLogicDelaysFromEDIFCellInsts(this.generateCellMapOfNets(targetNets));
         }
         if(this.routerTimer != null) this.routerTimer.getRuntimeTracker("determine logic dly").stop();
         
@@ -157,7 +170,20 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
             	addNetDelayEdges(net);
             }
         }
+        
+        this.addTimingEdgesOfNets(isPartialRouting, targetNets);
+        
         if(this.routerTimer != null) this.routerTimer.getRuntimeTracker("add net dly edges").stop();
+    }
+    
+    private void addTimingEdgesOfNets(boolean isPartialRouting, Collection<Net> assignedNets) {
+    	for (Net net : assignedNets) {
+			if(net.isClockNet()) continue;//this is for getting rid of the problem in addNetDelayEdges() of clock net
+			if(net.isStaticNet()) continue;
+			if(!isPartialRouting || !net.hasPIPs()) {
+				addNetDelayEdges(net);
+			}
+    	}
     }
     
     public void populateHierCellInstMap() {
@@ -187,13 +213,14 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     }
     
     /**
-     * Gets a map of hierarchical names to EDIFCellInsts of unrouted nets only
-     * @return A map of hierarchical names to EdifCellInstances that use primitives in the library, for unrouted nets only
+     * Gets a map of hierarchical names to EDIFCellInsts of target nets.
+     * @param nets Nets in question.
+     * @return A map of hierarchical names to EdifCellInstances that use primitives in the library.
      */
-    private Map<String, EDIFCellInst> generateCellMapOfUnoutedNets() {
+    private Map<String, EDIFCellInst> generateCellMapOfNets(Collection<Net> nets) {
     	Map<String, EDIFCellInst> partialCellMap = new HashMap<>();
     	Set<String> keys = new HashSet<>();
-    	for(Net n : design.getNets()) {
+    	for(Net n : nets) {
     		if(n.isClockNet() || n.isStaticNet() || n.hasPIPs()) continue;
     		if(!RouterHelper.isRoutableNetWithSourceSinks(n)) continue;
     		List<EDIFHierPortInst> ehportInsts = design.getNetlist().getPhysicalPins(n.getName());
@@ -360,13 +387,6 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     		}
     	}
     	return null;
-    }
-
-	/**
-     * Gets the mapping between each EDIFHierPortInst (logical pin) and the SitePinInst physical pin.
-     */
-	public Map<EDIFHierPortInst, SitePinInst> getEdifHPortMap(){
-    	return this.edifHPortMap;
     }
     
 	/**
@@ -1501,12 +1521,15 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                     }
                 }
             }else if(mycellInst.getCellType().toString().contains("DSP_")){//contains DSP_, and FD, VCC
-                String dspBlockFullHierName = c.getParentHierarchicalInstName();
+                this.dspTimingDataPathCheck();
+            	String dspBlockFullHierName = c.getParentHierarchicalInstName();
                 DSPTimingData dspTimingData = dspNameDataMapping.get(dspBlockFullHierName);
                 if(dspTimingData == null) {
-            		dspTimingData = new DSPTimingData(dspBlockFullHierName);//check if data processed previously
+            		dspTimingData = new DSPTimingData(dspBlockFullHierName, this.dspTimingDataFolder);//check if data processed previously
             		if(dspTimingData.isValid()) {
-            			addDSPDataMapping(dspBlockFullHierName, dspTimingData);
+            			this.dspNameDataMapping.put(dspBlockFullHierName, dspTimingData);
+            		}else {
+                		this.dspTimingFileExistenceWarning(dspBlockFullHierName);
             		}
                 }
                 for(EDIFPortInst portInst : portInstList) {
@@ -1514,7 +1537,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         		    if(s1.endsWith(("CLK"))) {
         		    	if(dspTimingData.containsPortInst(portInst.getName())){
         				    dspTimingData.addPinMapping("CLK", portInst.getName());
-        				    addDSPTimingData(dspTimingData);
+        				    this.dspTimingDataSet.add(dspTimingData);
         			    }
         		    }
             	   
@@ -1523,7 +1546,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
 	            	    if(portInstOfNet.isTopLevelPort()) {
 	            	    	if(dspTimingData.containsPortInst(portInstOfNet.getName())) {
 	            			    dspTimingData.addPinMapping(portInst.getFullName(), portInstOfNet.getName());
-	            			    addDSPTimingData(dspTimingData);//saved for adding timing edges with logic delay
+	            			    this.dspTimingDataSet.add(dspTimingData);//saved for adding timing edges with logic delay
 	            		    }
 	            	    }
 	                }
@@ -1557,14 +1580,26 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         }   
     }
     
-    static Map<String, DSPTimingData> dspNameDataMapping = new HashMap<>();
-    private void addDSPDataMapping(String name, DSPTimingData data) {
-    	dspNameDataMapping.put(name, data);
+    private void dspTimingDataPathCheck() {
+    	if(this.dspTimingDataFolder == null && !this.dspTimingDataFolderWarning) {
+			System.out.println("CRITICAL WARNING: The design contains DSP blocks, but the DSP logic delay file path has not been set.");
+			DSPTimingData.generateWarningInfo();
+			this.dspTimingDataFolderWarning = true;
+		}else if (dspTimingDataFolder != null) {
+			if(!dspTimingDataFolder.endsWith("/")) this.dspTimingDataFolder += "/";
+			if(!this.dspTimingDataFolderWarning) {
+				System.out.println("INFO: DSP timing data folder set as: " + dspTimingDataFolder);
+				this.dspTimingDataFolderWarning = true;
+			}
+		}
     }
     
-    static Set<DSPTimingData> dspTimingDataSet = new HashSet<>();
-    private void addDSPTimingData(DSPTimingData data) {
-    	dspTimingDataSet.add(data);
+    private void dspTimingFileExistenceWarning(String dspBlockFullHierName) {
+    	if(!this.dspTimingFileExistenceWarning) {
+			System.out.println("CRITICAL WARNING: logic delay file does not exist: " + dspBlockFullHierName.replace("/", "-"));
+			DSPTimingData.generateWarningInfo();
+			this.dspTimingFileExistenceWarning = true;
+		}
     }
     
     private Cell srcCell;
@@ -1850,12 +1885,12 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
             setEdgeWeight(e, e.getDelay());
             
             if(spi_sink != null) {
-                List<TimingEdge> connectionEdges = this.getSinkSitePinInstTimingEdges().get(spi_sink);
+                List<TimingEdge> connectionEdges = this.sinkSitePinInstTimingEdges.get(spi_sink);
                 if(connectionEdges == null) {
                 	connectionEdges = new ArrayList<>();
                 }
                 connectionEdges.add(e);
-            	this.getSinkSitePinInstTimingEdges().put(spi_sink, connectionEdges);
+                this.sinkSitePinInstTimingEdges.put(spi_sink, connectionEdges);
             }
         }
         return 1;
@@ -1927,11 +1962,34 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     protected static int getBit(long value, int bitIndex){
         return (int)(value >> bitIndex) & 0x1;
     }
-
+    
+    public Map<TimingEdge, Connection> getTimingEdgeConnectionMap(){
+    	return this.timingEdgeConnectionMap;
+    }
+	
 	/**
-     * Gets the mapping between each pair of SitePinInsts and a list of the associated TimingEdges in the design
-     */
-	public Map<SitePinInst, List<TimingEdge>> getSinkSitePinInstTimingEdges() {
-		return sinkSitePinInstTimingEdges;
+	 * Assigns {@link TimingEdge} instances to each connection in the list.
+	 * @param connections A list of connections that should be associated with {@link TimingEdge} instances.
+	 * @param timingManager A {@link TimingManager} instance to use.
+	 */
+	public void setTimingEdgesOfConnections(List<Connection> connections) {
+		for(Connection connection : connections) {
+			if(connection.isDirect()) continue;
+			List<EDIFHierPortInst> hportsFromSitePinInsts = DesignTools.getPortInstsFromSitePinInst(connection.getSink());
+			if(hportsFromSitePinInsts.isEmpty()) {
+				throw new RuntimeException("ERROR: Unable to find hierarchical logical cell pins from: " + connection.getSink());
+			}
+			EDIFHierPortInst hportSink = hportsFromSitePinInsts.get(0);
+			SitePinInst mappedSink = this.edifHPortMap.get(hportSink);
+			
+			List<TimingEdge> timingEdges = this.sinkSitePinInstTimingEdges.get(mappedSink);
+			if(timingEdges == null) {
+				throw new RuntimeException("ERROR: No timing edges for connection from: " + connection.getSource() + " to " + connection.getSink());
+			}
+			connection.setTimingEdges(timingEdges);
+			for(TimingEdge edge : connection.getTimingEdges()){
+				this.timingEdgeConnectionMap.put(edge, connection); // for getting critical path delay breakdown in the timing report
+			}
+		}
 	}
 }

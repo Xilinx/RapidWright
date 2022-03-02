@@ -87,38 +87,44 @@ public class RWRouteConfig {
 	private boolean verbose;
 	/** true to display connection span statistics */
 	private boolean printConnectionSpan;
+	/** To indicate if the partial routing is for resolving conflict nets only */
+	private boolean resolveConflictNets;
+	/** A keyword to help recognize the target conflict nets */
+	private String anchorNameKeyword;
 	
 	/** Constructs a Configuration Object */
 	public RWRouteConfig(String[] arguments) {
-		this.maxIterations = (short) 100;
-		this.useBoundingBox = true;
-		this.boundingBoxExtensionX = (short) 3;
-		this.boundingBoxExtensionY = (short) 15;
-		this.enlargeBoundingBox = false;
-		this.extensionYIncrement = 2;
-		this.extensionXIncrement = 1;
-		this.wirelengthWeight = 0.8f;
-		this.timingWeight = 0.35f;
-		this.timingMultiplier = 1f;
-		this.shareExponent = 2;
-		this.criticalityExponent = 3;
-		this.minRerouteCriticality = 0.85f;
-		this.reroutePercentage = (short) 3;
-		this.initialPresentCongestionFactor = 0.5f;
-		this.presentCongestionMultiplier = 2f;
-		this.historicalCongestionFactor = 1f;
-		this.timingDriven = true;
-		this.partialRouting = false;
-		this.softPreserve = false;
-		this.clkRouteTiming = null;
-		this.pessimismA = 1.03f;
-		this.pessimismB = (short) 100;
-		this.maskNodesCrossRCLK = false;
-		this.useUTurnNodes = false;
-		this.verbose = false;
-		this.printConnectionSpan = false;
+		maxIterations = (short) 100;
+		useBoundingBox = true;
+		boundingBoxExtensionX = (short) 3;
+		boundingBoxExtensionY = (short) 15;
+		enlargeBoundingBox = false;
+		extensionYIncrement = 2;
+		extensionXIncrement = 1;
+		wirelengthWeight = 0.8f;
+		timingWeight = 0.35f;
+		timingMultiplier = 1f;
+		shareExponent = 2;
+		criticalityExponent = 3;
+		minRerouteCriticality = 0.85f;
+		reroutePercentage = (short) 3;
+		initialPresentCongestionFactor = 0.5f;
+		presentCongestionMultiplier = 2f;
+		historicalCongestionFactor = 1f;
+		timingDriven = true;
+		partialRouting = false;
+		softPreserve = false;
+		clkRouteTiming = null;
+		pessimismA = 1.03f;
+		pessimismB = (short) 100;
+		maskNodesCrossRCLK = false;
+		useUTurnNodes = false;
+		verbose = false;
+		printConnectionSpan = false;
+		resolveConflictNets = false;
+		anchorNameKeyword = "q0_reg";
 		if(arguments != null) {
-			this.parseArguments(arguments);
+			parseArguments(arguments);
 		}
 	}
 
@@ -127,105 +133,112 @@ public class RWRouteConfig {
 			String arg = arguments[i];
 			switch(arg) {
 			case "--maxIterations":
-				this.setMaxIterations(Short.parseShort(arguments[++i]));
+				setMaxIterations(Short.parseShort(arguments[++i]));
 				break;
 			case "--noBoundingBox":
-				this.setUseBoundingBox(false);
+				setUseBoundingBox(false);
 				break;
 			case "--boundingBoxExtensionX":
-				this.setBoundingBoxExtensionX(Short.parseShort(arguments[++i]));
+				setBoundingBoxExtensionX(Short.parseShort(arguments[++i]));
 				break;
 			case "--boundingBoxExtensionY":
-				this.setBoundingBoxExtensionY(Short.parseShort(arguments[++i]));
+				setBoundingBoxExtensionY(Short.parseShort(arguments[++i]));
 				break;
 			case "--enlargeBoundingBox":
 				if(i+1 < arguments.length && (!arguments[i+1].startsWith("--extensionYIncrement") && !arguments[i+1].startsWith("--extensionXIncrement"))) {
 					System.out.println("WARNING: --enlargeBoundingBox option is not followed by --extensionYIncrement <arg> or --extensionXIncrement <arg>.");
 					System.out.println("         Use default settings: extensionYIncrement = 2, extensionXIncrement = 1.");
 				}
-				this.setEnlargeBoundingBox(true);
+				setEnlargeBoundingBox(true);
 				break;
 			case "--fixBoundingBox":
 				if(i+1 < arguments.length && (!arguments[i+1].startsWith("--boundingBoxExtensionX") && !arguments[i+1].startsWith("--boundingBoxExtensionY"))) {
 					System.out.println("WARNING: --fixBoundingBox option is not followed by --boundingBoxExtensionX <arg> or --boundingBoxExtensionY <arg>.");
 					System.out.println("         Use default settings: boundingBoxExtensionX = 3, boundingBoxExtensionY = 15.");
 				}
-				this.setEnlargeBoundingBox(false);
+				setEnlargeBoundingBox(false);
 				break;
 			case "--extensionYIncrement":
-				this.setExtensionYIncrement(Short.parseShort(arguments[++i]));
+				setExtensionYIncrement(Short.parseShort(arguments[++i]));
 				break;
 			case "--extensionXIncrement":
-				this.setExtensionXIncrement(Short.parseShort(arguments[++i]));
+				setExtensionXIncrement(Short.parseShort(arguments[++i]));
 				break;
 			case "--wirelengthWeight":
-				this.setWirelengthWeight(Float.parseFloat(arguments[++i]));
+				setWirelengthWeight(Float.parseFloat(arguments[++i]));
 				break;
 			case "--shareExponent":
-				this.setShareExponent(Float.parseFloat(arguments[++i]));
+				setShareExponent(Float.parseFloat(arguments[++i]));
 				break;
 			case "--timingWeight":
-				this.setTimingWeight(Float.parseFloat(arguments[++i]));
+				setTimingWeight(Float.parseFloat(arguments[++i]));
 				break;
 			case "--timingMultiplier":
-				this.setTimingMultiplier(Float.parseFloat(arguments[++i]));
+				setTimingMultiplier(Float.parseFloat(arguments[++i]));
 				break;
 			case "--criticalityExponent":
-				this.setCriticalityExponent(Float.parseFloat(arguments[++i]));
+				setCriticalityExponent(Float.parseFloat(arguments[++i]));
 				break;
 			case "--minRerouteCriticality":
-				this.setMinRerouteCriticality(Float.parseFloat(arguments[++i]));
+				setMinRerouteCriticality(Float.parseFloat(arguments[++i]));
 				break;
 			case "--reroutePercentage":
-				this.setReroutePercentage(Short.parseShort(arguments[++i]));
+				setReroutePercentage(Short.parseShort(arguments[++i]));
 				break;
 			case "--initialPresentCongestionFactor":
-				this.setInitialPresentCongestionFactor(Float.parseFloat(arguments[++i]));
+				setInitialPresentCongestionFactor(Float.parseFloat(arguments[++i]));
 				break;
 			case "--presentCongestionMultiplier":
-				this.setPresentCongestionMultiplier(Float.parseFloat(arguments[++i]));
+				setPresentCongestionMultiplier(Float.parseFloat(arguments[++i]));
 				break;
 			case "--historicalCongestionFactor":
-				this.setHistoricalCongestionFactor(Float.parseFloat(arguments[++i]));
+				setHistoricalCongestionFactor(Float.parseFloat(arguments[++i]));
 				break;
 			case "--timingDriven":
-				this.setTimingDriven(true);
+				setTimingDriven(true);
 				break;
 			case "--nonTimingDriven":
-				this.setTimingDriven(false);
+				setTimingDriven(false);
 				break;
 			case "--partialRouting":
-				this.setPartialRouting(true);
+				setPartialRouting(true);
 				break;
 			case "--softPreserve":
-				this.setSoftPreserve(true);
+				setSoftPreserve(true);
 				break;
 			case "--dspTimingDataFolder":
-				this.setDspTimingDataFolder(arguments[++i]);
+				setDspTimingDataFolder(arguments[++i]);
 				break;
 			case "--clkRouteTiming":
-				this.setClkRouteTiming(arguments[++i]);
+				setClkRouteTiming(arguments[++i]);
 				break;
 			case "--pessimismA":
-				this.setPessimismA(Float.parseFloat(arguments[++i]));
+				setPessimismA(Float.parseFloat(arguments[++i]));
 				break;
 			case "--pessimismB":
-				this.setPessimismB(Short.parseShort(arguments[++i]));
+				setPessimismB(Short.parseShort(arguments[++i]));
 				break;
 			case "--maskNodesCrossRCLK":
-				this.setMaskNodesCrossRCLK(true);
+				setMaskNodesCrossRCLK(true);
 				break;
 			case "--maskUTurnNodes":
-				this.setUseUTurnNodes(false);
+				setUseUTurnNodes(false);
 				break;
 			case "--useUTurnNodes":
-				this.setUseUTurnNodes(true);
+				setUseUTurnNodes(true);
 				break;
 			case "--verbose":
-				this.setVerbose(true);
+				setVerbose(true);
 				break;
 			case "--printConnectionSpan":
-				this.setPrintConnectionSpan(true);
+				setPrintConnectionSpan(true);
+				break;
+			case "--resolveConflictNets":
+				setResolveConflictNets(true);
+				setEnlargeBoundingBox(true);
+				break;
+			case "--anchorNameKeyword":
+				setAnchorNameKeyword(arguments[++i]);
 				break;
 			default:
 				break;
@@ -239,7 +252,7 @@ public class RWRouteConfig {
 	 * @return The allowed maximum number of routing iterations.
 	 */
 	public short getMaxIterations() {
-		return this.maxIterations;
+		return maxIterations;
 	}
 	
 	/**
@@ -259,7 +272,7 @@ public class RWRouteConfig {
 	 * @return true, if the routing bounding box constraint is used.
 	 */
 	public boolean isUseBoundingBox() {
-		return this.useBoundingBox;
+		return useBoundingBox;
 	}
 	
 	/**
@@ -277,7 +290,7 @@ public class RWRouteConfig {
 	 * @return The bounding box extension range in the horizontal direction.
 	 */
 	public short getBoundingBoxExtensionX() {
-		return this.boundingBoxExtensionX;
+		return boundingBoxExtensionX;
 	}
 
 	/**
@@ -295,7 +308,7 @@ public class RWRouteConfig {
 	 * @return The bounding box extension range in the vertical direction.
 	 */
 	public short getBoundingBoxExtensionY() {
-		return this.boundingBoxExtensionY;
+		return boundingBoxExtensionY;
 	}
 
 	/**
@@ -316,7 +329,7 @@ public class RWRouteConfig {
 	 * @return true, if enlarging bounding boxes of connections is allowed.
 	 */
 	public boolean isEnlargeBoundingBox() {
-		return this.enlargeBoundingBox;
+		return enlargeBoundingBox;
 	}
 
 	/**
@@ -337,7 +350,7 @@ public class RWRouteConfig {
 	 * @return The number of INT Tiles that connections' bounding boxes should be enlarged by vertically.
 	 */
 	public short getExtensionYIncrement() {
-		return this.extensionYIncrement;
+		return extensionYIncrement;
 	}
 
 	/**
@@ -355,7 +368,7 @@ public class RWRouteConfig {
 	 * @return The number of INT Tiles that connections' bounding boxes should be enlarged by horizontally.
 	 */
 	public short getExtensionXIncrement() {
-		return this.extensionXIncrement;
+		return extensionXIncrement;
 	}
 
 	/**
@@ -374,7 +387,7 @@ public class RWRouteConfig {
 	 * @return The wirelength-driven weighting factor used in the cost function
 	 */
 	public float getWirelengthWeight() {
-		return this.wirelengthWeight;
+		return wirelengthWeight;
 	}
 
 	/**
@@ -396,7 +409,7 @@ public class RWRouteConfig {
 	 * @return The timing-driven weighting factor used in the cost function
 	 */
 	public float getTimingWeight() {
-		return this.timingWeight;
+		return timingWeight;
 	}
 
 	/**
@@ -417,7 +430,7 @@ public class RWRouteConfig {
 	 * @return The timing-driven weighting factor multiplier.
 	 */
 	public float getTimingMultiplier() {
-		return this.timingMultiplier;
+		return timingMultiplier;
 	}
 
 	/**
@@ -441,7 +454,7 @@ public class RWRouteConfig {
 	 * @return The sharing exponent that discourages resource sharing for timing-driven routing of critical connections.
 	 */
 	public float getShareExponent() {
-		return this.shareExponent;
+		return shareExponent;
 	}
 
 	/**
@@ -464,7 +477,7 @@ public class RWRouteConfig {
 	 * @return The criticality exponent.
 	 */
 	public float getCriticalityExponent() {
-		return this.criticalityExponent;
+		return criticalityExponent;
 	}
 
 	/**
@@ -487,7 +500,7 @@ public class RWRouteConfig {
 	 * @return
 	 */
 	public float getMinRerouteCriticality() {
-		return this.minRerouteCriticality;
+		return minRerouteCriticality;
 	}
 
 	/**
@@ -509,7 +522,7 @@ public class RWRouteConfig {
 	 * @return
 	 */
 	public short getReroutePercentage() {
-		return this.reroutePercentage;
+		return reroutePercentage;
 	}
 
 	/**
@@ -531,7 +544,7 @@ public class RWRouteConfig {
 	 * @return The initial present congestion cost penalty factor.
 	 */
 	public float getInitialPresentCongestionFactor() {
-		return this.initialPresentCongestionFactor;
+		return initialPresentCongestionFactor;
 	}
 
 	/**
@@ -553,7 +566,7 @@ public class RWRouteConfig {
 	 * @return
 	 */
 	public float getPresentCongestionMultiplier() {
-		return this.presentCongestionMultiplier;
+		return presentCongestionMultiplier;
 	}
 
 	/**
@@ -575,7 +588,7 @@ public class RWRouteConfig {
 	 * @return
 	 */
 	public float getHistoricalCongestionFactor() {
-		return this.historicalCongestionFactor;
+		return historicalCongestionFactor;
 	}
 
 	/**
@@ -597,7 +610,7 @@ public class RWRouteConfig {
 	 * @return true, if the router runs in the timing-driven mode.
 	 */
 	public boolean isTimingDriven() {
-		return this.timingDriven;
+		return timingDriven;
 	}
 
 	/**
@@ -617,7 +630,7 @@ public class RWRouteConfig {
 	 * @return true, if the router runs in the partial routing mode.
 	 */
 	public boolean isPartialRouting() {
-		return this.partialRouting;
+		return partialRouting;
 	}
 
 	/**
@@ -629,18 +642,18 @@ public class RWRouteConfig {
 	public void setPartialRouting(boolean partialRouting) {
 		this.partialRouting = partialRouting;
 		if(this.partialRouting == false) return;
-		if(this.enlargeBoundingBox == false) {
+		if(enlargeBoundingBox == false) {
 			// when enlargeBoundingBox is not set, use the default parameters as default
 			// can be overridden later if there are corresponding options included in the arguments
-			this.enlargeBoundingBox = true;
-			this.extensionYIncrement = 2;
-			this.extensionXIncrement =1;
+			enlargeBoundingBox = true;
+			extensionYIncrement = 2;
+			extensionXIncrement =1;
 		}
 		// use U-turn nodes and no masking of nodes cross RCLK
 		// Pros: maximumly allows exploration of routing resources for routability
 		// Con: might result in delay optimism and a slight increase in runtime
-		this.useUTurnNodes = true;
-		this.maskNodesCrossRCLK = false;
+		useUTurnNodes = true;
+		maskNodesCrossRCLK = false;
 	}
 
 	/**
@@ -650,7 +663,7 @@ public class RWRouteConfig {
 	 * @return
 	 */
 	public boolean isSoftPreserve() {
-		return this.softPreserve;
+		return softPreserve;
 	}
 
 	/**
@@ -671,7 +684,7 @@ public class RWRouteConfig {
 	 * @return
 	 */
 	public String getDspTimingDataFolder() {
-		return this.dspTimingDataFolder;
+		return dspTimingDataFolder;
 	}
 
 	/**
@@ -695,7 +708,7 @@ public class RWRouteConfig {
 	 * @return
 	 */
 	public String getClkRouteTiming() {
-		return this.clkRouteTiming;
+		return clkRouteTiming;
 	}
 
 	/**
@@ -716,7 +729,7 @@ public class RWRouteConfig {
 	 * @return pessimismA
 	 */
 	public float getPessimismA() {
-		return this.pessimismA;
+		return pessimismA;
 	}
 
 	/**
@@ -738,7 +751,7 @@ public class RWRouteConfig {
 	 * @return pessimismB
 	 */
 	public short getPessimismB() {
-		return this.pessimismB;
+		return pessimismB;
 	}
 
 	/**
@@ -786,7 +799,7 @@ public class RWRouteConfig {
 	 * @return true, if U-turn nodes are considered to be used
 	 */
 	public boolean isUseUTurnNodes() {
-		return this.useUTurnNodes;
+		return useUTurnNodes;
 	}
 
 	/**
@@ -806,7 +819,7 @@ public class RWRouteConfig {
 	 * @return true, if verbose is enabled.
 	 */
 	public boolean isVerbose() {
-		return this.verbose;
+		return verbose;
 	}
 
 	/**
@@ -839,41 +852,78 @@ public class RWRouteConfig {
 		this.verbose = verbose;
 	}
 
+	/**
+	 * Gets resolveConflictNets.
+	 * True to call the customized conflict-resolving partial routing functionality, e.g. the timing-driven partial routing in the RapidStream flow.
+	 * Default: false.
+	 * @return
+	 */
+	public boolean isResolveConflictNets() {
+		return resolveConflictNets;
+	}
+
+	/**
+	 * Sets resolveConflictNets.
+	 * True to call the customized conflict-resolving partial routing functionality, e.g. the timing-driven partial routing in the RapidStream flow.
+	 * Default: false.
+	 * @param resolveConflictNets
+	 */
+	public void setResolveConflictNets(boolean resolveConflictNets) {
+		this.resolveConflictNets = resolveConflictNets;
+	}
+	
+	/**
+	 * Gets the keyword to help recognize the routing targets.
+	 * Default: q0_reg, which is customized for the RapidStream flow.
+	 * @return
+	 */
+	public String getAnchorNameKeyword() {
+		return anchorNameKeyword;
+	}
+
+	/**
+	 * Sets anchorNameKeyWord.
+	 * @param anchorNameKeyWord A keyword to help recognize the routing targets.
+	 */
+	public void setAnchorNameKeyword(String anchorNameKeyWord) {
+		this.anchorNameKeyword = anchorNameKeyWord;
+	}
+
 	@Override
 	public String toString() {
 		StringBuilder s = new StringBuilder();
 		s.append(MessageGenerator.formatString("Router Configuration\n"));
-		s.append(MessageGenerator.formatString("Max routing iterations: ", this.maxIterations));
-		s.append(MessageGenerator.formatString("Timing-driven: ", this.timingDriven));
-		s.append(MessageGenerator.formatString("Partial routing: ", this.partialRouting));
-		s.append(MessageGenerator.formatString("Use bounding boxes: ", this.isUseBoundingBox()));
+		s.append(MessageGenerator.formatString("Max routing iterations: ", maxIterations));
+		s.append(MessageGenerator.formatString("Timing-driven: ", timingDriven));
+		s.append(MessageGenerator.formatString("Partial routing: ", partialRouting));
+		s.append(MessageGenerator.formatString("Use bounding boxes: ", isUseBoundingBox()));
 		if(this.isUseBoundingBox()) {
-			s.append(MessageGenerator.formatString("Bounding box extension X: ", this.boundingBoxExtensionX));
-			s.append(MessageGenerator.formatString("Bounding box extension Y: ", this.boundingBoxExtensionY));
+			s.append(MessageGenerator.formatString("Bounding box extension X: ", boundingBoxExtensionX));
+			s.append(MessageGenerator.formatString("Bounding box extension Y: ", boundingBoxExtensionY));
 			if(this.isEnlargeBoundingBox()) {
-				s.append(MessageGenerator.formatString("Enlarge bounding box: ", this.isEnlargeBoundingBox()));
-				s.append(MessageGenerator.formatString("Extension X increment: ", this.extensionXIncrement));
-				s.append(MessageGenerator.formatString("Extension Y increment: ", this.extensionYIncrement));
+				s.append(MessageGenerator.formatString("Enlarge bounding box: ", isEnlargeBoundingBox()));
+				s.append(MessageGenerator.formatString("Extension X increment: ", extensionXIncrement));
+				s.append(MessageGenerator.formatString("Extension Y increment: ", extensionYIncrement));
 			}else {
-				s.append(MessageGenerator.formatString("Fixed bounding box: ", !this.isEnlargeBoundingBox()));
+				s.append(MessageGenerator.formatString("Fixed bounding box: ", !isEnlargeBoundingBox()));
 			}
 		}
-		s.append(MessageGenerator.formatString("Wirelength-driven weight: ", this.wirelengthWeight));
-		if(this.timingDriven) {
-			s.append(MessageGenerator.formatString("Sharing exponent: ", this.shareExponent));
-			s.append(MessageGenerator.formatString("Timing-driven weight: ", this.timingWeight));
-			s.append(MessageGenerator.formatString("Timing-driven mult fac: ", this.timingMultiplier));
-			s.append(MessageGenerator.formatString("Criticality exponent: ", this.criticalityExponent));
-			s.append(MessageGenerator.formatString("Reroute criticality threshold:", this.minRerouteCriticality));
-			s.append(MessageGenerator.formatString("Reroute percentage: ", this.reroutePercentage));
-			s.append(MessageGenerator.formatString("PessimismA: ", this.pessimismA));
-			s.append(MessageGenerator.formatString("PessimismB: ", this.pessimismB));
+		s.append(MessageGenerator.formatString("Wirelength-driven weight: ", wirelengthWeight));
+		if(timingDriven) {
+			s.append(MessageGenerator.formatString("Sharing exponent: ", shareExponent));
+			s.append(MessageGenerator.formatString("Timing-driven weight: ", timingWeight));
+			s.append(MessageGenerator.formatString("Timing-driven mult fac: ", timingMultiplier));
+			s.append(MessageGenerator.formatString("Criticality exponent: ", criticalityExponent));
+			s.append(MessageGenerator.formatString("Reroute criticality threshold:", minRerouteCriticality));
+			s.append(MessageGenerator.formatString("Reroute percentage: ", reroutePercentage));
+			s.append(MessageGenerator.formatString("PessimismA: ", pessimismA));
+			s.append(MessageGenerator.formatString("PessimismB: ", pessimismB));
 		}
-		s.append(MessageGenerator.formatString("Mask nodes across RCLK: ", this.maskNodesCrossRCLK));
-		s.append(MessageGenerator.formatString("Include U-turn nodes: ", this.useUTurnNodes));
-		s.append(MessageGenerator.formatString("Initial present congestion factor: ", this.initialPresentCongestionFactor));
-		s.append(MessageGenerator.formatString("Present congestion multiplier: ", this.presentCongestionMultiplier));
-		s.append(MessageGenerator.formatString("Historical congestion factor ", this.historicalCongestionFactor));
+		s.append(MessageGenerator.formatString("Mask nodes across RCLK: ", maskNodesCrossRCLK));
+		s.append(MessageGenerator.formatString("Include U-turn nodes: ", useUTurnNodes));
+		s.append(MessageGenerator.formatString("Initial present congestion factor: ", initialPresentCongestionFactor));
+		s.append(MessageGenerator.formatString("Present congestion multiplier: ", presentCongestionMultiplier));
+		s.append(MessageGenerator.formatString("Historical congestion factor ", historicalCongestionFactor));
 		
 		return s.toString();
 	}

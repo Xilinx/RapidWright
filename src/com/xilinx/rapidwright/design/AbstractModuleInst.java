@@ -189,7 +189,7 @@ public abstract class AbstractModuleInst<ModuleT, T extends AbstractModuleInst<M
             if(net == null){
                 net = top.createNet(netName);
             }
-            if(net.getPortInst(netName) == null){
+            if(net.getPortInst(null, netName) == null){
                 net.createPortInst(port, busIndex1);
             }
             net.createPortInst(portName, busIndex0, eci0);

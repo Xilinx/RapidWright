@@ -12,7 +12,7 @@ def sw = new StringWriter()
 def get_rapidwright_version_line = file('.github/workflows/build.yml').filterLine(sw) { 
     line -> line.contains('RAPIDWRIGHT_VERSION:') 
 }
-def rapidwright_version = sw.toString().replace("RAPIDWRIGHT_VERSION: v", "").replace("-beta", "").trim()
+def rapidwright_version = sw.toString().replace("RAPIDWRIGHT_VERSION: v", "").replace("-beta", "").trim() + ""
 
 dependencies {
     api 'com.xilinx.rapidwright:rapidwright-api-lib:' + rapidwright_version
@@ -60,7 +60,7 @@ task update_jars {
 
 task sourceJar(type: Jar) {
   from sourceSets.main.allJava
-  archiveClassifier = rapidwright_version + "-sources"
+  archiveClassifier = "sources"
 }
 
 javadoc {
@@ -71,7 +71,7 @@ javadoc {
 
 task javadocJar(type: Jar) {
     from javadoc
-    archiveClassifier = rapidwright_version + "-javadoc"
+    archiveClassifier = "javadoc"
 }
 
 task standaloneJar (type: Jar) {

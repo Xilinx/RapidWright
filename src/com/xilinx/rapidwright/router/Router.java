@@ -885,7 +885,7 @@ public class Router extends AbstractRouter {
 			
 			
 			// If initial route fails, see if we can swap a LUT input
-			if(!successfulRoute){
+			if(!successfulRoute && currSinkPin.isLUTInputPin()){
 				String origPinName = "A" + currSinkPin.getName().charAt(1);
 				for(String alternate : getAlternativeLUTInputs(currSinkPin)){
 					swapLUTInputPins(currSinkPin, alternate);

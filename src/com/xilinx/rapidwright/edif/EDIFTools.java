@@ -24,12 +24,10 @@
  */
 package com.xilinx.rapidwright.edif;
 
-import java.io.BufferedWriter;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.OutputStreamWriter;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -54,7 +52,6 @@ import com.xilinx.rapidwright.design.PinType;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.FileTools;
-import com.xilinx.rapidwright.util.NoCloseOutputStream;
 
 
 /**
@@ -230,9 +227,7 @@ public class EDIFTools {
 	}
 	
 	public static void connectPortBus(EDIFCell topCell, EDIFCellInst src, EDIFCellInst snk, 
-									  String srcPrefix, String snkPrefix, int width,
-									  Map<String,EDIFPortInst> srcPortMap,
-									  Map<String,EDIFPortInst> snkPortMap){
+									  String srcPrefix, String snkPrefix, int width){
 		for(int i=0; i < width; i++){
 			String suffix = "["+i+"]";
 			String outputPortName = srcPrefix + suffix;
@@ -241,16 +236,13 @@ public class EDIFTools {
 			EDIFNet net = null;
 			net = new EDIFNet("conn_net_" + EDIFTools.makeNameEDIFCompatible(outputPortName), topCell);
 
-			EDIFPortInst outputPortInst = srcPortMap.get(outputPortName);
-			EDIFPortInst inputPortInst = snkPortMap.get(inputPortName);
+			EDIFPortInst outputPortInst = src.getPortInst(outputPortName);
+			EDIFPortInst inputPortInst = snk.getPortInst(inputPortName);
 			
 			@SuppressWarnings("unused")
 			EDIFPortInst outputPort = new EDIFPortInst(outputPortInst.getPort(),net,outputPortInst.getIndex(),src);
 			@SuppressWarnings("unused")
 			EDIFPortInst inputPort = new EDIFPortInst(inputPortInst.getPort(),net,inputPortInst.getIndex(),snk);
-			
-			//net.addPortInst(outputPort);
-			//net.addPortInst(inputPort);
 		}
 	}
 	
@@ -660,7 +652,7 @@ public class EDIFTools {
 			staticInst = new EDIFCellInst(staticTypeName, staticSrc, cell);
 			cell.addCellInst(staticInst);
 		}
-		EDIFPortInst outputPortInst = staticInst.getPortInstMap().get(portName);
+		EDIFPortInst outputPortInst = staticInst.getPortInst(portName);
 		if(outputPortInst == null){
 			outputPortInst = new EDIFPortInst(staticInst.getPort(portName),null,staticInst);
 		}
@@ -815,9 +807,7 @@ public class EDIFTools {
 										String partName){
 		try {
 			ensureCorrectPartInEDIF(edif, partName);
-			try (BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(new NoCloseOutputStream(out)))) {
-				edif.exportEDIF(bw);
-			}
+			edif.exportEDIF(out);
 			if(dcpFileName != null && edif.getEncryptedCells() != null) {
 				if(edif.getEncryptedCells().size() > 0) {
 					writeTclLoadScriptForPartialEncryptedDesigns(edif, dcpFileName, partName);
@@ -856,7 +846,7 @@ public class EDIFTools {
 		lines.add("read_checkpoint " + pathDCPFileName);
 		lines.add("set_property top "+edif.getName()+" [current_fileset]");
 		lines.add("link_design -part " + partName);
-		Path tclFileName = FileTools.replaceExtension(pathDCPFileName, LOAD_TCL_SUFFIX);
+		Path tclFileName = FileTools.replaceExtension(pathDCPFileName.getFileName(), LOAD_TCL_SUFFIX);
 		try {
 			Files.write(tclFileName, lines);
 		} catch (IOException e) {
@@ -1042,7 +1032,7 @@ public class EDIFTools {
 			portNet = d.getTopEDIFCell().createNet(name);
 		}
 		String portName = dir == PinType.IN ? "I" : "O";
-		EDIFPortInst bufPortInst = portNet.getPortInst(i.getName() + EDIFTools.EDIF_HIER_SEP + portName);
+		EDIFPortInst bufPortInst = portNet.getPortInst(i, portName);
 		if(bufPortInst == null)
 			portNet.createPortInst(portName, i);
 		if(pr.getNet() == null) 

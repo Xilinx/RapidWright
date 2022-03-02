@@ -50,8 +50,8 @@ public class NetWrapper{
 	public NetWrapper(int id, Net net){
 		this.id = id;
 		this.net = net;
-		this.connections = new ArrayList<>();
-		this.setSourceChanged(false);
+		connections = new ArrayList<>();
+		setSourceChanged(false);
 	}
 	
 	public void computeHPWLAndCenterCoordinates(){
@@ -65,7 +65,7 @@ public class NetWrapper{
 		List<Short> yArray = new ArrayList<>();
 		
 		boolean sourceRnodeAdded = false;	
-		for(Connection connection : this.connections) {
+		for(Connection connection : connections) {
 			if(connection.isDirect()) continue;
 			short x = 0;
 			short y = 0;
@@ -93,13 +93,13 @@ public class NetWrapper{
 		yMin = yArray.get(0);
 		yMax = yArray.get(xArray.size() - 1);
 		
-		this.setDoubleHpwl((short) ((xMax - xMin + 1 + yMax - yMin + 1) * 2));
-		this.setXCenter(xSum / xArray.size());
-		this.setYCenter(ySum / yArray.size());
+		setDoubleHpwl((short) ((xMax - xMin + 1 + yMax - yMin + 1) * 2));
+		setXCenter(xSum / xArray.size());
+		setYCenter(ySum / yArray.size());
 	}
 	
 	public Net getNet(){
-		return this.net;
+		return net;
 	}
 	
 	public int getId() {
@@ -107,11 +107,11 @@ public class NetWrapper{
 	}
 	
 	public void addConnection(Connection connection){
-		this.connections.add(connection);	
+		connections.add(connection);	
 	}
 	
 	public List<Connection> getConnections(){
-		return this.connections;
+		return connections;
 	}
 
 	public short getDoubleHpwl() {
@@ -119,7 +119,7 @@ public class NetWrapper{
 	}
 
 	public void setDoubleHpwl(short hpwl) {
-		this.doubleHpwl = hpwl;
+		doubleHpwl = hpwl;
 	}
 
 	public boolean isSourceChanged() {
@@ -148,7 +148,7 @@ public class NetWrapper{
 	
 	@Override
 	public int hashCode(){
-		return this.id;
+		return id;
 	}
 	
 }
