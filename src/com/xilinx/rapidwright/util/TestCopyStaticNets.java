@@ -117,5 +117,6 @@ public class TestCopyStaticNets {
         //        compareUsingBlackBoxes("hwct.dcp", "hwct_pr0.dcp", "INT_X28Y120",  "hw_contract_pr1", "INT_X28Y60");
         //        compareUsingBlackBoxes("full_shell.dcp", "AES128_rp2_RP2.dcp", "INT_X32Y240",  "openacap_shell_i/RP_0", "INT_X32Y0");
         compare();
+
     }
 }
