@@ -322,10 +322,6 @@ public class FileTools {
 	}
 	
 	public static boolean writeStringArray(Output dos, String[] stringArray){
-		/*int size = 0;
-		for(String s : stringArray){
-			size += s.length() + 1;
-		}*/
 		dos.writeInt(stringArray.length);
 		for(int i=0; i<stringArray.length; i++){
 			dos.writeString(stringArray[i]);
