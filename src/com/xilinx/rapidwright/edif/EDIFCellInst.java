@@ -61,7 +61,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
         super(name);
         setCellType(cellType);
         if(parentCell != null) parentCell.addCellInst(this);
-        viewref = cellType != null ? cellType.getEDIFView() : DEFAULT_VIEWREF;
+        setViewref(cellType != null ? cellType.getEDIFView() : DEFAULT_VIEWREF);
     }
     
     /**
@@ -72,7 +72,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
         super((EDIFPropertyObject)inst);
         this.parentCell = parentCell;
         this.cellType = inst.cellType;
-        this.viewref = new EDIFName(inst.viewref);
+        setViewref(new EDIFName(inst.viewref));
     }
     
     /**
@@ -86,7 +86,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
      * @param viewref the viewref to set
      */
     public void setViewref(EDIFName viewref) {
-        this.viewref = viewref;
+        this.viewref = EDIFCell.DEFAULT_VIEW.equals(viewref) ? EDIFCell.DEFAULT_VIEW : viewref;
     }
     
     /**
@@ -203,7 +203,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
      */
     public void setCellType(EDIFCell cellType) {
         this.cellType = cellType;
-        this.viewref = cellType != null ? cellType.getEDIFView() : null;
+        setViewref(cellType != null ? cellType.getEDIFView() : null);
     }
     
     public void updateCellType(EDIFCell cellType) {
