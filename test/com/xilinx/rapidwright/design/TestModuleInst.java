@@ -34,6 +34,8 @@ public class TestModuleInst {
 
         Assertions.assertTrue(emptyDesign.getVccNet().hasPIPs());
         Assertions.assertTrue(emptyDesign.getGndNet().hasPIPs());
+        Assertions.assertFalse(emptyDesign.getVccNet().getPins().isEmpty());
+        Assertions.assertFalse(emptyDesign.getGndNet().getPins().isEmpty());
 
         if (!placeOnOriginalAnchor) {
             final int xOffset = 0;
@@ -49,6 +51,8 @@ public class TestModuleInst {
 
             Assertions.assertFalse(emptyDesign.getVccNet().hasPIPs());
             Assertions.assertFalse(emptyDesign.getGndNet().hasPIPs());
+            Assertions.assertTrue(emptyDesign.getVccNet().getPins().isEmpty());
+            Assertions.assertTrue(emptyDesign.getGndNet().getPins().isEmpty());
 
             boolean skipIncompatible = true; // Otherwise it fails when trying to move
                                              // the gap routing in the clock net

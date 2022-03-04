@@ -359,6 +359,7 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 				}
 
 				designNet.getPIPs().addAll(net.getPIPs());
+				designNet.getPins().addAll(net.getPins());
 			}
 		}
 		return true;
@@ -381,6 +382,10 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 				HashSet<PIP> pips = new HashSet<>(net.getPIPs());
 				designNet.getPIPs().removeIf((p) -> pips.remove(p));
 				assert(pips.isEmpty());
+
+				HashSet<SitePinInst> pins = new HashSet<>(net.getPins());
+				designNet.getPins().removeIf((p) -> pins.remove(p));
+				assert(pins.isEmpty());
 			}
 
 			net.getPIPs().clear();
