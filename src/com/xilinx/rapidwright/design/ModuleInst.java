@@ -62,9 +62,6 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 	/** A list of all nets internal to this module instance */
 	private ArrayList<Net> nets;
 
-	/** A list of all SiteInsts that are the sources of static nets */
-	private List<SiteInst> staticSources;
-	
 	private boolean hasBeenPlaced = false;
 
 	/** A map from a static net to the list of its PIPs */
@@ -363,14 +360,7 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 			}
 		}
 		
-		if(staticSources != null) {
-			for(SiteInst staticSource : staticSources) {
-				Site templateSite = staticSource.getModuleTemplateInst().getSite();
-				Tile newTile = module.getCorrespondingTile(templateSite.getTile(), newAnchorSite.getTile(), dev);
-				Site newSite = templateSite.getCorrespondingSite(staticSource.getSiteTypeEnum(), newTile);
-				staticSource.place(newSite);
-			}
-		}
+
 		if(staticPIPs != null) {
 			for(Entry<NetType,List<Pair<PIP, Tile>>> e : staticPIPs.entrySet()) {
 				if(!hasBeenPlaced) {
@@ -682,14 +672,6 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 		}
 	}
 
-	/**
-	 * Add the SiteInst into the list of sources for a static net.
-	 * @param staticSource A SiteInst to add
-	 */
-	protected void addStaticSource(SiteInst staticSource) {
-		if(staticSources == null) staticSources = new ArrayList<>();
-		staticSources.add(staticSource);
-	}
 
 	/**
 	 * Add the list of PIPs to the given static net type
