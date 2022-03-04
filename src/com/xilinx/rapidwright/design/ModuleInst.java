@@ -24,9 +24,8 @@ package com.xilinx.rapidwright.design;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -38,7 +37,6 @@ import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.util.MessageGenerator;
-import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.Utils;
 
 /**
@@ -62,12 +60,6 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 	/** A list of all nets internal to this module instance */
 	private ArrayList<Net> nets;
 
-	private boolean hasBeenPlaced = false;
-
-	/** A map from a static net to the list of its PIPs */
-	private Map<NetType, List<Pair<PIP, Tile>>> staticPIPs;
-
-	
 	/**
 	 * Constructor initializing instance module name
 	 * @param name Name of the module instance
@@ -358,29 +350,17 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 				//}
 				net.addPIP(newPip);
 			}
-		}
-		
 
-		if(staticPIPs != null) {
-			for(Entry<NetType,List<Pair<PIP, Tile>>> e : staticPIPs.entrySet()) {
-				if(!hasBeenPlaced) {
-					Net topStaticNet = getDesign().getStaticNet(e.getKey());
-					for(Pair<PIP, Tile> pair : e.getValue()) {
-						topStaticNet.getPIPs().add(pair.getFirst());
-					}
+			if (templateNet.isStaticNet()) {
+				Net designNet = design.getNet(templateNet.getName());
+				if (designNet == null) {
+					designNet = new Net(templateNet.getName(), templateNet.getType());
+					design.addNet(designNet);
 				}
-				for(Pair<PIP, Tile> pair : e.getValue()) {
-					Tile templatePipTile = pair.getSecond();
-					Tile newPipTile = module.getCorrespondingTile(templatePipTile, newAnchorSite.getTile(), dev);
-					if(newPipTile == null){
-						throw new RuntimeException("ERROR: Problem relocating "+e.getKey()+" routing with PIP: " + pair );
-					}
-					pair.getFirst().setTile(newPipTile);
-				}
+
+				designNet.getPIPs().addAll(net.getPIPs());
 			}
 		}
-		
-		hasBeenPlaced = true;
 		return true;
 	}
 	
@@ -394,6 +374,15 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 		}
 		//unplace nets (remove pips)
 		for(Net net : nets){
+			if (net.isStaticNet()) {
+				Net templateNet = net.getModuleTemplateNet();
+				Net designNet = design.getNet(templateNet.getName());
+
+				HashSet<PIP> pips = new HashSet<>(net.getPIPs());
+				designNet.getPIPs().removeIf((p) -> pips.remove(p));
+				assert(pips.isEmpty());
+			}
+
 			net.getPIPs().clear();
 		}
 	}
@@ -670,17 +659,6 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 		for (SitePinInst inPin : getCorrespondingPins(inPort)) {
 			physicalNet.addPin(inPin);
 		}
-	}
-
-
-	/**
-	 * Add the list of PIPs to the given static net type
-	 * @param type The type of a static net
-	 * @param pips The list of PIPs to add
-	 */
-	protected void addStaticPIPs(NetType type, List<Pair<PIP, Tile>> pips) {
-		if (staticPIPs == null) staticPIPs = new HashMap<>();
-		staticPIPs.put(type, pips);
 	}
 
 	@Override

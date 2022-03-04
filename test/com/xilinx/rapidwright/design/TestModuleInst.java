@@ -6,7 +6,6 @@ import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -33,6 +32,9 @@ public class TestModuleInst {
         ModuleInst mi = emptyDesign.createModuleInst("inst", module);
         mi.placeOnOriginalAnchor();
 
+        Assertions.assertTrue(emptyDesign.getVccNet().hasPIPs());
+        Assertions.assertTrue(emptyDesign.getGndNet().hasPIPs());
+
         if (!placeOnOriginalAnchor) {
             final int xOffset = 0;
             final int yOffset = -5;
@@ -42,17 +44,14 @@ public class TestModuleInst {
             Tile st = si.getTile();
             Tile dt = st.getTileXYNeighbor(xOffset, yOffset);
             Site ds = ss.getCorrespondingSite(si.getSiteTypeEnum(), dt);
-            boolean skipIncompatible = true; // Since it attempts to move the gap routing in the clock net
-
-            Assertions.assertTrue(emptyDesign.getVccNet().hasPIPs());
-            Assertions.assertTrue(emptyDesign.getGndNet().hasPIPs());
 
             mi.unplace();
 
-            // FIXME
-            // Assertions.assertFalse(emptyDesign.getVccNet().hasPIPs());
-            // Assertions.assertFalse(emptyDesign.getGndNet().hasPIPs());
+            Assertions.assertFalse(emptyDesign.getVccNet().hasPIPs());
+            Assertions.assertFalse(emptyDesign.getGndNet().hasPIPs());
 
+            boolean skipIncompatible = true; // Otherwise it fails when trying to move
+                                             // the gap routing in the clock net
             mi.place(ds, skipIncompatible);
         }
 
@@ -61,34 +60,36 @@ public class TestModuleInst {
 
         if (placeOnOriginalAnchor) {
             // Check that all static PIPs were same as the original module design
-            Assertions.assertEquals(newVccPips, oldVccPips);
-            Assertions.assertEquals(newGndPips, oldGndPips);
+            Assertions.assertEquals(oldVccPips, newVccPips);
+            Assertions.assertEquals(oldGndPips, newGndPips);
         } else {
             // Number of static PIPs expected to be the same, but not the contents
-            Assertions.assertEquals(newVccPips.size(), oldVccPips.size());
-            Assertions.assertEquals(newGndPips.size(), oldGndPips.size());
+            Assertions.assertEquals(oldVccPips.size(), newVccPips.size());
+            Assertions.assertEquals(oldGndPips.size(), newGndPips.size());
 
-            Assertions.assertNotEquals(newVccPips, oldVccPips);
-            Assertions.assertNotEquals(newGndPips, oldGndPips);
+            Assertions.assertNotEquals(oldVccPips, newVccPips);
+            Assertions.assertNotEquals(oldGndPips, newGndPips);
 
             // Relocate the PIPs manually
-            HashSet<PIP> expectedVccPips = new HashSet<>(oldVccPips);
-            for (PIP pip : expectedVccPips) {
+            HashSet<PIP> expectedVccPips = new HashSet<>(oldVccPips.size());
+            for (PIP pip : oldVccPips) {
                 Tile st = pip.getTile();
                 Tile dt = module.getCorrespondingTile(st, mi.getAnchor().getTile(), module.getAnchor().getTile());
                 pip.setTile(dt);
+                expectedVccPips.add(pip);
             }
 
-            HashSet<PIP> expectedGndPips = new HashSet<>(oldGndPips);
-            for (PIP pip : expectedGndPips) {
+            HashSet<PIP> expectedGndPips = new HashSet<>(oldGndPips.size());
+            for (PIP pip : oldGndPips) {
                 Tile st = pip.getTile();
                 Tile dt = module.getCorrespondingTile(st, mi.getAnchor().getTile(), module.getAnchor().getTile());
                 pip.setTile(dt);
+                expectedGndPips.add(pip);
             }
 
             // Now they should be equal
-            Assertions.assertEquals(newVccPips, expectedVccPips);
-            Assertions.assertEquals(newGndPips, expectedGndPips);
+            Assertions.assertEquals(expectedVccPips, newVccPips);
+            Assertions.assertEquals(expectedGndPips, newGndPips);
         }
     }
 }
