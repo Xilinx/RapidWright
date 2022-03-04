@@ -213,11 +213,8 @@ public class DesignTools {
 		return inputPin.getBEL().getPin(idx);
 	}
 	
-	/**
+	/*
 	 * TODO - Work in progress
-	 * @param outputPin
-	 * @param inst
-	 * @return
 	 */
 	public static ArrayList<BELPin> getCorrespondingBELInputPins(BELPin outputPin, SiteInst inst){
 		ArrayList<BELPin> inputs = new ArrayList<BELPin>();
@@ -822,7 +819,7 @@ public class DesignTools {
 	/**
 	 * NOTE: This method is not fully tested.  
 	 * Populates a black box in a netlist with the provided design. This method
-	 * most closely resembles the Vivado command 'read_checkpoint -cell <cell name> <DCP Name>. 
+	 * most closely resembles the Vivado command {@code read_checkpoint -cell <cell name> <DCP Name>} 
 	 * @param design The top level design
 	 * @param hierarchicalCellName Name of the black box in the design netlist.
 	 * @param cell The 'guts' to be inserted into the black box
@@ -893,7 +890,7 @@ public class DesignTools {
 		//   iterate over all the nets and regularize on the proper net name for the physical
 		//   net.  Put all physical pins on the correct physical net once the black box has been
 		//   updated.
-		for(EDIFPortInst portInst : inst.getInst().getPortInstMap().values()) {
+		for(EDIFPortInst portInst : inst.getInst().getPortInsts()) {
 			EDIFNet net = portInst.getNet();
 			EDIFHierNet netName = new EDIFHierNet(parentInst, net);
 			EDIFHierNet parentNetName = netlist.getParentNet(netName);
@@ -999,7 +996,7 @@ public class DesignTools {
 	/**
 	 * Turns the cell named hierarchicalCellName into a blackbox and removes any
 	 * associated placement and routing information associated with that instance. In Vivado,
-	 * this can be accomplished by running: (1) 'update_design -cells <name> -black_box' or (2)
+	 * this can be accomplished by running: (1) {@code update_design -cells <name> -black_box} or (2)
 	 * by deleting all of the cells and nets insides of a cell instance.  Method (2) is
 	 * more likely to have complications.
 	 * @param d The current design
@@ -1015,7 +1012,7 @@ public class DesignTools {
 	/**
 	 * Turns the cell named hierarchicalCell into a blackbox and removes any
 	 * associated placement and routing information associated with that instance. In Vivado,
-	 * this can be accomplished by running: (1) 'update_design -cells <name> -black_box' or (2)
+	 * this can be accomplished by running: (1) {@code update_design -cells <name> -black_box} or (2)
 	 * by deleting all of the cells and nets insides of a cell instance.  Method (2) is 
 	 * more likely to have complications.  
 	 * @param d The current design 
@@ -1207,7 +1204,7 @@ public class DesignTools {
 	 * @param design The top level design with identical multiple cell instances.
 	 * @param stamp The prototype stamp (or stencil) to use for replicated placement and routing.
 	 * This must match identically with the named instances in instPlacements
-	 * @param instPlacements
+	 * @param instPlacements Desired locations for placements
 	 * @return True if the procedure completed successfully, false otherwise.
 	 */
 	public static boolean stampPlacement(Design design, Module stamp, Map<String,Site> instPlacements){
@@ -1292,6 +1289,7 @@ public class DesignTools {
 	
 	/**
 	 * Looks in the site instance for cells connected to this site pin.
+	 * @param pin The pint to examine for connected cells
 	 * @return List of connected cells to this pin
 	 */
 	public static Set<Cell> getConnectedCells(SitePinInst pin){
@@ -2215,6 +2213,11 @@ public class DesignTools {
 	            continue;
 	        }
 	        EDIFHierNet parentHierNet = netParentMap.get(hierNet);
+	        if(parentHierNet == null) {
+	            System.out.println("WARNING: Couldn't find parent net for '" +
+	                    hierNet.getHierarchicalNetName() + "'");
+	            continue;
+	        }
 	        if(!hierNet.equals(parentHierNet)) {
 	            Net parentPhysNet = design.getNet(parentHierNet.getHierarchicalNetName());
 	            if(parentPhysNet != null) {

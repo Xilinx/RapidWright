@@ -135,11 +135,9 @@ public class DesignInstrumentor {
 	 * Stitches in the debug unit probes and clock into the user design.
 	 * Specifically, it add the input pin ports of the debug block onto
 	 * the user design nets of interest.
-	 * @return All the pins that will need routing 
 	 */
 	public void stitchProbesOnILA(ModuleInst mi, EDIFCellInst debugCore){
 		EDIFCell topCell = design.getNetlist().getTopCell();
-		Map<String, EDIFPortInst> debugPorts = debugCore.getPortInstMap();
 		HashMap<EDIFCell, ArrayList<EDIFCellInst>> instMap = EDIFTools.generateCellInstMap(design.getNetlist().getTopCellInst());
 		
 		pinsToRoute = new ArrayList<SitePinInst>();
@@ -179,7 +177,7 @@ public class DesignInstrumentor {
 			design.movePinsToNewNetDeleteOldNet(portNet, n, true);
 			
 			// Connect EDIF in same way
-			EDIFPortInst currDebugPort = debugPorts.get(portName);
+			EDIFPortInst currDebugPort = debugCore.getPortInst(portName);
 			if(n.isStaticNet()){
 				EDIFNet debugNet = EDIFTools.getStaticNet(n.getType(), topCell, design.getNetlist());
 				EDIFTools.addDebugPort(debugNet, topCell, currDebugPort, debugCore);
@@ -210,7 +208,7 @@ public class DesignInstrumentor {
 		if(clockPin != null){
 			String clkDebugNet = "clk_probe_net";
 			String clkDebugPort = "clk_probe_port";
-			EDIFPortInst clkPort = debugPorts.get("clk");
+			EDIFPortInst clkPort = debugCore.getPortInst("clk");
 			edifClockNet = EDIFTools.addDebugPortAndNet(clkDebugNet, topCell, clkPort, debugCore);
 			clockNet = clockPin.getNet();
 			String routedClkNetName = clockNet.getName();
@@ -237,8 +235,6 @@ public class DesignInstrumentor {
 		int oportWidth = 37;
 		
 		EDIFCell topCell = design.getNetlist().getTopCell();
-		Map<String,EDIFPortInst> ilaPorts = ilaCoreLogical.getPortInstMap();
-		Map<String,EDIFPortInst> dhPorts = dhCoreLogical.getPortInstMap();
 		
 		for(int i=0; i < oportWidth; i++){
 			String suffix = "["+i+"]";
@@ -255,7 +251,7 @@ public class DesignInstrumentor {
 				pinsToRoute.add(p);
 			}
 		}
-		EDIFTools.connectPortBus(topCell, dhCoreLogical, ilaCoreLogical, dhOutput, ilaInput, oportWidth, dhPorts, ilaPorts);
+		EDIFTools.connectPortBus(topCell, dhCoreLogical, ilaCoreLogical, dhOutput, ilaInput, oportWidth);
 		
 		for(int i=0; i < iportWidth; i++){
 			String suffix = "["+i+"]";
@@ -272,14 +268,14 @@ public class DesignInstrumentor {
 				pinsToRoute.add(p);
 			}
 		}
-		EDIFTools.connectPortBus(topCell, ilaCoreLogical, dhCoreLogical, ilaOutput, dhInput, iportWidth, ilaPorts, dhPorts);
+		EDIFTools.connectPortBus(topCell, ilaCoreLogical, dhCoreLogical, ilaOutput, dhInput, iportWidth);
 
 		// Connect clock
 		Port dhClockPort = dhCorePhysical.getModule().getPort("clk");
 		Net dhClockNet = dhCorePhysical.getCorrespondingNet(dhClockPort);
 		design.movePinsToNewNetDeleteOldNet(dhClockNet, clockNet, true);
 		
-		EDIFPortInst clkPortInst = dhPorts.get("clk");
+		EDIFPortInst clkPortInst = dhCoreLogical.getPortInst("clk");
 		EDIFPortInst clkPort = new EDIFPortInst(clkPortInst.getPort(), edifClockNet,dhCoreLogical);
 		edifClockNet.addPortInst(clkPort);
 	}

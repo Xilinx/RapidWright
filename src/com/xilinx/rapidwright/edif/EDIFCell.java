@@ -101,8 +101,7 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
 		if(orig.nets != null) {
 			for(Entry<String, EDIFNet> e : orig.nets.entrySet()) {
 				EDIFNet net = addNet(new EDIFNet(e.getValue()));
-				for(Entry<String, EDIFPortInst> e2 : e.getValue().getPortInstMap().entrySet()) {
-					EDIFPortInst prototype = e2.getValue();
+				for(EDIFPortInst prototype : e.getValue().getPortInsts()) {
 					EDIFPortInst newPortInst = new EDIFPortInst(prototype);
 					EDIFPort newPort = null;
 					if(prototype.getCellInst() != null) {
@@ -391,7 +390,7 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
 	 * @param portInstName Name from a port ref as generated in @link {@link EDIFPortInst#getPortInstNameFromPort()} 
 	 * @param internalNet The net inside this cell to match with the port ref name.
 	 */
-	protected void addInternalPortMapEntry(String portInstName, EDIFNet internalNet){
+	public void addInternalPortMapEntry(String portInstName, EDIFNet internalNet){
 		if(internalPortMap == null) internalPortMap = getNewMap();
 		internalPortMap.put(portInstName, internalNet);
 	}
@@ -401,7 +400,7 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
 	 * @param portInstName Name of the port ref to remove 
 	 * @return The net to which the removed port ref belongs, or null if none could be found.
 	 */
-	protected EDIFNet removeInternalPortMapEntry(String portInstName){
+	public EDIFNet removeInternalPortMapEntry(String portInstName){
 		if(internalPortMap == null) return null;
 		return internalPortMap.remove(portInstName);
 	}

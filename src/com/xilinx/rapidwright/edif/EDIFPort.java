@@ -160,7 +160,8 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
 		if(!isBus()) return null;
 		int leftBracket = getName().lastIndexOf('[');
 		int colon = getName().lastIndexOf(':');
-		return Integer.parseInt(getName().substring(leftBracket+1,colon));
+		int value = Integer.parseInt(getName().substring(leftBracket+1,colon)); 
+		return value;
 	}
 	
 
@@ -168,7 +169,8 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
 		if(!isBus()) return null;
 		int rightBracket = getName().lastIndexOf(']');
 		int colon = getName().lastIndexOf(':');
-		return Integer.parseInt(getName().substring(colon+1, rightBracket));
+		int value = Integer.parseInt(getName().substring(colon+1, rightBracket)); 
+		return value;
 	}
 	
 	/**
@@ -269,6 +271,16 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
     @Override
     public String getUniqueKey() {
         return parentCell.getUniqueKey() + "_" + getName();
+    }
+    
+    public boolean isBusRangeEqual(EDIFPort otherPort) {
+        String name = getName();
+        int leftBracket = name.lastIndexOf('[');
+        int len = name.length()-leftBracket;
+        String otherName = otherPort.getName();
+        int otherLeftBracket = otherName.lastIndexOf('[');
+        if(leftBracket == -1 && otherLeftBracket == -1) return true;
+        return name.regionMatches(leftBracket, otherName, otherLeftBracket, len);
     }
 }
 

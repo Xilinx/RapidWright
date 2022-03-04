@@ -12,6 +12,7 @@ import com.xilinx.rapidwright.design.MetadataParser;
 import com.xilinx.rapidwright.design.blocks.ImplGuide;
 import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.design.blocks.PBlockGenerator;
+import com.xilinx.rapidwright.design.merge.MergeDesigns;
 import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.PseudoPIPHelper;
@@ -118,6 +119,7 @@ public class MainEntrypoint {
         addFunction("Lesson1", Lesson1::main);
         addFunction("LogicalNetlistExample", LogicalNetlistExample::main);
         addFunction("LUTTools", LUTTools::main);
+        addFunction("MergeDesigns", MergeDesigns::main);
         addFunction("MetadataParser", MetadataParser::main);
         addFunction("ModuleOptimizer", ModuleOptimizer::main);
         addFunction("MultGenerator", MultGenerator::main);

@@ -250,7 +250,6 @@ public abstract class AbstractRouter{
 	/**
 	 * This will add the sole source of the net to the set of sources to be used by the router.
 	 * It also updates the Router's currSources with the sole source of the net.
-	 * @param sources The set of sources for this net to be used for routing
 	 * @param currSource The source pin of the net
 	 */
 	public void addInitialSourceForRouting(SitePinInst currSource){

@@ -1,8 +1,22 @@
-import java.util.stream.Collectors
+plugins {
+    id 'java'
+    id 'maven-publish'
+    id 'signing'
+}
 
-apply plugin: 'application'
-apply plugin: 'java-library'
+apply from: 'common.gradle'
+
 mainClassName = "com.xilinx.rapidwright.MainEntrypoint"
+
+def sw = new StringWriter()
+def get_rapidwright_version_line = file('.github/workflows/build.yml').filterLine(sw) { 
+    line -> line.contains('RAPIDWRIGHT_VERSION:') 
+}
+def rapidwright_version = sw.toString().replace("RAPIDWRIGHT_VERSION: v", "").replace("-beta", "").trim() + ""
+
+dependencies {
+    api 'com.xilinx.rapidwright:rapidwright-api-lib:' + rapidwright_version
+}
 
 sourceSets {
   main {
@@ -18,60 +32,114 @@ sourceSets {
   }
 }
 
-//Kryo needs to access sun.nio.ch.DirectBuffer. This is forbidden by default in Java 16 and up. Check if we need to add a jvm arg.
-if (org.gradle.api.JavaVersion.current().isJava10Compatible()) {
-	applicationDefaultJvmArgs = ["--add-exports=java.base/sun.nio.ch=ALL-UNNAMED"]
+task copyJars(type: Copy) {
+    from configurations.implementation
+    into 'jars'
+    from configurations.testImplementation
+    into 'jars'
 }
+compileJava.dependsOn(copyJars)
 
-tasks.withType(Test) {
-  maxHeapSize = "5G"
-  //Propagate JVM settings to test JVM
-  jvmArgs applicationDefaultJvmArgs
-  environment 'RAPIDWRIGHT_PATH',file('.')
-  //We need to rerun tests when the data files change
-  if (file('data').exists()) {
-    inputs.dir file('data')
-  }
-}
-
-sourceCompatibility = 8
-targetCompatibility = 8
-
-dependencies {
-  api fileTree(dir: 'jars', include: ['*.jar'], exclude: ['junit*.jar', '*-javadoc.jar'])
-  testImplementation fileTree(dir: 'jars', include: ['junit-jupiter-*.jar', 'junit-platform-*.jar'])
+task deleteJars(type: Delete) {
+    delete fileTree('jars')
 }
 
 task updateJars {
   group = "build setup"
-  description = "Download Jar Dependencies."
-
-  doLast {
-    def f = new File('rapidwright-installer.jar')
-    if (!f.exists()) {
-        println 'Downloading...'
-        new URL('https://www.rapidwright.io/docs/_downloads/rapidwright-installer.jar').withInputStream{ i -> f.withOutputStream{ it << i }}
-    }
-    def stdout = new StringBuilder(), stderr = new StringBuilder()
-    def proc = 'java -jar rapidwright-installer.jar -u'.execute() 
-    proc.consumeProcessOutput(stdout,stderr)
-    proc.waitForOrKill(1100000)
-    println "$stdout\n$stderr"
-    f.delete()
-  }
+  description = "Removes all jars from RapidWright/jars and replaces with only necessary dependencies."
+  dependsOn deleteJars
+  dependsOn copyJars
+  copyJars.mustRunAfter deleteJars
 }
 
 task update_jars {
-  group = "build setup"
-  description = "Alias for 'updateJars'."
-  dependsOn updateJars
+    group = "build setup"
+    description = "Alias for 'updateJars'."
+    dependsOn updateJars
 }
 
-task testJava(type:Test) {
-  group = "verification"
-  description = "Runs the Java unit tests."
+task sourceJar(type: Jar) {
+  from sourceSets.main.allJava
+  archiveClassifier = "sources"
+}
 
-  useJUnitPlatform()
+javadoc {
+    source = sourceSets.main.allJava
+    classpath = configurations.implementation
+    options.addStringOption('Xdoclint:none', '-quiet')
+}
+
+task javadocJar(type: Jar) {
+    from javadoc
+    archiveClassifier = "javadoc"
+}
+
+task standaloneJar (type: Jar) {
+    duplicatesStrategy = DuplicatesStrategy.WARN
+    manifest {
+        attributes 'Main-Class': 'com.xilinx.rapidwright.util.RapidWright'
+    }
+    archiveBaseName = 'rapidwright-'+rapidwright_version+'-standalone-' + os.charAt(0) + 'in64'
+    from { configurations.implementation.collect { it.isDirectory() ? it : zipTree(it) } }
+    with jar
+}
+
+artifacts {
+    archives javadocJar
+    archives sourceJar
+    archives jar
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+            artifact sourceJar
+            artifact javadocJar
+            // rapidwright coordinates
+            groupId = "com.xilinx.rapidwright"
+            artifactId = "rapidwright"
+            version = rapidwright_version
+            pom {
+                name = "RapidWright"
+                description = "Open Source companion framework for Xilinx's Vivado for customizing backend implementation"
+                url = "http://rapidwright.io"
+                licenses {
+                    license {
+                        name = "The Apache License, Version 2.0"
+                        url = "http://www.apache.org/licenses/LICENSE-2.0.txt"
+                    }
+                }
+                developers {
+                    developer {
+                        name = "RapidWright Developers"
+                    }
+                }
+                scm {
+                    connection = 'scm:git@github.com:Xilinx/RapidWright.git'
+                    url ='https://github.com/Xilinx/RapidWright'
+                }
+            }
+        }
+    }
+    repositories {
+        maven {
+            credentials {
+                username = project.findProperty("ossrhUsername") ?: ""
+                password = project.findProperty("ossrhPassword") ?: ""
+            }
+            url = "https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/"
+        }
+    }
+}
+
+signing {
+    setRequired {
+        // signing is only required when publishing to maven central
+        gradle.taskGraph.allTasks.any { it.equals( publishMavenJavaPublicationToMavenRepository ) }
+    }
+    sign configurations.archives
+    sign publishing.publications.mavenJava
 }
 
 task testPython(type:Test) {
@@ -85,7 +153,9 @@ task testPython(type:Test) {
     exec {
       environment 'CLASSPATH', sourceSets.main.runtimeClasspath.getAsPath()
       executable = 'python3'
-      args = ['-m', 'pytest', '--junitxml', "$buildDir/test-results/testPython/testPython.xml", '--rootdir', 'python/test']
+      args = ['-m', 'pytest', '--junitxml', '$buildDir/test-results/testPython/testPython.xml', '--rootdir', 'python/test']
+      // Enable verbose flag which prints out a pass/fail for every test
+      args += ['-v']
       // Prevent python/tests/... with the same namespace as in Java from clobbering
       args += ['--import-mode=importlib']
       // Workaround from https://github.com/jpype-project/jpype/issues/842#issuecomment-847027355
@@ -98,42 +168,6 @@ task testPython(type:Test) {
 }
 
 test {
-  dependsOn testJava
   dependsOn testPython
-}
-
-gradle.taskGraph.whenReady {
-  if (!project.test.filter.commandLineIncludePatterns.isEmpty()) {
-    throw new InvalidUserDataException("'test' task does not support filters (i.e. '--tests' option); please apply filters directly to 'testJava'/'testPython' tasks instead.")
-  }
-}
-
-task updateSubmodules(type:Exec) {
-  group = "build setup"
-  description = "Update Git submodules"
-  executable = 'git'
-  args = ['submodule', 'update', '--init', '--recursive']
-}
-
-task initSubmodules {
-  group = "build setup"
-  description = "Init Git submodules (first time only)"
-  if (!file("test/RapidWrightDCP/.git").exists()) {
-    dependsOn updateSubmodules
-  }
-}
-
-task remindSubmodules {
-  onlyIf {
-    testJava.state.failure != null || testPython.state.failure != null
-  }
-  doLast {
-    logger.warn('Failed tests detected. Some tests depend on DCPs from the git submodule at test/RapidWrightDCP, consider checking its status and updating with \'gradlew updateSubmodules\'')
-  }
-}
-
-tasks.withType(Test) {
-  dependsOn initSubmodules
-  finalizedBy remindSubmodules
 }
 

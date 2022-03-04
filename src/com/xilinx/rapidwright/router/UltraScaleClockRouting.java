@@ -310,10 +310,10 @@ public class UltraScaleClockRouting {
 	/**
 	 * Routes from a vertical distribution centroid to destination horizontal distribution lines 
 	 * in the clock regions provided.  
-	 * @param clk
-	 * @param centroidDistLine
-	 * @param clockRegions
-	 * @return
+	 * @param clk The current clock net
+	 * @param centroidDistLine The current centroid 
+	 * @param crMap A map that provides a RouteNode reference for each ClockRegion
+	 * @return The List of nodes from the centroid to the horizontal distribution line.
 	 */
 	public static List<RouteNode> routeCentroidToHorizontalDistributionLines(Net clk, RouteNode centroidDistLine, Map<ClockRegion,RouteNode> crMap) {
 		List<RouteNode> distLines = new ArrayList<>();
@@ -344,9 +344,9 @@ public class UltraScaleClockRouting {
 	}
 
 	/**
-	 * @param clk
-	 * @param lcbTargets
-	 * @return
+	 * Routes from distribution lines to the leaf clock buffers (LCBs)
+	 * @param clk The current clock net
+	 * @param lcbTargets The target LCB nodes to route the clock 
 	 */
 	public static void routeDistributionToLCBs(Net clk, List<RouteNode> distLines, Set<RouteNode> lcbTargets) {
 		Map<ClockRegion, Set<RouteNode>> startingPoints = getStartingPoints(distLines);
