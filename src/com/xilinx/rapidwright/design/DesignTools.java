@@ -1832,10 +1832,7 @@ public class DesignTools {
 			EDIFHierCellInst cellInst = src.getNetlist().getHierCellInstFromName(e.getKey());
 			destNetlist.migrateCellAndSubCells(cellInst.getCellType());
 			EDIFHierCellInst bbInst = destNetlist.getHierCellInstFromName(e.getValue());
-			bbInst.getInst().setCellTypeRaw(cellInst.getCellType());
-			for(EDIFPortInst portInst : bbInst.getInst().getPortInsts()) {
-				portInst.getPort().setParentCell(cellInst.getCellType());
-			}
+			bbInst.getInst().setCellType(cellInst.getCellType());
 			instsWithSeparator.add(e.getKey() + EDIFTools.EDIF_HIER_SEP);
 		}
 		destNetlist.resetParentNetMap();
