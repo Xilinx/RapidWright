@@ -199,15 +199,20 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
     }
 
     /**
+     * Forcibly modify the cell being instantiated without updating portInsts
      * @param cellType the cellType to set
      */
-    public void setCellType(EDIFCell cellType) {
+    public void setCellTypeRaw(EDIFCell cellType) {
         this.cellType = cellType;
         this.viewref = cellType != null ? cellType.getEDIFView() : null;
     }
-    
-    public void updateCellType(EDIFCell cellType) {
-        setCellType(cellType);
+
+    /**
+     * Modify the cell being instantiated and update port refs on portInsts
+     * @param cellType the cellType to set
+     */
+    public void setCellType(EDIFCell cellType) {
+        setCellTypeRaw(cellType);
         for(EDIFPortInst portInst : getPortInsts()) {
             EDIFPort origPort = portInst.getPort();
             EDIFPort port = cellType.getPort(origPort.getBusName());
@@ -216,6 +221,13 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
             }
             portInst.setPort(port);
         }
+    }
+
+    /**
+     * @deprecated
+     */
+    public void updateCellType(EDIFCell cellType) {
+        setCellType(cellType);
     }
 	
 	public boolean isBlackBox(){
