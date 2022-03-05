@@ -57,11 +57,11 @@ public class RelocateDCPVertically {
 	 *
 	 * @param top         The design with black boxes to fill
 	 * @param mod         The implementation to fill the black boxes
-	 * @param cell_anchor The reference INT tile used as the handle to {@code mod} parameter
+	 * @param cellAnchor The reference INT tile used as the handle to {@code mod} parameter
 	 * @param toCells     The list of pairs of a black box cell to be filled and its reference INT tile.
-	 *                    The x-coordinate of this INT tile must match that of the cell_anchor.
+	 *                    The x-coordinate of this INT tile must match that of the cellAnchor.
 	 */
-	public static boolean relocateCell(Design top, Module mod, String cell_anchor, List<Pair<String, String>> toCells) {
+	public static boolean relocateCell(Design top, Module mod, String cellAnchor, List<Pair<String, String>> toCells) {
 		System.out.println("\n\nRelocate " + mod.getName());
 
 		EDIFNetlist netlist = top.getNetlist();
@@ -70,16 +70,16 @@ public class RelocateDCPVertically {
 
 		Site frSite = mod.getAnchor().getSite();
 		Tile frTile = frSite.getTile();
-		// The cell_anchor is used by a user as an anchor to the cell.  It can differ from anchorTile.
-		// Relocate the cell is equivalent to moving the cell so that the cell_anchor align with the specified INT tile.
-		Tile tFrom = top.getDevice().getTile(cell_anchor);
-		System.out.printf("\n     fr %12s                : anchor %14s  %14s\n", cell_anchor, frSite, frTile);
+		// The cellAnchor is used by a user as an anchor to the cell.  It can differ from anchorTile.
+		// Relocate the cell is equivalent to moving the cell so that the cellAnchor align with the specified INT tile.
+		Tile tFrom = top.getDevice().getTile(cellAnchor);
+		System.out.printf("\n     fr %12s                : anchor %14s  %14s\n", cellAnchor, frSite, frTile);
 
 		for (Pair<String, String> cell : toCells) {
 			Tile tTo = top.getDevice().getTile(cell.getSecond());
 			if (tFrom.getColumn() != tTo.getColumn()) {
 				System.out.println("Target location of " + cell.getFirst() + ", " + cell.getSecond() +
-						", is not vertically aligned with that of the implementation, " + cell_anchor + ".");
+						", is not vertically aligned with that of the implementation, " + cellAnchor + ".");
 				return false;
 			}
 		}
@@ -182,6 +182,9 @@ public class RelocateDCPVertically {
 		List<String> clockNets = new ArrayList<>();
 
 		for (EDIFPortInst p : top.getNetlist().getCellInstFromHierName(cellName).getPortInsts()) {
+			if (p.getInternalNet() == null) // unconnected port
+				continue;
+
 			String hierNetName_outside = top.getNetlist().getHierNetFromName(cellName + "/" + p.getInternalNet().getName()).getHierarchicalNetName();
 			for (EDIFHierNet net : top.getNetlist().getNetAliases(top.getNetlist().getHierNetFromName(hierNetName_outside))) {
 				String physNetName = net.getHierarchicalNetName();
@@ -360,8 +363,9 @@ public class RelocateDCPVertically {
 
 
 		// Fill the black boxes
-		Design top = Design.readCheckpoint(topDCPName + ".dcp", topDCPName + ".edf");
-		Module mod = new Module(Design.readCheckpoint(cellDCPName + ".dcp", cellDCPName + ".edf"), false);
+		Design top = Design.readCheckpoint(topDCPName + ".dcp");
+		Module mod = new Module(Design.readCheckpoint(cellDCPName + ".dcp"), false);
+
 
 		if (relocateCell(top, mod, cellAnchor, targets)) {
 
@@ -383,5 +387,6 @@ public class RelocateDCPVertically {
 
 		long stopTime = System.nanoTime();
 		System.out.printf("\nElapsed time %3.0f sec.\n\n", (stopTime - startTime)*1e-9);
+
 	}
 }
