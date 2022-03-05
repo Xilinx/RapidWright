@@ -139,10 +139,15 @@ public class EDIFTools {
 
 	public static final String LOAD_TCL_SUFFIX = "_load.tcl";
 	
-	/** Flag to switch EDIF files to KRYO files to make Java debugging faster  (must run once without debugging mode first, once set to true) */
-	public static final boolean EDIF_DEBUG = false;
-
 	public static int UNIQUE_COUNT = 0;
+
+	/**
+	 * Flag to set a feature where any .edf file that is attempted to be loaded will check if an
+	 * existing binary EDIF has already been generated and will load that instead (faster).  This 
+	 * will also enable generation of binary EDIF files after a successful EDIF file loading to be
+	 * used on the next load.
+	 */
+	public static final boolean ENABLE_EDIF_BINARY_CACHING = System.getenv("RW_ENABLE_EDIF_BINARY_CACHING") != null;
 	
 	private static String getUniqueNetSuffix() {
 	    return "_created_net" + UNIQUE_COUNT++;
@@ -674,21 +679,9 @@ public class EDIFTools {
 		String edifFileName = args[0];
 		EDIFNetlist edif;
 		
-		if(EDIFTools.EDIF_DEBUG && FileTools.isFileNewer(edifFileName + ".dat", edifFileName)){
-			t.start("Read EDIF from Kryo");
-			edif = FileTools.readObjectFromKryoFile(edifFileName + ".dat", EDIFNetlist.class);
-			t.stop();
-		}else{
-			t.start("Read EDIF from ASCII EDIF file");
-			edif = EDIFTools.loadEDIFFile(edifFileName);
-			t.stop(); 
-			if(!(new File(edifFileName + ".dat").exists()) || FileTools.isFileNewer(edifFileName, edifFileName + ".dat") ){
-				t.start("Write EDIF Kryo (.dat) file");
-				if(EDIFTools.EDIF_DEBUG) FileTools.writeObjectToKryoFile(edifFileName + ".dat", edif);
-				t.stop();
-			}
-			
-		}
+		t.start("Read EDIF from ASCII EDIF file");
+		edif = EDIFTools.loadEDIFFile(edifFileName);
+		t.stop(); 
 		t.start("Write EDIF file");
 		EDIFTools.writeEDIFFile(edifFileName.replace(".edf", "_byu.edf"), edif, "partname");
 		t.stop().printSummary();
@@ -730,6 +723,13 @@ public class EDIFTools {
 	}
 
 	public static EDIFNetlist readEdifFile(Path edifFileName){
+	    if(ENABLE_EDIF_BINARY_CACHING) {
+	        Path bedif = edifFileName.getParent().resolve(
+	                        edifFileName.getFileName().toString().replace(".edf", ".bedf"));
+	        if(Files.exists(bedif) && FileTools.isFileNewer(bedif, edifFileName)) {
+	            return BinaryEDIFReader.readBinaryEDIF(bedif);
+	        }
+	    }
 		EDIFNetlist edif;
 		File edifFile = edifFileName.toFile();
 		File parent = edifFile.getParentFile();
@@ -751,15 +751,7 @@ public class EDIFTools {
 					+ "be passed to resulting DCP load script.");
 			}
 		}
-		Path kryoFile = FileTools.appendExtension(edifFileName , ".dat");
-		if(EDIFTools.EDIF_DEBUG && FileTools.isFileNewer(kryoFile, edifFileName)){
-			edif = FileTools.readObjectFromKryoFile(kryoFile, EDIFNetlist.class);
-		}else{
-			edif = loadEDIFFile(edifFileName);
-			if(!Files.exists(kryoFile) || FileTools.isFileNewer(edifFileName, kryoFile)){
-				if(EDIFTools.EDIF_DEBUG) FileTools.writeObjectToKryoFile(kryoFile, edif);
-			}
-		}
+		edif = loadEDIFFile(edifFileName);
 		if(edifDirectoryName != null) {
 			File origDir = new File(edifDirectoryName);
 			edif.setOrigDirectory(edifDirectoryName);
@@ -773,7 +765,11 @@ public class EDIFTools {
 			}
 			edif.setEncryptedCells(new ArrayList<>(Arrays.asList(ednFiles)));
 		}
-		
+		if(ENABLE_EDIF_BINARY_CACHING) {
+		    Path bedif = edifFileName.getParent().resolve(
+                    edifFileName.getFileName().toString().replace(".edf", ".bedf"));
+		    BinaryEDIFWriter.writeBinaryEDIF(bedif, edif);
+		}
 		return edif;
 	}
 
