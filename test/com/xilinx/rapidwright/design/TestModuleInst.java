@@ -51,8 +51,6 @@ public class TestModuleInst {
 
             Assertions.assertFalse(emptyDesign.getVccNet().hasPIPs());
             Assertions.assertFalse(emptyDesign.getGndNet().hasPIPs());
-            Assertions.assertTrue(emptyDesign.getVccNet().getPins().isEmpty());
-            Assertions.assertTrue(emptyDesign.getGndNet().getPins().isEmpty());
 
             boolean skipIncompatible = true; // Otherwise it fails when trying to move
                                              // the gap routing in the clock net
@@ -61,6 +59,8 @@ public class TestModuleInst {
 
         HashSet<PIP> newVccPips = new HashSet<>(emptyDesign.getVccNet().getPIPs());
         HashSet<PIP> newGndPips = new HashSet<>(emptyDesign.getGndNet().getPIPs());
+        Assertions.assertFalse(emptyDesign.getVccNet().getPins().isEmpty());
+        Assertions.assertFalse(emptyDesign.getGndNet().getPins().isEmpty());
 
         if (placeOnOriginalAnchor) {
             // Check that all static PIPs were same as the original module design
