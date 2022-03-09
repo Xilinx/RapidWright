@@ -132,11 +132,22 @@ public class RoutableNode implements Routable{
 		List<Node> allDownHillNodes = node.getAllDownhillNodes();
 		
 		for(Node node:allDownHillNodes){		
-			if(reserved.contains(node)) continue;		
+			Routable child = createdRoutable.get(node);
+			if(reserved.contains(node)) {
+				if (child == null) {
+					continue;
+				}
+				// If this child is part of a partial net, disallow all edges
+				// except for the preserved one
+				Routable prev = child.getPrev();
+				assert(prev != null);
+				if (prev != this) {
+					continue;
+				}
+			}
 			if(isExcluded(node, timingDriven)) continue;
 			if(routethruHelper.isRouteThru(node, node)) continue;
 			
-			Routable child = createdRoutable.get(node);
 			if(child == null) {
 				RoutableType type = RoutableType.WIRE;		
 				child = new RoutableNode(globalIndex++, node, type);

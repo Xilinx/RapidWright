@@ -28,6 +28,7 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -45,7 +46,6 @@ import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
-import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.util.MessageGenerator;
 import com.xilinx.rapidwright.util.Pair;
@@ -400,6 +400,9 @@ public class RWRoute{
 	 * Routes static nets with preserved resources list supplied to avoid conflicting nodes.
 	 */
 	private void routeStaticNets(){
+		if (staticNetAndRoutingTargets.isEmpty())
+			return;
+
 		for(List<SitePinInst> netRouteTargetPins : staticNetAndRoutingTargets.values()) {
 			for(SitePinInst sink : netRouteTargetPins) {
 				preservedNodes.remove(sink.getConnectedNode());
@@ -485,6 +488,8 @@ public class RWRoute{
 		Node sourceINTNode = null;
 		
 		for(SitePinInst sink : net.getSinkPins()){
+			if(sink.isRouted())
+				continue;
 			if(RouterHelper.isExternalConnectionToCout(source, sink)){
 				source = net.getAlternateSource();
 				if(source == null){
@@ -599,10 +604,10 @@ public class RWRoute{
 	 * @param type The {@link RoutableType} of the {@link RoutableNode} Object.
 	 * @return The created {@link RoutableNode} instance.
 	 */
-	private Routable createAddRoutableNode(SitePinInst sitePinInst, Node node, RoutableType type){
+	protected Routable createAddRoutableNode(SitePinInst sitePinInst, Node node, RoutableType type){
 		Routable rnode = rnodesCreated.get(node);
 		if(rnode == null){
-			// this is for initializing sources and sinks of those to-be-routed nets's connections
+			// this is for initializing sources and sinks of those to-be-routed nets' connections
 			rnode = new RoutableNode(rnodeId++, node, type);
 			rnodesCreated.put(rnode.getNode(), rnode);
 		}else{
@@ -1162,7 +1167,8 @@ public class RWRoute{
 	 */
 	private void setPIPsOfNets(){
 		for(NetWrapper netWrapper : nets){
-			Set<PIP> netPIPs = new HashSet<>();
+			// Preserve the order of existing PIPs, e.g. the first PIP could be a logical driver
+			Set<PIP> netPIPs = new LinkedHashSet<>(netWrapper.getNet().getPIPs());
 			for(Connection connection:netWrapper.getConnections()){
 				netPIPs.addAll(RouterHelper.getConnectionPIPs(connection));
 			}
@@ -1273,7 +1279,6 @@ public class RWRoute{
 	private boolean swapOutputPin(Connection connection) {	
 		NetWrapper netWrapper = connection.getNetWrapper();
 		Net net = netWrapper.getNet();
-		
 		SitePinInst altSource = DesignTools.getLegalAlternativeOutputPin(net);
 		if(altSource == null) {
 			System.out.println("INFO: No alternative source to swap");	
@@ -1282,17 +1287,25 @@ public class RWRoute{
 		
 		System.out.println("INFO: Swap source from " + net.getSource() + " to " + altSource + "\n");
 		
-		net.replaceSource(altSource);
-		net.setSource(altSource);
-		net.setAlternateSource(connection.getSource());
+		Node source = connection.getSource().getConnectedNode();
+		if (!preservedNodes.containsKey(source)) {
+			// Net.replaceSource() calls Net.removePin() (which in turn calls
+			// Net.unroute()) -- only do this if the net is not a partial net
+			// as determined by whether the source node is in the preserved set
+			net.replaceSource(altSource);
+			net.setAlternateSource(connection.getSource());
+		} else {
+			net.setAlternateSource(altSource);
+		}
+
 		DesignTools.routeAlternativeOutputSitePin(net, altSource);
 		netWrapper.setSourceChanged(true);
 		
 		Node sourceINTNode = RouterHelper.projectOutputPinToINTNode(altSource);
-		Routable sourceR = createAddRoutableNode(altSource, sourceINTNode, RoutableType.PINFEED_O);;
+		Routable rAltSource = createAddRoutableNode(altSource, sourceINTNode, RoutableType.PINFEED_O);
 		for(Connection otherConnectionOfNet : netWrapper.getConnections()) {
 			otherConnectionOfNet.setSource(altSource);
-			otherConnectionOfNet.setSourceRnode(sourceR);
+			otherConnectionOfNet.setSourceRnode(rAltSource);
 		}
 			
 		return true;

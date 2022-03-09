@@ -179,7 +179,7 @@ public class RouterHelper {
 	public static Tile getUpstreamINTTileOfClkIn(SitePinInst clkIn) {
 		List<Node> pathToINTTile = projectInputPinToINTNode(clkIn);
 		if(pathToINTTile.isEmpty()) {
-			throw new RuntimeException("ERROR: CLK_IN does not connet to INT Tile directly");
+			throw new RuntimeException("ERROR: CLK_IN does not connect to INT Tile directly");
 		}
 		
 		return pathToINTTile.get(0).getTile();
@@ -191,21 +191,22 @@ public class RouterHelper {
 	 * @return A list of PIPs for the connection.
 	 */
 	public static List<PIP> getConnectionPIPs(Connection connection){
-		return getPIPsFromListOfReversedNodes(connection.getNodes());
+		return getPIPsFromListOfNodes(connection.getNodes());
 	}
 	
+
 	/**
-	 * Gets a list of {@link PIP} instances from a list of {@link Node} instances in a reversed order.
+	 * Gets a list of {@link PIP} instances from a list of {@link Node} instances.
 	 * @param connectionNodes The list of nodes of a routed {@link Connection} instance.
 	 * @return A list of PIPs generated from the list of nodes.
 	 */
-	public static List<PIP> getPIPsFromListOfReversedNodes(List<Node> connectionNodes){
+	public static List<PIP> getPIPsFromListOfNodes(List<Node> connectionNodes){
 		List<PIP> connectionPIPs = new ArrayList<>();
 		if(connectionNodes == null) return connectionPIPs;
 		// Nodes of a connection are added to the list starting from its sink to its source
-		for(int i = connectionNodes.size() -1; i > 0; i--){
+		for(int i = 0; i < connectionNodes.size() - 1; i++){
 			Node driver = connectionNodes.get(i);
-			Node load = connectionNodes.get(i-1);		
+			Node load = connectionNodes.get(i+1);
 			PIP pip = findPIPbetweenNodes(driver, load);	
 			if(pip != null){
 				connectionPIPs.add(pip);
@@ -300,6 +301,7 @@ public class RouterHelper {
 	
 	/**
 	 * Gets a set of {@link Node} instances used by a {@link Net} instance.
+	 * Nodes associated with unrouted pins on this net will be excluded.
 	 * @param net The target net.
 	 * @return A set of nodes used by a net.
 	 */
@@ -307,6 +309,8 @@ public class RouterHelper {
 		Set<Node> nodes = new HashSet<>();
 		if(net.getSource() != null) nodes.add(net.getSource().getConnectedNode());
 		for(SitePinInst pin : net.getSinkPins()) {
+			if (!pin.isRouted()) continue;
+
 			Node pinNode = pin.getConnectedNode();
 			if(pinNode != null) {
 				nodes.add(pinNode);

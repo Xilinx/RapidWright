@@ -29,6 +29,8 @@ import java.util.List;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.device.Node;
+import com.xilinx.rapidwright.device.PIP;
 
 /**
  * A class extends {@link RWRoute} for partial routing.
@@ -80,14 +82,29 @@ public class PartialRouter extends RWRoute{
 	
 	@Override
 	protected void addNetConnectionToRoutingTargets(Net net) {
-		if(!net.hasPIPs()) {
-			createsNetWrapperAndConnections(net, config.getBoundingBoxExtensionX(), config.getBoundingBoxExtensionY(), isMultiSLRDevice());
-		}else{
-			// In partial routing mode, a net with PIPs is preserved.
-			// This means the routed net is supposed to be fully routed without conflicts.
-			// TODO detect partially routed nets.
+		if (net.hasPIPs()) {
 			preserveNet(net);
 			increaseNumPreservedWireNets();
+		}
+
+		// If all pins are already routed, no routing necessary
+		if (net.getSinkPins().stream().allMatch(SitePinInst::isRouted)) {
+			return;
+		}
+
+		NetWrapper netWrapper = createsNetWrapperAndConnections(net, config.getBoundingBoxExtensionX(), config.getBoundingBoxExtensionY(), isMultiSLRDevice());
+
+		// Create all nodes used by this net, adding itself as a user, and
+		// set its previous node so that Routable.setChildren() will know
+		// to only allow this edge
+		for (PIP pip : net.getPIPs()) {
+			Node start = (pip.isReversed()) ? pip.getEndNode() : pip.getStartNode();
+			Node end = (pip.isReversed()) ? pip.getStartNode() : pip.getEndNode();
+			Routable rstart = createAddRoutableNode(null, start, RoutableType.WIRE);
+			Routable rend = createAddRoutableNode(null, end, RoutableType.WIRE);
+			assert(rend.getPrev() == null);
+			rend.setPrev(rstart);
+			rend.incrementUser(netWrapper);
 		}
 	}
 	
