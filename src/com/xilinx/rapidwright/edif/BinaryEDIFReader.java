@@ -69,7 +69,11 @@ public class BinaryEDIFReader {
      */
     static void readEDIFObject(EDIFPropertyObject o, Input is, String[] strings) {
         if(readEDIFName(o, is, strings)) {
-            int numProps = is.readShortUnsigned();
+            int numProps = is.readInt();
+            if((numProps & BinaryEDIFWriter.EDIF_HAS_OWNER) == BinaryEDIFWriter.EDIF_HAS_OWNER) {
+                numProps = ~BinaryEDIFWriter.EDIF_HAS_OWNER & numProps;
+                o.setOwner(strings[is.readInt()]);
+            }
             for(int i=0; i < numProps; i++) {
                 EDIFName key = new EDIFName();
                 if(readEDIFName(key, is, strings)) {
@@ -168,6 +172,7 @@ public class BinaryEDIFReader {
             }
             port.setWidth(width);
             port.setDirection(dir);
+            port.setIsLittleEndian();
             c.addPort(port);
         }
         int instCount = is.readInt();

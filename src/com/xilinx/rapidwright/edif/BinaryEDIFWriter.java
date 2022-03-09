@@ -51,7 +51,9 @@ public class BinaryEDIFWriter {
     public static final int EDIF_UNIQUE_VIEW_FLAG = 0x80000000;
     public static final int EDIF_SAME_LIB_FLAG = 0x80000000;
     public static final int EDIF_PROP_FLAG = 0x40000000;
+    public static final int EDIF_HAS_OWNER = 0x80000000;
 
+    
     public static final int EDIF_DIR_INPUT_MASK  = 0x40000000;
     public static final int EDIF_DIR_OUTPUT_MASK = 0x20000000;
     public static final int EDIF_DIR_INOUT_MASK  = 0x10000000;
@@ -83,6 +85,10 @@ public class BinaryEDIFWriter {
         for(Entry<EDIFName, EDIFPropertyValue> e : o.getProperties().entrySet()) {
             addNameToStringMap(e.getKey(), stringMap);
             addStringToStringMap(e.getValue().getValue(), stringMap);
+        }
+        String owner = o.getOwner();
+        if(owner != null) {
+            addStringToStringMap(owner, stringMap);
         }
     }
     
@@ -164,7 +170,13 @@ public class BinaryEDIFWriter {
                 throw new RuntimeException("ERROR: EDIF object exceeded number of encoded "
                         + "properties on object '" + o.getName() + "'");
             }
-            os.writeShort(o.getProperties().size());
+            String owner = o.getOwner();
+            if(owner != null) {
+                os.writeInt(EDIF_HAS_OWNER | o.getProperties().size());
+                os.writeInt(stringMap.get(owner));
+            }else {
+                os.writeInt(o.getProperties().size());                
+            }
             for(Entry<EDIFName, EDIFPropertyValue> e : o.getProperties().entrySet()) {
                 writeEDIFName(e.getKey(), os, stringMap);
                 int propType = e.getValue().getType().ordinal();
@@ -250,13 +262,32 @@ public class BinaryEDIFWriter {
             writeEDIFObject(n, os, stringMap);
             os.writeInt(n.getPortInsts().size());
             for(EDIFPortInst pi : n.getPortInsts()) {
-                String name = pi.getPort().isBus() ? pi.getPort().getBusName() : pi.getName();
+                String name = getPortInstKey(pi);
                 os.writeInt(stringMap.get(name));
                 os.writeInt(pi.getIndex());
                 os.writeInt(pi.getCellInst() == null ? 
                         EDIF_NULL_INST : stringMap.get(pi.getCellInst().getName()));
             }
         }
+    }
+    
+    /**
+     * Gets the proper port instance name, specifically the port name if it is a bussed port and
+     * there is a naming collision on the cell. 
+     * @param portInst The port instance to use
+     * @return The keyed-name of the port instance port on the cell
+     */
+    private static String getPortInstKey(EDIFPortInst portInst) {
+        EDIFPort port = portInst.getPort();
+        String returnValue = null;
+        if(port.isBus()) {
+            EDIFCell cell = portInst.getCellInst() == null ? portInst.getParentCell() : portInst.getCellInst().getCellType();
+            EDIFPort portCollision = cell.getPort(portInst.getPort().getName());
+            returnValue = portCollision != null ? port.getName() : port.getBusName();
+        } else {
+            returnValue = portInst.getName();
+        }
+        return returnValue;
     }
     
     /**

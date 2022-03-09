@@ -25,11 +25,19 @@
  */
 package com.xilinx.rapidwright.edif;
 
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map.Entry;
 
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -40,6 +48,8 @@ import com.xilinx.rapidwright.util.FileTools;
 
 public class TestBinaryEDIF {
 
+    public static final String RW_TEST_DCP_PATH_VAR_NAME = "RW_TEST_DCP_PATH";
+    public static final String RW_TEST_WORKING_DIR_VAR_NAME = "RW_TEST_WORKING_DIR";
     
     /**
      * Tests EDIFPropertyObjects for equivalence (EDIFName and EDIF property maps are equal and 
@@ -74,6 +84,12 @@ public class TestBinaryEDIF {
         Assertions.assertEquals(golden.getPorts().size(), test.getPorts().size());
         for(EDIFPort port : golden.getPorts()) {
             EDIFPort testPort = test.getPort(port.getBusName());
+            if(port.isBus()) {
+                EDIFPort portCollision = test.getPort(port.getName());
+                if(portCollision != null) {
+                    testPort = portCollision;
+                }
+            }
             Assertions.assertNotNull(testPort);
             Assertions.assertTrue(equivalentEDIFPropObject(port, testPort));
             Assertions.assertEquals(port.getLeft(), testPort.getLeft());
@@ -129,6 +145,22 @@ public class TestBinaryEDIF {
         return true;
     }
     
+    
+    private static List<String> readEDIFLines(Path path){
+        List<String> lines = new ArrayList<>();
+        try(BufferedReader br = new BufferedReader(new FileReader(path.toFile()))){
+            String line = null;
+            while((line = br.readLine()) != null) {
+                if(line.contains("(metax")) continue;
+                if(line.contains("(timeStamp")) continue;
+                lines.add(line);
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        return lines;
+    }
+    
     /**
      * Compares two text-based EDIF files to see if they match 
      * (except for their respective timestamp)
@@ -137,13 +169,14 @@ public class TestBinaryEDIF {
      * @return True if the two files match (excluding timestamp), false otherwise 
      */
     private boolean compareEDIFFiles(Path golden, Path test) {
-        List<String> goldenLines = FileTools.getLinesFromTextFile(golden.toString());
-        List<String> testLines = FileTools.getLinesFromTextFile(test.toString());
+        List<String> goldenLines = readEDIFLines(golden);
+        List<String> testLines = readEDIFLines(test);
+        Collections.sort(goldenLines);
+        Collections.sort(testLines);
         if(goldenLines.size() != testLines.size()) return false;
         int length = goldenLines.size();
         for(int i=0 ; i < length; i++) {
             if(!goldenLines.get(i).equals(testLines.get(i))) {
-                if(goldenLines.get(i).contains("(timeStamp ")) continue;
                 System.err.println("EDIF mismatch on line " + i + ": >>" 
                         + goldenLines.get(i) +"<<  >>" + testLines.get(i) + "<<");
                 return false;
@@ -156,23 +189,43 @@ public class TestBinaryEDIF {
     @Test
     @CheckOpenFiles
     public void testBinaryEDIF(@TempDir Path tempDir) {
+        String dcpPath = System.getenv(RW_TEST_DCP_PATH_VAR_NAME);
+        Assumptions.assumeTrue(dcpPath == null);
         Path dcp = RapidWrightDCP.getPath("optical-flow.dcp");
+        testBinaryEDIF(tempDir, dcp);
+    }
+    
+    @Test
+    public void runTestBinaryEDIFOnLSF() {
+        String dcpPath = System.getenv(RW_TEST_DCP_PATH_VAR_NAME);
+        Assumptions.assumeTrue(dcpPath != null);
+        String workingDir = System.getenv(RW_TEST_WORKING_DIR_VAR_NAME);
+        FileTools.makeDirs(workingDir);
+        System.out.println(RW_TEST_DCP_PATH_VAR_NAME + "=" + dcpPath);
+        System.out.println(RW_TEST_WORKING_DIR_VAR_NAME + "=" + workingDir);
+        testBinaryEDIF(Paths.get(workingDir), Paths.get(dcpPath));
+        FileTools.writeStringToTextFile("SUCCESS", workingDir + "/SUCCESS");
+    }
+    
+    public void testBinaryEDIF(Path workingDir, Path dcp) {
         boolean noXdef = true;
         Design design = Design.readCheckpoint(dcp, noXdef);
         EDIFNetlist netlist = design.getNetlist();
-        
-        Path goldenPath = tempDir.resolve("golden.edf");
+        // Reading the checkpoint will expand the macros automatically, we need to collapse
+        // before writing out the netlist
+        netlist.collapseMacroUnisims(design.getDevice().getSeries());
+        Path goldenPath = workingDir.resolve("golden.edf");
         netlist.exportEDIF(goldenPath);
         
         EDIFNetlist golden = EDIFTools.readEdifFile(goldenPath);
         
-        Path binaryPath = tempDir.resolve("test.bedf"); 
+        Path binaryPath = workingDir.resolve("test.bedf"); 
         netlist.writeBinaryEDIF(binaryPath);
         EDIFNetlist test = EDIFNetlist.readBinaryEDIF(binaryPath);
         
         Assertions.assertTrue(equivalentEDIFNetlists(golden, test));
         
-        Path testPath = tempDir.resolve("test.edf");
+        Path testPath = workingDir.resolve("test.edf");
         test.exportEDIF(testPath);
 
         Assertions.assertTrue(compareEDIFFiles(goldenPath, testPath));
