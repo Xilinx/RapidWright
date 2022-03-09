@@ -93,6 +93,8 @@ public class FileTools {
 	public static final String RAPIDWRIGHT_VARIABLE_NAME = "RAPIDWRIGHT_PATH";
 	/** Suffix of the device part files */
 	public static final String DEVICE_FILE_SUFFIX = "_db.dat";
+	/** Suffix of the device part files */
+	public static final String DEVICE_CACHE_FILE_SUFFIX = "_db_cache.dat";
 	/** Data folder name */
 	public static final String DATA_FOLDER_NAME = "data";
 	/** Tcl source folder name */
@@ -1109,7 +1111,15 @@ public class FileTools {
 	}
 	
 	public static String getDeviceResourceName(Part part){
-		return getPartFolderResourceName(part) + part.getDevice() + DEVICE_FILE_SUFFIX;
+		return getDeviceResourceSuffix(part) + DEVICE_FILE_SUFFIX;
+	}
+	
+	public static String getDeviceResourceSuffix(Part part) {
+	    return getPartFolderResourceName(part) + part.getDevice();
+	}
+	
+	public static String getDeviceResourceCache(Part part) {
+	    return getDeviceResourceSuffix(part) + DEVICE_CACHE_FILE_SUFFIX;
 	}
 	
 	/**
