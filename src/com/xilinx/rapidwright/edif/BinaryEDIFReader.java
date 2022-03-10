@@ -43,7 +43,7 @@ import com.xilinx.rapidwright.util.FileTools;
 public class BinaryEDIFReader {
     
     /**
-     * Reads an EDIFName object from kryo-based input stream.
+     * Reads an EDIFName object from Kryo-based input stream.
      * @param o The object to populate
      * @param is Kryo-based input stream
      * @param strings Indexed string lookup
