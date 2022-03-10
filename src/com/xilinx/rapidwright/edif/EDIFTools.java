@@ -683,7 +683,7 @@ public class EDIFTools {
 		edif = EDIFTools.loadEDIFFile(edifFileName);
 		t.stop(); 
 		t.start("Write EDIF file");
-		EDIFTools.writeEDIFFile(edifFileName.replace(".edf", "_byu.edf"), edif, "partname");
+		EDIFTools.writeEDIFFile(edifFileName.replace(".edf", "_out.edf"), edif, "partname");
 		t.stop().printSummary();
 	}
 
