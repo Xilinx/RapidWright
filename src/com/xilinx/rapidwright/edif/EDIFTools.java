@@ -147,7 +147,8 @@ public class EDIFTools {
 	 * will also enable generation of binary EDIF files after a successful EDIF file loading to be
 	 * used on the next load.
 	 */
-	public static final boolean ENABLE_EDIF_BINARY_CACHING = System.getenv("RW_ENABLE_EDIF_BINARY_CACHING") != null;
+	public static final boolean RW_ENABLE_EDIF_BINARY_CACHING = 
+	        System.getenv("RW_ENABLE_EDIF_BINARY_CACHING") != null;
 	
 	private static String getUniqueNetSuffix() {
 	    return "_created_net" + UNIQUE_COUNT++;
@@ -723,11 +724,18 @@ public class EDIFTools {
 	}
 
 	public static EDIFNetlist readEdifFile(Path edifFileName){
-	    if(ENABLE_EDIF_BINARY_CACHING) {
+	    if(RW_ENABLE_EDIF_BINARY_CACHING) {
 	        Path bedif = edifFileName.getParent().resolve(
 	                        edifFileName.getFileName().toString().replace(".edf", ".bedf"));
 	        if(Files.exists(bedif) && FileTools.isFileNewer(bedif, edifFileName)) {
-	            return BinaryEDIFReader.readBinaryEDIF(bedif);
+	            EDIFNetlist netlist = null;
+	            try {
+	                netlist = BinaryEDIFReader.readBinaryEDIF(bedif);
+	                return netlist;
+	            } catch(Exception e) {
+	                System.out.println("WARNING: Unable to read Binary EDIF: " + bedif.toString()
+	                        + ", falling back to reading EDIF: " + edifFileName.toString());
+	            }
 	        }
 	    }
 		EDIFNetlist edif;
@@ -765,10 +773,15 @@ public class EDIFTools {
 			}
 			edif.setEncryptedCells(new ArrayList<>(Arrays.asList(ednFiles)));
 		}
-		if(ENABLE_EDIF_BINARY_CACHING) {
+		if(RW_ENABLE_EDIF_BINARY_CACHING) {
 		    Path bedif = edifFileName.getParent().resolve(
                     edifFileName.getFileName().toString().replace(".edf", ".bedf"));
-		    BinaryEDIFWriter.writeBinaryEDIF(bedif, edif);
+		    try {
+		        BinaryEDIFWriter.writeBinaryEDIF(bedif, edif);
+		    }
+		    catch (Exception e) {
+		        System.out.println("INFO: Unable to write Binary EDIF file: " + bedif.toString());
+		    }
 		}
 		return edif;
 	}
