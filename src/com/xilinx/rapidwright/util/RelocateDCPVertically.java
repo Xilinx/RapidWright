@@ -47,7 +47,7 @@ import com.xilinx.rapidwright.util.Pair;
 
 
 /**
- * Fill some black boxes of a given design with a specific implementation.
+ * Fill some black boxes of a given design with a specific {@link Module} (DCP) implementation.
  */
 public class RelocateDCPVertically {
 
@@ -61,7 +61,7 @@ public class RelocateDCPVertically {
 	 * @param toCells     The list of pairs of a black box cell to be filled and its reference INT tile.
 	 *                    The x-coordinate of this INT tile must match that of the cellAnchor.
 	 */
-	public static boolean relocateCell(Design top, Module mod, String cellAnchor, List<Pair<String, String>> toCells) {
+	public static boolean placeModuleInsts(Design top, Module mod, String cellAnchor, List<Pair<String, String>> blackboxes) {
 		System.out.println("\n\nRelocate " + mod.getName());
 
 		EDIFNetlist netlist = top.getNetlist();
@@ -185,7 +185,7 @@ public class RelocateDCPVertically {
 			if (p.getInternalNet() == null) // unconnected port
 				continue;
 
-			String hierNetName_outside = top.getNetlist().getHierNetFromName(cellName + "/" + p.getInternalNet().getName()).getHierarchicalNetName();
+			String hierNetName_outside = top.getNetlist().getHierNetFromName(cellName + EDIFTools.EDIF_HIER_SEP + p.getInternalNet().getName()).getHierarchicalNetName();
 			for (EDIFHierNet net : top.getNetlist().getNetAliases(top.getNetlist().getHierNetFromName(hierNetName_outside))) {
 				String physNetName = net.getHierarchicalNetName();
 				Net physNet = top.getNet(physNetName);
@@ -205,9 +205,7 @@ public class RelocateDCPVertically {
 				String physNetName = net.getHierarchicalNetName();
 				Net physNet = top.getNet(physNetName);
 				if (physNet != null) {
-					for (PIP p : physNet.getPIPs()) {
-						pips.add(p);
-					}
+					pips.addAll(physNet.getPIPs());
 				}
 			}
 
@@ -379,10 +377,10 @@ public class RelocateDCPVertically {
 
 			System.out.println("\n");
 			top.writeCheckpoint(newDCPName + ".dcp");
-			System.out.println("\n\nFill " + targets.size() + " target black boxes successfully.\n");
+			System.out.println("\n\nFilled " + targets.size() + " target black boxes successfully.\n");
 
 		} else {
-			System.out.println("\n\nFail to fill all target black boxes.\n");
+			System.out.println("\n\nFailed to fill all target black boxes.\n");
 		}
 
 		long stopTime = System.nanoTime();
