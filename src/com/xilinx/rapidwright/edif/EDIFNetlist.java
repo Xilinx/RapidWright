@@ -1706,6 +1706,22 @@ public class EDIFNetlist extends EDIFName {
         addEncryptedCells(encryptedCells);
     }
 
+    public static EDIFNetlist readBinaryEDIF(Path path) {
+        return BinaryEDIFReader.readBinaryEDIF(path);
+    }
+    
+    public static EDIFNetlist readBinaryEDIF(String fileName) {
+        return BinaryEDIFReader.readBinaryEDIF(fileName);
+    }
+    
+    public void writeBinaryEDIF(Path path) {
+        BinaryEDIFWriter.writeBinaryEDIF(path, this);
+    }
+    
+    public void writeBinaryEDIF(String fileName) {
+        BinaryEDIFWriter.writeBinaryEDIF(fileName, this);
+    }
+    
 	public static void main(String[] args) throws FileNotFoundException {
 		CodePerfTracker t = new CodePerfTracker("EDIF Import/Export", true);
 		t.start("Read EDIF");
