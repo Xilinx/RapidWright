@@ -25,7 +25,6 @@ package com.xilinx.rapidwright.util;
 
 import java.util.List;
 import java.util.ArrayList;
-import java.util.Arrays;
 
 import com.xilinx.rapidwright.bitstream.Bitstream;
 import com.xilinx.rapidwright.bitstream.CRC;
@@ -34,6 +33,7 @@ import com.xilinx.rapidwright.bitstream.OpCode;
 import com.xilinx.rapidwright.bitstream.Packet;
 import com.xilinx.rapidwright.bitstream.RegisterType;
 import com.xilinx.rapidwright.device.Series;
+import com.xilinx.rapidwright.tests.CodePerfTracker;
 
 
 /**
@@ -59,21 +59,15 @@ public class RelocateBitstreamByRow {
 	 * @param bitstream Bitstream to update its rows
 	 * @param series    The device series
 	 * @param rowOffset The number of row to relocate. + means relocate upward
-	 * @param verbose   To print more information
 	 */
-	public static void relocate (Bitstream bitstream, Series series, int rowOffset, boolean verbose) {
+	public static void relocate (Bitstream bitstream, Series series, int rowOffset) {
 
 		List<Packet> newPackets = new ArrayList<>();
 		for (Packet packet : bitstream.getPackets()) {
 			if (packet.isTypeOnePacket() && (packet.getRegister() == RegisterType.FAR)) {
-				if (verbose) System.out.print("word count " + packet.getWordCount());
 				if (packet.getWordCount() == 1) {
 					int [] data = packet.getData();
 					int blkType = FAR.getBlockType(data[0],series);
-					if (verbose) {
-						System.out.print("  data " + toHexString(data) + " " +Arrays.toString(data));
-						System.out.print("  subblk " + blkType);
-					}
 					int rowAddr = FAR.getRowAddress(data[0], series);
 
 					if ((blkType == 0) || (blkType == 1)) {
@@ -81,9 +75,7 @@ public class RelocateBitstreamByRow {
 						// there is no FAR.setRowAddress()
 						int newData = (data[0] & ~series.getRowMask()) | (newRowAddr << series.getRowLSB());
 						newPackets.add(new Packet(packet.getHeader(), newData));
-						if (verbose) System.out.print("  update row address " + newRowAddr +"\n");
 					} else {
-						if (verbose) System.out.print("  blkType " + blkType + "  no change.\n");
 						newPackets.add(packet);
 					}
 				}
@@ -92,23 +84,7 @@ public class RelocateBitstreamByRow {
 			}
 		}
 
-
 		bitstream.setPackets(newPackets);
-	}
-
-
-	/**
-	 * Format int array into 32-bit hex, eg., return 000cd901 for 841985
-	 *
-	 * @param data int
-	 * @return hex string.
-	 */
-	static private String toHexString(int[] data) {
-		StringBuilder sb = new StringBuilder();
-		for (int i = 0; i < data.length; i++) {
-			sb.append(String.format("%08x ", data[i]));
-		}
-		return sb.toString();
 	}
 
 
@@ -116,10 +92,8 @@ public class RelocateBitstreamByRow {
 	 * Update multiple CRC within a partial bitstream.
 	 * There are two patterns: one that reset CRC computation and one that is not.
 	 * @param target    Bitstream to update CRC for
-	 * @param verbose   Print out information
 	 */
-	public static void updateCRC (Bitstream target, boolean verbose) {
-		if (verbose) {System.out.println("\nbegin updateCRC");}
+	public static void updateCRC (Bitstream target) {
 		// Separating CRC computing out to simplify the code. Can combine with the two loopsreplaceContent if needed.
 		// TODO: update the packets itself to reduce memory usage.
 		List<Packet> newPackets = new ArrayList<>();
@@ -129,7 +103,6 @@ public class RelocateBitstreamByRow {
 			if (packet.isTypeOnePacket() && (packet.getRegister() == RegisterType.CRC) && (packet.getOpCode() == OpCode.WRITE)) {
 				//write to CRC is not included.
 				previousCRCWrite = true;
-				if (verbose) {System.out.println("  CRC " + toHexString(new int[]{ CRCComputer.getCRCValue() }));}
 				newPackets.add(new Packet(packet.getHeader(), CRCComputer.getCRCValue()));
 			} else if (previousCRCWrite && packet.isTypeOnePacket() && (packet.getRegister() == RegisterType.CRC) && (packet.getOpCode() == OpCode.NOP)) {
 				// if CRC NOP is right after CRC WRITE, reset the CRC
@@ -145,7 +118,6 @@ public class RelocateBitstreamByRow {
 		}
 
 		target.setPackets(newPackets);
-		if (verbose) {System.out.println("end updateCRC");}
 	}
 
 
@@ -196,12 +168,10 @@ public class RelocateBitstreamByRow {
 			System.exit(1);
 		}
 
-		long startTime = System.nanoTime();
 
 		String inBit  = null;
 		String outBit = null;
 		int rowOffset = 0;
-		boolean verbose = false;
 		Series series = null;
 
 		// Collect command line arguments
@@ -242,14 +212,19 @@ public class RelocateBitstreamByRow {
 			i++;
 		}
 
+
+		CodePerfTracker t = new CodePerfTracker("Elapsed time", false);
+
 		// Report collected arguments
 		System.out.println("RelocateBitstreamByRow");
 		System.out.println("  -fr " + inBit);
 		System.out.println("  -to " + outBit + " " + rowOffset);
 		if (series != null)
 			System.out.println("  -series " + series.name());
+		System.out.println();
 
 
+		t.start("Read input bitstream");
 		Bitstream bitstream = Bitstream.readBitstream(inBit);
 
 		if (series == null) {
@@ -258,11 +233,15 @@ public class RelocateBitstreamByRow {
 			System.out.println("  -series is not set. The series inferred from " + inBit + " is " + series.name());
 		}
 
-		relocate (bitstream, series, rowOffset, verbose);
-		updateCRC(bitstream, verbose);
+		t.stop().start("Relocate the bitstream");
+		relocate (bitstream, series, rowOffset);
 
+		t.stop().start("Update CRC");
+		updateCRC(bitstream);
+
+		t.stop().start("Write bitstream");
 		bitstream.writeBitstream(outBit);
-		long stopTime = System.nanoTime();
-		System.out.println("\ntook " + (stopTime - startTime)*1e-6 + " ms\ndone.");
+
+		t.stop().printSummary();
 	}
 }

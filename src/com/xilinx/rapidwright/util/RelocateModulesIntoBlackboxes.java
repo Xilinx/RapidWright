@@ -41,15 +41,15 @@ import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
+import com.xilinx.rapidwright.edif.EDIFTools;
 // Need util.Pair to allow compiling outside IDE with only dependent on RapidWright
-import com.xilinx.rapidwright.util.Pair;
-
+import com.xilinx.rapidwright.tests.CodePerfTracker;
 
 
 /**
  * Fill some black boxes of a given design with a specific {@link Module} (DCP) implementation.
  */
-public class RelocateDCPVertically {
+public class RelocateModulesIntoBlackboxes {
 
 
 	/**
@@ -58,10 +58,10 @@ public class RelocateDCPVertically {
 	 * @param top         The design with black boxes to fill
 	 * @param mod         The implementation to fill the black boxes
 	 * @param cellAnchor The reference INT tile used as the handle to {@code mod} parameter
-	 * @param toCells     The list of pairs of a black box cell to be filled and its reference INT tile.
+	 * @param blackboxes The list of pairs of a black box cell to be filled and its reference INT tile.
 	 *                    The x-coordinate of this INT tile must match that of the cellAnchor.
 	 */
-	public static boolean placeModuleInsts(Design top, Module mod, String cellAnchor, List<Pair<String, String>> blackboxes) {
+	public static boolean relocateModuleInsts(Design top, Module mod, String cellAnchor, List<Pair<String, String>> blackboxes) {
 		System.out.println("\n\nRelocate " + mod.getName());
 
 		EDIFNetlist netlist = top.getNetlist();
@@ -75,7 +75,7 @@ public class RelocateDCPVertically {
 		Tile tFrom = top.getDevice().getTile(cellAnchor);
 		System.out.printf("\n     fr %12s                : anchor %14s  %14s\n", cellAnchor, frSite, frTile);
 
-		for (Pair<String, String> cell : toCells) {
+		for (Pair<String, String> cell : blackboxes) {
 			Tile tTo = top.getDevice().getTile(cell.getSecond());
 			if (tFrom.getColumn() != tTo.getColumn()) {
 				System.out.println("Target location of " + cell.getFirst() + ", " + cell.getSecond() +
@@ -84,7 +84,7 @@ public class RelocateDCPVertically {
 			}
 		}
 
-		for (Pair<String, String> cell : toCells) {
+		for (Pair<String, String> cell : blackboxes) {
 			Tile tTo = top.getDevice().getTile(cell.getSecond());
 			int verticalMoveOffset = tFrom.getRow() - tTo.getRow();
 
@@ -107,28 +107,6 @@ public class RelocateDCPVertically {
 
 
 	/**
-	 * Get the corresponding Site of the given SiteInst if the module is relocated.
-	 *
-	 * @param mod        The module to relocate
-	 * @param inst       The SiteInst to relocate
-	 * @param anchorSite The target location of the module anchor.
-	 * @return The corresponding site or null if none is available.
-	 */
-	private static Site getCorrespondingValidSite(Module mod, SiteInst inst, Site anchorSite) {
-		Site site = inst.getSite();
-		Tile newTile = mod.getCorrespondingTile(site.getTile(), anchorSite.getTile());
-		if (newTile == null) {
-			return null;
-		}
-		Site newSite = site.getCorrespondingSite(inst.getSiteTypeEnum(), newTile);
-		if (newSite == null) {
-			return null;
-		}
-		return newSite;
-	}
-
-
-	/**
 	 * Unplace all cells placed at the proposed existing SiteInts.
 	 *
 	 * @param proposedAnchorSite The proposed new anchor site
@@ -142,7 +120,7 @@ public class RelocateDCPVertically {
 				continue;
 			}
 
-			Site newSite = getCorrespondingValidSite(mod, inst, proposedAnchorSite);
+			Site newSite = mod.getCorrespondingSite(inst, proposedAnchorSite);
 
 			SiteInst si = design.getSiteInstFromSite(newSite);
 			if (design != null && si != null) {
@@ -180,13 +158,15 @@ public class RelocateDCPVertically {
 		System.out.println("Combine PIPs on clock nets of " + cellName);
 
 		List<String> clockNets = new ArrayList<>();
+		EDIFNetlist netlist = top.getNetlist();
 
-		for (EDIFPortInst p : top.getNetlist().getCellInstFromHierName(cellName).getPortInsts()) {
+		for (EDIFPortInst p : netlist.getCellInstFromHierName(cellName).getPortInsts()) {
 			if (p.getInternalNet() == null) // unconnected port
 				continue;
 
-			String hierNetName_outside = top.getNetlist().getHierNetFromName(cellName + EDIFTools.EDIF_HIER_SEP + p.getInternalNet().getName()).getHierarchicalNetName();
-			for (EDIFHierNet net : top.getNetlist().getNetAliases(top.getNetlist().getHierNetFromName(hierNetName_outside))) {
+			String hierNetName_outside = netlist.getHierNetFromName(
+					cellName + EDIFTools.EDIF_HIER_SEP + p.getInternalNet().getName()).getHierarchicalNetName();
+			for (EDIFHierNet net : netlist.getNetAliases(netlist.getHierNetFromName(hierNetName_outside))) {
 				String physNetName = net.getHierarchicalNetName();
 				Net physNet = top.getNet(physNetName);
 
@@ -201,7 +181,7 @@ public class RelocateDCPVertically {
 
 		for (String netName : clockNets) {
 			Set<PIP> pips = new HashSet<>();
-			for (EDIFHierNet net : top.getNetlist().getNetAliases(top.getNetlist().getHierNetFromName(netName))) {
+			for (EDIFHierNet net : netlist.getNetAliases(netlist.getHierNetFromName(netName))) {
 				String physNetName = net.getHierarchicalNetName();
 				Net physNet = top.getNet(physNetName);
 				if (physNet != null) {
@@ -209,7 +189,7 @@ public class RelocateDCPVertically {
 				}
 			}
 
-			for (EDIFHierNet net : top.getNetlist().getNetAliases(top.getNetlist().getHierNetFromName(netName))) {
+			for (EDIFHierNet net : netlist.getNetAliases(netlist.getHierNetFromName(netName))) {
 				String physNetName = net.getHierarchicalNetName();
 				Net physNet = top.getNet(physNetName);
 				if (physNet != null) {
@@ -251,33 +231,24 @@ public class RelocateDCPVertically {
 	}
 
 
-	private static String trimExtension(String name) {
-		int idx = name.lastIndexOf('.');
-		if(idx >=0) {
-			return name.substring(0, idx);
-		} else {
-			return name;
-		}
-	}
-
 
 // Example arguments
 /*
-   -in    hwct
-   -from  hwct_rp0           INT_X32Y0
+   -in    hwct.dcp
+   -out   hw_contract_userp0.dcp
+   -from  hwct_rp0.dcp       INT_X32Y0
    -to    hw_contract_rp2    INT_X32Y240
    -to    hw_contract_rp1    INT_X32Y120
    -to    hw_contract_rp0    INT_X32Y0
-   -out   hw_contract_userp0
 */
 
 /*   need to do RP_1 last when RP_1 is the source, otherwise nets of some BUFGCEs become unrouted!
-   -in    openacap_shell_bb
-   -from  AES128_inst_1_RP1     INT_X32Y120
+   -in    openacap_shell_bb.dcp
+   -out   openacap_shell_aes128.dcp
+   -from  AES128_inst_1_RP1.dcp INT_X32Y120
    -to    openacap_shell_i/RP_2 INT_X32Y240
    -to    openacap_shell_i/RP_0 INT_X32Y0
    -to    openacap_shell_i/RP_1 INT_X32Y120
-   -out   openacap_shell_aes128
  */
 
 	public static void main(String[] args) {
@@ -294,8 +265,6 @@ public class RelocateDCPVertically {
 				"Note: If the DCP specified by -form has a corresponding black box in the DCP specified by -in,",
 				"      it can be filled as well and it must be listed as the last -to option.");
 
-
-		long startTime = System.nanoTime();
 
 		String topDCPName  = null;
 		String newDCPName  = null;
@@ -345,8 +314,11 @@ public class RelocateDCPVertically {
 			i++;
 		}
 
+
+		CodePerfTracker t = new CodePerfTracker("Elapsed time", false);
+
 		// Report collected arguments
-		System.out.println("RelocateDCPVertically");
+		System.out.println("RelocateModulesIntoBlackboxes");
 		System.out.println("  -in   " + topDCPName);
 		System.out.println("  -out  " + newDCPName);
 		System.out.println("  -from " + cellDCPName + " " + cellAnchor);
@@ -355,17 +327,16 @@ public class RelocateDCPVertically {
 		}
 		System.out.println();
 
-		topDCPName  = trimExtension(topDCPName);
-		newDCPName  = trimExtension(newDCPName);
-		cellDCPName = trimExtension(cellDCPName);
-
 
 		// Fill the black boxes
-		Design top = Design.readCheckpoint(topDCPName + ".dcp");
-		Module mod = new Module(Design.readCheckpoint(cellDCPName + ".dcp"), false);
+		t.start("Read dcp of the top design");
+		Design top = Design.readCheckpoint(topDCPName);
+		t.stop().start("Read dcp of the module");
+		Module mod = new Module(Design.readCheckpoint(cellDCPName), false);
 
 
-		if (relocateCell(top, mod, cellAnchor, targets)) {
+		t.stop().start("Relocate module instances");
+		if (relocateModuleInsts(top, mod, cellAnchor, targets)) {
 
 			top.getNetlist().resetParentNetMap();
 
@@ -376,15 +347,14 @@ public class RelocateDCPVertically {
 			setPropertyValueInLateXDC (top, "HD.RECONFIGURABLE", "false");
 
 			System.out.println("\n");
-			top.writeCheckpoint(newDCPName + ".dcp");
+			t.stop().start("Write output dcp");
+			top.writeCheckpoint(newDCPName);
 			System.out.println("\n\nFilled " + targets.size() + " target black boxes successfully.\n");
 
 		} else {
 			System.out.println("\n\nFailed to fill all target black boxes.\n");
 		}
 
-		long stopTime = System.nanoTime();
-		System.out.printf("\nElapsed time %3.0f sec.\n\n", (stopTime - startTime)*1e-9);
-
+		t.stop().printSummary();
 	}
 }

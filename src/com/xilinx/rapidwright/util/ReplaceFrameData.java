@@ -36,6 +36,7 @@ import com.xilinx.rapidwright.bitstream.Frame;
 import com.xilinx.rapidwright.bitstream.OpCode;
 import com.xilinx.rapidwright.bitstream.Packet;
 import com.xilinx.rapidwright.bitstream.RegisterType;
+import com.xilinx.rapidwright.tests.CodePerfTracker;
 
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -652,14 +653,14 @@ public class ReplaceFrameData {
 		// Run
 		if (op.equals("extract")) {
 
-			long startExtract = System.nanoTime();
+			CodePerfTracker t = new CodePerfTracker("Time to extract frame data", false);
+
 			ReplaceFrameData extractor = new ReplaceFrameData();
 
-			long startTime = System.nanoTime();
+			t.start("Read bitstream");
 			Bitstream b = Bitstream.readBitstream(inBit);
-			System.out.println("\nread " + inBit + " took " + (System.nanoTime() - startTime) * 1e-6 + " ms.\n");
 
-			startTime = System.nanoTime();
+			t.stop().start("Extract frame data");
 			if (platform == "example_platform") {
 				// TODO: if more platforms are supported, passing platform forward
 				extractor.extractForExamplePlatform(b); // get frame data stored in this.frameData
@@ -668,31 +669,33 @@ public class ReplaceFrameData {
 				// Extract from row 0,1, to be used at row 4,5
 				extractor.incTemplateDataRowIndex(offset);
 			}
-			System.out.println("extract template took " + (System.nanoTime() - startTime) * 1e-6 + " ms.\n");
+			t.stop().start("Save frame data");
 			extractor.save(file);
-			System.out.println("Extraction  took " + (System.nanoTime() - startExtract) * 1e-6 + " ms.\n");
+			t.stop().printSummary();
 
 		} else if (op.equals("replace")) {
 
-			long startReplace = System.nanoTime();
+			CodePerfTracker t = new CodePerfTracker("Time to replace frame data", false);
+
+			t.stop().start("Load frame data");
 			ReplaceFrameData replacer = new ReplaceFrameData();
 			replacer.load(file);
 
-			long startTime = System.nanoTime();
+			t.stop().start("Read input bitstream");
 			Bitstream a = Bitstream.readBitstream(inBit);
-			System.out.println("read " + inBit + " took " + (System.nanoTime() - startTime) * 1e-6 + " ms.\n");
 
-			startTime = System.nanoTime();
+			t.stop().start("Replace frame data");
 			if (platform == "example_platform") {
 				// TODO: if more platforms are supported, passing platform forward
 				replacer.replaceForExamplePlatform(a); // get frame data stored in this.frameData
 			} else {
 				replacer.replace(a, rows, cols);
 			}
-			a.writeBitstream(outBit);
-			System.out.println("replace with template took " + (System.nanoTime() - startTime) * 1e-6 + " ms.\n");
 
-			System.out.println("Replacement  took " + (System.nanoTime() - startReplace) * 1e-6 + " ms.\n");
+			t.stop().start("Write bitstream");
+			a.writeBitstream(outBit);
+
+			t.stop().printSummary();
 		}
 
 	}
