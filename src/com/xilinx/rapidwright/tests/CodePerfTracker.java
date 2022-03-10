@@ -186,10 +186,18 @@ public class CodePerfTracker {
 
 	private void print(String segmentName, Long runtime, Long memUsage, boolean nested){
 		if(isUsingGCCallsToTrackMemory()){
-			System.out.printf("%"+maxSegmentNameSize+"s: %"+maxRuntimeSize+".3fs %"+maxUsageSize+".3fMBs\n", 
-				segmentName,
-				(runtime)/1000000000.0,
-				(memUsage)/(1024.0*1024.0));
+			if (nested) {
+				System.out.printf("%"+maxSegmentNameSize+"s: %"+maxRuntimeSize+"s %" + maxUsageSize + "s      (%" + maxRuntimeSize + ".3fs)\n",
+						segmentName,
+						"",
+						"",
+						(runtime)/1000000000.0);
+			} else {
+				System.out.printf("%"+maxSegmentNameSize+"s: %"+maxRuntimeSize+".3fs %"+maxUsageSize+".3fMBs\n",
+						segmentName,
+						(runtime)/1000000000.0,
+						(memUsage)/(1024.0*1024.0));
+			}
 		} else {
 			if (nested) {
 				System.out.printf("%" + maxSegmentNameSize + "s: %" + maxRuntimeSize + "s  (%" + maxRuntimeSize + ".3fs)\n",
