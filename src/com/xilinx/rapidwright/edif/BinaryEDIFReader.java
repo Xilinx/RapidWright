@@ -37,8 +37,10 @@ import com.xilinx.rapidwright.util.FileTools;
  * A Reader for the RapidWright Binary EDIF Format
  *  
  * Provides a binary alternative to textual EDIF that is ~10-15X smaller and loads 5-10X faster.
- * This is intended as a cached version of text-based EDIF as it cannot be read by Vivado.  One
- * additional tradeoff is that it takes about 2.5-3X longer to write than text-based EDIF.
+ * This is intended as a RapidWright-only cache (with the extension *.bedf) of this text-based
+ * EDIF and cannot be read by Vivado.  One additional tradeoff is that it takes about 2.5-3X
+ * longer to write than text-based EDIF, but it is expected that this binary alternative will
+ * be written once and read many times.
  */
 public class BinaryEDIFReader {
     
