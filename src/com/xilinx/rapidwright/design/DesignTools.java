@@ -835,7 +835,7 @@ public class DesignTools {
 		}
 		inst.getCellType().getLibrary().removeCell(inst.getCellType());
 		netlist.migrateCellAndSubCells(cell.getTopEDIFCell(), true);
-		inst.updateCellType(cell.getTopEDIFCell());
+		inst.setCellType(cell.getTopEDIFCell());
 		netlist.removeUnusedCellsFromAllWorkLibraries();
 		
 		// Add placement information
@@ -1833,9 +1833,6 @@ public class DesignTools {
 			destNetlist.migrateCellAndSubCells(cellInst.getCellType());
 			EDIFHierCellInst bbInst = destNetlist.getHierCellInstFromName(e.getValue());
 			bbInst.getInst().setCellType(cellInst.getCellType());
-            for(EDIFPortInst portInst : bbInst.getInst().getPortInsts()) {
-            	portInst.getPort().setParentCell(cellInst.getCellType());
-            }
 			instsWithSeparator.add(e.getKey() + EDIFTools.EDIF_HIER_SEP);
 		}
 		destNetlist.resetParentNetMap();
