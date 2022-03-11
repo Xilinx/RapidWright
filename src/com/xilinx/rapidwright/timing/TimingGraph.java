@@ -22,6 +22,7 @@ package com.xilinx.rapidwright.timing;
 
 import java.io.FileNotFoundException;
 import java.io.PrintStream;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -55,6 +56,7 @@ import com.xilinx.rapidwright.edif.EDIFPropertyValue;
 import com.xilinx.rapidwright.rwroute.Connection;
 import com.xilinx.rapidwright.rwroute.RouterHelper;
 import com.xilinx.rapidwright.util.Pair;
+import com.xilinx.rapidwright.util.RuntimeTracker;
 import com.xilinx.rapidwright.util.RuntimeTrackerTree;
 
 import org.jgrapht.GraphPath;
@@ -152,8 +154,15 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         }
         String seriesName = design.getDevice().getSeries().name().toLowerCase();
         intrasiteAndLogicDelayModel = DelayModelBuilder.getDelayModel(seriesName);
-          
-        if(this.routerTimer != null) this.routerTimer.createRuntimeTracker("determine logic dly", "build timing graph").start();
+
+        if(isPartialRouting) {
+            // TODO: Find the fan-in and fan-out net cone of targetNets necessary
+            //       in order to reach all its timing start-/end-points
+        }
+
+        if(this.routerTimer != null) {
+            this.routerTimer.createRuntimeTracker("determine logic dly", "build timing graph").start();
+        }
         myCellMap = design.getNetlist().generateCellInstMap();
         if(!isPartialRouting) {
         	determineLogicDelaysFromEDIFCellInsts(this.myCellMap);
@@ -163,12 +172,11 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         if(this.routerTimer != null) this.routerTimer.getRuntimeTracker("determine logic dly").stop();
         
         if(this.routerTimer != null) this.routerTimer.createRuntimeTracker("add net dly edges", "build timing graph").start();
-        for (Net net : this.design.getNets()) {
+
+        for (Net net : targetNets) {
             if(net.isClockNet()) continue;//this is for getting rid of the problem in addNetDelayEdges() of clock net
             if(net.isStaticNet()) continue;
-            if(!isPartialRouting || !net.hasPIPs()) {
-            	addNetDelayEdges(net);
-            }
+            addNetDelayEdges(net);
         }
         
         this.addTimingEdgesOfNets(isPartialRouting, targetNets);
@@ -1981,7 +1989,8 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
 			}
 			EDIFHierPortInst hportSink = hportsFromSitePinInsts.get(0);
 			SitePinInst mappedSink = this.edifHPortMap.get(hportSink);
-			
+			assert(mappedSink == connection.getSink());
+
 			List<TimingEdge> timingEdges = this.sinkSitePinInstTimingEdges.get(mappedSink);
 			if(timingEdges == null) {
 				throw new RuntimeException("ERROR: No timing edges for connection from: " + connection.getSource() + " to " + connection.getSink());

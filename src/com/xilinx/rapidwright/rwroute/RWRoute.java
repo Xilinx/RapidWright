@@ -35,6 +35,7 @@ import java.util.Map.Entry;
 import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
@@ -216,8 +217,13 @@ public class RWRoute{
 		if(config.isTimingDriven()) {
 			ClkRouteTiming clkTiming = createClkTimingData(config);
 			routesToSinkINTTiles = clkTiming == null? null : clkTiming.getRoutesToSinkINTTiles();
-			timingManager = new TimingManager(design, true, routerTimer, config, clkTiming,
-				config.isResolveConflictNets() ? conflictNets : design.getNets());
+			Collection<Net> timingNets;
+			if (config.isResolveConflictNets()) {
+				timingNets = conflictNets;
+			} else {
+				timingNets = indirectConnections.stream().map((c) -> c.getNetWrapper().getNet()).collect(Collectors.toSet());
+			}
+			timingManager = new TimingManager(design, true, routerTimer, config, clkTiming, timingNets);
 			timingManager.setTimingEdgesOfConnections(indirectConnections);
 		}
 		
@@ -1739,6 +1745,14 @@ public class RWRoute{
 	 */
 	public static Design routeDesignPartialNonTimingDriven(Design design) {
 		return routeDesign(design, new RWRouteConfig(new String[] {"--partialRouting", "--fixBoundingBox", "--nonTimingDriven", "--verbose"}));
+	}
+
+	/**
+	 * Routes a design in the partial timing-driven routing mode.
+	 * @param design The {@link Design} instance to be routed.
+	 */
+	public static Design routeDesignPartialTimingDriven(Design design) {
+		return routeDesign(design, new RWRouteConfig(new String[] {"--partialRouting", "--fixBoundingBox", "--verbose"}));
 	}
 	
 	/**
