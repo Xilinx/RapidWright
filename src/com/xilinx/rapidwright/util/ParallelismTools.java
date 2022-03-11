@@ -59,7 +59,7 @@ public class ParallelismTools {
     static {
         String value = System.getenv(RW_PARALLEL);
         if(value != null) {
-            setParallel((value.equals("0") || value.toLowerCase().equals("false")) ? false : true);
+            setParallel(!(value.equals("0") || value.toLowerCase().equals("false")));
         }
     }
 
