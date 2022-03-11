@@ -149,6 +149,10 @@ public class TestRelocationTools {
     @MethodSource()
     @CheckOpenFiles
     public void testPicoblaze4OOC(String instanceName, int colOffset, int rowOffset, boolean expectSuccess) {
+
+        // NOTE: Picoblaze4OOC, unlike PicoblazeOOC, has already had its static nets
+        //       unrouted on creation.
+
         Design design1 = Design.readCheckpoint(Picoblaze4OOCdcp, CodePerfTracker.SILENT);
 
         Assertions.assertEquals(RelocationTools.relocate(design1, instanceName, colOffset, rowOffset),
