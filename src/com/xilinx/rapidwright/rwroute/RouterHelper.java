@@ -191,7 +191,7 @@ public class RouterHelper {
 	 * @return A list of PIPs for the connection.
 	 */
 	public static List<PIP> getConnectionPIPs(Connection connection){
-		return getPIPsFromListOfReversedNodes(connection.getNodes());
+		return getPIPsFromNodes(connection.getNodes());
 	}
 	
 	/**
@@ -199,13 +199,13 @@ public class RouterHelper {
 	 * @param connectionNodes The list of nodes of a routed {@link Connection} instance.
 	 * @return A list of PIPs generated from the list of nodes.
 	 */
-	public static List<PIP> getPIPsFromListOfReversedNodes(List<Node> connectionNodes){
+	public static List<PIP> getPIPsFromNodes(List<Node> connectionNodes){
 		List<PIP> connectionPIPs = new ArrayList<>();
 		if(connectionNodes == null) return connectionPIPs;
 		// Nodes of a connection are added to the list starting from its sink to its source
-		for(int i = connectionNodes.size() -1; i > 0; i--){
+		for(int i = 0; i < connectionNodes.size() - 1; i++) {
 			Node driver = connectionNodes.get(i);
-			Node load = connectionNodes.get(i-1);		
+			Node load = connectionNodes.get(i+1);
 			PIP pip = findPIPbetweenNodes(driver, load);	
 			if(pip != null){
 				connectionPIPs.add(pip);

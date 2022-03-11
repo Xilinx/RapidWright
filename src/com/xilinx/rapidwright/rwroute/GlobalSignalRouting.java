@@ -82,12 +82,10 @@ public class GlobalSignalRouting {
 		Map<String, RouteNode> horDistributionLines = new HashMap<>();
 		
 		for(List<Node> nodes : dstINTtilePaths.values()) {
-			Collections.reverse(nodes); // HDISTR to CLK_OUT
-			Node hDistr = nodes.get(0);
+			clkPIPs.addAll(RouterHelper.getPIPsFromNodes(nodes));
+
+			Node hDistr = nodes.get(nodes.size() - 1);
 			RouteNode hdistr = new RouteNode(hDistr.getTile(), hDistr.getWire());
-			
-			clkPIPs.addAll(RouterHelper.getPIPsFromListOfReversedNodes(nodes));
-			
 			horDistributionLines.put(getDominateClockRegionOfNode(hDistr), hdistr);
 		}
 		clk.setPIPs(clkPIPs);
@@ -349,7 +347,6 @@ public class GlobalSignalRouting {
 						if(debug) System.out.println("  " + routingNode.toString());
 						routingNode = routingNode.getPrev();
 					}
-					Collections.reverse(pathNodes);
 					sinkPathNodes.put(sink, pathNodes);
 					if(debug){
 						for(Node pathNode:pathNodes){
@@ -383,7 +380,7 @@ public class GlobalSignalRouting {
 		}
 		
 		for(List<Node> nodes:sinkPathNodes.values()){
-			netPIPs.addAll(RouterHelper.getPIPsFromListOfReversedNodes(nodes));
+			netPIPs.addAll(RouterHelper.getPIPsFromNodes(nodes));
 		}
 		
 		currNet.setPIPs(netPIPs);
