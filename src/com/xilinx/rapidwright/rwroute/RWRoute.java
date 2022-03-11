@@ -399,6 +399,9 @@ public class RWRoute{
 	 * Routes static nets with preserved resources list supplied to avoid conflicting nodes.
 	 */
 	private void routeStaticNets(){
+		if (staticNetAndRoutingTargets.isEmpty())
+			return;
+
 		for(List<SitePinInst> netRouteTargetPins : staticNetAndRoutingTargets.values()) {
 			for(SitePinInst sink : netRouteTargetPins) {
 				preservedNodes.remove(sink.getConnectedNode());
