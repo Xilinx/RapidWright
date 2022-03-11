@@ -31,7 +31,6 @@ import java.util.Set;
 import java.util.stream.Stream;
 import java.util.stream.Collectors;
 
-import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.support.CheckOpenFiles;
 import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.design.tools.RelocationTools;
@@ -76,7 +75,7 @@ public class TestRelocationTools {
                 for (SiteInst si : mi.getSiteInsts()) {
                     for (Cell c2 : si.getCells()) {
                         Cell c1 = design1.getCell(c2.getName());
-                        if (c1 == null && c2.getName().startsWith(mi.getName() + EDIFTools.EDIF_HIER_SEP)) {
+                        if (c1 == null && c2.getName().startsWith(mi.getName() + "/")) {
                             // Retry without ModuleInst hierarchy in case it was flattened
                             c1 = design1.getCell(c2.getName().substring(mi.getName().length() + 1));
                         }
@@ -87,9 +86,13 @@ public class TestRelocationTools {
 
                 for (Net n2 : mi.getNets()) {
                     Net n1 = design1.getNet(n2.getName());
-                    if (n1 == null && n2.getName().startsWith(mi.getName() + EDIFTools.EDIF_HIER_SEP)) {
+                    if (n1 == null && n2.getName().startsWith(mi.getName() + "/")) {
                         // Retry without ModuleInst hierarchy in case it was flattened
                         n1 = design1.getNet(n2.getName().substring(mi.getName().length() + 1));
+                    }
+                    if (n1 == null && (n2.isStaticNet() || n2.getName() == Net.USED_NET)) {
+                        // Module relocation does not propagate static nets nor USED_NETs
+                        continue;
                     }
                     Assertions.assertNotNull(n1);
 
@@ -101,14 +104,7 @@ public class TestRelocationTools {
 
                     Set<PIP> p1 = new HashSet<>(n1.getPIPs());
                     Set<PIP> p2 = new HashSet<>(n2.getPIPs());
-                    if (!n1.isStaticNet()) {
-                        Assertions.assertEquals(p1, p2);
-                    } else {
-                        // For static nets, ModuleInst.place() will merge its
-                        // static PIPs into the parent Design's static net, so
-                        // check that it is contained within
-                        Assertions.assertTrue(p1.containsAll(p2));
-                    }
+                    Assertions.assertEquals(p1, p2);
                 }
             }
         }
