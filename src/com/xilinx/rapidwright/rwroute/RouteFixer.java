@@ -63,16 +63,15 @@ public class RouteFixer{
 				Routable nextRnode = rnodesCreated.get(next);
 				float currDly = currRnode == null? 0f : currRnode.getDelay();
 				float nextDly = nextRnode == null? 0f : nextRnode.getDelay();
-				
-				NodeWithDelay newCur = nodeMap.containsKey(cur) ? nodeMap.get(cur) : new NodeWithDelay(vertexId++, cur, currDly);
-				NodeWithDelay newNext = nodeMap.containsKey(next) ? nodeMap.get(next) : new NodeWithDelay(vertexId++, next, nextDly);
-				nodeMap.put(cur, newCur);
-				nodeMap.put(next, newNext);
-				
+
+				NodeWithDelay newCur = nodeMap.computeIfAbsent(cur, (k) -> new NodeWithDelay(vertexId++, cur, currDly));
+				NodeWithDelay newNext = nodeMap.computeIfAbsent(next, (k) -> new NodeWithDelay(vertexId++, next, nextDly));
 				if(i == 1) {
 					newNext.setSink(true);
 				}
-				if(i == vertexSize - 1) source = newCur;
+				if(i == vertexSize - 1) {
+					source = newCur;
+				}
 				newCur.addChildren(newNext);
 			}
 		}

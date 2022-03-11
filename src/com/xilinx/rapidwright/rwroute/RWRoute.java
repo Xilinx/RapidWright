@@ -384,7 +384,7 @@ public class RWRoute{
 			for(SitePinInst sink : sinks) {
 				addReservedNode(sink.getConnectedNode(), staticNet);
 			}
-			staticNetAndRoutingTargets.put(staticNet, sinks);
+			addStaticNetRoutingTargets(staticNet, sinks);
 		}else {
 			preserveNet(staticNet);
 			numNotNeedingRoutingNets++;	
@@ -535,13 +535,7 @@ public class RWRoute{
 	 * @param connection A connection of which span info is to be added.
 	 */
 	private void addConnectionSpanInfo(Connection connection) {
-		Integer counter = connectionSpan.get(connection.getHpwl());
-		if(counter == null) {
-			counter = 1;
-		}else {
-			counter += 1;
-		}
-		connectionSpan.put(connection.getHpwl(), counter);
+		connectionSpan.merge(connection.getHpwl(), 1, Integer::sum);
 	}
 	
 	/**
@@ -556,10 +550,10 @@ public class RWRoute{
 	}
 	
 	protected void addReservedNode(Node node, Net netToPreserve) {
-		Net reserved = preservedNodes.get(node);
-		if(reserved == null) {
-			preservedNodes.put(node, netToPreserve);
-		}else if(reserved.getSource() != null && netToPreserve.getSource() != null && !reserved.getName().equals(netToPreserve.getName())){
+		Net reserved = preservedNodes.putIfAbsent(node, netToPreserve);
+		if (reserved == null)
+			return;
+		if (reserved.getSource() != null && netToPreserve.getSource() != null && !reserved.getName().equals(netToPreserve.getName())){
 			boolean generateWarning = conflictNets.size() < 5;
 			EDIFNet reservedLogical = reserved.getLogicalNet();
 			EDIFNet toReserveLogical = netToPreserve.getLogicalNet();
@@ -602,18 +596,18 @@ public class RWRoute{
 	 * @return The created {@link RoutableNode} instance.
 	 */
 	private Routable createAddRoutableNode(SitePinInst sitePinInst, Node node, RoutableType type){
-		Routable rnode = rnodesCreated.get(node);
-		if(rnode == null){
-			// this is for initializing sources and sinks of those to-be-routed nets's connections
-			rnode = new RoutableNode(rnodeId++, node, type);
-			rnodesCreated.put(rnode.getNode(), rnode);
-		}else{
-			// this is for checking preserved routing resource conflicts among routed nets */
-			if(rnode.getRoutableType() == type && type == RoutableType.PINFEED_I) {
-				System.out.println("WARNING: Conflicting node: " + node + ", connected to sink " + sitePinInst);
+		return rnodesCreated.compute(node, (k,rnode) -> {
+			if(rnode == null){
+				// this is for initializing sources and sinks of those to-be-routed nets' connections
+				rnode = new RoutableNode(rnodeId++, node, type);
+			}else{
+				// this is for checking preserved routing resource conflicts among routed nets */
+				if(rnode.getRoutableType() == type && type == RoutableType.PINFEED_I) {
+					System.out.println("WARNING: Conflicting node: " + node + ", connected to sink " + sitePinInst);
+				}
 			}
-		}
-		return rnode;
+			return rnode;
+		});
 	}
 	
 	/**
@@ -1180,10 +1174,7 @@ public class RWRoute{
 		Map<PIP, Set<Net>> pipsUsage = new HashMap<>();
 		for(Net net : design.getNets()){
 			for(PIP pip:net.getPIPs()){
-				Set<Net> users = pipsUsage.get(pip);
-				if(users == null) users = new HashSet<>();
-				users.add(net);
-				pipsUsage.put(pip, users);
+				pipsUsage.computeIfAbsent(pip, (k) -> new HashSet<>()).add(net);
 			}
 		}
 		int pipsError = 0;
