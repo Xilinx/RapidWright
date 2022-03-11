@@ -653,7 +653,7 @@ public class ReplaceFrameData {
 		// Run
 		if (op.equals("extract")) {
 
-			CodePerfTracker t = new CodePerfTracker("Time to extract frame data", false);
+			CodePerfTracker t = new CodePerfTracker("Elapsed time", false);
 
 			ReplaceFrameData extractor = new ReplaceFrameData();
 
@@ -675,9 +675,9 @@ public class ReplaceFrameData {
 
 		} else if (op.equals("replace")) {
 
-			CodePerfTracker t = new CodePerfTracker("Time to replace frame data", false);
+			CodePerfTracker t = new CodePerfTracker("Elapsed time", false);
 
-			t.stop().start("Load frame data");
+			t.start("Load frame data");
 			ReplaceFrameData replacer = new ReplaceFrameData();
 			replacer.load(file);
 
