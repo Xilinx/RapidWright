@@ -24,6 +24,7 @@ package com.xilinx.rapidwright.util;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -42,7 +43,6 @@ import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFTools;
-// Need util.Pair to allow compiling outside IDE with only dependent on RapidWright
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 
 
@@ -231,6 +231,13 @@ public class RelocateModulesIntoBlackboxes {
 	}
 
 
+	// TODO: replace this with a more concise version
+	public static int indexOf(ArrayList<Pair<String,String>> targets, String word) {
+		for (int i = 0; i < targets.size(); i++)
+			if (targets.get(i).getSecond().equals(word))
+				return i;
+		return -1;
+	}
 
 // Example arguments
 /*
@@ -260,20 +267,18 @@ public class RelocateModulesIntoBlackboxes {
 				"        <a reference interconnect tile, eg., INT_X32Y0>",
 				"  -to   <a full hierarchical name to a black box in the DCP specified by -in>",
 				"        <a reference interconnect tile, eg., INT_X32Y120>",
-				"  -to   <can be repeated as many as the number of black boxes to fill>",
-				"",
-				"Note: If the DCP specified by -form has a corresponding black box in the DCP specified by -in,",
-				"      it can be filled as well and it must be listed as the last -to option.");
+				"  -to   <can be repeated as many as the number of black boxes to fill>");
 
 
-		String topDCPName  = null;
-		String newDCPName  = null;
+		String topDCPName = null;
+		String newDCPName = null;
 		String cellDCPName = null;
-		String cellAnchor  = null;
-		List<Pair<String,String>> targets = new ArrayList<>();
+		String cellAnchor = null;
+		// Need random access to the list
+		ArrayList<Pair<String, String>> targets = new ArrayList<>();
 
 		String toCell = null;
-		String toLoc  = null;
+		String toLoc = null;
 
 		// Collect command line arguments
 		int i = 0;
@@ -283,22 +288,26 @@ public class RelocateModulesIntoBlackboxes {
 					System.out.println(usage);
 					System.exit(0);
 					break;
-				case "-in":   topDCPName = args[++i];
+				case "-in":
+					topDCPName = args[++i];
 					break;
-				case "-out":  newDCPName = args[++i];
+				case "-out":
+					newDCPName = args[++i];
 					break;
-				case "-from": cellDCPName = args[++i];
+				case "-from":
+					cellDCPName = args[++i];
 					if (i < args.length) {
-						cellAnchor  = args[++i];
+						cellAnchor = args[++i];
 					} else {
 						System.out.println("Missing value for option -from.");
 						System.out.println(usage);
 						System.exit(1);
 					}
 					break;
-				case "-to":   toCell  = args[++i];
+				case "-to":
+					toCell = args[++i];
 					if (i < args.length) {
-						toLoc   = args[++i];
+						toLoc = args[++i];
 						targets.add(new Pair<>(toCell, toLoc));
 					} else {
 						System.out.println("Missing value for option -to");
@@ -306,12 +315,21 @@ public class RelocateModulesIntoBlackboxes {
 						System.exit(1);
 					}
 					break;
-				default:      System.out.println("Invalid option " + args[i] + " found.");
+				default:
+					System.out.println("Invalid option " + args[i] + " found.");
 					System.out.println(usage);
 					System.exit(1);
 					break;
 			}
 			i++;
+		}
+
+
+		int idx = indexOf(targets, cellAnchor);
+        if (idx >= 0) {
+        	// Make the blackbox whose reference INT tile the same as the implementation as the last to be copied.
+			// Otherwise some nets become unrouted!
+			Collections.swap(targets, idx, targets.size()-1);
 		}
 
 
