@@ -24,7 +24,6 @@
 package com.xilinx.rapidwright.rwroute;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -107,12 +106,7 @@ public class GlobalSignalRouting {
 		for(Entry<String, RouteNode> crRouteNode : crDistLines.entrySet()) {
 			String crName = crRouteNode.getKey();
 			ClockRegion cr = dev.getClockRegion(crName);
-			Set<RouteNode> routeNodes = startingPoints.get(cr);
-			if(routeNodes == null){
-				routeNodes = new HashSet<>();
-				startingPoints.put(cr, routeNodes);
-			}
-			routeNodes.add(crRouteNode.getValue());
+			startingPoints.computeIfAbsent(cr, (k) -> new HashSet<>()).add(crRouteNode.getValue());
 		}
 		return startingPoints;
 	}
@@ -126,13 +120,7 @@ public class GlobalSignalRouting {
 			if(cr == null) {
 				continue;
 			}
-			Integer count = crCounts.get(cr.getName());
-			if(count == null) {
-				count = 1;
-			}else {
-				count++;
-			}
-			crCounts.put(cr.getName(), count);
+			crCounts.merge(cr.getName(), 1, Integer::sum);
 		}
 		
 		String dominate = null;
@@ -261,15 +249,10 @@ public class GlobalSignalRouting {
 					}
 				}
 			}
-			
-			RouteNode rn = n != null? new RouteNode(n.getTile(), n.getWire()):null;
-			if(rn == null) throw new RuntimeException("ERROR: No mapped LCB to SitePinInst " + p);
-			ArrayList<SitePinInst> sinks = lcbMappings.get(rn);
-			if(sinks == null){
-				sinks = new ArrayList<>();
-				lcbMappings.put(rn, sinks);
-			}
-			sinks.add(p);	
+
+			if(n == null) throw new RuntimeException("ERROR: No mapped LCB to SitePinInst " + p);
+			RouteNode rn = new RouteNode(n.getTile(), n.getWire());
+			lcbMappings.computeIfAbsent(rn, (k) -> new ArrayList<>()).add(p);
 		}
 		
 		return lcbMappings;

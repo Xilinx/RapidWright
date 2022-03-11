@@ -411,23 +411,10 @@ public class RouterHelper {
 	 * @param typeUsage The map between each node type and the number of used nodes for the node type.
 	 * @param typeLength The map between each node type and the total wirelength of used nodes for the node type.
 	 */
-	public static void addNodeTypeLengthToMap(Node node, int wlNode, Map<IntentCode, Long> typeUsage, Map<IntentCode, Long> typeLength) {
+	public static void addNodeTypeLengthToMap(Node node, long wlNode, Map<IntentCode, Long> typeUsage, Map<IntentCode, Long> typeLength) {
 		IntentCode ic = node.getIntentCode();
-		Long counter = typeUsage.get(ic);
-		if(counter == null) {
-			counter = (long) 1;
-		}else {
-			counter++;
-		}
-		typeUsage.put(ic, counter);
-		
-		Long length = typeLength.get(ic);
-		if(length == null) {
-			length = (long) wlNode;
-		}else {
-			length += wlNode;
-		}
-		typeLength.put(ic, length);
+		typeUsage.merge(ic, 1L, Long::sum);
+		typeLength.merge(ic, wlNode, Long::sum);
 	}	
 	
 	/**
