@@ -90,10 +90,6 @@ public class TestRelocationTools {
                         // Retry without ModuleInst hierarchy in case it was flattened
                         n1 = design1.getNet(n2.getName().substring(mi.getName().length() + 1));
                     }
-                    if (n1 == null && (n2.isStaticNet() || n2.getName() == Net.USED_NET)) {
-                        // Module relocation does not propagate static nets nor USED_NETs
-                        continue;
-                    }
                     Assertions.assertNotNull(n1);
 
                     if (n1.isClockNet() || n1.hasGapRouting()) {
@@ -123,7 +119,7 @@ public class TestRelocationTools {
         String metaPath = RapidWrightDCP.getString("picoblaze_ooc_X10Y235.metadata");
         if (instanceName.isEmpty()) {
             Design design2 = new Design("design2", design1.getPartName());
-            Module module = new Module(Design.readCheckpoint(dcpPath, CodePerfTracker.SILENT), metaPath);
+            Module module = new Module(Design.readCheckpoint(dcpPath, CodePerfTracker.SILENT), metaPath, false);
             ModuleInst mi = design2.createModuleInst("inst", module);
             mi.placeOnOriginalAnchor();
             Collection<ModuleInst> moduleInsts = Arrays.asList(mi);
@@ -153,6 +149,10 @@ public class TestRelocationTools {
     @MethodSource()
     @CheckOpenFiles
     public void testPicoblaze4OOC(String instanceName, int colOffset, int rowOffset, boolean expectSuccess) {
+
+        // NOTE: Picoblaze4OOC, unlike PicoblazeOOC, has already had its static nets
+        //       unrouted on creation.
+
         Design design1 = Design.readCheckpoint(Picoblaze4OOCdcp, CodePerfTracker.SILENT);
 
         Assertions.assertEquals(RelocationTools.relocate(design1, instanceName, colOffset, rowOffset),

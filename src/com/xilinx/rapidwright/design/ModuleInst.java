@@ -351,15 +351,13 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 				net.addPIP(newPip);
 			}
 
+			// Because only one VCC/GND net is allowed for each Design,
+			// this net is just a placeholder for module-specific PIPs
+			// (that were relocated above) -- add those to Design's
+			// singleton net here
 			if (templateNet.isStaticNet()) {
 				Net designNet = design.getNet(templateNet.getName());
-				if (designNet == null) {
-					designNet = new Net(templateNet.getName(), templateNet.getType());
-					design.addNet(designNet);
-				}
-
 				designNet.getPIPs().addAll(net.getPIPs());
-				designNet.getPins().addAll(net.getPins());
 			}
 		}
 		return true;
@@ -375,6 +373,10 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 		}
 		//unplace nets (remove pips)
 		for(Net net : nets){
+			// Because only one VCC/GND net is allowed for each Design,
+			// this net is just a placeholder for any module-specific PIPs
+			// that would have been inserted into Design's static net, so
+			// surgically remove those here
 			if (net.isStaticNet()) {
 				Net templateNet = net.getModuleTemplateNet();
 				Net designNet = design.getNet(templateNet.getName());
@@ -382,10 +384,6 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 				HashSet<PIP> pips = new HashSet<>(net.getPIPs());
 				designNet.getPIPs().removeIf((p) -> pips.remove(p));
 				assert(pips.isEmpty());
-
-				HashSet<SitePinInst> pins = new HashSet<>(net.getPins());
-				designNet.getPins().removeIf((p) -> pins.remove(p));
-				assert(pins.isEmpty());
 			}
 
 			net.getPIPs().clear();
