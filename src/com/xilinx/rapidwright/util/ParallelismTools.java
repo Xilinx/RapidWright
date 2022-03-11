@@ -50,11 +50,18 @@ import java.util.concurrent.TimeUnit;
  */
 public class ParallelismTools {
     /**
-     * Name of the environment variable to enable parallel processing
+     * Name of the environment variable to disable parallel processing, set RW_PARALLEL=0 to disable
      */
     public static final String RW_PARALLEL = "RW_PARALLEL";
 
-    private static boolean parallel = System.getenv(RW_PARALLEL) != null;
+    private static boolean parallel = true;
+    
+    static {
+        String value = System.getenv(RW_PARALLEL);
+        if(value != null) {
+            setParallel((value.equals("0") || value.toLowerCase().equals("false")) ? false : true);
+        }
+    }
 
     /** A fixed-size thread pool with as many threads as there are processors
      * minus one, fed by a single task queue */
