@@ -1,6 +1,8 @@
 package com.xilinx.rapidwright.rwroute;
 
+import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import com.xilinx.rapidwright.design.Design;
@@ -60,6 +62,29 @@ public class TestRWRoute {
 	public void testNonTimingDrivenPartialRouting() {
 		String dcpPath = RapidWrightDCP.getString("picoblaze_partial.dcp");
 		Design design = Design.readCheckpoint(dcpPath);
+		// TODO: Not necessary when XDEF#92 is fixed
+		for (Net net : design.getNets()) {
+			if (!net.hasPIPs()) continue;
+			net.getPins().forEach((spi) -> spi.setRouted(true));
+		}
 		RWRoute.routeDesignPartialNonTimingDriven(design);
+	}
+
+	/**
+	 * Tests timing driven partial routing.
+	 * The picoblaze design is from one of the RapidWright tutorials with nets between computing kernels not routed.
+	 * Other nets within each kernel are fully routed.
+	 */
+	@Test
+	@Disabled("Blocked on TimingGraph.build() being able to build partial graphs")
+	public void testTimingDrivenPartialRouting() {
+		String dcpPath = RapidWrightDCP.getString("picoblaze_partial.dcp");
+		Design design = Design.readCheckpoint(dcpPath);
+		// TODO: Not necessary when XDEF#92 is fixed
+		for (Net net : design.getNets()) {
+			if (!net.hasPIPs()) continue;
+			net.getPins().forEach((spi) -> spi.setRouted(true));
+		}
+		RWRoute.routeDesignPartialTimingDriven(design);
 	}
 }
