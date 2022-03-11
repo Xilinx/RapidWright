@@ -359,11 +359,11 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
 	 * @param view the view to set
 	 */
 	public void setView(String view) {
-		this.view = new EDIFName(view);
+		setView(new EDIFName(view));
 	}
 	
 	public void setView(EDIFName view) {
-		this.view = view;
+		this.view = DEFAULT_VIEW.equals(view) ? DEFAULT_VIEW : view;
 	}
 	
 	public Collection<EDIFPort> getPorts(){

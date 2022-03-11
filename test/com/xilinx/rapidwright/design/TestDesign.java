@@ -11,7 +11,6 @@ import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
-import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.util.ParallelismTools;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
