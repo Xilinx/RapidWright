@@ -146,15 +146,15 @@ public class RWRouteConfig {
 				break;
 			case "--enlargeBoundingBox":
 				if(i+1 < arguments.length && (!arguments[i+1].startsWith("--extensionYIncrement") && !arguments[i+1].startsWith("--extensionXIncrement"))) {
-					System.out.println("WARNING: --enlargeBoundingBox option is not followed by --extensionYIncrement <arg> or --extensionXIncrement <arg>.");
-					System.out.println("         Use default settings: extensionYIncrement = 2, extensionXIncrement = 1.");
+					System.out.println("INFO: --enlargeBoundingBox option is specified without being followed by --extensionYIncrement <arg> or --extensionXIncrement <arg>.");
+					System.out.println("         Default settings are used: extensionYIncrement = 2, extensionXIncrement = 1.");
 				}
 				setEnlargeBoundingBox(true);
 				break;
 			case "--fixBoundingBox":
 				if(i+1 < arguments.length && (!arguments[i+1].startsWith("--boundingBoxExtensionX") && !arguments[i+1].startsWith("--boundingBoxExtensionY"))) {
-					System.out.println("WARNING: --fixBoundingBox option is not followed by --boundingBoxExtensionX <arg> or --boundingBoxExtensionY <arg>.");
-					System.out.println("         Use default settings: boundingBoxExtensionX = 3, boundingBoxExtensionY = 15.");
+					System.out.println("INFO: --fixBoundingBox option is specified without being followed by --boundingBoxExtensionX <arg> or --boundingBoxExtensionY <arg>.");
+					System.out.println("         Default settings are used: boundingBoxExtensionX = 3, boundingBoxExtensionY = 15.");
 				}
 				setEnlargeBoundingBox(false);
 				break;

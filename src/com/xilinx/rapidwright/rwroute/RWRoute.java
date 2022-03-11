@@ -45,7 +45,6 @@ import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
-import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.util.MessageGenerator;
 import com.xilinx.rapidwright.util.Pair;
@@ -849,10 +848,10 @@ public class RWRoute{
 			criticalConnections.sort(new Comparator<Connection>() {
 				@Override
 				public int compare(Connection connection1, Connection connection2) {
-					return connection1.getCriticality() < connection1.getCriticality()? 1 : -1;
+					return Float.compare(connection2.getCriticality(),connection1.getCriticality());
 				}});
 			minRerouteCriticality = criticalConnections.get(maxNumberOfCriticalConnections).getCriticality();
-    	}
+		}
 	}
 	
 	/**
