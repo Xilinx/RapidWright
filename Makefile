@@ -18,8 +18,4 @@ $(CLASSES): $(SOURCES) $(JARFILES)
 	echo "export CLASSPATH=`pwd`/bin:$(shell echo `pwd`/jars/*.jar | tr ' ' ':')" > $(BIN)/rapidwright_classpath.sh
 
 update_jars:
-	rm -rf jars
-	echo $(JARS_LINK) | wget -qi -
-	unzip rapidwright_jars.zip
-	rm jars/qtjambi-win64-msvc2005x64-4.5.2_01.jar rapidwright_jars.zip
-	make -C . compile
+	./gradlew update_jars
