@@ -210,7 +210,7 @@ public class RouterHelper {
 			if(pip != null){
 				connectionPIPs.add(pip);
 			}else{
-				System.err.println("ERROR: Null PIP connecting these two nodes: " + driver.toString() + ", " + load.toString());
+				System.err.println("ERROR: Null PIP connecting these two nodes: " + driver+ ", " + load);
 			}
 		}
 		return connectionPIPs;
@@ -259,7 +259,6 @@ public class RouterHelper {
 	 * @return The PIP from the driver node to the load node.
 	 */
 	public static PIP getPIP(Node driver, Node load) {
-		PIP pip = null;
 		for(PIP p : driver.getAllDownhillPIPs()) {
 			if(p.getEndNode().equals(load))
 				return p;
@@ -268,7 +267,7 @@ public class RouterHelper {
 			if(p.getStartNode().equals(load))
 				return p;
 		}
-		return pip;
+		return null;
 	}
 	
 	/**
@@ -498,7 +497,7 @@ public class RouterHelper {
 	public static boolean routeDirectConnection(Connection directConnection){
 		directConnection.newNodes();
 		directConnection.setNodes(findPathBetweenNodes(directConnection.getSource().getConnectedNode(), directConnection.getSink().getConnectedNode()));
-		return directConnection.getNodes() != null? true : false;
+		return directConnection.getNodes() != null;
 	}
 	
 	/**
@@ -541,7 +540,6 @@ public class RouterHelper {
 			}
 			watchdog--;
 			if(watchdog < 0) {
-				success = false;
 				break;
 			}	
 		}

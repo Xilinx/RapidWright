@@ -641,8 +641,8 @@ public class RWRouteConfig {
 	 */
 	public void setPartialRouting(boolean partialRouting) {
 		this.partialRouting = partialRouting;
-		if(this.partialRouting == false) return;
-		if(enlargeBoundingBox == false) {
+		if(!this.partialRouting) return;
+		if(!enlargeBoundingBox) {
 			// when enlargeBoundingBox is not set, use the default parameters as default
 			// can be overridden later if there are corresponding options included in the arguments
 			enlargeBoundingBox = true;

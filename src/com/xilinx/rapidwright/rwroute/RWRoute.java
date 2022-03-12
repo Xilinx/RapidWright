@@ -25,7 +25,6 @@ package com.xilinx.rapidwright.rwroute;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -154,13 +153,11 @@ public class RWRoute{
 	private long nodesPopped;
 	
 	/** The maximum criticality constraint of connection */
-	private static float MAX_CRITICALITY = 0.99f;
+	final private static float MAX_CRITICALITY = 0.99f;
 	/** The minimum criticality of connections that should be re-routed, updated after each iteration */
 	private float minRerouteCriticality;
 	/** The list of critical connections */
 	private List<Connection> criticalConnections;
-	/** An instantiated delay estimator that is used to calculate delay of routing resources */
-	private DelayEstimatorBase estimator;
 	/** A {@link TimingManager} instance to use that handles timing related tasks */
 	private TimingManager timingManager;
 	/** A map from nodes to delay values, used for timing update after fixing routes */
@@ -184,8 +181,9 @@ public class RWRoute{
 		
 		RoutableNode.setMaskNodesCrossRCLK(config.isMaskNodesCrossRCLK());
 
-		if(config.isTimingDriven()) {		
-		    estimator = new DelayEstimatorBase(design.getDevice(), new InterconnectInfo(), config.isUseUTurnNodes(), 0);
+		if(config.isTimingDriven()) {
+			/* An instantiated delay estimator that is used to calculate delay of routing resources */
+			DelayEstimatorBase estimator = new DelayEstimatorBase(design.getDevice(), new InterconnectInfo(), config.isUseUTurnNodes(), 0);
 			RoutableNode.setTimingDriven(true, estimator);
 			nodesDelays = new HashMap<>();
 		}
@@ -193,16 +191,7 @@ public class RWRoute{
 		minRerouteCriticality = config.getMinRerouteCriticality();
 		criticalConnections = new ArrayList<>();
 		
-		queue = new PriorityQueue<>(new Comparator<Routable>() {
-			@Override
-			public int compare(Routable r1, Routable r2) {
-				if(r1.getLowerBoundTotalPathCost() < r2.getLowerBoundTotalPathCost()) {
-					return -1;
-				}else {
-					return 1;
-				}
-			}
-		});
+		queue = new PriorityQueue<>((r1,r2) -> Float.compare(r1.getLowerBoundTotalPathCost(), r2.getLowerBoundTotalPathCost()));
 		rnodesVisited = new ArrayList<>();
 		preservedNodes = new HashMap<>();
 		rnodesCreated = new HashMap<>();		
@@ -238,8 +227,7 @@ public class RWRoute{
 	public static ClkRouteTiming createClkTimingData(RWRouteConfig config) {
 		String clkRouteTimingFile = config.getClkRouteTiming();
 		if(clkRouteTimingFile != null) {
-			ClkRouteTiming clkTiming = new ClkRouteTiming(clkRouteTimingFile);
-			return clkTiming;
+			return new ClkRouteTiming(clkRouteTimingFile);
 		}
 		return null;
 	}
@@ -287,7 +275,7 @@ public class RWRoute{
 				}
 			}else {
 				numUnrecognizedNets++;
-				System.err.println("ERROR: Unknown net " + net.toString());
+				System.err.println("ERROR: Unknown net " + net);
 			}
 		}
 	}
@@ -304,7 +292,9 @@ public class RWRoute{
 		for(Entry<Short, Integer> spanCount : connectionSpan.entrySet()) {
 			Short span = spanCount.getKey();
 			Integer count = spanCount.getValue();
-			if(config.isPrintConnectionSpan()) System.out.printf(String.format("%5d \t%12d \t%7.2f\n", span, count, (float)count / indirectConnections.size() * 100));
+			if(config.isPrintConnectionSpan()) {
+				System.out.printf("%5d \t%12d \t%7.2f\n", span, count, (float)count / indirectConnections.size() * 100);
+			}
 			sumSpan += span * count;
 			if(span > max) max = span;
 		}
@@ -318,8 +308,8 @@ public class RWRoute{
 			if(spanCount.getKey() >= avg) numConnectionsLongerThanAvg += spanCount.getValue();
 		}
 		
-		System.out.printf("INFO: # connections longer than avg span: " + numConnectionsLongerThanAvg);
-		System.out.printf(" (" + String.format("%5.2f", (float)numConnectionsLongerThanAvg / indirectConnections.size() * 100) + "%%)\n");
+		System.out.printf("INFO: # connections longer than avg span: %d\n", numConnectionsLongerThanAvg);
+		System.out.printf("(%5.2f%%)\n", (float)numConnectionsLongerThanAvg / indirectConnections.size() * 100);
 		System.out.println("------------------------------------------------------------------------------");
 	}
 	
@@ -422,8 +412,7 @@ public class RWRoute{
 			Map<SitePinInst, List<Node>> sinksRoutingPaths = GlobalSignalRouting.routeStaticNet(net, unavailableNodes, design, routethruHelper);
 			
 			for(Entry<SitePinInst, List<Node>> sinkPath : sinksRoutingPaths.entrySet()) {
-				Set<Node> sinkPathNodes = new HashSet<>();
-				sinkPathNodes.addAll(sinkPath.getValue());
+				Set<Node> sinkPathNodes = new HashSet<>(sinkPath.getValue());
 				addPreservedNode(sinkPathNodes, net);
 				unavailableNodes.addAll(sinkPathNodes);
 			}
@@ -683,8 +672,8 @@ public class RWRoute{
 		if(config.isTimingDriven()) {
 			estimateDelayOfConnections();
 			maxDelayAndTimingVertex = timingManager.calculateArrivalRequireTimes();
-			timingManager.calculateCriticality(indirectConnections, MAX_CRITICALITY, config.getCriticalityExponent(), maxDelayAndTimingVertex.getFirst().floatValue());
-			System.out.println(String.format("INFO: Estimated pre-routing max delay: %4d", (short) maxDelayAndTimingVertex.getFirst().floatValue()));
+			timingManager.calculateCriticality(indirectConnections, MAX_CRITICALITY, config.getCriticalityExponent(), maxDelayAndTimingVertex.getFirst());
+			System.out.printf("INFO: Estimated pre-routing max delay: %4d\n", (short) maxDelayAndTimingVertex.getFirst().floatValue());
 		}
 	}
 	
@@ -842,11 +831,7 @@ public class RWRoute{
 		}
     	
 		if(criticalConnections.size() > maxNumberOfCriticalConnections) {
-			criticalConnections.sort(new Comparator<Connection>() {
-				@Override
-				public int compare(Connection connection1, Connection connection2) {
-					return Float.compare(connection2.getCriticality(),connection1.getCriticality());
-				}});
+			criticalConnections.sort((connection1, connection2) -> Float.compare(connection2.getCriticality(),connection1.getCriticality()));
 			minRerouteCriticality = criticalConnections.get(maxNumberOfCriticalConnections).getCriticality();
 		}
 	}
@@ -856,11 +841,11 @@ public class RWRoute{
 	 */
 	private void updateTiming() {
 		updateTimingTimer.start();
-		timingWeight = (float) Math.min(timingWeight * config.getTimingMultiplier(), 1f);
+		timingWeight = Math.min(timingWeight * config.getTimingMultiplier(), 1f);
 		oneMinusTimingWeight = 1 - timingWeight;
 		maxDelayAndTimingVertex = timingManager.calculateArrivalRequireTimes();
 		timingManager.calculateCriticality(sortedIndirectConnections,
-				MAX_CRITICALITY, config.getCriticalityExponent(), maxDelayAndTimingVertex.getFirst().floatValue());
+				MAX_CRITICALITY, config.getCriticalityExponent(), maxDelayAndTimingVertex.getFirst());
 		updateTimingTimer.stop();
 	}
 	
@@ -906,15 +891,12 @@ public class RWRoute{
 	private void sortConnections(){
 		sortedIndirectConnections = new ArrayList<>();
 		sortedIndirectConnections.addAll(indirectConnections);
-		sortedIndirectConnections.sort(new Comparator<Connection>() {
-			@Override
-			public int compare(Connection connection1, Connection connection2) {
-				int comp = connection2.getNetWrapper().getConnections().size() - connection1.getNetWrapper().getConnections().size();
-				if(comp == 0) {
-					return connection1.getHpwl() > connection2.getHpwl()? 1:connection1.getHpwl() < connection2.getHpwl() ? -1 :0;
-				}else {
-					return comp;
-				}
+		sortedIndirectConnections.sort((connection1, connection2) -> {
+			int comp = connection2.getNetWrapper().getConnections().size() - connection1.getNetWrapper().getConnections().size();
+			if(comp == 0) {
+				return Short.compare(connection1.getHpwl(), connection2.getHpwl());
+			}else {
+				return comp;
 			}
 		});
 	}
@@ -1100,12 +1082,10 @@ public class RWRoute{
 			Routable driver = null;
 			for(int i = connection.getRnodes().size() - 1; i >= 0; i--){
 				Routable rnode = connection.getRnodes().get(i);
-				if(driver == null){
-					driver = rnode;
-				}else{
+				if (driver != null) {
 					rnode.incrementDriver(driver);
-					driver = rnode;
 				}
+				driver = rnode;
 			}
 		}
 	}
@@ -1282,7 +1262,7 @@ public class RWRoute{
 		netWrapper.setSourceChanged(true);
 		
 		Node sourceINTNode = RouterHelper.projectOutputPinToINTNode(altSource);
-		Routable sourceR = createAddRoutableNode(altSource, sourceINTNode, RoutableType.PINFEED_O);;
+		Routable sourceR = createAddRoutableNode(altSource, sourceINTNode, RoutableType.PINFEED_O);
 		for(Connection otherConnectionOfNet : netWrapper.getConnections()) {
 			otherConnectionOfNet.setSource(altSource);
 			otherConnectionOfNet.setSourceRnode(sourceR);
@@ -1371,10 +1351,7 @@ public class RWRoute{
 	private boolean usablePINBounce(Routable pinBounce, Routable target){
 		Tile bounce = pinBounce.getNode().getTile();
 		Tile sink = target.getNode().getTile();
-		if(bounce.getTileXCoordinate() == sink.getTileXCoordinate() && Math.abs(bounce.getTileYCoordinate() - sink.getTileYCoordinate()) <= 1){
-			return true;
-		}
-		return false;
+		return bounce.getTileXCoordinate() == sink.getTileXCoordinate() && Math.abs(bounce.getTileYCoordinate() - sink.getTileYCoordinate()) <= 1;
 	}
 	
 	/**
@@ -1551,11 +1528,10 @@ public class RWRoute{
 	
 	/**
 	 * Sets the costs of a rnode and pushes it to the queue.
-	 * @param childData The {@link RoutableData} instance of the childRnode.
 	 * @param childRnode A child rnode.
 	 * @param rnode The parent rnode of the childRnode.
 	 * @param newPartialPathCost The upstream path cost from childRnode to the source.
-	 * @param newLowerBoundTotalPathCost Total path cost of childRnode.
+	 * @param newTotalPathCost Total path cost of childRnode.
 	 */
 	private void push(Routable childRnode, Routable rnode, float newPartialPathCost, float newTotalPathCost) {
 		childRnode.setLowerBoundTotalPathCost(newTotalPathCost);
@@ -1625,11 +1601,11 @@ public class RWRoute{
 	public static void printNodeTypeUsageAndWirelength(boolean verbose, Map<IntentCode, Long> nodeTypeUsage, Map<IntentCode, Long> nodeTypeLength) {
 		if(verbose) {
 			System.out.println("Node Usage Per Type\n");
-			System.out.print(String.format(" %-15s  %14s  %12s\n", "Node Type", "Usage", "Length"));
+			System.out.printf(" %-15s  %14s  %12s\n", "Node Type", "Usage", "Length");
 			for(IntentCode ic : nodeTypes) {
 				long usage = nodeTypeUsage.getOrDefault(ic, (long)0);
 				long length = nodeTypeLength.getOrDefault(ic, (long)0);
-				System.out.printf(String.format(" %-15s  %14d  %12d\n", ic, usage, length));
+				System.out.printf(" %-15s  %14d  %12d\n", ic, usage, length);
 			}
 			System.out.println();
 		}
@@ -1663,11 +1639,11 @@ public class RWRoute{
 	}
 	
 	private static void printFormattedString(String s, int value) {
-		System.out.printf(MessageGenerator.formatString(s, value));
+		System.out.print(MessageGenerator.formatString(s, value));
 	}
 	
 	private static void printFormattedString(String s, long value) {
-		System.out.printf(MessageGenerator.formatString(s, value));
+		System.out.print(MessageGenerator.formatString(s, value));
 	}
 	
 	private void printRoutingStatistics(){

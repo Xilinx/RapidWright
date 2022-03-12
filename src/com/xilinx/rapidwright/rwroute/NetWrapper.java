@@ -33,7 +33,7 @@ import com.xilinx.rapidwright.design.Net;
  * A wrapper class of {@link Net} with additional information for the router.
  */
 public class NetWrapper{
-	/** A unique index for a NetWrapepr Object*/
+	/** A unique index for a NetWrapper Object*/
 	private int id;
 	/** The associated {@link Net} Object */
 	private Net net;
@@ -55,21 +55,19 @@ public class NetWrapper{
 	}
 	
 	public void computeHPWLAndCenterCoordinates(){
-		short xMin = 1<<10;
-		short xMax = 0;
-		short yMin = 1<<10;
-		short yMax = 0;
 		float xSum = 0;
-		float ySum = 0;		
+		float ySum = 0;
+		// TODO: Do we need to maintain an array for computing min/max/sum
 		List<Short> xArray = new ArrayList<>();
 		List<Short> yArray = new ArrayList<>();
-		
-		boolean sourceRnodeAdded = false;	
+
+		boolean sourceRnodeAdded = false;
 		for(Connection connection : connections) {
 			if(connection.isDirect()) continue;
-			short x = 0;
-			short y = 0;
+			short x;
+			short y;
 			if(!sourceRnodeAdded) {
+				// FIXME: Lines below are is redundant?
 				x = connection.getSourceRnode().getEndTileXCoordinate();
 				y = connection.getSourceRnode().getEndTileYCoordinate();
 				xArray.add(x);
@@ -88,10 +86,10 @@ public class NetWrapper{
 		
 		Collections.sort(xArray);
 		Collections.sort(yArray);
-		xMin = xArray.get(0);
-		xMax = xArray.get(xArray.size() - 1);
-		yMin = yArray.get(0);
-		yMax = yArray.get(xArray.size() - 1);
+		short xMin = xArray.get(0);
+		short xMax = xArray.get(xArray.size() - 1);
+		short yMin = yArray.get(0);
+		short yMax = yArray.get(yArray.size() - 1);
 		
 		setDoubleHpwl((short) ((xMax - xMin + 1 + yMax - yMin + 1) * 2));
 		setXCenter(xSum / xArray.size());

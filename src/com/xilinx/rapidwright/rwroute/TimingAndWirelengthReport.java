@@ -56,7 +56,6 @@ public class TimingAndWirelengthReport{
 	private int numConnectionsToRoute;
 	private TimingManager timingManager;
 	private DelayEstimatorBase estimator;
-	private Map<TimingEdge, Connection> timingEdgeConnectionMap;
 	private Map<IntentCode, Long> nodeTypeUsage ;
 	private Map<IntentCode, Long> nodeTypeLength;
 	
@@ -67,7 +66,6 @@ public class TimingAndWirelengthReport{
 		RoutableNode.setTimingDriven(true, this.estimator);
 		this.wirelength = 0;
 		this.usedNodes = 0;
-		this.timingEdgeConnectionMap = new HashMap<>();
 		this.nodeTypeUsage = new HashMap<>();
 		this.nodeTypeLength = new HashMap<>();
 	}

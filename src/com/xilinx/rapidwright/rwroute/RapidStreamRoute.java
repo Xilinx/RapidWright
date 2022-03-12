@@ -95,7 +95,7 @@ public class RapidStreamRoute extends PartialRouter{
 				break;
 			}
 		}
-		Tile anchorTile = null;
+		Tile anchorTile;
 		if(input) {
 			anchorTile = net.getSinkPins().get(0).getTile();
 		}else {

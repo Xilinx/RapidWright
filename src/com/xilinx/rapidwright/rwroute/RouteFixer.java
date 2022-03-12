@@ -96,7 +96,7 @@ public class RouteFixer{
 	}
 	
 	private void setShortestPathToEachVertex() {
-		PriorityQueue<NodeWithDelay> queue = new PriorityQueue<NodeWithDelay>(NodeWithDelayComparator);
+		PriorityQueue<NodeWithDelay> queue = new PriorityQueue<>(NodeWithDelayComparator);
 
 		queue.clear();
 		source.cost = source.delay;
@@ -122,18 +122,9 @@ public class RouteFixer{
 		}
 	}
 	
-	private static Comparator<NodeWithDelay> NodeWithDelayComparator = new Comparator<NodeWithDelay>() {
-    	@Override
-    	public int compare(NodeWithDelay a, NodeWithDelay b) {
-    		if(a.getDelay() < b.getDelay()){
-    			return -1;
-    		}else {
-    			return 1;
-    		}
-    	}
-    };
+	final private static Comparator<NodeWithDelay> NodeWithDelayComparator = (a, b) -> Float.compare(a.getDelay(), b.getDelay());
 	
-	class NodeWithDelay{
+	static class NodeWithDelay{
 		private int id;
 		private Node node;
 		private float delay;
