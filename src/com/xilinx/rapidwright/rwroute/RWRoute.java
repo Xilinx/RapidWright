@@ -105,8 +105,6 @@ public class RWRoute{
 	/** 1 - timingWeight */
 	private float oneMinusTimingWeight;
 	
-	/** A design-wise index to indicate total created routing resource graph nodes */
-	private int rnodeId;
 	/** The current routing iteration */
 	private int routeIteration;
 	/** Timers to store runtime of different phases */
@@ -118,7 +116,7 @@ public class RWRoute{
 	private RouteThruHelper routethruHelper;
 	
 	/** A set of indices of overused rondes */
-	private Set<Integer> overUsedRnodes;
+	private Set<Routable> overUsedRnodes;
 	/** A map of preserved nodes to their nets */
 	private Map<Node, Net> preservedNodes;
 	/** A map of nodes to created rnodes */
@@ -193,8 +191,7 @@ public class RWRoute{
 		rnodesVisited = new ArrayList<>();
 		preservedNodes = new HashMap<>();
 		rnodesCreated = new HashMap<>();		
-		rnodeId = 0;
-		
+
 		routerTimer.createRuntimeTracker("determine route targets", "Initialization").start();
 		determineRoutingTargets();
 		routerTimer.getRuntimeTracker("determine route targets").stop();
@@ -586,7 +583,7 @@ public class RWRoute{
 		return rnodesCreated.compute(node, (k,rnode) -> {
 			if(rnode == null){
 				// this is for initializing sources and sinks of those to-be-routed nets' connections
-				rnode = new RoutableNode(rnodeId++, node, type);
+				rnode = new RoutableNode(node, type);
 			}else{
 				// this is for checking preserved routing resource conflicts among routed nets */
 				if(rnode.getRoutableType() == type && type == RoutableType.PINFEED_I) {
@@ -720,8 +717,8 @@ public class RWRoute{
 	public void routeIndirectConnections(){
 		sortConnections();
 		initializeRouting();
-		long lastIterationRnodeId = 0;
-		long lasterIterationRnodeTime = 0;
+		long lastIterationRnodeCount = 0;
+		long lastIterationRnodeTime = 0;
 		
 		while(routeIteration < config.getMaxIterations()){
 			long startIteration = System.nanoTime();
@@ -740,8 +737,8 @@ public class RWRoute{
 			
 			updateCostFactors();
 			
-			printRoutingIterationStatisticsInfo(System.nanoTime() - startIteration, rnodeId - lastIterationRnodeId,
-					(float) ((rnodesTimer.getTime() - lasterIterationRnodeTime) * 1e-9), config.isTimingDriven());
+			printRoutingIterationStatisticsInfo(System.nanoTime() - startIteration, rnodesCreated.size() - lastIterationRnodeCount,
+					(float) ((rnodesTimer.getTime() - lastIterationRnodeTime) * 1e-9), config.isTimingDriven());
 			
 			if(overUsedRnodes.size() == 0) {
 				Set<Connection> unroutedConnectionss = getUnroutedConnections();
@@ -754,8 +751,8 @@ public class RWRoute{
 				}
 			}
 			routeIteration++;
-			lastIterationRnodeId = rnodeId;
-			lasterIterationRnodeTime = rnodesTimer.getTime();
+			lastIterationRnodeCount = rnodesCreated.size();
+			lastIterationRnodeTime = rnodesTimer.getTime();
 		}
 		if(routeIteration == config.getMaxIterations()) {
 			System.out.println("\nERROR: Routing terminated after " + (routeIteration -1 ) + " iterations.");
@@ -973,7 +970,7 @@ public class RWRoute{
 			if(overuse == 0) {
 				rnode.setPresentCongestionCost(1 + presentCongestionFactor);
 			} else if (overuse > 0) {
-				overUsedRnodes.add(rnode.getIndex());
+				overUsedRnodes.add(rnode);
 				rnode.setPresentCongestionCost(1 + (overuse + 1) * presentCongestionFactor);
 				rnode.setHistoricalCongestionCost(rnode.getHistoricalCongestionCost() + overuse * historicalCongestionFactor);
 			}
@@ -1325,7 +1322,7 @@ public class RWRoute{
 	private void setChildrenOfRnode(Routable rnode) {
 		rnodesTimer.start();
 		if(rnode.isChildrenUnset()) {
-			rnodeId = rnode.setChildren(rnodeId, rnodesCreated, preservedNodes.keySet(), routethruHelper);
+			rnode.setChildren(rnodesCreated, preservedNodes.keySet(), routethruHelper);
 		}
 		rnodesTimer.stop();
 	}
@@ -1641,7 +1638,7 @@ public class RWRoute{
 		printFormattedString("Total wirelength:", totalWL);
 		if(config.isVerbose()) {
 			printFormattedString("Total INT tile nodes:", totalINTNodes);
-			printFormattedString("Total rnodes created:", rnodeId);
+			printFormattedString("Total rnodes created:", rnodesCreated.size());
 			printFormattedString("Average #children per node:", Math.round(comupteAverageChildren()));
 			System.out.printf("------------------------------------------------------------------------------\n");	
 			printFormattedString("Num iterations:", routeIteration);

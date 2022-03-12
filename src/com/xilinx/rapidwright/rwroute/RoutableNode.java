@@ -43,8 +43,6 @@ import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
  * It implements {@link Routable} and is created based on a {@link Node} Object.
  */
 public class RoutableNode implements Routable{
-	/** A unique index of a rnode */
-	private int index;
 	/** The associated {@link Node} instance */
 	private Node node;
 	/** The type of a rnode*/
@@ -59,7 +57,7 @@ public class RoutableNode implements Routable{
 	/** The delay of this rnode computed based on the timing model */
 	private short delay;
 	/** A flag to indicate if this rnode is the target */
-	private boolean target;
+	private boolean isTarget;
 	/** The children (downhill rnodes) of this rnode */
 	private List<Routable> children;
 	
@@ -108,12 +106,11 @@ public class RoutableNode implements Routable{
 		maskNodesCrossRCLK = mask;
 	}
 	
-	public RoutableNode(int index, Node node, RoutableType type){
-		this.index = index;
+	public RoutableNode(Node node, RoutableType type){
 		this.type = type;
 		this.node = node;
 		children = null;
-		target = false;
+		isTarget = false;
 		setEndTileXYCoordinates();
 		setBaseCost();
 		presentCongestionCost = 1;
@@ -127,11 +124,10 @@ public class RoutableNode implements Routable{
 		}
 	}
 	
-	public int setChildren(int globalIndex, Map<Node, Routable> createdRoutable, Set<Node> reserved, RouteThruHelper routethruHelper){
+	public void setChildren(Map<Node, Routable> createdRoutable, Set<Node> reserved, RouteThruHelper routethruHelper){
 		children = new ArrayList<>();
-		List<Node> allDownHillNodes = node.getAllDownhillNodes();
 
-		int[] globalIndexForLambda = { globalIndex };
+		List<Node> allDownHillNodes = node.getAllDownhillNodes();
 		for(Node node:allDownHillNodes){
 			if(reserved.contains(node)) continue;		
 			if(isExcluded(node, timingDriven)) continue;
@@ -139,11 +135,10 @@ public class RoutableNode implements Routable{
 
 			Routable child = createdRoutable.computeIfAbsent(node, (k) -> {
 				RoutableType type = RoutableType.WIRE;
-				return new RoutableNode(globalIndexForLambda[0]++, node, type);
+				return new RoutableNode(node, type);
 			});
-			children.add(child); //the sink rnode of a target connection has been created up-front
+			children.add(child);//the sink rnode of a target connection has been created up-front
 		}
-		return globalIndexForLambda[0];
 	}
 	
 	public void setBaseCost(){
@@ -199,7 +194,7 @@ public class RoutableNode implements Routable{
 	}
 	
 	@Override
-	public boolean hasMultiDrivers(){
+	public boolean hasMultiDrivers() {
 		return Routable.capacity < uniqueDriverCount();
 	}
 
@@ -242,8 +237,6 @@ public class RoutableNode implements Routable{
 	@Override
 	public String toString(){
 		StringBuilder s = new StringBuilder();
-		s.append("id = " + index);
-		s.append(", ");
 		s.append("node " + node.toString());
 		s.append(", ");
 		s.append("(" + endTileXCoordinate + "," + endTileYCoordinate + ")");
@@ -267,11 +260,6 @@ public class RoutableNode implements Routable{
 	}
 	
 	@Override
-	public int getIndex() {
-		return index;
-	}
-	
-	@Override
 	public boolean isInConnectionBoundingBox(Connection connection) {		
 		return endTileXCoordinate > connection.getXMinBB() && endTileXCoordinate < connection.getXMaxBB() && endTileYCoordinate > connection.getYMinBB() && endTileYCoordinate < connection.getYMaxBB();
 	}
@@ -283,12 +271,12 @@ public class RoutableNode implements Routable{
 
 	@Override
 	public boolean isTarget() {
-		return target;
+		return isTarget;
 	}
 
 	@Override
 	public void setTarget(boolean isTarget) {
-		this.target = isTarget;	
+		this.isTarget = isTarget;
 	}
 
 	@Override
@@ -341,7 +329,7 @@ public class RoutableNode implements Routable{
 
 	@Override
 	public int manhattanDistToSink(Routable sink) {
-		return Math.abs(this.getEndTileXCoordinate() - sink.getEndTileXCoordinate()) + Math.abs(getEndTileYCoordinate() - sink.getEndTileYCoordinate());
+		return Math.abs(getEndTileXCoordinate() - sink.getEndTileXCoordinate()) + Math.abs(getEndTileYCoordinate() - sink.getEndTileYCoordinate());
 	}
 
 	@Override
