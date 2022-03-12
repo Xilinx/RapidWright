@@ -201,6 +201,7 @@ public class TestDesign {
             ParallelismTools.setParallel(false);
         }
     }
+    
     @Test
     @CheckOpenFiles
     public void testBug349(@TempDir Path tempDir) throws IOException {
