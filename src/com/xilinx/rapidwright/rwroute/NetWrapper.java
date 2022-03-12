@@ -24,7 +24,6 @@
 package com.xilinx.rapidwright.rwroute;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 import com.xilinx.rapidwright.design.Net;
@@ -55,45 +54,42 @@ public class NetWrapper{
 	}
 	
 	public void computeHPWLAndCenterCoordinates(){
-		float xSum = 0;
-		float ySum = 0;
-		// TODO: Do we need to maintain an array for computing min/max/sum
-		List<Short> xArray = new ArrayList<>();
-		List<Short> yArray = new ArrayList<>();
-
+		int xMin = Integer.MAX_VALUE;
+		int yMin = Integer.MAX_VALUE;
+		int xMax = Integer.MIN_VALUE;
+		int yMax = Integer.MIN_VALUE;
+		int xSum = 0;
+		int ySum = 0;
+		int count = 0;
 		boolean sourceRnodeAdded = false;
 		for(Connection connection : connections) {
 			if(connection.isDirect()) continue;
-			short x;
-			short y;
 			if(!sourceRnodeAdded) {
-				// FIXME: Lines below are is redundant?
-				x = connection.getSourceRnode().getEndTileXCoordinate();
-				y = connection.getSourceRnode().getEndTileYCoordinate();
-				xArray.add(x);
-				yArray.add(y);
+				short x = connection.getSourceRnode().getEndTileXCoordinate();
+				short y = connection.getSourceRnode().getEndTileYCoordinate();
+				xMin = Integer.min(xMin, x);
+				yMin = Integer.min(yMin, y);
+				xMax = Integer.max(xMax, x);
+				yMax = Integer.max(yMax, y);
 				xSum += x;
-				ySum += y;		
+				ySum += y;
 				sourceRnodeAdded = true;
+				count++;
 			}	
-			x = connection.getSinkRnode().getEndTileXCoordinate();
-			y = connection.getSinkRnode().getEndTileYCoordinate();
-			xArray.add(x);
-			yArray.add(y);
+			short x = connection.getSinkRnode().getEndTileXCoordinate();
+			short y = connection.getSinkRnode().getEndTileYCoordinate();
+			xMin = Integer.min(xMin, x);
+			yMin = Integer.min(yMin, y);
+			xMax = Integer.max(xMax, x);
+			yMax = Integer.max(yMax, y);
 			xSum += x;
-			ySum += y;	
+			ySum += y;
+			count++;
 		}
 		
-		Collections.sort(xArray);
-		Collections.sort(yArray);
-		short xMin = xArray.get(0);
-		short xMax = xArray.get(xArray.size() - 1);
-		short yMin = yArray.get(0);
-		short yMax = yArray.get(yArray.size() - 1);
-		
 		setDoubleHpwl((short) ((xMax - xMin + 1 + yMax - yMin + 1) * 2));
-		setXCenter(xSum / xArray.size());
-		setYCenter(ySum / yArray.size());
+		setXCenter((float)xSum / count);
+		setYCenter((float)ySum / count);
 	}
 	
 	public Net getNet(){
