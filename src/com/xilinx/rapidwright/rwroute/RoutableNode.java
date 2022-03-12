@@ -107,12 +107,12 @@ public class RoutableNode implements Routable{
 	}
 	
 	public RoutableNode(Node node, RoutableType type){
-		this.type = type;
 		this.node = node;
+		setRoutableType(type);
 		children = null;
 		isTarget = false;
 		setEndTileXYCoordinates();
-		setBaseCost();
+		setBaseCost(type);
 		presentCongestionCost = 1;
     	historicalCongestionCost = 1;
     	setVisited(false);
@@ -141,19 +141,22 @@ public class RoutableNode implements Routable{
 		}
 	}
 	
-	public void setBaseCost(){
+	private void setBaseCost(RoutableType type){
+		// TODO: Why does enabling the following line cause unroutability?
+		//       setRoutableType() is called before this, and it setting
+		//       this.type disrupts the base cost such that
+		//       testNonTimingDrivenPartialRouting becomes unroutable.
+		//       The `type` parameter fed to this method is the original
+		//       value provided to the constructor
+		// type = this.type;
 		if(type == RoutableType.WIRE){
 			baseCost = 0.4f;
 			// NOTE: IntentCode is device-dependent
 			IntentCode ic = node.getIntentCode();
 			switch(ic) {
 			case NODE_PINBOUNCE:
-				type = RoutableType.PINBOUNCE;
-				break;
 			case NODE_PINFEED:
-				type = RoutableType.PINFEED_I;
 				break;
-			
 			case NODE_DOUBLE:
 				if(endTileXCoordinate != getNode().getTile().getTileXCoordinate()) {
 					baseCost = 0.4f*length;
@@ -173,7 +176,6 @@ public class RoutableNode implements Routable{
 				break;	
 			default:
 				if(length != 0) baseCost *= length;
-				type = RoutableType.WIRE;
 				break;
 			}	
 		}else if(type == RoutableType.PINFEED_I){
@@ -332,9 +334,20 @@ public class RoutableNode implements Routable{
 		return Math.abs(getEndTileXCoordinate() - sink.getEndTileXCoordinate()) + Math.abs(getEndTileYCoordinate() - sink.getEndTileYCoordinate());
 	}
 
-	@Override
-	public void setRoutableType(RoutableType type) {
+	private void setRoutableType(RoutableType type) {
 		this.type = type;
+		if(type == RoutableType.WIRE) {
+			// NOTE: IntentCode is device-dependent
+			IntentCode ic = node.getIntentCode();
+			switch (ic) {
+				case NODE_PINBOUNCE:
+					this.type = RoutableType.PINBOUNCE;
+					break;
+				case NODE_PINFEED:
+					this.type = RoutableType.PINFEED_I;
+					break;
+			}
+		}
 	}
 
 	@Override

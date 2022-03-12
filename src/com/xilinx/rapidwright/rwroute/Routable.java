@@ -157,11 +157,6 @@ public interface Routable {
 	 */
 	RoutableType getRoutableType();
 	/**
-	 * Sets the type of a Routable Object.
-	 * @param type The type to be set.
-	 */
-	void setRoutableType(RoutableType type);
-	/**
 	 * Gets the associated Node of a Routable Object.
 	 * @return The associated Node of a Routable Object.
 	 */
