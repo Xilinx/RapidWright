@@ -7,7 +7,6 @@ JARFILES = $(shell find `pwd`/jars -name '*.jar' | egrep -v 'javadoc|win64' | tr
 SOURCES := $(shell find ./src -name '*.java'  )
 CLASSES := $(shell find ./src -name '*.java' | grep -v package-info.java | sed 's=^./src=./bin=' | sed 's/.java$$/.class/')
 
-JARS_LINK ?= $(shell curl -s https://api.github.com/repos/Xilinx/RapidWright/releases/latest | grep "browser_download_url.*_jars.zip" | cut -d : -f 2,3 | tr -d \")
 
 .PHONY: compile update_jars
 compile: $(CLASSES)
@@ -18,8 +17,4 @@ $(CLASSES): $(SOURCES) $(JARFILES)
 	echo "export CLASSPATH=`pwd`/bin:$(shell echo `pwd`/jars/*.jar | tr ' ' ':')" > $(BIN)/rapidwright_classpath.sh
 
 update_jars:
-	rm -rf jars
-	echo $(JARS_LINK) | wget -qi -
-	unzip rapidwright_jars.zip
-	rm jars/qtjambi-win64-msvc2005x64-4.5.2_01.jar rapidwright_jars.zip
-	make -C . compile
+	./gradlew update_jars
