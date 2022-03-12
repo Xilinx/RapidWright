@@ -151,11 +151,8 @@ public class TestDesign {
     }
 
     private EDIFNetlist generateEDIF(String edifName, long numLibraries, long cellsPerLibrary, long netsPerCell) {
-        EDIFNetlist netlist = new EDIFNetlist(edifName);
-        EDIFDesign edifDesign = new EDIFDesign(edifName);
-        edifDesign.addProperty(EDIFTools.EDIF_PART_PROP.toLowerCase(), Device.AWS_F1);
-        netlist.setDesign(edifDesign);
-        EDIFCell topCell = null;
+        EDIFNetlist netlist = EDIFTools.createNewNetlist(edifName);
+        EDIFTools.ensureCorrectPartInEDIF(netlist, Device.AWS_F1);
         for (int libraryIdx = 0; libraryIdx < numLibraries; libraryIdx++) {
             EDIFLibrary lib = new EDIFLibrary("library_" + libraryIdx);
             for (int cellIdx = 0; cellIdx < cellsPerLibrary; cellIdx++) {
@@ -163,11 +160,9 @@ public class TestDesign {
                 for (int netIdx = 0; netIdx < netsPerCell; netIdx++) {
                     new EDIFNet("net_" + netIdx, cell);
                 }
-                if (topCell == null) topCell = cell;
             }
             netlist.addLibrary(lib);
         }
-        edifDesign.setTopCell(topCell);
         return netlist;
     }
 
@@ -177,19 +172,20 @@ public class TestDesign {
         long maxMemoryNeeded = 1024L*1024L*1024L*16L;
         Assumptions.assumeTrue(Runtime.getRuntime().maxMemory() >= maxMemoryNeeded);
 
-        final String edifName = "testEdifBiggerThan4GB";
+        final String edifName = "testDcpEdifBiggerThan4GB";
         final long numLibraries = 100;
         final long cellsPerLibrary = 1000;
         final long netsPerCell = 1000;
         final Path outputPath = tempDir.resolve(edifName + ".dcp");
 
-        CodePerfTracker t = new CodePerfTracker("Generate EDIF", true);
+        CodePerfTracker t = new CodePerfTracker(edifName, true);
+        t.useGCToTrackMemory(true);
         t.start(numLibraries + " x " + cellsPerLibrary + " x " + netsPerCell);
         EDIFNetlist netlist = generateEDIF(edifName, numLibraries, cellsPerLibrary, netsPerCell);
         t.stop();
 
         Design design = new Design(netlist);
-        design.writeCheckpoint(outputPath);
+        design.writeCheckpoint(outputPath, t);
     }
 
     @Test
