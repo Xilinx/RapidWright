@@ -213,7 +213,7 @@ public class RoutableNode implements Routable{
 				intTiles.add(w.getTile());
 			}
 		}
-		Tile endTile = null;
+		Tile endTile;
 		if(intTiles.size() > 1) {
 			endTile = intTiles.get(1);
 		}else if(intTiles.size() == 1) {
@@ -242,14 +242,12 @@ public class RoutableNode implements Routable{
 	
 	@Override
 	public String toString(){
-		String coordinate = "";	
-		coordinate = "(" + endTileXCoordinate + "," + endTileYCoordinate + ")";
 		StringBuilder s = new StringBuilder();
 		s.append("id = " + index);
 		s.append(", ");
 		s.append("node " + node.toString());
 		s.append(", ");
-		s.append(coordinate);
+		s.append("(" + endTileXCoordinate + "," + endTileYCoordinate + ")");
 		s.append(", ");
 		s.append(String.format("type = %s", type));
 		s.append(", ");
@@ -493,7 +491,7 @@ public class RoutableNode implements Routable{
 	/**
 	 * Checks if a node is an exit node of a NodeGroup
 	 * @param node The node in question
-	 * @return true, if the node is a S/D/Q/L node or a local node with a GLOBA and CTRL wire 
+	 * @return true, if the node is a S/D/Q/L node or a local node with a GLOBAL and CTRL wire
 	 */
 	public static boolean isExitNode(Node node) {
 		switch(node.getIntentCode()) {
@@ -534,15 +532,12 @@ public class RoutableNode implements Routable{
 	        }
 	        return false;
         }else {
-        	if(tile.getName().startsWith("LAG")) {
-        		return false;
-        	}
-        	return true;
-        }
+			return !tile.getName().startsWith("LAG");
+		}
 	}
 	 
-	private static Set<String> excludeAboveRclk;
-	private static Set<String> excludeBelowRclk;
+	final private static Set<String> excludeAboveRclk;
+	final private static Set<String> excludeBelowRclk;
 	static {
 	        // these nodes are bleeding down
 		excludeAboveRclk = new HashSet<String>() {{
