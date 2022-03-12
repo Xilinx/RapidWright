@@ -3,6 +3,7 @@ package com.xilinx.rapidwright.design;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.HashSet;
 
 import com.xilinx.rapidwright.support.CheckOpenFiles;
@@ -11,8 +12,13 @@ import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.util.FileTools;
+import com.xilinx.rapidwright.util.Job;
+import com.xilinx.rapidwright.util.JobQueue;
+import com.xilinx.rapidwright.util.LocalJob;
 import com.xilinx.rapidwright.util.ParallelismTools;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -141,5 +147,32 @@ public class TestDesign {
         for (SitePinInst spi : net.getSinkPins()) {
             Assertions.assertTrue(spi.getSite().isInputPin(spi.getName()));
         }
+    }
+
+    @Test
+    @CheckOpenFiles
+    public void testBug349(@TempDir Path tempDir) throws IOException {
+        // This test won't run in CI as Vivado is not available
+        Assumptions.assumeTrue(FileTools.isVivadoOnPath());
+
+        final String inputPath = RapidWrightDCP.getString("bug349.dcp");
+        Design design = Design.readCheckpoint(inputPath);
+
+        final Path filenameWrite = tempDir.resolve("bug349_roundtrip.dcp");
+        final Path tclScript = tempDir.resolve("bug349_roundtrip.tcl");
+        design.writeCheckpoint(filenameWrite);
+
+        final Job job = new LocalJob();
+        job.setCommand(FileTools.getVivadoPath() + " -mode batch -source " + tclScript);
+
+        job.setRunDir(tempDir.toString());
+
+        Files.write(tclScript, Arrays.asList(
+                "open_checkpoint " + filenameWrite.toAbsolutePath()
+        ));
+
+        JobQueue queue = new JobQueue();
+        queue.addJob(job);
+        Assertions.assertTrue(queue.runAllToCompletion());
     }
 }
