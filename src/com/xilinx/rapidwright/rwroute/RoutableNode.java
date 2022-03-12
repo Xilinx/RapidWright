@@ -130,21 +130,20 @@ public class RoutableNode implements Routable{
 	public int setChildren(int globalIndex, Map<Node, Routable> createdRoutable, Set<Node> reserved, RouteThruHelper routethruHelper){
 		children = new ArrayList<>();
 		List<Node> allDownHillNodes = node.getAllDownhillNodes();
-		
-		for(Node node:allDownHillNodes){		
+
+		int[] globalIndexForLambda = { globalIndex };
+		for(Node node:allDownHillNodes){
 			if(reserved.contains(node)) continue;		
 			if(isExcluded(node, timingDriven)) continue;
 			if(routethruHelper.isRouteThru(node, node)) continue;
-			
-			Routable child = createdRoutable.get(node);
-			if(child == null) {
-				RoutableType type = RoutableType.WIRE;		
-				child = new RoutableNode(globalIndex++, node, type);
-				createdRoutable.put(node, child);
-			}
-			children.add(child);//the sink rnode of a target connection has been created up-front
+
+			Routable child = createdRoutable.computeIfAbsent(node, (k) -> {
+				RoutableType type = RoutableType.WIRE;
+				return new RoutableNode(globalIndexForLambda[0]++, node, type);
+			});
+			children.add(child); //the sink rnode of a target connection has been created up-front
 		}
-		return globalIndex;
+		return globalIndexForLambda[0];
 	}
 	
 	public void setBaseCost(){
@@ -386,8 +385,7 @@ public class RoutableNode implements Routable{
 		if(usersConnectionCounts == null) {
 			usersConnectionCounts = new HashMap<>();
 		}
-		Integer connectionCount = usersConnectionCounts.getOrDefault(source, 0);
-		usersConnectionCounts.put(source, connectionCount + 1);
+		usersConnectionCounts.merge(source, 1, Integer::sum);
 	}
 	
 	@Override
@@ -400,12 +398,7 @@ public class RoutableNode implements Routable{
 	
 	@Override
 	public void decrementUser(NetWrapper user) {
-		Integer count = usersConnectionCounts.getOrDefault(user, 0);
-		if(count == 1) {
-			usersConnectionCounts.remove(user);
-		}else if(count > 1) {
-			usersConnectionCounts.put(user, count - 1);
-		}
+		usersConnectionCounts.compute(user, (k,v) -> (v == 1) ? null : v - 1);
 	}
 	
 	@Override
@@ -429,23 +422,17 @@ public class RoutableNode implements Routable{
 		if(driversCounts == null) {
 			driversCounts = new HashMap<>();
 		}
-		Integer count = driversCounts.getOrDefault(parent, 0);
-		driversCounts.put(parent, count + 1);
+		driversCounts.merge(parent, 1, Integer::sum);
 	}
 	
 	@Override
 	public void decrementDriver(Routable parent) {
-		Integer count = driversCounts.getOrDefault(parent, 0);
-		if(count == 1) {
-			driversCounts.remove(parent);
-		}else if(count > 1) {
-			driversCounts.put(parent, count - 1);
-		}
+		driversCounts.compute(parent, (k,v) -> (v == 1) ? null : v - 1);
 	}
 	
 	@Override
 	public int getOccupancy() {
-		return this.uniqueUserCount();
+		return uniqueUserCount();
 	}
 	
 	@Override
