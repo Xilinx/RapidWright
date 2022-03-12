@@ -127,8 +127,6 @@ public class RWRoute{
 	private Collection<Routable> rnodesVisited;
 	/** The queue to store candidate nodes to route a connection */
 	private PriorityQueue<Routable> queue;
-	/** An indicator for the success / failed route of a connection */
-	private boolean successRoute;
 	/** The horizontal distance from a rnode to the sink rnode of a connection */
 	private short deltaX;
 	/** The vertical distance from a rnode to the sink rnode of a connection */
@@ -1171,15 +1169,7 @@ public class RWRoute{
 		else
 			System.out.println("\nINFO: No PIP overlaps\n");
 	}
-	
-	/**
-	 * Checks if the peek of the queue if the target.
-	 * @return true, if the peek element of queue is the target.
-	 */
-	private boolean targetReached(){
-		return queue.peek().isTarget();
-	}
-	
+
 	/**
 	 * Routes a connection.
 	 * @param connection The connection to route.
@@ -1187,26 +1177,24 @@ public class RWRoute{
 	private void routeConnection(Connection connection){
 		prepareRouteConnection(connection);
 		
-		successRoute = false;
 		float rnodeCostWeight = 1 - connection.getCriticality();
 		float shareWeight = (float) (Math.pow(rnodeCostWeight, config.getShareExponent()));
 		float rnodeWLWeight = rnodeCostWeight * oneMinusWlWeight;
 		float estWlWeight = rnodeCostWeight * wlWeight;
 		float dlyWeight = connection.getCriticality() * oneMinusTimingWeight;
 		float estDlyWeight = connection.getCriticality() * timingWeight;
-		
+
+		boolean successRoute = false;
 		while(!queue.isEmpty()){
-			if(!targetReached() && !successRoute) {
-				Routable rnode = queue.poll();
-				nodesPopped++;
-				
-				setChildrenOfRnode(rnode);
-				exploreAndExpand(rnode, connection, shareWeight, rnodeCostWeight,
-						rnodeWLWeight, estWlWeight, dlyWeight, estDlyWeight);
-			}else {
+			Routable rnode = queue.poll();
+			if (rnode.isTarget()) {
 				successRoute = true;
 				break;
 			}
+			nodesPopped++;
+			setChildrenOfRnode(rnode);
+			exploreAndExpand(rnode, connection, shareWeight, rnodeCostWeight,
+					rnodeWLWeight, estWlWeight, dlyWeight, estDlyWeight);
 		}
 		
 		if(successRoute) {
@@ -1404,10 +1392,10 @@ public class RWRoute{
 		boolean longParent = DelayEstimatorBase.isLong(rnode.getNode());
 		for(Routable childRNode:rnode.getChildren()){
 			if(childRNode.isVisited()) continue;
-			if(childRNode.isTarget()){		
+			if(childRNode.isTarget()){
+				queue.clear();
 				evaluateCostAndPush(rnode, longParent, childRNode, connection, shareWeight, rnodeCostWeight,
 						rnodeLengthWeight, rnodeEstWlWeight, rnodeDelayWeight, rnodeEstDlyWeight);
-				successRoute = true;
 				return;
 				
 			}else if(childRNode.getRoutableType() == RoutableType.WIRE) {
