@@ -169,7 +169,7 @@ public class TestDesign {
     @Test
     @CheckOpenFiles
     public void testDcpEdifBiggerThan4GB(@TempDir Path tempDir) {
-        long maxMemoryNeeded = 1024L*1024L*1024L*16L;
+        long maxMemoryNeeded = 1024L*1024L*1024L*14L;
         Assumptions.assumeTrue(Runtime.getRuntime().maxMemory() >= maxMemoryNeeded);
 
         final String edifName = "testDcpEdifBiggerThan4GB";
