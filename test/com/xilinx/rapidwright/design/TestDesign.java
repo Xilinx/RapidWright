@@ -22,6 +22,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Test that we can write a DCP file and read it back in. We currently don't have a way to check designs for equality,
@@ -166,34 +168,30 @@ public class TestDesign {
         return netlist;
     }
 
-    @Test
+    @ParameterizedTest
     @CheckOpenFiles
-    public void testDcpEdifBiggerThan4GB(@TempDir Path tempDir) {
+    @ValueSource(booleans = {false,true})
+    public void testDcpEdifBiggerThan4GB(boolean parallel, @TempDir Path tempDir) {
         long maxMemoryNeeded = 1024L*1024L*1024L*14L;
         Assumptions.assumeTrue(Runtime.getRuntime().maxMemory() >= maxMemoryNeeded);
 
-        final String edifName = "testDcpEdifBiggerThan4GB";
-        final long numLibraries = 100;
-        final long cellsPerLibrary = 1000;
-        final long netsPerCell = 1000;
-        final Path outputPath = tempDir.resolve(edifName + ".dcp");
-
-        CodePerfTracker t = new CodePerfTracker(edifName, true);
-        t.useGCToTrackMemory(true);
-        t.start(numLibraries + " x " + cellsPerLibrary + " x " + netsPerCell);
-        EDIFNetlist netlist = generateEDIF(edifName, numLibraries, cellsPerLibrary, netsPerCell);
-        t.stop();
-
-        Design design = new Design(netlist);
-        design.writeCheckpoint(outputPath, t);
-    }
-
-    @Test
-    @CheckOpenFiles
-    public void testDcpEdifBiggerThan4GBParallel(@TempDir Path tempDir) {
         try {
-            ParallelismTools.setParallel(true);
-            testDcpEdifBiggerThan4GB(tempDir);
+            ParallelismTools.setParallel(parallel);
+
+            final String edifName = "testDcpEdifBiggerThan4GB" + ((parallel) ? "Parallel" : "");
+            final long numLibraries = 100;
+            final long cellsPerLibrary = 1000;
+            final long netsPerCell = 1000;
+            final Path outputPath = tempDir.resolve(edifName + ".dcp");
+
+            CodePerfTracker t = new CodePerfTracker(edifName, true);
+            t.useGCToTrackMemory(true);
+            t.start(numLibraries + " x " + cellsPerLibrary + " x " + netsPerCell);
+            EDIFNetlist netlist = generateEDIF(edifName, numLibraries, cellsPerLibrary, netsPerCell);
+            t.stop();
+
+            Design design = new Design(netlist);
+            design.writeCheckpoint(outputPath, t);
         } finally {
             ParallelismTools.setParallel(false);
         }
