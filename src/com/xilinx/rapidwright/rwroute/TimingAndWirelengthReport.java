@@ -49,7 +49,6 @@ import com.xilinx.rapidwright.util.Pair;
  */
 public class TimingAndWirelengthReport{
 	private Design design;
-	private int rnodeId;
 	private long wirelength;
 	private long usedNodes;
 	private int numWireNetsToRoute;
@@ -130,11 +129,11 @@ public class TimingAndWirelengthReport{
 			if(nodes.isEmpty()) {	
 				connection.setDirect(true);
 			}else {
-				connection.setSinkRnode(new RoutableNode(this.rnodeId++, nodes.get(0), RoutableType.PINFEED_I));
+				connection.setSinkRnode(new RoutableNode(nodes.get(0), RoutableType.PINFEED_I));
 				if(sourceINTNode == null) {
 					sourceINTNode = RouterHelper.projectOutputPinToINTNode(source);
 				}
-				connection.setSourceRnode(new RoutableNode(this.rnodeId++, sourceINTNode, RoutableType.PINFEED_O));
+				connection.setSourceRnode(new RoutableNode(sourceINTNode, RoutableType.PINFEED_O));
 				connection.setDirect(false);
 			}
 		}

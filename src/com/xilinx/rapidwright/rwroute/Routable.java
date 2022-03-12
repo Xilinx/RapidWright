@@ -189,14 +189,11 @@ public interface Routable {
 	int manhattanDistToSink(Routable sink);
 	/**
 	 * Sets the children of a Routable Object.
-	 * @param rnodeId The starting unique index .
 	 * @param rnodesCreated The map of nodes to created Routable Objects.
 	 * @param reservedNodes The set of all preserved nodes.
 	 * @param routethruHelper The routethru helper to check if the Node of a Routable Object and a downhill node of it makes up a routetru.
-	 * @return The updated rnodeId after all children have been created.
 	 */
-	int setChildren(int rnodeId, Map<Node, Routable> rnodesCreated,
-			Set<Node> reservedNodes, RouteThruHelper routethruHelper);
+	void setChildren(Map<Node, Routable> rnodesCreated, Set<Node> reservedNodes, RouteThruHelper routethruHelper);
 	/**
 	 * Gets the children of a Routable Object.
 	 * @return A list of Routable Objects.
@@ -309,11 +306,4 @@ public interface Routable {
 	 * @param visited boolean value to set.
 	 */
 	void setVisited(boolean visited);
-	
-	/**
-	 * Gets the unique index of a rnode.
-	 * @return
-	 */
-	int getIndex();
-	
 }
