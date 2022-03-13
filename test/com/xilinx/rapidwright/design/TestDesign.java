@@ -6,12 +6,18 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.HashSet;
 
+import com.xilinx.rapidwright.edif.EDIFCell;
+import com.xilinx.rapidwright.edif.EDIFDesign;
+import com.xilinx.rapidwright.edif.EDIFLibrary;
+import com.xilinx.rapidwright.edif.EDIFNet;
+import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.support.CheckOpenFiles;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.Job;
 import com.xilinx.rapidwright.util.JobQueue;
@@ -21,6 +27,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Test that we can write a DCP file and read it back in. We currently don't have a way to check designs for equality,
@@ -149,6 +157,51 @@ public class TestDesign {
         }
     }
 
+    private EDIFNetlist generateEDIF(String edifName, long numLibraries, long cellsPerLibrary, long netsPerCell) {
+        EDIFNetlist netlist = EDIFTools.createNewNetlist(edifName);
+        EDIFTools.ensureCorrectPartInEDIF(netlist, Device.AWS_F1);
+        for (int libraryIdx = 0; libraryIdx < numLibraries; libraryIdx++) {
+            EDIFLibrary lib = new EDIFLibrary("library_" + libraryIdx);
+            for (int cellIdx = 0; cellIdx < cellsPerLibrary; cellIdx++) {
+                EDIFCell cell = new EDIFCell(lib, "cell_" + cellIdx);
+                for (int netIdx = 0; netIdx < netsPerCell; netIdx++) {
+                    new EDIFNet("net_" + netIdx, cell);
+                }
+            }
+            netlist.addLibrary(lib);
+        }
+        return netlist;
+    }
+
+    @ParameterizedTest
+    @CheckOpenFiles
+    @ValueSource(booleans = {false,true})
+    public void testDcpEdifBiggerThan4GB(boolean parallel, @TempDir Path tempDir) {
+        long maxMemoryNeeded = 1024L*1024L*1024L*14L;
+        Assumptions.assumeTrue(Runtime.getRuntime().maxMemory() >= maxMemoryNeeded);
+
+        try {
+            ParallelismTools.setParallel(parallel);
+
+            final String edifName = "testDcpEdifBiggerThan4GB" + ((parallel) ? "Parallel" : "");
+            final long numLibraries = 100;
+            final long cellsPerLibrary = 1000;
+            final long netsPerCell = 1000;
+            final Path outputPath = tempDir.resolve(edifName + ".dcp");
+
+            CodePerfTracker t = new CodePerfTracker(edifName, true);
+            t.useGCToTrackMemory(true);
+            t.start(numLibraries + " x " + cellsPerLibrary + " x " + netsPerCell);
+            EDIFNetlist netlist = generateEDIF(edifName, numLibraries, cellsPerLibrary, netsPerCell);
+            t.stop();
+
+            Design design = new Design(netlist);
+            design.writeCheckpoint(outputPath, t);
+        } finally {
+            ParallelismTools.setParallel(false);
+        }
+    }
+    
     @Test
     @CheckOpenFiles
     public void testBug349(@TempDir Path tempDir) throws IOException {
