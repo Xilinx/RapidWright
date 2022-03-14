@@ -144,21 +144,10 @@ public interface Routable {
 	 */
 	Node getNode();
 	/**
-	 * Sets the delay of a Routable Object.
-	 * @param delay The delay value to be set.
-	 */
-	void setDelay(short delay);
-	/**
 	 * Gets the delay of a Routable Object.
 	 * @return The delay of a Routable Object.
 	 */
 	float getDelay();
-	/**
-	 * Gets the Manhattan distance from a Routable Object to the target Routable Object, typically the sink Routable Object of a connection.
-	 * @param sink The target Routable Object.
-	 * @return The Manhattan distance from a Routable Object to the target Routable Object.
-	 */
-	int manhattanDistToSink(Routable sink);
 	/**
 	 * Sets the children of a Routable Object.
 	 * @param rnodesCreated The map of nodes to created Routable Objects.
