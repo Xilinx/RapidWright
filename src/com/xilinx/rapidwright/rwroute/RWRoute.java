@@ -126,11 +126,7 @@ public class RWRoute{
 	private Collection<Routable> rnodesVisited;
 	/** The queue to store candidate nodes to route a connection */
 	private PriorityQueue<Routable> queue;
-	/** The horizontal distance from a rnode to the sink rnode of a connection */
-	private short deltaX;
-	/** The vertical distance from a rnode to the sink rnode of a connection */
-	private short deltaY;
-	
+
 	/** Total wirelength of the routed design */
 	private int totalWL;
 	/** Total used INT tile nodes */
@@ -599,6 +595,7 @@ public class RWRoute{
 	 * Initializes routing.
 	 */
 	private void initializeRouting(){
+		nodesEvaluated = 0;
 		rnodesVisited.clear();
 		queue.clear(); 	
 		routeIteration = 1;
@@ -1366,6 +1363,7 @@ public class RWRoute{
 		for (Routable node : rnodesVisited) {
 			node.setVisited(false);
 		}
+		nodesEvaluated += rnodesVisited.size();
 		rnodesVisited.clear();
 	}
 	
@@ -1451,32 +1449,15 @@ public class RWRoute{
 		float newPartialPathCost = rnode.getUpstreamPathCost() + rnodeCostWeight * getRoutableCost(childRnode, connection, countSourceUses, sharingFactor)
 								+ rnodeLengthWeight * childRnode.getLength() / sharingFactor
 								+ rnodeDelayWeight * (childRnode.getDelay() + DelayEstimatorBase.getExtraDelay(childRnode.getNode(), longParent)) / 100f;
-		computeDeltaXY(childRnode, connection);
-		float newTotalPathCost = (float) (newPartialPathCost + rnodeEstWlWeight * distanceCostToSink() / sharingFactor
-								+ rnodeEstDlyWeight * (deltaX * 0.32 + deltaY * 0.16));
-		nodesEvaluated++;
+		int deltaX = Math.abs(childRnode.getEndTileXCoordinate() - connection.getSinkRnode().getEndTileXCoordinate());
+		int deltaY = Math.abs(childRnode.getEndTileYCoordinate() - connection.getSinkRnode().getEndTileYCoordinate());
+		int distanceToSink = deltaX + deltaY;
+		float newTotalPathCost = (float) (newPartialPathCost + rnodeEstWlWeight * distanceToSink / sharingFactor
+				+ rnodeEstDlyWeight * (deltaX * 0.32 + deltaY * 0.16));
 		rnodesVisited.add(childRnode);
 		push(childRnode, rnode, newPartialPathCost, newTotalPathCost);
 	}
-	
-	/**
-	 * Computes the distance from a childRnode to the sink of a connection in the horizontal and vertical direction.
-	 * @param childRNode The childRnode being evaluated.
-	 * @param connection The connection being routed.
-	 */
-	private void computeDeltaXY(Routable childRNode, Connection connection) {
-		deltaX = (short) Math.abs(childRNode.getEndTileXCoordinate() - connection.getSinkRnode().getEndTileXCoordinate());
-		deltaY = (short) Math.abs(childRNode.getEndTileYCoordinate() - connection.getSinkRnode().getEndTileYCoordinate());
-	}
-	
-	/**
-	 * Gets total distance to the sink based on the distance in horizontal and vertical directions.
-	 * @return Total distance.
-	 */
-	private float distanceCostToSink(){
-		return (float)(deltaX + deltaY);
-	}
-	
+
 	/**
 	 * Gets the congestion cost and bias cost of a rnode.
 	 * @param rnode The rnode in question.
