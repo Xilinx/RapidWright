@@ -69,8 +69,6 @@ public class RoutableNode implements Routable{
 	private float upstreamPathCost;
 	/** Lower bound of the total path cost */
 	private float lowerBoundTotalPathCost;
-	/** A flag to indicate if the rnode has been visited or not during the expansion */
-	private boolean visited;
 	/** A variable that stores the parent of a rnode during expansion to facilitate tracing back */
 	private Routable prev;
 	/**
@@ -468,12 +466,14 @@ public class RoutableNode implements Routable{
 
 	@Override
 	public boolean isVisited() {
-		return visited;
+		return getPrev() != null;
 	}
 
 	@Override
 	public void setVisited(boolean visited) {
-		this.visited = visited;
+		if (!visited) {
+			setPrev(null);
+		}
 	}
 	
 	/**
