@@ -1,0 +1,518 @@
+/* 
+ * Copyright (c) 2022 Xilinx, Inc. 
+ * All rights reserved.
+ *
+ * Author: Jakob Wenzel, Xilinx Research Labs.
+ *  
+ * This file is part of RapidWright. 
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * 
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * 
+ */
+ 
+package com.xilinx.rapidwright.edif;
+
+import java.io.BufferedInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.Map;
+
+public abstract class AbstractEDIFParser {
+
+
+    public static final String LEFT_PAREN = "(";
+    public static final String RIGHT_PAREN = ")";
+    public static final String EDIF = "edif";
+    public static final String RENAME = "rename";
+    public static final String EDIFVERSION = "edifversion";
+    public static final String EDIFLEVEL = "ediflevel";
+    public static final String EXTERNAL = "external";
+    public static final String KEYWORDMAP = "keywordmap";
+    public static final String KEYWORDLEVEL = "keywordlevel";
+    public static final String STATUS = "status";
+    public static final String WRITTEN = "written";
+    public static final String TIMESTAMP = "timestamp";
+    public static final String PROGRAM = "program";
+    public static final String VERSION = "version";
+    public static final String COMMENT = "comment";
+    public static final String LIBRARY = "library";
+    public static final String TECHNOLOGY = "technology";
+    public static final String NUMBERDEFINITION = "numberdefinition";
+    public static final String CELL = "cell";
+    public static final String CELLTYPE = "celltype";
+    public static final String VIEW = "view";
+    public static final String VIEWTYPE = "viewtype";
+    public static final String INTERFACE = "interface";
+    public static final String PORT = "port";
+    public static final String DIRECTION = "direction";
+    public static final String ARRAY = "array";
+    public static final String CONTENTS = "contents";
+    public static final String INSTANCE = "instance";
+    public static final String NET = "net";
+    public static final String VIEWREF = "viewref";
+    public static final String CELLREF = "cellref";
+    public static final String LIBRARYREF = "libraryref";
+    public static final String PROPERTY = "property";
+    public static final String JOINED = "joined";
+    public static final String PORTREF = "portref";
+    public static final String MEMBER = "member";
+    public static final String INSTANCEREF = "instanceref";
+    public static final String DESIGN = "design";
+    public static final String METAX = "metax";
+    public static final String OWNER = "owner";
+
+    protected final EDIFTokenizer tokenizer;
+    protected final InputStream in;
+
+    public AbstractEDIFParser(Path fileName, InputStream in, NameUniquifier uniquifier, int maxTokenLength) {
+        this.in = in;
+        this.tokenizer = new EDIFTokenizer(fileName, in, uniquifier, maxTokenLength);
+    }
+
+    public AbstractEDIFParser(Path fileName, InputStream in, NameUniquifier uniquifier) {
+        this.in = in;
+        this.tokenizer = new EDIFTokenizer(fileName, in, uniquifier);
+    }
+
+    public AbstractEDIFParser(Path fileName, NameUniquifier uniquifier) throws FileNotFoundException {
+        try {
+            in = new BufferedInputStream(Files.newInputStream(fileName));
+            tokenizer = new EDIFTokenizer(fileName, in, uniquifier);
+        } catch (FileNotFoundException e) {
+            throw e;
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    private static EDIFToken requireToken(EDIFToken t) {
+        if (t==null) {
+            throw EDIFParseException.unexpectedEOF();
+        }
+        return t;
+    }
+
+    protected EDIFToken peekNextTokenWithOffset(){
+        return requireToken(tokenizer.peekOptionalNextToken());
+    }
+    protected String peekNextToken() {
+        return peekNextTokenWithOffset().text;
+    }
+
+    protected EDIFToken getNextTokenWithOffset() {
+        return requireToken(tokenizer.getOptionalNextToken());
+    }
+
+    protected String getNextToken() {
+        return getNextTokenWithOffset().text;
+    }
+
+
+    protected<T extends EDIFName> T parseEDIFNameObject(T o){
+        String currToken = getNextToken();
+        if(currToken.equals(EDIFParser.LEFT_PAREN)){
+            expect(EDIFParser.RENAME, getNextToken());
+            o.setEDIFRename(getNextToken());
+            // Handle issue with names beginning with '[]'
+            String name = getNextToken();
+            if(name.charAt(0) == '[' && name.length() >= 2 &&  name.charAt(1) == ']'){
+                String tmpName = name.substring(2);
+                name = tokenizer.uniquifier.uniquifyName(tmpName);
+            }
+            o.setName(name);
+            expect(EDIFParser.RIGHT_PAREN, getNextToken());
+        } else {
+            o.setName(currToken);
+        }
+        return o;
+    }
+
+    protected void expect(String expectedString, String token){
+        if(!expectedString.equals(token)){
+            if(expectedString.equals(token.toLowerCase())) return;
+            throw new EDIFParseException("Parsing Error: Expected token: " + expectedString +
+                    ", encountered: " + token + " before byte offset "+tokenizer.byteOffset+".");
+        }
+    }
+
+    protected EDIFNetlist parseEDIFNetlistHead() {
+        expect(LEFT_PAREN, getNextToken());
+        expect(EDIF, getNextToken());
+        EDIFNetlist netlist = parseEDIFNameObject(new EDIFNetlist());
+        expect(LEFT_PAREN, getNextToken());
+        expect(EDIFVERSION, getNextToken());
+        expect("2", getNextToken());
+        expect("0", getNextToken());
+        expect("0", getNextToken());
+        expect(RIGHT_PAREN, getNextToken());
+        expect(LEFT_PAREN, getNextToken());
+        expect(EDIFLEVEL, getNextToken());
+        expect("0", getNextToken());
+        expect(RIGHT_PAREN, getNextToken());
+        expect(LEFT_PAREN, getNextToken());
+        expect(KEYWORDMAP, getNextToken());
+        expect(LEFT_PAREN, getNextToken());
+        expect(KEYWORDLEVEL, getNextToken());
+        expect("0", getNextToken());
+        expect(RIGHT_PAREN, getNextToken());
+        expect(RIGHT_PAREN, getNextToken());
+
+        return netlist;
+    }
+
+
+
+    protected EDIFCell parseEDIFCell(String libraryLegalName){
+        expect(CELL, getNextToken());
+        EDIFCell cell = parseEDIFNameObject(new EDIFCell());
+        cell = updateEDIFRefCellMap(libraryLegalName, cell);
+        Map<String, EDIFCellInst> instanceLookup = new HashMap<>();
+        expect(LEFT_PAREN, getNextToken());
+        expect(CELLTYPE, getNextToken());
+        expect("GENERIC", getNextToken());
+        expect(RIGHT_PAREN, getNextToken());
+
+        expect(LEFT_PAREN, getNextToken());
+        expect(VIEW, getNextToken());
+        cell.setView(parseEDIFNameObject(new EDIFName()));
+        expect(LEFT_PAREN, getNextToken());
+        expect(VIEWTYPE, getNextToken());
+        expect("NETLIST", getNextToken());
+        expect(RIGHT_PAREN, getNextToken());
+
+        expect(LEFT_PAREN, getNextToken());
+        expect(INTERFACE, getNextToken());
+        String currToken = null;
+        while(LEFT_PAREN.equals(currToken = getNextToken())){
+            EDIFPort p = parseEDIFPort();
+            cell.addPort(p);
+        }
+        expect(RIGHT_PAREN, currToken); // Interface end
+
+        while(LEFT_PAREN.equals(currToken = getNextToken())){
+            String contentsOrProperty = peekNextToken();
+            if(contentsOrProperty.equals(CONTENTS)){ // Optional content
+                expect(CONTENTS, getNextToken());
+                while(LEFT_PAREN.equals(currToken = getNextToken())){
+                    String nextToken = peekNextToken();
+                    if(nextToken.equals(INSTANCE)){
+                        cell.addCellInst(parseEDIFCellInst(libraryLegalName, instanceLookup, cell));
+                    } else if(nextToken.equals(NET)){
+                        parseEDIFNet(cell, instanceLookup);
+                    } else {
+                        expect(INSTANCE + " | " + NET, nextToken);
+                    }
+                }
+                expect(RIGHT_PAREN, currToken); // Content end
+            }else if (contentsOrProperty.equals(PROPERTY)){
+                parseProperty(cell);
+            }else{
+                expect(CONTENTS + " | " + PROPERTY, contentsOrProperty);
+            }
+        }
+        expect(RIGHT_PAREN, currToken); // View end
+        expect(RIGHT_PAREN, getNextToken()); // Cell end
+        return cell;
+    }
+
+    protected abstract EDIFCell updateEDIFRefCellMap(String libraryLegalName, EDIFCell cell);
+
+    protected void parseStatus(EDIFNetlist currNetlist) {
+        expect(STATUS, getNextToken());
+        expect(LEFT_PAREN, getNextToken());
+        expect(WRITTEN, getNextToken());
+        expect(LEFT_PAREN, getNextToken());
+        expect(TIMESTAMP, getNextToken());
+        int year = Integer.parseInt(getNextToken());
+        int month = Integer.parseInt(getNextToken());
+        int day = Integer.parseInt(getNextToken());
+        int hour = Integer.parseInt(getNextToken());
+        int min = Integer.parseInt(getNextToken());
+        int sec = Integer.parseInt(getNextToken());
+        expect(RIGHT_PAREN, getNextToken());
+        expect(LEFT_PAREN, getNextToken());
+        expect(PROGRAM, getNextToken());
+        String progName = getNextToken();
+        expect(LEFT_PAREN, getNextToken());
+        expect(VERSION, getNextToken());
+        String ver = getNextToken();
+        expect(RIGHT_PAREN, getNextToken());
+        expect(RIGHT_PAREN, getNextToken());
+
+        String currToken;
+        while(LEFT_PAREN.equals(currToken = getNextToken())){
+            String commentOrMetax = getNextToken();
+            if(commentOrMetax.equals(COMMENT)){
+                currNetlist.addComment(getNextToken());
+
+            }else if(commentOrMetax.equals(METAX)){
+                String key = getNextToken();
+                EDIFPropertyValue value = parsePropertyValue();
+                currNetlist.addMetax(key,value);
+            }else{
+                expect(COMMENT + "|" + METAX, commentOrMetax);
+            }
+            expect(RIGHT_PAREN, getNextToken());
+        }
+        expect(RIGHT_PAREN, currToken);
+        expect(RIGHT_PAREN, getNextToken());
+    }
+
+    protected EDIFPropertyValue parsePropertyValue(){
+        expect(LEFT_PAREN,getNextToken());
+        EDIFPropertyValue val = new EDIFPropertyValue();
+        val.setType(EDIFValueType.valueOf(getNextToken().toUpperCase()));
+        if(val.getType() == EDIFValueType.BOOLEAN){
+            expect(LEFT_PAREN,getNextToken());
+            val.setValue(getNextToken());
+            expect(RIGHT_PAREN,getNextToken());
+        }else {
+            val.setValue(getNextToken());
+        }
+        expect(RIGHT_PAREN,getNextToken());
+        return val;
+    }
+
+    protected EDIFLibrary parseEdifLibraryHead() {
+        String token = getNextToken();
+        if (!token.equalsIgnoreCase(EXTERNAL) && !token.equalsIgnoreCase(LIBRARY) ) {
+            expect(LIBRARY + "|" + EXTERNAL, token);
+        }
+        EDIFLibrary library = parseEDIFNameObject(new EDIFLibrary());
+        expect(LEFT_PAREN, getNextToken());
+        expect(EDIFLEVEL, getNextToken());
+        @SuppressWarnings("unused")
+        int level = Integer.parseInt(getNextToken());
+        expect(RIGHT_PAREN, getNextToken());
+
+        expect(LEFT_PAREN, getNextToken());
+        expect(TECHNOLOGY, getNextToken());
+        expect(LEFT_PAREN, getNextToken());
+        expect(NUMBERDEFINITION, getNextToken());
+        expect(RIGHT_PAREN, getNextToken());
+        expect(RIGHT_PAREN, getNextToken());
+        return library;
+    }
+
+    protected EDIFPropertyObject parseProperty(EDIFPropertyObject o){
+        expect(PROPERTY, getNextToken());
+        EDIFName key = parseEDIFNameObject(new EDIFName());
+        EDIFPropertyValue value = parsePropertyValue();
+        o.addProperty(key,value);
+        String paren = getNextToken();
+        if(paren.equals(RIGHT_PAREN)) {
+            // pass - nothing more to do here
+        }
+        else if(paren.equals(LEFT_PAREN)){
+            expect(OWNER, getNextToken());
+            o.setOwner(getNextToken());
+            expect(RIGHT_PAREN,getNextToken());
+            expect(RIGHT_PAREN,getNextToken());
+        }else{
+            expect(RIGHT_PAREN + "|" + LEFT_PAREN, paren);
+        }
+
+        return o;
+    }
+
+    protected EDIFNet parseEDIFNet(EDIFCell cell, Map<String, EDIFCellInst> instanceLookup){
+        expect(NET, getNextToken());
+        EDIFNet net = parseEDIFNameObject(new EDIFNet());
+        expect(LEFT_PAREN, getNextToken());
+        expect(JOINED, getNextToken());
+        String currToken = null;
+        cell.addNet(net);
+        while(LEFT_PAREN.equals(currToken = getNextToken())){
+            parseEDIFPortInst(cell, instanceLookup,net);
+        }
+        expect(RIGHT_PAREN, currToken);
+        while(LEFT_PAREN.equals(currToken = getNextToken())){
+            parseProperty(net);
+        }
+        expect(RIGHT_PAREN,currToken);
+
+
+        return net;
+    }
+
+    protected abstract void linkEdifPortInstToCellInst(EDIFCell parentCell, EDIFPortInst portInst, EDIFNet net);
+
+    private void parseEDIFPortInst(EDIFCell parentCell, Map<String, EDIFCellInst> instanceLookup, EDIFNet net){
+        expect(PORTREF,getNextToken());
+        String currToken = getNextToken();
+        EDIFPortInst portInst = new EDIFPortInst();
+        if(currToken.equals(LEFT_PAREN)){
+            expect(MEMBER,getNextToken());
+            portInst.setName(getNextToken());
+            portInst.setIndex(Integer.parseInt(getNextToken()));
+            expect(RIGHT_PAREN,getNextToken());
+        }else{
+            portInst.setName(currToken);
+        }
+
+        currToken = getNextToken();
+
+        if(currToken.equals(LEFT_PAREN)){
+            expect(INSTANCEREF,getNextToken());
+            String instanceref = getNextToken();
+            portInst.setCellInstRaw(getRefEDIFCellInst(instanceref, instanceLookup));
+            expect(RIGHT_PAREN,getNextToken());
+            expect(RIGHT_PAREN,getNextToken());
+        }else{
+            // This is a port to higher level
+            expect(RIGHT_PAREN,currToken);
+        }
+
+        linkEdifPortInstToCellInst(parentCell, portInst, net);
+    }
+
+    /**
+     * Get the reference cell instance by the given legal EDIF name.
+     * @param edifCellInstName Legal EDIF name for the cell instance.
+     * @return The existing cell instance or the reference instance that
+     * will be used when the cell instance is fully parsed.
+     */
+    protected EDIFCellInst getRefEDIFCellInst(String edifCellInstName, Map<String, EDIFCellInst> instanceLookup){
+        EDIFCellInst inst = instanceLookup.get(edifCellInstName);
+        if(inst == null) {
+            throw new EDIFParseException("ERROR: Bad instance ref "+ edifCellInstName);
+        }
+        return inst;
+    }
+
+    private EDIFPort parseEDIFPort(){
+        expect(PORT, getNextToken());
+        String currToken = getNextToken();
+        EDIFPort port = null;
+        if(currToken.equals(LEFT_PAREN)){
+            currToken = getNextToken();
+            if(currToken.equals(ARRAY)){
+                port = parseEDIFNameObject(new EDIFPort());
+                port.setWidth(Integer.parseInt(getNextToken()));
+                expect(RIGHT_PAREN, getNextToken());
+            } else if(currToken.equals(RENAME)){
+                port = new EDIFPort();
+                port.setEDIFRename(getNextToken());
+                port.setName(getNextToken());
+                expect(RIGHT_PAREN, getNextToken());
+            } else {
+                expect(ARRAY + " | " + RENAME, currToken);
+            }
+        }else{
+            port = new EDIFPort();
+            port.setName(currToken);
+        }
+        port.setIsLittleEndian();
+        expect(LEFT_PAREN, getNextToken());
+        expect(DIRECTION, getNextToken());
+        port.setDirection(EDIFDirection.valueOf(getNextToken()));
+        expect(RIGHT_PAREN, getNextToken());
+
+        while(LEFT_PAREN.equals(currToken = getNextToken())){
+            parseProperty(port);
+        }
+        expect(RIGHT_PAREN, currToken);
+        return port;
+    }
+
+    private EDIFCellInst parseEDIFCellInst(String currentLibraryName, Map<String, EDIFCellInst> instanceLookup, EDIFCell currentCell){
+        expect(INSTANCE, getNextToken());
+        EDIFCellInst inst = parseEDIFNameObject(new EDIFCellInst());
+        inst = updateEDIFRefCellInstMap(inst, instanceLookup);
+        expect(LEFT_PAREN,getNextToken());
+        expect(VIEWREF,getNextToken());
+        inst.setViewref(parseEDIFNameObject(new EDIFName()));
+        expect(LEFT_PAREN,getNextToken());
+        expect(CELLREF,getNextToken());
+        String cellref = getNextToken();
+
+        if (LEFT_PAREN.equals(peekNextToken())) {
+            expect(LEFT_PAREN, getNextToken());
+            expect(LIBRARYREF, getNextToken());
+            String libraryref = getNextToken();
+            linkCellInstToCell(inst, cellref, libraryref, currentCell);
+            expect(RIGHT_PAREN, getNextToken());
+        } else {
+            linkCellInstToCell(inst, cellref, currentLibraryName, currentCell);
+        }
+
+        expect(RIGHT_PAREN,getNextToken());
+        expect(RIGHT_PAREN,getNextToken());
+        String currToken = null;
+        while(LEFT_PAREN.equals(currToken = getNextToken())){
+            parseProperty(inst);
+        }
+        expect(RIGHT_PAREN, currToken);
+
+        return inst;
+    }
+
+    protected abstract void linkCellInstToCell(EDIFCellInst inst, String cellref, String libraryref, EDIFCell currentCell);
+
+    /**
+     * This method arbitrates between freshly created {@link EDIFCellInst} and
+     * those created temporarily as references.  It will take a freshly created
+     * {@link EDIFCellInst} that was generated by parsing the definition in the
+     * EDIF file and choose the proper one to populate.
+     * @param inst
+     * @return The {@link EDIFCellInst} to be used going forward
+     */
+    private EDIFCellInst updateEDIFRefCellInstMap(EDIFCellInst inst, Map<String, EDIFCellInst> instanceLookup){
+        EDIFCellInst existingInst = instanceLookup.get(inst.getLegalEDIFName());
+        if(existingInst != null){
+            existingInst.setName(inst.getName());
+            existingInst.setEDIFRename(inst.getEDIFName());
+            return existingInst;
+        }
+        instanceLookup.put(inst.getLegalEDIFName(), inst);
+        return inst;
+    }
+
+    protected static void doLinkPortInstToCellInst(EDIFCell parentCell, EDIFPortInst portInst, NameUniquifier uniquifier, EDIFNet net) {
+        EDIFCell portCell = parentCell;
+        if (portInst.getCellInst() != null) {
+            portCell = portInst.getCellInst().getCellType();
+        }
+        if (portCell ==null) {
+            throw new NullPointerException();
+        }
+        EDIFPort port = portCell.getPort(portInst.getName());
+        if(port == null) {
+            // Finding by EDIFName is O(n), but n is generally small and alternative to building
+            // a map for this single search ends up taking longer
+            for(Map.Entry<String,EDIFPort> e : portCell.getPortMap().entrySet()) {
+                if(e.getValue().getLegalEDIFName().equals(portInst.getName())) {
+                    port = e.getValue();
+                    break;
+                }
+            }
+        }
+
+        if(port == null) {
+            throw new EDIFParseException("ERROR: Couldn't find EDIFPort for "
+                    + "EDIFPortInst " + portInst.getName());
+        }
+        portInst.setPort(port);
+        String portInstName = portInst.getPortInstNameFromPort();
+        portInst.setName(uniquifier.uniquifyName(portInstName));
+        if(portInst.getCellInst() != null) {
+            portInst.getCellInst().addPortInst(portInst);
+        }
+        net.addPortInst(portInst);
+    }
+}
