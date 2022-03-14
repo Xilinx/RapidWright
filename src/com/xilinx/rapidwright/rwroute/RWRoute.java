@@ -24,6 +24,7 @@
 package com.xilinx.rapidwright.rwroute;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -677,12 +678,12 @@ public class RWRoute{
 	 */
 	private void estimateDelayOfConnections() {	
 		for(Connection connection : indirectConnections) {
-			RoutableNode source = (RoutableNode) connection.getSourceRnode();
+			Routable source = connection.getSourceRnode();
 			setChildrenOfRnode(source);			
-			if(source.getChildren().isEmpty()) {
+			if(source.getChildren().length == 0) {
 				// output pin is blocked
 				swapOutputPin(connection);
-				source = (RoutableNode) connection.getSourceRnode();
+				source = connection.getSourceRnode();
 				setChildrenOfRnode(source);
 			}
 			short estDelay = (short) 10000;
@@ -1004,15 +1005,13 @@ public class RWRoute{
 	}
 	
 	private float comupteAverageChildren() {
-		float sumChildren = 0;
-		float sumRNodes = 0;
+		int sumChildren = 0;
+		int sumRNodes = 0;
 		for(Routable rn : rnodesCreated.values()){	
-			if(!rn.isChildrenUnset()){
-				sumChildren += rn.getChildren().size();
-				sumRNodes++;
-			}
+			sumChildren += rn.getChildren().length;
+			sumRNodes++;
 		}
-		return sumChildren / sumRNodes;
+		return (float) sumChildren / sumRNodes;
 	}
 	
 	static List<IntentCode> nodeTypes = new ArrayList<>();
@@ -1302,9 +1301,9 @@ public class RWRoute{
 					// Without this routethru check, there will be Invalid Programming for Site error shown in Vivado.
 					// Do not use those nodes, because we do not know if the routethru is available or not
 					if(routethruHelper.isRouteThru(uphill, toBuild)) continue;
-					RoutableNode parent = (RoutableNode) rnodesCreated.get(uphill);
-					if(parent != null && !parent.isChildrenUnset()) {
-						if(!parent.getChildren().contains(rnode)) parent.getChildren().add(rnode);
+					Routable parent = rnodesCreated.get(uphill);
+					if(parent != null && !Arrays.stream(parent.getChildren()).anyMatch(rnode::equals)) {
+						parent.addChild(rnode);
 					}
 				}
 			}
@@ -1321,9 +1320,7 @@ public class RWRoute{
 	 */
 	private void setChildrenOfRnode(Routable rnode) {
 		rnodesTimer.start();
-		if(rnode.isChildrenUnset()) {
-			rnode.setChildren(rnodesCreated, preservedNodes.keySet(), routethruHelper);
-		}
+		rnode.setChildren(rnodesCreated, preservedNodes.keySet(), routethruHelper);
 		rnodesTimer.stop();
 	}
 	

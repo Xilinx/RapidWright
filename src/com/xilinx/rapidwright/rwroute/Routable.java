@@ -23,7 +23,6 @@
 
 package com.xilinx.rapidwright.rwroute;
 
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -61,23 +60,6 @@ public interface Routable {
 	 * @return The number of users.
 	 */
 	int getOccupancy();
-	/**
-	 * Sets the x and y coordinates of the INT {@link Tile} instance
-	 * that the associated {@link Node} instance stops at.
-	 */
-	void setEndTileXYCoordinates();
-	/**
-	 * Sets the x coordinate of the INT {@link Tile} instance
-	 * that the associated {@link Node} instance stops at.
-	 * @param x The tileXCoordinate of the INT tile that the associated {@link Node} instance stops at.
-	 */
-	void setEndTileXCoordinate(short x);
-	/**
-	 * Sets the Y coordinate of the INT {@link Tile} instance
-	 * that the associated {@link Node} instance stops at.
-	 * @param y The tileYCoordinate of the INT tile that the associated {@link Node} instance stops at.
-	 */
-	void setEndTileYCoordinate(short y);
 	/**
 	 * Gets the x coordinate of the INT {@link Tile} instance
 	 * that the associated {@link Node} instance stops at.
@@ -172,11 +154,6 @@ public interface Routable {
 	 */
 	float getDelay();
 	/**
-	 * Checks if the children of a Routable Object have been set or not.
-	 * @return true, if the children have not been set.
-	 */
-	boolean isChildrenUnset();
-	/**
 	 * Gets the Manhattan distance from a Routable Object to the target Routable Object, typically the sink Routable Object of a connection.
 	 * @param sink The target Routable Object.
 	 * @return The Manhattan distance from a Routable Object to the target Routable Object.
@@ -193,7 +170,13 @@ public interface Routable {
 	 * Gets the children of a Routable Object.
 	 * @return A list of Routable Objects.
 	 */
-	List<Routable> getChildren();
+	Routable[] getChildren();
+
+	/**
+	 * Adds a child to this node.
+	 * @param rnode Child to be added.
+	 */
+	void addChild(Routable rnode);
 	
 	/**
 	 * Sets the lower bound total path cost.
