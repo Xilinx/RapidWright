@@ -556,7 +556,7 @@ public class RouterHelper {
 	 *  {@code superSource -> Q -> O -> --- -> D.}
 	 */
 	public static void getSamplePathDelay(String filePath, TimingManager timingManager,
-			Map<TimingEdge, Connection> timingEdgeConnectionMap, Map<Node, Routable> rnodesCreated) {
+			Map<TimingEdge, Connection> timingEdgeConnectionMap, RoutableGraph routingGraph) {
 		List<String> verticesOfVivadoPath = new ArrayList<>();
 		// Include CLK if the first in the path is BRAM or DSP to check the logic delay
 		// NOTE: remember to change the pin names of DSPs from subblock to top-level block that we use
@@ -575,7 +575,7 @@ public class RouterHelper {
 			e.printStackTrace();
 		}
 		System.out.println(verticesOfVivadoPath);
-		timingManager.getSamplePathDelayInfo(verticesOfVivadoPath, timingEdgeConnectionMap, true, rnodesCreated);
+		timingManager.getSamplePathDelayInfo(verticesOfVivadoPath, timingEdgeConnectionMap, true, routingGraph);
 	}
 
 	/**

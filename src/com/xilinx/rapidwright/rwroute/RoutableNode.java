@@ -36,7 +36,6 @@ import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
-import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 
 /**
@@ -45,7 +44,7 @@ import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
  */
 public class RoutableNode implements Routable{
 	/** The associated {@link Node} instance */
-	private Node node;
+	protected Node node;
 	/** The type of a rnode*/
 	private RoutableType type;
 	/** The tileXCoordinate and tileYCoordinate of the INT tile that the associated node stops at */
@@ -60,7 +59,7 @@ public class RoutableNode implements Routable{
 	/** A flag to indicate if this rnode is the target */
 	private boolean isTarget;
 	/** The children (downhill rnodes) of this rnode */
-	private Routable[] children;
+	protected Routable[] children;
 	
 	/** Present congestion cost */
 	private float presentCongestionCost;
@@ -123,7 +122,7 @@ public class RoutableNode implements Routable{
 		}
 	}
 	
-	public void setChildren(Map<Node, Routable> createdRoutable, Set<Node> reserved, RouteThruHelper routethruHelper){
+	public void setChildren(Map<Node, Routable> createdRoutable, Set<Node> reserved/*, RouteThruHelper routethruHelper*/){
 		if (children != null)
 			return;
 
@@ -349,7 +348,6 @@ public class RoutableNode implements Routable{
 	@Override
 	public void setLowerBoundTotalPathCost(float totalPathCost) {
 		lowerBoundTotalPathCost = totalPathCost;
-		setVisited(true);
 	}
 	
 	@Override
@@ -464,9 +462,8 @@ public class RoutableNode implements Routable{
 
 	@Override
 	public void setVisited(boolean visited) {
-		if (!visited) {
+		assert(!visited);
 			setPrev(null);
-		}
 	}
 	
 	/**
