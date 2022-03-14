@@ -321,14 +321,8 @@ public class RoutableNode implements Routable{
 		children[children.length-1] = rnode;
 	}
 
-	@Override
-	public void setDelay(short delay) {
+	private void setDelay(short delay) {
 		this.delay = delay;
-	}
-
-	@Override
-	public int manhattanDistToSink(Routable sink) {
-		return Math.abs(getEndTileXCoordinate() - sink.getEndTileXCoordinate()) + Math.abs(getEndTileYCoordinate() - sink.getEndTileYCoordinate());
 	}
 
 	private void setRoutableType(RoutableType type) {
