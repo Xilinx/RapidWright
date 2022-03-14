@@ -29,7 +29,6 @@ import java.util.Set;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Tile;
-import com.xilinx.rapidwright.router.RouteThruHelper;
 
 /**
  * A Routable Object corresponds to a vertex of the routing resource graph.
@@ -152,9 +151,8 @@ public interface Routable {
 	 * Sets the children of a Routable Object.
 	 * @param rnodesCreated The map of nodes to created Routable Objects.
 	 * @param reservedNodes The set of all preserved nodes.
-	 * @param routethruHelper The routethru helper to check if the Node of a Routable Object and a downhill node of it makes up a routetru.
 	 */
-	void setChildren(Map<Node, Routable> rnodesCreated, Set<Node> reservedNodes, RouteThruHelper routethruHelper);
+	void setChildren(Map<Node, Routable> rnodesCreated, Set<Node> reservedNodes);
 	/**
 	 * Gets the children of a Routable Object.
 	 * @return A list of Routable Objects.

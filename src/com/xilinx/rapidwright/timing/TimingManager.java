@@ -34,6 +34,7 @@ import com.xilinx.rapidwright.rwroute.RWRouteConfig;
 import com.xilinx.rapidwright.rwroute.Connection;
 import com.xilinx.rapidwright.rwroute.NetWrapper;
 import com.xilinx.rapidwright.rwroute.Routable;
+import com.xilinx.rapidwright.rwroute.RoutableGraph;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 import com.xilinx.rapidwright.util.MessageGenerator;
 import com.xilinx.rapidwright.util.Pair;
@@ -170,7 +171,7 @@ public class TimingManager {
     	}
     }
     
-    public void getCriticalPathInfo(Pair<Float, TimingVertex> maxDelayTimingVertex, boolean useRoutable, Map<Node, Routable> rnodesCreated){
+    public void getCriticalPathInfo(Pair<Float, TimingVertex> maxDelayTimingVertex, boolean useRoutable, RoutableGraph routingGraph){
     	TimingVertex maxV = maxDelayTimingVertex.getSecond();
     	float maxDelay = maxDelayTimingVertex.getFirst();
     	System.out.printf(MessageGenerator.formatString("Timing requirement (ps):", timingRequirement));
@@ -187,23 +188,23 @@ public class TimingManager {
     	System.out.printf(MessageGenerator.formatString("Critical path delay (ps):", (short)adjusted));
     	System.out.printf(MessageGenerator.formatString("Slack (ps):", (short) (timingRequirement - adjusted)));
     	
-    	this.printPathDelayBreakDown(arr, criticalEdges, this.timingGraph.getTimingEdgeConnectionMap(), useRoutable, rnodesCreated);
+    	this.printPathDelayBreakDown(arr, criticalEdges, this.timingGraph.getTimingEdgeConnectionMap(), useRoutable, routingGraph);
     }
     
     /**
      * Gets and prints the given path from the TimingGraph
      */
-    public void getSamplePathDelayInfo(List<String> verticesOfVivadoPath, Map<TimingEdge, Connection> timingEdgeConnctionMap, boolean routableBased, Map<Node, Routable> rnodesCreated) {
+    public void getSamplePathDelayInfo(List<String> verticesOfVivadoPath, Map<TimingEdge, Connection> timingEdgeConnctionMap, boolean routableBased, RoutableGraph routingGraph) {
     	List<TimingEdge> edges = this.timingGraph.getTimingEdgeOfPath(verticesOfVivadoPath);
     	short totalDelay = 0;
     	for(TimingEdge edge : edges) {
     		totalDelay += edge.getDelay();
     	}
     	System.out.println("Total delay: " + totalDelay);
-    	this.printPathDelayBreakDown(totalDelay, edges, timingEdgeConnctionMap, routableBased, rnodesCreated);
+    	this.printPathDelayBreakDown(totalDelay, edges, timingEdgeConnctionMap, routableBased, routingGraph);
     }
     
-    private void printPathDelayBreakDown(short arr, List<TimingEdge> criticalEdges, Map<TimingEdge, Connection> timingEdgeConnctionMap, boolean useRoutable, Map<Node, Routable> rnodesCreated) {
+    private void printPathDelayBreakDown(short arr, List<TimingEdge> criticalEdges, Map<TimingEdge, Connection> timingEdgeConnctionMap, boolean useRoutable, RoutableGraph routingGraph) {
     	if(verbose) {
     		System.out.println("\nTimingEdges:");
         	int id = 0;
@@ -212,7 +213,7 @@ public class TimingManager {
         	}
     	}
     	this.printTimingPathInTable(criticalEdges, arr);
-    	if(rnodesCreated == null) return;
+    	if(routingGraph == null) return;
     	if(!verbose) return;
     	for(TimingEdge edge : criticalEdges) {
     		if(timingEdgeConnctionMap.containsKey(edge)){
@@ -225,7 +226,7 @@ public class TimingManager {
     			}else {
     				List<Node> nodes = timingEdgeConnctionMap.get(edge).getNodes();
         			for(int iGroup = nodes.size() -1; iGroup >= 0; iGroup--) {
-        				Routable rnode = rnodesCreated.get(nodes.get(iGroup));
+        				Routable rnode = routingGraph.getNode(nodes.get(iGroup));
         				if(rnode != null) {
         					System.out.println("\t " + rnode.getNode() + ", " + rnode.getNode().getIntentCode() + ", delay = " + (short) rnode.getDelay());
         				}else {
