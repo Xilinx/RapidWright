@@ -24,6 +24,7 @@
 package com.xilinx.rapidwright.rwroute;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -59,7 +60,7 @@ public class RoutableNode implements Routable{
 	/** A flag to indicate if this rnode is the target */
 	private boolean isTarget;
 	/** The children (downhill rnodes) of this rnode */
-	private List<Routable> children;
+	private Routable[] children;
 	
 	/** Present congestion cost */
 	private float presentCongestionCost;
@@ -116,27 +117,31 @@ public class RoutableNode implements Routable{
     	setVisited(false);
 		usersConnectionCounts = null;
 		driversCounts = null;
-		prev = null;
+		setPrev(null);
 		if(timingDriven){
 			setDelay(RouterHelper.computeNodeDelay(delayEstimator, node));
 		}
 	}
 	
 	public void setChildren(Map<Node, Routable> createdRoutable, Set<Node> reserved, RouteThruHelper routethruHelper){
-		children = new ArrayList<>();
+		if (children != null)
+			return;
 
 		List<Node> allDownHillNodes = node.getAllDownhillNodes();
+		List<Routable> childrenList = new ArrayList<>(allDownHillNodes.size());
 		for(Node node:allDownHillNodes){
 			if(reserved.contains(node)) continue;		
-			if(isExcluded(node, timingDriven)) continue;
-			if(routethruHelper.isRouteThru(node, node)) continue;
+			if(isExcluded(node)) continue;
+			// FIXME: What is the meaning of checking that a node routethru-s to itself?
+			// if(routethruHelper.isRouteThru(node, node)) continue;
 
 			Routable child = createdRoutable.computeIfAbsent(node, (k) -> {
 				RoutableType type = RoutableType.WIRE;
 				return new RoutableNode(node, type);
 			});
-			children.add(child);//the sink rnode of a target connection has been created up-front
+			childrenList.add(child);//the sink rnode of a target connection has been created up-front
 		}
+		children = childrenList.toArray(new Routable[0]);
 	}
 	
 	private void setBaseCost(RoutableType type){
@@ -198,8 +203,7 @@ public class RoutableNode implements Routable{
 		return Routable.capacity < uniqueDriverCount();
 	}
 
-	@Override
-	public void setEndTileXYCoordinates() {
+	private void setEndTileXYCoordinates() {
 		Wire[] wires = node.getAllWiresInNode();
 		List<Tile> intTiles = new ArrayList<>();
 		for(Wire w : wires) {
@@ -294,16 +298,6 @@ public class RoutableNode implements Routable{
 	}
 
 	@Override
-	public void setEndTileXCoordinate(short endTileXCoordinate) {
-		this.endTileXCoordinate = endTileXCoordinate;
-	}
-
-	@Override
-	public void setEndTileYCoordinate(short endTileYCoordinate) {
-		this.endTileYCoordinate = endTileYCoordinate;
-	}
-
-	@Override
 	public short getEndTileYCoordinate() {
 		return endTileYCoordinate;
 	}
@@ -313,13 +307,18 @@ public class RoutableNode implements Routable{
 		return baseCost;
 	}
 
-	public boolean isChildrenUnset() {
-		return children == null;
+	@Override
+	public Routable[] getChildren() {
+		return children != null ? children : new Routable[0];
 	}
 
 	@Override
-	public List<Routable> getChildren() {
-		return children;
+	public void addChild(Routable rnode) {
+		// FIXME: This is inefficient, but is currently only used by
+		//        RWRoute.unrouteReservedNetsToReleaseResources()
+		//        which is due for an overhaul
+		children = Arrays.copyOf(children, children.length+1);
+		children[children.length-1] = rnode;
 	}
 
 	@Override
@@ -504,30 +503,33 @@ public class RoutableNode implements Routable{
 	/**
 	 * Checks if some routing resources are prevented from being used.
 	 * @param node The routing resource in question.
-	 * @param timingDriven To indicate if it targets timing-driven routing.
 	 * @return true, if the node should be excluded from the routing resource graph.
 	 */
-	public static boolean isExcluded(Node node, boolean timingDriven) {
+	public static boolean isExcluded(Node node) {
 		Tile tile = node.getTile();
     	if(tile.getTileTypeEnum() == TileTypeEnum.INT) {
-	        if(timingDriven && maskNodesCrossRCLK) {
-	        	int y = tile.getTileYCoordinate();
-		        if ((y-30)%60 == 0) { // above RCLK
-		        	return excludeAboveRclk.contains(node.getWireName());
-		        } else if ((y-29)%60 == 0) { // below RCLK
-		        	return excludeBelowRclk.contains(node.getWireName());
-		        }
-	        }
-	        return false;
+			if(timingDriven && maskNodesCrossRCLK) {
+				int y = tile.getTileYCoordinate();
+				if ((y-30)%60 == 0) { // above RCLK
+					return excludeAboveRclk.contains(node.getWireName());
+				} else if ((y-29)%60 == 0) { // below RCLK
+					return excludeBelowRclk.contains(node.getWireName());
+				}
+			}
+			return false;
         }else {
-			return !tile.getName().startsWith("LAG");
+			// return !tile.getName().startsWith("LAG");
+			// TODO: Is this equivalent to the above?
+			return !lagunaTileEnums.contains(tile.getTileTypeEnum());
+
 		}
 	}
 	 
 	final private static Set<String> excludeAboveRclk;
 	final private static Set<String> excludeBelowRclk;
+	final private static Set<TileTypeEnum> lagunaTileEnums;
 	static {
-	        // these nodes are bleeding down
+		// these nodes are bleeding down
 		excludeAboveRclk = new HashSet<String>() {{
 			add("SDQNODE_E_0_FT1");
 			add("SDQNODE_E_2_FT1");
@@ -536,18 +538,25 @@ public class RoutableNode implements Routable{
 			add("EE12_BEG0");
 			add("WW2_E_BEG0");
 			add("WW2_W_BEG0");
-	     }};
+		}};
 	        // these nodes are bleeding up
-	     excludeBelowRclk = new HashSet<String>() {{
-	    	 add("SDQNODE_E_91_FT0");
-	    	 add("SDQNODE_E_93_FT0");
-	    	 add("SDQNODE_E_95_FT0");
-	    	 add("SDQNODE_W_91_FT0");
-	    	 add("SDQNODE_W_93_FT0");
-	    	 add("SDQNODE_W_95_FT0");
-	    	 add("EE12_BEG7");
-	    	 add("WW1_W_BEG7");
-	     }};
+		excludeBelowRclk = new HashSet<String>() {{
+			add("SDQNODE_E_91_FT0");
+			add("SDQNODE_E_93_FT0");
+			add("SDQNODE_E_95_FT0");
+			add("SDQNODE_W_91_FT0");
+			add("SDQNODE_W_93_FT0");
+			add("SDQNODE_W_95_FT0");
+			add("EE12_BEG7");
+			add("WW1_W_BEG7");
+		}};
+
+		lagunaTileEnums = new HashSet<>();
+		for (TileTypeEnum e : TileTypeEnum.values()) {
+			if (e.toString().startsWith("LAG")) {
+				lagunaTileEnums.add(e);
+			}
+		}
 	}
 	
 }
