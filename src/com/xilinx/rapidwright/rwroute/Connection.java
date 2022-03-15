@@ -89,7 +89,7 @@ public class Connection implements Comparable<Connection>{
 		criticality = 0f;
 		rnodes = new ArrayList<>();
 		this.netWrapper = netWrapper;
-		this.netWrapper.addConnection(this);
+		netWrapper.addConnection(this);
 	}
 	
 	/**

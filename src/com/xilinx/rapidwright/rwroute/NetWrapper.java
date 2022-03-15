@@ -50,7 +50,6 @@ public class NetWrapper{
 		this.id = id;
 		this.net = net;
 		connections = new ArrayList<>();
-		setSourceChanged(false);
 	}
 	
 	public void computeHPWLAndCenterCoordinates(){
@@ -86,18 +85,14 @@ public class NetWrapper{
 			ySum += y;
 			count++;
 		}
-		
-		setDoubleHpwl((short) ((xMax - xMin + 1 + yMax - yMin + 1) * 2));
-		setXCenter((float)xSum / count);
-		setYCenter((float)ySum / count);
+
+		doubleHpwl = (short) ((xMax - xMin + 1 + yMax - yMin + 1) * 2);
+		xCenter = (float)xSum / count;
+		yCenter = (float)ySum / count;
 	}
 	
 	public Net getNet(){
 		return net;
-	}
-	
-	public int getId() {
-		return id;
 	}
 	
 	public void addConnection(Connection connection){
@@ -112,34 +107,14 @@ public class NetWrapper{
 		return doubleHpwl;
 	}
 
-	public void setDoubleHpwl(short hpwl) {
-		doubleHpwl = hpwl;
-	}
-
-	public boolean isSourceChanged() {
-		return sourceChanged;
-	}
-
-	public void setSourceChanged(boolean sourceChanged) {
-		this.sourceChanged = sourceChanged;
-	}
-
 	public float getYCenter() {
 		return yCenter;
-	}
-
-	public void setYCenter(float yCenter) {
-		this.yCenter = yCenter;
 	}
 
 	public float getXCenter() {
 		return xCenter;
 	}
 
-	public void setXCenter(float xCenter) {
-		this.xCenter = xCenter;
-	}
-	
 	@Override
 	public int hashCode(){
 		return id;

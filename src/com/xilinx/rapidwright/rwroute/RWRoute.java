@@ -1212,8 +1212,7 @@ public class RWRoute{
 		net.setSource(altSource);
 		net.setAlternateSource(connection.getSource());
 		DesignTools.routeAlternativeOutputSitePin(net, altSource);
-		netWrapper.setSourceChanged(true);
-		
+
 		Node sourceINTNode = RouterHelper.projectOutputPinToINTNode(altSource);
 		Routable sourceR = createAddRoutableNode(altSource, sourceINTNode, RoutableType.PINFEED_O);
 		for(Connection otherConnectionOfNet : netWrapper.getConnections()) {
