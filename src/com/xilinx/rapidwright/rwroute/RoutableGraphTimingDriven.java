@@ -4,13 +4,9 @@ import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
-import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.RuntimeTracker;
 
-import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 public class RoutableGraphTimingDriven extends RoutableGraph {
@@ -21,6 +17,8 @@ public class RoutableGraphTimingDriven extends RoutableGraph {
 
     public RoutableGraphTimingDriven(RuntimeTracker rnodesTimer, DelayEstimatorBase delayEstimator, boolean maskNodesCrossRCLK) {
         super(rnodesTimer);
+        this.delayEstimator = delayEstimator;
+        this.maskNodesCrossRCLK = maskNodesCrossRCLK;
     }
 
     final private static Set<String> excludeAboveRclk;
@@ -56,11 +54,13 @@ public class RoutableGraphTimingDriven extends RoutableGraph {
 
         public RoutableNodeImpl(Node node, RoutableType type) {
             super(node, type);
-            setDelay(RouterHelper.computeNodeDelay(delayEstimator, node));
+            delay = RouterHelper.computeNodeDelay(delayEstimator, node);
         }
 
         @Override
         public boolean isExcluded(Node node) {
+            if (super.isExcluded(node))
+                return true;
             Tile tile = node.getTile();
             if(tile.getTileTypeEnum() == TileTypeEnum.INT) {
                 if (maskNodesCrossRCLK) {
@@ -71,13 +71,8 @@ public class RoutableGraphTimingDriven extends RoutableGraph {
                         return excludeBelowRclk.contains(node.getWireName());
                     }
                 }
-                return false;
             }
-            return super.isExcluded(node);
-        }
-
-        private void setDelay(short delay) {
-            this.delay = delay;
+            return false;
         }
 
         @Override
@@ -105,6 +100,7 @@ public class RoutableGraphTimingDriven extends RoutableGraph {
         }
     }
 
+    @Override
     protected Routable newNode(Node node, RoutableType type) {
         return new RoutableNodeImpl(node, type);
     }
