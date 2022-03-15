@@ -24,7 +24,6 @@
 package com.xilinx.rapidwright.rwroute;
 
 import java.util.Map;
-import java.util.Set;
 
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.device.Node;

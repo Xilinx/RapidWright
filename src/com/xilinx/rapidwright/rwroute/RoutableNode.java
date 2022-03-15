@@ -98,7 +98,7 @@ public abstract class RoutableNode implements Routable{
 		setPrev(null);
 	}
 
-	abstract public Routable create(Node node, RoutableType type);
+	abstract protected Routable getOrCreate(Node node, RoutableType type);
 	
 	protected void setChildren(/*RouteThruHelper routethruHelper*/){
 		if (children != null)
@@ -112,7 +112,7 @@ public abstract class RoutableNode implements Routable{
 			// if(routethruHelper.isRouteThru(node, node)) continue;
 
 			RoutableType type = RoutableType.WIRE;
-			Routable child = create(node, type);
+			Routable child = getOrCreate(node, type);
 			childrenList.add(child);//the sink rnode of a target connection has been created up-front
 		}
 		children = childrenList.toArray(new Routable[0]);
