@@ -35,6 +35,8 @@ public enum EDIFValueType {
 	INTEGER,
 	BOOLEAN;
 	
+	public static final EDIFValueType[] values = values();
+	
 	@Override
 	public String toString(){
 		return this.name().toLowerCase();

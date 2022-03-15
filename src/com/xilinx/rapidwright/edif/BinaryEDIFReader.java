@@ -82,7 +82,7 @@ public class BinaryEDIFReader {
                     throw new RuntimeException("ERROR: Corrupted file while reading " + o.getName());
                 }
                 int typeAndStringIdx = is.readInt();
-                EDIFValueType type = EDIFValueType.values()[typeAndStringIdx >>> BinaryEDIFWriter.EDIF_PROP_TYPE_BIT];
+                EDIFValueType type = EDIFValueType.values[typeAndStringIdx >>> BinaryEDIFWriter.EDIF_PROP_TYPE_BIT];
                 String value = strings[BinaryEDIFWriter.EDIF_PROP_VALUE_MASK & typeAndStringIdx];
                 o.addProperty(key, new EDIFPropertyValue(value, type));
             }
