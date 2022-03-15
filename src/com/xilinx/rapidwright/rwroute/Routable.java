@@ -148,12 +148,6 @@ public interface Routable {
 	 */
 	float getDelay();
 	/**
-	 * Sets the children of a Routable Object.
-	 * @param rnodesCreated The map of nodes to created Routable Objects.
-	 * @param reservedNodes The set of all preserved nodes.
-	 */
-	void setChildren(Map<Node, Routable> rnodesCreated, Set<Node> reservedNodes);
-	/**
 	 * Gets the children of a Routable Object.
 	 * @return A list of Routable Objects.
 	 */

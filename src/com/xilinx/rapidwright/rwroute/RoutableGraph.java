@@ -15,58 +15,47 @@ import java.util.Set;
 
 public class RoutableGraph {
 
-    private class RoutableNodeImpl extends RoutableNode {
+    protected class RoutableNodeImpl extends RoutableNode {
 
         public RoutableNodeImpl(Node node, RoutableType type) {
             super(node, type);
         }
 
         @Override
-        public void setChildren(Map<Node, Routable> createdRoutable, Set<Node> reserved) {
-            if (children == null) {
-                List<Node> allDownHillNodes = node.getAllDownhillNodes();
-                List<Routable> childrenList = new ArrayList<>(allDownHillNodes.size());
-                for (Node node : allDownHillNodes) {
-                    if (preservedNodes.containsKey(node)) continue;
-                    if (isExcluded(node)) continue;
+        public Routable create(Node node, RoutableType type) {
+            return RoutableGraph.this.create(node, type).getFirst();
+        }
 
-                    RoutableType type = RoutableType.WIRE;
-                    Routable child = create(node, type).getFirst();
-                    childrenList.add(child);//the sink rnode of a target connection has been created up-front
-                }
-                children = childrenList.toArray(new Routable[0]);
-            }
+        @Override
+        public boolean isExcluded(Node node) {
+            return preservedNodes.containsKey(node) || super.isExcluded(node);
         }
 
         @Override
         public Routable[] getChildren() {
             rnodesTimer.start();
-            setChildren(rnodesCreated, getPreservedNodes());
+            setChildren();
             rnodesTimer.stop();
             return super.getChildren();
-        }
-
-        public int numChildren() {
-            return children.length;
         }
     }
 
     /**
      * A map of nodes to created rnodes
      */
-    final private Map<Node, Routable> rnodesCreated;
+    final protected Map<Node, Routable> rnodesCreated;
 
     /**
      * A map of preserved nodes to their nets
      */
-    final private Map<Node, Net> preservedNodes;
+    final protected Map<Node, Net> preservedNodes;
 
     /**
      * Visited rnodes data during connection routing
      */
-    final private Collection<Routable> rnodesVisited;
+    final protected Collection<Routable> rnodesVisited;
 
-    final private RuntimeTracker rnodesTimer;
+    final protected RuntimeTracker rnodesTimer;
 
     private long totalNodesVisited;
 
@@ -114,12 +103,16 @@ public class RoutableGraph {
         return rnodesCreated.get(node);
     }
 
+    protected Routable newNode(Node node, RoutableType type) {
+        return new RoutableNodeImpl(node, type);
+    }
+
     public Pair<Routable,Boolean> create(Node node, RoutableType type) {
         final boolean[] inserted = {false};
         Routable rnode = rnodesCreated.compute(node, (k,v) -> {
             if (v == null) {
                 // this is for initializing sources and sinks of those to-be-routed nets' connections
-                v = new RoutableNodeImpl(node, type);
+                v = newNode(node, type);
                 inserted[0] = true;
             }
             return v;
