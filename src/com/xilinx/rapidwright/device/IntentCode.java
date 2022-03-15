@@ -25,7 +25,6 @@
 package com.xilinx.rapidwright.device;
 
 import java.util.Arrays;
-import java.util.Collections;
 
 /**
  * List of wire/node annotations available on devices in Vivado.
