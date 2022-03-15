@@ -49,9 +49,9 @@ public class TimingGroup implements Comparable<TimingGroup> {
     private GroupDelayType groupDelayType;
     private GroupWireDirection groupWireDir;
     private TimingDirection direction;
-    private boolean isInitialGroup = false;
-    private boolean isFinalGroup = false;
-    private boolean hasGlobalWire = false;
+    private boolean isInitialGroup;
+    private boolean isFinalGroup;
+    private boolean hasGlobalWire;
     private boolean hasPinFeed = false;
 
     /**
@@ -72,14 +72,14 @@ public class TimingGroup implements Comparable<TimingGroup> {
      * @param timingModel Reference to the TimingModel.
      */
     public TimingGroup(TimingModel timingModel) {
-        this.sameSpotCounter = 0;
+        sameSpotCounter = 0;
         this.timingModel = timingModel;
-        this.nodes = new LinkedList<>();
-        this.pips = new LinkedList<>();
-        this.nodeTypes = new LinkedList<>();
-        this.isInitialGroup = false;
-        this.isFinalGroup = false;
-        this.hasGlobalWire = false;
+        nodes = new LinkedList<>();
+        pips = new LinkedList<>();
+        nodeTypes = new LinkedList<>();
+        isInitialGroup = false;
+        isFinalGroup = false;
+        hasGlobalWire = false;
     }
 
     /**
@@ -88,14 +88,7 @@ public class TimingGroup implements Comparable<TimingGroup> {
      * @param timingModel Reference to the current TimingModel.
      */
     public TimingGroup(SitePinInst startPin, TimingModel timingModel) {
-        this.sameSpotCounter = 0;
-        this.timingModel = timingModel;
-        this.nodes = new LinkedList<>();
-        this.pips = new LinkedList<>();
-        this.nodeTypes = new LinkedList<>();
-        this.isInitialGroup = true;
-        this.isFinalGroup = false;
-        this.hasGlobalWire = false;
+        this(timingModel);
         Node node = startPin.getConnectedNode();
         if (node != null) {
             Wire[] wires = node.getAllWiresInNode();
@@ -179,19 +172,14 @@ public class TimingGroup implements Comparable<TimingGroup> {
                     newTS.add(nextNextNode, nextNextIc);
                     if (pip != null)
                         newTS.add(pip);
-                    if (nextNextPip != null)
-                        newTS.add(nextNextPip);
+                    newTS.add(nextNextPip);
                     newTS.computeTypes();
                     timingModel.calcDelay(newTS);
                     preResult.add(newTS);
                 }
-                if (nextNextPip == null) {
-                    continue;
-                }
             }
         }
-        TimingGroup[] result = preResult.toArray(new TimingGroup[preResult.size()]);
-        return result;
+        return preResult.toArray(new TimingGroup[0]);
     }
 
 
@@ -284,7 +272,7 @@ public class TimingGroup implements Comparable<TimingGroup> {
         if (groupWireDir == GroupWireDirection.VERTICAL && row1 < row2) {
             result += timingModel.computeVerticalDistFromArray(row1, row2, groupDelayType);
         }
-        this.d = result;
+        d = result;
         return result;
     }
 
@@ -295,8 +283,8 @@ public class TimingGroup implements Comparable<TimingGroup> {
         if (nodes.size() == 0) {
             return;
         }
-        IntentCode nodeToCheckIntent = null;
-        int nodeToCheckInx = -1;
+        IntentCode nodeToCheckIntent;
+        int nodeToCheckInx;
         if (nodes.size()>1 &&
                 (nodeTypes.get(1)==IntentCode.NODE_PINBOUNCE ||
                         nodeTypes.get(0)==IntentCode.NODE_LOCAL)) {
@@ -308,8 +296,9 @@ public class TimingGroup implements Comparable<TimingGroup> {
         nodeToCheckIntent = nodeTypes.get(nodeToCheckInx);
 
         Wire[] wires;
+        // FIXME: Written to but never used
         Tile t1, t2;
-        String wName = "";
+        String wName;
 
         switch(nodeToCheckIntent) {
 
