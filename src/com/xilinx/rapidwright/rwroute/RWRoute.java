@@ -132,10 +132,10 @@ public class RWRoute{
 	private Map<IntentCode, Long> nodeTypeLength;
 	/** The total number of connections that are routed */
 	private int connectionsRouted;
-	/** The total number of nodes pushed into the queue */
-	private long nodesPushed;
 	/** The total number of connections routed in an iteration */
 	private int connectionsRoutedIteration;
+	/** Total number of nodes popped from the queue */
+	private long nodesPopped;
 
 	/** The maximum criticality constraint of connection */
 	final private static float MAX_CRITICALITY = 0.99f;
@@ -163,21 +163,19 @@ public class RWRoute{
 		updateTimingTimer = routerTimer.createStandAloneRuntimeTracker("update timing");
 		updateCongestionCosts = routerTimer.createStandAloneRuntimeTracker("update congestion costs");
 		routerTimer.createRuntimeTracker("Initialization", routerTimer.getRootRuntimeTracker()).start();
-		
-		RoutableNode.setMaskNodesCrossRCLK(config.isMaskNodesCrossRCLK());
 
+		minRerouteCriticality = config.getMinRerouteCriticality();
+		criticalConnections = new ArrayList<>();
+
+		queue = new PriorityQueue<>((r1,r2) -> Float.compare(r1.getLowerBoundTotalPathCost(), r2.getLowerBoundTotalPathCost()));
 		if(config.isTimingDriven()) {
 			/* An instantiated delay estimator that is used to calculate delay of routing resources */
 			DelayEstimatorBase estimator = new DelayEstimatorBase(design.getDevice(), new InterconnectInfo(), config.isUseUTurnNodes(), 0);
-			RoutableNode.setTimingDriven(true, estimator);
+			routingGraph = new RoutableGraphTimingDriven(rnodesTimer, estimator, config.isMaskNodesCrossRCLK());
 			nodesDelays = new HashMap<>();
+		} else {
+			routingGraph = new RoutableGraph(rnodesTimer);
 		}
-		
-		minRerouteCriticality = config.getMinRerouteCriticality();
-		criticalConnections = new ArrayList<>();
-		
-		queue = new PriorityQueue<>((r1,r2) -> Float.compare(r1.getLowerBoundTotalPathCost(), r2.getLowerBoundTotalPathCost()));
-		routingGraph = new RoutableGraph(rnodesTimer);
 
 		routerTimer.createRuntimeTracker("determine route targets", "Initialization").start();
 		determineRoutingTargets();
@@ -195,7 +193,7 @@ public class RWRoute{
 		routethruHelper = new RouteThruHelper(design.getDevice());		
 		connectionsRouted = 0;
 		connectionsRoutedIteration = 0;
-		nodesPushed = 0;
+		nodesPopped = 0;
 		overUsedRnodes = new HashSet<>();
 		
 		routerTimer.getRuntimeTracker("Initialization").stop();
@@ -1159,6 +1157,7 @@ public class RWRoute{
 				successRoute = true;
 				break;
 			}
+			nodesPopped++;
 			exploreAndExpand(rnode, connection, shareWeight, rnodeCostWeight,
 					rnodeWLWeight, estWlWeight, dlyWeight, estDlyWeight);
 		}
@@ -1453,7 +1452,6 @@ public class RWRoute{
 		childRnode.setPrev(rnode);
 		routingGraph.visit(childRnode);
 		queue.add(childRnode);
-		nodesPushed++;
 	}
 	
 	/**
@@ -1573,8 +1571,8 @@ public class RWRoute{
 			System.out.printf("------------------------------------------------------------------------------\n");	
 			printFormattedString("Num iterations:", routeIteration);
 			printFormattedString("Connections routed:", connectionsRouted);
-			printFormattedString("Nodes pushed:", nodesPushed);
-			printFormattedString("Nodes popped:", routingGraph.getTotalNodesVisited());
+			printFormattedString("Nodes pushed:", routingGraph.getTotalNodesVisited());
+			printFormattedString("Nodes popped:", nodesPopped);
 			System.out.printf("------------------------------------------------------------------------------\n");
 		}
 		
