@@ -564,7 +564,7 @@ public class RWRoute{
 	 * @return The created {@link RoutableNode} instance.
 	 */
 	private Routable createAddRoutableNode(SitePinInst sitePinInst, Node node, RoutableType type){
-		Pair<Routable,Boolean> ret = routingGraph.create(node, type);
+		Pair<Routable,Boolean> ret = routingGraph.getOrCreate(node, type);
 		Routable rnode = ret.getFirst();
 		boolean inserted = ret.getSecond();
 		if (!inserted) {
@@ -1570,7 +1570,7 @@ public class RWRoute{
 			System.out.printf("------------------------------------------------------------------------------\n");	
 			printFormattedString("Num iterations:", routeIteration);
 			printFormattedString("Connections routed:", connectionsRouted);
-			printFormattedString("Nodes pushed:", routingGraph.getTotalNodesVisited());
+			printFormattedString("Nodes pushed:", routingGraph.getTotalVisited());
 			printFormattedString("Nodes popped:", nodesPopped);
 			System.out.printf("------------------------------------------------------------------------------\n");
 		}

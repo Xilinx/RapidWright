@@ -101,7 +101,7 @@ public class RoutableGraphTimingDriven extends RoutableGraph {
     }
 
     @Override
-    protected Routable newNode(Node node, RoutableType type) {
+    protected Routable create(Node node, RoutableType type) {
         return new RoutableNodeImpl(node, type);
     }
 }

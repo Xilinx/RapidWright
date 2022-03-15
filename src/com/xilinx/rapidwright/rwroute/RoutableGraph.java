@@ -9,7 +9,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -22,20 +21,20 @@ public class RoutableGraph {
         }
 
         @Override
-        public Routable create(Node node, RoutableType type) {
-            return RoutableGraph.this.create(node, type).getFirst();
+        protected Routable getOrCreate(Node node, RoutableType type) {
+            return RoutableGraph.this.getOrCreate(node, type).getFirst();
         }
 
         @Override
         public boolean isExcluded(Node node) {
-            return preservedNodes.containsKey(node) || super.isExcluded(node);
+            return preservedMap.containsKey(node) || super.isExcluded(node);
         }
 
         @Override
         public Routable[] getChildren() {
-            rnodesTimer.start();
+            setChildrenTimer.start();
             setChildren();
-            rnodesTimer.stop();
+            setChildrenTimer.stop();
             return super.getChildren();
         }
     }
@@ -43,76 +42,76 @@ public class RoutableGraph {
     /**
      * A map of nodes to created rnodes
      */
-    final protected Map<Node, Routable> rnodesCreated;
+    final protected Map<Node, Routable> nodesMap;
 
     /**
      * A map of preserved nodes to their nets
      */
-    final protected Map<Node, Net> preservedNodes;
+    final protected Map<Node, Net> preservedMap;
 
     /**
      * Visited rnodes data during connection routing
      */
-    final protected Collection<Routable> rnodesVisited;
+    final protected Collection<Routable> visited;
 
-    final protected RuntimeTracker rnodesTimer;
+    final protected RuntimeTracker setChildrenTimer;
 
-    private long totalNodesVisited;
+    private long totalVisited;
 
-    public RoutableGraph(RuntimeTracker rnodesTimer) {
-        rnodesCreated = new HashMap<>();
-        preservedNodes = new HashMap<>();
-        rnodesVisited = new ArrayList<>();
-        this.rnodesTimer = rnodesTimer;
+    public RoutableGraph(RuntimeTracker setChildrenTimer) {
+        nodesMap = new HashMap<>();
+        preservedMap = new HashMap<>();
+        visited = new ArrayList<>();
+        this.setChildrenTimer = setChildrenTimer;
     }
 
     public void initialize() {
-        totalNodesVisited = 0;
-        rnodesVisited.clear();
+        totalVisited = 0;
+        visited.clear();
     }
 
     public Net preserve(Node node, Net net) {
-        return preservedNodes.putIfAbsent(node, net);
+        return preservedMap.putIfAbsent(node, net);
     }
 
     public void unpreserve(Node node) {
-        preservedNodes.remove(node);
+        preservedMap.remove(node);
     }
 
     public Set<Node> getPreservedNodes() {
-        return Collections.unmodifiableSet(preservedNodes.keySet());
+        return Collections.unmodifiableSet(preservedMap.keySet());
     }
 
     public Net getPreservedNet(Node node) {
-        return preservedNodes.get(node);
-    }
-
-    public Set<Node> getNodes() {
-        return Collections.unmodifiableSet(rnodesCreated.keySet());
-    }
-
-    public Set<Map.Entry<Node,Routable>> getNodeEntries() {
-        return Collections.unmodifiableSet(rnodesCreated.entrySet());
-    }
-
-    public int numNodes() {
-        return rnodesCreated.size();
+        return preservedMap.get(node);
     }
 
     public Routable getNode(Node node) {
-        return rnodesCreated.get(node);
+        return nodesMap.get(node);
     }
 
-    protected Routable newNode(Node node, RoutableType type) {
+    public Set<Node> getNodes() {
+        return Collections.unmodifiableSet(nodesMap.keySet());
+    }
+
+    public Set<Map.Entry<Node,Routable>> getNodeEntries() {
+        return Collections.unmodifiableSet(nodesMap.entrySet());
+    }
+
+    public int numNodes() {
+        return nodesMap.size();
+    }
+
+    protected Routable create(Node node, RoutableType type) {
         return new RoutableNodeImpl(node, type);
     }
 
-    public Pair<Routable,Boolean> create(Node node, RoutableType type) {
+    public Pair<Routable,Boolean> getOrCreate(Node node, RoutableType type) {
         final boolean[] inserted = {false};
-        Routable rnode = rnodesCreated.compute(node, (k,v) -> {
+        Routable rnode = nodesMap.compute(node, (k, v) -> {
             if (v == null) {
                 // this is for initializing sources and sinks of those to-be-routed nets' connections
-                v = newNode(node, type);
+                v = create(node, type);
                 inserted[0] = true;
             }
             return v;
@@ -121,22 +120,22 @@ public class RoutableGraph {
     }
 
     public void visit(Routable rnode) {
-        rnodesVisited.add(rnode);
+        visited.add(rnode);
     }
 
     /**
      * Resets the expansion history.
      */
     public void resetExpansion() {
-        for (Routable node : rnodesVisited) {
+        for (Routable node : visited) {
             node.setVisited(false);
         }
-        totalNodesVisited += rnodesVisited.size();
-        rnodesVisited.clear();
+        totalVisited += visited.size();
+        visited.clear();
     }
 
-    public long getTotalNodesVisited() {
-        return totalNodesVisited;
+    public long getTotalVisited() {
+        return totalVisited;
     }
 
     public int averageChildren() {
