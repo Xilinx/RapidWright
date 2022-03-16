@@ -43,8 +43,6 @@ public class NetWrapper{
 	private float yCenter;
 	/** The half-perimeter wirelength */
 	private short doubleHpwl;
-	/** A flag to indicate if the source has been swapped */
-	private boolean sourceChanged;
 	
 	public NetWrapper(int id, Net net){
 		this.id = id;
