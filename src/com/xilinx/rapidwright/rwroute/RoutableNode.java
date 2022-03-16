@@ -282,7 +282,7 @@ public abstract class RoutableNode implements Routable{
 
 	@Override
 	public Routable[] getChildren() {
-		return children != null ? children : new Routable[0];
+		return children != null ? children : EMPTY_ARRAY;
 	}
 
 	@Override
