@@ -1270,7 +1270,7 @@ public class RWRoute{
 					// Do not use those nodes, because we do not know if the routethru is available or not
 					if(routethruHelper.isRouteThru(uphill, toBuild)) continue;
 					Routable parent = routingGraph.getNode(uphill);
-					if(parent != null && !Arrays.stream(parent.getChildren()).anyMatch(rnode::equals)) {
+					if(parent != null && Arrays.stream(parent.getChildren()).noneMatch(rnode::equals)) {
 						parent.addChild(rnode);
 					}
 				}
@@ -1336,33 +1336,34 @@ public class RWRoute{
 			if(childRNode.isVisited()) continue;
 			if(childRNode.isTarget()){
 				queue.clear();
-				evaluateCostAndPush(rnode, longParent, childRNode, connection, shareWeight, rnodeCostWeight,
-						rnodeLengthWeight, rnodeEstWlWeight, rnodeDelayWeight, rnodeEstDlyWeight);
-				return;
-				
 			}else if(childRNode.getRoutableType() == RoutableType.WIRE) {
 				if(childRNode.getDelay() > 10000) {
 					// To filter out those nodes that are considered to be excluded with the masking resource approach,
 					// such as U-turn shape nodes near the boundary and some node cross RCLK
 					continue;
 				}
-				if(isAccessible(childRNode, connection)){
-					evaluateCostAndPush(rnode, longParent, childRNode, connection, shareWeight, rnodeCostWeight,
-							rnodeLengthWeight, rnodeEstWlWeight, rnodeDelayWeight, rnodeEstDlyWeight);
+				if(!isAccessible(childRNode, connection)) {
+					continue;
 				}
-			}else if(childRNode.getRoutableType() == RoutableType.PINBOUNCE) {			
-				if(isAccessible(childRNode, connection)) {				
-					if(usablePINBounce(childRNode, connection.getSinkRnode())) {
-						evaluateCostAndPush(rnode, longParent, childRNode, connection, shareWeight, rnodeCostWeight,
-								rnodeLengthWeight, rnodeEstWlWeight, rnodeDelayWeight, rnodeEstDlyWeight);
-					}					
+			}else if(childRNode.getRoutableType() == RoutableType.PINBOUNCE) {
+				if(!isAccessible(childRNode, connection)) {
+					continue;
+				}
+				if(!usablePINBounce(childRNode, connection.getSinkRnode())) {
+					continue;
 				}
 			}else if(childRNode.getRoutableType() == RoutableType.PINFEED_I) {
-				if(connection.isCrossSLR()) {
-					evaluateCostAndPush(rnode, longParent, childRNode, connection, shareWeight, rnodeCostWeight,
-							rnodeLengthWeight, rnodeEstWlWeight, rnodeDelayWeight, rnodeEstDlyWeight);
+				if(!connection.isCrossSLR()) {
+					continue;
 				}
+			} else {
+				continue;
 			}
+
+			evaluateCostAndPush(rnode, longParent, childRNode, connection, shareWeight, rnodeCostWeight,
+					rnodeLengthWeight, rnodeEstWlWeight, rnodeDelayWeight, rnodeEstDlyWeight);
+			if (childRNode.isTarget())
+				break;
 		}
 	}
 
