@@ -1516,8 +1516,8 @@ public class RWRoute{
 			System.out.println("Node Usage Per Type\n");
 			System.out.printf(" %-15s  %14s  %12s\n", "Node Type", "Usage", "Length");
 			for(IntentCode ic : nodeTypes) {
-				long usage = nodeTypeUsage.getOrDefault(ic, (long)0);
-				long length = nodeTypeLength.getOrDefault(ic, (long)0);
+				long usage = nodeTypeUsage.getOrDefault(ic, 0L);
+				long length = nodeTypeLength.getOrDefault(ic, 0L);
 				System.out.printf(" %-15s  %14d  %12d\n", ic, usage, length);
 			}
 			System.out.println();
