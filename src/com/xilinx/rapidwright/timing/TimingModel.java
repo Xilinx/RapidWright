@@ -168,6 +168,7 @@ public class TimingModel {
 
     private TimingManager timingManager;
     private Tile[] goodRowTypes;
+    // FIXME: Read but never written to
     private PrintStream printStream;
     private Device device;
 
@@ -1440,7 +1441,7 @@ public class TimingModel {
                 result.add(ts);
             }
         }
-        return result.toArray(new TimingGroup[0]);
+        return result.toArray(TimingGroup.EMPTY_ARRAY);
     }
 
 
@@ -1461,7 +1462,7 @@ public class TimingModel {
                 result.add(ts);
             }
         }
-        return result.toArray(new TimingGroup[0]);
+        return result.toArray(TimingGroup.EMPTY_ARRAY);
     }
 
     /**
@@ -1526,7 +1527,7 @@ public class TimingModel {
                 break;
 
         }
-        return result.toArray(new TimingGroup[0]);
+        return result.toArray(TimingGroup.EMPTY_ARRAY);
     }
 
     private HashMap<String, PIP> pipEndNodeHashMap;

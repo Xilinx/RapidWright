@@ -116,7 +116,7 @@ public abstract class RoutableNode implements Routable{
 			Routable child = getOrCreate(node, type);
 			childrenList.add(child);//the sink rnode of a target connection has been created up-front
 		}
-		children = childrenList.toArray(new Routable[0]);
+		children = childrenList.toArray(EMPTY_ARRAY);
 		setChildrenTimer.stop();
 	}
 	

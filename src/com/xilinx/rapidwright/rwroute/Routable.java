@@ -38,6 +38,8 @@ import com.xilinx.rapidwright.device.Tile;
 public interface Routable {
 	/** Each Routable Object can be legally used by one net only */
 	short capacity = 1;
+	/** Memoized static array for use by Collection.toArray() or similar */
+	Routable[] EMPTY_ARRAY = new Routable[0];
 	/** 
 	 * Checks if a Routable Object has been used.
 	 * @return true, if a Routable Object has been used.

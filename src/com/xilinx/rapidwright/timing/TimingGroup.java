@@ -67,6 +67,9 @@ public class TimingGroup implements Comparable<TimingGroup> {
     public float cost;
     public int sameSpotCounter;
 
+    /** Memoized static array for use by Collection.toArray() or similar */
+    public final static TimingGroup[] EMPTY_ARRAY = new TimingGroup[0];
+
     /**
      * Default constructor used by the TimingModel to create a TimingGroup.
      * @param timingModel Reference to the TimingModel.
@@ -179,7 +182,7 @@ public class TimingGroup implements Comparable<TimingGroup> {
                 }
             }
         }
-        return preResult.toArray(new TimingGroup[0]);
+        return preResult.toArray(EMPTY_ARRAY);
     }
 
 
