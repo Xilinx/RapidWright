@@ -104,7 +104,7 @@ public abstract class RoutableNode implements Routable{
 	protected void setChildren(RuntimeTracker setChildrenTimer/*RouteThruHelper routethruHelper*/){
 		if (children != null)
 			return;
-        setChildrenTimer.start();
+		setChildrenTimer.start();
 		List<Node> allDownHillNodes = node.getAllDownhillNodes();
 		List<Routable> childrenList = new ArrayList<>(allDownHillNodes.size());
 		for(Node node:allDownHillNodes){
@@ -117,7 +117,7 @@ public abstract class RoutableNode implements Routable{
 			childrenList.add(child);//the sink rnode of a target connection has been created up-front
 		}
 		children = childrenList.toArray(new Routable[0]);
-        setChildrenTimer.stop();
+		setChildrenTimer.stop();
 	}
 	
 	private void setBaseCost(RoutableType type){
