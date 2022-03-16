@@ -32,9 +32,7 @@ public class RoutableGraph {
 
         @Override
         public Routable[] getChildren() {
-            setChildrenTimer.start();
-            setChildren();
-            setChildrenTimer.stop();
+            setChildren(setChildrenTimer);
             return super.getChildren();
         }
     }

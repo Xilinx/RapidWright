@@ -36,6 +36,7 @@ import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
+import com.xilinx.rapidwright.util.RuntimeTracker;
 
 /**
  * A RoutableNode Object, denoted as rnode, is a vertex of the routing resource graph.
@@ -100,10 +101,10 @@ public abstract class RoutableNode implements Routable{
 
 	abstract protected Routable getOrCreate(Node node, RoutableType type);
 	
-	protected void setChildren(/*RouteThruHelper routethruHelper*/){
+	protected void setChildren(RuntimeTracker setChildrenTimer/*RouteThruHelper routethruHelper*/){
 		if (children != null)
 			return;
-
+        setChildrenTimer.start();
 		List<Node> allDownHillNodes = node.getAllDownhillNodes();
 		List<Routable> childrenList = new ArrayList<>(allDownHillNodes.size());
 		for(Node node:allDownHillNodes){
@@ -116,6 +117,7 @@ public abstract class RoutableNode implements Routable{
 			childrenList.add(child);//the sink rnode of a target connection has been created up-front
 		}
 		children = childrenList.toArray(new Routable[0]);
+        setChildrenTimer.stop();
 	}
 	
 	private void setBaseCost(RoutableType type){
