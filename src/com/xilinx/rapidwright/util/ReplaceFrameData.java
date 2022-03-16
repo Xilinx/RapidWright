@@ -498,23 +498,22 @@ public class ReplaceFrameData {
 			" Replace or Extract frame data of a bitstream. It is used to replace the NOP frame contents for unused hard block columns.",
 			"",
 			"Usage",
-			" ReplaceFrameData [-extract, -replace] -in <bitfile> [-out <bitfile>] -template <file> [-platform <name>, -row <list> -col <list> -offset <int>]",
+			" ReplaceFrameData [-extract, -replace] -in <bitFile> [-out <bitFile>] -template <file> [-platform <name>, -row <list> -col <list> -offset <int>]",
 			"",
 			" Examples:",
-			"   ReplaceFrameData -extract -in dcpreloc_aes128_pblock_0_partial.bit -template templater.ser -row 0 1 -col 191 192 193 -offset 4",
-			"   ReplaceFrameData -extract -in dcpreloc_aes128_pblock_0_partial.bit -template templatep.ser -platform example_platform",
-			"   ReplaceFrameData -replace -in dcpreloc_aes128_pblock_2_partial.bit -out outr_r.bit -template templater.ser -row 0 1 -col 191 192 193 -offset 4",
-			"   ReplaceFrameData -replace -in dcpreloc_aes128_pblock_2_partial.bit -out outp_r.bit -template templater.ser -platform example_platform",
-			"   ReplaceFrameData -replace -in dcpreloc_aes128_pblock_2_partial.bit -out outr_p.bit -template templatep.ser -row 0 1 -col 191 192 193 -offset 4",
-			"   ReplaceFrameData -replace -in dcpreloc_aes128_pblock_2_partial.bit -out outp_p.bit -template templatep.ser -platform example_platform",
+			"   ReplaceFrameData -extract -in dcpreloc_aes128_pblock_0_partial.bit -template template.ser -row 0 1 -col 191 192 193 -offset 4",
+			"   ReplaceFrameData -extract -in dcpreloc_aes128_pblock_0_partial.bit -template template.ser -platform example_platform",
+			"   ReplaceFrameData -replace -in dcpreloc_aes128_pblock_2_partial.bit -out out.bit -template template.ser -row 4 5 -col 191 192 193",
+			"   ReplaceFrameData -replace -in dcpreloc_aes128_pblock_2_partial.bit -out out.bit -template template.ser -platform example_platform",
 			"",
 			" There are 4 groups of required arguments, can be in any order.",
 			" 1) The operation to perform is either -extract or -replace.",
 			" 2) There are two way to specify the frames to operate on.",
 			"   a) Specify the predefined platform. Currently, there is only -platform example_platform",
-			"   b) Specify the list of rows and the list of cols, along with the row offset, ie., row to use the tempalte - row to extract the template.",
+			"   b) For extraction, specify the list of rows and the list of cols, along with the row offset, ie., row to use the template - row to extract the template.",
 			"      Setting -row 0 1 -col 191 192 193 means that column 191, 192 and 193 of both row 0 and 1 will be processed.",
-			" 3) The bit file to operate on is specified by -in <bitfile>. For -replace, -out <bitFile> is also required.",
+			"   c) For replacement, specify the list of rows and the list of cols to be replaced. Only the set of rows and columns that are common with those in the template will be replaced.",
+			" 3) The bit file to operate on is specified by -in <bitFile>. For -replace, -out <bitFile> is also required.",
 			" 4) The file to store the extract data or to retrieve for replacement is specified by -template <file>"
 		);
 
@@ -618,6 +617,8 @@ public class ReplaceFrameData {
 			System.out.println("-" + op);
 		if (!inBit.isEmpty())
 			System.out.println("-in       " + inBit);
+		if (!outBit.isEmpty())
+			System.out.println("-out      " + outBit);
 		if (!file.isEmpty())
 			System.out.println("-template " + file);
 		if (!platform.isEmpty())
@@ -641,8 +642,12 @@ public class ReplaceFrameData {
 			reportThenExit.apply("Error: -in must be specified.");
 		if (file.isEmpty())
 			reportThenExit.apply("Error: -template must be specified.");
-		if (platform.isEmpty() && ((rows.isEmpty())||(cols.isEmpty())||(offset==-255)))
+		if (op.equals("extract") && platform.isEmpty() && ((rows.isEmpty())||(cols.isEmpty())||(offset==-255)))
 			reportThenExit.apply("Error: either -platform or the complete set of -row, -col and -offset must be set.");
+		if (op.equals("replace") && platform.isEmpty() && ((rows.isEmpty())||(cols.isEmpty())))
+			reportThenExit.apply("Error: either -platform or the complete set of -row and -col must be set.");
+		if (op.equals("replace") && platform.isEmpty() && (offset!=-255))
+			System.out.println("Warning: -replace does not need -offset. -offset will be ignored.");
 		if (!platform.isEmpty() && !platform.equals("example_platform"))
 			reportThenExit.apply("Error: only example_platform option is available for -platform.");
 		if (op.equals("replace") && outBit.isEmpty())
@@ -653,7 +658,7 @@ public class ReplaceFrameData {
 		// Run
 		if (op.equals("extract")) {
 
-			CodePerfTracker t = new CodePerfTracker("Elapsed time", false);
+			CodePerfTracker t = new CodePerfTracker("Extract frame data", false);
 
 			ReplaceFrameData extractor = new ReplaceFrameData();
 
@@ -661,7 +666,7 @@ public class ReplaceFrameData {
 			Bitstream b = Bitstream.readBitstream(inBit);
 
 			t.stop().start("Extract frame data");
-			if (platform == "example_platform") {
+			if (platform.equals("example_platform")) {
 				// TODO: if more platforms are supported, passing platform forward
 				extractor.extractForExamplePlatform(b); // get frame data stored in this.frameData
 			} else {
@@ -675,7 +680,7 @@ public class ReplaceFrameData {
 
 		} else if (op.equals("replace")) {
 
-			CodePerfTracker t = new CodePerfTracker("Elapsed time", false);
+			CodePerfTracker t = new CodePerfTracker("Replace frame data", false);
 
 			t.start("Load frame data");
 			ReplaceFrameData replacer = new ReplaceFrameData();
@@ -685,7 +690,7 @@ public class ReplaceFrameData {
 			Bitstream a = Bitstream.readBitstream(inBit);
 
 			t.stop().start("Replace frame data");
-			if (platform == "example_platform") {
+			if (platform.equals("example_platform")) {
 				// TODO: if more platforms are supported, passing platform forward
 				replacer.replaceForExamplePlatform(a); // get frame data stored in this.frameData
 			} else {
@@ -701,3 +706,4 @@ public class ReplaceFrameData {
 	}
 
 }
+
