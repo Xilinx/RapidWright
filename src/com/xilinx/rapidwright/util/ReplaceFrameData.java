@@ -656,54 +656,32 @@ public class ReplaceFrameData {
 
 
 		// Run
+		Bitstream b = Bitstream.readBitstream(inBit);
+		ReplaceFrameData frameDataOp = new ReplaceFrameData();
+
 		if (op.equals("extract")) {
 
-			CodePerfTracker t = new CodePerfTracker("Extract frame data", false);
-
-			ReplaceFrameData extractor = new ReplaceFrameData();
-
-			t.start("Read bitstream");
-			Bitstream b = Bitstream.readBitstream(inBit);
-
-			t.stop().start("Extract frame data");
 			if (platform.equals("example_platform")) {
-				// TODO: if more platforms are supported, passing platform forward
-				extractor.extractForExamplePlatform(b); // get frame data stored in this.frameData
+				frameDataOp.extractForExamplePlatform(b);
 			} else {
-				extractor.extract(b, rows, cols);
-				// Extract from row 0,1, to be used at row 4,5
-				extractor.incTemplateDataRowIndex(offset);
+				frameDataOp.extract(b, rows, cols);
+				// Extract from row i, to be used at row i+offset
+				frameDataOp.incTemplateDataRowIndex(offset);
 			}
-			t.stop().start("Save frame data");
-			extractor.save(file);
-			t.stop().printSummary();
+			frameDataOp.save(file);
 
 		} else if (op.equals("replace")) {
 
-			CodePerfTracker t = new CodePerfTracker("Replace frame data", false);
+			frameDataOp.load(file);
 
-			t.start("Load frame data");
-			ReplaceFrameData replacer = new ReplaceFrameData();
-			replacer.load(file);
-
-			t.stop().start("Read input bitstream");
-			Bitstream a = Bitstream.readBitstream(inBit);
-
-			t.stop().start("Replace frame data");
 			if (platform.equals("example_platform")) {
-				// TODO: if more platforms are supported, passing platform forward
-				replacer.replaceForExamplePlatform(a); // get frame data stored in this.frameData
+				frameDataOp.replaceForExamplePlatform(b);
 			} else {
-				replacer.replace(a, rows, cols);
+				frameDataOp.replace(b, rows, cols);
 			}
 
-			t.stop().start("Write bitstream");
-			a.writeBitstream(outBit);
-
-			t.stop().printSummary();
+			b.writeBitstream(outBit);
 		}
-
 	}
 
 }
-
