@@ -52,6 +52,8 @@ public enum UtilizationType {
 
 	private String name;
 	
+	public static final UtilizationType[] values = values();
+	
 	private UtilizationType(String name){
 		this.name = name;
 	}
