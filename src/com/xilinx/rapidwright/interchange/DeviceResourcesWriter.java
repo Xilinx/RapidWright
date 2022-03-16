@@ -891,9 +891,9 @@ public class DeviceResourcesWriter {
         }
     }
     public static void writeWireTypes(Enumerator<String> allStrings, DeviceResources.Device.Builder devBuilder) {
-        IntentCode[] intents = IntentCode.values();
-        StructList.Builder<DeviceResources.Device.WireType.Builder> wireTypesObj = devBuilder.initWireTypes(intents.length);
-        for (IntentCode intent : IntentCode.values()) {
+        StructList.Builder<DeviceResources.Device.WireType.Builder> wireTypesObj = 
+                devBuilder.initWireTypes(IntentCode.values.length);
+        for (IntentCode intent : IntentCode.values) {
             DeviceResources.Device.WireType.Builder wireType = wireTypesObj.get(intent.ordinal());
             wireType.setName(allStrings.getIndex(intent.toString()));
             wireType.setCategory(WireType.intentToCategory(intent));

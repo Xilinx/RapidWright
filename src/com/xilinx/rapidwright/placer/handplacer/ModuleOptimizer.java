@@ -242,8 +242,8 @@ public class ModuleOptimizer extends QMainWindow {
 	private void updateUtilizationTable(Design d){
 		HashMap<UtilizationType,Integer> map = DesignTools.calculateUtilization(d);
 		
-		for(int i=0; i < UtilizationType.values().length; i++){
-			Integer count = map.get(UtilizationType.values()[i]);
+		for(int i=0; i < UtilizationType.values.length; i++){
+			Integer count = map.get(UtilizationType.values[i]);
 			utilTable.setItem(i, 0, new QTableWidgetItem(count.toString()));
 		}
 		
