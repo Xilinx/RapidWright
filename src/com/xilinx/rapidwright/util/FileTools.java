@@ -500,7 +500,7 @@ public class FileTools {
 
 		ArrayList<String> lines = new ArrayList<String>();
 		try (FileReader fr = new FileReader(fileName);
-			 BufferedReader br = new BufferedReader(fr)) {
+			BufferedReader br = new BufferedReader(fr)) {
 			while((line = br.readLine()) != null){
 				lines.add(line);
 			}
