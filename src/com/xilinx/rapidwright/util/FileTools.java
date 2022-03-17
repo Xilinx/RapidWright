@@ -409,8 +409,8 @@ public class FileTools {
 		File inputFile = new File(fileName);
 
 		try (FileInputStream fis = new FileInputStream(inputFile);
-			 BufferedInputStream bis = new BufferedInputStream(fis);
-			 ObjectInputStream ois  = new ObjectInputStream(bis)){
+			BufferedInputStream bis = new BufferedInputStream(fis);
+			ObjectInputStream ois  = new ObjectInputStream(bis)){
 			return ois.readObject();
 		}
 		catch (FileNotFoundException e) {
