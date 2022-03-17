@@ -442,8 +442,8 @@ public class FileTools {
 	public static boolean saveToFile(Object o, String fileName){
 		File objectFile = new File(fileName);
 		try (FileOutputStream fos = new FileOutputStream(objectFile);
-			 BufferedOutputStream bos = new BufferedOutputStream(fos);
-			 ObjectOutputStream oos = new ObjectOutputStream(bos)){
+			BufferedOutputStream bos = new BufferedOutputStream(fos);
+			ObjectOutputStream oos = new ObjectOutputStream(bos)){
 			oos.writeObject(o);
 			return true;
 		} catch (IOException e) {
