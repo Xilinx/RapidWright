@@ -460,7 +460,7 @@ public class FileTools {
 	public static void writeLinesToTextFile(List<String> lines, String fileName) {
 		String nl = System.getProperty("line.separator");
 		try (FileWriter fw = new FileWriter(fileName);
-			 BufferedWriter bw = new BufferedWriter(fw)){
+			BufferedWriter bw = new BufferedWriter(fw)){
 			for(String line : lines) {
 				bw.write(line + nl);
 			}
