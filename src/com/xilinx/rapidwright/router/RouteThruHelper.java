@@ -66,30 +66,31 @@ public class RouteThruHelper {
     }
     
     private void writeFile() {
-        Output out = FileTools.getKryoOutputStream(getSerializedFileName(device));
-        out.writeInt(routeThrus.size());
-        for(Entry<TileTypeEnum, HashSet<Integer>> e : routeThrus.entrySet()) {
-            out.writeString(e.getKey().toString());
-            out.writeInt(e.getValue().size());
-            for(Integer i : e.getValue()) {
-                out.writeInt(i);
+        try (Output out = FileTools.getKryoOutputStream(getSerializedFileName(device))) {
+            out.writeInt(routeThrus.size());
+            for (Entry<TileTypeEnum, HashSet<Integer>> e : routeThrus.entrySet()) {
+                out.writeString(e.getKey().toString());
+                out.writeInt(e.getValue().size());
+                for (Integer i : e.getValue()) {
+                    out.writeInt(i);
+                }
             }
         }
-        out.close();
     }
     
     private void readFile(){
         routeThrus = new HashMap<TileTypeEnum, HashSet<Integer>>();
-        Input in = FileTools.getKryoInputStream(getSerializedFileName(device));
-        int count = in.readInt();
-        for(int i=0; i < count; i++) {
-            TileTypeEnum type = TileTypeEnum.valueOf(in.readString());
-            int count2 = in.readInt();
-            HashSet<Integer> pips = new HashSet<Integer>(count2);
-            for(int j=0; j < count2; j++) {
-                pips.add(in.readInt());
+        try (Input in = FileTools.getKryoInputStream(getSerializedFileName(device))) {
+            int count = in.readInt();
+            for(int i=0; i < count; i++) {
+                TileTypeEnum type = TileTypeEnum.valueOf(in.readString());
+                int count2 = in.readInt();
+                HashSet<Integer> pips = new HashSet<Integer>(count2);
+                for(int j=0; j < count2; j++) {
+                    pips.add(in.readInt());
+                }
+                routeThrus.put(type, pips);
             }
-            routeThrus.put(type, pips);
         }
     }
     

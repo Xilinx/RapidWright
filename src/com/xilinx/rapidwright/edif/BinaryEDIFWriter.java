@@ -310,29 +310,29 @@ public class BinaryEDIFWriter {
      */
     public static void writeBinaryEDIF(Path path, EDIFNetlist netlist) {
         Map<String, Integer> stringMap = createStringMap(netlist);
-        Output os = FileTools.getKryoOutputStream(path.toString());
-        os.writeString(EDIF_BINARY_FILE_TAG);
-        os.writeString(EDIF_BINARY_FILE_VERSION);
-        String[] strings = new String[stringMap.size()];
-        for(Entry<String,Integer> e : stringMap.entrySet()) {
-            strings[e.getValue()] = e.getKey();
-        }
-        FileTools.writeStringArray(os, strings);
-        os.writeInt(netlist.getLibraries().size());
-        for(EDIFLibrary lib : netlist.getLibrariesInExportOrder()) {
-            writeEDIFName(lib, os, stringMap);
-            os.writeInt(lib.getCells().size());
-            for(EDIFCell cell : lib.getValidCellExportOrder()) {
-                writeEDIFCell(cell, os, stringMap);
+        try (Output os = FileTools.getKryoOutputStream(path.toString())) {
+            os.writeString(EDIF_BINARY_FILE_TAG);
+            os.writeString(EDIF_BINARY_FILE_VERSION);
+            String[] strings = new String[stringMap.size()];
+            for(Entry<String,Integer> e : stringMap.entrySet()) {
+                strings[e.getValue()] = e.getKey();
             }
+            FileTools.writeStringArray(os, strings);
+            os.writeInt(netlist.getLibraries().size());
+            for(EDIFLibrary lib : netlist.getLibrariesInExportOrder()) {
+                writeEDIFName(lib, os, stringMap);
+                os.writeInt(lib.getCells().size());
+                for(EDIFCell cell : lib.getValidCellExportOrder()) {
+                    writeEDIFCell(cell, os, stringMap);
+                }
+            }
+            writeEDIFName(netlist, os, stringMap);
+            // Comments are likely to be unique
+            os.writeInt(netlist.getComments().size());
+            for(String comment : netlist.getComments()) {
+                os.writeString(comment);
+            }
+            writeEDIFDesign(netlist.getDesign(), os, stringMap);
         }
-        writeEDIFName(netlist, os, stringMap);
-        // Comments are likely to be unique
-        os.writeInt(netlist.getComments().size());
-        for(String comment : netlist.getComments()) {
-            os.writeString(comment);
-        }
-        writeEDIFDesign(netlist.getDesign(), os, stringMap);
-        os.close();
     }
 }

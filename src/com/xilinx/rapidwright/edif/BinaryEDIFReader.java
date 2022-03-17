@@ -223,34 +223,33 @@ public class BinaryEDIFReader {
      * @see BinaryEDIFWriter#writeBinaryEDIF(Path, EDIFNetlist)
      */
     public static EDIFNetlist readBinaryEDIF(Path path) {
-        Input is = FileTools.getKryoInputStream(path.toString());
-        if(!is.readString().equals(BinaryEDIFWriter.EDIF_BINARY_FILE_TAG)) {
-            throw new RuntimeException("ERROR: Cannot recognize EDIF Binary format");
-        }
-        if(!is.readString().equals(BinaryEDIFWriter.EDIF_BINARY_FILE_VERSION)) {
-            throw new RuntimeException("ERROR: Unsupported EDIF Binary format version");
-        }
-        EDIFNetlist netlist = new EDIFNetlist();
-        String[] strings = FileTools.readStringArray(is);
-        int numLibraries = is.readInt();
-        for(int i=0; i < numLibraries; i++) {
-            EDIFLibrary lib = new EDIFLibrary();
-            readEDIFName(lib, is, strings);
-            netlist.addLibrary(lib);
-            int numCells = is.readInt();
-            for(int j=0; j < numCells; j++) {
-                readEDIFCell(is, strings, lib, netlist);
+        try (Input is = FileTools.getKryoInputStream(path.toString())) {
+            if(!is.readString().equals(BinaryEDIFWriter.EDIF_BINARY_FILE_TAG)) {
+                throw new RuntimeException("ERROR: Cannot recognize EDIF Binary format");
             }
+            if(!is.readString().equals(BinaryEDIFWriter.EDIF_BINARY_FILE_VERSION)) {
+                throw new RuntimeException("ERROR: Unsupported EDIF Binary format version");
+            }
+            EDIFNetlist netlist = new EDIFNetlist();
+            String[] strings = FileTools.readStringArray(is);
+            int numLibraries = is.readInt();
+            for(int i=0; i < numLibraries; i++) {
+                EDIFLibrary lib = new EDIFLibrary();
+                readEDIFName(lib, is, strings);
+                netlist.addLibrary(lib);
+                int numCells = is.readInt();
+                for(int j=0; j < numCells; j++) {
+                    readEDIFCell(is, strings, lib, netlist);
+                }
+            }
+            readEDIFName(netlist, is, strings);
+            int numComments = is.readInt();
+            for(int i=0; i < numComments; i++) {
+                netlist.addComment(is.readString());
+            }
+            readEDIFDesign(is, strings, netlist);
+            return netlist;
         }
-        readEDIFName(netlist, is, strings);
-        int numComments = is.readInt();
-        for(int i=0; i < numComments; i++) {
-            netlist.addComment(is.readString());
-        }
-        readEDIFDesign(is, strings, netlist);
-        
-        is.close();
-        return netlist;
     }
 
 }
