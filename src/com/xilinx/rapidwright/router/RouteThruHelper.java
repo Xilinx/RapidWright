@@ -66,16 +66,16 @@ public class RouteThruHelper {
     }
     
     private void writeFile() {
-        Output out = FileTools.getKryoOutputStream(getSerializedFileName(device));
-        out.writeInt(routeThrus.size());
-        for(Entry<TileTypeEnum, HashSet<Integer>> e : routeThrus.entrySet()) {
-            out.writeString(e.getKey().toString());
-            out.writeInt(e.getValue().size());
-            for(Integer i : e.getValue()) {
-                out.writeInt(i);
+        try (Output out = FileTools.getKryoOutputStream(getSerializedFileName(device))) {
+            out.writeInt(routeThrus.size());
+            for (Entry<TileTypeEnum, HashSet<Integer>> e : routeThrus.entrySet()) {
+                out.writeString(e.getKey().toString());
+                out.writeInt(e.getValue().size());
+                for (Integer i : e.getValue()) {
+                    out.writeInt(i);
+                }
             }
         }
-        out.close();
     }
     
     private void readFile(){
