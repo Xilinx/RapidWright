@@ -165,7 +165,7 @@ public class FileTools {
 	/* Get Streams                                                                       */
 	//===================================================================================//
 	public static Output getKryoOutputStream(String fileName){
-		FileOutputStream fos = null; 
+		FileOutputStream fos = null;
 		try {
 			fos = new FileOutputStream(fileName);
 		} catch (FileNotFoundException e) {
@@ -175,8 +175,7 @@ public class FileTools {
 	}
 	
 	public static Output getKryoOutputStream(OutputStream os){
-		return useUnsafeStreams() ? new UnsafeOutput(new DeflaterOutputStream(os)) 
-		                          : new Output(new DeflaterOutputStream(os));
+		return getKryoOutputStreamWithoutDeflater(new DeflaterOutputStream(os));
 	}
 
     public static Output getKryoOutputStreamWithoutDeflater(OutputStream os){
@@ -196,8 +195,7 @@ public class FileTools {
 	}
 	
 	public static Input getKryoInputStream(InputStream in){
-		return useUnsafeStreams() ? new UnsafeInput(new InflaterInputStream(in)) 
-		                          : new Input(new InflaterInputStream(in)) ;
+		return getKryoInputStreamWithoutInflater(new InflaterInputStream(in));
 	}
 
     public static Input getKryoInputStreamWithoutInflater(InputStream in){
@@ -252,8 +250,8 @@ public class FileTools {
 			if(fileName.endsWith(".gz")){
 				in = new BufferedReader(new InputStreamReader(new GZIPInputStream(new FileInputStream(fileName))));
 			}else{
-				in = new BufferedReader(new FileReader(fileName));	
-			}			
+				in = new BufferedReader(new FileReader(fileName));
+			}
 		}
 		catch(FileNotFoundException e){
 		    throw new UncheckedIOException("ERROR: Could not find file: " + fileName, e);
@@ -279,14 +277,14 @@ public class FileTools {
 			if(fileName.endsWith(".gz")){
 				out = new BufferedWriter(new OutputStreamWriter(new GZIPOutputStream(new FileOutputStream(fileName))));
 			}else{
-				out = new BufferedWriter(new FileWriter(fileName));	
+				out = new BufferedWriter(new FileWriter(fileName));
 			}			
 		}
 		catch(IOException e){
 			e.printStackTrace();
 		}
 
-		
+
 		return out;
 	}
 	
@@ -409,38 +407,30 @@ public class FileTools {
 	@SuppressWarnings("resource")
 	public static Object loadFromFile(String fileName){
 		File inputFile = new File(fileName);
-		FileInputStream fis;
-		BufferedInputStream bis;
-		ObjectInputStream ois;
-		Object o; 
-		try {
-			fis = new FileInputStream(inputFile);
-			bis = new BufferedInputStream(fis);
-			ois = new ObjectInputStream(bis);
-			o = ois.readObject();
-			ois.close();
-			bis.close();
-			fis.close();
-		} 
+
+		try (FileInputStream fis = new FileInputStream(inputFile);
+			 BufferedInputStream bis = new BufferedInputStream(fis);
+			 ObjectInputStream ois  = new ObjectInputStream(bis)){
+			return ois.readObject();
+		}
 		catch (FileNotFoundException e) {
 			MessageGenerator.briefError("Could not open file: " + fileName + " , does it exist?");
-			return null;			
+
 		}
 		catch (IOException e) {
 			MessageGenerator.briefError("Trouble reading from file: " + fileName);
-			return null;						
+
 		}		
 		catch (ClassNotFoundException e) {
 			MessageGenerator.briefError("Improper file found: ");
-			return null;									
+
 		}
 		catch (OutOfMemoryError e){
 			MessageGenerator.briefError("The JVM ran out of memory trying to load the object in " +
 				fileName + ". Try using the JVM switch to increase the heap space (" +
 						"ex: java -Xmx1600M).");
-			return null;
 		}
-		return o;
+		return null;
 	}
 
 	/**
@@ -450,26 +440,15 @@ public class FileTools {
 	 * @return True if operation was successful, false otherwise.
 	 */
 	public static boolean saveToFile(Object o, String fileName){
-		FileOutputStream fos = null;
-		BufferedOutputStream bos = null;
-		ObjectOutputStream oos = null;
-		File objectFile = null;
-		
-		objectFile = new File(fileName);
-		try {
-			fos = new FileOutputStream(objectFile);
-			bos = new BufferedOutputStream(fos);
-			oos = new ObjectOutputStream(bos);
+		File objectFile = new File(fileName);
+		try (FileOutputStream fos = new FileOutputStream(objectFile);
+			 BufferedOutputStream bos = new BufferedOutputStream(fos);
+			 ObjectOutputStream oos = new ObjectOutputStream(bos)){
 			oos.writeObject(o);
-			oos.close();
-			bos.close();
-			fos.close();
-		} catch (FileNotFoundException e) {
-			return false;
+			return true;
 		} catch (IOException e) {
 			return false;
 		}
-		return true;
 	}
 
 	/**
@@ -480,12 +459,11 @@ public class FileTools {
 	 */
 	public static void writeLinesToTextFile(List<String> lines, String fileName) {
 		String nl = System.getProperty("line.separator");
-		try{
-			BufferedWriter bw = new BufferedWriter(new FileWriter(fileName));
+		try (FileWriter fw = new FileWriter(fileName);
+			 BufferedWriter bw = new BufferedWriter(fw)){
 			for(String line : lines) {
 				bw.write(line + nl);
 			}
-			bw.close();
 		}
 		catch(IOException e){
 			throw new UncheckedIOException("Error writing file: " +
@@ -500,7 +478,8 @@ public class FileTools {
 	 */
 	public static void writeStringToTextFile(String text, String fileName) {
 		String nl = System.getProperty("line.separator");
-		try(BufferedWriter bw = new BufferedWriter(new FileWriter(fileName))){
+		try(FileWriter fw = new FileWriter(fileName);
+			BufferedWriter bw = new BufferedWriter(fw)) {
 			bw.write(text + nl);
 		}
 		catch(IOException e){
@@ -517,10 +496,11 @@ public class FileTools {
 	 * @return An ArrayList containing strings of each line in the file. 
 	 */
 	public static ArrayList<String> getLinesFromTextFile(String fileName){
-		String line = null;
+		String line;
 
 		ArrayList<String> lines = new ArrayList<String>();
-		try (BufferedReader br = new BufferedReader(new FileReader(fileName))){
+		try (FileReader fr = new FileReader(fileName);
+			 BufferedReader br = new BufferedReader(fr)) {
 			while((line = br.readLine()) != null){
 				lines.add(line);
 			}
@@ -726,21 +706,17 @@ public class FileTools {
 	 * @return True if operation was successful, false otherwise.
 	 */
 	public static boolean copyFile(String src, String dst){
-	    FileChannel inChannel = null;
-	    FileChannel outChannel = null;
-		try {
-			File srcFile = new File(src);
-			FileInputStream fis = new FileInputStream(srcFile); 
-			inChannel = fis.getChannel();
+		File srcFile = new File(src);
+		try (FileInputStream fis = new FileInputStream(srcFile);
+			 FileChannel inChannel = fis.getChannel()) {
 			if(new File(dst).isDirectory()){
 				dst = dst + File.separator + srcFile.getName();
 			}
-			FileOutputStream fos = new FileOutputStream(new File(dst)); 
-			outChannel = fos.getChannel();
-			inChannel.transferTo(0, inChannel.size(), outChannel);
-			fis.close();
-			fos.close();
-		} 
+			try (FileOutputStream fos = new FileOutputStream(dst);
+				 FileChannel outChannel = fos.getChannel()) {
+				inChannel.transferTo(0, inChannel.size(), outChannel);
+			}
+		}
 		catch (FileNotFoundException e){
 			e.printStackTrace();
 			MessageGenerator.briefError("ERROR could not find/access file(s): " + src + " and/or " + dst);
@@ -749,18 +725,6 @@ public class FileTools {
 		catch (IOException e){
 			MessageGenerator.briefError("ERROR copying file: " + src + " to " + dst);
 			return false;
-		}
-		finally {
-			try {
-				if(inChannel != null)
-					inChannel.close();
-				if(outChannel != null) 
-					outChannel.close();
-			} 
-			catch (IOException e) {
-				MessageGenerator.briefError("Error closing files involved in copying: " + src + " and " + dst);
-				return false;
-			}
 		}
 		return true;
 	}
@@ -1632,9 +1596,9 @@ public class FileTools {
 		if(!destDir.exists()){
 			destDir.mkdirs();
 		}
-		try {
-			ZipInputStream zin = new ZipInputStream(new FileInputStream(zipFileName));
-			ZipEntry e = null;
+		try (FileInputStream fis = new FileInputStream(zipFileName);
+			 ZipInputStream zin = new ZipInputStream(fis)) {
+			ZipEntry e;
 			while((e = zin.getNextEntry()) != null){
 				String destFilePath = destDirectory + File.separator + e.getName();
 				if(e.isDirectory()){
@@ -1643,17 +1607,15 @@ public class FileTools {
 					File currFile = new File(destFilePath);
 					String parentName = currFile.getParentFile().getAbsolutePath();
 					makeDirs(parentName);
-					BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(destFilePath));
-					int read = 0;
-					while( (read = zin.read(buffer)) != -1){
-						bos.write(buffer,0,read);
+					try (FileOutputStream fos = new FileOutputStream(destFilePath);
+						 BufferedOutputStream bos = new BufferedOutputStream(fos)) {
+						int read;
+						while( (read = zin.read(buffer)) != -1){
+							bos.write(buffer,0,read);
+						}
 					}
-					bos.close();
 				}
 			}
-			zin.close();
-		} catch (FileNotFoundException e) {
-			e.printStackTrace();
 		} catch (IOException e1) {
 			e1.printStackTrace();
 		}
@@ -1722,28 +1684,28 @@ public class FileTools {
 					return false;
 				}
 				URL jar = src.getLocation();
-				ZipInputStream zip = new ZipInputStream(jar.openStream());
-				ZipEntry e;
-				byte[] buffer = new byte[1024];
-				while((e = zip.getNextEntry()) != null){
-					String name = e.getName();
-					if(name.startsWith(folderName)){
-						if(!e.isDirectory()){
-						    String fileName = outputPath + File.separator + e.getName();
-							System.out.println("Unpacking " + fileName);
-							File newFile = new File(fileName);
-							new File(newFile.getParent()).mkdirs();
-							FileOutputStream fos = new FileOutputStream(newFile);
-							
-							int len = 0;
-							while((len = zip.read(buffer)) > 0){
-								fos.write(buffer, 0, len);
+				try (InputStream is = jar.openStream();
+					 ZipInputStream zip = new ZipInputStream(is)) {
+					ZipEntry e;
+					byte[] buffer = new byte[1024];
+					while((e = zip.getNextEntry()) != null){
+						String name = e.getName();
+						if(name.startsWith(folderName)){
+							if(!e.isDirectory()){
+								String fileName = outputPath + File.separator + e.getName();
+								System.out.println("Unpacking " + fileName);
+								File newFile = new File(fileName);
+								new File(newFile.getParent()).mkdirs();
+								try(FileOutputStream fos = new FileOutputStream(newFile)) {
+									int len;
+									while((len = zip.read(buffer)) > 0){
+										fos.write(buffer, 0, len);
+									}
+								}
 							}
-							fos.close();
 						}
 					}
 				}
-				zip.close();
 			} catch(IOException e){
 				e.printStackTrace();
 				return false;

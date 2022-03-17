@@ -80,16 +80,17 @@ public class RouteThruHelper {
     
     private void readFile(){
         routeThrus = new HashMap<TileTypeEnum, HashSet<Integer>>();
-        Input in = FileTools.getKryoInputStream(getSerializedFileName(device));
-        int count = in.readInt();
-        for(int i=0; i < count; i++) {
-            TileTypeEnum type = TileTypeEnum.valueOf(in.readString());
-            int count2 = in.readInt();
-            HashSet<Integer> pips = new HashSet<Integer>(count2);
-            for(int j=0; j < count2; j++) {
-                pips.add(in.readInt());
+        try (Input in = FileTools.getKryoInputStream(getSerializedFileName(device))) {
+            int count = in.readInt();
+            for(int i=0; i < count; i++) {
+                TileTypeEnum type = TileTypeEnum.valueOf(in.readString());
+                int count2 = in.readInt();
+                HashSet<Integer> pips = new HashSet<Integer>(count2);
+                for(int j=0; j < count2; j++) {
+                    pips.add(in.readInt());
+                }
+                routeThrus.put(type, pips);
             }
-            routeThrus.put(type, pips);
         }
     }
     
