@@ -1597,7 +1597,7 @@ public class FileTools {
 			destDir.mkdirs();
 		}
 		try (FileInputStream fis = new FileInputStream(zipFileName);
-			 ZipInputStream zin = new ZipInputStream(fis)) {
+			ZipInputStream zin = new ZipInputStream(fis)) {
 			ZipEntry e;
 			while((e = zin.getNextEntry()) != null){
 				String destFilePath = destDirectory + File.separator + e.getName();
