@@ -54,15 +54,6 @@ public class ParallelismTools {
      */
     public static final String RW_PARALLEL = "RW_PARALLEL";
 
-    private static boolean parallel = true;
-    
-    static {
-        String value = System.getenv(RW_PARALLEL);
-        if(value != null) {
-            setParallel(!(value.equals("0") || value.toLowerCase().equals("false")));
-        }
-    }
-
     /** A fixed-size thread pool with as many threads as there are processors
      * minus one, fed by a single task queue */
     private static final ThreadPoolExecutor pool = new ThreadPoolExecutor(
@@ -75,6 +66,13 @@ public class ParallelismTools {
                 t.setDaemon(true);
                 return t;
             });
+
+    private static boolean parallel = true;
+
+    static {
+        String value = System.getenv(RW_PARALLEL);
+        setParallel(!(value.equals("0") || value.equalsIgnoreCase("false")));
+    }
 
     /**
      * Global setter to control parallel processing.
