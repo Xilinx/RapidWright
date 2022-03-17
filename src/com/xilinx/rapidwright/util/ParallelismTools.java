@@ -71,7 +71,7 @@ public class ParallelismTools {
 
     static {
         String value = System.getenv(RW_PARALLEL);
-        setParallel(!(value.equals("0") || value.equalsIgnoreCase("false")));
+        setParallel(value == null || !(value.equals("0") || value.equalsIgnoreCase("false")));
     }
 
     /**
