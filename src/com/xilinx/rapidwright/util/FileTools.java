@@ -708,7 +708,7 @@ public class FileTools {
 	public static boolean copyFile(String src, String dst){
 		File srcFile = new File(src);
 		try (FileInputStream fis = new FileInputStream(srcFile);
-			 FileChannel inChannel = fis.getChannel()) {
+			FileChannel inChannel = fis.getChannel()) {
 			if(new File(dst).isDirectory()){
 				dst = dst + File.separator + srcFile.getName();
 			}
