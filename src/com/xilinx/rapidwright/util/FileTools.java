@@ -713,7 +713,7 @@ public class FileTools {
 				dst = dst + File.separator + srcFile.getName();
 			}
 			try (FileOutputStream fos = new FileOutputStream(dst);
-				 FileChannel outChannel = fos.getChannel()) {
+				FileChannel outChannel = fos.getChannel()) {
 				inChannel.transferTo(0, inChannel.size(), outChannel);
 			}
 		}
