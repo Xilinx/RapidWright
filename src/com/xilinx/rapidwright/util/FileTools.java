@@ -1608,7 +1608,7 @@ public class FileTools {
 					String parentName = currFile.getParentFile().getAbsolutePath();
 					makeDirs(parentName);
 					try (FileOutputStream fos = new FileOutputStream(destFilePath);
-						 BufferedOutputStream bos = new BufferedOutputStream(fos)) {
+						BufferedOutputStream bos = new BufferedOutputStream(fos)) {
 						int read;
 						while( (read = zin.read(buffer)) != -1){
 							bos.write(buffer,0,read);
