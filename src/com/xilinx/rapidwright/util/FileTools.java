@@ -1685,7 +1685,7 @@ public class FileTools {
 				}
 				URL jar = src.getLocation();
 				try (InputStream is = jar.openStream();
-					 ZipInputStream zip = new ZipInputStream(is)) {
+					ZipInputStream zip = new ZipInputStream(is)) {
 					ZipEntry e;
 					byte[] buffer = new byte[1024];
 					while((e = zip.getNextEntry()) != null){
