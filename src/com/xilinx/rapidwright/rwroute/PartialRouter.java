@@ -25,12 +25,15 @@ package com.xilinx.rapidwright.rwroute;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.device.Site;
+import com.xilinx.rapidwright.device.SitePin;
 
 /**
  * A class extends {@link RWRoute} for partial routing.
@@ -106,6 +109,26 @@ public class PartialRouter extends RWRoute{
 			rend.setPrev(rstart);
 			rend.incrementUser(netWrapper);
 		}
+
+		for (Connection connection : netWrapper.getConnections()) {
+			SitePinInst sink = connection.getSink();
+			String sinkPinName = sink.getName();
+			if (!Pattern.matches("[A-H](X|_I)", sinkPinName))
+				continue;
+
+			// TODO: Assumes that LUT is unoccupied
+			Routable rnode = connection.getSinkRnode();
+			String lut = sinkPinName.substring(0, 1);
+			Site site = sink.getSite();
+			for (int i = 1; i <= 6; i++) {
+				Node altNode = site.getConnectedNode(lut + i);
+				Routable altRnode = createAddRoutableNode(null, altNode, RoutableType.WIRE);
+				// Trigger a setChildren() for LUT routethrus
+				altRnode.getChildren();
+				// Create a fake edge from [A-H][1-6] to [A-H](I|_X)
+				altRnode.addChild(rnode);
+			}
+		}
 	}
-	
+
 }

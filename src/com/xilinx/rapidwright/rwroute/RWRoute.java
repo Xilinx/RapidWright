@@ -35,6 +35,7 @@ import java.util.Map.Entry;
 import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.design.Design;
@@ -45,6 +46,7 @@ import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.edif.EDIFNet;
@@ -726,9 +728,17 @@ public class RWRoute{
 			}
 			
 			updateCostFactors();
-			
-			printRoutingIterationStatisticsInfo(System.nanoTime() - startIteration, routingGraph.numNodes() - lastIterationRnodeCount,
+
+			long generatedRnodes = routingGraph.numNodes() - lastIterationRnodeCount;
+			printRoutingIterationStatisticsInfo(System.nanoTime() - startIteration, generatedRnodes,
 					(float) ((rnodesTimer.getTime() - lastIterationRnodeTime) * 1e-9), config.isTimingDriven());
+
+			if (routeIteration > 1 && generatedRnodes == 0) {
+				Set<Connection> unroutedConnections = getUnroutedConnections();
+				System.err.println("ERROR: Unroutable connections: " + unroutedConnections.size());
+				System.err.println("ERROR: Fixed point reached: giving up");
+				break;
+			}
 			
 			if(overUsedRnodes.size() == 0) {
 				Set<Connection> unroutedConnections = getUnroutedConnections();
@@ -849,24 +859,42 @@ public class RWRoute{
 	 */
 	private void assignNodesToConnections() {
 		for(Connection connection : sortedIndirectConnections){
-			connection.newNodes();
-			List<Node> switchBoxToSink = RouterHelper.findPathBetweenNodes(connection.getSinkRnode().getNode(), connection.getSink().getConnectedNode());
+			List<Node> nodes = new ArrayList<>();
+			SitePinInst sink = connection.getSink();
+
+			List<Node> switchBoxToSink = RouterHelper.findPathBetweenNodes(connection.getSinkRnode().getNode(), sink.getConnectedNode());
 			if(switchBoxToSink.size() >= 2) {			
 				for(int i = 0; i < switchBoxToSink.size() -1; i++) {
-					connection.addNode(switchBoxToSink.get(i));
+					nodes.add(switchBoxToSink.get(i));
+				}
+			}
+
+			List<Routable> rnodes = connection.getRnodes();
+
+			String sinkPinName = sink.getName();
+			if (rnodes.size() >= 2 && Pattern.matches("[A-H](X|_I)", sinkPinName)) {
+				Routable prevRnode = rnodes.get(1);
+				Node prevNode = (prevRnode != null) ? prevRnode.getNode() : null;
+				SitePin prevPin = (prevNode != null) ? prevNode.getSitePin() : null;
+				if (prevPin != null && Pattern.matches("[A-H][1-6]", prevPin.getPinName())) {
+					rnodes = rnodes.subList(1, rnodes.size());
+					// TODO: Update site routing
+					System.out.println(sinkPinName + " -> " + prevPin.getPinName() + " for " + connection.getNetWrapper().getNet());
 				}
 			}
 			
-			for(Routable rnode:connection.getRnodes()){
-				connection.addNode(rnode.getNode());
+			for(Routable rnode : rnodes){
+				nodes.add(rnode.getNode());
 			}
 			
 			List<Node> sourceToSwitchBox = RouterHelper.findPathBetweenNodes(connection.getSource().getConnectedNode(), connection.getSourceRnode().getNode());
 			if(sourceToSwitchBox.size() >= 2) {
 				for(int i = 1; i <= sourceToSwitchBox.size() - 1; i++) {
-					connection.addNode(sourceToSwitchBox.get(i));
+					nodes.add(sourceToSwitchBox.get(i));
 				}
 			}
+
+			connection.setNodes(nodes);
 		}
 	}
 	
@@ -1659,6 +1687,7 @@ public class RWRoute{
 			if(config.isPartialRouting()) {
 				return new PartialRouter(design, config);
 			}
+			DesignTools.createMissingSitePinInsts(design);
 			return new RWRoute(design, config);
 		});
 	}
@@ -1675,8 +1704,7 @@ public class RWRoute{
 		if(!config.isPartialRouting() || (!design.getVccNet().hasPIPs() && !design.getGndNet().hasPIPs())) {
 			DesignTools.createPossiblePinsToStaticNets(design);
 		}
-		DesignTools.createMissingSitePinInsts(design);
-		
+
 		// Instantiates router object
 		RWRoute router = newRouter.get();
 		

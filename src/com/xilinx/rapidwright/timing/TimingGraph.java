@@ -164,7 +164,8 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         if(routerTimer != null) routerTimer.getRuntimeTracker("determine logic dly").stop();
         
         if(routerTimer != null) routerTimer.createRuntimeTracker("add net dly edges", "build timing graph").start();
-        for (Net net : design.getNets()) {
+        // for (Net net : design.getNets()) {
+        for (Net net : targetNets) {
             if(net.isClockNet()) continue;//this is for getting rid of the problem in addNetDelayEdges() of clock net
             if(net.isStaticNet()) continue;
             addNetDelayEdges(net);

@@ -499,8 +499,8 @@ public class RouterHelper {
 	 * @return true, if the connection is successfully routed.
 	 */
 	public static boolean routeDirectConnection(Connection directConnection){
-		directConnection.newNodes();
 		directConnection.setNodes(findPathBetweenNodes(directConnection.getSource().getConnectedNode(), directConnection.getSink().getConnectedNode()));
+		// TODO: Following is always true
 		return directConnection.getNodes() != null;
 	}
 	

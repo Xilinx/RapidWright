@@ -365,14 +365,6 @@ public class Connection implements Comparable<Connection>{
 		this.crossSLR = crossSLR;
 	}
 	
-	public void newNodes(){
-		setNodes(new ArrayList<>());
-	}
-	
-	public void addNode(Node node){
-		getNodes().add(node);
-	}
-	
 	public List<Node> getNodes() {
 		return nodes;
 	}

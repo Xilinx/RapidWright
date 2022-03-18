@@ -479,7 +479,11 @@ public abstract class RoutableNode implements Routable{
 		// return !tile.getName().startsWith("LAG");
 		// TODO: Is this equivalent to the above?
 		//       (i.e. do not allow anything except INT and LAG* tiles)
-		return !lagunaTileEnums.contains(tileType);
+		// return !lagunaTileEnums.contains(tileType);
+
+		// FIXME: Temporarily allowing all tile types to also enable LUT RTs
+		//        to be considered
+		return false;
 	}
 	 
 	final private static Set<TileTypeEnum> lagunaTileEnums;
