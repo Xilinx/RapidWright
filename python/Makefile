@@ -8,7 +8,7 @@
 #  1. Run 'make update_version' to update the files with the version to release
 #  2. Modify setup.py to the Test PyPi available version number (if needed)
 #  3. Run 'make package'
-#  4. Run 'test_upload'
+#  4. Run 'make test_upload'
 #  5. Test the package download and install in a venv from Test PyPi to ensure
 #     The package and release is good. For example:
 #     $ unset RAPIDWRIGHT_PATH
