@@ -860,10 +860,10 @@ public class RWRoute{
 			criticalConnections.sort(new Comparator<Connection>() {
 				@Override
 				public int compare(Connection connection1, Connection connection2) {
-					return connection1.getCriticality() < connection1.getCriticality()? 1 : -1;
+					return Float.compare(connection2.getCriticality(),connection1.getCriticality());
 				}});
 			minRerouteCriticality = criticalConnections.get(maxNumberOfCriticalConnections).getCriticality();
-    	}
+		}
 	}
 	
 	/**

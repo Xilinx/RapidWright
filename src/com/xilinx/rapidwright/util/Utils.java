@@ -315,9 +315,7 @@ public class Utils{
 		
 		lockedSiteTypes = EnumSet.of(
 			SiteTypeEnum.CONFIG_SITE,
-			SiteTypeEnum.BUFG,
-			SiteTypeEnum.BUFGCE,
-			SiteTypeEnum.BUFGCTRL
+			SiteTypeEnum.BUFG
 		);
 
 		sliceTypes = EnumSet.of(

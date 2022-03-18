@@ -24,6 +24,7 @@ package com.xilinx.rapidwright.design;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -58,7 +59,7 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 	private ArrayList<SiteInst> instances;
 	/** A list of all nets internal to this module instance */
 	private ArrayList<Net> nets;
-	
+
 	/**
 	 * Constructor initializing instance module name
 	 * @param name Name of the module instance
@@ -349,6 +350,15 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 				//}
 				net.addPIP(newPip);
 			}
+
+			// Because only one VCC/GND net is allowed for each Design,
+			// this net is just a placeholder for module-specific PIPs
+			// (that were relocated above) -- add those to Design's
+			// singleton net here
+			if (templateNet.isStaticNet()) {
+				Net designNet = design.getNet(templateNet.getName());
+				designNet.getPIPs().addAll(net.getPIPs());
+			}
 		}
 		return true;
 	}
@@ -363,6 +373,19 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 		}
 		//unplace nets (remove pips)
 		for(Net net : nets){
+			// Because only one VCC/GND net is allowed for each Design,
+			// this net is just a placeholder for any module-specific PIPs
+			// that would have been inserted into Design's static net, so
+			// surgically remove those here
+			if (net.isStaticNet()) {
+				Net templateNet = net.getModuleTemplateNet();
+				Net designNet = design.getNet(templateNet.getName());
+
+				HashSet<PIP> pips = new HashSet<>(net.getPIPs());
+				designNet.getPIPs().removeIf((p) -> pips.remove(p));
+				assert(pips.isEmpty());
+			}
+
 			net.getPIPs().clear();
 		}
 	}

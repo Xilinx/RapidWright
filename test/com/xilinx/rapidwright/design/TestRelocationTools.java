@@ -31,6 +31,7 @@ import java.util.Set;
 import java.util.stream.Stream;
 import java.util.stream.Collectors;
 
+import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.support.CheckOpenFiles;
 import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.design.tools.RelocationTools;
@@ -75,7 +76,7 @@ public class TestRelocationTools {
                 for (SiteInst si : mi.getSiteInsts()) {
                     for (Cell c2 : si.getCells()) {
                         Cell c1 = design1.getCell(c2.getName());
-                        if (c1 == null && c2.getName().startsWith(mi.getName() + "/")) {
+                        if (c1 == null && c2.getName().startsWith(mi.getName() + EDIFTools.EDIF_HIER_SEP)) {
                             // Retry without ModuleInst hierarchy in case it was flattened
                             c1 = design1.getCell(c2.getName().substring(mi.getName().length() + 1));
                         }
@@ -86,13 +87,9 @@ public class TestRelocationTools {
 
                 for (Net n2 : mi.getNets()) {
                     Net n1 = design1.getNet(n2.getName());
-                    if (n1 == null && n2.getName().startsWith(mi.getName() + "/")) {
+                    if (n1 == null && n2.getName().startsWith(mi.getName() + EDIFTools.EDIF_HIER_SEP)) {
                         // Retry without ModuleInst hierarchy in case it was flattened
                         n1 = design1.getNet(n2.getName().substring(mi.getName().length() + 1));
-                    }
-                    if (n1 == null && (n2.isStaticNet() || n2.getName() == Net.USED_NET)) {
-                        // Module relocation does not propagate static nets nor USED_NETs
-                        continue;
                     }
                     Assertions.assertNotNull(n1);
 
@@ -104,7 +101,14 @@ public class TestRelocationTools {
 
                     Set<PIP> p1 = new HashSet<>(n1.getPIPs());
                     Set<PIP> p2 = new HashSet<>(n2.getPIPs());
-                    Assertions.assertEquals(p1, p2);
+                    if (!n1.isStaticNet()) {
+                        Assertions.assertEquals(p1, p2);
+                    } else {
+                        // For static nets, ModuleInst.place() will merge its
+                        // static PIPs into the parent Design's static net, so
+                        // check that it is contained within
+                        Assertions.assertTrue(p1.containsAll(p2));
+                    }
                 }
             }
         }
@@ -123,7 +127,7 @@ public class TestRelocationTools {
         String metaPath = RapidWrightDCP.getString("picoblaze_ooc_X10Y235.metadata");
         if (instanceName.isEmpty()) {
             Design design2 = new Design("design2", design1.getPartName());
-            Module module = new Module(Design.readCheckpoint(dcpPath, CodePerfTracker.SILENT), metaPath);
+            Module module = new Module(Design.readCheckpoint(dcpPath, CodePerfTracker.SILENT), metaPath, false);
             ModuleInst mi = design2.createModuleInst("inst", module);
             mi.placeOnOriginalAnchor();
             Collection<ModuleInst> moduleInsts = Arrays.asList(mi);
@@ -153,6 +157,10 @@ public class TestRelocationTools {
     @MethodSource()
     @CheckOpenFiles
     public void testPicoblaze4OOC(String instanceName, int colOffset, int rowOffset, boolean expectSuccess) {
+
+        // NOTE: Picoblaze4OOC, unlike PicoblazeOOC, has already had its static nets
+        //       unrouted on creation.
+
         Design design1 = Design.readCheckpoint(Picoblaze4OOCdcp, CodePerfTracker.SILENT);
 
         Assertions.assertEquals(RelocationTools.relocate(design1, instanceName, colOffset, rowOffset),
