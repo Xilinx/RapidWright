@@ -80,17 +80,17 @@ public class RoutableGraphTimingDriven extends RoutableGraph {
         }
 
         @Override
-        public boolean isExcluded(Node node) {
-            if (super.isExcluded(node))
+        public boolean isExcluded(Node parent, Node child) {
+            if (super.isExcluded(parent, child))
                 return true;
-            Tile tile = node.getTile();
+            Tile tile = child.getTile();
             if(tile.getTileTypeEnum() == TileTypeEnum.INT) {
                 if (maskNodesCrossRCLK) {
                     int y = tile.getTileYCoordinate();
                     if ((y-30)%60 == 0) { // above RCLK
-                        return excludeAboveRclk.contains(node.getWireName());
+                        return excludeAboveRclk.contains(child.getWireName());
                     } else if ((y-29)%60 == 0) { // below RCLK
-                        return excludeBelowRclk.contains(node.getWireName());
+                        return excludeBelowRclk.contains(child.getWireName());
                     }
                 }
             }

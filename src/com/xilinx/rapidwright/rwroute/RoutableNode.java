@@ -108,7 +108,7 @@ public abstract class RoutableNode implements Routable{
 		List<Node> allDownHillNodes = node.getAllDownhillNodes();
 		List<Routable> childrenList = new ArrayList<>(allDownHillNodes.size());
 		for(Node node:allDownHillNodes){
-			if(isExcluded(node)) continue;
+			if(isExcluded(this.node, node)) continue;
 			// FIXME: What is the meaning of checking that a node routethru-s to itself?
 			// if(routethruHelper.isRouteThru(node, node)) continue;
 
@@ -290,8 +290,12 @@ public abstract class RoutableNode implements Routable{
 		// FIXME: This is inefficient, but is currently only used by
 		//        RWRoute.unrouteReservedNetsToReleaseResources()
 		//        which is due for an overhaul
-		children = Arrays.copyOf(children, children.length+1);
-		children[children.length-1] = rnode;
+		if (children == null) {
+			children = new Routable[]{rnode};
+		} else {
+			children = Arrays.copyOf(children, children.length + 1);
+			children[children.length - 1] = rnode;
+		}
 	}
 
 	private void setRoutableType(RoutableType type) {
@@ -463,11 +467,11 @@ public abstract class RoutableNode implements Routable{
 	
 	/**
 	 * Checks if some routing resources are prevented from being used.
-	 * @param node The routing resource in question.
+	 * @param child The routing resource in question.
 	 * @return true, if the node should be excluded from the routing resource graph.
 	 */
-	public boolean isExcluded(Node node) {
-		Tile tile = node.getTile();
+	public boolean isExcluded(Node parent, Node child) {
+		Tile tile = child.getTile();
 		TileTypeEnum tileType = tile.getTileTypeEnum();
 		if (tileType == TileTypeEnum.INT) {
 			return false;

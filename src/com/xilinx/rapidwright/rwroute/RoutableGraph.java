@@ -48,8 +48,22 @@ public class RoutableGraph {
         }
 
         @Override
-        public boolean isExcluded(Node node) {
-            return preservedMap.containsKey(node) || super.isExcluded(node);
+        public boolean isExcluded(Node parent, Node child) {
+            boolean preserved = isPreserved(child);
+            // TODO: Only necessary for partial router
+            {
+                // If preserved, check if child node has been created already
+                Routable rnode = (preserved) ? RoutableGraph.this.getNode(child) : null;
+                // If so, get its prev pointer
+                Routable prev = (rnode != null) ? rnode.getPrev() : null;
+                // Presence means that the only arc allowed to enter this child node
+                // is if it came from prev
+                if (prev != null && prev.getNode() == parent) {
+                    preserved = false;
+                    rnode.setVisited(false);
+                }
+            }
+            return preserved || super.isExcluded(parent, child);
         }
 
         @Override

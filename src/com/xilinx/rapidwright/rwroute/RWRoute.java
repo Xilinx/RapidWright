@@ -573,7 +573,7 @@ public class RWRoute{
 	 * @param type The {@link RoutableType} of the {@link RoutableNode} Object.
 	 * @return The created {@link RoutableNode} instance.
 	 */
-	private Routable createAddRoutableNode(SitePinInst sitePinInst, Node node, RoutableType type){
+	protected Routable createAddRoutableNode(SitePinInst sitePinInst, Node node, RoutableType type){
 		Pair<Routable,Boolean> ret = routingGraph.getOrCreate(node, type);
 		Routable rnode = ret.getFirst();
 		boolean inserted = ret.getSecond();
