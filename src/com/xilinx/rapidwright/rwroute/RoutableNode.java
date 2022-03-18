@@ -24,6 +24,7 @@
 package com.xilinx.rapidwright.rwroute;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -35,18 +36,15 @@ import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
-import com.xilinx.rapidwright.router.RouteThruHelper;
-import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
+import com.xilinx.rapidwright.util.RuntimeTracker;
 
 /**
  * A RoutableNode Object, denoted as rnode, is a vertex of the routing resource graph.
  * It implements {@link Routable} and is created based on a {@link Node} Object.
  */
-public class RoutableNode implements Routable{
-	/** A unique index of a rnode */
-	private int index;
+public abstract class RoutableNode implements Routable{
 	/** The associated {@link Node} instance */
-	private Node node;
+	protected Node node;
 	/** The type of a rnode*/
 	private RoutableType type;
 	/** The tileXCoordinate and tileYCoordinate of the INT tile that the associated node stops at */
@@ -56,12 +54,10 @@ public class RoutableNode implements Routable{
 	private short length;
 	/** The base cost of a rnode */
 	private float baseCost;
-	/** The delay of this rnode computed based on the timing model */
-	private short delay;
 	/** A flag to indicate if this rnode is the target */
-	private boolean target;
+	private boolean isTarget;
 	/** The children (downhill rnodes) of this rnode */
-	private List<Routable> children;
+	protected Routable[] children;
 	
 	/** Present congestion cost */
 	private float presentCongestionCost;
@@ -71,8 +67,6 @@ public class RoutableNode implements Routable{
 	private float upstreamPathCost;
 	/** Lower bound of the total path cost */
 	private float lowerBoundTotalPathCost;
-	/** A flag to indicate if the rnode has been visited or not during the expansion */
-	private boolean visited;
 	/** A variable that stores the parent of a rnode during expansion to facilitate tracing back */
 	private Routable prev;
 	/**
@@ -90,87 +84,58 @@ public class RoutableNode implements Routable{
 	 */
 	private Map<Routable, Integer> driversCounts;
 	
-	/** Static variable to indicate if the routing is timing-driven */
-	static boolean timingDriven;
-	/** The instantiated delayEstimator to compute delays */
-	static DelayEstimatorBase delayEstimator;
-	/** A flag to indicate if the routing resource exclusion should disable exclusion of nodes cross RCLK */
-	static boolean maskNodesCrossRCLK;
-	
-	public static void setTimingDriven(boolean isTimingDriven, DelayEstimatorBase estimator) {
-		timingDriven = isTimingDriven;
-		if(timingDriven) {
-			delayEstimator = estimator;
-		}
-	}
-	
-	public static void setMaskNodesCrossRCLK(boolean mask) {
-		maskNodesCrossRCLK = mask;
-	}
-	
-	public RoutableNode(int index, Node node, RoutableType type){
-		this.index = index;
-		this.type = type;
+	public RoutableNode(Node node, RoutableType type){
 		this.node = node;
+		setRoutableType(type);
 		children = null;
-		target = false;
+		isTarget = false;
 		setEndTileXYCoordinates();
-		setBaseCost();
+		setBaseCost(type);
 		presentCongestionCost = 1;
     	historicalCongestionCost = 1;
     	setVisited(false);
 		usersConnectionCounts = null;
 		driversCounts = null;
-		prev = null;
-		if(timingDriven){
-			setDelay(RouterHelper.computeNodeDelay(delayEstimator, node));
-		}
+		setPrev(null);
 	}
+
+	abstract protected Routable getOrCreate(Node node, RoutableType type);
 	
-	public int setChildren(int globalIndex, Map<Node, Routable> createdRoutable, Set<Node> reserved, RouteThruHelper routethruHelper){
-		children = new ArrayList<>();
+	protected void setChildren(RuntimeTracker setChildrenTimer/*RouteThruHelper routethruHelper*/){
+		if (children != null)
+			return;
+		setChildrenTimer.start();
 		List<Node> allDownHillNodes = node.getAllDownhillNodes();
-		
-		for(Node node:allDownHillNodes){		
-			Routable child = createdRoutable.get(node);
-			if(reserved.contains(node)) {
-				if (child == null) {
-					continue;
-				}
-				// If this child is part of a partial net, disallow all edges
-				// except for the preserved one
-				Routable prev = child.getPrev();
-				assert(prev != null);
-				if (prev != this) {
-					continue;
-				}
-			}
-			if(isExcluded(node, timingDriven)) continue;
-			if(routethruHelper.isRouteThru(node, node)) continue;
-			
-			if(child == null) {
-				RoutableType type = RoutableType.WIRE;		
-				child = new RoutableNode(globalIndex++, node, type);
-				createdRoutable.put(node, child);
-			}
-			children.add(child);//the sink rnode of a target connection has been created up-front
+		List<Routable> childrenList = new ArrayList<>(allDownHillNodes.size());
+		for(Node node:allDownHillNodes){
+			if(isExcluded(node)) continue;
+			// FIXME: What is the meaning of checking that a node routethru-s to itself?
+			// if(routethruHelper.isRouteThru(node, node)) continue;
+
+			RoutableType type = RoutableType.WIRE;
+			Routable child = getOrCreate(node, type);
+			childrenList.add(child);//the sink rnode of a target connection has been created up-front
 		}
-		return globalIndex;
+		children = childrenList.toArray(EMPTY_ARRAY);
+		setChildrenTimer.stop();
 	}
 	
-	public void setBaseCost(){
+	private void setBaseCost(RoutableType type){
+		// TODO: Why does enabling the following line cause unroutability?
+		//       setRoutableType() is called before this, and it setting
+		//       this.type disrupts the base cost such that
+		//       testNonTimingDrivenPartialRouting becomes unroutable.
+		//       The `type` parameter fed to this method is the original
+		//       value provided to the constructor
+		// type = this.type;
 		if(type == RoutableType.WIRE){
 			baseCost = 0.4f;
 			// NOTE: IntentCode is device-dependent
 			IntentCode ic = node.getIntentCode();
 			switch(ic) {
 			case NODE_PINBOUNCE:
-				type = RoutableType.PINBOUNCE;
-				break;
 			case NODE_PINFEED:
-				type = RoutableType.PINFEED_I;
 				break;
-			
 			case NODE_DOUBLE:
 				if(endTileXCoordinate != getNode().getTile().getTileXCoordinate()) {
 					baseCost = 0.4f*length;
@@ -190,7 +155,6 @@ public class RoutableNode implements Routable{
 				break;	
 			default:
 				if(length != 0) baseCost *= length;
-				type = RoutableType.WIRE;
 				break;
 			}	
 		}else if(type == RoutableType.PINFEED_I){
@@ -211,12 +175,11 @@ public class RoutableNode implements Routable{
 	}
 	
 	@Override
-	public boolean hasMultiDrivers(){
+	public boolean hasMultiDrivers() {
 		return Routable.capacity < uniqueDriverCount();
 	}
 
-	@Override
-	public void setEndTileXYCoordinates() {
+	private void setEndTileXYCoordinates() {
 		Wire[] wires = node.getAllWiresInNode();
 		List<Tile> intTiles = new ArrayList<>();
 		for(Wire w : wires) {
@@ -224,7 +187,7 @@ public class RoutableNode implements Routable{
 				intTiles.add(w.getTile());
 			}
 		}
-		Tile endTile = null;
+		Tile endTile;
 		if(intTiles.size() > 1) {
 			endTile = intTiles.get(1);
 		}else if(intTiles.size() == 1) {
@@ -253,36 +216,24 @@ public class RoutableNode implements Routable{
 	
 	@Override
 	public String toString(){
-		String coordinate = "";	
-		coordinate = "(" + endTileXCoordinate + "," + endTileYCoordinate + ")";
 		StringBuilder s = new StringBuilder();
-		s.append("id = " + index);
-		s.append(", ");
 		s.append("node " + node.toString());
 		s.append(", ");
-		s.append(coordinate);
+		s.append("(" + endTileXCoordinate + "," + endTileYCoordinate + ")");
 		s.append(", ");
 		s.append(String.format("type = %s", type));
 		s.append(", ");
 		s.append(String.format("ic = %s", getNode().getIntentCode()));
 		s.append(", ");
-		s.append(String.format("dly = %d", delay));
-		s.append(", ");
 		s.append(String.format("user = %s", getOccupancy()));
 		s.append(", ");
 		s.append(getUsersConnectionCounts());
-		
 		return s.toString();
 	}
 	
 	@Override
 	public int hashCode(){
 		return node.hashCode();
-	}
-	
-	@Override
-	public int getIndex() {
-		return index;
 	}
 	
 	@Override
@@ -297,12 +248,12 @@ public class RoutableNode implements Routable{
 
 	@Override
 	public boolean isTarget() {
-		return target;
+		return isTarget;
 	}
 
 	@Override
 	public void setTarget(boolean isTarget) {
-		this.target = isTarget;	
+		this.isTarget = isTarget;
 	}
 
 	@Override
@@ -312,21 +263,11 @@ public class RoutableNode implements Routable{
 
 	@Override
 	public float getDelay() {
-		return delay;
+		return 0;
 	}
 	@Override
 	public short getEndTileXCoordinate() {
 		return endTileXCoordinate;
-	}
-
-	@Override
-	public void setEndTileXCoordinate(short endTileXCoordinate) {
-		this.endTileXCoordinate = endTileXCoordinate;
-	}
-
-	@Override
-	public void setEndTileYCoordinate(short endTileYCoordinate) {
-		this.endTileYCoordinate = endTileYCoordinate;
 	}
 
 	@Override
@@ -339,28 +280,34 @@ public class RoutableNode implements Routable{
 		return baseCost;
 	}
 
-	public boolean isChildrenUnset() {
-		return children == null;
+	@Override
+	public Routable[] getChildren() {
+		return children != null ? children : EMPTY_ARRAY;
 	}
 
 	@Override
-	public List<Routable> getChildren() {
-		return children;
+	public void addChild(Routable rnode) {
+		// FIXME: This is inefficient, but is currently only used by
+		//        RWRoute.unrouteReservedNetsToReleaseResources()
+		//        which is due for an overhaul
+		children = Arrays.copyOf(children, children.length+1);
+		children[children.length-1] = rnode;
 	}
 
-	@Override
-	public void setDelay(short delay) {
-		this.delay = delay;
-	}
-
-	@Override
-	public int manhattanDistToSink(Routable sink) {
-		return Math.abs(this.getEndTileXCoordinate() - sink.getEndTileXCoordinate()) + Math.abs(getEndTileYCoordinate() - sink.getEndTileYCoordinate());
-	}
-
-	@Override
-	public void setRoutableType(RoutableType type) {
+	private void setRoutableType(RoutableType type) {
 		this.type = type;
+		if(type == RoutableType.WIRE) {
+			// NOTE: IntentCode is device-dependent
+			IntentCode ic = node.getIntentCode();
+			switch (ic) {
+				case NODE_PINBOUNCE:
+					this.type = RoutableType.PINBOUNCE;
+					break;
+				case NODE_PINFEED:
+					this.type = RoutableType.PINFEED_I;
+					break;
+			}
+		}
 	}
 
 	@Override
@@ -371,7 +318,6 @@ public class RoutableNode implements Routable{
 	@Override
 	public void setLowerBoundTotalPathCost(float totalPathCost) {
 		lowerBoundTotalPathCost = totalPathCost;
-		setVisited(true);
 	}
 	
 	@Override
@@ -399,8 +345,7 @@ public class RoutableNode implements Routable{
 		if(usersConnectionCounts == null) {
 			usersConnectionCounts = new HashMap<>();
 		}
-		Integer connectionCount = usersConnectionCounts.getOrDefault(source, 0);
-		usersConnectionCounts.put(source, connectionCount + 1);
+		usersConnectionCounts.merge(source, 1, Integer::sum);
 	}
 	
 	@Override
@@ -413,12 +358,7 @@ public class RoutableNode implements Routable{
 	
 	@Override
 	public void decrementUser(NetWrapper user) {
-		Integer count = usersConnectionCounts.getOrDefault(user, 0);
-		if(count == 1) {
-			usersConnectionCounts.remove(user);
-		}else if(count > 1) {
-			usersConnectionCounts.put(user, count - 1);
-		}
+		usersConnectionCounts.compute(user, (k,v) -> (v == 1) ? null : v - 1);
 	}
 	
 	@Override
@@ -442,23 +382,17 @@ public class RoutableNode implements Routable{
 		if(driversCounts == null) {
 			driversCounts = new HashMap<>();
 		}
-		Integer count = driversCounts.getOrDefault(parent, 0);
-		driversCounts.put(parent, count + 1);
+		driversCounts.merge(parent, 1, Integer::sum);
 	}
 	
 	@Override
 	public void decrementDriver(Routable parent) {
-		Integer count = driversCounts.getOrDefault(parent, 0);
-		if(count == 1) {
-			driversCounts.remove(parent);
-		}else if(count > 1) {
-			driversCounts.put(parent, count - 1);
-		}
+		driversCounts.compute(parent, (k,v) -> (v == 1) ? null : v - 1);
 	}
 	
 	@Override
 	public int getOccupancy() {
-		return this.uniqueUserCount();
+		return uniqueUserCount();
 	}
 	
 	@Override
@@ -493,18 +427,19 @@ public class RoutableNode implements Routable{
 
 	@Override
 	public boolean isVisited() {
-		return visited;
+		return getPrev() != null;
 	}
 
 	@Override
 	public void setVisited(boolean visited) {
-		this.visited = visited;
+		assert(!visited);
+		setPrev(null);
 	}
 	
 	/**
 	 * Checks if a node is an exit node of a NodeGroup
 	 * @param node The node in question
-	 * @return true, if the node is a S/D/Q/L node or a local node with a GLOBA and CTRL wire 
+	 * @return true, if the node is a S/D/Q/L node or a local node with a GLOBAL and CTRL wire
 	 */
 	public static boolean isExitNode(Node node) {
 		switch(node.getIntentCode()) {
@@ -529,53 +464,28 @@ public class RoutableNode implements Routable{
 	/**
 	 * Checks if some routing resources are prevented from being used.
 	 * @param node The routing resource in question.
-	 * @param timingDriven To indicate if it targets timing-driven routing.
 	 * @return true, if the node should be excluded from the routing resource graph.
 	 */
-	public static boolean isExcluded(Node node, boolean timingDriven) {
+	public boolean isExcluded(Node node) {
 		Tile tile = node.getTile();
-    	if(tile.getTileTypeEnum() == TileTypeEnum.INT) {
-	        if(timingDriven && maskNodesCrossRCLK) {
-	        	int y = tile.getTileYCoordinate();
-		        if ((y-30)%60 == 0) { // above RCLK
-		        	return excludeAboveRclk.contains(node.getWireName());
-		        } else if ((y-29)%60 == 0) { // below RCLK
-		        	return excludeBelowRclk.contains(node.getWireName());
-		        }
-	        }
-	        return false;
-        }else {
-        	if(tile.getName().startsWith("LAG")) {
-        		return false;
-        	}
-        	return true;
-        }
+		TileTypeEnum tileType = tile.getTileTypeEnum();
+		if (tileType == TileTypeEnum.INT) {
+			return false;
+		}
+		// return !tile.getName().startsWith("LAG");
+		// TODO: Is this equivalent to the above?
+		//       (i.e. do not allow anything except INT and LAG* tiles)
+		return !lagunaTileEnums.contains(tileType);
 	}
 	 
-	private static Set<String> excludeAboveRclk;
-	private static Set<String> excludeBelowRclk;
+	final private static Set<TileTypeEnum> lagunaTileEnums;
 	static {
-	        // these nodes are bleeding down
-		excludeAboveRclk = new HashSet<String>() {{
-			add("SDQNODE_E_0_FT1");
-			add("SDQNODE_E_2_FT1");
-			add("SDQNODE_W_0_FT1");
-			add("SDQNODE_W_2_FT1");
-			add("EE12_BEG0");
-			add("WW2_E_BEG0");
-			add("WW2_W_BEG0");
-	     }};
-	        // these nodes are bleeding up
-	     excludeBelowRclk = new HashSet<String>() {{
-	    	 add("SDQNODE_E_91_FT0");
-	    	 add("SDQNODE_E_93_FT0");
-	    	 add("SDQNODE_E_95_FT0");
-	    	 add("SDQNODE_W_91_FT0");
-	    	 add("SDQNODE_W_93_FT0");
-	    	 add("SDQNODE_W_95_FT0");
-	    	 add("EE12_BEG7");
-	    	 add("WW1_W_BEG7");
-	     }};
+		lagunaTileEnums = new HashSet<>();
+		for (TileTypeEnum e : TileTypeEnum.values()) {
+			if (e.toString().startsWith("LAG")) {
+				lagunaTileEnums.add(e);
+			}
+		}
 	}
 	
 }

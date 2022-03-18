@@ -100,8 +100,8 @@ public class PartialRouter extends RWRoute{
 		for (PIP pip : net.getPIPs()) {
 			Node start = (pip.isReversed()) ? pip.getEndNode() : pip.getStartNode();
 			Node end = (pip.isReversed()) ? pip.getStartNode() : pip.getEndNode();
-			Routable rstart = createAddRoutableNode(null, start, RoutableType.WIRE);
-			Routable rend = createAddRoutableNode(null, end, RoutableType.WIRE);
+			Routable rstart = routingGraph.create(start, RoutableType.WIRE);
+			Routable rend = routingGraph.create(end, RoutableType.WIRE);
 			assert(rend.getPrev() == null);
 			rend.setPrev(rstart);
 			rend.incrementUser(netWrapper);

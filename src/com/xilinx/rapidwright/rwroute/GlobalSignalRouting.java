@@ -24,7 +24,6 @@
 package com.xilinx.rapidwright.rwroute;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -58,9 +57,9 @@ import com.xilinx.rapidwright.router.UltraScaleClockRouting;
  * Adapted from RapidWright APIs.
  */
 public class GlobalSignalRouting {	
-	private static HashSet<String> lutOutputPinNames;
+	final private static HashSet<String> lutOutputPinNames;
 	static {
-		lutOutputPinNames = new HashSet<String>();
+		lutOutputPinNames = new HashSet<>();
 		for(String cle : new String[]{"L", "M"}){
 			for(String pin : new String[]{"A", "B", "C", "D", "E", "F", "G", "H"}){
 				lutOutputPinNames.add("CLE_CLE_" + cle + "_SITE_0_" + pin + "_O");
@@ -82,8 +81,8 @@ public class GlobalSignalRouting {
 		Map<String, RouteNode> horDistributionLines = new HashMap<>();
 		
 		for(List<Node> nodes : dstINTtilePaths.values()) {
-			clkPIPs.addAll(RouterHelper.getPIPsFromListOfNodes(nodes));
-			
+			clkPIPs.addAll(RouterHelper.getPIPsFromNodes(nodes));
+
 			Node hDistr = nodes.get(nodes.size() - 1);
 			RouteNode hdistr = new RouteNode(hDistr.getTile(), hDistr.getWire());
 			horDistributionLines.put(getDominateClockRegionOfNode(hDistr), hdistr);
@@ -96,10 +95,9 @@ public class GlobalSignalRouting {
 		
 		// route LCBs to sink pins
 		UltraScaleClockRouting.routeLCBsToSinks(clk, lcbMappings);
-		
-		Set<PIP> clkPIPsWithoutDuplication = new HashSet<>();
-		clkPIPsWithoutDuplication.addAll(clk.getPIPs());
-		clk.setPIPs(clkPIPsWithoutDuplication);	
+
+		Set<PIP> clkPIPsWithoutDuplication = new HashSet<>(clk.getPIPs());
+		clk.setPIPs(clkPIPsWithoutDuplication);
 	}
 	
 	private static Map<ClockRegion, Set<RouteNode>> getStartingPoint(Map<String, RouteNode> crDistLines, Device dev) {
@@ -107,12 +105,7 @@ public class GlobalSignalRouting {
 		for(Entry<String, RouteNode> crRouteNode : crDistLines.entrySet()) {
 			String crName = crRouteNode.getKey();
 			ClockRegion cr = dev.getClockRegion(crName);
-			Set<RouteNode> routeNodes = startingPoints.get(cr);
-			if(routeNodes == null){
-				routeNodes = new HashSet<>();
-				startingPoints.put(cr, routeNodes);
-			}
-			routeNodes.add(crRouteNode.getValue());
+			startingPoints.computeIfAbsent(cr, (k) -> new HashSet<>()).add(crRouteNode.getValue());
 		}
 		return startingPoints;
 	}
@@ -126,13 +119,7 @@ public class GlobalSignalRouting {
 			if(cr == null) {
 				continue;
 			}
-			Integer count = crCounts.get(cr.getName());
-			if(count == null) {
-				count = 1;
-			}else {
-				count++;
-			}
-			crCounts.put(cr.getName(), count);
+			crCounts.merge(cr.getName(), 1, Integer::sum);
 		}
 		
 		String dominate = null;
@@ -207,10 +194,8 @@ public class GlobalSignalRouting {
 		UltraScaleClockRouting.routeDistributionToLCBs(clk, upDownDistLines, lcbMappings.keySet());
 		
 		UltraScaleClockRouting.routeLCBsToSinks(clk, lcbMappings);
-		
-		Set<PIP> clkPIPsWithoutDuplication = new HashSet<>();
-		clkPIPsWithoutDuplication.addAll(clk.getPIPs());
-		clk.getPIPs().clear();
+
+		Set<PIP> clkPIPsWithoutDuplication = new HashSet<>(clk.getPIPs());
 		clk.setPIPs(clkPIPsWithoutDuplication);
 	}
 	
@@ -261,15 +246,10 @@ public class GlobalSignalRouting {
 					}
 				}
 			}
-			
-			RouteNode rn = n != null? new RouteNode(n.getTile(), n.getWire()):null;
-			if(rn == null) throw new RuntimeException("ERROR: No mapped LCB to SitePinInst " + p);
-			ArrayList<SitePinInst> sinks = lcbMappings.get(rn);
-			if(sinks == null){
-				sinks = new ArrayList<>();
-				lcbMappings.put(rn, sinks);
-			}
-			sinks.add(p);	
+
+			if(n == null) throw new RuntimeException("ERROR: No mapped LCB to SitePinInst " + p);
+			RouteNode rn = new RouteNode(n.getTile(), n.getWire());
+			lcbMappings.computeIfAbsent(rn, (k) -> new ArrayList<>()).add(p);
 		}
 		
 		return lcbMappings;
@@ -289,8 +269,7 @@ public class GlobalSignalRouting {
 			sitePinInstTilePoints.add(new Point(c.getColumn(),c.getRow()));
 		}	
 		Point center = SmallestEnclosingCircle.getCenterPoint(sitePinInstTilePoints);
-		ClockRegion c = device.getClockRegion(center.y, center.x);		
-		return c;
+		return device.getClockRegion(center.y, center.x);
 	}
 	
 	/**
@@ -361,7 +340,6 @@ public class GlobalSignalRouting {
 				for(Node uphillNode : routingNode.getNode().getAllUphillNodes()){
 					if(routeThruHelper.isRouteThru(uphillNode, routingNode.getNode())) continue;
 					RoutingNode nParent = RouterHelper.createRoutingNode(uphillNode, createdRoutingNodes);
-					if(nParent == null) continue;
 					if(!pruneNode(nParent, unavailableNodes, visitedRoutingNodes)) {
 						nParent.setPrev(routingNode);
 						q.add(nParent);
@@ -373,14 +351,14 @@ public class GlobalSignalRouting {
 				}
 			}
 			if(!success){
-				System.err.println("ERROR: Failed to route " + currNet.getName() + " pin " + sink.toString());
+				System.err.println("ERROR: Failed to route " + currNet.getName() + " pin " + sink);
 			}else{
 				sink.setRouted(true);
 			}
 		}
 		
 		for(List<Node> nodes:sinkPathNodes.values()){
-			netPIPs.addAll(RouterHelper.getPIPsFromListOfNodes(nodes));
+			netPIPs.addAll(RouterHelper.getPIPsFromNodes(nodes));
 		}
 		
 		currNet.setPIPs(netPIPs);
@@ -410,8 +388,7 @@ public class GlobalSignalRouting {
 			default:
 		}
 		if(unavailableNodes.contains(node)) return true;
-		if(visitedRoutingNodes.contains(routingNode)) return true;
-		return false;
+		return visitedRoutingNodes.contains(routingNode);
 	}
 	
 	/**
@@ -452,8 +429,7 @@ public class GlobalSignalRouting {
 			char uniqueId = node.getWireName().charAt(node.getWireName().length()-3);
 			Net currNet = i.getNetFromSiteWire(uniqueId + "_O");
 			if(currNet == null) return true;
-			if(currNet.getType() == type) return true;
-			return false;
+			return currNet.getType() == type;
 		}
 		return false;
 	}

@@ -43,15 +43,15 @@ public class RouteFixer{
 	private NodeWithDelay source;
 	private int vertexId;
 	
-	public RouteFixer(NetWrapper netp, Map<Node, Routable> rnodesCreated){
+	public RouteFixer(NetWrapper netp, RoutableGraph routingGraph){
 		this.netp = netp;
 		nodeMap = new HashMap<>();
 		source = null;
 		vertexId = 0;
-		buildGraph(netp, rnodesCreated);
+		buildGraph(netp, routingGraph);
 	}
 	
-	private void buildGraph(NetWrapper netWrapper, Map<Node, Routable> rnodesCreated){
+	private void buildGraph(NetWrapper netWrapper, RoutableGraph routingGraph){
 		for(Connection connection:netWrapper.getConnections()){
 			// nodes of connections are in the order from sink to source
 			int vertexSize = connection.getNodes().size();
@@ -59,20 +59,19 @@ public class RouteFixer{
 				Node cur = connection.getNodes().get(i);
 				Node next = connection.getNodes().get(i - 1);
 				
-				Routable currRnode = rnodesCreated.get(cur);
-				Routable nextRnode = rnodesCreated.get(next);
+				Routable currRnode = routingGraph.getNode(cur);
+				Routable nextRnode = routingGraph.getNode(next);
 				float currDly = currRnode == null? 0f : currRnode.getDelay();
 				float nextDly = nextRnode == null? 0f : nextRnode.getDelay();
-				
-				NodeWithDelay newCur = nodeMap.containsKey(cur) ? nodeMap.get(cur) : new NodeWithDelay(vertexId++, cur, currDly);
-				NodeWithDelay newNext = nodeMap.containsKey(next) ? nodeMap.get(next) : new NodeWithDelay(vertexId++, next, nextDly);
-				nodeMap.put(cur, newCur);
-				nodeMap.put(next, newNext);
-				
+
+				NodeWithDelay newCur = nodeMap.computeIfAbsent(cur, (k) -> new NodeWithDelay(vertexId++, cur, currDly));
+				NodeWithDelay newNext = nodeMap.computeIfAbsent(next, (k) -> new NodeWithDelay(vertexId++, next, nextDly));
 				if(i == 1) {
 					newNext.setSink(true);
 				}
-				if(i == vertexSize - 1) source = newCur;
+				if(i == vertexSize - 1) {
+					source = newCur;
+				}
 				newCur.addChildren(newNext);
 			}
 		}
@@ -97,7 +96,7 @@ public class RouteFixer{
 	}
 	
 	private void setShortestPathToEachVertex() {
-		PriorityQueue<NodeWithDelay> queue = new PriorityQueue<NodeWithDelay>(NodeWithDelayComparator);
+		PriorityQueue<NodeWithDelay> queue = new PriorityQueue<>(NodeWithDelayComparator);
 
 		queue.clear();
 		source.cost = source.delay;
@@ -123,18 +122,9 @@ public class RouteFixer{
 		}
 	}
 	
-	private static Comparator<NodeWithDelay> NodeWithDelayComparator = new Comparator<NodeWithDelay>() {
-    	@Override
-    	public int compare(NodeWithDelay a, NodeWithDelay b) {
-    		if(a.getDelay() < b.getDelay()){
-    			return -1;
-    		}else {
-    			return 1;
-    		}
-    	}
-    };
+	final private static Comparator<NodeWithDelay> NodeWithDelayComparator = (a, b) -> Float.compare(a.getDelay(), b.getDelay());
 	
-	class NodeWithDelay{
+	static class NodeWithDelay{
 		private int id;
 		private Node node;
 		private float delay;

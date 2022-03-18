@@ -191,7 +191,7 @@ public class RouterHelper {
 	 * @return A list of PIPs for the connection.
 	 */
 	public static List<PIP> getConnectionPIPs(Connection connection){
-		return getPIPsFromListOfNodes(connection.getNodes());
+		return getPIPsFromNodes(connection.getNodes());
 	}
 	
 
@@ -200,18 +200,18 @@ public class RouterHelper {
 	 * @param connectionNodes The list of nodes of a routed {@link Connection} instance.
 	 * @return A list of PIPs generated from the list of nodes.
 	 */
-	public static List<PIP> getPIPsFromListOfNodes(List<Node> connectionNodes){
+	public static List<PIP> getPIPsFromNodes(List<Node> connectionNodes){
 		List<PIP> connectionPIPs = new ArrayList<>();
 		if(connectionNodes == null) return connectionPIPs;
 		// Nodes of a connection are added to the list starting from its sink to its source
-		for(int i = 0; i < connectionNodes.size() - 1; i++){
+		for(int i = 0; i < connectionNodes.size() - 1; i++) {
 			Node driver = connectionNodes.get(i);
 			Node load = connectionNodes.get(i+1);
 			PIP pip = findPIPbetweenNodes(driver, load);	
 			if(pip != null){
 				connectionPIPs.add(pip);
 			}else{
-				System.err.println("ERROR: Null PIP connecting these two nodes: " + driver.toString() + ", " + load.toString());
+				System.err.println("ERROR: Null PIP connecting these two nodes: " + driver+ ", " + load);
 			}
 		}
 		return connectionPIPs;
@@ -260,7 +260,6 @@ public class RouterHelper {
 	 * @return The PIP from the driver node to the load node.
 	 */
 	public static PIP getPIP(Node driver, Node load) {
-		PIP pip = null;
 		for(PIP p : driver.getAllDownhillPIPs()) {
 			if(p.getEndNode().equals(load))
 				return p;
@@ -269,7 +268,7 @@ public class RouterHelper {
 			if(p.getStartNode().equals(load))
 				return p;
 		}
-		return pip;
+		return null;
 	}
 	
 	/**
@@ -415,23 +414,10 @@ public class RouterHelper {
 	 * @param typeUsage The map between each node type and the number of used nodes for the node type.
 	 * @param typeLength The map between each node type and the total wirelength of used nodes for the node type.
 	 */
-	public static void addNodeTypeLengthToMap(Node node, int wlNode, Map<IntentCode, Long> typeUsage, Map<IntentCode, Long> typeLength) {
+	public static void addNodeTypeLengthToMap(Node node, long wlNode, Map<IntentCode, Long> typeUsage, Map<IntentCode, Long> typeLength) {
 		IntentCode ic = node.getIntentCode();
-		Long counter = typeUsage.get(ic);
-		if(counter == null) {
-			counter = (long) 1;
-		}else {
-			counter++;
-		}
-		typeUsage.put(ic, counter);
-		
-		Long length = typeLength.get(ic);
-		if(length == null) {
-			length = (long) wlNode;
-		}else {
-			length += wlNode;
-		}
-		typeLength.put(ic, length);
+		typeUsage.merge(ic, 1L, Long::sum);
+		typeLength.merge(ic, wlNode, Long::sum);
 	}	
 	
 	/**
@@ -515,7 +501,7 @@ public class RouterHelper {
 	public static boolean routeDirectConnection(Connection directConnection){
 		directConnection.newNodes();
 		directConnection.setNodes(findPathBetweenNodes(directConnection.getSource().getConnectedNode(), directConnection.getSink().getConnectedNode()));
-		return directConnection.getNodes() != null? true : false;
+		return directConnection.getNodes() != null;
 	}
 	
 	/**
@@ -558,7 +544,6 @@ public class RouterHelper {
 			}
 			watchdog--;
 			if(watchdog < 0) {
-				success = false;
 				break;
 			}	
 		}
@@ -575,7 +560,7 @@ public class RouterHelper {
 	 *  {@code superSource -> Q -> O -> --- -> D.}
 	 */
 	public static void getSamplePathDelay(String filePath, TimingManager timingManager,
-			Map<TimingEdge, Connection> timingEdgeConnectionMap, Map<Node, Routable> rnodesCreated) {
+			Map<TimingEdge, Connection> timingEdgeConnectionMap, RoutableGraph routingGraph) {
 		List<String> verticesOfVivadoPath = new ArrayList<>();
 		// Include CLK if the first in the path is BRAM or DSP to check the logic delay
 		// NOTE: remember to change the pin names of DSPs from subblock to top-level block that we use
@@ -594,7 +579,7 @@ public class RouterHelper {
 			e.printStackTrace();
 		}
 		System.out.println(verticesOfVivadoPath);
-		timingManager.getSamplePathDelayInfo(verticesOfVivadoPath, timingEdgeConnectionMap, true, rnodesCreated);
+		timingManager.getSamplePathDelayInfo(verticesOfVivadoPath, timingEdgeConnectionMap, true, routingGraph);
 	}
 
 	/**
