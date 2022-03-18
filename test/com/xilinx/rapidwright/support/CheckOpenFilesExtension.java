@@ -94,6 +94,10 @@ public class CheckOpenFilesExtension implements BeforeTestExecutionCallback, Aft
         if (path.startsWith(System.getProperty("java.home"))) {
             return false;
         }
+        // Ignore Sysfs
+        if(path.startsWith("/sys")) {
+            return false;
+        }
         return true;
     }
 
