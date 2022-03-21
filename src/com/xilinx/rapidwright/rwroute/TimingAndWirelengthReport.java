@@ -94,8 +94,7 @@ public class TimingAndWirelengthReport{
 			if(!RouterHelper.isRoutableNetWithSourceSinks(net)) continue;
 			if(net.getSource().toString().contains("CLK")) continue;
 			NetWrapper netplus = createNetWrapper(net);
-			List<Node> netNodes = RouterHelper.getNodesOfNet(net);			
-			for(Node node:netNodes){	
+			for(Node node : RouterHelper.getNodesOfNet(net)){
 				if(node.getTile().getTileTypeEnum() != TileTypeEnum.INT) continue;
 				usedNodes++;	
 				int wl = RouterHelper.getLengthOfNode(node);	

@@ -272,42 +272,22 @@ public class RouterHelper {
 	}
 	
 	/**
-	 * Gets {@link Node} instances of a {@link Net} instance from its {@link PIP} instances, 
-	 * in the order of source pin node, sink pin nodes, and other intermediate nodes.
-	 * @param net The target net.
-	 * @return All nodes used by the net.
-	 */
-	public static List<Node> getNodesOfNet(Net net){
-		List<Node> nodes = new ArrayList<>();
-		if(net.getSource() != null) nodes.add(net.getSource().getConnectedNode());
-		for(SitePinInst pin : net.getSinkPins()) {
-			Node pinNode = pin.getConnectedNode();
-			if(pinNode != null) {
-				nodes.add(pinNode);
-			}else {
-				System.err.println("ERROR: No node connects to pin " + pin + ", net " + net);
-			}
-		}
-		
-		for(PIP pip : net.getPIPs()) {
-			Node end = pip.getEndNode();
-			Node start = pip.getStartNode();
-			if(!nodes.contains(end)) nodes.add(end);
-			if(!nodes.contains(start)) nodes.add(start);
-		}	
-		return nodes;
-	}
-	
-	/**
 	 * Gets a set of {@link Node} instances used by a {@link Net} instance.
 	 * Nodes associated with unrouted pins on this net will be excluded.
 	 * @param net The target net.
 	 * @return A set of nodes used by a net.
 	 */
-	public static Set<Node> getUsedNodesOfNet(Net net){
+	public static Set<Node> getNodesOfNet(Net net){
 		Set<Node> nodes = new HashSet<>();
-		if(net.getSource() != null) nodes.add(net.getSource().getConnectedNode());
-		for(SitePinInst pin : net.getSinkPins()) {
+		SitePinInst sourcePin = net.getSource();
+		if(sourcePin != null) {
+			nodes.add(sourcePin.getConnectedNode());
+		}
+		SitePinInst altSourcePin = net.getAlternateSource();
+		if(altSourcePin != null) {
+			nodes.add(altSourcePin.getConnectedNode());
+		}
+		for(SitePinInst pin : net.getPins()) {
 			if (!pin.isRouted()) continue;
 
 			Node pinNode = pin.getConnectedNode();

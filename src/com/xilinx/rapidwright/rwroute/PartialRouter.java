@@ -24,11 +24,15 @@
 package com.xilinx.rapidwright.rwroute;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
@@ -95,38 +99,59 @@ public class PartialRouter extends RWRoute{
 			return;
 		}
 
-		NetWrapper netWrapper = createsNetWrapperAndConnections(net, config.getBoundingBoxExtensionX(), config.getBoundingBoxExtensionY(), isMultiSLRDevice());
+		createsNetWrapperAndConnections(net, config.getBoundingBoxExtensionX(), config.getBoundingBoxExtensionY(), isMultiSLRDevice());
+	}
 
-		// Create all nodes used by this net, adding itself as a user, and
-		// set its previous node so that Routable.setChildren() will know
-		// to only allow this edge
-		for (PIP pip : net.getPIPs()) {
-			Node start = (pip.isReversed()) ? pip.getEndNode() : pip.getStartNode();
-			Node end = (pip.isReversed()) ? pip.getStartNode() : pip.getEndNode();
-			Routable rstart = createAddRoutableNode(null, start, RoutableType.WIRE);
-			Routable rend = createAddRoutableNode(null, end, RoutableType.WIRE);
-			assert(rend.getPrev() == null);
-			rend.setPrev(rstart);
-			rend.incrementUser(netWrapper);
-		}
+	@Override
+	protected void determineRoutingTargets(){
+		super.determineRoutingTargets();
 
-		for (Connection connection : netWrapper.getConnections()) {
-			SitePinInst sink = connection.getSink();
-			String sinkPinName = sink.getName();
-			if (!Pattern.matches("[A-H](X|_I)", sinkPinName))
-				continue;
+		for (Map.Entry<Net,NetWrapper> e : nets.entrySet()) {
+			Net net = e.getKey();
+			NetWrapper netWrapper = e.getValue();
 
-			// TODO: Assumes that LUT is unoccupied
-			Routable rnode = connection.getSinkRnode();
-			String lut = sinkPinName.substring(0, 1);
-			Site site = sink.getSite();
-			for (int i = 1; i <= 6; i++) {
-				Node altNode = site.getConnectedNode(lut + i);
-				Routable altRnode = createAddRoutableNode(null, altNode, RoutableType.WIRE);
-				// Trigger a setChildren() for LUT routethrus
-				altRnode.getChildren();
-				// Create a fake edge from [A-H][1-6] to [A-H](I|_X)
-				altRnode.addChild(rnode);
+			// Create all nodes used by this net and set its previous pointer so that:
+			// (a) the routing for each connection can be recovered by
+			//      finishRouteConnection()
+			// (b) Routable.setChildren() will know to only allow this incoming
+			//     arc on these nodes
+			for (PIP pip : net.getPIPs()) {
+				Node start = (pip.isReversed()) ? pip.getEndNode() : pip.getStartNode();
+				Node end = (pip.isReversed()) ? pip.getStartNode() : pip.getEndNode();
+				Routable rstart = createAddRoutableNode(null, start, RoutableType.WIRE);
+				Routable rend = createAddRoutableNode(null, end, RoutableType.WIRE);
+				assert (rend.getPrev() == null);
+				rend.setPrev(rstart);
+			}
+
+			for (Connection connection : netWrapper.getConnections()) {
+				finishRouteConnection(connection);
+
+				SitePinInst sink = connection.getSink();
+				String sinkPinName = sink.getName();
+				if (!Pattern.matches("[A-H](X|_I)", sinkPinName))
+					continue;
+
+				Routable rnode = connection.getSinkRnode();
+				String lut = sinkPinName.substring(0, 1);
+				Site site = sink.getSite();
+				for (int i = 6; i >= 1; i--) {
+					Node altNode = site.getConnectedNode(lut + i);
+
+					// Skip if LUT pin is already being preserved
+					Net preservedNet = routingGraph.getPreservedNet(altNode);
+					if (preservedNet != null) {
+						continue;
+					}
+
+					// RoutableType type = RoutableType.WIRE;
+					RoutableType type = RoutableType.PINFEED_I;
+					Routable altRnode = createAddRoutableNode(null, altNode, type);
+					// Trigger a setChildren() for LUT routethrus
+					altRnode.getChildren();
+					// Create a fake edge from [A-H][1-6] to [A-H](I|_X)
+					altRnode.addChild(rnode);
+				}
 			}
 		}
 	}

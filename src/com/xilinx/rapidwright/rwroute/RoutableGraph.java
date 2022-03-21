@@ -33,6 +33,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.BiFunction;
 
 public class RoutableGraph {
 
@@ -122,6 +123,10 @@ public class RoutableGraph {
 
     public Net getPreservedNet(Node node) {
         return preservedMap.get(node);
+    }
+
+    public Net computePreserved(Node node, BiFunction<Node,Net,Net> remappingFunction) {
+        return preservedMap.compute(node, remappingFunction);
     }
 
     public Routable getNode(Node node) {

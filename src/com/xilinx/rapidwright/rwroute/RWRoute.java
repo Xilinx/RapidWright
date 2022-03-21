@@ -24,11 +24,9 @@
 package com.xilinx.rapidwright.rwroute;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -72,7 +70,7 @@ public class RWRoute{
 	/** A flag to indicate if the device has multiple SLRs, for the sake of avoiding unnecessary check for single-SLR devices */
 	private boolean multiSLRDevice;
 	/** Created NetWrappers */
-	private List<NetWrapper> nets;
+	protected Map<Net,NetWrapper> nets;
 	/** A list of indirect connections that will go through iterative routing */
 	private List<Connection> indirectConnections;
 	/** A list of direct connections that are easily routed through dedicated resources */
@@ -236,13 +234,13 @@ public class RWRoute{
 		numNotNeedingRoutingNets = 0;
 		numUnrecognizedNets = 0;
 		
-		nets = new ArrayList<>();
+		nets = new HashMap<>();
 		indirectConnections = new ArrayList<>();
 		directConnections = new ArrayList<>();
 		clkNets = new ArrayList<>();
 		staticNetAndRoutingTargets = new HashMap<>();
 		conflictNets = new HashSet<>();
-		
+
 		for(Net net : design.getNets()){	
 			if(net.isClockNet()){
 				addGlobalClkRoutingTargets(net);
@@ -425,7 +423,7 @@ public class RWRoute{
 	 * @param net The net to be preserved.
 	 */
 	protected void preserveNet(Net net){
-		addPreservedNode(RouterHelper.getUsedNodesOfNet(net), net);
+		addPreservedNode(RouterHelper.getNodesOfNet(net), net);
 	}
 	
 	protected void increaseNumNotNeedingRouting() {
@@ -448,6 +446,7 @@ public class RWRoute{
 	}
 	
 	private Map<Short, Integer> connectionSpan = new HashMap<>();
+
 	/**
 	 * Creates a unique {@link NetWrapper} instance and {@link Connection} instances based on a {@link Net} instance.
 	 * @param net The net to be initialized.
@@ -458,15 +457,13 @@ public class RWRoute{
 	 */
 	protected NetWrapper createsNetWrapperAndConnections(Net net, short boundingBoxExtensionX, short boundingBoxExtensionY, boolean multiSLR) {
 		NetWrapper netWrapper = new NetWrapper(numWireNetsToRoute++, net);
-		nets.add(netWrapper);
-		
+		NetWrapper existingNetWrapper = nets.put(net, netWrapper);
+		assert(existingNetWrapper == null);
 		SitePinInst source = net.getSource();
 		int indirect = 0;
 		Node sourceINTNode = null;
 		
 		for(SitePinInst sink : net.getSinkPins()){
-			if(sink.isRouted())
-				continue;
 			if(RouterHelper.isExternalConnectionToCout(source, sink)){
 				source = net.getAlternateSource();
 				if(source == null){
@@ -483,6 +480,7 @@ public class RWRoute{
 			}else {
 				Node sinkINTNode = nodes.get(0);
 				indirectConnections.add(connection);
+
 				connection.setSinkRnode(createAddRoutableNode(connection.getSink(), sinkINTNode, RoutableType.PINFEED_I));
 				if(sourceINTNode == null) {
 					sourceINTNode = RouterHelper.projectOutputPinToINTNode(source);
@@ -492,6 +490,7 @@ public class RWRoute{
 				}
 				connection.setSourceRnode(createAddRoutableNode(connection.getSource(), sourceINTNode, RoutableType.PINFEED_O));
 				connection.setDirect(false);
+
 				indirect++;
 				connection.computeHpwl();
 				addConnectionSpanInfo(connection);
@@ -507,6 +506,7 @@ public class RWRoute{
 				}
 			}
 		}
+
 		return netWrapper;
 	}
 	
@@ -559,7 +559,7 @@ public class RWRoute{
 	}
 	
 	protected void removeNetNodesFromPreservedNodes(Net net) {
-		Set<Node> netNodes = RouterHelper.getUsedNodesOfNet(net);
+		Set<Node> netNodes = RouterHelper.getNodesOfNet(net);
 		for(Node node : netNodes) {
 			routingGraph.unpreserve(node);
 		}
@@ -711,6 +711,7 @@ public class RWRoute{
 		initializeRouting();
 		long lastIterationRnodeCount = 0;
 		long lastIterationRnodeTime = 0;
+		boolean unrouted = false;
 		
 		while(routeIteration < config.getMaxIterations()){
 			long startIteration = System.nanoTime();
@@ -733,15 +734,8 @@ public class RWRoute{
 			printRoutingIterationStatisticsInfo(System.nanoTime() - startIteration, generatedRnodes,
 					(float) ((rnodesTimer.getTime() - lastIterationRnodeTime) * 1e-9), config.isTimingDriven());
 
-			if (routeIteration > 1 && generatedRnodes == 0) {
-				Set<Connection> unroutedConnections = getUnroutedConnections();
-				System.err.println("ERROR: Unroutable connections: " + unroutedConnections.size());
-				System.err.println("ERROR: Fixed point reached: giving up");
-				break;
-			}
-			
 			if(overUsedRnodes.size() == 0) {
-				Set<Connection> unroutedConnections = getUnroutedConnections();
+				List<Connection> unroutedConnections = getUnroutedConnections();
 				if(unroutedConnections.isEmpty()) {
 					break;
 				}else {
@@ -750,6 +744,89 @@ public class RWRoute{
 					}
 				}
 			}
+
+			if (routeIteration > 1 && generatedRnodes == 0) {
+				Set<NetWrapper> unroutableNets = new HashSet<>();
+				for (Connection connection : getUnroutedConnections()) {
+					// unroutableNets.add(connection.getNetWrapper());
+					unrouteReservedNetsToReleaseResources(connection);
+				}
+				// for (Routable rnode : overUsedRnodes) {
+                // 	unroutableNets.addAll(rnode.getUsersConnectionCounts().keySet());
+				// }
+
+				// for (NetWrapper netWrapper : unroutableNets) {
+				// 	Net net = netWrapper.getNet();
+				// 	List<Node> netNodes = RouterHelper.getNodesOfNet(net);
+				//
+				// 	System.out.println("INFO: Unpreserving " + netNodes.size() + " nodes on " + net.getName());
+				// 	// System.out.println("INFO: Releasing nodes within 1-hop of the " + netNodes.size() + " nodes on " + net.getName());
+				// 	for (Node node : netNodes) {
+				// 		Routable rnode = routingGraph.getNode(node);
+				//
+				// 		if (node != net.getSource().getConnectedNode()) {
+				// 			Net preservedNet = routingGraph.getPreservedNet(node);
+				// 			uphill: for(Node parentNode : node.getAllUphillNodes()) {
+				// 				// if (routingGraph.isPreserved(parentNode)) {
+				// 				// 	continue;
+				// 				// }
+				//
+				// 				Net preservedParentNet = routingGraph.getPreservedNet(parentNode);
+				// 				if (preservedParentNet != null) {
+				// 					if (preservedParentNet == net) continue;
+				// 					if (preservedParentNet.isClockNet() || preservedParentNet.isStaticNet()) continue;
+				// 				}
+				//
+				// 				Routable parentRnode = createAddRoutableNode(null, parentNode, RoutableType.WIRE);
+				// 				for (Routable childRnode : parentRnode.getChildren()) {
+				// 					if (childRnode == rnode) {
+				// 						continue uphill;
+				// 					}
+				// 				}
+				//
+				// 				if (!parentRnode.isUsed()) {
+				// 					// Mark this node with a placeholder (null) user so that
+				// 					// it can be recognized as being over-used; the preserved net
+				// 					// that actually uses this node will only be inserted when
+				// 					// necessary by updateCost()
+				// 					parentRnode.incrementUser(null);
+				// 				}
+				//
+				// 				System.out.println("\t" + node + " <- " + parentNode);
+				// 				parentRnode.addChild(rnode);
+				// 			}
+				// 			assert(preservedNet == null || preservedNet == net);
+				// 			// if (preservedNet != null && preservedNet != net)
+				// 			// 	System.out.println(node + " :" + preservedNet + " != " + net);
+				// 			routingGraph.unpreserve(node);
+				// 			rnode.setVisited(false);
+				// 		}
+				//
+				// 		// for(Node childNode : node.getAllDownhillNodes()) {
+				// 		// 	Net preservedNet = routingGraph.getPreservedNet(childNode);
+				// 		// 	if (preservedNet == null) continue;
+				// 		// 	if (preservedNet == net) continue;
+				// 		// 	if (preservedNet.isClockNet() || preservedNet.isStaticNet()) continue;
+				// 		//
+				// 		// 	Routable childRnode = createAddRoutableNode(null, childNode, RoutableType.WIRE);
+				// 		// 	if (Arrays.stream(rnode.getChildren()).noneMatch(childRnode::equals)) {
+				// 		// 		rnode.addChild(childRnode);
+				// 		//
+				// 		// 		if (!childRnode.isUsed()) {
+				// 		// 			// Mark this node with a placeholder (null) user so that
+				// 		// 			// it can be recognized as being over-used; the preserved net
+				// 		// 			// that actually uses this node will only be inserted when
+				// 		// 			// necessary by updateCost()
+				// 		// 			childRnode.incrementUser(null);
+				// 		// 		}
+				// 		//
+				// 		// 		System.out.println("\t" + node + " -> " + childNode + " from " + preservedNet);
+				// 		// 	}
+				// 		// }
+				// 	}
+				// }
+			}
+
 			routeIteration++;
 			lastIterationRnodeCount = routingGraph.numNodes();
 			lastIterationRnodeTime = rnodesTimer.getTime();
@@ -758,15 +835,20 @@ public class RWRoute{
 			System.out.println("\nERROR: Routing terminated after " + (routeIteration -1 ) + " iterations.");
 			System.out.println("       Unrouted connections: " + getUnroutedConnections().size());
 			System.out.println("       Conflicting nodes: " + overUsedRnodes.size());
+			for (Routable rnode : overUsedRnodes) {
+				System.out.println(rnode.getNode());
+				for (Entry<NetWrapper,Integer> e : rnode.getUsersConnectionCounts().entrySet())
+				System.out.println("\t" + e.getKey().getNet() + " = " + e.getValue());
+			}
 		}
 	}
 	
 	/**
 	 * Gets unrouted connections.
-	 * @return A set of unrouted connections.
+	 * @return A list of unrouted connections.
 	 */
-	private Set<Connection> getUnroutedConnections() {
-		Set<Connection> unroutedConnections = new HashSet<>();
+	private List<Connection> getUnroutedConnections() {
+		List<Connection> unroutedConnections = new ArrayList<>();
 		for(Connection connection : sortedIndirectConnections) {
 			if(!connection.getSink().isRouted()) {
 				unroutedConnections.add(connection);
@@ -792,9 +874,11 @@ public class RWRoute{
 	 * @param connection The connection in question.
 	 * @return true, if the connection should be routed.
 	 */
-	private boolean shouldRoute(Connection connection) {		
+	private boolean shouldRoute(Connection connection) {
 		if(routeIteration == 1) {
-			return true;
+			// In the partial routing case, it is possible that the
+			// connection exists but does not need routing
+			return !connection.getSink().isRouted();
 		}else {
 			if(connection.getCriticality() > minRerouteCriticality) {
 				return true;
@@ -802,7 +886,7 @@ public class RWRoute{
 			if(connection.isCongested() || !connection.getSink().isRouted()) {
 				if(config.isEnlargeBoundingBox()) {
 					connection.enlargeBoundingBox(config.getExtensionXIncrement(), config.getExtensionYIncrement());
-				}	
+				}
 				return true;
 			}else {
 				return false;
@@ -858,43 +942,46 @@ public class RWRoute{
 	 * Assigns a list nodes to each connection to complete the route path of it.
 	 */
 	private void assignNodesToConnections() {
-		for(Connection connection : sortedIndirectConnections){
-			List<Node> nodes = new ArrayList<>();
-			SitePinInst sink = connection.getSink();
+		for(Entry<Net,NetWrapper> e : nets.entrySet()) {
+			NetWrapper netWrapper = e.getValue();
+			for(Connection connection : netWrapper.getConnections()){
+				List<Node> nodes = new ArrayList<>();
+				SitePinInst sink = connection.getSink();
 
-			List<Node> switchBoxToSink = RouterHelper.findPathBetweenNodes(connection.getSinkRnode().getNode(), sink.getConnectedNode());
-			if(switchBoxToSink.size() >= 2) {			
-				for(int i = 0; i < switchBoxToSink.size() -1; i++) {
-					nodes.add(switchBoxToSink.get(i));
+				List<Node> switchBoxToSink = RouterHelper.findPathBetweenNodes(connection.getSinkRnode().getNode(), sink.getConnectedNode());
+				if(switchBoxToSink.size() >= 2) {
+					for(int i = 0; i < switchBoxToSink.size() -1; i++) {
+						nodes.add(switchBoxToSink.get(i));
+					}
 				}
-			}
 
-			List<Routable> rnodes = connection.getRnodes();
+				List<Routable> rnodes = connection.getRnodes();
 
-			String sinkPinName = sink.getName();
-			if (rnodes.size() >= 2 && Pattern.matches("[A-H](X|_I)", sinkPinName)) {
-				Routable prevRnode = rnodes.get(1);
-				Node prevNode = (prevRnode != null) ? prevRnode.getNode() : null;
-				SitePin prevPin = (prevNode != null) ? prevNode.getSitePin() : null;
-				if (prevPin != null && Pattern.matches("[A-H][1-6]", prevPin.getPinName())) {
-					rnodes = rnodes.subList(1, rnodes.size());
-					// TODO: Update site routing
-					System.out.println(sinkPinName + " -> " + prevPin.getPinName() + " for " + connection.getNetWrapper().getNet());
+				String sinkPinName = sink.getName();
+				if (rnodes.size() >= 2 && Pattern.matches("[A-H](X|_I)", sinkPinName)) {
+					Routable prevRnode = rnodes.get(1);
+					Node prevNode = (prevRnode != null) ? prevRnode.getNode() : null;
+					SitePin prevPin = (prevNode != null) ? prevNode.getSitePin() : null;
+					if (prevPin != null && Pattern.matches("[A-H][1-6]", prevPin.getPinName())) {
+						rnodes = rnodes.subList(1, rnodes.size());
+						// TODO: Update site routing
+						System.out.println(prevPin.getPinName() + " -> " + sinkPinName + " for " + connection.getNetWrapper().getNet());
+					}
 				}
-			}
-			
-			for(Routable rnode : rnodes){
-				nodes.add(rnode.getNode());
-			}
-			
-			List<Node> sourceToSwitchBox = RouterHelper.findPathBetweenNodes(connection.getSource().getConnectedNode(), connection.getSourceRnode().getNode());
-			if(sourceToSwitchBox.size() >= 2) {
-				for(int i = 1; i <= sourceToSwitchBox.size() - 1; i++) {
-					nodes.add(sourceToSwitchBox.get(i));
-				}
-			}
 
-			connection.setNodes(nodes);
+				for(Routable rnode : rnodes){
+					nodes.add(rnode.getNode());
+				}
+
+				List<Node> sourceToSwitchBox = RouterHelper.findPathBetweenNodes(connection.getSource().getConnectedNode(), connection.getSourceRnode().getNode());
+				if(sourceToSwitchBox.size() >= 2) {
+					for(int i = 1; i <= sourceToSwitchBox.size() - 1; i++) {
+						nodes.add(sourceToSwitchBox.get(i));
+					}
+				}
+
+				connection.setNodes(nodes);
+			}
 		}
 	}
 	
@@ -983,17 +1070,77 @@ public class RWRoute{
 	 */
 	private void updateCost() {
 		overUsedRnodes.clear();
+		Set<Net> overUsedPreservedNets = new HashSet<>();
 		for(Entry<Node,Routable> e : routingGraph.getNodeEntries()){
 			Routable rnode = e.getValue();
-			int overuse =rnode.getOccupancy() - Routable.capacity;
+			int overuse = rnode.getOccupancy() - Routable.capacity;
 			if(overuse == 0) {
 				rnode.setPresentCongestionCost(1 + presentCongestionFactor);
 			} else if (overuse > 0) {
 				overUsedRnodes.add(rnode);
 				rnode.setPresentCongestionCost(1 + (overuse + 1) * presentCongestionFactor);
 				rnode.setHistoricalCongestionCost(rnode.getHistoricalCongestionCost() + overuse * historicalCongestionFactor);
+
+				// Extract all overused preserved nets
+				Net preservedNet = routingGraph.getPreservedNet(rnode.getNode());
+				if (preservedNet != null) {
+					overUsedPreservedNets.add(preservedNet);
+				}
 			}
 		}
+
+		// for (Net net : overUsedPreservedNets) {
+		// 	NetWrapper netWrapper = createsNetWrapperAndConnections(net, config.getBoundingBoxExtensionX(), config.getBoundingBoxExtensionY(), multiSLRDevice);
+		//
+		// 	Set<Routable> rnodes = new HashSet<>();
+		// 	for (PIP pip : net.getPIPs()) {
+		// 		Node start = (pip.isReversed()) ? pip.getEndNode() : pip.getStartNode();
+		// 		Node end = (pip.isReversed()) ? pip.getStartNode() : pip.getEndNode();
+		// 		Routable rstart = createAddRoutableNode(null, start, RoutableType.WIRE);
+		// 		Routable rend = createAddRoutableNode(null, end, RoutableType.WIRE);
+		//
+		// 		rnodes.add(rstart);
+		// 		rnodes.add(rend);
+		//
+		// 		// assert(rend.getPrev() == null);
+		// 		rend.setPrev(rstart);
+		// 	}
+		//
+		// 	for (Routable rnode : rnodes) {
+		// 		routingGraph.computePreserved(rnode.getNode(),
+		// 				($,preservedNet) -> {
+		// 					if (preservedNet != null) {
+		// 						assert(preservedNet == net);
+		//
+		// 						// If it happens to be a node with a placeholder (null) user
+		// 						// then decrement the occupancy as it will be properly
+		// 						// incremented by correctly finishRouteConnection()
+		// 						int count = rnode.countConnectionsOfUser(null);
+		// 						if (count > 0) {
+		// 							rnode.decrementUser(null);
+		// 							// System.out.println("DECREMENTING " + rnode.getNode());
+		// 							// for (Entry<NetWrapper,Integer> e : rnode.getUsersConnectionCounts().entrySet()) {
+		// 							// 	System.out.println("\t" + e.getKey().getNet() + " = " + e.getValue());
+		// 							// }
+		// 						}
+		//
+		// 						// Fall-through and unpreserve by returning null
+		// 						// TODO: Maybe just unpreserve relevant connection(s)?
+		// 					}
+		// 					return null;
+		// 				});
+		// 		routingGraph.visit(rnode);
+		// 	}
+		//
+		// 	for (Connection connection : netWrapper.getConnections()) {
+		// 		finishRouteConnection(connection);
+		// 		// if (connection.isCongested()) {
+		// 		// 	System.out.println(net.getName() + " 's " + connection + " is congested");
+		// 		// }
+		// 	}
+		//
+		// 	routingGraph.resetExpansion();
+		// }
 	}
 	
 	/**
@@ -1004,10 +1151,11 @@ public class RWRoute{
 		totalINTNodes = 0;
 		nodeTypeUsage = new HashMap<>();
 		nodeTypeLength = new HashMap<>();	
-		
+
 		Set<Node> netNodes = new HashSet<>();
-		for(NetWrapper net : nets){	
-			for(Connection connection:net.getConnections()){
+		for(Entry<Net,NetWrapper> e : nets.entrySet()){
+			NetWrapper netWrapper = e.getValue();
+			for(Connection connection:netWrapper.getConnections()){
 				netNodes.addAll(connection.getNodes());
 			}		
 			for(Node node:netNodes){
@@ -1062,12 +1210,13 @@ public class RWRoute{
 	 */
 	private Set<NetWrapper> findIllegalRoutes(){
 		Set<NetWrapper> illegalRoutes = new HashSet<>();
-		for(NetWrapper net : nets) {
-			buildDriverCountsOfRnodes(net);
-			for(Connection connection : net.getConnections()) {
+		for(Entry<Net,NetWrapper> e : nets.entrySet()) {
+			NetWrapper netWrapper = e.getValue();
+			buildDriverCountsOfRnodes(netWrapper);
+			for(Connection connection : netWrapper.getConnections()) {
 				if(shouldMergePath(connection)) {
-					illegalRoutes.add(net);
-					if(config.isTimingDriven()) addNodesDelays(net);
+					illegalRoutes.add(netWrapper);
+					if(config.isTimingDriven()) addNodesDelays(netWrapper);
 					break;
 				}
 			}
@@ -1139,13 +1288,29 @@ public class RWRoute{
 	 * Sets a list of {@link PIP} instances of each {@link Net} instance and checks if there is any PIP overlaps.
 	 */
 	private void setPIPsOfNets(){
-		for(NetWrapper netWrapper : nets){
+		for(Entry<Net,NetWrapper> e : nets.entrySet()){
+			NetWrapper netWrapper = e.getValue();
+			Set<PIP> oldPIPs = new HashSet<>(netWrapper.getNet().getPIPs());
 			// Preserve the order of existing PIPs, e.g. the first PIP could be a logical driver
-			Set<PIP> netPIPs = new LinkedHashSet<>(netWrapper.getNet().getPIPs());
+			Set<PIP> newPIPs = new /*Linked*/HashSet<>(/*oldPIPs*/);
 			for(Connection connection:netWrapper.getConnections()){
-				netPIPs.addAll(RouterHelper.getConnectionPIPs(connection));
+				newPIPs.addAll(RouterHelper.getConnectionPIPs(connection));
 			}
-			netWrapper.getNet().setPIPs(netPIPs);
+
+			// Skip if new and old PIPs are completely identical
+			// (meaning net was unpreserved but never re-routed)
+			if (oldPIPs.equals(newPIPs))
+				continue;
+
+			netWrapper.getNet().setPIPs(new ArrayList<>(newPIPs));
+
+			if (!newPIPs.containsAll(oldPIPs)) {
+				System.out.println("PIP delta for '" + netWrapper.getNet() + "':");
+				oldPIPs.removeAll(newPIPs);
+				for (PIP pip : oldPIPs) {
+					System.out.println("\t- " + pip);
+				}
+			}
 		}
 		checkPIPsUsage();
 	}
@@ -1286,6 +1451,9 @@ public class RWRoute{
 			if(toRoute.isClockNet() || toRoute.isStaticNet()) continue;
 			toRouteNets.add(toRoute);
 		}
+
+		// TODO: Only nets immediately downhill of the source node is unrouted,
+		//       do we need to do more?
 		// Find those preserved nets that are using downhill nodes of the source pin node
 		for(Node node : connection.getSourceRnode().getNode().getAllDownhillNodes()) {
 			Net toRoute = routingGraph.getPreservedNet(node);
@@ -1296,31 +1464,82 @@ public class RWRoute{
 		
 		if(!toRouteNets.isEmpty()) {
 			System.out.println("INFO: Unroute " + toRouteNets.size() + " preserved nets");
-			System.out.println(toRouteNets);
 		}
 		
 		for(Net n : toRouteNets) {
-			List<Node> reservedNetNodes = RouterHelper.getNodesOfNet(n);
-			
-			NetWrapper netnew = createsNetWrapperAndConnections(n, config.getBoundingBoxExtensionX(), config.getBoundingBoxExtensionY(), multiSLRDevice);
-			
-			for(Node toBuild : reservedNetNodes) {
-				// remove the node from the preserved nodes
-				routingGraph.unpreserve(toBuild);
-				// creates a RoutableNode with the node 
-				Routable rnode = createAddRoutableNode(null, toBuild, RoutableType.WIRE);
-				// Each rnode created above should be added to its parents if parent exists,
-				// because children of an existing parent may have been set.
-				for(Node uphill : toBuild.getAllUphillNodes()) {
+			System.out.println("\t" + n);
+
+			Collection<Routable> rnodes;
+			NetWrapper netnew = nets.get(n);
+			if (netnew != null) {
+				// Net already exists
+				rnodes = new ArrayList<>();
+
+				for(Node toBuild : RouterHelper.getNodesOfNet(n)) {
+					// Since net already exists, all the nodes it uses will already
+					// have been created
+					Routable rnode = routingGraph.getNode(toBuild);
+					assert(rnode != null);
+
+					rnodes.add(rnode);
+				}
+			} else {
+				// Net needs to be created
+				netnew = createsNetWrapperAndConnections(n, config.getBoundingBoxExtensionX(), config.getBoundingBoxExtensionY(), multiSLRDevice);
+
+				// Collect all nodes used by this net
+				rnodes = new HashSet<>();
+				for (PIP pip : n.getPIPs()) {
+					Node start = (pip.isReversed()) ? pip.getEndNode() : pip.getStartNode();
+					Node end = (pip.isReversed()) ? pip.getStartNode() : pip.getEndNode();
+					Routable rstart = createAddRoutableNode(null, start, RoutableType.WIRE);
+					Routable rend = createAddRoutableNode(null, end, RoutableType.WIRE);
+
+					rnodes.add(rstart);
+					rnodes.add(rend);
+
+					// Also set the prev pointer according to the PIP
+					rend.setPrev(rstart);
+				}
+
+				// Use the prev pointers to update the routing for each connection
+				for (Connection netnewConnection : netnew.getConnections()) {
+					finishRouteConnection(netnewConnection);
+					assert(netnewConnection.getSink().isRouted());
+				}
+			}
+
+			// Set<Node> pinNodes = new HashSet<>();
+			// for (SitePinInst pin : n.getPins()) {
+			// 	pinNodes.add(pin.getConnectedNode());
+			// }
+
+			for (Routable rnode : rnodes) {
+				Node toBuild = rnode.getNode();
+				/*if (!pinNodes.contains(toBuild))*/ {
+					routingGraph.unpreserve(toBuild);
+				}
+				// Each rnode should be added a child to any of its parents
+				// that already exist, unless it was already present
+				uphill: for(Node uphill : toBuild.getAllUphillNodes()) {
 					// Without this routethru check, there will be Invalid Programming for Site error shown in Vivado.
 					// Do not use those nodes, because we do not know if the routethru is available or not
 					if(routethruHelper.isRouteThru(uphill, toBuild)) continue;
 					Routable parent = routingGraph.getNode(uphill);
-					if(parent != null && Arrays.stream(parent.getChildren()).noneMatch(rnode::equals)) {
-						parent.addChild(rnode);
+					if (parent == null)
+						continue;
+					for (Routable child : parent.getChildren()) {
+						if (child == rnode)
+							continue uphill;
 					}
+					parent.addChild(rnode);
 				}
+
+				// Clear the prev pointer (as it is also used to track
+				// whether a node has been visited during expansion)
+				rnode.setPrev(null);
 			}
+
 			if(config.isTimingDriven()) timingManager.setTimingEdgesOfConnections(netnew.getConnections());
 		}
 		
@@ -1344,9 +1563,9 @@ public class RWRoute{
 	 * Completes the routing process of a connection.
 	 * @param connection The routed target connection.
 	 */
-	private void finishRouteConnection(Connection connection){
+	protected void finishRouteConnection(Connection connection){
 		saveRouting(connection);	
-		connection.getSinkRnode().setTarget(false);		
+		connection.getSinkRnode().setTarget(false);
 		routingGraph.resetExpansion();
 		updateUsersAndPresentCongestionCost(connection);
 	}
