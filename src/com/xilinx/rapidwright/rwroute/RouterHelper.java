@@ -205,9 +205,9 @@ public class RouterHelper {
 		if(connectionNodes == null) return connectionPIPs;
 		// Nodes of a connection are added to the list starting from its sink to its source
 		for(int i = 0; i < connectionNodes.size() - 1; i++) {
-			Node driver = connectionNodes.get(i);
-			Node load = connectionNodes.get(i+1);
-			PIP pip = findPIPbetweenNodes(driver, load);	
+			Node driver = connectionNodes.get(i+1);
+			Node load = connectionNodes.get(i);
+			PIP pip = findPIPbetweenNodes(driver, load);
 			if(pip != null){
 				connectionPIPs.add(pip);
 			}else{
