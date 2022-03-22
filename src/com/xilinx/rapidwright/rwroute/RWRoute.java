@@ -1312,7 +1312,9 @@ public class RWRoute{
 				}
 			}
 		}
-		checkPIPsUsage();
+
+		// FIXME: Temporarily disable for runtime
+		// checkPIPsUsage();
 	}
 	
 	/**
