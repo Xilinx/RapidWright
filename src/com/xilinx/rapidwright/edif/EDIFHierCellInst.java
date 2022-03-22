@@ -22,6 +22,7 @@
  */
 package com.xilinx.rapidwright.edif;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -138,11 +139,62 @@ public class EDIFHierCellInst {
     public EDIFHierCellInst getChild(EDIFCellInst relativeChild) {
         return new EDIFHierCellInst(cellInsts, cellInsts.length+1, relativeChild);
     }
+    
+    public List<EDIFHierCellInst> getImmediateChildren(){
+        List<EDIFHierCellInst> children = new ArrayList<>();
+        for(EDIFCellInst child : getCellType().getCellInsts()) {
+            children.add(getChild(child));
+        }
+        return children;
+    }
 
     public EDIFHierCellInst getSibling(EDIFCellInst relativeSibling) {
         return new EDIFHierCellInst(cellInsts, cellInsts.length, relativeSibling);
     }
 
+    /**
+     * Checks if the provided instance is an ancestor (hierarchical parent) of this instance. For 
+     * example, if this = "disneyland/tomorrow_land/space_mountain" and 
+     * inst = "disneyland/tomorrow_land", this method would return true.  however, if 
+     * inst = "disneyland/adventure_land", it would return false. 
+     *  
+     * @param inst The hierarchical instance in question to check if it is  
+     * @return True if the provided instance is a hierarchical ancestor of this instance.
+     */
+    public boolean isAncestor(EDIFHierCellInst inst) {
+        EDIFCellInst[] other = inst.cellInsts;
+        if(other.length >= cellInsts.length) return false;
+        for(int i=0; i < other.length; i++) {
+            if(cellInsts.length > i) {
+                if(!cellInsts[i].getName().equals(other[i].getName())) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+    
+    /**
+     * Given this instance and the provided instance o, it determines the closest common ancestor
+     * between the two instances.  In some cases, this can default to the top cell design instance.
+     * For example, if this instance = "a/b/c/d" and o = "a/b/e/f", the method would return "a/b".  
+     * @param o The other instance to check for a common ancestor.
+     * @return The closest common ancestor between this instance and the provided instance.
+     */
+    public EDIFHierCellInst getCommonAncestor(EDIFHierCellInst o) {
+        EDIFCellInst[] oCellInsts = o.cellInsts;
+        int min = Integer.min(cellInsts.length, oCellInsts.length);
+        int idx = 0;
+        for(int i=0; i< min; i++) { 
+            if(cellInsts[i] == oCellInsts[i]) {
+                idx++;
+            } else {
+                break;
+            }
+        }
+        return new EDIFHierCellInst(oCellInsts, idx, null);
+    }
+    
     public boolean isAbsolute() {
         return isToplevelInst(cellInsts[0]);
     }

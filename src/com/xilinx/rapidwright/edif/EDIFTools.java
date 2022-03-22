@@ -150,8 +150,8 @@ public class EDIFTools {
 	public static final boolean RW_ENABLE_EDIF_BINARY_CACHING = 
 	        System.getenv("RW_ENABLE_EDIF_BINARY_CACHING") != null;
 	
-	private static String getUniqueNetSuffix() {
-	    return "_created_net" + UNIQUE_COUNT++;
+	private static String getUniqueSuffix() {
+	    return "_rw_created" + UNIQUE_COUNT++;
 	}
 	
 	/**
@@ -457,77 +457,98 @@ public class EDIFTools {
 		return Math.abs(left - right) + 1;
 	}
 
+	private static EDIFNet createUniqueNet(EDIFCell parentCell, String netName) {
+	    if(parentCell.getNet(netName) != null) {
+            netName += getUniqueSuffix();
+        }
+        return new EDIFNet(netName, parentCell);
+	}
+	
 	/**
 	 * Connects two existing logical port insts together by creating new ports and nets on all cells
 	 * instantiated between their levels of hierarchy.  It assumes the netlist cells involved only
-	 * have one instance (does not differentiate cells when creating the ports).  If the src or snk
+	 * have one instance (does not differentiate cells when creating the ports).  This assumption 
+	 * can be enforce by calling {@link #flattenNetlist(Design)}. If the src or snk
 	 * port insts do net have nets connected, it will create them and connect them in their parent
 	 * cell definition.
 	 * @param src The logical port inst driver or source  
 	 * @param snk The logical port inst sink
 	 * @param netlist The EDIF netlist of the design
-	 * @param newPortName A unique name to be used in creating the ports and nets
+	 * @param newName A unique name to be used in creating the ports and nets
 	 */
 	public static void connectPortInstsThruHier(EDIFHierPortInst src, EDIFHierPortInst snk, 
-	        EDIFNetlist netlist, String newPortName) {
-        EDIFNet currNet = src.getNet();
-        String srcParentInstName = src.getHierarchicalInstName();
-        EDIFCellInst srcParentInst = netlist.getCellInstFromHierName(srcParentInstName);
+	        EDIFNetlist netlist, String newName) {
+	    EDIFHierCellInst commonAncestor = 
+	            src.getHierarchicalInst().getCommonAncestor(snk.getHierarchicalInst());
+	    EDIFHierPortInst finalSrc = src;
+	    EDIFHierPortInst finalSnk = snk;
+	    // Trace existing connections or make new connections between src and snk to the common 
+	    // ancestor.   
+	    for(EDIFHierPortInst hierPortInst : new EDIFHierPortInst[] {src, snk}) {
+	        EDIFHierCellInst hierParentInst = hierPortInst.getHierarchicalInst();
+	        EDIFNet currNet = hierPortInst.getNet();
+	        if(currNet == null) {
+	            currNet = createUniqueNet(hierParentInst.getCellType(), newName);
+	            currNet.addPortInst(hierPortInst.getPortInst());
+	        }
 
-        if(currNet == null) {
-            currNet = srcParentInst.getCellType().createNet(newPortName + getUniqueNetSuffix());
-            currNet.addPortInst(src.getPortInst());
-        }
-        // Need to check if we need to move up levels of hierarchy before we move down
-        while(!snk.getHierarchicalNetName().startsWith(srcParentInstName)){
-            EDIFPort port = srcParentInst.getCellType().createPort(newPortName, EDIFDirection.INPUT, 1);
-            currNet.createPortInst(port);
-            EDIFCellInst prevInst = srcParentInst;
-            srcParentInstName = srcParentInstName
-                    .substring(0, srcParentInstName.lastIndexOf(EDIFTools.EDIF_HIER_SEP));
-            srcParentInst = netlist.getCellInstFromHierName(srcParentInstName);
-            currNet = new EDIFNet(newPortName + getUniqueNetSuffix(), srcParentInst.getCellType());
-            currNet.createPortInst(newPortName, prevInst);
-        }
-        
-        // Check if destination pin has a net
-        if(snk.getNet() == null) {
-            EDIFCellInst snkParentInst = netlist.getCellInstFromHierName(snk.getHierarchicalInstName());
-            EDIFNet snkNet = snkParentInst.getCellType().createNet(newPortName + getUniqueNetSuffix());
-            snkNet.addPortInst(snk.getPortInst());
-        }
-        
-        String[] parts = snk.getHierarchicalNetName().split(EDIFTools.EDIF_HIER_SEP);
-        int idx = 0;
-        if(!netlist.getTopCell().equals(srcParentInst.getCellType())){
-            while( idx < parts.length){
-                if(parts[idx++].equals(srcParentInst.getName())){
-                    break;
-                }
-            }
-            if(idx == parts.length){
-                throw new RuntimeException("ERROR: Couldn't find instance " +
-                    srcParentInst.getName() + " from routed net name " + snk.getHierarchicalNetName());
-            }
-        }
-        
-        for(int i=idx; i <= parts.length-2; i++){
-            srcParentInst = srcParentInst.getCellType().getCellInst(parts[i]);
-            // TODO Replicate cell type and create new
-            EDIFCell type = srcParentInst.getCellType();
+	        while(hierParentInst.getInst() != commonAncestor.getInst()) {
+	            EDIFPortInst exitPath = null;
+	            for(EDIFPortInst portInst : currNet.getPortInsts()) {
+	                if(portInst.isTopLevelPort()) {
+	                    exitPath = portInst;
+	                    break;
+	                }
+	            }                    
+	            EDIFPortInst outerPortInst = null;
+	            if(exitPath != null) {
+	                // Follow existing connection to parent instance
+	                outerPortInst = hierParentInst.getInst().getPortInst(exitPath.getName());
+	                hierParentInst = hierParentInst.getParent();
+	                if(outerPortInst == null) {
+	                    outerPortInst = new EDIFPortInst(exitPath.getPort(), null,
+	                            exitPath.getIndex(), hierParentInst.getInst());
+	                }
+	                currNet = outerPortInst.getNet();
+	                if(currNet == null) {
+	                    currNet = createUniqueNet(hierParentInst.getCellType(), newName);
+	                    currNet.addPortInst(outerPortInst);
+	                }
+	            }else {
+	                // no port to the parent cell above exists, create one
+	                EDIFCell cellType = hierParentInst.getCellType();
+	                String newPortName = newName;
+	                if(cellType.getPort(newPortName) != null) {
+	                    newPortName += getUniqueSuffix(); 
+	                }
+	                EDIFPort port = cellType.createPort(newPortName, 
+	                        hierPortInst == src ? EDIFDirection.OUTPUT : EDIFDirection.INPUT, 1);
 
-            EDIFPort newPort = srcParentInst.getCellType().createPort(newPortName, EDIFDirection.INPUT, 1);
-            EDIFPortInst portInst = new EDIFPortInst(newPort, currNet, srcParentInst);
-            currNet.addPortInst(portInst);
-            if(i == parts.length-2){
-                EDIFNet targetNet = srcParentInst.getCellType().getNet(parts[parts.length-1]);
-                targetNet.createPortInst(newPort);
-            }else{
-                EDIFNet childNet = new EDIFNet(newPortName +"_added_net", srcParentInst.getCellType());           
-                childNet.createPortInst(newPort);
-                currNet = childNet;
-            }
-        }	    
+	                currNet.createPortInst(port);
+	                EDIFCellInst prevInst = hierParentInst.getInst();
+	                hierParentInst = hierParentInst.getParent();
+	                if(hierParentInst.equals(commonAncestor) && hierPortInst == snk) {
+	                    // We don't need to create another net, just connect to the src's net
+	                    currNet = finalSrc.getNet();
+	                } else {
+	                    currNet = createUniqueNet(hierParentInst.getCellType(), newName);
+	                }
+	                outerPortInst = currNet.createPortInst(newName, prevInst);
+	            }
+	            EDIFHierPortInst currPortInst = new EDIFHierPortInst(hierParentInst, outerPortInst);
+	            if(hierPortInst == src) {
+	                finalSrc = currPortInst;
+	            } else {
+	                finalSnk = currPortInst;
+	            }
+	        }
+	    }
+	    // Make final connection in the common ancestor instance
+	    EDIFNet snkNet = finalSrc.getNet();
+	    if(snkNet != null) {
+	        snkNet.removePortInst(finalSnk.getPortInst());
+	    }
+	    finalSrc.getNet().addPortInst(finalSnk.getPortInst());   
 	}
 
 	/**
