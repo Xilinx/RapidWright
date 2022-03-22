@@ -225,9 +225,12 @@ public class RWRoute{
 	 */
 	protected void determineRoutingTargets(){
 		categorizeNets();
+
+		// Wait for all outstanding RoutingGraph.asyncPreserve() calls to complete
+		routingGraph.awaitPreserve();
 	}
 	
-	protected void categorizeNets() {
+	private void categorizeNets() {
 		numWireNetsToRoute = 0;
 		numConnectionsToRoute = 0;
 		numPreservedRoutableNets = 0;
@@ -417,7 +420,7 @@ public class RWRoute{
 	 * @param net The net to be preserved.
 	 */
 	protected void preserveNet(Net net){
-		addPreservedNodes(RouterHelper.getNodesOfNet(net), net);
+		routingGraph.asyncPreserve(net);
 	}
 	
 	protected void increaseNumNotNeedingRouting() {
@@ -519,28 +522,29 @@ public class RWRoute{
 	 * @param netToPreserve The net that uses those nodes.
 	 */
 	protected void addPreservedNodes(Collection<Node> nodes, Net netToPreserve) {
-		for(Node node : nodes) {
-			Net reserved = routingGraph.preserve(node, netToPreserve);
-			if (reserved == null)
-				continue;
-			// Nodes already preserved by the same net are ignored
-			if (reserved.equals(netToPreserve))
-				continue;
-			if (reserved.getSource() != null && netToPreserve.getSource() != null) {
-				boolean generateWarning = conflictNets.size() < 5;
-				EDIFNet reservedLogical = reserved.getLogicalNet();
-				EDIFNet toReserveLogical = netToPreserve.getLogicalNet();
-				if(reservedLogical != null && toReserveLogical != null) {
-					if(!toReserveLogical.equals(reservedLogical)) {
-						if(generateWarning) generateConflictInfo(node, reserved, netToPreserve);
-					}
-				}else {
-					if(generateWarning) generateConflictInfo(node, reserved, netToPreserve);
-				}
-				conflictNets.add(reserved);
-				conflictNets.add(netToPreserve);
-			}
-		}
+		// for(Node node : nodes) {
+		// 	Net reserved = routingGraph.preserve(node, netToPreserve);
+		// 	if (reserved == null)
+		// 		continue;
+		// 	// Nodes already preserved by the same net are ignored
+		// 	if (reserved.equals(netToPreserve))
+		// 		continue;
+		// 	if (reserved.getSource() != null && netToPreserve.getSource() != null) {
+		// 		boolean generateWarning = conflictNets.size() < 5;
+		// 		EDIFNet reservedLogical = reserved.getLogicalNet();
+		// 		EDIFNet toReserveLogical = netToPreserve.getLogicalNet();
+		// 		if(reservedLogical != null && toReserveLogical != null) {
+		// 			if(!toReserveLogical.equals(reservedLogical)) {
+		// 				if(generateWarning) generateConflictInfo(node, reserved, netToPreserve);
+		// 			}
+		// 		}else {
+		// 			if(generateWarning) generateConflictInfo(node, reserved, netToPreserve);
+		// 		}
+		// 		conflictNets.add(reserved);
+		// 		conflictNets.add(netToPreserve);
+		// 	}
+		// }
+		routingGraph.asyncPreserve(nodes, netToPreserve);
 	}
 
 	private void generateConflictInfo(Node node, Net reserved, Net netToPreserve) {
@@ -1465,11 +1469,10 @@ public class RWRoute{
 		for(Net n : toRouteNets) {
 			System.out.println("\t" + n);
 
-			Collection<Routable> rnodes;
+			Set<Routable> rnodes = new HashSet<>();
 			NetWrapper netnew = nets.get(n);
 			if (netnew != null) {
 				// Net already exists
-				rnodes = new ArrayList<>();
 
 				for(Node toBuild : RouterHelper.getNodesOfNet(n)) {
 					// Since net already exists, all the nodes it uses will already
@@ -1484,7 +1487,6 @@ public class RWRoute{
 				netnew = createsNetWrapperAndConnections(n, config.getBoundingBoxExtensionX(), config.getBoundingBoxExtensionY(), multiSLRDevice);
 
 				// Collect all nodes used by this net
-				rnodes = new HashSet<>();
 				for (PIP pip : n.getPIPs()) {
 					Node start = (pip.isReversed()) ? pip.getEndNode() : pip.getStartNode();
 					Node end = (pip.isReversed()) ? pip.getStartNode() : pip.getEndNode();

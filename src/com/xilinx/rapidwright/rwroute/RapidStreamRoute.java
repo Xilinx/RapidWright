@@ -46,7 +46,7 @@ public class RapidStreamRoute extends PartialRouter{
 	 */
 	@Override
 	protected void determineRoutingTargets(){
-		categorizeNets();
+		super.determineRoutingTargets();
 		if(config.isResolveConflictNets()) handleConflictNets();
 	}
 	

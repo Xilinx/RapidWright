@@ -23,17 +23,22 @@
 package com.xilinx.rapidwright.rwroute;
 
 import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
+import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.util.Pair;
+import com.xilinx.rapidwright.util.ParallelismTools;
 import com.xilinx.rapidwright.util.RuntimeTracker;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.BiFunction;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Phaser;
 
 public class RoutableGraph {
 
@@ -84,6 +89,8 @@ public class RoutableGraph {
      */
     final protected Map<Node, Net> preservedMap;
 
+    final protected Phaser preservedMapOutstanding;
+
     /**
      * Visited rnodes data during connection routing
      */
@@ -95,7 +102,8 @@ public class RoutableGraph {
 
     public RoutableGraph(RuntimeTracker setChildrenTimer) {
         nodesMap = new HashMap<>();
-        preservedMap = new HashMap<>();
+        preservedMap = new ConcurrentHashMap<>();
+        preservedMapOutstanding = new Phaser();
         visited = new ArrayList<>();
         this.setChildrenTimer = setChildrenTimer;
     }
@@ -105,8 +113,55 @@ public class RoutableGraph {
         visited.clear();
     }
 
-    public Net preserve(Node node, Net net) {
-        return preservedMap.putIfAbsent(node, net);
+    private void preserve(Node node, Net net) {
+        Net existingNet = preservedMap.putIfAbsent(node, net);
+        if (existingNet == null)
+            return;
+        // Nodes already preserved by the same net are ignored
+        if (existingNet.equals(existingNet))
+            return;
+        // TODO: Handle conflicts
+    }
+
+    public void asyncPreserve(Collection<Node> nodes, Net net) {
+        preservedMapOutstanding.register();
+        ParallelismTools.submit(() -> {
+            nodes.forEach((node) -> preserve(node, net));
+            preservedMapOutstanding.arriveAndDeregister();
+        });
+    }
+
+    public void asyncPreserve(Net net) {
+        preservedMapOutstanding.register();
+        ParallelismTools.submit(() -> {
+            List<SitePinInst> pins = net.getPins();
+            SitePinInst sourcePin = net.getSource();
+            assert(sourcePin == null || pins.contains(sourcePin));
+            SitePinInst altSourcePin = net.getAlternateSource();
+            assert(altSourcePin == null || pins.contains(altSourcePin));
+            for(SitePinInst pin : net.getPins()) {
+                // SitePinInst.isRouted() is meaningless for output pins
+                if (!pin.isRouted() && !pin.isOutPin()) {
+                    continue;
+                }
+
+                Node node = pin.getConnectedNode();
+                preserve(node, net);
+            }
+
+            for(PIP pip : net.getPIPs()) {
+                Node start = pip.getStartNode();
+                preserve(start, net);
+                Node end = pip.getEndNode();
+                preserve(end, net);
+            }
+
+            preservedMapOutstanding.arriveAndDeregister();
+        });
+    }
+
+    public void awaitPreserve() {
+        preservedMapOutstanding.arriveAndAwaitAdvance();
     }
 
     public void unpreserve(Node node) {
@@ -123,10 +178,6 @@ public class RoutableGraph {
 
     public Net getPreservedNet(Node node) {
         return preservedMap.get(node);
-    }
-
-    public Net computePreserved(Node node, BiFunction<Node,Net,Net> remappingFunction) {
-        return preservedMap.compute(node, remappingFunction);
     }
 
     public Routable getNode(Node node) {
