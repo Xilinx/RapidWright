@@ -127,6 +127,9 @@ public class PartialRouter extends RWRoute{
 			for (Connection connection : netWrapper.getConnections()) {
 				finishRouteConnection(connection);
 
+				if (connection.getSink().isRouted())
+					continue;
+
 				SitePinInst sink = connection.getSink();
 				String sinkPinName = sink.getName();
 				if (!Pattern.matches("[A-H](X|_I)", sinkPinName))
@@ -144,8 +147,7 @@ public class PartialRouter extends RWRoute{
 						continue;
 					}
 
-					// RoutableType type = RoutableType.WIRE;
-					RoutableType type = RoutableType.PINFEED_I;
+					RoutableType type = RoutableType.WIRE;
 					Routable altRnode = createAddRoutableNode(null, altNode, type);
 					// Trigger a setChildren() for LUT routethrus
 					altRnode.getChildren();
