@@ -493,13 +493,7 @@ public class EDIFTools {
 	        }
 
 	        while(hierParentInst.getInst() != commonAncestor.getInst()) {
-	            EDIFPortInst exitPath = null;
-	            for(EDIFPortInst portInst : currNet.getPortInsts()) {
-	                if(portInst.isTopLevelPort()) {
-	                    exitPath = portInst;
-	                    break;
-	                }
-	            }                    
+	            EDIFPortInst exitPath = currNet.getTopLevelPortInst();
 	            EDIFPortInst outerPortInst = null;
 	            if(exitPath != null) {
 	                // Follow existing connection to parent instance

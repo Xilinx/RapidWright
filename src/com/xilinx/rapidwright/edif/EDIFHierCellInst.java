@@ -22,7 +22,6 @@
  */
 package com.xilinx.rapidwright.edif;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -139,14 +138,6 @@ public class EDIFHierCellInst {
     public EDIFHierCellInst getChild(EDIFCellInst relativeChild) {
         return new EDIFHierCellInst(cellInsts, cellInsts.length+1, relativeChild);
     }
-    
-    public List<EDIFHierCellInst> getImmediateChildren(){
-        List<EDIFHierCellInst> children = new ArrayList<>();
-        for(EDIFCellInst child : getCellType().getCellInsts()) {
-            children.add(getChild(child));
-        }
-        return children;
-    }
 
     public EDIFHierCellInst getSibling(EDIFCellInst relativeSibling) {
         return new EDIFHierCellInst(cellInsts, cellInsts.length, relativeSibling);
@@ -154,15 +145,15 @@ public class EDIFHierCellInst {
 
     /**
      * Checks if the provided instance is an ancestor (hierarchical parent) of this instance. For 
-     * example, if this = "disneyland/tomorrow_land/space_mountain" and 
-     * inst = "disneyland/tomorrow_land", this method would return true.  however, if 
-     * inst = "disneyland/adventure_land", it would return false. 
+     * example, if this="disneyland/tomorrow_land/space_mountain" and 
+     * potentialAncestor="disneyland/tomorrow_land", this method would return true.  however, if 
+     * potentialAncestor="disneyland/adventure_land", it would return false. 
      *  
-     * @param inst The hierarchical instance in question to check if it is  
+     * @param potentialAncestor The hierarchical instance in question to check if it is  
      * @return True if the provided instance is a hierarchical ancestor of this instance.
      */
-    public boolean isAncestor(EDIFHierCellInst inst) {
-        EDIFCellInst[] other = inst.cellInsts;
+    public boolean isDescendantOf(EDIFHierCellInst potentialAncestor) {
+        EDIFCellInst[] other = potentialAncestor.cellInsts;
         if(other.length >= cellInsts.length) return false;
         for(int i=0; i < other.length; i++) {
             if(cellInsts.length > i) {
@@ -182,6 +173,11 @@ public class EDIFHierCellInst {
      * @return The closest common ancestor between this instance and the provided instance.
      */
     public EDIFHierCellInst getCommonAncestor(EDIFHierCellInst o) {
+        if(!isAbsolute() || !o.isAbsolute()) {
+            throw new RuntimeException("ERROR: Can only get a common ancestor of absolute "
+                    + "EDIFHierCellInsts. this.isAbsolute()=" + this.isAbsolute() 
+                    + ", o.isAbsolute()=" + o.isAbsolute());
+        }
         EDIFCellInst[] oCellInsts = o.cellInsts;
         int min = Integer.min(cellInsts.length, oCellInsts.length);
         int idx = 0;

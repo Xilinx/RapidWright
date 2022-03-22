@@ -18,12 +18,13 @@ public class TestEDIFHierCellInst {
         EDIFNetlist netlist = d.getNetlist();
 
         EDIFHierCellInst topInst = netlist.getTopHierCellInst();
-        Queue<EDIFHierCellInst> q = new LinkedList<>(topInst.getImmediateChildren());
+        Queue<EDIFHierCellInst> q = new LinkedList<>();
+        topInst.addChildren(q);
         while(!q.isEmpty()) {
             EDIFHierCellInst curr = q.poll();
-            Assertions.assertTrue(curr.isAncestor(topInst));
-            Assertions.assertFalse(topInst.isAncestor(curr));
-            q.addAll(curr.getImmediateChildren());
+            Assertions.assertTrue(curr.isDescendantOf(topInst));
+            Assertions.assertFalse(topInst.isDescendantOf(curr));
+            curr.addChildren(q);
         }
     }
     
