@@ -723,9 +723,13 @@ public class EDIFTools {
 		}
 	}
 
-	public static EDIFNetlist readEdifFile(Path edifFileName){
+	public static EDIFNetlist readEdifFile(Path edifFileName) {
+	    Path parent = edifFileName.getParent();
+	    if(parent == null) {
+	        parent = Paths.get(System.getProperty("user.dir"));
+	    }
 	    if(RW_ENABLE_EDIF_BINARY_CACHING) {
-	        Path bedif = edifFileName.getParent().resolve(
+	        Path bedif = parent.resolve(
 	                        edifFileName.getFileName().toString().replace(".edf", ".bedf"));
 	        if(Files.exists(bedif) && FileTools.isFileNewer(bedif, edifFileName)) {
 	            EDIFNetlist netlist = null;
@@ -740,11 +744,7 @@ public class EDIFTools {
 	    }
 		EDIFNetlist edif;
 		File edifFile = edifFileName.toFile();
-		File parent = edifFile.getParentFile();
-		if(parent == null) {
-			parent = new File(System.getProperty("user.dir"));
-		}
-		String edifDirectoryName = parent.getAbsolutePath();
+		String edifDirectoryName = parent.toAbsolutePath().toString();
 		if(edifDirectoryName == null) {
 			try {
 				File canEdifFile = edifFile.getCanonicalFile();
@@ -774,7 +774,7 @@ public class EDIFTools {
 			edif.setEncryptedCells(new ArrayList<>(Arrays.asList(ednFiles)));
 		}
 		if(RW_ENABLE_EDIF_BINARY_CACHING) {
-		    Path bedif = edifFileName.getParent().resolve(
+		    Path bedif = parent.resolve(
                     edifFileName.getFileName().toString().replace(".edf", ".bedf"));
 		    try {
 		        BinaryEDIFWriter.writeBinaryEDIF(bedif, edif);
