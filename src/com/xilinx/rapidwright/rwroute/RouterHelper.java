@@ -28,6 +28,7 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -272,23 +273,23 @@ public class RouterHelper {
 	}
 	
 	/**
-	 * Gets a set of {@link Node} instances used by a {@link Net} instance.
-	 * Nodes associated with unrouted pins on this net will be excluded.
+	 * Gets a (non-unique) collection of {@link Node} instances used by a {@link Net} instance.
+	 * Nodes associated with unrouted sink pins on this net will be excluded.
 	 * @param net The target net.
-	 * @return A set of nodes used by a net.
+	 * @return A collection of nodes used by a net.
 	 */
-	public static Set<Node> getNodesOfNet(Net net){
-		Set<Node> nodes = new HashSet<>();
+	public static Collection<Node> getNodesOfNet(Net net){
+		List<SitePinInst> pins = net.getPins();
+		List<Node> nodes = new ArrayList<>(net.getPins().size() + net.getPIPs().size() / 2);
 		SitePinInst sourcePin = net.getSource();
-		if(sourcePin != null) {
-			nodes.add(sourcePin.getConnectedNode());
-		}
+		assert(sourcePin == null || pins.contains(sourcePin));
 		SitePinInst altSourcePin = net.getAlternateSource();
-		if(altSourcePin != null) {
-			nodes.add(altSourcePin.getConnectedNode());
-		}
+		assert(altSourcePin == null || pins.contains(altSourcePin));
 		for(SitePinInst pin : net.getPins()) {
-			if (!pin.isRouted()) continue;
+			// SitePinInst.isRouted() is meaningless for output pins
+			if (!pin.isRouted() && !pin.isOutPin()) {
+				continue;
+			}
 
 			Node pinNode = pin.getConnectedNode();
 			if(pinNode != null) {

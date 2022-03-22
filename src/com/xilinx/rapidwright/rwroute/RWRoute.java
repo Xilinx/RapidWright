@@ -351,16 +351,11 @@ public class RWRoute{
 	 * @param staticNet The static net in question, i.e. VCC or GND.
 	 */
 	protected void addStaticNetRoutingTargets(Net staticNet){
-		List<SitePinInst> sinks = new ArrayList<>();
-		for(SitePinInst sink : staticNet.getPins()){
-			if(sink.isOutPin()) continue;
-			sinks.add(sink);
-		}
-		
+		List<SitePinInst> sinks = staticNet.getSinkPins();
 		if(sinks.size() > 0 ) {
-			for(SitePinInst sink : sinks) {
-				addReservedNode(sink.getConnectedNode(), staticNet);
-			}
+			List<Node> sinkNodes = new ArrayList<>(sinks.size());
+			sinks.forEach((p) -> sinkNodes.add(p.getConnectedNode()));
+			addPreservedNodes(sinkNodes, staticNet);
 			addStaticNetRoutingTargets(staticNet, sinks);
 		}else {
 			preserveNet(staticNet);
@@ -399,9 +394,8 @@ public class RWRoute{
 			Map<SitePinInst, List<Node>> sinksRoutingPaths = GlobalSignalRouting.routeStaticNet(net, unavailableNodes, design, routethruHelper);
 			
 			for(Entry<SitePinInst, List<Node>> sinkPath : sinksRoutingPaths.entrySet()) {
-				Set<Node> sinkPathNodes = new HashSet<>(sinkPath.getValue());
-				addPreservedNode(sinkPathNodes, net);
-				unavailableNodes.addAll(sinkPathNodes);
+				addPreservedNodes(sinkPath.getValue(), net);
+				unavailableNodes.addAll(sinkPath.getValue());
 			}
 		}
 	}
@@ -423,7 +417,7 @@ public class RWRoute{
 	 * @param net The net to be preserved.
 	 */
 	protected void preserveNet(Net net){
-		addPreservedNode(RouterHelper.getNodesOfNet(net), net);
+		addPreservedNodes(RouterHelper.getNodesOfNet(net), net);
 	}
 	
 	protected void increaseNumNotNeedingRouting() {
@@ -519,36 +513,36 @@ public class RWRoute{
 	}
 	
 	/**
-	 * Adds preserved nodes.
-	 * @param nodes A set of nodes to be preserved.
+	 * Adds preserved nodes. Duplicated nodes (more specifically,
+	 * nodes already preserved with the same net) have no effect.
+	 * @param nodes A collection of nodes to be preserved.
 	 * @param netToPreserve The net that uses those nodes.
 	 */
-	private void addPreservedNode(Set<Node> nodes, Net netToPreserve) {
+	protected void addPreservedNodes(Collection<Node> nodes, Net netToPreserve) {
 		for(Node node : nodes) {
-			addReservedNode(node, netToPreserve);
-		}
-	}
-	
-	protected void addReservedNode(Node node, Net netToPreserve) {
-		Net reserved = routingGraph.preserve(node, netToPreserve);
-		if (reserved == null)
-			return;
-		if (reserved.getSource() != null && netToPreserve.getSource() != null && !reserved.getName().equals(netToPreserve.getName())){
-			boolean generateWarning = conflictNets.size() < 5;
-			EDIFNet reservedLogical = reserved.getLogicalNet();
-			EDIFNet toReserveLogical = netToPreserve.getLogicalNet();
-			if(reservedLogical != null && toReserveLogical != null) {
-				if(!toReserveLogical.equals(reservedLogical)) {
+			Net reserved = routingGraph.preserve(node, netToPreserve);
+			if (reserved == null)
+				continue;
+			// Nodes already preserved by the same net are ignored
+			if (reserved.equals(netToPreserve))
+				continue;
+			if (reserved.getSource() != null && netToPreserve.getSource() != null) {
+				boolean generateWarning = conflictNets.size() < 5;
+				EDIFNet reservedLogical = reserved.getLogicalNet();
+				EDIFNet toReserveLogical = netToPreserve.getLogicalNet();
+				if(reservedLogical != null && toReserveLogical != null) {
+					if(!toReserveLogical.equals(reservedLogical)) {
+						if(generateWarning) generateConflictInfo(node, reserved, netToPreserve);
+					}
+				}else {
 					if(generateWarning) generateConflictInfo(node, reserved, netToPreserve);
 				}
-			}else {
-				if(generateWarning) generateConflictInfo(node, reserved, netToPreserve);
+				conflictNets.add(reserved);
+				conflictNets.add(netToPreserve);
 			}
-			conflictNets.add(reserved);
-			conflictNets.add(netToPreserve);
 		}
 	}
-	
+
 	private void generateConflictInfo(Node node, Net reserved, Net netToPreserve) {
 		System.out.println("WARNING: Conflicting node " + node + ":");
 		System.out.println("         " + netToPreserve.getName() + " \n         " + reserved.getName());
@@ -557,15 +551,15 @@ public class RWRoute{
 	public boolean isMultiSLRDevice() {
 		return multiSLRDevice;
 	}
-	
+
 	protected void removeNetNodesFromPreservedNodes(Net net) {
-		Set<Node> netNodes = RouterHelper.getNodesOfNet(net);
+		Collection<Node> netNodes = RouterHelper.getNodesOfNet(net);
 		for(Node node : netNodes) {
 			routingGraph.unpreserve(node);
 		}
 		numPreservedWire--;
 	}
-	
+
 	/**
 	 * Creates a {@link RoutableNode} Object based on a {@link Node} instance and avoids duplicates,
 	 * used for creating the source and sink rnodes of {@link Connection} instances.

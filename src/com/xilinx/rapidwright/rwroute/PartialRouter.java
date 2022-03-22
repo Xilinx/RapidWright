@@ -24,20 +24,16 @@
 package com.xilinx.rapidwright.rwroute;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.regex.Pattern;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
-import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
-import com.xilinx.rapidwright.device.SitePin;
 
 /**
  * A class extends {@link RWRoute} for partial routing.
@@ -64,17 +60,12 @@ public class PartialRouter extends RWRoute{
 	
 	@Override
 	protected void addStaticNetRoutingTargets(Net staticNet){
-		List<SitePinInst> sinks = new ArrayList<>();
-		for(SitePinInst sink : staticNet.getPins()){
-			if(sink.isOutPin()) continue;
-			sinks.add(sink);
-		}
-		
-		if(sinks.size() > 0 ) {
+		List<SitePinInst> sinks = staticNet.getSinkPins();
+		if(sinks.size() > 0) {
 			if(!staticNet.hasPIPs()) {
-				for(SitePinInst sink : sinks) {
-					addReservedNode(sink.getConnectedNode(), staticNet);
-				}
+				List<Node> sinkNodes = new ArrayList<>(sinks.size());
+				sinks.forEach((p) -> sinkNodes.add(p.getConnectedNode()));
+				addPreservedNodes(sinkNodes, staticNet);
 				addStaticNetRoutingTargets(staticNet, sinks);
 			}else {
 				preserveNet(staticNet);
