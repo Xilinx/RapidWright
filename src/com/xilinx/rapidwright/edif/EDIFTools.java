@@ -724,10 +724,10 @@ public class EDIFTools {
 	}
 
 	public static EDIFNetlist readEdifFile(Path edifFileName) {
-        Path parent = edifFileName.getParent();
-        if(parent == null) {
-            parent = Paths.get(System.getProperty("user.dir"));
-        }
+	    Path parent = edifFileName.getParent();
+	    if(parent == null) {
+	        parent = Paths.get(System.getProperty("user.dir"));
+	    }
 	    if(RW_ENABLE_EDIF_BINARY_CACHING) {
 	        Path bedif = parent.resolve(
 	                        edifFileName.getFileName().toString().replace(".edf", ".bedf"));
