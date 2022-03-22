@@ -201,6 +201,35 @@ public class EDIFNet extends EDIFPropertyObject {
 	}
 
 	/**
+	 * Gets the first top level port instance from the stored list in the net.  If multiple top level
+	 * port instances exist on the net, this only returns the first found. For a comprehensive list
+	 * call {@link #getAllTopLevelPortInsts()}.
+	 * @return The first top level port instance found in the net, or null if none exists.
+	 */
+	public EDIFPortInst getTopLevelPortInst() {
+	    for(EDIFPortInst portInst : getPortInsts()) {
+	        if(portInst.isTopLevelPort()) {
+	            return portInst;
+	        }
+	    }
+	    return null;
+	}
+	
+	/**
+	 * Gets all top level port instances connected to this net.  
+	 * @return A list of all top level port instances connected to this net.
+	 */
+	public List<EDIFPortInst> getAllTopLevelPortInsts() {
+	    List<EDIFPortInst> topPortInsts = new ArrayList<>();
+	    for(EDIFPortInst portInst : getPortInsts()) {
+            if(portInst.isTopLevelPort()) {
+                topPortInsts.add(portInst);
+            }
+        }
+	    return topPortInsts;
+	}
+	
+	/**
 	 * Removes the port instance provided from the net. The net stores the port instances using a 
 	 * sorted ArrayList (@link EDIFPortInstList).  Worst case O(n) to remove.
 	 * @param portInst The port instance to remove from the net.
