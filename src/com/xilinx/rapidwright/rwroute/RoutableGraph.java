@@ -26,6 +26,7 @@ import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.util.CountUpDownLatch;
 import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.ParallelismTools;
 import com.xilinx.rapidwright.util.RuntimeTracker;
@@ -38,7 +39,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Phaser;
 
 public class RoutableGraph {
 
@@ -89,7 +89,7 @@ public class RoutableGraph {
      */
     final private Map<LightweightNode, Net> preservedMap;
 
-    final private Phaser preservedMapOutstanding;
+    final private CountUpDownLatch preservedMapOutstanding;
 
     /**
      * Visited rnodes data during connection routing
@@ -103,7 +103,7 @@ public class RoutableGraph {
     public RoutableGraph(RuntimeTracker setChildrenTimer) {
         nodesMap = new HashMap<>();
         preservedMap = new ConcurrentHashMap<>();
-        preservedMapOutstanding = new Phaser();
+        preservedMapOutstanding = new CountUpDownLatch();
         visited = new ArrayList<>();
         this.setChildrenTimer = setChildrenTimer;
     }
@@ -124,15 +124,15 @@ public class RoutableGraph {
     }
 
     public void asyncPreserve(Collection<Node> nodes, Net net) {
-        preservedMapOutstanding.register();
+        preservedMapOutstanding.countUp();
         ParallelismTools.submit(() -> {
             nodes.forEach((node) -> preserve(new LightweightNode(node), net));
-            preservedMapOutstanding.arriveAndDeregister();
+            preservedMapOutstanding.countDown();
         });
     }
 
     public void asyncPreserve(Net net) {
-        preservedMapOutstanding.register();
+        preservedMapOutstanding.countUp();
         ParallelismTools.submit(() -> {
             List<SitePinInst> pins = net.getPins();
             SitePinInst sourcePin = net.getSource();
@@ -153,12 +153,16 @@ public class RoutableGraph {
                 preserve(new LightweightNode(pip, false), net);
             }
 
-            preservedMapOutstanding.arriveAndDeregister();
+            preservedMapOutstanding.countDown();
         });
     }
 
     public void awaitPreserve() {
-        preservedMapOutstanding.arriveAndAwaitAdvance();
+        try {
+            preservedMapOutstanding.await();
+        } catch (InterruptedException e) {
+            throw new RuntimeException();
+        }
     }
 
     public void unpreserve(Node node) {
