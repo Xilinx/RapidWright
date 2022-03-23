@@ -87,9 +87,9 @@ public class RoutableGraph {
     /**
      * A map of preserved nodes to their nets
      */
-    final protected Map<Node, Net> preservedMap;
+    final private Map<LightweightNode, Net> preservedMap;
 
-    final protected Phaser preservedMapOutstanding;
+    final private Phaser preservedMapOutstanding;
 
     /**
      * Visited rnodes data during connection routing
@@ -113,7 +113,7 @@ public class RoutableGraph {
         visited.clear();
     }
 
-    private void preserve(Node node, Net net) {
+    private void preserve(LightweightNode node, Net net) {
         Net existingNet = preservedMap.putIfAbsent(node, net);
         if (existingNet == null)
             return;
@@ -126,7 +126,7 @@ public class RoutableGraph {
     public void asyncPreserve(Collection<Node> nodes, Net net) {
         preservedMapOutstanding.register();
         ParallelismTools.submit(() -> {
-            nodes.forEach((node) -> preserve(node, net));
+            nodes.forEach((node) -> preserve(new LightweightNode(node), net));
             preservedMapOutstanding.arriveAndDeregister();
         });
     }
@@ -145,15 +145,12 @@ public class RoutableGraph {
                     continue;
                 }
 
-                Node node = pin.getConnectedNode();
-                preserve(node, net);
+                preserve(new LightweightNode(pin), net);
             }
 
             for(PIP pip : net.getPIPs()) {
-                Node start = pip.getStartNode();
-                preserve(start, net);
-                Node end = pip.getEndNode();
-                preserve(end, net);
+                preserve(new LightweightNode(pip, true), net);
+                preserve(new LightweightNode(pip, false), net);
             }
 
             preservedMapOutstanding.arriveAndDeregister();
@@ -165,19 +162,20 @@ public class RoutableGraph {
     }
 
     public void unpreserve(Node node) {
-        preservedMap.remove(node);
+        preservedMap.remove(new LightweightNode(node));
     }
 
     public boolean isPreserved(Node node) {
-        return preservedMap.containsKey(node);
+        return preservedMap.containsKey(new LightweightNode(node));
     }
 
-    public Set<Node> getPreservedNodes() {
-        return Collections.unmodifiableSet(preservedMap.keySet());
-    }
+    // FIXME:
+    // public Set<Node> getPreservedNodes() {
+    //     return Collections.unmodifiableSet(preservedMap.keySet());
+    // }
 
     public Net getPreservedNet(Node node) {
-        return preservedMap.get(node);
+        return preservedMap.get(new LightweightNode(node));
     }
 
     public Routable getNode(Node node) {

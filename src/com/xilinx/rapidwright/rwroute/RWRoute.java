@@ -47,7 +47,6 @@ import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
-import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.util.MessageGenerator;
 import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.RuntimeTracker;
@@ -377,30 +376,33 @@ public class RWRoute{
 		if (staticNetAndRoutingTargets.isEmpty())
 			return;
 
-		for(List<SitePinInst> netRouteTargetPins : staticNetAndRoutingTargets.values()) {
-			for(SitePinInst sink : netRouteTargetPins) {
-				routingGraph.unpreserve(sink.getConnectedNode());
-			}
-		}
-		
-		RouterHelper.invertPossibleGndPinsToVccPins(design, design.getGndNet());
-		
-		// If connections of other nets are routed first, used resources should be preserved.
-		Set<Node> unavailableNodes = getAllUsedNodesOfRoutedConnections();
-		unavailableNodes.addAll(routingGraph.getPreservedNodes());
-		// If the connections of other nets are not routed yet, 
-		// the nodes connected to pins of other nets must be preserved.
-		unavailableNodes.addAll(routingGraph.getNodes());
-		
-		for(Net net : staticNetAndRoutingTargets.keySet()){
-			System.out.println("INFO: Route " + net.getSinkPins().size() + " pins of " + net);
-			Map<SitePinInst, List<Node>> sinksRoutingPaths = GlobalSignalRouting.routeStaticNet(net, unavailableNodes, design, routethruHelper);
-			
-			for(Entry<SitePinInst, List<Node>> sinkPath : sinksRoutingPaths.entrySet()) {
-				addPreservedNodes(sinkPath.getValue(), net);
-				unavailableNodes.addAll(sinkPath.getValue());
-			}
-		}
+		// FIXME
+		throw new RuntimeException();
+
+		// for(List<SitePinInst> netRouteTargetPins : staticNetAndRoutingTargets.values()) {
+		// 	for(SitePinInst sink : netRouteTargetPins) {
+		// 		routingGraph.unpreserve(sink.getConnectedNode());
+		// 	}
+		// }
+		//
+		// RouterHelper.invertPossibleGndPinsToVccPins(design, design.getGndNet());
+		//
+		// // If connections of other nets are routed first, used resources should be preserved.
+		// Set<Node> unavailableNodes = getAllUsedNodesOfRoutedConnections();
+		// unavailableNodes.addAll(routingGraph.getPreservedNodes());
+		// // If the connections of other nets are not routed yet,
+		// // the nodes connected to pins of other nets must be preserved.
+		// unavailableNodes.addAll(routingGraph.getNodes());
+		//
+		// for(Net net : staticNetAndRoutingTargets.keySet()){
+		// 	System.out.println("INFO: Route " + net.getSinkPins().size() + " pins of " + net);
+		// 	Map<SitePinInst, List<Node>> sinksRoutingPaths = GlobalSignalRouting.routeStaticNet(net, unavailableNodes, design, routethruHelper);
+		//
+		// 	for(Entry<SitePinInst, List<Node>> sinkPath : sinksRoutingPaths.entrySet()) {
+		// 		addPreservedNodes(sinkPath.getValue(), net);
+		// 		unavailableNodes.addAll(sinkPath.getValue());
+		// 	}
+		// }
 	}
 	
 	/**
