@@ -1751,10 +1751,19 @@ public class RWRoute{
 	public Design getDesign() {
 		return design;
 	}
-	
-	private int getNumSitePinOfStaticNets() {
+
+	private int getNumIndirectConnectionPins() {
 		int totalSitePins = 0;
-		for(List<SitePinInst> pins : staticNetAndRoutingTargets.values()) {
+		for(Connection connection : indirectConnections) {
+			totalSitePins += (connection.getSink().isRouted()) ? 1 : 0;
+		}
+		return totalSitePins;
+	}
+	
+	private int getNumStaticNetPins() {
+		int totalSitePins = 0;
+		for(Entry<Net,List<SitePinInst>> e : staticNetAndRoutingTargets.entrySet()) {
+			List<SitePinInst> pins = e.getValue();
 			totalSitePins += pins.size();
 		}
 		return totalSitePins;
@@ -1806,9 +1815,11 @@ public class RWRoute{
 		for(Net clk : clkNets) {
 			clkPins += clk.getSinkPins().size();
 		}
-		printFormattedString("  All site pins to be routed: ", (indirectConnections.size() + getNumSitePinOfStaticNets() + clkPins));	
-		printFormattedString("    Connections to be routed: ", indirectConnections.size());
-		printFormattedString("    Static net pins: ", getNumSitePinOfStaticNets());
+		int indirectPins = getNumIndirectConnectionPins();
+		int staticPins = getNumStaticNetPins();
+		printFormattedString("  All site pins to be routed: ", (indirectPins + staticPins + clkPins));
+		printFormattedString("    Connections to be routed: ", indirectPins);
+		printFormattedString("    Static net pins: ", getNumStaticNetPins());
 		printFormattedString("    Clock pins: ", clkPins);
 		printFormattedString("Nets not needing routing: ", numNotNeedingRoutingNets);
 		if(numUnrecognizedNets != 0)
