@@ -487,7 +487,7 @@ public class EDIFTools {
 	    for(EDIFHierPortInst hierPortInst : new EDIFHierPortInst[] {src, snk}) {
 	        EDIFHierCellInst hierParentInst = hierPortInst.getHierarchicalInst();
 	        EDIFNet currNet = hierPortInst.getNet();
-	        if(currNet == null) {
+	        if(currNet == null && !(hierParentInst.equals(commonAncestor) && hierPortInst == snk)) {
 	            currNet = createUniqueNet(hierParentInst.getCellType(), newName);
 	            currNet.addPortInst(hierPortInst.getPortInst());
 	        }
@@ -537,11 +537,12 @@ public class EDIFTools {
 	            }
 	        }
 	    }
-	    // Make final connection in the common ancestor instance
-	    EDIFNet snkNet = finalSrc.getNet();
+	    // Disconnect sink from existing net if connected
+	    EDIFNet snkNet = finalSnk.getNet();
 	    if(snkNet != null) {
 	        snkNet.removePortInst(finalSnk.getPortInst());
 	    }
+	    // Make final connection in the common ancestor instance
 	    finalSrc.getNet().addPortInst(finalSnk.getPortInst());   
 	}
 
