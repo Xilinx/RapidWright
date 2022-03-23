@@ -1755,7 +1755,7 @@ public class RWRoute{
 	private int getNumIndirectConnectionPins() {
 		int totalSitePins = 0;
 		for(Connection connection : indirectConnections) {
-			totalSitePins += (connection.getSink().isRouted()) ? 1 : 0;
+			totalSitePins += (connection.getSink().isRouted()) ? 0 : 1;
 		}
 		return totalSitePins;
 	}
