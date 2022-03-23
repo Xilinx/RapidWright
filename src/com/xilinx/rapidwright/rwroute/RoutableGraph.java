@@ -118,7 +118,7 @@ public class RoutableGraph {
         if (existingNet == null)
             return;
         // Nodes already preserved by the same net are ignored
-        if (existingNet.equals(existingNet))
+        if (existingNet.equals(net))
             return;
         // TODO: Handle conflicts
     }
