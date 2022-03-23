@@ -527,7 +527,7 @@ public class EDIFTools {
 	                } else {
 	                    currNet = createUniqueNet(hierParentInst.getCellType(), newName);
 	                }
-	                outerPortInst = currNet.createPortInst(newName, prevInst);
+	                outerPortInst = currNet.createPortInst(port, prevInst);
 	            }
 	            EDIFHierPortInst currPortInst = new EDIFHierPortInst(hierParentInst, outerPortInst);
 	            if(hierPortInst == src) {
