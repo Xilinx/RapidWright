@@ -166,14 +166,17 @@ public class Connection implements Comparable<Connection>{
 	 * @param criticalityExponent The exponent to separate critical connections and non-critical connections.
 	 */
 	public void calculateCriticality(float maxDelay, float maxCriticality, float criticalityExponent){
-		float slackCon = Float.MAX_VALUE;
+		float minSlack = Float.MAX_VALUE;
 		for(TimingEdge e : getTimingEdges()) {
-			float tmpslackCon = e.getDst().getRequiredTime() - e.getSrc().getArrivalTime() - e.getDelay();
-			if(tmpslackCon < slackCon)
-				slackCon = tmpslackCon;
+			float slack = e.getDst().getRequiredTime() - e.getSrc().getArrivalTime() - e.getDelay();
+			minSlack = Float.min(minSlack, slack);
 		}
+
+		// Negative slacks are not supported, and should not occur if maxDelay was
+		// normalized correctly.
+		assert(minSlack >= 0);
 		
-		float tempCriticality  = (1 - slackCon / maxDelay);
+		float tempCriticality  = (1 - minSlack / maxDelay);
 		
 		tempCriticality = (float) Math.pow(tempCriticality, criticalityExponent) * maxCriticality;
     	

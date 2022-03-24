@@ -284,7 +284,8 @@ public class RouterHelper {
 		SitePinInst sourcePin = net.getSource();
 		assert(sourcePin == null || pins.contains(sourcePin));
 		SitePinInst altSourcePin = net.getAlternateSource();
-		assert(altSourcePin == null || pins.contains(altSourcePin));
+		// FIXME:
+		// assert(altSourcePin == null || pins.contains(altSourcePin));
 		for(SitePinInst pin : net.getPins()) {
 			// SitePinInst.isRouted() is meaningless for output pins
 			if (!pin.isRouted() && !pin.isOutPin()) {

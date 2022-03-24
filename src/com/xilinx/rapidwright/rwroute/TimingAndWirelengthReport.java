@@ -75,7 +75,7 @@ public class TimingAndWirelengthReport{
 	private void computeStatisticsAndReport() {	
 		computeNetsWirelengthAndDelay();
 		
-		Pair<Float, TimingVertex> maxDelayAndTimingVertex = timingManager.calculateArrivalRequireTimes();
+		Pair<Float, TimingVertex> maxDelayAndTimingVertex = timingManager.calculateArrivalRequiredTimes();
 		System.out.println();
 		timingManager.getCriticalPathInfo(maxDelayAndTimingVertex, false, routingGraph);
 		

@@ -194,6 +194,9 @@ public class RWRoute{
 			}
 			timingManager = new TimingManager(design, true, routerTimer, config, clkTiming, timingNets);
 			timingManager.setTimingEdgesOfConnections(indirectConnections);
+
+			// FIXME
+			timingManager.setTimingRequirementPs(100*1000);
 		}
 		
 		sortedIndirectConnections = new ArrayList<>();		
@@ -660,8 +663,8 @@ public class RWRoute{
 	private void preRoutingEstimation() {
 		if(config.isTimingDriven()) {
 			estimateDelayOfConnections();
-			maxDelayAndTimingVertex = timingManager.calculateArrivalRequireTimes();
-			timingManager.calculateCriticality(indirectConnections, MAX_CRITICALITY, config.getCriticalityExponent(), maxDelayAndTimingVertex.getFirst());
+			maxDelayAndTimingVertex = timingManager.calculateArrivalRequiredTimes();
+			timingManager.calculateCriticality(indirectConnections, MAX_CRITICALITY, config.getCriticalityExponent());
 			System.out.printf("INFO: Estimated pre-routing max delay: %4d\n", (short) maxDelayAndTimingVertex.getFirst().floatValue());
 		}
 	}
@@ -746,85 +749,11 @@ public class RWRoute{
 			}
 
 			if (routeIteration > 1 && generatedRnodes == 0) {
-				Set<NetWrapper> unroutableNets = new HashSet<>();
 				for (Connection connection : getUnroutedConnections()) {
-					// unroutableNets.add(connection.getNetWrapper());
 					unrouteReservedNetsToReleaseResources(connection);
 				}
-				// for (Routable rnode : overUsedRnodes) {
-                // 	unroutableNets.addAll(rnode.getUsersConnectionCounts().keySet());
-				// }
 
-				// for (NetWrapper netWrapper : unroutableNets) {
-				// 	Net net = netWrapper.getNet();
-				// 	List<Node> netNodes = RouterHelper.getNodesOfNet(net);
-				//
-				// 	System.out.println("INFO: Unpreserving " + netNodes.size() + " nodes on " + net.getName());
-				// 	// System.out.println("INFO: Releasing nodes within 1-hop of the " + netNodes.size() + " nodes on " + net.getName());
-				// 	for (Node node : netNodes) {
-				// 		Routable rnode = routingGraph.getNode(node);
-				//
-				// 		if (node != net.getSource().getConnectedNode()) {
-				// 			Net preservedNet = routingGraph.getPreservedNet(node);
-				// 			uphill: for(Node parentNode : node.getAllUphillNodes()) {
-				// 				// if (routingGraph.isPreserved(parentNode)) {
-				// 				// 	continue;
-				// 				// }
-				//
-				// 				Net preservedParentNet = routingGraph.getPreservedNet(parentNode);
-				// 				if (preservedParentNet != null) {
-				// 					if (preservedParentNet == net) continue;
-				// 					if (preservedParentNet.isClockNet() || preservedParentNet.isStaticNet()) continue;
-				// 				}
-				//
-				// 				Routable parentRnode = createAddRoutableNode(null, parentNode, RoutableType.WIRE);
-				// 				for (Routable childRnode : parentRnode.getChildren()) {
-				// 					if (childRnode == rnode) {
-				// 						continue uphill;
-				// 					}
-				// 				}
-				//
-				// 				if (!parentRnode.isUsed()) {
-				// 					// Mark this node with a placeholder (null) user so that
-				// 					// it can be recognized as being over-used; the preserved net
-				// 					// that actually uses this node will only be inserted when
-				// 					// necessary by updateCost()
-				// 					parentRnode.incrementUser(null);
-				// 				}
-				//
-				// 				System.out.println("\t" + node + " <- " + parentNode);
-				// 				parentRnode.addChild(rnode);
-				// 			}
-				// 			assert(preservedNet == null || preservedNet == net);
-				// 			// if (preservedNet != null && preservedNet != net)
-				// 			// 	System.out.println(node + " :" + preservedNet + " != " + net);
-				// 			routingGraph.unpreserve(node);
-				// 			rnode.setVisited(false);
-				// 		}
-				//
-				// 		// for(Node childNode : node.getAllDownhillNodes()) {
-				// 		// 	Net preservedNet = routingGraph.getPreservedNet(childNode);
-				// 		// 	if (preservedNet == null) continue;
-				// 		// 	if (preservedNet == net) continue;
-				// 		// 	if (preservedNet.isClockNet() || preservedNet.isStaticNet()) continue;
-				// 		//
-				// 		// 	Routable childRnode = createAddRoutableNode(null, childNode, RoutableType.WIRE);
-				// 		// 	if (Arrays.stream(rnode.getChildren()).noneMatch(childRnode::equals)) {
-				// 		// 		rnode.addChild(childRnode);
-				// 		//
-				// 		// 		if (!childRnode.isUsed()) {
-				// 		// 			// Mark this node with a placeholder (null) user so that
-				// 		// 			// it can be recognized as being over-used; the preserved net
-				// 		// 			// that actually uses this node will only be inserted when
-				// 		// 			// necessary by updateCost()
-				// 		// 			childRnode.incrementUser(null);
-				// 		// 		}
-				// 		//
-				// 		// 		System.out.println("\t" + node + " -> " + childNode + " from " + preservedNet);
-				// 		// 	}
-				// 		// }
-				// 	}
-				// }
+				updateTiming();
 			}
 
 			routeIteration++;
@@ -922,9 +851,9 @@ public class RWRoute{
 		updateTimingTimer.start();
 		timingWeight = Math.min(timingWeight * config.getTimingMultiplier(), 1f);
 		oneMinusTimingWeight = 1 - timingWeight;
-		maxDelayAndTimingVertex = timingManager.calculateArrivalRequireTimes();
+		maxDelayAndTimingVertex = timingManager.calculateArrivalRequiredTimes();
 		timingManager.calculateCriticality(sortedIndirectConnections,
-				MAX_CRITICALITY, config.getCriticalityExponent(), maxDelayAndTimingVertex.getFirst());
+				MAX_CRITICALITY, config.getCriticalityExponent());
 		updateTimingTimer.stop();
 	}
 	
@@ -1464,10 +1393,12 @@ public class RWRoute{
 			toRouteNets.add(toRoute);
 		}
 		
-		if(!toRouteNets.isEmpty()) {
-			System.out.println("INFO: Unroute " + toRouteNets.size() + " preserved nets");
+		if(toRouteNets.isEmpty()) {
+			return 0;
 		}
-		
+
+		System.out.println("INFO: Unrouting " + toRouteNets.size() + " preserved nets");
+
 		for(Net n : toRouteNets) {
 			System.out.println("\t" + n);
 
@@ -1507,6 +1438,14 @@ public class RWRoute{
 					finishRouteConnection(netnewConnection);
 					assert(netnewConnection.getSink().isRouted());
 				}
+
+				if(config.isTimingDriven()) {
+					timingManager.getTimingGraph().addNetDelayEdges(n);
+					timingManager.setTimingEdgesOfConnections(netnew.getConnections());
+					for (Connection netnewConnection : netnew.getConnections()) {
+						netnewConnection.updateRouteDelay();
+					}
+				}
 			}
 
 			// Set<Node> pinNodes = new HashSet<>();
@@ -1539,8 +1478,6 @@ public class RWRoute{
 				// whether a node has been visited during expansion)
 				rnode.setPrev(null);
 			}
-
-			if(config.isTimingDriven()) timingManager.setTimingEdgesOfConnections(netnew.getConnections());
 		}
 		
 		sortConnections();

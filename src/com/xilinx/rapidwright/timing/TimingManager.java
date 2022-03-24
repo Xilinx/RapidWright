@@ -56,7 +56,7 @@ public class TimingManager {
     public RuntimeTrackerTree routerTimer;
     private boolean verbose;
     
-    private short timingRequirement;
+    private float timingRequirement;
     private float pessimismA = (float) 1.03;
     private float pessimismB = 100;
     
@@ -148,13 +148,22 @@ public class TimingManager {
     /**
      * Calculates and returns the maximum arrival time and the associated TimingVertex
      */
-    public Pair<Float, TimingVertex> calculateArrivalRequireTimes(){
-    	Pair<Float, TimingVertex> maxs;
-    	
+    public Pair<Float,TimingVertex> calculateArrivalRequiredTimes(){
+		Pair<Float, TimingVertex> maxs;
+
 		timingGraph.resetRequiredAndArrivalTime();
 		timingGraph.computeArrivalTimesTopologicalOrder();
-    	maxs = timingGraph.getMaxDelay();
-    	timingGraph.setTimingRequirementTopologicalOrder(maxs.getFirst());
+
+		maxs = timingGraph.getMaxDelay();
+		float maxArrival = maxs.getFirst();
+		// Negative slacks are not supported. Normalize the required time
+		// to be the maximum of the latest arrival time and the timing requirement.
+		// If maxArrival > timingRequirement, setting it to timingRequirement would mean
+		// negative slack.
+		// If timingRequirement > maxArrival, setting it to maxArrival would mean that
+		// minimum slack is zero leading to unnecessary router effort.
+		float normalizedRequired = Float.max(maxArrival, timingRequirement);
+		timingGraph.setTimingRequirementTopologicalOrder(normalizedRequired);
     	
     	return maxs;
     }
@@ -181,12 +190,12 @@ public class TimingManager {
     	for(TimingEdge e : criticalEdges) {
     		arr += e.getDelay();
     	}
-    	System.out.printf(MessageGenerator.formatString("Critical path delay (ps):", arr - criticalEdges.get(0).getDelay() - clkskew));
-    	System.out.printf(MessageGenerator.formatString("Slack (ps):", timingRequirement - maxDelay));
+    	System.out.printf(MessageGenerator.formatString("Critical path delay (ps):", (int)(arr - criticalEdges.get(0).getDelay() - clkskew)));
+    	System.out.printf(MessageGenerator.formatString("Slack (ps):", (int)(timingRequirement - maxDelay)));
     	System.out.printf(MessageGenerator.formatString("With timing closure guarantee:"));
-    	short adjusted = (short) (pessimismA * (arr - criticalEdges.get(0).getDelay() - clkskew) + pessimismB);
-    	System.out.printf(MessageGenerator.formatString("Critical path delay (ps):",adjusted));
-    	System.out.printf(MessageGenerator.formatString("Slack (ps):", timingRequirement - adjusted));
+    	int adjusted = (int) (pessimismA * (arr - criticalEdges.get(0).getDelay() - clkskew) + pessimismB);
+    	System.out.printf(MessageGenerator.formatString("Critical path delay (ps):", adjusted));
+    	System.out.printf(MessageGenerator.formatString("Slack (ps):", (int)(timingRequirement - adjusted)));
     	
     	printPathDelayBreakDown(arr, criticalEdges, timingGraph.getTimingEdgeConnectionMap(), useRoutable, routingGraph);
     }
@@ -271,9 +280,17 @@ public class TimingManager {
      * Set the timing requirement of the design
      */
     public void setTimingRequirement() {
-    	timingRequirement = (short) (getDesignTimingRequirement(design) * 1000);
+    	setTimingRequirementPs(getDesignTimingRequirement(design) * 1000);
     }
-    
+
+	public void setTimingRequirementPs(float ps) {
+		timingRequirement = ps;
+	}
+
+	public float getTimingRequirementPs() {
+		return timingRequirement;
+	}
+
     public static float getDesignTimingRequirement(Design design) {
 		float treq = 0;
 		
@@ -297,17 +314,14 @@ public class TimingManager {
      * @param connections Connections in question.
      * @param maxCriticality The maximum criticality value.
      * @param criticalityExponent The criticality exponent to use. For more information, please refer to the {@link RWRouteConfig} class file.
-     * @param maxDelay The maximum delay used to normalize the slack of a connection.
      */
-    public void calculateCriticality(List<Connection> connections, float maxCriticality, float criticalityExponent, float maxDelay){
+    public void calculateCriticality(List<Connection> connections, float maxCriticality, float criticalityExponent){
     	for(Connection connection:connections){
     		connection.resetCriticality();
     	}
-    	float maxCriti = 0;
+		float maxRequired = timingGraph.superSink.getRequiredTime();
 		for(Connection connection : connections){
-    		connection.calculateCriticality(maxDelay, maxCriticality, criticalityExponent);
-    		if(connection.getCriticality() > maxCriti)
-    			maxCriti = connection.getCriticality();
+    		connection.calculateCriticality(maxRequired, maxCriticality, criticalityExponent);
     	}
     }
 

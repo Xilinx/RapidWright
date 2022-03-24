@@ -22,7 +22,6 @@ package com.xilinx.rapidwright.timing;
 
 import java.io.FileNotFoundException;
 import java.io.PrintStream;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -56,7 +55,6 @@ import com.xilinx.rapidwright.edif.EDIFPropertyValue;
 import com.xilinx.rapidwright.rwroute.Connection;
 import com.xilinx.rapidwright.rwroute.RouterHelper;
 import com.xilinx.rapidwright.util.Pair;
-import com.xilinx.rapidwright.util.RuntimeTracker;
 import com.xilinx.rapidwright.util.RuntimeTrackerTree;
 
 import org.jgrapht.GraphPath;
@@ -176,7 +174,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         if(routerTimer != null) routerTimer.getRuntimeTracker("add net dly edges").stop();
     }
     
-    private void addTimingEdgesOfNets(boolean isPartialRouting, Collection<Net> assignedNets) {
+    public void addTimingEdgesOfNets(boolean isPartialRouting, Collection<Net> assignedNets) {
     	for (Net net : assignedNets) {
 			if(net.isClockNet()) continue;//this is for getting rid of the problem in addNetDelayEdges() of clock net
 			if(net.isStaticNet()) continue;
@@ -1634,7 +1632,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     }
     
     public boolean overwriteBUGCEDelay = false;
-    int addNetDelayEdges(Net net) {
+    public int addNetDelayEdges(Net net) {
     	EDIFNet edifNet = net.getLogicalNet();
     	boolean haveIntrasiteNet = (net.getSinkPins().size() == 0);
     	SitePinInst spi_source = net.getSource();
@@ -1893,6 +1891,9 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                 sinkSitePinInstTimingEdges.put(spi_sink, connectionEdges);
             }
         }
+
+        // Clear the topological order so that it will be recomputed
+        orderedTimingVertices.clear();
         return 1;
     }
     
@@ -1980,6 +1981,10 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
 			}
 			EDIFHierPortInst hportSink = hportsFromSitePinInsts.get(0);
 			SitePinInst mappedSink = edifHPortMap.get(hportSink);
+			// FIXME
+			if (mappedSink == null) {
+			    mappedSink = connection.getSink();
+			}
 			
 			List<TimingEdge> timingEdges = sinkSitePinInstTimingEdges.get(mappedSink);
 			if(timingEdges == null) {
