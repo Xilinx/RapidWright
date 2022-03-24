@@ -173,7 +173,7 @@ public class RWRoute{
 		if(config.isTimingDriven()) {
 			/* An instantiated delay estimator that is used to calculate delay of routing resources */
 			DelayEstimatorBase estimator = new DelayEstimatorBase(design.getDevice(), new InterconnectInfo(), config.isUseUTurnNodes(), 0);
-			routingGraph = new RoutableGraphTimingDriven(rnodesTimer, estimator, config.isMaskNodesCrossRCLK());
+			routingGraph = new RoutableGraphTimingDriven(rnodesTimer, design.getDevice(), estimator, config.isMaskNodesCrossRCLK());
 			nodesDelays = new HashMap<>();
 		} else {
 			routingGraph = new RoutableGraph(rnodesTimer);

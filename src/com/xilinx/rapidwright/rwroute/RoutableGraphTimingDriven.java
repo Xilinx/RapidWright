@@ -22,8 +22,10 @@
  
 package com.xilinx.rapidwright.rwroute;
 
+import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Tile;
+import com.xilinx.rapidwright.device.TileType;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 import com.xilinx.rapidwright.util.RuntimeTracker;
@@ -33,21 +35,15 @@ import java.util.Set;
 
 public class RoutableGraphTimingDriven extends RoutableGraph {
     /** The instantiated delayEstimator to compute delays */
-    protected DelayEstimatorBase delayEstimator;
+    protected final DelayEstimatorBase delayEstimator;
     /** A flag to indicate if the routing resource exclusion should disable exclusion of nodes cross RCLK */
-    protected boolean maskNodesCrossRCLK;
+    protected final boolean maskNodesCrossRCLK;
 
-    public RoutableGraphTimingDriven(RuntimeTracker rnodesTimer, DelayEstimatorBase delayEstimator, boolean maskNodesCrossRCLK) {
-        super(rnodesTimer);
-        this.delayEstimator = delayEstimator;
-        this.maskNodesCrossRCLK = maskNodesCrossRCLK;
-    }
-
-    final private static Set<String> excludeAboveRclk;
-    final private static Set<String> excludeBelowRclk;
+    private final static Set<String> excludeAboveRclkString;
+    private final static Set<String> excludeBelowRclkString;
     static {
         // these nodes are bleeding down
-        excludeAboveRclk = new HashSet<String>() {{
+        excludeAboveRclkString = new HashSet<String>() {{
             add("SDQNODE_E_0_FT1");
             add("SDQNODE_E_2_FT1");
             add("SDQNODE_W_0_FT1");
@@ -57,7 +53,7 @@ public class RoutableGraphTimingDriven extends RoutableGraph {
             add("WW2_W_BEG0");
         }};
         // these nodes are bleeding up
-        excludeBelowRclk = new HashSet<String>() {{
+        excludeBelowRclkString = new HashSet<String>() {{
             add("SDQNODE_E_91_FT0");
             add("SDQNODE_E_93_FT0");
             add("SDQNODE_E_95_FT0");
@@ -69,10 +65,33 @@ public class RoutableGraphTimingDriven extends RoutableGraph {
         }};
     }
 
+    public RoutableGraphTimingDriven(RuntimeTracker rnodesTimer, Device device, DelayEstimatorBase delayEstimator, boolean maskNodesCrossRCLK) {
+        super(rnodesTimer);
+        this.delayEstimator = delayEstimator;
+        this.maskNodesCrossRCLK = maskNodesCrossRCLK;
+
+        excludeAboveRclk = new HashSet<>();
+        excludeBelowRclk = new HashSet<>();
+        TileType intType = device.getTileType(TileTypeEnum.INT);
+        String[] wireNames = intType.getWireNames();
+        for (int wireIndex = 0; wireIndex < intType.getWireCount(); wireIndex++) {
+            String wireName = wireNames[wireIndex];
+            if (excludeAboveRclkString.contains(wireName)) {
+                excludeAboveRclk.add(wireIndex);
+            }
+            if (excludeBelowRclkString.contains(wireName)) {
+                excludeBelowRclk.add(wireIndex);
+            }
+        }
+    }
+
+    private final Set<Integer> excludeAboveRclk;
+    private final Set<Integer> excludeBelowRclk;
+
     protected class RoutableNodeImpl extends RoutableGraph.RoutableNodeImpl {
 
         /** The delay of this rnode computed based on the timing model */
-        private float delay;
+        private final float delay;
 
         public RoutableNodeImpl(Node node, RoutableType type) {
             super(node, type);
@@ -83,14 +102,14 @@ public class RoutableGraphTimingDriven extends RoutableGraph {
         public boolean isExcluded(Node parent, Node child) {
             if (super.isExcluded(parent, child))
                 return true;
-            Tile tile = child.getTile();
-            if(tile.getTileTypeEnum() == TileTypeEnum.INT) {
-                if (maskNodesCrossRCLK) {
+            if (maskNodesCrossRCLK) {
+                Tile tile = child.getTile();
+                if(tile.getTileTypeEnum() == TileTypeEnum.INT) {
                     int y = tile.getTileYCoordinate();
                     if ((y-30)%60 == 0) { // above RCLK
-                        return excludeAboveRclk.contains(child.getWireName());
+                        return excludeAboveRclk.contains(child.getWire());
                     } else if ((y-29)%60 == 0) { // below RCLK
-                        return excludeBelowRclk.contains(child.getWireName());
+                        return excludeBelowRclk.contains(child.getWire());
                     }
                 }
             }

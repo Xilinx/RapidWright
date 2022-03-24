@@ -62,7 +62,7 @@ public class TimingAndWirelengthReport{
 		this.design = design;
 		timingManager = new TimingManager(design, true, null, config, RWRoute.createClkTimingData(config), design.getNets());
 		estimator = new DelayEstimatorBase(design.getDevice(), new InterconnectInfo(), config.isUseUTurnNodes(), 0);
-		routingGraph = new RoutableGraphTimingDriven(null, estimator, config.isMaskNodesCrossRCLK());
+		routingGraph = new RoutableGraphTimingDriven(null, design.getDevice(), estimator, config.isMaskNodesCrossRCLK());
 		wirelength = 0;
 		usedNodes = 0;
 		nodeTypeUsage = new HashMap<>();
