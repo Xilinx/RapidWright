@@ -498,11 +498,11 @@ public class EDIFTools {
 	            if(exitPath != null) {
 	                // Follow existing connection to parent instance
 	                outerPortInst = hierParentInst.getInst().getPortInst(exitPath.getName());
-	                hierParentInst = hierParentInst.getParent();
 	                if(outerPortInst == null) {
 	                    outerPortInst = new EDIFPortInst(exitPath.getPort(), null,
 	                            exitPath.getIndex(), hierParentInst.getInst());
 	                }
+	                hierParentInst = hierParentInst.getParent();
 	                currNet = outerPortInst.getNet();
 	                if(currNet == null) {
 	                    currNet = createUniqueNet(hierParentInst.getCellType(), newName);
