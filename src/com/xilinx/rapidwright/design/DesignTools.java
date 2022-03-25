@@ -94,7 +94,6 @@ import com.xilinx.rapidwright.util.Utils;
 public class DesignTools {
 
 	private static int uniqueBlackBoxCount = 0;
-	private static List<PIP> pips;
 
 	/**
 	 * Tries to identify the clock pin source for the given user signal output by
@@ -994,19 +993,160 @@ public class DesignTools {
 	}
 
 	/**
-	 * This method will completely remove a placed cell (both logical and physical) from a design.  
-	 * @param design The design from which to remove the cell
-	 * @param cell The cell to remove
+	 * Unroutes pins from a specific net by only removing the routing (PIPs) that are essential
+	 * for those pins.  This allows the net to remain routed in the context of other pins not 
+	 * being removed.  This enables a batch approach which is much more efficient than removing
+	 * pins individually.
+	 * @param net The current net to modify routing and to which all pins will have their routing 
+	 * removed. If any pin passed in is not of this net, it is skipped and no effect is taken.
+	 * @param pins Pins that belong to the provided net that should have their selective routing 
+	 * removed.
 	 */
-	public static void fullyRemoveCell(Design design, Cell c) {
-	    SiteInst siteInst = c.getSiteInst();
+	public static void unroutePins(Net net, Collection<SitePinInst> pins) {
+	    // Map listing the PIPs that drive a Node
+	    Map<Node,ArrayList<PIP>> reverseConns = new HashMap<>();
+	    Map<Node,ArrayList<PIP>> reverseConnsStart = new HashMap<>();
+	    Map<Node,Integer> fanout = new HashMap<>();
+	    for(PIP pip : net.getPIPs()){
+	        Node endNode = pip.getEndNode();
+	        Node startNode = pip.getStartNode();
+
+	        ArrayList<PIP> rPips = reverseConns.get(endNode);
+	        if(rPips == null){
+	            rPips = new ArrayList<>();
+	            reverseConns.put(endNode, rPips);
+	        }
+	        rPips.add(pip);
+
+	        if (pip.isBidirectional()) {
+	            rPips = reverseConnsStart.get(startNode);
+	            if (rPips == null) {
+	                rPips = new ArrayList<>();
+	                reverseConnsStart.put(startNode, rPips);
+	            }
+	            rPips.add(pip);
+	        }
+
+	        Integer count = fanout.get(startNode);
+	        if(count == null){
+	            fanout.put(startNode, 1);
+	        }else{
+	            fanout.put(startNode, count+1);
+	        }
+	    }
+
+	    HashSet<PIP> toRemove = new HashSet<>();
+
+	    for(SitePinInst p : pins) {
+	        if(p.getSite() == null) continue;
+	        if(p.getNet() != net) continue;
+	        Node sink = p.getConnectedNode();
+
+	        ArrayList<PIP> curr = reverseConns.get(sink);
+	        Integer fanoutCount = fanout.get(sink);
+	        fanoutCount = fanoutCount == null ? 0 : fanoutCount;
+	        boolean atReversedBidirectionalPip = false;
+	        if (curr == null) {
+	            // must be at a reversed bidirectional PIP
+	            curr = reverseConnsStart.get(sink);
+	            fanoutCount--;
+	            atReversedBidirectionalPip = true;
+	        }
+	        while(curr != null && curr.size() == 1 && fanoutCount < 2){
+	            PIP pip = curr.get(0);
+	            toRemove.add(pip);
+	            if (new Node(pip.getTile(), pip.getStartWireIndex()).equals(sink) && !atReversedBidirectionalPip) {
+	                // reached the source and there is another branch starting with a reversed
+	                // bidirectional PIP ... don't traverse it
+	                break;
+	            }
+	            sink = new Node(pip.getTile(), atReversedBidirectionalPip ? pip.getEndWireIndex() :
+	                pip.getStartWireIndex());
+	            curr = reverseConns.get(sink);
+	            if(curr != null && curr.size() > 1 && atReversedBidirectionalPip) {
+	                for(PIP reversePIP : toRemove) {
+	                    curr.remove(reversePIP);
+	                }
+	            }
+	            atReversedBidirectionalPip = false;
+	            fanoutCount = fanout.get(sink);
+	            fanoutCount = fanoutCount == null ? 0 : fanoutCount;
+	            SitePin sitePin = sink.getSitePin();
+	            if (curr == null && !(sitePin != null || sink.getWireName().contains(Net.VCC_WIRE_NAME) ||
+	                    sink.getWireName().contains(Net.GND_WIRE_NAME))) {
+	                // curr should only be null when we're at the source site, so we've hit a reversed bidirectional PIP
+	                // on our linear path
+	                curr = reverseConnsStart.get(sink);
+	                curr.remove(pip);
+	                fanoutCount--;
+	                atReversedBidirectionalPip = true;
+	            }
+	            if(sitePin != null && sitePin.isInput()){
+	                SiteInst si = p.getSiteInst().getDesign().getSiteInstFromSite(sitePin.getSite());
+	                if(si != null){
+	                    if(net.equals(si.getNetFromSiteWire(sitePin.getPinName()))){
+	                        fanoutCount = 2;
+	                    }
+	                }
+	            }
+	        }
+	        if(curr == null && fanout.size() == 1 && !net.isStaticNet()){
+	            // We got all the way back to the source site. It is likely that 
+	            // the net is using dual exit points from the site as is common in
+	            // SLICEs -- we should unroute the sitenet
+	            SitePin sPin = sink.getSitePin();
+	            SiteInst si = net.getSource().getSiteInst();
+	            BELPin belPin = sPin.getBELPin();
+	            si.unrouteIntraSiteNet(belPin, belPin);
+	        }
+	        p.setRouted(false);	        
+	    }
+	    ArrayList<PIP> updatedPIPs = new ArrayList<>();
+	    for(PIP pip : net.getPIPs()){
+	        if(!toRemove.contains(pip)) updatedPIPs.add(pip);
+	    }
+	    net.setPIPs(updatedPIPs);
+	}
+
+
+	/**
+	 * This method will completely remove a placed cell (both logical and physical) from a design.
+	 * @param design The design where the cell is instantiated
+	 * @param cell The cell to remove
+	 * @param deferRemovals An optional map that, if passed in non-null will be populated with 
+	 * site pins marked for removal.  The map allows a persistent tracking if this method is called
+	 * many times as the process is expensive without batching. 
+	 */
+	public static void fullyRemoveCell(Design design, Cell cell, Map<Net, Set<SitePinInst>> deferRemovals) {
+	    SiteInst siteInst = cell.getSiteInst();
+	    BEL bel = cell.getBEL();
 	    // If cell was using shared control signals (CLK, CE, RST), check to see if this was
 	    // the last cell used and then remove the site routing, site pin, and partial routing if 
 	    // it exists
-	    for(BELPin pin : c.getBEL().getPins()) {
+	    for(BELPin pin : bel.getPins()) {
 	        Net net = siteInst.getNetFromSiteWire(pin.getSiteWireName());
-	        if(net == null) continue;
-	        boolean otherSink = false;
+	        if(net == null) {
+	            // Under certain circumstances, site routing is not explicit for VCC/GND 
+	            // Unfortunately, Vivado does not label the SR pin as SET or RESET
+	            if(bel.isFF() && (pin.isEnable() || pin.getName().equals("SR"))) {
+	                String sitePinName = getSitePinSource(pin);
+	                SitePinInst spi = siteInst.getSitePinInst(sitePinName);
+	                if(spi == null || !spi.getNet().isStaticNet()) continue;
+	                boolean otherUsers = false;
+	                for(BELPin otherPin : siteInst.getSiteWirePins(pin.getSiteWireName())) {
+	                    if(otherPin == pin || otherPin.isOutput()) continue;
+	                    if(siteInst.getCell(otherPin.getBEL()) != null) {
+	                        otherUsers = true;
+	                        break;
+	                    }
+	                }
+	                if(!otherUsers) {
+	                    handlePinRemovals(spi, deferRemovals);
+	                }
+	            } 
+	            continue;
+	        }
+	        boolean otherUser = false;
 	        Queue<String> siteWires = new LinkedList<>();
 	        Set<String> visited = new HashSet<>();
 	        siteWires.add(pin.getSiteWireName());
@@ -1034,42 +1174,117 @@ public class DesignTools {
 	                }
 	                String logicalPinName = otherCell.getLogicalPinMapping(otherPin.getName());
 	                if(logicalPinName == null) continue;
-	                otherSink = true;
+	                otherUser = true;
 	                break;
 	            }                
 	        }
-	        if(otherSink == false) {
+	        if(otherUser == false) {
 	            // Unroute site routing back to pin and remove site pin
-	            String sitePinName = getRoutedSitePinFromPhysicalPin(c, net, pin.getName());
+	            String sitePinName = getRoutedSitePinFromPhysicalPin(cell, net, pin.getName());
 	            SitePinInst spi = siteInst.getSitePinInst(sitePinName);
 	            siteInst.unrouteIntraSiteNet(spi.getBELPin(), pin);
-	            boolean preserveOtherRoutes = false;
-	            spi.getNet().removePin(spi, preserveOtherRoutes);
+	            handlePinRemovals(spi, deferRemovals);
 	        }
 	    }
 
 	    // Remove Physical Cell
-	    design.removeCell(c);
+	    design.removeCell(cell);
 
 	    // Check and remove routethrus that exist that point to removed cell
 	    List<BEL> belsToRemove = null;
-	    for(Cell otherCell : c.getSiteInst().getCells()) {
-	        if(otherCell.hasAltPinMappings() && otherCell.getName().equals(c.getName())) {
+	    for(Cell otherCell : siteInst.getCells()) {
+	        if(otherCell.hasAltPinMappings() && otherCell.getName().equals(cell.getName())) {
 	            if(belsToRemove == null) belsToRemove = new ArrayList<>();
 	            belsToRemove.add(otherCell.getBEL());
 	        }
 	    }
 	    if(belsToRemove != null) {
-	        for(BEL bel : belsToRemove) {
-	            siteInst.removeCell(bel);
+	        for(BEL b : belsToRemove) {
+	            siteInst.removeCell(b);
 	        }
 	    }
 
 	    // Remove Logical Cell
-	    for(EDIFPortInst portInst : c.getEDIFCellInst().getPortInsts()) {
+	    for(EDIFPortInst portInst : cell.getEDIFCellInst().getPortInsts()) {
 	        portInst.getNet().removePortInst(portInst);
 	    }
-	    c.getParentCell().removeCellInst(c.getEDIFCellInst());
+	    cell.getParentCell().removeCellInst(cell.getEDIFCellInst());
+	}
+
+	private static void handlePinRemovals(SitePinInst spi, Map<Net,Set<SitePinInst>> deferRemovals) {
+	    boolean preserveOtherRoutes = true;
+	    if(deferRemovals != null) {
+	        Set<SitePinInst> pins = deferRemovals.computeIfAbsent(spi.getNet(), p -> new HashSet<>());
+	        pins.add(spi);
+	    } else {
+	        spi.getNet().removePin(spi, preserveOtherRoutes);
+	    }
+	}
+
+	/**
+	 * Given an unroute site wire path, find the site pin name that would drive the given BELPin.
+	 * @param pin The BELpin to search from
+	 * @return Name of the site pin that would drive the given BELPin or null if it could not be 
+	 * determined.
+	 */
+	public static String getSitePinSource(BELPin pin) {
+	    String currSitePinName = pin.getConnectedSitePinName();
+	    outer: while(currSitePinName == null){
+	        boolean changedPin = false;
+	        for(BELPin p : pin.getSiteConns()){
+	            if(p.getBEL().getBELClass() == BELClass.RBEL){
+	                for(SitePIP pip : p.getSitePIPs()){
+	                    pin = p.equals(pip.getInputPin()) ? pip.getOutputPin() : pip.getInputPin();
+	                    changedPin = true;
+	                    String isSitePin = pin.getConnectedSitePinName();
+	                    if(isSitePin == null) continue;
+	                    break outer;                        
+	                }
+	            }
+	        }
+	        if(!changedPin){
+	            return null;
+	        }
+	    }
+	    currSitePinName = pin.getConnectedSitePinName();
+	    return currSitePinName;
+	}
+	
+	/**
+	 * Remove a batch of site pins from nets for efficiency purposes.  Used in conjunction with
+	 * {@link #fullyRemoveCell(Design, Cell, Map)}.
+	 * @param deferredRemovals Mapping between nets and the site pins to be removed
+	 * @param preserveOtherRoutes Flag indicating if when pins are removed, if other routes on the 
+	 * net should be preserved.
+	 */
+	public static void batchRemoveSitePins(Map<Net, Set<SitePinInst>> deferredRemovals, 
+	                                        boolean preserveOtherRoutes) {
+	    for(Entry<Net, Set<SitePinInst>> e : deferredRemovals.entrySet()) {
+	        Net net = e.getKey();
+	        SitePinInst srcPin = net.getSource();
+	        Set<SitePinInst> removals = e.getValue();
+	        if(preserveOtherRoutes) {
+	            DesignTools.unroutePins(net, removals);
+	        }else {
+	            net.unroute();
+	        }
+	        List<SitePinInst> pins = new ArrayList<>();
+	        for(SitePinInst pin : net.getPins()) {
+	            if(removals.contains(pin)) {                   
+	                if(pin.isOutPin() && pin.equals(srcPin)){
+	                    net.setSource(null);
+	                }
+	                pin.setNet(null);
+	                if(pin.getSiteInst() != null){
+	                    BELPin belPin = pin.getBELPin();
+	                    pin.getSiteInst().unrouteIntraSiteNet(belPin, belPin); 
+	                }
+	                continue;
+	            }
+	            pins.add(pin);
+	        }
+	        net.setPins(pins);
+	    }
 	}
 	
 	/**
