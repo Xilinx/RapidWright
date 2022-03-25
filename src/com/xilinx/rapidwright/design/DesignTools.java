@@ -994,6 +994,85 @@ public class DesignTools {
 	}
 
 	/**
+	 * This method will completely remove a placed cell (both logical and physical) from a design.  
+	 * @param design The design from which to remove the cell
+	 * @param cell The cell to remove
+	 */
+	public static void fullyRemoveCell(Design design, Cell c) {
+	    SiteInst siteInst = c.getSiteInst();
+	    // If cell was using shared control signals (CLK, CE, RST), check to see if this was
+	    // the last cell used and then remove the site routing, site pin, and partial routing if 
+	    // it exists
+	    for(BELPin pin : c.getBEL().getPins()) {
+	        Net net = siteInst.getNetFromSiteWire(pin.getSiteWireName());
+	        if(net == null) continue;
+	        boolean otherSink = false;
+	        Queue<String> siteWires = new LinkedList<>();
+	        Set<String> visited = new HashSet<>();
+	        siteWires.add(pin.getSiteWireName());
+	        while(!siteWires.isEmpty()) {
+	            String siteWire = siteWires.poll();
+	            visited.add(siteWire);
+	            for(BELPin otherPin : siteInst.getSiteWirePins(siteWire)) {
+	                if(otherPin == pin) continue;
+	                if(otherPin.getBEL().getBELClass() == BELClass.RBEL) {
+	                    SitePIP pip = siteInst.getUsedSitePIP(otherPin);
+	                    if(pip != null) {
+	                        String nextSiteWire = pip.getInputPin() == otherPin ? 
+	                                pip.getOutputPin().getSiteWireName() : pip.getInputPin().getSiteWireName();
+	                        if(!visited.contains(nextSiteWire)) {
+	                            siteWires.add(nextSiteWire);                                
+	                        }
+	                    }
+	                    continue;
+	                }
+	                Cell otherCell = siteInst.getCell(otherPin.getBEL());
+	                if(otherCell == null) continue;
+	                if(otherCell.isRoutethru()) {
+	                    // Follow routethru TODO
+	                    continue;
+	                }
+	                String logicalPinName = otherCell.getLogicalPinMapping(otherPin.getName());
+	                if(logicalPinName == null) continue;
+	                otherSink = true;
+	                break;
+	            }                
+	        }
+	        if(otherSink == false) {
+	            // Unroute site routing back to pin and remove site pin
+	            String sitePinName = getRoutedSitePinFromPhysicalPin(c, net, pin.getName());
+	            SitePinInst spi = siteInst.getSitePinInst(sitePinName);
+	            siteInst.unrouteIntraSiteNet(spi.getBELPin(), pin);
+	            boolean preserveOtherRoutes = true;
+	            spi.getNet().removePin(spi, preserveOtherRoutes);
+	        }
+	    }
+
+	    // Remove Physical Cell
+	    design.removeCell(c);
+
+	    // Check and remove routethrus that exist that point to removed cell
+	    List<BEL> belsToRemove = null;
+	    for(Cell otherCell : c.getSiteInst().getCells()) {
+	        if(otherCell.hasAltPinMappings() && otherCell.getName().equals(c.getName())) {
+	            if(belsToRemove == null) belsToRemove = new ArrayList<>();
+	            belsToRemove.add(otherCell.getBEL());
+	        }
+	    }
+	    if(belsToRemove != null) {
+	        for(BEL bel : belsToRemove) {
+	            siteInst.removeCell(bel);
+	        }
+	    }
+
+	    // Remove Logical Cell
+	    for(EDIFPortInst portInst : c.getEDIFCellInst().getPortInsts()) {
+	        portInst.getNet().removePortInst(portInst);
+	    }
+	    c.getParentCell().removeCellInst(c.getEDIFCellInst());
+	}
+	
+	/**
 	 * Turns the cell named hierarchicalCellName into a blackbox and removes any
 	 * associated placement and routing information associated with that instance. In Vivado,
 	 * this can be accomplished by running: (1) {@code update_design -cells <name> -black_box} or (2)
