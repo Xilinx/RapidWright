@@ -1043,7 +1043,7 @@ public class DesignTools {
 	            String sitePinName = getRoutedSitePinFromPhysicalPin(c, net, pin.getName());
 	            SitePinInst spi = siteInst.getSitePinInst(sitePinName);
 	            siteInst.unrouteIntraSiteNet(spi.getBELPin(), pin);
-	            boolean preserveOtherRoutes = true;
+	            boolean preserveOtherRoutes = false;
 	            spi.getNet().removePin(spi, preserveOtherRoutes);
 	        }
 	    }
