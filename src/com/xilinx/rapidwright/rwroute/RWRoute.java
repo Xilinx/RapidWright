@@ -753,7 +753,9 @@ public class RWRoute{
 					unrouteReservedNetsToReleaseResources(connection);
 				}
 
-				updateTiming();
+				if (config.isTimingDriven()) {
+					updateTiming();
+				}
 			}
 
 			routeIteration++;
