@@ -24,6 +24,7 @@ package com.xilinx.rapidwright.rwroute;
 
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.util.CountUpDownLatch;
@@ -173,10 +174,11 @@ public class RoutableGraph {
         return preservedMap.containsKey(new LightweightNode(node));
     }
 
-    // FIXME:
-    // public Set<Node> getPreservedNodes() {
-    //     return Collections.unmodifiableSet(preservedMap.keySet());
-    // }
+    public Collection<Node> getPreservedNodes(Device device) {
+        List<Node> nodes = new ArrayList<>(preservedMap.size());
+        preservedMap.keySet().forEach((k) -> nodes.add(new Node(device.getTile(k.tileID), k.wireID)));
+        return nodes;
+    }
 
     public Net getPreservedNet(Node node) {
         return preservedMap.get(new LightweightNode(node));

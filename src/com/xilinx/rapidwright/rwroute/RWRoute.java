@@ -71,15 +71,15 @@ public class RWRoute{
 	/** Created NetWrappers */
 	protected Map<Net,NetWrapper> nets;
 	/** A list of indirect connections that will go through iterative routing */
-	private List<Connection> indirectConnections;
+	protected List<Connection> indirectConnections;
 	/** A list of direct connections that are easily routed through dedicated resources */
 	private List<Connection> directConnections;
 	/** Sorted indirect connections */
 	private List<Connection> sortedIndirectConnections;
 	/** A list of global clock nets */
-	private List<Net> clkNets;
+	protected List<Net> clkNets;
 	/** Static nets */
-	private Map<Net, List<SitePinInst>> staticNetAndRoutingTargets;
+	protected Map<Net, List<SitePinInst>> staticNetAndRoutingTargets;
 	/** Nets with conflicting nodes that should be added to the routing targets */
 	protected Set<Net> conflictNets;
 	/** Several integers to indicate the netlist info */
@@ -146,7 +146,7 @@ public class RWRoute{
 	/** The list of critical connections */
 	private List<Connection> criticalConnections;
 	/** A {@link TimingManager} instance to use that handles timing related tasks */
-	private TimingManager timingManager;
+	protected TimingManager timingManager;
 	/** A map from nodes to delay values, used for timing update after fixing routes */
 	private Map<Node, Float> nodesDelays;
 	/** The maximum delay and associated timing vertex */
@@ -194,9 +194,6 @@ public class RWRoute{
 			}
 			timingManager = new TimingManager(design, true, routerTimer, config, clkTiming, timingNets);
 			timingManager.setTimingEdgesOfConnections(indirectConnections);
-
-			// FIXME
-			timingManager.setTimingRequirementPs(100*1000);
 		}
 		
 		sortedIndirectConnections = new ArrayList<>();		
@@ -326,7 +323,7 @@ public class RWRoute{
 	 * Vivado will unroute the global clock nets immediately when there is such warning.
 	 * TODO: fix the potential issue.
 	 */
-	private void routeGlobalClkNets() {
+	protected void routeGlobalClkNets() {
  		if(clkNets.size() > 0) System.out.println("INFO: Route clock nets");
  		for(Net clk : clkNets) {
  			if(routesToSinkINTTiles != null) {
@@ -375,37 +372,34 @@ public class RWRoute{
 	/**
 	 * Routes static nets with preserved resources list supplied to avoid conflicting nodes.
 	 */
-	private void routeStaticNets(){
+	protected void routeStaticNets(){
 		if (staticNetAndRoutingTargets.isEmpty())
 			return;
 
-		// FIXME
-		throw new RuntimeException();
+		for(List<SitePinInst> netRouteTargetPins : staticNetAndRoutingTargets.values()) {
+			for(SitePinInst sink : netRouteTargetPins) {
+				routingGraph.unpreserve(sink.getConnectedNode());
+			}
+		}
 
-		// for(List<SitePinInst> netRouteTargetPins : staticNetAndRoutingTargets.values()) {
-		// 	for(SitePinInst sink : netRouteTargetPins) {
-		// 		routingGraph.unpreserve(sink.getConnectedNode());
-		// 	}
-		// }
-		//
-		// RouterHelper.invertPossibleGndPinsToVccPins(design, design.getGndNet());
-		//
-		// // If connections of other nets are routed first, used resources should be preserved.
-		// Set<Node> unavailableNodes = getAllUsedNodesOfRoutedConnections();
-		// unavailableNodes.addAll(routingGraph.getPreservedNodes());
-		// // If the connections of other nets are not routed yet,
-		// // the nodes connected to pins of other nets must be preserved.
-		// unavailableNodes.addAll(routingGraph.getNodes());
-		//
-		// for(Net net : staticNetAndRoutingTargets.keySet()){
-		// 	System.out.println("INFO: Route " + net.getSinkPins().size() + " pins of " + net);
-		// 	Map<SitePinInst, List<Node>> sinksRoutingPaths = GlobalSignalRouting.routeStaticNet(net, unavailableNodes, design, routethruHelper);
-		//
-		// 	for(Entry<SitePinInst, List<Node>> sinkPath : sinksRoutingPaths.entrySet()) {
-		// 		addPreservedNodes(sinkPath.getValue(), net);
-		// 		unavailableNodes.addAll(sinkPath.getValue());
-		// 	}
-		// }
+		RouterHelper.invertPossibleGndPinsToVccPins(design, design.getGndNet());
+
+		// If connections of other nets are routed first, used resources should be preserved.
+		Set<Node> unavailableNodes = getAllUsedNodesOfRoutedConnections();
+		unavailableNodes.addAll(routingGraph.getPreservedNodes(design.getDevice()));
+		// If the connections of other nets are not routed yet,
+		// the nodes connected to pins of other nets must be preserved.
+		unavailableNodes.addAll(routingGraph.getNodes());
+
+		for(Net net : staticNetAndRoutingTargets.keySet()){
+			System.out.println("INFO: Route " + net.getSinkPins().size() + " pins of " + net);
+			Map<SitePinInst, List<Node>> sinksRoutingPaths = GlobalSignalRouting.routeStaticNet(net, unavailableNodes, design, routethruHelper);
+
+			for(Entry<SitePinInst, List<Node>> sinkPath : sinksRoutingPaths.entrySet()) {
+				addPreservedNodes(sinkPath.getValue(), net);
+				unavailableNodes.addAll(sinkPath.getValue());
+			}
+		}
 	}
 	
 	/**
@@ -482,7 +476,6 @@ public class RWRoute{
 			}else {
 				Node sinkINTNode = nodes.get(0);
 				indirectConnections.add(connection);
-
 				connection.setSinkRnode(createAddRoutableNode(connection.getSink(), sinkINTNode, RoutableType.PINFEED_I));
 				if(sourceINTNode == null) {
 					sourceINTNode = RouterHelper.projectOutputPinToINTNode(source);
@@ -492,7 +485,6 @@ public class RWRoute{
 				}
 				connection.setSourceRnode(createAddRoutableNode(connection.getSource(), sourceINTNode, RoutableType.PINFEED_O));
 				connection.setDirect(false);
-
 				indirect++;
 				connection.computeHpwl();
 				addConnectionSpanInfo(connection);
@@ -508,7 +500,6 @@ public class RWRoute{
 				}
 			}
 		}
-
 		return netWrapper;
 	}
 	
@@ -714,8 +705,7 @@ public class RWRoute{
 		initializeRouting();
 		long lastIterationRnodeCount = 0;
 		long lastIterationRnodeTime = 0;
-		boolean unrouted = false;
-		
+
 		while(routeIteration < config.getMaxIterations()){
 			long startIteration = System.nanoTime();
 			connectionsRoutedIteration = 0;
@@ -764,13 +754,8 @@ public class RWRoute{
 		}
 		if(routeIteration == config.getMaxIterations()) {
 			System.out.println("\nERROR: Routing terminated after " + (routeIteration -1 ) + " iterations.");
-			System.out.println("       Unrouted connections: " + getUnroutedConnections().size());
+			System.out.println("       Unroutable connections: " + getUnroutedConnections().size());
 			System.out.println("       Conflicting nodes: " + overUsedRnodes.size());
-			for (Routable rnode : overUsedRnodes) {
-				System.out.println(rnode.getNode());
-				for (Entry<NetWrapper,Integer> e : rnode.getUsersConnectionCounts().entrySet())
-				System.out.println("\t" + e.getKey().getNet() + " = " + e.getValue());
-			}
 		}
 	}
 	
@@ -1001,77 +986,17 @@ public class RWRoute{
 	 */
 	private void updateCost() {
 		overUsedRnodes.clear();
-		Set<Net> overUsedPreservedNets = new HashSet<>();
 		for(Entry<Node,Routable> e : routingGraph.getNodeEntries()){
 			Routable rnode = e.getValue();
-			int overuse = rnode.getOccupancy() - Routable.capacity;
+			int overuse=rnode.getOccupancy() - Routable.capacity;
 			if(overuse == 0) {
 				rnode.setPresentCongestionCost(1 + presentCongestionFactor);
 			} else if (overuse > 0) {
 				overUsedRnodes.add(rnode);
 				rnode.setPresentCongestionCost(1 + (overuse + 1) * presentCongestionFactor);
 				rnode.setHistoricalCongestionCost(rnode.getHistoricalCongestionCost() + overuse * historicalCongestionFactor);
-
-				// Extract all overused preserved nets
-				Net preservedNet = routingGraph.getPreservedNet(rnode.getNode());
-				if (preservedNet != null) {
-					overUsedPreservedNets.add(preservedNet);
-				}
 			}
 		}
-
-		// for (Net net : overUsedPreservedNets) {
-		// 	NetWrapper netWrapper = createsNetWrapperAndConnections(net, config.getBoundingBoxExtensionX(), config.getBoundingBoxExtensionY(), multiSLRDevice);
-		//
-		// 	Set<Routable> rnodes = new HashSet<>();
-		// 	for (PIP pip : net.getPIPs()) {
-		// 		Node start = (pip.isReversed()) ? pip.getEndNode() : pip.getStartNode();
-		// 		Node end = (pip.isReversed()) ? pip.getStartNode() : pip.getEndNode();
-		// 		Routable rstart = createAddRoutableNode(null, start, RoutableType.WIRE);
-		// 		Routable rend = createAddRoutableNode(null, end, RoutableType.WIRE);
-		//
-		// 		rnodes.add(rstart);
-		// 		rnodes.add(rend);
-		//
-		// 		// assert(rend.getPrev() == null);
-		// 		rend.setPrev(rstart);
-		// 	}
-		//
-		// 	for (Routable rnode : rnodes) {
-		// 		routingGraph.computePreserved(rnode.getNode(),
-		// 				($,preservedNet) -> {
-		// 					if (preservedNet != null) {
-		// 						assert(preservedNet == net);
-		//
-		// 						// If it happens to be a node with a placeholder (null) user
-		// 						// then decrement the occupancy as it will be properly
-		// 						// incremented by correctly finishRouteConnection()
-		// 						int count = rnode.countConnectionsOfUser(null);
-		// 						if (count > 0) {
-		// 							rnode.decrementUser(null);
-		// 							// System.out.println("DECREMENTING " + rnode.getNode());
-		// 							// for (Entry<NetWrapper,Integer> e : rnode.getUsersConnectionCounts().entrySet()) {
-		// 							// 	System.out.println("\t" + e.getKey().getNet() + " = " + e.getValue());
-		// 							// }
-		// 						}
-		//
-		// 						// Fall-through and unpreserve by returning null
-		// 						// TODO: Maybe just unpreserve relevant connection(s)?
-		// 					}
-		// 					return null;
-		// 				});
-		// 		routingGraph.visit(rnode);
-		// 	}
-		//
-		// 	for (Connection connection : netWrapper.getConnections()) {
-		// 		finishRouteConnection(connection);
-		// 		// if (connection.isCongested()) {
-		// 		// 	System.out.println(net.getName() + " 's " + connection + " is congested");
-		// 		// }
-		// 	}
-		//
-		// 	routingGraph.resetExpansion();
-		// }
 	}
 	
 	/**
@@ -1691,12 +1616,8 @@ public class RWRoute{
 		return design;
 	}
 
-	private int getNumIndirectConnectionPins() {
-		int totalSitePins = 0;
-		for(Connection connection : indirectConnections) {
-			totalSitePins += (connection.getSink().isRouted()) ? 0 : 1;
-		}
-		return totalSitePins;
+	protected int getNumIndirectConnectionPins() {
+		return indirectConnections.size();
 	}
 	
 	private int getNumStaticNetPins() {

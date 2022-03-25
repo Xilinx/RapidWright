@@ -7,8 +7,8 @@ import com.xilinx.rapidwright.device.PIP;
 import java.util.Objects;
 
 class LightweightNode {
-    private final int tileID;
-    private final int wireID;
+    final int tileID;
+    final int wireID;
 
     public LightweightNode(Node node) {
         assert(!node.isInvalidNode());
