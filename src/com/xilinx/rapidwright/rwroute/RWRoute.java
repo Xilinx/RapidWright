@@ -857,7 +857,7 @@ public class RWRoute{
 	/**
 	 * Assigns a list nodes to each connection to complete the route path of it.
 	 */
-	private void assignNodesToConnections() {
+	protected void assignNodesToConnections() {
 		for(Entry<Net,NetWrapper> e : nets.entrySet()) {
 			NetWrapper netWrapper = e.getValue();
 			for(Connection connection : netWrapper.getConnections()){
@@ -872,19 +872,6 @@ public class RWRoute{
 				}
 
 				List<Routable> rnodes = connection.getRnodes();
-
-				String sinkPinName = sink.getName();
-				if (rnodes.size() >= 2 && Pattern.matches("[A-H](X|_I)", sinkPinName)) {
-					Routable prevRnode = rnodes.get(1);
-					Node prevNode = (prevRnode != null) ? prevRnode.getNode() : null;
-					SitePin prevPin = (prevNode != null) ? prevNode.getSitePin() : null;
-					if (prevPin != null && Pattern.matches("[A-H][1-6]", prevPin.getPinName())) {
-						rnodes = rnodes.subList(1, rnodes.size());
-						// TODO: Update site routing
-						System.out.println(prevPin.getPinName() + " -> " + sinkPinName + " for " + connection.getNetWrapper().getNet());
-					}
-				}
-
 				for(Routable rnode : rnodes){
 					nodes.add(rnode.getNode());
 				}

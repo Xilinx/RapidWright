@@ -23,6 +23,7 @@
 
 package com.xilinx.rapidwright.rwroute;
 
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
@@ -32,6 +33,7 @@ import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
+import com.xilinx.rapidwright.device.SitePin;
 
 /**
  * TODO
@@ -89,35 +91,60 @@ public class ECORouter extends PartialRouter {
             for (Connection connection : netWrapper.getConnections()) {
                 finishRouteConnection(connection);
 
-                if (connection.getSink().isRouted())
-                    continue;
-
-                SitePinInst sink = connection.getSink();
-                String sinkPinName = sink.getName();
-                if (!Pattern.matches("[A-H](X|_I)", sinkPinName))
-                    continue;
-
-                Routable rnode = connection.getSinkRnode();
-                String lut = sinkPinName.substring(0, 1);
-                Site site = sink.getSite();
-                for (int i = 6; i >= 1; i--) {
-                    Node altNode = site.getConnectedNode(lut + i);
-
-                    // Skip if LUT pin is already being preserved
-                    Net preservedNet = routingGraph.getPreservedNet(altNode);
-                    if (preservedNet != null) {
-                        continue;
-                    }
-
-                    RoutableType type = RoutableType.WIRE;
-                    Routable altRnode = createAddRoutableNode(null, altNode, type);
-                    // Trigger a setChildren() for LUT routethrus
-                    altRnode.getChildren();
-                    // Create a fake edge from [A-H][1-6] to [A-H](I|_X)
-                    altRnode.addChild(rnode);
-                }
+                // if (connection.getSink().isRouted())
+                //     continue;
+                //
+                // SitePinInst sink = connection.getSink();
+                // String sinkPinName = sink.getName();
+                // if (!Pattern.matches("[A-H](X|_I)", sinkPinName))
+                //     continue;
+                //
+                // Routable rnode = connection.getSinkRnode();
+                // String lut = sinkPinName.substring(0, 1);
+                // Site site = sink.getSite();
+                // for (int i = 6; i >= 1; i--) {
+                //     Node altNode = site.getConnectedNode(lut + i);
+                //
+                //     // Skip if LUT pin is already being preserved
+                //     Net preservedNet = routingGraph.getPreservedNet(altNode);
+                //     if (preservedNet != null) {
+                //         continue;
+                //     }
+                //
+                //     RoutableType type = RoutableType.WIRE;
+                //     Routable altRnode = createAddRoutableNode(null, altNode, type);
+                //     // Trigger a setChildren() for LUT routethrus
+                //     altRnode.getChildren();
+                //     // Create a fake edge from [A-H][1-6] to [A-H](I|_X)
+                //     altRnode.addChild(rnode);
+                // }
             }
         }
+    }
+
+    @Override
+    protected void assignNodesToConnections() {
+        // for(Map.Entry<Net,NetWrapper> e : nets.entrySet()) {
+        //     NetWrapper netWrapper = e.getValue();
+        //     for (Connection connection : netWrapper.getConnections()) {
+        //         SitePinInst sink = connection.getSink();
+        //         List<Routable> rnodes = connection.getRnodes();
+        //         String sinkPinName = sink.getName();
+        //         if (rnodes.size() >= 2 && Pattern.matches("[A-H](X|_I)", sinkPinName)) {
+        //             Routable prevRnode = rnodes.get(1);
+        //             Node prevNode = (prevRnode != null) ? prevRnode.getNode() : null;
+        //             SitePin prevPin = (prevNode != null) ? prevNode.getSitePin() : null;
+        //             if (prevPin != null && Pattern.matches("[A-H][1-6]", prevPin.getPinName())) {
+        //                 // Drop the fake LUT -> X/I pin edge
+        //                 connection.setRnodes(rnodes.subList(1, rnodes.size()));
+        //                 // TODO: Update site routing
+        //                 System.out.println(prevPin.getPinName() + " -> " + sinkPinName + " for " + connection.getNetWrapper().getNet());
+        //             }
+        //         }
+        //     }
+        // }
+
+        super.assignNodesToConnections();
     }
 
     public static Design routeDesign(Design design) {
