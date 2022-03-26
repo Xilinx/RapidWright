@@ -67,7 +67,7 @@ public class RWRoute{
 	/** The design to route */
 	protected Design design;
 	/** A flag to indicate if the device has multiple SLRs, for the sake of avoiding unnecessary check for single-SLR devices */
-	private boolean multiSLRDevice;
+	protected boolean multiSLRDevice;
 	/** Created NetWrappers */
 	protected Map<Net,NetWrapper> nets;
 	/** A list of indirect connections that will go through iterative routing */
@@ -91,7 +91,7 @@ public class RWRoute{
 	private int numConnectionsToRoute;
 	private int numNotNeedingRoutingNets;
 	private int numUnrecognizedNets;
-	
+
 	/** A {@link RWRouteConfig} instance consisting of a list of routing parameters */
 	protected RWRouteConfig config;
 	/** The present congestion cost factor */
@@ -108,14 +108,14 @@ public class RWRoute{
 	private float oneMinusTimingWeight;
 	
 	/** The current routing iteration */
-	private int routeIteration;
+	protected int routeIteration;
 	/** Timers to store runtime of different phases */
 	private RuntimeTrackerTree routerTimer;
 	private RuntimeTracker rnodesTimer;
 	private RuntimeTracker updateTimingTimer;
 	private RuntimeTracker updateCongestionCosts;
 	/** An instantiation of RouteThruHelper to avoid route-thrus in the routing resource graph */
-	private RouteThruHelper routethruHelper;
+	protected RouteThruHelper routethruHelper;
 	
 	/** A set of indices of overused rondes */
 	private Set<Routable> overUsedRnodes;
@@ -717,13 +717,20 @@ public class RWRoute{
 					routeConnection(connection);
 				}
 			}
+
+			long generatedRnodes = routingGraph.numNodes() - lastIterationRnodeCount;
+			if (generatedRnodes == 0) {
+				for (Connection connection : getUnroutedConnections()) {
+					handleUnroutableConnection(connection);
+				}
+			}
+
 			if(config.isTimingDriven()) {
 				updateTiming();
 			}
 			
 			updateCostFactors();
 
-			long generatedRnodes = routingGraph.numNodes() - lastIterationRnodeCount;
 			printRoutingIterationStatisticsInfo(System.nanoTime() - startIteration, generatedRnodes,
 					(float) ((rnodesTimer.getTime() - lastIterationRnodeTime) * 1e-9), config.isTimingDriven());
 
@@ -735,16 +742,6 @@ public class RWRoute{
 					if(routeIteration == config.getMaxIterations() - 1) {
 						System.err.println("ERROR: Unroutable connections: " + unroutedConnections.size());
 					}
-				}
-			}
-
-			if (routeIteration > 1 && generatedRnodes == 0) {
-				for (Connection connection : getUnroutedConnections()) {
-					unrouteReservedNetsToReleaseResources(connection);
-				}
-
-				if (config.isTimingDriven()) {
-					updateTiming();
 				}
 			}
 
@@ -891,7 +888,7 @@ public class RWRoute{
 	/**
 	 * Sorts indirect connections for routing.
 	 */
-	private void sortConnections(){
+	protected void sortConnections(){
 		sortedIndirectConnections = new ArrayList<>();
 		sortedIndirectConnections.addAll(indirectConnections);
 		sortedIndirectConnections.sort((connection1, connection2) -> {
@@ -1229,15 +1226,8 @@ public class RWRoute{
 	 * Deals with a failed connection by possible output pin swapping and unrouting preserved nets if the router is in the soft preserve mode.
 	 * @param connection The failed connection.
 	 */
-	private void handleUnroutableConnection(Connection connection) {
-		if (routeIteration == 1) {		
-			boolean hasAltOutput = swapOutputPin(connection);
-			if(!hasAltOutput && config.isSoftPreserve()) {
-				unrouteReservedNetsToReleaseResources(connection);
-			}
-		} else if(routeIteration == 2) {
-			if (config.isSoftPreserve()) unrouteReservedNetsToReleaseResources(connection);
-		}
+	protected boolean handleUnroutableConnection(Connection connection) {
+		return routeIteration == 1 && swapOutputPin(connection);
 	}
 	
 	/**
@@ -1245,7 +1235,7 @@ public class RWRoute{
 	 * @param connection The connection in question.
 	 * @return true, if the output pin has been swapped.
 	 */
-	private boolean swapOutputPin(Connection connection) {	
+	private boolean swapOutputPin(Connection connection) {
 		NetWrapper netWrapper = connection.getNetWrapper();
 		Net net = netWrapper.getNet();
 		SitePinInst altSource = DesignTools.getLegalAlternativeOutputPin(net);
@@ -1278,126 +1268,7 @@ public class RWRoute{
 			
 		return true;
 	}
-	
-	/**
-	 * Unroutes preserved nets to release routing resource to resolve congestion that blocks the routablity of a connection.
-	 * NOTE: This is a primary method to enable the experimental soft preserve feature of partial routing. 
-	 * It only unroutes nets that are using resources immediately downhill of the source and 
-	 * immediately uphill of the sink of a connection.
-	 * @param connection The connection in question.
-	 * @return The number of unrouted nets.
-	 */
-	private int unrouteReservedNetsToReleaseResources(Connection connection) {
-		// Find those reserved signals that are using uphill nodes of the target pin node
-		Set<Net> toRouteNets = new HashSet<>();
-		for(Node node : connection.getSinkRnode().getNode().getAllUphillNodes()) {
-			Net toRoute = routingGraph.getPreservedNet(node);
-			if(toRoute == null) continue;
-			if(toRoute.isClockNet() || toRoute.isStaticNet()) continue;
-			toRouteNets.add(toRoute);
-		}
 
-		// TODO: Only nets immediately downhill of the source node is unrouted,
-		//       do we need to do more?
-		// Find those preserved nets that are using downhill nodes of the source pin node
-		for(Node node : connection.getSourceRnode().getNode().getAllDownhillNodes()) {
-			Net toRoute = routingGraph.getPreservedNet(node);
-			if(toRoute == null) continue;
-			if(toRoute.isClockNet() || toRoute.isStaticNet()) continue;
-			toRouteNets.add(toRoute);
-		}
-		
-		if(toRouteNets.isEmpty()) {
-			return 0;
-		}
-
-		System.out.println("INFO: Unrouting " + toRouteNets.size() + " preserved nets");
-
-		for(Net n : toRouteNets) {
-			System.out.println("\t" + n);
-
-			Set<Routable> rnodes = new HashSet<>();
-			NetWrapper netnew = nets.get(n);
-			if (netnew != null) {
-				// Net already exists
-
-				for(Node toBuild : RouterHelper.getNodesOfNet(n)) {
-					// Since net already exists, all the nodes it uses will already
-					// have been created
-					Routable rnode = routingGraph.getNode(toBuild);
-					assert(rnode != null);
-
-					rnodes.add(rnode);
-				}
-			} else {
-				// Net needs to be created
-				netnew = createsNetWrapperAndConnections(n, config.getBoundingBoxExtensionX(), config.getBoundingBoxExtensionY(), multiSLRDevice);
-
-				// Collect all nodes used by this net
-				for (PIP pip : n.getPIPs()) {
-					Node start = (pip.isReversed()) ? pip.getEndNode() : pip.getStartNode();
-					Node end = (pip.isReversed()) ? pip.getStartNode() : pip.getEndNode();
-					Routable rstart = createAddRoutableNode(null, start, RoutableType.WIRE);
-					Routable rend = createAddRoutableNode(null, end, RoutableType.WIRE);
-
-					rnodes.add(rstart);
-					rnodes.add(rend);
-
-					// Also set the prev pointer according to the PIP
-					rend.setPrev(rstart);
-				}
-
-				// Use the prev pointers to update the routing for each connection
-				for (Connection netnewConnection : netnew.getConnections()) {
-					finishRouteConnection(netnewConnection);
-					assert(netnewConnection.getSink().isRouted());
-				}
-
-				if(config.isTimingDriven()) {
-					timingManager.getTimingGraph().addNetDelayEdges(n);
-					timingManager.setTimingEdgesOfConnections(netnew.getConnections());
-					for (Connection netnewConnection : netnew.getConnections()) {
-						netnewConnection.updateRouteDelay();
-					}
-				}
-			}
-
-			// Set<Node> pinNodes = new HashSet<>();
-			// for (SitePinInst pin : n.getPins()) {
-			// 	pinNodes.add(pin.getConnectedNode());
-			// }
-
-			for (Routable rnode : rnodes) {
-				Node toBuild = rnode.getNode();
-				/*if (!pinNodes.contains(toBuild))*/ {
-					routingGraph.unpreserve(toBuild);
-				}
-				// Each rnode should be added a child to any of its parents
-				// that already exist, unless it was already present
-				uphill: for(Node uphill : toBuild.getAllUphillNodes()) {
-					// Without this routethru check, there will be Invalid Programming for Site error shown in Vivado.
-					// Do not use those nodes, because we do not know if the routethru is available or not
-					if(routethruHelper.isRouteThru(uphill, toBuild)) continue;
-					Routable parent = routingGraph.getNode(uphill);
-					if (parent == null)
-						continue;
-					for (Routable child : parent.getChildren()) {
-						if (child == rnode)
-							continue uphill;
-					}
-					parent.addChild(rnode);
-				}
-
-				// Clear the prev pointer (as it is also used to track
-				// whether a node has been visited during expansion)
-				rnode.setPrev(null);
-			}
-		}
-		
-		sortConnections();
-		return toRouteNets.size();
-	}
-	
 	/**
 	 * Checks if a NODE_PINBOUNCE is suitable to be used for routing to a target.
 	 * @param pinBounce The PINBOUNCE rnode in question.

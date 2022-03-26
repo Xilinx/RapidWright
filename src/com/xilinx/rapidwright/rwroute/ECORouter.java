@@ -147,6 +147,15 @@ public class ECORouter extends PartialRouter {
         super.assignNodesToConnections();
     }
 
+    @Override
+    protected boolean handleUnroutableConnection(Connection connection) {
+        if (routeIteration > 1) {
+            unrouteReservedNetsToReleaseResources(connection);
+            return true;
+        }
+        return super.handleUnroutableConnection(connection);
+    }
+
     public static Design routeDesign(Design design) {
         RWRouteConfig config = new RWRouteConfig(new String[] {
                 "--partialRouting",
