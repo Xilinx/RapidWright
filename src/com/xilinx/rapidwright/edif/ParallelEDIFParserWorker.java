@@ -220,7 +220,9 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParser implements Auto
     }
 
 
-    public void doParse() {
+    private EDIFToken actualStopCellToken = null;
+
+    public void doParse(boolean rerun) {
         //We have seeked to a random place inside the EDIF, so we cannot be absolutely sure that we correctly detected
         // token boundaries. Catch all EDIFParseExceptions and figure out later which ones are correct
         try {
@@ -229,8 +231,12 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParser implements Auto
             if (firstCellToken == null) {
                 return;
             }
+            if (rerun && actualStopCellToken==null) {
+                //Already hit eof
+                return;
+            }
+            EDIFToken next = rerun ? actualStopCellToken : firstCellToken;
             startTimestamp = System.nanoTime();
-            EDIFToken next = firstCellToken;
             while (true) {
                 if (next.equals(stopCellToken)) {
                     stopTimestamp = System.nanoTime();
@@ -239,6 +245,7 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParser implements Auto
                 if (stopCellToken != null && next.byteOffset >= stopCellToken.byteOffset) {
                     stopTokenMismatch = true;
                     stopTimestamp = System.nanoTime();
+                    actualStopCellToken = next;
                     return;
                 }
                 EDIFCell cell = parseEDIFCell(null, next.text);

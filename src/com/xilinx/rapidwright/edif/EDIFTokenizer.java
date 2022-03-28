@@ -78,7 +78,7 @@ public class EDIFTokenizer implements AutoCloseable {
         if ( (fillEnd & bufferAddressMask) == offset) {
             //Leave space for the marker byte
             fillEnd=bufferAddressMask&(fillEnd-1);
-            buffer[bufferAddressMask&(offset-1)] = -1;
+            buffer[fillEnd] = -1;
         }
 
         while (fillPosition < fillEnd) {
@@ -279,7 +279,7 @@ public class EDIFTokenizer implements AutoCloseable {
         if (offset != 0) {
             throw new RuntimeException("can only advance if current offset is zero!");
         }
-        if (available != buffer.length) {
+        if (available != (buffer.length-1)) { //Offset by one since we don't fill the buffer completely
             //Hit EOF
             skipInBuffer(available);
             return false;
@@ -291,7 +291,7 @@ public class EDIFTokenizer implements AutoCloseable {
         int totalOutsideQuote = 0;
         int tokenEndersOutsideQuote = 0;
         Integer firstQuoteOffset = null;
-        for (int i = 0; i < maxTokenLength*2; i++) {
+        for (int i = 0; i < available; i++) {
             int ch = buffer[i];
             if (ch == -1) {
                 throw new IllegalStateException("unexpected -1");
