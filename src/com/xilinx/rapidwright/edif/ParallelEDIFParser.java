@@ -32,10 +32,13 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.LongStream;
 
 import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.ParallelismTools;
 import com.xilinx.rapidwright.util.function.InputStreamSupplier;
+import org.jetbrains.annotations.NotNull;
 
 public class ParallelEDIFParser implements AutoCloseable{
     private static final long SIZE_PER_THREAD = EDIFTokenizer.DEFAULT_MAX_TOKEN_LENGTH * 10L;
@@ -87,11 +90,13 @@ public class ParallelEDIFParser implements AutoCloseable{
     }
 
     private int numberOfThreads;
-    public EDIFNetlist parseEDIFNetlist() throws IOException {
+    public EDIFNetlist parseEDIFNetlist(CodePerfTracker t) throws IOException {
 
+        t.start("Initialize workers");
         initializeWorkers();
         numberOfThreads = workers.size();
 
+        t.stop().start("Parse First Token");
         final List<ParallelEDIFParserWorker> failedWorkers = ParallelismTools.maybeToParallel(workers.stream())
                 .filter(w -> !w.parseFirstToken())
                 .collect(Collectors.toList());
@@ -99,11 +104,10 @@ public class ParallelEDIFParser implements AutoCloseable{
             for (ParallelEDIFParserWorker failedWorker : failedWorkers) {
                 if (failedWorker.parseException!=null) {
                     String message = failedWorker.parseException.getMessage();
-                    //Full message contains a hint to a constant that the user should adjust.
-                    //Token misdetection is the more likely cause, so let's cut off that part
-                    final String overflowPrefix = "ERROR: String buffer overflow";
-                    if (message.startsWith(overflowPrefix)) {
-                        message = overflowPrefix;
+                    if (failedWorker.parseException instanceof TokenTooLongException) {
+                        //Message contains a hint to a constant that the user should adjust.
+                        //Token misdetection is the more likely cause, so let's adjust it
+                        message = "Likely token mistetection";
                     }
                     System.err.println("Removing failed thread "+failedWorker+": "+ message);
                 } else {
@@ -121,14 +125,26 @@ public class ParallelEDIFParser implements AutoCloseable{
             workers.get(i - 1).setStopCellToken(workers.get(i).getFirstCellToken());
         }
 
+        t.stop().start("Do Parse");
         doParse();
 
-        final EDIFNetlist netlist = mergeParseResults();
 
+        return mergeParseResults(t);
+    }
+
+    @NotNull
+    private LongStream getCellByteLengths() {
+        ParallelEDIFParserWorker.LibraryOrCellResult lastItem = null;
+        final LongStream.Builder lengths = LongStream.builder();
         for (ParallelEDIFParserWorker worker : workers) {
-            worker.printParseStats(fileSize);
+            for (ParallelEDIFParserWorker.LibraryOrCellResult item : worker.librariesAndCells) {
+                if (lastItem !=null && (item instanceof ParallelEDIFParserWorker.CellResult)) {
+                    lengths.add(item.getToken().byteOffset - lastItem.getToken().byteOffset);
+                }
+                lastItem = item;
+            }
         }
-        return netlist;
+        return lengths.build();
     }
 
 
@@ -203,20 +219,24 @@ public class ParallelEDIFParser implements AutoCloseable{
         final Map<String, EDIFLibrary> librariesByLegalName = netlist.getLibraries().stream()
                 .collect(Collectors.toMap(EDIFName::getLegalEDIFName, Function.identity()));
 
-        ParallelismTools.maybeToParallel(workers.stream()).forEach(w->w.linkCellReferences(librariesByLegalName));
+        ParallelismTools.maybeToParallel(workers.stream()).flatMap(ParallelEDIFParserWorker::streamCellReferences).forEach(w->w.apply(librariesByLegalName));
     }
 
     private void processPortInstLinks() {
-        ParallelismTools.maybeToParallel(workers.stream()).forEach(ParallelEDIFParserWorker::linkPortInsts);
+        ParallelismTools.maybeToParallel(workers.stream()).flatMap(ParallelEDIFParserWorker::streamPortInsts).forEach(cellReferenceData -> cellReferenceData.apply(uniquifier));
     }
 
-    private EDIFNetlist mergeParseResults() {
+    private EDIFNetlist mergeParseResults(CodePerfTracker t) {
         EDIFNetlist netlist = Objects.requireNonNull(workers.get(0).netlist);
         netlist.setDesign(getEdifDesign());
 
+        t.stop().start("Assemble Libraries");
         addCellsAndLibraries(netlist);
+        t.stop().start("process cell inst links");
         processCellInstLinks(netlist);
+        t.stop().start("process port inst links");
         processPortInstLinks();
+        t.stop();
 
         return netlist;
     }
