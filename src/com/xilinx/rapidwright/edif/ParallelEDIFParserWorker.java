@@ -30,11 +30,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
+import java.util.stream.Stream;
 
 import com.xilinx.rapidwright.util.Pair;
+import com.xilinx.rapidwright.util.ParallelismTools;
 
 public class ParallelEDIFParserWorker extends AbstractEDIFParser implements AutoCloseable{
-    private static final boolean printStats = false;
+    private static final boolean printStats = true;
 
     //Data to limit parsing to part of the file
     protected final long offset;
@@ -67,18 +69,17 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParser implements Auto
         tokenizer.skip(offset);
         if (isFirstParser()) {
             parseToFirstCell();
+            firstCellToken = getNextTokenWithOffset(true);
+            return firstCellToken!=null;
         } else {
             try {
-                if (!advanceToFirstCell()) {
-                    return false;
-                }
+                firstCellToken = advanceToFirstCell();
+                return firstCellToken != null;
             } catch (EDIFParseException e) {
                 parseException = e;
                 return false;
             }
         }
-        firstCellToken = peekNextTokenWithOffset();
-        return true;
     }
 
     boolean inLibrary;
@@ -88,9 +89,8 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParser implements Auto
      * @return true if there is a next cell, false if we reached the end of the library
      */
     private boolean parseToNextCellWithinLibrary() {
-
-        String currToken;
-        if (LEFT_PAREN.equals(currToken = getNextToken())){
+        String currToken = getNextToken(true);
+        if (LEFT_PAREN.equals(currToken)){
             return true;
         }
         expect(RIGHT_PAREN, currToken);
@@ -110,47 +110,45 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParser implements Auto
             inLibrary = false;
         }
 
-        String currToken;
-        while(LEFT_PAREN.equals(currToken = getNextToken())){
-            String nextToken = peekNextToken();
-            if (nextToken.equalsIgnoreCase(STATUS)) {
+        String currToken = getNextToken(true);
+        while(LEFT_PAREN.equals(currToken)){
+            EDIFToken nextToken = getNextTokenWithOffset(true);
+            if (nextToken.text.equalsIgnoreCase(STATUS)) {
                 parseStatus(netlist);
-            } else if(nextToken.equalsIgnoreCase(LIBRARY) || nextToken.equalsIgnoreCase(EXTERNAL)){
-                EDIFToken libraryStartToken = peekNextTokenWithOffset();
+            } else if(nextToken.text.equalsIgnoreCase(LIBRARY) || nextToken.text.equalsIgnoreCase(EXTERNAL)){
                 EDIFLibrary library = parseEdifLibraryHead();
-                libraryCache.add(new Pair<>(libraryStartToken, library));
-                librariesAndCells.add(new LibraryResult(libraryStartToken, library));
+                libraryCache.add(new Pair<>(nextToken, library));
+                librariesAndCells.add(new LibraryResult(nextToken, library));
                 if (parseToNextCellWithinLibrary()) {
                     inLibrary = true;
                     return true;
                 }
-            } else if(nextToken.equalsIgnoreCase(COMMENT)){
+            } else if(nextToken.text.equalsIgnoreCase(COMMENT)){
                 // Final Comment on Reference To The Cell Of Highest Level
-                expect(COMMENT, getNextToken());
-                String comment = getNextToken();
-                expect(RIGHT_PAREN, getNextToken());
-            } else if(nextToken.equalsIgnoreCase(DESIGN)){
-                expect(DESIGN, getNextToken());
+                String comment = getNextToken(true);
+                expect(RIGHT_PAREN, getNextToken(true));
+            } else if(nextToken.text.equalsIgnoreCase(DESIGN)){
                 edifDesign = parseEDIFNameObject(new EDIFDesign());
-                expect(LEFT_PAREN, getNextToken());
-                expect(CELLREF, getNextToken());
-                String cellref = getNextToken();
-                expect(LEFT_PAREN, getNextToken());
-                expect(LIBRARYREF, getNextToken());
-                String libraryref = getNextToken();
+                expect(LEFT_PAREN, getNextToken(true));
+                expect(CELLREF, getNextToken(true));
+                String cellref = getNextToken(false);
+                expect(LEFT_PAREN, getNextToken(true));
+                expect(LIBRARYREF, getNextToken(true));
+                String libraryref = getNextToken(false);
                 linkCellReference.add(new CellReferenceData(edifDesign::setTopCell, cellref, libraryref, null));
-                expect(RIGHT_PAREN, getNextToken());
-                expect(RIGHT_PAREN, getNextToken());
+                expect(RIGHT_PAREN, getNextToken(true));
+                expect(RIGHT_PAREN, getNextToken(true));
                 currToken = null;
-                while(LEFT_PAREN.equals(currToken = getNextToken())){
-                    parseProperty(edifDesign);
+                while(LEFT_PAREN.equals(currToken = getNextToken(true))){
+                    parseProperty(edifDesign, getNextToken(true));
                 }
                 expect(RIGHT_PAREN, currToken);
 
             } else {
-                expect(LIBRARY + " | " + COMMENT + " | " + DESIGN + " | " + STATUS+ " | " + EXTERNAL, nextToken);
+                expect(LIBRARY + " | " + COMMENT + " | " + DESIGN + " | " + STATUS+ " | " + EXTERNAL, nextToken.text);
             }
 
+            currToken = getNextToken(true);
         }
         expect(RIGHT_PAREN, currToken);  // edif end
         return false;
@@ -163,21 +161,25 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParser implements Auto
         parseToNextCell();
     }
 
-    private boolean advanceToFirstCell() {
+    private EDIFToken advanceToFirstCell() {
         while (true) {
-            final EDIFToken currentToken = tokenizer.getOptionalNextToken();
+            final EDIFToken currentToken = tokenizer.getOptionalNextToken(true);
             if (currentToken == null) {
-                return false;
+                return null;
             }
 
-            EDIFToken next = tokenizer.peekOptionalNextToken();
+            if (!currentToken.text.equalsIgnoreCase("(")) {
+                continue;
+            }
+
+            EDIFToken next = tokenizer.getOptionalNextToken(true);
             if (next == null) {
-                return false;
+                return null;
             }
 
-            if (currentToken.text.equals("(") && "cell".equals(next.text)) {
+            if ("cell".equalsIgnoreCase(next.text)) {
                 inLibrary = true;
-                return true;
+                return next;
             }
         }
     }
@@ -189,25 +191,32 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParser implements Auto
     private long startTimestamp;
     private long stopTimestamp;
 
+
+    private double calcReadPercentage(long fileSize) {
+        long endOffset = stopCellToken != null ? stopCellToken.byteOffset : fileSize;
+        if (firstCellToken == null) {
+            return 0;
+        } else {
+            long startOffset = firstCellToken.byteOffset;;
+            if (isFirstParser()) {
+                startOffset = 0;
+            }
+            return (endOffset - startOffset)*100.0/fileSize;
+        }
+    }
+
     public void printParseStats(long fileSize) {
         if (!printStats) {
             return;
         }
         double duration = (stopTimestamp-startTimestamp)/1E9;
 
-        long endOffset = stopCellToken != null ? stopCellToken.byteOffset : fileSize;
-        double percentage;
-        if (firstCellToken == null) {
-            percentage = 0;
-        } else {
-            long startOffset = firstCellToken.byteOffset;;
-            if (isFirstParser()) {
-                startOffset = 0;
-            }
-            percentage = (endOffset - startOffset)*100.0/fileSize;
-        }
+        double percentage = calcReadPercentage(fileSize);
 
-        System.out.println(this+" took "+duration+"s to parse "+percentage+"%, seeing "+librariesAndCells.size()+" items");
+        long libraries = librariesAndCells.stream().filter(lc->lc instanceof LibraryResult).count();
+        long cells = librariesAndCells.stream().filter(lc->lc instanceof CellResult).count();
+
+        System.out.println(this+" started at "+firstCellToken+" and took "+duration+"s to parse "+percentage+"%, seeing "+libraries+" libraries and "+cells+" cells");
     }
 
 
@@ -221,8 +230,8 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParser implements Auto
                 return;
             }
             startTimestamp = System.nanoTime();
+            EDIFToken next = firstCellToken;
             while (true) {
-                final EDIFToken next = peekNextTokenWithOffset();
                 if (next.equals(stopCellToken)) {
                     stopTimestamp = System.nanoTime();
                     return;
@@ -232,7 +241,7 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParser implements Auto
                     stopTimestamp = System.nanoTime();
                     return;
                 }
-                EDIFCell cell = parseEDIFCell(null);
+                EDIFCell cell = parseEDIFCell(null, next.text);
                 parsedCells.add(cell);
                 librariesAndCells.add(new CellResult(next, cell));
                 if (!parseToNextCell()) {
@@ -243,6 +252,7 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParser implements Auto
                     //EOF
                     return;
                 }
+                next = getNextTokenWithOffset(true);
             }
         } catch (EDIFParseException e) {
             parseException = e;
@@ -277,17 +287,14 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParser implements Auto
         linkPortInstCache.add(new LinkPortInstData(parentCell, portInst, net));
     }
 
-    public void linkCellReferences(Map<String, EDIFLibrary> librariesByLegalName) {
-        for (ParallelEDIFParserWorker.CellReferenceData cellReferenceData : linkCellReference) {
-            cellReferenceData.apply(librariesByLegalName);
-        }
+    public Stream<CellReferenceData> streamCellReferences() {
+        return ParallelismTools.maybeToParallel(linkCellReference.stream());
     }
 
-    public void linkPortInsts() {
-        for (ParallelEDIFParserWorker.LinkPortInstData linkData : linkPortInstCache) {
-            linkData.apply(tokenizer.uniquifier);
-        }
+    public Stream<LinkPortInstData> streamPortInsts() {
+        return ParallelismTools.maybeToParallel(linkPortInstCache.stream());
     }
+
 
     public static class CellReferenceData {
         public final Consumer<EDIFCell> cellSetter;
