@@ -149,7 +149,7 @@ public class ParallelEDIFParser implements AutoCloseable{
 
 
     private void doParse() {
-        ParallelismTools.maybeToParallel(workers.stream()).forEach(ParallelEDIFParserWorker::doParse);
+        ParallelismTools.maybeToParallel(workers.stream()).forEach(w->w.doParse(false));
 
         //Check if we had misdetected start tokens
         for (int i=0; i<workers.size();i++) {
@@ -180,7 +180,7 @@ public class ParallelEDIFParser implements AutoCloseable{
                 }
 
                 //Re-Parse :(
-                worker.doParse();
+                worker.doParse(true);
                 if (worker.parseException!=null) {
                     throw worker.parseException;
                 }
@@ -205,6 +205,7 @@ public class ParallelEDIFParser implements AutoCloseable{
         EDIFToken currentToken = null;
         for (ParallelEDIFParserWorker worker : workers) {
             for (ParallelEDIFParserWorker.LibraryOrCellResult parsed : worker.librariesAndCells) {
+                System.out.println("looking at "+parsed.getToken()+" from "+worker);
                 if (currentToken!=null && parsed.getToken().byteOffset<= currentToken.byteOffset) {
                     throw new IllegalStateException("Not in ascending order! seen: "+currentToken+", now processed "+parsed.getToken());
                 }
