@@ -27,13 +27,14 @@ import java.util.stream.Stream;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFParser;
 import com.xilinx.rapidwright.edif.ParallelEDIFParser;
+import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.Installer;
 import com.xilinx.rapidwright.util.Job;
 import com.xilinx.rapidwright.util.JobQueue;
+import com.xilinx.rapidwright.util.MessageGenerator;
 import com.xilinx.rapidwright.util.NullOutputStream;
 import com.xilinx.rapidwright.util.Pair;
-import com.xilinx.rapidwright.util.ParallelismTools;
 import com.xilinx.rapidwright.util.function.ThrowingConsumer;
 
 public class BenchmarkEdifLoad {
@@ -71,48 +72,57 @@ public class BenchmarkEdifLoad {
             System.out.println("source edif has md5: "+md5);
         }
 
-        public Stats benchmark(Path origFile) throws IOException {
-            Path p = copyCloser(origFile);
-            try {
-                warmUpCache(p);
-                System.gc();
-                try {
-                    Thread.sleep(1000);
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
-                }
-                System.gc();
-                final long usageBefore = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
-                final long start = System.nanoTime();
-                T parser = makeParser(p);
 
-                this.netlist = parse(parser);
-                final long end = System.nanoTime();
-                System.gc();
+        private Stats benchmark(Path file) throws IOException {
+            warmUpCache(file);
+            System.gc();
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+            System.gc();
+            final long usageBefore = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
+            final long start = System.nanoTime();
+            T parser = makeParser(file);
+
+            this.netlist = parse(parser);
+            final long end = System.nanoTime();
+            System.gc();
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+            System.gc();
+            final long usageDuring = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
+            int threads = getAllThreads(parser);
+            int successfulThreads = getSuccessfulThreads(parser);
+            //Free reference
+            parser = null;
+            System.gc();
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+            System.gc();
+            final long usageAfter = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
+            long memEdif = usageAfter - usageBefore;
+            long memParser = usageDuring - usageAfter;
+            return new Stats((end - start), memParser, memEdif, threads, successfulThreads, checksum(netlist::exportEDIF), checksum(netlist::writeBinaryEDIF));
+        }
+
+        public Stats benchmark(Path origFile, boolean isFullRun) throws IOException {
+            if (isFullRun) {
+                Path p = copyCloser(origFile);
                 try {
-                    Thread.sleep(1000);
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
+                    return benchmark(p);
+                } finally {
+                    Files.delete(p);
                 }
-                System.gc();
-                final long usageDuring = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
-                int threads = getAllThreads(parser);
-                int successfulThreads = getSuccessfulThreads(parser);
-                //Free reference
-                parser = null;
-                System.gc();
-                try {
-                    Thread.sleep(1000);
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
-                }
-                System.gc();
-                final long usageAfter = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
-                long memEdif = usageAfter - usageBefore;
-                long memParser = usageDuring - usageAfter;
-                return new Stats((end - start), memParser, memEdif, threads, successfulThreads, checksum(netlist::exportEDIF), checksum(netlist::writeBinaryEDIF));
-            } finally {
-                Files.delete(p);
+            } else {
+                return benchmark(origFile);
             }
         }
 
@@ -203,7 +213,11 @@ public class BenchmarkEdifLoad {
 
         @Override
         protected EDIFNetlist parse(ParallelEDIFParser parallelEDIFParser) throws IOException {
-            return parallelEDIFParser.parseEDIFNetlist();
+            CodePerfTracker t = new CodePerfTracker("Parallel EDIF Load");
+            final EDIFNetlist edifNetlist = parallelEDIFParser.parseEDIFNetlist(t);
+            t.printSummary();
+            parallelEDIFParser.printNetlistStats(edifNetlist);
+            return edifNetlist;
         }
     }
 
@@ -429,41 +443,51 @@ public class BenchmarkEdifLoad {
     }
 
     public static void main(String[] args) throws IOException {
+        //MessageGenerator.waitOnAnyKey();
         if (args.length==0) {
             throw new RuntimeException("no mode given");
         }
         String mode = args[0];
-        if (mode.equals("lsf")) {
-            Path benchmarkDir = Paths.get(args[1]);
-            submitLsf(benchmarkDir);
-        } else if (mode.equals("run")) {
-            Path input = Paths.get(args[1]);
-            String config = args[2];
-
-            Path outputDir = Paths.get(".");
-            int i=0;
-            Path outputFile;
-            while (Files.exists(outputFile = outputDir.resolve(i+".txt"))) {
-                i++;
+        switch (mode) {
+            case "lsf": {
+                Path benchmarkDir = Paths.get(args[1]);
+                submitLsf(benchmarkDir);
+                break;
             }
+            case "run":
+            case "print":
+                boolean isFullRun = mode.equals("run");
 
-            ParserBenchmark<?> benchmark = makeBenchmark(config);
-            Stats stats = benchmark.benchmark(input);
-            ParallelismTools.setParallel(false);
 
-            //benchmark.netlist.exportEDIF(outputDir.resolve(i+".edf"));
-            //benchmark.netlist.writeBinaryEDIF(outputDir.resolve(i+".bedf"));
-            benchmark.freeNetlist();
-            stats.print();
-            stats.save(outputFile);
-        } else if (mode.equals("results")) {
-            Path benchmarkDir = Paths.get(args[1]);
-            try (PrintWriter pw = new PrintWriter(Files.newBufferedWriter(Paths.get(args[2])))) {
+                Path input = Paths.get(args[1]);
+                String config = args[2];
 
-                results(benchmarkDir, pw);
+                Path outputDir = Paths.get(".");
+                int i = 0;
+                Path outputFile;
+                while (Files.exists(outputFile = outputDir.resolve(i + ".txt"))) {
+                    i++;
+                }
+
+                ParserBenchmark<?> benchmark = makeBenchmark(config);
+                Stats stats = benchmark.benchmark(input, isFullRun);
+
+                benchmark.freeNetlist();
+                stats.print();
+                if (isFullRun) {
+                    stats.save(outputFile);
+                }
+                break;
+            case "results": {
+                Path benchmarkDir = Paths.get(args[1]);
+                try (PrintWriter pw = new PrintWriter(Files.newBufferedWriter(Paths.get(args[2])))) {
+
+                    results(benchmarkDir, pw);
+                }
+                break;
             }
-        } else {
-            throw new RuntimeException("unknown mode "+mode);
+            default:
+                throw new RuntimeException("unknown mode " + mode);
         }
     }
 }

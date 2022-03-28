@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.stream.LongStream;
 
 import com.xilinx.rapidwright.device.Device;
@@ -132,6 +133,38 @@ public class ParallelEDIFParser implements AutoCloseable{
         return mergeParseResults(t);
     }
 
+
+    public void printNetlistStats(EDIFNetlist netlist) {
+
+        for (ParallelEDIFParserWorker worker : workers) {
+            worker.printParseStats(fileSize);
+        }
+
+        System.out.println("cell byte lengths = " + getCellByteLengths().summaryStatistics());
+
+        final LongStream portInstLinksPerThread = workers.stream().mapToLong(w -> w.linkPortInstCache.size());
+
+        System.out.println("portInstLinksPerThread = " + portInstLinksPerThread.summaryStatistics());
+
+        final IntStream cellInstsPerCell     = netlist.getLibraries().stream().flatMap(l -> l.getCells().stream()).mapToInt(c -> c.getCellInsts().size());
+        final IntStream cellInstPortsPerCell = netlist.getLibraries().stream().flatMap(l -> l.getCells().stream()).mapToInt(c -> c.getCellInsts().stream().mapToInt(ci -> ci.getCellPorts().size()).sum());
+        final IntStream cellInstPortsPerCellInst = netlist.getLibraries().stream().flatMap(l -> l.getCells().stream()).flatMap(c -> c.getCellInsts().stream()).mapToInt(ci -> ci.getCellPorts().size());
+
+        final Map<String, Long> countsPerName = netlist.getLibraries().stream().flatMap(l -> l.getCells().stream()).collect(Collectors.groupingBy(EDIFName::getLegalEDIFName, Collectors.counting()));
+        LongStream nameCollisions = countsPerName.values().stream().filter(l->l!=1).mapToLong(l->l);
+
+
+        System.out.println("nameCollisions = " + nameCollisions.summaryStatistics());
+        System.out.println("cellInstsPerCell = " + cellInstsPerCell.summaryStatistics());
+        System.out.println("cellInstPortsPerCell = " + cellInstPortsPerCell.summaryStatistics());
+        System.out.println("cellInstPortsPerCellInst = " + cellInstPortsPerCellInst.summaryStatistics());
+
+        final Map<Boolean, Long> cellReferenceHasLibraryName = workers.stream().flatMap(w -> w.linkCellReference.stream()).collect(Collectors.partitioningBy(d -> d.libraryref != null, Collectors.counting()));
+        System.out.println("cellReferenceHasLibraryName = " + cellReferenceHasLibraryName);
+
+
+    }
+    
     @NotNull
     private LongStream getCellByteLengths() {
         ParallelEDIFParserWorker.LibraryOrCellResult lastItem = null;
