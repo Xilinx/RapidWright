@@ -85,33 +85,31 @@ public class EDIFParser extends AbstractEDIFParser implements AutoCloseable{
 
 		String currToken;
 		
-		while(LEFT_PAREN.equals(currToken = getNextToken())){
-			String nextToken = peekNextToken();
+		while(LEFT_PAREN.equals(currToken = getNextToken(true))){
+			String nextToken = getNextToken(true);
 			if (nextToken.equalsIgnoreCase(STATUS)) {
 				parseStatus(currNetlist);
 			} else if(nextToken.equalsIgnoreCase(LIBRARY) || nextToken.equalsIgnoreCase(EXTERNAL)){
 				currNetlist.addLibrary(parseEDIFLibrary());
 			} else if(nextToken.equalsIgnoreCase(COMMENT)){
 				// Final Comment on Reference To The Cell Of Highest Level
-				expect(COMMENT, getNextToken());
-				String comment = getNextToken();
-				expect(RIGHT_PAREN, getNextToken());
+				String comment = getNextToken(true);
+				expect(RIGHT_PAREN, getNextToken(true));
 			} else if(nextToken.equalsIgnoreCase(DESIGN)){
-				expect(DESIGN, getNextToken());
 				EDIFDesign design = parseEDIFNameObject(new EDIFDesign());
 				currNetlist.setDesign(design);
-				expect(LEFT_PAREN, getNextToken());
-				expect(CELLREF, getNextToken());
-				String cellref = getNextToken();
-				expect(LEFT_PAREN, getNextToken());
-				expect(LIBRARYREF, getNextToken());
-				String libraryref = getNextToken();
+				expect(LEFT_PAREN, getNextToken(true));
+				expect(CELLREF, getNextToken(true));
+				String cellref = getNextToken(false);
+				expect(LEFT_PAREN, getNextToken(true));
+				expect(LIBRARYREF, getNextToken(true));
+				String libraryref = getNextToken(false);
 				design.setTopCell(getRefEDIFCell(cellref, libraryref));
-				expect(RIGHT_PAREN, getNextToken());
-				expect(RIGHT_PAREN, getNextToken());
+				expect(RIGHT_PAREN, getNextToken(true));
+				expect(RIGHT_PAREN, getNextToken(true));
 				currToken = null;
-				while(LEFT_PAREN.equals(currToken = getNextToken())){
-					parseProperty(design); 
+				while(LEFT_PAREN.equals(currToken = getNextToken(true))){
+					parseProperty(design, getNextToken(true));
 				}
 				expect(RIGHT_PAREN, currToken);
 
@@ -122,7 +120,7 @@ public class EDIFParser extends AbstractEDIFParser implements AutoCloseable{
 		}
 		expect(RIGHT_PAREN, currToken);  // edif end
 
-		final EDIFToken token = tokenizer.getOptionalNextToken();
+		final EDIFToken token = tokenizer.getOptionalNextToken(true);
 		if (token != null) {
 			throw new EDIFParseException(token, "Expected EOF but found "+token);
 		}
@@ -134,8 +132,8 @@ public class EDIFParser extends AbstractEDIFParser implements AutoCloseable{
 		EDIFLibrary library = parseEdifLibraryHead();
 
 		String currToken;
-		while(LEFT_PAREN.equals(currToken = getNextToken())){
-			library.addCell(parseEDIFCell(library.getLegalEDIFName()));
+		while(LEFT_PAREN.equals(currToken = getNextToken(true))){
+			library.addCell(parseEDIFCell(library.getLegalEDIFName(), getNextToken(true)));
 		}
 		expect(RIGHT_PAREN, currToken);
 		return library;
