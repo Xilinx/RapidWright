@@ -31,7 +31,7 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Set;
 
-public class EDIFTokenizer implements AutoCloseable, IEDIFTokenizer {
+public class LegacyEDIFTokenizer implements AutoCloseable, IEDIFTokenizer {
     private static final boolean debug = false;
 
     private final Path fileName;
@@ -49,7 +49,7 @@ public class EDIFTokenizer implements AutoCloseable, IEDIFTokenizer {
 
     public static final int DEFAULT_MAX_TOKEN_LENGTH = 8192*16*18;
 
-    public EDIFTokenizer(Path fileName, InputStream in, NameUniquifier uniquifier, int maxTokenLength) {
+    public LegacyEDIFTokenizer(Path fileName, InputStream in, NameUniquifier uniquifier, int maxTokenLength) {
         this.fileName = fileName;
         this.in = in;
         this.uniquifier = uniquifier;
@@ -57,14 +57,14 @@ public class EDIFTokenizer implements AutoCloseable, IEDIFTokenizer {
         this.buffer = new char[maxTokenLength];
     }
 
-    public EDIFTokenizer(Path fileName, InputStream in, NameUniquifier uniquifier) {
+    public LegacyEDIFTokenizer(Path fileName, InputStream in, NameUniquifier uniquifier) {
         this(fileName, in, uniquifier, DEFAULT_MAX_TOKEN_LENGTH);
     }
 
     private EDIFToken getUniqueToken(long tokenStart, char[] buffer, int offset, int count, boolean isShortLived){
         String tmp = new String(buffer, offset, count);
         String unique = uniquifier.uniquifyName(tmp, isShortLived);
-        return new EDIFToken(unique, tokenStart);
+        return new EDIFToken(unique, tokenStart+unique.length());
     }
 
     /**
@@ -99,10 +99,10 @@ public class EDIFTokenizer implements AutoCloseable, IEDIFTokenizer {
                     return getUniqueToken(tokenStart, buffer, 0, idx, isShortLived);
 
                 case '(':
-                    nextTokens.add(new EDIFToken("(", byteOffset-1));
+                    nextTokens.add(new EDIFToken("(", byteOffset));
                     return getUniqueToken(tokenStart, buffer, 0, idx, isShortLived);
                 case ')':
-                    nextTokens.add(new EDIFToken(")", byteOffset-1));
+                    nextTokens.add(new EDIFToken(")", byteOffset));
                     return getUniqueToken(tokenStart, buffer, 0, idx, isShortLived);
 
                 case '"':
@@ -125,11 +125,11 @@ public class EDIFTokenizer implements AutoCloseable, IEDIFTokenizer {
                 byteOffset++;
                 switch (ch) {
                     case '"':
-                        return getQuotedToken(byteOffset-1, isShortLived);
+                        return getQuotedToken(byteOffset+1, isShortLived);
                     case '(':
-                        return new EDIFToken("(", byteOffset-1);
+                        return new EDIFToken("(", byteOffset);
                     case ')':
-                        return new EDIFToken(")", byteOffset-1);
+                        return new EDIFToken(")", byteOffset);
 
                     case ' ':
                     case '\n':
