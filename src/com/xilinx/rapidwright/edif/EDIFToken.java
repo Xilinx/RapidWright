@@ -48,7 +48,11 @@ class EDIFToken {
 
     @Override
     public String toString() {
-        return text +"@"+byteOffset;
+        String displayText = text;
+        if (text.length()>120) {
+            displayText = text.substring(0,100)+"[shortened, length is "+text.length()+"]";
+        }
+        return displayText +"@"+byteOffset;
     }
 
 }
