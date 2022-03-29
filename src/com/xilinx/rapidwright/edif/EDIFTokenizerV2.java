@@ -76,10 +76,9 @@ public class EDIFTokenizerV2 implements AutoCloseable, IEDIFTokenizer {
         }
 
         int fillStart = (offset+available)&bufferAddressMask;
-        int fillEnd = (offset-2) & bufferAddressMask;
-        int markerLocation = (offset-1) & bufferAddressMask;
+        int fillEnd = (offset-1) & bufferAddressMask;
 
-        buffer[markerLocation] = 0;
+        buffer[fillEnd] = 0;
 
         if (fillStart>fillEnd) {
             //Fill in two parts

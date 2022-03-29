@@ -66,7 +66,7 @@ public class ComparingEDIFTokenizer implements IEDIFTokenizer{
         final byte[] bytes = os.toByteArray();
 
 
-        IEDIFTokenizer a = new EDIFTokenizer(fileName, new ByteArrayInputStream(bytes), uniquifier, maxTokenLength);
+        IEDIFTokenizer a = new LegacyEDIFTokenizer(fileName, new ByteArrayInputStream(bytes), uniquifier, maxTokenLength);
         IEDIFTokenizer b = new EDIFTokenizerV2(fileName, new ByteArrayInputStream(bytes), uniquifier, maxTokenLength);
         return new ComparingEDIFTokenizer(a,b);
     }
