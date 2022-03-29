@@ -32,7 +32,6 @@ import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.Installer;
 import com.xilinx.rapidwright.util.Job;
 import com.xilinx.rapidwright.util.JobQueue;
-import com.xilinx.rapidwright.util.MessageGenerator;
 import com.xilinx.rapidwright.util.NullOutputStream;
 import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.function.ThrowingConsumer;
@@ -350,9 +349,9 @@ public class BenchmarkEdifLoad {
         final List<String> configNames = configs.keySet().stream().sorted(Comparator.comparing(s->s.equals(serial)?"":s)).collect(Collectors.toList());
 
         List<Pair<String, Function<Stats,Double>>> metrics = Arrays.asList(
-            new Pair<>("Runtime",s->s.runtime/1E9),
-            new Pair<>("Parser Mem",s->s.parserMem/1E6),
-            new Pair<>("EDIF Mem",s->s.edifMem/1E6)
+            new Pair<String, Function<Stats,Double>>("Runtime",(Function<Stats,Double>)s->s.runtime/1E9),
+            new Pair<String, Function<Stats,Double>>("Parser Mem",(Function<Stats,Double>)s->s.parserMem/1E6),
+            new Pair<String, Function<Stats,Double>>("EDIF Mem",(Function<Stats,Double>)s->s.edifMem/1E6)
 
         );
 
