@@ -1036,7 +1036,8 @@ public class DesignTools {
 	    }
 
 	    HashSet<PIP> toRemove = new HashSet<>();
-
+	    ArrayList<Node> updateFanout = new ArrayList<>();
+        
 	    for(SitePinInst p : pins) {
 	        if(p.getSite() == null) continue;
 	        if(p.getNet() != net) continue;
@@ -1052,9 +1053,13 @@ public class DesignTools {
 	            fanoutCount--;
 	            atReversedBidirectionalPip = true;
 	        }
+	        updateFanout.clear();
 	        while(curr != null && curr.size() == 1 && fanoutCount < 2){
 	            PIP pip = curr.get(0);
+	            
 	            toRemove.add(pip);
+	            Node startNode = pip.getStartNode();
+	            updateFanout.add(startNode);
 	            if (new Node(pip.getTile(), pip.getStartWireIndex()).equals(sink) && !atReversedBidirectionalPip) {
 	                // reached the source and there is another branch starting with a reversed
 	                // bidirectional PIP ... don't traverse it
@@ -1100,6 +1105,13 @@ public class DesignTools {
 	            si.unrouteIntraSiteNet(belPin, belPin);
 	        }
 	        p.setRouted(false);	        
+	        for(Node startNode : updateFanout) {
+	            Integer newFanout = fanout.get(startNode);
+	            if(newFanout != null) {
+	                newFanout--;
+	                fanout.put(startNode, newFanout);
+	            }
+	        }
 	    }
 	    ArrayList<PIP> updatedPIPs = new ArrayList<>();
 	    for(PIP pip : net.getPIPs()){
