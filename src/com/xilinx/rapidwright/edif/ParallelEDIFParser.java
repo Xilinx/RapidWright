@@ -41,7 +41,7 @@ import com.xilinx.rapidwright.util.function.InputStreamSupplier;
 import org.jetbrains.annotations.NotNull;
 
 public class ParallelEDIFParser implements AutoCloseable{
-    private static final long SIZE_PER_THREAD = EDIFTokenizer.DEFAULT_MAX_TOKEN_LENGTH * 10L;
+    private static final long SIZE_PER_THREAD = EDIFTokenizerV2.DEFAULT_MAX_TOKEN_LENGTH * 10L;
     protected final List<ParallelEDIFParserWorker> workers = new ArrayList<>();
     protected final Path fileName;
     private final long fileSize;
@@ -57,7 +57,7 @@ public class ParallelEDIFParser implements AutoCloseable{
     }
 
     public ParallelEDIFParser(Path fileName, long fileSize, InputStreamSupplier inputStreamSupplier) {
-        this(fileName, fileSize, inputStreamSupplier, EDIFTokenizer.DEFAULT_MAX_TOKEN_LENGTH);
+        this(fileName, fileSize, inputStreamSupplier, EDIFTokenizerV2.DEFAULT_MAX_TOKEN_LENGTH);
     }
 
     public ParallelEDIFParser(Path p, long fileSize) {
@@ -205,7 +205,6 @@ public class ParallelEDIFParser implements AutoCloseable{
         EDIFToken currentToken = null;
         for (ParallelEDIFParserWorker worker : workers) {
             for (ParallelEDIFParserWorker.LibraryOrCellResult parsed : worker.librariesAndCells) {
-                System.out.println("looking at "+parsed.getToken()+" from "+worker);
                 if (currentToken!=null && parsed.getToken().byteOffset<= currentToken.byteOffset) {
                     throw new IllegalStateException("Not in ascending order! seen: "+currentToken+", now processed "+parsed.getToken());
                 }

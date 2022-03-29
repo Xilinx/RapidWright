@@ -75,23 +75,24 @@ public abstract class AbstractEDIFParser {
     public static final String METAX = "metax";
     public static final String OWNER = "owner";
 
-    protected final EDIFTokenizer tokenizer;
+    protected final IEDIFTokenizer tokenizer;
     protected final InputStream in;
 
     public AbstractEDIFParser(Path fileName, InputStream in, NameUniquifier uniquifier, int maxTokenLength) {
         this.in = in;
-        this.tokenizer = new EDIFTokenizer(fileName, in, uniquifier, maxTokenLength);
+        this.tokenizer = new EDIFTokenizerV2(fileName, in, uniquifier, maxTokenLength);
     }
 
     public AbstractEDIFParser(Path fileName, InputStream in, NameUniquifier uniquifier) {
-        this.in = in;
-        this.tokenizer = new EDIFTokenizer(fileName, in, uniquifier);
+        this(fileName, in, uniquifier, EDIFTokenizerV2.DEFAULT_MAX_TOKEN_LENGTH);
     }
 
     public AbstractEDIFParser(Path fileName, NameUniquifier uniquifier) throws FileNotFoundException {
         try {
             in = Files.newInputStream(fileName);
-            tokenizer = new EDIFTokenizer(fileName, in, uniquifier);
+            //InputStream in2 = new BufferedInputStream(Files.newInputStream(fileName));
+            //tokenizer = new ComparingEDIFTokenizer(new EDIFTokenizer(fileName, in2, uniquifier), new EDIFTokenizerV2(fileName, in, uniquifier));
+            tokenizer = new EDIFTokenizerV2(fileName, in, uniquifier);
         } catch (FileNotFoundException e) {
             throw e;
         } catch (IOException e) {
@@ -99,7 +100,7 @@ public abstract class AbstractEDIFParser {
         }
     }
 
-    private static EDIFToken requireToken(EDIFToken t) {
+    private static <T> T requireToken(T t) {
         if (t==null) {
             throw EDIFParseException.unexpectedEOF();
         }
@@ -111,7 +112,7 @@ public abstract class AbstractEDIFParser {
     }
 
     protected String getNextToken(boolean isShortLived) {
-        return getNextTokenWithOffset(isShortLived).text;
+        return requireToken(tokenizer.getOptionalNextTokenString(isShortLived));
     }
 
 
@@ -124,7 +125,7 @@ public abstract class AbstractEDIFParser {
             String name = getNextToken(false);
             if(name.charAt(0) == '[' && name.length() >= 2 &&  name.charAt(1) == ']'){
                 String tmpName = name.substring(2);
-                name = tokenizer.uniquifier.uniquifyName(tmpName, false);
+                name = tokenizer.getUniquifier().uniquifyName(tmpName, false);
             }
             o.setName(name);
             expect(EDIFParser.RIGHT_PAREN, getNextToken(true));
@@ -137,7 +138,7 @@ public abstract class AbstractEDIFParser {
     protected void expect(String expectedString, String token){
         if(!expectedString.equalsIgnoreCase(token)){
             throw new EDIFParseException("Parsing Error: Expected token: " + expectedString +
-                    ", encountered: " + token + " before byte offset "+tokenizer.byteOffset+".");
+                    ", encountered: " + token + " before byte offset "+tokenizer.getByteOffset()+".");
         }
     }
 
