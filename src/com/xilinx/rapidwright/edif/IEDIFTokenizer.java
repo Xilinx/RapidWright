@@ -2,7 +2,7 @@ package com.xilinx.rapidwright.edif;
 
 import java.io.IOException;
 
-public interface IEDIFTokenizer {
+public interface IEDIFTokenizer extends AutoCloseable{
     EDIFToken getOptionalNextToken(boolean isShortLived);
     String getOptionalNextTokenString(boolean isShortLived);
 
