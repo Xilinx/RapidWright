@@ -30,6 +30,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.LongStream;
@@ -226,6 +228,13 @@ public class ParallelEDIFParser implements AutoCloseable{
         ParallelismTools.maybeToParallel(workers.stream()).flatMap(ParallelEDIFParserWorker::streamPortInsts).forEach(cellReferenceData -> cellReferenceData.apply(uniquifier));
     }
 
+    private void printPortTime(String name, AtomicLong value) {
+
+        System.out.printf("%24s: %9.3fs (wall time, cpu time: %9.3f)\n",
+                name,
+                value.get()/1000000000.0/ForkJoinPool.commonPool().getParallelism(),
+                value.get()/1000000000.0);
+    }
     private EDIFNetlist mergeParseResults(CodePerfTracker t) {
         EDIFNetlist netlist = Objects.requireNonNull(workers.get(0).netlist);
         netlist.setDesign(getEdifDesign());
@@ -237,6 +246,11 @@ public class ParallelEDIFParser implements AutoCloseable{
         t.stop().start("process port inst links");
         processPortInstLinks();
         t.stop();
+
+        printPortTime("Port Lookup", AbstractEDIFParser.portLookupTime);
+        printPortTime("PortInst Naming", AbstractEDIFParser.portNamingTime);
+        printPortTime("PortInst Adding", AbstractEDIFParser.portAddingTime);
+
 
         return netlist;
     }
