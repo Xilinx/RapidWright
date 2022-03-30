@@ -541,5 +541,21 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
 		}
 		return leafCells;
     }
+
+	public EDIFPort getPortByLegalName(String name) {
+
+		EDIFPort port = getPort(name);
+		if(port != null) {
+			return port;
+		}
+		// Finding by EDIFName is O(n), but n is generally small and alternative to building
+		// a map for this single search ends up taking longer
+		for(Map.Entry<String,EDIFPort> e : getPortMap().entrySet()) {
+			if(e.getValue().getLegalEDIFName().equals(name)) {
+				return e.getValue();
+			}
+		}
+		return null;
+	}
 }
  
