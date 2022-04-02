@@ -1036,7 +1036,8 @@ public class DesignTools {
 	    }
 
 	    HashSet<PIP> toRemove = new HashSet<>();
-
+	    ArrayList<Node> updateFanout = new ArrayList<>();
+        
 	    for(SitePinInst p : pins) {
 	        if(p.getSite() == null) continue;
 	        if(p.getNet() != net) continue;
@@ -1052,9 +1053,13 @@ public class DesignTools {
 	            fanoutCount--;
 	            atReversedBidirectionalPip = true;
 	        }
+	        updateFanout.clear();
 	        while(curr != null && curr.size() == 1 && fanoutCount < 2){
 	            PIP pip = curr.get(0);
+	            
 	            toRemove.add(pip);
+	            Node startNode = pip.getStartNode();
+	            updateFanout.add(startNode);
 	            if (new Node(pip.getTile(), pip.getStartWireIndex()).equals(sink) && !atReversedBidirectionalPip) {
 	                // reached the source and there is another branch starting with a reversed
 	                // bidirectional PIP ... don't traverse it
@@ -1100,6 +1105,13 @@ public class DesignTools {
 	            si.unrouteIntraSiteNet(belPin, belPin);
 	        }
 	        p.setRouted(false);	        
+	        for(Node startNode : updateFanout) {
+	            Integer newFanout = fanout.get(startNode);
+	            if(newFanout != null) {
+	                newFanout--;
+	                fanout.put(startNode, newFanout);
+	            }
+	        }
 	    }
 	    ArrayList<PIP> updatedPIPs = new ArrayList<>();
 	    for(PIP pip : net.getPIPs()){
@@ -1971,6 +1983,7 @@ public class DesignTools {
 			if(pin.isInput()) continue;
 			if(pin.getBEL().getBELClass() == BELClass.RBEL) {
 				SitePIP p = siteInst.getUsedSitePIP(pin.getBELName());
+				if(p == null) continue;
 				for(BELPin pin2 : p.getInputPin().getSiteConns()) {
 					if(pin2.isOutput()) {
 						return pin2;
@@ -1978,6 +1991,20 @@ public class DesignTools {
 				}
 			}
 			return pin;
+		}
+		// Looks like the approach above failed (site may not be routed), try logical path
+		Net net = sitePinInst.getNet();
+		if(net == null) return null;
+		Design design = siteInst.getDesign();
+		EDIFNetlist netlist = design.getNetlist();
+		EDIFHierNet hierNet = netlist.getHierNetFromName(net.getName());
+		if(hierNet == null) return null;
+		List<EDIFPortInst> portInsts = hierNet.getNet().getSourcePortInsts(false);
+		for(EDIFPortInst portInst : portInsts) {
+		    Cell c = design.getCell(hierNet.getHierarchicalInstName(portInst));
+		    if(c != null) {
+		        return c.getBELPin(portInst);
+		    }
 		}
 		return null;
 	}
