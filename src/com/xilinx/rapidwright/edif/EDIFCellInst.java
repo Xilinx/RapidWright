@@ -112,7 +112,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
      */
     protected void addPortInst(EDIFPortInst epr) {
         if(portInsts == null) portInsts = new EDIFPortInstList();
-        if(!epr.getCellInst().equals(this)) 
+        if(!epr.getCellInst().equals(this))
             throw new RuntimeException("ERROR: Incorrect EDIFPortInst '"+
                 epr.getFullName()+"' being added to EDIFCellInst " + toString());
         portInsts.add(epr);

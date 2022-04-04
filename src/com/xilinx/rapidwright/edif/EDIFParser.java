@@ -185,7 +185,7 @@ public class EDIFParser extends AbstractEDIFParser implements AutoCloseable{
 
 	@Override
 	protected void linkEdifPortInstToCellInst(EDIFCell parentCell, EDIFPortInst portInst, EDIFNet net) {
-		doLinkPortInstToCellInst(parentCell, portInst, tokenizer.getUniquifier(), net);
+		doLinkPortInstToCellInst(parentCell, portInst, net);
 	}
 
 }
