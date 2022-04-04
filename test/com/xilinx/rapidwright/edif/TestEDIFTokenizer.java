@@ -234,8 +234,7 @@ public class TestEDIFTokenizer {
 
     @Test
     void testConcatenateMultibyte() throws IOException {
-        //String orig = "\uD83D\uDE0B\uD83C\uDF9B️äöüßΩΦ";
-        String orig = "Hello oworld";
+        String orig = "\uD83D\uDE0B\uD83C\uDF9B️äöüßΩΦ";
         final byte[] bytes = toByteArray(orig);
         for (int i=0;i<bytes.length;i++) {
 
