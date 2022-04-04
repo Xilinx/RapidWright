@@ -272,9 +272,8 @@ public class ParallelEDIFParser implements AutoCloseable{
                         .forEach((entry) -> {
                             EDIFCell cell = entry.getKey();
                             final EDIFPortCache edifPortCache = new EDIFPortCache(cell);
-                            for (ParallelEDIFParserWorker.LinkPortInstData linkPortInstData : entry.getValue()) {
-                                linkPortInstData.enterPort(edifPortCache);
-                            }
+                            ParallelismTools.maybeToParallel(entry.getValue().stream())
+                                    .forEach(linkPortInstData -> linkPortInstData.enterPort(edifPortCache));
                         });
         //Order is irrelevant in naming the port insts
         t.stop().start("Name port insts");
