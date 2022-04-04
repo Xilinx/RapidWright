@@ -1983,6 +1983,7 @@ public class DesignTools {
 			if(pin.isInput()) continue;
 			if(pin.getBEL().getBELClass() == BELClass.RBEL) {
 				SitePIP p = siteInst.getUsedSitePIP(pin.getBELName());
+				if(p == null) continue;
 				for(BELPin pin2 : p.getInputPin().getSiteConns()) {
 					if(pin2.isOutput()) {
 						return pin2;
@@ -1990,6 +1991,20 @@ public class DesignTools {
 				}
 			}
 			return pin;
+		}
+		// Looks like the approach above failed (site may not be routed), try logical path
+		Net net = sitePinInst.getNet();
+		if(net == null) return null;
+		Design design = siteInst.getDesign();
+		EDIFNetlist netlist = design.getNetlist();
+		EDIFHierNet hierNet = netlist.getHierNetFromName(net.getName());
+		if(hierNet == null) return null;
+		List<EDIFPortInst> portInsts = hierNet.getNet().getSourcePortInsts(false);
+		for(EDIFPortInst portInst : portInsts) {
+		    Cell c = design.getCell(hierNet.getHierarchicalInstName(portInst));
+		    if(c != null) {
+		        return c.getBELPin(portInst);
+		    }
 		}
 		return null;
 	}
