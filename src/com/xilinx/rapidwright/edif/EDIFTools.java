@@ -709,8 +709,10 @@ public class EDIFTools {
 	}
 
 	public static EDIFNetlist loadEDIFFile(Path fileName) {
-		try (EDIFParser p = new EDIFParser(fileName)) {
-			return p.parseEDIFNetlist();
+		try (/*EDIFParser p = new EDIFParser(fileName)*/
+			 ParallelEDIFParser p = new ParallelEDIFParser(fileName)) {
+			CodePerfTracker t = new CodePerfTracker(null);
+			return p.parseEDIFNetlist(t);
 		} catch (IOException e) {
 			throw new UncheckedIOException("ERROR: Couldn't read file : " + fileName, e);
 		}
