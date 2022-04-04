@@ -25,9 +25,6 @@ public class EDIFPortCache {
     }
 
     public EDIFPort getPort(String name) {
-        /*if (cache != null) {
-            return cache.get(name);
-        }*/
-        return cell.getPortByLegalName(name);
+        return cache.get(name);
     }
 }
