@@ -7,6 +7,6 @@ public class TestEDIFTools {
     @Test
     void testRename() {
         Assertions.assertEquals("emoji______", EDIFTools.makeNameEDIFCompatible("emoji_\uD83D\uDE0B\uD83C\uDF9B️"));
-        Assertions.assertEquals("_", EDIFTools.makeNameEDIFCompatible(" "));
+        Assertions.assertEquals("&_", EDIFTools.makeNameEDIFCompatible(" "));
     }
 }
