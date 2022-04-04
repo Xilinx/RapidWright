@@ -30,7 +30,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicLong;
 
 public abstract class AbstractEDIFParser {
 
@@ -472,11 +471,7 @@ public abstract class AbstractEDIFParser {
         return inst;
     }
 
-    public static AtomicLong portLookupTime = new AtomicLong();
-    public static AtomicLong portNamingTime = new AtomicLong();
-    public static AtomicLong portAddingTime = new AtomicLong();
-
-    protected static void doLinkPortInstToCellInst(EDIFCell parentCell, EDIFPortInst portInst, NameUniquifier uniquifier, EDIFNet net) {
+    protected static EDIFCell lookupPortCell(EDIFCell parentCell, EDIFPortInst portInst) {
         EDIFCell portCell = parentCell;
         if (portInst.getCellInst() != null) {
             portCell = portInst.getCellInst().getCellType();
@@ -484,27 +479,23 @@ public abstract class AbstractEDIFParser {
         if (portCell ==null) {
             throw new NullPointerException();
         }
-        long startTime = System.nanoTime();
+        return portCell;
+    }
+
+    protected void doLinkPortInstToCellInst(EDIFCell parentCell, EDIFPortInst portInst, EDIFNet net) {
+        EDIFCell portCell = lookupPortCell(parentCell, portInst);
         EDIFPort port = portCell.getPortByLegalName(portInst.getName());
-        long endTime = System.nanoTime();
-        portLookupTime.addAndGet(endTime-startTime);
 
         if(port == null) {
             throw new EDIFParseException("ERROR: Couldn't find EDIFPort for "
                     + "EDIFPortInst " + portInst.getName());
         }
         portInst.setPort(port);
-        startTime = System.nanoTime();
         String portInstName = portInst.getPortInstNameFromPort();
         portInst.setName(portInstName);
-        endTime = System.nanoTime();
-        portNamingTime.addAndGet(endTime-startTime);
-        startTime = System.nanoTime();
         if(portInst.getCellInst() != null) {
             portInst.getCellInst().addPortInst(portInst);
         }
         net.addPortInst(portInst);
-        endTime = System.nanoTime();
-        portAddingTime.addAndGet(endTime-startTime);
     }
 }

@@ -369,9 +369,13 @@ public class EDIFTools {
 			case '@':
 			case '$':
 			case '&':
+			case ' ':
 				newName[i] = '_';
 			default:
 				// Keep the same
+			}
+			if ((newName[i]>127)) {
+				newName[i] = '_';
 			}
 		}
 		if(newName[0] == '_' || Character.isDigit(newName[0])) return "&" + new String(newName,0,len); 

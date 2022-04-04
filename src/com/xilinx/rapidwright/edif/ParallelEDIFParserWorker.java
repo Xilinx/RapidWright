@@ -26,9 +26,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
@@ -37,6 +39,10 @@ import com.xilinx.rapidwright.util.ParallelismTools;
 
 public class ParallelEDIFParserWorker extends AbstractEDIFParser implements AutoCloseable{
     private static final boolean printStats = true;
+    /**
+     * Number of ports in a cell above which a map is used for port name lookup
+     */
+    private static final int PORT_LOOKUP_MAP_LIMIT = 300;
 
     //Data to limit parsing to part of the file
     protected final long offset;
@@ -51,7 +57,7 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParser implements Auto
     protected EDIFNetlist netlist = null;
     protected final List<EDIFCell> parsedCells = new ArrayList<>();
     protected final List<Pair<EDIFToken, EDIFLibrary>> libraryCache = new ArrayList<>();
-    List<LinkPortInstData> linkPortInstCache = new ArrayList<>();
+    List<List<LinkPortInstData>> linkPortInstData = new ArrayList<>();
     protected final List<CellReferenceData> linkCellReference = new ArrayList<>();
     protected EDIFDesign edifDesign = null;
     protected final List<LibraryOrCellResult> librariesAndCells = new ArrayList<>();
@@ -289,17 +295,42 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParser implements Auto
     }
 
 
+    private EDIFCell currentParentCell = null;
+    private List<LinkPortInstData> currentLinks = new ArrayList<>();
+
     @Override
     protected void linkEdifPortInstToCellInst(EDIFCell parentCell, EDIFPortInst portInst, EDIFNet net) {
-        linkPortInstCache.add(new LinkPortInstData(parentCell, portInst, net));
+        if (parentCell != currentParentCell) {
+            currentParentCell = parentCell;
+            if (!currentLinks.isEmpty()) {
+                linkPortInstData.add(currentLinks);
+            }
+            currentLinks = new ArrayList<>();
+        }
+        currentLinks.add(new LinkPortInstData(parentCell, portInst, net));
     }
 
     public Stream<CellReferenceData> streamCellReferences() {
         return ParallelismTools.maybeToParallel(linkCellReference.stream());
     }
 
-    public Stream<LinkPortInstData> streamPortInsts() {
-        return ParallelismTools.maybeToParallel(linkPortInstCache.stream());
+    public void finish() {
+        if (!currentLinks.isEmpty()) {
+            linkPortInstData.add(currentLinks);
+        }
+    }
+
+    public void linkSmallPorts(Map<EDIFCell, Collection<LinkPortInstData>> largeCellMap) {
+        for (List<LinkPortInstData> data : linkPortInstData) {
+            for (LinkPortInstData d : data) {
+                final EDIFCell cell = d.mapPortCell();
+                if (cell.getPorts().size() < PORT_LOOKUP_MAP_LIMIT) {
+                    d.portInst.setPort(cell.getPortByLegalName(d.portInst.getName()));
+                } else {
+                    largeCellMap.computeIfAbsent(cell, x-> new ConcurrentLinkedQueue<>()).add(d);
+                }
+            }
+        }
     }
 
 
@@ -332,7 +363,7 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParser implements Auto
         }
     }
 
-    static class LinkPortInstData {
+    class LinkPortInstData {
         private final EDIFCell parentCell;
         private final EDIFPortInst portInst;
         private final EDIFNet net;
@@ -343,8 +374,34 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParser implements Auto
             this.portInst = portInst;
             this.net = net;
         }
-        public void apply(NameUniquifier uniquifier) {
-            doLinkPortInstToCellInst(parentCell, portInst, uniquifier, net);
+        public void apply() {
+            doLinkPortInstToCellInst(parentCell, portInst, net);
+        }
+
+        public EDIFCell mapPortCell() {
+            return lookupPortCell(parentCell, portInst);
+        }
+
+        public void enterPort(EDIFPortCache edifPortCache) {
+            EDIFPort port;
+            if (edifPortCache != null) {
+                port = edifPortCache.getPort(portInst.getName());
+            } else {
+                port = lookupPortCell(parentCell, portInst).getPortByLegalName(portInst.getName());
+            }
+            portInst.setPort(port);
+        }
+
+        public void name() {
+            String portInstName = portInst.getPortInstNameFromPort();
+            portInst.setName(portInstName);
+        }
+
+        public void add() {
+            if(portInst.getCellInst() != null) {
+                portInst.getCellInst().addPortInst(portInst);
+            }
+            net.addPortInst(portInst);
         }
     }
 

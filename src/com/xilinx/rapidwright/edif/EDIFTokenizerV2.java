@@ -22,10 +22,16 @@
 
 package com.xilinx.rapidwright.edif;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.SequenceInputStream;
 import java.io.UncheckedIOException;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+
+import org.apache.commons.io.IOUtils;
 
 public class EDIFTokenizerV2 implements AutoCloseable, IEDIFTokenizer {
     private static final boolean debug = false;
@@ -35,6 +41,7 @@ public class EDIFTokenizerV2 implements AutoCloseable, IEDIFTokenizer {
     private final InputStream in;
 
     private final byte[] buffer;
+    private static final Charset charset = StandardCharsets.UTF_8;
 
     protected long byteOffset;
 
@@ -108,6 +115,29 @@ public class EDIFTokenizerV2 implements AutoCloseable, IEDIFTokenizer {
         this(fileName, in, uniquifier, DEFAULT_MAX_TOKEN_LENGTH);
     }
 
+
+    public static String byteArrayToStringMulti(byte[] buffer, int start1, int length1, int start2, int length2) {
+        //There might be a multi-byte character that is split between the parts. Therefore, we have to take
+        // care to first concatenate, then decode.
+        //TODO benchmark which approach is faster. Arraycopy is probably be faster for small strings?
+        if (length1+length2 < 10000) {
+            byte[] complete = new byte[length1 + length2];
+            System.arraycopy(buffer, start1, complete, 0, length1);
+            System.arraycopy(buffer, start2, complete, length1, length2);
+            return new String(complete, charset);
+        } else {
+            try {
+                InputStream firstPart = new ByteArrayInputStream(buffer, start1, length1);
+                InputStream secondPart = new ByteArrayInputStream(buffer, start2, length2);
+                InputStream input = new SequenceInputStream(firstPart, secondPart);
+
+                return IOUtils.toString(input, charset);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+
     /**
      * create a token instance from offsets
      * @param startOffset start offset inside buffer. inclusive
@@ -118,12 +148,9 @@ public class EDIFTokenizerV2 implements AutoCloseable, IEDIFTokenizer {
     protected String getUniqueToken(int startOffset, int endOffset, boolean isShortLived) {
         String tmp;
         if (endOffset >= startOffset) {
-            tmp = new String(buffer, startOffset, endOffset-startOffset);
+            tmp = new String(buffer, startOffset, endOffset-startOffset, charset);
         } else {
-            //We do string concatenation here, so we introduce a copy. It does not seem like there is any way to avoid this.
-            String strA = new String(buffer, startOffset, buffer.length-startOffset);
-            String strB = new String(buffer, 0, endOffset);
-            tmp = strA + strB;
+            tmp = byteArrayToStringMulti(buffer, startOffset, buffer.length-startOffset, 0, endOffset);
         }
         String unique = uniquifier.uniquifyName(tmp, isShortLived);
         byteOffset+=unique.length();
