@@ -27,11 +27,11 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.LongStream;
@@ -43,7 +43,7 @@ import com.xilinx.rapidwright.util.function.InputStreamSupplier;
 import org.jetbrains.annotations.NotNull;
 
 public class ParallelEDIFParser implements AutoCloseable{
-    private static final long SIZE_PER_THREAD = EDIFTokenizerV2.DEFAULT_MAX_TOKEN_LENGTH * 10L;
+    private static final long SIZE_PER_THREAD = EDIFTokenizerV2.DEFAULT_MAX_TOKEN_LENGTH * 8L;
     protected final List<ParallelEDIFParserWorker> workers = new ArrayList<>();
     protected final Path fileName;
     private final long fileSize;
@@ -134,6 +134,38 @@ public class ParallelEDIFParser implements AutoCloseable{
         return mergeParseResults(t);
     }
 
+
+    public void printNetlistStats(EDIFNetlist netlist) {
+
+        for (ParallelEDIFParserWorker worker : workers) {
+            worker.printParseStats(fileSize);
+        }
+
+        System.out.println("cell byte lengths = " + getCellByteLengths().summaryStatistics());
+
+        final LongStream portInstLinksPerThread = workers.stream().mapToLong(w -> w.linkPortInstData.size());
+
+        System.out.println("portInstLinksPerThread = " + portInstLinksPerThread.summaryStatistics());
+
+        final IntStream cellInstsPerCell     = netlist.getLibraries().stream().flatMap(l -> l.getCells().stream()).mapToInt(c -> c.getCellInsts().size());
+        final IntStream cellInstPortsPerCell = netlist.getLibraries().stream().flatMap(l -> l.getCells().stream()).mapToInt(c -> c.getCellInsts().stream().mapToInt(ci -> ci.getCellPorts().size()).sum());
+        final IntStream cellInstPortsPerCellInst = netlist.getLibraries().stream().flatMap(l -> l.getCells().stream()).flatMap(c -> c.getCellInsts().stream()).mapToInt(ci -> ci.getCellPorts().size());
+
+        final Map<String, Long> countsPerName = netlist.getLibraries().stream().flatMap(l -> l.getCells().stream()).collect(Collectors.groupingBy(EDIFName::getLegalEDIFName, Collectors.counting()));
+        LongStream nameCollisions = countsPerName.values().stream().filter(l->l!=1).mapToLong(l->l);
+
+
+        System.out.println("nameCollisions = " + nameCollisions.summaryStatistics());
+        System.out.println("cellInstsPerCell = " + cellInstsPerCell.summaryStatistics());
+        System.out.println("cellInstPortsPerCell = " + cellInstPortsPerCell.summaryStatistics());
+        System.out.println("cellInstPortsPerCellInst = " + cellInstPortsPerCellInst.summaryStatistics());
+
+        final Map<Boolean, Long> cellReferenceHasLibraryName = workers.stream().flatMap(w -> w.linkCellReference.stream()).collect(Collectors.partitioningBy(d -> d.libraryref != null, Collectors.counting()));
+        System.out.println("cellReferenceHasLibraryName = " + cellReferenceHasLibraryName);
+
+
+    }
+    
     @NotNull
     private LongStream getCellByteLengths() {
         ParallelEDIFParserWorker.LibraryOrCellResult lastItem = null;
@@ -188,6 +220,9 @@ public class ParallelEDIFParser implements AutoCloseable{
                 }
             }
         }
+        for (ParallelEDIFParserWorker worker : workers) {
+            worker.finish();
+        }
     }
 
     private EDIFDesign getEdifDesign() {
@@ -224,17 +259,45 @@ public class ParallelEDIFParser implements AutoCloseable{
         ParallelismTools.maybeToParallel(workers.stream()).flatMap(ParallelEDIFParserWorker::streamCellReferences).forEach(w->w.apply(librariesByLegalName));
     }
 
-    private void processPortInstLinks() {
-        ParallelismTools.maybeToParallel(workers.stream()).flatMap(ParallelEDIFParserWorker::streamPortInsts).forEach(cellReferenceData -> cellReferenceData.apply(uniquifier));
+    private void processPortInstLinks(CodePerfTracker t) {
+        t.start("Link Small Port Cells");
+        //We have to map from a string representation of the ports' names to the ports.
+        //Directly map the ports from small cells, add ports from large cells to this map
+        Map<EDIFCell, Collection<ParallelEDIFParserWorker.LinkPortInstData>> byPortCell = new ConcurrentHashMap<>();
+        ParallelismTools.maybeToParallel(workers.stream())
+                .forEach(worker -> worker.linkSmallPorts(byPortCell));
+        t.stop().start("Link Large Port Cells");
+        //Now we can create a map of ports just for large cells and look up the ports
+        ParallelismTools.maybeToParallel(byPortCell.entrySet().stream())
+                        .forEach((entry) -> {
+                            EDIFCell cell = entry.getKey();
+                            final EDIFPortCache edifPortCache = new EDIFPortCache(cell);
+                            for (ParallelEDIFParserWorker.LinkPortInstData linkPortInstData : entry.getValue()) {
+                                linkPortInstData.enterPort(edifPortCache);
+                            }
+                        });
+        //Order is irrelevant in naming the port insts
+        t.stop().start("Name port insts");
+                ParallelismTools.maybeToParallel(workers.stream())
+                        .flatMap(w -> w.linkPortInstData.stream())
+                        .forEach(list -> {
+                            for (ParallelEDIFParserWorker.LinkPortInstData linkPortInstData : list) {
+                                linkPortInstData.name();
+                            }
+                        });
+        t.stop().start("Add port insts");
+        //When adding the port insts, we have to make sure that we don't split a parent cell's port instances between threads
+        //That could lead to ConcurrentModificationExceptions
+        ParallelismTools.maybeToParallel(workers.stream())
+                .flatMap(w -> w.linkPortInstData.stream())
+                .forEach(list -> {
+                    for (ParallelEDIFParserWorker.LinkPortInstData linkPortInstData : list) {
+                        linkPortInstData.add();
+                    }
+                });
+        t.stop();
     }
 
-    private void printPortTime(String name, AtomicLong value) {
-
-        System.out.printf("%24s: %9.3fs (wall time, cpu time: %9.3f)\n",
-                name,
-                value.get()/1000000000.0/ForkJoinPool.commonPool().getParallelism(),
-                value.get()/1000000000.0);
-    }
     private EDIFNetlist mergeParseResults(CodePerfTracker t) {
         EDIFNetlist netlist = Objects.requireNonNull(workers.get(0).netlist);
         netlist.setDesign(getEdifDesign());
@@ -243,14 +306,8 @@ public class ParallelEDIFParser implements AutoCloseable{
         addCellsAndLibraries(netlist);
         t.stop().start("process cell inst links");
         processCellInstLinks(netlist);
-        t.stop().start("process port inst links");
-        processPortInstLinks();
         t.stop();
-
-        printPortTime("Port Lookup", AbstractEDIFParser.portLookupTime);
-        printPortTime("PortInst Naming", AbstractEDIFParser.portNamingTime);
-        printPortTime("PortInst Adding", AbstractEDIFParser.portAddingTime);
-
+        processPortInstLinks(t);
 
         return netlist;
     }
