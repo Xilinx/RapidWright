@@ -33,7 +33,6 @@ import java.util.Map.Entry;
 import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.function.Supplier;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.design.Design;
@@ -44,7 +43,6 @@ import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
-import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.util.MessageGenerator;
@@ -120,7 +118,8 @@ public class RWRoute{
 	/** A set of indices of overused rondes */
 	private Set<Routable> overUsedRnodes;
 	/** TODO */
-	RoutableGraph routingGraph;
+	protected RoutableGraph routingGraph;
+	protected long rnodesCreatedThisIteration;
 	/** The queue to store candidate nodes to route a connection */
 	private PriorityQueue<Routable> queue;
 
@@ -178,6 +177,7 @@ public class RWRoute{
 		} else {
 			routingGraph = new RoutableGraph(rnodesTimer);
 		}
+		rnodesCreatedThisIteration = 0;
 
 		routerTimer.createRuntimeTracker("determine route targets", "Initialization").start();
 		determineRoutingTargets();
@@ -718,29 +718,37 @@ public class RWRoute{
 				}
 			}
 
-			long generatedRnodes = routingGraph.numNodes() - lastIterationRnodeCount;
-			if (generatedRnodes == 0) {
-				for (Connection connection : getUnroutedConnections()) {
-					handleUnroutableConnection(connection);
-				}
+			updateCostFactors();
+
+			rnodesCreatedThisIteration = routingGraph.numNodes() - lastIterationRnodeCount;
+			List<Connection> unroutableConnections = getUnroutableConnections();
+			boolean needsResorting = false;
+			for (Connection connection : unroutableConnections) {
+				System.out.printf("CRITICAL WARNING: Unroutable connection in iteration #%d\n", routeIteration);
+				System.out.println("                 " + connection);
+				needsResorting = handleUnroutableConnection(connection) || needsResorting;
+			}
+			rnodesCreatedThisIteration = routingGraph.numNodes() - lastIterationRnodeCount;
+			for (Connection connection : getCongestedConnections()) {
+				needsResorting = handleCongestedConnection(connection) || needsResorting;
+			}
+			if (needsResorting) {
+				sortConnections();
 			}
 
 			if(config.isTimingDriven()) {
 				updateTiming();
 			}
-			
-			updateCostFactors();
 
-			printRoutingIterationStatisticsInfo(System.nanoTime() - startIteration, generatedRnodes,
+			printRoutingIterationStatisticsInfo(System.nanoTime() - startIteration, rnodesCreatedThisIteration,
 					(float) ((rnodesTimer.getTime() - lastIterationRnodeTime) * 1e-9), config.isTimingDriven());
 
 			if(overUsedRnodes.size() == 0) {
-				List<Connection> unroutedConnections = getUnroutedConnections();
-				if(unroutedConnections.isEmpty()) {
+				if(unroutableConnections.isEmpty()) {
 					break;
 				}else {
 					if(routeIteration == config.getMaxIterations() - 1) {
-						System.err.println("ERROR: Unroutable connections: " + unroutedConnections.size());
+						System.err.println("ERROR: Unroutable connections: " + unroutableConnections.size());
 					}
 				}
 			}
@@ -751,8 +759,11 @@ public class RWRoute{
 		}
 		if(routeIteration == config.getMaxIterations()) {
 			System.out.println("\nERROR: Routing terminated after " + (routeIteration -1 ) + " iterations.");
-			System.out.println("       Unroutable connections: " + getUnroutedConnections().size());
+			System.out.println("       Unroutable connections: " + getUnroutableConnections().size());
 			System.out.println("       Conflicting nodes: " + overUsedRnodes.size());
+			for (Routable rnode : overUsedRnodes) {
+				System.out.println("              " + rnode);
+			}
 		}
 	}
 	
@@ -760,7 +771,7 @@ public class RWRoute{
 	 * Gets unrouted connections.
 	 * @return A list of unrouted connections.
 	 */
-	private List<Connection> getUnroutedConnections() {
+	private List<Connection> getUnroutableConnections() {
 		List<Connection> unroutedConnections = new ArrayList<>();
 		for(Connection connection : sortedIndirectConnections) {
 			if(!connection.getSink().isRouted()) {
@@ -768,6 +779,16 @@ public class RWRoute{
 			}
 		}
 		return unroutedConnections;
+	}
+
+	private List<Connection> getCongestedConnections() {
+		List<Connection> congestedConnections = new ArrayList<>();
+		for(Connection connection : sortedIndirectConnections) {
+			if (connection.isCongested()) {
+				congestedConnections.add(connection);
+			}
+		}
+		return congestedConnections;
 	}
 	
 	/**
@@ -796,14 +817,7 @@ public class RWRoute{
 			if(connection.getCriticality() > minRerouteCriticality) {
 				return true;
 			}
-			if(connection.isCongested() || !connection.getSink().isRouted()) {
-				if(config.isEnlargeBoundingBox()) {
-					connection.enlargeBoundingBox(config.getExtensionXIncrement(), config.getExtensionYIncrement());
-				}
-				return true;
-			}else {
-				return false;
-			}
+			return connection.isCongested() || !connection.getSink().isRouted();
 		}
 	}
 	
@@ -889,6 +903,7 @@ public class RWRoute{
 	 * Sorts indirect connections for routing.
 	 */
 	protected void sortConnections(){
+		// TODO: Sort in place
 		sortedIndirectConnections = new ArrayList<>();
 		sortedIndirectConnections.addAll(indirectConnections);
 		sortedIndirectConnections.sort((connection1, connection2) -> {
@@ -1216,9 +1231,9 @@ public class RWRoute{
 			connection.getSink().setRouted(false);
 			connection.getSinkRnode().setTarget(false);
 			routingGraph.resetExpansion();
-			System.out.printf("CRITICAL WARNING: Unroutable connection in iteration #%d\n", routeIteration);
-			System.out.println("                 " + connection);
-			handleUnroutableConnection(connection);
+			// System.out.printf("CRITICAL WARNING: Unroutable connection in iteration #%d\n", routeIteration);
+			// System.out.println("                 " + connection);
+			// handleUnroutableConnection(connection);
 		}
 	}
 	
@@ -1227,7 +1242,17 @@ public class RWRoute{
 	 * @param connection The failed connection.
 	 */
 	protected boolean handleUnroutableConnection(Connection connection) {
+		if(config.isEnlargeBoundingBox()) {
+			connection.enlargeBoundingBox(config.getExtensionXIncrement(), config.getExtensionYIncrement());
+		}
 		return routeIteration == 1 && swapOutputPin(connection);
+	}
+
+	protected boolean handleCongestedConnection(Connection connection) {
+		if(config.isEnlargeBoundingBox()) {
+			connection.enlargeBoundingBox(config.getExtensionXIncrement(), config.getExtensionYIncrement());
+		}
+		return false;
 	}
 	
 	/**

@@ -43,11 +43,13 @@ public class NetWrapper{
 	private float yCenter;
 	/** The half-perimeter wirelength */
 	private short doubleHpwl;
-	
+	private boolean partiallyPreserved;
+
 	public NetWrapper(int id, Net net){
 		this.id = id;
 		this.net = net;
 		connections = new ArrayList<>();
+		partiallyPreserved = false;
 	}
 	
 	public void computeHPWLAndCenterCoordinates(){
@@ -111,6 +113,14 @@ public class NetWrapper{
 
 	public float getXCenter() {
 		return xCenter;
+	}
+
+	public void setPartiallyPreserved(boolean partiallyPreserved) {
+		this.partiallyPreserved = partiallyPreserved;
+	}
+
+	public boolean getPartiallyPreserved() {
+		return partiallyPreserved;
 	}
 
 	@Override

@@ -23,17 +23,16 @@
 
 package com.xilinx.rapidwright.rwroute;
 
-import java.util.List;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.Map;
-import java.util.regex.Pattern;
+import java.util.Set;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
-import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
-import com.xilinx.rapidwright.device.Site;
-import com.xilinx.rapidwright.device.SitePin;
+import com.xilinx.rapidwright.device.Tile;
 
 /**
  * TODO
@@ -149,17 +148,102 @@ public class ECORouter extends PartialRouter {
 
     @Override
     protected boolean handleUnroutableConnection(Connection connection) {
+        if(config.isEnlargeBoundingBox()) {
+            connection.enlargeBoundingBox(config.getExtensionXIncrement(), config.getExtensionYIncrement());
+        }
         if (routeIteration > 1) {
-            unrouteReservedNetsToReleaseResources(connection);
-            return true;
+            if (rnodesCreatedThisIteration == 0) {
+                unpreserveNetsAndReleaseResources(connection);
+                return true;
+            }
         }
         return super.handleUnroutableConnection(connection);
     }
 
+    @Override
+    protected Collection<Net> pickNetsToUnpreserve(Connection connection) {
+        Set<Net> unpreserveNets = new HashSet<>();
+
+        // Find those preserved nets that are using downhill nodes of the source pin node
+        for(Node node : connection.getSourceRnode().getNode().getAllDownhillNodes()) {
+            Net toRoute = routingGraph.getPreservedNet(node);
+            if(toRoute == null) continue;
+            if(toRoute.isClockNet() || toRoute.isStaticNet()) continue;
+            unpreserveNets.add(toRoute);
+        }
+
+        unpreserveNets.removeIf((net) -> {
+            NetWrapper netWrapper = nets.get(net);
+            if (netWrapper == null)
+                return false;
+            if (netWrapper.getPartiallyPreserved())
+                return false;
+            // Net already seen and is fully unpreserved
+            return true;
+        });
+
+        return unpreserveNets;
+    }
+
+    // @Override
+    // protected boolean handleCongestedConnection(Connection connection) {
+    //     super.handleCongestedConnection(connection);
+    //
+    //     if (routeIteration > 1) {
+    //         if (rnodesCreatedThisIteration == 0) {
+    //             // NetWrapper netWrapper = connection.getNetWrapper();
+    //             // if (netWrapper.getPartiallyPreserved()) {
+    //             //     Net net = netWrapper.getNet();
+    //             //     System.out.println("INFO: Unpreserving rest of '" + net + "' due to congestion");
+    //             //     unpreserveNet(net);
+    //             //     return true;
+    //             // }
+    //             //
+    //             // return false;
+    //
+    //             Set<Tile> overUsedTiles = new HashSet<>();
+    //             for(Routable rn : connection.getRnodes()){
+    //                 if(rn.isOverUsed()) {
+    //                     overUsedTiles.add(rn.getNode().getTile());
+    //                 }
+    //             }
+    //
+    //             Set<Net> unpreserveNets = new HashSet<>();
+    //             for (Tile tile : overUsedTiles) {
+    //                 for (int wire = 0; wire < tile.getWireCount(); wire++) {
+    //                     Node node = Node.getNode(tile, wire);
+    //                     Net net = routingGraph.getPreservedNet(node);
+    //                     if (net == null)
+    //                         continue;
+    //                     if (net.isClockNet() || net.isStaticNet())
+    //                         continue;
+    //                     NetWrapper netWrapper = nets.get(net);
+    //                     if (netWrapper != null && !netWrapper.getPartiallyPreserved())
+    //                         continue;
+    //
+    //                     unpreserveNets.add(net);
+    //                 }
+    //             }
+    //
+    //             if (!unpreserveNets.isEmpty()) {
+    //                 System.out.println("INFO: Unpreserving " + unpreserveNets.size() + " nets in vicinity of congestion");
+    //                 for (Net net : unpreserveNets) {
+    //                     System.out.println("\t" + net);
+    //                     unpreserveNet(net);
+    //                 }
+    //                 return true;
+    //             }
+    //         }
+    //     }
+    //     return false;
+    // }
+
     public static Design routeDesign(Design design) {
         RWRouteConfig config = new RWRouteConfig(new String[] {
                 "--partialRouting",
-                "--fixBoundingBox",
+                // "--fixBoundingBox",
+                // "--boundingBoxExtensionX 6", // Necessary to ensure that we can reach a Laguna column
+                "--enlargeBoundingBox", // Necessary to ensure that we can reach a Laguna column
                 "--nonTimingDriven",
                 "--verbose"});
         return routeDesign(design, config, () -> new ECORouter(design, config));
