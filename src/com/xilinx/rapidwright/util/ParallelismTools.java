@@ -22,8 +22,6 @@
 
 package com.xilinx.rapidwright.util;
 
-import org.jetbrains.annotations.NotNull;
-
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -40,6 +38,9 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RunnableFuture;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
+
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Utilities to aid in parallel processing
@@ -359,5 +360,19 @@ public class ParallelismTools {
      */
     public static <T> RunnableFuture<T> adapt(Callable<T> task) {
         return new FutureTask<>(task);
+    }
+
+    /**
+     * If parallelism is enabled, return the result of the parameter's parallel() method. Otherwise,
+     * return it unchanged
+     * @param stream the stream to parallelize
+     * @param <T> stream type
+     * @return parallel version or unchanged input stream
+     */
+    public static <T> Stream<T> maybeToParallel(Stream<T> stream) {
+        if (getParallel()) {
+            return stream.parallel();
+        }
+        return stream;
     }
 }
