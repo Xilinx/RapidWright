@@ -1,15 +1,14 @@
 package com.xilinx.rapidwright.edif;
 
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.Path;
 import java.util.Objects;
 
 import com.xilinx.rapidwright.util.function.ThrowingFunction;
-import org.apache.commons.io.IOUtils;
 
+/**
+ * Compare the results of two different EDIF tokenizers
+ */
 public class ComparingEDIFTokenizer implements IEDIFTokenizer{
     private final IEDIFTokenizer a;
     private final IEDIFTokenizer b;
@@ -58,20 +57,12 @@ public class ComparingEDIFTokenizer implements IEDIFTokenizer{
         return forAll(IEDIFTokenizer::getByteOffset);
     }
 
-    public static ComparingEDIFTokenizer bufferAndCreateTokenizers(Path fileName, InputStream is, NameUniquifier uniquifier, int maxTokenLength) throws IOException {
-
-
-        ByteArrayOutputStream os = new ByteArrayOutputStream();
-        IOUtils.copy(is, os);
-        final byte[] bytes = os.toByteArray();
-
-
-        IEDIFTokenizer a = new LegacyEDIFTokenizer(fileName, new ByteArrayInputStream(bytes), uniquifier, maxTokenLength);
-        IEDIFTokenizer b = new EDIFTokenizerV2(fileName, new ByteArrayInputStream(bytes), uniquifier, maxTokenLength);
+    public static ComparingEDIFTokenizer createTokenizers(byte[] bytes, NameUniquifier uniquifier, int maxTokenLength) throws IOException {
+        IEDIFTokenizer a = new LegacyEDIFTokenizer(null, new ByteArrayInputStream(bytes), uniquifier, maxTokenLength);
+        IEDIFTokenizer b = new EDIFTokenizerV2(null, new ByteArrayInputStream(bytes), uniquifier, maxTokenLength);
         return new ComparingEDIFTokenizer(a,b);
     }
-
-    public static ComparingEDIFTokenizer bufferAndCreateTokenizers(Path fileName, InputStream is, NameUniquifier uniquifier) throws IOException {
-        return bufferAndCreateTokenizers(fileName, is, uniquifier, EDIFTokenizerV2.DEFAULT_MAX_TOKEN_LENGTH);
+    public static ComparingEDIFTokenizer createTokenizers(byte[] bytes, NameUniquifier uniquifier) throws IOException {
+        return createTokenizers(bytes, uniquifier, EDIFTokenizerV2.DEFAULT_MAX_TOKEN_LENGTH);
     }
 }

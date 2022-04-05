@@ -90,8 +90,6 @@ public abstract class AbstractEDIFParser {
     public AbstractEDIFParser(Path fileName, NameUniquifier uniquifier) throws FileNotFoundException {
         try {
             in = Files.newInputStream(fileName);
-            //InputStream in2 = new BufferedInputStream(Files.newInputStream(fileName));
-            //tokenizer = new ComparingEDIFTokenizer(new EDIFTokenizer(fileName, in2, uniquifier), new EDIFTokenizerV2(fileName, in, uniquifier));
             tokenizer = new EDIFTokenizerV2(fileName, in, uniquifier);
         } catch (FileNotFoundException e) {
             throw e;
@@ -125,7 +123,7 @@ public abstract class AbstractEDIFParser {
             String name = getNextToken(false);
             if(name.charAt(0) == '[' && name.length() >= 2 &&  name.charAt(1) == ']'){
                 String tmpName = name.substring(2);
-                name = tokenizer.getUniquifier().uniquifyName(tmpName, false);
+                name = tokenizer.getUniquifier().uniquifyName(tmpName);
             }
             o.setName(name);
             expect(EDIFParser.RIGHT_PAREN, getNextToken(true));
