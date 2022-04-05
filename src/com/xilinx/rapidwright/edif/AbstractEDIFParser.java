@@ -75,22 +75,22 @@ public abstract class AbstractEDIFParser {
     public static final String METAX = "metax";
     public static final String OWNER = "owner";
 
-    protected final IEDIFTokenizer tokenizer;
+    protected final EDIFTokenizer tokenizer;
     protected final InputStream in;
 
     public AbstractEDIFParser(Path fileName, InputStream in, NameUniquifier uniquifier, int maxTokenLength) {
         this.in = in;
-        this.tokenizer = new EDIFTokenizerV2(fileName, in, uniquifier, maxTokenLength);
+        this.tokenizer = new EDIFTokenizer(fileName, in, uniquifier, maxTokenLength);
     }
 
     public AbstractEDIFParser(Path fileName, InputStream in, NameUniquifier uniquifier) {
-        this(fileName, in, uniquifier, EDIFTokenizerV2.DEFAULT_MAX_TOKEN_LENGTH);
+        this(fileName, in, uniquifier, EDIFTokenizer.DEFAULT_MAX_TOKEN_LENGTH);
     }
 
     public AbstractEDIFParser(Path fileName, NameUniquifier uniquifier) throws FileNotFoundException {
         try {
             in = Files.newInputStream(fileName);
-            tokenizer = new EDIFTokenizerV2(fileName, in, uniquifier);
+            tokenizer = new EDIFTokenizer(fileName, in, uniquifier);
         } catch (FileNotFoundException e) {
             throw e;
         } catch (IOException e) {
