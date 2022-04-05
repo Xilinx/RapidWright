@@ -374,7 +374,7 @@ public class EDIFTools {
 			default:
 				// Keep the same
 			}
-			if ((newName[i]>127)) {
+			if (newName[i]>127) {
 				newName[i] = '_';
 			}
 		}
