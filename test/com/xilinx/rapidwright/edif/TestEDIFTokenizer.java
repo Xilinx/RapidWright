@@ -24,11 +24,11 @@ package com.xilinx.rapidwright.edif;
 
 import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.PrintStream;
 import java.io.UncheckedIOException;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -122,21 +122,20 @@ public class TestEDIFTokenizer {
                 + firstSuffix + ", last full token: " + allTokens.get(allTokens.size() - 1);
     }
 
+    private byte[] toByteArray(String s) {
+        final ByteBuffer buffer = StandardCharsets.UTF_8.encode(s);
+        byte[] data = new byte[buffer.limit()];
+        buffer.get(data);
+        return data;
+    }
+
     private InputStream stringToInputStream(String s) {
-        byte[] bytes;
-        try (ByteArrayOutputStream os = new ByteArrayOutputStream();
-             PrintStream ps = new PrintStream(os)) {
-            ps.print(s);
-            bytes = os.toByteArray();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-        return new ByteArrayInputStream(bytes);
+        return new ByteArrayInputStream(toByteArray(s));
     }
 
     @Test
     public void readEmptyQuotes() throws IOException {
-        IEDIFTokenizer tokenizerV2 = ComparingEDIFTokenizer.bufferAndCreateTokenizers(null, stringToInputStream("\"\""), NameUniquifier.singleThreadedUniquifier());
+        IEDIFTokenizer tokenizerV2 = ComparingEDIFTokenizer.createTokenizers(toByteArray("\"\""), NameUniquifier.singleThreadedUniquifier());
         final EDIFToken token = tokenizerV2.getOptionalNextToken(true);
         Assertions.assertNotNull(token);
         Assertions.assertEquals("", token.text);
@@ -144,17 +143,8 @@ public class TestEDIFTokenizer {
     }
 
     @Test
-    public void testTooLongToken() throws IOException {
-        byte[] data = new byte[1000];
-        for (int i = 0; i < data.length; i++) {
-            switch (i%4) {
-                case 0: data[i]='A';break;
-                case 1: data[i]='S';break;
-                case 2: data[i]='D';break;
-                case 3: data[i]='F';break;
-            }
-        }
-        ByteArrayInputStream is = new ByteArrayInputStream(data);
+    public void testTooLongToken() {
+        InputStream is = stringToInputStream(repeatString("ASDF", 250));
         IEDIFTokenizer tokenizer = new EDIFTokenizerV2(null, is, NameUniquifier.singleThreadedUniquifier(), 256);
         Assertions.assertThrows(TokenTooLongException.class, () -> tokenizer.getOptionalNextToken(true));
     }
@@ -233,7 +223,7 @@ public class TestEDIFTokenizer {
 
 
     @Test
-    void testConcatenateMultibyte() throws IOException {
+    void testConcatenateMultibyte() {
         String orig = "\uD83D\uDE0B\uD83C\uDF9B️äöüßΩΦ";
         final byte[] bytes = toByteArray(orig);
         for (int i=0;i<bytes.length;i++) {
@@ -243,13 +233,6 @@ public class TestEDIFTokenizer {
         }
     }
 
-    private byte[] toByteArray(String orig) throws IOException {
-        try (ByteArrayOutputStream out = new ByteArrayOutputStream();
-                PrintStream ps = new PrintStream(out); ) {
-            ps.print(orig);
-            return out.toByteArray();
-        }
-    }
 
 
 }

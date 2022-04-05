@@ -34,7 +34,6 @@ import java.nio.file.Path;
 import org.apache.commons.io.IOUtils;
 
 public class EDIFTokenizerV2 implements AutoCloseable, IEDIFTokenizer {
-    private static final boolean debug = false;
 
     private final Path fileName;
 
@@ -116,10 +115,20 @@ public class EDIFTokenizerV2 implements AutoCloseable, IEDIFTokenizer {
     }
 
 
+    /**
+     * Read two separate locations from a buffer, concatenating them into a single string.
+     * Suppports multi-byte characters split between the two parts
+     * @param buffer the buffer to read from
+     * @param start1 first part start
+     * @param length1 first part length
+     * @param start2 second part start
+     * @param length2 second part length
+     * @return the string assembled from the two locations
+     */
     public static String byteArrayToStringMulti(byte[] buffer, int start1, int length1, int start2, int length2) {
-        //There might be a multi-byte character that is split between the parts. Therefore, we have to take
+        //To support multi-byte characters being split between the parts, we have to take
         // care to first concatenate, then decode.
-        //TODO benchmark which approach is faster. Arraycopy is probably be faster for small strings?
+        //TODO benchmark which approach is faster. Arraycopy is probably faster for small strings?
         if (length1+length2 < 10000) {
             byte[] complete = new byte[length1 + length2];
             System.arraycopy(buffer, start1, complete, 0, length1);
@@ -142,28 +151,30 @@ public class EDIFTokenizerV2 implements AutoCloseable, IEDIFTokenizer {
      * create a token instance from offsets
      * @param startOffset start offset inside buffer. inclusive
      * @param endOffset end offset inside buffer. exclusive
-     * @param isShortLived only long lived tokens will get uniquified
-     * @return
+     * @param isShortLived skip uniquifying if true
+     * @return decoded token text
      */
     protected String getUniqueToken(int startOffset, int endOffset, boolean isShortLived) {
-        String tmp;
+        String token;
         if (endOffset >= startOffset) {
-            tmp = new String(buffer, startOffset, endOffset-startOffset, charset);
+            token = new String(buffer, startOffset, endOffset-startOffset, charset);
         } else {
-            tmp = byteArrayToStringMulti(buffer, startOffset, buffer.length-startOffset, 0, endOffset);
+            token = byteArrayToStringMulti(buffer, startOffset, buffer.length-startOffset, 0, endOffset);
         }
-        String unique = uniquifier.uniquifyName(tmp, isShortLived);
-        byteOffset+=unique.length();
-        available-=unique.length();
+        if (!isShortLived) {
+            token = uniquifier.uniquifyName(token);
+        }
+        byteOffset+= token.length();
+        available-= token.length();
         if (available<0) {
-            throw new EDIFParseException("Token probably too long or failed to fetch data in time: "+unique+" at "+byteOffset);
+            throw new EDIFParseException("Token probably too long or failed to fetch data in time: "+ token +" at "+byteOffset);
         }
-        return unique;
+        return token;
     }
 
     /**
-     * Starting quote is expected to have already been read. Searching for closing quote and return everything before.
-     * @return
+     * Starting quote is expected to have already been read. Searching for closing quote and return everything between.
+     * @return The token
      */
     private String getQuotedToken(boolean isShortLived) throws IOException {
         int offsetStart = offset;
@@ -219,17 +230,16 @@ public class EDIFTokenizerV2 implements AutoCloseable, IEDIFTokenizer {
         }
     }
 
-    private static boolean[] makeTokenEnderTable(int size) {
-        boolean[] res = new boolean[size];
-        for (int i = 0; i < size; i++) {
+    private static boolean[] makeTokenEnderTable() {
+        boolean[] res = new boolean[256];
+        for (int i = 0; i < 256; i++) {
             char c = (char) i;
             res[i] = endsTokenSwitch(c);
         }
         return res;
     }
 
-    private static final boolean[] ENDS_TOKEN_ASCII = makeTokenEnderTable(128);
-    private static final boolean[] ENDS_TOKEN = makeTokenEnderTable(256);
+    private static final boolean[] ENDS_TOKEN = makeTokenEnderTable();
 
 
     /**
@@ -250,6 +260,7 @@ public class EDIFTokenizerV2 implements AutoCloseable, IEDIFTokenizer {
 
         //This is the hottest loop in the whole parser. Just look for anything that ends a token, figure out the reason
         //after the loop.
+        //Inverting the result of endsTokenOpt performed better than having a continuesToken function.
         while (!endsTokenOpt((char)current)) {
             offset=bufferAddressMask & (offset+1);
             current=buffer[offset];
@@ -276,6 +287,11 @@ public class EDIFTokenizerV2 implements AutoCloseable, IEDIFTokenizer {
         return res;
     }
 
+    /**
+     * Get the next token object
+     * @param isShortLived skip uniquifying if true
+     * @return token object, or null if at end of file
+     */
     public EDIFToken getOptionalNextToken(boolean isShortLived) {
         String tokenText = getOptionalNextTokenString(isShortLived);
         if (tokenText==null) {
@@ -284,6 +300,11 @@ public class EDIFTokenizerV2 implements AutoCloseable, IEDIFTokenizer {
         return new EDIFToken(tokenText, byteOffset);
     }
 
+    /**
+     * Get the next token string
+     * @param isShortLived skip uniquifying if true
+     * @return token text, or null if at end of file
+     */
     public String getOptionalNextTokenString(boolean isShortLived) {
         try {
             char ch;
@@ -340,7 +361,7 @@ public class EDIFTokenizerV2 implements AutoCloseable, IEDIFTokenizer {
      * and outside of quotes to determine this case. The higher ratio is probably outside.
      * @return True if we succeeded, false if reached EOF
      */
-    private boolean advanceToEndOfQuote() throws IOException {
+    private boolean advanceToEndOfQuote() {
         if (offset != 0) {
             throw new RuntimeException("can only advance if current offset is zero!");
         }
@@ -358,8 +379,8 @@ public class EDIFTokenizerV2 implements AutoCloseable, IEDIFTokenizer {
         Integer firstQuoteOffset = null;
         for (int i = 0; i < available; i++) {
             int ch = buffer[i];
-            if (ch == -1) {
-                throw new IllegalStateException("unexpected -1");
+            if (ch == 0) {
+                throw new IllegalStateException("unexpected end of file marker");
             }
             if (ch == '"') {
                 inQuote = !inQuote;
@@ -398,11 +419,10 @@ public class EDIFTokenizerV2 implements AutoCloseable, IEDIFTokenizer {
 
     /**
      * Advance to the next token ending character but don't consume it
-     * @throws IOException
      */
-    void advanceToTokenEnder() throws IOException{
+    void advanceToTokenEnder() {
         int ch;
-        while ((ch = buffer[offset]) != -1) {
+        while ((ch = buffer[offset]) != 0) {
             if (endsTokenOpt((char)ch)) {
                 return;
             }
@@ -414,8 +434,8 @@ public class EDIFTokenizerV2 implements AutoCloseable, IEDIFTokenizer {
     /**
      * In parallel loading, we seek ahead by some offset. We probably end up inside some token.
      *
-     * This method tries to advance to the next token boundary. This is just a guess that needs to verified once the
-     * thread that reads the preceding part of the file catches up to this one.
+     * This method tries to advance to the next token boundary. This is an educated guess that needs to be verified once
+     * the thread that reads the preceding part of the file catches up to this one.
      */
     private void advanceToTokenBeginning() throws IOException {
         fill();
@@ -438,6 +458,12 @@ public class EDIFTokenizerV2 implements AutoCloseable, IEDIFTokenizer {
         byteOffset += i;
     }
 
+    /**
+     * Skip ahead by some offset. 
+     * After skipping, this method tries to advance to the next token boundary. This is an educated guess that needs
+     * to be verified once the thread that reads the preceding part of the file catches up to this one.
+     * @param i offset to advance by
+     */
     public void skip(long i) {
         if (i == 0) {
             return;
