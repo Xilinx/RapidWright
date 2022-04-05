@@ -34,14 +34,15 @@ import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import java.util.stream.LongStream;
 
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.ParallelismTools;
 import com.xilinx.rapidwright.util.function.InputStreamSupplier;
-import org.jetbrains.annotations.NotNull;
 
+/**
+ * Fast EDIF Parser using parallelism
+ */
 public class ParallelEDIFParser implements AutoCloseable{
     private static final long SIZE_PER_THREAD = EDIFTokenizerV2.DEFAULT_MAX_TOKEN_LENGTH * 8L;
     protected final List<ParallelEDIFParserWorker> workers = new ArrayList<>();
@@ -102,6 +103,7 @@ public class ParallelEDIFParser implements AutoCloseable{
         final List<ParallelEDIFParserWorker> failedWorkers = ParallelismTools.maybeToParallel(workers.stream())
                 .filter(w -> !w.parseFirstToken())
                 .collect(Collectors.toList());
+
         if (!failedWorkers.isEmpty() && !Device.QUIET_MESSAGE) {
             for (ParallelEDIFParserWorker failedWorker : failedWorkers) {
                 if (failedWorker.parseException!=null) {
@@ -109,7 +111,7 @@ public class ParallelEDIFParser implements AutoCloseable{
                     if (failedWorker.parseException instanceof TokenTooLongException) {
                         //Message contains a hint to a constant that the user should adjust.
                         //Token misdetection is the more likely cause, so let's adjust it
-                        message = "Likely token mistetection";
+                        message = "Likely token misdetection";
                     }
                     System.err.println("Removing failed thread "+failedWorker+": "+ message);
                 } else {
@@ -133,54 +135,6 @@ public class ParallelEDIFParser implements AutoCloseable{
 
         return mergeParseResults(t);
     }
-
-
-    public void printNetlistStats(EDIFNetlist netlist) {
-
-        for (ParallelEDIFParserWorker worker : workers) {
-            worker.printParseStats(fileSize);
-        }
-
-        System.out.println("cell byte lengths = " + getCellByteLengths().summaryStatistics());
-
-        final LongStream portInstLinksPerThread = workers.stream().mapToLong(w -> w.linkPortInstData.size());
-
-        System.out.println("portInstLinksPerThread = " + portInstLinksPerThread.summaryStatistics());
-
-        final IntStream cellInstsPerCell     = netlist.getLibraries().stream().flatMap(l -> l.getCells().stream()).mapToInt(c -> c.getCellInsts().size());
-        final IntStream cellInstPortsPerCell = netlist.getLibraries().stream().flatMap(l -> l.getCells().stream()).mapToInt(c -> c.getCellInsts().stream().mapToInt(ci -> ci.getCellPorts().size()).sum());
-        final IntStream cellInstPortsPerCellInst = netlist.getLibraries().stream().flatMap(l -> l.getCells().stream()).flatMap(c -> c.getCellInsts().stream()).mapToInt(ci -> ci.getCellPorts().size());
-
-        final Map<String, Long> countsPerName = netlist.getLibraries().stream().flatMap(l -> l.getCells().stream()).collect(Collectors.groupingBy(EDIFName::getLegalEDIFName, Collectors.counting()));
-        LongStream nameCollisions = countsPerName.values().stream().filter(l->l!=1).mapToLong(l->l);
-
-
-        System.out.println("nameCollisions = " + nameCollisions.summaryStatistics());
-        System.out.println("cellInstsPerCell = " + cellInstsPerCell.summaryStatistics());
-        System.out.println("cellInstPortsPerCell = " + cellInstPortsPerCell.summaryStatistics());
-        System.out.println("cellInstPortsPerCellInst = " + cellInstPortsPerCellInst.summaryStatistics());
-
-        final Map<Boolean, Long> cellReferenceHasLibraryName = workers.stream().flatMap(w -> w.linkCellReference.stream()).collect(Collectors.partitioningBy(d -> d.libraryref != null, Collectors.counting()));
-        System.out.println("cellReferenceHasLibraryName = " + cellReferenceHasLibraryName);
-
-
-    }
-    
-    @NotNull
-    private LongStream getCellByteLengths() {
-        ParallelEDIFParserWorker.LibraryOrCellResult lastItem = null;
-        final LongStream.Builder lengths = LongStream.builder();
-        for (ParallelEDIFParserWorker worker : workers) {
-            for (ParallelEDIFParserWorker.LibraryOrCellResult item : worker.librariesAndCells) {
-                if (lastItem !=null && (item instanceof ParallelEDIFParserWorker.CellResult)) {
-                    lengths.add(item.getToken().byteOffset - lastItem.getToken().byteOffset);
-                }
-                lastItem = item;
-            }
-        }
-        return lengths.build();
-    }
-
 
     private void doParse() {
         ParallelismTools.maybeToParallel(workers.stream()).forEach(w->w.doParse(false));
@@ -275,7 +229,7 @@ public class ParallelEDIFParser implements AutoCloseable{
                             ParallelismTools.maybeToParallel(entry.getValue().stream())
                                     .forEach(linkPortInstData -> linkPortInstData.enterPort(edifPortCache));
                         });
-        //Order is irrelevant in naming the port insts
+        //Name the port insts, order is not important
         t.stop().start("Name port insts");
                 ParallelismTools.maybeToParallel(workers.stream())
                         .flatMap(w -> w.linkPortInstData.stream())
@@ -285,7 +239,8 @@ public class ParallelEDIFParser implements AutoCloseable{
                             }
                         });
         t.stop().start("Add port insts");
-        //When adding the port insts, we have to make sure that we don't split a parent cell's port instances between threads
+        //When adding the port insts, we have to make sure that we don't split a parent cell's port instances
+        // between threads.
         //That could lead to ConcurrentModificationExceptions
         ParallelismTools.maybeToParallel(workers.stream())
                 .flatMap(w -> w.linkPortInstData.stream())

@@ -40,7 +40,7 @@ public class LegacyEDIFTokenizer implements AutoCloseable, IEDIFTokenizer {
 
     private final char[] buffer;
 
-    private final Deque<EDIFToken> nextTokens = new LinkedList<>(); //TODO Try ArrayDeque
+    private final Deque<EDIFToken> nextTokens = new LinkedList<>();
 
     protected long byteOffset;
 
@@ -62,9 +62,11 @@ public class LegacyEDIFTokenizer implements AutoCloseable, IEDIFTokenizer {
     }
 
     private EDIFToken getUniqueToken(long tokenStart, char[] buffer, int offset, int count, boolean isShortLived){
-        String tmp = new String(buffer, offset, count);
-        String unique = uniquifier.uniquifyName(tmp, isShortLived);
-        return new EDIFToken(unique, tokenStart+unique.length());
+        String token = new String(buffer, offset, count);
+        if (!isShortLived) {
+            token = uniquifier.uniquifyName(token);
+        }
+        return new EDIFToken(token, tokenStart+token.length());
     }
 
     /**

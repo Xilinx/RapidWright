@@ -46,10 +46,7 @@ public class NameUniquifier {
         return new NameUniquifier(new HashMap<>());
     }
 
-    public String uniquifyName(String tmpName, boolean isShortLived) {
-        if (isShortLived) {
-            return tmpName;
-        }
+    public String uniquifyName(String tmpName) {
         return stringPool.computeIfAbsent(tmpName, Function.identity());
     }
 
