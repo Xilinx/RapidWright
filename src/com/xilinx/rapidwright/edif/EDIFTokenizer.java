@@ -33,7 +33,7 @@ import java.nio.file.Path;
 
 import org.apache.commons.io.IOUtils;
 
-public class EDIFTokenizerV2 implements AutoCloseable, IEDIFTokenizer {
+public class EDIFTokenizer implements AutoCloseable {
 
     private final Path fileName;
 
@@ -97,7 +97,7 @@ public class EDIFTokenizerV2 implements AutoCloseable, IEDIFTokenizer {
         }
     }
 
-    public EDIFTokenizerV2(Path fileName, InputStream in, NameUniquifier uniquifier, int maxTokenLength) {
+    public EDIFTokenizer(Path fileName, InputStream in, NameUniquifier uniquifier, int maxTokenLength) {
         this.fileName = fileName;
         this.in = in;
         this.uniquifier = uniquifier;
@@ -110,7 +110,7 @@ public class EDIFTokenizerV2 implements AutoCloseable, IEDIFTokenizer {
         this.buffer = new byte[maxTokenLength*2];
     }
 
-    public EDIFTokenizerV2(Path fileName, InputStream in, NameUniquifier uniquifier) {
+    public EDIFTokenizer(Path fileName, InputStream in, NameUniquifier uniquifier) {
         this(fileName, in, uniquifier, DEFAULT_MAX_TOKEN_LENGTH);
     }
 
@@ -476,12 +476,10 @@ public class EDIFTokenizerV2 implements AutoCloseable, IEDIFTokenizer {
         }
     }
 
-    @Override
     public NameUniquifier getUniquifier() {
         return uniquifier;
     }
 
-    @Override
     public long getByteOffset() {
         return byteOffset;
     }
