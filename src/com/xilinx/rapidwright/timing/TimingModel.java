@@ -20,6 +20,25 @@
 
 package com.xilinx.rapidwright.timing;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
+import java.io.PrintStream;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.EnumMap;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
@@ -37,25 +56,6 @@ import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.util.FileTools;
-
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
-import java.io.PrintStream;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.EnumMap;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.LinkedList;
-import java.util.Arrays;
-import java.util.Map;
-import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * A TimingModel calculates net delay by implementing the lightweight timing model described in our 
@@ -790,13 +790,13 @@ public class TimingModel {
             }
         }
 
-        res.put("CKEN1", (short) SITEPIN_CKEN1_DELAY);
-        res.put("CKEN2", (short) SITEPIN_CKEN2_DELAY);
-        res.put("CKEN3", (short) SITEPIN_CKEN3_DELAY);
-        res.put("CKEN4", (short) SITEPIN_CKEN4_DELAY);
-        res.put("SRST1", (short) SITEPIN_SRST1_DELAY);
-        res.put("SRST2", (short) SITEPIN_SRST2_DELAY);
-        res.put("WCKEN", (short) SITEPIN_WCKEN_DELAY);
+        res.put("CKEN1",Float.valueOf(SITEPIN_CKEN1_DELAY).shortValue());
+        res.put("CKEN2",Float.valueOf(SITEPIN_CKEN2_DELAY).shortValue());
+        res.put("CKEN3",Float.valueOf(SITEPIN_CKEN3_DELAY).shortValue());
+        res.put("CKEN4",Float.valueOf(SITEPIN_CKEN4_DELAY).shortValue());
+        res.put("SRST1",Float.valueOf(SITEPIN_SRST1_DELAY).shortValue());
+        res.put("SRST2",Float.valueOf(SITEPIN_SRST2_DELAY).shortValue());
+        res.put("WCKEN",Float.valueOf(SITEPIN_WCKEN_DELAY).shortValue());
         return res;
     }
 

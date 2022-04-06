@@ -1718,6 +1718,9 @@ public class EDIFNetlist extends EDIFName {
     public void writeBinaryEDIF(Path path) {
         BinaryEDIFWriter.writeBinaryEDIF(path, this);
     }
+	public void writeBinaryEDIF(OutputStream os) {
+		BinaryEDIFWriter.writeBinaryEDIF(os, this);
+	}
     
     public void writeBinaryEDIF(String fileName) {
         BinaryEDIFWriter.writeBinaryEDIF(fileName, this);
