@@ -38,7 +38,7 @@ import org.json.JSONObject;
  */
 public class LSFJob extends Job {
 	
-	public static String LSF_RESOURCE = "select[osver=ws7] rusage[mem=20000]";//"select[type=X86_64 && osdistro=rhel && (osver=ws6 || osver=sv6)] rusage[mem=6000]";
+	public static String LSF_RESOURCE = "select[osver=ws7]";//"select[type=X86_64 && osdistro=rhel && (osver=ws6 || osver=sv6)] rusage[mem=6000]";
 	
 	public static String LSF_PROJECT = "RapidWright";
 	

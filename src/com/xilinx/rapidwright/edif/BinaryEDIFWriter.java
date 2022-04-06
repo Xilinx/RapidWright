@@ -25,9 +25,6 @@
  */
 package com.xilinx.rapidwright.edif;
 
-import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
@@ -312,16 +309,8 @@ public class BinaryEDIFWriter {
      * @see BinaryEDIFReader#readBinaryEDIF(Path)
      */
     public static void writeBinaryEDIF(Path path, EDIFNetlist netlist) {
-        try (final OutputStream outputStream = Files.newOutputStream(path)){
-            writeBinaryEDIF(outputStream, netlist);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    public static void writeBinaryEDIF(OutputStream outputStream, EDIFNetlist netlist) {
         Map<String, Integer> stringMap = createStringMap(netlist);
-        try (Output os = FileTools.getKryoOutputStream(outputStream)) {
+        try (Output os = FileTools.getKryoOutputStream(path.toString())) {
             os.writeString(EDIF_BINARY_FILE_TAG);
             os.writeString(EDIF_BINARY_FILE_VERSION);
             String[] strings = new String[stringMap.size()];

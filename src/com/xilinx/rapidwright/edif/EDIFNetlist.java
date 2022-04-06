@@ -628,8 +628,7 @@ public class EDIFNetlist extends EDIFName {
 			bw.write(" (written\n");
 			bw.write("  (timeStamp ");
 			SimpleDateFormat formatter = new SimpleDateFormat("yyyy MM dd HH mm ss");
-			//bw.write(formatter.format(new java.util.Date()));
-			bw.write("0000 00 00 00 00 00");
+			bw.write(formatter.format(new java.util.Date()));
 			bw.write(")\n");
 			bw.write("  (program \"" + Device.FRAMEWORK_NAME + "\" (version \"" + Device.RAPIDWRIGHT_VERSION + "\"))\n");
 			for (String comment : getComments()) {
@@ -1719,9 +1718,6 @@ public class EDIFNetlist extends EDIFName {
     public void writeBinaryEDIF(Path path) {
         BinaryEDIFWriter.writeBinaryEDIF(path, this);
     }
-	public void writeBinaryEDIF(OutputStream os) {
-		BinaryEDIFWriter.writeBinaryEDIF(os, this);
-	}
     
     public void writeBinaryEDIF(String fileName) {
         BinaryEDIFWriter.writeBinaryEDIF(fileName, this);

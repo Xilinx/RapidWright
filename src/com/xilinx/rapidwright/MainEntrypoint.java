@@ -178,7 +178,6 @@ public class MainEntrypoint {
         addFunction("TileColumnPattern", TileColumnPattern::main);
         addFunction("Unzip", Unzip::main);
         addFunction("UpdateRoutingUsingSATRouter", UpdateRoutingUsingSATRouter::main);
-        addFunction("BenchmarkEDIFLoad", BenchmarkEdifLoad::main);
     }
 
     private static void listModes() {
