@@ -25,13 +25,24 @@ package com.xilinx.rapidwright.rwroute;
 
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
+import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.SiteInst;
+import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.device.BELClass;
+import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.device.Site;
+import com.xilinx.rapidwright.device.SitePIP;
+import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.device.Tile;
 
 /**
@@ -90,58 +101,100 @@ public class ECORouter extends PartialRouter {
             for (Connection connection : netWrapper.getConnections()) {
                 finishRouteConnection(connection);
 
-                // if (connection.getSink().isRouted())
-                //     continue;
-                //
-                // SitePinInst sink = connection.getSink();
-                // String sinkPinName = sink.getName();
-                // if (!Pattern.matches("[A-H](X|_I)", sinkPinName))
-                //     continue;
-                //
-                // Routable rnode = connection.getSinkRnode();
-                // String lut = sinkPinName.substring(0, 1);
-                // Site site = sink.getSite();
-                // for (int i = 6; i >= 1; i--) {
-                //     Node altNode = site.getConnectedNode(lut + i);
-                //
-                //     // Skip if LUT pin is already being preserved
-                //     Net preservedNet = routingGraph.getPreservedNet(altNode);
-                //     if (preservedNet != null) {
-                //         continue;
-                //     }
-                //
-                //     RoutableType type = RoutableType.WIRE;
-                //     Routable altRnode = createAddRoutableNode(null, altNode, type);
-                //     // Trigger a setChildren() for LUT routethrus
-                //     altRnode.getChildren();
-                //     // Create a fake edge from [A-H][1-6] to [A-H](I|_X)
-                //     altRnode.addChild(rnode);
-                // }
+                if (connection.getSink().isRouted())
+                    continue;
+
+                SitePinInst sink = connection.getSink();
+                String sinkPinName = sink.getName();
+                if (!Pattern.matches("[A-H](X|_I)", sinkPinName))
+                    continue;
+
+                Routable rnode = connection.getSinkRnode();
+                String lut = sinkPinName.substring(0, 1);
+                Site site = sink.getSite();
+                SiteInst siteInst = sink.getSiteInst();
+
+                boolean LUT6 = (siteInst.getCell(lut + "6LUT") != null);
+                boolean LUT5 = (siteInst.getCell(lut + "5LUT") != null);
+                int i = (LUT6 && LUT5) ? 0 : (LUT6 || LUT5) ? 5 : 6;
+                for (; i >= 1; i--) {
+                    Node altNode = site.getConnectedNode(lut + i);
+
+                    // Skip if LUT pin is already being preserved
+                    Net preservedNet = routingGraph.getPreservedNet(altNode);
+                    if (preservedNet != null) {
+                        continue;
+                    }
+
+                    RoutableType type = RoutableType.WIRE;
+                    Routable altRnode = createAddRoutableNode(null, altNode, type);
+                    // Trigger a setChildren() for LUT routethrus
+                    altRnode.getChildren();
+                    // Create a fake edge from [A-H][1-6] to [A-H](I|_X)
+                    altRnode.addChild(rnode);
+                }
             }
         }
     }
 
+    // Adapted from DesignTools.getConnectedCells()
+    public static Set<BELPin> getConnectedBELPins(SitePinInst pin){
+        HashSet<BELPin> pins = new HashSet<>();
+        SiteInst si = pin.getSiteInst();
+        if(si == null) return pins;
+        for(BELPin p : pin.getBELPin().getSiteConns()){
+            if(p.getBEL().getBELClass() == BELClass.RBEL){
+                SitePIP pip = si.getUsedSitePIP(p.getBELName());
+                if(pip == null) continue;
+                if(p.isOutput()){
+                    p = pip.getInputPin().getSiteConns().get(0);
+                    Cell c = si.getCell(p.getBELName());
+                    if(c != null) pins.add(p);
+                }else{
+                    for(BELPin snk : pip.getOutputPin().getSiteConns()){
+                        Cell c = si.getCell(snk.getBELName());
+                        if(c != null) pins.add(snk);
+                    }
+                }
+            }else{
+                Cell c = si.getCell(p.getBELName());
+                if(c != null && c.getLogicalPinMapping(p.getName()) != null) {
+                    pins.add(p);
+                }
+            }
+        }
+        return pins;
+    }
+
     @Override
     protected void assignNodesToConnections() {
-        // for(Map.Entry<Net,NetWrapper> e : nets.entrySet()) {
-        //     NetWrapper netWrapper = e.getValue();
-        //     for (Connection connection : netWrapper.getConnections()) {
-        //         SitePinInst sink = connection.getSink();
-        //         List<Routable> rnodes = connection.getRnodes();
-        //         String sinkPinName = sink.getName();
-        //         if (rnodes.size() >= 2 && Pattern.matches("[A-H](X|_I)", sinkPinName)) {
-        //             Routable prevRnode = rnodes.get(1);
-        //             Node prevNode = (prevRnode != null) ? prevRnode.getNode() : null;
-        //             SitePin prevPin = (prevNode != null) ? prevNode.getSitePin() : null;
-        //             if (prevPin != null && Pattern.matches("[A-H][1-6]", prevPin.getPinName())) {
-        //                 // Drop the fake LUT -> X/I pin edge
-        //                 connection.setRnodes(rnodes.subList(1, rnodes.size()));
-        //                 // TODO: Update site routing
-        //                 System.out.println(prevPin.getPinName() + " -> " + sinkPinName + " for " + connection.getNetWrapper().getNet());
-        //             }
-        //         }
-        //     }
-        // }
+        for(Map.Entry<Net,NetWrapper> e : nets.entrySet()) {
+            NetWrapper netWrapper = e.getValue();
+            for (Connection connection : netWrapper.getConnections()) {
+                SitePinInst sink = connection.getSink();
+                List<Routable> rnodes = connection.getRnodes();
+                String sinkPinName = sink.getName();
+                if (rnodes.size() >= 2 && Pattern.matches("[A-H](X|_I)", sinkPinName)) {
+                    Routable prevRnode = rnodes.get(1);
+                    Node prevNode = (prevRnode != null) ? prevRnode.getNode() : null;
+                    SitePin prevPin = (prevNode != null) ? prevNode.getSitePin() : null;
+                    if (prevPin != null && Pattern.matches("[A-H][1-6]", prevPin.getPinName())) {
+                        // Drop the fake LUT -> X/I pin edge
+                        connection.setRnodes(rnodes.subList(1, rnodes.size()));
+
+                        // Fix the intra-site routing
+                        SiteInst si = sink.getSiteInst();
+                        Net net = connection.getNetWrapper().getNet();
+                        for (BELPin sinkBELPin : getConnectedBELPins(sink)) {
+                            si.unrouteIntraSiteNet(sink.getBELPin(), sinkBELPin);
+                            si.routeIntraSiteNet(net, prevPin.getBELPin(), sinkBELPin);
+                        }
+
+                        System.out.println(prevPin.getPinName() + " -> " + sinkPinName + " for " + connection.getNetWrapper().getNet());
+                    }
+                }
+            }
+        }
 
         super.assignNodesToConnections();
     }

@@ -473,26 +473,22 @@ public abstract class RoutableNode implements Routable{
 	public boolean isExcluded(Node parent, Node child) {
 		Tile tile = child.getTile();
 		TileTypeEnum tileType = tile.getTileTypeEnum();
-		if (tileType == TileTypeEnum.INT) {
-			return false;
-		}
+		// if (tileType == TileTypeEnum.INT) {
+		// 	return false;
+		// }
 		// return !tile.getName().startsWith("LAG");
 		// TODO: Is this equivalent to the above?
 		//       (i.e. do not allow anything except INT and LAG* tiles)
-		return !lagunaTileEnums.contains(tileType);
-
-		// TODO: Using A6 on the LUT for anything except GLOBAL_LOGIC1 means
-		//       we can't use A[1-5] -> O5 routethru -- need to account for this
-		//       before allowing routethrus
-		// return false;
+		return !allowedTileEnums.contains(tileType);
 	}
 	 
-	final private static Set<TileTypeEnum> lagunaTileEnums;
+	final private static Set<TileTypeEnum> allowedTileEnums;
 	static {
-		lagunaTileEnums = new HashSet<>();
+		allowedTileEnums = new HashSet<>();
+		allowedTileEnums.add(TileTypeEnum.INT);
 		for (TileTypeEnum e : TileTypeEnum.values()) {
 			if (e.toString().startsWith("LAG")) {
-				lagunaTileEnums.add(e);
+				allowedTileEnums.add(e);
 			}
 		}
 	}

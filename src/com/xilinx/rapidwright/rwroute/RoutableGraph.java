@@ -22,11 +22,20 @@
  
 package com.xilinx.rapidwright.rwroute;
 
+import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.NetType;
+import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.device.Site;
+import com.xilinx.rapidwright.device.SitePin;
+import com.xilinx.rapidwright.device.SiteTypeEnum;
+import com.xilinx.rapidwright.device.Tile;
+import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.util.CountUpDownLatch;
 import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.ParallelismTools;
@@ -70,7 +79,58 @@ public class RoutableGraph {
                     rnode.setVisited(false);
                 }
             }
-            return preserved || super.isExcluded(parent, child);
+            if (preserved)
+                return true;
+            // Enable LUT routethrus on A1-5 (not A6 since using that should block O5
+            // others from being used, but there isn't currently an efficient way to
+            // check that during routing expansion so better exclude it during routing
+            // generation)
+            {
+                if (parent.getIntentCode() == IntentCode.NODE_PINFEED) {
+                    TileTypeEnum parentTileType = parent.getTile().getTileTypeEnum();
+                    TileTypeEnum childTileType = child.getTile().getTileTypeEnum();
+                    if (parentTileType == TileTypeEnum.INT &&
+                            (childTileType == TileTypeEnum.CLEL_L || childTileType == TileTypeEnum.CLEL_R ||
+                            childTileType == TileTypeEnum.CLEM || childTileType == TileTypeEnum.CLEM_R)) {
+                        SitePin sp = parent.getSitePin();
+                        Site s = sp.getSite();
+                        SiteTypeEnum siteType = s.getSiteTypeEnum();
+                        assert(siteType == SiteTypeEnum.SLICEL || siteType == SiteTypeEnum.SLICEM);
+                        String pinName = sp.getPinName();
+                        if (pinName.length() == 2) {
+                            char first = pinName.charAt(0);
+                            char second = pinName.charAt(1);
+                            if (first >= 'A' && first <= 'H' && second >= '1' && second <= '5' /*'6'*/) {
+                                SiteInst si = design.getSiteInstFromSite(s);
+
+                                // Nothing placed at site, all routethrus possible
+                                if (si == null)
+                                    return false;
+
+                                Net A6 = si.getNetFromSiteWire(first + "6");
+                                boolean A6used = (A6 != null && A6.getType() != NetType.VCC);
+                                boolean O6used = (si.getNetFromSiteWire(first + "_O") != null);
+                                if (A6used) {
+                                    // A6 is used -> cannot use 5LUT
+                                    // O6 is used -> already using 6LUT
+                                    if (O6used)
+                                        return true;
+                                } else {
+                                    boolean O5used = (si.getNetFromSiteWire(first + "5LUT_O5") != null);
+                                    // A6 is unused -> can use 6LUT and 5LUT
+                                    // O6 and O5 used -> already using both
+                                    if (O6used && O5used)
+                                        return true;
+                                }
+
+                                // Routethru allowed
+                                return false;
+                            }
+                        }
+                    }
+                }
+            }
+            return super.isExcluded(parent, child);
         }
 
         @Override
@@ -101,12 +161,15 @@ public class RoutableGraph {
 
     private long totalVisited;
 
-    public RoutableGraph(RuntimeTracker setChildrenTimer) {
+    final Design design;
+
+    public RoutableGraph(RuntimeTracker setChildrenTimer, Design design) {
         nodesMap = new HashMap<>();
         preservedMap = new ConcurrentHashMap<>();
         preservedMapOutstanding = new CountUpDownLatch();
         visited = new ArrayList<>();
         this.setChildrenTimer = setChildrenTimer;
+        this.design = design;
     }
 
     public void initialize() {

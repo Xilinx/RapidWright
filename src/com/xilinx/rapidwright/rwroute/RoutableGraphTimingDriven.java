@@ -22,6 +22,7 @@
  
 package com.xilinx.rapidwright.rwroute;
 
+import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Tile;
@@ -65,13 +66,14 @@ public class RoutableGraphTimingDriven extends RoutableGraph {
         }};
     }
 
-    public RoutableGraphTimingDriven(RuntimeTracker rnodesTimer, Device device, DelayEstimatorBase delayEstimator, boolean maskNodesCrossRCLK) {
-        super(rnodesTimer);
+    public RoutableGraphTimingDriven(RuntimeTracker rnodesTimer, Design design, DelayEstimatorBase delayEstimator, boolean maskNodesCrossRCLK) {
+        super(rnodesTimer, design);
         this.delayEstimator = delayEstimator;
         this.maskNodesCrossRCLK = maskNodesCrossRCLK;
 
         excludeAboveRclk = new HashSet<>();
         excludeBelowRclk = new HashSet<>();
+        Device device = design.getDevice();
         TileType intType = device.getTileType(TileTypeEnum.INT);
         String[] wireNames = intType.getWireNames();
         for (int wireIndex = 0; wireIndex < intType.getWireCount(); wireIndex++) {
