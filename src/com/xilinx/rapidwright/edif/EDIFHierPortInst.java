@@ -30,7 +30,11 @@ import java.util.Objects;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.device.BELPin;
+import com.xilinx.rapidwright.util.Pair;
+
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -185,10 +189,32 @@ public class EDIFHierPortInst {
 	 * @return The connected site pin to the connected to this cell pin.
 	 */
 	public SitePinInst getRoutedSitePinInst(Design design) {
-		String cellName = getFullHierarchicalInstName();
-		Cell cell = design.getCell(cellName);
+		Cell cell = getPhysicalCell(design);
 		if(cell == null) return null;
 		return cell.getSitePinFromPortInst(getPortInst(), null);
+	}
+	
+	/**
+	 * Gets the physical cell to which this port instance has been placed
+	 * @param design The design corresponding to the implementation of this port instance's netlist
+	 * @return The placed physical cell mapped for this port instance or null if none could be found
+	 */
+	public Cell getPhysicalCell(Design design) {
+	    String cellName = getFullHierarchicalInstName();
+	    Cell cell = design.getCell(cellName);
+	    return cell;	    
+	}
+
+	/**
+	 * Gets the physical site instance and BEL pin location where this port instance has been placed
+	 * @param design The design corresponding to the implementation of this port instance's netlist
+	 * @return The site instance and BELPin for this port instance
+	 */
+	public Pair<SiteInst, BELPin> getRoutedBELPin(Design design) {
+	    Cell cell = getPhysicalCell(design);
+	    if(cell == null) return null;
+	    BELPin belPin = cell.getBELPin(this);
+	    return new Pair<>(cell.getSiteInst(), belPin);
 	}
 	
 	/**
