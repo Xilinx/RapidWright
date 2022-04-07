@@ -284,6 +284,9 @@ public class EDIFNet extends EDIFPropertyObject {
 	 */
 	public void setParentCell(EDIFCell parentCell) {
 		this.parentCell = parentCell;
+		if(parentCell.isTrackingChanges()) {
+		    parentCell.getNetlist().addModifiedCell(parentCell);
+		}
 	}
 	
 	public void exportEDIF(Writer wr) throws IOException {

@@ -34,6 +34,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Queue;
 
 /**
@@ -211,7 +212,10 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
 	}
 	
 	public EDIFNet removeNet(String name){
-		if(nets == null) return null;;
+		if(nets == null) return null;
+		if(isTrackingChanges()) {
+		    getNetlist().addModifiedCell(this);
+		}
 		return nets.remove(name);
 	}
 	/**
@@ -280,6 +284,9 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
 	
 	public EDIFCellInst removeCellInst(String name){
 		if(instances == null) return null;
+		if(isTrackingChanges()) {
+		    getNetlist().addModifiedCell(this);
+		}		
 		return instances.remove(name);
 	}
 	
@@ -331,6 +338,9 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
         }
         for(String s : portObjectsToRemove) {
             getPortMap().remove(s);
+        }
+        if(isTrackingChanges() && portObjectsToRemove.size() > 0) {
+            getNetlist().addModifiedCell(this);
         }
     }
 	
@@ -464,6 +474,9 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
 		instances = null;
 		nets = null;
 		internalPortMap = null;
+		if(isTrackingChanges()) {
+		    getNetlist().addModifiedCell(this);
+		}
 	}
 	
 	public void exportEDIF(Writer wr) throws IOException{
@@ -540,6 +553,30 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
 			}
 		}
 		return leafCells;
+    }
+
+    public EDIFNetlist getNetlist() {
+        EDIFLibrary lib = getLibrary();
+        return lib != null ? lib.getNetlist() : null;
+    }
+    
+    public boolean isTrackingChanges() {
+        EDIFNetlist netlist = getNetlist();
+        return netlist == null ? false : netlist.isTrackingCellChanges();
+    }
+    
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        if (!super.equals(o)) return false;
+        EDIFCell edifCell = (EDIFCell) o;
+        return Objects.equals(library, edifCell.library);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(super.hashCode(), library);
     }
 }
  

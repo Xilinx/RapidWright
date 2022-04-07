@@ -104,6 +104,10 @@ public class EDIFNetlist extends EDIFName {
 	
 	private List<String> encryptedCells; 
 	
+	private boolean trackCellChanges = false;
+	
+	private Set<EDIFCell> modifiedCells = null;
+	
 	private boolean DEBUG = false;
 
 	/**
@@ -1722,7 +1726,26 @@ public class EDIFNetlist extends EDIFName {
         BinaryEDIFWriter.writeBinaryEDIF(fileName, this);
     }
     
-	public static void main(String[] args) throws FileNotFoundException {
+	public boolean isTrackingCellChanges() {
+        return trackCellChanges;
+    }
+
+    public void setTrackCellChanges(boolean trackCellChanges) {
+        this.trackCellChanges = trackCellChanges;
+        if(trackCellChanges && modifiedCells == null) {
+            modifiedCells = new HashSet<>();
+        }
+    }
+
+    public Set<EDIFCell> getModifiedCells() {
+        return modifiedCells;
+    }
+    
+    public boolean addModifiedCell(EDIFCell cell) {
+        return modifiedCells.add(cell);
+    }
+
+    public static void main(String[] args) throws FileNotFoundException {
 		CodePerfTracker t = new CodePerfTracker("EDIF Import/Export", true);
 		t.start("Read EDIF");
 		EDIFParser p = new EDIFParser(args[0]);

@@ -250,6 +250,9 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
 	 */
 	public void setParentCell(EDIFCell parentCell) {
 		this.parentCell = parentCell;
+		if(parentCell.isTrackingChanges()) {
+		    parentCell.getNetlist().addModifiedCell(parentCell);
+		}
 	}
 
 	/**
