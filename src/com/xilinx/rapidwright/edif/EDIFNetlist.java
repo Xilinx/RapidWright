@@ -1726,22 +1726,43 @@ public class EDIFNetlist extends EDIFName {
         BinaryEDIFWriter.writeBinaryEDIF(fileName, this);
     }
     
+    /**
+     * Checks a flag indicating if this netlist is currently tracking changes to its EDIFCells.
+     * Modified EDIFCells are tracked in a set which can be queried with {@link #getModifiedCells()}.
+     * EDIFCells are determined as modified if one of the following is true: 
+     *   (1) A port was removed, added or modified
+     *   (2) A net was removed, added or modified
+     *   (3) An instance was removed, added or modified 
+     * @return True if this netlist is tracking EDIFCell changes, false otherwise.
+     */
 	public boolean isTrackingCellChanges() {
         return trackCellChanges;
     }
 
+    /**
+     * Flag to track changes to EDIFCell changes to this netlist. See {@link #isTrackingCellChanges()}
+     * @param trackCellChanges True to enable tracking of EDIFCells, false to stop tracking
+     */
     public void setTrackCellChanges(boolean trackCellChanges) {
         this.trackCellChanges = trackCellChanges;
-        if(trackCellChanges && modifiedCells == null) {
-            modifiedCells = new HashSet<>();
-        }
     }
 
+    /**
+     * Gets the set of modified cells for this netlist.  These are accumulated when changes are 
+     * made to an EDIFCell and {@link #isTrackingCellChanges()} returns true.
+     * @return The set of modified EDIFCells
+     */
     public Set<EDIFCell> getModifiedCells() {
         return modifiedCells;
     }
     
+    /**
+     * Adds the EDIFCell to the set of modified EDIFCells for this netlist.
+     * @param cell The cell to add
+     * @return True if the cell was added to the set, false if the cell was already in the set.
+     */
     public boolean addModifiedCell(EDIFCell cell) {
+        if(modifiedCells == null) modifiedCells = new HashSet<>();
         return modifiedCells.add(cell);
     }
 
