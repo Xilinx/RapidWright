@@ -34,6 +34,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
+import com.xilinx.rapidwright.util.StringPool;
 import com.xilinx.rapidwright.util.ParallelismTools;
 
 /**
@@ -43,7 +44,7 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParser implements Auto
     /**
      * Number of ports in a cell above which a map is used for port name lookup
      */
-    private static final int PORT_LOOKUP_MAP_LIMIT = 300;
+    private static final int PORT_LOOKUP_MAP_THRESHOLD = 300;
 
     //Data to limit parsing to part of the file
     protected final long offset;
@@ -62,7 +63,7 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParser implements Auto
     protected final List<CellReferenceData> linkCellReference = new ArrayList<>();
     protected final List<List<LinkPortInstData>> linkPortInstData = new ArrayList<>();
 
-    public ParallelEDIFParserWorker(Path fileName, InputStream in, long offset, NameUniquifier uniquifier, int maxTokenLength) {
+    public ParallelEDIFParserWorker(Path fileName, InputStream in, long offset, StringPool uniquifier, int maxTokenLength) {
         super(fileName, in, uniquifier, maxTokenLength);
         this.offset = offset;
     }
@@ -292,7 +293,7 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParser implements Auto
         for (List<LinkPortInstData> data : linkPortInstData) {
             for (LinkPortInstData d : data) {
                 final EDIFCell cell = d.mapPortCell();
-                if (cell.getPorts().size() < PORT_LOOKUP_MAP_LIMIT) {
+                if (cell.getPorts().size() < PORT_LOOKUP_MAP_THRESHOLD) {
                     d.portInst.setPort(cell.getPortByLegalName(d.portInst.getName()));
                 } else {
                     largeCellMap.computeIfAbsent(cell, x-> new ConcurrentLinkedQueue<>()).add(d);

@@ -31,6 +31,8 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.xilinx.rapidwright.util.StringPool;
+
 public abstract class AbstractEDIFParser {
 
 
@@ -78,16 +80,16 @@ public abstract class AbstractEDIFParser {
     protected final EDIFTokenizer tokenizer;
     protected final InputStream in;
 
-    public AbstractEDIFParser(Path fileName, InputStream in, NameUniquifier uniquifier, int maxTokenLength) {
+    public AbstractEDIFParser(Path fileName, InputStream in, StringPool uniquifier, int maxTokenLength) {
         this.in = in;
         this.tokenizer = new EDIFTokenizer(fileName, in, uniquifier, maxTokenLength);
     }
 
-    public AbstractEDIFParser(Path fileName, InputStream in, NameUniquifier uniquifier) {
+    public AbstractEDIFParser(Path fileName, InputStream in, StringPool uniquifier) {
         this(fileName, in, uniquifier, EDIFTokenizer.DEFAULT_MAX_TOKEN_LENGTH);
     }
 
-    public AbstractEDIFParser(Path fileName, NameUniquifier uniquifier) throws FileNotFoundException {
+    public AbstractEDIFParser(Path fileName, StringPool uniquifier) throws FileNotFoundException {
         try {
             in = Files.newInputStream(fileName);
             tokenizer = new EDIFTokenizer(fileName, in, uniquifier);

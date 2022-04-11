@@ -1,9 +1,8 @@
 /* 
- * Original work: Copyright (c) 2010-2011 Brigham Young University
- * Modified work: Copyright (c) 2017 Xilinx, Inc. 
+ * Copyright (c) 2022 Xilinx, Inc. 
  * All rights reserved.
  *
- * Author: Chris Lavin, Xilinx Research Labs.
+ * Author: Jakob Wenzel, Xilinx Research Labs.
  *  
  * This file is part of RapidWright. 
  * 
@@ -20,31 +19,43 @@
  * limitations under the License.
  * 
  */
+ 
 package com.xilinx.rapidwright.util;
 
 import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 
 /**
- * Keeps track of a unique set of Strings.
- * @author clavin
- *
+ * Deduplicate Strings for optimized memory usage
  */
-public class StringPool extends HashMap<String,String>{
+public class StringPool {
 
-	private static final long serialVersionUID = 3200270847975999156L;
-	
-	/**
-	 * This gets a unique copy of the String string from the HashMap. 
-	 * If the string is not in the HashMap yet, it adds it and returns
-	 * the original string. 
-	 * @param string The string to make unique.
-	 * @return The unique copy of the String string. 
-	 */
-	public String getUnique(String string){
-		if(this.get(string)==null) {
-			this.put(string,string);
-			return string;
-		}
-		return this.get(string);
-	}
+    private final Map<String,String> stringPool;
+
+    private StringPool(Map<String, String> stringPool) {
+        this.stringPool = stringPool;
+    }
+
+    /**
+     * Create a new thread safe StringPool
+     * @return a thread safe StringPool
+     */
+    public static StringPool concurrentPool() {
+        return new StringPool(new ConcurrentHashMap<>());
+    }
+
+    /**
+     * Create a new StringPool that should be only used by a single thread.
+     * @return a non thread safe StringPool
+     */
+    public static StringPool singleThreadedPool() {
+        return new StringPool(new HashMap<>());
+    }
+
+    public String uniquifyName(String tmpName) {
+        return stringPool.computeIfAbsent(tmpName, Function.identity());
+    }
+
 }

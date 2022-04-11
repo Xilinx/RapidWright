@@ -375,4 +375,12 @@ public class ParallelismTools {
         }
         return stream;
     }
+
+    /**
+     * The number of cores the system has
+     * @return number of cores
+     */
+    public static int maxParallelism() {
+        return Runtime.getRuntime().availableProcessors();
+    }
 }

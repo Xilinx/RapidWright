@@ -40,6 +40,7 @@ import java.util.stream.Stream;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.support.CheckOpenFiles;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
+import com.xilinx.rapidwright.util.StringPool;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -65,14 +66,14 @@ public class TestEDIFTokenizer {
         Path edif = tempDir.resolve("picoblaze.edf");
         d.getNetlist().exportEDIF(edif);
         long fileSize = Files.size(edif);
-        EDIFTokenizer tokenizer = new EDIFTokenizer(edif, new BufferedInputStream(Files.newInputStream(edif)), NameUniquifier.singleThreadedUniquifier());
+        EDIFTokenizer tokenizer = new EDIFTokenizer(edif, new BufferedInputStream(Files.newInputStream(edif)), StringPool.singleThreadedPool());
 
         List<EDIFToken> allTokens = readTokens(tokenizer);
         tokenizer.close();
 
         LongStream.range(0, fileSize).parallel()
                 .forEach(i-> {
-                    try (EDIFTokenizer skipTokenizer = new EDIFTokenizer(edif, new BufferedInputStream(Files.newInputStream(edif)), NameUniquifier.singleThreadedUniquifier(), TESTING_MAX_TOKEN_LENGTH)) {
+                    try (EDIFTokenizer skipTokenizer = new EDIFTokenizer(edif, new BufferedInputStream(Files.newInputStream(edif)), StringPool.singleThreadedPool(), TESTING_MAX_TOKEN_LENGTH)) {
                         skipTokenizer.skip(i);
 
                         compareSuffixTokens(i, allTokens, skipTokenizer);
@@ -131,7 +132,7 @@ public class TestEDIFTokenizer {
 
     @Test
     public void readEmptyQuotes() throws IOException {
-        EDIFTokenizer tokenizerV2 = new EDIFTokenizer(null, new ByteArrayInputStream(toByteArray("\"\"")), NameUniquifier.singleThreadedUniquifier(), EDIFTokenizer.DEFAULT_MAX_TOKEN_LENGTH);
+        EDIFTokenizer tokenizerV2 = new EDIFTokenizer(null, new ByteArrayInputStream(toByteArray("\"\"")), StringPool.singleThreadedPool(), EDIFTokenizer.DEFAULT_MAX_TOKEN_LENGTH);
         final EDIFToken token = tokenizerV2.getOptionalNextToken(true);
         Assertions.assertNotNull(token);
         Assertions.assertEquals("", token.text);
@@ -141,7 +142,7 @@ public class TestEDIFTokenizer {
     @Test
     public void testTooLongToken() {
         InputStream is = stringToInputStream(repeatString("ASDF", 250));
-        EDIFTokenizer tokenizer = new EDIFTokenizer(null, is, NameUniquifier.singleThreadedUniquifier(), 256);
+        EDIFTokenizer tokenizer = new EDIFTokenizer(null, is, StringPool.singleThreadedPool(), 256);
         Assertions.assertThrows(TokenTooLongException.class, () -> tokenizer.getOptionalNextToken(true));
     }
 
@@ -167,7 +168,7 @@ public class TestEDIFTokenizer {
 
             StringBuilder sb = new StringBuilder();
 
-            TestingTokenizer tokenizer = new TestingTokenizer(null, stringToInputStream(input), NameUniquifier.singleThreadedUniquifier(), FILLING_MAX_TOKEN_LENGTH);
+            TestingTokenizer tokenizer = new TestingTokenizer(null, stringToInputStream(input), StringPool.singleThreadedPool(), FILLING_MAX_TOKEN_LENGTH);
 
             for (Integer length : lengths) {
                 tokenizer.fill();
@@ -203,7 +204,7 @@ public class TestEDIFTokenizer {
 
     static class TestingTokenizer extends EDIFTokenizer {
 
-        public TestingTokenizer(Path fileName, InputStream in, NameUniquifier uniquifier, int maxTokenLength) {
+        public TestingTokenizer(Path fileName, InputStream in, StringPool uniquifier, int maxTokenLength) {
             super(fileName, in, uniquifier, maxTokenLength);
         }
 

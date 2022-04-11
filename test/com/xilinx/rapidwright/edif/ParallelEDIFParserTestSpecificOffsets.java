@@ -28,17 +28,21 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
+import com.xilinx.rapidwright.util.StringPool;
 import com.xilinx.rapidwright.util.function.InputStreamSupplier;
 
-public class TestingParallelEDIFParser extends ParallelEDIFParser{
+/**
+ * Manually supply the start offsets of the different threads
+ */
+public class ParallelEDIFParserTestSpecificOffsets extends ParallelEDIFParser{
     private final List<ParseStart>  startOffsets;
 
-    TestingParallelEDIFParser(Path fileName, long fileSize, InputStreamSupplier inputStreamSupplier, int maxTokenLength, List<ParseStart>  startOffsets) throws IOException {
+    ParallelEDIFParserTestSpecificOffsets(Path fileName, long fileSize, InputStreamSupplier inputStreamSupplier, int maxTokenLength, List<ParseStart>  startOffsets) throws IOException {
         super(fileName, fileSize, inputStreamSupplier, maxTokenLength);
         this.startOffsets = startOffsets;
     }
 
-    TestingParallelEDIFParser(Path fileName, int maxTokenLength, List<ParseStart> startOffsets) throws IOException {
+    ParallelEDIFParserTestSpecificOffsets(Path fileName, int maxTokenLength, List<ParseStart> startOffsets) throws IOException {
         this(fileName, Files.size(fileName), InputStreamSupplier.fromPath(fileName), maxTokenLength, startOffsets);
     }
 
@@ -58,7 +62,7 @@ public class TestingParallelEDIFParser extends ParallelEDIFParser{
 
         private final String name;
 
-        public TestingParallelEDIFParserWorker(Path fileName, InputStream in, long offset, NameUniquifier uniquifier, int maxTokenLength, String name) {
+        public TestingParallelEDIFParserWorker(Path fileName, InputStream in, long offset, StringPool uniquifier, int maxTokenLength, String name) {
             super(fileName, in, offset, uniquifier, maxTokenLength);
             this.name = name;
         }

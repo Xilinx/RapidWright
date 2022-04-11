@@ -75,7 +75,7 @@ public class TestEDIFParser {
     @MethodSource("testParallelArgs")
     @CheckOpenFiles
     public void testParallel(String ignoredDescription, List<ParseStart> offsets, int expectedSuccessfulThreads) throws IOException {
-        try (TestingParallelEDIFParser parser = new TestingParallelEDIFParser(input, 128, offsets)) {
+        try (ParallelEDIFParserTestSpecificOffsets parser = new ParallelEDIFParserTestSpecificOffsets(input, 128, offsets)) {
             parser.parseEDIFNetlist(new CodePerfTracker("parse edif"));
             Assertions.assertEquals(expectedSuccessfulThreads, parser.getSuccessfulThreads());
         }
