@@ -1,4 +1,5 @@
-/* 
+
+/*
  * Copyright (c) 2022 Xilinx, Inc. 
  * All rights reserved.
  *
@@ -24,6 +25,8 @@ package com.xilinx.rapidwright.edif;
 
 import java.util.List;
 
+import java.nio.charset.StandardCharsets;
+
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -33,26 +36,26 @@ import com.xilinx.rapidwright.support.RapidWrightDCP;
 public class TestEDIFTools {
 
     public static final String UNIQUE_SUFFIX = "TestEDIFToolsWasHere";
-    
+
     @Test
     public void testConnectPortInstsThruHier() {
         Design d = Design.readCheckpoint(RapidWrightDCP.getPath("microblazeAndILA_3pblocks.dcp"), true);
         EDIFNetlist netlist = d.getNetlist();
-        
+
         EDIFHierPortInst srcPortInst = netlist.getHierPortInstFromName("base_mb_i/microblaze_0/U0/"
                 + "MicroBlaze_Core_I/Performance.Core/Data_Flow_I/Data_Flow_Logic_I/Gen_Bits[22]."
                 + "MEM_EX_Result_Inst/Using_FPGA.Native/Q");
         EDIFHierPortInst snkPortInst = netlist.getHierPortInstFromName("u_ila_0/inst/PROBE_PIPE."
                 + "shift_probes_reg[0][7]/D");
-        
+
         // Disconnect sink in anticipation of connecting to another net
         snkPortInst.getNet().removePortInst(snkPortInst.getPortInst());
-        
+
         EDIFTools.connectPortInstsThruHier(srcPortInst, snkPortInst, netlist, UNIQUE_SUFFIX);
-        
+
         netlist.resetParentNetMap();
-        
-        
+
+
         List<EDIFHierNet> netAliases = netlist.getNetAliases(srcPortInst.getHierarchicalNet());
         Assertions.assertEquals(netAliases.size(), 16);
         boolean containsSnkNet = false;
@@ -62,8 +65,8 @@ public class TestEDIFTools {
             }
         }
         Assertions.assertTrue(containsSnkNet);
-        
-        
+
+
         List<EDIFHierPortInst> portInsts = netlist.getPhysicalPins(srcPortInst.getHierarchicalNet());
         Assertions.assertEquals(portInsts.size(), 6);
         boolean containsSnk = false;
@@ -73,14 +76,22 @@ public class TestEDIFTools {
             }
         }
         Assertions.assertTrue(containsSnk);
-        
-        
-        
+
+
+
     }
 
     @Test
     void testRename() {
-        Assertions.assertEquals("emoji______", EDIFTools.makeNameEDIFCompatible("emoji_\uD83D\uDE0B\uD83C\uDF9B️"));
+        //This test string contains multi-byte characters. We cannot encode it directly as a string here, because
+        //source code encoding varies between platforms.
+        byte[] special = new byte[]{
+                (byte)0x65, (byte)0x6d, (byte)0x6f, (byte)0x6a, (byte)0x69, (byte)0x5f, (byte)0xf0,
+                (byte)0x9f, (byte)0x98, (byte)0x8b, (byte)0xf0, (byte)0x9f, (byte)0x8e, (byte)0x9b,
+                (byte)0xef, (byte)0xb8, (byte)0x8f
+        };
+        String unicodeStr = new String(special, StandardCharsets.UTF_8);
+        Assertions.assertEquals("emoji______", EDIFTools.makeNameEDIFCompatible(unicodeStr));
         Assertions.assertEquals("&_", EDIFTools.makeNameEDIFCompatible(" "));
     }
 }
