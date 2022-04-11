@@ -220,8 +220,15 @@ public class TestEDIFTokenizer {
 
     @Test
     void testConcatenateMultibyte() {
-        String orig = "\uD83D\uDE0B\uD83C\uDF9B️äöüßΩΦ";
-        final byte[] bytes = toByteArray(orig);
+        //This test string contains multi-byte characters. We cannot encode it directly as a string here, because
+        //source code encoding varies between platforms.
+        byte[] bytes = new byte[]{
+                (byte) 0xf0, (byte) 0x9f, (byte) 0x98, (byte) 0x8b, (byte) 0xf0, (byte) 0x9f,
+                (byte) 0x8e, (byte) 0x9b, (byte) 0xef, (byte) 0xb8, (byte) 0x8f, (byte) 0xc3,
+                (byte) 0xa4, (byte) 0xc3, (byte) 0xb6, (byte) 0xc3, (byte) 0xbc, (byte) 0xc3,
+                (byte) 0x9f, (byte) 0xce, (byte) 0xa9, (byte) 0xce, (byte) 0xa6
+        };
+        String orig = new String(bytes, StandardCharsets.UTF_8);
         for (int i=0;i<bytes.length;i++) {
 
             String read = EDIFTokenizer.byteArrayToStringMulti(bytes, 0, i, i, bytes.length-i);
