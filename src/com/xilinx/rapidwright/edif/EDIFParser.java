@@ -34,6 +34,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import com.xilinx.rapidwright.tests.CodePerfTracker;
+import com.xilinx.rapidwright.util.StringPool;
 
 /**
  * An EDIF parser created especially for RapidWright.  It is only intended to 
@@ -49,7 +50,7 @@ public class EDIFParser extends AbstractEDIFParser implements AutoCloseable{
 
 
 	public EDIFParser(Path fileName) throws FileNotFoundException {
-		super(fileName, NameUniquifier.singleThreadedUniquifier());
+		super(fileName, StringPool.singleThreadedPool());
 	}
 
 	public EDIFParser(String fileName) throws FileNotFoundException {
@@ -57,7 +58,7 @@ public class EDIFParser extends AbstractEDIFParser implements AutoCloseable{
 	}
 
 	public EDIFParser(InputStream in){
-		super(null, in, NameUniquifier.singleThreadedUniquifier());
+		super(null, in, StringPool.singleThreadedPool());
 	}
 	
 	/**
