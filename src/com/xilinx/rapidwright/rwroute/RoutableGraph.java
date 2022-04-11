@@ -107,19 +107,21 @@ public class RoutableGraph {
                                 if (si == null)
                                     return false;
 
-                                Net A6 = si.getNetFromSiteWire(first + "6");
-                                boolean A6used = (A6 != null && A6.getType() != NetType.VCC);
-                                boolean O6used = (si.getNetFromSiteWire(first + "_O") != null);
-                                if (A6used) {
-                                    // A6 is used -> cannot use 5LUT
-                                    // O6 is used -> already using 6LUT
+                                String childWireName = child.getWireName();
+                                if (childWireName.endsWith("_O")) {
+                                    boolean O6used = si.getNetFromSiteWire(first + "_O") != null;
                                     if (O6used)
                                         return true;
                                 } else {
+                                    assert(childWireName.endsWith("MUX"));
+
                                     boolean O5used = (si.getNetFromSiteWire(first + "5LUT_O5") != null);
-                                    // A6 is unused -> can use 6LUT and 5LUT
-                                    // O6 and O5 used -> already using both
-                                    if (O6used && O5used)
+                                    if (O5used)
+                                        return true;
+
+                                    Net A6 = si.getNetFromSiteWire(first + "6");
+                                    boolean A6used = (A6 != null && A6.getType() != NetType.VCC);
+                                    if (A6used)
                                         return true;
                                 }
 
