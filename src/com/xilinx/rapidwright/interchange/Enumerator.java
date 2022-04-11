@@ -50,13 +50,10 @@ public class Enumerator<T> extends ArrayList<T> {
 
     public Integer getIndex(T obj) {
         String key = getKey(obj);
-        Integer idx = map.get(key);
-        if (idx == null) {
-            idx = map.size();
-            map.put(key, idx);
+        return map.computeIfAbsent(key, ($) -> {
             add(obj);
-        }
-        return idx;
+            return map.size();
+        });
     }
 
     public void addObject(T obj) {
