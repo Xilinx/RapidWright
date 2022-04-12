@@ -37,6 +37,7 @@ import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
+import com.xilinx.rapidwright.util.StringPool;
 import com.xilinx.rapidwright.util.ParallelismTools;
 import com.xilinx.rapidwright.util.function.InputStreamSupplier;
 
@@ -44,13 +45,13 @@ import com.xilinx.rapidwright.util.function.InputStreamSupplier;
  * Fast EDIF Parser using parallelism
  */
 public class ParallelEDIFParser implements AutoCloseable{
-    private static final long SIZE_PER_THREAD = EDIFTokenizer.DEFAULT_MAX_TOKEN_LENGTH * 8L;
+    private static final long MIN_BYTES_PER_THREAD = EDIFTokenizer.DEFAULT_MAX_TOKEN_LENGTH * 8L;
     protected final List<ParallelEDIFParserWorker> workers = new ArrayList<>();
     protected final Path fileName;
     private final long fileSize;
     protected final InputStreamSupplier inputStreamSupplier;
     protected final int maxTokenLength;
-    protected NameUniquifier uniquifier = NameUniquifier.concurrentUniquifier();
+    protected StringPool uniquifier = StringPool.concurrentPool();
 
     ParallelEDIFParser(Path fileName, long fileSize, InputStreamSupplier inputStreamSupplier, int maxTokenLength) {
         this.fileName = fileName;
@@ -76,9 +77,8 @@ public class ParallelEDIFParser implements AutoCloseable{
     }
 
     private int calcThreads(long fileSize) {
-        int maxUsefulThreads = Math.max((int) (fileSize / SIZE_PER_THREAD),1);
-        int processors = Runtime.getRuntime().availableProcessors();
-        return Math.min(maxUsefulThreads, processors);
+        int maxUsefulThreads = Math.max((int) (fileSize / MIN_BYTES_PER_THREAD),1);
+        return Math.min(maxUsefulThreads, ParallelismTools.maxParallelism());
     }
 
 
@@ -93,6 +93,11 @@ public class ParallelEDIFParser implements AutoCloseable{
     }
 
     private int numberOfThreads;
+
+    public EDIFNetlist parseEDIFNetlist() throws IOException {
+        return parseEDIFNetlist(CodePerfTracker.SILENT);
+    }
+
     public EDIFNetlist parseEDIFNetlist(CodePerfTracker t) throws IOException {
 
         t.start("Initialize workers");

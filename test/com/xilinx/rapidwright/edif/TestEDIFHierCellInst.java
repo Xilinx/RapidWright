@@ -29,7 +29,7 @@ public class TestEDIFHierCellInst {
     }
     
     @Test
-    public void testgetCommonAncestor() {
+    public void testGetCommonAncestor() {
         Design d = Design.readCheckpoint(RapidWrightDCP.getPath("microblazeAndILA_3pblocks.dcp"), true);
         EDIFNetlist netlist = d.getNetlist();
 

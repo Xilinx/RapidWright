@@ -22,17 +22,19 @@
 
 package com.xilinx.rapidwright.edif;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.SequenceInputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 
-import org.apache.commons.io.IOUtils;
+import com.xilinx.rapidwright.util.StringPool;
 
+/**
+ * Tokenize an InputStream containing an EDIF. This class buffers its input internally. To minimize copying data,
+ * combining it with a {@link java.io.BufferedInputStream} should be avoided.
+ */
 public class EDIFTokenizer implements AutoCloseable {
 
     private final Path fileName;
@@ -44,7 +46,7 @@ public class EDIFTokenizer implements AutoCloseable {
 
     protected long byteOffset;
 
-    protected final NameUniquifier uniquifier;
+    protected final StringPool uniquifier;
     protected final int maxTokenLength;
     protected final int bufferAddressMask;
 
@@ -97,7 +99,7 @@ public class EDIFTokenizer implements AutoCloseable {
         }
     }
 
-    public EDIFTokenizer(Path fileName, InputStream in, NameUniquifier uniquifier, int maxTokenLength) {
+    public EDIFTokenizer(Path fileName, InputStream in, StringPool uniquifier, int maxTokenLength) {
         this.fileName = fileName;
         this.in = in;
         this.uniquifier = uniquifier;
@@ -110,7 +112,7 @@ public class EDIFTokenizer implements AutoCloseable {
         this.buffer = new byte[maxTokenLength*2];
     }
 
-    public EDIFTokenizer(Path fileName, InputStream in, NameUniquifier uniquifier) {
+    public EDIFTokenizer(Path fileName, InputStream in, StringPool uniquifier) {
         this(fileName, in, uniquifier, DEFAULT_MAX_TOKEN_LENGTH);
     }
 
@@ -128,23 +130,10 @@ public class EDIFTokenizer implements AutoCloseable {
     public static String byteArrayToStringMulti(byte[] buffer, int start1, int length1, int start2, int length2) {
         //To support multi-byte characters being split between the parts, we have to take
         // care to first concatenate, then decode.
-        //TODO benchmark which approach is faster. Arraycopy is probably faster for small strings?
-        if (length1+length2 < 10000) {
-            byte[] complete = new byte[length1 + length2];
-            System.arraycopy(buffer, start1, complete, 0, length1);
-            System.arraycopy(buffer, start2, complete, length1, length2);
-            return new String(complete, charset);
-        } else {
-            try {
-                InputStream firstPart = new ByteArrayInputStream(buffer, start1, length1);
-                InputStream secondPart = new ByteArrayInputStream(buffer, start2, length2);
-                InputStream input = new SequenceInputStream(firstPart, secondPart);
-
-                return IOUtils.toString(input, charset);
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-        }
+        byte[] complete = new byte[length1 + length2];
+        System.arraycopy(buffer, start1, complete, 0, length1);
+        System.arraycopy(buffer, start2, complete, length1, length2);
+        return new String(complete, charset);
     }
 
     /**
@@ -476,7 +465,7 @@ public class EDIFTokenizer implements AutoCloseable {
         }
     }
 
-    public NameUniquifier getUniquifier() {
+    public StringPool getUniquifier() {
         return uniquifier;
     }
 

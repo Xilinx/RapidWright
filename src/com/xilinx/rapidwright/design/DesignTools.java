@@ -1123,6 +1123,7 @@ public class DesignTools {
 
 	/**
 	 * This method will completely remove a placed cell (both logical and physical) from a design.
+	 * In the case where the removed cell is the last user of a shared control signal (CLK, CE, SR) then that pin will also be removed and unrouted immediately if deferRemovals is null, otherwise it is added to this map.
 	 * @param design The design where the cell is instantiated
 	 * @param cell The cell to remove
 	 * @param deferRemovals An optional map that, if passed in non-null will be populated with 
