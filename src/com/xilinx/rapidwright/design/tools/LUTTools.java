@@ -50,7 +50,31 @@ public class LUTTools {
 
 	public static final int MAX_LUT_SIZE = 6;
 	
-
+	public static final String[][] lutMap;
+	
+	public static final char[] lutLetters = new char[] {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'};
+	
+	public static final String[] empty = new String[0];
+	
+	static {
+	    lutMap = new String[lutLetters.length][];
+	    for(char letter : lutLetters) {
+	        lutMap[letter - 'A'] = new String[] {letter + "6LUT", letter + "5LUT"};
+	    }
+	}
+	
+	/**
+	 * Gets the corresponding BEL site names for a given LUT letter.  For example, 'A' will return
+	 * ["A6LUT", "A5LUT"]
+	 * @param lutLetter The letter of the LUT of interest.  Valid values are 'A'..'H', 
+	 * case insensitive.
+	 * @return The list of corresponding BEL site names or an empty list if none were found.
+	 */
+	public static String[] getLUTBELNames(char lutLetter) {
+	    int index = lutLetter - (lutLetter >= 'a' ? 'a' : 'A');
+	    if(index < 0 || index >= lutLetters.length) return empty;
+	    return lutMap[index];
+	}
 	
 	/**
 	 * Checks if this cell is a LUT (LUT1, LUT2, LUT3,...). A CFGLUT5 will return false.
