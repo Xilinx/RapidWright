@@ -113,26 +113,29 @@ public class ECORouter extends PartialRouter {
                 String lut = sinkPinName.substring(0, 1);
                 Site site = sink.getSite();
                 SiteInst siteInst = sink.getSiteInst();
+                String outputPinName = lut + "_O";
 
-                boolean LUT6 = (siteInst.getCell(lut + "6LUT") != null);
-                boolean LUT5 = (siteInst.getCell(lut + "5LUT") != null);
-                int i = (LUT6 && LUT5) ? 0 : (LUT6 || LUT5) ? 5 : 6;
-                for (; i >= 1; i--) {
-                    Node altNode = site.getConnectedNode(lut + i);
-
-                    // Skip if LUT pin is already being preserved
-                    Net preservedNet = routingGraph.getPreservedNet(altNode);
-                    if (preservedNet != null) {
-                        continue;
-                    }
-
-                    RoutableType type = RoutableType.WIRE;
-                    Routable altRnode = createAddRoutableNode(null, altNode, type);
-                    // Trigger a setChildren() for LUT routethrus
-                    altRnode.getChildren();
-                    // Create a fake edge from [A-H][1-6] to [A-H](I|_X)
-                    altRnode.addChild(rnode);
+                boolean O6used = siteInst.getNetFromSiteWire(outputPinName) != null;
+                if (O6used) {
+                    // TODO: If O6 unavailable, consider using O5 (would also require
+                    //       A6 to be tied to VCC)
+                    continue;
                 }
+
+                // Check if LUT is used for constant generation by examining output
+                // pin (since SiteInst.getNetFromSiteWire() will not show this)
+                Node outputPinNode = site.getConnectedNode(outputPinName);
+                if (routingGraph.isPreserved(outputPinNode)) {
+                    // TODO: Since it is used for constant generation, could move it elsewhere
+                    continue;
+                }
+
+                RoutableType type = RoutableType.WIRE;
+                Routable outputPinRnode = createAddRoutableNode(null, outputPinNode, type);
+                // Pre-emptively trigger a setChildren()
+                outputPinRnode.getChildren();
+                // Create a fake edge from [A-H]_O to target [A-H](I|_X)
+                outputPinRnode.addChild(rnode);
             }
         }
     }
@@ -174,23 +177,29 @@ public class ECORouter extends PartialRouter {
                 SitePinInst sink = connection.getSink();
                 List<Routable> rnodes = connection.getRnodes();
                 String sinkPinName = sink.getName();
-                if (rnodes.size() >= 2 && Pattern.matches("[A-H](X|_I)", sinkPinName)) {
-                    Routable prevRnode = rnodes.get(1);
-                    Node prevNode = (prevRnode != null) ? prevRnode.getNode() : null;
-                    SitePin prevPin = (prevNode != null) ? prevNode.getSitePin() : null;
-                    if (prevPin != null && Pattern.matches("[A-H][1-6]", prevPin.getPinName())) {
-                        // Drop the fake LUT -> X/I pin edge
-                        connection.setRnodes(rnodes.subList(1, rnodes.size()));
+                if (rnodes.size() >= 3 && Pattern.matches("[A-H](X|_I)", sinkPinName)) {
+                    if (Pattern.matches(".+[A-H]_O", rnodes.get(1).getNode().toString())) {
+                        Routable lutRnode = rnodes.get(2);
+                        Node lutNode = lutRnode.getNode();
+                        SitePin lutPin = lutNode.getSitePin();
+
+                        assert(Pattern.matches("[A-H][1-6]", lutPin.getPinName()));
+
+                        // Drop the fake LUT input -> LUT output -> X/I pin edges
+                        connection.setRnodes(rnodes.subList(2, rnodes.size()));
 
                         // Fix the intra-site routing
                         SiteInst si = sink.getSiteInst();
                         Net net = connection.getNetWrapper().getNet();
                         for (BELPin sinkBELPin : getConnectedBELPins(sink)) {
-                            si.unrouteIntraSiteNet(sink.getBELPin(), sinkBELPin);
-                            si.routeIntraSiteNet(net, prevPin.getBELPin(), sinkBELPin);
+                            boolean r = si.unrouteIntraSiteNet(sink.getBELPin(), sinkBELPin);
+                            assert(r);
+                            r = si.routeIntraSiteNet(net, lutPin.getBELPin(), sinkBELPin);
+                            assert(r);
+                            si.dirty = true;
                         }
 
-                        System.out.println(prevPin.getPinName() + " -> " + sinkPinName + " for " + connection.getNetWrapper().getNet());
+                        System.out.println(lutPin.getPinName() + " -> " + sinkPinName + " for " + connection.getNetWrapper().getNet());
                     }
                 }
             }
