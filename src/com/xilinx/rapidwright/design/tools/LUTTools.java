@@ -58,7 +58,7 @@ public class LUTTools {
 	public static final String[] empty = new String[0];
 	
 	static {
-	    lutMap = new String[8][];
+	    lutMap = new String[lutLetters.length][];
 	    for(char letter : lutLetters) {
 	        lutMap[letter - 'A'] = new String[] {letter + "6LUT", letter + "5LUT"};
 	    }
