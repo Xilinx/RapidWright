@@ -472,16 +472,15 @@ public class EDIFTools {
 	 * Connects two existing logical port insts together by creating new ports and nets on all cells
 	 * instantiated between their levels of hierarchy.  It assumes the netlist cells involved only
 	 * have one instance (does not differentiate cells when creating the ports).  This assumption 
-	 * can be enforce by calling {@link #flattenNetlist(Design)}. If the src or snk
+	 * can be enforced by calling {@link #flattenNetlist(Design)}. If the src or snk
 	 * port insts do net have nets connected, it will create them and connect them in their parent
 	 * cell definition.
 	 * @param src The logical port inst driver or source  
 	 * @param snk The logical port inst sink
-	 * @param netlist The EDIF netlist of the design
 	 * @param newName A unique name to be used in creating the ports and nets
 	 */
 	public static void connectPortInstsThruHier(EDIFHierPortInst src, EDIFHierPortInst snk, 
-	        EDIFNetlist netlist, String newName) {
+	        String newName) {
 	    EDIFHierCellInst commonAncestor = 
 	            src.getHierarchicalInst().getCommonAncestor(snk.getHierarchicalInst());
 	    EDIFHierPortInst finalSrc = src;
