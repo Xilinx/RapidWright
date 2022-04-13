@@ -98,35 +98,40 @@ public class RoutableGraph {
                         assert(siteType == SiteTypeEnum.SLICEL || siteType == SiteTypeEnum.SLICEM);
                         String pinName = sp.getPinName();
                         if (pinName.length() == 2) {
-                            char first = pinName.charAt(0);
-                            char second = pinName.charAt(1);
-                            if (first >= 'A' && first <= 'H' && second >= '1' && second <= '5' /*'6'*/) {
-                                SiteInst si = design.getSiteInstFromSite(s);
+                            String childWireName = child.getWireName();
 
-                                // Nothing placed at site, all routethrus possible
-                                if (si == null)
+                            // Only support O6 route-thrus
+                            if (childWireName.endsWith("_O")) {
+
+                                char first = pinName.charAt(0);
+                                char second = pinName.charAt(1);
+                                if (first >= 'A' && first <= 'H' && second >= '1' && second <= '5' /*'6'*/) {
+                                    SiteInst si = design.getSiteInstFromSite(s);
+
+                                    // Nothing placed at site, all routethrus possible
+                                    if (si == null)
+                                        return false;
+
+                                    // if (childWireName.endsWith("_O")) {
+                                        boolean O6used = si.getNetFromSiteWire(first + "_O") != null;
+                                        if (O6used)
+                                            return true;
+                                    // } else {
+                                    //     assert(childWireName.endsWith("MUX"));
+                                    //
+                                    //     boolean O5used = (si.getNetFromSiteWire(first + "5LUT_O5") != null);
+                                    //     if (O5used)
+                                    //         return true;
+                                    //
+                                    //     Net A6 = si.getNetFromSiteWire(first + "6");
+                                    //     boolean A6used = (A6 != null && A6.getType() != NetType.VCC);
+                                    //     if (A6used)
+                                    //         return true;
+                                    // }
+
+                                    // Routethru allowed
                                     return false;
-
-                                String childWireName = child.getWireName();
-                                if (childWireName.endsWith("_O")) {
-                                    boolean O6used = si.getNetFromSiteWire(first + "_O") != null;
-                                    if (O6used)
-                                        return true;
-                                } else {
-                                    assert(childWireName.endsWith("MUX"));
-
-                                    boolean O5used = (si.getNetFromSiteWire(first + "5LUT_O5") != null);
-                                    if (O5used)
-                                        return true;
-
-                                    Net A6 = si.getNetFromSiteWire(first + "6");
-                                    boolean A6used = (A6 != null && A6.getType() != NetType.VCC);
-                                    if (A6used)
-                                        return true;
                                 }
-
-                                // Routethru allowed
-                                return false;
                             }
                         }
                     }
