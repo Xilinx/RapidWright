@@ -24,6 +24,8 @@ package com.xilinx.rapidwright.interchange;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -100,14 +102,20 @@ public class PhysNetlistWriter {
         }
         return cellName;
     }
+
+    private static void writePlacement(PhysNetlist.Builder physNetlist, Design design,
+                                      Enumerator<String> strings)
+    {
+        writePlacement(physNetlist, design, strings, design.getSiteInsts());
+    }
     
-    private static void writePlacement(PhysNetlist.Builder physNetlist, Design design, 
-            Enumerator<String> strings) {
+    public static void writePlacement(PhysNetlist.Builder physNetlist, Design design,
+            Enumerator<String> strings, Collection<SiteInst> siteInsts) {
         HashMap<String,PhysCellType> physCells = new HashMap<>();
         ArrayList<Cell> allCells = new ArrayList<Cell>();
         HashMap<String,ArrayList<Cell>> multiBelCells = new HashMap<>();
         int i=0;
-        for(SiteInst siteInst : design.getSiteInsts()) {
+        for(SiteInst siteInst : siteInsts) {
         	if(!siteInst.isPlaced()) continue;
             for(Cell cell : siteInst.getCells()) {
             	allCells.add(cell);
@@ -204,72 +212,75 @@ public class PhysNetlistWriter {
         }
     	return idx;
     }
-    
-    private static void writePhysNets(PhysNetlist.Builder physNetlist, Design design, 
-                                        Enumerator<String> strings) {
-    	
-    	// Extract out site routing first, for partially routed designs...
-    	HashMap<Net, ArrayList<RouteBranchNode>> netSiteRouting = new HashMap<>();
-    	List<RouteBranchNode> nullNetStubs = new ArrayList<>();
-    	for(SiteInst siteInst : design.getSiteInsts()) {
-    		Site site = siteInst.getSite();
+
+    public static Map<Net, List<RouteBranchNode>> extractSiteRouting(Collection<SiteInst> siteInsts)
+    {
+        // Extract out site routing first, for partially routed designs...
+        Map<Net, List<RouteBranchNode>> netSiteRouting = new HashMap<>();
+        // List<RouteBranchNode> nullNetStubs = new ArrayList<>();
+        for(SiteInst siteInst : siteInsts) {
+            Site site = siteInst.getSite();
             for(SitePIP sitePIP : siteInst.getUsedSitePIPs()) {
                 String siteWire = sitePIP.getInputPin().getSiteWireName();
                 Net net = siteInst.getNetFromSiteWire(siteWire);
                 if(net == null) {
-                	String sitePinName = sitePIP.getInputPin().getConnectedSitePinName();
-                	SitePinInst spi = siteInst.getSitePinInst(sitePinName);
-                	if(spi != null) {
-                		net = spi.getNet();
-                	}
+                    String sitePinName = sitePIP.getInputPin().getConnectedSitePinName();
+                    SitePinInst spi = siteInst.getSitePinInst(sitePinName);
+                    if(spi != null) {
+                        net = spi.getNet();
+                    }
                 }
                 SitePIPStatus status = siteInst.getSitePIPStatus(sitePIP);
-                if(net == null) {
-                	nullNetStubs.add(new RouteBranchNode(site, sitePIP, status.isFixed()));
-                	continue;
-                }
-                
-                ArrayList<RouteBranchNode> segments = netSiteRouting.get(net);
-                if(segments == null) {
-                	segments = new ArrayList<RouteBranchNode>();
-                	netSiteRouting.put(net, segments);
-                }
+                // if(net == null) {
+                //     nullNetStubs.add(new RouteBranchNode(site, sitePIP, status.isFixed()));
+                //     continue;
+                // }
+
+                List<RouteBranchNode> segments = netSiteRouting.computeIfAbsent(net, (n) -> new ArrayList<>());
                 segments.add(new RouteBranchNode(site, sitePIP, status.isFixed()));
             }
-            
+
             for(Entry<Net,HashSet<String>> e : siteInst.getSiteCTags().entrySet()) {
-                ArrayList<RouteBranchNode> segments = netSiteRouting.get(e.getKey());
-                if(segments == null) {
-                	segments = new ArrayList<RouteBranchNode>();
-                	netSiteRouting.put(e.getKey(), segments);
-                }
+                List<RouteBranchNode> segments = netSiteRouting.computeIfAbsent(e.getKey(), (n) -> new ArrayList<>());
                 if(e.getValue() != null && e.getValue().size() > 0) {
                     for(String siteWire : e.getValue()) {
-	                    BELPin[] belPins = siteInst.getSiteWirePins(siteWire);
-	                    for(BELPin belPin : belPins) {
-	                        BEL bel = belPin.getBEL();
-	                        Cell cell = siteInst.getCell(bel);
-	                        boolean routethru = false;
-	                        if(belPin.isInput()) {
-	                            // Skip if no BEL placed here
-	                            if (cell == null) {
-	                                continue;
-	                            }
-	                            // Skip if pin not used (e.g. A1 connects to A[56]LUT.A1;
-	                            // both cells can exist but not both need be using this pin)
-	                            if (cell.getLogicalPinMapping(belPin.getName()) == null) {
-	                                continue;
-	                            }
+                        BELPin[] belPins = siteInst.getSiteWirePins(siteWire);
+                        for(BELPin belPin : belPins) {
+                            BEL bel = belPin.getBEL();
+                            Cell cell = siteInst.getCell(bel);
+                            boolean routethru = false;
+                            if(belPin.isInput()) {
+                                // Skip if no BEL placed here
+                                if (cell == null) {
+                                    continue;
+                                }
+                                // Skip if pin not used (e.g. A1 connects to A[56]LUT.A1;
+                                // both cells can exist but not both need be using this pin)
+                                if (cell.getLogicalPinMapping(belPin.getName()) == null) {
+                                    continue;
+                                }
                             } else {
                                 routethru = cell != null && cell.isRoutethru();
                             }
                             segments.add(new RouteBranchNode(site, belPin, routethru));
-	                    }
-                    }                	
+                        }
+                    }
                 }
             }
-    	}
-    	
+        }
+
+        return netSiteRouting;
+    }
+    
+    private static void writePhysNets(PhysNetlist.Builder physNetlist, Design design, 
+                                        Enumerator<String> strings) {
+
+        Map<Net, List<RouteBranchNode>> netSiteRouting = extractSiteRouting(design.getSiteInsts());
+        List<RouteBranchNode> nullNetStubs = netSiteRouting.remove(null);
+        if (nullNetStubs == null) {
+            nullNetStubs = Collections.EMPTY_LIST;
+        }
+
     	PhysNet.Builder nullNet = physNetlist.getNullNet();
     	Builder<RouteBranch.Builder> stubs = nullNet.initStubs(nullNetStubs.size());
     	int i=0;
@@ -292,7 +303,6 @@ public class PhysNetlistWriter {
     		}
     	}
     	
-    	
         Builder<PhysNet.Builder> nets = physNetlist.initPhysNets(physNetCount);
         i=0;
         for(Net net : design.getNets()) {
@@ -310,21 +320,21 @@ public class PhysNetlistWriter {
             }
             
             // We need to traverse the net inside sites to fully populate routing spec
-            ArrayList<RouteBranchNode> routingSources = new ArrayList<>();
+            List<RouteBranchNode> routingSources = new ArrayList<>();
             for(PIP p : net.getPIPs()) {
                 routingSources.add(new RouteBranchNode(p));
             }
             for(SitePinInst spi : net.getPins()) {
                 routingSources.add(new RouteBranchNode(spi));
             }
-            ArrayList<RouteBranchNode> segments = netSiteRouting.remove(net);
+            List<RouteBranchNode> segments = netSiteRouting.remove(net);
             if(segments != null) routingSources.addAll(segments);
             populateRouting(routingSources, physNet, strings);
             i++;
         }
 
         // Clean up any nets not found in design that were stored in site routing
-        for(Entry<Net,ArrayList<RouteBranchNode>> e : netSiteRouting.entrySet()) {
+        for(Entry<Net,List<RouteBranchNode>> e : netSiteRouting.entrySet()) {
         	PhysNet.Builder physNet = nets.get(i);
         	physNet.setName(strings.getIndex(e.getKey().getName()));
         	populateRouting(e.getValue(), physNet, strings);
@@ -341,7 +351,7 @@ public class PhysNetlistWriter {
         }
     }
     
-    private static void populateRouting(ArrayList<RouteBranchNode> routingBranches, 
+    private static void populateRouting(List<RouteBranchNode> routingBranches,
                                         PhysNet.Builder physNet, Enumerator<String> strings) {
 
         List<RouteBranchNode> sources = new ArrayList<>();
@@ -414,7 +424,7 @@ public class PhysNetlistWriter {
         }
     }
 
-    private static void writeRouteBranch(RouteBranch.Builder srcBuilder, RouteBranchNode src, 
+    public static void writeRouteBranch(RouteBranch.Builder srcBuilder, RouteBranchNode src,
                                             Enumerator<String> strings) {
         RouteSegment.Builder segment = srcBuilder.getRouteSegment();
         switch(src.getType()) {
@@ -477,7 +487,7 @@ public class PhysNetlistWriter {
         ooc.setValue(strings.getIndex(design.isDesignOutOfContext() ? "1" : "0"));        
     }
     
-    private static void writeStrings(PhysNetlist.Builder physNetlist, Enumerator<String> strings) {
+    public static void writeStrings(PhysNetlist.Builder physNetlist, Enumerator<String> strings) {
         TextList.Builder strList = physNetlist.initStrList(strings.size());
         int stringCount = strList.size();
         for(int i=0; i < stringCount; i++) {
