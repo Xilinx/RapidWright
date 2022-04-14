@@ -212,7 +212,8 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
 	}
 	
 	public EDIFNet removeNet(String name){
-		if(nets == null) return null;;
+		if(nets == null) return null;
+		trackChange(EDIFChangeType.NET_REMOVE, name);		    
 		return nets.remove(name);
 	}
 	/**
@@ -281,6 +282,7 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
 	
 	public EDIFCellInst removeCellInst(String name){
 		if(instances == null) return null;
+		trackChange(EDIFChangeType.CELL_INST_REMOVE, name);		    
 		return instances.remove(name);
 	}
 	
@@ -333,6 +335,7 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
         for(String s : portObjectsToRemove) {
             getPortMap().remove(s);
         }
+        trackChange(EDIFChangeType.PORT_REMOVE, port.getName());
     }
 	
 	public void moveToLibrary(EDIFLibrary newLibrary){
@@ -462,6 +465,15 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
 	 * Deletes internal representation.  
 	 */
 	protected void makePrimitive() { 
+		EDIFNetlist netlist = getNetlist();
+		if(netlist!= null && netlist.isTrackingCellChanges()) {
+		    for(EDIFCellInst inst : getCellInsts()) {
+		        netlist.trackChange(this, EDIFChangeType.CELL_INST_REMOVE, inst.getName());
+		    }
+		    for(EDIFNet net : getNets()) {
+		        netlist.trackChange(this, EDIFChangeType.NET_REMOVE, net.getName());
+		    }
+		}
 		instances = null;
 		nets = null;
 		internalPortMap = null;
@@ -543,34 +555,30 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
 		return leafCells;
     }
 
-	public EDIFPort getPortByLegalName(String name) {
+    public EDIFNetlist getNetlist() {
+        EDIFLibrary lib = getLibrary();
+        return lib != null ? lib.getNetlist() : null;
+    }
+    
+    public void trackChange(EDIFChangeType type, String name) {
+        EDIFNetlist netlist = getNetlist();
+        if(netlist != null) {
+            netlist.trackChange(this, type, name);            
+        }
+    }
+    
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        if (!super.equals(o)) return false;
+        EDIFCell edifCell = (EDIFCell) o;
+        return Objects.equals(library, edifCell.library);
+    }
 
-		EDIFPort port = getPort(name);
-		if(port != null) {
-			return port;
-		}
-		// Finding by EDIFName is O(n), but n is generally small and alternative to building
-		// a map for this single search ends up taking longer
-		for(Map.Entry<String,EDIFPort> e : getPortMap().entrySet()) {
-			if(e.getValue().getLegalEDIFName().equals(name)) {
-				return e.getValue();
-			}
-		}
-		return null;
-	}
-
-	@Override
-	public boolean equals(Object o) {
-		if (this == o) return true;
-		if (o == null || getClass() != o.getClass()) return false;
-		if (!super.equals(o)) return false;
-		EDIFCell edifCell = (EDIFCell) o;
-		return Objects.equals(library, edifCell.library);
-	}
-
-	@Override
-	public int hashCode() {
-		return Objects.hash(super.hashCode(), library);
-	}
+    @Override
+    public int hashCode() {
+        return Objects.hash(super.hashCode(), library);
+    }
 }
  

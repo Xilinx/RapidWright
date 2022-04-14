@@ -219,6 +219,14 @@ public class Utils{
 	public static boolean isURAM(SiteInst s){
 		return uramTypes.contains(s.getSiteTypeEnum());
 	}
+	
+	public static boolean isIOB(SiteInst s) {
+	    return iobTypes.contains(s.getSiteTypeEnum());
+	}
+	
+	public static boolean isIOB(SiteTypeEnum s) {
+	    return iobTypes.contains(s);
+	}
 
 
 	
@@ -354,7 +362,21 @@ public class Utils{
 			SiteTypeEnum.IOB18S,
 			SiteTypeEnum.IOB33,
 			SiteTypeEnum.IOB33M,
-			SiteTypeEnum.IOB33S
+			SiteTypeEnum.IOB33S,
+			SiteTypeEnum.IOB,
+			SiteTypeEnum.IOBM,
+			SiteTypeEnum.IOBS, 
+			SiteTypeEnum.HPIOB,
+			SiteTypeEnum.HPIOB_M,
+			SiteTypeEnum.HPIOB_S,
+			SiteTypeEnum.HPIOB,
+			SiteTypeEnum.HPIOB_DCI_SNGL,
+			SiteTypeEnum.HPIOB_SNGL,
+			SiteTypeEnum.HPIOBDIFFINBUF,
+			SiteTypeEnum.HPIOBDIFFOUTBUF,
+			SiteTypeEnum.HRIO,
+			SiteTypeEnum.HRIODIFFINBUF,
+			SiteTypeEnum.HRIODIFFOUTBUF
 		);
 		
 		uramTypes = EnumSet.of(

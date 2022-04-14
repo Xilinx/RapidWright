@@ -36,18 +36,21 @@ import com.xilinx.rapidwright.support.RapidWrightDCP;
 public class TestEDIFTools {
 
     public static final String UNIQUE_SUFFIX = "TestEDIFToolsWasHere";
-
+    
+    public static final String TEST_SRC = "base_mb_i/microblaze_0/U0/"
+            + "MicroBlaze_Core_I/Performance.Core/Data_Flow_I/Data_Flow_Logic_I/Gen_Bits[22]."
+            + "MEM_EX_Result_Inst/Using_FPGA.Native/Q"; 
+    public static final String TEST_SNK = "u_ila_0/inst/PROBE_PIPE."
+            + "shift_probes_reg[0][7]/D"; 
+    
     @Test
     public void testConnectPortInstsThruHier() {
         Design d = Design.readCheckpoint(RapidWrightDCP.getPath("microblazeAndILA_3pblocks.dcp"), true);
         EDIFNetlist netlist = d.getNetlist();
-
-        EDIFHierPortInst srcPortInst = netlist.getHierPortInstFromName("base_mb_i/microblaze_0/U0/"
-                + "MicroBlaze_Core_I/Performance.Core/Data_Flow_I/Data_Flow_Logic_I/Gen_Bits[22]."
-                + "MEM_EX_Result_Inst/Using_FPGA.Native/Q");
-        EDIFHierPortInst snkPortInst = netlist.getHierPortInstFromName("u_ila_0/inst/PROBE_PIPE."
-                + "shift_probes_reg[0][7]/D");
-
+        
+        EDIFHierPortInst srcPortInst = netlist.getHierPortInstFromName(TEST_SRC);
+        EDIFHierPortInst snkPortInst = netlist.getHierPortInstFromName(TEST_SNK);
+        
         // Disconnect sink in anticipation of connecting to another net
         snkPortInst.getNet().removePortInst(snkPortInst.getPortInst());
 
