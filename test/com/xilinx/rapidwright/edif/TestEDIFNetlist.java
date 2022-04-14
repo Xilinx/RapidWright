@@ -25,6 +25,7 @@ package com.xilinx.rapidwright.edif;
 import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.junit.jupiter.api.Assertions;
@@ -88,7 +89,7 @@ class TestEDIFNetlist {
 
         netlist.resetParentNetMap();
         
-        Set<EDIFCell> modifiedCells = netlist.getModifiedCells();
+        Map<EDIFCell,List<EDIFChange>> modifiedCells = netlist.getModifiedCells();
         
         Assertions.assertEquals(modifiedCells.size(), 8);
         
@@ -97,7 +98,7 @@ class TestEDIFNetlist {
             potentiallyModifiedCells.add(logNets.getParentInst().getCellType());
         }
         
-        for(EDIFCell modifiedCell : modifiedCells) {
+        for(EDIFCell modifiedCell : modifiedCells.keySet()) {
             Assertions.assertTrue(potentiallyModifiedCells.contains(modifiedCell));
         }
     }

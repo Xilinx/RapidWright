@@ -213,9 +213,7 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
 	
 	public EDIFNet removeNet(String name){
 		if(nets == null) return null;
-		if(isTrackingChanges()) {
-		    getNetlist().addModifiedCell(this);
-		}
+		trackChange(EDIFChangeType.NET_REMOVE, name);		    
 		return nets.remove(name);
 	}
 	/**
@@ -284,9 +282,7 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
 	
 	public EDIFCellInst removeCellInst(String name){
 		if(instances == null) return null;
-		if(isTrackingChanges()) {
-		    getNetlist().addModifiedCell(this);
-		}		
+		trackChange(EDIFChangeType.CELL_INST_REMOVE, name);		    
 		return instances.remove(name);
 	}
 	
@@ -339,9 +335,7 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
         for(String s : portObjectsToRemove) {
             getPortMap().remove(s);
         }
-        if(isTrackingChanges() && portObjectsToRemove.size() > 0) {
-            getNetlist().addModifiedCell(this);
-        }
+        trackChange(EDIFChangeType.PORT_REMOVE, port.getName());
     }
 	
 	public void moveToLibrary(EDIFLibrary newLibrary){
@@ -471,12 +465,18 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
 	 * Deletes internal representation.  
 	 */
 	protected void makePrimitive() { 
+		EDIFNetlist netlist = getNetlist();
+		if(netlist!= null && netlist.isTrackingCellChanges()) {
+		    for(EDIFCellInst inst : getCellInsts()) {
+		        netlist.trackChange(this, EDIFChangeType.CELL_INST_REMOVE, inst.getName());
+		    }
+		    for(EDIFNet net : getNets()) {
+		        netlist.trackChange(this, EDIFChangeType.NET_REMOVE, net.getName());
+		    }
+		}
 		instances = null;
 		nets = null;
 		internalPortMap = null;
-		if(isTrackingChanges()) {
-		    getNetlist().addModifiedCell(this);
-		}
 	}
 	
 	public void exportEDIF(Writer wr) throws IOException{
@@ -560,9 +560,11 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
         return lib != null ? lib.getNetlist() : null;
     }
     
-    public boolean isTrackingChanges() {
+    public void trackChange(EDIFChangeType type, String name) {
         EDIFNetlist netlist = getNetlist();
-        return netlist == null ? false : netlist.isTrackingCellChanges();
+        if(netlist != null) {
+            netlist.trackChange(this, type, name);            
+        }
     }
     
     @Override

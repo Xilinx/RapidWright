@@ -106,7 +106,7 @@ public class EDIFNetlist extends EDIFName {
 	
 	private boolean trackCellChanges = false;
 	
-	private Set<EDIFCell> modifiedCells = null;
+	private Map<EDIFCell, List<EDIFChange>> modifiedCells = null;
 	
 	private boolean DEBUG = false;
 
@@ -1746,26 +1746,22 @@ public class EDIFNetlist extends EDIFName {
     public void setTrackCellChanges(boolean trackCellChanges) {
         this.trackCellChanges = trackCellChanges;
     }
+    
+    public void trackChange(EDIFCell cell, EDIFChangeType type, String objectName) {
+        if(isTrackingCellChanges()) {
+            addTrackingChange(cell, new EDIFChange(type, objectName));
+        }
+    }
+    
+    public void addTrackingChange(EDIFCell cell, EDIFChange change) {
+        getModifiedCells().computeIfAbsent(cell, l -> new ArrayList<>()).add(change);
+    }
 
-    /**
-     * Gets the set of modified cells for this netlist.  These are accumulated when changes are 
-     * made to an EDIFCell and {@link #isTrackingCellChanges()} returns true.
-     * @return The set of modified EDIFCells
-     */
-    public Set<EDIFCell> getModifiedCells() {
+    public Map<EDIFCell, List<EDIFChange>> getModifiedCells(){
+        if(modifiedCells == null) modifiedCells = new HashMap<>();
         return modifiedCells;
     }
     
-    /**
-     * Adds the EDIFCell to the set of modified EDIFCells for this netlist.
-     * @param cell The cell to add
-     * @return True if the cell was added to the set, false if the cell was already in the set.
-     */
-    public boolean addModifiedCell(EDIFCell cell) {
-        if(modifiedCells == null) modifiedCells = new HashSet<>();
-        return modifiedCells.add(cell);
-    }
-
     public static void main(String[] args) throws FileNotFoundException {
 		CodePerfTracker t = new CodePerfTracker("EDIF Import/Export", true);
 		t.start("Read EDIF");

@@ -71,11 +71,25 @@ public class EDIFNet extends EDIFPropertyObject {
 	 */
 	public void addPortInst(EDIFPortInst portInst){
 		if(portInsts == null) portInsts = new EDIFPortInstList();
-		if(parentCell != null && portInst.getCellInst() == null) {
+		boolean isParentCellNonNull = parentCell != null;
+		EDIFCellInst inst = portInst.getCellInst();
+		if(isParentCellNonNull && inst == null) {
 			parentCell.addInternalPortMapEntry(portInst.getName(), this);
 		}
 		portInst.setParentNet(this);
+		if(isParentCellNonNull) {
+		    trackChanges(EDIFChangeType.PORT_INST_ADD, inst, portInst.getName());
+		}
 		portInsts.add(portInst);
+	}
+	
+	public void trackChanges(EDIFChangeType type, EDIFCellInst inst, String portInstName) {
+        EDIFNetlist netlist = parentCell.getNetlist();
+        if(netlist != null && netlist.isTrackingCellChanges()) {
+            String instName = inst == null ? null : inst.getName();
+            EDIFChangeNet change = new EDIFChangeNet(type, portInstName, getName(), instName);
+            netlist.addTrackingChange(parentCell, change);
+        }
 	}
 	
 	public EDIFPortInst createPortInst(EDIFPort port){
@@ -267,6 +281,9 @@ public class EDIFNet extends EDIFPropertyObject {
 	 */
 	public EDIFPortInst removePortInst(EDIFCellInst inst, String portInstName){
         if (portInsts == null) return null;
+        if(parentCell != null) {
+            trackChanges(EDIFChangeType.PORT_INST_ADD, inst, portInstName);
+        }
         EDIFPortInst tmp = portInsts.remove(inst, portInstName);
 		if(tmp != null) tmp.setParentNet(null);
 		return tmp;
@@ -284,9 +301,7 @@ public class EDIFNet extends EDIFPropertyObject {
 	 */
 	public void setParentCell(EDIFCell parentCell) {
 		this.parentCell = parentCell;
-		if(parentCell.isTrackingChanges()) {
-		    parentCell.getNetlist().addModifiedCell(parentCell);
-		}
+		parentCell.trackChange(EDIFChangeType.NET_ADD, getName());
 	}
 	
 	public void exportEDIF(Writer wr) throws IOException {
