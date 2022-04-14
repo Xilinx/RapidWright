@@ -52,6 +52,7 @@ import com.xilinx.rapidwright.design.PinType;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.FileTools;
+import com.xilinx.rapidwright.util.ParallelismTools;
 
 
 /**
@@ -708,10 +709,17 @@ public class EDIFTools {
 	}
 
 	public static EDIFNetlist loadEDIFFile(Path fileName) {
-		try (/*EDIFParser p = new EDIFParser(fileName)*/
-			 ParallelEDIFParser p = new ParallelEDIFParser(fileName)) {
-			CodePerfTracker t = new CodePerfTracker(null);
-			return p.parseEDIFNetlist(t);
+		try {
+			if (ParallelismTools.getParallel()) {
+				try (ParallelEDIFParser p = new ParallelEDIFParser(fileName)) {
+					CodePerfTracker t = new CodePerfTracker(null);
+					return p.parseEDIFNetlist(t);
+				}
+			} else {
+				try (EDIFParser p = new EDIFParser(fileName)) {
+					return p.parseEDIFNetlist();
+				}
+			}
 		} catch (IOException e) {
 			throw new UncheckedIOException("ERROR: Couldn't read file : " + fileName, e);
 		}
