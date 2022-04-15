@@ -65,6 +65,7 @@ import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.edif.EDIFHierPortInst;
+import com.xilinx.rapidwright.edif.EDIFLibrary;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPort;
@@ -2152,6 +2153,17 @@ public class DesignTools {
 		HashSet<String> instsWithSeparator = new HashSet<>();
 		for(Entry<String,String> e : srcToDestInstNames.entrySet()) {
 			EDIFHierCellInst cellInst = src.getNetlist().getHierCellInstFromName(e.getKey());
+			if(e.getValue().length() == 0) {
+			    // If its the top cell, remove the top cell from destNetlist
+			    EDIFLibrary destLib = destNetlist.getLibrary(cellInst.getCellType().getLibrary().getName());
+			    if(destLib == null){
+			        destLib = destNetlist.getWorkLibrary();
+			    }
+			    EDIFCell existingCell = destLib.getCell(cellInst.getCellType().getLegalEDIFName());
+			    if(existingCell != null) {
+			        destLib.removeCell(existingCell);
+			    }
+			}
 			destNetlist.migrateCellAndSubCells(cellInst.getCellType());
 			EDIFHierCellInst bbInst = destNetlist.getHierCellInstFromName(e.getValue());
 			bbInst.getInst().setCellType(cellInst.getCellType());
@@ -2176,8 +2188,7 @@ public class DesignTools {
 					dstSiteInst = dest.createSiteInst(srcSiteInst.getName(), 
 									srcSiteInst.getSiteTypeEnum(), srcSiteInst.getSite());
 				}
-				String newCellPrefix = srcToDestInstNames.get(prefixes.get(prefixMatch));
-				String newCellName = newCellPrefix + cell.getName().substring(prefixMatch.length()-1);
+				String newCellName = getNewHierName(cellName, srcToDestInstNames, prefixes, prefixMatch);
 				Cell copy = cell.copyCell(newCellName, cell.getEDIFCellInst(), dstSiteInst);
 				dstSiteInst.addCell(copy);
 				copy.setBELFixed(lockPlacement);
@@ -2223,8 +2234,7 @@ public class DesignTools {
 			String newNetName = net.getName();
 			String prefixMatch = null;
 			if((prefixMatch = StringTools.startsWithAny(net.getName(), prefixes.keySet())) != null) {
-				String noSeparator = prefixes.get(prefixMatch);
-				newNetName = srcToDestInstNames.get(noSeparator) + newNetName.substring(noSeparator.length());
+			    newNetName = getNewHierName(newNetName, srcToDestInstNames, prefixes, prefixMatch);
 			}
 			EDIFNet logicalNet = destNetlist.getNetFromHierName(net.getName());
 			Net copiedNet = dest.createNet(newNetName, logicalNet);
@@ -2236,6 +2246,13 @@ public class DesignTools {
 				}
 			}
 		}		
+	}
+	
+	private static String getNewHierName(String srcName, Map<String,String> srcToDestInstNames, 
+	                                        Map<String,String> prefixes, String prefixMatch) {
+        String newCellPrefix = srcToDestInstNames.get(prefixes.get(prefixMatch));
+        int idx = prefixMatch.length() - (newCellPrefix.length() == 0 ? 0 : 1);
+        return newCellPrefix + srcName.substring(idx);
 	}
 	
 	/**
@@ -2354,8 +2371,7 @@ public class DesignTools {
 								throw new RuntimeException("ERROR: Unable to find appropriate "
 									+ "translation name for cell: " + tmpCell);
 							}
-							String newPrefix = srcToDestNames.get(prefixes.get(prefixMatch));
-							String newCellName = newPrefix+cellName.substring(prefixMatch.length()-1);
+							String newCellName = getNewHierName(cellName, srcToDestNames, prefixes, prefixMatch);
 							Cell rtCopy = tmpCell
 									.copyCell(newCellName, tmpCell.getEDIFCellInst(), dstSiteInst);
 							dstSiteInst.getCellMap().put(belName, rtCopy);
