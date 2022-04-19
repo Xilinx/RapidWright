@@ -2130,15 +2130,17 @@ public class DesignTools {
 	}
 
 	/**
-	 * Copies the logic and implementation of a set of cells from one design to another.
+	 * Copies the logic and implementation of a set of cells from one design to another.  This will
+	 * replace the destination logical cell instances with those of the source design. 
 	 * @param src The source design (with partial or full implementation)
-	 * @param dest The destination design (with matching cell instance interfaces) 
+	 * @param dest The destination design (with matching cell instance interfaces).  
 	 * @param lockPlacement Flag indicating if the destination implementation copy should have the 
 	 * 	placement locked
 	 * @param lockRouting Flag indicating if the destination implementation copy should have the 
 	 * 	routing locked
 	 * @param srcToDestInstNames A map of source (key) to destination (value) pairs of cell 
-	 * instances from which to copy the implementation
+	 * instances from which to copy the implementation. If targeting the top instance, use an 
+	 * empty String ("") as the destination instance name.
 	 */
 	public static void copyImplementation(Design src, Design dest, boolean lockPlacement, 
 			boolean lockRouting, Map<String,String> srcToDestInstNames) {
@@ -2250,9 +2252,9 @@ public class DesignTools {
 	
 	private static String getNewHierName(String srcName, Map<String,String> srcToDestInstNames, 
 	                                        Map<String,String> prefixes, String prefixMatch) {
-        String newCellPrefix = srcToDestInstNames.get(prefixes.get(prefixMatch));
-        int idx = prefixMatch.length() - (newCellPrefix.length() == 0 ? 0 : 1);
-        return newCellPrefix + srcName.substring(idx);
+		String newCellPrefix = srcToDestInstNames.get(prefixes.get(prefixMatch));
+		int idx = prefixMatch.length() - (newCellPrefix.length() == 0 ? 0 : 1);
+		return newCellPrefix + srcName.substring(idx);
 	}
 	
 	/**
