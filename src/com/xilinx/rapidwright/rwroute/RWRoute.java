@@ -1145,7 +1145,8 @@ public class RWRoute{
 	private void setPIPsOfNets(){
 		for(Entry<Net,NetWrapper> e : nets.entrySet()){
 			NetWrapper netWrapper = e.getValue();
-			Set<PIP> oldPIPs = new HashSet<>(netWrapper.getNet().getPIPs());
+			Net net = netWrapper.getNet();
+			Set<PIP> oldPIPs = new HashSet<>(net.getPIPs());
 			// Preserve the order of existing PIPs, e.g. the first PIP could be a logical driver
 			Set<PIP> newPIPs = new /*Linked*/HashSet<>(/*oldPIPs*/);
 			for(Connection connection:netWrapper.getConnections()){
@@ -1153,14 +1154,15 @@ public class RWRoute{
 			}
 
 			// Skip if new and old PIPs are completely identical
-			// (meaning net was unpreserved but never re-routed)
+			// (meaning net was unpreserved but never re-routed any differently)
 			if (oldPIPs.equals(newPIPs))
 				continue;
 
-			netWrapper.getNet().setPIPs(new ArrayList<>(newPIPs));
+			net.setPIPs(newPIPs);
+			net.dirty = true;
 
 			if (!newPIPs.containsAll(oldPIPs)) {
-				System.out.println("PIP delta for '" + netWrapper.getNet() + "':");
+				System.out.println("PIP delta for '" + net + "':");
 				oldPIPs.removeAll(newPIPs);
 				for (PIP pip : oldPIPs) {
 					System.out.println("\t- " + pip);

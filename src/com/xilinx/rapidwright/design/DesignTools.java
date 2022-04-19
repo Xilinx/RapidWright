@@ -1103,6 +1103,7 @@ public class DesignTools {
 	            SiteInst si = net.getSource().getSiteInst();
 	            BELPin belPin = sPin.getBELPin();
 	            si.unrouteIntraSiteNet(belPin, belPin);
+	            si.dirty = true;
 	        }
 	        p.setRouted(false);	        
 	        for(Node startNode : updateFanout) {
@@ -1222,6 +1223,8 @@ public class DesignTools {
 	        portInst.getNet().removePortInst(portInst);
 	    }
 	    cell.getParentCell().removeCellInst(cell.getEDIFCellInst());
+
+	    siteInst.dirty = true;
 	}
 
 	private static void handlePinRemovals(SitePinInst spi, Map<Net,Set<SitePinInst>> deferRemovals) {
@@ -1299,6 +1302,7 @@ public class DesignTools {
 	            pins.add(pin);
 	        }
 	        net.setPins(pins);
+	        net.dirty = true;
 	    }
 	}
 	
