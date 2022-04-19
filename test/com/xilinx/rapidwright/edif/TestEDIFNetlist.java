@@ -85,7 +85,7 @@ class TestEDIFNetlist {
         
         netlist.setTrackCellChanges(true);
         
-        EDIFTools.connectPortInstsThruHier(srcPortInst, snkPortInst, netlist, TestEDIFTools.UNIQUE_SUFFIX);
+        EDIFTools.connectPortInstsThruHier(srcPortInst, snkPortInst, TestEDIFTools.UNIQUE_SUFFIX);
 
         netlist.resetParentNetMap();
         
