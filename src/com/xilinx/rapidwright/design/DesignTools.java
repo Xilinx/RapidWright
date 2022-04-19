@@ -2252,9 +2252,9 @@ public class DesignTools {
 	
 	private static String getNewHierName(String srcName, Map<String,String> srcToDestInstNames, 
 	                                        Map<String,String> prefixes, String prefixMatch) {
-        String newCellPrefix = srcToDestInstNames.get(prefixes.get(prefixMatch));
-        int idx = prefixMatch.length() - (newCellPrefix.length() == 0 ? 0 : 1);
-        return newCellPrefix + srcName.substring(idx);
+		String newCellPrefix = srcToDestInstNames.get(prefixes.get(prefixMatch));
+		int idx = prefixMatch.length() - (newCellPrefix.length() == 0 ? 0 : 1);
+		return newCellPrefix + srcName.substring(idx);
 	}
 	
 	/**
