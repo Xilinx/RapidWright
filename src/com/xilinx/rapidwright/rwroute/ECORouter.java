@@ -196,7 +196,7 @@ public class ECORouter extends PartialRouter {
                             assert(r);
                             r = si.routeIntraSiteNet(net, lutPin.getBELPin(), sinkBELPin);
                             assert(r);
-                            si.dirty = true;
+                            assert(design.getModifiedSiteInsts().contains(si));
                         }
 
                         System.out.println(lutPin.getPinName() + " -> " + sinkPinName + " for " + connection.getNetWrapper().getNet());

@@ -1159,7 +1159,7 @@ public class RWRoute{
 				continue;
 
 			net.setPIPs(newPIPs);
-			net.dirty = true;
+			assert(design.getModifiedNets().contains(net));
 
 			if (!newPIPs.containsAll(oldPIPs)) {
 				System.out.println("PIP delta for '" + net + "':");
