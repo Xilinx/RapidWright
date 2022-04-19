@@ -204,9 +204,11 @@ public class PhysNetlistWriter {
                 pinMapping.setBel(strings.getIndex(cell.getBELName()));
                 pinMapping.setCellPin(strings.getIndex(e.getValue().getLogicalName()));
                 pinMapping.setBelPin(strings.getIndex(e.getKey()));
-                MultiCellPinMapping.Builder otherCell = pinMapping.getOtherCell();
-                otherCell.setMultiCell(strings.getIndex(e.getValue().getAltCellName()));
-                otherCell.setMultiType(strings.getIndex(e.getValue().getAltCellType()));
+                if (pinMapping.isOtherCell()) {
+                    MultiCellPinMapping.Builder otherCell = pinMapping.getOtherCell();
+                    otherCell.setMultiCell(strings.getIndex(e.getValue().getAltCellName()));
+                    otherCell.setMultiType(strings.getIndex(e.getValue().getAltCellType()));
+                }
                 idx++;
         	}
         }
