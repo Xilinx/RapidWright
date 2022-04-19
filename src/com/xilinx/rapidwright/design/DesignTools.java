@@ -1288,9 +1288,11 @@ public class DesignTools {
 	                    net.setSource(null);
 	                }
 	                pin.setNet(null);
-	                if(pin.getSiteInst() != null){
+	                SiteInst si = pin.getSiteInst();
+	                if(si != null){
 	                    BELPin belPin = pin.getBELPin();
-	                    pin.getSiteInst().unrouteIntraSiteNet(belPin, belPin); 
+	                    si.unrouteIntraSiteNet(belPin, belPin);
+	                    si.getSitePinInstMap().remove(pin.getName());
 	                }
 	                continue;
 	            }
