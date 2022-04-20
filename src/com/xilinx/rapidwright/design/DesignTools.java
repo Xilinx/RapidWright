@@ -2130,6 +2130,25 @@ public class DesignTools {
 	}
 
 	/**
+	 * Copy a cell from a design as a new design.
+	 * @param src The source design with or without implementation
+	 * @param cellName The full hierarchy cell name to be extracted as another design
+	 * @return A newly created design copied from the source
+	 */
+	public static Design createDesignFromCell(Design src, String cellName) {
+		EDIFNetlist srcCellNetlist = EDIFTools.createNewNetlist(src.getNetlist().getHierCellInstFromName(cellName).getInst());
+		EDIFTools.ensureCorrectPartInEDIF(srcCellNetlist, src.getPartName());
+		Design d2 = new Design(srcCellNetlist);
+		d2.setAutoIOBuffers(false);
+		d2.setDesignOutOfContext(true);
+
+		// TODO: Skip this step if the design was not implemented.
+		Map<String, String> cellMap = Collections.singletonMap(cellName, "");
+		DesignTools.copyImplementation(src, d2, true, true, true, true, cellMap);
+		return d2;
+	}
+
+	/**
 	 * Copies the logic and implementation of a set of cells from one design to another.
 	 * @param src The source design (with partial or full implementation)
 	 * @param dest The destination design (with matching cell instance interfaces) 
@@ -2140,7 +2159,25 @@ public class DesignTools {
 	 * @param srcToDestInstNames A map of source (key) to destination (value) pairs of cell 
 	 * instances from which to copy the implementation
 	 */
-	public static void copyImplementation(Design src, Design dest, boolean lockPlacement, 
+	public static void copyImplementation(Design src, Design dest, boolean lockPlacement,
+										  boolean lockRouting, Map<String,String> srcToDestInstNames) {
+		copyImplementation(src, dest, false, false, lockPlacement, lockRouting, srcToDestInstNames);
+	}
+
+	/**
+	 * Copies the logic and implementation of a set of cells from one design to another with additional flags to control copying nets.
+	 * @param src The source design (with partial or full implementation)
+	 * @param dest The destination design (with matching cell instance interfaces)
+	 * @param copyStaticNet Flag indicating if static nets should be copied
+	 * @param copyOnlyInternalNets Flag indicating if only nets with every terminal inside the cell should be copied
+	 * @param lockPlacement Flag indicating if the destination implementation copy should have the
+	 * 	placement locked
+	 * @param lockRouting Flag indicating if the destination implementation copy should have the
+	 * 	routing locked
+	 * @param srcToDestInstNames A map of source (key) to destination (value) pairs of cell
+	 * instances from which to copy the implementation
+	 */
+	public static void copyImplementation(Design src, Design dest, boolean copyStaticNet, boolean copyOnlyInternalNets, boolean lockPlacement,
 			boolean lockRouting, Map<String,String> srcToDestInstNames) {
 		// Removing existing logic in target cells in destination design
 		EDIFNetlist destNetlist = dest.getNetlist();
@@ -2177,6 +2214,7 @@ public class DesignTools {
 		}
 		
 		// Identify cells to copy placement
+		Set<SiteInst> siteInstsOfCells = new HashSet<>();
 		for(Cell cell : src.getCells()) {
 			String cellName = cell.getName();
 			
@@ -2184,6 +2222,7 @@ public class DesignTools {
 			if((prefixMatch = StringTools.startsWithAny(cellName, prefixes.keySet())) != null) {
 				SiteInst dstSiteInst = dest.getSiteInstFromSite(cell.getSite());
 				SiteInst srcSiteInst = cell.getSiteInst();
+				siteInstsOfCells.add(srcSiteInst);
 				if(dstSiteInst == null) {
 					dstSiteInst = dest.createSiteInst(srcSiteInst.getName(), 
 									srcSiteInst.getSiteTypeEnum(), srcSiteInst.getSite());
@@ -2198,10 +2237,16 @@ public class DesignTools {
 				copySiteRouting(copy, cell, srcToDestInstNames, prefixes); 
 			}
 		}
+
+		List<Net> staticNets = new ArrayList();
 		
 		// Identify nets to copy routing
 		for(Net net : src.getNets()) {
-			if(net.isStaticNet()) continue;
+			if(net.isStaticNet()) {
+				staticNets.add(net);
+				continue;
+			}
+
 			List<EDIFHierPortInst> pins = src.getNetlist().getPhysicalPins(net);
 			if(pins == null) continue;
 			// Identify the kinds of routes to preserve:
@@ -2221,6 +2266,9 @@ public class DesignTools {
 			}
 			// Don't keep routing if source is not in preservation zone
 			if(!srcInside) continue;
+			if(copyOnlyInternalNets && outside.size() > 0) {
+				continue;
+			}
 			if((outside.size() + 1) >= pins.size()) continue;
 			
 			Set<PIP> pipsToRemove = new HashSet<>();
@@ -2245,7 +2293,80 @@ public class DesignTools {
 					p.setIsPIPFixed(true);
 				}
 			}
-		}		
+		}
+
+		if (copyStaticNet) {
+			copyStaticNets(dest, staticNets, siteInstsOfCells);
+		}
+	}
+
+
+	/**
+	 * Copy the route of static nets feeding the sinks within the given SiteInst.
+	 * @param dest The destination design
+	 * @param staticNets The list of static nets to copy
+	 * @param siteInstsOfCells The set of SiteInst containing the sinks of the static nets
+	 */
+	private static void copyStaticNets(Design dest, List<Net> staticNets, Set<SiteInst> siteInstsOfCells) {
+		// Map from a node to its driver PIP
+		Map<Net,Map<Node,PIP>> netToUphillPIPMap = new HashMap<>();
+		Map<Net,Set<PIP>> netToItsPIPs = new HashMap<>();
+		for (Net net : staticNets) {
+			netToItsPIPs.put(net, new HashSet<>());
+			Map<Node,PIP> nodeToDriverPIP = new HashMap<>();
+			for (PIP pip : net.getPIPs()) {
+				nodeToDriverPIP.put(pip.getEndNode(), pip);
+				if (pip.isBidirectional()) {
+					nodeToDriverPIP.put(pip.getStartNode(), pip);
+				}
+			}
+			netToUphillPIPMap.put(net, nodeToDriverPIP);
+		}
+
+
+		for (SiteInst siteInst : siteInstsOfCells) {
+			// Go through the set of pins being used on this site instance.
+			for (SitePinInst sitePinInst : siteInst.getSitePinInsts()) {
+				if (sitePinInst.isOutPin())
+					continue;
+
+				Net net = sitePinInst.getNet();
+				Map<Node,PIP> nodeToDriverPIP = netToUphillPIPMap.get(net);
+				Set<PIP> allPIPs = netToItsPIPs.get(net);
+				if (nodeToDriverPIP != null) {
+					// This SitePinInst connects to a static net. Trace and collect all the PIPs to a source.
+					Node node = sitePinInst.getConnectedNode();
+					SitePin sitePin = node.getSitePin();
+					// Backtrack through routing nodes (no SitePin)
+					while ((sitePin == null) || sitePin.isInput()) {
+						PIP pip = nodeToDriverPIP.get(node);
+						allPIPs.add(pip);
+
+						if (pip.isBidirectional()) {
+							node = (node == pip.getStartNode()) ? pip.getEndNode() : pip.getStartNode();
+						} else {
+							node = pip.getStartNode();
+						}
+						if (node.getWireName().contains("VCC_WIRE"))
+							break;
+						sitePin = node.getSitePin();
+					}
+
+				}
+				netToItsPIPs.put(net,allPIPs);
+			}
+		}
+
+
+		for (Map.Entry<Net, Set<PIP>> entry : netToItsPIPs.entrySet()) {
+			if ((entry == null) || (entry.getKey() == null) || (entry.getValue() == null))
+				continue;
+
+			Net net = dest.getStaticNet(entry.getKey().getType());
+			for (PIP p : entry.getValue()) {
+				net.addPIP(p);
+			}
+		}
 	}
 	
 	private static String getNewHierName(String srcName, Map<String,String> srcToDestInstNames, 
