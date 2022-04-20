@@ -28,17 +28,15 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.HashSet;
 
-import com.xilinx.rapidwright.edif.EDIFCell;
-import com.xilinx.rapidwright.edif.EDIFDesign;
-import com.xilinx.rapidwright.edif.EDIFLibrary;
-import com.xilinx.rapidwright.edif.EDIFNet;
-import com.xilinx.rapidwright.edif.EDIFTools;
-import com.xilinx.rapidwright.support.CheckOpenFiles;
-import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Site;
+import com.xilinx.rapidwright.edif.EDIFCell;
+import com.xilinx.rapidwright.edif.EDIFLibrary;
+import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.edif.EDIFTools;
+import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.Job;
@@ -77,7 +75,6 @@ public class TestDesign {
     }
 
     @Test
-    @CheckOpenFiles
     public void checkDcpRoundtrip(@TempDir Path tempDir) throws IOException {
         //Keep a reference to the device to avoid it being garbage collected during testcase execution
         Device device = Device.getDevice(DEVICE);
@@ -99,7 +96,6 @@ public class TestDesign {
     }
 
     @Test
-    @CheckOpenFiles
     public void checkDcpRoundtripModuleInstAnchor(@TempDir Path tempDir) throws IOException {
         //Keep a reference to the device to avoid it being garbage collected during testcase execution
         Device device = Device.getDevice(DEVICE);
@@ -128,7 +124,6 @@ public class TestDesign {
     }
 
     @Test
-    @CheckOpenFiles
     public void checkDcpRoundtripParallel(@TempDir Path tempDir) {
         final Path filenameRead = RapidWrightDCP.getPath("optical-flow.dcp");
         final Path filenameWrite = tempDir.resolve("testWrite.dcp");
@@ -152,7 +147,6 @@ public class TestDesign {
     }
   
     @Test
-    @CheckOpenFiles
     public void testDcpSecondarySourcePins() {
         final String inputPath = RapidWrightDCP.getString("ramb18.dcp");
         Design design = Design.readCheckpoint(inputPath);
@@ -168,7 +162,6 @@ public class TestDesign {
     }
     
     @Test
-    @CheckOpenFiles
     public void testRouteThruPIPsSitePinInsts() {
         final String inputPath = RapidWrightDCP.getString("routethru_pip.dcp");
         Design design = Design.readCheckpoint(inputPath);
@@ -196,7 +189,6 @@ public class TestDesign {
     }
 
     @ParameterizedTest
-    @CheckOpenFiles
     @ValueSource(booleans = {false,true})
     public void testDcpEdifBiggerThan4GB(boolean parallel, @TempDir Path tempDir) {
         long maxMemoryNeeded = 1024L*1024L*1024L*14L;
@@ -225,7 +217,6 @@ public class TestDesign {
     }
     
     @Test
-    @CheckOpenFiles
     public void testBug349(@TempDir Path tempDir) throws IOException {
         // This test won't run in CI as Vivado is not available
         Assumptions.assumeTrue(FileTools.isVivadoOnPath());

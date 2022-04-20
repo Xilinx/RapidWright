@@ -29,17 +29,15 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+import com.xilinx.rapidwright.edif.EDIFTools;
+import com.xilinx.rapidwright.support.RapidWrightDCP;
+import com.xilinx.rapidwright.tests.CodePerfTracker;
+import com.xilinx.rapidwright.util.FileTools;
+import com.xilinx.rapidwright.util.Installer;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-
-import com.xilinx.rapidwright.support.CheckOpenFiles;
-import com.xilinx.rapidwright.support.RapidWrightDCP;
-import com.xilinx.rapidwright.edif.EDIFTools;
-import com.xilinx.rapidwright.tests.CodePerfTracker;
-import com.xilinx.rapidwright.util.FileTools;
-import com.xilinx.rapidwright.util.Installer;
 
 /**
  * Tests the EDIF auto-generate mechanism when reading DCPs
@@ -58,7 +56,6 @@ public class TestDCPLoad {
     }
     
     @Test
-    @CheckOpenFiles
     public void checkAutoEDIFGenerationFailure(@TempDir Path tempDir) throws IOException {
         Path dcpPath = RapidWrightDCP.getPath("picoblaze_ooc_X10Y235.dcp");
         final Path dcpCopy = tempDir.resolve(dcpPath.getFileName());
@@ -77,7 +74,6 @@ public class TestDCPLoad {
     }
 
     @Test
-    @CheckOpenFiles
     public void checkAutoEDIFGenerationSuccess(@TempDir Path tempDir) throws IOException {
         Path dcpPath = RapidWrightDCP.getPath("picoblaze_ooc_X10Y235.dcp");
         final Path dcpCopy = tempDir.resolve(dcpPath.getFileName());
@@ -96,7 +92,6 @@ public class TestDCPLoad {
     }
     
     @Test
-    @CheckOpenFiles
     public void checkAutoEDIFGenerationWithVivado(@TempDir Path tempDir) throws IOException {
         // This test won't run in CI as Vivado is not available
         Assumptions.assumeTrue(FileTools.isVivadoOnPath());

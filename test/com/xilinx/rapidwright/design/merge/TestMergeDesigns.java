@@ -23,15 +23,7 @@
 package com.xilinx.rapidwright.design.merge;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.HashSet;
-
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
@@ -39,7 +31,6 @@ import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.Unisim;
-import com.xilinx.rapidwright.design.merge.MergeDesigns;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFDirection;
@@ -47,11 +38,12 @@ import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.router.Router;
-import com.xilinx.rapidwright.support.CheckOpenFiles;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
-import com.xilinx.rapidwright.tests.CodePerfTracker;
-import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.Pair;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestMergeDesigns {
 
@@ -166,7 +158,6 @@ public class TestMergeDesigns {
     }
     
     @Test
-    @CheckOpenFiles
     public void testMergePicoblaze() throws IOException {
         Design design0 = Design.readCheckpoint(RapidWrightDCP.getPath("picoblaze_ooc_X10Y235.dcp"));
         Design design1 = Design.readCheckpoint(RapidWrightDCP.getPath("picoblaze4_ooc_X6Y60_X6Y65_X10Y60_X10Y65.dcp"));
