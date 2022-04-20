@@ -1,6 +1,8 @@
 package com.xilinx.rapidwright.edif;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -51,8 +53,22 @@ public class TestEDIFTools {
             }
         }
         Assertions.assertTrue(containsSnk);
+    }
+    
+    @Test
+    public void testCreateNewNetlist() {
+        Design d = Design.readCheckpoint(RapidWrightDCP.getPath("bnn.dcp"), true);
+        EDIFHierCellInst inst = d.getNetlist().getHierCellInstFromName("bd_0_i/hls_inst/inst/dmem_V_U");
         
+        EDIFNetlist newNetlist = EDIFTools.createNewNetlist(inst.getInst());
+        EDIFTools.ensureCorrectPartInEDIF(newNetlist, d.getPartName());
+        Design d2 = new Design(newNetlist);
+        d2.setAutoIOBuffers(false);
+        d2.setDesignOutOfContext(true);
+
+        List<EDIFHierCellInst> goldChildren = d.getNetlist().getAllLeafDescendants(inst);
+        List<EDIFHierCellInst> testChildren = d2.getNetlist().getAllLeafDescendants("");
         
-        
+        Assertions.assertEquals(goldChildren.size(), testChildren.size());        
     }
 }
