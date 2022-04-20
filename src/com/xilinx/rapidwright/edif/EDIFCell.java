@@ -556,44 +556,33 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
     }
 
 	public EDIFPort getPortByLegalName(String name) {
+
 		EDIFPort port = getPort(name);
-		if (port != null) {
+		if(port != null) {
 			return port;
 		}
 		// Finding by EDIFName is O(n), but n is generally small and alternative to building
 		// a map for this single search ends up taking longer
-		for (Map.Entry<String, EDIFPort> e : getPortMap().entrySet()) {
-			if (e.getValue().getLegalEDIFName().equals(name)) {
+		for(Map.Entry<String,EDIFPort> e : getPortMap().entrySet()) {
+			if(e.getValue().getLegalEDIFName().equals(name)) {
 				return e.getValue();
 			}
 		}
 		return null;
 	}
 
-    public EDIFNetlist getNetlist() {
-        EDIFLibrary lib = getLibrary();
-        return lib != null ? lib.getNetlist() : null;
-    }
-    
-    public void trackChange(EDIFChangeType type, String name) {
-        EDIFNetlist netlist = getNetlist();
-        if(netlist != null) {
-            netlist.trackChange(this, type, name);            
-        }
-    }
-    
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        if (!super.equals(o)) return false;
-        EDIFCell edifCell = (EDIFCell) o;
-        return Objects.equals(library, edifCell.library);
-    }
+	@Override
+	public boolean equals(Object o) {
+		if (this == o) return true;
+		if (o == null || getClass() != o.getClass()) return false;
+		if (!super.equals(o)) return false;
+		EDIFCell edifCell = (EDIFCell) o;
+		return Objects.equals(library, edifCell.library);
+	}
 
-    @Override
-    public int hashCode() {
-        return Objects.hash(super.hashCode(), library);
-    }
+	@Override
+	public int hashCode() {
+		return Objects.hash(super.hashCode(), library);
+	}
 }
  
