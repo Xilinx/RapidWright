@@ -571,6 +571,18 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
 		return null;
 	}
 
+	public EDIFNetlist getNetlist() {
+		EDIFLibrary lib = getLibrary();
+		return lib != null ? lib.getNetlist() : null;
+	}
+
+	public void trackChange(EDIFChangeType type, String name) {
+		EDIFNetlist netlist = getNetlist();
+		if (netlist != null) {
+			netlist.trackChange(this, type, name);
+		}
+	}
+
 	@Override
 	public boolean equals(Object o) {
 		if (this == o) return true;
