@@ -910,7 +910,8 @@ public class EDIFTools {
 	}
 
 	/**
-	 * Creates a new netlist from an existing EDIFCellInst in a netlist.  
+	 * Creates a new netlist from an existing EDIFCellInst in a netlist.  This operation is 
+	 * destructive to the source netlist.   
 	 * @param cellInst The new top cell/top cell inst in the netlist.
 	 * @return The newly created netlist from the provided cell inst.
 	 */
