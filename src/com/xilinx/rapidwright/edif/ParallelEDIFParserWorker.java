@@ -35,12 +35,11 @@ import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 import com.xilinx.rapidwright.util.StringPool;
-import com.xilinx.rapidwright.util.ParallelismTools;
 
 /**
  * Worker thread inside the parallel EDIF parser
  */
-public class ParallelEDIFParserWorker extends AbstractEDIFParser implements AutoCloseable{
+public class ParallelEDIFParserWorker extends AbstractEDIFParserWorker implements AutoCloseable{
     /**
      * Number of ports in a cell above which a map is used for port name lookup
      */
@@ -280,7 +279,7 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParser implements Auto
     }
 
     public Stream<CellReferenceData> streamCellReferences() {
-        return ParallelismTools.maybeToParallel(linkCellReference.stream());
+        return linkCellReference.stream();
     }
 
     public void finish() {

@@ -32,13 +32,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Future;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
-import com.xilinx.rapidwright.util.StringPool;
 import com.xilinx.rapidwright.util.ParallelismTools;
+import com.xilinx.rapidwright.util.StringPool;
 import com.xilinx.rapidwright.util.function.InputStreamSupplier;
 
 /**
@@ -105,8 +106,10 @@ public class ParallelEDIFParser implements AutoCloseable{
         numberOfThreads = workers.size();
 
         t.stop().start("Parse First Token");
-        final List<ParallelEDIFParserWorker> failedWorkers = ParallelismTools.maybeToParallel(workers.stream())
-                .filter(w -> !w.parseFirstToken())
+        final List<Future<ParallelEDIFParserWorker>> futures = ParallelismTools.invokeAll(workers, w -> !w.parseFirstToken() ? w : null);
+        final List<ParallelEDIFParserWorker> failedWorkers = futures.stream()
+                .map(ParallelismTools::get)
+                .filter(Objects::nonNull)
                 .collect(Collectors.toList());
 
         if (!failedWorkers.isEmpty() && !Device.QUIET_MESSAGE) {
@@ -142,7 +145,7 @@ public class ParallelEDIFParser implements AutoCloseable{
     }
 
     private void doParse() {
-        ParallelismTools.maybeToParallel(workers.stream()).forEach(w->w.doParse(false));
+        ParallelismTools.invokeAllRunnable(workers, w->w.doParse(false));
 
         //Check if we had misdetected start tokens
         for (int i=0; i<workers.size();i++) {
@@ -211,47 +214,41 @@ public class ParallelEDIFParser implements AutoCloseable{
         }
     }
 
-    private void processCellInstLinks(EDIFNetlist netlist) {
-        final Map<String, EDIFLibrary> librariesByLegalName = netlist.getLibraries().stream()
-                .collect(Collectors.toMap(EDIFName::getLegalEDIFName, Function.identity()));
-
-        ParallelismTools.maybeToParallel(workers.stream()).flatMap(ParallelEDIFParserWorker::streamCellReferences).forEach(w->w.apply(librariesByLegalName));
-    }
-
-    private void processPortInstLinks(CodePerfTracker t) {
-        t.start("Link Small Port Cells");
+    private void processLinks(CodePerfTracker t, EDIFNetlist netlist) {
+        t.start("Link CellInst+SmallPorts");
         //We have to map from a string representation of the ports' names to the ports.
         //Directly map the ports from small cells, add ports from large cells to this map
+        final Map<String, EDIFLibrary> librariesByLegalName = netlist.getLibraries().stream()
+                .collect(Collectors.toMap(EDIFName::getLegalEDIFName, Function.identity()));
         Map<EDIFCell, Collection<ParallelEDIFParserWorker.LinkPortInstData>> byPortCell = new ConcurrentHashMap<>();
-        ParallelismTools.maybeToParallel(workers.stream())
-                .forEach(worker -> worker.linkSmallPorts(byPortCell));
+        ParallelismTools.invokeAllRunnable(workers, w-> {
+            for (ParallelEDIFParserWorker.CellReferenceData cellReferenceData : w.linkCellReference) {
+                cellReferenceData.apply(librariesByLegalName);
+            }
+            w.linkSmallPorts(byPortCell);
+        });
+
         t.stop().start("Link Large Port Cells");
         //Now we can create a map of ports just for large cells and look up the ports
-        ParallelismTools.maybeToParallel(byPortCell.entrySet().stream())
-                        .forEach((entry) -> {
-                            EDIFCell cell = entry.getKey();
-                            final EDIFPortCache edifPortCache = new EDIFPortCache(cell);
-                            ParallelismTools.maybeToParallel(entry.getValue().stream())
-                                    .forEach(linkPortInstData -> linkPortInstData.enterPort(edifPortCache));
-                        });
-        //Name the port insts, order is not important
-        t.stop().start("Name port insts");
-                ParallelismTools.maybeToParallel(workers.stream())
-                        .flatMap(w -> w.linkPortInstData.stream())
-                        .forEach(list -> {
-                            for (ParallelEDIFParserWorker.LinkPortInstData linkPortInstData : list) {
-                                linkPortInstData.name();
-                            }
-                        });
-        t.stop().start("Add port insts");
+        ParallelismTools.invokeAllRunnable(byPortCell.entrySet(), entry -> {
+            EDIFCell cell = entry.getKey();
+            final EDIFPortCache edifPortCache = new EDIFPortCache(cell);
+            for (ParallelEDIFParserWorker.LinkPortInstData linkPortInstData : entry.getValue()) {
+                linkPortInstData.enterPort(edifPortCache);
+            }
+        });
+
+        t.stop().start("Name and Add port insts");
         //When adding the port insts, we have to make sure that we don't split a parent cell's port instances
         // between threads.
         //That could lead to ConcurrentModificationExceptions
-        ParallelismTools.maybeToParallel(workers.stream())
-                .flatMap(w -> w.linkPortInstData.stream())
-                .forEach(list -> {
-                    for (ParallelEDIFParserWorker.LinkPortInstData linkPortInstData : list) {
-                        linkPortInstData.add();
+        ParallelismTools.invokeAllRunnable(workers,
+                w-> {
+                    for (List<ParallelEDIFParserWorker.LinkPortInstData> list : w.linkPortInstData) {
+                        for (ParallelEDIFParserWorker.LinkPortInstData linkPortInstData : list) {
+                            linkPortInstData.name();
+                            linkPortInstData.add();
+                        }
                     }
                 });
         t.stop();
@@ -263,10 +260,8 @@ public class ParallelEDIFParser implements AutoCloseable{
 
         t.stop().start("Assemble Libraries");
         addCellsAndLibraries(netlist);
-        t.stop().start("process cell inst links");
-        processCellInstLinks(netlist);
         t.stop();
-        processPortInstLinks(t);
+        processLinks(t, netlist);
 
         return netlist;
     }

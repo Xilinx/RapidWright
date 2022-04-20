@@ -43,7 +43,7 @@ import com.xilinx.rapidwright.util.StringPool;
  * RapidWright, load it into Vivado first and then write it out from Vivado.
  * Created on: May 10, 2017
  */
-public class EDIFParser extends AbstractEDIFParser implements AutoCloseable{
+public class EDIFParser extends AbstractEDIFParserWorker implements AutoCloseable{
 
 	private Map<String,Map<String,EDIFCell>> edifInstCellMap = new HashMap<>();
 
