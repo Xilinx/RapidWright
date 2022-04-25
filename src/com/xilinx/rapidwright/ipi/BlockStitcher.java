@@ -537,9 +537,9 @@ public class BlockStitcher {
 			ModuleInst mi = stitched.createModuleInst(modInstName, modImpls.get(implementationIndex));
 			stitched.setNetlist(tmp);
 			miMap.put(mi, modImpls.getNetlist());
-			SiteInst anchor = mi.getModule().getAnchor();
+			Site anchor = mi.getModule().getAnchor();
 			if(anchor != null){
-				mi.place(anchor.getSite());
+				mi.place(anchor);
 				//System.out.println("Placed: " + mi.place(anchor.getSite(), stitched.getDevice()) + " " + totalBlocks);
 			}
 			

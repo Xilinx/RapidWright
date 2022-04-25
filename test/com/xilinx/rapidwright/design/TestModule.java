@@ -49,10 +49,10 @@ public class TestModule {
         top.addModule(noSLRAdder);
         top.addModule(slrAdder);
         
-        Assertions.assertTrue(noSLRAdder.isValidPlacement(noSLRAdder.getAnchor().getSite(), top));
-        Assertions.assertFalse(noSLRAdder.isValidPlacement(slrAdder.getAnchor().getSite(), top));
+        Assertions.assertTrue(noSLRAdder.isValidPlacement(noSLRAdder.getAnchor(), top));
+        Assertions.assertFalse(noSLRAdder.isValidPlacement(slrAdder.getAnchor(), top));
 
-        Assertions.assertTrue(slrAdder.isValidPlacement(slrAdder.getAnchor().getSite(), top));
-        Assertions.assertFalse(slrAdder.isValidPlacement(noSLRAdder.getAnchor().getSite(), top));
+        Assertions.assertTrue(slrAdder.isValidPlacement(slrAdder.getAnchor(), top));
+        Assertions.assertFalse(slrAdder.isValidPlacement(noSLRAdder.getAnchor(), top));
     }
 }
