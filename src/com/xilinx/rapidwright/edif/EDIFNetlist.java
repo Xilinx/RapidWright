@@ -457,6 +457,11 @@ public class EDIFNetlist extends EDIFName {
 		}
 	}
 	
+	/**
+	 * This moves the cell and all of its descendants into this netlist.  This is a destructive 
+	 * operation for the source netlist.
+	 * @param cell The cell (and all its descendants) to move into this netlist's libraries
+	 */
 	public void migrateCellAndSubCells(EDIFCell cell) {
 		migrateCellAndSubCellsWorker(cell);
 	}

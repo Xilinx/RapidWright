@@ -1,29 +1,31 @@
 
 /*
- * Copyright (c) 2022 Xilinx, Inc. 
+ * Copyright (c) 2022 Xilinx, Inc.
  * All rights reserved.
  *
  * Author: Jakob Wenzel, Xilinx Research Labs.
- *  
- * This file is part of RapidWright. 
- * 
+ *
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
- 
+
 package com.xilinx.rapidwright.edif;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import java.nio.charset.StandardCharsets;
 
@@ -76,9 +78,23 @@ public class TestEDIFTools {
             }
         }
         Assertions.assertTrue(containsSnk);
+    }
 
+    @Test
+    public void testCreateNewNetlist() {
+        Design d = Design.readCheckpoint(RapidWrightDCP.getPath("bnn.dcp"), true);
+        EDIFHierCellInst inst = d.getNetlist().getHierCellInstFromName("bd_0_i/hls_inst/inst/dmem_V_U");
 
+        EDIFNetlist newNetlist = EDIFTools.createNewNetlist(inst.getInst());
+        EDIFTools.ensureCorrectPartInEDIF(newNetlist, d.getPartName());
+        Design d2 = new Design(newNetlist);
+        d2.setAutoIOBuffers(false);
+        d2.setDesignOutOfContext(true);
 
+        List<EDIFHierCellInst> goldChildren = d.getNetlist().getAllLeafDescendants(inst);
+        List<EDIFHierCellInst> testChildren = d2.getNetlist().getAllLeafDescendants("");
+
+        Assertions.assertEquals(goldChildren.size(), testChildren.size());
     }
 
     @Test
