@@ -63,8 +63,8 @@ public class ParallelismTools {
     /** A fixed-size thread pool with as many threads as there are processors
      * minus one, fed by a single task queue */
     private static final ThreadPoolExecutor pool = new ThreadPoolExecutor(
-            Runtime.getRuntime().availableProcessors() - 1,
-            Runtime.getRuntime().availableProcessors() - 1,
+            maxParallelism() - 1,
+            maxParallelism() - 1,
             0, TimeUnit.MILLISECONDS,
             new LinkedBlockingQueue<>(),
             (r) -> {
@@ -400,8 +400,8 @@ public class ParallelismTools {
     }
 
     /**
-     * The number of cores the system has
-     * @return number of cores
+     * The number of parallel threads we want to use
+     * @return number of parallel threads
      */
     public static int maxParallelism() {
         return Runtime.getRuntime().availableProcessors();
