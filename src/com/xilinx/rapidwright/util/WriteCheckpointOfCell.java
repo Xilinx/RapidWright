@@ -70,7 +70,7 @@ public class WriteCheckpointOfCell {
         }
 
         Design srcDesign = Design.readCheckpoint(srcDCPName);
-        Design d = DesignTools.createDesignFromCell(srcDesign, srcCellName);
+        Design d = DesignTools.createDesignFromCellWithStatic(srcDesign, srcCellName);
         d.writeCheckpoint(outDCPName);
     }
 }

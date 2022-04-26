@@ -2150,7 +2150,13 @@ public class DesignTools {
 	 * @param cellName The full hierarchy cell name to be extracted as another design
 	 * @return A newly created design copied from the source
 	 */
-	public static Design createDesignFromCell(Design src, String cellName) {
+	public static Design createDesignFromCellWithStatic(Design src, String cellName) {
+		return createDesignFromCell(src, cellName, true);
+	}
+	public static Design createDesignFromCellWithoutStatic(Design src, String cellName) {
+		return createDesignFromCell(src, cellName, false);
+	}
+	public static Design createDesignFromCell(Design src, String cellName, boolean copyPIPOfStaticNet) {
 		EDIFNetlist srcCellNetlist = EDIFTools.createNewNetlist(src.getNetlist().getHierCellInstFromName(cellName).getInst());
 		EDIFTools.ensureCorrectPartInEDIF(srcCellNetlist, src.getPartName());
 		Design d2 = new Design(srcCellNetlist);
@@ -2159,7 +2165,7 @@ public class DesignTools {
 
 		// TODO: Skip this step if the design was not implemented.
 		Map<String, String> cellMap = Collections.singletonMap(cellName, "");
-		DesignTools.copyImplementation(src, d2, true, true, true, true, cellMap);
+		DesignTools.copyImplementation(src, d2, copyPIPOfStaticNet, true, true, true, cellMap);
 		return d2;
 	}
 
