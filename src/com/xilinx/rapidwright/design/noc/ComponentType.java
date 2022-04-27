@@ -28,32 +28,32 @@ import java.util.Map;
  * Enumerates NOC Site Types.
  */
 public enum ComponentType {
-	PL_NMU,
-	PL_NSU,
-	PS_NMU,
-	PS_NSU,
-	PS_RPU,
-	PS_NCI_NMU,
-	PS_NCI_NSU,
-	PS_CCI_NSU,
-	PS_CCI_NMU,
-	PMC_NMU,
-	PMC_NSU,
-	LPD_NMU,
-	AIE_NMU,
-	AIE_NSU,
-	DDRC;
+    PL_NMU,
+    PL_NSU,
+    PS_NMU,
+    PS_NSU,
+    PS_RPU,
+    PS_NCI_NMU,
+    PS_NCI_NSU,
+    PS_CCI_NSU,
+    PS_CCI_NMU,
+    PMC_NMU,
+    PMC_NSU,
+    LPD_NMU,
+    AIE_NMU,
+    AIE_NSU,
+    DDRC;
 
     private static Map<String,ComponentType> map;
-    
+
     static {
         map = new HashMap<>();
         for(ComponentType e : values()) {
             map.put(e.toString(), e);
         }
     }
-    
+
     public static ComponentType stringToValue(String s) {
         return map.get(s);
-	}
+    }
 }

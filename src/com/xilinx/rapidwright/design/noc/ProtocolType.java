@@ -28,29 +28,30 @@ import java.util.Map;
  * Enumerates AXI protocols 
  */
 public enum ProtocolType {
-	AXI_MEMORY_MAPPED("AXI_MM"),
-	AXI_STREAM("AXI_STRM");
-    
+    AXI_MEMORY_MAPPED("AXI_MM"),
+    AXI_STREAM("AXI_STRM");
+
     private static Map<String,ProtocolType> map;
-    
-	private final String p;
-	
-	ProtocolType(String p){
-		this.p = p;
-	}
-	
-	public static ProtocolType stringToValue(String s) {
-        if(map == null) {
-            map = new HashMap<>();
-            for(ProtocolType e : values()) {
-                map.put(e.toString(), e);
-            }
+
+    static {
+        map = new HashMap<>();
+        for(ProtocolType e : values()) {
+            map.put(e.toString(), e);
         }
+    }    
+
+    private final String p;
+
+    ProtocolType(String p){
+        this.p = p;
+    }
+
+    public static ProtocolType stringToValue(String s) {
         return map.get(s);
-	}
-	
-	@Override
-	public String toString() {
-		return p;
-	}
+    }
+
+    @Override
+    public String toString() {
+        return p;
+    }
 }

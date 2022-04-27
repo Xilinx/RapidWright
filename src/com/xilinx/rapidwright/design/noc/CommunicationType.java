@@ -28,31 +28,32 @@ import java.util.Map;
  * Enumerates AXI traffic communication types.
  */
 public enum CommunicationType {
-	MEMORY_MAPPED_FULL("MM_ReadWrite"),
-	MEMORY_MAPPED_READ("MM_ReadOnly"),
-	MEMORY_MAPPED_WRITE("MM_WriteOnly"),
-	STREAM("STRM");
-    
+    MEMORY_MAPPED_FULL("MM_ReadWrite"),
+    MEMORY_MAPPED_READ("MM_ReadOnly"),
+    MEMORY_MAPPED_WRITE("MM_WriteOnly"),
+    STREAM("STRM");
+
     private static Map<String,CommunicationType> map;
-    
-	private final String ct;
-	
-	CommunicationType(String ct){
-		this.ct = ct;
-	}
-	
-	public static CommunicationType stringToValue(String s) {
-	    if(map == null) {
-	        map = new HashMap<>();
-	        for(CommunicationType e : values()) {
-	            map.put(e.toString(), e);
-	        }
-	    }
-	    return map.get(s);
-	}
-	
-	@Override
-	public String toString() {
-		return ct;
-	}
+
+    static {
+        map = new HashMap<>();
+        for(CommunicationType e : values()) {
+            map.put(e.toString(), e);
+        }
+    }
+
+    private final String ct;
+
+    CommunicationType(String ct){
+        this.ct = ct;
+    }
+
+    public static CommunicationType stringToValue(String s) {
+        return map.get(s);
+    }
+
+    @Override
+    public String toString() {
+        return ct;
+    }
 }

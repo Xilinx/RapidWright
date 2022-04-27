@@ -28,31 +28,32 @@ import java.util.Map;
  * Enumerates the four major channel types that are used in a NOC Connection
  */
 public enum ChannelType {
-	READ("READ"),
-	READ_REQUEST("READ_REQ"),
-	WRITE("WRITE"),
-	WRITE_RESPONSE("WRITE_RESP");
+    READ("READ"),
+    READ_REQUEST("READ_REQ"),
+    WRITE("WRITE"),
+    WRITE_RESPONSE("WRITE_RESP");
 
     private static Map<String,ChannelType> map;
 
-	private final String nc;
-	
-	ChannelType(String nc){
-		this.nc = nc;
-	}
-	
-	public static ChannelType stringToValue(String s) {
-        if(map == null) {
-            map = new HashMap<>();
-            for(ChannelType e : values()) {
-                map.put(e.toString(), e);
-            }
+    static {
+        map = new HashMap<>();
+        for(ChannelType e : values()) {
+            map.put(e.toString(), e);
         }
+    }    
+
+    private final String nc;
+
+    ChannelType(String nc){
+        this.nc = nc;
+    }
+
+    public static ChannelType stringToValue(String s) {
         return map.get(s);
-	}
-	
-	@Override
-	public String toString() {
-		return nc;
-	}
+    }
+
+    @Override
+    public String toString() {
+        return nc;
+    }
 }

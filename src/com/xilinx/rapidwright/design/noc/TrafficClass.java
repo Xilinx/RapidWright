@@ -28,31 +28,32 @@ import java.util.Map;
  * Enumerates traffic classification on a given connection
  */
 public enum TrafficClass {
-	LOW_LATENCY("LL"),
-	BEST_EFFORT("BE"),
-	ISOCHRONOUS("ISOC"),
-	BANDWIDTH("BW");
-    
+    LOW_LATENCY("LL"),
+    BEST_EFFORT("BE"),
+    ISOCHRONOUS("ISOC"),
+    BANDWIDTH("BW");
+
     private static Map<String,TrafficClass> map;
-    
-	private final String tc;
-	
-	TrafficClass(String tc){
-		this.tc = tc;
-	}
-	
-	public static TrafficClass stringToValue(String s) {
-        if(map == null) {
-            map = new HashMap<>();
-            for(TrafficClass e : values()) {
-                map.put(e.toString(), e);
-            }
+
+    static {
+        map = new HashMap<>();
+        for(TrafficClass e : values()) {
+            map.put(e.toString(), e);
         }
+    }    
+
+    private final String tc;
+
+    TrafficClass(String tc){
+        this.tc = tc;
+    }
+
+    public static TrafficClass stringToValue(String s) {
         return map.get(s);
-	}
-	
-	@Override
-	public String toString() {
-		return tc;
-	}
+    }
+
+    @Override
+    public String toString() {
+        return tc;
+    }
 }
