@@ -2322,6 +2322,9 @@ public class DesignTools {
 		}
 	}
 
+	private static boolean equalNodes(Node lNode, Node rNode) {
+		return (lNode.getTile().getName().equals(rNode.getTile().getName()) && lNode.getWireName().equals(rNode.getWireName()));
+	}
 
 	/**
 	 * Copy the route of static nets feeding the sinks within the given SiteInst.
@@ -2331,15 +2334,28 @@ public class DesignTools {
 	 */
 	private static void copyStaticNets(Design dest, List<Net> staticNets, Set<SiteInst> siteInstsOfCells) {
 		// Map from a node to its driver PIP
+		// Note: Some PIPs are bidirectional. But, every PIP performs only one direction.
+		// The direction of a bidirectional PIP is determined from the context, ie., its connecting directional PIPs.
+		// To determine that context, go through directional PIPs first. This process does not support consecutive bidirectional PIPs.
 		Map<Net,Map<Node,PIP>> netToUphillPIPMap = new HashMap<>();
 		Map<Net,Set<PIP>> netToItsPIPs = new HashMap<>();
 		for (Net net : staticNets) {
 			netToItsPIPs.put(net, new HashSet<>());
 			Map<Node,PIP> nodeToDriverPIP = new HashMap<>();
+			List<PIP> biPIPs = new ArrayList<>();
 			for (PIP pip : net.getPIPs()) {
-				nodeToDriverPIP.put(pip.getEndNode(), pip);
 				if (pip.isBidirectional()) {
-					nodeToDriverPIP.put(pip.getStartNode(), pip);
+					biPIPs.add(pip);
+				} else {
+					nodeToDriverPIP.put(pip.getEndNode(), pip);
+				}
+			}
+			for (PIP pip : biPIPs) {
+				Node stNode = pip.getStartNode();
+				if (nodeToDriverPIP.containsKey(stNode)) {
+					nodeToDriverPIP.put(pip.getEndNode(), pip);
+				} else {
+					nodeToDriverPIP.put(stNode, pip);
 				}
 			}
 			netToUphillPIPMap.put(net, nodeToDriverPIP);
@@ -2364,11 +2380,13 @@ public class DesignTools {
 						PIP pip = nodeToDriverPIP.get(node);
 						allPIPs.add(pip);
 
+
 						if (pip.isBidirectional()) {
-							node = (node == pip.getStartNode()) ? pip.getEndNode() : pip.getStartNode();
+							node = equalNodes(node,pip.getStartNode()) ? pip.getEndNode() : pip.getStartNode();
 						} else {
 							node = pip.getStartNode();
 						}
+
 						if (node.getWireName().contains("VCC_WIRE"))
 							break;
 						sitePin = node.getSitePin();
