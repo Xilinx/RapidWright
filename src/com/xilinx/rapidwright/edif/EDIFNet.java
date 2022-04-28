@@ -282,6 +282,7 @@ public class EDIFNet extends EDIFPropertyObject {
 	public EDIFPortInst removePortInst(EDIFCellInst inst, String portInstName){
         if (portInsts == null) return null;
         if(parentCell != null) {
+            // This does not explicitly track the port instance index, in most cases the name should be sufficient.
             trackChanges(EDIFChangeType.PORT_INST_REMOVE, inst, portInstName);
         }
         EDIFPortInst tmp = portInsts.remove(inst, portInstName);
