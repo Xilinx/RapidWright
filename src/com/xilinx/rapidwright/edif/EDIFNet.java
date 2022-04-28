@@ -78,6 +78,7 @@ public class EDIFNet extends EDIFPropertyObject {
 		}
 		portInst.setParentNet(this);
 		if(isParentCellNonNull) {
+		    // This does not explicitly track the port instance index, in most cases the name should be sufficient.
 		    trackChanges(EDIFChangeType.PORT_INST_ADD, inst, portInst.getName());
 		}
 		portInsts.add(portInst);
