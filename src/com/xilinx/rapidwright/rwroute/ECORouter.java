@@ -1,9 +1,9 @@
 /*
  *
- * Copyright (c) 2021 Ghent University.
+ * Copyright (c) 2021 Xilinx, Inc.
  * All rights reserved.
  *
- * Author: Yun Zhou, Ghent University.
+ * Author: Eddie Hung, Xilinx Research Labs.
  *
  * This file is part of RapidWright.
  *
@@ -80,6 +80,7 @@ public class ECORouter extends PartialRouter {
     protected void determineRoutingTargets(){
         super.determineRoutingTargets();
 
+        // Go through all nets to be routed
         for (Map.Entry<Net,NetWrapper> e : nets.entrySet()) {
             Net net = e.getKey();
             NetWrapper netWrapper = e.getValue();
@@ -104,10 +105,13 @@ public class ECORouter extends PartialRouter {
                 if (connection.getSink().isRouted())
                     continue;
 
+                // If the sink pin is a direct input, consider allowing it to use the LUT input
                 SitePinInst sink = connection.getSink();
                 String sinkPinName = sink.getName();
                 if (!Pattern.matches("[A-H](X|_I)", sinkPinName))
                     continue;
+
+                // TODO: Check that there is only connectivity to either or both FFs
 
                 Routable rnode = connection.getSinkRnode();
                 String lut = sinkPinName.substring(0, 1);
