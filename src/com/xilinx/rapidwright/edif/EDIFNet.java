@@ -282,7 +282,7 @@ public class EDIFNet extends EDIFPropertyObject {
 	public EDIFPortInst removePortInst(EDIFCellInst inst, String portInstName){
         if (portInsts == null) return null;
         if(parentCell != null) {
-            trackChanges(EDIFChangeType.PORT_INST_ADD, inst, portInstName);
+            trackChanges(EDIFChangeType.PORT_INST_REMOVE, inst, portInstName);
         }
         EDIFPortInst tmp = portInsts.remove(inst, portInstName);
 		if(tmp != null) tmp.setParentNet(null);
