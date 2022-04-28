@@ -22,14 +22,14 @@
  
 package com.xilinx.rapidwright.util.function;
 
-import java.io.BufferedInputStream;
-import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-public interface InputStreamSupplier extends ThrowingSupplier<InputStream, IOException> {
+import org.apache.commons.io.function.IOSupplier;
+
+public interface InputStreamSupplier extends IOSupplier<InputStream> {
     static InputStreamSupplier fromPath(Path p) {
-        return () -> new BufferedInputStream(Files.newInputStream(p));
+        return () -> Files.newInputStream(p);
     }
 }

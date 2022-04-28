@@ -919,8 +919,23 @@ public class EDIFTools {
 		EDIFDesign eDesign = new EDIFDesign(topName);
 		n.setDesign(eDesign);
 		eDesign.setTopCell(top);
-		
 		return n;
+	}
+
+	/**
+	 * Creates a new netlist from an existing EDIFCellInst in a netlist.  This operation is 
+	 * destructive to the source netlist.   
+	 * @param cellInst The new top cell/top cell inst in the netlist.
+	 * @return The newly created netlist from the provided cell inst.
+	 */
+	public static EDIFNetlist createNewNetlist(EDIFCellInst cellInst){
+	    EDIFNetlist n = new EDIFNetlist(cellInst.getName());
+	    n.generateBuildComments();
+	    EDIFDesign eDesign = new EDIFDesign(cellInst.getName());
+	    n.setDesign(eDesign);
+	    eDesign.setTopCell(cellInst.getCellType());
+	    n.migrateCellAndSubCells(cellInst.getCellType());
+	    return n;
 	}
 	
 	public static int[] bitBlastBus(String busSuffix){
