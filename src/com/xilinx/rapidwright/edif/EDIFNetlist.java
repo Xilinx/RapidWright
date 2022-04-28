@@ -461,6 +461,11 @@ public class EDIFNetlist extends EDIFName {
 		}
 	}
 	
+	/**
+	 * This moves the cell and all of its descendants into this netlist.  This is a destructive 
+	 * operation for the source netlist.
+	 * @param cell The cell (and all its descendants) to move into this netlist's libraries
+	 */
 	public void migrateCellAndSubCells(EDIFCell cell) {
 		migrateCellAndSubCellsWorker(cell);
 	}
@@ -1721,6 +1726,9 @@ public class EDIFNetlist extends EDIFName {
     public void writeBinaryEDIF(Path path) {
         BinaryEDIFWriter.writeBinaryEDIF(path, this);
     }
+	public void writeBinaryEDIF(OutputStream os) {
+		BinaryEDIFWriter.writeBinaryEDIF(os, this);
+	}
     
     public void writeBinaryEDIF(String fileName) {
         BinaryEDIFWriter.writeBinaryEDIF(fileName, this);

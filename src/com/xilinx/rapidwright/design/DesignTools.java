@@ -65,6 +65,7 @@ import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.edif.EDIFHierPortInst;
+import com.xilinx.rapidwright.edif.EDIFLibrary;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPort;
@@ -1003,6 +1004,26 @@ public class DesignTools {
 	 * removed.
 	 */
 	public static void unroutePins(Net net, Collection<SitePinInst> pins) {
+	    Set<PIP> toRemove = getTrimmablePIPsFromPins(net, pins);
+	    ArrayList<PIP> updatedPIPs = new ArrayList<>();
+	    for(PIP pip : net.getPIPs()){
+	        if(!toRemove.contains(pip)) updatedPIPs.add(pip);
+	    }
+	    net.setPIPs(updatedPIPs);
+	    for(SitePinInst pin : pins) {
+	        pin.setRouted(false);
+	    }	    
+	}
+
+	/**
+	 * For the given set of pins, if they were removed, determine which PIPs could be trimmed as 
+	 * they no longer route to any specific sink.
+	 * @param net The current net
+	 * @param pins The set of pins to remove.
+	 * @return The set of redundant (trimmable) PIPs that cane safely be removed when removing the
+	 * set of provided pins from the net.
+	 */
+	public static Set<PIP> getTrimmablePIPsFromPins(Net net, Collection<SitePinInst> pins) {
 	    // Map listing the PIPs that drive a Node
 	    Map<Node,ArrayList<PIP>> reverseConns = new HashMap<>();
 	    Map<Node,ArrayList<PIP>> reverseConnsStart = new HashMap<>();
@@ -1104,7 +1125,6 @@ public class DesignTools {
 	            BELPin belPin = sPin.getBELPin();
 	            si.unrouteIntraSiteNet(belPin, belPin);
 	        }
-	        p.setRouted(false);	        
 	        for(Node startNode : updateFanout) {
 	            Integer newFanout = fanout.get(startNode);
 	            if(newFanout != null) {
@@ -1113,11 +1133,7 @@ public class DesignTools {
 	            }
 	        }
 	    }
-	    ArrayList<PIP> updatedPIPs = new ArrayList<>();
-	    for(PIP pip : net.getPIPs()){
-	        if(!toRemove.contains(pip)) updatedPIPs.add(pip);
-	    }
-	    net.setPIPs(updatedPIPs);
+	    return toRemove;
 	}
 
 
@@ -2129,15 +2145,17 @@ public class DesignTools {
 	}
 
 	/**
-	 * Copies the logic and implementation of a set of cells from one design to another.
+	 * Copies the logic and implementation of a set of cells from one design to another.  This will
+	 * replace the destination logical cell instances with those of the source design. 
 	 * @param src The source design (with partial or full implementation)
-	 * @param dest The destination design (with matching cell instance interfaces) 
+	 * @param dest The destination design (with matching cell instance interfaces).  
 	 * @param lockPlacement Flag indicating if the destination implementation copy should have the 
 	 * 	placement locked
 	 * @param lockRouting Flag indicating if the destination implementation copy should have the 
 	 * 	routing locked
 	 * @param srcToDestInstNames A map of source (key) to destination (value) pairs of cell 
-	 * instances from which to copy the implementation
+	 * instances from which to copy the implementation. If targeting the top instance, use an 
+	 * empty String ("") as the destination instance name.
 	 */
 	public static void copyImplementation(Design src, Design dest, boolean lockPlacement, 
 			boolean lockRouting, Map<String,String> srcToDestInstNames) {
@@ -2152,6 +2170,17 @@ public class DesignTools {
 		HashSet<String> instsWithSeparator = new HashSet<>();
 		for(Entry<String,String> e : srcToDestInstNames.entrySet()) {
 			EDIFHierCellInst cellInst = src.getNetlist().getHierCellInstFromName(e.getKey());
+			if(e.getValue().length() == 0) {
+			    // If its the top cell, remove the top cell from destNetlist
+			    EDIFLibrary destLib = destNetlist.getLibrary(cellInst.getCellType().getLibrary().getName());
+			    if(destLib == null){
+			        destLib = destNetlist.getWorkLibrary();
+			    }
+			    EDIFCell existingCell = destLib.getCell(cellInst.getCellType().getLegalEDIFName());
+			    if(existingCell != null) {
+			        destLib.removeCell(existingCell);
+			    }
+			}
 			destNetlist.migrateCellAndSubCells(cellInst.getCellType());
 			EDIFHierCellInst bbInst = destNetlist.getHierCellInstFromName(e.getValue());
 			bbInst.getInst().setCellType(cellInst.getCellType());
@@ -2176,8 +2205,7 @@ public class DesignTools {
 					dstSiteInst = dest.createSiteInst(srcSiteInst.getName(), 
 									srcSiteInst.getSiteTypeEnum(), srcSiteInst.getSite());
 				}
-				String newCellPrefix = srcToDestInstNames.get(prefixes.get(prefixMatch));
-				String newCellName = newCellPrefix + cell.getName().substring(prefixMatch.length()-1);
+				String newCellName = getNewHierName(cellName, srcToDestInstNames, prefixes, prefixMatch);
 				Cell copy = cell.copyCell(newCellName, cell.getEDIFCellInst(), dstSiteInst);
 				dstSiteInst.addCell(copy);
 				copy.setBELFixed(lockPlacement);
@@ -2212,19 +2240,17 @@ public class DesignTools {
 			if(!srcInside) continue;
 			if((outside.size() + 1) >= pins.size()) continue;
 			
-			Set<PIP> pipsToRemove = new HashSet<>();
+			Set<SitePinInst> pinsToRemove = new HashSet<>();
 			// Net is partially inside, preserve only portions inside
 			for(EDIFHierPortInst removeMe : outside) {
-				for(SitePinInst sitePin : removeMe.getAllRoutedSitePinInsts(src)) {
-					pipsToRemove.addAll(unroutePin(sitePin, net));					
-				}
+			    pinsToRemove.addAll(removeMe.getAllRoutedSitePinInsts(src));
 			}
+			Set<PIP> pipsToRemove = getTrimmablePIPsFromPins(net, pinsToRemove);
 
 			String newNetName = net.getName();
 			String prefixMatch = null;
 			if((prefixMatch = StringTools.startsWithAny(net.getName(), prefixes.keySet())) != null) {
-				String noSeparator = prefixes.get(prefixMatch);
-				newNetName = srcToDestInstNames.get(noSeparator) + newNetName.substring(noSeparator.length());
+			    newNetName = getNewHierName(newNetName, srcToDestInstNames, prefixes, prefixMatch);
 			}
 			EDIFNet logicalNet = destNetlist.getNetFromHierName(net.getName());
 			Net copiedNet = dest.createNet(newNetName, logicalNet);
@@ -2236,6 +2262,13 @@ public class DesignTools {
 				}
 			}
 		}		
+	}
+	
+	private static String getNewHierName(String srcName, Map<String,String> srcToDestInstNames, 
+	                                        Map<String,String> prefixes, String prefixMatch) {
+		String newCellPrefix = srcToDestInstNames.get(prefixes.get(prefixMatch));
+		int idx = prefixMatch.length() - (newCellPrefix.length() == 0 ? 0 : 1);
+		return newCellPrefix + srcName.substring(idx);
 	}
 	
 	/**
@@ -2354,8 +2387,7 @@ public class DesignTools {
 								throw new RuntimeException("ERROR: Unable to find appropriate "
 									+ "translation name for cell: " + tmpCell);
 							}
-							String newPrefix = srcToDestNames.get(prefixes.get(prefixMatch));
-							String newCellName = newPrefix+cellName.substring(prefixMatch.length()-1);
+							String newCellName = getNewHierName(cellName, srcToDestNames, prefixes, prefixMatch);
 							Cell rtCopy = tmpCell
 									.copyCell(newCellName, tmpCell.getEDIFCellInst(), dstSiteInst);
 							dstSiteInst.getCellMap().put(belName, rtCopy);
