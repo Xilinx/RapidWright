@@ -712,8 +712,7 @@ public class EDIFTools {
 		try {
 			if (ParallelismTools.getParallel()) {
 				try (ParallelEDIFParser p = new ParallelEDIFParser(fileName)) {
-					CodePerfTracker t = new CodePerfTracker(null);
-					return p.parseEDIFNetlist(t);
+					return p.parseEDIFNetlist();
 				}
 			} else {
 				try (EDIFParser p = new EDIFParser(fileName)) {
