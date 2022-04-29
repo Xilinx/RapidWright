@@ -477,11 +477,10 @@ public class EDIFTools {
 	 * cell definition.
 	 * @param src The logical port inst driver or source  
 	 * @param snk The logical port inst sink
-	 * @param netlist The EDIF netlist of the design
 	 * @param newName A unique name to be used in creating the ports and nets
 	 */
 	public static void connectPortInstsThruHier(EDIFHierPortInst src, EDIFHierPortInst snk, 
-	        EDIFNetlist netlist, String newName) {
+	        String newName) {
 	    EDIFHierCellInst commonAncestor = 
 	            src.getHierarchicalInst().getCommonAncestor(snk.getHierarchicalInst());
 	    EDIFHierPortInst finalSrc = src;
