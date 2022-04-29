@@ -24,6 +24,7 @@ package com.xilinx.rapidwright.design;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -104,6 +105,23 @@ public class TestDesignTools {
             }else {
                 Assertions.assertNotEquals(dstSiteInst.getNetFromSiteWire(siteWireName), 
                                         dstDesign.getVccNet());
+            }
+        }
+    }
+
+    @Test
+    public void testCreateMissingSitePinInstsInPins() {
+        String dcpPath = RapidWrightDCP.getString("picoblaze_partial.dcp");
+        Design design = Design.readCheckpoint(dcpPath);
+        DesignTools.createMissingSitePinInsts(design);
+
+        for (Net net : design.getNets()) {
+            Collection<SitePinInst> pins = net.getPins();
+            if (net.getSource() != null) {
+                Assertions.assertTrue(pins.contains(net.getSource()));
+            }
+            if (net.getAlternateSource() != null) {
+                Assertions.assertTrue(pins.contains(net.getAlternateSource()));
             }
         }
     }
