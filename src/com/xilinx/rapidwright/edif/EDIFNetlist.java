@@ -104,6 +104,10 @@ public class EDIFNetlist extends EDIFName {
 	
 	private List<String> encryptedCells; 
 	
+	private boolean trackCellChanges = false;
+	
+	private Map<EDIFCell, List<EDIFChange>> modifiedCells = null;
+	
 	private boolean DEBUG = false;
 
 	/**
@@ -1730,7 +1734,43 @@ public class EDIFNetlist extends EDIFName {
         BinaryEDIFWriter.writeBinaryEDIF(fileName, this);
     }
     
-	public static void main(String[] args) throws FileNotFoundException {
+    /**
+     * Checks a flag indicating if this netlist is currently tracking changes to its EDIFCells.
+     * Modified EDIFCells are tracked in a set which can be queried with {@link #getModifiedCells()}.
+     * EDIFCells are determined as modified if one of the following is true: 
+     *   (1) A port was removed, added or modified
+     *   (2) A net was removed, added or modified
+     *   (3) An instance was removed, added or modified 
+     * @return True if this netlist is tracking EDIFCell changes, false otherwise.
+     */
+	public boolean isTrackingCellChanges() {
+        return trackCellChanges;
+    }
+
+    /**
+     * Flag to track changes to EDIFCell changes to this netlist. See {@link #isTrackingCellChanges()}
+     * @param trackCellChanges True to enable tracking of EDIFCells, false to stop tracking
+     */
+    public void setTrackCellChanges(boolean trackCellChanges) {
+        this.trackCellChanges = trackCellChanges;
+    }
+    
+    public void trackChange(EDIFCell cell, EDIFChangeType type, String objectName) {
+        if(isTrackingCellChanges()) {
+            addTrackingChange(cell, new EDIFChange(type, objectName));
+        }
+    }
+    
+    public void addTrackingChange(EDIFCell cell, EDIFChange change) {
+        getModifiedCells().computeIfAbsent(cell, l -> new ArrayList<>()).add(change);
+    }
+
+    public Map<EDIFCell, List<EDIFChange>> getModifiedCells(){
+        if(modifiedCells == null) modifiedCells = new HashMap<>();
+        return modifiedCells;
+    }
+    
+    public static void main(String[] args) throws FileNotFoundException {
 		CodePerfTracker t = new CodePerfTracker("EDIF Import/Export", true);
 		t.start("Read EDIF");
 		EDIFParser p = new EDIFParser(args[0]);

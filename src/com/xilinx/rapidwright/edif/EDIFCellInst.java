@@ -181,6 +181,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
      */
     public void setParentCell(EDIFCell parent) {
         this.parentCell = parent;
+        parent.trackChange(EDIFChangeType.CELL_INST_ADD, getName());
     }
 
     /**
