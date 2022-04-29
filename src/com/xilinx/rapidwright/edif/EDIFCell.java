@@ -555,6 +555,18 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
 		return leafCells;
     }
 
+    public EDIFNetlist getNetlist() {
+        EDIFLibrary lib = getLibrary();
+        return lib != null ? lib.getNetlist() : null;
+    }
+    
+    public void trackChange(EDIFChangeType type, String name) {
+        EDIFNetlist netlist = getNetlist();
+        if(netlist != null) {
+            netlist.trackChange(this, type, name);            
+        }
+    }
+
 	public EDIFPort getPortByLegalName(String name) {
 
 		EDIFPort port = getPort(name);
@@ -569,18 +581,6 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
 			}
 		}
 		return null;
-	}
-
-	public EDIFNetlist getNetlist() {
-		EDIFLibrary lib = getLibrary();
-		return lib != null ? lib.getNetlist() : null;
-	}
-
-	public void trackChange(EDIFChangeType type, String name) {
-		EDIFNetlist netlist = getNetlist();
-		if (netlist != null) {
-			netlist.trackChange(this, type, name);
-		}
 	}
 
 	@Override
