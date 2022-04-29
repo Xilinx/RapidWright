@@ -26,9 +26,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -115,6 +117,14 @@ public class TestDesignTools {
         Design design = Design.readCheckpoint(dcpPath);
         DesignTools.createMissingSitePinInsts(design);
 
+        final Set<String> dualOutputNets = new HashSet<String>(){{
+            add("picoblaze_2_25/processor/alu_result_0");
+            add("picoblaze_2_25/processor/alu_result_1");
+            add("picoblaze_2_25/processor/alu_result_2");
+            add("picoblaze_8_43/processor/pc_move_is_valid");
+            add("picoblaze_0_43/processor/E[0]");
+        }};
+
         for (Net net : design.getNets()) {
             Collection<SitePinInst> pins = net.getPins();
             if (net.getSource() != null) {
@@ -122,6 +132,10 @@ public class TestDesignTools {
             }
             if (net.getAlternateSource() != null) {
                 Assertions.assertTrue(pins.contains(net.getAlternateSource()));
+            }
+
+            if (dualOutputNets.contains(net.getName())) {
+                Assertions.assertTrue(net.getSource() != null && net.getAlternateSource() != null);
             }
         }
     }
