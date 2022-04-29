@@ -1835,7 +1835,8 @@ public class DesignTools {
 	                		}else {
 		                		toCreate = sink.getName();
 		                	}
-	                		net.createPin(toCreate, inst);
+		                	if (inst.getSitePinInst(toCreate) == null)
+		                		net.createPin(toCreate, inst);
 	                		// We'll return the first one we found, store the 2nd in the alternate
 	                		// reference on the net
 	                		return toReturn;
