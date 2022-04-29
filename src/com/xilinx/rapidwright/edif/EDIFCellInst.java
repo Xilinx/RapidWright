@@ -263,4 +263,24 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
     public String getUniqueKey() {
         return getCellType().getUniqueKey() + "_" + getParentCell().getUniqueKey() + "_" + getName();
     }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        if (!super.equals(o))
+            return false;
+        EDIFCellInst that = (EDIFCellInst) o;
+
+        if (!parentCell.equals(that.parentCell))
+            return false;
+
+        if (!cellType.equals(that.cellType))
+            return false;
+
+        if (!viewref.equals(that.viewref))
+            return false;
+
+        return true;
+    }
 }
