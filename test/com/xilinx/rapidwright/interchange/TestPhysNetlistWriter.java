@@ -27,7 +27,7 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
 
-import com.xilinx.rapidwright.support.CheckOpenFiles;
+import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.device.BEL;
@@ -73,7 +73,6 @@ public class TestPhysNetlistWriter {
     }
 
     @Test
-    @CheckOpenFiles
     public void testAllRouteSegmentsEndInBELInputPins(@TempDir Path tempDir) throws IOException {
         final String inputPath = RapidWrightDCP.getString("routethru_luts.dcp");
         Design design = Design.readCheckpoint(inputPath);
@@ -105,4 +104,35 @@ public class TestPhysNetlistWriter {
             }
         }
     }
+
+    @Test
+    public void testNoLutRoutethruCells(@TempDir Path tempDir) throws IOException {
+        final String inputPath = RapidWrightDCP.getString("routethru_luts.dcp");
+        Design design = Design.readCheckpoint(inputPath);
+
+        final Path interchangePath = tempDir.resolve("routethru_luts.phys");
+        PhysNetlistWriter.writePhysNetlist(design, interchangePath.toString());
+
+        ReaderOptions rdOptions =
+                new ReaderOptions(ReaderOptions.DEFAULT_READER_OPTIONS.traversalLimitInWords * 64,
+                        ReaderOptions.DEFAULT_READER_OPTIONS.nestingLimit * 128);
+        MessageReader readMsg = Interchange.readInterchangeFile(interchangePath.toString(), rdOptions);
+
+        PhysNetlist.Reader physNetlist = readMsg.getRoot(PhysNetlist.factory);
+
+        List<String> allStrings = PhysNetlistReader.readAllStrings(physNetlist);
+
+        for (PhysNetlist.CellPlacement.Reader placement : physNetlist.getPlacements()) {
+            SiteInst siteInst = design.getSiteInstFromSiteName(allStrings.get(placement.getSite()));
+            Assertions.assertNotNull(siteInst);
+
+            for (PhysNetlist.PinMapping.Reader pinMapping : placement.getPinMap()) {
+                Cell belCell = siteInst.getCell(allStrings.get(pinMapping.getBel()));
+                Assertions.assertNotNull(belCell);
+
+                Assertions.assertFalse(belCell.isRoutethru());
+            }
+        }
+    }
+
 }

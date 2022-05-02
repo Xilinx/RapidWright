@@ -36,7 +36,6 @@ import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.PartNameTools;
-import com.xilinx.rapidwright.support.CheckOpenFiles;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 
 class TestEDIFNetlist {
@@ -61,7 +60,6 @@ class TestEDIFNetlist {
     }
     
     @Test
-    @CheckOpenFiles
     void testMacroExpansionException(@TempDir Path tempDir) {
         final Part part = PartNameTools.getPart(PART_NAME);
         Design testDesign = createSampleMacroDesign(TEST_MACRO, part);
