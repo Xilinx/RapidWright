@@ -1180,9 +1180,6 @@ public class RWRoute{
 			connection.getSink().setRouted(false);
 			connection.getSinkRnode().setTarget(false);
 			routingGraph.resetExpansion();
-			System.out.printf("CRITICAL WARNING: Unroutable connection in iteration #%d\n", routeIteration);
-			System.out.println("                 " + connection);
-			handleUnroutableConnection(connection);
 		}
 	}
 	
