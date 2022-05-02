@@ -174,3 +174,8 @@ test {
   dependsOn testPython
 }
 
+task printVersion() {
+    doLast {
+        print(rapidwright_version)
+    }
+}
