@@ -114,12 +114,12 @@ public class RWRoute{
 	protected RouteThruHelper routethruHelper;
 	
 	/** A set of indices of overused rondes */
-	private Set<Routable> overUsedRnodes;
-	/** TODO */
-	protected RoutableGraph routingGraph;
+	private Set<RouteNode> overUsedRnodes;
+	/** Class encapsulating the routing resource graph */
+	protected RouteNodeGraph routingGraph;
 	protected long rnodesCreatedThisIteration;
 	/** The queue to store candidate nodes to route a connection */
-	private PriorityQueue<Routable> queue;
+	private PriorityQueue<RouteNode> queue;
 
 	/** Total wirelength of the routed design */
 	private int totalWL;
@@ -167,7 +167,7 @@ public class RWRoute{
 		criticalConnections = new ArrayList<>();
 
 		queue = new PriorityQueue<>((r1,r2) -> Float.compare(r1.getLowerBoundTotalPathCost(), r2.getLowerBoundTotalPathCost()));
-		routingGraph = createRoutableGraph();
+		routingGraph = createRouteNodeGraph();
 		if(config.isTimingDriven()) {
 			nodesDelays = new HashMap<>();
 		}
@@ -207,13 +207,13 @@ public class RWRoute{
 		return null;
 	}
 
-	protected RoutableGraph createRoutableGraph() {
+	protected RouteNodeGraph createRouteNodeGraph() {
 		if(config.isTimingDriven()) {
 			/* An instantiated delay estimator that is used to calculate delay of routing resources */
 			DelayEstimatorBase estimator = new DelayEstimatorBase(design.getDevice(), new InterconnectInfo(), config.isUseUTurnNodes(), 0);
-			return new RoutableGraphTimingDriven(rnodesTimer, design, estimator, config.isMaskNodesCrossRCLK());
+			return new RouteNodeGraphTimingDriven(rnodesTimer, design, estimator, config.isMaskNodesCrossRCLK());
 		} else {
-			return new RoutableGraph(rnodesTimer, design);
+			return new RouteNodeGraph(rnodesTimer, design);
 		}
 	}
 
@@ -475,14 +475,14 @@ public class RWRoute{
 			}else {
 				Node sinkINTNode = nodes.get(0);
 				indirectConnections.add(connection);
-				connection.setSinkRnode(createAddRoutableNode(connection.getSink(), sinkINTNode, RoutableType.PINFEED_I));
+				connection.setSinkRnode(getOrCreateRouteNode(connection.getSink(), sinkINTNode, RouteNodeType.PINFEED_I));
 				if(sourceINTNode == null) {
 					sourceINTNode = RouterHelper.projectOutputPinToINTNode(source);
 					if(sourceINTNode == null) {
 						throw new RuntimeException("ERROR: Null projected INT node for the source of net " + net.toStringFull());
 					}
 				}
-				connection.setSourceRnode(createAddRoutableNode(connection.getSource(), sourceINTNode, RoutableType.PINFEED_O));
+				connection.setSourceRnode(getOrCreateRouteNode(connection.getSource(), sourceINTNode, RouteNodeType.PINFEED_O));
 				connection.setDirect(false);
 				indirect++;
 				connection.computeHpwl();
@@ -535,21 +535,21 @@ public class RWRoute{
 	}
 
 	/**
-	 * Creates a {@link RoutableNode} Object based on a {@link Node} instance and avoids duplicates,
+	 * Creates a {@link RouteNode} Object based on a {@link Node} instance and avoids duplicates,
 	 * used for creating the source and sink rnodes of {@link Connection} instances.
 	 * NOTE: This method does not consider the preserved nodes.
 	 * @param sitePinInst The source or sink {@link SitePinInst} instance.
 	 * @param node The node associated to the {@link SitePinInst} instance.
-	 * @param type The {@link RoutableType} of the {@link RoutableNode} Object.
-	 * @return The created {@link RoutableNode} instance.
+	 * @param type The {@link RouteNodeType} of the {@link RouteNode} Object.
+	 * @return The created {@link RouteNode} instance.
 	 */
-	protected Routable createAddRoutableNode(SitePinInst sitePinInst, Node node, RoutableType type){
-		Pair<Routable,Boolean> ret = routingGraph.getOrCreate(node, type);
-		Routable rnode = ret.getFirst();
+	protected RouteNode getOrCreateRouteNode(SitePinInst sitePinInst, Node node, RouteNodeType type){
+		Pair<RouteNode,Boolean> ret = routingGraph.getOrCreate(node, type);
+		RouteNode rnode = ret.getFirst();
 		boolean inserted = ret.getSecond();
 		if (!inserted) {
 			// this is for checking preserved routing resource conflicts among routed nets */
-			if(rnode.getRoutableType() == type && type == RoutableType.PINFEED_I) {
+			if(rnode.getType() == type && type == RouteNodeType.PINFEED_I) {
 				System.out.println("WARNING: Conflicting node: " + node + ", connected to sink " + sitePinInst);
 			}
 		}
@@ -639,14 +639,14 @@ public class RWRoute{
 	 */
 	private void estimateDelayOfConnections() {	
 		for(Connection connection : indirectConnections) {
-			Routable source = connection.getSourceRnode();
+			RouteNode source = connection.getSourceRnode();
 			if(source.getChildren().length == 0) {
 				// output pin is blocked
 				swapOutputPin(connection);
 				source = connection.getSourceRnode();
 			}
 			short estDelay = (short) 10000;
-			for(Routable child : source.getChildren()) {				
+			for(RouteNode child : source.getChildren()) {
 				short tmpDelay = 113;
 				tmpDelay += child.getDelay();
 				if(tmpDelay < estDelay) {
@@ -735,7 +735,7 @@ public class RWRoute{
 			System.out.println("\nERROR: Routing terminated after " + (routeIteration -1 ) + " iterations.");
 			System.out.println("       Unroutable connections: " + getUnroutableConnections().size());
 			System.out.println("       Conflicting nodes: " + overUsedRnodes.size());
-			for (Routable rnode : overUsedRnodes) {
+			for (RouteNode rnode : overUsedRnodes) {
 				System.out.println("              " + rnode);
 			}
 		}
@@ -852,8 +852,8 @@ public class RWRoute{
 				}
 			}
 
-			List<Routable> rnodes = connection.getRnodes();
-			for(Routable rnode : rnodes){
+			List<RouteNode> rnodes = connection.getRnodes();
+			for(RouteNode rnode : rnodes){
 				nodes.add(rnode.getNode());
 			}
 
@@ -950,9 +950,9 @@ public class RWRoute{
 	 */
 	private void updateCost() {
 		overUsedRnodes.clear();
-		for(Entry<Node,Routable> e : routingGraph.getNodeEntries()){
-			Routable rnode = e.getValue();
-			int overuse=rnode.getOccupancy() - Routable.capacity;
+		for(Entry<Node, RouteNode> e : routingGraph.getNodeEntries()){
+			RouteNode rnode = e.getValue();
+			int overuse=rnode.getOccupancy() - RouteNode.capacity;
 			if(overuse == 0) {
 				rnode.setPresentCongestionCost(1 + presentCongestionFactor);
 			} else if (overuse > 0) {
@@ -1045,14 +1045,14 @@ public class RWRoute{
 	}
 	
 	/**
-	 * Builds the driversCounts map of each {@link Routable} instance that is used by a net.
+	 * Builds the driversCounts map of each {@link RouteNode} instance that is used by a net.
 	 * @param netWrapper A NetWrapper instance that represents a net.
 	 */
 	private void buildDriverCountsOfRnodes(NetWrapper netWrapper) {
 		for(Connection connection : netWrapper.getConnections()) {
-			Routable driver = null;
+			RouteNode driver = null;
 			for(int i = connection.getRnodes().size() - 1; i >= 0; i--){
-				Routable rnode = connection.getRnodes().get(i);
+				RouteNode rnode = connection.getRnodes().get(i);
 				if (driver != null) {
 					rnode.incrementDriver(driver);
 				}
@@ -1067,7 +1067,7 @@ public class RWRoute{
 	 */
 	private void addNodesDelays(NetWrapper net){	
 		for(Connection connection:net.getConnections()){
-			for(Routable rnode : connection.getRnodes()){
+			for(RouteNode rnode : connection.getRnodes()){
 				nodesDelays.put(rnode.getNode(), rnode.getDelay());
 			}
 		}
@@ -1087,7 +1087,7 @@ public class RWRoute{
 	 * @param connection The connection to be ripped up.
 	 */
 	private void ripUp(Connection connection){
-		for(Routable rnode : connection.getRnodes()) {
+		for(RouteNode rnode : connection.getRnodes()) {
 			rnode.decrementUser(connection.getNetWrapper());
 			rnode.updatePresentCongestionCost(presentCongestionFactor);
 		}
@@ -1098,7 +1098,7 @@ public class RWRoute{
 	 * @param connection The routed connection.
 	 */
 	private void updateUsersAndPresentCongestionCost(Connection connection){
-		for(Routable rnode : connection.getRnodes()) {
+		for(RouteNode rnode : connection.getRnodes()) {
 			rnode.incrementUser(connection.getNetWrapper());
 			rnode.updatePresentCongestionCost(presentCongestionFactor);
 		}
@@ -1162,7 +1162,7 @@ public class RWRoute{
 
 		boolean successRoute = false;
 		while(!queue.isEmpty()){
-			Routable rnode = queue.poll();
+			RouteNode rnode = queue.poll();
 			if (rnode.isTarget()) {
 				successRoute = true;
 				break;
@@ -1234,7 +1234,7 @@ public class RWRoute{
 		DesignTools.routeAlternativeOutputSitePin(net, altSource);
 
 		Node sourceINTNode = RouterHelper.projectOutputPinToINTNode(altSource);
-		Routable sourceR = createAddRoutableNode(altSource, sourceINTNode, RoutableType.PINFEED_O);
+		RouteNode sourceR = getOrCreateRouteNode(altSource, sourceINTNode, RouteNodeType.PINFEED_O);
 		for(Connection otherConnectionOfNet : netWrapper.getConnections()) {
 			otherConnectionOfNet.setSource(altSource);
 			otherConnectionOfNet.setSourceRnode(sourceR);
@@ -1249,7 +1249,7 @@ public class RWRoute{
 	 * @param target The target rnode to reach.
 	 * @return true, if the PINBOUNCE rnode is in the same column as the target and within one INT tile of the target.
 	 */
-	private boolean usablePINBounce(Routable pinBounce, Routable target){
+	private boolean usablePINBounce(RouteNode pinBounce, RouteNode target){
 		Tile bounce = pinBounce.getNode().getTile();
 		Tile sink = target.getNode().getTile();
 		return bounce.getTileXCoordinate() == sink.getTileXCoordinate() && Math.abs(bounce.getTileYCoordinate() - sink.getTileYCoordinate()) <= 1;
@@ -1271,7 +1271,7 @@ public class RWRoute{
 	 * @param connection: The connection that is being routed.
 	 */
 	private void saveRouting(Connection connection){
-		Routable rnode = connection.getSinkRnode();
+		RouteNode rnode = connection.getSinkRnode();
 		while (rnode != null) {
 			connection.addRnode(rnode);
 			rnode = rnode.getPrev();
@@ -1290,14 +1290,14 @@ public class RWRoute{
 	 * @param rnodeDelayWeight The weight of childRnode's exact delay.
 	 * @param rnodeEstDlyWeight The weight of estimated delay to the target.
 	 */
-	private void exploreAndExpand(Routable rnode, Connection connection, float shareWeight, float rnodeCostWeight,
-			float rnodeLengthWeight, float rnodeEstWlWeight, float rnodeDelayWeight, float rnodeEstDlyWeight){
+	private void exploreAndExpand(RouteNode rnode, Connection connection, float shareWeight, float rnodeCostWeight,
+								  float rnodeLengthWeight, float rnodeEstWlWeight, float rnodeDelayWeight, float rnodeEstDlyWeight){
 		boolean longParent = DelayEstimatorBase.isLong(rnode.getNode());
-		for(Routable childRNode:rnode.getChildren()){
+		for(RouteNode childRNode:rnode.getChildren()){
 			if(childRNode.isVisited()) continue;
 			if(childRNode.isTarget()){
 				queue.clear();
-			}else if(childRNode.getRoutableType() == RoutableType.WIRE) {
+			}else if(childRNode.getType() == RouteNodeType.WIRE) {
 				if(childRNode.getDelay() > 10000) {
 					// To filter out those nodes that are considered to be excluded with the masking resource approach,
 					// such as U-turn shape nodes near the boundary and some node cross RCLK
@@ -1306,14 +1306,14 @@ public class RWRoute{
 				if(!isAccessible(childRNode, connection)) {
 					continue;
 				}
-			}else if(childRNode.getRoutableType() == RoutableType.PINBOUNCE) {
+			}else if(childRNode.getType() == RouteNodeType.PINBOUNCE) {
 				if(!isAccessible(childRNode, connection)) {
 					continue;
 				}
 				if(!usablePINBounce(childRNode, connection.getSinkRnode())) {
 					continue;
 				}
-			}else if(childRNode.getRoutableType() == RoutableType.PINFEED_I) {
+			}else if(childRNode.getType() == RouteNodeType.PINFEED_I) {
 				if(!connection.isCrossSLR()) {
 					continue;
 				}
@@ -1334,7 +1334,7 @@ public class RWRoute{
 	 * @param connection The connection to route.
 	 * @return true, if no bounding box constraints, or if the routing resource is within the connection's bounding box when use the bounding box constraint.
 	 */
-	private boolean isAccessible(Routable child, Connection connection) {
+	private boolean isAccessible(RouteNode child, Connection connection) {
 		if(config.isUseBoundingBox()) {
 			return child.isInConnectionBoundingBox(connection);
 		}
@@ -1354,11 +1354,11 @@ public class RWRoute{
 	 * @param rnodeDelayWeight The weight of childRnode's exact delay.
 	 * @param rnodeEstDlyWeight The weight of estimated delay from childRnode to the target.
 	 */
-	private void evaluateCostAndPush(Routable rnode, boolean longParent, Routable childRnode, Connection connection, float sharingWeight, float rnodeCostWeight,
-			float rnodeLengthWeight, float rnodeEstWlWeight, float rnodeDelayWeight, float rnodeEstDlyWeight) {
+	private void evaluateCostAndPush(RouteNode rnode, boolean longParent, RouteNode childRnode, Connection connection, float sharingWeight, float rnodeCostWeight,
+									 float rnodeLengthWeight, float rnodeEstWlWeight, float rnodeDelayWeight, float rnodeEstDlyWeight) {
 		int countSourceUses = childRnode.countConnectionsOfUser(connection.getNetWrapper());
 		float sharingFactor = 1 + sharingWeight* countSourceUses;
-		float newPartialPathCost = rnode.getUpstreamPathCost() + rnodeCostWeight * getRoutableCost(childRnode, connection, countSourceUses, sharingFactor)
+		float newPartialPathCost = rnode.getUpstreamPathCost() + rnodeCostWeight * getNodeCost(childRnode, connection, countSourceUses, sharingFactor)
 								+ rnodeLengthWeight * childRnode.getLength() / sharingFactor
 								+ rnodeDelayWeight * (childRnode.getDelay() + DelayEstimatorBase.getExtraDelay(childRnode.getNode(), longParent)) / 100f;
 		int deltaX = Math.abs(childRnode.getEndTileXCoordinate() - connection.getSinkRnode().getEndTileXCoordinate());
@@ -1378,12 +1378,12 @@ public class RWRoute{
 	 * @param sharingFactor The sharing factor.
 	 * @return The sum of the congestion cost and the bias cost of rnode.
 	 */
-	private float getRoutableCost(Routable rnode, Connection connection, int countSameSourceUsers, float sharingFactor) {		
+	private float getNodeCost(RouteNode rnode, Connection connection, int countSameSourceUsers, float sharingFactor) {
 		boolean hasSameSourceUsers = countSameSourceUsers!= 0;	
 		float presentCongestionCost;
 		
 		if(hasSameSourceUsers) {// the rnode is used by other connection(s) from the same net
-			int overoccupancy = rnode.getOccupancy() - Routable.capacity;
+			int overoccupancy = rnode.getOccupancy() - RouteNode.capacity;
 			// make the congestion cost less for the current connection
 			presentCongestionCost = 1 + overoccupancy * presentCongestionFactor;
 		}else{
@@ -1407,7 +1407,7 @@ public class RWRoute{
 	 * @param newPartialPathCost The upstream path cost from childRnode to the source.
 	 * @param newTotalPathCost Total path cost of childRnode.
 	 */
-	private void push(Routable childRnode, Routable rnode, float newPartialPathCost, float newTotalPathCost) {
+	private void push(RouteNode childRnode, RouteNode rnode, float newPartialPathCost, float newTotalPathCost) {
 		childRnode.setLowerBoundTotalPathCost(newTotalPathCost);
 		childRnode.setUpstreamPathCost(newPartialPathCost);
 		childRnode.setPrev(rnode);
@@ -1599,17 +1599,13 @@ public class RWRoute{
 		return routeDesign(design, new RWRouteConfig(args));
 	}
 	
-	/**
-	 * Routes a design after pre-processing.
-	 * @param design The {@link Design} instance to be routed.
-	 * @param config A {@link RWRouteConfig} instance consisting of customizable parameters to use.
-	 */
 	private static Design routeDesign(Design design, RWRouteConfig config) {
+		DesignTools.createMissingSitePinInsts(design);
+
 		return routeDesign(design, config, () -> {
 			if(config.isPartialRouting()) {
 				return new PartialRouter(design, config);
 			}
-			DesignTools.createMissingSitePinInsts(design);
 			return new RWRoute(design, config);
 		});
 	}

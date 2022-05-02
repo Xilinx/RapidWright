@@ -42,8 +42,9 @@ import com.xilinx.rapidwright.util.RuntimeTracker;
  * A class extends {@link RWRoute} for partial routing.
  */
 public class PartialRouter extends RWRoute{
-	protected static class RoutableGraphPartial extends RoutableGraph {
-		public RoutableGraphPartial(RuntimeTracker setChildrenTimer, Design design) {
+	protected class RouteNodeGraphPartial extends RouteNodeGraph {
+
+		public RouteNodeGraphPartial(RuntimeTracker setChildrenTimer, Design design) {
 			super(setChildrenTimer, design);
 		}
 
@@ -52,9 +53,9 @@ public class PartialRouter extends RWRoute{
 			boolean preserved = super.isPreserved(child);
 
 			// If preserved, check if child node has been created already
-			Routable rnode = (preserved) ? RoutableGraphPartial.this.getNode(child) : null;
+			RouteNode rnode = (preserved) ? RouteNodeGraphPartial.this.getNode(child) : null;
 			// If so, get its prev pointer
-			Routable prev = (rnode != null) ? rnode.getPrev() : null;
+			RouteNode prev = (rnode != null) ? rnode.getPrev() : null;
 			// Presence means that the only arc allowed to enter this child node
 			// is if it came from prev
 			if (prev != null && prev.getNode() == parent) {
@@ -64,10 +65,11 @@ public class PartialRouter extends RWRoute{
 
 			return preserved;
 		}
+
 	}
 
-	protected static class RoutableGraphPartialTimingDriven extends RoutableGraphTimingDriven {
-		public RoutableGraphPartialTimingDriven(RuntimeTracker rnodesTimer, Design design, DelayEstimatorBase delayEstimator, boolean maskNodesCrossRCLK) {
+	protected class RouteNodeGraphPartialTimingDriven extends RouteNodeGraphTimingDriven {
+		public RouteNodeGraphPartialTimingDriven(RuntimeTracker rnodesTimer, Design design, DelayEstimatorBase delayEstimator, boolean maskNodesCrossRCLK) {
 			super(rnodesTimer, design, delayEstimator, maskNodesCrossRCLK);
 		}
 
@@ -76,9 +78,9 @@ public class PartialRouter extends RWRoute{
 			boolean preserved = super.isPreserved(child);
 
 			// If preserved, check if child node has been created already
-			Routable rnode = (preserved) ? RoutableGraphPartialTimingDriven.this.getNode(child) : null;
+			RouteNode rnode = (preserved) ? RouteNodeGraphPartialTimingDriven.this.getNode(child) : null;
 			// If so, get its prev pointer
-			Routable prev = (rnode != null) ? rnode.getPrev() : null;
+			RouteNode prev = (rnode != null) ? rnode.getPrev() : null;
 			// Presence means that the only arc allowed to enter this child node
 			// is if it came from prev
 			if (prev != null && prev.getNode() == parent) {
@@ -95,13 +97,13 @@ public class PartialRouter extends RWRoute{
 	}
 
 	@Override
-	protected RoutableGraph createRoutableGraph() {
+	protected RouteNodeGraph createRouteNodeGraph() {
 		if(config.isTimingDriven()) {
 			/* An instantiated delay estimator that is used to calculate delay of routing resources */
 			DelayEstimatorBase estimator = new DelayEstimatorBase(design.getDevice(), new InterconnectInfo(), config.isUseUTurnNodes(), 0);
-			return new RoutableGraphPartialTimingDriven(rnodesTimer, design, estimator, config.isMaskNodesCrossRCLK());
+			return new RouteNodeGraphPartialTimingDriven(rnodesTimer, design, estimator, config.isMaskNodesCrossRCLK());
 		} else {
-			return new RoutableGraphPartial(rnodesTimer, design);
+			return new RouteNodeGraphPartial(rnodesTimer, design);
 		}
 	}
 
@@ -222,7 +224,7 @@ public class PartialRouter extends RWRoute{
 	}
 
 	protected void unpreserveNet(Net net) {
-		Set<Routable> rnodes = new HashSet<>();
+		Set<RouteNode> rnodes = new HashSet<>();
 		NetWrapper netWrapper = nets.get(net);
 		if (netWrapper != null) {
 			// Net already exists -- any unrouted connection will cause the
@@ -234,7 +236,7 @@ public class PartialRouter extends RWRoute{
 			for(Node toBuild : RouterHelper.getNodesOfNet(net)) {
 				// Since net already exists, all the nodes it uses will already
 				// have been created
-				Routable rnode = routingGraph.getNode(toBuild);
+				RouteNode rnode = routingGraph.getNode(toBuild);
 				assert(rnode != null);
 
 				rnodes.add(rnode);
@@ -247,8 +249,8 @@ public class PartialRouter extends RWRoute{
 			for (PIP pip : net.getPIPs()) {
 				Node start = (pip.isReversed()) ? pip.getEndNode() : pip.getStartNode();
 				Node end = (pip.isReversed()) ? pip.getStartNode() : pip.getEndNode();
-				Routable rstart = createAddRoutableNode(null, start, RoutableType.WIRE);
-				Routable rend = createAddRoutableNode(null, end, RoutableType.WIRE);
+				RouteNode rstart = getOrCreateRouteNode(null, start, RouteNodeType.WIRE);
+				RouteNode rend = getOrCreateRouteNode(null, end, RouteNodeType.WIRE);
 
 				rnodes.add(rstart);
 				rnodes.add(rend);
@@ -273,7 +275,7 @@ public class PartialRouter extends RWRoute{
 			}
 		}
 
-		for (Routable rnode : rnodes) {
+		for (RouteNode rnode : rnodes) {
 			Node toBuild = rnode.getNode();
 			routingGraph.unpreserve(toBuild);
 
@@ -283,7 +285,7 @@ public class PartialRouter extends RWRoute{
 				// Without this routethru check, there will be Invalid Programming for Site error shown in Vivado.
 				// Do not use those nodes, because we do not know if the routethru is available or not
 				if(routethruHelper.isRouteThru(uphill, toBuild)) continue;
-				Routable parent = routingGraph.getNode(uphill);
+				RouteNode parent = routingGraph.getNode(uphill);
 				if (parent == null)
 					continue;
 				if (parent.containsChild(rnode))

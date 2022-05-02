@@ -40,14 +40,20 @@ import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.util.RuntimeTracker;
 
 /**
- * A RoutableNode Object, denoted as rnode, is a vertex of the routing resource graph.
- * It implements {@link Routable} and is created based on a {@link Node} Object.
+ * A RouteNode Object corresponds to a vertex of the routing resource graph.
+ * Each RouteNode instance is associated with a {@link Node} instance. It is denoted as "rnode".
+ * The routing resource graph is built "lazily", i.e., RouteNode Objects (rnodes) are created when needed.
  */
-public abstract class RoutableNode implements Routable{
+public abstract class RouteNode {
+	/** Each RouteNode Object can be legally used by one net only */
+	public static final short capacity = 1;
+	/** Memoized static array for use by Collection.toArray() or similar */
+	public static final RouteNode[] EMPTY_ARRAY = new RouteNode[0];
+
 	/** The associated {@link Node} instance */
 	protected Node node;
 	/** The type of a rnode*/
-	private RoutableType type;
+	private RouteNodeType type;
 	/** The tileXCoordinate and tileYCoordinate of the INT tile that the associated node stops at */
 	private short endTileXCoordinate;
 	private short endTileYCoordinate;
@@ -58,7 +64,7 @@ public abstract class RoutableNode implements Routable{
 	/** A flag to indicate if this rnode is the target */
 	private boolean isTarget;
 	/** The children (downhill rnodes) of this rnode */
-	protected Routable[] children;
+	protected RouteNode[] children;
 	
 	/** Present congestion cost */
 	private float presentCongestionCost;
@@ -69,7 +75,7 @@ public abstract class RoutableNode implements Routable{
 	/** Lower bound of the total path cost */
 	private float lowerBoundTotalPathCost;
 	/** A variable that stores the parent of a rnode during expansion to facilitate tracing back */
-	private Routable prev;
+	private RouteNode prev;
 	/**
 	 * A map that records users of a rnode based on all routed connections.
 	 * Each user is a {@link NetWrapper} instance that corresponds to a {@link Net} instance.
@@ -83,11 +89,11 @@ public abstract class RoutableNode implements Routable{
 	 * It is possible that a rnode are driven by different rnodes after routing of all connections of a net.
 	 * We count the drivers of a rnode to facilitate the route fixer at the end of routing.
 	 */
-	private Map<Routable, Integer> driversCounts;
+	private Map<RouteNode, Integer> driversCounts;
 	
-	public RoutableNode(Node node, RoutableType type){
+	public RouteNode(Node node, RouteNodeType type){
 		this.node = node;
-		setRoutableType(type);
+		setType(type);
 		children = null;
 		isTarget = false;
 		setEndTileXYCoordinates();
@@ -100,36 +106,36 @@ public abstract class RoutableNode implements Routable{
 		setPrev(null);
 	}
 
-	abstract protected Routable getOrCreate(Node node, RoutableType type);
+	abstract protected RouteNode getOrCreate(Node node, RouteNodeType type);
 	
 	protected void setChildren(RuntimeTracker setChildrenTimer/*RouteThruHelper routethruHelper*/){
 		if (children != null)
 			return;
 		setChildrenTimer.start();
 		List<Node> allDownHillNodes = node.getAllDownhillNodes();
-		List<Routable> childrenList = new ArrayList<>(allDownHillNodes.size());
+		List<RouteNode> childrenList = new ArrayList<>(allDownHillNodes.size());
 		for(Node node:allDownHillNodes){
 			if(isExcluded(this.node, node)) continue;
 			// FIXME: What is the meaning of checking that a node routethru-s to itself?
 			// if(routethruHelper.isRouteThru(node, node)) continue;
 
-			RoutableType type = RoutableType.WIRE;
-			Routable child = getOrCreate(node, type);
+			RouteNodeType type = RouteNodeType.WIRE;
+			RouteNode child = getOrCreate(node, type);
 			childrenList.add(child);//the sink rnode of a target connection has been created up-front
 		}
 		children = childrenList.toArray(EMPTY_ARRAY);
 		setChildrenTimer.stop();
 	}
 	
-	private void setBaseCost(RoutableType type){
+	private void setBaseCost(RouteNodeType type){
 		// TODO: Why does enabling the following line cause unroutability?
-		//       setRoutableType() is called before this, and it setting
+		//       setRouteType() is called before this, and it setting
 		//       this.type disrupts the base cost such that
 		//       testNonTimingDrivenPartialRouting becomes unroutable.
 		//       The `type` parameter fed to this method is the original
 		//       value provided to the constructor
 		// type = this.type;
-		if(type == RoutableType.WIRE){
+		if(type == RouteNodeType.WIRE){
 			baseCost = 0.4f;
 			// NOTE: IntentCode is device-dependent
 			IntentCode ic = node.getIntentCode();
@@ -158,26 +164,35 @@ public abstract class RoutableNode implements Routable{
 				if(length != 0) baseCost *= length;
 				break;
 			}	
-		}else if(type == RoutableType.PINFEED_I){
+		}else if(type == RouteNodeType.PINFEED_I){
 			baseCost = 0.4f;
-		}else if(type == RoutableType.PINFEED_O){
+		}else if(type == RouteNodeType.PINFEED_O){
 			baseCost = 1f;
 		}
 	}
 
-	@Override
+	/**
+	 * Checks if a RouteNode Object has been used by more than one users.
+	 * @return true, if a RouteNode Object has been used by multiple users.
+	 */
 	public boolean isOverUsed() {
-		return Routable.capacity < getOccupancy();
+		return RouteNode.capacity < getOccupancy();
 	}
-	
-	@Override
+
+	/**
+	 * Checks if a RouteNode Object has been used.
+	 * @return true, if a RouteNode Object has been used.
+	 */
 	public boolean isUsed(){
 		return getOccupancy() > 0;
 	}
-	
-	@Override
+
+	/**
+	 * Checks if a RouteNode Object are illegally driven by multiple drivers.
+	 * @return true, if a RouteNode Object has multiple drivers.
+	 */
 	public boolean hasMultiDrivers() {
-		return Routable.capacity < uniqueDriverCount();
+		return RouteNode.capacity < uniqueDriverCount();
 	}
 
 	private void setEndTileXYCoordinates() {
@@ -202,11 +217,14 @@ public abstract class RoutableNode implements Routable{
 		length = (short) (Math.abs(endTileXCoordinate - base.getTileXCoordinate()) 
 				+ Math.abs(endTileYCoordinate - base.getTileYCoordinate()));
 	}
-	
-	@Override
+
+	/**
+	 * Updates the present congestion cost based on the present congestion penalty factor.
+	 * @param pres_fac The present congestion penalty factor.
+	 */
 	public void updatePresentCongestionCost(float pres_fac) {
 		int occ = getOccupancy();
-		int cap = Routable.capacity;
+		int cap = RouteNode.capacity;
 		
 		if (occ < cap) {
 			setPresentCongestionCost(1);
@@ -236,64 +254,102 @@ public abstract class RoutableNode implements Routable{
 	public int hashCode(){
 		return node.hashCode();
 	}
-	
-	@Override
+
+	/**
+	 * Checks if coordinates of a RouteNode Object is within the connection's bounding box.
+	 * @param connection The connection that is being routed.
+	 * @return true, if coordinates of a RouteNode is within the connection's bounding box.
+	 */
 	public boolean isInConnectionBoundingBox(Connection connection) {		
 		return endTileXCoordinate > connection.getXMinBB() && endTileXCoordinate < connection.getXMaxBB() && endTileYCoordinate > connection.getYMinBB() && endTileYCoordinate < connection.getYMaxBB();
 	}
-	
-	@Override
+
+	/**
+	 * Gets the associated Node of a RouteNode Object.
+	 * @return The associated Node of a RouteNode Object.
+	 */
 	public Node getNode() {
 		return node;
 	}
 
-	@Override
+	/**
+	 * Checks if a RouteNode Object is the current routing target.
+	 * @return true, if a RouteNode Object is the current routing target.
+	 */
 	public boolean isTarget() {
 		return isTarget;
 	}
 
-	@Override
+	/**
+	 * Sets the boolean value of target.
+	 * @param isTarget The value to be set.
+	 */
 	public void setTarget(boolean isTarget) {
 		this.isTarget = isTarget;
 	}
 
-	@Override
-	public RoutableType getRoutableType() {
+	/**
+	 * Gets the type of a RouteNode Object.
+	 * @return The RouteNodeType of a RouteNode Object.
+	 */
+	public RouteNodeType getType() {
 		return type;
 	}
 
-	@Override
+	/**
+	 * Gets the delay of a RouteNode Object.
+	 * @return The delay of a RouteNode Object.
+	 */
 	public float getDelay() {
 		return 0;
 	}
-	@Override
+
+	/**
+	 * Gets the x coordinate of the INT {@link Tile} instance
+	 * that the associated {@link Node} instance stops at.
+	 * @return The tileXCoordinate of the INT tile that the associated {@link Node} instance stops at.
+	 */
 	public short getEndTileXCoordinate() {
 		return endTileXCoordinate;
 	}
 
-	@Override
+	/**
+	 * Gets the Y coordinate of the INT {@link Tile} instance
+	 * that the associated {@link Node} instance stops at.
+	 * @return The tileYCoordinate of the INT tile that the associated {@link Node} instance stops at.
+	 */
 	public short getEndTileYCoordinate() {
 		return endTileYCoordinate;
 	}
-	
-	@Override
+
+	/**
+	 * Gets the base cost of a RouteNode Object.
+	 * @return The base cost of a RouteNode Object.
+	 */
 	public float getBaseCost() {
 		return baseCost;
 	}
 
-	@Override
-	public Routable[] getChildren() {
+	/**
+	 * Gets the children of a RouteNode Object.
+	 * @return A list of RouteNode Objects.
+	 */
+	public RouteNode[] getChildren() {
 		return children != null ? children : EMPTY_ARRAY;
 	}
 
-	@Override
-	public boolean containsChild(Routable rnode) {
+	/**
+	 * Gets whether the given RouteNode Object is already a child.
+	 * @param rnode Child node to search for.
+	 * @return True if child already present.
+	 */
+	public boolean containsChild(RouteNode rnode) {
 		if (children == null) {
 			return false;
 		}
 		// This linear search is rather inefficient, but is currently only used by
 		// PartialRouter.unpreserveNet() which is not expected to be called often
-		for (Routable child : children) {
+		for (RouteNode child : children) {
 			if (child == rnode) {
 				return true;
 			}
@@ -301,155 +357,235 @@ public abstract class RoutableNode implements Routable{
 		return false;
 	}
 
-	@Override
-	public void addChild(Routable rnode) {
-		// This linear search is rather inefficient, but is currently only used by
+	/**
+	 * Adds a child to this node.
+	 * @param rnode Child to be added.
+	 */
+	public void addChild(RouteNode rnode) {
+		// This add-just-one method is rather inefficient, but is currently only used by
 		// PartialRouter.unpreserveNet() which is not expected to be called often
 		if (children == null) {
-			children = new Routable[]{rnode};
+			children = new RouteNode[]{rnode};
 		} else {
 			children = Arrays.copyOf(children, children.length + 1);
 			children[children.length - 1] = rnode;
 		}
 	}
 
-	private void setRoutableType(RoutableType type) {
+	private void setType(RouteNodeType type) {
 		this.type = type;
-		if(type == RoutableType.WIRE) {
+		if(type == RouteNodeType.WIRE) {
 			// NOTE: IntentCode is device-dependent
 			IntentCode ic = node.getIntentCode();
 			switch (ic) {
 				case NODE_PINBOUNCE:
-					this.type = RoutableType.PINBOUNCE;
+					this.type = RouteNodeType.PINBOUNCE;
 					break;
 				case NODE_PINFEED:
-					this.type = RoutableType.PINFEED_I;
+					this.type = RouteNodeType.PINFEED_I;
 					break;
 			}
 		}
 	}
 
-	@Override
+	/**
+	 * Gets the wirelength.
+	 * @return The wirelength, i.e. the number of INT tiles that the associated {@link Node} instance spans.
+	 */
 	public short getLength() {
 		return length;
 	}
-	
-	@Override
+
+	/**
+	 * Sets the lower bound total path cost.
+	 * @param totalPathCost The cost value to be set.
+	 */
 	public void setLowerBoundTotalPathCost(float totalPathCost) {
 		lowerBoundTotalPathCost = totalPathCost;
 	}
-	
-	@Override
+
+	/**
+	 * Sets the upstream path cost.
+	 * @param newPartialPathCost The new value to be set.
+	 */
 	public void setUpstreamPathCost(float newPartialPathCost) {
 		this.upstreamPathCost = newPartialPathCost;
 	}
-	
-	@Override
+
+	/**
+	 * Gets the lower bound total path cost.
+	 * @return The lower bound total path cost.
+	 */
 	public float getLowerBoundTotalPathCost() {
 		return lowerBoundTotalPathCost;
 	}
-	
-	@Override
+
+	/**
+	 * Gets the upstream path cost.
+	 * @return The upstream path cost.
+	 */
 	public float getUpstreamPathCost() {
 		return upstreamPathCost;
 	}
 
-	@Override
+	/**
+	 * Gets a map that records users of a {@link RouteNode} instance based on all routed connections.
+	 * Each user is a {@link NetWrapper} instance representing a {@link Net} instance.
+	 * It is often the case that multiple connections of a net are using a same rnode.
+	 * So we count connections of each user to facilitate the sharing mechanism of RWRoute.
+	 * @return A map between users, i.e., {@link NetWrapper} instances representing by {@link Net} instances,
+	 *  and numbers of connections from different users.
+	 */
 	public Map<NetWrapper, Integer> getUsersConnectionCounts() {
 		return usersConnectionCounts;
 	}
-	
-	@Override
-	public void incrementUser(NetWrapper source) {
+
+	/**
+	 * Adds an user {@link NetWrapper} instance to the user map, of which a key is a {@link NetWrapper} instance and
+	 * the value is the number of connections that are using a rnode.
+	 * If the user is already stored in the map, increment the connection count of the user by 1. Otherwise, put the user
+	 * into the map and initialize the connection count as 1.
+	 * @param user The user net in question.
+	 */
+	public void incrementUser(NetWrapper user) {
 		if(usersConnectionCounts == null) {
 			usersConnectionCounts = new HashMap<>();
 		}
-		usersConnectionCounts.merge(source, 1, Integer::sum);
+		usersConnectionCounts.merge(user, 1, Integer::sum);
 	}
-	
-	@Override
+
+	/**
+	 * Gets the number of unique users.
+	 * @return The number of unique {@link NetWrapper} instances in the user map, i.e, the key set size of the user map.
+	 */
 	public int uniqueUserCount() {
 		if(usersConnectionCounts == null) {
 			return 0;
 		}
 		return usersConnectionCounts.size();
 	}
-	
-	@Override
+
+	/**
+	 * Decrements the connection count of a user that is represented by a
+	 * {@link NetWrapper} instance corresponding to a {@link Net} instance.
+	 * If there is only one connection of the user that is using a RouteNode instance, remove the user from the map.
+	 * Otherwise, decrement the connection count by 1.
+	 * @param user The user to be decremented from the user map.
+	 */
 	public void decrementUser(NetWrapper user) {
 		usersConnectionCounts.compute(user, (k,v) -> (v == 1) ? null : v - 1);
 	}
-	
-	@Override
+
+	/**
+	 * Counts the connections of a user that are using a rnode.
+	 * @param user The user in question indicated by a {@link NetWrapper} instance.
+	 * @return The total number of connections of the user.
+	 */
 	public int countConnectionsOfUser(NetWrapper user) {
 		if(usersConnectionCounts == null) {
 			return 0;
 		}
 		return usersConnectionCounts.getOrDefault(user, 0);
 	}
-	
-	@Override
+
+	/**
+	 * Gets the number of unique drivers.
+	 * @return The number of unique drivers of a rnode, i.e., the key set size of the driver map
+	 */
 	public int uniqueDriverCount() {
 		if(driversCounts == null) {
 			return 0;
 		}
 		return driversCounts.size();
 	}
-	
-	@Override
-	public void incrementDriver(Routable parent) {
+
+	/**
+	 * Adds a driver to the driver map.
+	 * @param parent The driver to be added.
+	 */
+	public void incrementDriver(RouteNode parent) {
 		if(driversCounts == null) {
 			driversCounts = new HashMap<>();
 		}
 		driversCounts.merge(parent, 1, Integer::sum);
 	}
-	
-	@Override
-	public void decrementDriver(Routable parent) {
+
+	/**
+	 * Decrements the driver count of a RouteNode instance.
+	 * @param parent The driver that should have its count reduced by 1.
+	 */
+	public void decrementDriver(RouteNode parent) {
 		driversCounts.compute(parent, (k,v) -> (v == 1) ? null : v - 1);
 	}
-	
-	@Override
+
+	/**
+	 * Gets the number of users.
+	 * @return The number of users.
+	 */
 	public int getOccupancy() {
 		return uniqueUserCount();
 	}
-	
-	@Override
-	public Routable getPrev() {
+
+	/**
+	 * Gets the parent RouteNode instance for routing a connection.
+	 * @return The driving RouteNode instance.
+	 */
+	public RouteNode getPrev() {
 		return prev;
 	}
 
-	@Override
-	public void setPrev(Routable prev) {
+	/**
+	 * Sets the parent RouteNode instance for routing a connection.
+	 * @param prev The driving RouteNode instance to set.
+	 */
+	public void setPrev(RouteNode prev) {
 		this.prev = prev;
 	}
-	
-	@Override
+
+	/**
+	 * Gets the present congestion cost of a RouteNode Object.
+	 * @return The present congestion of a RouteNode Object.
+	 */
 	public float getPresentCongestionCost() {
 		return presentCongestionCost;
 	}
 
-	@Override
+	/**
+	 * Sets the present congestion cost of a RouteNode Object.
+	 * @param presentCongestionCost The present congestion cost to be set.
+	 */
 	public void setPresentCongestionCost(float presentCongestionCost) {
 		this.presentCongestionCost = presentCongestionCost;
 	}
 
-	@Override
+	/**
+	 * Gets the historical congestion cost of a RouteNode Object.
+	 * @return The historical congestion cost of a RouteNode Object.
+	 */
 	public float getHistoricalCongestionCost() {
 		return historicalCongestionCost;
 	}
 
-	@Override
+	/**
+	 * Gets the historical congestion cost of a RouteNode Object.
+	 * @param historicalCongestionCost The historical congestion cost to be set.
+	 */
 	public void setHistoricalCongestionCost(float historicalCongestionCost) {
 		this.historicalCongestionCost = historicalCongestionCost;
 	}
 
-	@Override
+	/**
+	 * Checks if a RouteNode instance has been visited before when routing a connection.
+	 * @return true, if a RouteNode instance has been visited before.
+	 */
 	public boolean isVisited() {
 		return getPrev() != null;
 	}
 
-	@Override
+	/**
+	 * Sets visited to indicate if a RouteNode instance has been visited before when routing a connection.
+	 * @param visited boolean value to set.
+	 */
 	public void setVisited(boolean visited) {
 		assert(!visited);
 		setPrev(null);

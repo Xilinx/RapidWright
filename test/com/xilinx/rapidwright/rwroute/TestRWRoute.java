@@ -85,7 +85,6 @@ public class TestRWRoute {
 	public void testNonTimingDrivenPartialRouting() {
 		String dcpPath = RapidWrightDCP.getString("picoblaze_partial.dcp");
 		Design design = Design.readCheckpoint(dcpPath);
-		DesignTools.createMissingSitePinInsts(design);
 		// TODO: Not necessary when XDEF#92 is fixed
 		for (Net net : design.getNets()) {
 			if (!net.hasPIPs()) continue;
@@ -104,7 +103,6 @@ public class TestRWRoute {
 	public void testTimingDrivenPartialRouting() {
 		String dcpPath = RapidWrightDCP.getString("picoblaze_partial.dcp");
 		Design design = Design.readCheckpoint(dcpPath);
-		DesignTools.createMissingSitePinInsts(design);
 		// TODO: Not necessary when XDEF#92 is fixed
 		for (Net net : design.getNets()) {
 			if (!net.hasPIPs()) continue;

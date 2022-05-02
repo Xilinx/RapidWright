@@ -37,22 +37,145 @@ import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.BELClass;
 import com.xilinx.rapidwright.device.BELPin;
+import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePIP;
 import com.xilinx.rapidwright.device.SitePin;
+import com.xilinx.rapidwright.device.SiteTypeEnum;
+import com.xilinx.rapidwright.device.TileTypeEnum;
+import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
+import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
+import com.xilinx.rapidwright.util.RuntimeTracker;
 
 /**
  * TODO
  */
 public class ECORouter extends PartialRouter {
-    public ECORouter(Design design, RWRouteConfig config){
+
+    protected class RouteNodeGraphECO extends RouteNodeGraphPartial {
+
+        protected class RouteNodeImpl extends RouteNodeGraphPartial.RouteNodeImpl {
+
+            public RouteNodeImpl(Node node, RouteNodeType type) {
+                super(node, type);
+            }
+
+            @Override
+            public boolean isExcluded(Node parent, Node child) {
+                boolean preserved = isPreserved(parent, child);
+                if (preserved) {
+                    return true;
+                }
+
+                if (allowRoutethru(parent, child)) {
+                    return false;
+                }
+
+                return super.isExcluded(parent, child);
+            }
+        }
+
+        public RouteNodeGraphECO(RuntimeTracker setChildrenTimer, Design design) {
+            super(setChildrenTimer, design);
+        }
+    }
+
+    protected class RouteNodeGraphECOTimingDriven extends RouteNodeGraphPartialTimingDriven {
+
+        protected class RouteNodeImpl extends RouteNodeGraphPartialTimingDriven.RouteNodeImpl {
+
+            public RouteNodeImpl(Node node, RouteNodeType type) {
+                super(node, type);
+            }
+
+            @Override
+            public boolean isExcluded(Node parent, Node child) {
+                boolean preserved = isPreserved(parent, child);
+                if (preserved) {
+                    return true;
+                }
+
+                if (allowRoutethru(parent, child)) {
+                    return false;
+                }
+
+                return super.isExcluded(parent, child);
+            }
+        }
+
+        public RouteNodeGraphECOTimingDriven(RuntimeTracker rnodesTimer, Design design, DelayEstimatorBase delayEstimator, boolean maskNodesCrossRCLK) {
+            super(rnodesTimer, design, delayEstimator, maskNodesCrossRCLK);
+        }
+    }
+
+    protected boolean allowRoutethru(Node parent, Node child) {
+        // Enable LUT routethrus on A1-5 (not A6 since using that should block O5
+        // others from being used, but there isn't currently an efficient way to
+        // check that during routing expansion so better exclude it during routing
+        // generation)
+        if (parent.getIntentCode() != IntentCode.NODE_PINFEED)
+            return false;
+
+        TileTypeEnum parentTileType = parent.getTile().getTileTypeEnum();
+        TileTypeEnum childTileType = child.getTile().getTileTypeEnum();
+        if (parentTileType == TileTypeEnum.INT &&
+                (childTileType == TileTypeEnum.CLEL_L || childTileType == TileTypeEnum.CLEL_R ||
+                        childTileType == TileTypeEnum.CLEM || childTileType == TileTypeEnum.CLEM_R)) {
+            SitePin sp = parent.getSitePin();
+            Site s = sp.getSite();
+            SiteTypeEnum siteType = s.getSiteTypeEnum();
+            assert(siteType == SiteTypeEnum.SLICEL || siteType == SiteTypeEnum.SLICEM);
+            String pinName = sp.getPinName();
+            if (pinName.length() == 2) {
+                String childWireName = child.getWireName();
+
+                // Only support O6 route-thrus
+                if (childWireName.endsWith("_O")) {
+
+                    char first = pinName.charAt(0);
+                    char second = pinName.charAt(1);
+                    if (first >= 'A' && first <= 'H' && second >= '1' && second <= '5') {
+                        SiteInst si = design.getSiteInstFromSite(s);
+
+                        // Nothing placed at site, all routethrus possible
+                        if (si == null)
+                            return true;
+
+                        // O6 already used by something/someone else
+                        boolean O6used = si.getNetFromSiteWire(first + "_O") != null;
+                        if (!O6used)
+                            return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    public ECORouter(Design design, RWRouteConfig config, float timingRequirementNs) {
         super(design, config);
 
-        // FIXME
-        if (config.isTimingDriven()) {
-            timingManager.setTimingRequirementPs(100 * 1000);
+        if (timingRequirementNs > 0) {
+            assert(config.isTimingDriven());
+            timingManager.setTimingRequirementPs(timingRequirementNs * 1000);
+        }
+    }
+
+    public ECORouter(Design design, RWRouteConfig config) {
+        this(design, config, 0);
+    }
+
+    @Override
+    protected RouteNodeGraph createRouteNodeGraph() {
+        if(config.isTimingDriven()) {
+            /* An instantiated delay estimator that is used to calculate delay of routing resources */
+            DelayEstimatorBase estimator = new DelayEstimatorBase(design.getDevice(), new InterconnectInfo(), config.isUseUTurnNodes(), 0);
+            return new RouteNodeGraphECOTimingDriven(rnodesTimer, design, estimator, config.isMaskNodesCrossRCLK());
+        } else {
+            return new RouteNodeGraphECO(rnodesTimer, design);
         }
     }
 
@@ -86,13 +209,13 @@ public class ECORouter extends PartialRouter {
             // Create all nodes used by this net and set its previous pointer so that:
             // (a) the routing for each connection can be recovered by
             //      finishRouteConnection()
-            // (b) Routable.setChildren() will know to only allow this incoming
+            // (b) RouteNode.setChildren() will know to only allow this incoming
             //     arc on these nodes
             for (PIP pip : net.getPIPs()) {
                 Node start = (pip.isReversed()) ? pip.getEndNode() : pip.getStartNode();
                 Node end = (pip.isReversed()) ? pip.getStartNode() : pip.getEndNode();
-                Routable rstart = createAddRoutableNode(null, start, RoutableType.WIRE);
-                Routable rend = createAddRoutableNode(null, end, RoutableType.WIRE);
+                RouteNode rstart = getOrCreateRouteNode(null, start, RouteNodeType.WIRE);
+                RouteNode rend = getOrCreateRouteNode(null, end, RouteNodeType.WIRE);
                 assert (rend.getPrev() == null);
                 rend.setPrev(rstart);
             }
@@ -111,7 +234,7 @@ public class ECORouter extends PartialRouter {
 
                 // TODO: Check that there is only connectivity to either or both FFs
 
-                Routable rnode = connection.getSinkRnode();
+                RouteNode rnode = connection.getSinkRnode();
                 String lut = sinkPinName.substring(0, 1);
                 Site site = sink.getSite();
                 SiteInst siteInst = sink.getSiteInst();
@@ -132,8 +255,8 @@ public class ECORouter extends PartialRouter {
                     continue;
                 }
 
-                RoutableType type = RoutableType.WIRE;
-                Routable outputPinRnode = createAddRoutableNode(null, outputPinNode, type);
+                RouteNodeType type = RouteNodeType.WIRE;
+                RouteNode outputPinRnode = getOrCreateRouteNode(null, outputPinNode, type);
                 // Pre-emptively trigger a setChildren()
                 outputPinRnode.getChildren();
                 // Create a fake edge from [A-H]_O to target [A-H](I|_X)
@@ -175,11 +298,11 @@ public class ECORouter extends PartialRouter {
     protected void assignNodesToConnections() {
         for(Connection connection : indirectConnections) {
             SitePinInst sink = connection.getSink();
-            List<Routable> rnodes = connection.getRnodes();
+            List<RouteNode> rnodes = connection.getRnodes();
             String sinkPinName = sink.getName();
             if (rnodes.size() >= 3 && Pattern.matches("[A-H](X|_I)", sinkPinName)) {
                 if (Pattern.matches(".+[A-H]_O", rnodes.get(1).getNode().toString())) {
-                    Routable lutRnode = rnodes.get(2);
+                    RouteNode lutRnode = rnodes.get(2);
                     Node lutNode = lutRnode.getNode();
                     SitePin lutPin = lutNode.getSitePin();
 
@@ -263,7 +386,7 @@ public class ECORouter extends PartialRouter {
     //             // return false;
     //
     //             Set<Tile> overUsedTiles = new HashSet<>();
-    //             for(Routable rn : connection.getRnodes()){
+    //             for(RouteNode rn : connection.getRnodes()){
     //                 if(rn.isOverUsed()) {
     //                     overUsedTiles.add(rn.getNode().getTile());
     //                 }
@@ -331,15 +454,21 @@ public class ECORouter extends PartialRouter {
         // checkPIPsUsage();
     }
 
-    public static Design routeDesign(Design design) {
+    public static Design routeDesignNonTimingDriven(Design design) {
         RWRouteConfig config = new RWRouteConfig(new String[] {
                 "--partialRouting",
-                // "--fixBoundingBox",
-                // "--boundingBoxExtensionX 6", // Necessary to ensure that we can reach a Laguna column
                 "--enlargeBoundingBox", // Necessary to ensure that we can reach a Laguna column
                 "--nonTimingDriven",
                 "--verbose"});
         return routeDesign(design, config, () -> new ECORouter(design, config));
+    }
+
+    public static Design routeDesignTimingDriven(Design design, float timingRequirementNs) {
+        RWRouteConfig config = new RWRouteConfig(new String[] {
+                "--partialRouting",
+                "--enlargeBoundingBox", // Necessary to ensure that we can reach a Laguna column
+                "--verbose"});
+        return routeDesign(design, config, () -> new ECORouter(design, config, timingRequirementNs));
     }
 
 }

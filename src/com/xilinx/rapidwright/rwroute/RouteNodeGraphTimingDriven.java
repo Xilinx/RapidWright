@@ -26,7 +26,6 @@ import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Tile;
-import com.xilinx.rapidwright.device.TileType;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 import com.xilinx.rapidwright.util.RuntimeTracker;
@@ -34,7 +33,7 @@ import com.xilinx.rapidwright.util.RuntimeTracker;
 import java.util.HashSet;
 import java.util.Set;
 
-public class RoutableGraphTimingDriven extends RoutableGraph {
+public class RouteNodeGraphTimingDriven extends RouteNodeGraph {
     /** The instantiated delayEstimator to compute delays */
     protected final DelayEstimatorBase delayEstimator;
     /** A flag to indicate if the routing resource exclusion should disable exclusion of nodes cross RCLK */
@@ -66,7 +65,7 @@ public class RoutableGraphTimingDriven extends RoutableGraph {
         }};
     }
 
-    public RoutableGraphTimingDriven(RuntimeTracker rnodesTimer, Design design, DelayEstimatorBase delayEstimator, boolean maskNodesCrossRCLK) {
+    public RouteNodeGraphTimingDriven(RuntimeTracker rnodesTimer, Design design, DelayEstimatorBase delayEstimator, boolean maskNodesCrossRCLK) {
         super(rnodesTimer, design);
         this.delayEstimator = delayEstimator;
         this.maskNodesCrossRCLK = maskNodesCrossRCLK;
@@ -90,12 +89,12 @@ public class RoutableGraphTimingDriven extends RoutableGraph {
     private final Set<Integer> excludeAboveRclk;
     private final Set<Integer> excludeBelowRclk;
 
-    protected class RoutableNodeImpl extends RoutableGraph.RoutableNodeImpl {
+    protected class RouteNodeImpl extends RouteNodeGraph.RouteNodeImpl {
 
         /** The delay of this rnode computed based on the timing model */
         private final float delay;
 
-        public RoutableNodeImpl(Node node, RoutableType type) {
+        public RouteNodeImpl(Node node, RouteNodeType type) {
             super(node, type);
             delay = RouterHelper.computeNodeDelay(delayEstimator, node);
         }
@@ -104,17 +103,7 @@ public class RoutableGraphTimingDriven extends RoutableGraph {
         public boolean isExcluded(Node parent, Node child) {
             if (super.isExcluded(parent, child))
                 return true;
-            if (maskNodesCrossRCLK) {
-                Tile tile = child.getTile();
-                if(tile.getTileTypeEnum() == TileTypeEnum.INT) {
-                    int y = tile.getTileYCoordinate();
-                    if ((y-30)%60 == 0) { // above RCLK
-                        return excludeAboveRclk.contains(child.getWire());
-                    } else if ((y-29)%60 == 0) { // below RCLK
-                        return excludeBelowRclk.contains(child.getWire());
-                    }
-                }
-            }
+
             return false;
         }
 
@@ -130,7 +119,7 @@ public class RoutableGraphTimingDriven extends RoutableGraph {
             s.append(", ");
             s.append("(" + getEndTileXCoordinate() + "," + getEndTileYCoordinate() + ")");
             s.append(", ");
-            s.append(String.format("type = %s", getRoutableType()));
+            s.append(String.format("type = %s", getType()));
             s.append(", ");
             s.append(String.format("ic = %s", node.getIntentCode()));
             s.append(", ");
@@ -144,7 +133,11 @@ public class RoutableGraphTimingDriven extends RoutableGraph {
     }
 
     @Override
-    protected Routable create(Node node, RoutableType type) {
-        return new RoutableNodeImpl(node, type);
+    protected RouteNode create(Node node, RouteNodeType type) {
+        return new RouteNodeImpl(node, type);
+    }
+
+    protected boolean isExcluded(Node parent, Node child) {
+        return isPreserved(parent, child);
     }
 }

@@ -56,13 +56,13 @@ public class TimingAndWirelengthReport{
 	private DelayEstimatorBase estimator;
 	private Map<IntentCode, Long> nodeTypeUsage ;
 	private Map<IntentCode, Long> nodeTypeLength;
-	private RoutableGraph routingGraph;
+	private RouteNodeGraph routingGraph;
 	
 	public TimingAndWirelengthReport(Design design, RWRouteConfig config) {
 		this.design = design;
 		timingManager = new TimingManager(design, true, null, config, RWRoute.createClkTimingData(config), design.getNets());
 		estimator = new DelayEstimatorBase(design.getDevice(), new InterconnectInfo(), config.isUseUTurnNodes(), 0);
-		routingGraph = new RoutableGraphTimingDriven(null, design, estimator, config.isMaskNodesCrossRCLK());
+		routingGraph = new RouteNodeGraphTimingDriven(null, design, estimator, config.isMaskNodesCrossRCLK());
 		wirelength = 0;
 		usedNodes = 0;
 		nodeTypeUsage = new HashMap<>();
@@ -128,11 +128,11 @@ public class TimingAndWirelengthReport{
 			if(nodes.isEmpty()) {	
 				connection.setDirect(true);
 			}else {
-				connection.setSinkRnode(routingGraph.getOrCreate(nodes.get(0), RoutableType.PINFEED_I).getFirst());
+				connection.setSinkRnode(routingGraph.getOrCreate(nodes.get(0), RouteNodeType.PINFEED_I).getFirst());
 				if(sourceINTNode == null) {
 					sourceINTNode = RouterHelper.projectOutputPinToINTNode(source);
 				}
-				connection.setSourceRnode(routingGraph.getOrCreate(sourceINTNode, RoutableType.PINFEED_O).getFirst());
+				connection.setSourceRnode(routingGraph.getOrCreate(sourceINTNode, RouteNodeType.PINFEED_O).getFirst());
 				connection.setDirect(false);
 			}
 		}

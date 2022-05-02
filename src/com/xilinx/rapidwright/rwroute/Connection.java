@@ -42,11 +42,11 @@ public class Connection implements Comparable<Connection>{
 	private SitePinInst source;
 	private final SitePinInst sink;
 	/** 
-	 * The source and sink {@link RoutableNode} instances (rnodes) of a connection.
+	 * The source and sink {@link RouteNode} instances (rnodes) of a connection.
 	 * They are created based on the INT tile nodes the source and sink SitePinInsts connect to, respectively.
 	 */
-	private Routable sourceRnode;
-	private Routable sinkRnode;
+	private RouteNode sourceRnode;
+	private RouteNode sinkRnode;
 	/** 
 	 * true to indicate the source and the sink are connected through dedicated resources, 
 	 * such as the carry chain connections and connections between cascaded BRAMs.
@@ -72,8 +72,8 @@ public class Connection implements Comparable<Connection>{
 	private List<TimingEdge> timingEdges;
 	/** The criticality factor to indicate how timing-critical a connection is */
 	private float criticality;
-	/** List of Routable instances that make up of the route of a connection */
-	private List<Routable> rnodes;
+	/** List of RouteNodes that make up of the route of a connection */
+	private List<RouteNode> rnodes;
 	
 	/** To indicate if the route delay of a connection has been patched up, when there are consecutive long nodes */
 	private boolean dlyPatched;
@@ -189,7 +189,7 @@ public class Connection implements Comparable<Connection>{
 	 * @return
 	 */
 	public boolean isCongested() {
-		for(Routable rn : getRnodes()){
+		for(RouteNode rn : getRnodes()){
 			if(rn.isOverUsed()) {
 				return true;
 			}
@@ -202,7 +202,7 @@ public class Connection implements Comparable<Connection>{
 	 * @return
 	 */
 	public boolean useRnodesWithMultiDrivers() {
-		for(Routable rn : getRnodes()){
+		for(RouteNode rn : getRnodes()){
 			if(rn.hasMultiDrivers()) {
 				return true;
 			}
@@ -210,7 +210,7 @@ public class Connection implements Comparable<Connection>{
 		return false;
 	}
 	
-	public void addRnode(Routable rn) {
+	public void addRnode(RouteNode rn) {
 		rnodes.add(rn);	
 	}
 	
@@ -227,8 +227,8 @@ public class Connection implements Comparable<Connection>{
 	private float getRouteDelay() {
 		float routeDelay = getRnodes().get(getRnodes().size() - 1).getDelay();
 		for(int i = getRnodes().size() - 2; i >= 0; i--) {
-			Routable rnode = getRnodes().get(i);
-			Routable parent = getRnodes().get(i+1);
+			RouteNode rnode = getRnodes().get(i);
+			RouteNode parent = getRnodes().get(i+1);
 			routeDelay += rnode.getDelay() +
 					DelayEstimatorBase.getExtraDelay(rnode.getNode(), DelayEstimatorBase.isLong(parent.getNode()));
 		}
@@ -252,19 +252,19 @@ public class Connection implements Comparable<Connection>{
 		sink.setRouted(false);
 	}
 	
-	public Routable getSourceRnode() {
+	public RouteNode getSourceRnode() {
 		return sourceRnode;
 	}
 
-	public void setSourceRnode(Routable sourceNode) {
+	public void setSourceRnode(RouteNode sourceNode) {
 		sourceRnode = sourceNode;
 	}
 
-	public Routable getSinkRnode() {
+	public RouteNode getSinkRnode() {
 		return sinkRnode;
 	}
 
-	public void setSinkRnode(Routable childRnode) {
+	public void setSinkRnode(RouteNode childRnode) {
 		sinkRnode = childRnode;
 	}
 	
@@ -344,11 +344,11 @@ public class Connection implements Comparable<Connection>{
 		hpwl = conHpwl;
 	}
 
-	public List<Routable> getRnodes() {
+	public List<RouteNode> getRnodes() {
 		return rnodes;
 	}
 
-	public void setRnodes(List<Routable> rnodes) {
+	public void setRnodes(List<RouteNode> rnodes) {
 		this.rnodes = rnodes;
 	}
 

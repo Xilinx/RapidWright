@@ -24,16 +24,10 @@ package com.xilinx.rapidwright.rwroute;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
-import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Device;
-import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
-import com.xilinx.rapidwright.device.Site;
-import com.xilinx.rapidwright.device.SitePin;
-import com.xilinx.rapidwright.device.SiteTypeEnum;
-import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.util.CountUpDownLatch;
 import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.ParallelismTools;
@@ -48,85 +42,26 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class RoutableGraph {
+public class RouteNodeGraph {
 
-    protected class RoutableNodeImpl extends RoutableNode {
+    protected class RouteNodeImpl extends RouteNode {
 
-        public RoutableNodeImpl(Node node, RoutableType type) {
+        public RouteNodeImpl(Node node, RouteNodeType type) {
             super(node, type);
         }
 
         @Override
-        protected Routable getOrCreate(Node node, RoutableType type) {
-            return RoutableGraph.this.getOrCreate(node, type).getFirst();
+        protected RouteNode getOrCreate(Node node, RouteNodeType type) {
+            return RouteNodeGraph.this.getOrCreate(node, type).getFirst();
         }
 
         @Override
         public boolean isExcluded(Node parent, Node child) {
-            boolean preserved = isPreserved(parent, child);
-            if (preserved)
-                return true;
-            // Enable LUT routethrus on A1-5 (not A6 since using that should block O5
-            // others from being used, but there isn't currently an efficient way to
-            // check that during routing expansion so better exclude it during routing
-            // generation)
-            {
-                if (parent.getIntentCode() == IntentCode.NODE_PINFEED) {
-                    TileTypeEnum parentTileType = parent.getTile().getTileTypeEnum();
-                    TileTypeEnum childTileType = child.getTile().getTileTypeEnum();
-                    if (parentTileType == TileTypeEnum.INT &&
-                            (childTileType == TileTypeEnum.CLEL_L || childTileType == TileTypeEnum.CLEL_R ||
-                            childTileType == TileTypeEnum.CLEM || childTileType == TileTypeEnum.CLEM_R)) {
-                        SitePin sp = parent.getSitePin();
-                        Site s = sp.getSite();
-                        SiteTypeEnum siteType = s.getSiteTypeEnum();
-                        assert(siteType == SiteTypeEnum.SLICEL || siteType == SiteTypeEnum.SLICEM);
-                        String pinName = sp.getPinName();
-                        if (pinName.length() == 2) {
-                            String childWireName = child.getWireName();
-
-                            // Only support O6 route-thrus
-                            if (childWireName.endsWith("_O")) {
-
-                                char first = pinName.charAt(0);
-                                char second = pinName.charAt(1);
-                                if (first >= 'A' && first <= 'H' && second >= '1' && second <= '5' /*'6'*/) {
-                                    SiteInst si = design.getSiteInstFromSite(s);
-
-                                    // Nothing placed at site, all routethrus possible
-                                    if (si == null)
-                                        return false;
-
-                                    // if (childWireName.endsWith("_O")) {
-                                        boolean O6used = si.getNetFromSiteWire(first + "_O") != null;
-                                        if (O6used)
-                                            return true;
-                                    // } else {
-                                    //     assert(childWireName.endsWith("MUX"));
-                                    //
-                                    //     boolean O5used = (si.getNetFromSiteWire(first + "5LUT_O5") != null);
-                                    //     if (O5used)
-                                    //         return true;
-                                    //
-                                    //     Net A6 = si.getNetFromSiteWire(first + "6");
-                                    //     boolean A6used = (A6 != null && A6.getType() != NetType.VCC);
-                                    //     if (A6used)
-                                    //         return true;
-                                    // }
-
-                                    // Routethru allowed
-                                    return false;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            return super.isExcluded(parent, child);
+            return isPreserved(parent, child) || super.isExcluded(parent, child);
         }
 
         @Override
-        public Routable[] getChildren() {
+        public RouteNode[] getChildren() {
             setChildren(setChildrenTimer);
             return super.getChildren();
         }
@@ -135,7 +70,7 @@ public class RoutableGraph {
     /**
      * A map of nodes to created rnodes
      */
-    final protected Map<Node, Routable> nodesMap;
+    final protected Map<Node, RouteNode> nodesMap;
 
     /**
      * A map of preserved nodes to their nets
@@ -147,7 +82,7 @@ public class RoutableGraph {
     /**
      * Visited rnodes data during connection routing
      */
-    final protected Collection<Routable> visited;
+    final protected Collection<RouteNode> visited;
 
     final protected RuntimeTracker setChildrenTimer;
 
@@ -155,7 +90,7 @@ public class RoutableGraph {
 
     final Design design;
 
-    public RoutableGraph(RuntimeTracker setChildrenTimer, Design design) {
+    public RouteNodeGraph(RuntimeTracker setChildrenTimer, Design design) {
         nodesMap = new HashMap<>();
         preservedMap = new ConcurrentHashMap<>();
         preservedMapOutstanding = new CountUpDownLatch();
@@ -233,7 +168,7 @@ public class RoutableGraph {
 
     public Collection<Node> getPreservedNodes(Device device) {
         List<Node> nodes = new ArrayList<>(preservedMap.size());
-        preservedMap.keySet().forEach((k) -> nodes.add(new Node(device.getTile(k.tileID), k.wireID)));
+        preservedMap.keySet().forEach((k) -> nodes.add(Node.getNode(device.getTile(k.tileID), k.wireID)));
         return nodes;
     }
 
@@ -241,7 +176,7 @@ public class RoutableGraph {
         return preservedMap.get(new LightweightNode(node));
     }
 
-    public Routable getNode(Node node) {
+    public RouteNode getNode(Node node) {
         return nodesMap.get(node);
     }
 
@@ -249,7 +184,7 @@ public class RoutableGraph {
         return Collections.unmodifiableSet(nodesMap.keySet());
     }
 
-    public Set<Map.Entry<Node,Routable>> getNodeEntries() {
+    public Set<Map.Entry<Node, RouteNode>> getNodeEntries() {
         return Collections.unmodifiableSet(nodesMap.entrySet());
     }
 
@@ -257,13 +192,13 @@ public class RoutableGraph {
         return nodesMap.size();
     }
 
-    protected Routable create(Node node, RoutableType type) {
-        return new RoutableNodeImpl(node, type);
+    protected RouteNode create(Node node, RouteNodeType type) {
+        return new RouteNodeImpl(node, type);
     }
 
-    public Pair<Routable,Boolean> getOrCreate(Node node, RoutableType type) {
+    public Pair<RouteNode,Boolean> getOrCreate(Node node, RouteNodeType type) {
         final boolean[] inserted = {false};
-        Routable rnode = nodesMap.compute(node, (k, v) -> {
+        RouteNode rnode = nodesMap.compute(node, (k, v) -> {
             if (v == null) {
                 // this is for initializing sources and sinks of those to-be-routed nets' connections
                 v = create(node, type);
@@ -274,7 +209,7 @@ public class RoutableGraph {
         return new Pair<>(rnode, inserted[0]);
     }
 
-    public void visit(Routable rnode) {
+    public void visit(RouteNode rnode) {
         visited.add(rnode);
     }
 
@@ -282,7 +217,7 @@ public class RoutableGraph {
      * Resets the expansion history.
      */
     public void resetExpansion() {
-        for (Routable node : visited) {
+        for (RouteNode node : visited) {
             node.setVisited(false);
         }
         totalVisited += visited.size();
@@ -295,8 +230,8 @@ public class RoutableGraph {
 
     public int averageChildren() {
         int sum = 0;
-        for(Map.Entry<Node,Routable> e : getNodeEntries()){
-            RoutableNodeImpl rnode = (RoutableNodeImpl) e.getValue();
+        for(Map.Entry<Node, RouteNode> e : getNodeEntries()){
+            RouteNodeImpl rnode = (RouteNodeImpl) e.getValue();
             sum += (rnode.children != null) ? rnode.children.length : 0;
         }
         return Math.round((float) sum / numNodes());

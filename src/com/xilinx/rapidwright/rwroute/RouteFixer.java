@@ -43,7 +43,7 @@ public class RouteFixer{
 	private NodeWithDelay source;
 	private int vertexId;
 	
-	public RouteFixer(NetWrapper netp, RoutableGraph routingGraph){
+	public RouteFixer(NetWrapper netp, RouteNodeGraph routingGraph){
 		this.netp = netp;
 		nodeMap = new HashMap<>();
 		source = null;
@@ -51,7 +51,7 @@ public class RouteFixer{
 		buildGraph(netp, routingGraph);
 	}
 	
-	private void buildGraph(NetWrapper netWrapper, RoutableGraph routingGraph){
+	private void buildGraph(NetWrapper netWrapper, RouteNodeGraph routingGraph){
 		for(Connection connection:netWrapper.getConnections()){
 			// nodes of connections are in the order from sink to source
 			int vertexSize = connection.getNodes().size();
@@ -59,8 +59,8 @@ public class RouteFixer{
 				Node cur = connection.getNodes().get(i);
 				Node next = connection.getNodes().get(i - 1);
 				
-				Routable currRnode = routingGraph.getNode(cur);
-				Routable nextRnode = routingGraph.getNode(next);
+				RouteNode currRnode = routingGraph.getNode(cur);
+				RouteNode nextRnode = routingGraph.getNode(next);
 				float currDly = currRnode == null? 0f : currRnode.getDelay();
 				float nextDly = nextRnode == null? 0f : nextRnode.getDelay();
 
