@@ -34,13 +34,75 @@ import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
+import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
+import com.xilinx.rapidwright.util.RuntimeTracker;
 
 /**
  * A class extends {@link RWRoute} for partial routing.
  */
 public class PartialRouter extends RWRoute{
+	protected static class RoutableGraphPartial extends RoutableGraph {
+		public RoutableGraphPartial(RuntimeTracker setChildrenTimer, Design design) {
+			super(setChildrenTimer, design);
+		}
+
+		@Override
+		protected boolean isPreserved(Node parent, Node child) {
+			boolean preserved = super.isPreserved(child);
+
+			// If preserved, check if child node has been created already
+			Routable rnode = (preserved) ? RoutableGraphPartial.this.getNode(child) : null;
+			// If so, get its prev pointer
+			Routable prev = (rnode != null) ? rnode.getPrev() : null;
+			// Presence means that the only arc allowed to enter this child node
+			// is if it came from prev
+			if (prev != null && prev.getNode() == parent) {
+				preserved = false;
+				rnode.setVisited(false);
+			}
+
+			return preserved;
+		}
+	}
+
+	protected static class RoutableGraphPartialTimingDriven extends RoutableGraphTimingDriven {
+		public RoutableGraphPartialTimingDriven(RuntimeTracker rnodesTimer, Design design, DelayEstimatorBase delayEstimator, boolean maskNodesCrossRCLK) {
+			super(rnodesTimer, design, delayEstimator, maskNodesCrossRCLK);
+		}
+
+		@Override
+		protected boolean isPreserved(Node parent, Node child) {
+			boolean preserved = super.isPreserved(child);
+
+			// If preserved, check if child node has been created already
+			Routable rnode = (preserved) ? RoutableGraphPartialTimingDriven.this.getNode(child) : null;
+			// If so, get its prev pointer
+			Routable prev = (rnode != null) ? rnode.getPrev() : null;
+			// Presence means that the only arc allowed to enter this child node
+			// is if it came from prev
+			if (prev != null && prev.getNode() == parent) {
+				preserved = false;
+				rnode.setVisited(false);
+			}
+
+			return preserved;
+		}
+	}
+
 	public PartialRouter(Design design, RWRouteConfig config){
 		super(design, config);
+	}
+
+	@Override
+	protected RoutableGraph createRoutableGraph() {
+		if(config.isTimingDriven()) {
+			/* An instantiated delay estimator that is used to calculate delay of routing resources */
+			DelayEstimatorBase estimator = new DelayEstimatorBase(design.getDevice(), new InterconnectInfo(), config.isUseUTurnNodes(), 0);
+			return new RoutableGraphPartialTimingDriven(rnodesTimer, design, estimator, config.isMaskNodesCrossRCLK());
+		} else {
+			return new RoutableGraphPartial(rnodesTimer, design);
+		}
 	}
 
 	@Override
@@ -94,7 +156,7 @@ public class PartialRouter extends RWRoute{
 			return;
 		}
 
-		NetWrapper netWrapper = createsNetWrapperAndConnections(net, config.getBoundingBoxExtensionX(), config.getBoundingBoxExtensionY(), isMultiSLRDevice());
+		NetWrapper netWrapper = createsNetWrapperAndConnections(net);
 		netWrapper.setPartiallyPreserved(true);
 	}
 
@@ -163,7 +225,8 @@ public class PartialRouter extends RWRoute{
 		Set<Routable> rnodes = new HashSet<>();
 		NetWrapper netWrapper = nets.get(net);
 		if (netWrapper != null) {
-			// Net already exists
+			// Net already exists -- any unrouted connection will cause the
+			// net to exist, but already routed connections may still be preserved
 
 			assert(netWrapper.getPartiallyPreserved());
 			netWrapper.setPartiallyPreserved(false);
@@ -178,7 +241,7 @@ public class PartialRouter extends RWRoute{
 			}
 		} else {
 			// Net needs to be created
-			netWrapper = createsNetWrapperAndConnections(net, config.getBoundingBoxExtensionX(), config.getBoundingBoxExtensionY(), multiSLRDevice);
+			netWrapper = createsNetWrapperAndConnections(net);
 
 			// Collect all nodes used by this net
 			for (PIP pip : net.getPIPs()) {
@@ -200,6 +263,7 @@ public class PartialRouter extends RWRoute{
 				assert(netnewConnection.getSink().isRouted());
 			}
 
+			// Update the timing graph
 			if(config.isTimingDriven()) {
 				timingManager.getTimingGraph().addNetDelayEdges(net);
 				timingManager.setTimingEdgesOfConnections(netWrapper.getConnections());
@@ -209,30 +273,21 @@ public class PartialRouter extends RWRoute{
 			}
 		}
 
-		// TODO: Re-enable this to be consistent with preserveNet()
-		// Set<Node> pinNodes = new HashSet<>();
-		// for (SitePinInst pin : n.getPins()) {
-		// 	pinNodes.add(pin.getConnectedNode());
-		// }
-
 		for (Routable rnode : rnodes) {
 			Node toBuild = rnode.getNode();
-			/*if (!pinNodes.contains(toBuild))*/ {
-				routingGraph.unpreserve(toBuild);
-			}
-			// Each rnode should be added a child to any of its parents
+			routingGraph.unpreserve(toBuild);
+
+			// Each rnode should be added as a child to any of its parents
 			// that already exist, unless it was already present
-			uphill: for(Node uphill : toBuild.getAllUphillNodes()) {
+			for(Node uphill : toBuild.getAllUphillNodes()) {
 				// Without this routethru check, there will be Invalid Programming for Site error shown in Vivado.
 				// Do not use those nodes, because we do not know if the routethru is available or not
 				if(routethruHelper.isRouteThru(uphill, toBuild)) continue;
 				Routable parent = routingGraph.getNode(uphill);
 				if (parent == null)
 					continue;
-				for (Routable child : parent.getChildren()) {
-					if (child == rnode)
-						continue uphill;
-				}
+				if (parent.containsChild(rnode))
+					continue;
 				parent.addChild(rnode);
 			}
 

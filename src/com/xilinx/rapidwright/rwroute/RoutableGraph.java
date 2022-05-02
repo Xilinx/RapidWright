@@ -24,7 +24,6 @@ package com.xilinx.rapidwright.rwroute;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
-import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Device;
@@ -34,7 +33,6 @@ import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
-import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.util.CountUpDownLatch;
 import com.xilinx.rapidwright.util.Pair;
@@ -65,20 +63,7 @@ public class RoutableGraph {
 
         @Override
         public boolean isExcluded(Node parent, Node child) {
-            boolean preserved = isPreserved(child);
-            // TODO: Only necessary for partial router
-            {
-                // If preserved, check if child node has been created already
-                Routable rnode = (preserved) ? RoutableGraph.this.getNode(child) : null;
-                // If so, get its prev pointer
-                Routable prev = (rnode != null) ? rnode.getPrev() : null;
-                // Presence means that the only arc allowed to enter this child node
-                // is if it came from prev
-                if (prev != null && prev.getNode() == parent) {
-                    preserved = false;
-                    rnode.setVisited(false);
-                }
-            }
+            boolean preserved = isPreserved(parent, child);
             if (preserved)
                 return true;
             // Enable LUT routethrus on A1-5 (not A6 since using that should block O5
@@ -184,20 +169,18 @@ public class RoutableGraph {
         visited.clear();
     }
 
-    private void preserve(LightweightNode node, Net net) {
-        Net existingNet = preservedMap.putIfAbsent(node, net);
-        if (existingNet == null)
-            return;
-        // Nodes already preserved by the same net are ignored
-        if (existingNet.equals(net))
-            return;
-        // TODO: Handle conflicts
+    public Net preserve(Node node, Net net) {
+        return preserve(new LightweightNode(node), net);
+    }
+
+    private Net preserve(LightweightNode node, Net net) {
+        return preservedMap.putIfAbsent(node, net);
     }
 
     public void asyncPreserve(Collection<Node> nodes, Net net) {
         preservedMapOutstanding.countUp();
         ParallelismTools.submit(() -> {
-            nodes.forEach((node) -> preserve(new LightweightNode(node), net));
+            nodes.forEach((node) -> preserve(node, net));
             preservedMapOutstanding.countDown();
         });
     }
@@ -220,8 +203,8 @@ public class RoutableGraph {
             }
 
             for(PIP pip : net.getPIPs()) {
-                preserve(new LightweightNode(pip, true), net);
-                preserve(new LightweightNode(pip, false), net);
+                preserve(pip.getStartNode(), net);
+                preserve(pip.getEndNode(), net);
             }
 
             preservedMapOutstanding.countDown();
@@ -242,6 +225,10 @@ public class RoutableGraph {
 
     public boolean isPreserved(Node node) {
         return preservedMap.containsKey(new LightweightNode(node));
+    }
+
+    protected boolean isPreserved(Node parent, Node child) {
+        return isPreserved(child);
     }
 
     public Collection<Node> getPreservedNodes(Device device) {

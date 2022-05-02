@@ -78,8 +78,6 @@ public class RWRoute{
 	protected List<Net> clkNets;
 	/** Static nets */
 	protected Map<Net, List<SitePinInst>> staticNetAndRoutingTargets;
-	/** Nets with conflicting nodes that should be added to the routing targets */
-	protected Set<Net> conflictNets;
 	/** Several integers to indicate the netlist info */
 	private int numPreservedRoutableNets;
 	private int numPreservedClks;
@@ -109,7 +107,7 @@ public class RWRoute{
 	protected int routeIteration;
 	/** Timers to store runtime of different phases */
 	private RuntimeTrackerTree routerTimer;
-	private RuntimeTracker rnodesTimer;
+	protected RuntimeTracker rnodesTimer;
 	private RuntimeTracker updateTimingTimer;
 	private RuntimeTracker updateCongestionCosts;
 	/** An instantiation of RouteThruHelper to avoid route-thrus in the routing resource graph */
@@ -169,13 +167,9 @@ public class RWRoute{
 		criticalConnections = new ArrayList<>();
 
 		queue = new PriorityQueue<>((r1,r2) -> Float.compare(r1.getLowerBoundTotalPathCost(), r2.getLowerBoundTotalPathCost()));
+		routingGraph = createRoutableGraph();
 		if(config.isTimingDriven()) {
-			/* An instantiated delay estimator that is used to calculate delay of routing resources */
-			DelayEstimatorBase estimator = new DelayEstimatorBase(design.getDevice(), new InterconnectInfo(), config.isUseUTurnNodes(), 0);
-			routingGraph = new RoutableGraphTimingDriven(rnodesTimer, design, estimator, config.isMaskNodesCrossRCLK());
 			nodesDelays = new HashMap<>();
-		} else {
-			routingGraph = new RoutableGraph(rnodesTimer, design);
 		}
 		rnodesCreatedThisIteration = 0;
 
@@ -186,17 +180,12 @@ public class RWRoute{
 		if(config.isTimingDriven()) {
 			ClkRouteTiming clkTiming = createClkTimingData(config);
 			routesToSinkINTTiles = clkTiming == null? null : clkTiming.getRoutesToSinkINTTiles();
-			Collection<Net> timingNets;
-			if (config.isResolveConflictNets()) {
-				timingNets = conflictNets;
-			} else {
-				timingNets = indirectConnections.stream().map((c) -> c.getNetWrapper().getNet()).collect(Collectors.toSet());
-			}
+			Collection<Net> timingNets = getTimingNets();
 			timingManager = new TimingManager(design, true, routerTimer, config, clkTiming, timingNets);
 			timingManager.setTimingEdgesOfConnections(indirectConnections);
 		}
 		
-		sortedIndirectConnections = new ArrayList<>();		
+		sortedIndirectConnections = new ArrayList<>(indirectConnections.size());
 		routethruHelper = new RouteThruHelper(design.getDevice());		
 		connectionsRouted = 0;
 		connectionsRoutedIteration = 0;
@@ -205,7 +194,7 @@ public class RWRoute{
 		
 		routerTimer.getRuntimeTracker("Initialization").stop();
 	}
-	
+
 	/**
 	 * Creates clock routing related inputs based on the {@link RWRouteConfig} instance.
 	 * @param config The {@link RWRouteConfig} instance to use.
@@ -217,7 +206,21 @@ public class RWRoute{
 		}
 		return null;
 	}
-	
+
+	protected RoutableGraph createRoutableGraph() {
+		if(config.isTimingDriven()) {
+			/* An instantiated delay estimator that is used to calculate delay of routing resources */
+			DelayEstimatorBase estimator = new DelayEstimatorBase(design.getDevice(), new InterconnectInfo(), config.isUseUTurnNodes(), 0);
+			return new RoutableGraphTimingDriven(rnodesTimer, design, estimator, config.isMaskNodesCrossRCLK());
+		} else {
+			return new RoutableGraph(rnodesTimer, design);
+		}
+	}
+
+	protected Collection<Net> getTimingNets() {
+		return indirectConnections.stream().map((c) -> c.getNetWrapper().getNet()).collect(Collectors.toSet());
+	}
+
 	/**
 	 * Classifies {@link Net} Objects into different categories: clocks, static nets,
 	 * and regular signal nets (i.e. {@link NetType}.WIRE) and determines routing targets.
@@ -241,7 +244,6 @@ public class RWRoute{
 		directConnections = new ArrayList<>();
 		clkNets = new ArrayList<>();
 		staticNetAndRoutingTargets = new HashMap<>();
-		conflictNets = new HashSet<>();
 
 		for(Net net : design.getNets()){	
 			if(net.isClockNet()){
@@ -345,7 +347,7 @@ public class RWRoute{
 	 */
 	protected void addNetConnectionToRoutingTargets(Net net) {
 		net.unroute();
-		createsNetWrapperAndConnections(net, config.getBoundingBoxExtensionX(), config.getBoundingBoxExtensionY(), multiSLRDevice);
+		createsNetWrapperAndConnections(net);
 	}
 	
 	/**
@@ -446,12 +448,9 @@ public class RWRoute{
 	/**
 	 * Creates a unique {@link NetWrapper} instance and {@link Connection} instances based on a {@link Net} instance.
 	 * @param net The net to be initialized.
-	 * @param boundingBoxExtensionX The bounding box extension factor for restricting accessible routing resource of a connection in the horizontal direction.
-	 * @param boundingBoxExtensionY The bounding box extension factor for restricting accessible routing resource of a connection in the vertical direction.
-	 * @param multiSLR The flag to indicate if the device has multiple SLRs.
 	 * @return A {@link NetWrapper} instance.
 	 */
-	protected NetWrapper createsNetWrapperAndConnections(Net net, short boundingBoxExtensionX, short boundingBoxExtensionY, boolean multiSLR) {
+	protected NetWrapper createsNetWrapperAndConnections(Net net) {
 		NetWrapper netWrapper = new NetWrapper(numWireNetsToRoute++, net);
 		NetWrapper existingNetWrapper = nets.put(net, netWrapper);
 		assert(existingNetWrapper == null);
@@ -496,7 +495,9 @@ public class RWRoute{
 			if(config.isUseBoundingBox()) {
 				for(Connection connection : netWrapper.getConnections()) {
 					if(connection.isDirect()) continue;
-					connection.computeConnectionBoundingBox(boundingBoxExtensionX, boundingBoxExtensionY,multiSLR);
+					connection.computeConnectionBoundingBox(config.getBoundingBoxExtensionX(),
+							config.getBoundingBoxExtensionY(),
+							isMultiSLRDevice());
 				}
 			}
 		}
@@ -518,36 +519,9 @@ public class RWRoute{
 	 * @param netToPreserve The net that uses those nodes.
 	 */
 	protected void addPreservedNodes(Collection<Node> nodes, Net netToPreserve) {
-		// for(Node node : nodes) {
-		// 	Net reserved = routingGraph.preserve(node, netToPreserve);
-		// 	if (reserved == null)
-		// 		continue;
-		// 	// Nodes already preserved by the same net are ignored
-		// 	if (reserved.equals(netToPreserve))
-		// 		continue;
-		// 	if (reserved.getSource() != null && netToPreserve.getSource() != null) {
-		// 		boolean generateWarning = conflictNets.size() < 5;
-		// 		EDIFNet reservedLogical = reserved.getLogicalNet();
-		// 		EDIFNet toReserveLogical = netToPreserve.getLogicalNet();
-		// 		if(reservedLogical != null && toReserveLogical != null) {
-		// 			if(!toReserveLogical.equals(reservedLogical)) {
-		// 				if(generateWarning) generateConflictInfo(node, reserved, netToPreserve);
-		// 			}
-		// 		}else {
-		// 			if(generateWarning) generateConflictInfo(node, reserved, netToPreserve);
-		// 		}
-		// 		conflictNets.add(reserved);
-		// 		conflictNets.add(netToPreserve);
-		// 	}
-		// }
 		routingGraph.asyncPreserve(nodes, netToPreserve);
 	}
 
-	private void generateConflictInfo(Node node, Net reserved, Net netToPreserve) {
-		System.out.println("WARNING: Conflicting node " + node + ":");
-		System.out.println("         " + netToPreserve.getName() + " \n         " + reserved.getName());
-	}
-	
 	public boolean isMultiSLRDevice() {
 		return multiSLRDevice;
 	}
@@ -740,8 +714,8 @@ public class RWRoute{
 				updateTiming();
 			}
 
-			printRoutingIterationStatisticsInfo(System.nanoTime() - startIteration, rnodesCreatedThisIteration,
-					(float) ((rnodesTimer.getTime() - lastIterationRnodeTime) * 1e-9), config.isTimingDriven());
+			printRoutingIterationStatisticsInfo(System.nanoTime() - startIteration,
+					(float) ((rnodesTimer.getTime() - lastIterationRnodeTime) * 1e-9));
 
 			if(overUsedRnodes.size() == 0) {
 				if(unroutableConnections.isEmpty()) {
@@ -869,33 +843,28 @@ public class RWRoute{
 	 * Assigns a list nodes to each connection to complete the route path of it.
 	 */
 	protected void assignNodesToConnections() {
-		for(Entry<Net,NetWrapper> e : nets.entrySet()) {
-			NetWrapper netWrapper = e.getValue();
-			for(Connection connection : netWrapper.getConnections()){
-				List<Node> nodes = new ArrayList<>();
-				SitePinInst sink = connection.getSink();
-
-				List<Node> switchBoxToSink = RouterHelper.findPathBetweenNodes(connection.getSinkRnode().getNode(), sink.getConnectedNode());
-				if(switchBoxToSink.size() >= 2) {
-					for(int i = 0; i < switchBoxToSink.size() -1; i++) {
-						nodes.add(switchBoxToSink.get(i));
-					}
+		for(Connection connection : indirectConnections) {
+			List<Node> nodes = new ArrayList<>();
+			List<Node> switchBoxToSink = RouterHelper.findPathBetweenNodes(connection.getSinkRnode().getNode(), connection.getSink().getConnectedNode());
+			if(switchBoxToSink.size() >= 2) {
+				for(int i = 0; i < switchBoxToSink.size() -1; i++) {
+					nodes.add(switchBoxToSink.get(i));
 				}
-
-				List<Routable> rnodes = connection.getRnodes();
-				for(Routable rnode : rnodes){
-					nodes.add(rnode.getNode());
-				}
-
-				List<Node> sourceToSwitchBox = RouterHelper.findPathBetweenNodes(connection.getSource().getConnectedNode(), connection.getSourceRnode().getNode());
-				if(sourceToSwitchBox.size() >= 2) {
-					for(int i = 1; i <= sourceToSwitchBox.size() - 1; i++) {
-						nodes.add(sourceToSwitchBox.get(i));
-					}
-				}
-
-				connection.setNodes(nodes);
 			}
+
+			List<Routable> rnodes = connection.getRnodes();
+			for(Routable rnode : rnodes){
+				nodes.add(rnode.getNode());
+			}
+
+			List<Node> sourceToSwitchBox = RouterHelper.findPathBetweenNodes(connection.getSource().getConnectedNode(), connection.getSourceRnode().getNode());
+			if(sourceToSwitchBox.size() >= 2) {
+				for(int i = 1; i <= sourceToSwitchBox.size() - 1; i++) {
+					nodes.add(sourceToSwitchBox.get(i));
+				}
+			}
+
+			connection.setNodes(nodes);
 		}
 	}
 	
@@ -903,8 +872,7 @@ public class RWRoute{
 	 * Sorts indirect connections for routing.
 	 */
 	protected void sortConnections(){
-		// TODO: Sort in place
-		sortedIndirectConnections = new ArrayList<>();
+		sortedIndirectConnections.clear();
 		sortedIndirectConnections.addAll(indirectConnections);
 		sortedIndirectConnections.sort((connection1, connection2) -> {
 			int comp = connection2.getNetWrapper().getConnections().size() - connection1.getNetWrapper().getConnections().size();
@@ -936,18 +904,15 @@ public class RWRoute{
 	/**
 	 * Prints routing iteration statistics, including the iteration, number of connections routed in the iteration, 
 	 * total runtime of the iteration, number of created rnodes, time spent in creating rnodes that is included in the
-	 * total iteratin runtime, number of congested rnodes and the critical path delay achieved after the routing iteration.
-	 * @param iterationRuntime
-	 * @param numRnodes Generated routing resource graph nodes.
+	 * @param iterationRuntime Total runtime of this iteration.
 	 * @param rnodesCreationTime The runtime of generating routing resource graph nodes.
 	 */
-	private void printRoutingIterationStatisticsInfo(float iterationRuntime, long numRnodes, float rnodesCreationTime,
-			boolean timingDriven){
+	private void printRoutingIterationStatisticsInfo(float iterationRuntime, float rnodesCreationTime){
 		long overUsed = overUsedRnodes.size();
-		if(timingDriven) {
+		if(config.isTimingDriven()) {
 			System.out.printf("%4d       %12d  %8.2f   %11d  %10d   %5d  %9.2f\n",
 					routeIteration,
-					numRnodes,
+					rnodesCreatedThisIteration,
 					rnodesCreationTime,
 					connectionsRoutedIteration,
 					overUsed,
@@ -956,7 +921,7 @@ public class RWRoute{
 		}else {
 			System.out.printf("%4d       %12d  %8.2f   %11d  %10d   %5s  %9.2f\n",
 					routeIteration,
-					numRnodes,
+					rnodesCreatedThisIteration,
 					rnodesCreationTime,
 					connectionsRoutedIteration,
 					overUsed,
@@ -1142,36 +1107,18 @@ public class RWRoute{
 	/**
 	 * Sets a list of {@link PIP} instances of each {@link Net} instance and checks if there is any PIP overlaps.
 	 */
-	private void setPIPsOfNets(){
+	protected void setPIPsOfNets(){
 		for(Entry<Net,NetWrapper> e : nets.entrySet()){
 			NetWrapper netWrapper = e.getValue();
 			Net net = netWrapper.getNet();
-			Set<PIP> oldPIPs = new HashSet<>(net.getPIPs());
-			// Preserve the order of existing PIPs, e.g. the first PIP could be a logical driver
-			Set<PIP> newPIPs = new /*Linked*/HashSet<>(/*oldPIPs*/);
+			Set<PIP> newPIPs = new HashSet<>();
 			for(Connection connection:netWrapper.getConnections()){
 				newPIPs.addAll(RouterHelper.getConnectionPIPs(connection));
 			}
-
-			// Skip if new and old PIPs are completely identical
-			// (meaning net was unpreserved but never re-routed any differently)
-			if (oldPIPs.equals(newPIPs))
-				continue;
-
 			net.setPIPs(newPIPs);
-			assert(design.getModifiedNets().contains(net));
-
-			if (!newPIPs.containsAll(oldPIPs)) {
-				System.out.println("PIP delta for '" + net + "':");
-				oldPIPs.removeAll(newPIPs);
-				for (PIP pip : oldPIPs) {
-					System.out.println("\t- " + pip);
-				}
-			}
 		}
 
-		// FIXME: Temporarily disable for runtime
-		// checkPIPsUsage();
+		checkPIPsUsage();
 	}
 	
 	/**
@@ -1233,9 +1180,9 @@ public class RWRoute{
 			connection.getSink().setRouted(false);
 			connection.getSinkRnode().setTarget(false);
 			routingGraph.resetExpansion();
-			// System.out.printf("CRITICAL WARNING: Unroutable connection in iteration #%d\n", routeIteration);
-			// System.out.println("                 " + connection);
-			// handleUnroutableConnection(connection);
+			System.out.printf("CRITICAL WARNING: Unroutable connection in iteration #%d\n", routeIteration);
+			System.out.println("                 " + connection);
+			handleUnroutableConnection(connection);
 		}
 	}
 	

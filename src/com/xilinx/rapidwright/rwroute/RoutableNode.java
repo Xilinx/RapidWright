@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Tile;
@@ -286,10 +287,24 @@ public abstract class RoutableNode implements Routable{
 	}
 
 	@Override
+	public boolean containsChild(Routable rnode) {
+		if (children == null) {
+			return false;
+		}
+		// This linear search is rather inefficient, but is currently only used by
+		// PartialRouter.unpreserveNet() which is not expected to be called often
+		for (Routable child : children) {
+			if (child == rnode) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	@Override
 	public void addChild(Routable rnode) {
-		// FIXME: This is inefficient, but is currently only used by
-		//        RWRoute.unrouteReservedNetsToReleaseResources()
-		//        which is due for an overhaul
+		// This linear search is rather inefficient, but is currently only used by
+		// PartialRouter.unpreserveNet() which is not expected to be called often
 		if (children == null) {
 			children = new Routable[]{rnode};
 		} else {
@@ -473,12 +488,6 @@ public abstract class RoutableNode implements Routable{
 	public boolean isExcluded(Node parent, Node child) {
 		Tile tile = child.getTile();
 		TileTypeEnum tileType = tile.getTileTypeEnum();
-		// if (tileType == TileTypeEnum.INT) {
-		// 	return false;
-		// }
-		// return !tile.getName().startsWith("LAG");
-		// TODO: Is this equivalent to the above?
-		//       (i.e. do not allow anything except INT and LAG* tiles)
 		return !allowedTileEnums.contains(tileType);
 	}
 	 

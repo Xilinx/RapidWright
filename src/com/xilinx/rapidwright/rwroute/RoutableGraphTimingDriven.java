@@ -74,9 +74,9 @@ public class RoutableGraphTimingDriven extends RoutableGraph {
         excludeAboveRclk = new HashSet<>();
         excludeBelowRclk = new HashSet<>();
         Device device = design.getDevice();
-        TileType intType = device.getTileType(TileTypeEnum.INT);
-        String[] wireNames = intType.getWireNames();
-        for (int wireIndex = 0; wireIndex < intType.getWireCount(); wireIndex++) {
+        Tile intTile = device.getArbitraryTileOfType(TileTypeEnum.INT);
+        String[] wireNames = intTile.getWireNames();
+        for (int wireIndex = 0; wireIndex < intTile.getWireCount(); wireIndex++) {
             String wireName = wireNames[wireIndex];
             if (excludeAboveRclkString.contains(wireName)) {
                 excludeAboveRclk.add(wireIndex);

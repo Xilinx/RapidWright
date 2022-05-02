@@ -24,21 +24,43 @@
 package com.xilinx.rapidwright.rwroute;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
+import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.edif.EDIFHierPortInst;
+import com.xilinx.rapidwright.edif.EDIFNet;
 
 /**
  * Customized {@link PartialRouter} for the RapidStream use case.
  */
 public class RapidStreamRoute extends PartialRouter{
-	public RapidStreamRoute(Design design, RWRouteConfig config) {
+	/** Nets with conflicting nodes that should be added to the routing targets */
+	protected Set<Net> conflictNets;
+	/** A keyword to help recognize the target conflict nets */
+	private String anchorNameKeyword;
+
+	public RapidStreamRoute(Design design, RWRouteConfig config, String anchorNameKeyword) {
 		super(design, config);
+		this.anchorNameKeyword = anchorNameKeyword;
 	}
+
+	public RapidStreamRoute(Design design, RWRouteConfig config) {
+		this(design, config, "q0_reg");
+	}
+
+	@Override
+	protected Collection<Net> getTimingNets() {
+		return conflictNets;
+	}
+
 	/**
 	 * Classifies {@link Net} Objects into different categories: clocks, static nets,
 	 * and regular signal nets (i.e. {@link NetType}.WIRE) and determines routing targets.
@@ -46,8 +68,42 @@ public class RapidStreamRoute extends PartialRouter{
 	 */
 	@Override
 	protected void determineRoutingTargets(){
+		conflictNets = new HashSet<>();
 		super.determineRoutingTargets();
-		if(config.isResolveConflictNets()) handleConflictNets();
+		handleConflictNets();
+	}
+
+	private void generateConflictInfo(Node node, Net reserved, Net netToPreserve) {
+		System.out.println("WARNING: Conflicting node " + node + ":");
+		System.out.println("         " + netToPreserve.getName() + " \n         " + reserved.getName());
+	}
+
+	@Override
+	protected void addPreservedNodes(Collection<Node> nodes, Net netToPreserve) {
+		for(Node node : nodes) {
+			Net reserved = routingGraph.preserve(node, netToPreserve);
+			if (reserved == null)
+				continue;
+			// Nodes already preserved by the same net are ignored
+			if (reserved.equals(netToPreserve))
+				continue;
+			if (reserved.getSource() != null && netToPreserve.getSource() != null) {
+				boolean generateWarning = conflictNets.size() < 5;
+				EDIFNet reservedLogical = reserved.getLogicalNet();
+				EDIFNet toReserveLogical = netToPreserve.getLogicalNet();
+				if(reservedLogical != null && toReserveLogical != null) {
+					if(!toReserveLogical.equals(reservedLogical)) {
+						if(generateWarning) generateConflictInfo(node, reserved, netToPreserve);
+					}
+				}else {
+					if(generateWarning) generateConflictInfo(node, reserved, netToPreserve);
+				}
+				conflictNets.add(reserved);
+				conflictNets.add(netToPreserve);
+			}
+		}
+
+		routingGraph.asyncPreserve(nodes, netToPreserve);
 	}
 	
 	/**
@@ -62,7 +118,7 @@ public class RapidStreamRoute extends PartialRouter{
 			}
 			
 			removeNetNodesFromPreservedNodes(net); // remove preserved nodes of a net from the map
-			createsNetWrapperAndConnections(net, config.getBoundingBoxExtensionX(), config.getBoundingBoxExtensionY(), this.isMultiSLRDevice());
+			createsNetWrapperAndConnections(net);
 			net.unroute();//NOTE: no need to unroute if routing tree is reused, then toPreserveNets should be detected before createNetWrapperAndConnections
 		}
 		for(Net net : toPreserveNets) {
@@ -88,7 +144,7 @@ public class RapidStreamRoute extends PartialRouter{
 			return false;
 		}
 		for(EDIFHierPortInst eport : ehportInsts) {
-			if(eport.getFullHierarchicalInstName().contains(config.getAnchorNameKeyword())) {
+			if(eport.getFullHierarchicalInstName().contains(anchorNameKeyword)) {
 				//use the key word to identify target anchor nets
 				anchorNet = true;
 				if(eport.isInput()) input = true;
@@ -112,7 +168,7 @@ public class RapidStreamRoute extends PartialRouter{
 	 * @return The routed design instance.
 	 */
 	public static Design routeDesignRapidStream(Design design) {
-		RWRouteConfig config = new RWRouteConfig(new String[] {"--partialRouting", "--resolveConflictNets", "--useUTurnNodes", "--verbose"});
+		RWRouteConfig config = new RWRouteConfig(new String[] {"--partialRouting", "--enlargeBoundingBox", "--useUTurnNodes", "--verbose"});
 		return routeDesign(design, config, () -> new RapidStreamRoute(design, config));
 	}
 }

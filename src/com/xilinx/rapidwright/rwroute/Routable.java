@@ -155,6 +155,13 @@ public interface Routable {
 	Routable[] getChildren();
 
 	/**
+	 * Gets whether the given Routable Object is already a child.
+	 * @param rnode Child node to search for.
+	 * @return True if child already present.
+	 */
+	boolean containsChild(Routable rnode);
+
+	/**
 	 * Adds a child to this node.
 	 * @param rnode Child to be added.
 	 */

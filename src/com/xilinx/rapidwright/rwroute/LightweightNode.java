@@ -20,10 +20,6 @@ class LightweightNode {
         this(pin.getConnectedNode());
     }
 
-    public LightweightNode(PIP pip, boolean start) {
-        this((start) ? pip.getStartNode() : pip.getEndNode());
-    }
-
     @Override
     public boolean equals(Object that) {
         if (this == that)

@@ -32,7 +32,6 @@ import java.util.regex.Pattern;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
-import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
@@ -43,7 +42,6 @@ import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePIP;
 import com.xilinx.rapidwright.device.SitePin;
-import com.xilinx.rapidwright.device.Tile;
 
 /**
  * TODO
@@ -175,36 +173,33 @@ public class ECORouter extends PartialRouter {
 
     @Override
     protected void assignNodesToConnections() {
-        for(Map.Entry<Net,NetWrapper> e : nets.entrySet()) {
-            NetWrapper netWrapper = e.getValue();
-            for (Connection connection : netWrapper.getConnections()) {
-                SitePinInst sink = connection.getSink();
-                List<Routable> rnodes = connection.getRnodes();
-                String sinkPinName = sink.getName();
-                if (rnodes.size() >= 3 && Pattern.matches("[A-H](X|_I)", sinkPinName)) {
-                    if (Pattern.matches(".+[A-H]_O", rnodes.get(1).getNode().toString())) {
-                        Routable lutRnode = rnodes.get(2);
-                        Node lutNode = lutRnode.getNode();
-                        SitePin lutPin = lutNode.getSitePin();
+        for(Connection connection : indirectConnections) {
+            SitePinInst sink = connection.getSink();
+            List<Routable> rnodes = connection.getRnodes();
+            String sinkPinName = sink.getName();
+            if (rnodes.size() >= 3 && Pattern.matches("[A-H](X|_I)", sinkPinName)) {
+                if (Pattern.matches(".+[A-H]_O", rnodes.get(1).getNode().toString())) {
+                    Routable lutRnode = rnodes.get(2);
+                    Node lutNode = lutRnode.getNode();
+                    SitePin lutPin = lutNode.getSitePin();
 
-                        assert(Pattern.matches("[A-H][1-6]", lutPin.getPinName()));
+                    assert(Pattern.matches("[A-H][1-6]", lutPin.getPinName()));
 
-                        // Drop the fake LUT input -> LUT output -> X/I pin edges
-                        connection.setRnodes(rnodes.subList(2, rnodes.size()));
+                    // Drop the fake LUT input -> LUT output -> X/I pin edges
+                    connection.setRnodes(rnodes.subList(2, rnodes.size()));
 
-                        // Fix the intra-site routing
-                        SiteInst si = sink.getSiteInst();
-                        Net net = connection.getNetWrapper().getNet();
-                        for (BELPin sinkBELPin : getConnectedBELPins(sink)) {
-                            boolean r = si.unrouteIntraSiteNet(sink.getBELPin(), sinkBELPin);
-                            assert(r);
-                            r = si.routeIntraSiteNet(net, lutPin.getBELPin(), sinkBELPin);
-                            assert(r);
-                            assert(design.getModifiedSiteInsts().contains(si));
-                        }
-
-                        System.out.println(lutPin.getPinName() + " -> " + sinkPinName + " for " + connection.getNetWrapper().getNet());
+                    // Fix the intra-site routing
+                    SiteInst si = sink.getSiteInst();
+                    Net net = connection.getNetWrapper().getNet();
+                    for (BELPin sinkBELPin : getConnectedBELPins(sink)) {
+                        boolean r = si.unrouteIntraSiteNet(sink.getBELPin(), sinkBELPin);
+                        assert(r);
+                        r = si.routeIntraSiteNet(net, lutPin.getBELPin(), sinkBELPin);
+                        assert(r);
+                        assert(design.getModifiedSiteInsts().contains(si));
                     }
+
+                    System.out.println(lutPin.getPinName() + " -> " + sinkPinName + " for " + connection.getNetWrapper().getNet());
                 }
             }
         }
@@ -303,6 +298,38 @@ public class ECORouter extends PartialRouter {
     //     }
     //     return false;
     // }
+
+    @Override
+    protected void setPIPsOfNets(){
+        for(Map.Entry<Net,NetWrapper> e : nets.entrySet()){
+            NetWrapper netWrapper = e.getValue();
+            Net net = netWrapper.getNet();
+            Set<PIP> oldPIPs = new HashSet<>(net.getPIPs());
+            Set<PIP> newPIPs = new HashSet<>();
+            for(Connection connection:netWrapper.getConnections()){
+                newPIPs.addAll(RouterHelper.getConnectionPIPs(connection));
+            }
+
+            // Skip if new and old PIPs are completely identical
+            // (meaning net was unpreserved but never re-routed any differently)
+            if (oldPIPs.equals(newPIPs))
+                continue;
+
+            net.setPIPs(newPIPs);
+
+            oldPIPs.removeAll(newPIPs);
+            if (!oldPIPs.isEmpty()) {
+                System.out.println("PIP delta for '" + net + "':");
+                for (PIP pip : oldPIPs) {
+                    System.out.println("\t- " + pip);
+                }
+            }
+        }
+
+        // Disabled for runtime reasons
+        // TODO: What's the value of checking PIPs? Surely checking nodes more useful?
+        // checkPIPsUsage();
+    }
 
     public static Design routeDesign(Design design) {
         RWRouteConfig config = new RWRouteConfig(new String[] {
