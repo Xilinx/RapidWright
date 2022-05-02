@@ -29,14 +29,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
-
 import com.xilinx.rapidwright.device.BELPin;
-import com.xilinx.rapidwright.support.CheckOpenFiles;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.Pair;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 public class TestDesignTools {
 
@@ -60,7 +58,6 @@ public class TestDesignTools {
     }
     
     @Test
-    @CheckOpenFiles
     public void testResolveSiteRoutingFromInContextPorts() {
         String dcpPath = RapidWrightDCP.getString("picoblaze_ooc_X10Y235.dcp");
         Design design = Design.readCheckpoint(dcpPath, CodePerfTracker.SILENT);

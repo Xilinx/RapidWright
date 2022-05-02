@@ -42,7 +42,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import com.xilinx.rapidwright.design.Design;
-import com.xilinx.rapidwright.support.CheckOpenFiles;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.util.FileTools;
 
@@ -187,7 +186,6 @@ public class TestBinaryEDIF {
     
 
     @Test
-    @CheckOpenFiles
     public void testBinaryEDIF(@TempDir Path tempDir) {
         String dcpPath = System.getenv(RW_TEST_DCP_PATH_VAR_NAME);
         Assumptions.assumeTrue(dcpPath == null);

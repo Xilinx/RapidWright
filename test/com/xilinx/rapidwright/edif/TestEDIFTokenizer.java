@@ -38,7 +38,6 @@ import java.util.stream.LongStream;
 import java.util.stream.Stream;
 
 import com.xilinx.rapidwright.design.Design;
-import com.xilinx.rapidwright.support.CheckOpenFiles;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.util.StringPool;
 import org.jetbrains.annotations.NotNull;
@@ -60,7 +59,6 @@ public class TestEDIFTokenizer {
     }
 
     @Test
-    @CheckOpenFiles
     public void testTokenizerOffsets(@TempDir Path tempDir) throws IOException {
         Design d = Design.readCheckpoint(RapidWrightDCP.getPath("picoblaze_ooc_X10Y235.dcp"));
         Path edif = tempDir.resolve("picoblaze.edf");

@@ -29,7 +29,6 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 
-import com.xilinx.rapidwright.support.CheckOpenFiles;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
@@ -66,7 +65,6 @@ public class TestEDIF {
     }
 
     @Test
-    @CheckOpenFiles
     public void checkEdifRoundtrip(@TempDir Path tempDir) throws IOException {
         //Use separate files for writing/reading so we can identify identify leaking file handles by filename
         final Path filenameWrite = tempDir.resolve("testWrite.edf");
@@ -181,7 +179,6 @@ public class TestEDIF {
 
     @ParameterizedTest(name="Macro Unisim expansion of {0}")
     @EnumSource(names = {"LUT6_2", "CFGLUT5", "BUFG"})
-    @CheckOpenFiles
     public void testMacroExpansion(Unisim unisim) {
         EDIFNetlist netlist = createEmptyNetlist();
 

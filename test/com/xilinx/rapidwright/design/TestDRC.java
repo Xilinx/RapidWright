@@ -22,15 +22,13 @@
 
 package com.xilinx.rapidwright.design;
 
-import com.xilinx.rapidwright.support.CheckOpenFiles;
-import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.design.drc.NetRoutesThruLutAtMostOnce;
+import com.xilinx.rapidwright.support.RapidWrightDCP;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestDRC {
     @Test
-    @CheckOpenFiles
     public void testRoutethruPass() {
         /*
          * DCP created from:
@@ -51,7 +49,6 @@ public class TestDRC {
     }
 
     @Test
-    @CheckOpenFiles
     public void testRoutethruFail() {
         /*
          * DCP derived from https://github.com/Xilinx/RapidWright/issues/226#issuecomment-906164846

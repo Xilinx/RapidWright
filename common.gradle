@@ -60,6 +60,7 @@ task testJava(type:Test) {
   description = "Runs the Java unit tests."
 
   useJUnitPlatform()
+  systemProperty("junit.jupiter.extensions.autodetection.enabled", true)
 }
 
 test {
