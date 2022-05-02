@@ -1124,7 +1124,6 @@ public class DesignTools {
 	            SiteInst si = net.getSource().getSiteInst();
 	            BELPin belPin = sPin.getBELPin();
 	            si.unrouteIntraSiteNet(belPin, belPin);
-	            assert(si.getDesign().getModifiedSiteInsts().contains(si));
 	        }
 	        for(Node startNode : updateFanout) {
 	            Integer newFanout = fanout.get(startNode);
@@ -1239,8 +1238,6 @@ public class DesignTools {
 	        portInst.getNet().removePortInst(portInst);
 	    }
 	    cell.getParentCell().removeCellInst(cell.getEDIFCellInst());
-
-	    assert(design.getModifiedSiteInsts().contains(siteInst));
 	}
 
 	private static void handlePinRemovals(SitePinInst spi, Map<Net,Set<SitePinInst>> deferRemovals) {
@@ -1318,7 +1315,6 @@ public class DesignTools {
 	            pins.add(pin);
 	        }
 	        net.setPins(pins);
-	        // assert(design.getModifiedNets().contains(net));
 	    }
 	}
 	
