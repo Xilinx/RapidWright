@@ -74,28 +74,28 @@ class TestEDIFNetlist {
     public void testTrackChanges() {
         Design d = Design.readCheckpoint(RapidWrightDCP.getPath("microblazeAndILA_3pblocks.dcp"), true);
         EDIFNetlist netlist = d.getNetlist();
-        
+
         EDIFHierPortInst srcPortInst = netlist.getHierPortInstFromName(TestEDIFTools.TEST_SRC);
         EDIFHierPortInst snkPortInst = netlist.getHierPortInstFromName(TestEDIFTools.TEST_SNK);
-        
+
         // Disconnect sink in anticipation of connecting to another net
         snkPortInst.getNet().removePortInst(snkPortInst.getPortInst());
-        
+
         netlist.setTrackCellChanges(true);
-        
+
         EDIFTools.connectPortInstsThruHier(srcPortInst, snkPortInst, TestEDIFTools.UNIQUE_SUFFIX);
 
         netlist.resetParentNetMap();
-        
+
         Map<EDIFCell,List<EDIFChange>> modifiedCells = netlist.getModifiedCells();
-        
+
         Assertions.assertEquals(modifiedCells.size(), 8);
-        
+
         Set<EDIFCell> potentiallyModifiedCells = new HashSet<>();
         for(EDIFHierNet logNets : netlist.getNetAliases(srcPortInst.getHierarchicalNet())) {
             potentiallyModifiedCells.add(logNets.getParentInst().getCellType());
         }
-        
+
         for(EDIFCell modifiedCell : modifiedCells.keySet()) {
             Assertions.assertTrue(potentiallyModifiedCells.contains(modifiedCell));
         }
