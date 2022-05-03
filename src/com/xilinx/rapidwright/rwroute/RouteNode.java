@@ -108,19 +108,19 @@ public abstract class RouteNode {
 
 	abstract protected RouteNode getOrCreate(Node node, RouteNodeType type);
 	
-	protected void setChildren(RuntimeTracker setChildrenTimer/*RouteThruHelper routethruHelper*/){
+	protected void setChildren(RuntimeTracker setChildrenTimer /*, RouteThruHelper routethruHelper*/){
 		if (children != null)
 			return;
 		setChildrenTimer.start();
 		List<Node> allDownHillNodes = node.getAllDownhillNodes();
 		List<RouteNode> childrenList = new ArrayList<>(allDownHillNodes.size());
-		for(Node node:allDownHillNodes){
-			if(isExcluded(this.node, node)) continue;
+		for(Node downhill: allDownHillNodes){
+			if(isExcluded(node, downhill)) continue;
 			// FIXME: What is the meaning of checking that a node routethru-s to itself?
-			// if(routethruHelper.isRouteThru(node, node)) continue;
+			// if(routethruHelper.isRouteThru(downhill, downhill)) continue;
 
 			RouteNodeType type = RouteNodeType.WIRE;
-			RouteNode child = getOrCreate(node, type);
+			RouteNode child = getOrCreate(downhill, type);
 			childrenList.add(child);//the sink rnode of a target connection has been created up-front
 		}
 		children = childrenList.toArray(EMPTY_ARRAY);
@@ -618,21 +618,5 @@ public abstract class RouteNode {
 	 * @param child The routing resource in question.
 	 * @return true, if the node should be excluded from the routing resource graph.
 	 */
-	public boolean isExcluded(Node parent, Node child) {
-		Tile tile = child.getTile();
-		TileTypeEnum tileType = tile.getTileTypeEnum();
-		return !allowedTileEnums.contains(tileType);
-	}
-	 
-	final private static Set<TileTypeEnum> allowedTileEnums;
-	static {
-		allowedTileEnums = new HashSet<>();
-		allowedTileEnums.add(TileTypeEnum.INT);
-		for (TileTypeEnum e : TileTypeEnum.values()) {
-			if (e.toString().startsWith("LAG")) {
-				allowedTileEnums.add(e);
-			}
-		}
-	}
-	
+	abstract public boolean isExcluded(Node parent, Node child);
 }

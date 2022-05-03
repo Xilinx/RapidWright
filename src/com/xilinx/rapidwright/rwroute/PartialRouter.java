@@ -50,22 +50,11 @@ public class PartialRouter extends RWRoute{
 
 		@Override
 		protected boolean isPreserved(Node parent, Node child) {
-			boolean preserved = super.isPreserved(child);
-
-			// If preserved, check if child node has been created already
-			RouteNode rnode = (preserved) ? RouteNodeGraphPartial.this.getNode(child) : null;
-			// If so, get its prev pointer
-			RouteNode prev = (rnode != null) ? rnode.getPrev() : null;
-			// Presence means that the only arc allowed to enter this child node
-			// is if it came from prev
-			if (prev != null && prev.getNode() == parent) {
-				preserved = false;
-				rnode.setVisited(false);
-			}
-
-			return preserved;
+			boolean preserved = super.isPreserved(parent, child);
+			// Note that maskPreservedIfExistingRoute() can only be called
+			// once for each child node
+			return preserved && maskPreservedIfExistingRoute(parent, child);
 		}
-
 	}
 
 	protected class RouteNodeGraphPartialTimingDriven extends RouteNodeGraphTimingDriven {
@@ -75,21 +64,41 @@ public class PartialRouter extends RWRoute{
 
 		@Override
 		protected boolean isPreserved(Node parent, Node child) {
-			boolean preserved = super.isPreserved(child);
-
-			// If preserved, check if child node has been created already
-			RouteNode rnode = (preserved) ? RouteNodeGraphPartialTimingDriven.this.getNode(child) : null;
-			// If so, get its prev pointer
-			RouteNode prev = (rnode != null) ? rnode.getPrev() : null;
-			// Presence means that the only arc allowed to enter this child node
-			// is if it came from prev
-			if (prev != null && prev.getNode() == parent) {
-				preserved = false;
-				rnode.setVisited(false);
-			}
-
-			return preserved;
+			boolean preserved = super.isPreserved(parent, child);
+			// Note that maskPreservedIfExistingRoute() can only be called
+			// once for each child node
+			return preserved && maskPreservedIfExistingRoute(parent, child);
 		}
+	}
+
+	/**
+	 * Compute the mask for an otherwise preserved node.
+	 * For Nets containing at least one Connection to be routed, all fully routed
+	 * Connections and their associated Nodes (if any) are preserved. Any such
+	 * Nodes can (and are encouraged) to be used as part of routing such incomplete
+	 * Connections. In these cases, the RouteNode.prev member is used to restrict
+	 * incoming arcs to just the RouteNode already used by the Net; this method
+	 * detects this case and allows the preserved state to be masked.
+	 * Note that this method must only be called once for each end Node, since
+	 * RouteNode.prev (which is also used to track its "visited" state) is erased
+	 * upon masking.
+	 * @param start Start Node of arc.
+	 * @param end End Node of arc.
+	 * @return Mask to be AND-ed with preserved state
+	 */
+	protected boolean maskPreservedIfExistingRoute(Node start, Node end) {
+		// If preserved, check if end node has been created already
+		RouteNode rnode = routingGraph.getNode(end);
+		// If so, get its prev pointer
+		RouteNode prev = (rnode != null) ? rnode.getPrev() : null;
+		// Presence means that the only arc allowed to enter this end node
+		// is if it came from prev
+		if (prev != null && prev.getNode() == start) {
+			rnode.setVisited(false);
+			return false;
+		}
+
+		return true;
 	}
 
 	public PartialRouter(Design design, RWRouteConfig config){

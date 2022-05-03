@@ -56,25 +56,16 @@ public class ECORouter extends PartialRouter {
 
     protected class RouteNodeGraphECO extends RouteNodeGraphPartial {
 
-        protected class RouteNodeImpl extends RouteNodeGraphPartial.RouteNodeImpl {
-
-            public RouteNodeImpl(Node node, RouteNodeType type) {
-                super(node, type);
+        @Override
+        protected boolean isExcluded(Node parent, Node child) {
+            // Note that the isPreserved(Node) overload is called,
+            // and not isPreserved(Node, Node) which is overridden by
+            // RouteNodeGraphPartial and may only be called once
+            if (!isPreserved(child) && allowLutRoutethru(parent, child)) {
+                return false;
             }
 
-            @Override
-            public boolean isExcluded(Node parent, Node child) {
-                boolean preserved = isPreserved(parent, child);
-                if (preserved) {
-                    return true;
-                }
-
-                if (allowRoutethru(parent, child)) {
-                    return false;
-                }
-
-                return super.isExcluded(parent, child);
-            }
+            return super.isExcluded(parent, child);
         }
 
         public RouteNodeGraphECO(RuntimeTracker setChildrenTimer, Design design) {
@@ -84,25 +75,16 @@ public class ECORouter extends PartialRouter {
 
     protected class RouteNodeGraphECOTimingDriven extends RouteNodeGraphPartialTimingDriven {
 
-        protected class RouteNodeImpl extends RouteNodeGraphPartialTimingDriven.RouteNodeImpl {
-
-            public RouteNodeImpl(Node node, RouteNodeType type) {
-                super(node, type);
+        @Override
+        protected boolean isExcluded(Node parent, Node child) {
+            // Note that the isPreserved(Node) overload is called,
+            // and not isPreserved(Node, Node) which is overridden by
+            // RouteNodeGraphPartial and may only be called once
+            if (!isPreserved(child) && allowLutRoutethru(parent, child)) {
+                return false;
             }
 
-            @Override
-            public boolean isExcluded(Node parent, Node child) {
-                boolean preserved = isPreserved(parent, child);
-                if (preserved) {
-                    return true;
-                }
-
-                if (allowRoutethru(parent, child)) {
-                    return false;
-                }
-
-                return super.isExcluded(parent, child);
-            }
+            return super.isExcluded(parent, child);
         }
 
         public RouteNodeGraphECOTimingDriven(RuntimeTracker rnodesTimer, Design design, DelayEstimatorBase delayEstimator, boolean maskNodesCrossRCLK) {
@@ -110,46 +92,57 @@ public class ECORouter extends PartialRouter {
         }
     }
 
-    protected boolean allowRoutethru(Node parent, Node child) {
+    protected boolean allowLutRoutethru(Node parent, Node child) {
         // Enable LUT routethrus on A1-5 (not A6 since using that should block O5
-        // others from being used, but there isn't currently an efficient way to
+        // from being used, but there isn't currently an efficient way to
         // check that during routing expansion so better exclude it during routing
         // generation)
         if (parent.getIntentCode() != IntentCode.NODE_PINFEED)
             return false;
 
         TileTypeEnum parentTileType = parent.getTile().getTileTypeEnum();
+        if (parentTileType != TileTypeEnum.INT)
+            return false;
+
         TileTypeEnum childTileType = child.getTile().getTileTypeEnum();
-        if (parentTileType == TileTypeEnum.INT &&
-                (childTileType == TileTypeEnum.CLEL_L || childTileType == TileTypeEnum.CLEL_R ||
-                        childTileType == TileTypeEnum.CLEM || childTileType == TileTypeEnum.CLEM_R)) {
-            SitePin sp = parent.getSitePin();
-            Site s = sp.getSite();
-            SiteTypeEnum siteType = s.getSiteTypeEnum();
-            assert(siteType == SiteTypeEnum.SLICEL || siteType == SiteTypeEnum.SLICEM);
-            String pinName = sp.getPinName();
-            if (pinName.length() == 2) {
-                String childWireName = child.getWireName();
+        if (childTileType != TileTypeEnum.CLEL_L && childTileType != TileTypeEnum.CLEL_R &&
+            childTileType != TileTypeEnum.CLEM && childTileType != TileTypeEnum.CLEM_R) {
+            return false;
+        }
 
-                // Only support O6 route-thrus
-                if (childWireName.endsWith("_O")) {
+        SitePin sp = parent.getSitePin();
+        Site s = sp.getSite();
+        SiteTypeEnum siteType = s.getSiteTypeEnum();
+        assert(siteType == SiteTypeEnum.SLICEL || siteType == SiteTypeEnum.SLICEM);
+        String pinName = sp.getPinName();
+        if (pinName.length() != 2)
+            return false;
 
-                    char first = pinName.charAt(0);
-                    char second = pinName.charAt(1);
-                    if (first >= 'A' && first <= 'H' && second >= '1' && second <= '5') {
-                        SiteInst si = design.getSiteInstFromSite(s);
+        // Only support O6 route-thrus
+        if (!child.getWireName().endsWith("_O"))
+            return false;
 
-                        // Nothing placed at site, all routethrus possible
-                        if (si == null)
-                            return true;
+        char first = pinName.charAt(0);
+        char second = pinName.charAt(1);
+        if (first >= 'A' && first <= 'H' && second >= '1' && second <= '5') {
+            SiteInst si = design.getSiteInstFromSite(s);
 
-                        // O6 already used by something/someone else
-                        boolean O6used = si.getNetFromSiteWire(first + "_O") != null;
-                        if (!O6used)
-                            return true;
-                    }
-                }
-            }
+            // Nothing placed at site, all routethrus possible
+            if (si == null)
+                return true;
+
+            // O6 already used by something/someone else
+            boolean O6used = si.getNetFromSiteWire(first + "_O") != null;
+            if (O6used)
+                return false;
+
+            // O5 already used by something/someone else
+            // boolean O5used = si.getNetFromSiteWire(first + "5LUT_O5") != null;
+            // if (O5used)
+            //     return false;
+
+            // Routethru allowed
+            return true;
         }
 
         return false;
