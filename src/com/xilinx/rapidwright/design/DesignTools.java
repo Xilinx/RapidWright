@@ -1306,9 +1306,7 @@ public class DesignTools {
 	                pin.setNet(null);
 	                SiteInst si = pin.getSiteInst();
 	                if(si != null){
-	                    BELPin belPin = pin.getBELPin();
-	                    si.unrouteIntraSiteNet(belPin, belPin);
-	                    si.getSitePinInstMap().remove(pin.getName());
+	                    si.removePin(pin);
 	                }
 	                continue;
 	            }

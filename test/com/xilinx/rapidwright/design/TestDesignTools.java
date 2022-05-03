@@ -22,13 +22,16 @@
  
 package com.xilinx.rapidwright.design;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
@@ -119,6 +122,33 @@ public class TestDesignTools {
             }
             if (net.getAlternateSource() != null) {
                 Assertions.assertTrue(pins.contains(net.getAlternateSource()));
+            }
+        }
+    }
+
+    @Test
+    public void testBatchRemoveSitePins() {
+        Path dcpPath = RapidWrightDCP.getPath("picoblaze_ooc_X10Y235.dcp");
+        Design design = Design.readCheckpoint(dcpPath);
+
+        SiteInst si = design.getSiteInstFromSiteName("SLICE_X14Y238");
+        Assertions.assertNotNull(si);
+
+        Map<Net, Set<SitePinInst>> deferredRemovals = new HashMap<>();
+        for (SitePinInst spi : si.getSitePinInsts()) {
+            Net net = spi.getNet();
+            Assertions.assertNotNull(net);
+            deferredRemovals.computeIfAbsent(net, ($) -> new HashSet<>()).add(spi);
+        }
+
+        DesignTools.batchRemoveSitePins(deferredRemovals, true);
+
+        Assertions.assertTrue(si.getSitePinInstMap().isEmpty());
+
+        Map<String,Net> netSiteWireMap = si.getNetSiteWireMap();
+        for (Map.Entry<Net, Set<SitePinInst>> e : deferredRemovals.entrySet()) {
+            for (SitePinInst spi : e.getValue()) {
+                Assertions.assertFalse(netSiteWireMap.containsKey(spi.getSiteWireName()));
             }
         }
     }
