@@ -32,8 +32,6 @@ import java.util.Queue;
 import java.util.Map;
 import java.util.Set;
 
-import com.xilinx.rapidwright.device.ArcType;
-import com.xilinx.rapidwright.device.SitePIP;
 import org.capnproto.MessageReader;
 import org.capnproto.PrimitiveList;
 import org.capnproto.ReaderOptions;
@@ -51,6 +49,7 @@ import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.device.BEL;
+import com.xilinx.rapidwright.device.BELClass;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.PIP;
@@ -81,34 +80,37 @@ import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.Property;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranch;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranch.RouteSegment;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.SiteInstance;
+import com.xilinx.rapidwright.util.Utils;
 
 public class PhysNetlistReader {
 
     protected static final String DISABLE_AUTO_IO_BUFFERS = "DISABLE_AUTO_IO_BUFFERS";
     protected static final String OUT_OF_CONTEXT = "OUT_OF_CONTEXT";
 
-    public static Design readPhysNetlist(PhysNetlist.Reader physNetlist, EDIFNetlist netlist, boolean skipChecks) {
+    private static final String STATIC_SOURCE = "STATIC_SOURCE";
+    private static int tieoffInstanceCount = 0;
+
+    public static Design readPhysNetlist(String physNetlistFileName, EDIFNetlist netlist) throws IOException {
         Design design = new Design();
         design.setNetlist(netlist);
+        ReaderOptions rdOptions =
+                new ReaderOptions(ReaderOptions.DEFAULT_READER_OPTIONS.traversalLimitInWords * 64,
+                ReaderOptions.DEFAULT_READER_OPTIONS.nestingLimit * 128);
+        MessageReader readMsg = Interchange.readInterchangeFile(physNetlistFileName, rdOptions);
 
-        if (physNetlist.hasPart()) {
-            design.setPartName(physNetlist.getPart().toString());
-        }
+        PhysNetlist.Reader physNetlist = readMsg.getRoot(PhysNetlist.factory);
+        design.setPartName(physNetlist.getPart().toString());
 
-        List<String> allStrings = readAllStrings(physNetlist);
+        Enumerator<String> allStrings = readAllStrings(physNetlist);
 
-        if (!skipChecks) {
-            checkConstantRoutingAndNetNaming(physNetlist, netlist, allStrings);
-        }
+        checkConstantRoutingAndNetNaming(physNetlist, netlist, allStrings);
 
         readSiteInsts(physNetlist, design, allStrings);
 
         readPlacement(physNetlist, design, allStrings);
 
-        if (!skipChecks) {
-            checkMacros(design);
-        }
-
+        checkMacros(design);
+        
         readRouting(physNetlist, design, allStrings);
 
         readDesignProperties(physNetlist, design, allStrings);
@@ -116,30 +118,19 @@ public class PhysNetlistReader {
         return design;
     }
 
-    public static Design readPhysNetlist(String physNetlistFileName, EDIFNetlist netlist) throws IOException {
-        ReaderOptions rdOptions =
-                new ReaderOptions(ReaderOptions.DEFAULT_READER_OPTIONS.traversalLimitInWords * 64,
-                        ReaderOptions.DEFAULT_READER_OPTIONS.nestingLimit * 128);
-        MessageReader readMsg = Interchange.readInterchangeFile(physNetlistFileName, rdOptions);
-
-        PhysNetlist.Reader physNetlist = readMsg.getRoot(PhysNetlist.factory);
-
-        return readPhysNetlist(physNetlist, netlist, false);
-    }
-
-    public static List<String> readAllStrings(PhysNetlist.Reader physNetlist){
+    public static Enumerator<String> readAllStrings(PhysNetlist.Reader physNetlist){
+        Enumerator<String> allStrings = new Enumerator<>();
         TextList.Reader strListReader = physNetlist.getStrList();
         int strCount = strListReader.size();
-        List<String> allStrings = new ArrayList<>(strCount);
         for(int i=0; i < strCount; i++) {
             String str = strListReader.get(i).toString();
-            allStrings.add(str);
+            allStrings.addObject(str);
         }
         return allStrings;
     }
 
     private static void readSiteInsts(PhysNetlist.Reader physNetlist, Design design,
-                                      List<String> strings) {
+                                        Enumerator<String> strings) {
         Device device = design.getDevice();
         StructList.Reader<SiteInstance.Reader> siteInsts = physNetlist.getSiteInsts();
         int siteInstCount = siteInsts.size();
@@ -152,7 +143,7 @@ public class PhysNetlistReader {
     }
 
     private static void readPlacement(PhysNetlist.Reader physNetlist, Design design,
-                                      List<String> strings) {
+                                        Enumerator<String> strings) {
         HashMap<String, PhysCellType> physCells = new HashMap<>();
         StructList.Reader<PhysCell.Reader> physCellReaders = physNetlist.getPhysCells();
         int physCellCount = physCellReaders.size();
@@ -161,11 +152,13 @@ public class PhysNetlistReader {
             physCells.put(strings.get(reader.getCellName()), reader.getPhysType());
         }
 
+
         StructList.Reader<CellPlacement.Reader> placements = physNetlist.getPlacements();
         int placementCount = placements.size();
         Device device = design.getDevice();
-        EDIFLibrary macroPrims = Design.getMacroPrimitives(device.getSeries());
         EDIFNetlist netlist = design.getNetlist();
+        EDIFLibrary macroPrims = Design.getMacroPrimitives(device.getSeries());
+        Map<String, List<String>> macroLeafChildren = new HashMap<>();
         for(int i=0; i < placementCount; i++) {
             CellPlacement.Reader placement = placements.get(i);
             String cellName = strings.get(placement.getCellName());
@@ -299,7 +292,38 @@ public class PhysNetlistReader {
             }
         }
 
+        // Validate macro primitives are placed fully
+        HashSet<String> checked = new HashSet<>();
+        for(Cell c : design.getCells()) {
+            EDIFCell cellType = c.getParentCell();
+            if(cellType != null && macroPrims.containsCell(cellType)) {
+                String parentHierName = c.getParentHierarchicalInstName();
+                if(checked.contains(parentHierName)) continue;
+                List<String> missingPlacements = null;
+                List<String> childrenNames = macroLeafChildren.get(cellType.getName());
+                if(childrenNames == null) {
+                    childrenNames = EDIFTools.getMacroLeafCellNames(cellType);
+                    macroLeafChildren.put(cellType.getName(), childrenNames);
+                }
+                //for(EDIFCellInst inst : cellType.getCellInsts()) { // TODO - Fix up loop list
+                for(String childName : childrenNames) {
+                    String childCellName = parentHierName + EDIFTools.EDIF_HIER_SEP + childName;
+                    Cell child = design.getCell(childCellName);
+                    if(child == null) {
+                        if(missingPlacements == null) missingPlacements = new ArrayList<String>();
+                        missingPlacements.add(childName + " (" + childCellName + ")");
+                    }
+                }
+                if(missingPlacements != null && !cellType.getName().equals("IOBUFDS")) {
+                    throw new RuntimeException("ERROR: Macro primitive '"+ parentHierName
+                            + "' is not fully placed. Expected placements for all child cells: "
+                            + cellType.getCellInsts() + ", but missing placements "
+                            + "for cells: " + missingPlacements);
+                }
 
+                checked.add(parentHierName);
+            }
+        }
     }
 
     private static NetType getNetType(PhysNet.Reader netReader, String netName) {
@@ -322,67 +346,48 @@ public class PhysNetlistReader {
     }
 
     private static void readRouting(PhysNetlist.Reader physNetlist, Design design,
-                                    List<String> strings) {
+                                    Enumerator<String> strings) {
         StructList.Reader<PhysNet.Reader> nets = physNetlist.getPhysNets();
         EDIFNetlist netlist = design.getNetlist();
         int netCount = nets.size();
         for(int i=0; i < netCount; i++) {
             PhysNet.Reader netReader = nets.get(i);
             String netName = strings.get(netReader.getName());
-
-            Net net = design.getNet(netName);
-            if (net == null) {
-                // Ignore nets that are completely empty
-                if (!netReader.hasSources() && !netReader.hasStubs()) {
-                    continue;
-                }
-
-                EDIFHierNet edifNet = netlist.getHierNetFromName(netName);
-                net = new Net(netName, edifNet == null ? null : edifNet.getNet());
-                design.addNet(net);
-                net.setType(getNetType(netReader, netName));
-            }
+            EDIFHierNet edifNet = netlist.getHierNetFromName(netName);
+            Net net = new Net(netName, edifNet == null ? null : edifNet.getNet());
+            design.addNet(net);
+            net.setType(getNetType(netReader, netName));
 
             // Sources
             StructList.Reader<RouteBranch.Reader> routeSrcs = netReader.getSources();
-            List<ArcType> prevNonGeneralArcTypes = new ArrayList<>();
             int routeSrcsCount = routeSrcs.size();
             for(int j=0; j < routeSrcsCount; j++) {
                 RouteBranch.Reader branchReader = routeSrcs.get(j);
-                readRouteBranch(branchReader, net, design, strings, prevNonGeneralArcTypes);
+                readRouteBranch(branchReader, net, design, strings, null);
             }
             // Stubs
             StructList.Reader<RouteBranch.Reader> routeStubs = netReader.getStubs();
             int routeStubsCount = routeStubs.size();
             for(int j=0; j < routeStubsCount; j++) {
                 RouteBranch.Reader branchReader = routeStubs.get(j);
-                readRouteBranch(branchReader, net, design, strings, prevNonGeneralArcTypes);
+                readRouteBranch(branchReader, net, design, strings, null);
             }
+
         }
     }
 
     private static void readRouteBranch(RouteBranch.Reader branchReader, Net net, Design design,
-                                        List<String> strings, List<ArcType> prevNonGeneralArcTypes) {
+                                        Enumerator<String> strings, BELPin routeThruLutInput) {
         RouteBranch.RouteSegment.Reader segment = branchReader.getRouteSegment();
+        StructList.Reader<RouteBranch.Reader> branches = branchReader.getBranches();
+        int branchesCount = branches.size();
         Device device = design.getDevice();
         switch(segment.which()) {
             case PIP:{
                 PhysPIP.Reader pReader = segment.getPip();
-                String tileName = strings.get(pReader.getTile());
+                Tile tile = device.getTile(strings.get(pReader.getTile()));
                 String wire0 = strings.get(pReader.getWire0());
                 String wire1 = strings.get(pReader.getWire1());
-                // By comparing pointers, equivalent to comparing the originating int
-                // because they come from strings.get()
-                if (tileName == wire0 && wire0 == wire1) {
-                    if (tileName.equals("STUB_ARC")) {
-                        prevNonGeneralArcTypes.add(ArcType.STUB);
-                    }
-                    else throw new RuntimeException("ERROR: Invalid special PIP on net '" + net + "'");
-                    break;
-                }
-
-                Tile tile = device.getTile(tileName);
-
                 if(tile == null) {
                     throw new RuntimeException("ERROR: Tile " + tile + " for pip from wire " + wire0 + " to wire " + wire1 + " not found.");
                 }
@@ -400,13 +405,6 @@ public class PhysNetlistReader {
                 PIP pip = tile.getPIP(wire0Idx, wire1Idx);
                 if(pip == null) {
                     throw new RuntimeException("ERROR: PIP for tile " + tile + " from wire " + wire0 + " to wire " + wire1 + " not found.");
-                }
-
-                if (!prevNonGeneralArcTypes.isEmpty()) {
-                    for (ArcType at : prevNonGeneralArcTypes) {
-                        pip.updateArcType(at);
-                    }
-                    prevNonGeneralArcTypes.clear();
                 }
 
                 pip.setIsPIPFixed(pReader.getIsFixed());
@@ -428,24 +426,58 @@ public class PhysNetlistReader {
                     throw new RuntimeException(String.format("ERROR: Failed to get BEL pin %s/%s", belName, belPinName));
                 }
 
+                // Examine BEL input pins from SLICEL/M only
+                if (Utils.isSLICE(siteInst) && bel.getBELClass() == BELClass.BEL && belPin.isInput()) {
+
+                    // If this route branch terminates here ...
+                    if (branchesCount == 0) {
+                        // ... and it routed through a LUT along the way
+                        if (routeThruLutInput != null) {
+                            // Then place a route-thru LUT
+
+                            // Make sure nothing placed there already
+                            assert(siteInst.getCell(routeThruLutInput.getBEL()) == null);
+
+                            Cell belCell = siteInst.getCell(bel);
+                            EDIFCellInst cellInst = belCell.getEDIFCellInst();
+                            assert(cellInst != null);
+
+                            Cell c = new Cell(belCell.getName(), routeThruLutInput.getBEL(), cellInst);
+                            c.setSiteInst(siteInst);
+                            siteInst.getCellMap().put(routeThruLutInput.getBELName(), c);
+                            c.setRoutethru(true);
+                            c.addPinMapping(routeThruLutInput.getName(), belCell.getLogicalPinMapping(belPinName));
+                        }
+                    } else if (belName.endsWith("LUT")) {
+                        assert (routeThruLutInput == null);
+
+                        routeThruLutInput = belPin;
+                    }
+                }
+
                 siteInst.routeIntraSiteNet(net, belPin, belPin);
                 break;
             }
             case SITE_P_I_P:{
                 PhysSitePIP.Reader spReader = segment.getSitePIP();
                 SiteInst siteInst = getSiteInst(spReader.getSite(), design, strings);
-                SitePIP sitePIP = siteInst.getSitePIP(strings.get(spReader.getBel()),
-                                                      strings.get(spReader.getPin()));
-                siteInst.addSitePIP(sitePIP);
-                String siteWire = sitePIP.getInputPin().getSiteWireName();
-                siteInst.addCTag(net, siteWire);
+                siteInst.addSitePIP(strings.get(spReader.getBel()),
+                                    strings.get(spReader.getPin()));
                 break;
             }
             case SITE_PIN: {
                 PhysSitePin.Reader spReader = segment.getSitePin();
-                SiteInst siteInst = getSiteInst(spReader.getSite(), design, strings, net.isStaticNet());
+                SiteInst siteInst = getSiteInst(spReader.getSite(), design, strings);
                 String pinName = strings.get(spReader.getPin());
+                if(siteInst == null && net.isStaticNet()){
+                    Site site = design.getDevice().getSite(strings.get(spReader.getSite()));
+                    siteInst = new SiteInst(STATIC_SOURCE + tieoffInstanceCount++, site.getSiteTypeEnum());
+                    siteInst.place(site);
+                }
+
                 net.addPin(new SitePinInst(pinName, siteInst), false);
+
+                assert(routeThruLutInput == null);
                 break;
             }
             case _NOT_IN_SCHEMA: {
@@ -453,18 +485,15 @@ public class PhysNetlistReader {
             }
         }
 
-        List<ArcType> nestedPrevNonGeneralArcTypes = new ArrayList<>();
-
-        StructList.Reader<RouteBranch.Reader> branches = branchReader.getBranches();
-        int branchesCount = branches.size();
         for(int j=0; j < branchesCount; j++) {
             RouteBranch.Reader bReader = branches.get(j);
-            readRouteBranch(bReader, net, design, strings, nestedPrevNonGeneralArcTypes);
+            readRouteBranch(bReader, net, design, strings, routeThruLutInput);
         }
+
     }
 
     private static void readDesignProperties(PhysNetlist.Reader physNetlist, Design design,
-                                             List<String> strings) {
+                                                Enumerator<String> strings) {
         StructList.Reader<Property.Reader> props = physNetlist.getProperties();
         int propCount = props.size();
         for(int i=0; i < propCount; i++) {
@@ -480,11 +509,7 @@ public class PhysNetlistReader {
         }
     }
 
-    private static SiteInst getSiteInst(int stringIdx, Design design, List<String> strings) {
-        return getSiteInst(stringIdx, design, strings, false);
-    }
-
-    private static SiteInst getSiteInst(int stringIdx, Design design, List<String> strings, boolean createIfNotFound) {
+    private static SiteInst getSiteInst(int stringIdx, Design design, Enumerator<String> strings) {
         String siteName = strings.get(stringIdx);
         Site site = design.getDevice().getSite(siteName);
         if(site == null) {
@@ -492,21 +517,21 @@ public class PhysNetlistReader {
                     " found while parsing routing");
         }
         SiteInst siteInst = design.getSiteInstFromSite(site);
-        if(siteInst == null && (site.getSiteTypeEnum() == SiteTypeEnum.TIEOFF || createIfNotFound)) {
+        if(siteInst == null && site.getSiteTypeEnum() == SiteTypeEnum.TIEOFF) {
             // Create a dummy TIEOFF SiteInst
-            siteInst = new SiteInst(SiteInst.STATIC_SOURCE + "_" + site.getName(), site.getSiteTypeEnum());
+            siteInst = new SiteInst(STATIC_SOURCE + tieoffInstanceCount++, site.getSiteTypeEnum());
             siteInst.place(site);
         }
         return siteInst;
     }
 
-    private static void checkNetTypeFromCellNet(Map<String, PhysNet.Reader> cellPinToPhysicalNet, EDIFNet net, List<String> strings) {
+    private static void checkNetTypeFromCellNet(Map<String, PhysNet.Reader> cellPinToPhysicalNet, EDIFNet net, Enumerator<String> strings) {
         // Expand EDIFNet and make sure sink cell pins that are part of a
         // physical net are annotated as a VCC or GND net.
         //
         // It is harder to verify if the VCC/GND net type is correct, because
         // site local inverters may convert signals on a VCC to a GND net or
-        // vice versa.
+        // vise versa.
         //
         // If the full physical net is present and the inverting site pips are
         // labelled, then it would be possible to confirm if the NetType was
@@ -555,7 +580,7 @@ public class PhysNetlistReader {
         }
     }
 
-    private static void mapBelPinsToPhysicalNets(Map<String, PhysNet.Reader> belPinToPhysicalNet, PhysNet.Reader netReader, RouteBranch.Reader routeBranch, List<String> strings) {
+    private static void mapBelPinsToPhysicalNets(Map<String, PhysNet.Reader> belPinToPhysicalNet, PhysNet.Reader netReader, RouteBranch.Reader routeBranch, Enumerator<String> strings) {
         // Populate a map from strings formatted like "<site>/<bel>/<bel pin>"
         // to PhysNet by recursively expanding routing branches.
 
@@ -570,7 +595,7 @@ public class PhysNetlistReader {
         }
     }
 
-    private static void checkConstantRoutingAndNetNaming(PhysNetlist.Reader PhysicalNetlist, EDIFNetlist netlist, List<String> strings) {
+    private static void checkConstantRoutingAndNetNaming(PhysNetlist.Reader PhysicalNetlist, EDIFNetlist netlist, Enumerator<String> strings) {
         // Checks that constant routing and net names are valid.
         //
         // Specifically:
@@ -644,13 +669,13 @@ public class PhysNetlistReader {
 
         // Search the EDIFNetlist for sinks from VCC or GND nets.  Find the
         // EDIFPortInst sinks on those nets, and see if a physical net
-        // corresponds to that cell pin.
+        // corrisponds to that cell pin.
         //
         // If so, verify that the physical net is marked with either VCC or
         // GND.
         //
         // Note: Sink port instances on the VCC net may end up in the GND
-        // physical net, or vice versa. This can occur when a constant net is
+        // physical net, or vise versa. This can occur when a constant net is
         // run through a site local inverter.  Modelling these site local
         // inverters is not done here, hence why the requirement is only that
         // the net type be either VCC or GND.
@@ -679,44 +704,6 @@ public class PhysNetlistReader {
      */
     private static void checkMacros(Design design) {
     	EDIFNetlist netlist = design.getNetlist();
-
-        // Validate macro primitives are placed fully
-        Device device = design.getDevice();
-        EDIFLibrary macroPrims = Design.getMacroPrimitives(device.getSeries());
-        Map<String, List<String>> macroLeafChildren = new HashMap<>();
-
-        HashSet<String> checked = new HashSet<>();
-        for(Cell c : design.getCells()) {
-            EDIFCell cellType = c.getParentCell();
-            if(cellType != null && macroPrims.containsCell(cellType)) {
-                String parentHierName = c.getParentHierarchicalInstName();
-                if(checked.contains(parentHierName)) continue;
-                List<String> missingPlacements = null;
-                List<String> childrenNames = macroLeafChildren.get(cellType.getName());
-                if(childrenNames == null) {
-                    childrenNames = EDIFTools.getMacroLeafCellNames(cellType);
-                    macroLeafChildren.put(cellType.getName(), childrenNames);
-                }
-                //for(EDIFCellInst inst : cellType.getCellInsts()) { // TODO - Fix up loop list
-                for(String childName : childrenNames) {
-                    String childCellName = parentHierName + EDIFTools.EDIF_HIER_SEP + childName;
-                    Cell child = design.getCell(childCellName);
-                    if(child == null) {
-                        if(missingPlacements == null) missingPlacements = new ArrayList<String>();
-                        missingPlacements.add(childName + " (" + childCellName + ")");
-                    }
-                }
-                if(missingPlacements != null && !cellType.getName().equals("IOBUFDS")) {
-                    throw new RuntimeException("ERROR: Macro primitive '"+ parentHierName
-                            + "' is not fully placed. Expected placements for all child cells: "
-                            + cellType.getCellInsts() + ", but missing placements "
-                            + "for cells: " + missingPlacements);
-                }
-
-                checked.add(parentHierName);
-            }
-        }
-
     	List<EDIFHierCellInst> leaves = netlist.getTopCell().getAllLeafDescendants();
     	EDIFLibrary macros = Design.getMacroPrimitives(design.getDevice().getSeries());
     	for(EDIFHierCellInst leaf : leaves) {
