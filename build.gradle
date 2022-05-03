@@ -44,12 +44,14 @@ sourceSets {
 }
 
 task copyJars(type: Copy) {
-    from configurations.implementation
+    from configurations.api
     into 'jars'
-    from configurations.testFixturesImplementation
+    //testFixturesImplementation contains the output jar, as well as an implicit dependency on the task.
+    //Filter to remove the jar itself, getFiles() to remove the implicit dependency
+    from configurations.testFixturesImplementation.filter { !tasks.getByName("jar").outputs.files.contains(it) } .getFiles()
     into 'jars'
 }
-//compileJava.dependsOn(copyJars)
+compileJava.dependsOn(copyJars)
 
 task deleteJars(type: Delete) {
     delete fileTree('jars')
@@ -187,3 +189,4 @@ task printVersion() {
         print(rapidwright_version)
     }
 }
+
