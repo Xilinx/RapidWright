@@ -247,7 +247,7 @@ public class EDIFLibrary extends EDIFName {
 		yetToVisit.remove(cell.getLegalEDIFName());
 		for(EDIFCellInst i : cell.getCellInsts()){
 			EDIFCell childCell = i.getCellType();
-			if(containsCell(childCell) && yetToVisit.containsKey(childCell.getLegalEDIFName())){
+			if(childCell.getLibrary() == this && containsCell(childCell) && yetToVisit.containsKey(childCell.getLegalEDIFName())){
 				visit(childCell,visited,yetToVisit);
 			}
 		}
