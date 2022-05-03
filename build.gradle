@@ -15,7 +15,7 @@ def read_rapidwright_version() {
     }
     return sw.toString().replace("RAPIDWRIGHT_VERSION: v", "").replace("-beta", "").trim() + ""
 }
-def rapidwright_version = project.hasProperty('overwrite_rapidwright_version') ? overwrite_rapidwright_version : read_rapidwright_version()
+def rapidwright_version = project.hasProperty('override_rapidwright_version') ? override_rapidwright_version : read_rapidwright_version()
 
 dependencies {
     api 'com.xilinx.rapidwright:rapidwright-api-lib:' + rapidwright_version
