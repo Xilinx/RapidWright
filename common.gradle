@@ -1,5 +1,6 @@
 apply plugin: 'application'
 apply plugin: 'java-library'
+apply plugin: "java-test-fixtures"
 
 sourceCompatibility = 8
 targetCompatibility = 8
@@ -38,9 +39,9 @@ dependencies {
   api 'commons-io:commons-io:2.11.0'
   api 'com.xilinx.rapidwright:qtjambi-'+os+':4.5.2_01'
   api 'com.xilinx.rapidwright:jupyter-kernel-jsr223:1.0.1'
-  testImplementation 'org.junit.jupiter:junit-jupiter-api:5.7.1'
-  testImplementation 'org.junit.jupiter:junit-jupiter-engine:5.7.1'
-  testImplementation 'org.junit.jupiter:junit-jupiter-params:5.7.1'
+  testFixturesApi 'org.junit.jupiter:junit-jupiter-api:5.7.1'
+  testFixturesApi 'org.junit.jupiter:junit-jupiter-engine:5.7.1'
+  testFixturesApi 'org.junit.jupiter:junit-jupiter-params:5.7.1'
 }
 //Kryo needs to access sun.nio.ch.DirectBuffer. This is forbidden by default in Java 16 and up. Check if we need to add a jvm arg.
 if (org.gradle.api.JavaVersion.current().isJava10Compatible()) {
@@ -49,6 +50,7 @@ if (org.gradle.api.JavaVersion.current().isJava10Compatible()) {
 
 configurations.implementation.canBeResolved = true
 configurations.testImplementation.canBeResolved = true
+configurations.testFixturesImplementation.canBeResolved = true
 configurations.api.canBeResolved = true
 
 tasks.withType(Test) {

@@ -8,7 +8,6 @@ apply from: 'common.gradle'
 
 mainClassName = "com.xilinx.rapidwright.MainEntrypoint"
 
-
 def read_rapidwright_version() {
     def sw = new StringWriter()
     file('.github/workflows/build.yml').filterLine(sw) {
@@ -31,7 +30,12 @@ sourceSets {
   }
   test {
     java {
-      srcDirs = ['test/src', 'test/shared']
+      srcDirs = ['test/src']
+    }
+  }
+  testFixtures {
+    java {
+      srcDirs = ['test/shared']
     }
     resources {
       srcDirs = ['test/testResources']
@@ -42,10 +46,10 @@ sourceSets {
 task copyJars(type: Copy) {
     from configurations.implementation
     into 'jars'
-    from configurations.testImplementation
+    from configurations.testFixturesImplementation
     into 'jars'
 }
-compileJava.dependsOn(copyJars)
+//compileJava.dependsOn(copyJars)
 
 task deleteJars(type: Delete) {
     delete fileTree('jars')
