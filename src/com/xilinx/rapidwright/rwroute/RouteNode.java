@@ -344,12 +344,9 @@ public abstract class RouteNode {
 	 * @return True if child already present.
 	 */
 	public boolean containsChild(RouteNode rnode) {
-		if (children == null) {
-			return false;
-		}
 		// This linear search is rather inefficient, but is currently only used by
 		// PartialRouter.unpreserveNet() which is not expected to be called often
-		for (RouteNode child : children) {
+		for (RouteNode child : getChildren()) {
 			if (child == rnode) {
 				return true;
 			}
