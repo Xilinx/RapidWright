@@ -57,6 +57,9 @@ tasks.withType(Test) {
   maxHeapSize = "5G"
   //Propagate JVM settings to test JVM
   jvmArgs applicationDefaultJvmArgs
+
+  environment 'RAPIDWRIGHT_PATH', rapidwrightDir
+
   //We need to rerun tests when the data files change
   if (file(rapidwrightDir + '/data').exists()) {
     inputs.dir file(rapidwrightDir + '/data')
