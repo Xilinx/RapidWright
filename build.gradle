@@ -184,7 +184,7 @@ test {
   dependsOn testPython
 }
 
-task printVersion() {
+task printRapidWrightVersion() {
     doLast {
         print(rapidwright_version)
     }
