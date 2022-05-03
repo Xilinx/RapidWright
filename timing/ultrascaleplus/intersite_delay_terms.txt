@@ -2,11 +2,7 @@
 # v 0.4
 
 START_TILE_ROW		1.
-# Select an INT tile containing CLE on both sides
-# VU3P :: get property COLUMN [get_tiles INT_X2Y299]
-# START_TILE_COL		61.
-# VU19P :: get property COLUMN [get_tiles INT_X1Y1199]
-START_TILE_COL		58.
+START_TILE_COL		61.
 
 # input site pin delay
 # FIXED_DELAY is obsolete and should be replaced by A1-A6 below
