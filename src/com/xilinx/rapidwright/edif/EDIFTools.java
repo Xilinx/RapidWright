@@ -52,6 +52,7 @@ import com.xilinx.rapidwright.design.PinType;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.FileTools;
+import com.xilinx.rapidwright.util.ParallelismTools;
 
 
 /**
@@ -369,9 +370,13 @@ public class EDIFTools {
 			case '@':
 			case '$':
 			case '&':
+			case ' ':
 				newName[i] = '_';
 			default:
 				// Keep the same
+			}
+			if (newName[i]>127) {
+				newName[i] = '_';
 			}
 		}
 		if(newName[0] == '_' || Character.isDigit(newName[0])) return "&" + new String(newName,0,len); 
@@ -473,11 +478,10 @@ public class EDIFTools {
 	 * cell definition.
 	 * @param src The logical port inst driver or source  
 	 * @param snk The logical port inst sink
-	 * @param netlist The EDIF netlist of the design
 	 * @param newName A unique name to be used in creating the ports and nets
 	 */
 	public static void connectPortInstsThruHier(EDIFHierPortInst src, EDIFHierPortInst snk, 
-	        EDIFNetlist netlist, String newName) {
+	        String newName) {
 	    EDIFHierCellInst commonAncestor = 
 	            src.getHierarchicalInst().getCommonAncestor(snk.getHierarchicalInst());
 	    EDIFHierPortInst finalSrc = src;
@@ -705,11 +709,19 @@ public class EDIFTools {
 	}
 
 	public static EDIFNetlist loadEDIFFile(Path fileName) {
-		try (EDIFParser p = new EDIFParser(fileName)) {
-			return p.parseEDIFNetlist();
-		} catch (IOException e) {
-			throw new UncheckedIOException("ERROR: Couldn't read file : " + fileName, e);
-		}
+	    try {
+	        if(ParallelismTools.getParallel()) {
+	            try (ParallelEDIFParser p = new ParallelEDIFParser(fileName)) {
+	                return p.parseEDIFNetlist();
+	            }           
+	        } else {
+	            try (EDIFParser p = new EDIFParser(fileName)) {
+	                return p.parseEDIFNetlist();
+	            }                       
+	        }	        
+	    } catch (IOException e) {
+	        throw new UncheckedIOException("ERROR: Couldn't read file : " + fileName, e);
+	    }
 	}
 
 	public static EDIFNetlist loadEDIFFile(String fileName){
@@ -906,8 +918,23 @@ public class EDIFTools {
 		EDIFDesign eDesign = new EDIFDesign(topName);
 		n.setDesign(eDesign);
 		eDesign.setTopCell(top);
-		
 		return n;
+	}
+
+	/**
+	 * Creates a new netlist from an existing EDIFCellInst in a netlist.  This operation is 
+	 * destructive to the source netlist.   
+	 * @param cellInst The new top cell/top cell inst in the netlist.
+	 * @return The newly created netlist from the provided cell inst.
+	 */
+	public static EDIFNetlist createNewNetlist(EDIFCellInst cellInst){
+	    EDIFNetlist n = new EDIFNetlist(cellInst.getName());
+	    n.generateBuildComments();
+	    EDIFDesign eDesign = new EDIFDesign(cellInst.getName());
+	    n.setDesign(eDesign);
+	    eDesign.setTopCell(cellInst.getCellType());
+	    n.migrateCellAndSubCells(cellInst.getCellType());
+	    return n;
 	}
 	
 	public static int[] bitBlastBus(String busSuffix){

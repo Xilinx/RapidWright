@@ -112,7 +112,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
      */
     protected void addPortInst(EDIFPortInst epr) {
         if(portInsts == null) portInsts = new EDIFPortInstList();
-        if(!epr.getCellInst().equals(this)) 
+        if(!epr.getCellInst().equals(this))
             throw new RuntimeException("ERROR: Incorrect EDIFPortInst '"+
                 epr.getFullName()+"' being added to EDIFCellInst " + toString());
         portInsts.add(epr);
@@ -181,6 +181,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
      */
     public void setParentCell(EDIFCell parent) {
         this.parentCell = parent;
+        parent.trackChange(EDIFChangeType.CELL_INST_ADD, getName());
     }
 
     /**
@@ -261,5 +262,25 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
     @Override
     public String getUniqueKey() {
         return getCellType().getUniqueKey() + "_" + getParentCell().getUniqueKey() + "_" + getName();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        if (!super.equals(o))
+            return false;
+        EDIFCellInst that = (EDIFCellInst) o;
+
+        if (!parentCell.equals(that.parentCell))
+            return false;
+
+        if (!cellType.equals(that.cellType))
+            return false;
+
+        if (!viewref.equals(that.viewref))
+            return false;
+
+        return true;
     }
 }
