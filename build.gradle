@@ -38,7 +38,7 @@ sourceSets {
       srcDirs = ['test/shared']
     }
     resources {
-      srcDirs = ['test/testResources']
+      srcDirs = ['test/resources']
     }
   }
 }
