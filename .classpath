@@ -1,7 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <classpath>
 	<classpathentry kind="src" path="src"/>
-	<classpathentry kind="src" output="build/classes/java/test" path="test">
+	<classpathentry kind="src" output="build/classes/java/test" path="test/src">
+		<attributes>
+			<attribute name="test" value="true"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="src" output="build/classes/java/test" path="test/shared">
 		<attributes>
 			<attribute name="test" value="true"/>
 		</attributes>
