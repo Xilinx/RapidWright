@@ -151,7 +151,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         }
         String seriesName = design.getDevice().getSeries().name().toLowerCase();
         intrasiteAndLogicDelayModel = DelayModelBuilder.getDelayModel(seriesName);
-
+          
         if(routerTimer != null) routerTimer.createRuntimeTracker("determine logic dly", "build timing graph").start();
         myCellMap = design.getNetlist().generateCellInstMap();
         if(!isPartialRouting) {
@@ -162,11 +162,12 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         if(routerTimer != null) routerTimer.getRuntimeTracker("determine logic dly").stop();
         
         if(routerTimer != null) routerTimer.createRuntimeTracker("add net dly edges", "build timing graph").start();
-        // for (Net net : design.getNets()) {
-        for (Net net : targetNets) {
+        for (Net net : design.getNets()) {
             if(net.isClockNet()) continue;//this is for getting rid of the problem in addNetDelayEdges() of clock net
             if(net.isStaticNet()) continue;
-            addNetDelayEdges(net);
+            if(!isPartialRouting || !net.hasPIPs()) {
+            	addNetDelayEdges(net);
+            }
         }
         
         addTimingEdgesOfNets(isPartialRouting, targetNets);
@@ -174,7 +175,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         if(routerTimer != null) routerTimer.getRuntimeTracker("add net dly edges").stop();
     }
     
-    public void addTimingEdgesOfNets(boolean isPartialRouting, Collection<Net> assignedNets) {
+    private void addTimingEdgesOfNets(boolean isPartialRouting, Collection<Net> assignedNets) {
     	for (Net net : assignedNets) {
 			if(net.isClockNet()) continue;//this is for getting rid of the problem in addNetDelayEdges() of clock net
 			if(net.isStaticNet()) continue;
@@ -1632,7 +1633,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     }
     
     public boolean overwriteBUGCEDelay = false;
-    public int addNetDelayEdges(Net net) {
+    int addNetDelayEdges(Net net) {
     	EDIFNet edifNet = net.getLogicalNet();
     	boolean haveIntrasiteNet = (net.getSinkPins().size() == 0);
     	SitePinInst spi_source = net.getSource();
@@ -1891,9 +1892,6 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                 sinkSitePinInstTimingEdges.put(spi_sink, connectionEdges);
             }
         }
-
-        // Clear the topological order so that it will be recomputed
-        orderedTimingVertices.clear();
         return 1;
     }
     
@@ -1981,10 +1979,6 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
 			}
 			EDIFHierPortInst hportSink = hportsFromSitePinInsts.get(0);
 			SitePinInst mappedSink = edifHPortMap.get(hportSink);
-			// FIXME
-			if (mappedSink == null) {
-			    mappedSink = connection.getSink();
-			}
 			
 			List<TimingEdge> timingEdges = sinkSitePinInstTimingEdges.get(mappedSink);
 			if(timingEdges == null) {

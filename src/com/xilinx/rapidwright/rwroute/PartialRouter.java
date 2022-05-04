@@ -307,11 +307,7 @@ public class PartialRouter extends RWRoute{
 
 			// Update the timing graph
 			if(config.isTimingDriven()) {
-				timingManager.getTimingGraph().addNetDelayEdges(net);
 				timingManager.setTimingEdgesOfConnections(netWrapper.getConnections());
-				for (Connection netnewConnection : netWrapper.getConnections()) {
-					netnewConnection.updateRouteDelay();
-				}
 			}
 		}
 
