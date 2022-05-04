@@ -714,14 +714,14 @@ public class EDIFTools {
 	            try (ParallelEDIFParser p = new ParallelEDIFParser(fileName)) {
 	                return p.parseEDIFNetlist();
 	            }           
-	        }else {
+	        } else {
 	            try (EDIFParser p = new EDIFParser(fileName)) {
 	                return p.parseEDIFNetlist();
 	            }                       
 	        }	        
 	    } catch (IOException e) {
-            throw new UncheckedIOException("ERROR: Couldn't read file : " + fileName, e);
-        }
+	        throw new UncheckedIOException("ERROR: Couldn't read file : " + fileName, e);
+	    }
 	}
 
 	public static EDIFNetlist loadEDIFFile(String fileName){
