@@ -65,7 +65,7 @@ public class RWRoute{
 	/** The design to route */
 	protected Design design;
 	/** A flag to indicate if the device has multiple SLRs, for the sake of avoiding unnecessary check for single-SLR devices */
-	protected boolean multiSLRDevice;
+	private boolean multiSLRDevice;
 	/** Created NetWrappers */
 	protected Map<Net,NetWrapper> nets;
 	/** A list of indirect connections that will go through iterative routing */
@@ -75,14 +75,14 @@ public class RWRoute{
 	/** Sorted indirect connections */
 	private List<Connection> sortedIndirectConnections;
 	/** A list of global clock nets */
-	protected List<Net> clkNets;
+	private List<Net> clkNets;
 	/** Static nets */
 	protected Map<Net, List<SitePinInst>> staticNetAndRoutingTargets;
 	/** Several integers to indicate the netlist info */
-	private int numPreservedRoutableNets;
+	protected int numPreservedRoutableNets;
 	private int numPreservedClks;
 	private int numPreservedStaticNets;
-	private int numPreservedWire;
+	protected int numPreservedWire;
 	private int numWireNetsToRoute;
 	private int numConnectionsToRoute;
 	private int numNotNeedingRoutingNets;
@@ -117,7 +117,8 @@ public class RWRoute{
 	private Set<RouteNode> overUsedRnodes;
 	/** Class encapsulating the routing resource graph */
 	protected RouteNodeGraph routingGraph;
-	protected long rnodesCreatedThisIteration;
+	/** Count of rnodes created in the current routing iteration */
+	private long rnodesCreatedThisIteration;
 	/** The queue to store candidate nodes to route a connection */
 	private PriorityQueue<RouteNode> queue;
 
@@ -352,7 +353,7 @@ public class RWRoute{
 	 */
 	protected void addNetConnectionToRoutingTargets(Net net) {
 		net.unroute();
-		createsNetWrapperAndConnections(net);
+		createNetWrapperAndConnections(net);
 	}
 	
 	/**
@@ -455,7 +456,7 @@ public class RWRoute{
 	 * @param net The net to be initialized.
 	 * @return A {@link NetWrapper} instance.
 	 */
-	protected NetWrapper createsNetWrapperAndConnections(Net net) {
+	protected NetWrapper createNetWrapperAndConnections(Net net) {
 		NetWrapper netWrapper = new NetWrapper(numWireNetsToRoute++, net);
 		NetWrapper existingNetWrapper = nets.put(net, netWrapper);
 		assert(existingNetWrapper == null);
@@ -528,14 +529,6 @@ public class RWRoute{
 
 	public boolean isMultiSLRDevice() {
 		return multiSLRDevice;
-	}
-
-	protected void removeNetNodesFromPreservedNodes(Net net) {
-		Collection<Node> netNodes = RouterHelper.getNodesOfNet(net);
-		for(Node node : netNodes) {
-			routingGraph.unpreserve(node);
-		}
-		numPreservedWire--;
 	}
 
 	/**
@@ -846,7 +839,7 @@ public class RWRoute{
 	/**
 	 * Assigns a list nodes to each connection to complete the route path of it.
 	 */
-	protected void assignNodesToConnections() {
+	private void assignNodesToConnections() {
 		for(Connection connection : indirectConnections) {
 			List<Node> nodes = new ArrayList<>();
 			List<Node> switchBoxToSink = RouterHelper.findPathBetweenNodes(connection.getSinkRnode().getNode(), connection.getSink().getConnectedNode());
@@ -875,7 +868,7 @@ public class RWRoute{
 	/**
 	 * Sorts indirect connections for routing.
 	 */
-	protected void sortConnections(){
+	private void sortConnections(){
 		sortedIndirectConnections.clear();
 		sortedIndirectConnections.addAll(indirectConnections);
 		sortedIndirectConnections.sort((connection1, connection2) -> {
@@ -1111,7 +1104,7 @@ public class RWRoute{
 	/**
 	 * Sets a list of {@link PIP} instances of each {@link Net} instance and checks if there is any PIP overlaps.
 	 */
-	protected void setPIPsOfNets(){
+	private void setPIPsOfNets(){
 		for(Entry<Net,NetWrapper> e : nets.entrySet()){
 			NetWrapper netWrapper = e.getValue();
 			Net net = netWrapper.getNet();

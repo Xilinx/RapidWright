@@ -197,7 +197,7 @@ public class PartialRouter extends RWRoute{
 			return;
 		}
 
-		NetWrapper netWrapper = createsNetWrapperAndConnections(net);
+		NetWrapper netWrapper = createNetWrapperAndConnections(net);
 
 		if (numRouted > 0) {
 			partiallyPreserved.add(netWrapper);
@@ -285,7 +285,7 @@ public class PartialRouter extends RWRoute{
 			}
 		} else {
 			// Net needs to be created
-			netWrapper = createsNetWrapperAndConnections(net);
+			netWrapper = createNetWrapperAndConnections(net);
 
 			// Collect all nodes used by this net
 			for (PIP pip : net.getPIPs()) {
@@ -335,6 +335,9 @@ public class PartialRouter extends RWRoute{
 			// whether a node has been visited during expansion)
 			rnode.setPrev(null);
 		}
+
+		numPreservedWire--;
+		numPreservedRoutableNets--;
 	}
 
 	@Override

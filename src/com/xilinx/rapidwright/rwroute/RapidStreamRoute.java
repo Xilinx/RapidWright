@@ -116,8 +116,8 @@ public class RapidStreamRoute extends PartialRouter{
 				continue;
 			}
 			
-			removeNetNodesFromPreservedNodes(net); // remove preserved nodes of a net from the map
-			createsNetWrapperAndConnections(net);
+			unpreserveNet(net); // remove preserved nodes of a net from the map
+			createNetWrapperAndConnections(net);
 			net.unroute();//NOTE: no need to unroute if routing tree is reused, then toPreserveNets should be detected before createNetWrapperAndConnections
 		}
 		for(Net net : toPreserveNets) {
