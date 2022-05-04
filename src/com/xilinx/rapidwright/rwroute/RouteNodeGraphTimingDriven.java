@@ -115,7 +115,7 @@ public class RouteNodeGraphTimingDriven extends RouteNodeGraph {
             s.append(", ");
             s.append(String.format("ic = %s", node.getIntentCode()));
             s.append(", ");
-            s.append(String.format("dly = %d", delay));
+            s.append(String.format("dly = %f", delay));
             s.append(", ");
             s.append(String.format("user = %s", getOccupancy()));
             s.append(", ");

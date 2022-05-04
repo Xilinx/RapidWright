@@ -448,8 +448,7 @@ public class ECORouter extends PartialRouter {
 
     public static Design routeDesignNonTimingDriven(Design design) {
         RWRouteConfig config = new RWRouteConfig(new String[] {
-                "--partialRouting",
-                "--enlargeBoundingBox", // Necessary to ensure that we can reach a Laguna column
+                "--enlargeBoundingBox", // Necessary to ensure that we can reach Laguna columns
                 "--nonTimingDriven",
                 "--verbose"});
         return routeDesign(design, config, () -> new ECORouter(design, config));
@@ -457,8 +456,7 @@ public class ECORouter extends PartialRouter {
 
     public static Design routeDesignTimingDriven(Design design, float timingRequirementNs) {
         RWRouteConfig config = new RWRouteConfig(new String[] {
-                "--partialRouting",
-                "--enlargeBoundingBox", // Necessary to ensure that we can reach a Laguna column
+                "--enlargeBoundingBox", // Necessary to ensure that we can reach Laguna columns
                 "--verbose"});
         return routeDesign(design, config, () -> new ECORouter(design, config, timingRequirementNs));
     }

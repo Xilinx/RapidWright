@@ -30,16 +30,22 @@ import java.util.List;
 import java.util.Set;
 
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.timing.ClkRouteTiming;
+import com.xilinx.rapidwright.timing.TimingManager;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
 import com.xilinx.rapidwright.util.RuntimeTracker;
 
 /**
- * A class extends {@link RWRoute} for partial routing.
+ * A class extending {@link RWRoute} for partial routing.
+ * In partial routing mode, nets that are already routed will be preserved and
+ * the router routes unrouted connections (where SitePinInst.isRouted() returns
+ * false) only.
  */
 public class PartialRouter extends RWRoute{
 	protected class RouteNodeGraphPartial extends RouteNodeGraph {
@@ -104,8 +110,15 @@ public class PartialRouter extends RWRoute{
 		return true;
 	}
 
-	public PartialRouter(Design design, RWRouteConfig config){
+	final boolean softPreserve;
+
+	public PartialRouter(Design design, RWRouteConfig config, boolean softPreserve){
 		super(design, config);
+		this.softPreserve = softPreserve;
+	}
+
+	public PartialRouter(Design design, RWRouteConfig config){
+		this(design, config, false);
 	}
 
 	@Override
@@ -117,6 +130,12 @@ public class PartialRouter extends RWRoute{
 		} else {
 			return new RouteNodeGraphPartial(rnodesTimer, design);
 		}
+	}
+
+	@Override
+	protected TimingManager createTimingManager(ClkRouteTiming clkTiming, Collection<Net> timingNets) {
+		final boolean isPartialRouting = true;
+		return new TimingManager(design, routerTimer, config, clkTiming, timingNets, isPartialRouting);
 	}
 
 	@Override
@@ -316,12 +335,46 @@ public class PartialRouter extends RWRoute{
 		boolean hasAltOutput = super.handleUnroutableConnection(connection);
 		if (hasAltOutput)
 			return true;
-		if (config.isSoftPreserve()) {
+		if (softPreserve) {
 			if (routeIteration == 2) {
 				unpreserveNetsAndReleaseResources(connection);
 				return true;
 			}
 		}
 		return false;
+	}
+
+	private static Design routeDesign(Design design, RWRouteConfig config) {
+		DesignTools.createMissingSitePinInsts(design);
+		if((!design.getVccNet().hasPIPs() && !design.getGndNet().hasPIPs())) {
+			DesignTools.createPossiblePinsToStaticNets(design);
+		}
+
+		if(config.isMaskNodesCrossRCLK()) {
+			System.out.println("WARNING: Masking nodes across RCLK for partial routing could result in routability problems.");
+		}
+
+		return routeDesign(design, config, () -> new PartialRouter(design, config));
+	}
+
+	/**
+	 * Routes a design in the partial non-timing-driven routing mode.
+	 * @param design The {@link Design} instance to be routed.
+	 */
+	public static Design routeDesignPartialNonTimingDriven(Design design) {
+		return routeDesign(design, new RWRouteConfig(new String[] {
+				"--fixBoundingBox",
+				"--nonTimingDriven",
+				"--verbose"}));
+	}
+
+	/**
+	 * Routes a design in the partial timing-driven routing mode.
+	 * @param design The {@link Design} instance to be routed.
+	 */
+	public static Design routeDesignPartialTimingDriven(Design design) {
+		return routeDesign(design, new RWRouteConfig(new String[] {
+				"--fixBoundingBox",
+				"--verbose"}));
 	}
 }
