@@ -274,7 +274,7 @@ public class RouterHelper {
 	 * Gets a (non-unique) collection of {@link Node} instances used by a {@link Net} instance.
 	 * Nodes associated with unrouted sink pins on this net will be excluded.
 	 * @param net The target net.
-	 * @return A collection of nodes used by a net.
+	 * @return A collection of nodes used by target net.
 	 */
 	public static Collection<Node> getNodesOfNet(Net net){
 		List<SitePinInst> pins = net.getPins();

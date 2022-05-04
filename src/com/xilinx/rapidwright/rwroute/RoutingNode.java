@@ -29,7 +29,7 @@ import com.xilinx.rapidwright.device.Node;
  * A lightweight useful class for different simple routing-related scenarios, 
  * each {@link RoutingNode} Object is associated to a {@link Node} Object.
  */
-public class RoutingNode {
+public class RoutingNode{
 	private Node node;
 	private RoutingNode prev;
 	private boolean isTarget;

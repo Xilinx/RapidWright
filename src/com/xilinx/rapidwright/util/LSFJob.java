@@ -43,8 +43,6 @@ public class LSFJob extends Job {
 	public static String LSF_PROJECT = "RapidWright";
 	
 	public static String LSF_QUEUE = "medium";
-
-	public static String LSF_SLOTS = "1";
 	
 	
 	/* (non-Javadoc)
@@ -64,8 +62,6 @@ public class LSFJob extends Job {
 				LSF_PROJECT +"-"+ System.getenv("USER"), 
 				"-q", 
 				LSF_QUEUE,
-				"-n",
-				LSF_SLOTS,
 				FileTools.isWindows() ? "cmd.exe" : "/bin/bash",
 				launchScriptNames.getFirst()};
 
