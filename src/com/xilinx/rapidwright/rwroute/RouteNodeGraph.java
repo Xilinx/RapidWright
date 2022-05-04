@@ -45,30 +45,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Encapsulation of RWRoute's routing resource graph.
+ */
 public class RouteNodeGraph {
-
-    protected class RouteNodeImpl extends RouteNode {
-
-        public RouteNodeImpl(Node node, RouteNodeType type) {
-            super(node, type);
-        }
-
-        @Override
-        protected RouteNode getOrCreate(Node node, RouteNodeType type) {
-            return RouteNodeGraph.this.getOrCreate(node, type).getFirst();
-        }
-
-        @Override
-        public boolean isExcluded(Node parent, Node child) {
-            return RouteNodeGraph.this.isExcluded(parent, child);
-        }
-
-        @Override
-        public RouteNode[] getChildren() {
-            setChildren(setChildrenTimer);
-            return super.getChildren();
-        }
-    }
 
     /**
      * A map of nodes to created rnodes
@@ -96,6 +76,29 @@ public class RouteNodeGraph {
     private long totalVisited;
 
     final Design design;
+
+    protected class RouteNodeImpl extends RouteNode {
+
+        public RouteNodeImpl(Node node, RouteNodeType type) {
+            super(node, type);
+        }
+
+        @Override
+        protected RouteNode getOrCreate(Node node, RouteNodeType type) {
+            return RouteNodeGraph.this.getOrCreate(node, type).getFirst();
+        }
+
+        @Override
+        public boolean isExcluded(Node parent, Node child) {
+            return RouteNodeGraph.this.isExcluded(parent, child);
+        }
+
+        @Override
+        public RouteNode[] getChildren() {
+            setChildren(setChildrenTimer);
+            return super.getChildren();
+        }
+    }
 
     public RouteNodeGraph(RuntimeTracker setChildrenTimer, Design design) {
         nodesMap = new HashMap<>();

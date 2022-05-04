@@ -102,7 +102,7 @@ public class RapidStreamRoute extends PartialRouter{
 			}
 		}
 
-		routingGraph.asyncPreserve(nodes, netToPreserve);
+		super.addPreservedNodes(nodes, netToPreserve);
 	}
 	
 	/**

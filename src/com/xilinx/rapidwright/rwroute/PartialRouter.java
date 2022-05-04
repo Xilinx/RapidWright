@@ -50,6 +50,11 @@ import com.xilinx.rapidwright.util.RuntimeTracker;
  * unroutable connections to be ripped up and re-routed.
  */
 public class PartialRouter extends RWRoute{
+
+	final protected boolean softPreserve;
+
+	protected Set<NetWrapper> partiallyPreserved;
+
 	protected class RouteNodeGraphPartial extends RouteNodeGraph {
 
 		public RouteNodeGraphPartial(RuntimeTracker setChildrenTimer, Design design) {
@@ -77,6 +82,16 @@ public class PartialRouter extends RWRoute{
 			}
 			return super.isExcluded(parent, child);
 		}
+	}
+
+	public PartialRouter(Design design, RWRouteConfig config, boolean softPreserve){
+		super(design, config);
+		this.softPreserve = softPreserve;
+		partiallyPreserved = new HashSet<>();
+	}
+
+	public PartialRouter(Design design, RWRouteConfig config){
+		this(design, config, false);
 	}
 
 	/**
@@ -110,19 +125,6 @@ public class PartialRouter extends RWRoute{
 		}
 
 		return true;
-	}
-
-	final boolean softPreserve;
-	Set<NetWrapper> partiallyPreserved;
-
-	public PartialRouter(Design design, RWRouteConfig config, boolean softPreserve){
-		super(design, config);
-		this.softPreserve = softPreserve;
-		partiallyPreserved = new HashSet<>();
-	}
-
-	public PartialRouter(Design design, RWRouteConfig config){
-		this(design, config, false);
 	}
 
 	@Override

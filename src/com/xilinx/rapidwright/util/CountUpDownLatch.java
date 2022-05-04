@@ -22,8 +22,13 @@
  
 package com.xilinx.rapidwright.util;
 
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 
+/**
+ * Mirrors {@link CountDownLatch} functionality but with the ability to
+ * count up too.
+ */
 public class CountUpDownLatch {
     private final AtomicInteger count;
     private final Object lock;
