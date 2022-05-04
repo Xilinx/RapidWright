@@ -58,10 +58,7 @@ public class ECORouter extends PartialRouter {
 
         @Override
         protected boolean isExcluded(Node parent, Node child) {
-            // Note that the isPreserved(Node) overload is called,
-            // and not isPreserved(Node, Node) which is overridden by
-            // RouteNodeGraphPartial and may only be called once
-            if (!isPreserved(child) && allowLutRoutethru(parent, child)) {
+            if (allowLutRoutethru(parent, child)) {
                 return false;
             }
 
@@ -77,10 +74,7 @@ public class ECORouter extends PartialRouter {
 
         @Override
         protected boolean isExcluded(Node parent, Node child) {
-            // Note that the isPreserved(Node) overload is called,
-            // and not isPreserved(Node, Node) which is overridden by
-            // RouteNodeGraphPartial and may only be called once
-            if (!isPreserved(child) && allowLutRoutethru(parent, child)) {
+            if (allowLutRoutethru(parent, child)) {
                 return false;
             }
 
@@ -110,6 +104,10 @@ public class ECORouter extends PartialRouter {
             return false;
         }
 
+        if (routingGraph.isPreserved(child)) {
+            return false;
+        }
+
         SitePin sp = parent.getSitePin();
         Site s = sp.getSite();
         SiteTypeEnum siteType = s.getSiteTypeEnum();
@@ -118,34 +116,35 @@ public class ECORouter extends PartialRouter {
         if (pinName.length() != 2)
             return false;
 
-        // Only support O6 route-thrus
-        if (!child.getWireName().endsWith("_O"))
+        char first = pinName.charAt(0);
+        assert(first >= 'A' && first <= 'H');
+
+        // Only consider [A-H]_O routethrus to avoid the complication of
+        // having both [A-H]_O and [A-H]MUX occurring simultaneously
+        String childWireName = child.getWireName();
+        if (childWireName.endsWith("_O"))
             return false;
 
-        char first = pinName.charAt(0);
         char second = pinName.charAt(1);
-        if (first >= 'A' && first <= 'H' && second >= '1' && second <= '5') {
-            SiteInst si = design.getSiteInstFromSite(s);
+        assert(second >= '1' && second <= '6');
 
-            // Nothing placed at site, all routethrus possible
-            if (si == null)
-                return true;
-
-            // O6 already used by something/someone else
-            boolean O6used = si.getNetFromSiteWire(first + "_O") != null;
-            if (O6used)
-                return false;
-
-            // O5 already used by something/someone else
-            // boolean O5used = si.getNetFromSiteWire(first + "5LUT_O5") != null;
-            // if (O5used)
-            //     return false;
-
-            // Routethru allowed
+        SiteInst si = design.getSiteInstFromSite(s);
+        // Nothing placed at site, all routethrus possible
+        if (si == null)
             return true;
-        }
 
-        return false;
+        // O6 already used by something else
+        boolean O6used = si.getNetFromSiteWire(first + "_O") != null;
+        if (O6used)
+            return false;
+
+        // O5 already used by something else
+        boolean O5used = si.getNetFromSiteWire(first + "5LUT_O5") != null;
+        if (O5used)
+            return false;
+
+        // Routethru allowed
+        return true;
     }
 
     public ECORouter(Design design, RWRouteConfig config, float timingRequirementNs) {

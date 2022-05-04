@@ -49,11 +49,11 @@ public class PartialRouter extends RWRoute{
 		}
 
 		@Override
-		protected boolean isPreserved(Node parent, Node child) {
-			boolean preserved = super.isPreserved(parent, child);
-			// Note that maskPreservedIfExistingRoute() can only be called
-			// once for each child node
-			return preserved && maskPreservedIfExistingRoute(parent, child);
+		protected boolean isExcluded(Node parent, Node child) {
+			if (isPreserved(child) && maskPreservedIfExistingRoute(parent, child)) {
+				return true;
+			}
+			return super.isExcluded(parent, child);
 		}
 	}
 
@@ -63,11 +63,11 @@ public class PartialRouter extends RWRoute{
 		}
 
 		@Override
-		protected boolean isPreserved(Node parent, Node child) {
-			boolean preserved = super.isPreserved(parent, child);
-			// Note that maskPreservedIfExistingRoute() can only be called
-			// once for each child node
-			return preserved && maskPreservedIfExistingRoute(parent, child);
+		protected boolean isExcluded(Node parent, Node child) {
+			if (isPreserved(child) && maskPreservedIfExistingRoute(parent, child)) {
+				return true;
+			}
+			return super.isExcluded(parent, child);
 		}
 	}
 
@@ -86,15 +86,18 @@ public class PartialRouter extends RWRoute{
 	 * @param end End Node of arc.
 	 * @return Mask to be AND-ed with preserved state
 	 */
-	protected boolean maskPreservedIfExistingRoute(Node start, Node end) {
+	private boolean maskPreservedIfExistingRoute(Node start, Node end) {
 		// If preserved, check if end node has been created already
-		RouteNode rnode = routingGraph.getNode(end);
+		RouteNode endRnode = routingGraph.getNode(end);
+		if (endRnode == null)
+			return true;
+
 		// If so, get its prev pointer
-		RouteNode prev = (rnode != null) ? rnode.getPrev() : null;
+		RouteNode prev = endRnode.getPrev();
 		// Presence means that the only arc allowed to enter this end node
 		// is if it came from prev
 		if (prev != null && prev.getNode() == start) {
-			rnode.setVisited(false);
+			endRnode.setVisited(false);
 			return false;
 		}
 

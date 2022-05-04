@@ -165,10 +165,6 @@ public class RouteNodeGraph {
         return preservedMap.containsKey(new LightweightNode(node));
     }
 
-    protected boolean isPreserved(Node parent, Node child) {
-        return isPreserved(child);
-    }
-
     final private static Set<TileTypeEnum> allowedTileEnums;
     static {
         allowedTileEnums = new HashSet<>();
@@ -181,7 +177,7 @@ public class RouteNodeGraph {
     }
 
     protected boolean isExcluded(Node parent, Node child) {
-        if (isPreserved(parent, child))
+        if (isPreserved(child))
             return true;
 
         Tile tile = child.getTile();
