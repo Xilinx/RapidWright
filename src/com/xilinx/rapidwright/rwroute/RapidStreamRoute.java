@@ -167,7 +167,10 @@ public class RapidStreamRoute extends PartialRouter{
 	 * @return The routed design instance.
 	 */
 	public static Design routeDesignRapidStream(Design design) {
-		RWRouteConfig config = new RWRouteConfig(new String[] {"--partialRouting", "--enlargeBoundingBox", "--useUTurnNodes", "--verbose"});
+		RWRouteConfig config = new RWRouteConfig(new String[] {
+				"--enlargeBoundingBox",
+				"--useUTurnNodes",
+				"--verbose"});
 		return routeDesign(design, config, () -> new RapidStreamRoute(design, config));
 	}
 }

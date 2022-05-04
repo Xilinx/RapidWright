@@ -106,7 +106,7 @@ public abstract class RouteNode {
 
 	abstract protected RouteNode getOrCreate(Node node, RouteNodeType type);
 	
-	protected void setChildren(RuntimeTracker setChildrenTimer /*, RouteThruHelper routethruHelper*/){
+	protected void setChildren(RuntimeTracker setChildrenTimer){
 		if (children != null)
 			return;
 		setChildrenTimer.start();
@@ -114,10 +114,8 @@ public abstract class RouteNode {
 		List<RouteNode> childrenList = new ArrayList<>(allDownHillNodes.size());
 		for(Node downhill: allDownHillNodes){
 			if(isExcluded(node, downhill)) continue;
-			// FIXME: What is the meaning of checking that a node routethru-s to itself?
-			// if(routethruHelper.isRouteThru(downhill, downhill)) continue;
 
-			RouteNodeType type = RouteNodeType.WIRE;
+			final RouteNodeType type = RouteNodeType.WIRE;
 			RouteNode child = getOrCreate(downhill, type);
 			childrenList.add(child);//the sink rnode of a target connection has been created up-front
 		}

@@ -518,8 +518,7 @@ public class RWRoute{
 	}
 	
 	/**
-	 * Adds preserved nodes. Duplicated nodes (more specifically,
-	 * nodes already preserved with the same net) have no effect.
+	 * Adds preserved nodes.
 	 * @param nodes A collection of nodes to be preserved.
 	 * @param netToPreserve The net that uses those nodes.
 	 */

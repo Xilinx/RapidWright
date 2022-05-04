@@ -24,10 +24,15 @@ package com.xilinx.rapidwright.rwroute;
 
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
-import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.device.Tile;
 
 import java.util.Objects;
 
+/**
+ * A lightweight representation of a {@link Node} object.
+ * Specifically, it holds the unique address of its {@link Tile} as opposed
+ * to a reference to this object, as well as omitting all flags.
+ */
 class LightweightNode {
     final int tileID;
     final int wireID;

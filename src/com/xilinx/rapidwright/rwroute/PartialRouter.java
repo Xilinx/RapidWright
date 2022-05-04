@@ -43,9 +43,11 @@ import com.xilinx.rapidwright.util.RuntimeTracker;
 
 /**
  * A class extending {@link RWRoute} for partial routing.
- * In partial routing mode, nets that are already routed will be preserved and
- * the router routes unrouted connections (where SitePinInst.isRouted() returns
- * false) only.
+ * In partial routing mode, nets that are already fully- or partially- routed
+ * will be preserved and only the unrouted connections (where SitePinInst.isRouted()
+ * returns false) are tackled.
+ * Enabling soft preserve allows preserved routing that may be the cause of any
+ * unroutable connections to be ripped up and re-routed.
  */
 public class PartialRouter extends RWRoute{
 	protected class RouteNodeGraphPartial extends RouteNodeGraph {
@@ -111,10 +113,12 @@ public class PartialRouter extends RWRoute{
 	}
 
 	final boolean softPreserve;
+	Set<NetWrapper> partiallyPreserved;
 
 	public PartialRouter(Design design, RWRouteConfig config, boolean softPreserve){
 		super(design, config);
 		this.softPreserve = softPreserve;
+		partiallyPreserved = new HashSet<>();
 	}
 
 	public PartialRouter(Design design, RWRouteConfig config){
@@ -185,12 +189,17 @@ public class PartialRouter extends RWRoute{
 		}
 
 		// If all pins are already routed, no routing necessary
-		if (net.getSinkPins().stream().allMatch(SitePinInst::isRouted)) {
+		Collection<SitePinInst> sinkPins = net.getSinkPins();
+		long numRouted = sinkPins.stream().filter(SitePinInst::isRouted).count();
+		if (numRouted == sinkPins.size()) {
 			return;
 		}
 
 		NetWrapper netWrapper = createsNetWrapperAndConnections(net);
-		netWrapper.setPartiallyPreserved(true);
+
+		if (numRouted > 0) {
+			partiallyPreserved.add(netWrapper);
+		}
 	}
 
 	/**
@@ -222,7 +231,7 @@ public class PartialRouter extends RWRoute{
 			NetWrapper netWrapper = nets.get(net);
 			if (netWrapper == null)
 				return false;
-			if (netWrapper.getPartiallyPreserved())
+			if (partiallyPreserved.contains(netWrapper))
 				return false;
 			// Net already seen and is fully unpreserved
 			return true;
@@ -261,8 +270,8 @@ public class PartialRouter extends RWRoute{
 			// Net already exists -- any unrouted connection will cause the
 			// net to exist, but already routed connections may still be preserved
 
-			assert(netWrapper.getPartiallyPreserved());
-			netWrapper.setPartiallyPreserved(false);
+			boolean removed = partiallyPreserved.remove(netWrapper);
+			assert(removed);
 
 			for(Node toBuild : RouterHelper.getNodesOfNet(net)) {
 				// Since net already exists, all the nodes it uses will already
