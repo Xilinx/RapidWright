@@ -77,7 +77,7 @@ public class RWRoute{
 	/** A list of global clock nets */
 	private List<Net> clkNets;
 	/** Static nets */
-	protected Map<Net, List<SitePinInst>> staticNetAndRoutingTargets;
+	private Map<Net, List<SitePinInst>> staticNetAndRoutingTargets;
 	/** Several integers to indicate the netlist info */
 	protected int numPreservedRoutableNets;
 	private int numPreservedClks;
@@ -1217,8 +1217,7 @@ public class RWRoute{
 		Node source = connection.getSource().getConnectedNode();
 		if (!routingGraph.isPreserved(source)) {
 			// Net.replaceSource() calls Net.removePin() (which in turn calls
-			// Net.unroute()) -- only do this if the net is not a partial net
-			// as determined by whether the source node is in the preserved set
+			// Net.unroute()) -- only do this if the source is not on a preserved net
 			net.replaceSource(altSource);
 			net.setAlternateSource(connection.getSource());
 		} else {
