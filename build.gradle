@@ -8,11 +8,14 @@ apply from: 'common.gradle'
 
 mainClassName = "com.xilinx.rapidwright.MainEntrypoint"
 
-def sw = new StringWriter()
-def get_rapidwright_version_line = file('.github/workflows/build.yml').filterLine(sw) { 
-    line -> line.contains('RAPIDWRIGHT_VERSION:') 
+def read_rapidwright_version() {
+    def sw = new StringWriter()
+    file('.github/workflows/build.yml').filterLine(sw) {
+        line -> line.contains('RAPIDWRIGHT_VERSION:')
+    }
+    return sw.toString().replace("RAPIDWRIGHT_VERSION: v", "").replace("-beta", "").trim() + ""
 }
-def rapidwright_version = sw.toString().replace("RAPIDWRIGHT_VERSION: v", "").replace("-beta", "").trim() + ""
+def rapidwright_version = project.hasProperty('override_rapidwright_version') ? override_rapidwright_version : read_rapidwright_version()
 
 dependencies {
     api 'com.xilinx.rapidwright:rapidwright-api-lib:' + rapidwright_version
@@ -27,18 +30,25 @@ sourceSets {
   }
   test {
     java {
-      srcDirs = ['test']
+      srcDirs = ['test/src']
+    }
+  }
+  testFixtures {
+    java {
+      srcDirs = ['test/shared']
     }
     resources {
-      srcDirs = ['test/testResources']
+      srcDirs = ['test/resources']
     }
   }
 }
 
 task copyJars(type: Copy) {
-    from configurations.implementation
+    from configurations.api
     into 'jars'
-    from configurations.testImplementation
+    //testFixturesImplementation contains the output jar, as well as an implicit dependency on the task.
+    //Filter to remove the jar itself, getFiles() to remove the implicit dependency
+    from configurations.testFixturesImplementation.filter { !tasks.getByName("jar").outputs.files.contains(it) } .getFiles()
     into 'jars'
 }
 compileJava.dependsOn(copyJars)
@@ -172,5 +182,11 @@ task testPython(type:Test) {
 
 test {
   dependsOn testPython
+}
+
+task printRapidWrightVersion() {
+    doLast {
+        print(rapidwright_version)
+    }
 }
 
