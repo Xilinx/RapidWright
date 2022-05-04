@@ -68,7 +68,6 @@ public class CodePerfTracker {
 	
 	
 	public CodePerfTracker(String name){
-		super();
 		init(name,true);
 	}
 	
@@ -77,9 +76,8 @@ public class CodePerfTracker {
 	}
 	
 	public CodePerfTracker(String name, boolean printProgress, boolean isVerbose){
-		super();
 		verbose = isVerbose;
-		init(name,true);
+		init(name,printProgress);
 	}
 	
 	public void init(String name, boolean printProgress){
@@ -131,7 +129,6 @@ public class CodePerfTracker {
 
 	public CodePerfTracker start(String segmentName){
 		if(!GLOBAL_DEBUG || this == SILENT) return this;
-		int idx = runtimes.size();
 		if(isUsingGCCallsToTrackMemory()) System.gc();
 		long currUsage = rt.totalMemory() - rt.freeMemory();
 		segmentNames.add(segmentName);
@@ -255,6 +252,13 @@ public class CodePerfTracker {
 		segmentNames.add(totalName);
 		if(maxSegmentNameSize < totalName.length()) maxSegmentNameSize = totalName.length();
 	}
+
+	private void removeTotalEntry(){
+		final int idx = runtimes.size() - 1;
+		runtimes.remove(idx);
+		memUsages.remove(idx);
+		segmentNames.remove(idx);
+	}
 	
 	public void printSummary(){
 		if(!GLOBAL_DEBUG || this == SILENT) return;
@@ -268,5 +272,6 @@ public class CodePerfTracker {
 			}
 			print(i);
 		}
+		removeTotalEntry();
 	}
 }
