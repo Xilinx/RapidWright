@@ -100,14 +100,6 @@ public class RouteNodeGraphTimingDriven extends RouteNodeGraph {
         }
 
         @Override
-        public boolean isExcluded(Node parent, Node child) {
-            if (super.isExcluded(parent, child))
-                return true;
-
-            return false;
-        }
-
-        @Override
         public float getDelay() {
             return delay;
         }
@@ -123,7 +115,7 @@ public class RouteNodeGraphTimingDriven extends RouteNodeGraph {
             s.append(", ");
             s.append(String.format("ic = %s", node.getIntentCode()));
             s.append(", ");
-            s.append(String.format("dly = %d", delay));
+            s.append(String.format("dly = %f", delay));
             s.append(", ");
             s.append(String.format("user = %s", getOccupancy()));
             s.append(", ");
@@ -137,7 +129,21 @@ public class RouteNodeGraphTimingDriven extends RouteNodeGraph {
         return new RouteNodeImpl(node, type);
     }
 
+    @Override
     protected boolean isExcluded(Node parent, Node child) {
-        return isPreserved(parent, child);
+        if (super.isExcluded(parent, child))
+            return true;
+        if (maskNodesCrossRCLK) {
+            Tile tile = child.getTile();
+            if(tile.getTileTypeEnum() == TileTypeEnum.INT) {
+                int y = tile.getTileYCoordinate();
+                if ((y-30)%60 == 0) { // above RCLK
+                    return excludeAboveRclk.contains(child.getWire());
+                } else if ((y-29)%60 == 0) { // below RCLK
+                    return excludeBelowRclk.contains(child.getWire());
+                }
+            }
+        }
+        return false;
     }
 }

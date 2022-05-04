@@ -30,16 +30,22 @@ import java.util.List;
 import java.util.Set;
 
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.timing.ClkRouteTiming;
+import com.xilinx.rapidwright.timing.TimingManager;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
 import com.xilinx.rapidwright.util.RuntimeTracker;
 
 /**
- * A class extends {@link RWRoute} for partial routing.
+ * A class extending {@link RWRoute} for partial routing.
+ * In partial routing mode, nets that are already routed will be preserved and
+ * the router routes unrouted connections (where SitePinInst.isRouted() returns
+ * false) only.
  */
 public class PartialRouter extends RWRoute{
 	protected class RouteNodeGraphPartial extends RouteNodeGraph {
@@ -49,23 +55,12 @@ public class PartialRouter extends RWRoute{
 		}
 
 		@Override
-		protected boolean isPreserved(Node parent, Node child) {
-			boolean preserved = super.isPreserved(child);
-
-			// If preserved, check if child node has been created already
-			RouteNode rnode = (preserved) ? RouteNodeGraphPartial.this.getNode(child) : null;
-			// If so, get its prev pointer
-			RouteNode prev = (rnode != null) ? rnode.getPrev() : null;
-			// Presence means that the only arc allowed to enter this child node
-			// is if it came from prev
-			if (prev != null && prev.getNode() == parent) {
-				preserved = false;
-				rnode.setVisited(false);
+		protected boolean isExcluded(Node parent, Node child) {
+			if (isPreserved(child) && maskPreservedIfExistingRoute(parent, child)) {
+				return true;
 			}
-
-			return preserved;
+			return super.isExcluded(parent, child);
 		}
-
 	}
 
 	protected class RouteNodeGraphPartialTimingDriven extends RouteNodeGraphTimingDriven {
@@ -74,26 +69,56 @@ public class PartialRouter extends RWRoute{
 		}
 
 		@Override
-		protected boolean isPreserved(Node parent, Node child) {
-			boolean preserved = super.isPreserved(child);
-
-			// If preserved, check if child node has been created already
-			RouteNode rnode = (preserved) ? RouteNodeGraphPartialTimingDriven.this.getNode(child) : null;
-			// If so, get its prev pointer
-			RouteNode prev = (rnode != null) ? rnode.getPrev() : null;
-			// Presence means that the only arc allowed to enter this child node
-			// is if it came from prev
-			if (prev != null && prev.getNode() == parent) {
-				preserved = false;
-				rnode.setVisited(false);
+		protected boolean isExcluded(Node parent, Node child) {
+			if (isPreserved(child) && maskPreservedIfExistingRoute(parent, child)) {
+				return true;
 			}
-
-			return preserved;
+			return super.isExcluded(parent, child);
 		}
 	}
 
-	public PartialRouter(Design design, RWRouteConfig config){
+	/**
+	 * Compute the mask for an otherwise preserved node.
+	 * For Nets containing at least one Connection to be routed, all fully routed
+	 * Connections and their associated Nodes (if any) are preserved. Any such
+	 * Nodes can (and are encouraged) to be used as part of routing such incomplete
+	 * Connections. In these cases, the RouteNode.prev member is used to restrict
+	 * incoming arcs to just the RouteNode already used by the Net; this method
+	 * detects this case and allows the preserved state to be masked.
+	 * Note that this method must only be called once for each end Node, since
+	 * RouteNode.prev (which is also used to track its "visited" state) is erased
+	 * upon masking.
+	 * @param start Start Node of arc.
+	 * @param end End Node of arc.
+	 * @return Mask to be AND-ed with preserved state
+	 */
+	private boolean maskPreservedIfExistingRoute(Node start, Node end) {
+		// If preserved, check if end node has been created already
+		RouteNode endRnode = routingGraph.getNode(end);
+		if (endRnode == null)
+			return true;
+
+		// If so, get its prev pointer
+		RouteNode prev = endRnode.getPrev();
+		// Presence means that the only arc allowed to enter this end node
+		// is if it came from prev
+		if (prev != null && prev.getNode() == start) {
+			endRnode.setVisited(false);
+			return false;
+		}
+
+		return true;
+	}
+
+	final boolean softPreserve;
+
+	public PartialRouter(Design design, RWRouteConfig config, boolean softPreserve){
 		super(design, config);
+		this.softPreserve = softPreserve;
+	}
+
+	public PartialRouter(Design design, RWRouteConfig config){
+		this(design, config, false);
 	}
 
 	@Override
@@ -105,6 +130,12 @@ public class PartialRouter extends RWRoute{
 		} else {
 			return new RouteNodeGraphPartial(rnodesTimer, design);
 		}
+	}
+
+	@Override
+	protected TimingManager createTimingManager(ClkRouteTiming clkTiming, Collection<Net> timingNets) {
+		final boolean isPartialRouting = true;
+		return new TimingManager(design, routerTimer, config, clkTiming, timingNets, isPartialRouting);
 	}
 
 	@Override
@@ -304,12 +335,46 @@ public class PartialRouter extends RWRoute{
 		boolean hasAltOutput = super.handleUnroutableConnection(connection);
 		if (hasAltOutput)
 			return true;
-		if (config.isSoftPreserve()) {
+		if (softPreserve) {
 			if (routeIteration == 2) {
 				unpreserveNetsAndReleaseResources(connection);
 				return true;
 			}
 		}
 		return false;
+	}
+
+	private static Design routeDesign(Design design, RWRouteConfig config) {
+		DesignTools.createMissingSitePinInsts(design);
+		if((!design.getVccNet().hasPIPs() && !design.getGndNet().hasPIPs())) {
+			DesignTools.createPossiblePinsToStaticNets(design);
+		}
+
+		if(config.isMaskNodesCrossRCLK()) {
+			System.out.println("WARNING: Masking nodes across RCLK for partial routing could result in routability problems.");
+		}
+
+		return routeDesign(design, config, () -> new PartialRouter(design, config));
+	}
+
+	/**
+	 * Routes a design in the partial non-timing-driven routing mode.
+	 * @param design The {@link Design} instance to be routed.
+	 */
+	public static Design routeDesignPartialNonTimingDriven(Design design) {
+		return routeDesign(design, new RWRouteConfig(new String[] {
+				"--fixBoundingBox",
+				"--nonTimingDriven",
+				"--verbose"}));
+	}
+
+	/**
+	 * Routes a design in the partial timing-driven routing mode.
+	 * @param design The {@link Design} instance to be routed.
+	 */
+	public static Design routeDesignPartialTimingDriven(Design design) {
+		return routeDesign(design, new RWRouteConfig(new String[] {
+				"--fixBoundingBox",
+				"--verbose"}));
 	}
 }

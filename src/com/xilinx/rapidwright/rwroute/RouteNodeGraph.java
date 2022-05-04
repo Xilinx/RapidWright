@@ -28,6 +28,8 @@ import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.device.Tile;
+import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.util.CountUpDownLatch;
 import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.ParallelismTools;
@@ -37,6 +39,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -57,7 +60,7 @@ public class RouteNodeGraph {
 
         @Override
         public boolean isExcluded(Node parent, Node child) {
-            return isPreserved(parent, child) || super.isExcluded(parent, child);
+            return RouteNodeGraph.this.isExcluded(parent, child);
         }
 
         @Override
@@ -162,8 +165,24 @@ public class RouteNodeGraph {
         return preservedMap.containsKey(new LightweightNode(node));
     }
 
-    protected boolean isPreserved(Node parent, Node child) {
-        return isPreserved(child);
+    final private static Set<TileTypeEnum> allowedTileEnums;
+    static {
+        allowedTileEnums = new HashSet<>();
+        allowedTileEnums.add(TileTypeEnum.INT);
+        for (TileTypeEnum e : TileTypeEnum.values()) {
+            if (e.toString().startsWith("LAG")) {
+                allowedTileEnums.add(e);
+            }
+        }
+    }
+
+    protected boolean isExcluded(Node parent, Node child) {
+        if (isPreserved(child))
+            return true;
+
+        Tile tile = child.getTile();
+        TileTypeEnum tileType = tile.getTileTypeEnum();
+        return !allowedTileEnums.contains(tileType);
     }
 
     public Collection<Node> getPreservedNodes(Device device) {

@@ -73,7 +73,7 @@ public class TimingManager {
      * Alternate constructor for creating the objects for the TimingModel, but with the choice to 
      * not build the model yet.
      * @param design RapidWright Design object.
-     * @param doBuild Whether to go ahead and build the model now.  For example, a user might not 
+     * @param doBuild Whether to go ahead and build the model now.  For example, a user might not
      * want to build the TimingGraph yet.
      */
     public TimingManager(Design design, boolean doBuild) {
@@ -88,7 +88,7 @@ public class TimingManager {
             build(false, design.getNets());
     }
     
-    public TimingManager(Design design, boolean doBuild, RuntimeTrackerTree timer, RWRouteConfig config, ClkRouteTiming clkTiming, Collection<Net> targetNets) {
+    public TimingManager(Design design, RuntimeTrackerTree timer, RWRouteConfig config, ClkRouteTiming clkTiming, Collection<Net> targetNets, boolean isPartialRouting) {
     	this.design = design;
     	setTimingRequirement();
     	verbose = config.isVerbose();
@@ -100,8 +100,7 @@ public class TimingManager {
         timingGraph.setTimingManager(this);
         timingGraph.setTimingModel(timingModel);
         device = design.getDevice();
-        if (doBuild)
-            build(config.isPartialRouting(), targetNets);
+        build(isPartialRouting, targetNets);
     }
     
     /**

@@ -22,7 +22,6 @@
  
 package com.xilinx.rapidwright.rwroute;
 
-import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import org.junit.jupiter.api.Disabled;
@@ -90,7 +89,7 @@ public class TestRWRoute {
 			if (!net.hasPIPs()) continue;
 			net.getPins().forEach((spi) -> spi.setRouted(true));
 		}
-		RWRoute.routeDesignPartialNonTimingDriven(design);
+		PartialRouter.routeDesignPartialNonTimingDriven(design);
 	}
 
 	/**
@@ -108,6 +107,6 @@ public class TestRWRoute {
 			if (!net.hasPIPs()) continue;
 			net.getPins().forEach((spi) -> spi.setRouted(true));
 		}
-		RWRoute.routeDesignPartialTimingDriven(design);
+		PartialRouter.routeDesignPartialTimingDriven(design);
 	}
 }

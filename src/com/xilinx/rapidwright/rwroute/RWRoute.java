@@ -106,7 +106,7 @@ public class RWRoute{
 	/** The current routing iteration */
 	protected int routeIteration;
 	/** Timers to store runtime of different phases */
-	private RuntimeTrackerTree routerTimer;
+	protected RuntimeTrackerTree routerTimer;
 	protected RuntimeTracker rnodesTimer;
 	private RuntimeTracker updateTimingTimer;
 	private RuntimeTracker updateCongestionCosts;
@@ -181,7 +181,7 @@ public class RWRoute{
 			ClkRouteTiming clkTiming = createClkTimingData(config);
 			routesToSinkINTTiles = clkTiming == null? null : clkTiming.getRoutesToSinkINTTiles();
 			Collection<Net> timingNets = getTimingNets();
-			timingManager = new TimingManager(design, true, routerTimer, config, clkTiming, timingNets);
+			timingManager = createTimingManager(clkTiming, timingNets);
 			timingManager.setTimingEdgesOfConnections(indirectConnections);
 		}
 		
@@ -219,6 +219,11 @@ public class RWRoute{
 
 	protected Collection<Net> getTimingNets() {
 		return indirectConnections.stream().map((c) -> c.getNetWrapper().getNet()).collect(Collectors.toSet());
+	}
+
+	protected TimingManager createTimingManager(ClkRouteTiming clkTiming, Collection<Net> timingNets) {
+		final boolean isPartialRouting = false;
+		return new TimingManager(design, routerTimer, config, clkTiming, timingNets, isPartialRouting);
 	}
 
 	/**
@@ -1565,23 +1570,7 @@ public class RWRoute{
 	public static Design routeDesignFullNonTimingDriven(Design design) {
 		return routeDesign(design, new RWRouteConfig(new String[] {"--nonTimingDriven", "--verbose"}));
 	}
-	
-	/**
-	 * Routes a design in the partial non-timing-driven routing mode.
-	 * @param design The {@link Design} instance to be routed.
-	 */
-	public static Design routeDesignPartialNonTimingDriven(Design design) {
-		return routeDesign(design, new RWRouteConfig(new String[] {"--partialRouting", "--fixBoundingBox", "--nonTimingDriven", "--verbose"}));
-	}
 
-	/**
-	 * Routes a design in the partial timing-driven routing mode.
-	 * @param design The {@link Design} instance to be routed.
-	 */
-	public static Design routeDesignPartialTimingDriven(Design design) {
-		return routeDesign(design, new RWRouteConfig(new String[] {"--partialRouting", "--fixBoundingBox", "--verbose"}));
-	}
-	
 	/**
 	 * Routes a {@link Design} instance.
 	 * @param design The {@link Design} instance to be routed.
@@ -1598,13 +1587,13 @@ public class RWRoute{
 	
 	private static Design routeDesign(Design design, RWRouteConfig config) {
 		DesignTools.createMissingSitePinInsts(design);
+		DesignTools.createPossiblePinsToStaticNets(design);
 
-		return routeDesign(design, config, () -> {
-			if(config.isPartialRouting()) {
-				return new PartialRouter(design, config);
-			}
-			return new RWRoute(design, config);
-		});
+		if(!config.isMaskNodesCrossRCLK()) {
+			System.out.println("WARNING: Not masking nodes across RCLK could result in delay optimism.");
+		}
+
+		return routeDesign(design, config, () -> new RWRoute(design, config));
 	}
 	
 	/**
@@ -1616,9 +1605,6 @@ public class RWRoute{
 	protected static Design routeDesign(Design design, RWRouteConfig config, Supplier<RWRoute> newRouter) {
 		// Pre-processing of the design regarding physical net names pins
 		DesignTools.makePhysNetNamesConsistent(design);
-		if(!config.isPartialRouting() || (!design.getVccNet().hasPIPs() && !design.getGndNet().hasPIPs())) {
-			DesignTools.createPossiblePinsToStaticNets(design);
-		}
 
 		// Instantiates router object
 		RWRoute router = newRouter.get();

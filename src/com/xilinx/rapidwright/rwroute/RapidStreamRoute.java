@@ -28,7 +28,6 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
@@ -45,7 +44,7 @@ public class RapidStreamRoute extends PartialRouter{
 	/** Nets with conflicting nodes that should be added to the routing targets */
 	protected Set<Net> conflictNets;
 	/** A keyword to help recognize the target conflict nets */
-	private String anchorNameKeyword;
+	final private String anchorNameKeyword;
 
 	public RapidStreamRoute(Design design, RWRouteConfig config, String anchorNameKeyword) {
 		super(design, config);

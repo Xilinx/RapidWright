@@ -1304,10 +1304,7 @@ public class DesignTools {
 	                    net.setSource(null);
 	                }
 	                pin.setNet(null);
-	                SiteInst si = pin.getSiteInst();
-	                if(si != null){
-	                    si.removePin(pin);
-	                }
+	                pin.detachSiteInst();
 	                continue;
 	            }
 	            pins.add(pin);

@@ -58,9 +58,9 @@ public class TimingAndWirelengthReport{
 	private Map<IntentCode, Long> nodeTypeLength;
 	private RouteNodeGraph routingGraph;
 	
-	public TimingAndWirelengthReport(Design design, RWRouteConfig config) {
+	public TimingAndWirelengthReport(Design design, RWRouteConfig config, boolean isPartialRouting) {
 		this.design = design;
-		timingManager = new TimingManager(design, true, null, config, RWRoute.createClkTimingData(config), design.getNets());
+		timingManager = new TimingManager(design, null, config, RWRoute.createClkTimingData(config), design.getNets(), isPartialRouting);
 		estimator = new DelayEstimatorBase(design.getDevice(), new InterconnectInfo(), config.isUseUTurnNodes(), 0);
 		routingGraph = new RouteNodeGraphTimingDriven(null, design, estimator, config.isMaskNodesCrossRCLK());
 		wirelength = 0;
@@ -186,9 +186,9 @@ public class TimingAndWirelengthReport{
 		DesignTools.makePhysNetNamesConsistent(design);
 		DesignTools.createMissingSitePinInsts(design);
 		RWRouteConfig config = new RWRouteConfig(args);
-		config.setPartialRouting(false);
 		config.setTimingDriven(true);
-		TimingAndWirelengthReport reporter = new TimingAndWirelengthReport(design, config);	
+		final boolean isPartialRouting = false;
+		TimingAndWirelengthReport reporter = new TimingAndWirelengthReport(design, config, isPartialRouting);
 		reporter.computeStatisticsAndReport();
 	}
 	
