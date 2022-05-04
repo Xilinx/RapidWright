@@ -19,12 +19,21 @@
  * limitations under the License.
  * 
  */
-
+ 
+/**
+ * 
+ */
 package com.xilinx.rapidwright.util;
 
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * Generated on: Wed May 04 13:05:08 2022
+ * by: com.xilinx.rapidwright.release.UploadFilesToAzure
+ * 
+ * Versioned list of data files to use in current RapidWright environment
+ */
 public class DataVersions {
     public static Map<String,Pair<String,String>> dataVersionMap;
     static {
