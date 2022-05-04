@@ -26,7 +26,6 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Arrays;
 
-import com.xilinx.rapidwright.support.CheckOpenFiles;
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.SiteInst;
@@ -75,7 +74,6 @@ public class TestPhysNetlistWriter {
     }
 
     @Test
-    @CheckOpenFiles
     public void testAllRouteSegmentsEndInBELInputPins(@TempDir Path tempDir) throws IOException {
         final String inputPath = RapidWrightDCP.getString("routethru_luts.dcp");
         Design design = Design.readCheckpoint(inputPath);
@@ -109,7 +107,6 @@ public class TestPhysNetlistWriter {
     }
 
     @Test
-    @CheckOpenFiles
     public void testNoLutRoutethruCells(@TempDir Path tempDir) throws IOException {
         final String inputPath = RapidWrightDCP.getString("routethru_luts.dcp");
         Design design = Design.readCheckpoint(inputPath);

@@ -27,7 +27,6 @@ import java.io.File;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.examples.PicoBlazeArray;
 import com.xilinx.rapidwright.placer.blockplacer.BlockPlacer2;
-import com.xilinx.rapidwright.support.CheckOpenFiles;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import org.junit.jupiter.api.Assertions;
@@ -53,13 +52,11 @@ public class TestBlockPlacer2 {
     }
 
     @Test
-    @CheckOpenFiles
     public void placePicoBlazeArrayModules() {
         placeSomePicoBlazeArray(PicoBlazeArray.makeModuleCreator());
     }
 
     @Test
-    @CheckOpenFiles
     public void placePicoBlazeArrayImpls() {
         placeSomePicoBlazeArray(PicoBlazeArray.makeImplsCreator());
     }

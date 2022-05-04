@@ -25,10 +25,9 @@ package com.xilinx.rapidwright.interchange;
 import java.io.IOException;
 import java.nio.file.Path;
 
-import com.xilinx.rapidwright.support.CheckOpenFiles;
+import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.SiteInst;
-import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -48,7 +47,6 @@ public class TestPhysNetlistReader {
     }
 
     @Test
-    @CheckOpenFiles
     public void testRoutethruLUTs(@TempDir Path tempDir) throws IOException {
         final String inputPath = RapidWrightDCP.getString("routethru_luts.dcp");
         Design input = Design.readCheckpoint(inputPath);
