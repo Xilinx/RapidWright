@@ -283,10 +283,10 @@ public class GlobalSignalRouting {
 		NetType netType = currNet.getType();
 		Set<PIP> netPIPs = new HashSet<>();
 		Map<SitePinInst, List<Node>> sinkPathNodes = new HashMap<>();
-		Queue<RoutingNode> q = new LinkedList<>();
-		Set<RoutingNode> visitedRoutingNodes = new HashSet<>();
-		Set<RoutingNode> usedRoutingNodes = new HashSet<>();
-		Map<Node, RoutingNode> createdRoutingNodes = new HashMap<>();
+		Queue<LightweightRouteNode> q = new LinkedList<>();
+		Set<LightweightRouteNode> visitedRoutingNodes = new HashSet<>();
+		Set<LightweightRouteNode> usedRoutingNodes = new HashSet<>();
+		Map<Node, LightweightRouteNode> createdRoutingNodes = new HashMap<>();
 		
 		boolean debug = false;
 		if(debug) {
@@ -304,12 +304,12 @@ public class GlobalSignalRouting {
 			List<Node> pathNodes = new ArrayList<>();			
 			Node node = sink.getConnectedNode();
 			if(debug) System.out.println(node);
-			RoutingNode sinkRNode = RouterHelper.createRoutingNode(node, createdRoutingNodes);
+			LightweightRouteNode sinkRNode = RouterHelper.createRoutingNode(node, createdRoutingNodes);
 			sinkRNode.setPrev(null);	
 			q.add(sinkRNode);
 			boolean success = false;
 			while(!q.isEmpty()){
-				RoutingNode routingNode = q.poll();
+				LightweightRouteNode routingNode = q.poll();
 				visitedRoutingNodes.add(routingNode);		
 				if(debug) System.out.println("DEQUEUE:" + routingNode);
 				if(debug) System.out.println(", PREV = " + routingNode.getPrev() == null ? " null" : routingNode.getPrev());		
@@ -339,7 +339,7 @@ public class GlobalSignalRouting {
 				}
 				for(Node uphillNode : routingNode.getNode().getAllUphillNodes()){
 					if(routeThruHelper.isRouteThru(uphillNode, routingNode.getNode())) continue;
-					RoutingNode nParent = RouterHelper.createRoutingNode(uphillNode, createdRoutingNodes);
+					LightweightRouteNode nParent = RouterHelper.createRoutingNode(uphillNode, createdRoutingNodes);
 					if(!pruneNode(nParent, unavailableNodes, visitedRoutingNodes)) {
 						nParent.setPrev(routingNode);
 						q.add(nParent);
@@ -366,13 +366,13 @@ public class GlobalSignalRouting {
 	}
 	
 	/**
-	 * Checks if a {@link RoutingNode} instance that represents a {@link Node} object should be pruned.
+	 * Checks if a {@link LightweightRouteNode} instance that represents a {@link Node} object should be pruned.
 	 * @param routingNode The RoutingNode in question.
 	 * @param unavailableNodes A set of unavailable Node instances.
 	 * @param visitedRoutingNodes RoutingNode instances that have been visited.
 	 * @return true, if the RoutingNode instance should not be considered as an available resource.
 	 */
-	private static boolean pruneNode(RoutingNode routingNode, Set<Node> unavailableNodes, Set<RoutingNode> visitedRoutingNodes){
+	private static boolean pruneNode(LightweightRouteNode routingNode, Set<Node> unavailableNodes, Set<LightweightRouteNode> visitedRoutingNodes){
 		Node node = routingNode.getNode();
 		IntentCode ic = node.getTile().getWireIntentCode(node.getWire());
 		switch(ic){
@@ -392,13 +392,13 @@ public class GlobalSignalRouting {
 	}
 	
 	/**
-	 * Determines if the given {@link RoutingNode} instance that represents a {@link Node} instance can serve as our sink.
-	 * @param routingNode The {@link RoutingNode} instance in question.
+	 * Determines if the given {@link LightweightRouteNode} instance that represents a {@link Node} instance can serve as our sink.
+	 * @param routingNode The {@link LightweightRouteNode} instance in question.
 	 * @param type The net type to designate the static source type.
 	 * @param usedRoutingNodes The used RoutingNode instances by of the given net type representing the VCC or GND net.
 	 * @return true if this sources is usable, false otherwise. 
 	 */
-	private static boolean isThisOurStaticSource(Design design, RoutingNode routingNode, NetType type, Set<RoutingNode> usedRoutingNodes){
+	private static boolean isThisOurStaticSource(Design design, LightweightRouteNode routingNode, NetType type, Set<LightweightRouteNode> usedRoutingNodes){
 		if(usedRoutingNodes != null && usedRoutingNodes.contains(routingNode))
 			return true;
 		Node node = routingNode.getNode();

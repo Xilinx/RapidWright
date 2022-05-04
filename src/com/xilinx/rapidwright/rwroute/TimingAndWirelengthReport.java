@@ -146,17 +146,17 @@ public class TimingAndWirelengthReport{
 	 */
 	private void setAccumulativeDelayOfEachNetNode(NetWrapper netWrapper) {
 		List<PIP> pips = netWrapper.getNet().getPIPs();	
-		Map<Node, RoutingNode> nodeRoutingNodeMap = new HashMap<>();
+		Map<Node, LightweightRouteNode> nodeRoutingNodeMap = new HashMap<>();
 		boolean firstPIP = true;
 		for(PIP pip : pips) {
 			// This approach works because we observed that the PIPs are in order
 			Node startNode = pip.getStartNode();
-			RoutingNode startrn = RouterHelper.createRoutingNode(startNode, nodeRoutingNodeMap);
+			LightweightRouteNode startrn = RouterHelper.createRoutingNode(startNode, nodeRoutingNodeMap);
 			if(firstPIP) startrn.setDelayFromSource(0);
 			firstPIP = false;
 			
 			Node endNode = pip.getEndNode();
-			RoutingNode endrn = RouterHelper.createRoutingNode(endNode, nodeRoutingNodeMap);
+			LightweightRouteNode endrn = RouterHelper.createRoutingNode(endNode, nodeRoutingNodeMap);
 			endrn.setPrev(startrn);
 			float delay = 0;
 			if(endNode.getTile().getTileTypeEnum() == TileTypeEnum.INT) {
@@ -169,7 +169,7 @@ public class TimingAndWirelengthReport{
 		for(Connection connection : netWrapper.getConnections()) {
 			if(connection.isDirect()) continue;
 			Node sinkNode = connection.getSinkRnode().getNode();
-			RoutingNode sinkrn = nodeRoutingNodeMap.get(sinkNode);
+			LightweightRouteNode sinkrn = nodeRoutingNodeMap.get(sinkNode);
 			if(sinkrn == null) continue;
 			float connectionDelay = sinkrn.getDelayFromSource();
 			if(connection.getTimingEdges() == null) continue;

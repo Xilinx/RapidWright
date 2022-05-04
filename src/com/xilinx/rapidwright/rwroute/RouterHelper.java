@@ -146,13 +146,13 @@ public class RouterHelper {
 	 */
 	public static List<Node> projectInputPinToINTNode(SitePinInst input) {
 		List<Node> sinkToSwitchBoxPath = new ArrayList<>();		
-		RoutingNode sink = new RoutingNode(input.getConnectedNode());
+		LightweightRouteNode sink = new LightweightRouteNode(input.getConnectedNode());
 		sink.setPrev(null);
-		Queue<RoutingNode> q = new LinkedList<>();
+		Queue<LightweightRouteNode> q = new LinkedList<>();
 		q.add(sink);
 		int watchdog = 1000;		
 		while(!q.isEmpty()) {
-			RoutingNode n = q.poll();
+			LightweightRouteNode n = q.poll();
 			if(n.getNode().getTile().getTileTypeEnum() == TileTypeEnum.INT) {
 				while(n != null) {
 					sinkToSwitchBoxPath.add(n.getNode());
@@ -162,7 +162,7 @@ public class RouterHelper {
 			}
 			for(Node uphill : n.getNode().getAllUphillNodes()) {
 				if(uphill.getAllUphillNodes().size() == 0) continue;
-				RoutingNode prev = new RoutingNode(uphill);
+				LightweightRouteNode prev = new LightweightRouteNode(uphill);
 				prev.setPrev(n);
 				q.add(prev);
 			}
@@ -407,11 +407,11 @@ public class RouterHelper {
 	 */
 	public static Map<Pair<SitePinInst, Node>, Short> getSourceToSinkINTNodeDelays(Net net, DelayEstimatorBase estimator) {
 		List<PIP> pips = net.getPIPs();
-		Map<Node, RoutingNode> nodeRoutingNodeMap = new HashMap<>();
+		Map<Node, LightweightRouteNode> nodeRoutingNodeMap = new HashMap<>();
 		boolean firstPIP = true;
 		for(PIP pip : pips) {
 			Node startNode = pip.getStartNode();
-			RoutingNode startrn = createRoutingNode(pip.getStartNode(), nodeRoutingNodeMap);
+			LightweightRouteNode startrn = createRoutingNode(pip.getStartNode(), nodeRoutingNodeMap);
 			
 			if(firstPIP) {
 				startrn.setDelayFromSource(0);
@@ -419,7 +419,7 @@ public class RouterHelper {
 			firstPIP = false;
 			
 			Node endNode = pip.getEndNode();
-			RoutingNode endrn = createRoutingNode(endNode, nodeRoutingNodeMap);
+			LightweightRouteNode endrn = createRoutingNode(endNode, nodeRoutingNodeMap);
 			endrn.setPrev(startrn);
 			int delay = 0;
 			if(endNode.getTile().getTileTypeEnum() == TileTypeEnum.INT) {//device independent?
@@ -445,15 +445,15 @@ public class RouterHelper {
 	}
 	
 	/**
-	 * Creates a {@link RoutingNode} Object based on a {@link Node} Object, avoiding duplicates.
+	 * Creates a {@link LightweightRouteNode} Object based on a {@link Node} Object, avoiding duplicates.
 	 * @param node The {@link Node} instance that is used to create a RoutingNode object.
-	 * @param createdRoutingNodes A map storing created {@link RoutingNode} instances and corresponding {@link Node} instances.
+	 * @param createdRoutingNodes A map storing created {@link LightweightRouteNode} instances and corresponding {@link Node} instances.
 	 * @return A created RoutingNode instance based on a node
 	 */
-	public static RoutingNode createRoutingNode(Node node, Map<Node, RoutingNode> createdRoutingNodes) {
-		RoutingNode resourceNode = createdRoutingNodes.get(node);
+	public static LightweightRouteNode createRoutingNode(Node node, Map<Node, LightweightRouteNode> createdRoutingNodes) {
+		LightweightRouteNode resourceNode = createdRoutingNodes.get(node);
 		if(resourceNode == null) {
-			resourceNode = new RoutingNode(node);
+			resourceNode = new LightweightRouteNode(node);
 			createdRoutingNodes.put(node, resourceNode);
 		}
 		return resourceNode;
@@ -498,15 +498,15 @@ public class RouterHelper {
 			path.add(source);
 			return path;
 		}		
-		RoutingNode sourcer = new RoutingNode(source);
+		LightweightRouteNode sourcer = new LightweightRouteNode(source);
 		sourcer.setPrev(null);
-		Queue<RoutingNode> queue = new LinkedList<>();
+		Queue<LightweightRouteNode> queue = new LinkedList<>();
 		queue.add(sourcer);
 		
 		int watchdog = 10000;
 		boolean success = false;
 		while(!queue.isEmpty()) {
-			RoutingNode curr = queue.poll();		
+			LightweightRouteNode curr = queue.poll();
 			if(curr.getNode().equals(sink)) {
 				while(curr != null) {
 					path.add(curr.getNode());
@@ -516,7 +516,7 @@ public class RouterHelper {
 				break;
 			}	
 			for(Node n : curr.getNode().getAllDownhillNodes()) {
-				RoutingNode child = new RoutingNode(n);
+				LightweightRouteNode child = new LightweightRouteNode(n);
 				child.setPrev(curr);
 				queue.add(child);	
 			}
