@@ -1,3 +1,33 @@
+============= RapidWright 2022.1.0-beta released on 2022-05-05 ================
+Notes: 
+ * Support for Vivado 2022.1 devices and read of DCPs
+ * Enables parallel EDIF parsing by default (except when EDIF is readable inside DCP).  Depending on
+   file size and number of available threads, speedup can achieve 2.5-10X faster runtimes. 
+ * Adds facilities to track logical netlist and physical netlist changes to keep a record of 
+   incremental changes in a design.
+ * Preserves AI Engine and NOC data when writing DCPs from RapidWright
+ * Disallows turning multiple sitePIPs on on the same RBEL at the same time
+ * Enables LUT routethru routing on intrasite nets
+ * Net.addPin() to add output pin as an alternate source if a source on the net already exists
+ * The anchor object on the Module class has been changed from a SiteInst to a Site
+ * Allows better recovery of augmented tile cache generation failure 
+ * Includes PRs: #378, #379, #380, #381, #382, #383, #385, #387, #396, #395, #397, #400, #401, #402, 
+                 #405, #406, #404, #407
+ * Fixes Issues: #392
+ - API Additions:
+   - com.xilinx.rapidwright.design.Design public "void clearTrackedChanges()"
+   - com.xilinx.rapidwright.design.Design public "void setTrackingChanges(boolean trackChanges)"
+   - com.xilinx.rapidwright.design.Design public "boolean isTrackingSiteInstChanges()"
+   - com.xilinx.rapidwright.design.Design public "void setTrackSiteInstChanges(boolean trackSiteInstChanges)"
+   - com.xilinx.rapidwright.design.Design public "boolean isTrackingNetChanges()"
+   - com.xilinx.rapidwright.design.Design public "void setTrackNetChanges(boolean trackNetChanges)"
+   - com.xilinx.rapidwright.design.Design public "Set<SiteInst> getModifiedSiteInsts()"
+   - com.xilinx.rapidwright.design.Design public "Set<Net> getModifiedNets()"
+   - com.xilinx.rapidwright.design.Design public "boolean addModifiedNet(Net net)"
+   - com.xilinx.rapidwright.design.Design public "boolean addModifiedSiteInst(SiteInst siteInst)"
+   - com.xilinx.rapidwright.device.Device public "Tile getArbitraryTileOfType(TileTypeEnum type)"
+
+
 ============= RapidWright 2021.2.2-beta released on 2022-03-17 ================
 Notes: 
  * Parallelism enabled by default (#365), can be turned off with:
