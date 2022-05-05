@@ -52,6 +52,7 @@ import com.xilinx.rapidwright.design.PinType;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.FileTools;
+import com.xilinx.rapidwright.util.ParallelismTools;
 
 
 /**
@@ -477,11 +478,10 @@ public class EDIFTools {
 	 * cell definition.
 	 * @param src The logical port inst driver or source  
 	 * @param snk The logical port inst sink
-	 * @param netlist The EDIF netlist of the design
 	 * @param newName A unique name to be used in creating the ports and nets
 	 */
 	public static void connectPortInstsThruHier(EDIFHierPortInst src, EDIFHierPortInst snk, 
-	        EDIFNetlist netlist, String newName) {
+	        String newName) {
 	    EDIFHierCellInst commonAncestor = 
 	            src.getHierarchicalInst().getCommonAncestor(snk.getHierarchicalInst());
 	    EDIFHierPortInst finalSrc = src;
@@ -709,11 +709,19 @@ public class EDIFTools {
 	}
 
 	public static EDIFNetlist loadEDIFFile(Path fileName) {
-		try (EDIFParser p = new EDIFParser(fileName)) {
-			return p.parseEDIFNetlist();
-		} catch (IOException e) {
-			throw new UncheckedIOException("ERROR: Couldn't read file : " + fileName, e);
-		}
+	    try {
+	        if(ParallelismTools.getParallel()) {
+	            try (ParallelEDIFParser p = new ParallelEDIFParser(fileName)) {
+	                return p.parseEDIFNetlist();
+	            }           
+	        } else {
+	            try (EDIFParser p = new EDIFParser(fileName)) {
+	                return p.parseEDIFNetlist();
+	            }                       
+	        }	        
+	    } catch (IOException e) {
+	        throw new UncheckedIOException("ERROR: Couldn't read file : " + fileName, e);
+	    }
 	}
 
 	public static EDIFNetlist loadEDIFFile(String fileName){

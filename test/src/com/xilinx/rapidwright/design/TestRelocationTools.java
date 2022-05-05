@@ -28,20 +28,19 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Stream;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
-import com.xilinx.rapidwright.edif.EDIFTools;
-import com.xilinx.rapidwright.support.CheckOpenFiles;
 import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.design.tools.RelocationTools;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.Tile;
+import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
-import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
+import com.xilinx.rapidwright.util.Pair;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -116,7 +115,6 @@ public class TestRelocationTools {
 
     @ParameterizedTest(name = "Relocate PicoBlaze OOC ''{0}'' ({1},{2})")
     @MethodSource()
-    @CheckOpenFiles
     public void testPicoblazeOOC(String instanceName, int colOffset, int rowOffset, boolean expectSuccess) {
         String dcpPath = RapidWrightDCP.getString("picoblaze_ooc_X10Y235.dcp");
         Design design1 = Design.readCheckpoint(dcpPath, CodePerfTracker.SILENT);
@@ -155,7 +153,6 @@ public class TestRelocationTools {
 
     @ParameterizedTest(name = "Relocate PicoBlaze4 OOC ''{0}'' ({1},{2})")
     @MethodSource()
-    @CheckOpenFiles
     public void testPicoblaze4OOC(String instanceName, int colOffset, int rowOffset, boolean expectSuccess) {
 
         // NOTE: Picoblaze4OOC, unlike PicoblazeOOC, has already had its static nets
@@ -190,7 +187,6 @@ public class TestRelocationTools {
 
     @ParameterizedTest(name = "Relocate PicoBlaze4 OOC PBlock ''{0}'' ({1},{2})")
     @MethodSource()
-    @CheckOpenFiles
     public void testPicoblaze4OOC_PBlock(PBlock pblock, int colOffset, int rowOffset, boolean expectSuccess) {
         Design design1 = Design.readCheckpoint(Picoblaze4OOCdcp, CodePerfTracker.SILENT);
 
@@ -228,7 +224,6 @@ public class TestRelocationTools {
 
     @ParameterizedTest(name = "Relocate MicroBlazeAndILA ''{0}'' ({1},{2})")
     @MethodSource()
-    @CheckOpenFiles
     public void testMicroBlazeAndILA(String instanceName, int colOffset, int rowOffset, boolean expectSuccess) {
         String dcpPath = RapidWrightDCP.getString("microblazeAndILA_3pblocks.dcp");
 

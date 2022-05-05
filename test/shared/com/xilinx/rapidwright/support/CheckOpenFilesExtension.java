@@ -107,8 +107,7 @@ public class CheckOpenFilesExtension implements BeforeTestExecutionCallback, Aft
     @Override
     public void afterTestExecution(ExtensionContext extensionContext) {
         final List<String> afterList = getOpenFiles();
-        @SuppressWarnings("unchecked")
-        List<String> beforeList = extensionContext.getStore(NAMESPACE).get(OPEN_FILES, List.class);
+        List<String> beforeList = getBeforeList(extensionContext);
 
 
         if (!beforeList.equals(afterList)) {
@@ -121,8 +120,25 @@ public class CheckOpenFilesExtension implements BeforeTestExecutionCallback, Aft
         }
     }
 
+    private static List<String> getBeforeList(ExtensionContext extensionContext) {
+        @SuppressWarnings("unchecked")
+        List<String> beforeList = extensionContext.getStore(NAMESPACE).get(OPEN_FILES, List.class);
+        return beforeList;
+    }
+
     @Override
     public void beforeTestExecution(ExtensionContext extensionContext) {
         extensionContext.getStore(NAMESPACE).put(OPEN_FILES, getOpenFiles());
+    }
+
+    public static void assertExtensionInstalled(ExtensionContext extensionContext) {
+        Assertions.assertNotNull(getBeforeList(extensionContext), "Open Files Checker Extension does not seem to be running");
+    }
+
+    public static class CheckOpenFilesWorkingExtension implements AfterTestExecutionCallback {
+        @Override
+        public void afterTestExecution(ExtensionContext context) {
+            assertExtensionInstalled(context);
+        }
     }
 }

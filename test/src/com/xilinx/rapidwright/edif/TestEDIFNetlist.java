@@ -36,7 +36,6 @@ import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.PartNameTools;
-import com.xilinx.rapidwright.support.CheckOpenFiles;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 
 class TestEDIFNetlist {
@@ -61,7 +60,6 @@ class TestEDIFNetlist {
     }
     
     @Test
-    @CheckOpenFiles
     void testMacroExpansionException(@TempDir Path tempDir) {
         final Part part = PartNameTools.getPart(PART_NAME);
         Design testDesign = createSampleMacroDesign(TEST_MACRO, part);
@@ -76,28 +74,28 @@ class TestEDIFNetlist {
     public void testTrackChanges() {
         Design d = Design.readCheckpoint(RapidWrightDCP.getPath("microblazeAndILA_3pblocks.dcp"), true);
         EDIFNetlist netlist = d.getNetlist();
-        
+
         EDIFHierPortInst srcPortInst = netlist.getHierPortInstFromName(TestEDIFTools.TEST_SRC);
         EDIFHierPortInst snkPortInst = netlist.getHierPortInstFromName(TestEDIFTools.TEST_SNK);
-        
+
         // Disconnect sink in anticipation of connecting to another net
         snkPortInst.getNet().removePortInst(snkPortInst.getPortInst());
-        
+
         netlist.setTrackCellChanges(true);
-        
-        EDIFTools.connectPortInstsThruHier(srcPortInst, snkPortInst, netlist, TestEDIFTools.UNIQUE_SUFFIX);
+
+        EDIFTools.connectPortInstsThruHier(srcPortInst, snkPortInst, TestEDIFTools.UNIQUE_SUFFIX);
 
         netlist.resetParentNetMap();
-        
+
         Map<EDIFCell,List<EDIFChange>> modifiedCells = netlist.getModifiedCells();
-        
+
         Assertions.assertEquals(modifiedCells.size(), 8);
-        
+
         Set<EDIFCell> potentiallyModifiedCells = new HashSet<>();
         for(EDIFHierNet logNets : netlist.getNetAliases(srcPortInst.getHierarchicalNet())) {
             potentiallyModifiedCells.add(logNets.getParentInst().getCellType());
         }
-        
+
         for(EDIFCell modifiedCell : modifiedCells.keySet()) {
             Assertions.assertTrue(potentiallyModifiedCells.contains(modifiedCell));
         }

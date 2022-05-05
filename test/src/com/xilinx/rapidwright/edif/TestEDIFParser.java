@@ -32,7 +32,6 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
-import com.xilinx.rapidwright.support.CheckOpenFiles;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import org.junit.jupiter.api.Assertions;
@@ -73,7 +72,6 @@ public class TestEDIFParser {
      */
     @ParameterizedTest(name="{0}")
     @MethodSource("testParallelArgs")
-    @CheckOpenFiles
     public void testParallel(String ignoredDescription, List<ParseStart> offsets, int expectedSuccessfulThreads) throws IOException {
         try (ParallelEDIFParserTestSpecificOffsets parser = new ParallelEDIFParserTestSpecificOffsets(input, 128, offsets)) {
             parser.parseEDIFNetlist(new CodePerfTracker("parse edif"));
@@ -114,7 +112,6 @@ public class TestEDIFParser {
     }
 
     @Test
-    @CheckOpenFiles
     public void loadEDIFSingleThreaded() throws IOException {
         try (EDIFParser parser = new EDIFParser(input)) {
             parser.parseEDIFNetlist();
