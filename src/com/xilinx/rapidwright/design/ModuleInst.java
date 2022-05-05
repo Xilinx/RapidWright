@@ -195,16 +195,17 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 	}
 	
 	public boolean isPlaced(){
-		return anchor.isPlaced();
+		return anchor != null && anchor.isPlaced();
 	}
 	
 	public void addNOCClient(NOCClient nc) {
-		if(nocClients == null)
-			nocClients = new ArrayList<NOCClient>();
-		nocClients.add(nc);
+		getNOCClients().add(nc);
 	}
 	
 	public List<NOCClient> getNOCClients() {
+		if(nocClients == null) {
+		    nocClients = new ArrayList<NOCClient>();
+		}
 		return nocClients;
 	}
 	
@@ -374,7 +375,7 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 			}
 		}
 		//Update location of NOCClients
-		for(NOCClient nc : nocClients) {
+		for(NOCClient nc : getNOCClients()) {
 			Site templateSite = dev.getSite(nc.getLocation());
 			if(templateSite == null) 
 				continue;
