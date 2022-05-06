@@ -75,7 +75,7 @@ public class RelocateModulesIntoBlackboxes {
 		netlist.migrateCellAndSubCells(mod.getNetlist().getTopCell());
 		top.setAutoIOBuffers(false);
 
-		Site frSite = mod.getAnchor().getSite();
+		Site frSite = mod.getAnchor();
 		Tile frTile = frSite.getTile();
 		// The cellAnchor is used by a user as an anchor to the cell.  It can differ from anchorTile.
 		// Relocate the cell is equivalent to moving the cell so that the cellAnchor align with the specified INT tile.

@@ -31,6 +31,7 @@ import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.design.blocks.PBlockRange;
+import com.xilinx.rapidwright.design.noc.NOCClient;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
@@ -59,6 +60,8 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 	private ArrayList<SiteInst> instances;
 	/** A list of all nets internal to this module instance */
 	private ArrayList<Net> nets;
+	/** A list of all NOCClients belonging to this instance **/
+	private ArrayList<NOCClient> nocClients;
 
 	/**
 	 * Constructor initializing instance module name
@@ -192,7 +195,18 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 	}
 	
 	public boolean isPlaced(){
-		return anchor.isPlaced();
+		return anchor != null && anchor.isPlaced();
+	}
+	
+	public void addNOCClient(NOCClient nc) {
+		getNOCClients().add(nc);
+	}
+	
+	public List<NOCClient> getNOCClients() {
+		if(nocClients == null) {
+		    nocClients = new ArrayList<NOCClient>();
+		}
+		return nocClients;
 	}
 	
 	/**
@@ -236,7 +250,7 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 	 * @return True if the placement was successful, false otherwise.
 	 */
 	public boolean placeOnOriginalAnchor() {
-		return place(module.getAnchor().getSite(), false);
+		return place(module.getAnchor(), false);
 	}
 	
 	/**
@@ -258,7 +272,7 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 		
 		// Do some error checking on the newAnchorSite
 		if(module.getAnchor() == null) return false;
-		Site p = module.getAnchor().getSite();
+		Site p = module.getAnchor();
 		Tile t = newAnchorSite.getTile();
 		Site newValidSite = p.getCorrespondingSite(module.getAnchor().getSiteTypeEnum(), t);
 		if(!newAnchorSite.equals(newValidSite)){
@@ -360,6 +374,16 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 				designNet.getPIPs().addAll(net.getPIPs());
 			}
 		}
+		//Update location of NOCClients
+		for(NOCClient nc : getNOCClients()) {
+			Site templateSite = dev.getSite(nc.getLocation());
+			if(templateSite == null) 
+				continue;
+			Tile newTile = module.getCorrespondingTile(templateSite.getTile(), newAnchorSite.getTile());
+			Site newSite = templateSite.getCorrespondingSite(templateSite.getSiteTypeEnum(), newTile);
+			nc.setLocation(newSite != null ? newSite.getName() : null);
+		}
+		
 		return true;
 	}
 	
@@ -523,10 +547,10 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 	 */
 	public Site getLowerLeftPlacement(SiteTypeEnum type){
 		// Calculate anchor offset
-		SiteInst anchor = getModule().getAnchor();
+		Site anchor = getModule().getAnchor();
 		if(anchor == null) return null;
 		
-		Tile origAnchor = anchor.getSite().getTile();
+		Tile origAnchor = anchor.getTile();
 		Tile currAnchor = getAnchor().getSite().getTile();
 		int dx = currAnchor.getTileXCoordinate() - origAnchor.getTileXCoordinate();
 		int dy = currAnchor.getTileYCoordinate() - origAnchor.getTileYCoordinate();
@@ -613,9 +637,9 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 		Tile newAnchorTile = getModule().getCorrespondingAnchorTile(targetTile, ipTile, dev);
 		if(newAnchorTile == null) return false;
 		
-		SiteInst anchor = getModule().getAnchor();
+		Site anchor = getModule().getAnchor();
 		if(anchor == null) return false;
-		Site moduleAnchor = anchor.getSite();
+		Site moduleAnchor = anchor;
 		boolean success = place(newAnchorTile.getSites()[moduleAnchor.getTile().getSiteIndex(moduleAnchor)]);
 		
 		if(!success) System.out.println("Failed placement attempt, TargetTile="+targetTile.getName()+" ipTile="+ipTile.getName());

@@ -120,7 +120,7 @@ class MoveCommand extends QUndoCommand {
 				int tileY = (int)tileYd;
 				//Tile newAnchorTile = device.getTile(tileY, tileX);
 				Tile newAnchorTile = scene.drawnTiles[tileY][tileX];
-				Site newAnchorSite = ghm.getModuleInst().getModule().getAnchor().getSite().getCorrespondingSite(ghm.getModuleInst().getModule().getAnchor().getSiteTypeEnum(), newAnchorTile);
+				Site newAnchorSite = ghm.getModuleInst().getModule().getAnchor().getCorrespondingSite(ghm.getModuleInst().getModule().getAnchor().getSiteTypeEnum(), newAnchorTile);
 				newAnchorSiteList.add(newAnchorSite);
 				ghm.getModuleInst().place(newAnchorSite);
 			}else{

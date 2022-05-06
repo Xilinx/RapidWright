@@ -41,6 +41,7 @@ import com.xilinx.rapidwright.design.ModuleInst;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
@@ -481,9 +482,9 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
 
 	
 	public void setAnchorOffset() {
-		SiteInst anchorInst = null;
-		if (moduleInst.getSiteInsts().get(0).isPlaced()) {
-			anchorInst  = moduleInst.getAnchor();
+		Site anchorInst = null;
+		if (moduleInst.isPlaced()) {
+			anchorInst  = moduleInst.getAnchor().getSite();
 		} else {
 			anchorInst = moduleInst.getModule().getAnchor();
 		}
