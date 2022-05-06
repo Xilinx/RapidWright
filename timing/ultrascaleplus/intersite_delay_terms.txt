@@ -1,9 +1,6 @@
 #type delay(ps)
 # v 0.4
 
-START_TILE_ROW		1.
-START_TILE_COL		61.
-
 # input site pin delay
 # FIXED_DELAY is obsolete and should be replaced by A1-A6 below
 #FIXED_DELAY		43.
@@ -29,8 +26,8 @@ INTRASITE_DELAY_LUT_OUTPUT_TO_O_SITEPIN     0.
 INTRASITE_DELAY_LUT_OUTPUT_TO_MUX_SITEPIN  60.
 INTRASITE_DELAY_SITEPIN_TO_FF_INPUT       100.
 #INTRASITE_DELAY_FF_OUTPUT_TO_SITEPIN       0.
-INTRASITE_DELAY_LUT_OUTPUT_TO_FF_INPUT     50
-#48.
+INTRASITE_DELAY_LUT_OUTPUT_TO_FF_INPUT     50.
+
 # Bounce is considered as L 0 in the model.L_HORIZONTAL_BOUNCE should be used instead. 
 # Similarly please use L_HORIZONTAL_INTERNAL for 
 #BOUNCE_DELAY		43.
