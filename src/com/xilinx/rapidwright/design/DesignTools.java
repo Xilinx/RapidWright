@@ -1532,7 +1532,7 @@ public class DesignTools {
 			String instName = e.getKey();
 			String prefix = instName + "/";
 			Site newAnchor = e.getValue();
-			Site anchor = stamp.getAnchor().getSite();
+			Site anchor = stamp.getAnchor();
 			
 			// Create New Nets
 			for(Net n : stamp.getNets()){
@@ -1705,13 +1705,7 @@ public class DesignTools {
 						if(pin.isSitePort()) {
 							SitePinInst currPin = siteInst.getSitePinInst(pin.getName());
 							if(currPin == null) {
-								boolean isOutput = siteInst.isSitePinOutput(pin.getName());
-								if(isOutput && net.getSource() != null) {
-									currPin = new SitePinInst(pin.getName(), siteInst);
-									net.setAlternateSource(currPin);
-								}else {
-									currPin = net.createPin(isOutput, pin.getName(), siteInst);
-								}
+								currPin = net.createPin(pin.getName(), siteInst);
 								newPins.add(currPin);
 							}
 						}
@@ -1831,12 +1825,15 @@ public class DesignTools {
 	                	// Check if there is a dual output scenario
 	                	if(toReturn != null) {
 	                		SitePinInst source = net.getSource();
+	                		String toCreate;
 	                		if(source != null && source.getName().equals(sink.getName())) {
-		                		net.setAlternateSource(new SitePinInst(true, toReturn, inst));
+		                		toCreate = toReturn;
 		                		toReturn = sink.getName();
 	                		}else {
-		                		net.setAlternateSource(new SitePinInst(true, sink.getName(), inst));	                			
-	                		}
+		                		toCreate = sink.getName();
+		                	}
+		                	if (inst.getSitePinInst(toCreate) == null)
+		                		net.createPin(toCreate, inst);
 	                		// We'll return the first one we found, store the 2nd in the alternate
 	                		// reference on the net
 	                		return toReturn;

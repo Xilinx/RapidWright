@@ -1,5 +1,5 @@
 /* 
- * Copyright (c) 2021 Xilinx, Inc. 
+ * Copyright (c) 2022 Xilinx, Inc. 
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -19,6 +19,7 @@
  * limitations under the License.
  * 
  */
+ 
 /**
  * 
  */
@@ -26,7 +27,7 @@ package com.xilinx.rapidwright.device;
 
 
 /**
- * Generated on: Thu Nov 04 18:03:17 2021
+ * Generated on: Wed Apr 27 13:18:34 2022
  * by: com.xilinx.rapidwright.release.PartNamePopulator
  * 
  * Set of all Supported Xilinx families in RapidWright
@@ -50,6 +51,9 @@ public enum FamilyType {
 		QKINTEXU,
 		QKINTEXUPLUS,
 		QRKINTEXU,
+		QRVERSALAICORE,
+		QVERSALAICORE,
+		QVERSALPRIME,
 		QVIRTEX7,
 		QVIRTEXUPLUS,
 		QVIRTEXUPLUSHBM,
@@ -59,6 +63,8 @@ public enum FamilyType {
 		SPARTAN7,
 		VERSAL,
 		VERSALAICORE,
+		VERSALAIEDGE,
+		VERSALPREMIUM,
 		VERSALPRIME,
 		VIRTEX7,
 		VIRTEXU,
@@ -69,5 +75,4 @@ public enum FamilyType {
 		ZYNQ,
 		ZYNQUPLUS,
 		ZYNQUPLUSRFSOC,
-		ZYNQUPLUSRFSOCES1,
 }

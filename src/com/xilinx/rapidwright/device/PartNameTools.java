@@ -1,5 +1,5 @@
 /* 
- * Copyright (c) 2021 Xilinx, Inc. 
+ * Copyright (c) 2022 Xilinx, Inc. 
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -19,6 +19,7 @@
  * limitations under the License.
  * 
  */
+ 
 /**
  * 
  */
@@ -35,7 +36,7 @@ import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.util.FileTools;
 
 /**
- * Generated on: Thu Nov 04 18:03:17 2021
+ * Generated on: Wed Apr 27 13:18:34 2022
  * by: com.xilinx.rapidwright.release.PartNamePopulator
  * 
  * Class to hold utility APIs dealing with Parts and device names.
@@ -143,6 +144,9 @@ public class PartNameTools {
 			case QKINTEXU: return FamilyType.KINTEXU;
 			case QKINTEXUPLUS: return FamilyType.KINTEXUPLUS;
 			case QRKINTEXU: return FamilyType.KINTEXU;
+			case QRVERSALAICORE: return FamilyType.VERSAL;
+			case QVERSALAICORE: return FamilyType.VERSAL;
+			case QVERSALPRIME: return FamilyType.VERSAL;
 			case QVIRTEX7: return FamilyType.VIRTEX7;
 			case QVIRTEXUPLUS: return FamilyType.VIRTEXUPLUS;
 			case QVIRTEXUPLUSHBM: return FamilyType.VIRTEXUPLUSHBM;
@@ -151,6 +155,8 @@ public class PartNameTools {
 			case QZYNQUPLUSRFSOC: return FamilyType.ZYNQUPLUSRFSOC;
 			case SPARTAN7: return FamilyType.SPARTAN7;
 			case VERSALAICORE: return FamilyType.VERSAL;
+			case VERSALAIEDGE: return FamilyType.VERSAL;
+			case VERSALPREMIUM: return FamilyType.VERSAL;
 			case VERSALPRIME: return FamilyType.VERSAL;
 			case VIRTEX7: return FamilyType.VIRTEX7;
 			case VIRTEXU: return FamilyType.VIRTEXU;
@@ -161,7 +167,6 @@ public class PartNameTools {
 			case ZYNQ: return FamilyType.ZYNQ;
 			case ZYNQUPLUS: return FamilyType.ZYNQUPLUS;
 			case ZYNQUPLUSRFSOC: return FamilyType.ZYNQUPLUSRFSOC;
-			case ZYNQUPLUSRFSOCES1: return FamilyType.ZYNQUPLUSRFSOC;
 			default: return null;
 		}
 	}
@@ -190,6 +195,9 @@ public class PartNameTools {
 			case QKINTEXU: return "Kintex UltraScale";
 			case QKINTEXUPLUS: return "Kintex UltraScale+";
 			case QRKINTEXU: return "Kintex UltraScale";
+			case QRVERSALAICORE: return "Versal ACAP";
+			case QVERSALAICORE: return "Versal ACAP";
+			case QVERSALPRIME: return "Versal ACAP";
 			case QVIRTEX7: return "Virtex-7";
 			case QVIRTEXUPLUS: return "Virtex UltraScale+";
 			case QVIRTEXUPLUSHBM: return "Virtex UltraScale+";
@@ -199,6 +207,8 @@ public class PartNameTools {
 			case SPARTAN7: return "Spartan-7";
 			case VERSAL: return "Versal ACAP";
 			case VERSALAICORE: return "Versal ACAP";
+			case VERSALAIEDGE: return "Versal ACAP";
+			case VERSALPREMIUM: return "Versal ACAP";
 			case VERSALPRIME: return "Versal ACAP";
 			case VIRTEX7: return "Virtex-7";
 			case VIRTEXU: return "Virtex UltraScale";
@@ -209,7 +219,6 @@ public class PartNameTools {
 			case ZYNQ: return "Zynq-7000";
 			case ZYNQUPLUS: return "Zynq UltraScale+";
 			case ZYNQUPLUSRFSOC: return "Zynq UltraScale+ RFSOC";
-			case ZYNQUPLUSRFSOCES1: return "Zynq UltraScale+ RFSOC";
 			default: return null;
 		}
 	}
@@ -238,6 +247,9 @@ public class PartNameTools {
 			case QKINTEXU: return Series.UltraScale;
 			case QKINTEXUPLUS: return Series.UltraScalePlus;
 			case QRKINTEXU: return Series.UltraScale;
+			case QRVERSALAICORE: return Series.Versal;
+			case QVERSALAICORE: return Series.Versal;
+			case QVERSALPRIME: return Series.Versal;
 			case QVIRTEX7: return Series.Series7;
 			case QVIRTEXUPLUS: return Series.UltraScalePlus;
 			case QVIRTEXUPLUSHBM: return Series.UltraScalePlus;
@@ -247,6 +259,8 @@ public class PartNameTools {
 			case SPARTAN7: return Series.Series7;
 			case VERSAL: return Series.Versal;
 			case VERSALAICORE: return Series.Versal;
+			case VERSALAIEDGE: return Series.Versal;
+			case VERSALPREMIUM: return Series.Versal;
 			case VERSALPRIME: return Series.Versal;
 			case VIRTEX7: return Series.Series7;
 			case VIRTEXU: return Series.UltraScale;
@@ -257,7 +271,6 @@ public class PartNameTools {
 			case ZYNQ: return Series.Series7;
 			case ZYNQUPLUS: return Series.UltraScalePlus;
 			case ZYNQUPLUSRFSOC: return Series.UltraScalePlus;
-			case ZYNQUPLUSRFSOCES1: return Series.UltraScalePlus;
 			default: return null;
 		}
 	}
