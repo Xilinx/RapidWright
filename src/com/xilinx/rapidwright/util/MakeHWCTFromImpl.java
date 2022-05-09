@@ -22,9 +22,13 @@
  */
 package com.xilinx.rapidwright.util;
 
+import com.xilinx.rapidwright.design.ConstraintGroup;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Module;
+import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.Site;
+import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 
 import java.io.IOException;
@@ -33,9 +37,60 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 
 public class MakeHWCTFromImpl {
+
+    /**
+     * Relocate constraints from module to the top design.
+     *
+     * @param top         The design with black boxes to fill
+     * @param constraints The constraints. A module created from a design does not carry the constraints.
+     *                    In addition, the creation destroys the constriants. Thus, need to capture it before and pass them.
+     * @param cellAnchor The reference INT tile used as the handle to {@code mod} parameter
+     * @param blackboxes The list of pairs of a black box cell to be filled and its reference INT tile.
+     *                    The x-coordinate of this INT tile must match that of the cellAnchor.
+     */
+    public static boolean relocateConstraints(Design top, List<String> constraints, String cellAnchor, ArrayList<Pair<String, String>> blackboxes) {
+
+        List<String> prohibitSites = new ArrayList<>();
+
+        Pattern pattern = Pattern.compile("(\\w+)\\s+(\\w+)\\s+(\\w+)\\s+(.+)");
+        Pattern getSite = Pattern.compile("get_sites\\s+(\\w+)");
+        for (String c : constraints) {
+            Matcher matcher = pattern.matcher(c);
+            if (matcher.find()) {
+                if (matcher.group(1).equals("set_property")&&matcher.group(2).equals("PROHIBIT")
+                        &&(matcher.group(3).equals("true")||matcher.group(3).equals("1"))) {
+                    Matcher findSite = getSite.matcher(matcher.group(4));
+                    if (findSite.find()) {
+                        prohibitSites.add(findSite.group(1));
+                    }
+                }
+            }
+        }
+
+        // Apply prohibit sites to all the copies
+        Device d = top.getDevice();
+        Tile tFrom = d.getTile(cellAnchor);
+        for (Pair<String, String> cell : blackboxes) {
+            Tile tTo = d.getTile(cell.getSecond());
+            int verticalMoveOffset = tFrom.getRow() - tTo.getRow();
+
+            for (String s : prohibitSites) {
+                Site frSite = d.getSite(s);
+                Tile frTile = frSite.getTile();
+                Tile toTile = frTile.getTileNeighbor(0, verticalMoveOffset);
+                Site toSite = toTile.getSites()[frTile.getSiteIndex(frSite)];
+                top.addXDCConstraint(ConstraintGroup.LATE, "set_property PROHIBIT true [get_sites " + toSite.getName() + "]");
+//                System.out.println("add prohibit fr " + frSite + " to " + toSite);
+            }
+        }
+
+        return true;
+    }
 
     public static void main(String[] args) {
         String usage = String.join(System.getProperty("line.separator"),
@@ -173,10 +228,14 @@ INT_X0Y0
             System.out.println("Invalid permissions.");
         }
 
+        // Create module remove constraints from the design. Thus, need to capture it here.
+        List<String> constraints = hwct_component.getXDCConstraints(ConstraintGroup.LATE);
 
 
         Module mod = new Module(hwct_component, false);
-        if (RelocateModulesIntoBlackboxes.relocateModuleInsts(hwct, mod, cellAnchor, targets)) {
+        if (RelocateModulesIntoBlackboxes.relocateModuleInsts(hwct, mod, cellAnchor, targets)
+           && relocateConstraints(hwct, constraints, cellAnchor, targets)) {
+            // TODO: remove the use of relocateConstraints, once RapidWright can carry xdc through module creation and relocation
 
             RelocateModulesIntoBlackboxes.postProcessing(hwct, targets);
 

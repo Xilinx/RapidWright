@@ -2361,6 +2361,7 @@ public class DesignTools {
 			netToUphillPIPMap.put(net, nodeToDriverPIP);
 		}
 
+		Set<Site> prohibitSites = new HashSet<>();
 
 		for (SiteInst siteInst : siteInstsOfCells) {
 			// Go through the set of pins being used on this site instance.
@@ -2391,11 +2392,19 @@ public class DesignTools {
 							break;
 						sitePin = node.getSitePin();
 					}
-
+					if ((sitePin != null) && !node.getWireName().contains("VCC_WIRE"))  { // GND source
+						// Conceptually, need to prohibit a bel.
+						// However, placer will add a phohibited site, probably, to avoid dealing with partial site
+						// Thus, no need to trace to bel.
+						prohibitSites.add(sitePin.getSite());
+					}
 				}
 				netToItsPIPs.put(net,allPIPs);
 			}
 		}
+
+		for (Site site : prohibitSites)
+			dest.addXDCConstraint(ConstraintGroup.LATE, "set_property PROHIBIT true [get_sites " + site.getName() + "]");
 
 
 		for (Map.Entry<Net, Set<PIP>> entry : netToItsPIPs.entrySet()) {
