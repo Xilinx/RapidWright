@@ -63,11 +63,10 @@ public class TestModuleInst {
             final int xOffset = 0;
             final int yOffset = -5;
 
-            SiteInst si = module.getAnchor();
-            Site ss = si.getSite();
-            Tile st = si.getTile();
+            Site ss = module.getAnchor();
+            Tile st = ss.getTile();
             Tile dt = st.getTileXYNeighbor(xOffset, yOffset);
-            Site ds = ss.getCorrespondingSite(si.getSiteTypeEnum(), dt);
+            Site ds = ss.getCorrespondingSite(ss.getSiteTypeEnum(), dt);
 
             mi.unplace();
 

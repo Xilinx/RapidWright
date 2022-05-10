@@ -173,7 +173,7 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
         // Perform final placement of all hard macros
         for(HardMacro hm : array){
             //System.out.println(moveCount.get(hm) + " " + hm.tileSize + " " + hm.getName());
-            HashSet<Tile> footPrint = isValidPlacement((ModuleInst)hm, hm.getModule().getAnchor().getSite(), hm.getTempAnchorSite().getTile(), usedTiles);
+            HashSet<Tile> footPrint = isValidPlacement((ModuleInst)hm, hm.getModule().getAnchor(), hm.getTempAnchorSite().getTile(), usedTiles);
             if(footPrint == null){
 
                 if(!placeModuleNear((ModuleInst)hm, hm.getTempAnchorSite().getTile(), usedTiles)){
@@ -293,7 +293,7 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
     }
 
     public boolean placeModuleNear(ModuleInst modInst, Tile tile, HashSet<Tile> usedTiles){
-        Site anchorSite = modInst.getModule().getAnchor().getSite();
+        Site anchorSite = modInst.getModule().getAnchor();
         Tile proposedAnchorTile = tile;
         Direction dir = Direction.UP;
         HashSet<Tile> triedTiles = new HashSet<Tile>();
@@ -400,7 +400,7 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
         //Previously:
         //Site newSite2 = modInst.getAnchor().getSite().getCorrespondingSite(modInst.getAnchor().getSiteTypeEnum(), proposedAnchorTile);
         //Now
-        Site newSite2 = modInst.getModule().getAnchor().getSite().getCorrespondingSite(modInst.getAnchor().getSiteTypeEnum(), proposedAnchorTile);
+        Site newSite2 = modInst.getModule().getAnchor().getCorrespondingSite(modInst.getAnchor().getSiteTypeEnum(), proposedAnchorTile);
 
         if(newSite2 == null){
             return null;

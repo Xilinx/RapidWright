@@ -422,7 +422,7 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
 		// Perform final placement of all hard macros
 		for(HardMacro hm : array){	
 			//System.out.println(moveCount.get(hm) + " " + hm.tileSize + " " + hm.getName());
-			HashSet<Tile> footPrint = isValidPlacement((ModuleInst)hm, hm.getModule().getAnchor().getSite(), hm.getTempAnchorSite().getTile(), usedTiles);
+			HashSet<Tile> footPrint = isValidPlacement((ModuleInst)hm, hm.getModule().getAnchor(), hm.getTempAnchorSite().getTile(), usedTiles);
 			if(footPrint == null){
 				
 				if(!placeModuleNear((ModuleInst)hm, hm.getTempAnchorSite().getTile(), usedTiles)){
@@ -463,7 +463,7 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
 	}
 	
 	public boolean placeModuleNear(ModuleInst modInst, Tile tile, HashSet<Tile> usedTiles){
-		Site anchorSite = modInst.getModule().getAnchor().getSite();
+		Site anchorSite = modInst.getModule().getAnchor();
 		Tile proposedAnchorTile = tile;
 		Direction dir = Direction.UP;
 		HashSet<Tile> triedTiles = new HashSet<Tile>();

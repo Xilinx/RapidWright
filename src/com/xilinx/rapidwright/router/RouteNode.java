@@ -23,6 +23,7 @@
 package com.xilinx.rapidwright.router;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.PriorityQueue;
@@ -334,22 +335,43 @@ public class RouteNode{
 		return new RouteNode(n);
 	}
 	
-
+	public ArrayList<PIP> getPIPsForwardToSink(){
+		ArrayList<PIP> pips = new ArrayList<>();
+		RouteNode curr = this;
+		while(curr.parent != null){
+			for(Wire currWire : Arrays.asList(curr.getWiresInNode())) {
+				if(!currWire.getTile().equals(curr.parent.getTile()))
+					continue;
+				for(Wire w1 : curr.parent.tile.getWireConnections(currWire.getWireIndex())){
+					if(w1.getWireIndex() == curr.parent.wire){
+						if(w1.isEndPIPWire()){
+							pips.add(new PIP(curr.parent.tile, currWire.getWireIndex(), curr.parent.wire, w1.getPIPType()));
+							break;
+						}
+					}
+				}
+				curr = curr.parent;
+			}
+		}
+		return pips;
+	}
 	
 	public ArrayList<PIP> getPIPsBackToSource(){
 		ArrayList<PIP> pips = new ArrayList<>();
 		RouteNode curr = this;
 		while(curr.parent != null){
-			for(Wire w1 : curr.parent.tile.getWireConnections(curr.parent.wire)){
-				if(w1.getWireIndex() == curr.wire){
-					if(w1.isEndPIPWire() && curr.parent.tile.equals(curr.tile)){
-						pips.add(new PIP(curr.tile, curr.parent.wire, curr.wire, w1.getPIPType()));
-						break;
+			for(Wire parentWire : Arrays.asList(curr.parent.getWiresInNode())) {
+				if(!parentWire.getTile().equals(curr.getTile()))
+					continue;
+				for(Wire w1 : curr.tile.getWireConnections(parentWire.getWireIndex())){
+					if(w1.getWireIndex() == curr.wire){
+						if(w1.isEndPIPWire()){
+							pips.add(new PIP(curr.tile, parentWire.getWireIndex(), curr.wire, w1.getPIPType()));
+							break;
+						}
 					}
 				}
 			}
-			// Update the current node to the parent
-			// this way we can traverse backwards to the source
 			curr = curr.parent;
 		}
 		return pips;

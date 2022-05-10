@@ -473,7 +473,7 @@ public class EDIFTools {
 	 * Connects two existing logical port insts together by creating new ports and nets on all cells
 	 * instantiated between their levels of hierarchy.  It assumes the netlist cells involved only
 	 * have one instance (does not differentiate cells when creating the ports).  This assumption 
-	 * can be enforced by calling {@link #flattenNetlist(Design)}. If the src or snk
+	 * can be enforce by calling {@link #flattenNetlist(Design)}. If the src or snk
 	 * port insts do net have nets connected, it will create them and connect them in their parent
 	 * cell definition.
 	 * @param src The logical port inst driver or source  
@@ -709,19 +709,19 @@ public class EDIFTools {
 	}
 
 	public static EDIFNetlist loadEDIFFile(Path fileName) {
-		try {
-			if (ParallelismTools.getParallel()) {
-				try (ParallelEDIFParser p = new ParallelEDIFParser(fileName)) {
-					return p.parseEDIFNetlist();
-				}
-			} else {
-				try (EDIFParser p = new EDIFParser(fileName)) {
-					return p.parseEDIFNetlist();
-				}
-			}
-		} catch (IOException e) {
-			throw new UncheckedIOException("ERROR: Couldn't read file : " + fileName, e);
-		}
+	    try {
+	        if(ParallelismTools.getParallel()) {
+	            try (ParallelEDIFParser p = new ParallelEDIFParser(fileName)) {
+	                return p.parseEDIFNetlist();
+	            }           
+	        } else {
+	            try (EDIFParser p = new EDIFParser(fileName)) {
+	                return p.parseEDIFNetlist();
+	            }                       
+	        }	        
+	    } catch (IOException e) {
+	        throw new UncheckedIOException("ERROR: Couldn't read file : " + fileName, e);
+	    }
 	}
 
 	public static EDIFNetlist loadEDIFFile(String fileName){
