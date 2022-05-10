@@ -150,7 +150,7 @@ public class ILAInserter {
 		ModuleInst mi = original.createModuleInst(ila.getName(), m);
 		original.getNetlist().migrateCellAndSubCells(ila.getTopEDIFCell());
 		if(m.getAnchor() != null) {
-			mi.place(m.getAnchor().getSite());
+			mi.place(m.getAnchor());
 		}
 		
 

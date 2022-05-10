@@ -1,5 +1,5 @@
 /* 
- * Copyright (c) 2021 Xilinx, Inc. 
+ * Copyright (c) 2022 Xilinx, Inc. 
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -19,6 +19,7 @@
  * limitations under the License.
  * 
  */
+ 
 /**
  * 
  */
@@ -32,7 +33,7 @@ import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFLibrary;
 
 /**
- * Generated on: Thu Nov 04 18:28:41 2021
+ * Generated on: Mon Apr 25 23:31:34 2022
  * by: com.xilinx.rapidwright.release.UnisimParser
  * 
  * Enumerates supported Unisim primitives that map to Xilinx devices.

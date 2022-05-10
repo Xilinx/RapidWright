@@ -1,5 +1,5 @@
 /* 
- * Copyright (c) 2021 Xilinx, Inc. 
+ * Copyright (c) 2022 Xilinx, Inc. 
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -19,6 +19,7 @@
  * limitations under the License.
  * 
  */
+ 
 /**
  * 
  */
@@ -26,7 +27,7 @@ package com.xilinx.rapidwright.device;
 
 
 /**
- * Generated on: Tue Apr 27 08:16:41 2021
+ * Generated on: Mon Apr 25 23:31:34 2022
  * by: com.xilinx.rapidwright.release.SiteAndTileTypeUpdater
  * 
  * Enumeration of IOStandard type for all valid devices within Vivado.

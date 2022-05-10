@@ -84,7 +84,7 @@ public class StampPlacement {
 				String fullDCPFileName = tokens[3];
 				String metadataFileName = tokens[4];
 				stamps.put(idx, new Module(Design.readCheckpoint(fullDCPFileName, CodePerfTracker.SILENT), metadataFileName));
-				stamps.get(idx).setAnchor(stamps.get(idx).getSiteInstAtSite(anchor));
+				stamps.get(idx).setAnchor(anchor);
 				if(stamps.get(idx).getAnchor() == null){
 					throw new RuntimeException("ERROR: No site used in " + fullDCPFileName + " at proposed anchor " + anchor + " on line " + lineNum);
 				}
