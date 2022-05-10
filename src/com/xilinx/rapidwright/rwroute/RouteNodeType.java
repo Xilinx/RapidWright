@@ -27,24 +27,24 @@ import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 
-public enum RoutableType {
+public enum RouteNodeType {
 	/** 
-	 * Denotes {@link Routable} Objects that correspond to the output pins of {@link Net} Objects, 
-	 * typically the source {@link Routable} Objects of {@link Connection} Objects.
+	 * Denotes {@link RouteNode} Objects that correspond to the output pins of {@link Net} Objects,
+	 * typically the source {@link RouteNode} Objects of {@link Connection} Objects.
 	 */
 	PINFEED_O,
 	/** 
-	 * Denotes {@link Routable} Objects that correspond to input pins of {@link Net} Objects, 
-	 * typically the sink {@link Routable} Objects of {@link Connection} Objects. 
+	 * Denotes {@link RouteNode} Objects that correspond to input pins of {@link Net} Objects,
+	 * typically the sink {@link RouteNode} Objects of {@link Connection} Objects.
 	 */
 	PINFEED_I,
 	/** 
-	 * Denotes {@link Routable} Objects that are created based on {@link Node} Objects 
+	 * Denotes {@link RouteNode} Objects that are created based on {@link Node} Objects
 	 * that have an {@link IntentCode} of NODE_PINBOUNCE.
 	 */
 	PINBOUNCE,
 	/** 
-	 * Denotes other wiring {@link Routable} Objects 
+	 * Denotes other wiring {@link RouteNode} Objects
 	 * that are created for routing {@link Connection} Objects.
 	 */
 	WIRE

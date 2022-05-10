@@ -33,7 +33,8 @@ import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.rwroute.RWRouteConfig;
 import com.xilinx.rapidwright.rwroute.Connection;
 import com.xilinx.rapidwright.rwroute.NetWrapper;
-import com.xilinx.rapidwright.rwroute.Routable;
+import com.xilinx.rapidwright.rwroute.RouteNode;
+import com.xilinx.rapidwright.rwroute.RouteNodeGraph;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 import com.xilinx.rapidwright.util.MessageGenerator;
 import com.xilinx.rapidwright.util.Pair;
@@ -55,7 +56,7 @@ public class TimingManager {
     public RuntimeTrackerTree routerTimer;
     private boolean verbose;
     
-    private short timingRequirement;
+    private float timingRequirement;
     private float pessimismA = (float) 1.03;
     private float pessimismB = 100;
     
@@ -77,30 +78,29 @@ public class TimingManager {
      */
     public TimingManager(Design design, boolean doBuild) {
     	this.design = design;
-        timingModel = new TimingModel(this.design.getDevice());
-        timingGraph = new TimingGraph(this.design);
+        timingModel = new TimingModel(design.getDevice());
+        timingGraph = new TimingGraph(design);
         timingModel.setTimingManager(this);
         timingGraph.setTimingManager(this);
         timingGraph.setTimingModel(timingModel);
-        this.device = this.design.getDevice();
+        device = design.getDevice();
         if (doBuild)
-            build(false, this.design.getNets());
+            build(false, design.getNets());
     }
     
-    public TimingManager(Design design, boolean doBuild, RuntimeTrackerTree timer, RWRouteConfig config, ClkRouteTiming clkTiming, Collection<Net> targetNets) {
+    public TimingManager(Design design, RuntimeTrackerTree timer, RWRouteConfig config, ClkRouteTiming clkTiming, Collection<Net> targetNets, boolean isPartialRouting) {
     	this.design = design;
-    	this.setTimingRequirement();
-    	this.verbose = config.isVerbose();
+    	setTimingRequirement();
+    	verbose = config.isVerbose();
     	setPessimismFactors(config.getPessimismA(), config.getPessimismB());
-    	this.routerTimer = timer;
-        timingModel = new TimingModel(this.design.getDevice());
-        timingGraph = new TimingGraph(this.design, this.routerTimer, clkTiming, config.getDspTimingDataFolder());
+    	routerTimer = timer;
+        timingModel = new TimingModel(design.getDevice());
+        timingGraph = new TimingGraph(design, routerTimer, clkTiming, config.getDspTimingDataFolder());
         timingModel.setTimingManager(this);
         timingGraph.setTimingManager(this);
         timingGraph.setTimingModel(timingModel);
-        this.device = this.design.getDevice();
-        if (doBuild)
-            build(config.isPartialRouting(), targetNets);
+        device = design.getDevice();
+        build(isPartialRouting, targetNets);
     }
     
     /**
@@ -135,9 +135,9 @@ public class TimingManager {
     		if(connection.isDlyPatched()) continue;
     		float netDelay = 0;
     		for(int i = connection.getRnodes().size() - 2; i >= 0; i--) {
-    			Routable child = connection.getRnodes().get(i);
-				Routable parent = connection.getRnodes().get(i+1);
-				netDelay += child.getDelay() + DelayEstimatorBase.getExtraDelay(child.getNode(), DelayEstimatorBase.isLong(parent.getNode()));
+    			RouteNode child = connection.getRnodes().get(i);
+    			RouteNode parent = connection.getRnodes().get(i+1);
+    			netDelay += child.getDelay() + DelayEstimatorBase.getExtraDelay(child.getNode(), DelayEstimatorBase.isLong(parent.getNode()));
     		}
     		connection.setTimingEdgesDelay(netDelay);
 			connection.setDlyPatched(true);
@@ -147,13 +147,22 @@ public class TimingManager {
     /**
      * Calculates and returns the maximum arrival time and the associated TimingVertex
      */
-    public Pair<Float, TimingVertex> calculateArrivalRequireTimes(){
+    public Pair<Float,TimingVertex> calculateArrivalRequiredTimes(){
     	Pair<Float, TimingVertex> maxs;
-    	
-		this.timingGraph.resetRequiredAndArrivalTime();
-		this.timingGraph.computeArrivalTimesTopologicalOrder();
-    	maxs = this.timingGraph.getMaxDelay();
-    	this.timingGraph.setTimingRequirementTopologicalOrder(maxs.getFirst());
+
+    	timingGraph.resetRequiredAndArrivalTime();
+    	timingGraph.computeArrivalTimesTopologicalOrder();
+
+    	maxs = timingGraph.getMaxDelay();
+    	float maxArrival = maxs.getFirst();
+    	// Negative slacks are not supported. Normalize the required time
+    	// to be the maximum of the latest arrival time and the timing requirement.
+    	// If maxArrival > timingRequirement, setting it to timingRequirement would mean
+    	// negative slack.
+    	// If timingRequirement > maxArrival, setting it to maxArrival would mean that
+    	// minimum slack is zero leading to unnecessary router effort.
+    	float normalizedRequired = Float.max(maxArrival, timingRequirement);
+    	timingGraph.setTimingRequirementTopologicalOrder(normalizedRequired);
     	
     	return maxs;
     }
@@ -170,40 +179,40 @@ public class TimingManager {
     	}
     }
     
-    public void getCriticalPathInfo(Pair<Float, TimingVertex> maxDelayTimingVertex, boolean useRoutable, Map<Node, Routable> rnodesCreated){
+    public void getCriticalPathInfo(Pair<Float, TimingVertex> maxDelayTimingVertex, boolean useRoutable, RouteNodeGraph routingGraph){
     	TimingVertex maxV = maxDelayTimingVertex.getSecond();
     	float maxDelay = maxDelayTimingVertex.getFirst();
     	System.out.printf(MessageGenerator.formatString("Timing requirement (ps):", timingRequirement));
-    	List<TimingEdge> criticalEdges = this.timingGraph.getCriticalTimingEdgesInOrder(maxV);
+    	List<TimingEdge> criticalEdges = timingGraph.getCriticalTimingEdgesInOrder(maxV);
     	short arr = 0;
     	short clkskew = 0;
     	for(TimingEdge e : criticalEdges) {
     		arr += e.getDelay();
     	}
-    	System.out.printf(MessageGenerator.formatString("Critical path delay (ps):", (short) (arr - criticalEdges.get(0).getDelay() - clkskew)));
-    	System.out.printf(MessageGenerator.formatString("Slack (ps):", (short) (timingRequirement - maxDelay)));
+    	System.out.printf(MessageGenerator.formatString("Critical path delay (ps):", (int)(arr - criticalEdges.get(0).getDelay() - clkskew)));
+    	System.out.printf(MessageGenerator.formatString("Slack (ps):", (int)(timingRequirement - maxDelay)));
     	System.out.printf(MessageGenerator.formatString("With timing closure guarantee:"));
-    	short adjusted = (short) (pessimismA * (arr - criticalEdges.get(0).getDelay() - clkskew) + pessimismB);
-    	System.out.printf(MessageGenerator.formatString("Critical path delay (ps):", (short)adjusted));
-    	System.out.printf(MessageGenerator.formatString("Slack (ps):", (short) (timingRequirement - adjusted)));
+    	int adjusted = (int) (pessimismA * (arr - criticalEdges.get(0).getDelay() - clkskew) + pessimismB);
+    	System.out.printf(MessageGenerator.formatString("Critical path delay (ps):", adjusted));
+    	System.out.printf(MessageGenerator.formatString("Slack (ps):", (int)(timingRequirement - adjusted)));
     	
-    	this.printPathDelayBreakDown(arr, criticalEdges, this.timingGraph.getTimingEdgeConnectionMap(), useRoutable, rnodesCreated);
+    	printPathDelayBreakDown(arr, criticalEdges, timingGraph.getTimingEdgeConnectionMap(), useRoutable, routingGraph);
     }
     
     /**
      * Gets and prints the given path from the TimingGraph
      */
-    public void getSamplePathDelayInfo(List<String> verticesOfVivadoPath, Map<TimingEdge, Connection> timingEdgeConnctionMap, boolean routableBased, Map<Node, Routable> rnodesCreated) {
-    	List<TimingEdge> edges = this.timingGraph.getTimingEdgeOfPath(verticesOfVivadoPath);
+    public void getSamplePathDelayInfo(List<String> verticesOfVivadoPath, Map<TimingEdge, Connection> timingEdgeConnctionMap, boolean routableBased, RouteNodeGraph routingGraph) {
+    	List<TimingEdge> edges = timingGraph.getTimingEdgeOfPath(verticesOfVivadoPath);
     	short totalDelay = 0;
     	for(TimingEdge edge : edges) {
     		totalDelay += edge.getDelay();
     	}
     	System.out.println("Total delay: " + totalDelay);
-    	this.printPathDelayBreakDown(totalDelay, edges, timingEdgeConnctionMap, routableBased, rnodesCreated);
+    	printPathDelayBreakDown(totalDelay, edges, timingEdgeConnctionMap, routableBased, routingGraph);
     }
     
-    private void printPathDelayBreakDown(short arr, List<TimingEdge> criticalEdges, Map<TimingEdge, Connection> timingEdgeConnctionMap, boolean useRoutable, Map<Node, Routable> rnodesCreated) {
+    private void printPathDelayBreakDown(short arr, List<TimingEdge> criticalEdges, Map<TimingEdge, Connection> timingEdgeConnctionMap, boolean useRoutable, RouteNodeGraph routingGraph) {
     	if(verbose) {
     		System.out.println("\nTimingEdges:");
         	int id = 0;
@@ -211,21 +220,21 @@ public class TimingManager {
         		System.out.println(String.format("%5d", id++) + "  " + e);
         	}
     	}
-    	this.printTimingPathInTable(criticalEdges, arr);
-    	if(rnodesCreated == null) return;
+    	printTimingPathInTable(criticalEdges, arr);
+    	if(routingGraph == null) return;
     	if(!verbose) return;
     	for(TimingEdge edge : criticalEdges) {
     		if(timingEdgeConnctionMap.containsKey(edge)){
     			System.out.println(timingEdgeConnctionMap.get(edge));
     			if(useRoutable) {
-    				List<Routable> groups = timingEdgeConnctionMap.get(edge).getRnodes();
+    				List<RouteNode> groups = timingEdgeConnctionMap.get(edge).getRnodes();
         			for(int iGroup = groups.size() -1; iGroup >= 0; iGroup--) {
         				System.out.println("\t " + groups.get(iGroup));
         			}
     			}else {
     				List<Node> nodes = timingEdgeConnctionMap.get(edge).getNodes();
         			for(int iGroup = nodes.size() -1; iGroup >= 0; iGroup--) {
-        				Routable rnode = rnodesCreated.get(nodes.get(iGroup));
+        				RouteNode rnode = routingGraph.getNode(nodes.get(iGroup));
         				if(rnode != null) {
         					System.out.println("\t " + rnode.getNode() + ", " + rnode.getNode().getIntentCode() + ", delay = " + (short) rnode.getDelay());
         				}else {
@@ -270,9 +279,17 @@ public class TimingManager {
      * Set the timing requirement of the design
      */
     public void setTimingRequirement() {
-    	timingRequirement = (short) (getDesignTimingRequirement(this.design) * 1000);
+    	setTimingRequirementPs(getDesignTimingRequirement(design) * 1000);
     }
-    
+
+    public void setTimingRequirementPs(float ps) {
+    	timingRequirement = ps;
+    }
+
+    public float getTimingRequirementPs() {
+    	return timingRequirement;
+    }
+
     public static float getDesignTimingRequirement(Design design) {
 		float treq = 0;
 		
@@ -283,7 +300,7 @@ public class TimingManager {
 			for(String constraint : constraints) {
 				if(constraint.contains("-period")) {
 					int startIndex = constraint.indexOf("-period");
-					treq = Math.max(treq, Float.valueOf(constraint.substring(startIndex+7, startIndex+13)));
+					treq = Math.max(treq, Float.parseFloat(constraint.substring(startIndex+7, startIndex+13)));
 				}
 			}
 		}
@@ -296,17 +313,14 @@ public class TimingManager {
      * @param connections Connections in question.
      * @param maxCriticality The maximum criticality value.
      * @param criticalityExponent The criticality exponent to use. For more information, please refer to the {@link RWRouteConfig} class file.
-     * @param maxDelay The maximum delay used to normalize the slack of a connection.
      */
-    public void calculateCriticality(List<Connection> connections, float maxCriticality, float criticalityExponent, float maxDelay){
+    public void calculateCriticality(List<Connection> connections, float maxCriticality, float criticalityExponent){
     	for(Connection connection:connections){
     		connection.resetCriticality();
     	}
-    	float maxCriti = 0;
-		for(Connection connection : connections){
-    		connection.calculateCriticality(maxDelay, maxCriticality, criticalityExponent);
-    		if(connection.getCriticality() > maxCriti)
-    			maxCriti = connection.getCriticality();
+    	float maxRequired = timingGraph.superSink.getRequiredTime();
+    	for(Connection connection : connections){
+    		connection.calculateCriticality(maxRequired, maxCriticality, criticalityExponent);
     	}
     }
 
@@ -315,23 +329,23 @@ public class TimingManager {
      * @return Indication of successful completion.
      */
     private boolean build(boolean isPartialRouting, Collection<Net> targetNets) {
-    	if(this.routerTimer != null) this.routerTimer.createRuntimeTracker("build timing model", "Initialization").start();
+    	if(routerTimer != null) routerTimer.createRuntimeTracker("build timing model", "Initialization").start();
         timingModel.build();
-        if(this.routerTimer != null) this.routerTimer.getRuntimeTracker("build timing model").stop();
+        if(routerTimer != null) routerTimer.getRuntimeTracker("build timing model").stop();
         
-        if(this.routerTimer != null) this.routerTimer.createRuntimeTracker("build timing graph", "Initialization").start();
+        if(routerTimer != null) routerTimer.createRuntimeTracker("build timing graph", "Initialization").start();
         timingGraph.build(isPartialRouting, targetNets);
-        if(this.routerTimer != null) this.routerTimer.getRuntimeTracker("build timing graph").stop();
+        if(routerTimer != null) routerTimer.getRuntimeTracker("build timing graph").stop();
         
         return postBuild();
     }
 
     private boolean postBuild() {
-    	if(this.routerTimer != null) this.routerTimer.createRuntimeTracker("post graph build", "Initialization").start();
+    	if(routerTimer != null) routerTimer.createRuntimeTracker("post graph build", "Initialization").start();
         timingGraph.removeClockCrossingPaths();
         timingGraph.buildSuperGraphPaths();
         timingGraph.setOrderedTimingVertexLists();
-        if(this.routerTimer != null) this.routerTimer.getRuntimeTracker("post graph build").stop();
+        if(routerTimer != null) routerTimer.getRuntimeTracker("post graph build").stop();
         return true;
     }
 
@@ -368,7 +382,7 @@ public class TimingManager {
     }
     
     public void setTimingEdgesOfConnections(List<Connection> connections) {
-    	this.timingGraph.setTimingEdgesOfConnections(connections);
+    	timingGraph.setTimingEdgesOfConnections(connections);
     }
     
     

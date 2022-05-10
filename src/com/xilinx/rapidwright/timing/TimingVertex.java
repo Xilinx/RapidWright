@@ -20,8 +20,6 @@
 
 package com.xilinx.rapidwright.timing;
 
-import java.util.Arrays;
-
 /**
  * A TimingVertex represents a node within the TimingGraph.  It encapsulates slack, arrival time, 
  * required time, and whether it represents a pin on a flip flop.
@@ -49,9 +47,9 @@ public class TimingVertex {
      */
     public TimingVertex(String name) {
         this.name = name;
-        this.isFlopInput = false;
-        this.isFlopOutput = false;
-        this.printed = false;
+        isFlopInput = false;
+        isFlopOutput = false;
+        printed = false;
     }
     
     /**
@@ -62,8 +60,8 @@ public class TimingVertex {
     public TimingVertex(String name, boolean isFlopInput) {
     	this.name = name;
     	this.isFlopInput = isFlopInput;
-        this.isFlopOutput = !isFlopInput;
-        this.printed = false;
+        isFlopOutput = !isFlopInput;
+        printed = false;
     }
 
     /**
@@ -126,7 +124,7 @@ public class TimingVertex {
         } else {
             //System.out.println("Setting required time for "+this+" to:"+requiredTime);
         }
-        this.slack = requiredTime - arrivalTime;
+        slack = requiredTime - arrivalTime;
     }
     
 	public void setMinRequiredTime(float requiredTime){
@@ -156,10 +154,10 @@ public class TimingVertex {
     public void setMaxArrivalTime(float arrivalTime, TimingVertex prev){
     	if(this.arrivalTime == null){
     		this.arrivalTime = arrivalTime;
-    		this.setPrev(prev);
+    		setPrev(prev);
     	}else if(this.arrivalTime < arrivalTime){
     		this.arrivalTime = arrivalTime;
-    		this.setPrev(prev);
+    		setPrev(prev);
     	}
     }
     

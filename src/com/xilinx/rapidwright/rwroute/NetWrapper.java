@@ -24,7 +24,6 @@
 package com.xilinx.rapidwright.rwroute;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 import com.xilinx.rapidwright.design.Net;
@@ -33,7 +32,7 @@ import com.xilinx.rapidwright.design.Net;
  * A wrapper class of {@link Net} with additional information for the router.
  */
 public class NetWrapper{
-	/** A unique index for a NetWrapepr Object*/
+	/** A unique index for a NetWrapper Object*/
 	private int id;
 	/** The associated {@link Net} Object */
 	private Net net;
@@ -44,66 +43,54 @@ public class NetWrapper{
 	private float yCenter;
 	/** The half-perimeter wirelength */
 	private short doubleHpwl;
-	/** A flag to indicate if the source has been swapped */
-	private boolean sourceChanged;
-	
+
 	public NetWrapper(int id, Net net){
 		this.id = id;
 		this.net = net;
 		connections = new ArrayList<>();
-		setSourceChanged(false);
 	}
 	
 	public void computeHPWLAndCenterCoordinates(){
-		short xMin = 1<<10;
-		short xMax = 0;
-		short yMin = 1<<10;
-		short yMax = 0;
-		float xSum = 0;
-		float ySum = 0;		
-		List<Short> xArray = new ArrayList<>();
-		List<Short> yArray = new ArrayList<>();
-		
-		boolean sourceRnodeAdded = false;	
+		int xMin = Integer.MAX_VALUE;
+		int yMin = Integer.MAX_VALUE;
+		int xMax = Integer.MIN_VALUE;
+		int yMax = Integer.MIN_VALUE;
+		int xSum = 0;
+		int ySum = 0;
+		int count = 0;
+		boolean sourceRnodeAdded = false;
 		for(Connection connection : connections) {
 			if(connection.isDirect()) continue;
-			short x = 0;
-			short y = 0;
 			if(!sourceRnodeAdded) {
-				x = connection.getSourceRnode().getEndTileXCoordinate();
-				y = connection.getSourceRnode().getEndTileYCoordinate();
-				xArray.add(x);
-				yArray.add(y);
+				short x = connection.getSourceRnode().getEndTileXCoordinate();
+				short y = connection.getSourceRnode().getEndTileYCoordinate();
+				xMin = Integer.min(xMin, x);
+				yMin = Integer.min(yMin, y);
+				xMax = Integer.max(xMax, x);
+				yMax = Integer.max(yMax, y);
 				xSum += x;
-				ySum += y;		
+				ySum += y;
 				sourceRnodeAdded = true;
+				count++;
 			}	
-			x = connection.getSinkRnode().getEndTileXCoordinate();
-			y = connection.getSinkRnode().getEndTileYCoordinate();
-			xArray.add(x);
-			yArray.add(y);
+			short x = connection.getSinkRnode().getEndTileXCoordinate();
+			short y = connection.getSinkRnode().getEndTileYCoordinate();
+			xMin = Integer.min(xMin, x);
+			yMin = Integer.min(yMin, y);
+			xMax = Integer.max(xMax, x);
+			yMax = Integer.max(yMax, y);
 			xSum += x;
-			ySum += y;	
+			ySum += y;
+			count++;
 		}
-		
-		Collections.sort(xArray);
-		Collections.sort(yArray);
-		xMin = xArray.get(0);
-		xMax = xArray.get(xArray.size() - 1);
-		yMin = yArray.get(0);
-		yMax = yArray.get(xArray.size() - 1);
-		
-		setDoubleHpwl((short) ((xMax - xMin + 1 + yMax - yMin + 1) * 2));
-		setXCenter(xSum / xArray.size());
-		setYCenter(ySum / yArray.size());
+
+		doubleHpwl = (short) ((xMax - xMin + 1 + yMax - yMin + 1) * 2);
+		xCenter = (float)xSum / count;
+		yCenter = (float)ySum / count;
 	}
 	
 	public Net getNet(){
 		return net;
-	}
-	
-	public int getId() {
-		return id;
 	}
 	
 	public void addConnection(Connection connection){
@@ -118,34 +105,14 @@ public class NetWrapper{
 		return doubleHpwl;
 	}
 
-	public void setDoubleHpwl(short hpwl) {
-		doubleHpwl = hpwl;
-	}
-
-	public boolean isSourceChanged() {
-		return sourceChanged;
-	}
-
-	public void setSourceChanged(boolean sourceChanged) {
-		this.sourceChanged = sourceChanged;
-	}
-
 	public float getYCenter() {
 		return yCenter;
-	}
-
-	public void setYCenter(float yCenter) {
-		this.yCenter = yCenter;
 	}
 
 	public float getXCenter() {
 		return xCenter;
 	}
 
-	public void setXCenter(float xCenter) {
-		this.xCenter = xCenter;
-	}
-	
 	@Override
 	public int hashCode(){
 		return id;
