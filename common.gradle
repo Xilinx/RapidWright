@@ -5,8 +5,6 @@ apply plugin: "java-test-fixtures"
 sourceCompatibility = 8
 targetCompatibility = 8
 
-def rapidwrightDir = System.getenv("RAPIDWRIGHT_PATH") ?: file('.').toString()
-
 repositories {
     if (project.hasProperty('additionalMavenRepo')) {
       project.logger.lifecycle('Adding Maven Repository at '+additionalMavenRepo)
@@ -58,11 +56,11 @@ tasks.withType(Test) {
   //Propagate JVM settings to test JVM
   jvmArgs applicationDefaultJvmArgs
 
-  environment 'RAPIDWRIGHT_PATH', rapidwrightDir
+  environment 'RAPIDWRIGHT_PATH', gradle.ext.rapidwrightDir
 
   //We need to rerun tests when the data files change
-  if (file(rapidwrightDir + '/data').exists()) {
-    inputs.dir file(rapidwrightDir + '/data')
+  if (new File(gradle.ext.rapidwrightDir, 'data').exists()) {
+    inputs.dir new File(gradle.ext.rapidwrightDir, 'data')
   }
 }
 
