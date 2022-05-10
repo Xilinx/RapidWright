@@ -62,21 +62,24 @@ public class ParallelismTools {
 
     /** A fixed-size thread pool with as many threads as there are processors
      * minus one, fed by a single task queue */
-    private static final ThreadPoolExecutor pool = new ThreadPoolExecutor(
-            maxParallelism() - 1,
-            maxParallelism() - 1,
-            0, TimeUnit.MILLISECONDS,
-            new LinkedBlockingQueue<>(),
-            (r) -> {
-                Thread t = Executors.defaultThreadFactory().newThread(r);
-                t.setDaemon(true);
-                t.setName("RapidWright-ParallelismTools-Worker-"+ threadId.getAndIncrement());
-                return t;
-            });
+    private static final ThreadPoolExecutor pool;
 
     private static boolean parallel = true;
 
     static {
+        int maxParallelism = maxParallelism(); 
+        pool = new ThreadPoolExecutor(
+                maxParallelism - 1,
+                Integer.max(maxParallelism - 1, 1),
+                0, TimeUnit.MILLISECONDS,
+                new LinkedBlockingQueue<>(),
+                (r) -> {
+                    Thread t = Executors.defaultThreadFactory().newThread(r);
+                    t.setDaemon(true);
+                    t.setName("RapidWright-ParallelismTools-Worker-"+ threadId.getAndIncrement());
+                    return t;
+                });
+        
         String value = System.getenv(RW_PARALLEL);
         setParallel(value == null || !(value.equals("0") || value.equalsIgnoreCase("false")));
     }
