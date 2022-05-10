@@ -93,7 +93,7 @@ public class PicoBlazeArray {
 	public static void updateAnchorToBRAM(Module m){
 		for(SiteInst i : m.getSiteInsts()){
 			if(i.getSite().getSiteTypeEnum() == SiteTypeEnum.RAMBFIFO36){
-				m.setAnchor(i);
+				m.setAnchor(i.getSite());
 				m.calculateAllValidPlacements(m.getDevice());
 			}
 		}

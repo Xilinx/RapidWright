@@ -1,5 +1,5 @@
 /* 
- * Copyright (c) 2020 Xilinx, Inc. 
+ * Copyright (c) 2022 Xilinx, Inc. 
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -19,6 +19,7 @@
  * limitations under the License.
  * 
  */
+ 
 /**
  * 
  */
@@ -26,10 +27,10 @@ package com.xilinx.rapidwright.device;
 
 
 /**
- * Generated on: Wed Dec 16 10:12:41 2020
+ * Generated on: Mon Apr 25 23:31:34 2022
  * by: com.xilinx.rapidwright.release.SiteAndTileTypeUpdater
  * 
- * Enumeration of Site type for all valid devices within Vivado.
+ * Enumeration of SiteTypeEnum type for all valid devices within Vivado.
  */
 public enum SiteTypeEnum {
 	ABUS_SWITCH,
@@ -39,6 +40,18 @@ public enum SiteTypeEnum {
 	AIE_INTF_B_TEST,
 	AIE_INTF_C_TEST,
 	AIE_MEMGRP,
+	AIE_ML_ARRAYSWITCH,
+	AIE_ML_CORE,
+	AIE_ML_FIFO,
+	AIE_ML_MEMGRP,
+	AIE_ML_MEM_ARRAYSWITCH,
+	AIE_ML_MEM_MEMGRP,
+	AIE_ML_NOC,
+	AIE_ML_PL,
+	AIE_ML_PLL,
+	AIE_ML_SHIMSWITCH,
+	AIE_ML_SHIMTRACE,
+	AIE_ML_TILECTRL,
 	AIE_NOC,
 	AIE_PL,
 	AIE_PLL,
@@ -98,12 +111,21 @@ public enum SiteTypeEnum {
 	CMACE4,
 	CMAC_SITE,
 	CONFIG_SITE,
+	CPM5,
 	CPM_EXT,
 	CPM_MAIN,
 	DCI,
 	DCIRESET,
+	DCMAC,
 	DDRMC,
 	DDRMC_RIU,
+	DFE_A,
+	DFE_B,
+	DFE_C,
+	DFE_D,
+	DFE_E,
+	DFE_F,
+	DFE_G,
 	DNA_PORT,
 	DPLL,
 	DRP_AMS_ADC,
@@ -122,6 +144,7 @@ public enum SiteTypeEnum {
 	FIFO36E1,
 	FRAME_ECC,
 	GCLK_DELAY,
+	GCLK_DELAY_SSIT,
 	GCLK_PD,
 	GCLK_TAPS_DECODE_GT,
 	GCLK_TAPS_DECODE_VNOC,
@@ -138,6 +161,7 @@ public enum SiteTypeEnum {
 	GTHE4_CHANNEL,
 	GTHE4_COMMON,
 	GTM_DUAL,
+	GTM_QUAD,
 	GTM_REFCLK,
 	GTPE2_CHANNEL,
 	GTPE2_COMMON,
@@ -147,6 +171,8 @@ public enum SiteTypeEnum {
 	GTYE3_COMMON,
 	GTYE4_CHANNEL,
 	GTYE4_COMMON,
+	GTYP_QUAD,
+	GTYP_REFCLK,
 	GTY_QUAD,
 	GTY_REFCLK,
 	GTZE2_OCTAL,
@@ -177,6 +203,7 @@ public enum SiteTypeEnum {
 	HRIODIFFINBUF,
 	HRIODIFFOUTBUF,
 	HSADC,
+	HSC,
 	HSDAC,
 	IBUFDS_GTE2,
 	ICAP,
@@ -184,6 +211,7 @@ public enum SiteTypeEnum {
 	IDELAYE2,
 	IDELAYE2_FINEDELAY,
 	ILKNE4,
+	ILKNF,
 	ILKN_SITE,
 	ILOGICE2,
 	ILOGICE3,
@@ -212,9 +240,13 @@ public enum SiteTypeEnum {
 	MTBF2,
 	MTBF3,
 	NOC_NCRB,
+	NOC_NCRB_SSIT,
+	NOC_NIDB,
 	NOC_NMU128,
 	NOC_NMU512,
+	NOC_NPP_RPTR,
 	NOC_NPS5555,
+	NOC_NPS7575,
 	NOC_NPS_VNOC,
 	NOC_NSU128,
 	NOC_NSU512,
@@ -229,6 +261,7 @@ public enum SiteTypeEnum {
 	PCIE40,
 	PCIE40E4,
 	PCIE4CE4,
+	PCIE50,
 	PCIE_2_1,
 	PCIE_3_0,
 	PCIE_3_1,
@@ -279,6 +312,7 @@ public enum SiteTypeEnum {
 	USR_ACCESS,
 	VBUS_SWITCH,
 	VCU,
+	VDU,
 	XADC,
 	XIPHY_FEEDTHROUGH,
 	XPHY,
@@ -288,4 +322,5 @@ public enum SiteTypeEnum {
 	XPIO_VREF,
 	XPIPE_QUAD,
 	XPLL,
+	XRAM,
 }

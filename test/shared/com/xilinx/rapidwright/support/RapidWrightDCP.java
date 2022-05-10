@@ -25,11 +25,16 @@ package com.xilinx.rapidwright.support;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.util.FileTools;
 
 public class RapidWrightDCP {
     public static final Path dirPath = Paths.get(FileTools.getRapidWrightPath(),  "test", "RapidWrightDCP");
 
+    public static Design loadDCP(String name) { 
+        return Design.readCheckpoint(getPath(name));
+    }
+    
     public static Path getPath(String name) {
         return dirPath.resolve(name);
     }

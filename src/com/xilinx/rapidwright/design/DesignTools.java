@@ -1532,7 +1532,7 @@ public class DesignTools {
 			String instName = e.getKey();
 			String prefix = instName + "/";
 			Site newAnchor = e.getValue();
-			Site anchor = stamp.getAnchor().getSite();
+			Site anchor = stamp.getAnchor();
 			
 			// Create New Nets
 			for(Net n : stamp.getNets()){

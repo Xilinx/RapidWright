@@ -152,4 +152,33 @@ public class TestDesignTools {
             }
         }
     }
+
+    @Test
+    public void testCreateMissingSitePinInstsInPins() {
+        String dcpPath = RapidWrightDCP.getString("picoblaze_partial.dcp");
+        Design design = Design.readCheckpoint(dcpPath);
+        DesignTools.createMissingSitePinInsts(design);
+
+        final Set<String> dualOutputNets = new HashSet<String>() {{
+            add("picoblaze_2_25/processor/alu_result_0");
+            add("picoblaze_2_25/processor/alu_result_1");
+            add("picoblaze_2_25/processor/alu_result_2");
+            add("picoblaze_8_43/processor/pc_move_is_valid");
+            add("picoblaze_0_43/processor/E[0]");
+        }};
+
+        for (Net net : design.getNets()) {
+            Collection<SitePinInst> pins = net.getPins();
+            if (net.getSource() != null) {
+                Assertions.assertTrue(pins.contains(net.getSource()));
+            }
+            if (net.getAlternateSource() != null) {
+                Assertions.assertTrue(pins.contains(net.getAlternateSource()));
+            }
+
+            if (dualOutputNets.contains(net.getName())) {
+                Assertions.assertTrue(net.getSource() != null && net.getAlternateSource() != null);
+            }
+        }
+    }
 }
