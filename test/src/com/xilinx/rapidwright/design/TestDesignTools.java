@@ -110,23 +110,6 @@ public class TestDesignTools {
     }
 
     @Test
-    public void testCreateMissingSitePinInstsInPins() {
-        String dcpPath = RapidWrightDCP.getString("picoblaze_partial.dcp");
-        Design design = Design.readCheckpoint(dcpPath);
-        DesignTools.createMissingSitePinInsts(design);
-
-        for (Net net : design.getNets()) {
-            Collection<SitePinInst> pins = net.getPins();
-            if (net.getSource() != null) {
-                Assertions.assertTrue(pins.contains(net.getSource()));
-            }
-            if (net.getAlternateSource() != null) {
-                Assertions.assertTrue(pins.contains(net.getAlternateSource()));
-            }
-        }
-    }
-
-    @Test
     public void testBatchRemoveSitePins() {
         Path dcpPath = RapidWrightDCP.getPath("picoblaze_ooc_X10Y235.dcp");
         Design design = Design.readCheckpoint(dcpPath);
