@@ -352,7 +352,7 @@ public class ECORouter extends PartialRouter {
             NetWrapper netWrapper = nets.get(net);
             if (netWrapper == null)
                 return false;
-            if (netWrapper.getPartiallyPreserved())
+            if (partiallyPreserved.contains(netWrapper))
                 return false;
             // Net already seen and is fully unpreserved
             return true;

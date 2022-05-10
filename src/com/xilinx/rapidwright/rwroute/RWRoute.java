@@ -77,7 +77,7 @@ public class RWRoute{
 	/** A list of global clock nets */
 	protected List<Net> clkNets;
 	/** Static nets */
-	private Map<Net, List<SitePinInst>> staticNetAndRoutingTargets;
+	protected Map<Net, List<SitePinInst>> staticNetAndRoutingTargets;
 	/** Several integers to indicate the netlist info */
 	protected int numPreservedRoutableNets;
 	private int numPreservedClks;
@@ -118,7 +118,7 @@ public class RWRoute{
 	/** Class encapsulating the routing resource graph */
 	protected RouteNodeGraph routingGraph;
 	/** Count of rnodes created in the current routing iteration */
-	private long rnodesCreatedThisIteration;
+	protected long rnodesCreatedThisIteration;
 	/** The queue to store candidate nodes to route a connection */
 	private PriorityQueue<RouteNode> queue;
 
@@ -839,7 +839,7 @@ public class RWRoute{
 	/**
 	 * Assigns a list nodes to each connection to complete the route path of it.
 	 */
-	private void assignNodesToConnections() {
+	protected void assignNodesToConnections() {
 		for(Connection connection : indirectConnections) {
 			List<Node> nodes = new ArrayList<>();
 			List<Node> switchBoxToSink = RouterHelper.findPathBetweenNodes(connection.getSinkRnode().getNode(), connection.getSink().getConnectedNode());
@@ -1104,7 +1104,7 @@ public class RWRoute{
 	/**
 	 * Sets a list of {@link PIP} instances of each {@link Net} instance and checks if there is any PIP overlaps.
 	 */
-	private void setPIPsOfNets(){
+	protected void setPIPsOfNets(){
 		for(Entry<Net,NetWrapper> e : nets.entrySet()){
 			NetWrapper netWrapper = e.getValue();
 			Net net = netWrapper.getNet();
