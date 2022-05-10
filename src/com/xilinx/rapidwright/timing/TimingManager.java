@@ -73,7 +73,7 @@ public class TimingManager {
      * Alternate constructor for creating the objects for the TimingModel, but with the choice to 
      * not build the model yet.
      * @param design RapidWright Design object.
-     * @param doBuild Whether to go ahead and build the model now.  For example, a user might not
+     * @param doBuild Whether to go ahead and build the model now.  For example, a user might not 
      * want to build the TimingGraph yet.
      */
     public TimingManager(Design design, boolean doBuild) {

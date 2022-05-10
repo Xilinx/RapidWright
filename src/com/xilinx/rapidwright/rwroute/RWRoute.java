@@ -65,7 +65,7 @@ public class RWRoute{
 	/** The design to route */
 	protected Design design;
 	/** A flag to indicate if the device has multiple SLRs, for the sake of avoiding unnecessary check for single-SLR devices */
-	protected boolean multiSLRDevice;
+	private boolean multiSLRDevice;
 	/** Created NetWrappers */
 	protected Map<Net,NetWrapper> nets;
 	/** A list of indirect connections that will go through iterative routing */
