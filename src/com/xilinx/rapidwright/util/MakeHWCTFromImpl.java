@@ -55,18 +55,18 @@ public class MakeHWCTFromImpl {
      */
     public static boolean relocateConstraints(Design top, List<String> constraints, String cellAnchor, ArrayList<Pair<String, String>> blackboxes) {
 
-        List<String> prohibitSites = new ArrayList<>();
+        List<String> prohibitBels = new ArrayList<>();
 
         Pattern pattern = Pattern.compile("(\\w+)\\s+(\\w+)\\s+(\\w+)\\s+(.+)");
-        Pattern getSite = Pattern.compile("get_sites\\s+(\\w+)");
+        Pattern getBel = Pattern.compile("get_bels\\s+([/\\w]+)");
         for (String c : constraints) {
             Matcher matcher = pattern.matcher(c);
             if (matcher.find()) {
                 if (matcher.group(1).equals("set_property")&&matcher.group(2).equals("PROHIBIT")
                         &&(matcher.group(3).equals("true")||matcher.group(3).equals("1"))) {
-                    Matcher findSite = getSite.matcher(matcher.group(4));
-                    if (findSite.find()) {
-                        prohibitSites.add(findSite.group(1));
+                    Matcher findBel = getBel.matcher(matcher.group(4));
+                    if (findBel.find()) {
+                        prohibitBels.add(findBel.group(1));
                     }
                 }
             }
@@ -79,13 +79,17 @@ public class MakeHWCTFromImpl {
             Tile tTo = d.getTile(cell.getSecond());
             int verticalMoveOffset = tFrom.getRow() - tTo.getRow();
 
-            for (String s : prohibitSites) {
-                Site frSite = d.getSite(s);
+
+            for (String s : prohibitBels) {
+                String[] ary = s.split("/");
+                String siteName = ary[0];
+                String belName = ary[1];
+                Site frSite = d.getSite(siteName);
                 Tile frTile = frSite.getTile();
                 Tile toTile = frTile.getTileNeighbor(0, verticalMoveOffset);
                 Site toSite = toTile.getSites()[frTile.getSiteIndex(frSite)];
-                top.addXDCConstraint(ConstraintGroup.LATE, "set_property PROHIBIT true [get_sites " + toSite.getName() + "]");
-//                System.out.println("add prohibit fr " + frSite + " to " + toSite);
+                String c = "set_property PROHIBIT true [get_bels " + toSite.getName() + "/" + belName + "]";
+                top.addXDCConstraint(ConstraintGroup.LATE, c);
             }
         }
 

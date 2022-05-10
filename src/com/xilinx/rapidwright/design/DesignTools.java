@@ -86,6 +86,7 @@ import com.xilinx.rapidwright.util.MessageGenerator;
 import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.StringTools;
 import com.xilinx.rapidwright.util.Utils;
+import org.python.modules._hashlib;
 
 /**
  * A collection of methods to operate on {@link Design} objects.
@@ -2333,6 +2334,30 @@ public class DesignTools {
 	 * @param siteInstsOfCells The set of SiteInst containing the sinks of the static nets
 	 */
 	private static void copyStaticNets(Design dest, List<Net> staticNets, Set<SiteInst> siteInstsOfCells) {
+
+		// build map to from site_pin to list of bels
+		HashMap<String, List<String>> sitePin2Bels = new HashMap<String,List<String>>()
+		{{
+			put("A_O",  Arrays.asList("A5LUT", "A6LUT"));
+			put("AMUX", Arrays.asList("A5LUT", "A6LUT"));
+			put("B_O",  Arrays.asList("B5LUT", "B6LUT"));
+			put("BMUX", Arrays.asList("B5LUT", "B6LUT"));
+			put("C_O",  Arrays.asList("C5LUT", "C6LUT"));
+			put("CMUX", Arrays.asList("C5LUT", "C6LUT"));
+			put("D_O",  Arrays.asList("D5LUT", "D6LUT"));
+			put("DMUX", Arrays.asList("D5LUT", "D6LUT"));
+			put("E_O",  Arrays.asList("E5LUT", "E6LUT"));
+			put("EMUX", Arrays.asList("E5LUT", "E6LUT"));
+			put("F_O",  Arrays.asList("F5LUT", "F6LUT"));
+			put("FMUX", Arrays.asList("F5LUT", "F6LUT"));
+			put("G_O",  Arrays.asList("G5LUT", "G6LUT"));
+			put("GMUX", Arrays.asList("G5LUT", "G6LUT"));
+			put("H_O",  Arrays.asList("H5LUT", "H6LUT"));
+			put("HMUX", Arrays.asList("H5LUT", "H6LUT"));
+		}};
+
+
+
 		// Map from a node to its driver PIP
 		// Note: Some PIPs are bidirectional. But, every PIP performs only one direction.
 		// The direction of a bidirectional PIP is determined from the context, ie., its connecting directional PIPs.
@@ -2361,7 +2386,7 @@ public class DesignTools {
 			netToUphillPIPMap.put(net, nodeToDriverPIP);
 		}
 
-		Set<Site> prohibitSites = new HashSet<>();
+		Set<String> prohibitBels = new HashSet<>();
 
 		for (SiteInst siteInst : siteInstsOfCells) {
 			// Go through the set of pins being used on this site instance.
@@ -2393,18 +2418,28 @@ public class DesignTools {
 						sitePin = node.getSitePin();
 					}
 					if ((sitePin != null) && !node.getWireName().contains("VCC_WIRE"))  { // GND source
-						// Conceptually, need to prohibit a bel.
-						// However, placer will add a phohibited site, probably, to avoid dealing with partial site
-						// Thus, no need to trace to bel.
-						prohibitSites.add(sitePin.getSite());
+						String  pinName = sitePin.getPinName();
+						String  siteName = sitePin.getSite().getName();
+						List<String> bels = sitePin2Bels.get(pinName);
+						for (String bel : bels) {
+							prohibitBels.add(siteName + "/" + bel);
+						}
+
+//						BEL bel = sitePin.getBELPin().getBEL();
+//						System.out.println("belpin " + sitePin.getBELPin() + " " + bel);
+//						// Conceptually, need to prohibit a bel.
+//						// However, placer will add a phohibited site, probably, to avoid dealing with partial site
+//						// Thus, no need to trace to bel.
+//						prohibitBels.add(bel);
 					}
 				}
 				netToItsPIPs.put(net,allPIPs);
 			}
 		}
 
-		for (Site site : prohibitSites)
-			dest.addXDCConstraint(ConstraintGroup.LATE, "set_property PROHIBIT true [get_sites " + site.getName() + "]");
+		for (String bel : prohibitBels) {
+			dest.addXDCConstraint(ConstraintGroup.LATE, "set_property PROHIBIT true [get_bels " + bel + "]");
+		}
 
 
 		for (Map.Entry<Net, Set<PIP>> entry : netToItsPIPs.entrySet()) {
