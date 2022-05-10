@@ -33,6 +33,9 @@ import com.xilinx.rapidwright.util.RuntimeTracker;
 import java.util.HashSet;
 import java.util.Set;
 
+/**
+ * Extends {@link RouteNodeGraph} with timing-driven capabilities.
+ */
 public class RouteNodeGraphTimingDriven extends RouteNodeGraph {
     /** The instantiated delayEstimator to compute delays */
     protected final DelayEstimatorBase delayEstimator;

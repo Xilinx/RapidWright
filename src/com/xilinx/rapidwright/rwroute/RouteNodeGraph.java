@@ -45,7 +45,37 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Encapsulation of RWRoute's routing resource graph.
+ */
 public class RouteNodeGraph {
+
+    /**
+     * A map of nodes to created rnodes
+     */
+    final protected Map<Node, RouteNode> nodesMap;
+
+    /**
+     * A map of preserved nodes to their nets
+     */
+    final private Map<LightweightNode, Net> preservedMap;
+
+    /**
+     * A synchronization object tracking the number of outstanding calls to
+     * asyncPreserve()
+     */
+    final private CountUpDownLatch asyncPreserveOutstanding;
+
+    /**
+     * Visited rnodes data during connection routing
+     */
+    final protected Collection<RouteNode> visited;
+
+    final protected RuntimeTracker setChildrenTimer;
+
+    private long totalVisited;
+
+    final Design design;
 
     protected class RouteNodeImpl extends RouteNode {
 
@@ -70,33 +100,10 @@ public class RouteNodeGraph {
         }
     }
 
-    /**
-     * A map of nodes to created rnodes
-     */
-    final protected Map<Node, RouteNode> nodesMap;
-
-    /**
-     * A map of preserved nodes to their nets
-     */
-    final private Map<LightweightNode, Net> preservedMap;
-
-    final private CountUpDownLatch preservedMapOutstanding;
-
-    /**
-     * Visited rnodes data during connection routing
-     */
-    final protected Collection<RouteNode> visited;
-
-    final protected RuntimeTracker setChildrenTimer;
-
-    private long totalVisited;
-
-    final Design design;
-
     public RouteNodeGraph(RuntimeTracker setChildrenTimer, Design design) {
         nodesMap = new HashMap<>();
         preservedMap = new ConcurrentHashMap<>();
-        preservedMapOutstanding = new CountUpDownLatch();
+        asyncPreserveOutstanding = new CountUpDownLatch();
         visited = new ArrayList<>();
         this.setChildrenTimer = setChildrenTimer;
         this.design = design;
@@ -116,15 +123,15 @@ public class RouteNodeGraph {
     }
 
     public void asyncPreserve(Collection<Node> nodes, Net net) {
-        preservedMapOutstanding.countUp();
+        asyncPreserveOutstanding.countUp();
         ParallelismTools.submit(() -> {
             nodes.forEach((node) -> preserve(node, net));
-            preservedMapOutstanding.countDown();
+            asyncPreserveOutstanding.countDown();
         });
     }
 
     public void asyncPreserve(Net net) {
-        preservedMapOutstanding.countUp();
+        asyncPreserveOutstanding.countUp();
         ParallelismTools.submit(() -> {
             List<SitePinInst> pins = net.getPins();
             SitePinInst sourcePin = net.getSource();
@@ -145,13 +152,13 @@ public class RouteNodeGraph {
                 preserve(pip.getEndNode(), net);
             }
 
-            preservedMapOutstanding.countDown();
+            asyncPreserveOutstanding.countDown();
         });
     }
 
     public void awaitPreserve() {
         try {
-            preservedMapOutstanding.await();
+            asyncPreserveOutstanding.await();
         } catch (InterruptedException e) {
             throw new RuntimeException();
         }

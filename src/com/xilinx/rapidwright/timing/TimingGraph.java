@@ -151,7 +151,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         }
         String seriesName = design.getDevice().getSeries().name().toLowerCase();
         intrasiteAndLogicDelayModel = DelayModelBuilder.getDelayModel(seriesName);
-
+          
         if(routerTimer != null) routerTimer.createRuntimeTracker("determine logic dly", "build timing graph").start();
         myCellMap = design.getNetlist().generateCellInstMap();
         if(!isPartialRouting) {
@@ -162,8 +162,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         if(routerTimer != null) routerTimer.getRuntimeTracker("determine logic dly").stop();
         
         if(routerTimer != null) routerTimer.createRuntimeTracker("add net dly edges", "build timing graph").start();
-        // for (Net net : design.getNets()) {
-        for (Net net : targetNets) {
+        for (Net net : design.getNets()) {
             if(net.isClockNet()) continue;//this is for getting rid of the problem in addNetDelayEdges() of clock net
             if(net.isStaticNet()) continue;
             addNetDelayEdges(net);
@@ -1981,10 +1980,6 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
 			}
 			EDIFHierPortInst hportSink = hportsFromSitePinInsts.get(0);
 			SitePinInst mappedSink = edifHPortMap.get(hportSink);
-			// FIXME
-			if (mappedSink == null) {
-			    mappedSink = connection.getSink();
-			}
 			
 			List<TimingEdge> timingEdges = sinkSitePinInstTimingEdges.get(mappedSink);
 			if(timingEdges == null) {

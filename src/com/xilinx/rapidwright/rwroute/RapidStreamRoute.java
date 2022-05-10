@@ -102,7 +102,7 @@ public class RapidStreamRoute extends PartialRouter{
 			}
 		}
 
-		routingGraph.asyncPreserve(nodes, netToPreserve);
+		super.addPreservedNodes(nodes, netToPreserve);
 	}
 	
 	/**
@@ -116,8 +116,8 @@ public class RapidStreamRoute extends PartialRouter{
 				continue;
 			}
 			
-			removeNetNodesFromPreservedNodes(net); // remove preserved nodes of a net from the map
-			createsNetWrapperAndConnections(net);
+			unpreserveNet(net); // remove preserved nodes of a net from the map
+			createNetWrapperAndConnections(net);
 			net.unroute();//NOTE: no need to unroute if routing tree is reused, then toPreserveNets should be detected before createNetWrapperAndConnections
 		}
 		for(Net net : toPreserveNets) {
@@ -167,7 +167,10 @@ public class RapidStreamRoute extends PartialRouter{
 	 * @return The routed design instance.
 	 */
 	public static Design routeDesignRapidStream(Design design) {
-		RWRouteConfig config = new RWRouteConfig(new String[] {"--partialRouting", "--enlargeBoundingBox", "--useUTurnNodes", "--verbose"});
+		RWRouteConfig config = new RWRouteConfig(new String[] {
+				"--enlargeBoundingBox",
+				"--useUTurnNodes",
+				"--verbose"});
 		return routeDesign(design, config, () -> new RapidStreamRoute(design, config));
 	}
 }

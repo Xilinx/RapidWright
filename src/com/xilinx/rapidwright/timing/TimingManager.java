@@ -136,8 +136,8 @@ public class TimingManager {
     		float netDelay = 0;
     		for(int i = connection.getRnodes().size() - 2; i >= 0; i--) {
     			RouteNode child = connection.getRnodes().get(i);
-				RouteNode parent = connection.getRnodes().get(i+1);
-				netDelay += child.getDelay() + DelayEstimatorBase.getExtraDelay(child.getNode(), DelayEstimatorBase.isLong(parent.getNode()));
+    			RouteNode parent = connection.getRnodes().get(i+1);
+    			netDelay += child.getDelay() + DelayEstimatorBase.getExtraDelay(child.getNode(), DelayEstimatorBase.isLong(parent.getNode()));
     		}
     		connection.setTimingEdgesDelay(netDelay);
 			connection.setDlyPatched(true);
@@ -148,21 +148,21 @@ public class TimingManager {
      * Calculates and returns the maximum arrival time and the associated TimingVertex
      */
     public Pair<Float,TimingVertex> calculateArrivalRequiredTimes(){
-		Pair<Float, TimingVertex> maxs;
+    	Pair<Float, TimingVertex> maxs;
 
-		timingGraph.resetRequiredAndArrivalTime();
-		timingGraph.computeArrivalTimesTopologicalOrder();
+    	timingGraph.resetRequiredAndArrivalTime();
+    	timingGraph.computeArrivalTimesTopologicalOrder();
 
-		maxs = timingGraph.getMaxDelay();
-		float maxArrival = maxs.getFirst();
-		// Negative slacks are not supported. Normalize the required time
-		// to be the maximum of the latest arrival time and the timing requirement.
-		// If maxArrival > timingRequirement, setting it to timingRequirement would mean
-		// negative slack.
-		// If timingRequirement > maxArrival, setting it to maxArrival would mean that
-		// minimum slack is zero leading to unnecessary router effort.
-		float normalizedRequired = Float.max(maxArrival, timingRequirement);
-		timingGraph.setTimingRequirementTopologicalOrder(normalizedRequired);
+    	maxs = timingGraph.getMaxDelay();
+    	float maxArrival = maxs.getFirst();
+    	// Negative slacks are not supported. Normalize the required time
+    	// to be the maximum of the latest arrival time and the timing requirement.
+    	// If maxArrival > timingRequirement, setting it to timingRequirement would mean
+    	// negative slack.
+    	// If timingRequirement > maxArrival, setting it to maxArrival would mean that
+    	// minimum slack is zero leading to unnecessary router effort.
+    	float normalizedRequired = Float.max(maxArrival, timingRequirement);
+    	timingGraph.setTimingRequirementTopologicalOrder(normalizedRequired);
     	
     	return maxs;
     }
@@ -282,13 +282,13 @@ public class TimingManager {
     	setTimingRequirementPs(getDesignTimingRequirement(design) * 1000);
     }
 
-	public void setTimingRequirementPs(float ps) {
-		timingRequirement = ps;
-	}
+    public void setTimingRequirementPs(float ps) {
+    	timingRequirement = ps;
+    }
 
-	public float getTimingRequirementPs() {
-		return timingRequirement;
-	}
+    public float getTimingRequirementPs() {
+    	return timingRequirement;
+    }
 
     public static float getDesignTimingRequirement(Design design) {
 		float treq = 0;
@@ -318,8 +318,8 @@ public class TimingManager {
     	for(Connection connection:connections){
     		connection.resetCriticality();
     	}
-		float maxRequired = timingGraph.superSink.getRequiredTime();
-		for(Connection connection : connections){
+    	float maxRequired = timingGraph.superSink.getRequiredTime();
+    	for(Connection connection : connections){
     		connection.calculateCriticality(maxRequired, maxCriticality, criticalityExponent);
     	}
     }
