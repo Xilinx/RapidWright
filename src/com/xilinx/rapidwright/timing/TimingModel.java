@@ -568,6 +568,10 @@ public class TimingModel {
      */
     protected boolean readDelayTerms(String filename) {
 
+        // Compute before reading from file to allow overriding.
+        Pair<Integer,Integer> loc = findReferenceTileLocation(device);
+        START_TILE_COL = loc.getFirst();
+        START_TILE_ROW = loc.getSecond();
 
         boolean result = true; 
         try (BufferedReader br = new BufferedReader(new FileReader(FileTools.getRapidWrightPath() + File.separator + filename))) {
@@ -580,7 +584,9 @@ public class TimingModel {
                     continue;
                 Float value = 0.0f;
                 value = Float.valueOf(split[1]);
-                if (split[0].equalsIgnoreCase("INTRASITE_DELAY_SITEPIN_TO_LUT_INPUT")) INTRASITE_DELAY_SITEPIN_TO_LUT_INPUT = value;
+                if (split[0].equalsIgnoreCase("START_TILE_ROW"))       START_TILE_ROW = (int)(float)value;
+                else if (split[0].equalsIgnoreCase("START_TILE_COL"))  START_TILE_COL = (int)(float)value;
+                else if (split[0].equalsIgnoreCase("INTRASITE_DELAY_SITEPIN_TO_LUT_INPUT")) INTRASITE_DELAY_SITEPIN_TO_LUT_INPUT = value;
                 else if (split[0].equalsIgnoreCase("INTRASITE_DELAY_LUT_OUTPUT_TO_O_SITEPIN")) INTRASITE_DELAY_LUT_OUTPUT_TO_O_SITEPIN = value;
                 else if (split[0].equalsIgnoreCase("INTRASITE_DELAY_SITEPIN_TO_FF_INPUT")) INTRASITE_DELAY_SITEPIN_TO_FF_INPUT = value;
                 else if (split[0].equalsIgnoreCase("INTRASITE_DELAY_FF_INPUT_TO_SITEPIN")) INTRASITE_DELAY_FF_INPUT_TO_SITEPIN = value;
@@ -676,9 +682,6 @@ public class TimingModel {
             result = false;
         }
 
-        Pair<Integer,Integer> loc = findReferenceTileLocation(device);
-        START_TILE_COL = loc.getFirst();
-        START_TILE_ROW = loc.getSecond();
 
         return result;
     }
