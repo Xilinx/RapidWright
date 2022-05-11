@@ -194,9 +194,9 @@ public class RapidWright {
 					boolean success = FileTools.unPackSupportingJarData();
 					if(success){
 						System.out.println("Successfully unpacked "
-							+ " RapidWright jar data.  Please set the environment "
-							+ "variable RAPIDWRIGHT_PATH to the directory which contains the "
-							+ "recently expanded data directory (current directory="+System.getProperty("user.dir")+").");
+							+ " RapidWright jar data to "+FileTools.getExecJarStoragePath()+". "
+							+ "To override, please set the environment variable RAPIDWRIGHT_PATH to"
+							+ " point to the desired data location.");
 						return;
 					}
 					else {
