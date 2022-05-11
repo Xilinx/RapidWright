@@ -45,7 +45,7 @@ dependencies {
 if (org.gradle.api.JavaVersion.current().isJava10Compatible()) {
 	applicationDefaultJvmArgs = ["--add-exports=java.base/sun.nio.ch=ALL-UNNAMED"]
 }
-if(project.hasProperty('limitToSingleProc') && limitToSingleProc.equals("1")) {
+if(project.hasProperty('limitToSingleProc') && limitToSingleProc.equals("single-threaded")) {
 	applicationDefaultJvmArgs << "-XX:ActiveProcessorCount=1"
 }
 
