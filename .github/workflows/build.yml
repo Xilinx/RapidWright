@@ -12,6 +12,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
+	jvm_opt: [, -Dorg.gradle.jvmargs=-XX:ActiveProcessorCount=1]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
@@ -46,7 +47,7 @@ jobs:
         run: ./gradlew assemble
 
       - name: Test
-        run: ./gradlew test
+        run: ./gradlew test ${{ matrix.jvm_opt }}
 
       - name: Archive Java Test Report
         uses: actions/upload-artifact@v2
