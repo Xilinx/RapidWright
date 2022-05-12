@@ -72,7 +72,6 @@ public class RelocateModulesIntoBlackboxes {
 
 
 		EDIFNetlist netlist = top.getNetlist();
-		netlist.migrateCellAndSubCells(mod.getNetlist().getTopCell());
 		top.setAutoIOBuffers(false);
 
 		Site frSite = mod.getAnchor();
@@ -105,7 +104,6 @@ public class RelocateModulesIntoBlackboxes {
 			}
 
 			ModuleInst mi = top.createModuleInst(cell.getFirst(), mod, true);
-			mi.getCellInst().setCellType(mod.getNetlist().getTopCell());
 			mi.place(toSite);
 		}
 		System.out.println("\n");

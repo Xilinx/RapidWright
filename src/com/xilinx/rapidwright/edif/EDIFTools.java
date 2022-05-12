@@ -932,8 +932,9 @@ public class EDIFTools {
 	    n.generateBuildComments();
 	    EDIFDesign eDesign = new EDIFDesign(cellInst.getName());
 	    n.setDesign(eDesign);
-	    eDesign.setTopCell(cellInst.getCellType());
-	    n.migrateCellAndSubCells(cellInst.getCellType());
+	    EDIFCell topCell = cellInst.getCellType();
+	    n.copyCellAndSubCells(topCell);
+	    eDesign.setTopCell(topCell);
 	    return n;
 	}
 	

@@ -86,7 +86,6 @@ import com.xilinx.rapidwright.util.MessageGenerator;
 import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.StringTools;
 import com.xilinx.rapidwright.util.Utils;
-import org.python.modules._hashlib;
 
 /**
  * A collection of methods to operate on {@link Design} objects.
@@ -2201,8 +2200,8 @@ public class DesignTools {
 		EDIFNetlist destNetlist = dest.getNetlist();
 		for(Entry<String,String> e : srcToDestInstNames.entrySet()) {
 			DesignTools.makeBlackBox(dest, e.getValue());
-			destNetlist.removeUnusedCellsFromAllWorkLibraries();
 		}
+		destNetlist.removeUnusedCellsFromAllWorkLibraries();
 		
 		// Populate black boxes with existing logical netlist cells
 		HashSet<String> instsWithSeparator = new HashSet<>();
@@ -2219,9 +2218,10 @@ public class DesignTools {
 			        destLib.removeCell(existingCell);
 			    }
 			}
-			destNetlist.migrateCellAndSubCells(cellInst.getCellType());
+			destNetlist.copyCellAndSubCells(cellInst.getCellType());
 			EDIFHierCellInst bbInst = destNetlist.getHierCellInstFromName(e.getValue());
-			bbInst.getInst().setCellType(cellInst.getCellType());
+			EDIFCell destCell = destNetlist.getCell(cellInst.getCellType().getLegalEDIFName());
+			bbInst.getInst().setCellType(destCell);
 			instsWithSeparator.add(e.getKey() + EDIFTools.EDIF_HIER_SEP);
 		}
 		destNetlist.resetParentNetMap();
