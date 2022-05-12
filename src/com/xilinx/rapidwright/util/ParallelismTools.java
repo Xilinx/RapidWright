@@ -62,23 +62,37 @@ public class ParallelismTools {
 
     /** A fixed-size thread pool with as many threads as there are processors
      * minus one, fed by a single task queue */
-    private static final ThreadPoolExecutor pool = new ThreadPoolExecutor(
-            maxParallelism() - 1,
-            maxParallelism() - 1,
-            0, TimeUnit.MILLISECONDS,
-            new LinkedBlockingQueue<>(),
-            (r) -> {
-                Thread t = Executors.defaultThreadFactory().newThread(r);
-                t.setDaemon(true);
-                t.setName("RapidWright-ParallelismTools-Worker-"+ threadId.getAndIncrement());
-                return t;
-            });
+    private static final ThreadPoolExecutor pool;
 
-    private static boolean parallel = true;
+    private static boolean parallel;
 
     static {
-        String value = System.getenv(RW_PARALLEL);
-        setParallel(value == null || !(value.equals("0") || value.equalsIgnoreCase("false")));
+        final int maxParallelism = maxParallelism();
+        final String value = System.getenv(RW_PARALLEL);
+
+        if (value == null) {
+            // Enable parallelism by default only if maxParallelism > 1
+            parallel = (maxParallelism > 1);
+        } else {
+            parallel = !(value.equals("0") || value.equalsIgnoreCase("false"));
+        }
+
+        if (parallel) {
+            pool = new ThreadPoolExecutor(
+                    maxParallelism - 1,
+                    maxParallelism - 1,
+                    0, TimeUnit.MILLISECONDS,
+                    new LinkedBlockingQueue<>(),
+                    (r) -> {
+                        Thread t = Executors.defaultThreadFactory().newThread(r);
+                        t.setDaemon(true);
+                        t.setName("RapidWright-ParallelismTools-Worker-" + threadId.getAndIncrement());
+                        return t;
+                    });
+            pool.prestartAllCoreThreads();
+        } else {
+            pool = null;
+        }
     }
 
     /**
@@ -86,6 +100,11 @@ public class ParallelismTools {
      * @param parallel Enable parallel processing.
      */
     public static void setParallel(boolean parallel) {
+        final int maxParallelism = maxParallelism();
+        if (maxParallelism == 1) {
+            System.out.println("WARNING: Parallel execution unsupported since maxParallelism() == 1.");
+            return;
+        }
         ParallelismTools.parallel = parallel;
         if (parallel) {
             pool.prestartAllCoreThreads();
