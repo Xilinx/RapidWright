@@ -537,6 +537,38 @@ public class EDIFNetlist extends EDIFName {
 			}
 		}
 	}
+
+	/**
+	 * This copies the cell and all of its descendants into this netlist.
+	 * @param cell The cell (and all its descendants) to copy into this netlist's libraries
+	 */
+	public void copyCellAndSubCells(EDIFCell cell) {
+		copyCellAndSubCellsWorker(cell);
+	}
+
+	private EDIFCell copyCellAndSubCellsWorker(EDIFCell cell) {
+		EDIFLibrary destLib = getLibrary(cell.getLibrary().getName());
+		if(destLib == null){
+			if(cell.getLibrary().getName().equals(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME)){
+				destLib = getHDIPrimitivesLibrary();
+			}else{
+				destLib = getWorkLibrary();
+			}
+		}
+
+		EDIFCell existingCell = destLib.getCell(cell.getLegalEDIFName());
+		if(existingCell == null){
+			EDIFCell newCell = new EDIFCell(destLib, cell, cell.getName());
+			for(EDIFCellInst inst : newCell.getCellInsts()){
+				inst.setCellType(copyCellAndSubCellsWorker(inst.getCellType()));
+				//The view might have changed
+				inst.getViewref().setName(inst.getCellType().getView());
+			}
+			return newCell;
+		} else {
+			return existingCell;
+		}
+	}
 	
 	private boolean checkIfAlreadyInLib(EDIFCell cell, EDIFLibrary lib) {
 		EDIFCell existing = lib.getCell(cell.getLegalEDIFName());

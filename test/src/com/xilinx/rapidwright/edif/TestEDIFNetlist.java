@@ -100,4 +100,35 @@ class TestEDIFNetlist {
             Assertions.assertTrue(potentiallyModifiedCells.contains(modifiedCell));
         }
     }
+
+    @Test
+    public void testCopyCellsAndSubCells() {
+        String dcpPath = RapidWrightDCP.getString("picoblaze_ooc_X10Y235.dcp");
+        Design design = RapidWrightDCP.loadDCP(dcpPath);
+        EDIFNetlist srcNetlist = design.getNetlist();
+
+        EDIFNetlist dstNetlist = EDIFTools.createNewNetlist("dstNetlist");
+        dstNetlist.copyCellAndSubCells(srcNetlist.getTopCell());
+        for (EDIFLibrary srcLib : srcNetlist.getLibraries()) {
+            if (srcLib.isHDIPrimitivesLibrary())
+                continue;
+            EDIFLibrary dstLib = dstNetlist.getLibrary(srcLib.getName());
+            Assertions.assertEquals(srcLib, dstLib);
+            for (EDIFCell srcCell : srcLib.getCells()) {
+                EDIFCell dstCell = dstLib.getCell(srcCell.getLegalEDIFName());
+                // Check contents are equal, but not pointers
+                Assertions.assertEquals(srcCell, dstCell);
+                Assertions.assertTrue(srcCell != dstCell);
+                Assertions.assertTrue(srcCell.getLibrary().getNetlist() == srcNetlist);
+                Assertions.assertTrue(dstCell.getLibrary().getNetlist() == dstNetlist);
+                for (EDIFCellInst srcInst : srcCell.getCellInsts()) {
+                    EDIFCellInst dstInst = dstCell.getCellInst(srcInst.getName());
+                    Assertions.assertEquals(srcInst, dstInst);
+                    Assertions.assertTrue(srcInst != dstInst);
+                    Assertions.assertTrue(srcInst.getCellType().getLibrary().getNetlist() == srcNetlist);
+                    Assertions.assertTrue(dstInst.getCellType().getLibrary().getNetlist() == dstNetlist);
+                }
+            }
+        }
+    }
 }
