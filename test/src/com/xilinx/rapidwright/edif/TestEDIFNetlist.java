@@ -103,8 +103,7 @@ class TestEDIFNetlist {
 
     @Test
     public void testCopyCellsAndSubCells() {
-        String dcpPath = RapidWrightDCP.getString("picoblaze_ooc_X10Y235.dcp");
-        Design design = RapidWrightDCP.loadDCP(dcpPath);
+        Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
         EDIFNetlist srcNetlist = design.getNetlist();
 
         EDIFNetlist dstNetlist = EDIFTools.createNewNetlist("dstNetlist");

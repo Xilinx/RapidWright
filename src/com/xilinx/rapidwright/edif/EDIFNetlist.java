@@ -549,7 +549,7 @@ public class EDIFNetlist extends EDIFName {
 	private EDIFCell copyCellAndSubCellsWorker(EDIFCell cell) {
 		EDIFLibrary destLib = getLibrary(cell.getLibrary().getName());
 		if(destLib == null){
-			if(cell.getLibrary().getName().equals(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME)){
+			if(cell.getLibrary().isHDIPrimitivesLibrary()){
 				destLib = getHDIPrimitivesLibrary();
 			}else{
 				destLib = getWorkLibrary();
