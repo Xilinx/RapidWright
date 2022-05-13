@@ -58,7 +58,10 @@ public class ECORouter extends PartialRouter {
 
         @Override
         protected boolean isExcluded(Node parent, Node child) {
-            if (allowLutRoutethru(parent, child)) {
+            // Note that the isPreserved(Node) overload is called,
+            // and not isPreserved(Node, Node) which is overridden by
+            // RouteNodeGraphPartial and may only be called once
+            if (!isPreserved(child) && allowLutRoutethru(parent, child)) {
                 return false;
             }
 
@@ -74,7 +77,10 @@ public class ECORouter extends PartialRouter {
 
         @Override
         protected boolean isExcluded(Node parent, Node child) {
-            if (allowLutRoutethru(parent, child)) {
+            // Note that the isPreserved(Node) overload is called,
+            // and not isPreserved(Node, Node) which is overridden by
+            // RouteNodeGraphPartial and may only be called once
+            if (!isPreserved(child) && allowLutRoutethru(parent, child)) {
                 return false;
             }
 
@@ -122,7 +128,7 @@ public class ECORouter extends PartialRouter {
         // Only consider [A-H]_O routethrus to avoid the complication of
         // having both [A-H]_O and [A-H]MUX occurring simultaneously
         String childWireName = child.getWireName();
-        if (childWireName.endsWith("_O"))
+        if (!childWireName.endsWith("_O"))
             return false;
 
         char second = pinName.charAt(1);
