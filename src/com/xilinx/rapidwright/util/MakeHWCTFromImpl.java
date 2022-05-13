@@ -205,7 +205,7 @@ INT_X0Y0
             System.out.println("ERROR: Cannot find a cell name " + srcCellName + ", specified by -fromCell, at any hierarchy level.");
             System.exit(1);
         }
-        Design d2 = DesignTools.createDesignFromCellWithStatic(srcDesign, srcCell.get(0).getFullHierarchicalInstName());
+//        Design d2 = DesignTools.createDesignFromCellWithStatic(srcDesign, srcCell.get(0).getFullHierarchicalInstName());
 
         List<EDIFHierCellInst> ci = srcDesign.getNetlist().findCellInsts("*hw_contract");
         if (ci.isEmpty()) {
@@ -221,6 +221,7 @@ INT_X0Y0
         }
 
 
+        Design d2 = DesignTools.createDesignFromCellWithStatic(srcDesign, srcCell.get(0).getFullHierarchicalInstName());
         // Use d2 directly without write/readCheckpoint will cause Vivado to crash later
         d2.writeCheckpoint("d2_temp.dcp");
         Design hwct_component = Design.readCheckpoint("d2_temp.dcp");
