@@ -38,6 +38,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Tests the EDIF auto-generate mechanism when reading DCPs
@@ -116,5 +118,11 @@ public class TestDCPLoad {
         Design.readCheckpoint(dcpCopy, CodePerfTracker.SILENT);
         Assertions.assertTrue(Files.getLastModifiedTime(readableEDIF).toMillis() >
         Files.getLastModifiedTime(dcpPath).toMillis());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"picoblaze_ooc_X10Y235_2022_1.dcp"})
+    public void testDCPFromVivado2022_1(String dcp) {
+        RapidWrightDCP.loadDCP(dcp);
     }
 }
