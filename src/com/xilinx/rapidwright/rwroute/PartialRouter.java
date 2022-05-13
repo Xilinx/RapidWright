@@ -87,7 +87,8 @@ public class PartialRouter extends RWRoute{
 	public PartialRouter(Design design, RWRouteConfig config, boolean softPreserve){
 		super(design, config);
 		this.softPreserve = softPreserve;
-		partiallyPreserved = new HashSet<>();
+		// FIXME: Not initialized before call to addNetConnectionToRoutingTargets()
+		// partiallyPreserved = new HashSet<>();
 	}
 
 	public PartialRouter(Design design, RWRouteConfig config){
@@ -200,6 +201,10 @@ public class PartialRouter extends RWRoute{
 		NetWrapper netWrapper = createNetWrapperAndConnections(net);
 
 		if (numRouted > 0) {
+			// FIXME: Should be initialized in constructor
+			if (partiallyPreserved == null) {
+				partiallyPreserved = new HashSet<>();
+			}
 			partiallyPreserved.add(netWrapper);
 		}
 	}
