@@ -37,7 +37,7 @@ public class WidgetMaker {
 	
 	private static Set<String> devices;
 
-	public static Set<String> getAvailableDevices() {
+	public static Set<String> getSupportedDevices() {
 	    if(devices == null) {
 	        devices = new HashSet<>();
 	        for(Part part : PartNameTools.getParts()) {
@@ -54,7 +54,7 @@ public class WidgetMaker {
 		
 		HashMap<String, QTreeWidgetItem> familyItems = new HashMap<String, QTreeWidgetItem>();
 
-		getAvailableDevices().stream()
+		getSupportedDevices().stream()
 				.map(PartNameTools::getPart)
 				.sorted(Comparator.comparing((Part p) -> PartNameTools.getFullArchitectureName(p.getArchitecture())).thenComparing(Part::getName))
 				.forEach(p -> {

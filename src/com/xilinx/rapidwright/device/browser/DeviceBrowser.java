@@ -111,7 +111,7 @@ public class DeviceBrowser extends QMainWindow{
 		initializeSideBar();
 		
 		// Gets the available parts in RapidWright and populates the selection tree
-		Set<String> parts = WidgetMaker.getAvailableDevices();
+		Set<String> parts = WidgetMaker.getSupportedDevices();
 		if(parts.size() < 1){
 		    throw new RuntimeException("Error: No available parts. " +
 					"Please generate part database files.");
