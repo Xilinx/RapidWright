@@ -24,16 +24,28 @@ package com.xilinx.rapidwright.gui;
 
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Set;
 
 import com.trolltech.qt.core.Qt.ItemDataRole;
 import com.trolltech.qt.gui.QTreeWidget;
 import com.trolltech.qt.gui.QTreeWidgetItem;
-import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.PartNameTools;
 
 public class WidgetMaker {
 	
+	private static Set<String> devices;
+
+	public static Set<String> getAvailableDevices() {
+	    if(devices == null) {
+	        devices = new HashSet<>();
+	        for(Part part : PartNameTools.getParts()) {
+		    devices.add(part.getDevice());
+	        }
+	    }
+	    return devices;
+	}
 	
 	public static QTreeWidget createAvailablePartTreeWidget(String header){
 		QTreeWidget treeWidget = new QTreeWidget();
@@ -42,7 +54,7 @@ public class WidgetMaker {
 		
 		HashMap<String, QTreeWidgetItem> familyItems = new HashMap<String, QTreeWidgetItem>();
 
-		Device.getAvailableDevices().stream()
+		getAvailableDevices().stream()
 				.map(PartNameTools::getPart)
 				.sorted(Comparator.comparing((Part p) -> PartNameTools.getFullArchitectureName(p.getArchitecture())).thenComparing(Part::getName))
 				.forEach(p -> {

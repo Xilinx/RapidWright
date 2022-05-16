@@ -24,6 +24,7 @@ package com.xilinx.rapidwright.device.browser;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 import com.trolltech.qt.core.QModelIndex;
 import com.trolltech.qt.core.Qt.DockWidgetArea;
@@ -44,7 +45,6 @@ import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.gui.TileView;
 import com.xilinx.rapidwright.gui.WidgetMaker;
-import com.xilinx.rapidwright.util.MessageGenerator;
 
 /**
  * This class creates an interactive Xilinx FPGA device browser for all of the
@@ -111,7 +111,7 @@ public class DeviceBrowser extends QMainWindow{
 		initializeSideBar();
 		
 		// Gets the available parts in RapidWright and populates the selection tree
-		List<String> parts = Device.getAvailableDevices();
+		Set<String> parts = WidgetMaker.getAvailableDevices();
 		if(parts.size() < 1){
 		    throw new RuntimeException("Error: No available parts. " +
 					"Please generate part database files.");
@@ -123,7 +123,7 @@ public class DeviceBrowser extends QMainWindow{
 		if(parts.contains(defaultPart)){
 			currPart = defaultPart;
 		} else{
-			currPart = parts.get(0);
+			currPart = parts.iterator().next();
 			System.out.println(defaultPart+" not available, showing "+currPart);
 		}
 		
