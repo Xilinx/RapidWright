@@ -95,6 +95,18 @@ public abstract class Job {
 	}
 
 	/**
+	 * Set the command to run a RapidWright main class
+	 * @param mainClass the main class to use
+	 * @param memoryLimitMB maximum memory in MB
+	 * @param arguments command arguments as single string
+	 */
+	public void setRapidWrightCommand(Class<?> mainClass, int memoryLimitMB, String arguments) {
+		command = System.getProperty("java.home")+"/bin/java -cp "
+				+ System.getProperty("java.class.path") + " -Xmx"+memoryLimitMB+"m "
+				+ mainClass.getCanonicalName()+" "+arguments;
+	}
+
+	/**
 	 * @return the jobNumber
 	 */
 	public long getJobNumber() {
@@ -125,4 +137,5 @@ public abstract class Job {
 	public String toString(){
 		return Long.toString(jobNumber);
 	}
+
 }
