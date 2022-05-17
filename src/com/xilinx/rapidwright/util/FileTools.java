@@ -1258,20 +1258,19 @@ public class FileTools {
 		return isFileNewer(Paths.get(fileName1), Paths.get(fileName2));
 	}
 	
-	@SuppressWarnings("resource")
-	public static InputStream getInputStreamFromZipOrDcpFile(String zipOrDcpFileName, String fileEndsWith){
+	public static InputStream getInputStreamFromZipFile(String zipFileName, String fileEndsWith){
 		ZipFile zip = null;
 		ZipEntry match = null;
 		InputStream i = null;
 		try {
-			zip = new ZipFile(zipOrDcpFileName);
+			zip = new ZipFile(zipFileName);
 			Enumeration<? extends ZipEntry> entries = zip.entries();
 			while(entries.hasMoreElements()){
 				ZipEntry entry = entries.nextElement();
 				if(entry.getName().endsWith(fileEndsWith)){
 					if(match != null){
-						throw new RuntimeException("ERROR: Found 2 or more matching files in zip/dcp file: " +
-								zipOrDcpFileName + " with ending: '" + fileEndsWith + "'");
+						throw new RuntimeException("ERROR: Found 2 or more matching files in zip file: " +
+								zipFileName + " with ending: '" + fileEndsWith + "'");
 					}
 					match = entry;
 				}

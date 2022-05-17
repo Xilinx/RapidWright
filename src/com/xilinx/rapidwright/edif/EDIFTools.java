@@ -895,8 +895,8 @@ public class EDIFTools {
 				+ "\n\n      source " + tclFileName + "\n");
 	}
 
-	public static EDIFNetlist readEdifFromDcpFile(String dcpFileName){
-		return EDIFTools.loadEDIFFile(FileTools.getInputStreamFromZipOrDcpFile(dcpFileName, ".edf"));
+	public static EDIFNetlist readEdifFromZipFile(String zipFileName){
+		return EDIFTools.loadEDIFFile(FileTools.getInputStreamFromZipFile(zipFileName, ".edf"));
 	}
 
 	public static EDIFNetlist loadEDIFFile(InputStream is){
