@@ -246,7 +246,7 @@ public class ParallelEDIFParser implements AutoCloseable{
                 w-> {
                     for (List<ParallelEDIFParserWorker.LinkPortInstData> list : w.linkPortInstData) {
                         for (ParallelEDIFParserWorker.LinkPortInstData linkPortInstData : list) {
-                            linkPortInstData.name();
+                            linkPortInstData.name(uniquifier);
                             linkPortInstData.add();
                         }
                     }
