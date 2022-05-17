@@ -5,42 +5,29 @@ import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.timing.TimingModel;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 
 public class TestTimingModel {
-    private Tile testOneDevice(String deviceName) {
+    @ParameterizedTest
+    @CsvSource({
+            "xcvu3p,2,0,61,309",
+            "xck26,2,0,169,247",
+            "xczu7ev,66,256,379,107",
+            "vu19p,1,0,58,1242",
+    })
+    public void checkFindReferenceTileLocation (String deviceName,
+                                                int expectedTileX, int expectedTileY,
+                                                int expectedCol, int expectedRow) {
         TimingModel model = new TimingModel(Device.getDevice(deviceName));
         model.build();
-        return model.getRefIntTile();
-    }
-    @Test
-    public void checkFindReferenceTileLocation () {
-        Tile tile = null;
-
-        tile = testOneDevice("xcvu3p");
+        Tile tile = model.getRefIntTile();
         // check tile coor that can be visually checked in Vivado gui
-        Assertions.assertEquals(2,tile.getTileXCoordinate());
-        Assertions.assertEquals(0,tile.getTileYCoordinate());
+        Assertions.assertEquals(expectedTileX,tile.getTileXCoordinate());
+        Assertions.assertEquals(expectedTileY,tile.getTileYCoordinate());
         // check tile consistent with what specify in the file
-        Assertions.assertEquals(61,tile.getColumn());
-        Assertions.assertEquals(309,tile.getRow());
-
-        tile = testOneDevice("xck26");
-        Assertions.assertEquals(2,tile.getTileXCoordinate());
-        Assertions.assertEquals(0,tile.getTileYCoordinate());
-        Assertions.assertEquals(169,tile.getColumn());
-        Assertions.assertEquals(247,tile.getRow());
-
-        tile = testOneDevice("xczu7ev");
-        Assertions.assertEquals(66,tile.getTileXCoordinate());
-        Assertions.assertEquals(256,tile.getTileYCoordinate());
-        Assertions.assertEquals(379,tile.getColumn());
-        Assertions.assertEquals(107,tile.getRow());
-
-        tile = testOneDevice("vu19p");
-        Assertions.assertEquals(1,tile.getTileXCoordinate());
-        Assertions.assertEquals(0,tile.getTileYCoordinate());
-        Assertions.assertEquals(58,tile.getColumn());
-        Assertions.assertEquals(1242,tile.getRow());
+        Assertions.assertEquals(expectedCol,tile.getColumn());
+        Assertions.assertEquals(expectedRow,tile.getRow());
     }
 }
