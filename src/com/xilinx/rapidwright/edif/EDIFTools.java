@@ -716,12 +716,8 @@ public class EDIFTools {
 		return FileSystems.getDefault().getPath(tempEDIFFileName);
 	}
 
-	public static boolean shouldParseInParallel(long size) {
-		return ParallelEDIFParser.calcThreads(size) > 1;
-	}
-
 	public static EDIFNetlist loadEDIFStream(InputStream is, long size) throws IOException {
-		if (shouldParseInParallel(size)) {
+		if (ParallelEDIFParser.calcThreads(size) > 1) {
 			// Copy input stream to a temporary file so that it can be parsed in parallel
 			Path fileName = getTempEDIFFile();
 			try {
@@ -741,7 +737,8 @@ public class EDIFTools {
 
 	public static EDIFNetlist loadEDIFFile(Path fileName) {
 	    try {
-	        if(shouldParseInParallel(Files.size(fileName))) {
+			final long size = Files.size(fileName);
+			if (ParallelEDIFParser.calcThreads(size) > 1) {
 	            try (ParallelEDIFParser p = new ParallelEDIFParser(fileName)) {
 	                return p.parseEDIFNetlist();
 	            }           
