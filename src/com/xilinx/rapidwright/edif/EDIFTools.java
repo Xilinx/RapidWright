@@ -25,10 +25,12 @@
 package com.xilinx.rapidwright.edif;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -52,6 +54,7 @@ import com.xilinx.rapidwright.design.PinType;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.FileTools;
+import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.ParallelismTools;
 
 
@@ -708,9 +711,37 @@ public class EDIFTools {
 		t.stop().printSummary();
 	}
 
+	protected static Path getTempEDIFFile() {
+		String tempEDIFFileName = ".temp_edif_" + FileTools.getUniqueProcessAndHostID() + ".edf";
+		return FileSystems.getDefault().getPath(tempEDIFFileName);
+	}
+
+	public static boolean shouldParseInParallel(long size) {
+		return ParallelismTools.getParallel() && size > ParallelEDIFParser.MIN_BYTES_PER_THREAD;
+	}
+
+	public static EDIFNetlist loadEDIFStream(InputStream is, long size) throws IOException {
+		if (shouldParseInParallel(size)) {
+			// Copy input stream to a temporary file so that it can be parsed in parallel
+			Path fileName = getTempEDIFFile();
+			try {
+				Files.copy(is, fileName);
+				try (ParallelEDIFParser p = new ParallelEDIFParser(fileName, size)) {
+					return p.parseEDIFNetlist();
+				}
+			} finally {
+				Files.deleteIfExists(fileName);
+			}
+		} else {
+			try (EDIFParser p = new EDIFParser(is)) {
+				return p.parseEDIFNetlist();
+			}
+		}
+	}
+
 	public static EDIFNetlist loadEDIFFile(Path fileName) {
 	    try {
-	        if(ParallelismTools.getParallel()) {
+	        if(shouldParseInParallel(Files.size(fileName))) {
 	            try (ParallelEDIFParser p = new ParallelEDIFParser(fileName)) {
 	                return p.parseEDIFNetlist();
 	            }           
@@ -895,15 +926,13 @@ public class EDIFTools {
 				+ "\n\n      source " + tclFileName + "\n");
 	}
 
-	public static EDIFNetlist readEdifFromZipFile(String zipFileName){
-		return EDIFTools.loadEDIFFile(FileTools.getInputStreamFromZipFile(zipFileName, ".edf"));
+	public static EDIFNetlist readEdifFromZipFile(String zipFileName) throws IOException {
+		Pair<InputStream,Long> p = FileTools.getInputStreamFromZipFile(zipFileName, ".edf");
+		InputStream is = p.getFirst();
+		long size = p.getSecond();
+		return EDIFTools.loadEDIFStream(is, size);
 	}
 
-	public static EDIFNetlist loadEDIFFile(InputStream is){
-		EDIFParser p = new EDIFParser(is);
-		return p.parseEDIFNetlist();
-	}
-	
 	public static EDIFNetlist createNewNetlist(String topName){
 		return createNewNetlist(topName, true);
 	}
