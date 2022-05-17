@@ -77,6 +77,7 @@ import com.xilinx.rapidwright.device.FamilyType;
 import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.timing.TimingModel;
+import org.apache.commons.io.input.ProxyInputStream;
 
 /**
  * This class is specifically written to allow for efficient file import/export of different semi-primitive
@@ -1259,12 +1260,10 @@ public class FileTools {
 	}
 	
 	public static InputStream getInputStreamFromZipFile(String zipFileName, String fileEndsWith){
-		ZipFile zip = null;
-		ZipEntry match = null;
-		InputStream i = null;
 		try {
-			zip = new ZipFile(zipFileName);
+			final ZipFile zip = new ZipFile(zipFileName);
 			Enumeration<? extends ZipEntry> entries = zip.entries();
+			ZipEntry match = null;
 			while(entries.hasMoreElements()){
 				ZipEntry entry = entries.nextElement();
 				if(entry.getName().endsWith(fileEndsWith)){
@@ -1276,11 +1275,17 @@ public class FileTools {
 				}
 			}
 			if(match == null) return null;
-			i = zip.getInputStream(match);
+			InputStream i = zip.getInputStream(match);
+			return new ProxyInputStream(i) {
+				@Override
+				public void close() throws IOException {
+					super.close();
+					zip.close();
+				}
+			};
 		} catch (IOException e) {
-			e.printStackTrace();
+			throw new UncheckedIOException(e);
 		} 
-		return i;
 	}
 	
 	public static void close(InputStream is) {
