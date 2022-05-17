@@ -473,7 +473,7 @@ public class EDIFTools {
 	 * Connects two existing logical port insts together by creating new ports and nets on all cells
 	 * instantiated between their levels of hierarchy.  It assumes the netlist cells involved only
 	 * have one instance (does not differentiate cells when creating the ports).  This assumption 
-	 * can be enforce by calling {@link #uniqueifyNetlist(Design)}. If the src or snk
+	 * can be enforced by calling {@link #uniqueifyNetlist(Design)}. If the src or snk
 	 * port insts do net have nets connected, it will create them and connect them in their parent
 	 * cell definition.
 	 * @param src The logical port inst driver or source  
@@ -1179,9 +1179,8 @@ public class EDIFTools {
 		Map<EDIFCell, List<EDIFHierCellInst>> toUniqueify 
 		                                    = new HashMap<EDIFCell, List<EDIFHierCellInst>>();
 		
-		for(EDIFLibrary lib : instMap.keySet()) {
-			Map<EDIFCell, List<EDIFHierCellInst>> cellMap = instMap.get(lib);
-			for(Entry<EDIFCell,List<EDIFHierCellInst>> e : cellMap.entrySet()) {
+		for(Entry<EDIFLibrary, Map<EDIFCell, List<EDIFHierCellInst>>> libEntry : instMap.entrySet()) {
+			for(Entry<EDIFCell,List<EDIFHierCellInst>> e : libEntry.getValue().entrySet()) {
 				// Also skip macros
 				if(macros.containsCell(e.getKey())) continue;
 				// Identify multiple instantiated cells
