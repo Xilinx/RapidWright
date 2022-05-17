@@ -717,7 +717,7 @@ public class EDIFTools {
 	}
 
 	public static boolean shouldParseInParallel(long size) {
-		return ParallelismTools.getParallel() && size > ParallelEDIFParser.MIN_BYTES_PER_THREAD;
+		return ParallelEDIFParser.calcThreads(size) > 1;
 	}
 
 	public static EDIFNetlist loadEDIFStream(InputStream is, long size) throws IOException {
