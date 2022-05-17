@@ -1,3 +1,8 @@
+============= RapidWright 2022.1.1-beta released on 2022-05-13 ================
+Notes: 
+ * Fixes crash issue while reading DCPs created by Vivado 2022.1
+ * Adds more granularity to runtime reporting in reading 2022.1 DCPs
+
 ============= RapidWright 2022.1.0-beta released on 2022-05-05 ================
 Notes: 
  * Support for Vivado 2022.1 devices and read of DCPs
