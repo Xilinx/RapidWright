@@ -100,11 +100,14 @@ public class ECORouter extends PartialRouter {
         if (parent.getIntentCode() != IntentCode.NODE_PINFEED)
             return false;
 
+        // TODO: Check child.getIntentCode() == IntentCode.NODE_CLE_OUTPUT
+
         TileTypeEnum parentTileType = parent.getTile().getTileTypeEnum();
         if (parentTileType != TileTypeEnum.INT)
             return false;
 
         TileTypeEnum childTileType = child.getTile().getTileTypeEnum();
+        // TODO: Use Utils.isCLB()
         if (childTileType != TileTypeEnum.CLEL_L && childTileType != TileTypeEnum.CLEL_R &&
             childTileType != TileTypeEnum.CLEM && childTileType != TileTypeEnum.CLEM_R) {
             return false;
@@ -127,6 +130,10 @@ public class ECORouter extends PartialRouter {
 
         // Only consider [A-H]_O routethrus to avoid the complication of
         // having both [A-H]_O and [A-H]MUX occurring simultaneously
+        // TODO: Accept?_O and/or ?MUX routethru with the same net by
+        //       creating a fake ?_O -> ?MUX edge
+        // TODO: Use a Set<TileTypeEnum, Set<Integer>> instead of
+        //       string matching
         String childWireName = child.getWireName();
         if (!childWireName.endsWith("_O"))
             return false;
