@@ -25,7 +25,17 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintStream;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.EnumMap;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -47,6 +57,7 @@ import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.Pair;
+import com.xilinx.rapidwright.util.Utils;
 
 /**
  * A TimingModel calculates net delay by implementing the lightweight timing model described in our 
@@ -493,7 +504,7 @@ public class TimingModel {
 
     private Pair<Integer,Integer> findReferenceTileLocation(Device d) {
         class Helper {
-            Map<Integer,Set<Integer>> spans;
+            Map<Integer, Set<Integer>> spans;
             public Helper() {
                 spans = new HashMap<Integer,Set<Integer>>();
             }
@@ -541,7 +552,7 @@ public class TimingModel {
                 int col = tile.getColumn();
                 int row = tile .getRow();
                 // Want an INT tile that has CLB on both side
-                if (isCLE(d.getTile(row, col-1)) && isCLE(d.getTile(row, col+1))) {
+                if (Utils.isCLB(d.getTile(row, col-1).getTileTypeEnum()) && Utils.isCLB(d.getTile(row, col+1).getTileTypeEnum())) {
                     return new Pair<>(col,row);
                 }
             }
@@ -549,17 +560,6 @@ public class TimingModel {
         return new Pair<>(-1,-1);
     }
 
-    private boolean isCLE(Tile tile) {
-        TileTypeEnum t = tile.getTileTypeEnum();
-        return (
-                t == TileTypeEnum.CLE_M
-                || t == TileTypeEnum.CLE_M_R
-                || t == TileTypeEnum.CLEL_L
-                || t == TileTypeEnum.CLEL_R
-                || t == TileTypeEnum.CLEM
-                || t == TileTypeEnum.CLEM_R
-        );
-    }
 
     /**
      * Reads the text file containing the delay terms needed by this timing model.
@@ -573,7 +573,7 @@ public class TimingModel {
         START_TILE_COL = loc.getFirst();
         START_TILE_ROW = loc.getSecond();
 
-        boolean result = true; 
+        boolean result = true;
         try (BufferedReader br = new BufferedReader(new FileReader(FileTools.getRapidWrightPath() + File.separator + filename))) {
             String line = "";
             int lineCntr = 0;
@@ -665,7 +665,6 @@ public class TimingModel {
                 else if (split[0].equalsIgnoreCase("MID_MAX"))        MID_MAX =(int) Math.floor(value);
                 else if (split[0].equalsIgnoreCase("FAR_MIN"))        FAR_MIN =(int) Math.floor(value);
                 else if (split[0].equalsIgnoreCase("FAR_MAX"))        FAR_MAX =(int) Math.floor(value);
-
                 else {
                 	String errMessage;
                     if (split.length == 2) {
@@ -681,7 +680,6 @@ public class TimingModel {
             e.printStackTrace();
             result = false;
         }
-
 
         return result;
     }
