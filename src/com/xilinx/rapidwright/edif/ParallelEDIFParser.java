@@ -46,7 +46,7 @@ import com.xilinx.rapidwright.util.function.InputStreamSupplier;
  * Fast EDIF Parser using parallelism
  */
 public class ParallelEDIFParser implements AutoCloseable{
-    public static final long MIN_BYTES_PER_THREAD = EDIFTokenizer.DEFAULT_MAX_TOKEN_LENGTH * 8L;
+    private static final long MIN_BYTES_PER_THREAD = EDIFTokenizer.DEFAULT_MAX_TOKEN_LENGTH * 8L;
     protected final List<ParallelEDIFParserWorker> workers = new ArrayList<>();
     protected final Path fileName;
     private final long fileSize;
