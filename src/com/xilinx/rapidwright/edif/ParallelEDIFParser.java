@@ -77,7 +77,7 @@ public class ParallelEDIFParser implements AutoCloseable{
         return new ParallelEDIFParserWorker(fileName, inputStreamSupplier.get(), offset, uniquifier, maxTokenLength);
     }
 
-    private int calcThreads(long fileSize) {
+    public static int calcThreads(long fileSize) {
         int maxUsefulThreads = Math.max((int) (fileSize / MIN_BYTES_PER_THREAD),1);
         return Math.min(maxUsefulThreads, ParallelismTools.maxParallelism());
     }

@@ -1259,7 +1259,7 @@ public class FileTools {
 		return isFileNewer(Paths.get(fileName1), Paths.get(fileName2));
 	}
 	
-	public static InputStream getInputStreamFromZipFile(String zipFileName, String fileEndsWith){
+	public static Pair<InputStream,Long> getInputStreamFromZipFile(String zipFileName, String fileEndsWith){
 		try {
 			final ZipFile zip = new ZipFile(zipFileName);
 			Enumeration<? extends ZipEntry> entries = zip.entries();
@@ -1276,13 +1276,13 @@ public class FileTools {
 			}
 			if(match == null) return null;
 			InputStream i = zip.getInputStream(match);
-			return new ProxyInputStream(i) {
+			return new Pair<>(new ProxyInputStream(i) {
 				@Override
 				public void close() throws IOException {
 					super.close();
 					zip.close();
 				}
-			};
+			}, match.getSize());
 		} catch (IOException e) {
 			throw new UncheckedIOException(e);
 		} 
