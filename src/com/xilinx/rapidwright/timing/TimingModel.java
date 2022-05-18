@@ -37,6 +37,8 @@ import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.util.FileTools;
+import com.xilinx.rapidwright.util.Pair;
+import com.xilinx.rapidwright.util.Utils;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -501,17 +503,82 @@ public class TimingModel {
         return result;
     }
 
+    private Pair<Integer,Integer> findReferenceTileLocation(Device d) {
+        class Helper {
+            Map<Integer, Set<Integer>> spans;
+            public Helper() {
+                spans = new HashMap<Integer,Set<Integer>>();
+            }
+            void insert(int val, int span) {
+                if (!spans.containsKey(span)) {
+                    spans.put(span, new HashSet<Integer>());
+                }
+                spans.get(span).add(val);
+            }
+            Set<Integer> longest() {
+                List<Integer> keys = new ArrayList<>(spans.keySet());
+                Integer maxSpan = Collections.max(keys);
+                return spans.get(maxSpan);
+            }
+        }
+
+
+        // for each column, look for valid row
+        Helper colHelper = new Helper();
+        for (int i = 0; i < d.getColumns(); i++) {
+            int span = 0;
+            for (int j = 0; j < d.getRows(); j++) {
+                if (d.getTile("INT_X" + i + "Y" + j) != null) {
+                    span++;
+                }
+            }
+            colHelper.insert(i,span);
+        }
+
+        // for each row, look for valid col
+        Helper rowHelper = new Helper();
+        for (int j = 0; j < d.getRows(); j++) {
+            int span = 0;
+            for (int i = 0; i < d.getColumns(); i++) {
+                if (d.getTile("INT_X" + i + "Y" + j) != null) {
+                    span++;
+                }
+            }
+            rowHelper.insert(j,span);
+        }
+
+        for (int INTCol : colHelper.longest()) {
+            for (int INTRow : rowHelper.longest()) {
+                Tile tile = d.getTile("INT_X" + INTCol + "Y" + INTRow);
+                int col = tile.getColumn();
+                int row = tile .getRow();
+                // Want an INT tile that has CLB on both side
+                if (Utils.isCLB(d.getTile(row, col-1).getTileTypeEnum()) && Utils.isCLB(d.getTile(row, col+1).getTileTypeEnum())) {
+                    return new Pair<>(col,row);
+                }
+            }
+        }
+        return new Pair<>(-1,-1);
+    }
+
+
     /**
      * Reads the text file containing the delay terms needed by this timing model.
      * @param filename Name (and maybe the path) of the text file, the default is delay_terms.dat in the current directory.
      * @return Boolean indication of completion.
      */
     protected boolean readDelayTerms(String filename) {
-        boolean result = true; 
-        try (BufferedReader br = new BufferedReader(new FileReader(FileTools.getRapidWrightPath() + File.separator + filename))){
-            String line;
+
+        // Compute before reading from file to allow overriding.
+        Pair<Integer,Integer> loc = findReferenceTileLocation(device);
+        START_TILE_COL = loc.getFirst();
+        START_TILE_ROW = loc.getSecond();
+
+        boolean result = true;
+        try (BufferedReader br = new BufferedReader(new FileReader(FileTools.getRapidWrightPath() + File.separator + filename))) {
+            String line = "";
             int lineCntr = 0;
-            while ((line=br.readLine()) != null) {// && line.length() != 0) {
+            while ((line=br.readLine()) != null) {
                 String[] split = line.split("\\s+");
                 lineCntr++;
                 if (split.length < 2 || split[0].startsWith("#"))
@@ -598,7 +665,6 @@ public class TimingModel {
                 else if (split[0].equalsIgnoreCase("MID_MAX"))        MID_MAX =(int) Math.floor(value);
                 else if (split[0].equalsIgnoreCase("FAR_MIN"))        FAR_MIN =(int) Math.floor(value);
                 else if (split[0].equalsIgnoreCase("FAR_MAX"))        FAR_MAX =(int) Math.floor(value);
-
                 else {
                 	String errMessage;
                     if (split.length == 2) {
@@ -613,6 +679,7 @@ public class TimingModel {
             e.printStackTrace();
             result = false;
         }
+
         return result;
     }
 
@@ -729,20 +796,9 @@ public class TimingModel {
                 dDistHorizontal[i] = checkTileType(testT, GroupDelayType.DOUBLE);
                 qDistHorizontal[i] = checkTileType(testT, GroupDelayType.QUAD);
                 lDistHorizontal[i] = checkTileType(testT, GroupDelayType.LONG);
-
-//                Pattern pattern = Pattern.compile("INT_X(\\d+)Y");
-//                Matcher matcher = pattern.matcher(testT.getName());
-//                String IntX = "";
-//                if (matcher.find()) {
-//                    IntX = matcher.group(1);
-//                }
-//
-//                System.out.printf("PM:PM col %3d : %3d %3d %3d %3d : %s %s\n", i, sDistHorizontal[i],
-//                        dDistHorizontal[i], qDistHorizontal[i], lDistHorizontal[i], testT.getName(), IntX);
             }
         }
 
-//        getHorDistArrayInIntTileGrid();
 
         int col = START_TILE_COL;
         int row1 = 0;
@@ -756,15 +812,12 @@ public class TimingModel {
                 qDistVertical[i] = check_RCLK_TileType(testT, GroupDelayType.QUAD);
                 lDistVertical[i] = check_RCLK_TileType(testT, GroupDelayType.LONG);
 
-//                Pattern pattern = Pattern.compile("INT_X\\d+Y(\\d+)");
-//                Matcher matcher = pattern.matcher(testT.getName());
-//                String IntY = "";
-//                if (matcher.find()) {
-//                    IntY = matcher.group(1);
-//                }
-//
-//                System.out.printf("PM:PM col %3d : %3d %3d %3d %3d : %s %s\n", i, sDistVertical[i],
-//                        dDistVertical[i], qDistVertical[i], lDistVertical[i], testT.getName(), IntY);
+                Pattern pattern = Pattern.compile("INT_X\\d+Y(\\d+)");
+                Matcher matcher = pattern.matcher(testT.getName());
+                String IntY = "";
+                if (matcher.find()) {
+                    IntY = matcher.group(1);
+                }
             }
         }
 
@@ -958,7 +1011,6 @@ public class TimingModel {
             }
         }
 
-//        System.out.println("res: " + res.size() + " " + res);
         return res;
     }
 
