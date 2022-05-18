@@ -2312,10 +2312,6 @@ public class DesignTools {
 		}
 	}
 
-	private static boolean equalNodes(Node lNode, Node rNode) {
-		return (lNode.getTile().getName().equals(rNode.getTile().getName()) && lNode.getWireName().equals(rNode.getWireName()));
-	}
-
 	/**
 	 * Copy the route of static nets feeding the sinks within the given SiteInst.
 	 * @param dest The destination design
@@ -2395,7 +2391,7 @@ public class DesignTools {
 						PIP pip = nodeToDriverPIP.get(node);
 						allPIPs.add(pip);
 						if (pip.isBidirectional()) {
-							node = equalNodes(node,pip.getStartNode()) ? pip.getEndNode() : pip.getStartNode();
+							node = pip.getStartNode().equals(node) ? pip.getEndNode() : pip.getStartNode();
 						} else {
 							node = pip.getStartNode();
 						}
