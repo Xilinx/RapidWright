@@ -360,9 +360,9 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParserWorker implement
             portInst.setPort(port);
         }
 
-        public void name() {
+        public void name(StringPool uniquifier) {
             String portInstName = portInst.getPortInstNameFromPort();
-            portInst.setName(portInstName);
+            portInst.setName(uniquifier.uniquifyName(portInstName));
         }
 
         public void add() {

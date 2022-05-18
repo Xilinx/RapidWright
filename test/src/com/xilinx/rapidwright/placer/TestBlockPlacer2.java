@@ -27,11 +27,13 @@ import java.io.File;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.examples.PicoBlazeArray;
 import com.xilinx.rapidwright.placer.blockplacer.BlockPlacer2;
+import com.xilinx.rapidwright.support.LargeTest;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+@LargeTest
 public class TestBlockPlacer2 {
 
     private void placeSomePicoBlazeArray(PicoBlazeArray.PicoBlazeArrayCreator<?> arrayCreator) {
