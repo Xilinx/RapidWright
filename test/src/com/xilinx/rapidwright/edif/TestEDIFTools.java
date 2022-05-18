@@ -25,6 +25,8 @@ package com.xilinx.rapidwright.edif;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 
 import java.nio.charset.StandardCharsets;
@@ -33,6 +35,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 
 public class TestEDIFTools {
@@ -112,5 +115,36 @@ public class TestEDIFTools {
         String unicodeStr = new String(special, StandardCharsets.UTF_8);
         Assertions.assertEquals("emoji______", EDIFTools.makeNameEDIFCompatible(unicodeStr));
         Assertions.assertEquals("&_", EDIFTools.makeNameEDIFCompatible(" "));
+    }
+    
+    @Test
+    public void testUniqueifyNetlist() {
+        final EDIFNetlist netlist = EDIFTools.createNewNetlist("test");
+        Design design = new Design("test", Device.PYNQ_Z1);
+        design.setNetlist(netlist);
+        
+        EDIFCell top = netlist.getTopCell();
+        EDIFCell foo = new EDIFCell(netlist.getWorkLibrary(), "foo");
+        EDIFCell bar = new EDIFCell(netlist.getWorkLibrary(), "bar");
+        EDIFCell baz = new EDIFCell(netlist.getWorkLibrary(), "baz");
+        
+        bar.createChildCellInst("baz1", baz);
+        bar.createChildCellInst("baz2", baz);
+        
+        foo.createChildCellInst("bar1", bar);
+        foo.createChildCellInst("bar2", bar);
+        
+        top.createChildCellInst("foo1", foo);
+        top.createChildCellInst("foo2", foo);
+
+        EDIFTools.uniqueifyNetlist(design);
+        
+        for(Entry<EDIFLibrary, Map<EDIFCell, List<EDIFHierCellInst>>> e : 
+                                            EDIFTools.createCellInstanceMap(netlist).entrySet()) {
+            if(e.getKey().isHDIPrimitivesLibrary()) continue;
+            for(Entry<EDIFCell, List<EDIFHierCellInst>> e2 : e.getValue().entrySet()) {
+                Assertions.assertEquals(e2.getValue().size(), 1);
+            }
+        }
     }
 }
