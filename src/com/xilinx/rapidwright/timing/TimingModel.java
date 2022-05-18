@@ -799,20 +799,9 @@ public class TimingModel {
                 dDistHorizontal[i] = checkTileType(testT, GroupDelayType.DOUBLE);
                 qDistHorizontal[i] = checkTileType(testT, GroupDelayType.QUAD);
                 lDistHorizontal[i] = checkTileType(testT, GroupDelayType.LONG);
-
-//                Pattern pattern = Pattern.compile("INT_X(\\d+)Y");
-//                Matcher matcher = pattern.matcher(testT.getName());
-//                String IntX = "";
-//                if (matcher.find()) {
-//                    IntX = matcher.group(1);
-//                }
-//
-//                System.out.printf("PM:PM col %3d : %3d %3d %3d %3d : %s %s\n", i, sDistHorizontal[i],
-//                        dDistHorizontal[i], qDistHorizontal[i], lDistHorizontal[i], testT.getName(), IntX);
             }
         }
 
-//        getHorDistArrayInIntTileGrid();
 
         int col = START_TILE_COL;
         int row1 = 0;
@@ -834,9 +823,6 @@ public class TimingModel {
                 if (matcher.find()) {
                     IntY = matcher.group(1);
                 }
-
-//                System.out.printf("PM:PM col %3d : %3d %3d %3d %3d : %s %s\n", i, sDistVertical[i],
-//                        dDistVertical[i], qDistVertical[i], lDistVertical[i], testT.getName(), IntY);
             }
         }
 
@@ -1035,7 +1021,6 @@ public class TimingModel {
             }
         }
 
-//        System.out.println("res: " + res.size() + " " + res);
         return res;
     }
 
