@@ -64,7 +64,6 @@ public class RelocateModulesIntoBlackboxes {
 	public static boolean relocateModuleInsts(Design top, Module mod, String cellAnchor, List<Pair<String, String>> blackboxes) {
 		System.out.println("\n\nRelocate " + mod.getName());
 
-		EDIFNetlist netlist = top.getNetlist();
 		top.setAutoIOBuffers(false);
 
 		Site frSite = mod.getAnchor();
