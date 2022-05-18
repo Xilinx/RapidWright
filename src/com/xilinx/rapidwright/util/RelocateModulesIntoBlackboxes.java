@@ -25,6 +25,7 @@ package com.xilinx.rapidwright.util;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -60,16 +61,14 @@ public class RelocateModulesIntoBlackboxes {
 	 * @param blackboxes The list of pairs of a black box cell to be filled and its reference INT tile.
 	 *                    The x-coordinate of this INT tile must match that of the cellAnchor.
 	 */
-	public static boolean relocateModuleInsts(Design top, Module mod, String cellAnchor, ArrayList<Pair<String, String>> blackboxes) {
+	public static boolean relocateModuleInsts(Design top, Module mod, String cellAnchor, List<Pair<String, String>> blackboxes) {
 		System.out.println("\n\nRelocate " + mod.getName());
 
-		int idx = indexOf(blackboxes, cellAnchor);
-		if (idx >= 0) {
-			// Make the blackbox whose reference INT tile the same as the implementation as the last to be copied.
-			// Otherwise some nets become unrouted!
-			Collections.swap(blackboxes, idx, blackboxes.size()-1);
-		}
-
+		// Make the blackbox whose reference INT tile the same as the implementation as the last to be copied.
+		// Otherwise some nets become unrouted!
+		Collections.sort(blackboxes, (Pair<String, String> a,Pair<String, String> b)
+				-> {return (a.getSecond() == cellAnchor ? 1 : b.getSecond() == cellAnchor ? -1 : a.getSecond().compareTo(b.getSecond()));}
+		);
 
 		EDIFNetlist netlist = top.getNetlist();
 		top.setAutoIOBuffers(false);
@@ -115,7 +114,7 @@ public class RelocateModulesIntoBlackboxes {
 	 * @param top The design to process
 	 * @param blackboxes The black boxes that was filled
 	 */
-	public static void postProcessing(Design top, ArrayList<Pair<String, String>> blackboxes) {
+	public static void postProcessing(Design top, List<Pair<String, String>> blackboxes) {
 
 		top.getNetlist().resetParentNetMap();
 
@@ -250,15 +249,6 @@ public class RelocateModulesIntoBlackboxes {
 		}
 	}
 
-
-	// TODO: replace this with a more concise version
-	public static int indexOf(ArrayList<Pair<String,String>> targets, String word) {
-		for (int i = 0; i < targets.size(); i++)
-			if (targets.get(i).getSecond().equals(word))
-				return i;
-		return -1;
-	}
-
 // Example arguments
 /*
    -in    hwct.dcp
@@ -295,7 +285,7 @@ public class RelocateModulesIntoBlackboxes {
 		String cellDCPName = null;
 		String cellAnchor = null;
 		// Need random access to the list
-		ArrayList<Pair<String, String>> targets = new ArrayList<>();
+		List<Pair<String, String>> targets = new ArrayList<>();
 
 
 		// Collect command line arguments

@@ -2142,15 +2142,10 @@ public class DesignTools {
 	 * Copy a cell from a design as a new design.
 	 * @param src The source design with or without implementation
 	 * @param cellName The full hierarchy cell name to be extracted as another design
+	 * @param  keepStaticRouting A flag to indicate whether to keep the routes of static nets or not.
 	 * @return A newly created design copied from the source
 	 */
-	public static Design createDesignFromCellWithStatic(Design src, String cellName) {
-		return createDesignFromCell(src, cellName, true);
-	}
-	public static Design createDesignFromCellWithoutStatic(Design src, String cellName) {
-		return createDesignFromCell(src, cellName, false);
-	}
-	public static Design createDesignFromCell(Design src, String cellName, boolean copyPIPOfStaticNet) {
+	public static Design createDesignFromCell(Design src, String cellName, boolean keepStaticRouting) {
 		EDIFNetlist srcCellNetlist = EDIFTools.createNewNetlist(src.getNetlist().getHierCellInstFromName(cellName).getInst());
 		EDIFTools.ensureCorrectPartInEDIF(srcCellNetlist, src.getPartName());
 		Design d2 = new Design(srcCellNetlist);
@@ -2159,7 +2154,7 @@ public class DesignTools {
 
 		// TODO: Skip this step if the design was not implemented.
 		Map<String, String> cellMap = Collections.singletonMap(cellName, "");
-		DesignTools.copyImplementation(src, d2, copyPIPOfStaticNet, true, true, true, cellMap);
+		DesignTools.copyImplementation(src, d2,  keepStaticRouting, true, true, true, cellMap);
 		return d2;
 	}
 
@@ -2185,7 +2180,7 @@ public class DesignTools {
 	 * Copies the logic and implementation of a set of cells from one design to another with additional flags to control copying nets.
 	 * @param src The source design (with partial or full implementation)
 	 * @param dest The destination design (with matching cell instance interfaces)
-	 * @param copyStaticNet Flag indicating if static nets should be copied
+	 * @param copyStaticNets Flag indicating if static nets should be copied
 	 * @param copyOnlyInternalNets Flag indicating if only nets with every terminal inside the cell should be copied
 	 * @param lockPlacement Flag indicating if the destination implementation copy should have the
 	 * 	placement locked
@@ -2194,7 +2189,7 @@ public class DesignTools {
 	 * @param srcToDestInstNames A map of source (key) to destination (value) pairs of cell
 	 * instances from which to copy the implementation
 	 */
-	public static void copyImplementation(Design src, Design dest, boolean copyStaticNet, boolean copyOnlyInternalNets, boolean lockPlacement,
+	public static void copyImplementation(Design src, Design dest, boolean copyStaticNets, boolean copyOnlyInternalNets, boolean lockPlacement,
 			boolean lockRouting, Map<String,String> srcToDestInstNames) {
 		// Removing existing logic in target cells in destination design
 		EDIFNetlist destNetlist = dest.getNetlist();
@@ -2312,7 +2307,7 @@ public class DesignTools {
 			}
 		}
 
-		if (copyStaticNet) {
+		if (copyStaticNets) {
 			copyStaticNets(dest, staticNets, siteInstsOfCells);
 		}
 	}
@@ -2350,18 +2345,18 @@ public class DesignTools {
 			put("HMUX", Arrays.asList("H5LUT", "H6LUT"));
 		}};
 
-
-
 		// Map from a node to its driver PIP
 		// Note: Some PIPs are bidirectional. But, every PIP performs only one direction.
 		// The direction of a bidirectional PIP is determined from the context, ie., its connecting directional PIPs.
 		// To determine that context, go through directional PIPs first. This process does not support consecutive bidirectional PIPs.
 		Map<Net,Map<Node,PIP>> netToUphillPIPMap = new HashMap<>();
-		Map<Net,Set<PIP>> netToItsPIPs = new HashMap<>();
+		// netToPIPs to store PIPs extracted for static nets.
+		Map<Net,Set<PIP>> netToPIPs = new HashMap<>();
 		for (Net net : staticNets) {
-			netToItsPIPs.put(net, new HashSet<>());
+			netToPIPs.put(net, new HashSet<>());
 			Map<Node,PIP> nodeToDriverPIP = new HashMap<>();
 			List<PIP> biPIPs = new ArrayList<>();
+			// TODO: This goes through the whole design. Try to limit it to the target cell, if possible.
 			for (PIP pip : net.getPIPs()) {
 				if (pip.isBidirectional()) {
 					biPIPs.add(pip);
@@ -2390,8 +2385,8 @@ public class DesignTools {
 
 				Net net = sitePinInst.getNet();
 				Map<Node,PIP> nodeToDriverPIP = netToUphillPIPMap.get(net);
-				Set<PIP> allPIPs = netToItsPIPs.get(net);
 				if (nodeToDriverPIP != null) {
+					Set<PIP> allPIPs = netToPIPs.get(net);
 					// This SitePinInst connects to a static net. Trace and collect all the PIPs to a source.
 					Node node = sitePinInst.getConnectedNode();
 					SitePin sitePin = node.getSitePin();
@@ -2399,16 +2394,14 @@ public class DesignTools {
 					while ((sitePin == null) || sitePin.isInput()) {
 						PIP pip = nodeToDriverPIP.get(node);
 						allPIPs.add(pip);
-
-
 						if (pip.isBidirectional()) {
 							node = equalNodes(node,pip.getStartNode()) ? pip.getEndNode() : pip.getStartNode();
 						} else {
 							node = pip.getStartNode();
 						}
-
 						if (node.getWireName().contains("VCC_WIRE"))
 							break;
+
 						sitePin = node.getSitePin();
 					}
 					if ((sitePin != null) && !node.getWireName().contains("VCC_WIRE"))  { // GND source
@@ -2418,16 +2411,9 @@ public class DesignTools {
 						for (String bel : bels) {
 							prohibitBels.add(siteName + "/" + bel);
 						}
-
-//						BEL bel = sitePin.getBELPin().getBEL();
-//						System.out.println("belpin " + sitePin.getBELPin() + " " + bel);
-//						// Conceptually, need to prohibit a bel.
-//						// However, placer will add a phohibited site, probably, to avoid dealing with partial site
-//						// Thus, no need to trace to bel.
-//						prohibitBels.add(bel);
 					}
+					netToPIPs.put(net,allPIPs);
 				}
-				netToItsPIPs.put(net,allPIPs);
 			}
 		}
 
@@ -2436,7 +2422,7 @@ public class DesignTools {
 		}
 
 
-		for (Map.Entry<Net, Set<PIP>> entry : netToItsPIPs.entrySet()) {
+		for (Map.Entry<Net, Set<PIP>> entry : netToPIPs.entrySet()) {
 			if ((entry == null) || (entry.getKey() == null) || (entry.getValue() == null))
 				continue;
 

@@ -25,7 +25,17 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintStream;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.EnumMap;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -46,7 +56,6 @@ import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.util.FileTools;
-import com.xilinx.rapidwright.util.Pair;
 
 /**
  * A TimingModel calculates net delay by implementing the lightweight timing model described in our 
@@ -491,96 +500,26 @@ public class TimingModel {
         return result;
     }
 
-    private Pair<Integer,Integer> findReferenceTileLocation(Device d) {
-        class Helper {
-            Map<Integer,Set<Integer>> spans;
-            public Helper() {
-                spans = new HashMap<Integer,Set<Integer>>();
-            }
-            void insert(int val, int span) {
-                if (!spans.containsKey(span)) {
-                    spans.put(span, new HashSet<Integer>());
-                }
-                spans.get(span).add(val);
-            }
-            Set<Integer> longest() {
-                List<Integer> keys = new ArrayList<>(spans.keySet());
-                Integer maxSpan = Collections.max(keys);
-                return spans.get(maxSpan);
-            }
-        }
-
-
-        // for each column, look for valid row
-        Helper colHelper = new Helper();
-        for (int i = 0; i < d.getColumns(); i++) {
-            int span = 0;
-            for (int j = 0; j < d.getRows(); j++) {
-                if (d.getTile("INT_X" + i + "Y" + j) != null) {
-                    span++;
-                }
-            }
-            colHelper.insert(i,span);
-        }
-
-        // for each row, look for valid col
-        Helper rowHelper = new Helper();
-        for (int j = 0; j < d.getRows(); j++) {
-            int span = 0;
-            for (int i = 0; i < d.getColumns(); i++) {
-                if (d.getTile("INT_X" + i + "Y" + j) != null) {
-                    span++;
-                }
-            }
-            rowHelper.insert(j,span);
-        }
-
-        for (int INTCol : colHelper.longest()) {
-            for (int INTRow : rowHelper.longest()) {
-                Tile tile = d.getTile("INT_X" + INTCol + "Y" + INTRow);
-                int col = tile.getColumn();
-                int row = tile .getRow();
-                // Want an INT tile that has CLB on both side
-                if (isCLE(d.getTile(row, col-1)) && isCLE(d.getTile(row, col+1))) {
-                    return new Pair<>(col,row);
-                }
-            }
-        }
-        return new Pair<>(-1,-1);
-    }
-
-    private boolean isCLE(Tile tile) {
-        TileTypeEnum t = tile.getTileTypeEnum();
-        return (
-                t == TileTypeEnum.CLE_M
-                || t == TileTypeEnum.CLE_M_R
-                || t == TileTypeEnum.CLEL_L
-                || t == TileTypeEnum.CLEL_R
-                || t == TileTypeEnum.CLEM
-                || t == TileTypeEnum.CLEM_R
-        );
-    }
-
     /**
      * Reads the text file containing the delay terms needed by this timing model.
      * @param filename Name (and maybe the path) of the text file, the default is delay_terms.dat in the current directory.
      * @return Boolean indication of completion.
      */
     protected boolean readDelayTerms(String filename) {
-
-
         boolean result = true; 
-        try (BufferedReader br = new BufferedReader(new FileReader(FileTools.getRapidWrightPath() + File.separator + filename))) {
+        try (BufferedReader br = new BufferedReader(new FileReader(FileTools.getRapidWrightPath() + File.separator + filename))){
             String line = "";
             int lineCntr = 0;
-            while ((line=br.readLine()) != null) {
+            while ((line=br.readLine()) != null) {// && line.length() != 0) {
                 String[] split = line.split("\\s+");
                 lineCntr++;
                 if (split.length < 2 || split[0].startsWith("#"))
                     continue;
                 Float value = 0.0f;
                 value = Float.valueOf(split[1]);
-                if (split[0].equalsIgnoreCase("INTRASITE_DELAY_SITEPIN_TO_LUT_INPUT")) INTRASITE_DELAY_SITEPIN_TO_LUT_INPUT = value;
+                if (split[0].equalsIgnoreCase("START_TILE_ROW"))       START_TILE_ROW = (int)(float)value;
+                else if (split[0].equalsIgnoreCase("START_TILE_COL"))  START_TILE_COL = (int)(float)value;
+                else if (split[0].equalsIgnoreCase("INTRASITE_DELAY_SITEPIN_TO_LUT_INPUT")) INTRASITE_DELAY_SITEPIN_TO_LUT_INPUT = value;
                 else if (split[0].equalsIgnoreCase("INTRASITE_DELAY_LUT_OUTPUT_TO_O_SITEPIN")) INTRASITE_DELAY_LUT_OUTPUT_TO_O_SITEPIN = value;
                 else if (split[0].equalsIgnoreCase("INTRASITE_DELAY_SITEPIN_TO_FF_INPUT")) INTRASITE_DELAY_SITEPIN_TO_FF_INPUT = value;
                 else if (split[0].equalsIgnoreCase("INTRASITE_DELAY_FF_INPUT_TO_SITEPIN")) INTRASITE_DELAY_FF_INPUT_TO_SITEPIN = value;
@@ -675,11 +614,6 @@ public class TimingModel {
             e.printStackTrace();
             result = false;
         }
-
-        Pair<Integer,Integer> loc = findReferenceTileLocation(device);
-        START_TILE_COL = loc.getFirst();
-        START_TILE_ROW = loc.getSecond();
-
         return result;
     }
 

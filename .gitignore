@@ -10,11 +10,3 @@
 *.iml
 /designs/
 interchange/schema/capnp/java.capnp
-*.bit
-vivado*
-*.dcp
-*.edf
-*.edif
-.*
-*.log
-*.bak
