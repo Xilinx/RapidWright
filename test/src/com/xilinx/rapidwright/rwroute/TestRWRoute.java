@@ -23,12 +23,14 @@
 package com.xilinx.rapidwright.rwroute;
 
 import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.support.LargeTest;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import com.xilinx.rapidwright.design.Design;
 
+@LargeTest
 public class TestRWRoute {
 	/**
 	 * Tests the non-timing driven full routing, i.e., RWRoute running in its wirelength-driven mode.
