@@ -737,8 +737,8 @@ public class EDIFTools {
 
 	public static EDIFNetlist loadEDIFFile(Path fileName) {
 	    try {
-			final long size = Files.size(fileName);
-			if (ParallelEDIFParser.calcThreads(size) > 1) {
+	        final long size = Files.size(fileName);
+	        if (ParallelEDIFParser.calcThreads(size) > 1) {
 	            try (ParallelEDIFParser p = new ParallelEDIFParser(fileName)) {
 	                return p.parseEDIFNetlist();
 	            }           
