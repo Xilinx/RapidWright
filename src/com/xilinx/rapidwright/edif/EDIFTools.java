@@ -1163,7 +1163,7 @@ public class EDIFTools {
 	 * physical netlist so all references are self-consistent.  This transformation is useful when 
 	 * performing netlist manipulations such as adding/removing cells, ports or nets within a design.
 	 * @param design The design containing the netlist to uniqueify.
-	 * @return True if uniqueification necessary and performed, False if not necessary. Null if indeterminable.
+	 * @return True if uniqueification necessary and netlist was modified, False if not necessary and netlist was not modified. Null if indeterminable.
 	 */
 	public static Boolean uniqueifyNetlist(Design design) {
 		if(design.getModuleInsts().size() > 0) {
