@@ -137,7 +137,7 @@ public class TestEDIFTools {
         top.createChildCellInst("foo1", foo);
         top.createChildCellInst("foo2", foo);
 
-        EDIFTools.uniqueifyNetlist(design);
+        Assertions.assertTrue(EDIFTools.uniqueifyNetlist(design));
         
         for(Entry<EDIFLibrary, Map<EDIFCell, List<EDIFHierCellInst>>> e : 
                                             EDIFTools.createCellInstanceMap(netlist).entrySet()) {
@@ -146,5 +146,7 @@ public class TestEDIFTools {
                 Assertions.assertEquals(e2.getValue().size(), 1);
             }
         }
+
+        Assertions.assertFalse(EDIFTools.uniqueifyNetlist(design));
     }
 }

@@ -1189,12 +1189,13 @@ public class EDIFTools {
 	 * physical netlist so all references are self-consistent.  This transformation is useful when 
 	 * performing netlist manipulations such as adding/removing cells, ports or nets within a design.
 	 * @param design The design containing the netlist to uniqueify.
+	 * @return True if uniqueification necessary and netlist was modified, False if not necessary and netlist was not modified. Null if indeterminable.
 	 */
-	public static void uniqueifyNetlist(Design design) {
+	public static Boolean uniqueifyNetlist(Design design) {
 		if(design.getModuleInsts().size() > 0) {
 			System.err.println("ERROR: Cannot uniqueify netlist, design contains ModuleInstances. "
 					+ "Please call Design.flattenDesign() first.");
-			return;
+			return null;
 		}
 		EDIFNetlist netlist = design.getNetlist();
 		EDIFLibrary macros = Design.getMacroPrimitives(design.getDevice().getSeries());
@@ -1215,10 +1216,15 @@ public class EDIFTools {
 				}
 			}
 		}
+
+		if (toUniqueify.isEmpty())
+			return false;
 		
 		for(EDIFCell curr : new ArrayList<>(toUniqueify.keySet())) {
 			duplicateMultiInstCell(design, curr, toUniqueify);
 		}
+
+		return true;
 	}
 	
 	
