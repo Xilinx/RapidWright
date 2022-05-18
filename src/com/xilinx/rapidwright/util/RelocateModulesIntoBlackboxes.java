@@ -51,7 +51,6 @@ import com.xilinx.rapidwright.tests.CodePerfTracker;
  */
 public class RelocateModulesIntoBlackboxes {
 
-
 	/**
 	 * Fill some black boxes of the given design with the given implementation.
 	 *
@@ -64,8 +63,13 @@ public class RelocateModulesIntoBlackboxes {
 	public static boolean relocateModuleInsts(Design top, Module mod, String cellAnchor, List<Pair<String, String>> blackboxes) {
 		System.out.println("\n\nRelocate " + mod.getName());
 
+		// Make the blackbox whose reference INT tile the same as the implementation as the last to be copied.
+		// Otherwise some nets become unrouted!
+		Collections.sort(blackboxes, (Pair<String, String> a,Pair<String, String> b)
+				-> {return (a.getSecond() == cellAnchor ? 1 : b.getSecond() == cellAnchor ? -1 : a.getSecond().compareTo(b.getSecond()));}
+		);
+
 		EDIFNetlist netlist = top.getNetlist();
-		netlist.migrateCellAndSubCells(mod.getNetlist().getTopCell());
 		top.setAutoIOBuffers(false);
 
 		Site frSite = mod.getAnchor();
@@ -98,13 +102,27 @@ public class RelocateModulesIntoBlackboxes {
 			}
 
 			ModuleInst mi = top.createModuleInst(cell.getFirst(), mod, true);
-			mi.getCellInst().setCellType(mod.getNetlist().getTopCell());
 			mi.place(toSite);
 		}
 		System.out.println("\n");
 		return true;
 	}
 
+	/**
+	 * Process the design after filing black boxes.
+	 * @param top The design to process
+	 * @param blackboxes The black boxes that was filled
+	 */
+	public static void postProcessing(Design top, List<Pair<String, String>> blackboxes) {
+
+		top.getNetlist().resetParentNetMap();
+
+		for (Pair<String, String> toCellLoc : blackboxes) {
+			combinePIPonClockNets(top, toCellLoc.getFirst());
+		}
+
+		setPropertyValueInLateXDC(top, "HD.RECONFIGURABLE", "false");
+	}
 
 	/**
 	 * Unplace all cells placed at the proposed existing SiteInts.
@@ -230,15 +248,6 @@ public class RelocateModulesIntoBlackboxes {
 		}
 	}
 
-
-	// TODO: replace this with a more concise version
-	public static int indexOf(ArrayList<Pair<String,String>> targets, String word) {
-		for (int i = 0; i < targets.size(); i++)
-			if (targets.get(i).getSecond().equals(word))
-				return i;
-		return -1;
-	}
-
 // Example arguments
 /*
    -in    hwct.dcp
@@ -275,10 +284,8 @@ public class RelocateModulesIntoBlackboxes {
 		String cellDCPName = null;
 		String cellAnchor = null;
 		// Need random access to the list
-		ArrayList<Pair<String, String>> targets = new ArrayList<>();
+		List<Pair<String, String>> targets = new ArrayList<>();
 
-		String toCell = null;
-		String toLoc = null;
 
 		// Collect command line arguments
 		int i = 0;
@@ -305,9 +312,9 @@ public class RelocateModulesIntoBlackboxes {
 					}
 					break;
 				case "-to":
-					toCell = args[++i];
+					String toCell = args[++i];
 					if (i < args.length) {
-						toLoc = args[++i];
+						String toLoc = args[++i];
 						targets.add(new Pair<>(toCell, toLoc));
 					} else {
 						System.out.println("Missing value for option -to");
@@ -322,14 +329,6 @@ public class RelocateModulesIntoBlackboxes {
 					break;
 			}
 			i++;
-		}
-
-
-		int idx = indexOf(targets, cellAnchor);
-        if (idx >= 0) {
-        	// Make the blackbox whose reference INT tile the same as the implementation as the last to be copied.
-			// Otherwise some nets become unrouted!
-			Collections.swap(targets, idx, targets.size()-1);
 		}
 
 
@@ -356,13 +355,7 @@ public class RelocateModulesIntoBlackboxes {
 		t.stop().start("Relocate module instances");
 		if (relocateModuleInsts(top, mod, cellAnchor, targets)) {
 
-			top.getNetlist().resetParentNetMap();
-
-			for (Pair<String,String> toCellLoc : targets) {
-				combinePIPonClockNets(top, toCellLoc.getFirst());
-			}
-
-			setPropertyValueInLateXDC (top, "HD.RECONFIGURABLE", "false");
+		    postProcessing(top, targets);
 
 			System.out.println("\n");
 			t.stop().start("Write output dcp");
