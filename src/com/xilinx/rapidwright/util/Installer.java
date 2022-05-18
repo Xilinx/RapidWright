@@ -31,6 +31,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.UncheckedIOException;
 import java.lang.ProcessBuilder.Redirect;
@@ -101,22 +102,33 @@ public class Installer {
      * @return Checksum result String or null if no file was found.
      */
     public static String calculateMD5OfFile(Path path){
-        MessageDigest md5 = null;
-        try {
-            md5 = MessageDigest.getInstance("MD5");
-        } catch (NoSuchAlgorithmException e1) {
-            throw new RuntimeException("ERROR: Couldn't find an MD5 algorithm provider "
-                    + "in current Java environment.");
-        }
-        try (DigestInputStream dig = new DigestInputStream(Files.newInputStream(path), md5)) {            
-            byte[] buffer = new byte[1024];
-            while(dig.read(buffer) != -1){}
-            byte[] checksum = md5.digest();
-            return bytesToString(checksum);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+		try (InputStream inputStream = Files.newInputStream(path)) {
+			return calculateMD5OfStream(inputStream);
+		} catch (IOException e) {
+			throw new UncheckedIOException(e);
+		}
     }
+
+	/**
+	 * Performs an MD5 checksum on the provided input stream and returns the result.
+	 */
+	public static String calculateMD5OfStream(InputStream is) {
+		MessageDigest md5 = null;
+		try {
+			md5 = MessageDigest.getInstance("MD5");
+		} catch (NoSuchAlgorithmException e1) {
+			throw new RuntimeException("ERROR: Couldn't find an MD5 algorithm provider "
+					+ "in current Java environment.");
+		}
+		try (DigestInputStream dig = new DigestInputStream(is, md5)) {
+			byte[] buffer = new byte[1024];
+			while(dig.read(buffer) != -1){}
+			byte[] checksum = md5.digest();
+			return Installer.bytesToString(checksum);
+		} catch (IOException e) {
+			throw new UncheckedIOException(e);
+		}
+	}
 
     /**
      * Validates an already downloaded RapidWright release file using the MD5 hash
