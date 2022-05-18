@@ -140,6 +140,7 @@ public class TestModuleInst {
         String moduleTopCellName = moduleTopCell.getLegalEDIFName();
         EDIFCell copiedModuleTopCell = emptyDesignNetlist.getCell(moduleTopCellName);
         Assertions.assertNotNull(copiedModuleTopCell);
+        Assertions.assertEquals(copiedModuleTopCell, mi.getCellInst().getCellType());
 
         Site ss = module.getAnchor();
         Tile st = ss.getTile();
@@ -148,6 +149,7 @@ public class TestModuleInst {
             Site ds = ss.getCorrespondingSite(ss.getSiteTypeEnum(), dt);
 
             mi = emptyDesign.createModuleInst("inst_copy" + i, module);
+            Assertions.assertEquals(emptyDesignNetlist, mi.getCellInst().getCellType().getNetlist());
             boolean skipIncompatible = true; // Otherwise it fails when trying to move
                                              // the gap routing in the clock net
             Assertions.assertTrue(mi.place(ds, skipIncompatible));
