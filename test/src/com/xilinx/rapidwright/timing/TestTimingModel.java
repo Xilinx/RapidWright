@@ -1,4 +1,4 @@
-package com.xilinx.rapidwright.util;
+package com.xilinx.rapidwright.timing;
 
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Tile;
