@@ -71,6 +71,9 @@ public class TestRWRoute {
 	 */
 	@Test
 	public void testNonTimingDrivenFullRoutingWithClkDesign() {
+        // Sporadically failing due to OutOfMemoryException (see #439)
+        long maxMemoryNeeded = 1024L*1024L*1024L*8L; 
+        Assumptions.assumeTrue(Runtime.getRuntime().maxMemory() >= maxMemoryNeeded);
 		String dcpPath = RapidWrightDCP.getString("optical-flow.dcp");
 		Design design = Design.readCheckpoint(dcpPath);
 		RWRoute.routeDesignFullNonTimingDriven(design);
