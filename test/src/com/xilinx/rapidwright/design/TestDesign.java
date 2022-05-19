@@ -237,4 +237,12 @@ public class TestDesign {
         queue.addJob(job);
         Assertions.assertTrue(queue.runAllToCompletion());
     }
+    
+    @Test
+    public void testCopyCell() {
+        Design d = new Design("test", "xcvc1902-vsvd1760-2MP-e-S");
+        Cell orig = d.createAndPlaceCell("orig", Unisim.DSP_PREADD58, "DSP_X0Y0/DSP_PREADD");
+        Design d2 = new Design("test2", d.getPartName());
+        Assertions.assertNotNull(d2.copyCell(orig, "copy"));
+    }
 }
