@@ -56,7 +56,6 @@ import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.util.FileTools;
-import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.Utils;
 import org.python.google.common.collect.SetMultimap;
 import org.python.google.common.collect.TreeMultimap;
@@ -505,27 +504,9 @@ public class TimingModel {
     }
 
     private Tile findReferenceTile() {
-        class Helper {
-            Map<Integer, Set<Integer>> spans;
-            public Helper() {
-                spans = new HashMap<Integer,Set<Integer>>();
-            }
-            void insert(int val, int span) {
-                if (!spans.containsKey(span)) {
-                    spans.put(span, new HashSet<Integer>());
-                }
-                spans.get(span).add(val);
-            }
-            Set<Integer> longest() {
-                List<Integer> keys = new ArrayList<>(spans.keySet());
-                Integer maxSpan = Collections.max(keys);
-                return spans.get(maxSpan);
-            }
-        }
-
 
         // for each column, look for valid row
-        Helper colHelper = new Helper();
+        SetMultimap<Integer,Integer> colHelper = TreeMultimap.create();;
         for (int x = 0; x < device.getColumns(); x++) {
             int span = 0;
             for (int y = 0; y < device.getRows(); y++) {
@@ -533,12 +514,11 @@ public class TimingModel {
                     span++;
                 }
             }
-            colHelper.insert(x,span);
-
+            colHelper.put(span,x);
         }
 
         // for each row, look for valid col
-        Helper rowHelper = new Helper();
+        SetMultimap<Integer,Integer> rowHelper = TreeMultimap.create();;
         for (int y = 0; y < device.getRows(); y++) {
             int span = 0;
             for (int x = 0; x < device.getColumns(); x++) {
@@ -546,12 +526,11 @@ public class TimingModel {
                     span++;
                 }
             }
-            rowHelper.insert(y,span);
+            rowHelper.put(span,y);
         }
 
-
-        for (int x : colHelper.longest()) {
-            for (int y : rowHelper.longest()) {
+        for (int x : colHelper.get(Collections.max(colHelper.keySet()))) {
+            for (int y : rowHelper.get(Collections.max(rowHelper.keySet()))) {
                 Tile tile = device.getTile("INT", x, y);
 
                 int col = tile.getColumn();
