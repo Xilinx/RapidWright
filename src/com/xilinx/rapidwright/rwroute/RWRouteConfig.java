@@ -67,8 +67,6 @@ public class RWRouteConfig {
 	private float historicalCongestionFactor;
 	/** true to enable timing-aware routing */
 	private boolean timingDriven;
-	/** true to enable partial routing */
-	private boolean partialRouting;
 	/** The directory contains DSP timing data files for the target design */
 	private String dspTimingDataFolder;
 	/** The text file containing clock enable partial route and timing data */
@@ -106,7 +104,6 @@ public class RWRouteConfig {
 		presentCongestionMultiplier = 2f;
 		historicalCongestionFactor = 1f;
 		timingDriven = true;
-		partialRouting = false;
 		clkRouteTiming = null;
 		pessimismA = 1.03f;
 		pessimismB = (short) 100;
@@ -777,7 +774,6 @@ public class RWRouteConfig {
 		s.append(MessageGenerator.formatString("Router Configuration\n"));
 		s.append(MessageGenerator.formatString("Max routing iterations: ", maxIterations));
 		s.append(MessageGenerator.formatString("Timing-driven: ", timingDriven));
-		s.append(MessageGenerator.formatString("Partial routing: ", partialRouting));
 		s.append(MessageGenerator.formatString("Use bounding boxes: ", isUseBoundingBox()));
 		if(isUseBoundingBox()) {
 			s.append(MessageGenerator.formatString("Bounding box extension X: ", boundingBoxExtensionX));

@@ -383,6 +383,10 @@ public class PartialRouter extends RWRoute{
 	public static Design routeDesignPartialNonTimingDriven(Design design) {
 		return routeDesign(design, new RWRouteConfig(new String[] {
 				"--fixBoundingBox",
+				// use U-turn nodes and no masking of nodes cross RCLK
+				// Pros: maximum routability
+				// Con: might result in delay optimism and a slight increase in runtime
+				"--useUTurnNodes",
 				"--nonTimingDriven",
 				"--verbose"}));
 	}
@@ -394,6 +398,10 @@ public class PartialRouter extends RWRoute{
 	public static Design routeDesignPartialTimingDriven(Design design) {
 		return routeDesign(design, new RWRouteConfig(new String[] {
 				"--fixBoundingBox",
+				// use U-turn nodes and no masking of nodes cross RCLK
+				// Pros: maximum routability
+				// Con: might result in delay optimism and a slight increase in runtime
+				"--useUTurnNodes",
 				"--verbose"}));
 	}
 }
