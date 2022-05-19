@@ -17,7 +17,7 @@ public class TestTimingModel {
             "xczu7ev,66,256,379,107",
             "vu19p,1,0,58,1242",
     })
-    public void checkFindReferenceTileLocation (String deviceName,
+    public void checkFindReferenceTile (String deviceName,
                                                 int expectedTileX, int expectedTileY,
                                                 int expectedCol, int expectedRow) {
         TimingModel model = new TimingModel(Device.getDevice(deviceName));

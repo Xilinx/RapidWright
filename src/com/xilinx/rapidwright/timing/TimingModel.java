@@ -58,6 +58,8 @@ import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.Utils;
+import org.python.google.common.collect.SetMultimap;
+import org.python.google.common.collect.TreeMultimap;
 
 /**
  * A TimingModel calculates net delay by implementing the lightweight timing model described in our 
@@ -502,7 +504,7 @@ public class TimingModel {
         return result;
     }
 
-    private Pair<Integer,Integer> findReferenceTileLocation(Device d) {
+    private Tile findReferenceTile() {
         class Helper {
             Map<Integer, Set<Integer>> spans;
             public Helper() {
@@ -524,10 +526,10 @@ public class TimingModel {
 
         // for each column, look for valid row
         Helper colHelper = new Helper();
-        for (int x = 0; x < d.getColumns(); x++) {
+        for (int x = 0; x < device.getColumns(); x++) {
             int span = 0;
-            for (int y = 0; y < d.getRows(); y++) {
-                if (d.getTile("INT", x, y) != null) {
+            for (int y = 0; y < device.getRows(); y++) {
+                if (device.getTile("INT", x, y) != null) {
                     span++;
                 }
             }
@@ -537,10 +539,10 @@ public class TimingModel {
 
         // for each row, look for valid col
         Helper rowHelper = new Helper();
-        for (int y = 0; y < d.getRows(); y++) {
+        for (int y = 0; y < device.getRows(); y++) {
             int span = 0;
-            for (int x = 0; x < d.getColumns(); x++) {
-                if (d.getTile("INT", x, y) != null) {
+            for (int x = 0; x < device.getColumns(); x++) {
+                if (device.getTile("INT", x, y) != null) {
                     span++;
                 }
             }
@@ -550,18 +552,18 @@ public class TimingModel {
 
         for (int x : colHelper.longest()) {
             for (int y : rowHelper.longest()) {
-                Tile tile = d.getTile("INT", x, y);
+                Tile tile = device.getTile("INT", x, y);
 
                 int col = tile.getColumn();
                 int row = tile.getRow();
 
                 // Want an INT tile that has CLB on both side
-                if (Utils.isCLB(d.getTile(row, col-1).getTileTypeEnum()) && Utils.isCLB(d.getTile(row, col+1).getTileTypeEnum())) {
-                    return new Pair<>(col,row);
+                if (Utils.isCLB(device.getTile(row, col-1).getTileTypeEnum()) && Utils.isCLB(device.getTile(row, col+1).getTileTypeEnum())) {
+                    return tile;
                 }
             }
         }
-        return new Pair<>(-1,-1);
+        return null;
     }
 
 
@@ -573,9 +575,9 @@ public class TimingModel {
     protected boolean readDelayTerms(String filename) {
 
         // Compute before reading from file to allow overriding.
-        Pair<Integer,Integer> loc = findReferenceTileLocation(device);
-        START_TILE_COL = loc.getFirst();
-        START_TILE_ROW = loc.getSecond();
+        Tile tile = findReferenceTile();
+        START_TILE_COL = tile.getColumn();
+        START_TILE_ROW = tile.getRow();
 
         boolean result = true;
         try (BufferedReader br = new BufferedReader(new FileReader(FileTools.getRapidWrightPath() + File.separator + filename))) {
