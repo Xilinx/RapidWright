@@ -2,9 +2,7 @@ package com.xilinx.rapidwright.timing;
 
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Tile;
-import com.xilinx.rapidwright.timing.TimingModel;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
