@@ -77,6 +77,7 @@ import com.xilinx.rapidwright.device.FamilyType;
 import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.timing.TimingModel;
+import org.apache.commons.io.input.ProxyInputStream;
 
 /**
  * This class is specifically written to allow for efficient file import/export of different semi-primitive
@@ -1258,30 +1259,33 @@ public class FileTools {
 		return isFileNewer(Paths.get(fileName1), Paths.get(fileName2));
 	}
 	
-	@SuppressWarnings("resource")
-	public static InputStream getInputStreamFromZipOrDcpFile(String zipOrDcpFileName, String fileEndsWith){
-		ZipFile zip = null;
-		ZipEntry match = null;
-		InputStream i = null;
+	public static Pair<InputStream,Long> getInputStreamFromZipFile(String zipFileName, String fileEndsWith){
 		try {
-			zip = new ZipFile(zipOrDcpFileName);
+			final ZipFile zip = new ZipFile(zipFileName);
 			Enumeration<? extends ZipEntry> entries = zip.entries();
+			ZipEntry match = null;
 			while(entries.hasMoreElements()){
 				ZipEntry entry = entries.nextElement();
 				if(entry.getName().endsWith(fileEndsWith)){
 					if(match != null){
-						throw new RuntimeException("ERROR: Found 2 or more matching files in zip/dcp file: " +
-								zipOrDcpFileName + " with ending: '" + fileEndsWith + "'");
+						throw new RuntimeException("ERROR: Found 2 or more matching files in zip file: " +
+								zipFileName + " with ending: '" + fileEndsWith + "'");
 					}
 					match = entry;
 				}
 			}
 			if(match == null) return null;
-			i = zip.getInputStream(match);
+			InputStream i = zip.getInputStream(match);
+			return new Pair<>(new ProxyInputStream(i) {
+				@Override
+				public void close() throws IOException {
+					super.close();
+					zip.close();
+				}
+			}, match.getSize());
 		} catch (IOException e) {
-			e.printStackTrace();
+			throw new UncheckedIOException(e);
 		} 
-		return i;
 	}
 	
 	public static void close(InputStream is) {

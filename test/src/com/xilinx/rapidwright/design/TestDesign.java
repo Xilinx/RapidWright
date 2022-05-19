@@ -107,11 +107,7 @@ public class TestDesign {
         Module module = new Module(createSampleDesign());
 
         Design design = new Design("top", device.getDeviceName());
-        EDIFNetlist netlist = design.getNetlist();
-        netlist.migrateCellAndSubCells(module.getNetlist().getTopCell());
-
         ModuleInst mi = design.createModuleInst("inst", module);
-        mi.getCellInst().setCellType(module.getNetlist().getTopCell());
         mi.placeOnOriginalAnchor();
         String oldAnchor = mi.getAnchor().toString();
 
