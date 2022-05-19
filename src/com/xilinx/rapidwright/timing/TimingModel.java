@@ -524,33 +524,37 @@ public class TimingModel {
 
         // for each column, look for valid row
         Helper colHelper = new Helper();
-        for (int i = 0; i < d.getColumns(); i++) {
+        for (int x = 0; x < d.getColumns(); x++) {
             int span = 0;
-            for (int j = 0; j < d.getRows(); j++) {
-                if (d.getTile("INT_X" + i + "Y" + j) != null) {
+            for (int y = 0; y < d.getRows(); y++) {
+                if (d.getTile("INT", x, y) != null) {
                     span++;
                 }
             }
-            colHelper.insert(i,span);
+            colHelper.insert(x,span);
+
         }
 
         // for each row, look for valid col
         Helper rowHelper = new Helper();
-        for (int j = 0; j < d.getRows(); j++) {
+        for (int y = 0; y < d.getRows(); y++) {
             int span = 0;
-            for (int i = 0; i < d.getColumns(); i++) {
-                if (d.getTile("INT_X" + i + "Y" + j) != null) {
+            for (int x = 0; x < d.getColumns(); x++) {
+                if (d.getTile("INT", x, y) != null) {
                     span++;
                 }
             }
-            rowHelper.insert(j,span);
+            rowHelper.insert(y,span);
         }
 
-        for (int INTCol : colHelper.longest()) {
-            for (int INTRow : rowHelper.longest()) {
-                Tile tile = d.getTile("INT_X" + INTCol + "Y" + INTRow);
+
+        for (int x : colHelper.longest()) {
+            for (int y : rowHelper.longest()) {
+                Tile tile = d.getTile("INT", x, y);
+
                 int col = tile.getColumn();
-                int row = tile .getRow();
+                int row = tile.getRow();
+
                 // Want an INT tile that has CLB on both side
                 if (Utils.isCLB(d.getTile(row, col-1).getTileTypeEnum()) && Utils.isCLB(d.getTile(row, col+1).getTileTypeEnum())) {
                     return new Pair<>(col,row);
