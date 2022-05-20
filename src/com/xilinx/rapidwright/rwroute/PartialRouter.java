@@ -64,8 +64,6 @@ public class PartialRouter extends RWRoute{
 		@Override
 		protected boolean isPreserved(Node parent, Node child) {
 			boolean preserved = super.isPreserved(parent, child);
-			// Note that maskPreservedIfExistingRoute() can only be called
-			// once for each child node
 			return preserved && maskPreservedIfExistingRoute(parent, child);
 		}
 	}
@@ -78,8 +76,6 @@ public class PartialRouter extends RWRoute{
 		@Override
 		protected boolean isPreserved(Node parent, Node child) {
 			boolean preserved = super.isPreserved(parent, child);
-			// Note that maskPreservedIfExistingRoute() can only be called
-			// once for each child node
 			return preserved && maskPreservedIfExistingRoute(parent, child);
 		}
 	}

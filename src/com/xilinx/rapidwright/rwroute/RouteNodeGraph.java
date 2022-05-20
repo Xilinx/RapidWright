@@ -89,6 +89,11 @@ public class RouteNodeGraph {
         }
 
         @Override
+        public boolean isPreserved(Node parent, Node child) {
+            return RouteNodeGraph.this.isPreserved(parent, child);
+        }
+
+        @Override
         public boolean isExcluded(Node parent, Node child) {
             return RouteNodeGraph.this.isExcluded(parent, child);
         }
@@ -188,9 +193,6 @@ public class RouteNodeGraph {
     }
 
     protected boolean isExcluded(Node parent, Node child) {
-        if (isPreserved(parent, child))
-            return true;
-
         Tile tile = child.getTile();
         TileTypeEnum tileType = tile.getTileTypeEnum();
         return !allowedTileEnums.contains(tileType);

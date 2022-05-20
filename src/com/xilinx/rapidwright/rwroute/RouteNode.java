@@ -113,6 +113,7 @@ abstract public class RouteNode {
 		List<Node> allDownHillNodes = node.getAllDownhillNodes();
 		List<RouteNode> childrenList = new ArrayList<>(allDownHillNodes.size());
 		for(Node downhill: allDownHillNodes){
+			if(isPreserved(node, downhill)) continue;
 			if(isExcluded(node, downhill)) continue;
 
 			final RouteNodeType type = RouteNodeType.WIRE;
@@ -608,11 +609,20 @@ abstract public class RouteNode {
 		}
 		return false;
 	}
-	
+
 	/**
-	 * Checks if some routing resources are prevented from being used.
-	 * @param child The routing resource in question.
-	 * @return true, if the node should be excluded from the routing resource graph.
+	 * Checks if a routing arc has been preserved and cannot be used.
+	 * @param parent The routing arc's parent node.
+	 * @param child The routing arc's parent node.
+	 * @return true, if the arc should be excluded from the routing resource graph.
+	 */
+	abstract public boolean isPreserved(Node parent, Node child);
+
+	/**
+	 * Checks if a routing arc has been excluded and cannot be used.
+	 * @param parent The routing arc's parent node.
+	 * @param child The routing arc's parent node.
+	 * @return true, if the arc should be excluded from the routing resource graph.
 	 */
 	abstract public boolean isExcluded(Node parent, Node child);
 }

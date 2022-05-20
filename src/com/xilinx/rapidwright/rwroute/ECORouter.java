@@ -48,6 +48,7 @@ import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
 import com.xilinx.rapidwright.util.RuntimeTracker;
+import com.xilinx.rapidwright.util.Utils;
 
 /**
  * TODO
@@ -58,10 +59,7 @@ public class ECORouter extends PartialRouter {
 
         @Override
         protected boolean isExcluded(Node parent, Node child) {
-            // Note that the isPreserved(Node) overload is called,
-            // and not isPreserved(Node, Node) which is overridden by
-            // RouteNodeGraphPartial and may only be called once
-            if (!isPreserved(child) && allowLutRoutethru(parent, child)) {
+            if (allowLutRoutethru(parent, child)) {
                 return false;
             }
 
@@ -93,25 +91,19 @@ public class ECORouter extends PartialRouter {
     }
 
     protected boolean allowLutRoutethru(Node parent, Node child) {
-        // Enable LUT routethrus on A1-5 (not A6 since using that should block O5
-        // from being used, but there isn't currently an efficient way to
-        // check that during routing expansion so better exclude it during routing
-        // generation)
         if (parent.getIntentCode() != IntentCode.NODE_PINFEED)
             return false;
 
-        // TODO: Check child.getIntentCode() == IntentCode.NODE_CLE_OUTPUT
+        if (child.getIntentCode() != IntentCode.NODE_CLE_OUTPUT)
+            return false;
 
         TileTypeEnum parentTileType = parent.getTile().getTileTypeEnum();
-        if (parentTileType != TileTypeEnum.INT)
-            return false;
+        assert(parentTileType == TileTypeEnum.INT);
+        // if (parentTileType != TileTypeEnum.INT)
+        //     return false;
 
         TileTypeEnum childTileType = child.getTile().getTileTypeEnum();
-        // TODO: Use Utils.isCLB()
-        if (childTileType != TileTypeEnum.CLEL_L && childTileType != TileTypeEnum.CLEL_R &&
-            childTileType != TileTypeEnum.CLEM && childTileType != TileTypeEnum.CLEM_R) {
-            return false;
-        }
+        assert(Utils.isCLB(childTileType));
 
         if (routingGraph.isPreserved(child)) {
             return false;
@@ -462,6 +454,10 @@ public class ECORouter extends PartialRouter {
     public static Design routeDesignNonTimingDriven(Design design) {
         RWRouteConfig config = new RWRouteConfig(new String[] {
                 "--enlargeBoundingBox", // Necessary to ensure that we can reach Laguna columns
+                // use U-turn nodes and no masking of nodes cross RCLK
+                // Pros: maximum routability
+                // Con: might result in delay optimism and a slight increase in runtime
+                "--useUTurnNodes",
                 "--nonTimingDriven",
                 "--verbose"});
         return routeDesign(design, config, () -> new ECORouter(design, config));
@@ -470,6 +466,10 @@ public class ECORouter extends PartialRouter {
     public static Design routeDesignTimingDriven(Design design, float timingRequirementNs) {
         RWRouteConfig config = new RWRouteConfig(new String[] {
                 "--enlargeBoundingBox", // Necessary to ensure that we can reach Laguna columns
+                // use U-turn nodes and no masking of nodes cross RCLK
+                // Pros: maximum routability
+                // Con: might result in delay optimism and a slight increase in runtime
+                "--useUTurnNodes",
                 "--verbose"});
         return routeDesign(design, config, () -> new ECORouter(design, config, timingRequirementNs));
     }
