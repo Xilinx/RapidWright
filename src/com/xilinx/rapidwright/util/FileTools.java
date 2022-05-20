@@ -1680,7 +1680,6 @@ public class FileTools {
 	public static boolean unPackSupportingJarData(){
         String outputPath = getExecJarStoragePath();
 		for(String folderName : FileTools.UNPACK_FOLDERS){
-			if(new File(outputPath + File.separator + folderName).exists()) continue;
 			try{
 				CodeSource src = Device.class.getProtectionDomain().getCodeSource();
 				if(src == null) {
