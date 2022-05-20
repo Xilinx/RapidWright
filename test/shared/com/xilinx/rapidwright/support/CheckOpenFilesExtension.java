@@ -56,6 +56,7 @@ public class CheckOpenFilesExtension implements BeforeTestExecutionCallback, Aft
         return name.substring(0,atPosition);
     }
     private List<String> getOpenFiles() {
+        try {Thread.sleep(10);} catch (InterruptedException e1) {}
         final Path fdList = Paths.get("/proc/" + getOwnPid() + "/fd");
         if (!Files.exists(fdList)) {
             //We are probably not on Linux, fail silently
