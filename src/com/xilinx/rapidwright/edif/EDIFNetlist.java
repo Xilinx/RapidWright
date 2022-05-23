@@ -1158,7 +1158,7 @@ public class EDIFNetlist extends EDIFName {
 	public List<EDIFHierNet> getNetAliases(EDIFHierNet initialNet){
 		if(physicalNetPinMap == null){
 			physicalNetPinMap = new HashMap<>();
-			physicalVccPins = new ArrayList<>();
+			physicalGndPins = new ArrayList<>();
 			physicalVccPins = new ArrayList<>();
 		}
 		ArrayList<EDIFHierPortInst> leafCellPins = new ArrayList<>();
