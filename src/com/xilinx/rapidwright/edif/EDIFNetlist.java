@@ -33,7 +33,6 @@ import java.io.OutputStreamWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -63,11 +62,11 @@ import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.IOStandard;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
-import com.xilinx.rapidwright.util.ParallelDCPInput;
-import com.xilinx.rapidwright.util.ParallelDCPOutput;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.MessageGenerator;
 import com.xilinx.rapidwright.util.Pair;
+import com.xilinx.rapidwright.util.ParallelDCPInput;
+import com.xilinx.rapidwright.util.ParallelDCPOutput;
 import com.xilinx.rapidwright.util.ParallelismTools;
 
 /**
@@ -674,8 +673,9 @@ public class EDIFNetlist extends EDIFName {
 			bw.write("(status\n");
 			bw.write(" (written\n");
 			bw.write("  (timeStamp ");
-			SimpleDateFormat formatter = new SimpleDateFormat("yyyy MM dd HH mm ss");
-			bw.write(formatter.format(new java.util.Date()));
+			bw.write("2022 05 24 15 00 00");
+			//SimpleDateFormat formatter = new SimpleDateFormat("yyyy MM dd HH mm ss");
+			//bw.write(formatter.format(new java.util.Date()));
 			bw.write(")\n");
 			bw.write("  (program \"" + Device.FRAMEWORK_NAME + "\" (version \"" + Device.RAPIDWRIGHT_VERSION + "\"))\n");
 			for (String comment : getComments()) {
