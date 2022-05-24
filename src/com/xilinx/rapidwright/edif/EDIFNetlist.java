@@ -727,11 +727,13 @@ public class EDIFNetlist extends EDIFName {
 			bw.write("(comment \"Reference To The Cell Of Highest Level\")\n\n");
 			bw.write("  (design ");
 			EDIFDesign design = getDesign();
-			design.exportEDIFName(bw);
-			bw.write("\n    (cellref " + design.getTopCell().getLegalEDIFName() + " (libraryref ");
-			bw.write(design.getTopCell().getLibrary().getLegalEDIFName() + "))\n");
-			design.exportEDIFProperties(bw, "    ");
-			bw.write("  )\n");
+			if (design != null) {
+				design.exportEDIFName(bw);
+				bw.write("\n    (cellref " + design.getTopCell().getLegalEDIFName() + " (libraryref ");
+				bw.write(design.getTopCell().getLibrary().getLegalEDIFName() + "))\n");
+				design.exportEDIFProperties(bw, "    ");
+				bw.write("  )\n");
+			}
 			bw.write(")\n");
 		}
 	}
