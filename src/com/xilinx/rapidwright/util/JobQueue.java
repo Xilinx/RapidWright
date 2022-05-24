@@ -42,7 +42,9 @@ public class JobQueue {
 	
 	public static int MAX_LSF_CONCURRENT_JOBS = 120;
 	
-	public static boolean USE_LSF_IF_AVAILABLE = true; 
+	public static boolean USE_LSF_IF_AVAILABLE = true;
+
+	private final boolean printJobStart;
 	
 	private Queue<Job> waitingToRun;
 	
@@ -55,10 +57,14 @@ public class JobQueue {
 	public static final String LSF_QUEUE_OPTION = "-lsf_queue";
 	
 	
-	public JobQueue(){
+	public JobQueue(boolean printJobStart){
 		waitingToRun = new LinkedList<>();
 		running = new ConcurrentLinkedQueue<>();
 		finished = new LinkedList<>();
+		this.printJobStart = printJobStart;
+	}
+	public JobQueue() {
+		this(true);
 	}
 	
 	public boolean addJob(Job j){
@@ -80,7 +86,9 @@ public class JobQueue {
 				Job j = waitingToRun.poll();
 				long pid = j.launchJob();
 				running.add(j);
-				System.out.println("Running job [" + pid + "] " + j.getCommand() + " in " + j.getRunDir());
+				if (printJobStart) {
+					System.out.println("Running job [" + pid + "] " + j.getCommand() + " in " + j.getRunDir());
+				}
 				launched = true;
 			}
 
