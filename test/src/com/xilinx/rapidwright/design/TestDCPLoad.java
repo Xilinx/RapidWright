@@ -47,77 +47,50 @@ import org.junit.jupiter.params.provider.ValueSource;
  */
 public class TestDCPLoad {
 
-    public static void createSimulatedBinaryEDIF(Path edfFileName, int size) {
-        try (BufferedWriter bw = new BufferedWriter(new FileWriter(edfFileName.toString()))){
-            for(int i=0; i < size; i++) {
-                bw.write(0);
-            }
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
-    }
-    
     @Test
-    public void checkAutoEDIFGenerationFailure(@TempDir Path tempDir) throws IOException {
-        Path dcpPath = RapidWrightDCP.getPath("picoblaze_ooc_X10Y235.dcp");
-        final Path dcpCopy = tempDir.resolve(dcpPath.getFileName());
-        Files.copy(dcpPath, dcpCopy);
+    public void checkAutoEDIFGenerationFailure() {
+        Path dcpPath = RapidWrightDCP.getPath("picoblaze_ooc_X10Y235_unreadable_edif.dcp");
 
-        Path binEdfFile = tempDir.resolve(FileTools.replaceExtension(dcpPath.getFileName(), ".edf"));
-        createSimulatedBinaryEDIF(binEdfFile, FileTools.BINARY_CHECK_LENGTH+1); 
-        Assertions.assertTrue(Design.replaceEDIFinDCP(dcpCopy.toString(), binEdfFile.toString()));
-        FileTools.deleteFile(binEdfFile.toString());
-
-        // This should fail, we won't check Vivado auto-gen as CI's don't have access to it
         Design.setAutoGenerateReadableEdif(false);
         Assertions.assertThrows(RuntimeException.class, () -> {
-            Design.readCheckpoint(dcpCopy, CodePerfTracker.SILENT);
+            Design.readCheckpoint(dcpPath, CodePerfTracker.SILENT);
         });
     }
 
     @Test
-    public void checkAutoEDIFGenerationSuccess(@TempDir Path tempDir) throws IOException {
-        Path dcpPath = RapidWrightDCP.getPath("picoblaze_ooc_X10Y235.dcp");
-        final Path dcpCopy = tempDir.resolve(dcpPath.getFileName());
-        Files.copy(dcpPath, dcpCopy);
+    public void checkAutoEDIFGenerationSuccess() {
+        Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
+        Path dcpPath = RapidWrightDCP.getPath("picoblaze_ooc_X10Y235_unreadable_edif.dcp");
 
-        Path readableEDIFDir = DesignTools.getDefaultReadableEDIFDir(dcpCopy);
-        Path readableEDIF = DesignTools.getEDFAutoGenFilePath(dcpCopy, readableEDIFDir);
-        Design design = Design.readCheckpoint(dcpPath, CodePerfTracker.SILENT);
+        // Simulate auto-generation using Vivado by placing a readable EDIF into
+        // the output directory
+        // the output directory
+        Path readableEDIFDir = DesignTools.getDefaultReadableEDIFDir(dcpPath);
+        Path readableEDIF = DesignTools.getEDFAutoGenFilePath(dcpPath, readableEDIFDir);
         FileTools.makeDirs(readableEDIFDir.toString());
         EDIFTools.writeEDIFFile(readableEDIF, design.getNetlist(), design.getPartName());
-        FileTools.writeStringToTextFile(Installer.calculateMD5OfFile(dcpCopy), 
-                DesignTools.getDCPAutoGenMD5FilePath(dcpCopy, readableEDIFDir).toString());
+        FileTools.writeStringToTextFile(Installer.calculateMD5OfFile(dcpPath),
+                DesignTools.getDCPAutoGenMD5FilePath(dcpPath, readableEDIFDir).toString());
         
         Design.setAutoGenerateReadableEdif(true);
-        Design.readCheckpoint(dcpCopy, CodePerfTracker.SILENT);
+        Design.readCheckpoint(dcpPath, CodePerfTracker.SILENT);
     }
     
     @Test
-    public void checkAutoEDIFGenerationWithVivado(@TempDir Path tempDir) throws IOException {
-        // This test won't run in CI as Vivado is not available
+    public void checkAutoEDIFGenerationWithVivado() throws IOException {
+        // This test won't run in GH as Vivado is not available
         Assumptions.assumeTrue(FileTools.isVivadoOnPath());
         
-        Path dcpPath = RapidWrightDCP.getPath("picoblaze_ooc_X10Y235.dcp");
-        final Path dcpCopy = tempDir.resolve(dcpPath.getFileName());
-        Files.copy(dcpPath, dcpCopy);
+        Path dcpPath = RapidWrightDCP.getPath("picoblaze_ooc_X10Y235_unreadable_edif.dcp");
 
-        Path binEdfFile = tempDir.resolve(FileTools.replaceExtension(dcpPath.getFileName(), ".edf"));
-        createSimulatedBinaryEDIF(binEdfFile, FileTools.BINARY_CHECK_LENGTH+1); 
-        Assertions.assertTrue(Design.replaceEDIFinDCP(dcpCopy.toString(), binEdfFile.toString()));
-        FileTools.deleteFile(binEdfFile.toString());
-        Path readableEDIFDir = DesignTools.getDefaultReadableEDIFDir(dcpCopy);
-        Path readableEDIF = DesignTools.getEDFAutoGenFilePath(dcpCopy, readableEDIFDir);
-
-        // Modify DCP with a different binary EDIF
-        createSimulatedBinaryEDIF(binEdfFile, FileTools.BINARY_CHECK_LENGTH+2); 
-        Assertions.assertTrue(Design.replaceEDIFinDCP(dcpCopy.toString(), binEdfFile.toString()));
-        FileTools.deleteFile(binEdfFile.toString());
+        Path readableEDIFDir = DesignTools.getDefaultReadableEDIFDir(dcpPath);
+        Path readableEDIF = DesignTools.getEDFAutoGenFilePath(dcpPath, readableEDIFDir);
         FileTools.deleteFile(readableEDIF.toString());
+
         Design.setAutoGenerateReadableEdif(true);
-        Design.readCheckpoint(dcpCopy, CodePerfTracker.SILENT);
+        Design.readCheckpoint(dcpPath, CodePerfTracker.SILENT);
         Assertions.assertTrue(Files.getLastModifiedTime(readableEDIF).toMillis() >
-        Files.getLastModifiedTime(dcpPath).toMillis());
+                Files.getLastModifiedTime(dcpPath).toMillis());
     }
 
     @ParameterizedTest
