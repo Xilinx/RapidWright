@@ -537,6 +537,44 @@ public class EDIFNetlist extends EDIFName {
 			}
 		}
 	}
+
+	/**
+	 * This copies the cell and all of its descendants into this netlist.
+	 * @param cell The cell (and all its descendants) to copy into this netlist's libraries
+	 */
+	public void copyCellAndSubCells(EDIFCell cell) {
+		Set<EDIFCell> copiedCells = new HashSet<>();
+		copyCellAndSubCellsWorker(cell, copiedCells);
+	}
+
+	private EDIFCell copyCellAndSubCellsWorker(EDIFCell cell, Set<EDIFCell> copiedCells) {
+		EDIFLibrary destLib = getLibrary(cell.getLibrary().getName());
+		if(destLib == null){
+			if(cell.getLibrary().isHDIPrimitivesLibrary()){
+				destLib = getHDIPrimitivesLibrary();
+			}else{
+				destLib = getWorkLibrary();
+			}
+		}
+
+		EDIFCell existingCell = destLib.getCell(cell.getLegalEDIFName());
+		if(existingCell == null){
+			EDIFCell newCell = new EDIFCell(destLib, cell, cell.getName());
+			copiedCells.add(newCell);
+			for(EDIFCellInst inst : newCell.getCellInsts()){
+				inst.setCellType(copyCellAndSubCellsWorker(inst.getCellType(), copiedCells));
+				//The view might have changed
+				inst.getViewref().setName(inst.getCellType().getView());
+			}
+			return newCell;
+		} else {
+			if (copiedCells.contains(existingCell)) {
+				return existingCell;
+			}
+			throw new RuntimeException("ERROR: Destination netlist already contains EDIFCell named " +
+					"'" + cell.getName() + "' in library '" + destLib.getName() + "'");
+		}
+	}
 	
 	private boolean checkIfAlreadyInLib(EDIFCell cell, EDIFLibrary lib) {
 		EDIFCell existing = lib.getCell(cell.getLegalEDIFName());
@@ -1120,7 +1158,7 @@ public class EDIFNetlist extends EDIFName {
 	public List<EDIFHierNet> getNetAliases(EDIFHierNet initialNet){
 		if(physicalNetPinMap == null){
 			physicalNetPinMap = new HashMap<>();
-			physicalVccPins = new ArrayList<>();
+			physicalGndPins = new ArrayList<>();
 			physicalVccPins = new ArrayList<>();
 		}
 		ArrayList<EDIFHierPortInst> leafCellPins = new ArrayList<>();

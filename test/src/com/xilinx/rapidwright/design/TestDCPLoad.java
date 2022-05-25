@@ -38,6 +38,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Tests the EDIF auto-generate mechanism when reading DCPs
@@ -63,7 +65,7 @@ public class TestDCPLoad {
 
         Path binEdfFile = tempDir.resolve(FileTools.replaceExtension(dcpPath.getFileName(), ".edf"));
         createSimulatedBinaryEDIF(binEdfFile, FileTools.BINARY_CHECK_LENGTH+1); 
-        assert(Design.replaceEDIFinDCP(dcpCopy.toString(), binEdfFile.toString()));
+        Assertions.assertTrue(Design.replaceEDIFinDCP(dcpCopy.toString(), binEdfFile.toString()));
         FileTools.deleteFile(binEdfFile.toString());
 
         // This should fail, we won't check Vivado auto-gen as CI's don't have access to it
@@ -102,19 +104,25 @@ public class TestDCPLoad {
 
         Path binEdfFile = tempDir.resolve(FileTools.replaceExtension(dcpPath.getFileName(), ".edf"));
         createSimulatedBinaryEDIF(binEdfFile, FileTools.BINARY_CHECK_LENGTH+1); 
-        assert(Design.replaceEDIFinDCP(dcpCopy.toString(), binEdfFile.toString()));
+        Assertions.assertTrue(Design.replaceEDIFinDCP(dcpCopy.toString(), binEdfFile.toString()));
         FileTools.deleteFile(binEdfFile.toString());
         Path readableEDIFDir = DesignTools.getDefaultReadableEDIFDir(dcpCopy);
         Path readableEDIF = DesignTools.getEDFAutoGenFilePath(dcpCopy, readableEDIFDir);
 
         // Modify DCP with a different binary EDIF
         createSimulatedBinaryEDIF(binEdfFile, FileTools.BINARY_CHECK_LENGTH+2); 
-        assert(Design.replaceEDIFinDCP(dcpCopy.toString(), binEdfFile.toString()));
+        Assertions.assertTrue(Design.replaceEDIFinDCP(dcpCopy.toString(), binEdfFile.toString()));
         FileTools.deleteFile(binEdfFile.toString());
         FileTools.deleteFile(readableEDIF.toString());
         Design.setAutoGenerateReadableEdif(true);
         Design.readCheckpoint(dcpCopy, CodePerfTracker.SILENT);
         Assertions.assertTrue(Files.getLastModifiedTime(readableEDIF).toMillis() >
         Files.getLastModifiedTime(dcpPath).toMillis());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"picoblaze_ooc_X10Y235_2022_1.dcp"})
+    public void testDCPFromVivado2022_1(String dcp) {
+        RapidWrightDCP.loadDCP(dcp);
     }
 }
