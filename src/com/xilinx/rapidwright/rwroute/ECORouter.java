@@ -152,8 +152,8 @@ public class ECORouter extends PartialRouter {
         return true;
     }
 
-    public ECORouter(Design design, RWRouteConfig config, float timingRequirementNs) {
-        super(design, config);
+    public ECORouter(Design design, RWRouteConfig config, Collection<SitePinInst> pinsToRoute, float timingRequirementNs) {
+        super(design, config, pinsToRoute);
 
         if (timingRequirementNs > 0) {
             assert(config.isTimingDriven());
@@ -161,8 +161,8 @@ public class ECORouter extends PartialRouter {
         }
     }
 
-    public ECORouter(Design design, RWRouteConfig config) {
-        this(design, config, 0);
+    public ECORouter(Design design, RWRouteConfig config, Collection<SitePinInst> pinsToRoute) {
+        this(design, config, pinsToRoute,0);
     }
 
     @Override
@@ -182,7 +182,7 @@ public class ECORouter extends PartialRouter {
             return;
         }
 
-        throw new RuntimeException("ERROR: PartialECORouter does not support clock routing.");
+        throw new RuntimeException("ERROR: ECORouter does not support clock routing.");
     }
 
     @Override
@@ -191,7 +191,7 @@ public class ECORouter extends PartialRouter {
             return;
         }
 
-        throw new RuntimeException("ERROR: PartialECORouter does not support static net routing.");
+        throw new RuntimeException("ERROR: ECORouter does not support static net routing.");
     }
 
     @Override
@@ -357,7 +357,7 @@ public class ECORouter extends PartialRouter {
             NetWrapper netWrapper = nets.get(net);
             if (netWrapper == null)
                 return false;
-            if (partiallyPreserved.contains(netWrapper))
+            if (partiallyPreservedNets.contains(netWrapper))
                 return false;
             // Net already seen and is fully unpreserved
             return true;
@@ -451,7 +451,7 @@ public class ECORouter extends PartialRouter {
         // checkPIPsUsage();
     }
 
-    public static Design routeDesignNonTimingDriven(Design design) {
+    public static Design routeDesignNonTimingDriven(Design design, Collection<SitePinInst> pinsToRoute) {
         RWRouteConfig config = new RWRouteConfig(new String[] {
                 "--enlargeBoundingBox", // Necessary to ensure that we can reach Laguna columns
                 // use U-turn nodes and no masking of nodes cross RCLK
@@ -460,10 +460,10 @@ public class ECORouter extends PartialRouter {
                 "--useUTurnNodes",
                 "--nonTimingDriven",
                 "--verbose"});
-        return routeDesign(design, config, () -> new ECORouter(design, config));
+        return routeDesign(design, new ECORouter(design, config, pinsToRoute));
     }
 
-    public static Design routeDesignTimingDriven(Design design, float timingRequirementNs) {
+    public static Design routeDesignTimingDriven(Design design, Collection<SitePinInst> pinsToRoute, float timingRequirementNs) {
         RWRouteConfig config = new RWRouteConfig(new String[] {
                 "--enlargeBoundingBox", // Necessary to ensure that we can reach Laguna columns
                 // use U-turn nodes and no masking of nodes cross RCLK
@@ -471,7 +471,7 @@ public class ECORouter extends PartialRouter {
                 // Con: might result in delay optimism and a slight increase in runtime
                 "--useUTurnNodes",
                 "--verbose"});
-        return routeDesign(design, config, () -> new ECORouter(design, config, timingRequirementNs));
+        return routeDesign(design, new ECORouter(design, config, pinsToRoute, timingRequirementNs));
     }
 
 }
