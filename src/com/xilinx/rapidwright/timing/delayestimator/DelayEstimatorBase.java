@@ -133,7 +133,7 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
             return inputSitePinDelay.getOrDefault(exitNode.getWireName(), (short) 0);
         }
 
-        return calcNodeGroupDelay(termInfo.ng, termInfo.begin(), termInfo.end(), 0d);
+        return calcNodeGroupDelay(termInfo.ng, termInfo.begin(), termInfo.end());
     }
 
     /**
@@ -298,7 +298,7 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
                 }
             }
         }
-    };
+    }
 
 
     /**
@@ -424,7 +424,7 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
      * @return delay of the tg. When useUTurnNodes was set to false, return Short.MAX_VALUE/2 if the node graph is a U-turn.
      *         to indicate the node graph should be ignored.
      */
-    short calcNodeGroupDelay(T.NodeGroupType tg, short begLoc, short endLoc, Double dly) {
+    short calcNodeGroupDelay(T.NodeGroupType tg, short begLoc, short endLoc) {
         int size = (tg.orientation() == T.Orientation.HORIZONTAL) ? numCol : numRow;
         short d = 0;
         List<Short> dArray = distArrays.get(tg.orientation()).get(tg.type());
