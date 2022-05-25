@@ -22,13 +22,18 @@
  
 package com.xilinx.rapidwright.rwroute;
 
+import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.support.LargeTest;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import com.xilinx.rapidwright.design.Design;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @LargeTest
 public class TestRWRoute {
@@ -86,12 +91,16 @@ public class TestRWRoute {
 	public void testNonTimingDrivenPartialRouting() {
 		String dcpPath = RapidWrightDCP.getString("picoblaze_partial.dcp");
 		Design design = Design.readCheckpoint(dcpPath);
-		// TODO: Not necessary when XDEF#92 is fixed
+		DesignTools.createMissingSitePinInsts(design);
+		DesignTools.createPossiblePinsToStaticNets(design);
+
+		List<SitePinInst> pinsToRoute = new ArrayList<>();
 		for (Net net : design.getNets()) {
-			if (!net.hasPIPs()) continue;
-			net.getPins().forEach((spi) -> spi.setRouted(true));
+			if (!net.hasPIPs()) {
+				pinsToRoute.addAll(net.getSinkPins());
+			}
 		}
-		PartialRouter.routeDesignPartialNonTimingDriven(design);
+		PartialRouter.routeDesignPartialNonTimingDriven(design, pinsToRoute);
 	}
 
 	/**
@@ -104,11 +113,15 @@ public class TestRWRoute {
 	public void testTimingDrivenPartialRouting() {
 		String dcpPath = RapidWrightDCP.getString("picoblaze_partial.dcp");
 		Design design = Design.readCheckpoint(dcpPath);
-		// TODO: Not necessary when XDEF#92 is fixed
+		DesignTools.createMissingSitePinInsts(design);
+		DesignTools.createPossiblePinsToStaticNets(design);
+
+		List<SitePinInst> pinsToRoute = new ArrayList<>();
 		for (Net net : design.getNets()) {
-			if (!net.hasPIPs()) continue;
-			net.getPins().forEach((spi) -> spi.setRouted(true));
+			if (!net.hasPIPs()) {
+				pinsToRoute.addAll(net.getSinkPins());
+			}
 		}
-		PartialRouter.routeDesignPartialTimingDriven(design);
+		PartialRouter.routeDesignPartialTimingDriven(design, pinsToRoute);
 	}
 }

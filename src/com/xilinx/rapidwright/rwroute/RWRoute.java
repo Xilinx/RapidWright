@@ -32,7 +32,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.PriorityQueue;
 import java.util.Set;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.design.Design;
@@ -153,11 +152,14 @@ public class RWRoute{
 	/** A map storing routes from CLK_OUT to different INT tiles that connect to sink pins of a global clock net */
 	private Map<String, List<String>> routesToSinkINTTiles;
 	
-	public RWRoute(Design design, RWRouteConfig config){
+	public RWRoute(Design design, RWRouteConfig config) {
 		this.design = design;
 		multiSLRDevice = design.getDevice().getSLRs().length > 1;
-		
+
 		this.config = config;
+	}
+
+	protected void initialize() {
 		routerTimer = new RuntimeTrackerTree("Route design", config.isVerbose());
 		rnodesTimer = routerTimer.createStandAloneRuntimeTracker("rnodes creation");
 		updateTimingTimer = routerTimer.createStandAloneRuntimeTracker("update timing");
@@ -1593,21 +1595,20 @@ public class RWRoute{
 			System.out.println("WARNING: Not masking nodes across RCLK could result in delay optimism.");
 		}
 
-		return routeDesign(design, config, () -> new RWRoute(design, config));
+		return routeDesign(design, new RWRoute(design, config));
 	}
 	
 	/**
 	 * Routes a design after pre-processing.
 	 * @param design The {@link Design} instance to be routed.
-	 * @param config A {@link RWRouteConfig} instance consisting of customizable parameters to use.
-	 * @param newRouter Supplier lambda for constructing a new RWRoute object.
+	 * @param router A {@link RWRoute} object to be used to route the design.
 	 */
-	protected static Design routeDesign(Design design, RWRouteConfig config, Supplier<RWRoute> newRouter) {
+	protected static Design routeDesign(Design design, RWRoute router) {
 		// Pre-processing of the design regarding physical net names pins
 		DesignTools.makePhysNetNamesConsistent(design);
 
-		// Instantiates router object
-		RWRoute router = newRouter.get();
+		// Initialize router object
+		router.initialize();
 		
 		// Routes the design
 		router.route();

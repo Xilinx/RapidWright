@@ -25,6 +25,7 @@ package com.xilinx.rapidwright.rwroute;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -47,7 +48,8 @@ public class RapidStreamRoute extends PartialRouter{
 	final private String anchorNameKeyword;
 
 	public RapidStreamRoute(Design design, RWRouteConfig config, String anchorNameKeyword) {
-		super(design, config);
+		// FIXME
+		super(design, config, Collections.EMPTY_LIST);
 		this.anchorNameKeyword = anchorNameKeyword;
 	}
 
@@ -171,6 +173,6 @@ public class RapidStreamRoute extends PartialRouter{
 				"--enlargeBoundingBox",
 				"--useUTurnNodes",
 				"--verbose"});
-		return routeDesign(design, config, () -> new RapidStreamRoute(design, config));
+		return routeDesign(design, new RapidStreamRoute(design, config));
 	}
 }

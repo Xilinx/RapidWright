@@ -27,10 +27,11 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.design.Design;
-import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
@@ -44,8 +45,8 @@ import com.xilinx.rapidwright.util.RuntimeTracker;
 /**
  * A class extending {@link RWRoute} for partial routing.
  * In partial routing mode, nets that are already fully- or partially- routed
- * will be preserved and only the unrouted connections (where SitePinInst.isRouted()
- * returns false) are tackled.
+ * will be preserved and only the unrouted connections (as specified by the
+ * pinsToRoute parameter in the constructor) are tackled.
  * Enabling soft preserve allows preserved routing that may be the cause of any
  * unroutable connections to be ripped up and re-routed.
  */
@@ -53,7 +54,9 @@ public class PartialRouter extends RWRoute{
 
 	final protected boolean softPreserve;
 
-	protected Set<NetWrapper> partiallyPreserved;
+	protected Set<NetWrapper> partiallyPreservedNets;
+
+	protected Map<Net, List<SitePinInst>> netToPins;
 
 	protected class RouteNodeGraphPartial extends RouteNodeGraph {
 
@@ -80,15 +83,17 @@ public class PartialRouter extends RWRoute{
 		}
 	}
 
-	public PartialRouter(Design design, RWRouteConfig config, boolean softPreserve){
+	public PartialRouter(Design design, RWRouteConfig config, Collection<SitePinInst> pinsToRoute, boolean softPreserve){
 		super(design, config);
 		this.softPreserve = softPreserve;
-		// FIXME: Not initialized before call to addNetConnectionToRoutingTargets()
-		// partiallyPreserved = new HashSet<>();
+		partiallyPreservedNets = new HashSet<>();
+		netToPins = pinsToRoute.stream()
+				.filter((spi) -> !spi.isOutPin())
+				.collect(Collectors.groupingBy(SitePinInst::getNet));
 	}
 
-	public PartialRouter(Design design, RWRouteConfig config){
-		this(design, config, false);
+	public PartialRouter(Design design, RWRouteConfig config, Collection<SitePinInst> pinsToRoute){
+		this(design, config, pinsToRoute, false);
 	}
 
 	/**
@@ -187,21 +192,22 @@ public class PartialRouter extends RWRoute{
 			increaseNumPreservedWireNets();
 		}
 
-		// If all pins are already routed, no routing necessary
-		Collection<SitePinInst> sinkPins = net.getSinkPins();
-		long numRouted = sinkPins.stream().filter(SitePinInst::isRouted).count();
-		if (numRouted == sinkPins.size()) {
+		List<SitePinInst> pinsToRoute = netToPins.get(net);
+		if (pinsToRoute == null)
 			return;
+		assert(!pinsToRoute.isEmpty());
+
+		List<SitePinInst> sinkPins = net.getSinkPins();
+		final boolean partiallyPreserved = (pinsToRoute.size() < sinkPins.size());
+		if (partiallyPreserved) {
+			// Mark all pins as being routed, then unmark those that need routing
+			sinkPins.forEach((spi) -> spi.setRouted(true));
 		}
+		pinsToRoute.forEach((spi) -> spi.setRouted(false));
 
 		NetWrapper netWrapper = createNetWrapperAndConnections(net);
-
-		if (numRouted > 0) {
-			// FIXME: Should be initialized in constructor
-			if (partiallyPreserved == null) {
-				partiallyPreserved = new HashSet<>();
-			}
-			partiallyPreserved.add(netWrapper);
+		if (partiallyPreserved) {
+			partiallyPreservedNets.add(netWrapper);
 		}
 	}
 
@@ -234,7 +240,7 @@ public class PartialRouter extends RWRoute{
 			NetWrapper netWrapper = nets.get(net);
 			if (netWrapper == null)
 				return false;
-			if (partiallyPreserved.contains(netWrapper))
+			if (partiallyPreservedNets.contains(netWrapper))
 				return false;
 			// Net already seen and is fully unpreserved
 			return true;
@@ -273,7 +279,7 @@ public class PartialRouter extends RWRoute{
 			// Net already exists -- any unrouted connection will cause the
 			// net to exist, but already routed connections may still be preserved
 
-			boolean removed = partiallyPreserved.remove(netWrapper);
+			boolean removed = partiallyPreservedNets.remove(netWrapper);
 			assert(removed);
 
 			for(Node toBuild : RouterHelper.getNodesOfNet(net)) {
@@ -359,24 +365,20 @@ public class PartialRouter extends RWRoute{
 		return false;
 	}
 
-	private static Design routeDesign(Design design, RWRouteConfig config) {
-		DesignTools.createMissingSitePinInsts(design);
-		if((!design.getVccNet().hasPIPs() && !design.getGndNet().hasPIPs())) {
-			DesignTools.createPossiblePinsToStaticNets(design);
-		}
-
+	private static Design routeDesign(Design design, RWRouteConfig config, Collection<SitePinInst> pinsToRoute) {
 		if(config.isMaskNodesCrossRCLK()) {
 			System.out.println("WARNING: Masking nodes across RCLK for partial routing could result in routability problems.");
 		}
 
-		return routeDesign(design, config, () -> new PartialRouter(design, config));
+		return routeDesign(design, new PartialRouter(design, config, pinsToRoute));
 	}
 
 	/**
 	 * Routes a design in the partial non-timing-driven routing mode.
 	 * @param design The {@link Design} instance to be routed.
+	 * @param pinsToRoute Collection of {@link SitePinInst}-s to be routed.
 	 */
-	public static Design routeDesignPartialNonTimingDriven(Design design) {
+	public static Design routeDesignPartialNonTimingDriven(Design design, Collection<SitePinInst> pinsToRoute) {
 		return routeDesign(design, new RWRouteConfig(new String[] {
 				"--fixBoundingBox",
 				// use U-turn nodes and no masking of nodes cross RCLK
@@ -384,20 +386,23 @@ public class PartialRouter extends RWRoute{
 				// Con: might result in delay optimism and a slight increase in runtime
 				"--useUTurnNodes",
 				"--nonTimingDriven",
-				"--verbose"}));
+				"--verbose"}),
+				pinsToRoute);
 	}
 
 	/**
 	 * Routes a design in the partial timing-driven routing mode.
 	 * @param design The {@link Design} instance to be routed.
+	 * @param pinsToRoute Collection of {@link SitePinInst}-s to be routed.
 	 */
-	public static Design routeDesignPartialTimingDriven(Design design) {
+	public static Design routeDesignPartialTimingDriven(Design design, Collection<SitePinInst> pinsToRoute) {
 		return routeDesign(design, new RWRouteConfig(new String[] {
 				"--fixBoundingBox",
 				// use U-turn nodes and no masking of nodes cross RCLK
 				// Pros: maximum routability
 				// Con: might result in delay optimism and a slight increase in runtime
 				"--useUTurnNodes",
-				"--verbose"}));
+				"--verbose"}),
+				pinsToRoute);
 	}
 }
