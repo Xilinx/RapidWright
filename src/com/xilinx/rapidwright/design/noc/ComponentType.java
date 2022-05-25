@@ -42,7 +42,9 @@ public enum ComponentType {
     LPD_NMU,
     AIE_NMU,
     AIE_NSU,
-    DDRC;
+    DDRC,
+    PCIE_NMU,
+    PCIE_NSU;
 
     private static Map<String,ComponentType> map;
 

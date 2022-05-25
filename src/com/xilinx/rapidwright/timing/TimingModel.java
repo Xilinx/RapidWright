@@ -20,6 +20,25 @@
 
 package com.xilinx.rapidwright.timing;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
+import java.io.PrintStream;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.EnumMap;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
@@ -37,27 +56,9 @@ import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.util.FileTools;
-import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.Utils;
-
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
-import java.io.PrintStream;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.EnumMap;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.LinkedList;
-import java.util.Arrays;
-import java.util.Map;
-import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import org.python.google.common.collect.SetMultimap;
+import org.python.google.common.collect.TreeMultimap;
 
 /**
  * A TimingModel calculates net delay by implementing the lightweight timing model described in our 
@@ -503,62 +504,46 @@ public class TimingModel {
         return result;
     }
 
-    private Pair<Integer,Integer> findReferenceTileLocation(Device d) {
-        class Helper {
-            Map<Integer, Set<Integer>> spans;
-            public Helper() {
-                spans = new HashMap<Integer,Set<Integer>>();
-            }
-            void insert(int val, int span) {
-                if (!spans.containsKey(span)) {
-                    spans.put(span, new HashSet<Integer>());
-                }
-                spans.get(span).add(val);
-            }
-            Set<Integer> longest() {
-                List<Integer> keys = new ArrayList<>(spans.keySet());
-                Integer maxSpan = Collections.max(keys);
-                return spans.get(maxSpan);
-            }
-        }
-
+    private Tile findReferenceTile() {
 
         // for each column, look for valid row
-        Helper colHelper = new Helper();
-        for (int i = 0; i < d.getColumns(); i++) {
+        SetMultimap<Integer,Integer> colHelper = TreeMultimap.create();;
+        for (int x = 0; x < device.getColumns(); x++) {
             int span = 0;
-            for (int j = 0; j < d.getRows(); j++) {
-                if (d.getTile("INT_X" + i + "Y" + j) != null) {
+            for (int y = 0; y < device.getRows(); y++) {
+                if (device.getTile("INT", x, y) != null) {
                     span++;
                 }
             }
-            colHelper.insert(i,span);
+            colHelper.put(span,x);
         }
 
         // for each row, look for valid col
-        Helper rowHelper = new Helper();
-        for (int j = 0; j < d.getRows(); j++) {
+        SetMultimap<Integer,Integer> rowHelper = TreeMultimap.create();;
+        for (int y = 0; y < device.getRows(); y++) {
             int span = 0;
-            for (int i = 0; i < d.getColumns(); i++) {
-                if (d.getTile("INT_X" + i + "Y" + j) != null) {
+            for (int x = 0; x < device.getColumns(); x++) {
+                if (device.getTile("INT", x, y) != null) {
                     span++;
                 }
             }
-            rowHelper.insert(j,span);
+            rowHelper.put(span,y);
         }
 
-        for (int INTCol : colHelper.longest()) {
-            for (int INTRow : rowHelper.longest()) {
-                Tile tile = d.getTile("INT_X" + INTCol + "Y" + INTRow);
+        for (int x : colHelper.get(Collections.max(colHelper.keySet()))) {
+            for (int y : rowHelper.get(Collections.max(rowHelper.keySet()))) {
+                Tile tile = device.getTile("INT", x, y);
+
                 int col = tile.getColumn();
-                int row = tile .getRow();
+                int row = tile.getRow();
+
                 // Want an INT tile that has CLB on both side
-                if (Utils.isCLB(d.getTile(row, col-1).getTileTypeEnum()) && Utils.isCLB(d.getTile(row, col+1).getTileTypeEnum())) {
-                    return new Pair<>(col,row);
+                if (Utils.isCLB(device.getTile(row, col-1).getTileTypeEnum()) && Utils.isCLB(device.getTile(row, col+1).getTileTypeEnum())) {
+                    return tile;
                 }
             }
         }
-        return new Pair<>(-1,-1);
+        return null;
     }
 
 
@@ -570,9 +555,9 @@ public class TimingModel {
     protected boolean readDelayTerms(String filename) {
 
         // Compute before reading from file to allow overriding.
-        Pair<Integer,Integer> loc = findReferenceTileLocation(device);
-        START_TILE_COL = loc.getFirst();
-        START_TILE_ROW = loc.getSecond();
+        Tile tile = findReferenceTile();
+        START_TILE_COL = tile.getColumn();
+        START_TILE_ROW = tile.getRow();
 
         boolean result = true;
         try (BufferedReader br = new BufferedReader(new FileReader(FileTools.getRapidWrightPath() + File.separator + filename))) {

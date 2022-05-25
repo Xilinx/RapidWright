@@ -65,7 +65,7 @@ public class TestDCPLoad {
 
         Path binEdfFile = tempDir.resolve(FileTools.replaceExtension(dcpPath.getFileName(), ".edf"));
         createSimulatedBinaryEDIF(binEdfFile, FileTools.BINARY_CHECK_LENGTH+1); 
-        assert(Design.replaceEDIFinDCP(dcpCopy.toString(), binEdfFile.toString()));
+        Assertions.assertTrue(Design.replaceEDIFinDCP(dcpCopy.toString(), binEdfFile.toString()));
         FileTools.deleteFile(binEdfFile.toString());
 
         // This should fail, we won't check Vivado auto-gen as CI's don't have access to it
@@ -104,14 +104,14 @@ public class TestDCPLoad {
 
         Path binEdfFile = tempDir.resolve(FileTools.replaceExtension(dcpPath.getFileName(), ".edf"));
         createSimulatedBinaryEDIF(binEdfFile, FileTools.BINARY_CHECK_LENGTH+1); 
-        assert(Design.replaceEDIFinDCP(dcpCopy.toString(), binEdfFile.toString()));
+        Assertions.assertTrue(Design.replaceEDIFinDCP(dcpCopy.toString(), binEdfFile.toString()));
         FileTools.deleteFile(binEdfFile.toString());
         Path readableEDIFDir = DesignTools.getDefaultReadableEDIFDir(dcpCopy);
         Path readableEDIF = DesignTools.getEDFAutoGenFilePath(dcpCopy, readableEDIFDir);
 
         // Modify DCP with a different binary EDIF
         createSimulatedBinaryEDIF(binEdfFile, FileTools.BINARY_CHECK_LENGTH+2); 
-        assert(Design.replaceEDIFinDCP(dcpCopy.toString(), binEdfFile.toString()));
+        Assertions.assertTrue(Design.replaceEDIFinDCP(dcpCopy.toString(), binEdfFile.toString()));
         FileTools.deleteFile(binEdfFile.toString());
         FileTools.deleteFile(readableEDIF.toString());
         Design.setAutoGenerateReadableEdif(true);
