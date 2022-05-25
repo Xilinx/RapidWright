@@ -507,7 +507,7 @@ public class TimingModel {
     private Tile findReferenceTile() {
 
         // for each column, look for valid row
-        SetMultimap<Integer,Integer> colHelper = TreeMultimap.create();;
+        SetMultimap<Integer,Integer> colHelper = TreeMultimap.create();
         for (int x = 0; x < device.getColumns(); x++) {
             int span = 0;
             for (int y = 0; y < device.getRows(); y++) {
@@ -519,7 +519,7 @@ public class TimingModel {
         }
 
         // for each row, look for valid col
-        SetMultimap<Integer,Integer> rowHelper = TreeMultimap.create();;
+        SetMultimap<Integer,Integer> rowHelper = TreeMultimap.create();
         for (int y = 0; y < device.getRows(); y++) {
             int span = 0;
             for (int x = 0; x < device.getColumns(); x++) {
@@ -561,7 +561,7 @@ public class TimingModel {
 
         boolean result = true;
         try (BufferedReader br = new BufferedReader(new FileReader(FileTools.getRapidWrightPath() + File.separator + filename))) {
-            String line = "";
+            String line;
             int lineCntr = 0;
             while ((line=br.readLine()) != null) {
                 String[] split = line.split("\\s+");
@@ -796,13 +796,6 @@ public class TimingModel {
                 dDistVertical[i] = check_RCLK_TileType(testT, GroupDelayType.DOUBLE);
                 qDistVertical[i] = check_RCLK_TileType(testT, GroupDelayType.QUAD);
                 lDistVertical[i] = check_RCLK_TileType(testT, GroupDelayType.LONG);
-
-                Pattern pattern = Pattern.compile("INT_X\\d+Y(\\d+)");
-                Matcher matcher = pattern.matcher(testT.getName());
-                String IntY = "";
-                if (matcher.find()) {
-                    IntY = matcher.group(1);
-                }
             }
         }
 
