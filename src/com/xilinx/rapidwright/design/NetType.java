@@ -47,4 +47,10 @@ public enum NetType{
 	public boolean isStaticNetType(){
 		return this == GND || this == VCC; 
 	}
+	
+	private static final NetType[] values = values();
+	
+	public static NetType getNetType(int ordinal) {
+	    return values[ordinal];
+	}
 }
