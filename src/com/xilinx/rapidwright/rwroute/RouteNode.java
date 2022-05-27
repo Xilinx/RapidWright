@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Tile;
@@ -141,7 +142,7 @@ abstract public class RouteNode {
 			case NODE_PINFEED:
 				break;
 			case NODE_DOUBLE:
-				if(endTileXCoordinate != getNode().getTile().getTileXCoordinate()) {
+				if(endTileXCoordinate != node.getTile().getTileXCoordinate()) {
 					baseCost = 0.4f*length;
 				}
 				break;
@@ -206,11 +207,11 @@ abstract public class RouteNode {
 		}else if(intTiles.size() == 1) {
 			endTile = intTiles.get(0);
 		}else {
-			endTile = getNode().getTile();
+			endTile = node.getTile();
 		}
 		endTileXCoordinate = (short) endTile.getTileXCoordinate();
 		endTileYCoordinate = (short) endTile.getTileYCoordinate();
-		Tile base = getNode().getTile();
+		Tile base = node.getTile();
 		length = (short) (Math.abs(endTileXCoordinate - base.getTileXCoordinate()) 
 				+ Math.abs(endTileYCoordinate - base.getTileYCoordinate()));
 	}
@@ -239,7 +240,7 @@ abstract public class RouteNode {
 		s.append(", ");
 		s.append(String.format("type = %s", type));
 		s.append(", ");
-		s.append(String.format("ic = %s", getNode().getIntentCode()));
+		s.append(String.format("ic = %s", node.getIntentCode()));
 		s.append(", ");
 		s.append(String.format("user = %s", getOccupancy()));
 		s.append(", ");

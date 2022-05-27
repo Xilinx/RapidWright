@@ -298,8 +298,8 @@ public class PartialRouter extends RWRoute{
 			for (PIP pip : net.getPIPs()) {
 				Node start = (pip.isReversed()) ? pip.getEndNode() : pip.getStartNode();
 				Node end = (pip.isReversed()) ? pip.getStartNode() : pip.getEndNode();
-				RouteNode rstart = getOrCreateRouteNode(null, start, RouteNodeType.WIRE);
-				RouteNode rend = getOrCreateRouteNode(null, end, RouteNodeType.WIRE);
+				RouteNode rstart = getOrCreateRouteNode(start, RouteNodeType.WIRE);
+				RouteNode rend = getOrCreateRouteNode(end, RouteNodeType.WIRE);
 
 				rnodes.add(rstart);
 				rnodes.add(rend);

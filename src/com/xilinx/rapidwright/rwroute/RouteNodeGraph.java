@@ -25,13 +25,11 @@ package com.xilinx.rapidwright.rwroute;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
-import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.util.CountUpDownLatch;
-import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.ParallelismTools;
 import com.xilinx.rapidwright.util.RuntimeTracker;
 
@@ -58,7 +56,7 @@ public class RouteNodeGraph {
     /**
      * A map of preserved nodes to their nets
      */
-    final private Map<LightweightNode, Net> preservedMap;
+    final private Map<Node, Net> preservedMap;
 
     /**
      * A synchronization object tracking the number of outstanding calls to
@@ -85,7 +83,7 @@ public class RouteNodeGraph {
 
         @Override
         protected RouteNode getOrCreate(Node node, RouteNodeType type) {
-            return RouteNodeGraph.this.getOrCreate(node, type).getFirst();
+            return RouteNodeGraph.this.getOrCreate(node, type);
         }
 
         @Override
@@ -120,10 +118,6 @@ public class RouteNodeGraph {
     }
 
     public Net preserve(Node node, Net net) {
-        return preserve(new LightweightNode(node), net);
-    }
-
-    private Net preserve(LightweightNode node, Net net) {
         return preservedMap.putIfAbsent(node, net);
     }
 
@@ -149,7 +143,7 @@ public class RouteNodeGraph {
                     continue;
                 }
 
-                preserve(new LightweightNode(pin), net);
+                preserve(pin.getConnectedNode(), net);
             }
 
             for(PIP pip : net.getPIPs()) {
@@ -170,11 +164,11 @@ public class RouteNodeGraph {
     }
 
     public void unpreserve(Node node) {
-        preservedMap.remove(new LightweightNode(node));
+        preservedMap.remove(node);
     }
 
     public boolean isPreserved(Node node) {
-        return preservedMap.containsKey(new LightweightNode(node));
+        return preservedMap.containsKey(node);
     }
 
     protected boolean isPreserved(Node parent, Node child) {
@@ -198,14 +192,12 @@ public class RouteNodeGraph {
         return !allowedTileEnums.contains(tileType);
     }
 
-    public Collection<Node> getPreservedNodes(Device device) {
-        List<Node> nodes = new ArrayList<>(preservedMap.size());
-        preservedMap.keySet().forEach((k) -> nodes.add(Node.getNode(device.getTile(k.tileID), k.wireID)));
-        return nodes;
+    public Set<Node> getPreservedNodes() {
+        return Collections.unmodifiableSet(preservedMap.keySet());
     }
 
     public Net getPreservedNet(Node node) {
-        return preservedMap.get(new LightweightNode(node));
+        return preservedMap.get(node);
     }
 
     public RouteNode getNode(Node node) {
@@ -228,17 +220,8 @@ public class RouteNodeGraph {
         return new RouteNodeImpl(node, type);
     }
 
-    public Pair<RouteNode,Boolean> getOrCreate(Node node, RouteNodeType type) {
-        final boolean[] inserted = {false};
-        RouteNode rnode = nodesMap.compute(node, (k, v) -> {
-            if (v == null) {
-                // this is for initializing sources and sinks of those to-be-routed nets' connections
-                v = create(node, type);
-                inserted[0] = true;
-            }
-            return v;
-        });
-        return new Pair<>(rnode, inserted[0]);
+    public RouteNode getOrCreate(Node node, RouteNodeType type) {
+        return nodesMap.computeIfAbsent(node, ($) -> create(node, type));
     }
 
     public void visit(RouteNode rnode) {

@@ -237,6 +237,7 @@ public class RWRoute{
 		categorizeNets();
 
 		// Wait for all outstanding RoutingGraph.asyncPreserve() calls to complete
+		// FIXME: Calling thread does nothing while waiting
 		routingGraph.awaitPreserve();
 	}
 	
@@ -396,7 +397,7 @@ public class RWRoute{
 
 		// If connections of other nets are routed first, used resources should be preserved.
 		Set<Node> unavailableNodes = getAllUsedNodesOfRoutedConnections();
-		unavailableNodes.addAll(routingGraph.getPreservedNodes(design.getDevice()));
+		unavailableNodes.addAll(routingGraph.getPreservedNodes());
 		// If the connections of other nets are not routed yet,
 		// the nodes connected to pins of other nets must be preserved.
 		unavailableNodes.addAll(routingGraph.getNodes());
@@ -483,14 +484,14 @@ public class RWRoute{
 			}else {
 				Node sinkINTNode = nodes.get(0);
 				indirectConnections.add(connection);
-				connection.setSinkRnode(getOrCreateRouteNode(connection.getSink(), sinkINTNode, RouteNodeType.PINFEED_I));
+				connection.setSinkRnode(getOrCreateRouteNode(sinkINTNode, RouteNodeType.PINFEED_I));
 				if(sourceINTNode == null) {
 					sourceINTNode = RouterHelper.projectOutputPinToINTNode(source);
 					if(sourceINTNode == null) {
 						throw new RuntimeException("ERROR: Null projected INT node for the source of net " + net.toStringFull());
 					}
 				}
-				connection.setSourceRnode(getOrCreateRouteNode(connection.getSource(), sourceINTNode, RouteNodeType.PINFEED_O));
+				connection.setSourceRnode(getOrCreateRouteNode(sourceINTNode, RouteNodeType.PINFEED_O));
 				connection.setDirect(false);
 				indirect++;
 				connection.computeHpwl();
@@ -536,23 +537,13 @@ public class RWRoute{
 	/**
 	 * Creates a {@link RouteNode} Object based on a {@link Node} instance and avoids duplicates,
 	 * used for creating the source and sink rnodes of {@link Connection} instances.
-	 * NOTE: This method does not consider the preserved nodes.
-	 * @param sitePinInst The source or sink {@link SitePinInst} instance.
+	 * NOTE: This method does not consider whether returned node is preserved.
 	 * @param node The node associated to the {@link SitePinInst} instance.
 	 * @param type The {@link RouteNodeType} of the {@link RouteNode} Object.
 	 * @return The created {@link RouteNode} instance.
 	 */
-	protected RouteNode getOrCreateRouteNode(SitePinInst sitePinInst, Node node, RouteNodeType type){
-		Pair<RouteNode,Boolean> ret = routingGraph.getOrCreate(node, type);
-		RouteNode rnode = ret.getFirst();
-		boolean inserted = ret.getSecond();
-		if (!inserted) {
-			// this is for checking preserved routing resource conflicts among routed nets */
-			if(rnode.getType() == type && type == RouteNodeType.PINFEED_I) {
-				System.out.println("WARNING: Conflicting node: " + node + ", connected to sink " + sitePinInst);
-			}
-		}
-		return rnode;
+	protected RouteNode getOrCreateRouteNode(Node node, RouteNodeType type){
+		return routingGraph.getOrCreate(node, type);
 	}
 	
 	/**
@@ -949,7 +940,7 @@ public class RWRoute{
 	 */
 	private void updateCost() {
 		overUsedRnodes.clear();
-		for(Entry<Node, RouteNode> e : routingGraph.getNodeEntries()){
+		for(Entry<?, RouteNode> e : routingGraph.getNodeEntries()){
 			RouteNode rnode = e.getValue();
 			int overuse=rnode.getOccupancy() - RouteNode.capacity;
 			if(overuse == 0) {
@@ -1229,7 +1220,7 @@ public class RWRoute{
 		DesignTools.routeAlternativeOutputSitePin(net, altSource);
 
 		Node sourceINTNode = RouterHelper.projectOutputPinToINTNode(altSource);
-		RouteNode sourceR = getOrCreateRouteNode(altSource, sourceINTNode, RouteNodeType.PINFEED_O);
+		RouteNode sourceR = getOrCreateRouteNode(sourceINTNode, RouteNodeType.PINFEED_O);
 		for(Connection otherConnectionOfNet : netWrapper.getConnections()) {
 			otherConnectionOfNet.setSource(altSource);
 			otherConnectionOfNet.setSourceRnode(sourceR);
