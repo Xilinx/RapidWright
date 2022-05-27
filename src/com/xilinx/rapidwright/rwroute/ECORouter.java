@@ -99,8 +99,6 @@ public class ECORouter extends PartialRouter {
 
         TileTypeEnum parentTileType = parent.getTile().getTileTypeEnum();
         assert(parentTileType == TileTypeEnum.INT);
-        // if (parentTileType != TileTypeEnum.INT)
-        //     return false;
 
         TileTypeEnum childTileType = child.getTile().getTileTypeEnum();
         assert(Utils.isCLB(childTileType));
@@ -211,8 +209,8 @@ public class ECORouter extends PartialRouter {
             for (PIP pip : net.getPIPs()) {
                 Node start = (pip.isReversed()) ? pip.getEndNode() : pip.getStartNode();
                 Node end = (pip.isReversed()) ? pip.getStartNode() : pip.getEndNode();
-                RouteNode rstart = getOrCreateRouteNode(null, start, RouteNodeType.WIRE);
-                RouteNode rend = getOrCreateRouteNode(null, end, RouteNodeType.WIRE);
+                RouteNode rstart = getOrCreateRouteNode(start, RouteNodeType.WIRE);
+                RouteNode rend = getOrCreateRouteNode(end, RouteNodeType.WIRE);
                 assert (rend.getPrev() == null);
                 rend.setPrev(rstart);
             }
@@ -253,7 +251,7 @@ public class ECORouter extends PartialRouter {
                 }
 
                 RouteNodeType type = RouteNodeType.WIRE;
-                RouteNode outputPinRnode = getOrCreateRouteNode(null, outputPinNode, type);
+                RouteNode outputPinRnode = getOrCreateRouteNode(outputPinNode, type);
                 // Pre-emptively trigger a setChildren()
                 outputPinRnode.getChildren();
                 // Create a fake edge from [A-H]_O to target [A-H](I|_X)
