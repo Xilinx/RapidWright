@@ -221,18 +221,18 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
 	    return getBusName() + "[" + index + "]";     
 	}
 	
-	public void exportEDIF(Writer wr, String indent) throws IOException{
+	public void exportEDIF(Writer wr, String indent, EDIFWriteLegalNameCache cache) throws IOException{
 		wr.write(indent);
 		wr.write("(port ");
 		if(width > 1) wr.write("(array ");
-		exportEDIFName(wr);
+		exportEDIFName(wr, cache);
 		if(width > 1) wr.write(" " + width + ")");
 		wr.write(" (direction ");
 		wr.write(direction.toString());
 		wr.write(")");
 		if(getProperties().size() > 0){
 			wr.write("\n");
-			exportEDIFProperties(wr, indent+"   ");
+			exportEDIFProperties(wr, indent+"   ", cache);
 			wr.write(indent);
 		}
 		wr.write(")\n");

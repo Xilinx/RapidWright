@@ -251,9 +251,7 @@ public class EDIFNetlist extends EDIFName {
 	
 	public void renameNetlistAndTopCell(String newName){
 		this.setName(newName);
-		this.updateEDIFRename();
 		design.setName(newName);
-		design.updateEDIFRename();
 		EDIFLibrary topLib = design.getTopCell().getLibrary();
 		EDIFCell top = topLib.removeCell(design.getTopCell());
 		top.setName(newName);
@@ -261,7 +259,6 @@ public class EDIFNetlist extends EDIFName {
 		topLib.addCell(top);
 		if(topCellInstance != null){
 			topCellInstance.setName(newName);
-			topCellInstance.updateEDIFRename();
 		}
 	}
 	
@@ -662,10 +659,10 @@ public class EDIFNetlist extends EDIFName {
 		return new ArrayList<>(toExport);
 	}
 
-	public void exportEDIF(OutputStream out) throws IOException {
+	public void exportEDIF(OutputStream out, EDIFWriteLegalNameCache cache) throws IOException {
 		try (BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(out))) {
 			bw.write("(edif ");
-			exportEDIFName(bw);
+			exportEDIFName(bw, cache);
 			bw.write("\n");
 			bw.write("  (edifversion 2 0 0)\n");
 			bw.write("  (edifLevel 0)\n");
@@ -728,14 +725,18 @@ public class EDIFNetlist extends EDIFName {
 			bw.write("  (design ");
 			EDIFDesign design = getDesign();
 			if (design != null) {
-				design.exportEDIFName(bw);
+				design.exportEDIFName(bw, cache);
 				bw.write("\n    (cellref " + design.getTopCell().getLegalEDIFName() + " (libraryref ");
-				bw.write(design.getTopCell().getLibrary().getLegalEDIFName() + "))\n");
-				design.exportEDIFProperties(bw, "    ");
+				bw.write(cache.getLegalEDIFName(design.getTopCell().getLibrary()) + "))\n");
+				design.exportEDIFProperties(bw, "    ", cache);
 				bw.write("  )\n");
 			}
 			bw.write(")\n");
 		}
+	}
+
+	public void exportEDIF(OutputStream out) throws IOException {
+		exportEDIF(out, new EDIFWriteLegalNameCache());
 	}
 
 	public void exportEDIF(Path fileName){

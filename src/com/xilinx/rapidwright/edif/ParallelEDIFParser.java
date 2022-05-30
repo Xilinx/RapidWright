@@ -54,11 +54,14 @@ public class ParallelEDIFParser implements AutoCloseable{
     protected final int maxTokenLength;
     protected StringPool uniquifier = StringPool.concurrentPool();
 
+    private final EDIFReadLegalNameCache cache;
+
     ParallelEDIFParser(Path fileName, long fileSize, InputStreamSupplier inputStreamSupplier, int maxTokenLength) {
         this.fileName = fileName;
         this.fileSize = fileSize;
         this.inputStreamSupplier = inputStreamSupplier;
         this.maxTokenLength = maxTokenLength;
+        this.cache = EDIFReadLegalNameCache.createMultiThreaded();
     }
 
     public ParallelEDIFParser(Path fileName, long fileSize, InputStreamSupplier inputStreamSupplier) {
@@ -74,7 +77,7 @@ public class ParallelEDIFParser implements AutoCloseable{
     }
 
     protected ParallelEDIFParserWorker makeWorker(long offset) throws IOException {
-        return new ParallelEDIFParserWorker(fileName, inputStreamSupplier.get(), offset, uniquifier, maxTokenLength);
+        return new ParallelEDIFParserWorker(fileName, inputStreamSupplier.get(), offset, uniquifier, maxTokenLength, cache);
     }
 
     public static int calcThreads(long fileSize) {
@@ -219,7 +222,7 @@ public class ParallelEDIFParser implements AutoCloseable{
         //We have to map from a string representation of the ports' names to the ports.
         //Directly map the ports from small cells, add ports from large cells to this map
         final Map<String, EDIFLibrary> librariesByLegalName = netlist.getLibraries().stream()
-                .collect(Collectors.toMap(EDIFName::getLegalEDIFName, Function.identity()));
+                .collect(Collectors.toMap(cache::getLegalEDIFName, Function.identity()));
         Map<EDIFCell, Collection<ParallelEDIFParserWorker.LinkPortInstData>> byPortCell = new ConcurrentHashMap<>();
         ParallelismTools.invokeAllRunnable(workers, w-> {
             for (ParallelEDIFParserWorker.CellReferenceData cellReferenceData : w.linkCellReference) {

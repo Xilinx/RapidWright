@@ -31,6 +31,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.stream.Collectors;
 
 /**
  * All EDIF netlist objects that can possess properties inherit from this 
@@ -39,11 +40,9 @@ import java.util.Map.Entry;
  */
 public class EDIFPropertyObject extends EDIFName {
 
-	private Map<EDIFName,EDIFPropertyValue> properties;
+	private Map<String,EDIFPropertyValue> properties;
 	
 	private String owner;
-	
-	private static EDIFName tmp = new EDIFName();
 	
 	public EDIFPropertyObject(String name){
 		super(name);
@@ -51,7 +50,7 @@ public class EDIFPropertyObject extends EDIFName {
 	
 	public EDIFPropertyObject(EDIFPropertyObject obj) {
 		super((EDIFName)obj);
-		properties = obj.createDuplicatePropertiesMap();
+		properties = new HashMap<>(obj.properties);
 	}
 	
 	protected EDIFPropertyObject(){
@@ -124,7 +123,19 @@ public class EDIFPropertyObject extends EDIFName {
 	 * @param value Value entry for the property
 	 * @return Old property value for the provided key
 	 */
+	@Deprecated
 	public EDIFPropertyValue addProperty(EDIFName key, EDIFPropertyValue value){
+		return addProperty(key.getName(), value);
+	}
+
+	/**
+	 * Adds the property entry mapping for this object.
+	 * @param key Key entry for the property
+	 * @param value Value entry for the property
+	 * @return Old property value for the provided key
+	 */
+	@Deprecated
+	public EDIFPropertyValue addProperty(String key, EDIFPropertyValue value){
 		if(properties == null) properties = getNewMap();
 		return properties.put(key, value);
 	}
@@ -137,49 +148,39 @@ public class EDIFPropertyObject extends EDIFName {
 	
 	public EDIFPropertyValue getProperty(String key){
 		if(properties == null) return null;
-		String edifName = EDIFTools.makeNameEDIFCompatible(key);
-		tmp.setName(key);
-		if(!edifName.equals(key)) tmp.setEDIFRename(edifName);
-		EDIFPropertyValue val = properties.get(tmp);
-		tmp.setEDIFRename(null);
+		EDIFPropertyValue val = properties.get(key);
 		return val;
 	}
 		
 	/**
 	 * @return the properties
 	 */
+	@Deprecated
 	public Map<EDIFName, EDIFPropertyValue> getProperties() {
-		if(properties == null) return Collections.emptyMap();
-		return properties;
+		if (properties == null) {
+			return Collections.emptyMap();
+		}
+		return Collections.unmodifiableMap(properties.entrySet().stream().collect(Collectors.toMap(s->new EDIFName(s.getKey()), Entry::getValue)));
 	}
 
-	/**
-	 * Creates a completely new copy of the map
-	 * @return
-	 */
-	public Map<EDIFName, EDIFPropertyValue> createDuplicatePropertiesMap(){
-		if(properties == null) return null;
-		Map<EDIFName, EDIFPropertyValue> newMap = new HashMap<EDIFName, EDIFPropertyValue>();
-		for(Entry<EDIFName, EDIFPropertyValue> e : properties.entrySet()) {
-			newMap.put(new EDIFName(e.getKey()), new EDIFPropertyValue(e.getValue()));
-		}
-		return newMap;
+	public Map<String, EDIFPropertyValue> getPropertiesNew() {
+		return properties;
 	}
 	
 	/**
 	 * @param properties the properties to set
 	 */
 	public void setProperties(Map<EDIFName, EDIFPropertyValue> properties) {
-		this.properties = properties;
+		throw new RuntimeException("not implemented");
 	}
 
-	public void exportEDIFProperties(Writer wr, String indent) throws IOException{
+	public void exportEDIFProperties(Writer wr, String indent, EDIFWriteLegalNameCache cache) throws IOException{
 		if(properties == null) return;
 		properties.entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(e -> {
 			try {
 				wr.write(indent);
 				wr.write("(property ");
-				e.getKey().exportEDIFName(wr);
+				EDIFName.exportSomeEDIFName(wr, e.getKey(), cache);
 				wr.write(" ");
 				e.getValue().writeEDIFString(wr);
 				if(owner != null){

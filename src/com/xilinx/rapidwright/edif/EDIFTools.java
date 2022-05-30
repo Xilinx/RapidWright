@@ -25,7 +25,6 @@
 package com.xilinx.rapidwright.edif;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -55,7 +54,6 @@ import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.Pair;
-import com.xilinx.rapidwright.util.ParallelismTools;
 
 
 /**
@@ -714,21 +712,9 @@ public class EDIFTools {
 	}
 
 	public static EDIFNetlist loadEDIFStream(InputStream is, long size) throws IOException {
-		if (ParallelEDIFParser.calcThreads(size) > 1) {
-			// Copy input stream to a temporary file so that it can be parsed in parallel
-			Path fileName = getTempEDIFFile();
-			try {
-				Files.copy(is, fileName);
-				try (ParallelEDIFParser p = new ParallelEDIFParser(fileName, size)) {
-					return p.parseEDIFNetlist();
-				}
-			} finally {
-				Files.deleteIfExists(fileName);
-			}
-		} else {
-			try (EDIFParser p = new EDIFParser(is)) {
-				return p.parseEDIFNetlist();
-			}
+
+		try (EDIFParser p = new EDIFParser(is)) {
+			return p.parseEDIFNetlist();
 		}
 	}
 
@@ -1428,7 +1414,7 @@ public class EDIFTools {
 	        for(Entry<String,EDIFCell> entry : lib.getCellMap().entrySet()) {
 	            System.out.println("  CELL: " + entry.getValue().getLegalEDIFName() + " /// " + entry.getKey());
 	            for(EDIFCellInst inst : entry.getValue().getCellInsts()) {
-	                System.out.println("    INST: " + inst.getCellType().getLegalEDIFName() + "("+inst.getLegalEDIFName()+")");
+	                System.out.println("    INST: " + inst.getCellType().getLegalEDIFName() + "("+inst.getName() +")");
 	            }
 	        }
 	    }

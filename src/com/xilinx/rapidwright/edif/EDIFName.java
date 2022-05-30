@@ -39,8 +39,6 @@ import java.util.Map;
 public class EDIFName implements Comparable<EDIFName> {
 	/** Name of the EDIF object */
 	private String name;
-	/** Legal EDIF rename of the original name */
-	private String edifRename;
 	
 	
 	protected EDIFName(){
@@ -49,7 +47,6 @@ public class EDIFName implements Comparable<EDIFName> {
 	
 	public EDIFName(String name){
 		this.name = name;
-		updateEDIFRename();
 	}
 	
 	/**
@@ -58,49 +55,27 @@ public class EDIFName implements Comparable<EDIFName> {
 	 */
 	public EDIFName(EDIFName edifName) {
 		this.name = edifName.name;
-		this.edifRename = edifName.edifRename;
 	}
-	
-	/**
-	 * Forces the object to update its EDIF legal equivalent name based on 
-	 * the current name.  If the name is the same, the edifRename will be
-	 * null.
-	 * @return The newly updated EDIF rename string.
-	 */
-	protected String updateEDIFRename(){
-		String tmp = EDIFTools.makeNameEDIFCompatible(name); 
-		if(!tmp.equals(name)){
-			edifRename = tmp;
-		}else{
-			edifRename = null;
-		}
-		return edifRename;
-	}
-	
-	protected String updateEDIFRename(int unique){
-		updateEDIFRename();
-		edifRename =  getLegalEDIFName() + "_" + unique;
-		return edifRename;
-	}
-	
+
 	public String getName(){
 		return name;
-	}
-	
-	protected String getEDIFName(){
-		return edifRename;
 	}
 	
 	protected void setName(String name){
 		this.name = name;
 	}
-	
-	protected void setEDIFRename(String edifRename){
-		this.edifRename = edifRename;
-	}
-	
-	public String getLegalEDIFName(){
-		return edifRename == null ? name : edifRename;
+
+	public static void exportSomeEDIFName(Writer wr, String name, EDIFWriteLegalNameCache cache) throws IOException {
+		final String legalName = cache.getEDIFName(name);
+		if (legalName == null) {
+			wr.write(name);
+			return;
+		}
+		wr.write("(rename ");
+		wr.write(legalName);
+		wr.write(" \"");
+		wr.write(name);
+		wr.write("\")");
 	}
 	
 	/**
@@ -109,16 +84,9 @@ public class EDIFName implements Comparable<EDIFName> {
 	 * @param wr The writer to export the EDIF syntax to.
 	 * @throws IOException
 	 */
-	public void exportEDIFName(Writer wr) throws IOException{
-		if(edifRename == null) {
-			wr.write(name);
-			return;
-		}
-		wr.write("(rename ");
-		wr.write(edifRename);
-		wr.write(" \"");
-		wr.write(name);
-		wr.write("\")");
+	public void exportEDIFName(Writer wr, EDIFWriteLegalNameCache cache) throws IOException{
+
+		exportSomeEDIFName(wr, name, cache);
 	}
 
 	/* (non-Javadoc)
@@ -128,7 +96,6 @@ public class EDIFName implements Comparable<EDIFName> {
 	public int hashCode() {
 		final int prime = 31;
 		int result = 1;
-		result = prime * result + ((edifRename == null) ? 0 : edifRename.hashCode());
 		result = prime * result + ((name == null) ? 0 : name.hashCode());
 		return result;
 	}
@@ -145,11 +112,6 @@ public class EDIFName implements Comparable<EDIFName> {
 		if (getClass() != obj.getClass())
 			return false;
 		EDIFName other = (EDIFName) obj;
-		if (edifRename == null) {
-			if (other.edifRename != null)
-				return false;
-		} else if (!edifRename.equals(other.edifRename))
-			return false;
 		if (name == null) {
 			if (other.name != null)
 				return false;
@@ -162,7 +124,7 @@ public class EDIFName implements Comparable<EDIFName> {
 		return name;
 	}
 	
-	public <K, V> Map<K, V> getNewMap(){
+	public static <K, V> Map<K, V> getNewMap(){
 		//Save some memory for small maps
 		return new HashMap<K,V>(2);
 	}

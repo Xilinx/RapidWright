@@ -22,11 +22,6 @@
  */
 package com.xilinx.rapidwright.edif;
 
-import com.xilinx.rapidwright.util.NoCloseOutputStream;
-import com.xilinx.rapidwright.util.ParallelismTools;
-import com.xilinx.rapidwright.util.ParallelDCPInput;
-import com.xilinx.rapidwright.util.ParallelDCPOutput;
-
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
@@ -40,6 +35,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Future;
+
+import com.xilinx.rapidwright.util.NoCloseOutputStream;
+import com.xilinx.rapidwright.util.ParallelDCPInput;
+import com.xilinx.rapidwright.util.ParallelDCPOutput;
+import com.xilinx.rapidwright.util.ParallelismTools;
 
 /**
  * Keeps track of a set of {@link EDIFCell} objects 
@@ -194,15 +194,15 @@ public class EDIFLibrary extends EDIFName {
 	 * This method prepares all the cells in the library for a merger with another
 	 * library by adding a unique prefix to all cell names.  This method aims to
 	 * address EDIF naming convention.
-	 * @param name The prefix to add to all cells
+	 * @param prefix The prefix to add to all cells
 	 */
-	public void uniqueifyCellsWithPrefix(String name){
+	public void uniqueifyCellsWithPrefix(String prefix){
 		ArrayList<EDIFCell> renamedCells = new ArrayList<>(getCells());
 		cells.clear();
 		for(EDIFCell c : renamedCells){
-			c.setName(name + c.getName());
+			c.setName(prefix + c.getName());
 			if(c.getEDIFName() != null){
-				c.setEDIFRename(EDIFTools.makeNameEDIFCompatible(name + c.getEDIFName()));
+				c.setEDIFRename(prefix+c.getEDIFName());
 			}
 			addCell(c);
 		}
@@ -264,15 +264,15 @@ public class EDIFLibrary extends EDIFName {
 		}
 	}
 	
-	void exportEDIF(List<EDIFCell> cells, Writer w, boolean writeHeader, boolean writeFooter) throws IOException {
+	void exportEDIF(List<EDIFCell> cells, Writer w, boolean writeHeader, boolean writeFooter, EDIFWriteLegalNameCache cache) throws IOException {
 		if (writeHeader) {
 			w.write("  (Library ");
-			exportEDIFName(w);
+			exportEDIFName(w, cache);
 			w.write("\n    (edifLevel 0)\n");
 			w.write("    (technology (numberDefinition ))\n");
 		}
 		for (EDIFCell c : cells) {
-			c.exportEDIF(w);
+			c.exportEDIF(w, cache);
 		}
 		if (writeFooter) {
 			w.write("  )\n");
@@ -280,7 +280,7 @@ public class EDIFLibrary extends EDIFName {
 	}
 
 	public void exportEDIF(BufferedWriter bw) throws IOException {
-		exportEDIF(getValidCellExportOrder(), bw, true, true);
+		exportEDIF(getValidCellExportOrder(), bw, true, true, new EDIFWriteLegalNameCache());
 	}
 
 	public List<Future<ParallelDCPInput>> exportEDIF() throws IOException{
@@ -300,7 +300,7 @@ public class EDIFLibrary extends EDIFName {
 			streamFutures.add(ParallelismTools.submit(
 					() -> ParallelDCPOutput.newStream((os) -> {
 						try (OutputStreamWriter ow = new OutputStreamWriter(new NoCloseOutputStream(os))) {
-							exportEDIF(chunk, ow, firstChunk, lastChunk);
+							exportEDIF(chunk, ow, firstChunk, lastChunk, new EDIFWriteLegalNameCache());
 						} catch (IOException e) {
 							throw new RuntimeException(e);
 						}

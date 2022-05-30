@@ -46,7 +46,6 @@ public class EquivalentEDIF {
      * @return True if the two objects are equivalent
      */
     private static boolean equivalentEDIFPropObject(EDIFPropertyObject golden, EDIFPropertyObject test) {
-        Assertions.assertEquals(golden.getEDIFName(), test.getEDIFName());
         Assertions.assertEquals(golden.getProperties().size(), test.getProperties().size());
         for(Map.Entry<EDIFName, EDIFPropertyValue> e : golden.getProperties().entrySet()) {
             EDIFPropertyValue testValue = test.getProperty(e.getKey().getName());
@@ -66,6 +65,7 @@ public class EquivalentEDIF {
      * @return True if the two cells are equivalent, false otherwise.
      */
     private static boolean equivalentEDIFCells(EDIFCell golden, EDIFCell test) {
+        Assertions.assertEquals(golden.getEDIFName(), test.getEDIFName());
         Assertions.assertTrue(equivalentEDIFPropObject(golden, test));
         Assertions.assertEquals(golden.getEDIFView(), test.getEDIFView());
         Assertions.assertEquals(golden.getPorts().size(), test.getPorts().size());
@@ -89,8 +89,8 @@ public class EquivalentEDIF {
             Assertions.assertTrue(equivalentEDIFPropObject(inst, testInst));
             Assertions.assertEquals(inst.getViewref(), testInst.getViewref());
             Assertions.assertEquals(inst.getCellName(), testInst.getCellName());
-            Assertions.assertEquals(inst.getCellType().getLibrary().getEDIFName(),
-                                    testInst.getCellType().getLibrary().getEDIFName());
+            Assertions.assertEquals(inst.getCellType().getLibrary().getName(),
+                                    testInst.getCellType().getLibrary().getName());
         }
         Assertions.assertEquals(golden.getNets().size(), test.getNets().size());
         for(EDIFNet net : golden.getNets()) {
@@ -115,7 +115,7 @@ public class EquivalentEDIF {
      * instances and port instances, false otherwise
      */
     public static boolean equivalentEDIFNetlists(EDIFNetlist golden, EDIFNetlist test) {
-        Assertions.assertEquals(golden.getEDIFName(), test.getEDIFName());
+        Assertions.assertEquals(golden.getName(), test.getName());
         Assertions.assertTrue(equivalentEDIFPropObject(golden.getDesign(), test.getDesign()));
         Assertions.assertTrue(equivalentEDIFCells(golden.getDesign().getTopCell(),
                                                   test.getDesign().getTopCell()));

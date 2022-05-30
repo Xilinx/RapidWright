@@ -50,7 +50,7 @@ public class EDIFParser extends AbstractEDIFParserWorker implements AutoCloseabl
 
 
 	public EDIFParser(Path fileName) throws FileNotFoundException {
-		super(fileName, StringPool.singleThreadedPool());
+		super(fileName, StringPool.singleThreadedPool(), EDIFReadLegalNameCache.createSingleThreaded());
 	}
 
 	public EDIFParser(String fileName) throws FileNotFoundException {
@@ -58,7 +58,7 @@ public class EDIFParser extends AbstractEDIFParserWorker implements AutoCloseabl
 	}
 
 	public EDIFParser(InputStream in){
-		super(null, in, StringPool.singleThreadedPool());
+		super(null, in, StringPool.singleThreadedPool(), EDIFReadLegalNameCache.createSingleThreaded());
 	}
 	
 	/**
@@ -134,7 +134,7 @@ public class EDIFParser extends AbstractEDIFParserWorker implements AutoCloseabl
 
 		String currToken;
 		while(LEFT_PAREN.equals(currToken = getNextToken(true))){
-			library.addCell(parseEDIFCell(library.getLegalEDIFName(), getNextToken(true)));
+			library.addCell(parseEDIFCell(library.getName(), getNextToken(true))); //TODO
 		}
 		expect(RIGHT_PAREN, currToken);
 		return library;

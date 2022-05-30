@@ -241,18 +241,18 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
         return false;
     }
 
-    public void exportEDIF(Writer wr) throws IOException{
+    public void exportEDIF(Writer wr, EDIFWriteLegalNameCache cache) throws IOException{
         wr.write("         (instance ");
-        exportEDIFName(wr);
+        exportEDIFName(wr, cache);
         wr.write(" (viewref ");
-        wr.write( getViewref().getLegalEDIFName());
+        wr.write(cache.getLegalEDIFName(getViewref()));
         wr.write(" (cellref ");
         wr.write(cellType.getLegalEDIFName());
         wr.write(" (libraryref ");
-        wr.write(cellType.getLibrary().getLegalEDIFName());
+        wr.write(cache.getLegalEDIFName(cellType.getLibrary()));
         if(getProperties().size() > 0){
             wr.write(")))\n");
-            exportEDIFProperties(wr, "           ");
+            exportEDIFProperties(wr, "           ", cache);
             wr.write("         )\n");               
         }else{
             wr.write("))))\n");

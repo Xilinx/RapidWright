@@ -230,21 +230,21 @@ public class EDIFPortInst {
 		this.parentNet = parentNet;
 	}
 	
-	public void writeEDIFExport(Writer wr, String indent) throws IOException{
+	public void writeEDIFExport(Writer wr, String indent, EDIFWriteLegalNameCache cache) throws IOException{
 		wr.write(indent);
 		wr.write("(portref ");
 		if(index == -1) {
-			wr.write(getPort().getLegalEDIFName());
+			wr.write(cache.getLegalEDIFName(getPort()));
 		}
 		else {
 			wr.write("(member ");
-			wr.write(getPort().getLegalEDIFName());
+			wr.write(cache.getLegalEDIFName(getPort()));
 			wr.write(" " + index);
 			wr.write(")");
 		}
 		if(getCellInst() != null){
 			wr.write(" (instanceref ");
-			wr.write(getCellInst().getLegalEDIFName() + ")");			
+			wr.write(cache.getLegalEDIFName(getCellInst()) + ")");
 		}
 		wr.write(")\n");
 	}

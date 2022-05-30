@@ -80,7 +80,6 @@ public class BinaryEDIFWriter {
     
     private static void addNameToStringMap(EDIFName o, Map<String,Integer> stringMap) {
         addStringToStringMap(o.getName(), stringMap);
-        addStringToStringMap(o.getLegalEDIFName(), stringMap);
     }
     
     private static void addObjectToStringMap(EDIFPropertyObject o, Map<String,Integer> stringMap) {
@@ -108,6 +107,7 @@ public class BinaryEDIFWriter {
             for(EDIFCell cell : lib.getCells()) {
                 addObjectToStringMap(cell, stringMap);
                 addNameToStringMap(cell.getEDIFView(), stringMap);
+                addStringToStringMap(cell.getEDIFName(), stringMap);
                 for(EDIFCellInst inst : cell.getCellInsts()) {
                     addObjectToStringMap(inst, stringMap);
                 }
@@ -151,10 +151,7 @@ public class BinaryEDIFWriter {
      */
     private static void writeEDIFName(EDIFName o, Output os, Map<String,Integer> stringMap, 
             boolean hasPropMap) {
-        if(o.getEDIFName() != null) {
-            int edifName = stringMap.get(o.getEDIFName());
-            os.writeInt(EDIF_NAME_FLAG | edifName);
-        }
+        //TODO this does not handle renamed edif cells
         os.writeInt((hasPropMap ? EDIF_PROP_FLAG : 0) | stringMap.get(o.getName()));
     }
     
@@ -248,9 +245,6 @@ public class BinaryEDIFWriter {
                 dirAndWidth |= EDIF_DIR_OUTPUT_MASK;
             }else if(dir == EDIFDirection.INOUT) {
                 dirAndWidth |= EDIF_DIR_INOUT_MASK;
-            }
-            if(!p.getLegalEDIFName().equals(p.getName())){
-                dirAndWidth |= EDIF_RENAME_MASK; 
             }
             os.writeInt(dirAndWidth);
         }

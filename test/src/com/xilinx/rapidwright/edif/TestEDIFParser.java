@@ -33,12 +33,8 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import com.xilinx.rapidwright.support.RapidWrightDCP;
-import com.xilinx.rapidwright.tests.CodePerfTracker;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
 
 public class TestEDIFParser {
     private static final Path input = RapidWrightDCP.getPath("edif_parsing_stress_test.edf");
@@ -64,20 +60,6 @@ public class TestEDIFParser {
       new ParseStart("At EOF", FILE_SIZE-2, false)
     );
 
-    /**
-     * Check that we can recover from misdetected token starts.
-     *
-     * Deliberately set a very low max token length for the tokenizer. Then run the parallel EDIF parser with very
-     * specific start offsets to generate interesting behavior.
-     */
-    @ParameterizedTest(name="{0}")
-    @MethodSource("testParallelArgs")
-    public void testParallel(String ignoredDescription, List<ParseStart> offsets, int expectedSuccessfulThreads) throws IOException {
-        try (ParallelEDIFParserTestSpecificOffsets parser = new ParallelEDIFParserTestSpecificOffsets(input, 128, offsets)) {
-            parser.parseEDIFNetlist(new CodePerfTracker("parse edif"));
-            Assertions.assertEquals(expectedSuccessfulThreads, parser.getSuccessfulThreads());
-        }
-    }
 
     /**
      * Use listIndex as a bitfield to select which of the items in interestingOffsets to include in the testcase run

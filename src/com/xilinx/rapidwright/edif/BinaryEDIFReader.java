@@ -53,11 +53,8 @@ public class BinaryEDIFReader {
      * @see BinaryEDIFWriter#writeEDIFName(EDIFName, Output, Map, boolean)
      */
     private static boolean readEDIFName(EDIFName o, Input is, String[] strings) {
+        //TODO this does not handle renamed edif cells
         int nameIdx = is.readInt();
-        if((nameIdx & BinaryEDIFWriter.EDIF_NAME_FLAG) == BinaryEDIFWriter.EDIF_NAME_FLAG) {
-            o.setEDIFRename(strings[nameIdx & ~BinaryEDIFWriter.EDIF_NAME_FLAG]);
-            nameIdx = is.readInt();
-        }
         o.setName(strings[nameIdx & ~BinaryEDIFWriter.EDIF_PROP_FLAG]);
         return (nameIdx & BinaryEDIFWriter.EDIF_PROP_FLAG) == BinaryEDIFWriter.EDIF_PROP_FLAG;
     }

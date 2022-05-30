@@ -170,7 +170,6 @@ public class EDIFNet extends EDIFPropertyObject {
 	public void rename(String newName) {
 	    this.parentCell.removeNet(this);
 	    setName(newName);
-	    updateEDIFRename();
 	    this.parentCell.addNet(this);
 	}
 	
@@ -306,17 +305,17 @@ public class EDIFNet extends EDIFPropertyObject {
 		parentCell.trackChange(EDIFChangeType.NET_ADD, getName());
 	}
 	
-	public void exportEDIF(Writer wr) throws IOException {
+	public void exportEDIF(Writer wr, EDIFWriteLegalNameCache cache) throws IOException {
 		wr.write("         (net ");
-		exportEDIFName(wr);
+		exportEDIFName(wr, cache);
 		wr.write(" (joined\n");
 		for(EDIFPortInst p : getPortInsts()){
-			p.writeEDIFExport(wr, "          ");
+			p.writeEDIFExport(wr, "          ", cache);
 		}							
 		wr.write("          )\n"); // joined end
 		if(getProperties().size() > 0){
 			wr.write("\n");
-			exportEDIFProperties(wr, "           ");
+			exportEDIFProperties(wr, "           ", cache);
 		}
 		wr.write("         )\n"); // Nets end
 

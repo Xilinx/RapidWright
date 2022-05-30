@@ -61,10 +61,12 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParserWorker implement
     protected EDIFDesign edifDesign = null;
     protected final List<CellReferenceData> linkCellReference = new ArrayList<>();
     protected final List<List<LinkPortInstData>> linkPortInstData = new ArrayList<>();
+    protected final EDIFReadLegalNameCache cache;
 
-    public ParallelEDIFParserWorker(Path fileName, InputStream in, long offset, StringPool uniquifier, int maxTokenLength) {
-        super(fileName, in, uniquifier, maxTokenLength);
+    public ParallelEDIFParserWorker(Path fileName, InputStream in, long offset, StringPool uniquifier, int maxTokenLength, EDIFReadLegalNameCache cache) {
+        super(fileName, in, uniquifier, maxTokenLength, cache);
         this.offset = offset;
+        this.cache = cache;
     }
 
     public boolean isFirstParser() {
@@ -293,7 +295,7 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParserWorker implement
             for (LinkPortInstData d : data) {
                 final EDIFCell cell = d.mapPortCell();
                 if (cell.getPorts().size() < PORT_LOOKUP_MAP_THRESHOLD) {
-                    d.portInst.setPort(cell.getPortByLegalName(d.portInst.getName()));
+                    d.portInst.setPort(cell.getPortByLegalName(d.portInst.getName(), cache));
                 } else {
                     largeCellMap.computeIfAbsent(cell, x-> new ConcurrentLinkedQueue<>()).add(d);
                 }
@@ -355,7 +357,7 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParserWorker implement
             if (edifPortCache != null) {
                 port = edifPortCache.getPort(portInst.getName());
             } else {
-                port = lookupPortCell(parentCell, portInst).getPortByLegalName(portInst.getName());
+                port = lookupPortCell(parentCell, portInst).getPortByLegalName(portInst.getName(), cache);
             }
             portInst.setPort(port);
         }
