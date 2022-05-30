@@ -121,9 +121,12 @@ public class PartialRouter extends RWRoute{
 		RouteNode prev = endRnode.getPrev();
 		// Presence means that the only arc allowed to enter this end node
 		// is if it came from prev
-		if (prev != null && prev.getNode() == start) {
-			endRnode.setVisited(false);
-			return false;
+		if (prev != null) {
+			assert((prev.getNode() == start) == prev.getNode().equals(start));
+			if (prev.getNode() == start) {
+				endRnode.setVisited(false);
+				return false;
+			}
 		}
 
 		return true;

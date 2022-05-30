@@ -75,10 +75,7 @@ public class ECORouter extends PartialRouter {
 
         @Override
         protected boolean isExcluded(Node parent, Node child) {
-            // Note that the isPreserved(Node) overload is called,
-            // and not isPreserved(Node, Node) which is overridden by
-            // RouteNodeGraphPartial and may only be called once
-            if (!isPreserved(child) && allowLutRoutethru(parent, child)) {
+            if (allowLutRoutethru(parent, child)) {
                 return false;
             }
 
@@ -103,14 +100,10 @@ public class ECORouter extends PartialRouter {
         TileTypeEnum childTileType = child.getTile().getTileTypeEnum();
         assert(Utils.isCLB(childTileType));
 
-        if (routingGraph.isPreserved(child)) {
-            return false;
-        }
-
         SitePin sp = parent.getSitePin();
         Site s = sp.getSite();
         SiteTypeEnum siteType = s.getSiteTypeEnum();
-        assert(siteType == SiteTypeEnum.SLICEL || siteType == SiteTypeEnum.SLICEM);
+        assert(Utils.isSLICE(siteType));
         String pinName = sp.getPinName();
         if (pinName.length() != 2)
             return false;
@@ -160,7 +153,7 @@ public class ECORouter extends PartialRouter {
     }
 
     public ECORouter(Design design, RWRouteConfig config, Collection<SitePinInst> pinsToRoute) {
-        this(design, config, pinsToRoute,0);
+        this(design, config, pinsToRoute, 0);
     }
 
     @Override
@@ -331,6 +324,9 @@ public class ECORouter extends PartialRouter {
             connection.enlargeBoundingBox(config.getExtensionXIncrement(), config.getExtensionYIncrement());
         }
         if (routeIteration > 1) {
+            // TODO: Is this the best condition for unpreserving,
+            //  since expanding the bounding box typically means more
+            //  rnodes?
             if (rnodesCreatedThisIteration == 0) {
                 unpreserveNetsAndReleaseResources(connection);
                 return true;

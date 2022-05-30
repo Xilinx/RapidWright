@@ -30,7 +30,6 @@ import java.util.List;
 import java.util.Map;
 
 import com.xilinx.rapidwright.design.Net;
-import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Tile;
@@ -621,6 +620,9 @@ abstract public class RouteNode {
 
 	/**
 	 * Checks if a routing arc has been excluded and cannot be used.
+	 * Note that this method does not check if a node is unusable because
+	 * it is preserved, the assumption is that {@link #isPreserved} has
+	 * already been checked.
 	 * @param parent The routing arc's parent node.
 	 * @param child The routing arc's parent node.
 	 * @return true, if the arc should be excluded from the routing resource graph.
