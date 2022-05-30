@@ -175,19 +175,23 @@ public class EDIFPropertyObject extends EDIFName {
 
 	public void exportEDIFProperties(Writer wr, String indent) throws IOException{
 		if(properties == null) return;
-		for(Entry<EDIFName, EDIFPropertyValue> e : properties.entrySet()){
-			wr.write(indent);
-			wr.write("(property ");
-			e.getKey().exportEDIFName(wr);
-			wr.write(" ");
-			e.getValue().writeEDIFString(wr);
-			if(owner != null){
-				wr.write(" (owner \"");
-				wr.write(owner);
-				wr.write("\")");
+		properties.entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(e -> {
+			try {
+				wr.write(indent);
+				wr.write("(property ");
+				e.getKey().exportEDIFName(wr);
+				wr.write(" ");
+				e.getValue().writeEDIFString(wr);
+				if(owner != null){
+					wr.write(" (owner \"");
+					wr.write(owner);
+					wr.write("\")");
+				}
+				wr.write(")\n");
+			} catch (IOException ex) {
+				throw new RuntimeException(ex);
 			}
-			wr.write(")\n");
-		}
+		});
 	}
 
 	/**
