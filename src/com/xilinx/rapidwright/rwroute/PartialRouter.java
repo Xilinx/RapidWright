@@ -66,6 +66,8 @@ public class PartialRouter extends RWRoute{
 
 		@Override
 		protected boolean isPreserved(Node parent, Node child) {
+			// FIXME: Masking an existing route does not necessarily mean that
+			//        isExcluded() won't return false (e.g. LUT routethru)
 			boolean preserved = super.isPreserved(parent, child);
 			return preserved && maskPreservedIfExistingRoute(parent, child);
 		}
