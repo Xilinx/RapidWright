@@ -189,7 +189,12 @@ public class ECORouter extends PartialRouter {
     protected void determineRoutingTargets(){
         super.determineRoutingTargets();
 
-        // Go through all nets to be routed
+        // The following code is customer-specific.
+        // As a post-processing step once all nets-to-route have been determined,
+        // it looks for sinks that are direct inputs ([A-H]_X or [A-H]_I) and,
+        // assuming that they target either of the two available FFs, performs
+        // some routing graph manipulation to allow them to be reached through
+        // the LUT instead
         for (Map.Entry<?,NetWrapper> e : nets.entrySet()) {
             NetWrapper netWrapper = e.getValue();
 
@@ -267,6 +272,12 @@ public class ECORouter extends PartialRouter {
 
     @Override
     protected void assignNodesToConnections() {
+        // The following code is customer-specific.
+        // As a post-processing step once all nets have been routed,
+        // it looks for sinks that finish at the direct inputs ([A-H]_X or [A-H]_I),
+        // and are preceded by the LUT output. If this occurs, the fake edge that
+        // we inserted during determineRoutingTargets() was taken thus we need to
+        // remove this and update the intra-site routing
         for(Connection connection : indirectConnections) {
             SitePinInst sink = connection.getSink();
             List<RouteNode> rnodes = connection.getRnodes();
