@@ -160,6 +160,35 @@ public class PartialRouter extends RWRoute{
 	}
 
 	@Override
+	protected void determineRoutingTargets() {
+		super.determineRoutingTargets();
+
+		// Go through all nets to be routed
+		for (Map.Entry<Net, NetWrapper> e : nets.entrySet()) {
+			Net net = e.getKey();
+
+			// Create all nodes used by this net and set its previous pointer so that:
+			// (a) the routing for each connection can be recovered by
+			//      finishRouteConnection()
+			// (b) RouteNode.setChildren() will know to only allow this incoming
+			//     arc on these nodes
+			for (PIP pip : net.getPIPs()) {
+				Node start = (pip.isReversed()) ? pip.getEndNode() : pip.getStartNode();
+				Node end = (pip.isReversed()) ? pip.getStartNode() : pip.getEndNode();
+				RouteNode rstart = getOrCreateRouteNode(start, RouteNodeType.WIRE);
+				RouteNode rend = getOrCreateRouteNode(end, RouteNodeType.WIRE);
+				assert (rend.getPrev() == null);
+				rend.setPrev(rstart);
+			}
+
+			NetWrapper netWrapper = e.getValue();
+			for (Connection connection : netWrapper.getConnections()) {
+				finishRouteConnection(connection);
+			}
+		}
+	}
+
+	@Override
 	protected void addGlobalClkRoutingTargets(Net clk) {
 		if(!clk.hasPIPs()) {
 			super.addGlobalClkRoutingTargets(clk);
@@ -292,13 +321,27 @@ public class PartialRouter extends RWRoute{
 			boolean removed = partiallyPreservedNets.remove(netWrapper);
 			assert(removed);
 
-			for(Node toBuild : RouterHelper.getNodesOfNet(net)) {
-				// Since net already exists, all the nodes it uses will already
-				// have been created
-				RouteNode rnode = routingGraph.getNode(toBuild);
-				assert(rnode != null);
+			// Collect all nodes used by this net
+			for (PIP pip : net.getPIPs()) {
+				Node start = (pip.isReversed()) ? pip.getEndNode() : pip.getStartNode();
+				Node end = (pip.isReversed()) ? pip.getStartNode() : pip.getEndNode();
 
-				rnodes.add(rnode);
+				// Since net already exists, all the nodes it uses must already
+				// have been created
+				RouteNode rstart = routingGraph.getNode(start);
+				assert (rstart != null);
+				boolean rstartAdded = rnodes.add(rstart);
+				boolean startPreserved = routingGraph.unpreserve(start);
+				assert(rstartAdded == startPreserved);
+
+				RouteNode rend = routingGraph.getNode(end);
+				assert (rend != null);
+				boolean rendAdded = rnodes.add(rend);
+				boolean endPreserved = routingGraph.unpreserve(end);
+				assert(rendAdded == endPreserved);
+
+				// Also set the prev pointer according to the PIP
+				rend.setPrev(rstart);
 			}
 		} else {
 			// Net needs to be created
@@ -308,13 +351,18 @@ public class PartialRouter extends RWRoute{
 			for (PIP pip : net.getPIPs()) {
 				Node start = (pip.isReversed()) ? pip.getEndNode() : pip.getStartNode();
 				Node end = (pip.isReversed()) ? pip.getStartNode() : pip.getEndNode();
+				boolean startPreserved = routingGraph.unpreserve(start);
+				boolean endPreserved = routingGraph.unpreserve(end);
+
 				RouteNode rstart = getOrCreateRouteNode(start, RouteNodeType.WIRE);
 				RouteNode rend = getOrCreateRouteNode(end, RouteNodeType.WIRE);
-
-				rnodes.add(rstart);
-				rnodes.add(rend);
+				boolean rstartAdded = rnodes.add(rstart);
+				boolean rendAdded = rnodes.add(rend);
+				assert(rstartAdded == startPreserved);
+				assert(rendAdded == endPreserved);
 
 				// Also set the prev pointer according to the PIP
+				assert (rend.getPrev() == null);
 				rend.setPrev(rstart);
 			}
 
@@ -336,9 +384,10 @@ public class PartialRouter extends RWRoute{
 
 		for (RouteNode rnode : rnodes) {
 			Node toBuild = rnode.getNode();
-			routingGraph.unpreserve(toBuild);
+			// Check already unpreserved above
+			assert(!routingGraph.isPreserved(toBuild));
 
-			// Each rnode should be added as a child to any of its parents
+			// Each rnode should be added as a child to all of its parents
 			// that already exist, unless it was already present
 			for(Node uphill : toBuild.getAllUphillNodes()) {
 				// Without this routethru check, there will be Invalid Programming for Site error shown in Vivado.
@@ -347,8 +396,20 @@ public class PartialRouter extends RWRoute{
 				RouteNode parent = routingGraph.getNode(uphill);
 				if (parent == null)
 					continue;
-				if (parent.containsChild(rnode))
+
+				// Parent has never been expanded, let it expand naturally
+				if (!parent.everExpanded())
 					continue;
+
+				// Parent has been expanded, and if it is the prev node,
+				// then it must already be its child
+				if (rnode.getPrev() == parent) {
+					assert(parent.containsChild(rnode));
+					continue;
+				}
+
+				// Otherwise there's no reason for it to exist as a child
+				assert(!parent.containsChild(rnode));
 				parent.addChild(rnode);
 			}
 

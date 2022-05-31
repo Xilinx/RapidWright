@@ -254,6 +254,18 @@ abstract public class RouteNode {
 		return node.hashCode();
 	}
 
+	@Override
+	public boolean equals(Object obj){
+		if(this == obj)
+			return true;
+		if(obj == null)
+			return false;
+		if(getClass() != obj.getClass())
+			return false;
+		RouteNode that = (RouteNode) obj;
+		return node.equals(that.node);
+	}
+
 	/**
 	 * Checks if coordinates of a RouteNode Object is within the connection's bounding box.
 	 * @param connection The connection that is being routed.
@@ -343,9 +355,11 @@ abstract public class RouteNode {
 	 * @return True if child already present.
 	 */
 	public boolean containsChild(RouteNode rnode) {
+		assert(children != null);
+
 		// This linear search is rather inefficient, but is currently only used by
 		// PartialRouter.unpreserveNet() which is not expected to be called often
-		for (RouteNode child : getChildren()) {
+		for (RouteNode child : children) {
 			if (child == rnode) {
 				return true;
 			}
@@ -358,14 +372,12 @@ abstract public class RouteNode {
 	 * @param rnode Child to be added.
 	 */
 	public void addChild(RouteNode rnode) {
+		assert(children != null);
+
 		// This add-just-one method is rather inefficient, but is currently only used by
 		// PartialRouter.unpreserveNet() which is not expected to be called often
-		if (children == null) {
-			children = new RouteNode[]{rnode};
-		} else {
-			children = Arrays.copyOf(children, children.length + 1);
-			children[children.length - 1] = rnode;
-		}
+		children = Arrays.copyOf(children, children.length + 1);
+		children[children.length - 1] = rnode;
 	}
 
 	private void setType(RouteNodeType type) {
@@ -568,6 +580,15 @@ abstract public class RouteNode {
 	 */
 	public void setHistoricalCongestionCost(float historicalCongestionCost) {
 		this.historicalCongestionCost = historicalCongestionCost;
+	}
+
+	/**
+	 * Checks if a RouteNode instance has ever been expanded, as determined
+	 * by whether its children member is null.
+	 * @return true, if a RouteNode instance has been expanded before.
+	 */
+	public boolean everExpanded() {
+		return children != null;
 	}
 
 	/**

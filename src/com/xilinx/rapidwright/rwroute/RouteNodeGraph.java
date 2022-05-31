@@ -168,8 +168,8 @@ public class RouteNodeGraph {
         }
     }
 
-    public void unpreserve(Node node) {
-        preservedMap.remove(node);
+    public boolean unpreserve(Node node) {
+        return preservedMap.remove(node) != null;
     }
 
     public boolean isPreserved(Node node) {
@@ -252,7 +252,7 @@ public class RouteNodeGraph {
         int sum = 0;
         for(Map.Entry<Node, RouteNode> e : getNodeEntries()){
             RouteNodeImpl rnode = (RouteNodeImpl) e.getValue();
-            sum += (rnode.children != null) ? rnode.children.length : 0;
+            sum += rnode.everExpanded() ? rnode.getChildren().length : 0;
         }
         return Math.round((float) sum / numNodes());
     }
