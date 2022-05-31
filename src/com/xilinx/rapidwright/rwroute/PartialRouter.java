@@ -65,11 +65,8 @@ public class PartialRouter extends RWRoute{
 		}
 
 		@Override
-		protected boolean isPreserved(Node parent, Node child) {
-			// FIXME: Masking an existing route does not necessarily mean that
-			//        isExcluded() won't return false (e.g. LUT routethru)
-			boolean preserved = super.isPreserved(parent, child);
-			return preserved && maskPreservedIfExistingRoute(parent, child);
+		protected boolean mustInclude(Node parent, Node child) {
+			return isPartOfExistingRoute(parent, child);
 		}
 	}
 
@@ -79,9 +76,8 @@ public class PartialRouter extends RWRoute{
 		}
 
 		@Override
-		protected boolean isPreserved(Node parent, Node child) {
-			boolean preserved = super.isPreserved(parent, child);
-			return preserved && maskPreservedIfExistingRoute(parent, child);
+		protected boolean mustInclude(Node parent, Node child) {
+			return isPartOfExistingRoute(parent, child);
 		}
 	}
 
@@ -99,7 +95,7 @@ public class PartialRouter extends RWRoute{
 	}
 
 	/**
-	 * Compute the mask for an otherwise preserved node.
+	 * Checks whether this arc is part of an existing route.
 	 * For Nets containing at least one Connection to be routed, all fully routed
 	 * Connections and their associated Nodes (if any) are preserved. Any such
 	 * Nodes can (and are encouraged) to be used as part of routing such incomplete
@@ -111,13 +107,16 @@ public class PartialRouter extends RWRoute{
 	 * upon masking.
 	 * @param start Start Node of arc.
 	 * @param end End Node of arc.
-	 * @return Mask to be AND-ed with preserved state
+	 * @return True if arc is part of an existing route.
 	 */
-	private boolean maskPreservedIfExistingRoute(Node start, Node end) {
+	private boolean isPartOfExistingRoute(Node start, Node end) {
+		if (!routingGraph.isPreserved(end))
+			return false;
+
 		// If preserved, check if end node has been created already
 		RouteNode endRnode = routingGraph.getNode(end);
 		if (endRnode == null)
-			return true;
+			return false;
 
 		// If so, get its prev pointer
 		RouteNode prev = endRnode.getPrev();
@@ -127,11 +126,11 @@ public class PartialRouter extends RWRoute{
 			assert((prev.getNode() == start) == prev.getNode().equals(start));
 			if (prev.getNode() == start) {
 				endRnode.setVisited(false);
-				return false;
+				return true;
 			}
 		}
 
-		return true;
+		return false;
 	}
 
 	@Override

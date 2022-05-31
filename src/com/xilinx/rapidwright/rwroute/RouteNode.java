@@ -113,8 +113,10 @@ abstract public class RouteNode {
 		List<Node> allDownHillNodes = node.getAllDownhillNodes();
 		List<RouteNode> childrenList = new ArrayList<>(allDownHillNodes.size());
 		for(Node downhill: allDownHillNodes){
-			if(isPreserved(node, downhill)) continue;
-			if(isExcluded(node, downhill)) continue;
+			if(!mustInclude(node, downhill)) {
+				if (isPreserved(downhill) || isExcluded(node, downhill))
+					continue;
+			}
 
 			final RouteNodeType type = RouteNodeType.WIRE;
 			RouteNode child = getOrCreate(downhill, type);
@@ -611,21 +613,25 @@ abstract public class RouteNode {
 	}
 
 	/**
-	 * Checks if a routing arc has been preserved and cannot be used.
+	 * Checks if a routing arc must be included.
 	 * @param parent The routing arc's parent node.
 	 * @param child The routing arc's parent node.
-	 * @return true, if the arc should be excluded from the routing resource graph.
+	 * @return True, if the arc should be included in the routing resource graph.
 	 */
-	abstract public boolean isPreserved(Node parent, Node child);
+	abstract public boolean mustInclude(Node parent, Node child);
 
 	/**
-	 * Checks if a routing arc has been excluded and cannot be used.
-	 * Note that this method does not check if a node is unusable because
-	 * it is preserved, the assumption is that {@link #isPreserved} has
-	 * already been checked.
+	 * Checks if a node has been preserved and thus cannot be used.
+	 * @param node The node in question.
+	 * @return True, if the arc should be excluded from the routing resource graph.
+	 */
+	abstract public boolean isPreserved(Node node);
+
+	/**
+	 * Checks if a routing arc has been excluded thus cannot be used.
 	 * @param parent The routing arc's parent node.
 	 * @param child The routing arc's parent node.
-	 * @return true, if the arc should be excluded from the routing resource graph.
+	 * @return True, if the arc should be excluded from the routing resource graph.
 	 */
 	abstract public boolean isExcluded(Node parent, Node child);
 }

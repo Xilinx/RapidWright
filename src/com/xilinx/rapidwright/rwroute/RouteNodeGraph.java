@@ -87,8 +87,13 @@ public class RouteNodeGraph {
         }
 
         @Override
-        public boolean isPreserved(Node parent, Node child) {
-            return RouteNodeGraph.this.isPreserved(parent, child);
+        public boolean mustInclude(Node parent, Node child) {
+            return RouteNodeGraph.this.mustInclude(parent, child);
+        }
+
+        @Override
+        public boolean isPreserved(Node node) {
+            return RouteNodeGraph.this.isPreserved(node);
         }
 
         @Override
@@ -171,10 +176,6 @@ public class RouteNodeGraph {
         return preservedMap.containsKey(node);
     }
 
-    protected boolean isPreserved(Node parent, Node child) {
-        return isPreserved(child);
-    }
-
     final private static Set<TileTypeEnum> allowedTileEnums;
     static {
         allowedTileEnums = new HashSet<>();
@@ -184,6 +185,10 @@ public class RouteNodeGraph {
                 allowedTileEnums.add(e);
             }
         }
+    }
+
+    protected boolean mustInclude(Node parent, Node child) {
+        return false;
     }
 
     protected boolean isExcluded(Node parent, Node child) {
