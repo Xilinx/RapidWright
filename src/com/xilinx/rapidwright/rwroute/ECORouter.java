@@ -190,27 +190,10 @@ public class ECORouter extends PartialRouter {
         super.determineRoutingTargets();
 
         // Go through all nets to be routed
-        for (Map.Entry<Net,NetWrapper> e : nets.entrySet()) {
-            Net net = e.getKey();
+        for (Map.Entry<?,NetWrapper> e : nets.entrySet()) {
             NetWrapper netWrapper = e.getValue();
 
-            // Create all nodes used by this net and set its previous pointer so that:
-            // (a) the routing for each connection can be recovered by
-            //      finishRouteConnection()
-            // (b) RouteNode.setChildren() will know to only allow this incoming
-            //     arc on these nodes
-            for (PIP pip : net.getPIPs()) {
-                Node start = (pip.isReversed()) ? pip.getEndNode() : pip.getStartNode();
-                Node end = (pip.isReversed()) ? pip.getStartNode() : pip.getEndNode();
-                RouteNode rstart = getOrCreateRouteNode(start, RouteNodeType.WIRE);
-                RouteNode rend = getOrCreateRouteNode(end, RouteNodeType.WIRE);
-                assert (rend.getPrev() == null);
-                rend.setPrev(rstart);
-            }
-
             for (Connection connection : netWrapper.getConnections()) {
-                finishRouteConnection(connection);
-
                 if (connection.getSink().isRouted())
                     continue;
 
