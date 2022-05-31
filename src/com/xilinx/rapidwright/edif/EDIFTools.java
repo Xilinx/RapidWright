@@ -285,19 +285,16 @@ public class EDIFTools {
 		return instanceMap;
 	}
 	
+	/**
+	 * Same as EDIFNetlist.getCellInstFromHierName()
+	 * @param netlist The netlist to search
+	 * @param hierarchicalName The full hierarchical name of the instance
+	 * @return The cell instance named, or null if it could not be found
+	 * @deprecated 
+	 * To be removed in 2022.2.0
+	 */
 	public static EDIFCellInst getEDIFCellInst(EDIFNetlist netlist, String hierarchicalName){
-		String[] names = hierarchicalName.split(EDIF_HIER_SEP);
-		EDIFCellInst curr = netlist.getTopCellInst();
-		
-		for(String name : names){
-			EDIFCellInst next = curr.getCellType().getCellInst(name);
-			if (next == null) {
-				throw new NullPointerException("Did not find cell "+name+" in "+curr+" while trying to resolve hierarchical name "+hierarchicalName);
-			}
-			curr = next;
-		}
-		
-		return curr;
+	    return netlist.getCellInstFromHierName(hierarchicalName);
 	}
 	
 	/**
