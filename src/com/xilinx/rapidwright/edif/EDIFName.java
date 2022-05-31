@@ -65,8 +65,7 @@ public class EDIFName implements Comparable<EDIFName> {
 		this.name = name;
 	}
 
-	public static void exportSomeEDIFName(Writer wr, String name, EDIFWriteLegalNameCache cache) throws IOException {
-		final String legalName = cache.getEDIFName(name);
+	public static void exportSomeEDIFName(Writer wr, String name, String legalName) throws IOException {
 		if (legalName == null) {
 			wr.write(name);
 			return;
@@ -77,7 +76,7 @@ public class EDIFName implements Comparable<EDIFName> {
 		wr.write(name);
 		wr.write("\")");
 	}
-	
+
 	/**
 	 * Writes out valid EDIF syntax the name and/or rename of this object to
 	 * the provided output writer.
@@ -85,8 +84,7 @@ public class EDIFName implements Comparable<EDIFName> {
 	 * @throws IOException
 	 */
 	public void exportEDIFName(Writer wr, EDIFWriteLegalNameCache cache) throws IOException{
-
-		exportSomeEDIFName(wr, name, cache);
+		exportSomeEDIFName(wr, getName(), getEDIFName(cache));
 	}
 
 	/* (non-Javadoc)
@@ -132,4 +130,15 @@ public class EDIFName implements Comparable<EDIFName> {
 	public int compareTo(EDIFName o) {
 		return this.getName().compareTo(o.getName());
 	}
+
+
+	protected String getEDIFName(EDIFWriteLegalNameCache cache){
+		return cache.getEDIFName(getName());
+	}
+
+	public String getLegalEDIFName(EDIFWriteLegalNameCache cache) {
+		String rename = getEDIFName(cache);
+		return rename == null ? getName() : rename;
+	}
+
 }

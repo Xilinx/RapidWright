@@ -234,17 +234,17 @@ public class EDIFPortInst {
 		wr.write(indent);
 		wr.write("(portref ");
 		if(index == -1) {
-			wr.write(cache.getLegalEDIFName(getPort()));
+			wr.write(getPort().getLegalEDIFName(cache));
 		}
 		else {
 			wr.write("(member ");
-			wr.write(cache.getLegalEDIFName(getPort()));
+			wr.write(getPort().getLegalEDIFName(cache));
 			wr.write(" " + index);
 			wr.write(")");
 		}
 		if(getCellInst() != null){
 			wr.write(" (instanceref ");
-			wr.write(cache.getLegalEDIFName(getCellInst()) + ")");
+			wr.write(getCellInst().getLegalEDIFName(cache) + ")");
 		}
 		wr.write(")\n");
 	}

@@ -180,7 +180,7 @@ public class EDIFPropertyObject extends EDIFName {
 			try {
 				wr.write(indent);
 				wr.write("(property ");
-				EDIFName.exportSomeEDIFName(wr, e.getKey(), cache);
+				EDIFName.exportSomeEDIFName(wr, e.getKey(), cache.getEDIFName(e.getKey()));
 				wr.write(" ");
 				e.getValue().writeEDIFString(wr);
 				if(owner != null){

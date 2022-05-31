@@ -160,22 +160,18 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
 
 	protected String updateEDIFRename(int unique){
 		updateEDIFRename();
-		edifRename =  getLegalEDIFName() + "_" + unique;
+		edifRename =  edifRename + "_" + unique;
 		return edifRename;
 	}
 
-	protected String getEDIFName(){
+	@Override
+	protected String getEDIFName(EDIFWriteLegalNameCache cache){
 		return edifRename;
 	}
 
 	protected void setEDIFRename(String edifRename) {
 		this.edifRename = edifRename;
 	}
-
-	public String getLegalEDIFName() {
-		return edifRename == null ? getName() : edifRename;
-	}
-
 
 	public EDIFCellInst createChildCellInst(String name, EDIFCell reference) {
 		return new EDIFCellInst(name, reference, this);
@@ -654,6 +650,14 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
 	@Override
 	public int hashCode() {
 		return Objects.hash(super.hashCode(), edifRename, library);
+	}
+
+	public String getLegalEDIFName() {
+		return getLegalEDIFName(null); //This is overridden to not need the cache
+	}
+
+	public String getEDIFName() {
+		return getEDIFName(null); //This is overridden to not need the cache
 	}
 }
  

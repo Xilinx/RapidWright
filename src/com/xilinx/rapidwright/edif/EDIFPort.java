@@ -220,7 +220,16 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
 	    }
 	    return getBusName() + "[" + index + "]";     
 	}
-	
+
+	@Override
+	protected String getEDIFName(EDIFWriteLegalNameCache cache) {
+		final String edifName = cache.getEDIFName(getBusName());
+		if (edifName == null && isBus()) { //Always renaming buses
+			return getBusName();
+		}
+		return edifName;
+	}
+
 	public void exportEDIF(Writer wr, String indent, EDIFWriteLegalNameCache cache) throws IOException{
 		wr.write(indent);
 		wr.write("(port ");

@@ -727,7 +727,7 @@ public class EDIFNetlist extends EDIFName {
 			if (design != null) {
 				design.exportEDIFName(bw, cache);
 				bw.write("\n    (cellref " + design.getTopCell().getLegalEDIFName() + " (libraryref ");
-				bw.write(cache.getLegalEDIFName(design.getTopCell().getLibrary()) + "))\n");
+                bw.write(design.getTopCell().getLibrary().getLegalEDIFName(cache) + "))\n");
 				design.exportEDIFProperties(bw, "    ", cache);
 				bw.write("  )\n");
 			}

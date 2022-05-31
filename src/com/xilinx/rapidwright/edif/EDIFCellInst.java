@@ -245,11 +245,11 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
         wr.write("         (instance ");
         exportEDIFName(wr, cache);
         wr.write(" (viewref ");
-        wr.write(cache.getLegalEDIFName(getViewref()));
+        wr.write(getViewref().getLegalEDIFName(cache));
         wr.write(" (cellref ");
-        wr.write(cellType.getLegalEDIFName());
+        wr.write(cellType.getLegalEDIFName(cache));
         wr.write(" (libraryref ");
-        wr.write(cache.getLegalEDIFName(cellType.getLibrary()));
+        wr.write(cellType.getLibrary().getLegalEDIFName(cache));
         if(getProperties().size() > 0){
             wr.write(")))\n");
             exportEDIFProperties(wr, "           ", cache);
