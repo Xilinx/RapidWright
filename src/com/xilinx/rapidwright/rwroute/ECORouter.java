@@ -189,7 +189,7 @@ public class ECORouter extends PartialRouter {
     protected void determineRoutingTargets(){
         super.determineRoutingTargets();
 
-        // The following code is customer-specific.
+        // FIXME: The following code is Sashimi-specific.
         // As a post-processing step once all nets-to-route have been determined,
         // it looks for sinks that are direct inputs ([A-H]_X or [A-H]_I) and,
         // assuming that they target either of the two available FFs, performs
@@ -272,7 +272,7 @@ public class ECORouter extends PartialRouter {
 
     @Override
     protected void assignNodesToConnections() {
-        // The following code is customer-specific.
+        // FIXME: The following code is Sashimi-specific.
         // As a post-processing step once all nets have been routed,
         // it looks for sinks that finish at the direct inputs ([A-H]_X or [A-H]_I),
         // and are preceded by the LUT output. If this occurs, the fake edge that
@@ -304,7 +304,7 @@ public class ECORouter extends PartialRouter {
                         assert(design.getModifiedSiteInsts().contains(si));
                     }
 
-                    System.out.println(lutPin.getPinName() + " -> " + sinkPinName + " for " + connection.getNetWrapper().getNet());
+                    // System.out.println(lutPin.getPinName() + " -> " + sinkPinName + " for " + connection.getNetWrapper().getNet());
                 }
             }
         }
