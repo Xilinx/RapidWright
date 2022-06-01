@@ -2559,8 +2559,8 @@ public class DesignTools {
 	        }
 	        EDIFHierNet parentHierNet = netParentMap.get(hierNet);
 	        if(parentHierNet == null) {
-	            System.out.println("WARNING: Couldn't find parent net for '" +
-	                    hierNet.getHierarchicalNetName() + "'");
+	            // System.out.println("WARNING: Couldn't find parent net for '" +
+	            //         hierNet.getHierarchicalNetName() + "'");
 	            continue;
 	        }
 	        if(!hierNet.equals(parentHierNet)) {
