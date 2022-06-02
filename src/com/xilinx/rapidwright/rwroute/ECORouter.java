@@ -425,13 +425,13 @@ public class ECORouter extends PartialRouter {
 
             net.setPIPs(newPIPs);
 
-            oldPIPs.removeAll(newPIPs);
-            if (!oldPIPs.isEmpty()) {
-                System.out.println("PIP delta for '" + net + "':");
-                for (PIP pip : oldPIPs) {
-                    System.out.println("\t- " + pip);
-                }
-            }
+            // oldPIPs.removeAll(newPIPs);
+            // if (!oldPIPs.isEmpty()) {
+            //     System.out.println("PIP delta for '" + net + "':");
+            //     for (PIP pip : oldPIPs) {
+            //         System.out.println("\t- " + pip);
+            //     }
+            // }
         }
 
         // Disabled for runtime reasons
