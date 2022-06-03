@@ -896,8 +896,7 @@ public class DesignTools {
 			EDIFHierNet parentNetName = netlist.getParentNet(netName);
 			Net parentNet = design.getNet(parentNetName.getHierarchicalNetName());
 			if(parentNet == null) {
-				if(parentNetName == null) parentNetName = netName;
-				parentNet = new Net(parentNetName.getHierarchicalInstName(),parentNetName.getNet());
+				parentNet = new Net(parentNetName.getHierarchicalNetName(),parentNetName.getNet());
 			}
 			for(EDIFHierNet netAlias : netlist.getNetAliases(netName)) {
 				if(parentNet.equals(netAlias)) continue;
