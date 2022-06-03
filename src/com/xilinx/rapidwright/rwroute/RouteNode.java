@@ -357,8 +357,8 @@ abstract public class RouteNode {
 	public boolean containsChild(RouteNode rnode) {
 		assert(children != null);
 
-		// This linear search is rather inefficient, but is currently only used by
-		// PartialRouter.unpreserveNet() which is not expected to be called often
+		// This linear search is rather inefficient, but is currently only used in
+		// an assertion inside PartialRouter.unpreserveNet()
 		for (RouteNode child : children) {
 			if (child == rnode) {
 				return true;
