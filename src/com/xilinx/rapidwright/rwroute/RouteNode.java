@@ -47,6 +47,8 @@ abstract public class RouteNode {
 	public static final short capacity = 1;
 	/** Memoized static array for use by Collection.toArray() or similar */
 	public static final RouteNode[] EMPTY_ARRAY = new RouteNode[0];
+	public static final short SLR_HEIGHT_IN_TILES = 300;
+	public static final short LAGUNA_HEIGHT_IN_TILES = 60;
 
 	/** The associated {@link Node} instance */
 	protected Node node;
@@ -655,4 +657,8 @@ abstract public class RouteNode {
 	 * @return True, if the arc should be excluded from the routing resource graph.
 	 */
 	abstract public boolean isExcluded(Node parent, Node child);
+
+	public int getSLRIndex() {
+		return endTileYCoordinate / SLR_HEIGHT_IN_TILES;
+	}
 }

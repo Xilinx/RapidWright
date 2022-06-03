@@ -1354,8 +1354,26 @@ public class RWRoute{
 		if (config.isTimingDriven()) {
 			newPartialPathCost += rnodeDelayWeight * (childRnode.getDelay() + DelayEstimatorBase.getExtraDelay(childRnode.getNode(), longParent));
 		}
-		int deltaX = Math.abs(childRnode.getEndTileXCoordinate() - connection.getSinkRnode().getEndTileXCoordinate());
-		int deltaY = Math.abs(childRnode.getEndTileYCoordinate() - connection.getSinkRnode().getEndTileYCoordinate());
+
+		int childX = childRnode.getEndTileXCoordinate();
+		int childY = childRnode.getEndTileYCoordinate();
+		RouteNode sinkRnode = connection.getSinkRnode();
+		int sinkX = sinkRnode.getEndTileXCoordinate();
+		int sinkY = sinkRnode.getEndTileYCoordinate();
+		int deltaX = Math.abs(childX - sinkX);
+		int deltaY = Math.abs(childY - sinkY);
+		if (connection.isCrossSLR()) {
+			int deltaSLR = Math.abs(sinkRnode.getSLRIndex() - childRnode.getSLRIndex());
+			// Check for overshooting which occurs when child and sink node are in
+		 // adjacent SLRs and less than a Laguna wire's length apart in the Y axis.
+			if (deltaSLR == 1) {
+				int overshootBy = deltaY - RouteNode.LAGUNA_HEIGHT_IN_TILES;
+				if (overshootBy < 0) {
+					deltaY = RouteNode.LAGUNA_HEIGHT_IN_TILES - overshootBy;
+				}
+			}
+		}
+
 		int distanceToSink = deltaX + deltaY;
 		float newTotalPathCost = newPartialPathCost + rnodeEstWlWeight * distanceToSink / sharingFactor;
 		if (config.isTimingDriven()) {
