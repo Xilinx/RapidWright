@@ -56,6 +56,7 @@ import com.xilinx.rapidwright.timing.TimingManager;
 import com.xilinx.rapidwright.timing.TimingVertex;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
+import org.python.google.common.collect.Lists;
 
 /**
  * RWRoute class provides the main methods for routing a design.
@@ -1142,14 +1143,15 @@ public class RWRoute{
 	 * @param connection The connection to route.
 	 */
 	private void routeConnection(Connection connection){
-		prepareRouteConnection(connection);
-		
 		float rnodeCostWeight = 1 - connection.getCriticality();
 		float shareWeight = (float) (Math.pow(rnodeCostWeight, config.getShareExponent()));
 		float rnodeWLWeight = rnodeCostWeight * oneMinusWlWeight;
 		float estWlWeight = rnodeCostWeight * wlWeight;
 		float dlyWeight = connection.getCriticality() * oneMinusTimingWeight / 100f;
 		float estDlyWeight = connection.getCriticality() * timingWeight;
+
+		prepareRouteConnection(connection, shareWeight, rnodeCostWeight,
+				rnodeWLWeight, estWlWeight, dlyWeight, estDlyWeight);
 
 		boolean successRoute = false;
 		while(!queue.isEmpty()){
@@ -1162,6 +1164,7 @@ public class RWRoute{
 			exploreAndExpand(rnode, connection, shareWeight, rnodeCostWeight,
 					rnodeWLWeight, estWlWeight, dlyWeight, estDlyWeight);
 		}
+		assert(queue.isEmpty());
 		
 		if(successRoute) {
 			finishRouteConnection(connection);
@@ -1282,8 +1285,15 @@ public class RWRoute{
 								  float rnodeDelayWeight, float rnodeEstDlyWeight){
 		boolean longParent = config.isTimingDriven() && DelayEstimatorBase.isLong(rnode.getNode());
 		for(RouteNode childRNode:rnode.getChildren()){
-			if(childRNode.isVisited()) continue;
-			if(childRNode.isTarget()){
+			if(childRNode.isVisited()) {
+				// Skip all nodes that have ever been pushed on the queue (regardless
+				// of whether they have been popped or not).
+				// This does mean that, should the router find a shorter path to an
+				// (un-popped) node that is still present in the queue, this shorter
+				// path is discarded.
+				continue;
+			}
+			if(childRNode.isTarget()) {
 				queue.clear();
 			} else {
 				switch (childRNode.getType()) {
@@ -1431,23 +1441,57 @@ public class RWRoute{
 	
 	/**
 	 * Prepares for routing a connection.
-	 * @param connection The target connection to be routed.
+	 * @param connectionToRoute The target connection to be routed.
 	 */
-	private void prepareRouteConnection(Connection connection){
-		// Rips up the connection
-		ripUp(connection);
-		
+	private void prepareRouteConnection(Connection connectionToRoute, float shareWeight, float rnodeCostWeight,
+										float rnodeLengthWeight, float rnodeEstWlWeight,
+										float rnodeDelayWeight, float rnodeEstDlyWeight){
 		connectionsRouted++;
 		connectionsRoutedIteration++;
-		// Clears previous route of the connection
-		connection.resetRoute();
-		queue.clear();	
+		queue.clear();
 		
 		// Sets the sink rnode of the connection as the target
-		connection.getSinkRnode().setTarget(true);
-		
+		connectionToRoute.getSinkRnode().setTarget(true);
+
 		// Adds the source rnode to the queue
-		push(connection.getSourceRnode(), null, 0, 0);
+		push(connectionToRoute.getSourceRnode(), null, 0, 0);
+
+		// Push all nodes from all net's routed connections onto the queue
+		NetWrapper netWrapper = connectionToRoute.getNetWrapper();
+		for (Connection connection : netWrapper.getConnections()) {
+			if (connection.getSink().isRouted()) {
+				RouteNode parentRnode = null;
+				boolean overUsed = false;
+				for (RouteNode childRnode : Lists.reverse(connection.getRnodes())) {
+					if (connection == connectionToRoute) {
+						overUsed = overUsed || childRnode.isOverUsed();
+
+						// Rip up the connection
+						childRnode.decrementUser(netWrapper);
+						childRnode.updatePresentCongestionCost(presentCongestionFactor);
+
+						// Once an over used node is encountered, do not add anything
+						// downstream to queue (but continue looping since we need to rip up)
+						if (overUsed)
+							continue;
+					} else {
+						// Once an over used node is encountered, skip all downstream nodes
+						if (childRnode.isOverUsed())
+							break;
+					}
+
+					if (parentRnode != null && !childRnode.isVisited()) {
+						boolean longParent = config.isTimingDriven() && DelayEstimatorBase.isLong(parentRnode.getNode());
+						evaluateCostAndPush(parentRnode, longParent, childRnode, connection, shareWeight, rnodeCostWeight,
+								rnodeLengthWeight, rnodeEstWlWeight, rnodeDelayWeight, rnodeEstDlyWeight);
+					}
+					parentRnode = childRnode;
+				}
+			}
+		}
+
+		// Clears previous route of the connection
+		connectionToRoute.resetRoute();
 	}
 	
 	/**
