@@ -25,6 +25,7 @@ package com.xilinx.rapidwright.rwroute;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -165,7 +166,15 @@ public class RWRoute{
 		minRerouteCriticality = config.getMinRerouteCriticality();
 		criticalConnections = new ArrayList<>();
 
-		queue = new PriorityQueue<>((r1,r2) -> Float.compare(r1.getLowerBoundTotalPathCost(), r2.getLowerBoundTotalPathCost()));
+		// Latter appears to be slightly faster than the former two since it doesn't use a lambda...
+		// queue = new PriorityQueue<>((r1, r2) -> Float.compare(r1.getLowerBoundTotalPathCost(), r2.getLowerBoundTotalPathCost()));
+		// queue = new PriorityQueue<>(Comparator.comparing(RouteNode::getLowerBoundTotalPathCost));
+		queue = new PriorityQueue<>(new Comparator<RouteNode>() {
+		     public int compare(RouteNode r1, RouteNode r2) {
+		             return Float.compare(r1.getLowerBoundTotalPathCost(), r2.getLowerBoundTotalPathCost());
+		     }
+		});
+
 		routingGraph = createRouteNodeGraph();
 		if(config.isTimingDriven()) {
 			nodesDelays = new HashMap<>();
