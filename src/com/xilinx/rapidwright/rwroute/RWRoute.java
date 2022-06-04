@@ -1288,9 +1288,9 @@ public class RWRoute{
 			if(childRNode.isVisited()) {
 				// Skip all nodes that have ever been pushed on the queue (regardless
 				// of whether they have been popped or not).
-				// This does mean that, should the router find a shorter path to an
-				// (un-popped) node that is still present in the queue, this shorter
-				// path is discarded.
+				// This does mean that, if a shorter path to an (un-popped) node that
+				// is still present in the queue were to exist here, it would never be
+				// considered.
 				continue;
 			}
 			if(childRNode.isTarget()) {
