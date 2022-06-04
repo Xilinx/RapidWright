@@ -124,13 +124,18 @@ public class RouteNodeGraph {
         visited = new ArrayList<>();
         this.setChildrenTimer = setChildrenTimer;
         this.design = design;
+
         Device device = design.getDevice();
         yToSLRIndex = new int[device.getRows()];
-        for (SLR slr : device.getSLRs()) {
-            Tile lr = slr.getLowerRight();
-            Tile ul = slr.getUpperLeft();
-            for (int y = lr.getTileYCoordinate(); y <= ul.getTileYCoordinate(); y++) {
-                yToSLRIndex[y] = slr.getId();
+        Tile[][] intTiles = device.getTilesByNameRoot("INT");
+        for (int y = 0; y < intTiles.length; y++) {
+            Tile[] intTilesAtY = intTiles[y];
+            for (int x = 0; x < intTilesAtY.length; x++) {
+                Tile tile = intTilesAtY[x];
+                if (tile != null) {
+                    yToSLRIndex[y] = tile.getSLR().getId();
+                    break;
+                }
             }
         }
     }
