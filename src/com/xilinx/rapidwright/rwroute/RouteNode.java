@@ -48,6 +48,7 @@ abstract public class RouteNode {
 	/** Memoized static array for use by Collection.toArray() or similar */
 	public static final RouteNode[] EMPTY_ARRAY = new RouteNode[0];
 	public static final short SUPER_LONG_LINE_LENGTH_IN_TILES = 60;
+	public static final short MAX_COLS_FROM_LAGUNA_TILE = 12;
 
 	/** The associated {@link Node} instance */
 	protected Node node;

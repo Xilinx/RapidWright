@@ -90,6 +90,7 @@ public class Connection implements Comparable<Connection>{
 		rnodes = new ArrayList<>();
 		this.netWrapper = netWrapper;
 		netWrapper.addConnection(this);
+		crossSLR = !source.getTile().getSLR().equals(sink.getTile().getSLR());
 	}
 	
 	/**
@@ -105,9 +106,8 @@ public class Connection implements Comparable<Connection>{
 	 * @param boundingBoxExtensionX To indicate the extension on top of the minimum bounding box in the horizontal direction.
 	 * @param boundingBoxExtensionY To indicate the extension on top of the minimum bounding box in the vertical direction.
 	 * that contains the source rnode, sink rnode and the center of its {@link NetWrapper} Object.
-	 * @param checkSLRCrossing A flag to indicate if SLR-crossing check is needed.
 	 */
-	public void computeConnectionBoundingBox(short boundingBoxExtensionX, short boundingBoxExtensionY, boolean checkSLRCrossing) {
+	public void computeConnectionBoundingBox(short boundingBoxExtensionX, short boundingBoxExtensionY) {
 		short xMin, xMax, yMin, yMax;
 		short xNetCenter = (short) Math.ceil(netWrapper.getXCenter());
 		short yNetCenter = (short) Math.ceil(netWrapper.getYCenter());
@@ -119,24 +119,23 @@ public class Connection implements Comparable<Connection>{
 		xMinBB = (short) (xMin - boundingBoxExtensionX);
 		yMaxBB = (short) (yMax + boundingBoxExtensionY);
 		yMinBB = (short) (yMin - boundingBoxExtensionY);
-		
-		// allow more space for resource expansion of SLR-crossing connections
-		if(checkSLRCrossing) {		
-			if(crossSLR()) {
-				yMaxBB += 2 * boundingBoxExtensionY;
-				yMinBB -= 2 * boundingBoxExtensionY;
+
+		if (isCrossSLR()) {
+			short widthMinusMaxLagunaDist = (short) ((xMaxBB - xMinBB - 1) - RouteNode.MAX_COLS_FROM_LAGUNA_TILE);
+			if (widthMinusMaxLagunaDist < 0) {
+				xMinBB += widthMinusMaxLagunaDist / 2;
+				xMaxBB -= (widthMinusMaxLagunaDist - 1) / 2;
+			}
+
+			short heightMinusSLL = (short) ((yMaxBB - yMinBB - 1) - RouteNode.SUPER_LONG_LINE_LENGTH_IN_TILES);
+			if (heightMinusSLL < 0) {
+				yMinBB += heightMinusSLL / 2 - boundingBoxExtensionY;
+				yMaxBB -= (heightMinusSLL - 1) / 2 - boundingBoxExtensionY;
 			}
 		}
+
 		xMinBB = xMinBB < 0? -1:xMinBB;
 		yMinBB = yMinBB < 0? -1:yMinBB;
-	}
-	
-	private boolean crossSLR() {
-		if(getSource().getTile().getSLR().equals(sink.getTile().getSLR())) {
-			return false;
-		}
-		crossSLR = true;
-		return true;
 	}
 	
 	private short maxOfThree(short var1, short var2, short var3) {
@@ -364,10 +363,6 @@ public class Connection implements Comparable<Connection>{
 		return crossSLR;
 	}
 
-	public void setCrossSLR(boolean crossSLR) {
-		this.crossSLR = crossSLR;
-	}
-	
 	public List<Node> getNodes() {
 		return nodes;
 	}

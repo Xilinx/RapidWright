@@ -63,8 +63,6 @@ import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
 public class RWRoute{
 	/** The design to route */
 	protected Design design;
-	/** A flag to indicate if the device has multiple SLRs, for the sake of avoiding unnecessary check for single-SLR devices */
-	private boolean multiSLRDevice;
 	/** Created NetWrappers */
 	protected Map<Net,NetWrapper> nets;
 	/** A list of indirect connections that will go through iterative routing */
@@ -154,8 +152,6 @@ public class RWRoute{
 	
 	public RWRoute(Design design, RWRouteConfig config) {
 		this.design = design;
-		multiSLRDevice = design.getDevice().getSLRs().length > 1;
-
 		this.config = config;
 	}
 
@@ -505,8 +501,7 @@ public class RWRoute{
 				for(Connection connection : netWrapper.getConnections()) {
 					if(connection.isDirect()) continue;
 					connection.computeConnectionBoundingBox(config.getBoundingBoxExtensionX(),
-							config.getBoundingBoxExtensionY(),
-							isMultiSLRDevice());
+							config.getBoundingBoxExtensionY());
 				}
 			}
 		}
@@ -528,10 +523,6 @@ public class RWRoute{
 	 */
 	protected void addPreservedNodes(Collection<Node> nodes, Net netToPreserve) {
 		routingGraph.asyncPreserve(nodes, netToPreserve);
-	}
-
-	public boolean isMultiSLRDevice() {
-		return multiSLRDevice;
 	}
 
 	/**
