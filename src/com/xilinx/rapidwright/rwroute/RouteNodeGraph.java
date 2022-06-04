@@ -25,8 +25,10 @@ package com.xilinx.rapidwright.rwroute;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.device.SLR;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.util.CountUpDownLatch;
@@ -75,6 +77,8 @@ public class RouteNodeGraph {
 
     final Design design;
 
+    final int[] yToSLRIndex;
+
     protected class RouteNodeImpl extends RouteNode {
 
         public RouteNodeImpl(Node node, RouteNodeType type) {
@@ -106,6 +110,11 @@ public class RouteNodeGraph {
             setChildren(setChildrenTimer);
             return super.getChildren();
         }
+
+        @Override
+        public int getSLRIndex() {
+             return yToSLRIndex[getEndTileYCoordinate()];
+        }
     }
 
     public RouteNodeGraph(RuntimeTracker setChildrenTimer, Design design) {
@@ -115,6 +124,15 @@ public class RouteNodeGraph {
         visited = new ArrayList<>();
         this.setChildrenTimer = setChildrenTimer;
         this.design = design;
+        Device device = design.getDevice();
+        yToSLRIndex = new int[device.getRows()];
+        for (SLR slr : device.getSLRs()) {
+            Tile lr = slr.getLowerRight();
+            Tile ul = slr.getUpperLeft();
+            for (int y = lr.getTileYCoordinate(); y <= ul.getTileYCoordinate(); y++) {
+                yToSLRIndex[y] = slr.getId();
+            }
+        }
     }
 
     public void initialize() {
