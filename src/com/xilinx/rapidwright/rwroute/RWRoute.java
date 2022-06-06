@@ -1357,7 +1357,7 @@ public class RWRoute{
 		if (connection.isCrossSLR()) {
 			int deltaSLR = Math.abs(sinkRnode.getSLRIndex() - childRnode.getSLRIndex());
 			// Check for overshooting which occurs when child and sink node are in
-			// adjacent SLRs and less than a Laguna wire's length apart in the Y axis.
+			// adjacent SLRs and less than a SLL wire's length apart in the Y axis.
 			if (deltaSLR == 1) {
 				int overshootBy = deltaY - RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES;
 				if (overshootBy < 0) {
