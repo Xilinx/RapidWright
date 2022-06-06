@@ -105,9 +105,9 @@ public class Connection implements Comparable<Connection>{
 	 * Computes the connection bounding box based on the geometric center of the net, source and sink rnodes.
 	 * @param boundingBoxExtensionX To indicate the extension on top of the minimum bounding box in the horizontal direction.
 	 * @param boundingBoxExtensionY To indicate the extension on top of the minimum bounding box in the vertical direction.
-	 * that contains the source rnode, sink rnode and the center of its {@link NetWrapper} Object.
+	 * @param maxXBetweenLaguna Maximum X distance between any two Laguna tiles.
 	 */
-	public void computeConnectionBoundingBox(short boundingBoxExtensionX, short boundingBoxExtensionY) {
+	public void computeConnectionBoundingBox(short boundingBoxExtensionX, short boundingBoxExtensionY, int maxXBetweenLaguna) {
 		short xMin, xMax, yMin, yMax;
 		short xNetCenter = (short) Math.ceil(netWrapper.getXCenter());
 		short yNetCenter = (short) Math.ceil(netWrapper.getYCenter());
@@ -121,13 +121,13 @@ public class Connection implements Comparable<Connection>{
 		yMinBB = (short) (yMin - boundingBoxExtensionY);
 
 		if (isCrossSLR()) {
-			short widthMinusMaxLagunaDist = (short) ((xMaxBB - xMinBB - 1) - RouteNode.MAX_COLS_FROM_LAGUNA_TILE);
+			short widthMinusMaxLagunaDist = (short) ((xMaxBB - xMinBB - 1) - maxXBetweenLaguna);
 			if (widthMinusMaxLagunaDist < 0) {
 				xMinBB += widthMinusMaxLagunaDist / 2;
 				xMaxBB -= (widthMinusMaxLagunaDist - 1) / 2;
 			}
 
-			short heightMinusSLL = (short) ((yMaxBB - yMinBB - 1) - RouteNode.SUPER_LONG_LINE_LENGTH_IN_TILES);
+			short heightMinusSLL = (short) ((yMaxBB - yMinBB - 1) - RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES);
 			if (heightMinusSLL < 0) {
 				yMinBB += heightMinusSLL / 2 - boundingBoxExtensionY;
 				yMaxBB -= (heightMinusSLL - 1) / 2 - boundingBoxExtensionY;

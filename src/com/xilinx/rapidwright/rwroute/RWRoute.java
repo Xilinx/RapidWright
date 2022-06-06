@@ -501,7 +501,8 @@ public class RWRoute{
 				for(Connection connection : netWrapper.getConnections()) {
 					if(connection.isDirect()) continue;
 					connection.computeConnectionBoundingBox(config.getBoundingBoxExtensionX(),
-							config.getBoundingBoxExtensionY());
+							config.getBoundingBoxExtensionY(),
+							routingGraph.getMaxXBetweenLaguna());
 				}
 			}
 		}
@@ -1358,9 +1359,9 @@ public class RWRoute{
 			// Check for overshooting which occurs when child and sink node are in
 			// adjacent SLRs and less than a Laguna wire's length apart in the Y axis.
 			if (deltaSLR == 1) {
-				int overshootBy = deltaY - RouteNode.SUPER_LONG_LINE_LENGTH_IN_TILES;
+				int overshootBy = deltaY - RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES;
 				if (overshootBy < 0) {
-					deltaY = RouteNode.SUPER_LONG_LINE_LENGTH_IN_TILES - overshootBy;
+					deltaY = RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES - overshootBy;
 				}
 			}
 		}
