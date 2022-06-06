@@ -441,7 +441,7 @@ public class ECORouter extends PartialRouter {
 
     public static Design routeDesignNonTimingDriven(Design design, Collection<SitePinInst> pinsToRoute) {
         RWRouteConfig config = new RWRouteConfig(new String[] {
-                "--enlargeBoundingBox", // Necessary to ensure that we can reach Laguna columns
+                "--enlargeBoundingBox",
                 // use U-turn nodes and no masking of nodes cross RCLK
                 // Pros: maximum routability
                 // Con: might result in delay optimism and a slight increase in runtime
@@ -453,7 +453,7 @@ public class ECORouter extends PartialRouter {
 
     public static Design routeDesignTimingDriven(Design design, Collection<SitePinInst> pinsToRoute, float timingRequirementNs) {
         RWRouteConfig config = new RWRouteConfig(new String[] {
-                "--enlargeBoundingBox", // Necessary to ensure that we can reach Laguna columns
+                "--enlargeBoundingBox",
                 // use U-turn nodes and no masking of nodes cross RCLK
                 // Pros: maximum routability
                 // Con: might result in delay optimism and a slight increase in runtime
