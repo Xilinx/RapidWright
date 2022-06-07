@@ -65,7 +65,7 @@ public class EquivalentEDIF {
      * @return True if the two cells are equivalent, false otherwise.
      */
     private static boolean equivalentEDIFCells(EDIFCell golden, EDIFCell test) {
-        Assertions.assertEquals(golden.getEDIFName(), test.getEDIFName());
+        Assertions.assertEquals(golden.getName(), test.getName());
         Assertions.assertTrue(equivalentEDIFPropObject(golden, test));
         Assertions.assertEquals(golden.getEDIFView(), test.getEDIFView());
         Assertions.assertEquals(golden.getPorts().size(), test.getPorts().size());
@@ -124,7 +124,7 @@ public class EquivalentEDIF {
             EDIFLibrary testLib = test.getLibrary(lib.getName());
             Assertions.assertNotNull(testLib);
             for(EDIFCell cell : lib.getCells()) {
-                EDIFCell testCell = testLib.getCell(cell.getLegalEDIFName());
+                EDIFCell testCell = testLib.getCell(cell.getName());
                 Assertions.assertNotNull(testCell);
                 Assertions.assertTrue(equivalentEDIFCells(cell, testCell));
             }
