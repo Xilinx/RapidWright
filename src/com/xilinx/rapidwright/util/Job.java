@@ -28,6 +28,9 @@ package com.xilinx.rapidwright.util;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 
 /**
@@ -138,4 +141,17 @@ public abstract class Job {
 		return Long.toString(jobNumber);
 	}
 
+	public Optional<List<String>> getLastLogLines() {
+		String logFileName = getLogFilename();
+		if(new File(logFileName).exists()){
+			ArrayList<String> lines = FileTools.getLinesFromTextFile(logFileName);
+			int start = lines.size() >= 8 ? lines.size()-8 : 0;
+			return Optional.of(IntStream.range(start, lines.size()).mapToObj(lines::get).collect(Collectors.toList()));
+		}
+		return Optional.empty();
+	}
+
+	public String getLogFilename() {
+		return getRunDir() + File.separator + Job.DEFAULT_COMMAND_LOG_FILE;
+	}
 }
