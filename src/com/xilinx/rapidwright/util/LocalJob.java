@@ -62,11 +62,11 @@ public class LocalJob extends Job {
 	}
 
 	/* (non-Javadoc)
-	 * @see com.xilinx.rapidwright.util.Job#isFinished()
+	 * @see com.xilinx.rapidwright.util.Job#getJobState()
 	 */
 	@Override
-	public boolean isFinished() {
-		return !p.isAlive();
+	public JobState getJobState() {
+		return p.isAlive() ? JobState.RUNNING : JobState.EXITED;
 	}
 
 	/* (non-Javadoc)
