@@ -54,7 +54,7 @@ public class ParallelEDIFParser implements AutoCloseable{
     protected final int maxTokenLength;
     protected StringPool uniquifier = StringPool.concurrentPool();
 
-    private final EDIFReadLegalNameCache cache;
+    protected final EDIFReadLegalNameCache cache;
 
     ParallelEDIFParser(Path fileName, long fileSize, InputStreamSupplier inputStreamSupplier, int maxTokenLength) {
         this.fileName = fileName;
@@ -235,7 +235,7 @@ public class ParallelEDIFParser implements AutoCloseable{
         //Now we can create a map of ports just for large cells and look up the ports
         ParallelismTools.invokeAllRunnable(byPortCell.entrySet(), entry -> {
             EDIFCell cell = entry.getKey();
-            final EDIFPortCache edifPortCache = new EDIFPortCache(cell);
+            final EDIFPortCache edifPortCache = new EDIFPortCache(cell, cache);
             for (ParallelEDIFParserWorker.LinkPortInstData linkPortInstData : entry.getValue()) {
                 linkPortInstData.enterPort(edifPortCache);
             }

@@ -356,8 +356,16 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParserWorker implement
             EDIFPort port;
             if (edifPortCache != null) {
                 port = edifPortCache.getPort(portInst.getName());
+                if (port == null) {
+                    throw new RuntimeException("did not find port "+portInst.getName()+" in cache");
+                }
             } else {
-                port = lookupPortCell(parentCell, portInst).getPortByLegalName(portInst.getName(), cache);
+                final EDIFCell portCell = lookupPortCell(parentCell, portInst);
+                port = portCell.getPortByLegalName(portInst.getName(), cache);
+                if (port == null) {
+
+                    throw new RuntimeException("did not find port "+portInst.getName()+" on cell "+portCell);
+                }
             }
             portInst.setPort(port);
         }
