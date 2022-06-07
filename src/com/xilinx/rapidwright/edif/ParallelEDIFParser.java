@@ -28,6 +28,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -202,7 +203,8 @@ public class ParallelEDIFParser implements AutoCloseable{
         return null;
     }
 
-    private void addCellsAndLibraries(EDIFNetlist netlist) {
+    private Map<EDIFLibrary, Map<String, EDIFCell>> addCellsAndLibraries(EDIFNetlist netlist) {
+        Map<EDIFLibrary, Map<String, EDIFCell>> cellsByLegalName = new HashMap<>();
         EDIFLibrary currentLibrary = null;
         EDIFToken currentToken = null;
         for (ParallelEDIFParserWorker worker : workers) {
@@ -212,12 +214,13 @@ public class ParallelEDIFParser implements AutoCloseable{
                 }
                 currentToken = parsed.getToken();
 
-                currentLibrary = parsed.addToNetlist(netlist, currentLibrary);
+                currentLibrary = parsed.addToNetlist(netlist, currentLibrary, cellsByLegalName);
             }
         }
+        return cellsByLegalName;
     }
 
-    private void processLinks(CodePerfTracker t, EDIFNetlist netlist) {
+    private void processLinks(CodePerfTracker t, EDIFNetlist netlist, Map<EDIFLibrary, Map<String, EDIFCell>> cellsByLegalName) {
         t.start("Link CellInst+SmallPorts");
         //We have to map from a string representation of the ports' names to the ports.
         //Directly map the ports from small cells, add ports from large cells to this map
@@ -226,7 +229,7 @@ public class ParallelEDIFParser implements AutoCloseable{
         Map<EDIFCell, Collection<ParallelEDIFParserWorker.LinkPortInstData>> byPortCell = new ConcurrentHashMap<>();
         ParallelismTools.invokeAllRunnable(workers, w-> {
             for (ParallelEDIFParserWorker.CellReferenceData cellReferenceData : w.linkCellReference) {
-                cellReferenceData.apply(librariesByLegalName);
+                cellReferenceData.apply(librariesByLegalName, cellsByLegalName);
             }
             w.linkSmallPorts(byPortCell);
         });
@@ -262,9 +265,9 @@ public class ParallelEDIFParser implements AutoCloseable{
         netlist.setDesign(getEdifDesign());
 
         t.stop().start("Assemble Libraries");
-        addCellsAndLibraries(netlist);
+        final Map<EDIFLibrary, Map<String, EDIFCell>> cellsByLegalName = addCellsAndLibraries(netlist);
         t.stop();
-        processLinks(t, netlist);
+        processLinks(t, netlist, cellsByLegalName);
 
         return netlist;
     }

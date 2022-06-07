@@ -74,7 +74,6 @@ public class EDIFParser extends AbstractEDIFParserWorker implements AutoCloseabl
 		EDIFCell cell = lib.get(edifCellName);
 		if(cell == null){
 			cell = new EDIFCell();
-			cell.setEDIFRename(edifCellName);
 			lib.put(edifCellName, cell);
 		}
 		return cell;
@@ -134,7 +133,8 @@ public class EDIFParser extends AbstractEDIFParserWorker implements AutoCloseabl
 
 		String currToken;
 		while(LEFT_PAREN.equals(currToken = getNextToken(true))){
-			library.addCell(parseEDIFCell(library.getName(), getNextToken(true))); //TODO
+			final EDIFCell cell = parseEDIFCell(library.getName(), getNextToken(true));
+			library.addCellRenameDuplicates(cell, cache.getEDIFName(cell));
 		}
 		expect(RIGHT_PAREN, currToken);
 		return library;
@@ -154,13 +154,13 @@ public class EDIFParser extends AbstractEDIFParserWorker implements AutoCloseabl
 	@Override
 	protected EDIFCell updateEDIFRefCellMap(String libraryLegalName, EDIFCell cell){
 		Map<String, EDIFCell> map = edifInstCellMap.computeIfAbsent(libraryLegalName, k -> new HashMap<>());
-		EDIFCell existingCell = map.get(cell.getLegalEDIFName());
+		final String legalEDIFName = cache.getLegalEDIFName(cell);
+		EDIFCell existingCell = map.get(legalEDIFName);
 		if(existingCell != null){
 			existingCell.setName(cell.getName());
-			existingCell.setEDIFRename(cell.getEDIFName());
 			return existingCell;
 		}
-		map.put(cell.getLegalEDIFName(), cell);
+		map.put(legalEDIFName, cell);
 		return cell;
 	}
 

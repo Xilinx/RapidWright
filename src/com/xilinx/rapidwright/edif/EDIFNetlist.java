@@ -255,7 +255,6 @@ public class EDIFNetlist extends EDIFName {
 		EDIFLibrary topLib = design.getTopCell().getLibrary();
 		EDIFCell top = topLib.removeCell(design.getTopCell());
 		top.setName(newName);
-		top.updateEDIFRename();
 		topLib.addCell(top);
 		if(topCellInstance != null){
 			topCellInstance.setName(newName);
@@ -277,7 +276,7 @@ public class EDIFNetlist extends EDIFName {
 			throw new RuntimeException("ERROR: Cell " + cell + " references unknown library " 
 					+ libName);
 		}
-		libCells.remove(cell.getLegalEDIFName());
+		libCells.remove(cell.getName());
 	}
 	
 	/**
@@ -307,10 +306,10 @@ public class EDIFNetlist extends EDIFName {
 	public void removeUnusedCellsFromWorkLibrary(){
 		HashMap<String,EDIFCell> cellsToRemove = new HashMap<>(getWorkLibrary().getCellMap());
 		
-		cellsToRemove.remove(getTopCell().getLegalEDIFName());
+		cellsToRemove.remove(getTopCell().getName());
 		for(EDIFHierCellInst i : getAllDescendants("", null, false)){
 			if(i.getCellType().getLibrary().getName().equals(EDIFTools.EDIF_LIBRARY_WORK_NAME)){
-				cellsToRemove.remove(i.getCellType().getLegalEDIFName());
+				cellsToRemove.remove(i.getCellType().getName());
 			}
 		}
 		
@@ -443,7 +442,7 @@ public class EDIFNetlist extends EDIFName {
 			}
 		}
 
-		EDIFCell existingCell = destLib.getCell(cell.getLegalEDIFName());
+		EDIFCell existingCell = destLib.getCell(cell.getName());
 		if(existingCell == null){
 			destLib.addCell(cell);
 			for(EDIFCellInst inst : cell.getCellInsts()){
@@ -492,7 +491,6 @@ public class EDIFNetlist extends EDIFName {
 		while (destLibTop.containsCell(cell)) {
 			cell.setName(currentCellName + "_parameterized" + i);
 			cell.setView(currentCellName + "_parameterized" + i);
-			cell.updateEDIFRename();
 			i++;
 		}
 		destLibTop.addCell(cell);
@@ -524,7 +522,6 @@ public class EDIFNetlist extends EDIFName {
 					String newName = currentCellName + "_parameterized" + i;
 					instCellType.setName(newName);
 					instCellType.setView(newName);
-					instCellType.updateEDIFRename();
 					i++;
 				}
 				inst.setCellType(instCellType); // updating the celltype, which could be changed due to adding suffix
@@ -553,7 +550,7 @@ public class EDIFNetlist extends EDIFName {
 			}
 		}
 
-		EDIFCell existingCell = destLib.getCell(cell.getLegalEDIFName());
+		EDIFCell existingCell = destLib.getCell(cell.getName());
 		if(existingCell == null){
 			EDIFCell newCell = new EDIFCell(destLib, cell, cell.getName());
 			copiedCells.add(newCell);
@@ -573,7 +570,7 @@ public class EDIFNetlist extends EDIFName {
 	}
 	
 	private boolean checkIfAlreadyInLib(EDIFCell cell, EDIFLibrary lib) {
-		EDIFCell existing = lib.getCell(cell.getLegalEDIFName());
+		EDIFCell existing = lib.getCell(cell.getName());
 		if(existing == cell && lib.getNetlist() == cell.getLibrary().getNetlist()) {
 			return true;
 		}
@@ -726,7 +723,7 @@ public class EDIFNetlist extends EDIFName {
 			EDIFDesign design = getDesign();
 			if (design != null) {
 				design.exportEDIFName(bw, cache);
-				bw.write("\n    (cellref " + design.getTopCell().getLegalEDIFName() + " (libraryref ");
+				bw.write("\n    (cellref " + design.getTopCell().getLegalEDIFName(cache) + " (libraryref ");
                 bw.write(design.getTopCell().getLibrary().getLegalEDIFName(cache) + "))\n");
 				design.exportEDIFProperties(bw, "    ", cache);
 				bw.write("  )\n");

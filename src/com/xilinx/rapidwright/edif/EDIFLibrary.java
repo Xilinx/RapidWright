@@ -63,19 +63,56 @@ public class EDIFLibrary extends EDIFName {
 	
 	/**
 	 * Adds the provided cell to the library. All cells 
-	 * must be unique by their legal EDIF name (rename construct).  
+	 * must be unique by their name.
 	 * @param cell The cell to add to the library.
 	 * @return The cell that has been added.
 	 */
 	public EDIFCell addCell(EDIFCell cell){
 		if(cells == null) cells = getNewMap(); 
-		EDIFCell collision = cells.put(cell.getLegalEDIFName(), cell);
+		EDIFCell collision = cells.put(cell.getName(), cell);
 		if(collision != null && cell != collision){
 			throw new RuntimeException("ERROR: Failed to add cell " + 
 				cell.getName() + " to library " + getName()+". The library "
 				+ "already contains a cell with the same name.");
 		}
 		cell.setLibrary(this);
+		return cell;
+	}
+
+	private String findUniqueCellName(String name) {
+		int counter = 0;
+		String counterName = name; //First try without suffix
+		while (cells.containsKey(counterName)) {
+			counter++;
+			counterName = name+"_"+counter;
+		}
+		return counterName;
+	}
+
+	/**
+	 * Adds the provided cell to the library. If a cell by this name already exists, append a suffix to uniqueify the
+	 * name.
+	 * @param cell The cell to add to the library.
+	 * @param preferredSuffix If a suffix needs to be appended for uniquification, use this one
+	 * @return The cell that has been added.
+	 */
+	public EDIFCell addCellRenameDuplicates(EDIFCell cell, String preferredSuffix) {
+		if(cells == null) cells = getNewMap();
+		EDIFCell collision = cells.put(cell.getName(), cell);
+		if (collision == null) {
+			return cell;
+		}
+		//Restore the old mapping
+		cells.put(cell.getName(), collision);
+
+		if (preferredSuffix == null) {
+			preferredSuffix = "collisionRename";
+		}
+		String newName = findUniqueCellName(cell.getName()+"_HDI_"+preferredSuffix);
+		System.err.println("EDIF library "+getName()+" contains cells with same name \""+cell.getName()+"\". Changing name of one of those instances to "+newName);
+		
+		cell.setName(newName);
+		cells.put(newName, cell);
 		return cell;
 	}
 
@@ -118,16 +155,17 @@ public class EDIFLibrary extends EDIFName {
 	 * @return The removed cell.
 	 */
 	public EDIFCell removeCell(EDIFCell cell){
-		return removeCell(cell.getLegalEDIFName());
+		return removeCell(cell.getName());
 	}
 	
 	/**
-	 * Removes the cell by 'legal EDIF name' (rename construct)
-	 * @param legalEdifName The legal EDIF name (rename) of the cell to remove
+	 * Removes the cell by name
+	 * @param name The name of the cell to remove
 	 * @return The removed cell, or null if it did not exist in the library.
 	 */
-	public EDIFCell removeCell(String legalEdifName){
-		return cells == null ? null : cells.remove(legalEdifName);
+	//TODO this method changed from legal name to regular name. Do we want to do anything special?
+	public EDIFCell removeCell(String name){
+		return cells == null ? null : cells.remove(name);
 	}
 	
 	/**
@@ -137,16 +175,17 @@ public class EDIFLibrary extends EDIFName {
 	 * @return True if the cell exists in the library, False otherwise.
 	 */
 	public boolean containsCell(EDIFCell cell){
-		return containsCell(cell.getLegalEDIFName());
+		return containsCell(cell.getName());
 	}
 	
 	/**
-	 * Checks if the library contains a cell with the legal EDIF Name provided.
-	 * @param legalEDIFName The legal EDIF name of the cell to query in the library.
+	 * Checks if the library contains a cell with the name provided.
+	 * @param name The name of the cell to query in the library.
 	 * @return True if a cell by such name was found in the library, False otherwise.
 	 */
-	public boolean containsCell(String legalEDIFName){
-		return cells == null ? false : cells.containsKey(legalEDIFName);
+	//TODO this method changed from legal name to regular name. Do we want to do anything special?
+	public boolean containsCell(String name){
+		return cells == null ? false : cells.containsKey(name);
 	}
 	
 	/**
@@ -201,9 +240,6 @@ public class EDIFLibrary extends EDIFName {
 		cells.clear();
 		for(EDIFCell c : renamedCells){
 			c.setName(prefix + c.getName());
-			if(c.getEDIFName() != null){
-				c.setEDIFRename(prefix+c.getEDIFName());
-			}
 			addCell(c);
 		}
 	}
@@ -244,26 +280,16 @@ public class EDIFLibrary extends EDIFName {
 	}
 
 	private void visit(EDIFCell cell, List<EDIFCell> visited, Map<String,EDIFCell> yetToVisit){
-		yetToVisit.remove(cell.getLegalEDIFName());
+		yetToVisit.remove(cell.getName());
 		for(EDIFCellInst i : cell.getCellInsts()){
 			EDIFCell childCell = i.getCellType();
-			if(childCell.getLibrary() == this && yetToVisit.containsKey(childCell.getLegalEDIFName())){
+			if(childCell.getLibrary() == this && yetToVisit.containsKey(childCell.getName())){
 				visit(childCell,visited,yetToVisit);
 			}
 		}
 		visited.add(cell);
 	}
-	
-	protected void ensureValidEDIFCellNames(){
-		HashSet<String> names = new HashSet<>();
-		for(EDIFCell c : getCells()){
-			String setLegalName = c.getLegalEDIFName();
-			if(!names.add(setLegalName.toLowerCase())){
-				names.add(c.updateEDIFRename(netlist.nameSpaceUniqueCount++).toLowerCase());
-			}
-		}
-	}
-	
+
 	void exportEDIF(List<EDIFCell> cells, Writer w, boolean writeHeader, boolean writeFooter, EDIFWriteLegalNameCache cache) throws IOException {
 		if (writeHeader) {
 			w.write("  (Library ");

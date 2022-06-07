@@ -27,6 +27,7 @@ import java.io.InputStream;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -317,7 +318,7 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParserWorker implement
             this.currentCell = currentCell;
         }
 
-        public void apply(Map<String, EDIFLibrary> librariesByLegalName) {
+        public void apply(Map<String, EDIFLibrary> librariesByLegalName, Map<EDIFLibrary, Map<String, EDIFCell>> cellsByLegalName) {
             EDIFLibrary library;
             if (libraryref == null) {
                 if (currentCell == null) {
@@ -328,7 +329,10 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParserWorker implement
                 library = Objects.requireNonNull(librariesByLegalName.get(libraryref), ()-> "No library with name "+libraryref);
             }
 
-            final EDIFCell cell = library.getCell(cellref);
+            final EDIFCell cell = cellsByLegalName.get(library).get(cellref);
+            if (cell == null) {
+                throw new RuntimeException("did not find cell "+cellref+" in library "+libraryref);
+            }
             cellSetter.accept(cell);
         }
     }
@@ -394,7 +398,7 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParserWorker implement
             return token;
         }
 
-        public abstract EDIFLibrary addToNetlist(EDIFNetlist netlist, EDIFLibrary currentLibrary);
+        public abstract EDIFLibrary addToNetlist(EDIFNetlist netlist, EDIFLibrary currentLibrary, Map<EDIFLibrary, Map<String, EDIFCell>> cellsByLegalName);
     }
 
     static class LibraryResult extends LibraryOrCellResult {
@@ -406,13 +410,14 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParserWorker implement
         }
 
         @Override
-        public EDIFLibrary addToNetlist(EDIFNetlist netlist, EDIFLibrary currentLibrary) {
+        public EDIFLibrary addToNetlist(EDIFNetlist netlist, EDIFLibrary currentLibrary, Map<EDIFLibrary, Map<String, EDIFCell>> cellsByLegalName) {
             netlist.addLibrary(library);
             return library;
         }
     }
 
-    static class CellResult extends LibraryOrCellResult {
+    //TODO jakobw not static anymore. pass reference instead?
+    class CellResult extends LibraryOrCellResult {
         private final EDIFCell cell;
         CellResult(EDIFToken token, EDIFCell cell) {
             super(token);
@@ -420,11 +425,14 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParserWorker implement
         }
 
         @Override
-        public EDIFLibrary addToNetlist(EDIFNetlist netlist, EDIFLibrary currentLibrary) {
+        public EDIFLibrary addToNetlist(EDIFNetlist netlist, EDIFLibrary currentLibrary, Map<EDIFLibrary, Map<String, EDIFCell>> cellsByLegalName) {
             if (currentLibrary == null) {
                 throw new IllegalStateException("Saw first cell before first library");
             }
-            currentLibrary.addCell(cell);
+            currentLibrary.addCellRenameDuplicates(cell, cache.getEDIFName(cell));
+
+            cellsByLegalName.computeIfAbsent(currentLibrary, x-> new HashMap<>()).put(cache.getLegalEDIFName(cell), cell);
+
             return currentLibrary;
         }
     }

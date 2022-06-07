@@ -107,7 +107,6 @@ public class BinaryEDIFWriter {
             for(EDIFCell cell : lib.getCells()) {
                 addObjectToStringMap(cell, stringMap);
                 addNameToStringMap(cell.getEDIFView(), stringMap);
-                addStringToStringMap(cell.getEDIFName(), stringMap);
                 for(EDIFCellInst inst : cell.getCellInsts()) {
                     addObjectToStringMap(inst, stringMap);
                 }
@@ -211,7 +210,7 @@ public class BinaryEDIFWriter {
     static void writeEDIFCellRef(EDIFCell ref, Output os, Map<String,Integer> stringMap,
                                          EDIFLibrary parentCellLib) {
         int libMask = ref.getLibrary().equals(parentCellLib) ? EDIF_SAME_LIB_FLAG : 0; 
-        os.writeInt(libMask | stringMap.get(ref.getLegalEDIFName()));            
+        os.writeInt(libMask | stringMap.get(ref.getName()));
         if(libMask != EDIF_SAME_LIB_FLAG) {
             os.writeInt(stringMap.get(ref.getLibrary().getName()));
         }

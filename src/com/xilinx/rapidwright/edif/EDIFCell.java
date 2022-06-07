@@ -47,11 +47,6 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
 
 	public static final EDIFName DEFAULT_VIEW = new EDIFName("netlist");
 
-	/**
-	 * Legal EDIF rename of the original name
-	 */
-	private String edifRename;
-
 	private EDIFLibrary library;
 
 	private Map<String, EDIFCellInst> instances;
@@ -67,7 +62,6 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
 	public EDIFCell(EDIFLibrary lib, String name) {
 		super(name);
 		if (lib != null) lib.addCell(this);
-		updateEDIFRename();
 	}
 
 	/**
@@ -85,7 +79,6 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
 		ports = orig.ports;
 		internalPortMap = orig.internalPortMap;
 		view = orig.view;
-		updateEDIFRename();
 	}
 
 	/**
@@ -133,44 +126,11 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
 			}
 		}
 		view = orig.view;
-		updateEDIFRename();
 		setProperties(orig.getProperties()); //TODO duplicate
 	}
 
 	protected EDIFCell() {
 
-	}
-
-	/**
-	 * Forces the object to update its EDIF legal equivalent name based on
-	 * the current name.  If the name is the same, the edifRename will be
-	 * null.
-	 * @return The newly updated EDIF rename string.
-	 */
-	protected String updateEDIFRename(){
-		final String name = getName();
-		String tmp = EDIFTools.makeNameEDIFCompatible(name);
-		if(!tmp.equals(name)){
-			edifRename = tmp;
-		}else{
-			edifRename = null;
-		}
-		return edifRename;
-	}
-
-	protected String updateEDIFRename(int unique){
-		updateEDIFRename();
-		edifRename =  edifRename + "_" + unique;
-		return edifRename;
-	}
-
-	@Override
-	protected String getEDIFName(EDIFWriteLegalNameCache cache){
-		return edifRename;
-	}
-
-	protected void setEDIFRename(String edifRename) {
-		this.edifRename = edifRename;
 	}
 
 	public EDIFCellInst createChildCellInst(String name, EDIFCell reference) {
@@ -644,20 +604,12 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
 		if (o == null || getClass() != o.getClass()) return false;
 		if (!super.equals(o)) return false;
 		EDIFCell edifCell = (EDIFCell) o;
-		return Objects.equals(edifRename, edifCell.edifRename) && Objects.equals(library, edifCell.library);
+		return Objects.equals(library, edifCell.library);
 	}
 
 	@Override
 	public int hashCode() {
-		return Objects.hash(super.hashCode(), edifRename, library);
-	}
-
-	public String getLegalEDIFName() {
-		return getLegalEDIFName(null); //This is overridden to not need the cache
-	}
-
-	public String getEDIFName() {
-		return getEDIFName(null); //This is overridden to not need the cache
+		return Objects.hash(super.hashCode(), library);
 	}
 }
  

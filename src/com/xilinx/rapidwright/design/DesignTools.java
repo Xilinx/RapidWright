@@ -2170,7 +2170,7 @@ public class DesignTools {
 			    if(destLib == null){
 			        destLib = destNetlist.getWorkLibrary();
 			    }
-			    EDIFCell existingCell = destLib.getCell(cellInst.getCellType().getLegalEDIFName());
+			    EDIFCell existingCell = destLib.getCell(cellInst.getCellType().getName());
 			    if(existingCell != null) {
 			        destLib.removeCell(existingCell);
 			    }
