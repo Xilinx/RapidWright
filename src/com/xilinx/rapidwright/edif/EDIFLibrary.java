@@ -98,6 +98,8 @@ public class EDIFLibrary extends EDIFName {
 	 */
 	public EDIFCell addCellRenameDuplicates(EDIFCell cell, String preferredSuffix) {
 		if(cells == null) cells = getNewMap();
+		cell.setLibrary(this);
+		
 		EDIFCell collision = cells.put(cell.getName(), cell);
 		if (collision == null) {
 			return cell;
@@ -110,8 +112,8 @@ public class EDIFLibrary extends EDIFName {
 		}
 		String newName = findUniqueCellName(cell.getName()+"_HDI_"+preferredSuffix);
 		System.err.println("EDIF library "+getName()+" contains cells with same name \""+cell.getName()+"\". Changing name of one of those instances to "+newName);
-		
 		cell.setName(newName);
+
 		cells.put(newName, cell);
 		return cell;
 	}
