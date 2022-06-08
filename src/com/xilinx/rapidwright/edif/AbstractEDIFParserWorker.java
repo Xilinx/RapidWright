@@ -467,7 +467,7 @@ public abstract class AbstractEDIFParserWorker {
      * @return The {@link EDIFCellInst} to be used going forward
      */
     private EDIFCellInst updateEDIFRefCellInstMap(EDIFCellInst inst, Map<String, EDIFCellInst> instanceLookup){
-        final String rename = cache.getEDIFName(inst);
+        final String rename = cache.getEDIFRename(inst);
         EDIFCellInst existingInst = instanceLookup.get(rename);
         if(existingInst != null){
             existingInst.setName(inst.getName());

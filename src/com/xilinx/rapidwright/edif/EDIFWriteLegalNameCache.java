@@ -27,7 +27,7 @@ public class EDIFWriteLegalNameCache {
         return rename+"_HDI_"+previousCount;
     }
 
-    public String getEDIFName(String name) {
+    public String getEDIFRename(String name) {
         //We have null values, can't use get directly, nor computeIfAbsent
         if (renames.containsKey(name)) {
             return renames.get(name);

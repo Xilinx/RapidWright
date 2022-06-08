@@ -429,7 +429,7 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParserWorker implement
             if (currentLibrary == null) {
                 throw new IllegalStateException("Saw first cell before first library");
             }
-            currentLibrary.addCellRenameDuplicates(cell, cache.getEDIFName(cell));
+            currentLibrary.addCellRenameDuplicates(cell, cache.getEDIFRename(cell));
 
             cellsByLegalName.computeIfAbsent(currentLibrary, x-> new HashMap<>()).put(cache.getLegalEDIFName(cell), cell);
 

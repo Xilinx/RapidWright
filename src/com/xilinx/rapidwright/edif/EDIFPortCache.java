@@ -38,7 +38,7 @@ public class EDIFPortCache {
         cache = new HashMap<>(cell.getPortMap());
         final Collection<EDIFPort> ports = cell.getPorts();
         for (EDIFPort port : ports) {
-            final String edifName = nameCache.getEDIFName(port);
+            final String edifName = nameCache.getLegalEDIFName(port);
             if (edifName != null) {
                 cache.put(edifName, port);
             }

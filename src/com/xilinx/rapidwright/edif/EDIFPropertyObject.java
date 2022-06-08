@@ -153,7 +153,9 @@ public class EDIFPropertyObject extends EDIFName {
 	}
 		
 	/**
+	 * replaced by {@link #getPropertiesMap()}
 	 * @return the properties
+	 * to be removed in 2022.2.0
 	 */
 	@Deprecated
 	public Map<EDIFName, EDIFPropertyValue> getProperties() {
@@ -163,7 +165,7 @@ public class EDIFPropertyObject extends EDIFName {
 		return Collections.unmodifiableMap(properties.entrySet().stream().collect(Collectors.toMap(s->new EDIFName(s.getKey()), Entry::getValue)));
 	}
 
-	public Map<String, EDIFPropertyValue> getPropertiesNew() {
+	public Map<String, EDIFPropertyValue> getPropertiesMap() {
 		return properties;
 	}
 	
@@ -180,7 +182,7 @@ public class EDIFPropertyObject extends EDIFName {
 			try {
 				wr.write(indent);
 				wr.write("(property ");
-				EDIFName.exportSomeEDIFName(wr, e.getKey(), cache.getEDIFName(e.getKey()));
+				EDIFName.exportSomeEDIFName(wr, e.getKey(), cache.getEDIFRename(e.getKey()));
 				wr.write(" ");
 				e.getValue().writeEDIFString(wr);
 				if(owner != null){

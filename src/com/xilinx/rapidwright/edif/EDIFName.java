@@ -84,7 +84,7 @@ public class EDIFName implements Comparable<EDIFName> {
 	 * @throws IOException
 	 */
 	public void exportEDIFName(Writer wr, EDIFWriteLegalNameCache cache) throws IOException{
-		exportSomeEDIFName(wr, getName(), getEDIFName(cache));
+		exportSomeEDIFName(wr, getName(), getEDIFRename(cache));
 	}
 
 	/* (non-Javadoc)
@@ -131,13 +131,12 @@ public class EDIFName implements Comparable<EDIFName> {
 		return this.getName().compareTo(o.getName());
 	}
 
-
-	protected String getEDIFName(EDIFWriteLegalNameCache cache){
-		return cache.getEDIFName(getName());
+	protected String getEDIFRename(EDIFWriteLegalNameCache cache){
+		return cache.getEDIFRename(getName());
 	}
 
 	public String getLegalEDIFName(EDIFWriteLegalNameCache cache) {
-		String rename = getEDIFName(cache);
+		String rename = getEDIFRename(cache);
 		return rename == null ? getName() : rename;
 	}
 

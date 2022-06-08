@@ -48,7 +48,7 @@ import com.xilinx.rapidwright.util.FileTools;
 public class BinaryEDIFWriter {
     
     public static final String EDIF_BINARY_FILE_TAG = "RAPIDWRIGHT_EDIF_BINARY";
-    public static final String EDIF_BINARY_FILE_VERSION = "0.0.1";
+    public static final String EDIF_BINARY_FILE_VERSION = "0.0.2";
     
     public static final int EDIF_NAME_FLAG = 0x80000000;
     public static final int EDIF_UNIQUE_VIEW_FLAG = 0x80000000;

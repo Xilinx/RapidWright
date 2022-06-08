@@ -222,8 +222,8 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
 	}
 
 	@Override
-	protected String getEDIFName(EDIFWriteLegalNameCache cache) {
-		final String edifName = cache.getEDIFName(getBusName());
+	protected String getEDIFRename(EDIFWriteLegalNameCache cache) {
+		final String edifName = cache.getEDIFRename(getBusName());
 		if (edifName == null && isBus()) { //Always renaming buses
 			return getBusName();
 		}

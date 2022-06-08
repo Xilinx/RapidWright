@@ -122,12 +122,12 @@ public class EDIFLibrary extends EDIFName {
 	 * Gets the name of the cell using the EDIF name (rename construct).  This is 
 	 * to avoid collisions that Vivado generates with parameterized cells (end with _HDI_###).
 	 * Note that 
-	 * @param legalEdifName The name of the cell as would be returned by getLegalEDIFName().  
+	 * @param name The name of the cell as would be returned by getLegalEDIFName().
 	 * When the original name was already legal, it is the same.
 	 * @return The cell in the library by the given legal EDIF name, or null if none exists.
 	 */
-	public EDIFCell getCell(String legalEdifName){
-		return cells == null ? null : cells.get(legalEdifName);
+	public EDIFCell getCell(String name){
+		return cells == null ? null : cells.get(name);
 	}
 	
 	/**

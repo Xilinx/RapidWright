@@ -6,6 +6,10 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public abstract class EDIFReadLegalNameCache {
 
+    /**
+     * Wrapper object that overrides equals and hashCode to require an identical wrapped object
+     * @param <T>
+     */
     private static class IdentityEqualsHash<T> {
         private final T obj;
 
@@ -31,10 +35,10 @@ public abstract class EDIFReadLegalNameCache {
     }
 
     public abstract void setRename(EDIFName name, String rename);
-    public abstract String getEDIFName(EDIFName name);
+    public abstract String getEDIFRename(EDIFName name);
 
     public String getLegalEDIFName(EDIFName name) {
-        String rename = getEDIFName(name);
+        String rename = getEDIFRename(name);
         if (rename != null) {
             return rename;
         }
@@ -47,7 +51,7 @@ public abstract class EDIFReadLegalNameCache {
             public void setRename(EDIFName name, String rename) {
                 renames.put(name, rename);
             }
-            public String getEDIFName(EDIFName name) {
+            public String getEDIFRename(EDIFName name) {
                 return renames.get(name);
             }
         };
@@ -58,7 +62,7 @@ public abstract class EDIFReadLegalNameCache {
             public void setRename(EDIFName name, String rename) {
                 renames.put(new IdentityEqualsHash<>(name), rename);
             }
-            public String getEDIFName(EDIFName name) {
+            public String getEDIFRename(EDIFName name) {
                 return renames.get(new IdentityEqualsHash<>(name));
             }
         };

@@ -134,7 +134,7 @@ public class EDIFParser extends AbstractEDIFParserWorker implements AutoCloseabl
 		String currToken;
 		while(LEFT_PAREN.equals(currToken = getNextToken(true))){
 			final EDIFCell cell = parseEDIFCell(library.getName(), getNextToken(true));
-			library.addCellRenameDuplicates(cell, cache.getEDIFName(cell));
+			library.addCellRenameDuplicates(cell, cache.getEDIFRename(cell));
 		}
 		expect(RIGHT_PAREN, currToken);
 		return library;
