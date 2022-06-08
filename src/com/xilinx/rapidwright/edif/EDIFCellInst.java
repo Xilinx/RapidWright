@@ -241,7 +241,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
         return false;
     }
 
-    public void exportEDIF(Writer wr) throws IOException{
+    public void exportEDIF(Writer wr, boolean stable) throws IOException{
         wr.write("         (instance ");
         exportEDIFName(wr);
         wr.write(" (viewref ");
@@ -252,7 +252,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
         wr.write(cellType.getLibrary().getLegalEDIFName());
         if(getProperties().size() > 0){
             wr.write(")))\n");
-            exportEDIFProperties(wr, "           ");
+            exportEDIFProperties(wr, "           ", stable);
             wr.write("         )\n");               
         }else{
             wr.write("))))\n");

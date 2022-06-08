@@ -221,7 +221,7 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
 	    return getBusName() + "[" + index + "]";     
 	}
 	
-	public void exportEDIF(Writer wr, String indent) throws IOException{
+	public void exportEDIF(Writer wr, String indent, boolean stable) throws IOException{
 		wr.write(indent);
 		wr.write("(port ");
 		if(width > 1) wr.write("(array ");
@@ -232,7 +232,7 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
 		wr.write(")");
 		if(getProperties().size() > 0){
 			wr.write("\n");
-			exportEDIFProperties(wr, indent+"   ");
+			exportEDIFProperties(wr, indent+"   ", stable);
 			wr.write(indent);
 		}
 		wr.write(")\n");

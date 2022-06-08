@@ -333,7 +333,7 @@ public class BinaryEDIFWriter {
             for(EDIFLibrary lib : netlist.getLibrariesInExportOrder()) {
                 writeEDIFName(lib, os, stringMap);
                 os.writeInt(lib.getCells().size());
-                for(EDIFCell cell : lib.getValidCellExportOrder()) {
+                for(EDIFCell cell : lib.getValidCellExportOrder(false)) {
                     writeEDIFCell(cell, os, stringMap);
                 }
             }

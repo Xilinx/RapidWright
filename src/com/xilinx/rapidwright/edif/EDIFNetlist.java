@@ -63,11 +63,11 @@ import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.IOStandard;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
-import com.xilinx.rapidwright.util.ParallelDCPInput;
-import com.xilinx.rapidwright.util.ParallelDCPOutput;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.MessageGenerator;
 import com.xilinx.rapidwright.util.Pair;
+import com.xilinx.rapidwright.util.ParallelDCPInput;
+import com.xilinx.rapidwright.util.ParallelDCPOutput;
 import com.xilinx.rapidwright.util.ParallelismTools;
 
 /**
@@ -663,7 +663,7 @@ public class EDIFNetlist extends EDIFName {
 		return new ArrayList<>(toExport);
 	}
 
-	public void exportEDIF(OutputStream out) throws IOException {
+	public void exportEDIF(OutputStream out, boolean stable) throws IOException {
 		try (BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(out))) {
 			bw.write("(edif ");
 			exportEDIFName(bw);
@@ -675,7 +675,11 @@ public class EDIFNetlist extends EDIFName {
 			bw.write(" (written\n");
 			bw.write("  (timeStamp ");
 			SimpleDateFormat formatter = new SimpleDateFormat("yyyy MM dd HH mm ss");
-			bw.write(formatter.format(new java.util.Date()));
+			if (stable) {
+				bw.write(formatter.format(new java.util.Date()));
+			} else {
+				bw.write(formatter.format(new java.util.Date(0)));
+			}
 			bw.write(")\n");
 			bw.write("  (program \"" + Device.FRAMEWORK_NAME + "\" (version \"" + Device.RAPIDWRIGHT_VERSION + "\"))\n");
 			for (String comment : getComments()) {
@@ -683,7 +687,7 @@ public class EDIFNetlist extends EDIFName {
 				bw.write(comment);
 				bw.write("\")\n");
 			}
-			for (Entry<String, EDIFPropertyValue> e : metax.entrySet()) {
+			for (Entry<String, EDIFPropertyValue> e : EDIFTools.sortIfStable(metax, stable)) {
 				bw.write("(metax ");
 				bw.write(e.getKey());
 				bw.write(" ");
@@ -695,7 +699,7 @@ public class EDIFNetlist extends EDIFName {
 
 			List<EDIFLibrary> librariesToWrite = new ArrayList<>();
 			librariesToWrite.add(getHDIPrimitivesLibrary());
-			for(EDIFLibrary lib : getLibrariesMap().values()){
+			for(EDIFLibrary lib : EDIFTools.sortIfStable(getLibrariesMap().values(), stable)){
 				if(lib.getName().equals(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME)) continue;
 				librariesToWrite.add(lib);
 			}
@@ -720,7 +724,7 @@ public class EDIFNetlist extends EDIFName {
 				}
 			} else {
 				for (EDIFLibrary lib : librariesToWrite) {
-					lib.exportEDIF(bw);
+					lib.exportEDIF(bw, stable);
 				}
 			}
 
@@ -730,10 +734,15 @@ public class EDIFNetlist extends EDIFName {
 			design.exportEDIFName(bw);
 			bw.write("\n    (cellref " + design.getTopCell().getLegalEDIFName() + " (libraryref ");
 			bw.write(design.getTopCell().getLibrary().getLegalEDIFName() + "))\n");
-			design.exportEDIFProperties(bw, "    ");
+			design.exportEDIFProperties(bw, "    ", stable);
 			bw.write("  )\n");
 			bw.write(")\n");
 		}
+	}
+
+
+	public void exportEDIF(OutputStream out) throws IOException {
+		exportEDIF(out, false);
 	}
 
 	public void exportEDIF(Path fileName){

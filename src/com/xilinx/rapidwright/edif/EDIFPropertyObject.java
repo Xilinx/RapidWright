@@ -173,9 +173,9 @@ public class EDIFPropertyObject extends EDIFName {
 		this.properties = properties;
 	}
 
-	public void exportEDIFProperties(Writer wr, String indent) throws IOException{
+	public void exportEDIFProperties(Writer wr, String indent, boolean stable) throws IOException{
 		if(properties == null) return;
-		for(Entry<EDIFName, EDIFPropertyValue> e : properties.entrySet()){
+		for(Entry<EDIFName, EDIFPropertyValue> e : EDIFTools.sortIfStable(properties, stable)){
 			wr.write(indent);
 			wr.write("(property ");
 			e.getKey().exportEDIFName(wr);

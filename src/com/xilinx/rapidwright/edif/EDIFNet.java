@@ -30,6 +30,7 @@ import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -306,17 +307,17 @@ public class EDIFNet extends EDIFPropertyObject {
 		parentCell.trackChange(EDIFChangeType.NET_ADD, getName());
 	}
 	
-	public void exportEDIF(Writer wr) throws IOException {
+	public void exportEDIF(Writer wr, boolean stable) throws IOException {
 		wr.write("         (net ");
 		exportEDIFName(wr);
 		wr.write(" (joined\n");
-		for(EDIFPortInst p : getPortInsts()){
+		for(EDIFPortInst p : EDIFTools.sortIfStable(getPortInsts(), Comparator.comparing(EDIFPortInst::getName), stable)){
 			p.writeEDIFExport(wr, "          ");
 		}							
 		wr.write("          )\n"); // joined end
 		if(getProperties().size() > 0){
 			wr.write("\n");
-			exportEDIFProperties(wr, "           ");
+			exportEDIFProperties(wr, "           ", stable);
 		}
 		wr.write("         )\n"); // Nets end
 

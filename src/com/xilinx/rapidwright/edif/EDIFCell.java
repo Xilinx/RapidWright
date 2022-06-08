@@ -479,7 +479,7 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
 		internalPortMap = null;
 	}
 	
-	public void exportEDIF(Writer wr) throws IOException{
+	public void exportEDIF(Writer wr, boolean stable) throws IOException{
 		wr.write("   (cell ");
 		exportEDIFName(wr);
 		wr.write(" (celltype GENERIC)\n");
@@ -487,28 +487,31 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
 		view.exportEDIFName(wr);
 		wr.write(" (viewtype NETLIST)\n");
 		wr.write("       (interface \n");
-		for(EDIFPort port : getPorts()){
-			port.exportEDIF(wr, "        ");
+		for(EDIFPort port : EDIFTools.sortIfStable(getPorts(), stable)){
+			port.exportEDIF(wr, "        ", stable);
 		}
 		wr.write("       )\n"); // Interface end
 		if(hasContents()){
 			wr.write("       (contents\n");
-			for(EDIFCellInst i : getCellInsts()){
-				i.exportEDIF(wr);						
+			for(EDIFCellInst i : EDIFTools.sortIfStable(getCellInsts(), stable)){
+				i.exportEDIF(wr, stable);
 			}
-			for(EDIFNet n : getNets()){
-				n.exportEDIF(wr);
+			for(EDIFNet n : EDIFTools.sortIfStable(getNets(), stable)){
+				n.exportEDIF(wr, stable);
 			}
 			wr.write("       )\n"); // Contents end
 		}
 		if(getProperties().size() > 0){
 			wr.write("\n");
-			exportEDIFProperties(wr, "           ");
+			exportEDIFProperties(wr, "           ", stable);
 		}
 		wr.write("     )\n"); // View end
 		wr.write("   )\n"); // Cell end
 	}
 
+	public void exportEDIF(Writer wr) throws IOException{
+		exportEDIF(wr, false);
+	}
     @Override
     public String getUniqueKey() {
         return getLibrary().getName() + "_" + getName();
