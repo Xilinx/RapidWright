@@ -43,6 +43,7 @@ import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.util.MessageGenerator;
@@ -1156,7 +1157,8 @@ public class RWRoute{
 		boolean successRoute = false;
 		while(!queue.isEmpty()){
 			RouteNode rnode = queue.poll();
-			if (rnode.isTarget()) {
+			if (rnode == connection.getSinkRnode()) {
+				assert(rnode.isTarget());
 				successRoute = true;
 				break;
 			}
@@ -1165,16 +1167,15 @@ public class RWRoute{
 					rnodeWLWeight, estWlWeight, dlyWeight, estDlyWeight);
 		}
 		assert(queue.isEmpty());
-		
+
+		connection.getSink().setRouted(successRoute);
+
 		if(successRoute) {
 			finishRouteConnection(connection);
-			connection.getSink().setRouted(true);
 			if(config.isTimingDriven()) connection.updateRouteDelay();	
-		}else {
-			connection.getSink().setRouted(false);
-			connection.getSinkRnode().setTarget(false);
-			routingGraph.resetExpansion();
 		}
+
+		routingGraph.resetExpansion();
 	}
 	
 	/**
@@ -1251,8 +1252,6 @@ public class RWRoute{
 	 */
 	protected void finishRouteConnection(Connection connection){
 		saveRouting(connection);	
-		connection.getSinkRnode().setTarget(false);
-		routingGraph.resetExpansion();
 		updateUsersAndPresentCongestionCost(connection);
 	}
 	
@@ -1264,10 +1263,17 @@ public class RWRoute{
 		RouteNode rnode = connection.getSinkRnode();
 		while (rnode != null) {
 			connection.addRnode(rnode);
-			rnode = rnode.getPrev();
+			RouteNode prevRnode = rnode.getPrev();
+			if (prevRnode == null) {
+				// Blocked by RapidWrightXDEF#161
+				// assert(rnode == connection.getSourceRnode());
+				SitePin sp = rnode.getNode().getSitePin();
+				assert(!sp.isInput());
+			}
+			rnode = prevRnode;
 		}
 	}
-	
+
 	/**
 	 * Explores children (downhill rnodes) of a rnode for routing a connection and pushes the child into the queue,
 	 * if it is the target or is an accessible routing resource.
@@ -1291,10 +1297,16 @@ public class RWRoute{
 				// This does mean that, if a shorter path to an (un-popped) node that
 				// is still present in the queue were to exist here, it would never be
 				// considered.
+				// This includes any target nodes.
 				continue;
 			}
 			if(childRNode.isTarget()) {
-				queue.clear();
+				if (childRNode == connection.getSinkRnode()) {
+					// Due to the phenomenon above, pushing a target node onto the queue
+					// means that no other paths are considered so we might as well clear
+					// the queue before doing that push.
+					queue.clear();
+				}
 			} else {
 				switch (childRNode.getType()) {
 					case WIRE:
@@ -1446,6 +1458,9 @@ public class RWRoute{
 	private void prepareRouteConnection(Connection connectionToRoute, float shareWeight, float rnodeCostWeight,
 										float rnodeLengthWeight, float rnodeEstWlWeight,
 										float rnodeDelayWeight, float rnodeEstDlyWeight){
+		// Rips up the connection
+		ripUp(connectionToRoute);
+
 		connectionsRouted++;
 		connectionsRoutedIteration++;
 		queue.clear();
@@ -1459,33 +1474,83 @@ public class RWRoute{
 		// Push all nodes from all net's routed connections onto the queue
 		NetWrapper netWrapper = connectionToRoute.getNetWrapper();
 		for (Connection connection : netWrapper.getConnections()) {
-			if (connection.getSink().isRouted()) {
+			if (!connection.getSink().isRouted())
+				continue;
+
+			{
 				RouteNode parentRnode = null;
 				boolean overUsed = false;
+
+				// Go forwards from source
 				for (RouteNode childRnode : Lists.reverse(connection.getRnodes())) {
-					if (connection == connectionToRoute) {
-						overUsed = overUsed || childRnode.isOverUsed();
+					if (parentRnode != null) {
+						if (connection != connectionToRoute) {
+							// Also skip all downstream nodes if it leaves the current bounding box
+							if (!isAccessible(childRnode, connectionToRoute)) {
+								break;
+							}
+						}
 
-						// Rip up the connection
-						childRnode.decrementUser(netWrapper);
-						childRnode.updatePresentCongestionCost(presentCongestionFactor);
+						int occ = childRnode.getOccupancy();
+						overUsed = occ > RouteNode.capacity ||
+								(occ == RouteNode.capacity && childRnode.countConnectionsOfUser(netWrapper) == 0);
 
-						// Once an over used node is encountered, do not add anything
-						// downstream to queue (but continue looping since we need to rip up)
+						if (!childRnode.isVisited() &&
+								// Disallow over-used targets to leave room for another path
+								// to reach it
+								(!overUsed || !childRnode.isTarget())) {
+							boolean longParent = config.isTimingDriven() && DelayEstimatorBase.isLong(parentRnode.getNode());
+							evaluateCostAndPush(parentRnode, longParent, childRnode, connection, shareWeight, rnodeCostWeight,
+									rnodeLengthWeight, rnodeEstWlWeight, rnodeDelayWeight, rnodeEstDlyWeight);
+						}
+
+						// Once an over used node (or to-be-overused if we were to use it)
+						// is encountered and pushed, skip all downstream nodes
 						if (overUsed)
-							continue;
-					} else {
-						// Once an over used node is encountered, skip all downstream nodes
-						if (childRnode.isOverUsed())
 							break;
 					}
 
-					if (parentRnode != null && !childRnode.isVisited()) {
-						boolean longParent = config.isTimingDriven() && DelayEstimatorBase.isLong(parentRnode.getNode());
-						evaluateCostAndPush(parentRnode, longParent, childRnode, connection, shareWeight, rnodeCostWeight,
-								rnodeLengthWeight, rnodeEstWlWeight, rnodeDelayWeight, rnodeEstDlyWeight);
+					// Once an over used node (or to-be-overused if we were to use it)
+					// is encountered and pushed, skip all downstream nodes
+					int occ = childRnode.getOccupancy();
+					if (occ > RouteNode.capacity ||
+							(occ == RouteNode.capacity && childRnode.countConnectionsOfUser(netWrapper) == 0)) {
+						overUsed = true;
+						break;
 					}
+
 					parentRnode = childRnode;
+				}
+
+				// Must be at least one over-used node on the connection-to-be-routed
+				// (otherwise we wouldn't expect it to need re-routing)
+				if (connection == connectionToRoute) {
+					assert (overUsed);
+				}
+			}
+
+			if (connection == connectionToRoute) {
+				RouteNode childRnode = null;
+
+				// Now go backwards from sink
+				for (RouteNode parentRnode : connection.getRnodes()) {
+					// Once an over used node (or to-be-overused if we were to use it)
+					// is encountered, skip all downstream nodes
+					int occ = parentRnode.getOccupancy();
+					if (occ > RouteNode.capacity ||
+							(occ == RouteNode.capacity && parentRnode.countConnectionsOfUser(netWrapper) == 0)) {
+						break;
+					}
+
+					assert(!parentRnode.isVisited());
+
+					// Mark the sequence of uncongested nodes upstream of the sink as targets also
+					if (childRnode != null) {
+						assert(childRnode.isTarget());
+						parentRnode.setTarget(true);
+						// childRnode.setPrev(parentRnode);
+					}
+					childRnode = parentRnode;
 				}
 			}
 		}

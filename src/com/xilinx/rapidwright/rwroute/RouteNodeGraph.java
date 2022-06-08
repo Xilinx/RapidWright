@@ -296,6 +296,7 @@ public class RouteNodeGraph {
     public void resetExpansion() {
         for (RouteNode node : visited) {
             node.setVisited(false);
+            node.setTarget(false);
         }
         totalVisited += visited.size();
         visited.clear();
