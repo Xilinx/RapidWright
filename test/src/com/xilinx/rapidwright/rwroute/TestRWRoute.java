@@ -22,15 +22,19 @@
  
 package com.xilinx.rapidwright.rwroute;
 
+import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.support.LargeTest;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
-
-import com.xilinx.rapidwright.design.Design;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -123,5 +127,40 @@ public class TestRWRoute {
 			}
 		}
 		PartialRouter.routeDesignPartialTimingDriven(design, pinsToRoute);
+	}
+
+	@ParameterizedTest
+	@CsvSource({
+			// One SLR crossing
+			"SLICE_X9Y299,SLICE_X9Y300,10000",	// Close
+			"SLICE_X9Y240,SLICE_X9Y300,500",	// Perfect
+			"SLICE_X9Y359,SLICE_X9Y299,500",	// Perfect
+			"SLICE_X9Y240,SLICE_X9Y359,1000",	// Far
+			"SLICE_X9Y359,SLICE_X9Y240,2000",	// Far (opposite direction as above requires noticeably more nodes?)
+
+			// Two SLR crossings
+			"SLICE_X0Y240,SLICE_X0Y430,15000",
+			"SLICE_X0Y299,SLICE_X0Y599,15000",
+			"SLICE_X0Y599,SLICE_X0Y299,30000",	// (opposite direction as above requires noticeably more nodes?)
+
+			// Three SLR crossings
+			"SLICE_X0Y0,SLICE_X168Y899,20000",
+			"SLICE_X168Y0,SLICE_X0Y899,5000",	// (significantly less nodes than above?)
+	})
+	public void testSLRCrossingNonTimingDriven(String srcSiteName, String dstSiteName, long nodesPoppedLimit) {
+		Design design = new Design("top", Device.AWS_F1);
+
+		Net net = design.createNet("net");
+		SiteInst srcSi = design.createSiteInst(srcSiteName);
+		net.createPin("AQ", srcSi);
+
+		SiteInst dstSi = design.createSiteInst(dstSiteName);
+		SitePinInst dstSpi = net.createPin("A1", dstSi);
+
+		List<SitePinInst> pinsToRoute = new ArrayList<>();
+		pinsToRoute.add(dstSpi);
+		PartialRouter.routeDesignPartialNonTimingDriven(design, pinsToRoute);
+
+		Assertions.assertTrue(Long.valueOf(System.getProperty("rapidwright.rwroute.nodesPopped")) < nodesPoppedLimit);
 	}
 }

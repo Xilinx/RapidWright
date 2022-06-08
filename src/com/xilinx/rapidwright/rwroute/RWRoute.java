@@ -1555,7 +1555,9 @@ public class RWRoute{
 			printTimingInfo();
 		}
 		System.out.printf("==============================================================================\n");
-		
+
+		// For testing
+		System.setProperty("rapidwright.rwroute.nodesPopped", String.valueOf(nodesPopped));
 	}
 	
 	/**
