@@ -1534,8 +1534,15 @@ public class RWRoute{
 
 				// Now go backwards from sink
 				for (RouteNode parentRnode : connection.getRnodes()) {
+					// Mark nodes upstream of the sink as targets also
+					if (childRnode != null) {
+						assert(childRnode.isTarget());
+						parentRnode.setTarget(true);
+						// childRnode.setPrev(parentRnode);
+					}
+
 					// Once an over used node (or to-be-overused if we were to use it)
-					// is encountered, skip all downstream nodes
+					// is encountered and marked, skip all upstream nodes
 					int occ = parentRnode.getOccupancy();
 					if (occ > RouteNode.capacity ||
 							(occ == RouteNode.capacity && parentRnode.countConnectionsOfUser(netWrapper) == 0)) {
@@ -1544,12 +1551,6 @@ public class RWRoute{
 
 					assert(!parentRnode.isVisited());
 
-					// Mark the sequence of uncongested nodes upstream of the sink as targets also
-					if (childRnode != null) {
-						assert(childRnode.isTarget());
-						parentRnode.setTarget(true);
-						// childRnode.setPrev(parentRnode);
-					}
 					childRnode = parentRnode;
 				}
 			}
