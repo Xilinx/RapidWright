@@ -133,8 +133,8 @@ public class TestRWRoute {
 	@CsvSource({
 			// One SLR crossing
 			"SLICE_X9Y299,SLICE_X9Y300,10000",	// Close
-			"SLICE_X9Y240,SLICE_X9Y300,500",	// Perfect
-			"SLICE_X9Y359,SLICE_X9Y299,500",	// Perfect
+			"SLICE_X9Y241,SLICE_X9Y300,1000",	// Perfect
+			"SLICE_X9Y358,SLICE_X9Y299,1000",	// Perfect
 			"SLICE_X9Y240,SLICE_X9Y359,2000",	// Far
 			"SLICE_X9Y359,SLICE_X9Y240,2000",	// Far (opposite direction as above requires noticeably more nodes?)
 
