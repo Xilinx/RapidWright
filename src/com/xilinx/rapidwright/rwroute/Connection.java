@@ -146,23 +146,11 @@ public class Connection implements Comparable<Connection>{
 	}
 	
 	private short maxOfThree(short var1, short var2, short var3) {
-		if(var1 >= var2 && var1 >= var3) {
-			return var1;
-		}else if(var2 >= var1 && var2 >= var3) {
-			return var2;
-		}else {
-			return var3;
-		}
+		return (short) Math.max(Math.max(var1, var2), var3);
 	}
 	
 	private short minOfThree(short var1, short var2, short var3) {
-		if(var1 <= var2 && var1 <= var3) {
-			return var1;
-		}else if(var2 <= var1 && var2 <= var3) {
-			return var2;
-		}else {
-			return var3;
-		}
+		return (short) Math.min(Math.min(var1, var2), var3);
 	}
 	
 	/**
