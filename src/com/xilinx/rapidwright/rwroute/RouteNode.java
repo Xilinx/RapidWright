@@ -166,6 +166,7 @@ abstract public class RouteNode {
 		}else if(type == RouteNodeType.PINFEED_O){
 			baseCost = 1f;
 		}
+		assert(baseCost != 0);
 	}
 
 	/**
@@ -194,25 +195,28 @@ abstract public class RouteNode {
 
 	private void setEndTileXYCoordinates() {
 		Wire[] wires = node.getAllWiresInNode();
-		List<Tile> intTiles = new ArrayList<>();
-		for(Wire w : wires) {
-			if(w.getTile().getTileTypeEnum() == TileTypeEnum.INT) {
-				intTiles.add(w.getTile());
-			}
-		}
-		Tile endTile;
-		if(intTiles.size() > 1) {
-			endTile = intTiles.get(1);
-		}else if(intTiles.size() == 1) {
-			endTile = intTiles.get(0);
-		}else {
-			endTile = node.getTile();
-		}
-		endTileXCoordinate = (short) endTile.getTileXCoordinate();
-		endTileYCoordinate = (short) endTile.getTileYCoordinate();
 		Tile base = node.getTile();
-		length = (short) (Math.abs(endTileXCoordinate - base.getTileXCoordinate()) 
-				+ Math.abs(endTileYCoordinate - base.getTileYCoordinate()));
+		length = 0;
+		endTileXCoordinate = (short) base.getTileXCoordinate();
+		endTileYCoordinate = (short) base.getTileYCoordinate();
+
+		// Node.getNode("INT_X0Y297/NN4_W_BEG7", Device.getDevice("xcvu19p")).getAllWiresInNode()
+		// returns INT_X0Y297 as first and second wire, so cannot rely on second wire being the
+		// end tile
+		Arrays.stream(wires)
+				.map(Wire::getTile)
+				.filter((t) -> t.getTileTypeEnum() == TileTypeEnum.INT)
+				.forEach((t) -> {
+					short currTileX = (short) t.getTileXCoordinate();
+					short currTileY = (short) t.getTileYCoordinate();
+					short currLength = (short) (Math.abs(currTileX - base.getTileXCoordinate())
+												+ Math.abs(currTileY - base.getTileYCoordinate()));
+					if (currLength > length) {
+						length = currLength;
+						endTileXCoordinate = currTileX;
+						endTileYCoordinate = currTileY;
+					}
+				});
 	}
 
 	/**
