@@ -135,17 +135,17 @@ public class TestRWRoute {
 			"SLICE_X9Y299,SLICE_X9Y300,10000",	// Close
 			"SLICE_X9Y240,SLICE_X9Y300,500",	// Perfect
 			"SLICE_X9Y359,SLICE_X9Y299,500",	// Perfect
-			"SLICE_X9Y240,SLICE_X9Y359,1000",	// Far
+			"SLICE_X9Y240,SLICE_X9Y359,2000",	// Far
 			"SLICE_X9Y359,SLICE_X9Y240,2000",	// Far (opposite direction as above requires noticeably more nodes?)
 
 			// Two SLR crossings
-			"SLICE_X0Y240,SLICE_X0Y430,15000",
-			"SLICE_X0Y299,SLICE_X0Y599,15000",
+			"SLICE_X0Y240,SLICE_X0Y430,20000",
+			"SLICE_X0Y299,SLICE_X0Y599,10000",
 			"SLICE_X0Y599,SLICE_X0Y299,30000",	// (opposite direction as above requires noticeably more nodes?)
 
 			// Three SLR crossings
-			"SLICE_X0Y0,SLICE_X168Y899,20000",
-			"SLICE_X168Y0,SLICE_X0Y899,5000",	// (significantly less nodes than above?)
+			"SLICE_X0Y0,SLICE_X168Y899,15000",
+			"SLICE_X168Y0,SLICE_X0Y899,15000",
 	})
 	public void testSLRCrossingNonTimingDriven(String srcSiteName, String dstSiteName, long nodesPoppedLimit) {
 		Design design = new Design("top", Device.AWS_F1);
