@@ -93,15 +93,13 @@ abstract public class RouteNode {
 		this.node = node;
 		setType(type);
 		children = null;
-		isTarget = false;
 		setEndTileXYCoordinates();
 		setBaseCost(type);
 		presentCongestionCost = 1;
-    	historicalCongestionCost = 1;
-    	setVisited(false);
+		historicalCongestionCost = 1;
 		usersConnectionCounts = null;
 		driversCounts = null;
-		setPrev(null);
+		reset();
 	}
 
 	abstract protected RouteNode getOrCreate(Node node, RouteNodeType type);
@@ -592,20 +590,20 @@ abstract public class RouteNode {
 	}
 
 	/**
-	 * Checks if a RouteNode instance has been visited before when routing a connection.
+	 * Checks if a non-target RouteNode instance has been visited before when routing a connection.
 	 * @return true, if a RouteNode instance has been visited before.
 	 */
 	public boolean isVisited() {
-		return getPrev() != null;
+		// Targets may their prev members set
+		return getPrev() != null && !isTarget();
 	}
 
 	/**
-	 * Sets visited to indicate if a RouteNode instance has been visited before when routing a connection.
-	 * @param visited boolean value to set.
+	 * Reset the visited, prev, and target state of this node.
 	 */
-	public void setVisited(boolean visited) {
-		assert(!visited);
+	public void reset() {
 		setPrev(null);
+		setTarget(false);
 	}
 	
 	/**
