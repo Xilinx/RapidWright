@@ -1295,6 +1295,14 @@ public class RWRoute{
 				// Due to the phenomenon above, pushing a target node onto the queue
 				// means that no other paths are considered so we might as well clear
 				// the queue before doing that push.
+				// It is possible that the target node already exists in the queue with
+				// a lower cost than what this path would generate -- this eventuality is
+				// ignored.
+				// Note: RouteNode.isTarget() must be checked before RouteNode.isVisited()
+				// since a node's visited state is shared with whether it has a prev pointer;
+				// such pointers can also be populated by prepareRouteConnection()
+				// without inserting them into the queue. This is expected to be fine
+				// since routing should terminate as soon as a target is encountered.
 				queue.clear();
 			} else if(childRNode.isVisited()) {
 				// Skip all nodes that have ever been pushed on the queue (regardless
@@ -1302,7 +1310,6 @@ public class RWRoute{
 				// This does mean that, if a shorter path to an (un-popped) node that
 				// is still present in the queue were to exist here, it would never be
 				// considered.
-				// This includes any target nodes.
 				continue;
 			} else {
 				switch (childRNode.getType()) {
@@ -1485,91 +1492,97 @@ public class RWRoute{
 			if (!connection.getSink().isRouted())
 				continue;
 
-			{
-				RouteNode parentRnode = null;
-				boolean overUsed = false;
+			RouteNode parentRnode = null;
+			boolean overUsed = false;
 
-				// Go forwards from source
-				for (RouteNode childRnode : Lists.reverse(connection.getRnodes())) {
-					if (parentRnode != null) {
-						if (connection != connectionToRoute) {
-							// Skip all downstream nodes as soon as it leaves the current bounding box
-							if (!isAccessible(childRnode, connectionToRoute)) {
-								break;
-							}
-						}
-
-						if (!childRnode.isVisited() &&
-								// Disallow targets to leave room to find other paths to reach it
-								!childRnode.isTarget()) {
-							// Same as exploreAndExpand()
-							boolean longParent = config.isTimingDriven() && DelayEstimatorBase.isLong(parentRnode.getNode());
-							evaluateCostAndPush(parentRnode, longParent, childRnode, connection, shareWeight, rnodeCostWeight,
-									rnodeLengthWeight, rnodeEstWlWeight, rnodeDelayWeight, rnodeEstDlyWeight);
-						}
-
-						// Once an over used node (or to-be-overused if we were to use it)
-						// is encountered and pushed, skip all downstream nodes
-						int occ = childRnode.getOccupancy();
-						overUsed = occ > RouteNode.capacity ||
-								(occ == RouteNode.capacity && childRnode.countConnectionsOfUser(netWrapper) == 0);
-						if (overUsed)
+			// Go forwards from source
+			for (RouteNode childRnode : Lists.reverse(connection.getRnodes())) {
+				if (parentRnode != null) {
+					if (connection != connectionToRoute) {
+						// Skip all downstream nodes as soon as it leaves the current bounding box
+						if (!isAccessible(childRnode, connectionToRoute)) {
 							break;
+						}
 					}
 
-					// Once an over used node (or to-be-overused if we were to use it)
-					// is encountered and pushed, skip all downstream nodes
-					int occ = childRnode.getOccupancy();
-					if (occ > RouteNode.capacity ||
-							(occ == RouteNode.capacity && childRnode.countConnectionsOfUser(netWrapper) == 0)) {
-						overUsed = true;
-						break;
+					if (!childRnode.isVisited() &&
+							// Disallow targets to leave room to find other paths to reach it
+							!childRnode.isTarget()) {
+						// Same as exploreAndExpand()
+						boolean longParent = config.isTimingDriven() && DelayEstimatorBase.isLong(parentRnode.getNode());
+						evaluateCostAndPush(parentRnode, longParent, childRnode, connection, shareWeight, rnodeCostWeight,
+								rnodeLengthWeight, rnodeEstWlWeight, rnodeDelayWeight, rnodeEstDlyWeight);
 					}
-
-					parentRnode = childRnode;
 				}
 
-				// Must be at least one over-used node on the connection-to-be-routed
-				// (otherwise we wouldn't expect it to need re-routing)
-				if (connection == connectionToRoute) {
-					assert (overUsed);
+				// Once an over used node (or to-be-overused if we were to use it)
+				// is encountered and pushed, skip all downstream nodes
+				int occ = childRnode.getOccupancy();
+				if (occ > RouteNode.capacity ||
+						(occ == RouteNode.capacity && childRnode.countConnectionsOfUser(netWrapper) == 0)) {
+					overUsed = true;
+					break;
 				}
+
+				parentRnode = childRnode;
 			}
 
+			// Must be at least one over-used node on the connection-to-be-routed
+			// (otherwise we wouldn't expect it to need re-routing)
 			if (connection == connectionToRoute) {
-				RouteNode childRnode = null;
-
-				// Now go backwards from sink
-				for (RouteNode parentRnode : connection.getRnodes()) {
-					// Mark nodes upstream of the sink as targets also, unless it has been
-					// placed on the queue already (i.e. this must be the same first congested
-					// node reached from downstream as well as upstream)
-					if (childRnode != null && !parentRnode.isVisited()) {
-						assert(childRnode.isTarget());
-						assert(!parentRnode.isTarget());
-						parentRnode.setTarget(true);
-						childRnode.setPrev(parentRnode);
-
-						// Add it to the visited list, even if it's not truly been visited
-						// and may end up being inserted again when it does get visited,
-						// so that RouteNode.reset() gets called to clear the target
-						// and prev state
-						routingGraph.visit(parentRnode);
-					}
-
-					// Once an over used node (or to-be-overused if we were to use it)
-					// is encountered and marked, skip all upstream nodes
-					int occ = parentRnode.getOccupancy();
-					if (occ > RouteNode.capacity ||
-							(occ == RouteNode.capacity && parentRnode.countConnectionsOfUser(netWrapper) == 0)) {
-						break;
-					}
-
-					assert(!parentRnode.isVisited());
-
-					childRnode = parentRnode;
-				}
+				assert (overUsed);
 			}
+		}
+
+		RouteNode childRnode = null;
+
+		// For the connectionToRoute only, go backwards from sink
+		for (RouteNode parentRnode : connectionToRoute.getRnodes()) {
+			int occ = parentRnode.getOccupancy();
+			boolean parentOverUsed = occ > RouteNode.capacity ||
+					(occ == RouteNode.capacity && parentRnode.countConnectionsOfUser(netWrapper) == 0);
+
+			if (!parentRnode.isVisited()) {
+				// Mark nodes upstream of the sink as targets also, unless it has been
+				// placed on the queue already (i.e. this must be the same first congested
+				// node reached from downstream as well as upstream)
+				if (childRnode != null) {
+					assert (childRnode.isTarget());
+					assert (!parentRnode.isTarget());
+					parentRnode.setTarget(true);
+					childRnode.setPrev(parentRnode);
+
+					// Add it to the visited list, even if it's not truly been visited
+					// and may end up being inserted again when it does get visited,
+					// so that RouteNode.reset() gets called to clear the target
+					// and prev state
+					routingGraph.visit(parentRnode);
+				}
+			} else if (!parentOverUsed) {
+				// At this point, parentRnode has been visited but is not congested,
+				// so it must have been visited by another connection from the same
+				// net (since connectionToRoute has been ripped up already)
+				assert(parentRnode.countConnectionsOfUser(netWrapper) > 0);
+				if (!parentRnode.isTarget()) {
+					// We've accidentally stumbled upon an uncongested path back to the source!
+					// Mark this as a target and make it the only node in the queue, so that it
+					// is immediately popped and routing terminates
+					parentRnode.setTarget(true);
+					childRnode.setPrev(parentRnode);
+					queue.clear();
+					queue.add(parentRnode);
+				}
+				// If so, no point in going further upstream
+				break;
+			}
+
+			// Once an over used node (or to-be-overused if we were to use it)
+			// is encountered and marked, skip all upstream nodes
+			if (parentOverUsed) {
+				break;
+			}
+
+			childRnode = parentRnode;
 		}
 
 		// Clears previous route of the connection
