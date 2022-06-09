@@ -1290,7 +1290,12 @@ public class RWRoute{
 								  float rnodeDelayWeight, float rnodeEstDlyWeight){
 		boolean longParent = config.isTimingDriven() && DelayEstimatorBase.isLong(rnode.getNode());
 		for(RouteNode childRNode:rnode.getChildren()){
-			if(childRNode.isVisited()) {
+			if(childRNode.isTarget()) {
+				// Due to the phenomenon above, pushing a target node onto the queue
+				// means that no other paths are considered so we might as well clear
+				// the queue before doing that push.
+				queue.clear();
+			} else if(childRNode.isVisited()) {
 				// Skip all nodes that have ever been pushed on the queue (regardless
 				// of whether they have been popped or not).
 				// This does mean that, if a shorter path to an (un-popped) node that
@@ -1298,12 +1303,6 @@ public class RWRoute{
 				// considered.
 				// This includes any target nodes.
 				continue;
-			}
-			if(childRNode.isTarget()) {
-				// Due to the phenomenon above, pushing a target node onto the queue
-				// means that no other paths are considered so we might as well clear
-				// the queue before doing that push.
-				queue.clear();
 			} else {
 				switch (childRNode.getType()) {
 					case WIRE:

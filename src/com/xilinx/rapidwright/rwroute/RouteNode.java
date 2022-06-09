@@ -590,12 +590,11 @@ abstract public class RouteNode {
 	}
 
 	/**
-	 * Checks if a non-target RouteNode instance has been visited before when routing a connection.
+	 * Checks if a RouteNode instance has been visited before when routing a connection.
 	 * @return true, if a RouteNode instance has been visited before.
 	 */
 	public boolean isVisited() {
-		// Targets may their prev members set
-		return getPrev() != null && !isTarget();
+		return getPrev() != null;
 	}
 
 	/**
