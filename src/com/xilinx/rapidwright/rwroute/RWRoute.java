@@ -1508,7 +1508,8 @@ public class RWRoute{
 					}
 
 					if (!childRnode.isVisited() &&
-							// Disallow targets to leave room to find other paths to reach it
+							// For the case where the target node is the one that is congested,
+							// disallow targets to leave room to find other paths to reach it
 							!childRnode.isTarget()) {
 						// Same as exploreAndExpand()
 						boolean longParent = config.isTimingDriven() && DelayEstimatorBase.isLong(parentRnode.getNode());
@@ -1517,12 +1518,11 @@ public class RWRoute{
 					}
 				}
 
-				// Once an over used node (or to-be-overused if we were to use it)
-				// is encountered and pushed, skip all downstream nodes
+				// Skip all nodes downstream of over used (or to-be-overused if we were to use it) nodes
 				int occ = childRnode.getOccupancy();
-				if (occ > RouteNode.capacity ||
-						(occ == RouteNode.capacity && childRnode.countConnectionsOfUser(netWrapper) == 0)) {
-					overUsed = true;
+				overUsed = occ > RouteNode.capacity ||
+						(occ == RouteNode.capacity && childRnode.countConnectionsOfUser(netWrapper) == 0);
+				if (overUsed) {
 					break;
 				}
 
@@ -1541,6 +1541,7 @@ public class RWRoute{
 
 		// For the connectionToRoute only, go backwards from sink
 		for (RouteNode parentRnode : connectionToRoute.getRnodes()) {
+			// Over used node (or to-be-overused if we were to use it)
 			int occ = parentRnode.getOccupancy();
 			boolean parentOverUsed = occ > RouteNode.capacity ||
 					(occ == RouteNode.capacity && parentRnode.countConnectionsOfUser(netWrapper) == 0);
@@ -1580,8 +1581,7 @@ public class RWRoute{
 				break;
 			}
 
-			// Once an over used node (or to-be-overused if we were to use it)
-			// is encountered and marked, skip all upstream nodes
+			// Skip all nodes upstream of overused
 			if (parentOverUsed) {
 				break;
 			}
