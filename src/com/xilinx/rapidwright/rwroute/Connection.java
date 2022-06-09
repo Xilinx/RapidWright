@@ -121,16 +121,23 @@ public class Connection implements Comparable<Connection>{
 		yMinBB = (short) (yMin - boundingBoxExtensionY);
 
 		if (isCrossSLR()) {
+			// For SLR-crossing connections, ensure the bounding box width is no less than the
+			// maximum distance between Laguna columns to guarantee routability.
+			// Note: by blanket growing the bounding box to the worst-case maximum distance,
+			// this is likely to be more than is necessary to just reach the closest Laguna
+			// column, thus potentially imposing a runtime overhead.
 			short widthMinusMaxLagunaDist = (short) ((xMaxBB - xMinBB - 1) - maxXBetweenLaguna);
 			if (widthMinusMaxLagunaDist < 0) {
-				xMinBB += widthMinusMaxLagunaDist / 2;
-				xMaxBB -= (widthMinusMaxLagunaDist - 1) / 2;
+				xMinBB -= -widthMinusMaxLagunaDist / 2;
+				xMaxBB += (-widthMinusMaxLagunaDist + 1) / 2;
 			}
 
+			// Equivalently, ensure that the bounding box height is no less than a SLL's length
+			// to guarantee that at least one SLL is accessible.
 			short heightMinusSLL = (short) ((yMaxBB - yMinBB - 1) - RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES);
 			if (heightMinusSLL < 0) {
-				yMinBB += heightMinusSLL / 2 - boundingBoxExtensionY;
-				yMaxBB -= (heightMinusSLL - 1) / 2 - boundingBoxExtensionY;
+				yMinBB -= -heightMinusSLL / 2 + boundingBoxExtensionY;
+				yMaxBB += (-heightMinusSLL + 1) / 2 + boundingBoxExtensionY;
 			}
 		}
 
