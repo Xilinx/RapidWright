@@ -1175,6 +1175,7 @@ public class RWRoute{
 		}
 
 		routingGraph.resetExpansion();
+		assert(!connection.getSinkRnode().isVisited());
 	}
 	
 	/**
@@ -1448,8 +1449,17 @@ public class RWRoute{
 	}
 	
 	/**
-	 * Prepares for routing a connection.
+	 * Prepares for routing a connection, including seeding the routing queue with
+	 * known-uncongested downstream-from-source routing segments acquired from prior
+	 * iterations, as well as marking known-uncongested upstream-from-sink segments
+	 * as targets.
 	 * @param connectionToRoute The target connection to be routed.
+	 * @param shareWeight The criticality-aware share weight for a new sharing factor.
+	 * @param rnodeCostWeight The cost weight of the childRnode
+	 * @param rnodeLengthWeight The wirelength weight of childRnode's exact wirelength.
+	 * @param rnodeEstWlWeight The weight of estimated wirelength from childRnode to the connection's sink.
+	 * @param rnodeDelayWeight The weight of childRnode's exact delay.
+	 * @param rnodeEstDlyWeight The weight of estimated delay to the target.
 	 */
 	private void prepareRouteConnection(Connection connectionToRoute, float shareWeight, float rnodeCostWeight,
 										float rnodeLengthWeight, float rnodeEstWlWeight,
@@ -1460,9 +1470,11 @@ public class RWRoute{
 		connectionsRouted++;
 		connectionsRoutedIteration++;
 		queue.clear();
-		
+
 		// Sets the sink rnode of the connection as the target
-		connectionToRoute.getSinkRnode().setTarget(true);
+		RouteNode sinkRnode = connectionToRoute.getSinkRnode();
+		sinkRnode.setTarget(true);
+		routingGraph.visit(sinkRnode);
 
 		// Adds the source rnode to the queue
 		push(connectionToRoute.getSourceRnode(), null, 0, 0);
@@ -1481,7 +1493,7 @@ public class RWRoute{
 				for (RouteNode childRnode : Lists.reverse(connection.getRnodes())) {
 					if (parentRnode != null) {
 						if (connection != connectionToRoute) {
-							// Also skip all downstream nodes if it leaves the current bounding box
+							// Skip all downstream nodes as soon as it leaves the current bounding box
 							if (!isAccessible(childRnode, connectionToRoute)) {
 								break;
 							}
@@ -1490,6 +1502,7 @@ public class RWRoute{
 						if (!childRnode.isVisited() &&
 								// Disallow targets to leave room to find other paths to reach it
 								!childRnode.isTarget()) {
+							// Same as exploreAndExpand()
 							boolean longParent = config.isTimingDriven() && DelayEstimatorBase.isLong(parentRnode.getNode());
 							evaluateCostAndPush(parentRnode, longParent, childRnode, connection, shareWeight, rnodeCostWeight,
 									rnodeLengthWeight, rnodeEstWlWeight, rnodeDelayWeight, rnodeEstDlyWeight);
@@ -1528,12 +1541,6 @@ public class RWRoute{
 
 				// Now go backwards from sink
 				for (RouteNode parentRnode : connection.getRnodes()) {
-					// Add it to the visited list, even if it's not truly been visited
-					// and may end up being inserted again when it does get visited,
-					// so that RouteNode.reset() gets called to clear the target
-					// and prev state
-					routingGraph.visit(parentRnode);
-
 					// Mark nodes upstream of the sink as targets also, unless it has been
 					// placed on the queue already (i.e. this must be the same first congested
 					// node reached from downstream as well as upstream)
@@ -1542,6 +1549,12 @@ public class RWRoute{
 						assert(!parentRnode.isTarget());
 						parentRnode.setTarget(true);
 						childRnode.setPrev(parentRnode);
+
+						// Add it to the visited list, even if it's not truly been visited
+						// and may end up being inserted again when it does get visited,
+						// so that RouteNode.reset() gets called to clear the target
+						// and prev state
+						routingGraph.visit(parentRnode);
 					}
 
 					// Once an over used node (or to-be-overused if we were to use it)
