@@ -1267,8 +1267,10 @@ public class RWRoute{
 			if (prevRnode == null) {
 				// Blocked by RapidWrightXDEF#161
 				// assert(rnode == connection.getSourceRnode());
-				SitePin sp = rnode.getNode().getSitePin();
-				assert(!sp.isInput());
+				if (rnode != connection.getSourceRnode()) {
+					SitePin sp = rnode.getNode().getSitePin();
+					assert(!sp.isInput());
+				}
 			}
 			rnode = prevRnode;
 		}
@@ -1527,11 +1529,12 @@ public class RWRoute{
 				parentRnode = childRnode;
 			}
 
-			// Must be at least one over-used node on the connection-to-be-routed
-			// (otherwise we wouldn't expect it to need re-routing)
-			if (connection == connectionToRoute) {
-				assert (overUsed);
-			}
+			// If non-timing driven, there must be at least one over-used node on the
+			// connection-to-be-routed (otherwise we wouldn't expect it to need
+			// re-routing)
+			assert(config.isTimingDriven() ||
+					connection != connectionToRoute ||
+					overUsed);
 		}
 
 		RouteNode childRnode = null;
@@ -1559,14 +1562,15 @@ public class RWRoute{
 					routingGraph.visit(parentRnode);
 				}
 			} else if (!parentOverUsed) {
-				// At this point, parentRnode has been visited but is not congested,
-				// so it must have been visited by another connection from the same
-				// net (since connectionToRoute has been ripped up already)
-				assert(parentRnode.countConnectionsOfUser(netWrapper) > 0);
+				// During non timing driven, at this point parentRnode has been visited
+				// but is not congested, so it must have been visited by another connection
+				// from the same net (since connectionToRoute has been ripped up already)
+				assert(config.isTimingDriven() ||
+						parentRnode.countConnectionsOfUser(netWrapper) > 0);
 				if (!parentRnode.isTarget()) {
 					// We've accidentally stumbled upon an uncongested path back to the source!
 					// Mark this as a target and make it the only node in the queue, so that it
-					// is immediately popped and routing terminates
+					// can be immediately popped and terminate routing
 					parentRnode.setTarget(true);
 					childRnode.setPrev(parentRnode);
 					queue.clear();
