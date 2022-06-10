@@ -38,13 +38,48 @@ import org.json.JSONObject;
  */
 public class LSFJob extends Job {
 	
-	public static String LSF_RESOURCE = "select[osver=ws7]";//"select[type=X86_64 && osdistro=rhel && (osver=ws6 || osver=sv6)] rusage[mem=6000]";
+	public static final String LSF_RESOURCE = "select[osver=ws7]";//"select[type=X86_64 && osdistro=rhel && (osver=ws6 || osver=sv6)] rusage[mem=6000]";
 	
-	public static String LSF_PROJECT = "RapidWright";
+	public static final String LSF_PROJECT = "RapidWright";
 	
-	public static String LSF_QUEUE = "medium";
-	
-	
+	public static final String LSF_QUEUE = "medium";
+
+	private String lsfResource = LSF_RESOURCE;
+	private String lsfProject = LSF_PROJECT;
+	private String lsfQueue = LSF_QUEUE;
+
+
+	public String getLsfResource() {
+		return lsfResource;
+	}
+
+	public void setLsfResource(String lsfResource) {
+		this.lsfResource = lsfResource;
+	}
+
+	/**
+	 * Appends a memory liimt to this Job's LSF Resource.
+	 */
+	public void setLsfResourceMemoryLimit(int memLimitMb) {
+		this.lsfResource += " rusage[mem="+memLimitMb+"]";
+	}
+
+	public String getLsfProject() {
+		return lsfProject;
+	}
+
+	public void setLsfProject(String lsfProject) {
+		this.lsfProject = lsfProject;
+	}
+
+	public String getLsfQueue() {
+		return lsfQueue;
+	}
+
+	public void setLsfQueue(String lsfQueue) {
+		this.lsfQueue = lsfQueue;
+	}
+
 	/* (non-Javadoc)
 	 * @see com.xilinx.rapidwright.util.Job#launchJob()
 	 */
@@ -53,15 +88,15 @@ public class LSFJob extends Job {
 		Pair<String,String> launchScriptNames = createLaunchScript();
 		String[] cmd = new String[]{
 				"bsub","-R",
-				LSF_RESOURCE,
+				lsfResource,
 				"-J",
 				getRunDir()==null? System.getProperty("user.dir") : getRunDir(),
 				"-oo",
 				launchScriptNames.getSecond().replace(DEFAULT_LOG_EXTENSION, "_lsf_%J" + DEFAULT_LOG_EXTENSION),
 				"-P",
-				LSF_PROJECT +"-"+ System.getenv("USER"), 
+				lsfProject +"-"+ System.getenv("USER"),
 				"-q", 
-				LSF_QUEUE,
+				lsfQueue,
 				FileTools.isWindows() ? "cmd.exe" : "/bin/bash",
 				launchScriptNames.getFirst()};
 

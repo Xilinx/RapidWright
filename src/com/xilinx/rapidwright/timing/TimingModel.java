@@ -56,6 +56,9 @@ import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.util.FileTools;
+import com.xilinx.rapidwright.util.Utils;
+import org.python.google.common.collect.SetMultimap;
+import org.python.google.common.collect.TreeMultimap;
 
 /**
  * A TimingModel calculates net delay by implementing the lightweight timing model described in our 
@@ -500,17 +503,66 @@ public class TimingModel {
         return result;
     }
 
+    private Tile findReferenceTile() {
+
+        // for each column, look for valid row
+        SetMultimap<Integer,Integer> colHelper = TreeMultimap.create();;
+        for (int x = 0; x < device.getColumns(); x++) {
+            int span = 0;
+            for (int y = 0; y < device.getRows(); y++) {
+                if (device.getTile("INT", x, y) != null) {
+                    span++;
+                }
+            }
+            colHelper.put(span,x);
+        }
+
+        // for each row, look for valid col
+        SetMultimap<Integer,Integer> rowHelper = TreeMultimap.create();;
+        for (int y = 0; y < device.getRows(); y++) {
+            int span = 0;
+            for (int x = 0; x < device.getColumns(); x++) {
+                if (device.getTile("INT", x, y) != null) {
+                    span++;
+                }
+            }
+            rowHelper.put(span,y);
+        }
+
+        for (int x : colHelper.get(Collections.max(colHelper.keySet()))) {
+            for (int y : rowHelper.get(Collections.max(rowHelper.keySet()))) {
+                Tile tile = device.getTile("INT", x, y);
+
+                int col = tile.getColumn();
+                int row = tile.getRow();
+
+                // Want an INT tile that has CLB on both side
+                if (Utils.isCLB(device.getTile(row, col-1).getTileTypeEnum()) && Utils.isCLB(device.getTile(row, col+1).getTileTypeEnum())) {
+                    return tile;
+                }
+            }
+        }
+        return null;
+    }
+
+
     /**
      * Reads the text file containing the delay terms needed by this timing model.
      * @param filename Name (and maybe the path) of the text file, the default is delay_terms.dat in the current directory.
      * @return Boolean indication of completion.
      */
     protected boolean readDelayTerms(String filename) {
-        boolean result = true; 
-        try (BufferedReader br = new BufferedReader(new FileReader(FileTools.getRapidWrightPath() + File.separator + filename))){
+
+        // Compute before reading from file to allow overriding.
+        Tile tile = findReferenceTile();
+        START_TILE_COL = tile.getColumn();
+        START_TILE_ROW = tile.getRow();
+
+        boolean result = true;
+        try (BufferedReader br = new BufferedReader(new FileReader(FileTools.getRapidWrightPath() + File.separator + filename))) {
             String line = "";
             int lineCntr = 0;
-            while ((line=br.readLine()) != null) {// && line.length() != 0) {
+            while ((line=br.readLine()) != null) {
                 String[] split = line.split("\\s+");
                 lineCntr++;
                 if (split.length < 2 || split[0].startsWith("#"))
@@ -598,7 +650,6 @@ public class TimingModel {
                 else if (split[0].equalsIgnoreCase("MID_MAX"))        MID_MAX =(int) Math.floor(value);
                 else if (split[0].equalsIgnoreCase("FAR_MIN"))        FAR_MIN =(int) Math.floor(value);
                 else if (split[0].equalsIgnoreCase("FAR_MAX"))        FAR_MAX =(int) Math.floor(value);
-
                 else {
                 	String errMessage;
                     if (split.length == 2) {
@@ -614,6 +665,7 @@ public class TimingModel {
             e.printStackTrace();
             result = false;
         }
+
         return result;
     }
 
@@ -732,20 +784,9 @@ public class TimingModel {
                 dDistHorizontal[i] = checkTileType(testT, GroupDelayType.DOUBLE);
                 qDistHorizontal[i] = checkTileType(testT, GroupDelayType.QUAD);
                 lDistHorizontal[i] = checkTileType(testT, GroupDelayType.LONG);
-
-//                Pattern pattern = Pattern.compile("INT_X(\\d+)Y");
-//                Matcher matcher = pattern.matcher(testT.getName());
-//                String IntX = "";
-//                if (matcher.find()) {
-//                    IntX = matcher.group(1);
-//                }
-//
-//                System.out.printf("PM:PM col %3d : %3d %3d %3d %3d : %s %s\n", i, sDistHorizontal[i],
-//                        dDistHorizontal[i], qDistHorizontal[i], lDistHorizontal[i], testT.getName(), IntX);
             }
         }
 
-//        getHorDistArrayInIntTileGrid();
 
         int col = START_TILE_COL;
         int row1 = 0;
@@ -767,9 +808,6 @@ public class TimingModel {
                 if (matcher.find()) {
                     IntY = matcher.group(1);
                 }
-
-//                System.out.printf("PM:PM col %3d : %3d %3d %3d %3d : %s %s\n", i, sDistVertical[i],
-//                        dDistVertical[i], qDistVertical[i], lDistVertical[i], testT.getName(), IntY);
             }
         }
 
@@ -968,7 +1006,6 @@ public class TimingModel {
             }
         }
 
-//        System.out.println("res: " + res.size() + " " + res);
         return res;
     }
 

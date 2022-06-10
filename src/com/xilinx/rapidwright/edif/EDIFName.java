@@ -163,7 +163,8 @@ public class EDIFName implements Comparable<EDIFName> {
 	}
 	
 	public <K, V> Map<K, V> getNewMap(){
-		return new HashMap<K,V>();
+		//Save some memory for small maps
+		return new HashMap<K,V>(2);
 	}
 
 	public int compareTo(EDIFName o) {
