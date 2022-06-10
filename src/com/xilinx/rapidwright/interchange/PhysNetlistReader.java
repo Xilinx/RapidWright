@@ -176,7 +176,7 @@ public class PhysNetlistReader {
                 Cell c = siteInst.getCell(belName);
                 if(c == null){
                     BEL bel = siteInst.getBEL(belName);
-                    c = new Cell(PhysNetlistWriter.LOCKED, bel, cellInst);
+                    c = new Cell(PhysNetlistWriter.LOCKED, bel);
                     c.setBELFixed(placement.getIsBelFixed());
                     c.setNullBEL(bel == null);
                     siteInst.addCell(c);
@@ -186,7 +186,7 @@ public class PhysNetlistReader {
                 // c Alternative Blocked Site Type // TODO
             } else if(physCells.get(cellName) == PhysCellType.PORT) {
                 siteInst.getBEL(belName);
-                Cell portCell = new Cell(cellName,siteInst.getBEL(belName),null);
+                Cell portCell = new Cell(cellName,siteInst.getBEL(belName));
                 portCell.setType(PhysNetlistWriter.PORT);
                 siteInst.addCell(portCell);
                 portCell.setBELFixed(placement.getIsBelFixed());
@@ -225,7 +225,7 @@ public class PhysNetlistReader {
                             + bel.getName() + " is not valid. HARD0 and HARD1 BEL types do not "
                             + "require placed cells.");
                 }
-                Cell cell = new Cell(cellName, siteInst, bel, cellInst);
+                Cell cell = new Cell(cellName, siteInst, bel);
                 cell.setBELFixed(placement.getIsBelFixed());
                 cell.setSiteFixed(placement.getIsSiteFixed());
 
@@ -266,7 +266,7 @@ public class PhysNetlistReader {
                                     + " in site " + siteInst.getSiteName() + " of type "
                                     + siteInst.getSiteTypeEnum());
                         }
-                        c = new Cell(cellName, bel, cellInst);
+                        c = new Cell(cellName, bel);
                         c.setSiteInst(siteInst);
                         siteInst.getCellMap().put(belName, c);
                         c.setRoutethru(true);
@@ -439,10 +439,7 @@ public class PhysNetlistReader {
                             assert(siteInst.getCell(routeThruLutInput.getBEL()) == null);
 
                             Cell belCell = siteInst.getCell(bel);
-                            EDIFCellInst cellInst = belCell.getEDIFCellInst();
-                            assert(cellInst != null);
-
-                            Cell c = new Cell(belCell.getName(), routeThruLutInput.getBEL(), cellInst);
+                            Cell c = new Cell(belCell.getName(), routeThruLutInput.getBEL());
                             c.setSiteInst(siteInst);
                             siteInst.getCellMap().put(routeThruLutInput.getBELName(), c);
                             c.setRoutethru(true);
