@@ -66,12 +66,13 @@ public class CheckOpenFilesExtension implements BeforeTestExecutionCallback, Aft
             // (or may not) reflect updates to the directory that occur after returning from
             // this method.'
             return list.filter((p) -> Files.exists(p, LinkOption.NOFOLLOW_LINKS))
-                    .map(p -> {
+                    .flatMap(p -> {
                         try {
                             final Path linkTarget = Files.readSymbolicLink(p);
-                            return linkTarget.toString();
+                            return Stream.of(linkTarget.toString());
                         } catch (IOException e) {
-                            return p.toString();
+                            System.err.println("Ignoring file descriptor "+p+", could not resolve to actual file: "+e.getMessage());
+                            return Stream.empty();
                         }})
                     .filter(this::checkIgnore)
                     .sorted()
