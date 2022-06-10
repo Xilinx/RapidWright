@@ -25,10 +25,12 @@
 package com.xilinx.rapidwright.edif;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -52,6 +54,7 @@ import com.xilinx.rapidwright.design.PinType;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.FileTools;
+import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.ParallelismTools;
 
 
@@ -282,19 +285,16 @@ public class EDIFTools {
 		return instanceMap;
 	}
 	
+	/**
+	 * Same as EDIFNetlist.getCellInstFromHierName()
+	 * @param netlist The netlist to search
+	 * @param hierarchicalName The full hierarchical name of the instance
+	 * @return The cell instance named, or null if it could not be found
+	 * @deprecated 
+	 * To be removed in 2022.2.0
+	 */
 	public static EDIFCellInst getEDIFCellInst(EDIFNetlist netlist, String hierarchicalName){
-		String[] names = hierarchicalName.split(EDIF_HIER_SEP);
-		EDIFCellInst curr = netlist.getTopCellInst();
-		
-		for(String name : names){
-			EDIFCellInst next = curr.getCellType().getCellInst(name);
-			if (next == null) {
-				throw new NullPointerException("Did not find cell "+name+" in "+curr+" while trying to resolve hierarchical name "+hierarchicalName);
-			}
-			curr = next;
-		}
-		
-		return curr;
+	    return netlist.getCellInstFromHierName(hierarchicalName);
 	}
 	
 	/**
@@ -473,7 +473,7 @@ public class EDIFTools {
 	 * Connects two existing logical port insts together by creating new ports and nets on all cells
 	 * instantiated between their levels of hierarchy.  It assumes the netlist cells involved only
 	 * have one instance (does not differentiate cells when creating the ports).  This assumption 
-	 * can be enforce by calling {@link #flattenNetlist(Design)}. If the src or snk
+	 * can be enforced by calling {@link #uniqueifyNetlist(Design)}. If the src or snk
 	 * port insts do net have nets connected, it will create them and connect them in their parent
 	 * cell definition.
 	 * @param src The logical port inst driver or source  
@@ -708,9 +708,34 @@ public class EDIFTools {
 		t.stop().printSummary();
 	}
 
+	protected static Path getTempEDIFFile() {
+		String tempEDIFFileName = ".temp_edif_" + FileTools.getUniqueProcessAndHostID() + ".edf";
+		return FileSystems.getDefault().getPath(tempEDIFFileName);
+	}
+
+	public static EDIFNetlist loadEDIFStream(InputStream is, long size) throws IOException {
+		if (ParallelEDIFParser.calcThreads(size) > 1) {
+			// Copy input stream to a temporary file so that it can be parsed in parallel
+			Path fileName = getTempEDIFFile();
+			try {
+				Files.copy(is, fileName);
+				try (ParallelEDIFParser p = new ParallelEDIFParser(fileName, size)) {
+					return p.parseEDIFNetlist();
+				}
+			} finally {
+				Files.deleteIfExists(fileName);
+			}
+		} else {
+			try (EDIFParser p = new EDIFParser(is)) {
+				return p.parseEDIFNetlist();
+			}
+		}
+	}
+
 	public static EDIFNetlist loadEDIFFile(Path fileName) {
 	    try {
-	        if(ParallelismTools.getParallel()) {
+	        final long size = Files.size(fileName);
+	        if (ParallelEDIFParser.calcThreads(size) > 1) {
 	            try (ParallelEDIFParser p = new ParallelEDIFParser(fileName)) {
 	                return p.parseEDIFNetlist();
 	            }           
@@ -895,15 +920,13 @@ public class EDIFTools {
 				+ "\n\n      source " + tclFileName + "\n");
 	}
 
-	public static EDIFNetlist readEdifFromDcpFile(String dcpFileName){
-		return EDIFTools.loadEDIFFile(FileTools.getInputStreamFromZipOrDcpFile(dcpFileName, ".edf"));
+	public static EDIFNetlist readEdifFromZipFile(String zipFileName) throws IOException {
+		Pair<InputStream,Long> p = FileTools.getInputStreamFromZipFile(zipFileName, ".edf");
+		InputStream is = p.getFirst();
+		long size = p.getSecond();
+		return EDIFTools.loadEDIFStream(is, size);
 	}
 
-	public static EDIFNetlist loadEDIFFile(InputStream is){
-		EDIFParser p = new EDIFParser(is);
-		return p.parseEDIFNetlist();
-	}
-	
 	public static EDIFNetlist createNewNetlist(String topName){
 		return createNewNetlist(topName, true);
 	}
@@ -1117,10 +1140,10 @@ public class EDIFTools {
 	 * @param netlist The netlist to build the map from.
 	 * @return The populated map of cells to list of hierarchical instances.
 	 */
-	public static HashMap<EDIFLibrary, HashMap<EDIFCell, ArrayList<EDIFHierCellInst>>> 
+	public static Map<EDIFLibrary, Map<EDIFCell, List<EDIFHierCellInst>>> 
 							createCellInstanceMap(EDIFNetlist netlist) {
-		HashMap<EDIFLibrary, HashMap<EDIFCell, ArrayList<EDIFHierCellInst>>> cellInstMap = 
-				new HashMap<EDIFLibrary, HashMap<EDIFCell, ArrayList<EDIFHierCellInst>>>();
+		Map<EDIFLibrary, Map<EDIFCell, List<EDIFHierCellInst>>> cellInstMap = 
+				new HashMap<EDIFLibrary, Map<EDIFCell, List<EDIFHierCellInst>>>();
 		
 		Queue<EDIFHierCellInst> toProcess = new LinkedList<EDIFHierCellInst>();
 		netlist.getTopHierCellInst().addChildren(toProcess);
@@ -1129,10 +1152,10 @@ public class EDIFTools {
 			EDIFHierCellInst curr = toProcess.poll();
 			
 			EDIFLibrary lib = curr.getCellType().getLibrary();
-			HashMap<EDIFCell, ArrayList<EDIFHierCellInst>> cellMap = cellInstMap.computeIfAbsent(lib, k -> new HashMap<>());
+			Map<EDIFCell, List<EDIFHierCellInst>> cellMap = cellInstMap.computeIfAbsent(lib, k -> new HashMap<>());
 
 			EDIFCell cell = curr.getCellType();
-			ArrayList<EDIFHierCellInst> insts = cellMap.computeIfAbsent(cell, k -> new ArrayList<>());
+			List<EDIFHierCellInst> insts = cellMap.computeIfAbsent(cell, k -> new ArrayList<>());
 			insts.add(curr);
 
 			if(curr.getInst().getCellType().getCellInsts() == null) {
@@ -1145,32 +1168,44 @@ public class EDIFTools {
 	
 		return cellInstMap;
 	}
-	
+
 	/**
-	 * Flattens the netlist by creating unique cells within each library except primitives and 
-	 * macros.  It also updates references throughout the logical and physical netlist so all 
-	 * references are self-consistent.  This transformation is useful when performing netlist 
-	 * manipulations such as adding/removing cells, ports or nets within a design.
-	 * @param design The design containing the netlist to flatten.
+	 * Duplicates EDIFCells such that each EDIFCellInst only instantiates an EDIFCell once 
+	 * (except primitives and macros).
+	 * @param design The design containing the netlist to uniqueify.
+	 * @deprecated 
+	 * Please use {@link #uniqueifyNetlist(Design)} instead
+	 * To be removed in 2022.2.0
 	 */
 	public static void flattenNetlist(Design design) {
+	    uniqueifyNetlist(design);
+	}
+	
+	/**
+	 * Duplicates EDIFCells such that each EDIFCellInst only instantiates an EDIFCell once 
+	 * (except primitives and macros).  It also updates references throughout the logical and 
+	 * physical netlist so all references are self-consistent.  This transformation is useful when 
+	 * performing netlist manipulations such as adding/removing cells, ports or nets within a design.
+	 * @param design The design containing the netlist to uniqueify.
+	 * @return True if uniqueification necessary and netlist was modified, False if not necessary and netlist was not modified. Null if indeterminable.
+	 */
+	public static Boolean uniqueifyNetlist(Design design) {
 		if(design.getModuleInsts().size() > 0) {
-			System.err.println("ERROR: Cannot flatten netlist, design contains ModuleInstances. "
+			System.err.println("ERROR: Cannot uniqueify netlist, design contains ModuleInstances. "
 					+ "Please call Design.flattenDesign() first.");
-			return;
+			return null;
 		}
 		EDIFNetlist netlist = design.getNetlist();
 		EDIFLibrary macros = Design.getMacroPrimitives(design.getDevice().getSeries());
-		HashMap<EDIFLibrary, HashMap<EDIFCell, ArrayList<EDIFHierCellInst>>> instMap = 
-																	createCellInstanceMap(netlist);
+		Map<EDIFLibrary, Map<EDIFCell, List<EDIFHierCellInst>>> instMap = createCellInstanceMap(netlist);
 		// Don't uniqueify primitive cell instances
 		instMap.remove(netlist.getHDIPrimitivesLibrary());
 		
-		HashMap<EDIFCell, ArrayList<EDIFHierCellInst>> toUniqueify = new HashMap<EDIFCell, ArrayList<EDIFHierCellInst>>();
+		Map<EDIFCell, List<EDIFHierCellInst>> toUniqueify 
+		                                    = new HashMap<EDIFCell, List<EDIFHierCellInst>>();
 		
-		for(EDIFLibrary lib : instMap.keySet()) {
-			HashMap<EDIFCell, ArrayList<EDIFHierCellInst>> cellMap = instMap.get(lib);
-			for(Entry<EDIFCell,ArrayList<EDIFHierCellInst>> e : cellMap.entrySet()) {
+		for(Entry<EDIFLibrary, Map<EDIFCell, List<EDIFHierCellInst>>> libEntry : instMap.entrySet()) {
+			for(Entry<EDIFCell,List<EDIFHierCellInst>> e : libEntry.getValue().entrySet()) {
 				// Also skip macros
 				if(macros.containsCell(e.getKey())) continue;
 				// Identify multiple instantiated cells
@@ -1179,21 +1214,26 @@ public class EDIFTools {
 				}
 			}
 		}
+
+		if (toUniqueify.isEmpty())
+			return false;
 		
 		for(EDIFCell curr : new ArrayList<>(toUniqueify.keySet())) {
 			duplicateMultiInstCell(design, curr, toUniqueify);
 		}
+
+		return true;
 	}
 	
 	
 	private static int unique = 1;
 	
 	private static void duplicateMultiInstCell(Design design, EDIFCell cell, 
-									HashMap<EDIFCell, ArrayList<EDIFHierCellInst>> toUniqueify) {
+									Map<EDIFCell, List<EDIFHierCellInst>> toUniqueify) {
 		EDIFNetlist netlist = design.getNetlist();
 		// Check that all higher level cells don't have multiple shared cell definitions, before
 		// duplicating this one		
-		ArrayList<EDIFHierCellInst> insts = toUniqueify.get(cell);
+		List<EDIFHierCellInst> insts = toUniqueify.get(cell);
 		if(insts == null) {
 			// Already processed, or no duplicates
 			return;
@@ -1204,7 +1244,7 @@ public class EDIFTools {
 			for(int i=1; i < instParents.length; i++) {
 				EDIFCellInst parent = netlist.getCellInstFromHierName(sb.toString());
 				if(parent != null) {
-					ArrayList<EDIFHierCellInst> parentDuplicates = toUniqueify.get(parent.getCellType());
+					List<EDIFHierCellInst> parentDuplicates = toUniqueify.get(parent.getCellType());
 					if(parentDuplicates != null) {
 						duplicateMultiInstCell(design, parent.getCellType(), toUniqueify);
 					}					
@@ -1225,7 +1265,17 @@ public class EDIFTools {
 			EDIFCell newCell = new EDIFCell(origCell.getLibrary(), origCell, origCell.getName() 
 					+ "_RW" + unique++);
 			cellInst.getInst().setCellType(newCell);
-			
+			for(EDIFCellInst newInstCopy : newCell.getCellInsts()) {
+			    List<EDIFHierCellInst> instsToUniqueify = toUniqueify.get(newInstCopy.getCellType());
+			    if(instsToUniqueify == null) continue; 
+			    for(int i=0; i < instsToUniqueify.size(); i++) {
+			        EDIFHierCellInst hierInst = instsToUniqueify.get(i);
+			        if(newInstCopy.getName().equals(hierInst.getInst().getName()) 
+			                && hierInst.isDescendantOf(cellInst)) {
+			            instsToUniqueify.set(i, hierInst.getSibling(newInstCopy));			                
+			        }
+			    }
+			}
 			// Update any physical cell references
 			for(EDIFCellInst inst : newCell.getCellInsts()) {
 				String potentialLeafCell = cellInst.getFullHierarchicalInstName() 
@@ -1251,7 +1301,7 @@ public class EDIFTools {
 	
 	/**
 	 * Connects an existing logical net to another instances by creating intermediate logical
-	 * nets and ports.  Design must be fully flattened (see {@link EDIFTools#flattenNetlist(Design)}.
+	 * nets and ports.  Design must be fully flattened (see {@link EDIFTools#uniqueifyNetlist(Design)}.
 	 *
 	 * Note: EDIF cell instances and nets can contain '/' within their name. This function currently does not support
 	 * designs containing these constructs.

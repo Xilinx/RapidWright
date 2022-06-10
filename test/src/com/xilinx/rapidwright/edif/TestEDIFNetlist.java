@@ -103,8 +103,7 @@ class TestEDIFNetlist {
 
     @Test
     public void testCopyCellsAndSubCells() {
-        String dcpPath = RapidWrightDCP.getString("picoblaze_ooc_X10Y235.dcp");
-        Design design = RapidWrightDCP.loadDCP(dcpPath);
+        Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
         EDIFNetlist srcNetlist = design.getNetlist();
 
         EDIFNetlist dstNetlist = EDIFTools.createNewNetlist("dstNetlist");
@@ -130,5 +129,19 @@ class TestEDIFNetlist {
                 }
             }
         }
+    }
+
+    @Test
+    public void testCopyCellsAndSubCellsCollision() {
+        Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
+        EDIFNetlist srcNetlist = design.getNetlist();
+
+        EDIFNetlist dstNetlist = EDIFTools.createNewNetlist("dstNetlist");
+        dstNetlist.copyCellAndSubCells(srcNetlist.getTopCell());
+
+        RuntimeException e = Assertions.assertThrows(RuntimeException.class,
+                () -> dstNetlist.copyCellAndSubCells(srcNetlist.getTopCell()));
+        Assertions.assertEquals("ERROR: Destination netlist already contains EDIFCell named 'picoblaze_top' in library 'work'",
+                e.getMessage());
     }
 }

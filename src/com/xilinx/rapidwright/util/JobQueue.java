@@ -26,7 +26,6 @@
 package com.xilinx.rapidwright.util;
 
 import java.io.File;
-import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.Objects;
 import java.util.Queue;
@@ -43,7 +42,9 @@ public class JobQueue {
 	
 	public static int MAX_LSF_CONCURRENT_JOBS = 120;
 	
-	public static boolean USE_LSF_IF_AVAILABLE = true; 
+	public static boolean USE_LSF_IF_AVAILABLE = true;
+
+	private final boolean printJobStart;
 	
 	private Queue<Job> waitingToRun;
 	
@@ -56,10 +57,14 @@ public class JobQueue {
 	public static final String LSF_QUEUE_OPTION = "-lsf_queue";
 	
 	
-	public JobQueue(){
+	public JobQueue(boolean printJobStart){
 		waitingToRun = new LinkedList<>();
 		running = new ConcurrentLinkedQueue<>();
 		finished = new LinkedList<>();
+		this.printJobStart = printJobStart;
+	}
+	public JobQueue() {
+		this(true);
 	}
 	
 	public boolean addJob(Job j){
@@ -81,7 +86,9 @@ public class JobQueue {
 				Job j = waitingToRun.poll();
 				long pid = j.launchJob();
 				running.add(j);
-				System.out.println("Running job [" + pid + "] " + j.getCommand() + " in " + j.getRunDir());
+				if (printJobStart) {
+					System.out.println("Running job [" + pid + "] " + j.getCommand() + " in " + j.getRunDir());
+				}
 				launched = true;
 			}
 
@@ -111,19 +118,16 @@ public class JobQueue {
 			if(!curr){
 				if(failedCount == 0){
 					// Let's just print the first error output
-					String logFileName = j.getRunDir() + File.separator + Job.DEFAULT_COMMAND_LOG_FILE;
-					if(logFileName != null && new File(logFileName).exists()){
-						ArrayList<String> lines = FileTools.getLinesFromTextFile(logFileName);
+					j.getLastLogLines().ifPresent(lastLogLines -> {
 						System.err.println("***************************************************************************");
 						System.err.println("* ERROR: Job " + j.getJobNumber() + " failed");
-						System.err.println("* LOG FILE: " + logFileName);
+						System.err.println("* LOG FILE: " + j.getLogFilename());
 						System.err.println("*  Here are the last few lines of the log:");
-						int start = lines.size() >= 8 ? lines.size()-8 : 0; 
-						for(int i=start; i < lines.size(); i++){
-							System.err.println(lines.get(i));
+						for (String l : lastLogLines) {
+							System.err.println(l);
 						}
 						System.err.println("***************************************************************************");
-					}
+					});
 				}
 				failedCount++;
 			}
