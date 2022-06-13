@@ -30,6 +30,7 @@ import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -459,6 +460,30 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
 	
 	public boolean isLeafCellOrBlackBox() {
 		return (instances == null || instances.size() == 0) && (nets == null || nets.size() == 0);
+	}
+
+	/**
+	 * Checks if all the port on the provided cell match and are equal to the ports on this cell.
+	 * @param cell The other cell to check against.
+	 * @return True if the ports on each cell match each other, false otherwise.
+	 */
+	public boolean hasCompatibleInterface(EDIFCell cell) {
+	    Map<String,EDIFPort> portMap = new HashMap<>(ports);
+	    if(portMap.size() != cell.getPortMap().size()) return false;
+	    
+	    for(EDIFPort port : cell.getPorts()) {
+	        EDIFPort match = portMap.remove(port.getBusName());
+	        if(match == null) {
+	            match = portMap.remove(port.getName());
+	            if(match == null) {
+	                return false;	                
+	            }
+	        }
+            if(!Objects.equals(port.getName(), match.getName())) return false;
+	        if(!Objects.equals(port.getWidth(), match.getWidth())) return false;
+	        if(!Objects.equals(port.getDirection(), match.getDirection())) return false;
+	    }
+	    return portMap.isEmpty();
 	}
 	
 	/**
