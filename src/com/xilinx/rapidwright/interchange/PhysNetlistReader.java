@@ -185,7 +185,6 @@ public class PhysNetlistReader {
 
                 // c Alternative Blocked Site Type // TODO
             } else if(physCells.get(cellName) == PhysCellType.PORT) {
-                siteInst.getBEL(belName);
                 Cell portCell = new Cell(cellName,siteInst.getBEL(belName));
                 portCell.setType(PhysNetlistWriter.PORT);
                 siteInst.addCell(portCell);
