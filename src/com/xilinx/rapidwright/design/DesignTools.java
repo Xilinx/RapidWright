@@ -931,14 +931,11 @@ public class DesignTools {
 				parentNet = new Net(parentNetName.getHierarchicalNetName(),parentNetName.getNet());
 			}
 			for(EDIFHierNet netAlias : netlist.getNetAliases(netName)) {
-				if(parentNet.equals(netAlias)) continue;
+				if(parentNet.getName().equals(netAlias.getHierarchicalNetName())) continue;
 				Net alias = design.getNet(netAlias.getHierarchicalNetName());
 				if(alias != null) {
 					// Move this non-parent net physical information to the parent
 					for(SiteInst si : alias.getSiteInsts()) {
-						if(si.getNetList().remove(alias)) {
-							si.getNetList().add(parentNet);
-						}
 						List<String> siteWires = si.getSiteWiresFromNet(alias);
 						if(siteWires != null) {
 							for(String siteWire : new ArrayList<>(siteWires)) {
