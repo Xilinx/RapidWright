@@ -144,7 +144,9 @@ public class JobQueue {
 			}
 			success &= curr;
 		}
-		//if(failedCount > 0) System.err.println("Failed Job Count: " + failedCount);
+		if(failedCount > 0)  {
+			System.err.println("Failed Job Count: " + failedCount);
+		}
 		return success;
 	}
 	
