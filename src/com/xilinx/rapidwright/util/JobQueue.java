@@ -107,7 +107,7 @@ public class JobQueue {
 				launched = true;
 			}
 
-			if(!launched){
+			if(!launched || !printJobStart){
 				System.out.print("Waiting on ");
 				jobsByState.forEach((state, jobs) -> {
 					System.out.print(jobs.size()+" "+state.getName()+", ");
