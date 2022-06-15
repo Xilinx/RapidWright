@@ -42,6 +42,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.Set;
@@ -816,6 +817,32 @@ public class DesignTools {
 		return parentNetName;
 	}
 
+	private static String createInformativeCellInterfaceMismatchMessage(String hierCellInstName, 
+	                                                EDIFCell target, EDIFCell src) {
+	    Map<String, EDIFPort> cellPorts = new HashMap<>(target.getPortMap());
+        StringBuilder sb = new StringBuilder();
+        for(EDIFPort p : src.getPorts()) {
+            EDIFPort otherPort = cellPorts.remove(p.getBusName());
+            if(otherPort == null) {
+                otherPort = cellPorts.remove(p.getName());
+                if(otherPort == null) {
+                    sb.append("\n  port " + p.getName() + " doesn't exist on " + src);
+                }
+            }
+            
+            if(!Objects.equals(p.getWidth(), p.getWidth()) || 
+               !Objects.equals(p.getDirection(), p.getDirection())) {
+                sb.append("\n  port " + p.getName() + " mismatch in direction/width");
+            }
+        }
+        for(String portName : cellPorts.keySet()) {
+            sb.append("\n  port " + portName + " is missing on " + src);
+        }
+        
+        return "\nERROR: The destination instance " + hierCellInstName + 
+                " has a different port signature than " + src.getName() + ":" + sb.toString();
+	}
+	
 	/**
 	 * NOTE: This method is not fully tested.  
 	 * Populates a black box in a netlist with the provided design. This method
@@ -833,6 +860,11 @@ public class DesignTools {
 			System.err.println("ERROR: The cell instance " + hierarchicalCellName + " is not a black box.");
 			return;
 		}
+		if(!inst.getCellType().hasCompatibleInterface(cell.getTopEDIFCell())) {
+		    throw new RuntimeException(createInformativeCellInterfaceMismatchMessage(
+		            hierarchicalCellName, inst.getCellType(), cell.getTopEDIFCell()));
+		}
+		
 		inst.getCellType().getLibrary().removeCell(inst.getCellType());
 		netlist.migrateCellAndSubCells(cell.getTopEDIFCell(), true);
 		inst.setCellType(cell.getTopEDIFCell());
@@ -896,19 +928,15 @@ public class DesignTools {
 			EDIFHierNet parentNetName = netlist.getParentNet(netName);
 			Net parentNet = design.getNet(parentNetName.getHierarchicalNetName());
 			if(parentNet == null) {
-				if(parentNetName == null) parentNetName = netName;
-				parentNet = new Net(parentNetName.getHierarchicalInstName(),parentNetName.getNet());
+				parentNet = new Net(parentNetName.getHierarchicalNetName(),parentNetName.getNet());
 			}
 			for(EDIFHierNet netAlias : netlist.getNetAliases(netName)) {
-				if(parentNet.equals(netAlias)) continue;
+				if(parentNet.getName().equals(netAlias.getHierarchicalNetName())) continue;
 				Net alias = design.getNet(netAlias.getHierarchicalNetName());
 				if(alias != null) {
 					// Move this non-parent net physical information to the parent
 					for(SiteInst si : alias.getSiteInsts()) {
-						if(si.getNetList().remove(alias)) {
-							si.getNetList().add(parentNet);
-						}
-						Set<String> siteWires = si.getSiteWiresFromNet(alias);
+						List<String> siteWires = si.getSiteWiresFromNet(alias);
 						if(siteWires != null) {
 							for(String siteWire : new ArrayList<>(siteWires)) {
 								BELPin belPin = si.getSite().getBELPins(siteWire)[0];
@@ -1786,7 +1814,7 @@ public class DesignTools {
 	public static String getRoutedSitePinFromPhysicalPin(Cell cell, Net net, String belPinName) {
 	    SiteInst inst = cell.getSiteInst();
 	    if(belPinName == null) return null;
-	    Set<String> siteWires = inst.getSiteWiresFromNet(net);
+	    Set<String> siteWires = new HashSet<>(inst.getSiteWiresFromNet(net));
 	    String toReturn = null;
 	    Queue<BELPin> queue = new LinkedList<>();
 	    queue.add(cell.getBEL().getPin(belPinName));

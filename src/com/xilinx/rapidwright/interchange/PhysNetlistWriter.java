@@ -243,7 +243,7 @@ public class PhysNetlistWriter {
                 segments.add(new RouteBranchNode(site, sitePIP, status.isFixed()));
             }
             
-            for(Entry<Net,HashSet<String>> e : siteInst.getSiteCTags().entrySet()) {
+            for(Entry<Net,List<String>> e : siteInst.getNetToSiteWiresMap().entrySet()) {
                 ArrayList<RouteBranchNode> segments = netSiteRouting.get(e.getKey());
                 if(segments == null) {
                 	segments = new ArrayList<RouteBranchNode>();

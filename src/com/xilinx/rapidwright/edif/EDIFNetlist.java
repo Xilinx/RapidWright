@@ -568,7 +568,7 @@ public class EDIFNetlist extends EDIFName {
 			}
 			return newCell;
 		} else {
-			if (copiedCells.contains(existingCell)) {
+			if (destLib.isHDIPrimitivesLibrary() || copiedCells.contains(existingCell)) {
 				return existingCell;
 			}
 			throw new RuntimeException("ERROR: Destination netlist already contains EDIFCell named " +
