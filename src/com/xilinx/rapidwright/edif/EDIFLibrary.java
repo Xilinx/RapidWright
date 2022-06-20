@@ -223,7 +223,7 @@ public class EDIFLibrary extends EDIFName {
 		Map<String,EDIFCell> yetToVisit;
 		if (stable) {
 			yetToVisit = getCells().stream().sorted(Comparator.comparing(EDIFName::getName)).collect(Collectors.toMap(
-					EDIFName::getName,
+					EDIFName::getLegalEDIFName,
 					Function.identity(),
 					(a,b)-> {throw new RuntimeException("duplicate cell name "+a.getName());},
 					TreeMap::new
@@ -284,7 +284,7 @@ public class EDIFLibrary extends EDIFName {
 		}
 	}
 	
-	void exportEDIF(List<EDIFCell> cells, Writer w, boolean writeHeader, boolean writeFooter) throws IOException {
+	void exportEDIF(List<EDIFCell> cells, Writer w, boolean writeHeader, boolean writeFooter, boolean stable) throws IOException {
 		if (writeHeader) {
 			w.write("  (Library ");
 			exportEDIFName(w);
@@ -292,7 +292,7 @@ public class EDIFLibrary extends EDIFName {
 			w.write("    (technology (numberDefinition ))\n");
 		}
 		for (EDIFCell c : cells) {
-			c.exportEDIF(w);
+			c.exportEDIF(w, stable);
 		}
 		if (writeFooter) {
 			w.write("  )\n");
@@ -300,7 +300,7 @@ public class EDIFLibrary extends EDIFName {
 	}
 
 	public void exportEDIF(BufferedWriter bw, boolean stable) throws IOException {
-		exportEDIF(getValidCellExportOrder(stable), bw, true, true);
+		exportEDIF(getValidCellExportOrder(stable), bw, true, true, stable);
 	}
 	public void exportEDIF(BufferedWriter bw) throws IOException {
 		exportEDIF(bw, false);
@@ -323,7 +323,7 @@ public class EDIFLibrary extends EDIFName {
 			streamFutures.add(ParallelismTools.submit(
 					() -> ParallelDCPOutput.newStream((os) -> {
 						try (OutputStreamWriter ow = new OutputStreamWriter(new NoCloseOutputStream(os))) {
-							exportEDIF(chunk, ow, firstChunk, lastChunk);
+							exportEDIF(chunk, ow, firstChunk, lastChunk, false);
 						} catch (IOException e) {
 							throw new RuntimeException(e);
 						}

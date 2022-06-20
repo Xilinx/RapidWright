@@ -676,9 +676,9 @@ public class EDIFNetlist extends EDIFName {
 			bw.write("  (timeStamp ");
 			SimpleDateFormat formatter = new SimpleDateFormat("yyyy MM dd HH mm ss");
 			if (stable) {
-				bw.write(formatter.format(new java.util.Date()));
-			} else {
 				bw.write(formatter.format(new java.util.Date(0)));
+			} else {
+				bw.write(formatter.format(new java.util.Date()));
 			}
 			bw.write(")\n");
 			bw.write("  (program \"" + Device.FRAMEWORK_NAME + "\" (version \"" + Device.RAPIDWRIGHT_VERSION + "\"))\n");
