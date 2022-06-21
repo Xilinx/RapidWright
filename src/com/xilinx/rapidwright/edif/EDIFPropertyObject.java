@@ -41,9 +41,7 @@ import java.util.stream.Collectors;
 public class EDIFPropertyObject extends EDIFName {
 
 	private Map<String,EDIFPropertyValue> properties;
-	
-	private String owner;
-	
+
 	public EDIFPropertyObject(String name){
 		super(name);
 	}
@@ -185,9 +183,9 @@ public class EDIFPropertyObject extends EDIFName {
 				EDIFName.exportSomeEDIFName(wr, e.getKey(), cache.getEDIFRename(e.getKey()));
 				wr.write(" ");
 				e.getValue().writeEDIFString(wr);
-				if(owner != null){
+				if(e.getValue().getOwner() != null){
 					wr.write(" (owner \"");
-					wr.write(owner);
+					wr.write(e.getValue().getOwner());
 					wr.write("\")");
 				}
 				wr.write(")\n");
@@ -195,19 +193,5 @@ public class EDIFPropertyObject extends EDIFName {
 				throw new RuntimeException(ex);
 			}
 		}
-	}
-
-	/**
-	 * @return the owner
-	 */
-	public String getOwner() {
-		return owner;
-	}
-
-	/**
-	 * @param owner the owner to set
-	 */
-	public void setOwner(String owner) {
-		this.owner = owner;
 	}
 }

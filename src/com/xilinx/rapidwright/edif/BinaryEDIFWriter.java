@@ -87,10 +87,7 @@ public class BinaryEDIFWriter {
         for(Entry<EDIFName, EDIFPropertyValue> e : o.getProperties().entrySet()) {
             addNameToStringMap(e.getKey(), stringMap);
             addStringToStringMap(e.getValue().getValue(), stringMap);
-        }
-        String owner = o.getOwner();
-        if(owner != null) {
-            addStringToStringMap(owner, stringMap);
+            addStringToStringMap(e.getValue().getOwner(), stringMap);
         }
     }
     
@@ -169,13 +166,11 @@ public class BinaryEDIFWriter {
                 throw new RuntimeException("ERROR: EDIF object exceeded number of encoded "
                         + "properties on object '" + o.getName() + "'");
             }
-            String owner = o.getOwner();
-            if(owner != null) {
-                os.writeInt(EDIF_HAS_OWNER | o.getProperties().size());
-                os.writeInt(stringMap.get(owner));
-            }else {
-                os.writeInt(o.getProperties().size());                
-            }
+
+            os.writeInt(o.getProperties().size());
+
+            //TODO owner!!!
+
             for(Entry<EDIFName, EDIFPropertyValue> e : o.getProperties().entrySet()) {
                 writeEDIFName(e.getKey(), os, stringMap);
                 int propType = e.getValue().getType().ordinal();

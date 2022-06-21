@@ -304,14 +304,14 @@ public abstract class AbstractEDIFParserWorker {
         expect(PROPERTY, nextToken);
         EDIFName key = parseEDIFNameObject(new EDIFName());
         EDIFPropertyValue value = parsePropertyValue();
-        o.addProperty(key,value);
+        o.addProperty(key.getName(),value);
         String paren = getNextToken(true);
         if(paren.equals(RIGHT_PAREN)) {
             // pass - nothing more to do here
         }
         else if(paren.equals(LEFT_PAREN)){
             expect(OWNER, getNextToken(true));
-            o.setOwner(getNextToken(false));
+            value.setOwner(getNextToken(false));
             expect(RIGHT_PAREN,getNextToken(true));
             expect(RIGHT_PAREN,getNextToken(true));
         }else{

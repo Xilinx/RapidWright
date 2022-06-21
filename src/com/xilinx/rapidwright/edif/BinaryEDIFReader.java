@@ -71,7 +71,8 @@ public class BinaryEDIFReader {
             int numProps = is.readInt();
             if((numProps & BinaryEDIFWriter.EDIF_HAS_OWNER) == BinaryEDIFWriter.EDIF_HAS_OWNER) {
                 numProps = ~BinaryEDIFWriter.EDIF_HAS_OWNER & numProps;
-                o.setOwner(strings[is.readInt()]);
+                //o.setOwner(strings[is.readInt()]);
+                throw new RuntimeException("owner stuff!");
             }
             for(int i=0; i < numProps; i++) {
                 EDIFName key = new EDIFName();

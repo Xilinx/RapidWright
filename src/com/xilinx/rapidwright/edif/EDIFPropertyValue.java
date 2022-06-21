@@ -42,6 +42,8 @@ public class EDIFPropertyValue {
 	
 	private String value;
 
+	private String owner;
+
 	public EDIFPropertyValue(){
 		
 	}
@@ -249,5 +251,13 @@ public class EDIFPropertyValue {
 			}
 		}
 		
+	}
+
+	public String getOwner() {
+		return owner;
+	}
+
+	public void setOwner(String owner) {
+		this.owner = owner;
 	}
 }
