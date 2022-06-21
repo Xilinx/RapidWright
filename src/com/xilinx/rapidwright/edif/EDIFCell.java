@@ -523,8 +523,8 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
 		wr.write("   )\n"); // Cell end
 	}
 
-	public void exportEDIF(Writer wr) throws IOException{
-		exportEDIF(wr, new EDIFWriteLegalNameCache(), false);
+	public void exportEDIF(Writer wr, EDIFWriteLegalNameCache cache) throws IOException{
+		exportEDIF(wr, cache, false);
 	}
 	@Override
 	public String getUniqueKey() {

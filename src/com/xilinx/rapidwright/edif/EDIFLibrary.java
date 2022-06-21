@@ -327,14 +327,14 @@ public class EDIFLibrary extends EDIFName {
 		}
 	}
 
-	public void exportEDIF(BufferedWriter bw, boolean stable) throws IOException {
-		exportEDIF(getValidCellExportOrder(stable), bw, true, true, new EDIFWriteLegalNameCache(), stable);
+	public void exportEDIF(BufferedWriter bw, EDIFWriteLegalNameCache cache, boolean stable) throws IOException {
+		exportEDIF(getValidCellExportOrder(stable), bw, true, true, cache, stable);
 	}
-	public void exportEDIF(BufferedWriter bw) throws IOException {
-		exportEDIF(bw, false);
+	public void exportEDIF(BufferedWriter bw, EDIFWriteLegalNameCache cache) throws IOException {
+		exportEDIF(bw, cache, false);
 	}
 
-	public List<Future<ParallelDCPInput>> exportEDIF() throws IOException{
+	public List<Future<ParallelDCPInput>> exportEDIF(EDIFWriteLegalNameCache cache) throws IOException{
 		if (!ParallelismTools.getParallel()) {
 			throw new RuntimeException();
 		}
@@ -351,7 +351,7 @@ public class EDIFLibrary extends EDIFName {
 			streamFutures.add(ParallelismTools.submit(
 					() -> ParallelDCPOutput.newStream((os) -> {
 						try (OutputStreamWriter ow = new OutputStreamWriter(new NoCloseOutputStream(os))) {
-							exportEDIF(chunk, ow, firstChunk, lastChunk, new EDIFWriteLegalNameCache(), false);
+							exportEDIF(chunk, ow, firstChunk, lastChunk, cache, false);
 						} catch (IOException e) {
 							throw new RuntimeException(e);
 						}

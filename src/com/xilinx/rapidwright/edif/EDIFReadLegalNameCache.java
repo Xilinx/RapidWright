@@ -4,6 +4,10 @@ import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Helper class that keeps track of EDIF Renames during parsing. Two different subclasses exist for thread-safe vs.
+ * non-thread-safe implementation
+ */
 public abstract class EDIFReadLegalNameCache {
 
     /**

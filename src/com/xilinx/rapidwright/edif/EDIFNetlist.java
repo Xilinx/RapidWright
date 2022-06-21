@@ -657,8 +657,13 @@ public class EDIFNetlist extends EDIFName {
 		return new ArrayList<>(toExport);
 	}
 
-	public void exportEDIF(OutputStream out, EDIFWriteLegalNameCache cache, boolean stable) throws IOException {
+	public void exportEDIF(OutputStream out, boolean stable) throws IOException {
 		try (BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(out))) {
+			final ParallelDCPOutput dos = ParallelismTools.getParallel() ?
+					ParallelDCPOutput.cast(out) : null;
+
+			EDIFWriteLegalNameCache cache = dos!=null ? EDIFWriteLegalNameCache.multiThreaded() : EDIFWriteLegalNameCache.singleThreaded();
+
 			bw.write("(edif ");
 			exportEDIFName(bw, cache);
 			bw.write("\n");
@@ -698,12 +703,10 @@ public class EDIFNetlist extends EDIFName {
 				librariesToWrite.add(lib);
 			}
 
-			final ParallelDCPOutput dos = ParallelismTools.getParallel() ?
-					ParallelDCPOutput.cast(out) : null;
 			if (dos != null) {
 				Deque<Future<ParallelDCPInput>> streamFutures = new ArrayDeque<>();
 				for (EDIFLibrary lib : librariesToWrite) {
-					streamFutures.addAll(lib.exportEDIF());
+					streamFutures.addAll(lib.exportEDIF(cache));
 				}
 
 				bw.flush();
@@ -718,7 +721,7 @@ public class EDIFNetlist extends EDIFName {
 				}
 			} else {
 				for (EDIFLibrary lib : librariesToWrite) {
-					lib.exportEDIF(bw, stable);
+					lib.exportEDIF(bw, cache, stable);
 				}
 			}
 
@@ -735,19 +738,13 @@ public class EDIFNetlist extends EDIFName {
 			bw.write(")\n");
 		}
 	}
-
-
-	public void exportEDIF(OutputStream out, boolean stable) throws IOException {
-		exportEDIF(out, new EDIFWriteLegalNameCache(), stable);
-	}
-
 	public void exportEDIF(OutputStream out) throws IOException {
 		exportEDIF(out, false);
 	}
 
 	public void exportEDIF(Path fileName, boolean stable){
 		try (OutputStream out = Files.newOutputStream(fileName)){
-			exportEDIF(out, new EDIFWriteLegalNameCache(), stable);
+			exportEDIF(out, stable);
 		} catch (IOException e) {
 			MessageGenerator.briefError("ERROR: Failed to export EDIF file " + fileName);
 			e.printStackTrace();
