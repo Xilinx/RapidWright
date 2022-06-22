@@ -214,4 +214,23 @@ public class LSFJob extends Job {
 		}
 	}
 
+	public static void main(String[] args) throws InterruptedException {
+		if (args.length != 1) {
+			System.out.println("Usage: <command>");
+		}
+
+		LSFJob job = new LSFJob();
+
+		String memLimit = System.getProperty("LSFJob.ResourceMemoryLimit");
+		if (memLimit != null) {
+			job.setLsfResourceMemoryLimit(Integer.parseInt(memLimit));
+		}
+
+		job.setCommand(String.join(" ", args));
+		job.launchJob();
+
+		while (!job.isFinished()) {
+			Thread.sleep(2000);
+		}
+	}
 }
