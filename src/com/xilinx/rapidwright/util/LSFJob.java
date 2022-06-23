@@ -229,9 +229,17 @@ public class LSFJob extends Job {
 
 		job.setCommand(String.join(" ", args));
 		job.launchJob();
+		System.out.println("STATUS=PEND");
 
+		boolean running = false;
 		while (!job.isFinished()) {
+			if (!running && job.getJobState() == JobState.RUNNING) {
+				running = true;
+				System.out.println("STATUS=RUN");
+			}
 			Thread.sleep(2000);
 		}
+
+		System.exit(job.getStatus().getSecond());
 	}
 }
