@@ -148,15 +148,19 @@ abstract public class RouteNode {
 				}
 				break;
 			case NODE_HQUAD:
+				assert(length != 0 || node.getAllDownhillNodes().isEmpty());
 				baseCost = 0.35f*length;
 				break;
 			case NODE_VQUAD:
-				baseCost = 0.15f*length;// VQUADs have length 4 and 5
+				// In case of U-turn nodes
+				if (length != 0) baseCost = 0.15f*length;// VQUADs have length 4 and 5
 				break;
 			case NODE_HLONG:
+				assert(length != 0 || node.getAllDownhillNodes().isEmpty());
 				baseCost = 0.15f*length;// HLONGs have length 6 and 7
 				break;
 			case NODE_VLONG:
+				assert(length != 0);
 				baseCost = 0.7f;
 				break;	
 			default:
@@ -168,6 +172,10 @@ abstract public class RouteNode {
 		}else if(type == RouteNodeType.PINFEED_O){
 			baseCost = 1f;
 		}
+
+		// Node.getNode("INT_X182Y535/WW4_W_BEG7", Device.getDevice("xcvu19p")).getAllWiresInNode()
+		// returns two wires, both X182Y535
+		// assert(baseCost != 0);
 	}
 
 	/**
@@ -196,24 +204,22 @@ abstract public class RouteNode {
 
 	private void setEndTileXYCoordinates() {
 		Wire[] wires = node.getAllWiresInNode();
-		List<Tile> intTiles = new ArrayList<>();
+		Tile endTile = null;
 		for(Wire w : wires) {
 			if(w.getTile().getTileTypeEnum() == TileTypeEnum.INT) {
-				intTiles.add(w.getTile());
+				boolean endTileWasNotNull = (endTile != null);
+				endTile = w.getTile();
+				// Break if this is the second INT tile
+				if (endTileWasNotNull) break;
 			}
 		}
-		Tile endTile;
-		if(intTiles.size() > 1) {
-			endTile = intTiles.get(1);
-		}else if(intTiles.size() == 1) {
-			endTile = intTiles.get(0);
-		}else {
+		if (endTile == null) {
 			endTile = node.getTile();
 		}
 		endTileXCoordinate = (short) endTile.getTileXCoordinate();
 		endTileYCoordinate = (short) endTile.getTileYCoordinate();
 		Tile base = node.getTile();
-		length = (short) (Math.abs(endTileXCoordinate - base.getTileXCoordinate()) 
+		length = (short) (Math.abs(endTileXCoordinate - base.getTileXCoordinate())
 				+ Math.abs(endTileYCoordinate - base.getTileYCoordinate()));
 	}
 
@@ -655,4 +661,6 @@ abstract public class RouteNode {
 	 * @return True, if the arc should be excluded from the routing resource graph.
 	 */
 	abstract public boolean isExcluded(Node parent, Node child);
+
+	abstract public int getSLRIndex();
 }

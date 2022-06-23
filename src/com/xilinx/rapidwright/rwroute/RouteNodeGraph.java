@@ -25,8 +25,10 @@ package com.xilinx.rapidwright.rwroute;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.util.CountUpDownLatch;
@@ -75,6 +77,14 @@ public class RouteNodeGraph {
 
     final Design design;
 
+    public static final short SUPER_LONG_LINE_LENGTH_IN_TILES = 60;
+
+    /** Array mapping an INT tile's Y coordinate, to its SLR index */
+    final int[] intYToSLRIndex;
+
+    /** Maximum X distance between any two Laguna tiles */
+    final int maxXBetweenLaguna;
+
     protected class RouteNodeImpl extends RouteNode {
 
         public RouteNodeImpl(Node node, RouteNodeType type) {
@@ -106,6 +116,11 @@ public class RouteNodeGraph {
             setChildren(setChildrenTimer);
             return super.getChildren();
         }
+
+        @Override
+        public int getSLRIndex() {
+             return intYToSLRIndex[getEndTileYCoordinate()];
+        }
     }
 
     public RouteNodeGraph(RuntimeTracker setChildrenTimer, Design design) {
@@ -115,6 +130,48 @@ public class RouteNodeGraph {
         visited = new ArrayList<>();
         this.setChildrenTimer = setChildrenTimer;
         this.design = design;
+
+        Device device = design.getDevice();
+        intYToSLRIndex = new int[device.getRows()];
+        Tile[][] intTiles = device.getTilesByNameRoot("INT");
+        for (int y = 0; y < intTiles.length; y++) {
+            Tile[] intTilesAtY = intTiles[y];
+            for (int x = 0; x < intTilesAtY.length; x++) {
+                Tile tile = intTilesAtY[x];
+                if (tile != null) {
+                    intYToSLRIndex[y] = tile.getSLR().getId();
+                    break;
+                }
+            }
+        }
+
+        Tile[][] lagunaTiles;
+        if (device.getSeries() == Series.UltraScalePlus) {
+            lagunaTiles = device.getTilesByNameRoot("LAG_LAG");
+        } else if (device.getSeries() == Series.UltraScale) {
+            lagunaTiles = device.getTilesByNameRoot("LAGUNA_TILE");
+        } else {
+            lagunaTiles = null;
+        }
+
+        int currentMaxXBetweenLaguna = 0;
+        if (lagunaTiles != null) {
+            for (int y = 0; y < lagunaTiles.length; y++) {
+                Tile[] lagunaTilesAtY = lagunaTiles[y];
+                Tile lastTile = null;
+                for (int x = 0; x < lagunaTilesAtY.length; x++) {
+                    Tile tile = lagunaTilesAtY[x];
+                    if (tile != null) {
+                        if (lastTile != null) {
+                            int distFromLastTile = tile.getTileXCoordinate() - lastTile.getTileXCoordinate();
+                            currentMaxXBetweenLaguna = Math.max(currentMaxXBetweenLaguna, distFromLastTile);
+                        }
+                        lastTile = tile;
+                    }
+                }
+            }
+        }
+        maxXBetweenLaguna = currentMaxXBetweenLaguna;
     }
 
     public void initialize() {
@@ -257,4 +314,7 @@ public class RouteNodeGraph {
         return Math.round((float) sum / numNodes());
     }
 
+    public int getMaxXBetweenLaguna() {
+        return maxXBetweenLaguna;
+    }
 }

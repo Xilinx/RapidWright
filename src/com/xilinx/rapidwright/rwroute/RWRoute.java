@@ -63,8 +63,6 @@ import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
 public class RWRoute{
 	/** The design to route */
 	protected Design design;
-	/** A flag to indicate if the device has multiple SLRs, for the sake of avoiding unnecessary check for single-SLR devices */
-	private boolean multiSLRDevice;
 	/** Created NetWrappers */
 	protected Map<Net,NetWrapper> nets;
 	/** A list of indirect connections that will go through iterative routing */
@@ -154,8 +152,6 @@ public class RWRoute{
 	
 	public RWRoute(Design design, RWRouteConfig config) {
 		this.design = design;
-		multiSLRDevice = design.getDevice().getSLRs().length > 1;
-
 		this.config = config;
 	}
 
@@ -506,7 +502,7 @@ public class RWRoute{
 					if(connection.isDirect()) continue;
 					connection.computeConnectionBoundingBox(config.getBoundingBoxExtensionX(),
 							config.getBoundingBoxExtensionY(),
-							isMultiSLRDevice());
+							routingGraph.getMaxXBetweenLaguna());
 				}
 			}
 		}
@@ -528,10 +524,6 @@ public class RWRoute{
 	 */
 	protected void addPreservedNodes(Collection<Node> nodes, Net netToPreserve) {
 		routingGraph.asyncPreserve(nodes, netToPreserve);
-	}
-
-	public boolean isMultiSLRDevice() {
-		return multiSLRDevice;
 	}
 
 	/**
@@ -1354,8 +1346,26 @@ public class RWRoute{
 		if (config.isTimingDriven()) {
 			newPartialPathCost += rnodeDelayWeight * (childRnode.getDelay() + DelayEstimatorBase.getExtraDelay(childRnode.getNode(), longParent));
 		}
-		int deltaX = Math.abs(childRnode.getEndTileXCoordinate() - connection.getSinkRnode().getEndTileXCoordinate());
-		int deltaY = Math.abs(childRnode.getEndTileYCoordinate() - connection.getSinkRnode().getEndTileYCoordinate());
+
+		int childX = childRnode.getEndTileXCoordinate();
+		int childY = childRnode.getEndTileYCoordinate();
+		RouteNode sinkRnode = connection.getSinkRnode();
+		int sinkX = sinkRnode.getEndTileXCoordinate();
+		int sinkY = sinkRnode.getEndTileYCoordinate();
+		int deltaX = Math.abs(childX - sinkX);
+		int deltaY = Math.abs(childY - sinkY);
+		if (connection.isCrossSLR()) {
+			int deltaSLR = Math.abs(sinkRnode.getSLRIndex() - childRnode.getSLRIndex());
+			// Check for overshooting which occurs when child and sink node are in
+			// adjacent SLRs and less than a SLL wire's length apart in the Y axis.
+			if (deltaSLR == 1) {
+				int overshootBy = deltaY - RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES;
+				if (overshootBy < 0) {
+					deltaY = RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES - overshootBy;
+				}
+			}
+		}
+
 		int distanceToSink = deltaX + deltaY;
 		float newTotalPathCost = newPartialPathCost + rnodeEstWlWeight * distanceToSink / sharingFactor;
 		if (config.isTimingDriven()) {
@@ -1545,7 +1555,9 @@ public class RWRoute{
 			printTimingInfo();
 		}
 		System.out.printf("==============================================================================\n");
-		
+
+		// For testing
+		System.setProperty("rapidwright.rwroute.nodesPopped", String.valueOf(nodesPopped));
 	}
 	
 	/**
