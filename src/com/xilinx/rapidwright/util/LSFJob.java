@@ -215,8 +215,9 @@ public class LSFJob extends Job {
 	}
 
 	public static void main(String[] args) throws InterruptedException {
-		if (args.length != 1) {
+		if (args.length == 0) {
 			System.out.println("Usage: <command>");
+			return;
 		}
 
 		LSFJob job = new LSFJob();
