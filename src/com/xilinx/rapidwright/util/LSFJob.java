@@ -240,6 +240,9 @@ public class LSFJob extends Job {
 			Thread.sleep(2000);
 		}
 
-		System.exit(job.getStatus().getSecond());
+		int exitCode = job.getStatus().getSecond();
+		System.out.println("STATUS=EXIT (code=" + exitCode +")");
+
+		System.exit(exitCode);
 	}
 }
