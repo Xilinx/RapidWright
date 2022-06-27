@@ -309,7 +309,7 @@ public class EDIFLibrary extends EDIFName {
 	private static final byte[] EXPORT_CONST_TECHNOLOGY = "\n    (edifLevel 0)\n    (technology (numberDefinition ))\n".getBytes(StandardCharsets.UTF_8);
 	private static final byte[] EXPORT_CONST_LIBRARY_END = "  )\n".getBytes(StandardCharsets.UTF_8);
 
-	void exportEDIF(List<EDIFCell> cells, OutputStream os, boolean writeHeader, boolean writeFooter, EDIFWriteLegalNameCache cache, boolean stable) throws IOException {
+	void exportEDIF(List<EDIFCell> cells, OutputStream os, boolean writeHeader, boolean writeFooter, EDIFWriteLegalNameCache<?> cache, boolean stable) throws IOException {
 		if (writeHeader) {
 			os.write(EXPORT_CONST_LIBRARY_START);
 			exportEDIFName(os, cache);
@@ -323,14 +323,14 @@ public class EDIFLibrary extends EDIFName {
 		}
 	}
 
-	public void exportEDIF(OutputStream os, EDIFWriteLegalNameCache cache, boolean stable) throws IOException {
+	public void exportEDIF(OutputStream os, EDIFWriteLegalNameCache<?> cache, boolean stable) throws IOException {
 		exportEDIF(getValidCellExportOrder(stable), os, true, true, cache, stable);
 	}
-	public void exportEDIF(OutputStream os, EDIFWriteLegalNameCache cache) throws IOException {
+	public void exportEDIF(OutputStream os, EDIFWriteLegalNameCache<?> cache) throws IOException {
 		exportEDIF(os, cache, false);
 	}
 
-	public List<Future<ParallelDCPInput>> exportEDIF(EDIFWriteLegalNameCache cache) throws IOException{
+	public List<Future<ParallelDCPInput>> exportEDIF(EDIFWriteLegalNameCache<?> cache) throws IOException{
 		if (!ParallelismTools.getParallel()) {
 			throw new RuntimeException();
 		}

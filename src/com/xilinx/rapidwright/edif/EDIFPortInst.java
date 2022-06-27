@@ -236,7 +236,7 @@ public class EDIFPortInst {
 	public static final byte[] EXPORT_CONST_INSTANCEREF = " (instanceref ".getBytes(StandardCharsets.UTF_8);
 	public static final byte[] EXPORT_CONST_CLOSE_PORT_INST = ")\n".getBytes(StandardCharsets.UTF_8);
 	
-	public void writeEDIFExport(OutputStream os, byte[] indent, EDIFWriteLegalNameCache cache) throws IOException{
+	public void writeEDIFExport(OutputStream os, byte[] indent, EDIFWriteLegalNameCache<?> cache) throws IOException{
 		os.write(indent);
 		os.write(EXPORT_CONST_PORTREF);
 		if(index == -1) {

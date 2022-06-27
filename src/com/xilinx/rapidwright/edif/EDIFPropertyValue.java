@@ -48,11 +48,17 @@ public class EDIFPropertyValue {
 	public EDIFPropertyValue(){
 		
 	}
-	
-	public EDIFPropertyValue(String value, EDIFValueType type){
+
+	public EDIFPropertyValue(String value, EDIFValueType type, String owner){
 		this.value = value;
 		this.type = type;
+		this.owner = owner;
 	}
+
+    public EDIFPropertyValue(String value, EDIFValueType type){
+        this.value = value;
+        this.type = type;
+    }
 	
 	public EDIFPropertyValue(EDIFPropertyValue propValue) {
 		this.value = propValue.value;

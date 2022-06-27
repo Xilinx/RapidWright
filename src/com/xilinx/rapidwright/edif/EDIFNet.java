@@ -314,7 +314,7 @@ public class EDIFNet extends EDIFPropertyObject {
 	public static final byte[] EXPORT_CONST_JOINED_END = "          )\n".getBytes(StandardCharsets.UTF_8);
 	public static final byte[] EXPORT_CONST_NET_END = "         )\n".getBytes(StandardCharsets.UTF_8);
 
-	public void exportEDIF(OutputStream os, EDIFWriteLegalNameCache cache, boolean stable) throws IOException {
+	public void exportEDIF(OutputStream os, EDIFWriteLegalNameCache<?> cache, boolean stable) throws IOException {
 		os.write(EXPORT_CONST_NET_START);
 		exportEDIFName(os, cache);
 		os.write(EXPORT_CONST_JOINED);

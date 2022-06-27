@@ -127,7 +127,7 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
 			}
 		}
 		view = orig.view;
-		setProperties(orig.getProperties()); //TODO duplicate
+		setProperties(orig.createDuplicatePropertiesMap());
 	}
 
 	protected EDIFCell() {
@@ -505,7 +505,7 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
 		public static final byte[] EXPORT_CONST_CELL_END = "   )\n".getBytes(StandardCharsets.UTF_8);
 		public static final byte[] EXPORT_CONST_PROP_INDENT = "           ".getBytes(StandardCharsets.UTF_8);
 
-	public void exportEDIF(OutputStream os, EDIFWriteLegalNameCache cache, boolean stable) throws IOException {
+	public void exportEDIF(OutputStream os, EDIFWriteLegalNameCache<?> cache, boolean stable) throws IOException {
 		os.write(EXPORT_CONST_CELL_BEGIN);
 		exportEDIFName(os, cache);
 		os.write(EXPORT_CONST_CELLTYPE);
@@ -533,7 +533,7 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
 		os.write(EXPORT_CONST_CELL_END); // Cell end
 	}
 
-	public void exportEDIF(OutputStream os, EDIFWriteLegalNameCache cache) throws IOException{
+	public void exportEDIF(OutputStream os, EDIFWriteLegalNameCache<?> cache) throws IOException{
 		exportEDIF(os, cache, false);
 	}
 	@Override

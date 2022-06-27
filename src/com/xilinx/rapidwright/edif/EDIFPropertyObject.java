@@ -48,8 +48,8 @@ public class EDIFPropertyObject extends EDIFName {
 	}
 	
 	public EDIFPropertyObject(EDIFPropertyObject obj) {
-		super((EDIFName)obj);
-		properties = new HashMap<>(obj.properties);
+		super(obj);
+		properties = obj.createDuplicatePropertiesMap();
 	}
 	
 	protected EDIFPropertyObject(){
@@ -132,12 +132,12 @@ public class EDIFPropertyObject extends EDIFName {
 	 * @param value Value entry for the property
 	 * @return Old property value for the provided key
 	 */
-	@Deprecated
 	public EDIFPropertyValue addProperty(String key, EDIFPropertyValue value){
 		if(properties == null) properties = getNewMap();
 		return properties.put(key, value);
 	}
-	
+
+	@Deprecated
 	public void addProperties(Map<EDIFName,EDIFPropertyValue> properties){
 		for(Entry<EDIFName,EDIFPropertyValue> p : properties.entrySet()){
 			addProperty(p.getKey(),p.getValue());
@@ -146,23 +146,40 @@ public class EDIFPropertyObject extends EDIFName {
 	
 	public EDIFPropertyValue getProperty(String key){
 		if(properties == null) return null;
-		EDIFPropertyValue val = properties.get(key);
-		return val;
+		return properties.get(key);
 	}
 		
 	/**
-	 * replaced by {@link #getPropertiesMap()}
+	 * Get all properties. Because the internal representation has changed, this is read-only and
+	 * includes a conversion step.
+	 * Replaced by {@link #getPropertiesMap()}
 	 * @return the properties
-	 * to be removed in 2022.2.0
 	 */
 	@Deprecated
 	public Map<EDIFName, EDIFPropertyValue> getProperties() {
 		if (properties == null) {
 			return Collections.emptyMap();
 		}
-		return Collections.unmodifiableMap(properties.entrySet().stream().collect(Collectors.toMap(s->new EDIFName(s.getKey()), Entry::getValue)));
+		return Collections.unmodifiableMap(properties.entrySet().stream()
+				.collect(Collectors.toMap(e->new EDIFName(e.getKey()), Entry::getValue)));
 	}
 
+	/**
+	 * Creates a completely new copy of the map
+	 * @return
+	 */
+	public Map<String, EDIFPropertyValue> createDuplicatePropertiesMap(){
+		if(properties == null) return null;
+		Map<String, EDIFPropertyValue> newMap = new HashMap<>();
+		for(Entry<String, EDIFPropertyValue> e : properties.entrySet()) {
+			newMap.put(e.getKey(), new EDIFPropertyValue(e.getValue()));
+		}
+		return newMap;
+	}
+
+	/**
+	 * Get all properties in native format
+	 */
 	public Map<String, EDIFPropertyValue> getPropertiesMap() {
 		if (properties == null) {
 			return Collections.emptyMap();
@@ -174,7 +191,14 @@ public class EDIFPropertyObject extends EDIFName {
 	 * @param properties the properties to set
 	 */
 	public void setProperties(Map<EDIFName, EDIFPropertyValue> properties) {
-		throw new RuntimeException("not implemented");
+		throw new RuntimeException("no!");
+	}
+
+	/**
+	 * @param properties the properties to set
+	 */
+	public void setPropertiesMap(Map<String, EDIFPropertyValue> properties) {
+		this.properties = properties;
 	}
 
 	public static final byte[] EXPORT_CONST_PROP_START = "(property ".getBytes(StandardCharsets.UTF_8);
@@ -182,7 +206,7 @@ public class EDIFPropertyObject extends EDIFName {
 	public static final byte[] EXPORT_CONST_OWNER_END = "\")".getBytes(StandardCharsets.UTF_8);
 	public static final byte[] EXPORT_CONST_PROP_END = ")\n".getBytes(StandardCharsets.UTF_8);
 
-	public void exportEDIFProperties(OutputStream os, byte[] indent, EDIFWriteLegalNameCache cache, boolean stable) throws IOException{
+	public void exportEDIFProperties(OutputStream os, byte[] indent, EDIFWriteLegalNameCache<?> cache, boolean stable) throws IOException{
 		if(properties == null) return;
 		for(Entry<String, EDIFPropertyValue> e : EDIFTools.sortIfStable(properties, stable)) {
 			try {

@@ -252,10 +252,10 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
     public static final byte[] EXPORT_CONST_CLOSE_NO_PROPS = "))))\n".getBytes(StandardCharsets.UTF_8);
 
 
-    public void exportEDIF(OutputStream os, EDIFWriteLegalNameCache cache, boolean stable) throws IOException{
+    public void exportEDIF(OutputStream os, EDIFWriteLegalNameCache<?> cache, boolean stable) throws IOException{
         os.write(EXPORT_CONST_INSTANCE_BEGIN);
         exportEDIFName(os, cache);
-        os.write(viewref.toString().getBytes(StandardCharsets.UTF_8));
+        os.write(EXPORT_CONST_VIEWREF);
         os.write(getViewref().getLegalEDIFName(cache));
         os.write(EXPORT_CONST_CELLREF);
         os.write(cellType.getLegalEDIFName(cache));

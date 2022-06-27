@@ -223,7 +223,7 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
 	}
 	
 	@Override
-	protected byte[] getEDIFRename(EDIFWriteLegalNameCache cache) {
+	protected byte[] getEDIFRename(EDIFWriteLegalNameCache<?> cache) {
 		final byte[] edifName = cache.getEDIFRename(getBusName());
 		if (edifName == null && isBus()) { //Always renaming buses
 			return getBusName().getBytes(StandardCharsets.UTF_8);
@@ -237,7 +237,7 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
 	public static final byte[] EXPORT_CONST_INDENT = "        ".getBytes(StandardCharsets.UTF_8);
 	public static final byte[] EXPORT_CONST_CHILD_INDENT = "           ".getBytes(StandardCharsets.UTF_8);
 
-	public void exportEDIF(OutputStream os, EDIFWriteLegalNameCache cache, boolean stable) throws IOException{
+	public void exportEDIF(OutputStream os, EDIFWriteLegalNameCache<?> cache, boolean stable) throws IOException{
 		os.write(EXPORT_CONST_INDENT);
 		os.write(EXPORT_CONST_PORT_BEGIN);
 		if(width > 1) os.write(EXPORT_CONST_ARRAY_BEGIN);

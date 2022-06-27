@@ -168,12 +168,14 @@ public class BinaryEDIFWriter {
 
             os.writeInt(o.getPropertiesMap().size());
 
-            //TODO owner!!!
-
             for(Entry<String, EDIFPropertyValue> e : o.getPropertiesMap().entrySet()) {
-                os.writeInt(stringMap.get(e.getKey()));
+                int ownerFlag = e.getValue().getOwner() != null ? EDIF_HAS_OWNER : 0;
+                os.writeInt(ownerFlag | stringMap.get(e.getKey()));
                 int propType = e.getValue().getType().ordinal();
                 os.writeInt(propType << EDIF_PROP_TYPE_BIT | stringMap.get(e.getValue().getValue()));
+                if (e.getValue().getOwner() != null) {
+                    os.writeInt(stringMap.get(e.getValue().getOwner()));
+                }
             }            
         }
     }

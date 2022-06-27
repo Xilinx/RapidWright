@@ -33,6 +33,8 @@ import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
 import com.xilinx.rapidwright.util.FileTools;
 
+import static com.xilinx.rapidwright.edif.BinaryEDIFWriter.EDIF_HAS_OWNER;
+
 /**
  * A Reader for the RapidWright Binary EDIF Format
  *  
@@ -53,7 +55,6 @@ public class BinaryEDIFReader {
      * @see BinaryEDIFWriter#writeEDIFName(EDIFName, Output, Map, boolean)
      */
     private static boolean readEDIFName(EDIFName o, Input is, String[] strings) {
-        //TODO this does not handle renamed edif cells
         int nameIdx = is.readInt();
         o.setName(strings[nameIdx & ~BinaryEDIFWriter.EDIF_PROP_FLAG]);
         return (nameIdx & BinaryEDIFWriter.EDIF_PROP_FLAG) == BinaryEDIFWriter.EDIF_PROP_FLAG;
@@ -69,20 +70,15 @@ public class BinaryEDIFReader {
     static void readEDIFObject(EDIFPropertyObject o, Input is, String[] strings) {
         if(readEDIFName(o, is, strings)) {
             int numProps = is.readInt();
-            if((numProps & BinaryEDIFWriter.EDIF_HAS_OWNER) == BinaryEDIFWriter.EDIF_HAS_OWNER) {
-                numProps = ~BinaryEDIFWriter.EDIF_HAS_OWNER & numProps;
-                //o.setOwner(strings[is.readInt()]);
-                throw new RuntimeException("owner stuff!");
-            }
             for(int i=0; i < numProps; i++) {
-                EDIFName key = new EDIFName();
-                if(readEDIFName(key, is, strings)) {
-                    throw new RuntimeException("ERROR: Corrupted file while reading " + o.getName());
-                }
+                int ownerAndKeyIdx = is.readInt();
+                boolean hasOwner = (ownerAndKeyIdx & EDIF_HAS_OWNER) == EDIF_HAS_OWNER;
+                String key = strings[ownerAndKeyIdx & ~EDIF_HAS_OWNER];
                 int typeAndStringIdx = is.readInt();
                 EDIFValueType type = EDIFValueType.values[typeAndStringIdx >>> BinaryEDIFWriter.EDIF_PROP_TYPE_BIT];
                 String value = strings[BinaryEDIFWriter.EDIF_PROP_VALUE_MASK & typeAndStringIdx];
-                o.addProperty(key, new EDIFPropertyValue(value, type));
+                String owner = hasOwner ? strings[is.readInt()] : null;
+                o.addProperty(key, new EDIFPropertyValue(value, type, owner));
             }
         }
     }

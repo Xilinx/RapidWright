@@ -680,7 +680,7 @@ public class EDIFNetlist extends EDIFName {
 			final ParallelDCPOutput dos = ParallelismTools.getParallel() ?
 					ParallelDCPOutput.cast(out) : null;
 
-			EDIFWriteLegalNameCache cache = dos!=null ? EDIFWriteLegalNameCache.multiThreaded() : EDIFWriteLegalNameCache.singleThreaded();
+			EDIFWriteLegalNameCache<?> cache = dos!=null ? EDIFWriteLegalNameCache.multiThreaded() : EDIFWriteLegalNameCache.singleThreaded();
 
 			os.write(EXPORT_CONST_EDIF_HEAD);
 			exportEDIFName(os, cache);
