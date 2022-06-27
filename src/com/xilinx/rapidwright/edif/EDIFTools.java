@@ -163,11 +163,9 @@ public class EDIFTools {
 	 * @return The part name or null if none was found.
 	 */
 	public static String getPartName(EDIFNetlist edif){
-		EDIFName key = new EDIFName(EDIF_PART_PROP);
-		EDIFPropertyValue p = edif.getDesign().getProperties().get(key);
+		EDIFPropertyValue p = edif.getDesign().getPropertiesMap().get(EDIF_PART_PROP);
 		if(p == null) {
-			key.setName(EDIF_PART_PROP.toLowerCase());
-			p = edif.getDesign().getProperties().get(key);
+			p = edif.getDesign().getPropertiesMap().get(EDIF_PART_PROP.toLowerCase());
 			if(p == null) return null;
 		}
 		return p.getValue();
@@ -741,13 +739,13 @@ public class EDIFTools {
 	}
 
 	public static void ensureCorrectPartInEDIF(EDIFNetlist edif, String partName){
-		Map<EDIFName, EDIFPropertyValue> propMap = edif.getDesign().getProperties();
+		Map<String, EDIFPropertyValue> propMap = edif.getDesign().getPropertiesMap();
 		if(propMap == null){
 			edif.getDesign().addProperty(EDIF_PART_PROP, partName);
 			return;
 		}
 		boolean modified = false;
-		for(Entry<EDIFName,EDIFPropertyValue> p : propMap.entrySet()){
+		for(Entry<String,EDIFPropertyValue> p : propMap.entrySet()){
 			String val = p.getValue().toString();
 			if(val.contains("intex") || val.contains("irtex")){
 				EDIFPropertyValue v = new EDIFPropertyValue();

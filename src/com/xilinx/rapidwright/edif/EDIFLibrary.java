@@ -22,23 +22,19 @@
  */
 package com.xilinx.rapidwright.edif;
 
-import java.io.BufferedWriter;
+import java.io.BufferedOutputStream;
 import java.io.IOException;
-import java.io.OutputStreamWriter;
-import java.io.Writer;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.concurrent.Future;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.util.NoCloseOutputStream;
 import com.xilinx.rapidwright.util.ParallelDCPInput;
@@ -103,7 +99,7 @@ public class EDIFLibrary extends EDIFName {
 	public EDIFCell addCellRenameDuplicates(EDIFCell cell, String preferredSuffix) {
 		if(cells == null) cells = getNewMap();
 		cell.setLibrary(this);
-		
+
 		EDIFCell collision = cells.put(cell.getName(), cell);
 		if (collision == null) {
 			return cell;
@@ -258,20 +254,15 @@ public class EDIFLibrary extends EDIFName {
 	 */
 	public List<EDIFCell> getValidCellExportOrder(boolean stable){
 		List<EDIFCell> visited = new ArrayList<>();
-		Map<String,EDIFCell> yetToVisit;
+		Iterable<EDIFCell> cells;
 		if (stable) {
-			yetToVisit = getCells().stream().sorted(Comparator.comparing(EDIFName::getName)).collect(Collectors.toMap(
-					EDIFName::getName,
-					Function.identity(),
-					(a,b)-> {throw new RuntimeException("duplicate cell name "+a.getName());},
-					TreeMap::new
-			));
+			cells = getCells().stream().sorted(Comparator.comparing(EDIFName::getName))::iterator;
 		} else {
-			yetToVisit = new HashMap<>(getCellMap());
+			cells = getCells();
 		}
-		while(!yetToVisit.isEmpty()){
-			EDIFCell c = yetToVisit.values().iterator().next();
-			visit(c, visited, yetToVisit, stable);
+		Set<EDIFCell> visitedSet = new HashSet<>();
+		for (EDIFCell cell : cells) {
+			visit(cell, visited, visitedSet, stable);
 		}
 		
 		return visited;
@@ -295,8 +286,10 @@ public class EDIFLibrary extends EDIFName {
 		return getName().equals(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME);
 	}
 
-	private void visit(EDIFCell cell, List<EDIFCell> visited, Map<String,EDIFCell> yetToVisit, boolean stable){
-		yetToVisit.remove(cell.getName());
+	private void visit(EDIFCell cell, List<EDIFCell> visitedList, Set<EDIFCell> visitedSet, boolean stable){
+		if (!visitedSet.add(cell)) {
+			return;
+		}
 		final Iterable<EDIFCellInst> cellInsts;
 		if (stable) {
 			cellInsts = cell.getCellInsts().stream().sorted(Comparator.comparing(EDIFName::getName))::iterator;
@@ -305,33 +298,36 @@ public class EDIFLibrary extends EDIFName {
 		}
 		for(EDIFCellInst i : cellInsts){
 			EDIFCell childCell = i.getCellType();
-			if(childCell.getLibrary() == this && yetToVisit.containsKey(childCell.getName())){
-				visit(childCell,visited,yetToVisit, stable);
+			if(childCell.getLibrary() == this){
+				visit(childCell,visitedList,visitedSet, stable);
 			}
 		}
-		visited.add(cell);
+		visitedList.add(cell);
 	}
-		
-	void exportEDIF(List<EDIFCell> cells, Writer w, boolean writeHeader, boolean writeFooter, EDIFWriteLegalNameCache cache, boolean stable) throws IOException {
+
+	private static final byte[] EXPORT_CONST_LIBRARY_START = "  (Library ".getBytes(StandardCharsets.UTF_8);
+	private static final byte[] EXPORT_CONST_TECHNOLOGY = "\n    (edifLevel 0)\n    (technology (numberDefinition ))\n".getBytes(StandardCharsets.UTF_8);
+	private static final byte[] EXPORT_CONST_LIBRARY_END = "  )\n".getBytes(StandardCharsets.UTF_8);
+
+	void exportEDIF(List<EDIFCell> cells, OutputStream os, boolean writeHeader, boolean writeFooter, EDIFWriteLegalNameCache cache, boolean stable) throws IOException {
 		if (writeHeader) {
-			w.write("  (Library ");
-			exportEDIFName(w, cache);
-			w.write("\n    (edifLevel 0)\n");
-			w.write("    (technology (numberDefinition ))\n");
+			os.write(EXPORT_CONST_LIBRARY_START);
+			exportEDIFName(os, cache);
+			os.write(EXPORT_CONST_TECHNOLOGY);
 		}
 		for (EDIFCell c : cells) {
-			c.exportEDIF(w, cache, stable);
+			c.exportEDIF(os, cache, stable);
 		}
 		if (writeFooter) {
-			w.write("  )\n");
+			os.write(EXPORT_CONST_LIBRARY_END);
 		}
 	}
 
-	public void exportEDIF(BufferedWriter bw, EDIFWriteLegalNameCache cache, boolean stable) throws IOException {
-		exportEDIF(getValidCellExportOrder(stable), bw, true, true, cache, stable);
+	public void exportEDIF(OutputStream os, EDIFWriteLegalNameCache cache, boolean stable) throws IOException {
+		exportEDIF(getValidCellExportOrder(stable), os, true, true, cache, stable);
 	}
-	public void exportEDIF(BufferedWriter bw, EDIFWriteLegalNameCache cache) throws IOException {
-		exportEDIF(bw, cache, false);
+	public void exportEDIF(OutputStream os, EDIFWriteLegalNameCache cache) throws IOException {
+		exportEDIF(os, cache, false);
 	}
 
 	public List<Future<ParallelDCPInput>> exportEDIF(EDIFWriteLegalNameCache cache) throws IOException{
@@ -350,8 +346,8 @@ public class EDIFLibrary extends EDIFName {
 
 			streamFutures.add(ParallelismTools.submit(
 					() -> ParallelDCPOutput.newStream((os) -> {
-						try (OutputStreamWriter ow = new OutputStreamWriter(new NoCloseOutputStream(os))) {
-							exportEDIF(chunk, ow, firstChunk, lastChunk, cache, false);
+						try (BufferedOutputStream bs = new BufferedOutputStream(new NoCloseOutputStream(os))) {
+							exportEDIF(chunk, bs, firstChunk, lastChunk, cache, false);
 						} catch (IOException e) {
 							throw new RuntimeException(e);
 						}

@@ -26,7 +26,8 @@
 package com.xilinx.rapidwright.edif;
 
 import java.io.IOException;
-import java.io.Writer;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -194,21 +195,22 @@ public class EDIFPropertyValue {
 		this.value = value;
 	}
 	
-	public void writeEDIFString(Writer wr) throws IOException{
-		wr.write("(");
-		wr.write(type + " ");
+	public void writeEDIFString(OutputStream os) throws IOException{
+		os.write('(');
+		os.write(type.toString().getBytes(StandardCharsets.UTF_8));
+		os.write(' ');
 		if(type == EDIFValueType.STRING){
-			wr.write("\"");
-			wr.write(value);
-			wr.write("\"");
+			os.write('\"');
+			os.write(value.getBytes(StandardCharsets.UTF_8));
+			os.write('\"');
 		}else if(type == EDIFValueType.BOOLEAN){
-			wr.write("(");
-			wr.write(value);
-			wr.write(")");
+			os.write('(');
+			os.write(value.getBytes(StandardCharsets.UTF_8));
+			os.write(')');
 		}else{
-			wr.write(value);
+			os.write(value.getBytes(StandardCharsets.UTF_8));
 		}
-		wr.write(")");
+		os.write(')');
 	}
 	
 	@Override

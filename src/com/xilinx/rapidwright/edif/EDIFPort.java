@@ -26,7 +26,8 @@
 package com.xilinx.rapidwright.edif;
 
 import java.io.IOException;
-import java.io.Writer;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -220,31 +221,42 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
 	    }
 	    return getBusName() + "[" + index + "]";     
 	}
-
+	
 	@Override
-	protected String getEDIFRename(EDIFWriteLegalNameCache cache) {
-		final String edifName = cache.getEDIFRename(getBusName());
+	protected byte[] getEDIFRename(EDIFWriteLegalNameCache cache) {
+		final byte[] edifName = cache.getEDIFRename(getBusName());
 		if (edifName == null && isBus()) { //Always renaming buses
-			return getBusName();
+			return getBusName().getBytes(StandardCharsets.UTF_8);
 		}
 		return edifName;
 	}
 
-	public void exportEDIF(Writer wr, String indent, EDIFWriteLegalNameCache cache, boolean stable) throws IOException{
-		wr.write(indent);
-		wr.write("(port ");
-		if(width > 1) wr.write("(array ");
-		exportEDIFName(wr, cache);
-		if(width > 1) wr.write(" " + width + ")");
-		wr.write(" (direction ");
-		wr.write(direction.toString());
-		wr.write(")");
-		if(getProperties().size() > 0){
-			wr.write("\n");
-			exportEDIFProperties(wr, indent+"   ", cache, stable);
-			wr.write(indent);
+	public static final byte[] EXPORT_CONST_PORT_BEGIN = "(port ".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_ARRAY_BEGIN = "(array ".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_DIRECTION_START = " (direction ".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_INDENT = "        ".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_CHILD_INDENT = "           ".getBytes(StandardCharsets.UTF_8);
+
+	public void exportEDIF(OutputStream os, EDIFWriteLegalNameCache cache, boolean stable) throws IOException{
+		os.write(EXPORT_CONST_INDENT);
+		os.write(EXPORT_CONST_PORT_BEGIN);
+		if(width > 1) os.write(EXPORT_CONST_ARRAY_BEGIN);
+		exportEDIFName(os, cache);
+		if(width > 1) {
+			os.write(' ');
+			os.write(Integer.toString(width).getBytes(StandardCharsets.UTF_8));
+			os.write(')');
 		}
-		wr.write(")\n");
+		os.write(EXPORT_CONST_DIRECTION_START);
+		os.write(direction.toByteArray());
+		os.write(')');
+		if(getPropertiesMap().size() > 0){
+			os.write('\n');
+			exportEDIFProperties(os, EXPORT_CONST_CHILD_INDENT, cache, stable);
+			os.write(EXPORT_CONST_INDENT);
+		}
+		os.write(')');
+		os.write('\n');
 	}
 
 	/**

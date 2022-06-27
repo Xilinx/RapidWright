@@ -25,11 +25,11 @@
  */
 package com.xilinx.rapidwright.edif;
 
-import java.io.BufferedWriter;
+import java.io.BufferedOutputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.io.OutputStreamWriter;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -38,6 +38,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Date;
 import java.util.Deque;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -168,7 +169,7 @@ public class EDIFNetlist extends EDIFName {
 	    	macroCollapseExceptionMap.put(e.getValue().getFirst(), newPair);
 	    }
 	}
-	
+
 	public EDIFNetlist(String name){
 		super(name);
 		init();
@@ -657,44 +658,53 @@ public class EDIFNetlist extends EDIFName {
 		return new ArrayList<>(toExport);
 	}
 
+	public static final byte[] EXPORT_CONST_EDIF_VERSION = "\n  (edifversion 2 0 0)\n  (edifLevel 0)\n  (keywordmap (keywordlevel 0))\n(status\n (written\n  (timeStamp ".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_EDIF_HEAD = "(edif ".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_PROGRAM = (")\n  (program \"" + Device.FRAMEWORK_NAME + "\" (version \"" + Device.RAPIDWRIGHT_VERSION + "\"))\n").getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_CLOSE_NL = ")\n".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_QUOTE_CLOSE_NL = "\")\n".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_COMMENT = "  (comment \"".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_META_X = "(metax ".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_DOUBLE_CLOSE = " )\n)\n".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_DESIGN_START = "(comment \"Reference To The Cell Of Highest Level\")\n\n  (design ".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_CELLREF = "\n    (cellref ".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_LIBRARYREF = " (libraryref ".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_CLOSE_REF = "))\n".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_PROP_INDENT = "    ".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_CLOSE_DESIGN = "  )\n".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_CLOSE_EDIF = ")\n".getBytes(StandardCharsets.UTF_8);
+
+
 	public void exportEDIF(OutputStream out, boolean stable) throws IOException {
-		try (BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(out))) {
+		try (BufferedOutputStream os = new BufferedOutputStream(out)) {
 			final ParallelDCPOutput dos = ParallelismTools.getParallel() ?
 					ParallelDCPOutput.cast(out) : null;
 
 			EDIFWriteLegalNameCache cache = dos!=null ? EDIFWriteLegalNameCache.multiThreaded() : EDIFWriteLegalNameCache.singleThreaded();
 
-			bw.write("(edif ");
-			exportEDIFName(bw, cache);
-			bw.write("\n");
-			bw.write("  (edifversion 2 0 0)\n");
-			bw.write("  (edifLevel 0)\n");
-			bw.write("  (keywordmap (keywordlevel 0))\n");
-			bw.write("(status\n");
-			bw.write(" (written\n");
-			bw.write("  (timeStamp ");
+			os.write(EXPORT_CONST_EDIF_HEAD);
+			exportEDIFName(os, cache);
+			os.write(EXPORT_CONST_EDIF_VERSION);
 			SimpleDateFormat formatter = new SimpleDateFormat("yyyy MM dd HH mm ss");
 			if (stable) {
-				bw.write(formatter.format(new java.util.Date(0)));
+				os.write(formatter.format(new Date(0)).getBytes(StandardCharsets.UTF_8));
 			} else {
-				bw.write(formatter.format(new java.util.Date()));
+				os.write(formatter.format(new Date()).getBytes(StandardCharsets.UTF_8));
 			}
-			bw.write(")\n");
-			bw.write("  (program \"" + Device.FRAMEWORK_NAME + "\" (version \"" + Device.RAPIDWRIGHT_VERSION + "\"))\n");
+			os.write(EXPORT_CONST_PROGRAM);
 			for (String comment : getComments()) {
-				bw.write("  (comment \"");
-				bw.write(comment);
-				bw.write("\")\n");
+				os.write(EXPORT_CONST_COMMENT);
+				os.write(comment.getBytes(StandardCharsets.UTF_8));
+				os.write(EXPORT_CONST_QUOTE_CLOSE_NL);
 			}
 			for (Entry<String, EDIFPropertyValue> e : EDIFTools.sortIfStable(metax, stable)) {
-				bw.write("(metax ");
-				bw.write(e.getKey());
-				bw.write(" ");
-				e.getValue().writeEDIFString(bw);
-				bw.write(")\n");
+				os.write(EXPORT_CONST_META_X);
+				os.write(e.getKey().getBytes(StandardCharsets.UTF_8));
+				os.write(' ');
+				e.getValue().writeEDIFString(os);
+				os.write(EXPORT_CONST_CLOSE_NL);
 			}
-			bw.write(" )\n");
-			bw.write(")\n");
+			os.write(EXPORT_CONST_DOUBLE_CLOSE);
 
 			List<EDIFLibrary> librariesToWrite = new ArrayList<>();
 			librariesToWrite.add(getHDIPrimitivesLibrary());
@@ -709,7 +719,7 @@ public class EDIFNetlist extends EDIFName {
 					streamFutures.addAll(lib.exportEDIF(cache));
 				}
 
-				bw.flush();
+				os.flush();
 
 				while (!streamFutures.isEmpty()) {
 					try {
@@ -721,21 +731,23 @@ public class EDIFNetlist extends EDIFName {
 				}
 			} else {
 				for (EDIFLibrary lib : librariesToWrite) {
-					lib.exportEDIF(bw, cache, stable);
+					lib.exportEDIF(os, cache, stable);
 				}
 			}
 
-			bw.write("(comment \"Reference To The Cell Of Highest Level\")\n\n");
-			bw.write("  (design ");
+			os.write(EXPORT_CONST_DESIGN_START);
 			EDIFDesign design = getDesign();
 			if (design != null) {
-				design.exportEDIFName(bw, cache);
-				bw.write("\n    (cellref " + design.getTopCell().getLegalEDIFName(cache) + " (libraryref ");
-				bw.write(design.getTopCell().getLibrary().getLegalEDIFName(cache) + "))\n");
-				design.exportEDIFProperties(bw, "    ", cache, stable);
-				bw.write("  )\n");
+				design.exportEDIFName(os, cache);
+				os.write(EXPORT_CONST_CELLREF);
+				os.write(design.getTopCell().getLegalEDIFName(cache));
+				os.write(EXPORT_CONST_LIBRARYREF);
+				os.write(design.getTopCell().getLibrary().getLegalEDIFName(cache));
+				os.write(EXPORT_CONST_CLOSE_REF);
+				design.exportEDIFProperties(os, EXPORT_CONST_PROP_INDENT, cache, stable);
+				os.write(EXPORT_CONST_CLOSE_DESIGN);
 			}
-			bw.write(")\n");
+			os.write(EXPORT_CONST_CLOSE_EDIF);
 		}
 	}
 	public void exportEDIF(OutputStream out) throws IOException {

@@ -1,5 +1,6 @@
 package com.xilinx.rapidwright.edif;
 
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -17,7 +18,7 @@ public abstract class EDIFWriteLegalNameCache<T> {
      *
      * We cannot use null, as null values have special behaviour in {@link Map#computeIfAbsent(Object, Function)}.
      */
-    private static final String MARKER_NO_RENAME = "";
+    private static final byte[] MARKER_NO_RENAME = new byte[0];
 
     /**
      * Maps from unsuffixed legal name to the number of times we saw it from different source names
@@ -26,9 +27,9 @@ public abstract class EDIFWriteLegalNameCache<T> {
     /**
      * The actual renamed names
      */
-    private final Map<String, String>[] renames;
+    private final Map<String, byte[]>[] renames;
 
-    private EDIFWriteLegalNameCache(Map<String, T> usedRenames, Supplier<Map<String, String>> renameSupplier) {
+    private EDIFWriteLegalNameCache(Map<String, T> usedRenames, Supplier<Map<String, byte[]>> renameSupplier) {
         this.usedRenames = usedRenames;
         this.renames = new Map[256];
         for (int i = 0; i < renames.length; i++) {
@@ -38,21 +39,21 @@ public abstract class EDIFWriteLegalNameCache<T> {
 
     protected abstract int getAndIncrement(String rename);
 
-    private String calcRename(String name) {
+    private byte[] calcRename(String name) {
         final String rename = EDIFTools.makeNameEDIFCompatible(name);
         if (rename.equals(name)) {
             return MARKER_NO_RENAME;
         }
         int previousCount = getAndIncrement(rename);
         if (previousCount == 0) {
-            return rename;
+            return rename.getBytes(StandardCharsets.UTF_8);
         }
-        return rename+"_HDI_"+(previousCount-1);
+        return (rename+"_HDI_"+(previousCount-1)).getBytes(StandardCharsets.UTF_8);
     }
 
-    public String getEDIFRename(String name) {
-        Map<String, String> map = renames[name.charAt(0)&0xFF];
-        final String rename = map.computeIfAbsent(name, this::calcRename);
+    public byte[] getEDIFRename(String name) {
+        Map<String, byte[]> map = renames[name.charAt(0)&0xFF];
+        final byte[] rename = map.computeIfAbsent(name, this::calcRename);
         //Checking equality against this special marker instance is ok
         if (rename == MARKER_NO_RENAME) {
             return null;

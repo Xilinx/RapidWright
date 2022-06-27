@@ -26,7 +26,8 @@
 package com.xilinx.rapidwright.edif;
 
 import java.io.IOException;
-import java.io.Writer;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -75,9 +76,8 @@ public class EDIFPropertyObject extends EDIFName {
 	 * @return The previous property value stored under the provided key
 	 */
 	public EDIFPropertyValue addProperty(String key, String value){
-		EDIFName k = new EDIFName(key);
 		EDIFPropertyValue p = new EDIFPropertyValue(value, EDIFValueType.STRING);
-		return addProperty(k,p);
+		return addProperty(key,p);
 	}
 	
 	/**
@@ -164,6 +164,9 @@ public class EDIFPropertyObject extends EDIFName {
 	}
 
 	public Map<String, EDIFPropertyValue> getPropertiesMap() {
+		if (properties == null) {
+			return Collections.emptyMap();
+		}
 		return properties;
 	}
 
@@ -174,21 +177,26 @@ public class EDIFPropertyObject extends EDIFName {
 		throw new RuntimeException("not implemented");
 	}
 
-	public void exportEDIFProperties(Writer wr, String indent, EDIFWriteLegalNameCache cache, boolean stable) throws IOException{
+	public static final byte[] EXPORT_CONST_PROP_START = "(property ".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_OWNER_START = " (owner \"".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_OWNER_END = "\")".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_PROP_END = ")\n".getBytes(StandardCharsets.UTF_8);
+
+	public void exportEDIFProperties(OutputStream os, byte[] indent, EDIFWriteLegalNameCache cache, boolean stable) throws IOException{
 		if(properties == null) return;
 		for(Entry<String, EDIFPropertyValue> e : EDIFTools.sortIfStable(properties, stable)) {
 			try {
-				wr.write(indent);
-				wr.write("(property ");
-				EDIFName.exportSomeEDIFName(wr, e.getKey(), cache.getEDIFRename(e.getKey()));
-				wr.write(" ");
-				e.getValue().writeEDIFString(wr);
+				os.write(indent);
+				os.write(EXPORT_CONST_PROP_START);
+				EDIFName.exportSomeEDIFName(os, e.getKey(), cache.getEDIFRename(e.getKey()));
+				os.write(' ');
+				e.getValue().writeEDIFString(os);
 				if(e.getValue().getOwner() != null){
-					wr.write(" (owner \"");
-					wr.write(e.getValue().getOwner());
-					wr.write("\")");
+					os.write(EXPORT_CONST_OWNER_START);
+					os.write(e.getValue().getOwner().getBytes(StandardCharsets.UTF_8));
+					os.write(EXPORT_CONST_OWNER_END);
 				}
-				wr.write(")\n");
+				os.write(EXPORT_CONST_PROP_END);
 			} catch (IOException ex) {
 				throw new RuntimeException(ex);
 			}

@@ -26,7 +26,8 @@
 package com.xilinx.rapidwright.edif;
 
 import java.io.IOException;
-import java.io.Writer;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -47,7 +48,7 @@ public class EDIFNet extends EDIFPropertyObject {
 	private EDIFCell parentCell;
 	
 	private EDIFPortInstList portInsts;
-	
+
 	public EDIFNet(String name, EDIFCell parentCell){
 		super(name);
 		if(parentCell != null) parentCell.addNet(this);
@@ -306,19 +307,26 @@ public class EDIFNet extends EDIFPropertyObject {
 		parentCell.trackChange(EDIFChangeType.NET_ADD, getName());
 	}
 
-	public void exportEDIF(Writer wr, EDIFWriteLegalNameCache cache, boolean stable) throws IOException {
-		wr.write("         (net ");
-		exportEDIFName(wr, cache);
-		wr.write(" (joined\n");
+	public static final byte[] EXPORT_CONST_NET_START = "         (net ".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_JOINED = " (joined\n".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_PORT_INDENT = "          ".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_PROP_INDENT = "           ".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_JOINED_END = "          )\n".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_NET_END = "         )\n".getBytes(StandardCharsets.UTF_8);
+
+	public void exportEDIF(OutputStream os, EDIFWriteLegalNameCache cache, boolean stable) throws IOException {
+		os.write(EXPORT_CONST_NET_START);
+		exportEDIFName(os, cache);
+		os.write(EXPORT_CONST_JOINED);
 		for(EDIFPortInst p : EDIFTools.sortIfStable(getPortInsts(), Comparator.comparing(EDIFPortInst::getName), stable)){
-			p.writeEDIFExport(wr, "          ", cache);
+			p.writeEDIFExport(os, EXPORT_CONST_PORT_INDENT, cache);
 		}
-		wr.write("          )\n"); // joined end
-		if(getProperties().size() > 0){
-			wr.write("\n");
-			exportEDIFProperties(wr, "           ", cache, stable);
+		os.write(EXPORT_CONST_JOINED_END); // joined end
+		if(getPropertiesMap().size() > 0){
+			os.write('\n');
+			exportEDIFProperties(os, EXPORT_CONST_PROP_INDENT, cache, stable);
 		}
-		wr.write("         )\n"); // Nets end
+		os.write(EXPORT_CONST_NET_END); // Nets end
 
 	}
 }

@@ -26,7 +26,8 @@
 package com.xilinx.rapidwright.edif;
 
 import java.io.IOException;
-import java.io.Writer;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -493,38 +494,47 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
 		internalPortMap = null;
 	}
 
-	public void exportEDIF(Writer wr, EDIFWriteLegalNameCache cache, boolean stable) throws IOException {
-		wr.write("   (cell ");
-		exportEDIFName(wr, cache);
-		wr.write(" (celltype GENERIC)\n");
-		wr.write("     (view ");
-		view.exportEDIFName(wr, cache);
-		wr.write(" (viewtype NETLIST)\n");
-		wr.write("       (interface \n");
+
+		public static final byte[] EXPORT_CONST_CELL_BEGIN = "   (cell ".getBytes(StandardCharsets.UTF_8);
+		public static final byte[] EXPORT_CONST_CELLTYPE = " (celltype GENERIC)\n     (view ".getBytes(StandardCharsets.UTF_8);
+		public static final byte[] EXPORT_CONST_VIEWTYPE = " (viewtype NETLIST)\n       (interface \n".getBytes(StandardCharsets.UTF_8);
+		public static final byte[] EXPORT_CONST_INTERFACE_END = "       )\n".getBytes(StandardCharsets.UTF_8);
+		public static final byte[] EXPORT_CONST_CONTENTS = "       (contents\n".getBytes(StandardCharsets.UTF_8);
+		public static final byte[] EXPORT_CONST_CONTENTS_END = "       )\n".getBytes(StandardCharsets.UTF_8);
+		public static final byte[] EXPORT_CONST_VIEW_END = "     )\n".getBytes(StandardCharsets.UTF_8);
+		public static final byte[] EXPORT_CONST_CELL_END = "   )\n".getBytes(StandardCharsets.UTF_8);
+		public static final byte[] EXPORT_CONST_PROP_INDENT = "           ".getBytes(StandardCharsets.UTF_8);
+
+	public void exportEDIF(OutputStream os, EDIFWriteLegalNameCache cache, boolean stable) throws IOException {
+		os.write(EXPORT_CONST_CELL_BEGIN);
+		exportEDIFName(os, cache);
+		os.write(EXPORT_CONST_CELLTYPE);
+		view.exportEDIFName(os, cache);
+		os.write(EXPORT_CONST_VIEWTYPE);
 		for(EDIFPort port : EDIFTools.sortIfStable(getPorts(), stable)){
-			port.exportEDIF(wr, "        ", cache, stable);
+			port.exportEDIF(os, cache, stable);
 		}
-		wr.write("       )\n"); // Interface end
+		os.write(EXPORT_CONST_INTERFACE_END); // Interface end
 		if (hasContents()) {
-			wr.write("       (contents\n");
+			os.write(EXPORT_CONST_CONTENTS);
 			for(EDIFCellInst i : EDIFTools.sortIfStable(getCellInsts(), stable)){
-				i.exportEDIF(wr, cache, stable);
+				i.exportEDIF(os, cache, stable);
 			}
 			for(EDIFNet n : EDIFTools.sortIfStable(getNets(), stable)){
-				n.exportEDIF(wr, cache, stable);
+				n.exportEDIF(os, cache, stable);
 			}
-			wr.write("       )\n"); // Contents end
+			os.write(EXPORT_CONST_CONTENTS_END); // Contents end
 		}
-		if (getProperties().size() > 0) {
-			wr.write("\n");
-			exportEDIFProperties(wr, "           ", cache, stable);
+		if (getPropertiesMap().size() > 0) {
+			os.write('\n');
+			exportEDIFProperties(os, EXPORT_CONST_PROP_INDENT, cache, stable);
 		}
-		wr.write("     )\n"); // View end
-		wr.write("   )\n"); // Cell end
+		os.write(EXPORT_CONST_VIEW_END); // View end
+		os.write(EXPORT_CONST_CELL_END); // Cell end
 	}
 
-	public void exportEDIF(Writer wr, EDIFWriteLegalNameCache cache) throws IOException{
-		exportEDIF(wr, cache, false);
+	public void exportEDIF(OutputStream os, EDIFWriteLegalNameCache cache) throws IOException{
+		exportEDIF(os, cache, false);
 	}
 	@Override
 	public String getUniqueKey() {

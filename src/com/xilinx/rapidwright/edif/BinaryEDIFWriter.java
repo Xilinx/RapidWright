@@ -84,8 +84,8 @@ public class BinaryEDIFWriter {
     
     private static void addObjectToStringMap(EDIFPropertyObject o, Map<String,Integer> stringMap) {
         addNameToStringMap(o, stringMap);
-        for(Entry<EDIFName, EDIFPropertyValue> e : o.getProperties().entrySet()) {
-            addNameToStringMap(e.getKey(), stringMap);
+        for(Entry<String, EDIFPropertyValue> e : o.getPropertiesMap().entrySet()) {
+            addStringToStringMap(e.getKey(), stringMap);
             addStringToStringMap(e.getValue().getValue(), stringMap);
             addStringToStringMap(e.getValue().getOwner(), stringMap);
         }
@@ -147,7 +147,6 @@ public class BinaryEDIFWriter {
      */
     private static void writeEDIFName(EDIFName o, Output os, Map<String,Integer> stringMap, 
             boolean hasPropMap) {
-        //TODO this does not handle renamed edif cells
         os.writeInt((hasPropMap ? EDIF_PROP_FLAG : 0) | stringMap.get(o.getName()));
     }
     
@@ -159,20 +158,20 @@ public class BinaryEDIFWriter {
      * @see #readEDIFObject(EDIFPropertyObject, Output, Map)
      */
     private static void writeEDIFObject(EDIFPropertyObject o, Output os, Map<String,Integer> stringMap) {
-        boolean hasProperties = o.getProperties().size() > 0;
+        boolean hasProperties = o.getPropertiesMap().size() > 0;
         writeEDIFName(o, os, stringMap, hasProperties);
         if(hasProperties) {
-            if(o.getProperties().size() > 0x0000ffff) {
+            if(o.getPropertiesMap().size() > 0x0000ffff) {
                 throw new RuntimeException("ERROR: EDIF object exceeded number of encoded "
                         + "properties on object '" + o.getName() + "'");
             }
 
-            os.writeInt(o.getProperties().size());
+            os.writeInt(o.getPropertiesMap().size());
 
             //TODO owner!!!
 
-            for(Entry<EDIFName, EDIFPropertyValue> e : o.getProperties().entrySet()) {
-                writeEDIFName(e.getKey(), os, stringMap);
+            for(Entry<String, EDIFPropertyValue> e : o.getPropertiesMap().entrySet()) {
+                os.writeInt(stringMap.get(e.getKey()));
                 int propType = e.getValue().getType().ordinal();
                 os.writeInt(propType << EDIF_PROP_TYPE_BIT | stringMap.get(e.getValue().getValue()));
             }            

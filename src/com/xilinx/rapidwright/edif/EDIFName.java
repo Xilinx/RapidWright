@@ -26,9 +26,11 @@
 package com.xilinx.rapidwright.edif;
 
 import java.io.IOException;
-import java.io.Writer;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * This class serves as the universal common ancestor for most all EDIF netlist
@@ -65,26 +67,31 @@ public class EDIFName implements Comparable<EDIFName> {
 		this.name = name;
 	}
 
-	public static void exportSomeEDIFName(Writer wr, String name, String legalName) throws IOException {
+	public static final byte[] EXPORT_CONST_RENAME_START = "(rename ".getBytes(StandardCharsets.UTF_8);
+
+
+	public static void exportSomeEDIFName(OutputStream os, String name, byte[] legalName) throws IOException {
 		if (legalName == null) {
-			wr.write(name);
+			os.write(name.getBytes(StandardCharsets.UTF_8));
 			return;
 		}
-		wr.write("(rename ");
-		wr.write(legalName);
-		wr.write(" \"");
-		wr.write(name);
-		wr.write("\")");
+		os.write(EXPORT_CONST_RENAME_START);
+		os.write(legalName);
+		os.write(' ');
+		os.write('"');
+		os.write(name.getBytes(StandardCharsets.UTF_8));
+		os.write('"');
+		os.write(')');
 	}
 
 	/**
 	 * Writes out valid EDIF syntax the name and/or rename of this object to
 	 * the provided output writer.
-	 * @param wr The writer to export the EDIF syntax to.
+	 * @param os The stream to export the EDIF syntax to.
 	 * @throws IOException
 	 */
-	public void exportEDIFName(Writer wr, EDIFWriteLegalNameCache cache) throws IOException{
-		exportSomeEDIFName(wr, getName(), getEDIFRename(cache));
+	public void exportEDIFName(OutputStream os, EDIFWriteLegalNameCache cache) throws IOException{
+		exportSomeEDIFName(os, getName(), getEDIFRename(cache));
 	}
 
 	/* (non-Javadoc)
@@ -92,10 +99,7 @@ public class EDIFName implements Comparable<EDIFName> {
 	 */
 	@Override
 	public int hashCode() {
-		final int prime = 31;
-		int result = 1;
-		result = prime * result + ((name == null) ? 0 : name.hashCode());
-		return result;
+		return Objects.hashCode(name);
 	}
 
 	/* (non-Javadoc)
@@ -131,13 +135,13 @@ public class EDIFName implements Comparable<EDIFName> {
 		return this.getName().compareTo(o.getName());
 	}
 
-	protected String getEDIFRename(EDIFWriteLegalNameCache cache){
+	protected byte[] getEDIFRename(EDIFWriteLegalNameCache cache){
 		return cache.getEDIFRename(getName());
 	}
 
-	public String getLegalEDIFName(EDIFWriteLegalNameCache cache) {
-		String rename = getEDIFRename(cache);
-		return rename == null ? getName() : rename;
+	public byte[] getLegalEDIFName(EDIFWriteLegalNameCache cache) {
+		byte[] rename = getEDIFRename(cache);
+		return rename == null ? getName().getBytes(StandardCharsets.UTF_8) : rename;
 	}
 
 }
