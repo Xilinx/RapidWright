@@ -39,3 +39,6 @@ check_headers:
 		echo "Use make ensure_headers to automatically add the header." ;\
 		exit 1;\
 	fi
+
+
+pre_commit: check_headers
