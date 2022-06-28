@@ -757,6 +757,7 @@ public class EDIFTools {
 			}
 		}
 		if(!modified){
+			edif.getDesign().removeProperty(EDIF_PART_PROP.toLowerCase());
 			edif.getDesign().addProperty(EDIF_PART_PROP, partName);
 		}
 	}
