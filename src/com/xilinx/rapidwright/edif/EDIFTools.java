@@ -36,6 +36,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -1419,4 +1420,28 @@ public class EDIFTools {
 	        }
 	    }
 	}
+
+	public static <T>
+	Iterable<T> sortIfStable(Collection<T> collection, Comparator<T> comparator, boolean stable) {
+		if (!stable) {
+			return collection;
+		}
+		return collection.stream().sorted(comparator)::iterator;
+	}
+
+    public static <T extends EDIFName>
+    Iterable<T> sortIfStable(Collection<T> collection, boolean stable) {
+        if (!stable) {
+            return collection;
+        }
+        return collection.stream().sorted(Comparator.comparing(EDIFName::getName))::iterator;
+    }
+
+    public static <T extends Comparable<T>, U>
+    Iterable<Entry<T,U>> sortIfStable(Map<T,U> collection, boolean stable) {
+        if (!stable) {
+            return collection.entrySet();
+        }
+        return collection.entrySet().stream().sorted(Entry.comparingByKey())::iterator;
+    }
 }

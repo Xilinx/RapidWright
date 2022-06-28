@@ -168,7 +168,7 @@ public class EDIFPropertyObject extends EDIFName {
 	public Map<String, EDIFPropertyValue> getPropertiesMap() {
 		return properties;
 	}
-	
+
 	/**
 	 * @param properties the properties to set
 	 */
@@ -176,9 +176,9 @@ public class EDIFPropertyObject extends EDIFName {
 		throw new RuntimeException("not implemented");
 	}
 
-	public void exportEDIFProperties(Writer wr, String indent, EDIFWriteLegalNameCache cache) throws IOException{
+	public void exportEDIFProperties(Writer wr, String indent, EDIFWriteLegalNameCache cache, boolean stable) throws IOException{
 		if(properties == null) return;
-		properties.entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(e -> {
+		for(Entry<String, EDIFPropertyValue> e : EDIFTools.sortIfStable(properties, stable)) {
 			try {
 				wr.write(indent);
 				wr.write("(property ");
@@ -194,7 +194,7 @@ public class EDIFPropertyObject extends EDIFName {
 			} catch (IOException ex) {
 				throw new RuntimeException(ex);
 			}
-		});
+		}
 	}
 
 	/**

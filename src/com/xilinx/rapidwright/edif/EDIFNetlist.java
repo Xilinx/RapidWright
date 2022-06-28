@@ -33,6 +33,7 @@ import java.io.OutputStreamWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -457,7 +458,7 @@ public class EDIFNetlist extends EDIFName {
 	}
 	
 	/**
-	 * This moves the cell and all of its descendants into this netlist.  This is a destructive 
+	 * This moves the cell and all of its descendants into this netlist.  This is a destructive
 	 * operation for the source netlist.
 	 * @param cell The cell (and all its descendants) to move into this netlist's libraries
 	 */
@@ -656,7 +657,7 @@ public class EDIFNetlist extends EDIFName {
 		return new ArrayList<>(toExport);
 	}
 
-	public void exportEDIF(OutputStream out, EDIFWriteLegalNameCache cache) throws IOException {
+	public void exportEDIF(OutputStream out, EDIFWriteLegalNameCache cache, boolean stable) throws IOException {
 		try (BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(out))) {
 			bw.write("(edif ");
 			exportEDIFName(bw, cache);
@@ -667,9 +668,12 @@ public class EDIFNetlist extends EDIFName {
 			bw.write("(status\n");
 			bw.write(" (written\n");
 			bw.write("  (timeStamp ");
-			bw.write("2022 05 24 15 00 00");
-			//SimpleDateFormat formatter = new SimpleDateFormat("yyyy MM dd HH mm ss");
-			//bw.write(formatter.format(new java.util.Date()));
+			SimpleDateFormat formatter = new SimpleDateFormat("yyyy MM dd HH mm ss");
+			if (stable) {
+				bw.write(formatter.format(new java.util.Date(0)));
+			} else {
+				bw.write(formatter.format(new java.util.Date()));
+			}
 			bw.write(")\n");
 			bw.write("  (program \"" + Device.FRAMEWORK_NAME + "\" (version \"" + Device.RAPIDWRIGHT_VERSION + "\"))\n");
 			for (String comment : getComments()) {
@@ -677,7 +681,7 @@ public class EDIFNetlist extends EDIFName {
 				bw.write(comment);
 				bw.write("\")\n");
 			}
-			for (Entry<String, EDIFPropertyValue> e : metax.entrySet()) {
+			for (Entry<String, EDIFPropertyValue> e : EDIFTools.sortIfStable(metax, stable)) {
 				bw.write("(metax ");
 				bw.write(e.getKey());
 				bw.write(" ");
@@ -689,7 +693,7 @@ public class EDIFNetlist extends EDIFName {
 
 			List<EDIFLibrary> librariesToWrite = new ArrayList<>();
 			librariesToWrite.add(getHDIPrimitivesLibrary());
-			for(EDIFLibrary lib : getLibrariesMap().values()){
+			for(EDIFLibrary lib : EDIFTools.sortIfStable(getLibrariesMap().values(), stable)){
 				if(lib.getName().equals(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME)) continue;
 				librariesToWrite.add(lib);
 			}
@@ -714,7 +718,7 @@ public class EDIFNetlist extends EDIFName {
 				}
 			} else {
 				for (EDIFLibrary lib : librariesToWrite) {
-					lib.exportEDIF(bw);
+					lib.exportEDIF(bw, stable);
 				}
 			}
 
@@ -724,31 +728,40 @@ public class EDIFNetlist extends EDIFName {
 			if (design != null) {
 				design.exportEDIFName(bw, cache);
 				bw.write("\n    (cellref " + design.getTopCell().getLegalEDIFName(cache) + " (libraryref ");
-                bw.write(design.getTopCell().getLibrary().getLegalEDIFName(cache) + "))\n");
-				design.exportEDIFProperties(bw, "    ", cache);
+				bw.write(design.getTopCell().getLibrary().getLegalEDIFName(cache) + "))\n");
+				design.exportEDIFProperties(bw, "    ", cache, stable);
 				bw.write("  )\n");
 			}
 			bw.write(")\n");
 		}
 	}
 
-	public void exportEDIF(OutputStream out) throws IOException {
-		exportEDIF(out, new EDIFWriteLegalNameCache());
+
+	public void exportEDIF(OutputStream out, boolean stable) throws IOException {
+		exportEDIF(out, new EDIFWriteLegalNameCache(), stable);
 	}
 
-	public void exportEDIF(Path fileName){
+	public void exportEDIF(OutputStream out) throws IOException {
+		exportEDIF(out, false);
+	}
+
+	public void exportEDIF(Path fileName, boolean stable){
 		try (OutputStream out = Files.newOutputStream(fileName)){
-			exportEDIF(out);
+			exportEDIF(out, new EDIFWriteLegalNameCache(), stable);
 		} catch (IOException e) {
 			MessageGenerator.briefError("ERROR: Failed to export EDIF file " + fileName);
 			e.printStackTrace();
 		}
 	}
 
+	public void exportEDIF(Path fileName){
+		exportEDIF(fileName, false);
+	}
+
 	public void exportEDIF(String fileName) {
 		exportEDIF(Paths.get(fileName));
 	}
-
+			
 
 	/**
 	 * Based on a hierarchical string, this method will get the instance corresponding
@@ -1776,10 +1789,10 @@ public class EDIFNetlist extends EDIFName {
     /**
      * Checks a flag indicating if this netlist is currently tracking changes to its EDIFCells.
      * Modified EDIFCells are tracked in a set which can be queried with {@link #getModifiedCells()}.
-     * EDIFCells are determined as modified if one of the following is true: 
+     * EDIFCells are determined as modified if one of the following is true:
      *   (1) A port was removed, added or modified
      *   (2) A net was removed, added or modified
-     *   (3) An instance was removed, added or modified 
+     *   (3) An instance was removed, added or modified
      * @return True if this netlist is tracking EDIFCell changes, false otherwise.
      */
 	public boolean isTrackingCellChanges() {
@@ -1818,5 +1831,4 @@ public class EDIFNetlist extends EDIFName {
 		n.exportEDIF(args[1]);
 		t.stop().printSummary();
 	}
-
 }
