@@ -111,8 +111,7 @@ public class EDIFPropertyObject extends EDIFName {
 	 */
 	public EDIFPropertyValue removeProperty(String key) {
 		if(properties == null) return null;
-		EDIFName k = new EDIFName(key);
-		return properties.remove(k);
+		return properties.remove(key);
 	}
 	
 	/**
