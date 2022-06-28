@@ -25,5 +25,17 @@ update_jars:
 
 ensure_headers:
 	cat doc/SOURCE_HEADER.TXT | sed 's/$${user}/$(USER_FULL_NAME)/' | sed 's/$${year}/$(CURR_YEAR)/' > $(TMP_HEADER)
-	for f in `find {test,src} -name *.java`; do if ! grep -q 'Apache' $$f; then cat $(TMP_HEADER) $$f > $$f.new && mv $$f.new $$f; fi done
+	for f in `find {test,src} -name '*.java'`; do if ! grep -q 'Apache' $$f; then cat $(TMP_HEADER) $$f > $$f.new && mv $$f.new $$f; fi done
 	@rm $(TMP_HEADER)
+
+check_headers:
+	@ NO_LICENSE_FILES=$$(git grep --files-without-match --cached 'Apache' -- '*.java'); \
+	if [ ! -z "$$NO_LICENSE_FILES" ] ;\
+	then \
+		echo "These files are missing a license header:" ;\
+		echo ;\
+		echo "$$NO_LICENSE_FILES" | sed 's/^/    /' ;\
+		echo ;\
+		echo "Use make ensure_headers to automatically add the header." ;\
+		exit 1;\
+	fi
