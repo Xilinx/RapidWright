@@ -46,7 +46,7 @@ public class EDIFPropertyValue {
 	private String owner;
 
 	public EDIFPropertyValue(){
-		
+
 	}
 
 	public EDIFPropertyValue(String value, EDIFValueType type, String owner){
@@ -63,6 +63,7 @@ public class EDIFPropertyValue {
 	public EDIFPropertyValue(EDIFPropertyValue propValue) {
 		this.value = propValue.value;
 		this.type = propValue.type;
+		this.owner = propValue.owner;
 	}
 	
 	/**

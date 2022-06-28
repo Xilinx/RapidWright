@@ -188,13 +188,19 @@ public class EDIFPropertyObject extends EDIFName {
 	}
 
 	/**
-	 * @param properties the properties to set
+	 * This function does not work anymore and is only kept around to give users a hint on how to change their code.
+	 * Please use {@link #setPropertiesMap(Map)} instead.
 	 */
+	@Deprecated
 	public void setProperties(Map<EDIFName, EDIFPropertyValue> properties) {
-		throw new RuntimeException("no!");
+		// We can't just copy the values from the user-supplied map into a Map<String, EDIFPropertyValue>. The user might
+		// update the supplied map after calling this method. Those changes would not be reflected in the copied map.
+		// In order to not silently change behaviour, let's just throw an exception.
+		throw new RuntimeException("The internal representation of Properties has changed. Please use setPropertiesMap instead of this function.");
 	}
 
 	/**
+	 * Set all properties
 	 * @param properties the properties to set
 	 */
 	public void setPropertiesMap(Map<String, EDIFPropertyValue> properties) {

@@ -127,7 +127,7 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
 			}
 		}
 		view = orig.view;
-		setProperties(orig.createDuplicatePropertiesMap());
+		setPropertiesMap(orig.createDuplicatePropertiesMap());
 	}
 
 	protected EDIFCell() {
@@ -495,15 +495,15 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
 	}
 
 
-		public static final byte[] EXPORT_CONST_CELL_BEGIN = "   (cell ".getBytes(StandardCharsets.UTF_8);
-		public static final byte[] EXPORT_CONST_CELLTYPE = " (celltype GENERIC)\n     (view ".getBytes(StandardCharsets.UTF_8);
-		public static final byte[] EXPORT_CONST_VIEWTYPE = " (viewtype NETLIST)\n       (interface \n".getBytes(StandardCharsets.UTF_8);
-		public static final byte[] EXPORT_CONST_INTERFACE_END = "       )\n".getBytes(StandardCharsets.UTF_8);
-		public static final byte[] EXPORT_CONST_CONTENTS = "       (contents\n".getBytes(StandardCharsets.UTF_8);
-		public static final byte[] EXPORT_CONST_CONTENTS_END = "       )\n".getBytes(StandardCharsets.UTF_8);
-		public static final byte[] EXPORT_CONST_VIEW_END = "     )\n".getBytes(StandardCharsets.UTF_8);
-		public static final byte[] EXPORT_CONST_CELL_END = "   )\n".getBytes(StandardCharsets.UTF_8);
-		public static final byte[] EXPORT_CONST_PROP_INDENT = "           ".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_CELL_BEGIN = "   (cell ".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_CELLTYPE = " (celltype GENERIC)\n     (view ".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_VIEWTYPE = " (viewtype NETLIST)\n       (interface \n".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_INTERFACE_END = "       )\n".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_CONTENTS = "       (contents\n".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_CONTENTS_END = "       )\n".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_VIEW_END = "     )\n".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_CELL_END = "   )\n".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_PROP_INDENT = "           ".getBytes(StandardCharsets.UTF_8);
 
 	public void exportEDIF(OutputStream os, EDIFWriteLegalNameCache<?> cache, boolean stable) throws IOException {
 		os.write(EXPORT_CONST_CELL_BEGIN);
