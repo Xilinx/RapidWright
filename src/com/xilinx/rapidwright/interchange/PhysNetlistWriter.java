@@ -318,6 +318,7 @@ public class PhysNetlistWriter {
             // We need to traverse the net inside sites to fully populate routing spec
             ArrayList<RouteBranchNode> routingSources = new ArrayList<>();
             for(PIP p : net.getPIPs()) {
+                if(p.getEndWireName() == null) continue;
                 routingSources.add(new RouteBranchNode(p));
             }
             for(SitePinInst spi : net.getPins()) {
