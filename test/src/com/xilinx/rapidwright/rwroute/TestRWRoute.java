@@ -144,7 +144,7 @@ public class TestRWRoute {
 			"SLICE_X0Y599,SLICE_X0Y299,30000",	// (opposite direction as above requires noticeably more nodes?)
 
 			// Three SLR crossings
-			"SLICE_X0Y0,SLICE_X168Y899,15000",
+			"SLICE_X0Y0,SLICE_X168Y899,160000",
 			"SLICE_X168Y0,SLICE_X0Y899,15000",
 	})
 	public void testSLRCrossingNonTimingDriven(String srcSiteName, String dstSiteName, long nodesPoppedLimit) {

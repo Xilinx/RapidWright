@@ -146,15 +146,19 @@ abstract public class RouteNode {
 				}
 				break;
 			case NODE_HQUAD:
+				assert(length != 0 || node.getAllDownhillNodes().isEmpty());
 				baseCost = 0.35f*length;
 				break;
 			case NODE_VQUAD:
-				baseCost = 0.15f*length;// VQUADs have length 4 and 5
+				// In case of U-turn nodes
+				if (length != 0) baseCost = 0.15f*length;// VQUADs have length 4 and 5
 				break;
 			case NODE_HLONG:
+				assert(length != 0 || node.getAllDownhillNodes().isEmpty());
 				baseCost = 0.15f*length;// HLONGs have length 6 and 7
 				break;
 			case NODE_VLONG:
+				assert(length != 0);
 				baseCost = 0.7f;
 				break;	
 			default:
@@ -198,28 +202,23 @@ abstract public class RouteNode {
 
 	private void setEndTileXYCoordinates() {
 		Wire[] wires = node.getAllWiresInNode();
+		Tile endTile = null;
+		for(Wire w : wires) {
+			if(w.getTile().getTileTypeEnum() == TileTypeEnum.INT) {
+				boolean endTileWasNotNull = (endTile != null);
+				endTile = w.getTile();
+				// Break if this is the second INT tile
+				if (endTileWasNotNull) break;
+			}
+		}
+		if (endTile == null) {
+			endTile = node.getTile();
+		}
+		endTileXCoordinate = (short) endTile.getTileXCoordinate();
+		endTileYCoordinate = (short) endTile.getTileYCoordinate();
 		Tile base = node.getTile();
-		length = 0;
-		endTileXCoordinate = (short) base.getTileXCoordinate();
-		endTileYCoordinate = (short) base.getTileYCoordinate();
-
-		// Node.getNode("INT_X0Y297/NN4_W_BEG7", Device.getDevice("xcvu19p")).getAllWiresInNode()
-		// returns INT_X0Y297 as first and second wire, so cannot rely on second wire being the
-		// end tile
-		Arrays.stream(wires)
-				.map(Wire::getTile)
-				.filter((t) -> t.getTileTypeEnum() == TileTypeEnum.INT)
-				.forEach((t) -> {
-					short currTileX = (short) t.getTileXCoordinate();
-					short currTileY = (short) t.getTileYCoordinate();
-					short currLength = (short) (Math.abs(currTileX - base.getTileXCoordinate())
-												+ Math.abs(currTileY - base.getTileYCoordinate()));
-					if (currLength > length) {
-						length = currLength;
-						endTileXCoordinate = currTileX;
-						endTileYCoordinate = currTileY;
-					}
-				});
+		length = (short) (Math.abs(endTileXCoordinate - base.getTileXCoordinate())
+				+ Math.abs(endTileYCoordinate - base.getTileYCoordinate()));
 	}
 
 	/**
