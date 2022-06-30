@@ -113,7 +113,10 @@ abstract public class RouteNode {
 		List<Node> allDownHillNodes = node.getAllDownhillNodes();
 		List<RouteNode> childrenList = new ArrayList<>(allDownHillNodes.size());
 		for(Node downhill: allDownHillNodes){
-			if(isExcluded(node, downhill)) continue;
+			if(!mustInclude(node, downhill)) {
+				if (isPreserved(downhill) || isExcluded(node, downhill))
+					continue;
+			}
 
 			final RouteNodeType type = RouteNodeType.WIRE;
 			RouteNode child = getOrCreate(downhill, type);
@@ -140,20 +143,24 @@ abstract public class RouteNode {
 			case NODE_PINFEED:
 				break;
 			case NODE_DOUBLE:
-				if(endTileXCoordinate != getNode().getTile().getTileXCoordinate()) {
+				if(endTileXCoordinate != node.getTile().getTileXCoordinate()) {
 					baseCost = 0.4f*length;
 				}
 				break;
 			case NODE_HQUAD:
+				assert(length != 0 || node.getAllDownhillNodes().isEmpty());
 				baseCost = 0.35f*length;
 				break;
 			case NODE_VQUAD:
-				baseCost = 0.15f*length;// VQUADs have length 4 and 5
+				// In case of U-turn nodes
+				if (length != 0) baseCost = 0.15f*length;// VQUADs have length 4 and 5
 				break;
 			case NODE_HLONG:
+				assert(length != 0 || node.getAllDownhillNodes().isEmpty());
 				baseCost = 0.15f*length;// HLONGs have length 6 and 7
 				break;
 			case NODE_VLONG:
+				assert(length != 0);
 				baseCost = 0.7f;
 				break;	
 			default:
@@ -193,24 +200,22 @@ abstract public class RouteNode {
 
 	private void setEndTileXYCoordinates() {
 		Wire[] wires = node.getAllWiresInNode();
-		List<Tile> intTiles = new ArrayList<>();
+		Tile endTile = null;
 		for(Wire w : wires) {
 			if(w.getTile().getTileTypeEnum() == TileTypeEnum.INT) {
-				intTiles.add(w.getTile());
+				boolean endTileWasNotNull = (endTile != null);
+				endTile = w.getTile();
+				// Break if this is the second INT tile
+				if (endTileWasNotNull) break;
 			}
 		}
-		Tile endTile;
-		if(intTiles.size() > 1) {
-			endTile = intTiles.get(1);
-		}else if(intTiles.size() == 1) {
-			endTile = intTiles.get(0);
-		}else {
-			endTile = getNode().getTile();
+		if (endTile == null) {
+			endTile = node.getTile();
 		}
 		endTileXCoordinate = (short) endTile.getTileXCoordinate();
 		endTileYCoordinate = (short) endTile.getTileYCoordinate();
-		Tile base = getNode().getTile();
-		length = (short) (Math.abs(endTileXCoordinate - base.getTileXCoordinate()) 
+		Tile base = node.getTile();
+		length = (short) (Math.abs(endTileXCoordinate - base.getTileXCoordinate())
 				+ Math.abs(endTileYCoordinate - base.getTileYCoordinate()));
 	}
 
@@ -238,7 +243,7 @@ abstract public class RouteNode {
 		s.append(", ");
 		s.append(String.format("type = %s", type));
 		s.append(", ");
-		s.append(String.format("ic = %s", getNode().getIntentCode()));
+		s.append(String.format("ic = %s", node.getIntentCode()));
 		s.append(", ");
 		s.append(String.format("user = %s", getOccupancy()));
 		s.append(", ");
@@ -249,6 +254,18 @@ abstract public class RouteNode {
 	@Override
 	public int hashCode(){
 		return node.hashCode();
+	}
+
+	@Override
+	public boolean equals(Object obj){
+		if(this == obj)
+			return true;
+		if(obj == null)
+			return false;
+		if(getClass() != obj.getClass())
+			return false;
+		RouteNode that = (RouteNode) obj;
+		return node.equals(that.node);
 	}
 
 	/**
@@ -340,9 +357,11 @@ abstract public class RouteNode {
 	 * @return True if child already present.
 	 */
 	public boolean containsChild(RouteNode rnode) {
-		// This linear search is rather inefficient, but is currently only used by
-		// PartialRouter.unpreserveNet() which is not expected to be called often
-		for (RouteNode child : getChildren()) {
+		assert(children != null);
+
+		// This linear search is rather inefficient, but is currently only used in
+		// an assertion inside PartialRouter.unpreserveNet()
+		for (RouteNode child : children) {
 			if (child == rnode) {
 				return true;
 			}
@@ -355,14 +374,12 @@ abstract public class RouteNode {
 	 * @param rnode Child to be added.
 	 */
 	public void addChild(RouteNode rnode) {
+		assert(children != null);
+
 		// This add-just-one method is rather inefficient, but is currently only used by
 		// PartialRouter.unpreserveNet() which is not expected to be called often
-		if (children == null) {
-			children = new RouteNode[]{rnode};
-		} else {
-			children = Arrays.copyOf(children, children.length + 1);
-			children[children.length - 1] = rnode;
-		}
+		children = Arrays.copyOf(children, children.length + 1);
+		children[children.length - 1] = rnode;
 	}
 
 	private void setType(RouteNodeType type) {
@@ -568,6 +585,15 @@ abstract public class RouteNode {
 	}
 
 	/**
+	 * Checks if a RouteNode instance has ever been expanded, as determined
+	 * by whether its children member is null.
+	 * @return true, if a RouteNode instance has been expanded before.
+	 */
+	public boolean everExpanded() {
+		return children != null;
+	}
+
+	/**
 	 * Checks if a RouteNode instance has been visited before when routing a connection.
 	 * @return true, if a RouteNode instance has been visited before.
 	 */
@@ -608,11 +634,29 @@ abstract public class RouteNode {
 		}
 		return false;
 	}
-	
+
 	/**
-	 * Checks if some routing resources are prevented from being used.
-	 * @param child The routing resource in question.
-	 * @return true, if the node should be excluded from the routing resource graph.
+	 * Checks if a routing arc must be included.
+	 * @param parent The routing arc's parent node.
+	 * @param child The routing arc's parent node.
+	 * @return True, if the arc should be included in the routing resource graph.
+	 */
+	abstract public boolean mustInclude(Node parent, Node child);
+
+	/**
+	 * Checks if a node has been preserved and thus cannot be used.
+	 * @param node The node in question.
+	 * @return True, if the arc should be excluded from the routing resource graph.
+	 */
+	abstract public boolean isPreserved(Node node);
+
+	/**
+	 * Checks if a routing arc has been excluded thus cannot be used.
+	 * @param parent The routing arc's parent node.
+	 * @param child The routing arc's parent node.
+	 * @return True, if the arc should be excluded from the routing resource graph.
 	 */
 	abstract public boolean isExcluded(Node parent, Node child);
+
+	abstract public int getSLRIndex();
 }

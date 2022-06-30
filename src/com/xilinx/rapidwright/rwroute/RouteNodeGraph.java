@@ -28,10 +28,10 @@ import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.util.CountUpDownLatch;
-import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.ParallelismTools;
 import com.xilinx.rapidwright.util.RuntimeTracker;
 
@@ -58,7 +58,7 @@ public class RouteNodeGraph {
     /**
      * A map of preserved nodes to their nets
      */
-    final private Map<LightweightNode, Net> preservedMap;
+    final private Map<Node, Net> preservedMap;
 
     /**
      * A synchronization object tracking the number of outstanding calls to
@@ -77,6 +77,14 @@ public class RouteNodeGraph {
 
     final Design design;
 
+    public static final short SUPER_LONG_LINE_LENGTH_IN_TILES = 60;
+
+    /** Array mapping an INT tile's Y coordinate, to its SLR index */
+    final int[] intYToSLRIndex;
+
+    /** Maximum X distance between any two Laguna tiles */
+    final int maxXBetweenLaguna;
+
     protected class RouteNodeImpl extends RouteNode {
 
         public RouteNodeImpl(Node node, RouteNodeType type) {
@@ -85,7 +93,17 @@ public class RouteNodeGraph {
 
         @Override
         protected RouteNode getOrCreate(Node node, RouteNodeType type) {
-            return RouteNodeGraph.this.getOrCreate(node, type).getFirst();
+            return RouteNodeGraph.this.getOrCreate(node, type);
+        }
+
+        @Override
+        public boolean mustInclude(Node parent, Node child) {
+            return RouteNodeGraph.this.mustInclude(parent, child);
+        }
+
+        @Override
+        public boolean isPreserved(Node node) {
+            return RouteNodeGraph.this.isPreserved(node);
         }
 
         @Override
@@ -98,6 +116,11 @@ public class RouteNodeGraph {
             setChildren(setChildrenTimer);
             return super.getChildren();
         }
+
+        @Override
+        public int getSLRIndex() {
+             return intYToSLRIndex[getEndTileYCoordinate()];
+        }
     }
 
     public RouteNodeGraph(RuntimeTracker setChildrenTimer, Design design) {
@@ -107,6 +130,48 @@ public class RouteNodeGraph {
         visited = new ArrayList<>();
         this.setChildrenTimer = setChildrenTimer;
         this.design = design;
+
+        Device device = design.getDevice();
+        intYToSLRIndex = new int[device.getRows()];
+        Tile[][] intTiles = device.getTilesByNameRoot("INT");
+        for (int y = 0; y < intTiles.length; y++) {
+            Tile[] intTilesAtY = intTiles[y];
+            for (int x = 0; x < intTilesAtY.length; x++) {
+                Tile tile = intTilesAtY[x];
+                if (tile != null) {
+                    intYToSLRIndex[y] = tile.getSLR().getId();
+                    break;
+                }
+            }
+        }
+
+        Tile[][] lagunaTiles;
+        if (device.getSeries() == Series.UltraScalePlus) {
+            lagunaTiles = device.getTilesByNameRoot("LAG_LAG");
+        } else if (device.getSeries() == Series.UltraScale) {
+            lagunaTiles = device.getTilesByNameRoot("LAGUNA_TILE");
+        } else {
+            lagunaTiles = null;
+        }
+
+        int currentMaxXBetweenLaguna = 0;
+        if (lagunaTiles != null) {
+            for (int y = 0; y < lagunaTiles.length; y++) {
+                Tile[] lagunaTilesAtY = lagunaTiles[y];
+                Tile lastTile = null;
+                for (int x = 0; x < lagunaTilesAtY.length; x++) {
+                    Tile tile = lagunaTilesAtY[x];
+                    if (tile != null) {
+                        if (lastTile != null) {
+                            int distFromLastTile = tile.getTileXCoordinate() - lastTile.getTileXCoordinate();
+                            currentMaxXBetweenLaguna = Math.max(currentMaxXBetweenLaguna, distFromLastTile);
+                        }
+                        lastTile = tile;
+                    }
+                }
+            }
+        }
+        maxXBetweenLaguna = currentMaxXBetweenLaguna;
     }
 
     public void initialize() {
@@ -115,10 +180,6 @@ public class RouteNodeGraph {
     }
 
     public Net preserve(Node node, Net net) {
-        return preserve(new LightweightNode(node), net);
-    }
-
-    private Net preserve(LightweightNode node, Net net) {
         return preservedMap.putIfAbsent(node, net);
     }
 
@@ -144,7 +205,7 @@ public class RouteNodeGraph {
                     continue;
                 }
 
-                preserve(new LightweightNode(pin), net);
+                preserve(pin.getConnectedNode(), net);
             }
 
             for(PIP pip : net.getPIPs()) {
@@ -164,12 +225,12 @@ public class RouteNodeGraph {
         }
     }
 
-    public void unpreserve(Node node) {
-        preservedMap.remove(new LightweightNode(node));
+    public boolean unpreserve(Node node) {
+        return preservedMap.remove(node) != null;
     }
 
     public boolean isPreserved(Node node) {
-        return preservedMap.containsKey(new LightweightNode(node));
+        return preservedMap.containsKey(node);
     }
 
     final private static Set<TileTypeEnum> allowedTileEnums;
@@ -183,23 +244,22 @@ public class RouteNodeGraph {
         }
     }
 
-    protected boolean isExcluded(Node parent, Node child) {
-        if (isPreserved(child))
-            return true;
+    protected boolean mustInclude(Node parent, Node child) {
+        return false;
+    }
 
+    protected boolean isExcluded(Node parent, Node child) {
         Tile tile = child.getTile();
         TileTypeEnum tileType = tile.getTileTypeEnum();
         return !allowedTileEnums.contains(tileType);
     }
 
-    public Collection<Node> getPreservedNodes(Device device) {
-        List<Node> nodes = new ArrayList<>(preservedMap.size());
-        preservedMap.keySet().forEach((k) -> nodes.add(Node.getNode(device.getTile(k.tileID), k.wireID)));
-        return nodes;
+    public Set<Node> getPreservedNodes() {
+        return Collections.unmodifiableSet(preservedMap.keySet());
     }
 
     public Net getPreservedNet(Node node) {
-        return preservedMap.get(new LightweightNode(node));
+        return preservedMap.get(node);
     }
 
     public RouteNode getNode(Node node) {
@@ -222,17 +282,8 @@ public class RouteNodeGraph {
         return new RouteNodeImpl(node, type);
     }
 
-    public Pair<RouteNode,Boolean> getOrCreate(Node node, RouteNodeType type) {
-        final boolean[] inserted = {false};
-        RouteNode rnode = nodesMap.compute(node, (k, v) -> {
-            if (v == null) {
-                // this is for initializing sources and sinks of those to-be-routed nets' connections
-                v = create(node, type);
-                inserted[0] = true;
-            }
-            return v;
-        });
-        return new Pair<>(rnode, inserted[0]);
+    public RouteNode getOrCreate(Node node, RouteNodeType type) {
+        return nodesMap.computeIfAbsent(node, ($) -> create(node, type));
     }
 
     public void visit(RouteNode rnode) {
@@ -258,9 +309,12 @@ public class RouteNodeGraph {
         int sum = 0;
         for(Map.Entry<Node, RouteNode> e : getNodeEntries()){
             RouteNodeImpl rnode = (RouteNodeImpl) e.getValue();
-            sum += (rnode.children != null) ? rnode.children.length : 0;
+            sum += rnode.everExpanded() ? rnode.getChildren().length : 0;
         }
         return Math.round((float) sum / numNodes());
     }
 
+    public int getMaxXBetweenLaguna() {
+        return maxXBetweenLaguna;
+    }
 }

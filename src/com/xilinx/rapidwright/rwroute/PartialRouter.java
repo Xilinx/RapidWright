@@ -65,11 +65,8 @@ public class PartialRouter extends RWRoute{
 		}
 
 		@Override
-		protected boolean isExcluded(Node parent, Node child) {
-			if (isPreserved(child) && maskPreservedIfExistingRoute(parent, child)) {
-				return true;
-			}
-			return super.isExcluded(parent, child);
+		protected boolean mustInclude(Node parent, Node child) {
+			return isPartOfExistingRoute(parent, child);
 		}
 	}
 
@@ -79,11 +76,8 @@ public class PartialRouter extends RWRoute{
 		}
 
 		@Override
-		protected boolean isExcluded(Node parent, Node child) {
-			if (isPreserved(child) && maskPreservedIfExistingRoute(parent, child)) {
-				return true;
-			}
-			return super.isExcluded(parent, child);
+		protected boolean mustInclude(Node parent, Node child) {
+			return isPartOfExistingRoute(parent, child);
 		}
 	}
 
@@ -101,7 +95,7 @@ public class PartialRouter extends RWRoute{
 	}
 
 	/**
-	 * Compute the mask for an otherwise preserved node.
+	 * Checks whether this arc is part of an existing route.
 	 * For Nets containing at least one Connection to be routed, all fully routed
 	 * Connections and their associated Nodes (if any) are preserved. Any such
 	 * Nodes can (and are encouraged) to be used as part of routing such incomplete
@@ -113,24 +107,30 @@ public class PartialRouter extends RWRoute{
 	 * upon masking.
 	 * @param start Start Node of arc.
 	 * @param end End Node of arc.
-	 * @return Mask to be AND-ed with preserved state
+	 * @return True if arc is part of an existing route.
 	 */
-	private boolean maskPreservedIfExistingRoute(Node start, Node end) {
+	private boolean isPartOfExistingRoute(Node start, Node end) {
+		if (!routingGraph.isPreserved(end))
+			return false;
+
 		// If preserved, check if end node has been created already
 		RouteNode endRnode = routingGraph.getNode(end);
 		if (endRnode == null)
-			return true;
+			return false;
 
 		// If so, get its prev pointer
 		RouteNode prev = endRnode.getPrev();
 		// Presence means that the only arc allowed to enter this end node
 		// is if it came from prev
-		if (prev != null && prev.getNode() == start) {
-			endRnode.setVisited(false);
-			return false;
+		if (prev != null) {
+			assert((prev.getNode() == start) == prev.getNode().equals(start));
+			if (prev.getNode() == start) {
+				endRnode.setVisited(false);
+				return true;
+			}
 		}
 
-		return true;
+		return false;
 	}
 
 	@Override
@@ -157,6 +157,35 @@ public class PartialRouter extends RWRoute{
 			totalSitePins += (connection.getSink().isRouted()) ? 0 : 1;
         }
         return totalSitePins;
+	}
+
+	@Override
+	protected void determineRoutingTargets() {
+		super.determineRoutingTargets();
+
+		// Go through all nets to be routed
+		for (Map.Entry<Net, NetWrapper> e : nets.entrySet()) {
+			Net net = e.getKey();
+
+			// Create all nodes used by this net and set its previous pointer so that:
+			// (a) the routing for each connection can be recovered by
+			//      finishRouteConnection()
+			// (b) RouteNode.setChildren() will know to only allow this incoming
+			//     arc on these nodes
+			for (PIP pip : net.getPIPs()) {
+				Node start = (pip.isReversed()) ? pip.getEndNode() : pip.getStartNode();
+				Node end = (pip.isReversed()) ? pip.getStartNode() : pip.getEndNode();
+				RouteNode rstart = getOrCreateRouteNode(start, RouteNodeType.WIRE);
+				RouteNode rend = getOrCreateRouteNode(end, RouteNodeType.WIRE);
+				assert (rend.getPrev() == null);
+				rend.setPrev(rstart);
+			}
+
+			NetWrapper netWrapper = e.getValue();
+			for (Connection connection : netWrapper.getConnections()) {
+				finishRouteConnection(connection);
+			}
+		}
 	}
 
 	@Override
@@ -191,23 +220,29 @@ public class PartialRouter extends RWRoute{
 	
 	@Override
 	protected void addNetConnectionToRoutingTargets(Net net) {
+		List<SitePinInst> sinkPins = net.getSinkPins();
+		List<SitePinInst> pinsToRoute = netToPins.get(net);
+		final boolean partiallyPreserved = (pinsToRoute != null && pinsToRoute.size() < sinkPins.size());
+		if (pinsToRoute != null) {
+			assert(!pinsToRoute.isEmpty());
+
+			if (partiallyPreserved) {
+				// Mark all pins as being routed, then unmark those that need routing
+				sinkPins.forEach((spi) -> spi.setRouted(true));
+			}
+			pinsToRoute.forEach((spi) -> spi.setRouted(false));
+		}
+
 		if (net.hasPIPs()) {
+			// NOTE: SitePinInst.isRouted() must be finalized before this method is
+			//       called as it may operate asynchronously
 			preserveNet(net);
 			increaseNumPreservedWireNets();
 		}
 
-		List<SitePinInst> pinsToRoute = netToPins.get(net);
-		if (pinsToRoute == null)
+		if (pinsToRoute == null) {
 			return;
-		assert(!pinsToRoute.isEmpty());
-
-		List<SitePinInst> sinkPins = net.getSinkPins();
-		final boolean partiallyPreserved = (pinsToRoute.size() < sinkPins.size());
-		if (partiallyPreserved) {
-			// Mark all pins as being routed, then unmark those that need routing
-			sinkPins.forEach((spi) -> spi.setRouted(true));
 		}
-		pinsToRoute.forEach((spi) -> spi.setRouted(false));
 
 		NetWrapper netWrapper = createNetWrapperAndConnections(net);
 		if (partiallyPreserved) {
@@ -286,13 +321,27 @@ public class PartialRouter extends RWRoute{
 			boolean removed = partiallyPreservedNets.remove(netWrapper);
 			assert(removed);
 
-			for(Node toBuild : RouterHelper.getNodesOfNet(net)) {
-				// Since net already exists, all the nodes it uses will already
-				// have been created
-				RouteNode rnode = routingGraph.getNode(toBuild);
-				assert(rnode != null);
+			// Collect all nodes used by this net
+			for (PIP pip : net.getPIPs()) {
+				Node start = (pip.isReversed()) ? pip.getEndNode() : pip.getStartNode();
+				Node end = (pip.isReversed()) ? pip.getStartNode() : pip.getEndNode();
 
-				rnodes.add(rnode);
+				// Since net already exists, all the nodes it uses must already
+				// have been created
+				RouteNode rstart = routingGraph.getNode(start);
+				assert (rstart != null);
+				boolean rstartAdded = rnodes.add(rstart);
+				boolean startPreserved = routingGraph.unpreserve(start);
+				assert(rstartAdded == startPreserved);
+
+				RouteNode rend = routingGraph.getNode(end);
+				assert (rend != null);
+				boolean rendAdded = rnodes.add(rend);
+				boolean endPreserved = routingGraph.unpreserve(end);
+				assert(rendAdded == endPreserved);
+
+				// Also set the prev pointer according to the PIP
+				rend.setPrev(rstart);
 			}
 		} else {
 			// Net needs to be created
@@ -302,13 +351,18 @@ public class PartialRouter extends RWRoute{
 			for (PIP pip : net.getPIPs()) {
 				Node start = (pip.isReversed()) ? pip.getEndNode() : pip.getStartNode();
 				Node end = (pip.isReversed()) ? pip.getStartNode() : pip.getEndNode();
-				RouteNode rstart = getOrCreateRouteNode(null, start, RouteNodeType.WIRE);
-				RouteNode rend = getOrCreateRouteNode(null, end, RouteNodeType.WIRE);
+				boolean startPreserved = routingGraph.unpreserve(start);
+				boolean endPreserved = routingGraph.unpreserve(end);
 
-				rnodes.add(rstart);
-				rnodes.add(rend);
+				RouteNode rstart = getOrCreateRouteNode(start, RouteNodeType.WIRE);
+				RouteNode rend = getOrCreateRouteNode(end, RouteNodeType.WIRE);
+				boolean rstartAdded = rnodes.add(rstart);
+				boolean rendAdded = rnodes.add(rend);
+				assert(rstartAdded == startPreserved);
+				assert(rendAdded == endPreserved);
 
 				// Also set the prev pointer according to the PIP
+				assert (rend.getPrev() == null);
 				rend.setPrev(rstart);
 			}
 
@@ -326,9 +380,10 @@ public class PartialRouter extends RWRoute{
 
 		for (RouteNode rnode : rnodes) {
 			Node toBuild = rnode.getNode();
-			routingGraph.unpreserve(toBuild);
+			// Check already unpreserved above
+			assert(!routingGraph.isPreserved(toBuild));
 
-			// Each rnode should be added as a child to any of its parents
+			// Each rnode should be added as a child to all of its parents
 			// that already exist, unless it was already present
 			for(Node uphill : toBuild.getAllUphillNodes()) {
 				// Without this routethru check, there will be Invalid Programming for Site error shown in Vivado.
@@ -337,8 +392,20 @@ public class PartialRouter extends RWRoute{
 				RouteNode parent = routingGraph.getNode(uphill);
 				if (parent == null)
 					continue;
-				if (parent.containsChild(rnode))
+
+				// Parent has never been expanded, let it expand naturally
+				if (!parent.everExpanded())
 					continue;
+
+				// Parent has been expanded, and if it is the prev node,
+				// then it must already be its child
+				if (rnode.getPrev() == parent) {
+					assert(parent.containsChild(rnode));
+					continue;
+				}
+
+				// Otherwise there's no reason for it to exist as a child
+				assert(!parent.containsChild(rnode));
 				parent.addChild(rnode);
 			}
 

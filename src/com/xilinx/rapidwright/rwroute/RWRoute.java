@@ -63,8 +63,6 @@ import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
 public class RWRoute{
 	/** The design to route */
 	protected Design design;
-	/** A flag to indicate if the device has multiple SLRs, for the sake of avoiding unnecessary check for single-SLR devices */
-	private boolean multiSLRDevice;
 	/** Created NetWrappers */
 	protected Map<Net,NetWrapper> nets;
 	/** A list of indirect connections that will go through iterative routing */
@@ -74,9 +72,9 @@ public class RWRoute{
 	/** Sorted indirect connections */
 	private List<Connection> sortedIndirectConnections;
 	/** A list of global clock nets */
-	private List<Net> clkNets;
+	protected List<Net> clkNets;
 	/** Static nets */
-	private Map<Net, List<SitePinInst>> staticNetAndRoutingTargets;
+	protected Map<Net, List<SitePinInst>> staticNetAndRoutingTargets;
 	/** Several integers to indicate the netlist info */
 	protected int numPreservedRoutableNets;
 	private int numPreservedClks;
@@ -117,7 +115,7 @@ public class RWRoute{
 	/** Class encapsulating the routing resource graph */
 	protected RouteNodeGraph routingGraph;
 	/** Count of rnodes created in the current routing iteration */
-	private long rnodesCreatedThisIteration;
+	protected long rnodesCreatedThisIteration;
 	/** The queue to store candidate nodes to route a connection */
 	private PriorityQueue<RouteNode> queue;
 
@@ -154,8 +152,6 @@ public class RWRoute{
 	
 	public RWRoute(Design design, RWRouteConfig config) {
 		this.design = design;
-		multiSLRDevice = design.getDevice().getSLRs().length > 1;
-
 		this.config = config;
 	}
 
@@ -237,6 +233,7 @@ public class RWRoute{
 		categorizeNets();
 
 		// Wait for all outstanding RoutingGraph.asyncPreserve() calls to complete
+		// FIXME: Calling thread does nothing while waiting
 		routingGraph.awaitPreserve();
 	}
 	
@@ -396,7 +393,7 @@ public class RWRoute{
 
 		// If connections of other nets are routed first, used resources should be preserved.
 		Set<Node> unavailableNodes = getAllUsedNodesOfRoutedConnections();
-		unavailableNodes.addAll(routingGraph.getPreservedNodes(design.getDevice()));
+		unavailableNodes.addAll(routingGraph.getPreservedNodes());
 		// If the connections of other nets are not routed yet,
 		// the nodes connected to pins of other nets must be preserved.
 		unavailableNodes.addAll(routingGraph.getNodes());
@@ -483,14 +480,14 @@ public class RWRoute{
 			}else {
 				Node sinkINTNode = nodes.get(0);
 				indirectConnections.add(connection);
-				connection.setSinkRnode(getOrCreateRouteNode(connection.getSink(), sinkINTNode, RouteNodeType.PINFEED_I));
+				connection.setSinkRnode(getOrCreateRouteNode(sinkINTNode, RouteNodeType.PINFEED_I));
 				if(sourceINTNode == null) {
 					sourceINTNode = RouterHelper.projectOutputPinToINTNode(source);
 					if(sourceINTNode == null) {
 						throw new RuntimeException("ERROR: Null projected INT node for the source of net " + net.toStringFull());
 					}
 				}
-				connection.setSourceRnode(getOrCreateRouteNode(connection.getSource(), sourceINTNode, RouteNodeType.PINFEED_O));
+				connection.setSourceRnode(getOrCreateRouteNode(sourceINTNode, RouteNodeType.PINFEED_O));
 				connection.setDirect(false);
 				indirect++;
 				connection.computeHpwl();
@@ -505,7 +502,7 @@ public class RWRoute{
 					if(connection.isDirect()) continue;
 					connection.computeConnectionBoundingBox(config.getBoundingBoxExtensionX(),
 							config.getBoundingBoxExtensionY(),
-							isMultiSLRDevice());
+							routingGraph.getMaxXBetweenLaguna());
 				}
 			}
 		}
@@ -529,30 +526,16 @@ public class RWRoute{
 		routingGraph.asyncPreserve(nodes, netToPreserve);
 	}
 
-	public boolean isMultiSLRDevice() {
-		return multiSLRDevice;
-	}
-
 	/**
 	 * Creates a {@link RouteNode} Object based on a {@link Node} instance and avoids duplicates,
 	 * used for creating the source and sink rnodes of {@link Connection} instances.
-	 * NOTE: This method does not consider the preserved nodes.
-	 * @param sitePinInst The source or sink {@link SitePinInst} instance.
+	 * NOTE: This method does not consider whether returned node is preserved.
 	 * @param node The node associated to the {@link SitePinInst} instance.
 	 * @param type The {@link RouteNodeType} of the {@link RouteNode} Object.
 	 * @return The created {@link RouteNode} instance.
 	 */
-	protected RouteNode getOrCreateRouteNode(SitePinInst sitePinInst, Node node, RouteNodeType type){
-		Pair<RouteNode,Boolean> ret = routingGraph.getOrCreate(node, type);
-		RouteNode rnode = ret.getFirst();
-		boolean inserted = ret.getSecond();
-		if (!inserted) {
-			// this is for checking preserved routing resource conflicts among routed nets */
-			if(rnode.getType() == type && type == RouteNodeType.PINFEED_I) {
-				System.out.println("WARNING: Conflicting node: " + node + ", connected to sink " + sitePinInst);
-			}
-		}
-		return rnode;
+	protected RouteNode getOrCreateRouteNode(Node node, RouteNodeType type){
+		return routingGraph.getOrCreate(node, type);
 	}
 	
 	/**
@@ -841,7 +824,7 @@ public class RWRoute{
 	/**
 	 * Assigns a list nodes to each connection to complete the route path of it.
 	 */
-	private void assignNodesToConnections() {
+	protected void assignNodesToConnections() {
 		for(Connection connection : indirectConnections) {
 			List<Node> nodes = new ArrayList<>();
 			List<Node> switchBoxToSink = RouterHelper.findPathBetweenNodes(connection.getSinkRnode().getNode(), connection.getSink().getConnectedNode());
@@ -949,7 +932,7 @@ public class RWRoute{
 	 */
 	private void updateCost() {
 		overUsedRnodes.clear();
-		for(Entry<Node, RouteNode> e : routingGraph.getNodeEntries()){
+		for(Entry<?, RouteNode> e : routingGraph.getNodeEntries()){
 			RouteNode rnode = e.getValue();
 			int overuse=rnode.getOccupancy() - RouteNode.capacity;
 			if(overuse == 0) {
@@ -1106,7 +1089,7 @@ public class RWRoute{
 	/**
 	 * Sets a list of {@link PIP} instances of each {@link Net} instance and checks if there is any PIP overlaps.
 	 */
-	private void setPIPsOfNets(){
+	protected void setPIPsOfNets(){
 		for(Entry<Net,NetWrapper> e : nets.entrySet()){
 			NetWrapper netWrapper = e.getValue();
 			Net net = netWrapper.getNet();
@@ -1229,7 +1212,7 @@ public class RWRoute{
 		DesignTools.routeAlternativeOutputSitePin(net, altSource);
 
 		Node sourceINTNode = RouterHelper.projectOutputPinToINTNode(altSource);
-		RouteNode sourceR = getOrCreateRouteNode(altSource, sourceINTNode, RouteNodeType.PINFEED_O);
+		RouteNode sourceR = getOrCreateRouteNode(sourceINTNode, RouteNodeType.PINFEED_O);
 		for(Connection otherConnectionOfNet : netWrapper.getConnections()) {
 			otherConnectionOfNet.setSource(altSource);
 			otherConnectionOfNet.setSourceRnode(sourceR);
@@ -1363,8 +1346,26 @@ public class RWRoute{
 		if (config.isTimingDriven()) {
 			newPartialPathCost += rnodeDelayWeight * (childRnode.getDelay() + DelayEstimatorBase.getExtraDelay(childRnode.getNode(), longParent));
 		}
-		int deltaX = Math.abs(childRnode.getEndTileXCoordinate() - connection.getSinkRnode().getEndTileXCoordinate());
-		int deltaY = Math.abs(childRnode.getEndTileYCoordinate() - connection.getSinkRnode().getEndTileYCoordinate());
+
+		int childX = childRnode.getEndTileXCoordinate();
+		int childY = childRnode.getEndTileYCoordinate();
+		RouteNode sinkRnode = connection.getSinkRnode();
+		int sinkX = sinkRnode.getEndTileXCoordinate();
+		int sinkY = sinkRnode.getEndTileYCoordinate();
+		int deltaX = Math.abs(childX - sinkX);
+		int deltaY = Math.abs(childY - sinkY);
+		if (connection.isCrossSLR()) {
+			int deltaSLR = Math.abs(sinkRnode.getSLRIndex() - childRnode.getSLRIndex());
+			// Check for overshooting which occurs when child and sink node are in
+			// adjacent SLRs and less than a SLL wire's length apart in the Y axis.
+			if (deltaSLR == 1) {
+				int overshootBy = deltaY - RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES;
+				if (overshootBy < 0) {
+					deltaY = RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES - overshootBy;
+				}
+			}
+		}
+
 		int distanceToSink = deltaX + deltaY;
 		float newTotalPathCost = newPartialPathCost + rnodeEstWlWeight * distanceToSink / sharingFactor;
 		if (config.isTimingDriven()) {
@@ -1554,7 +1555,9 @@ public class RWRoute{
 			printTimingInfo();
 		}
 		System.out.printf("==============================================================================\n");
-		
+
+		// For testing
+		System.setProperty("rapidwright.rwroute.nodesPopped", String.valueOf(nodesPopped));
 	}
 	
 	/**
