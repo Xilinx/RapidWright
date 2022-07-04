@@ -98,7 +98,7 @@ public abstract class EDIFWriteLegalNameCache<T> {
     }
 
     public static EDIFWriteLegalNameCache<?> multiThreaded() {
-        return new EDIFWriteLegalNameCache<AtomicInteger>(new ConcurrentHashMap<>(), HashMap::new) {
+        return new EDIFWriteLegalNameCache<AtomicInteger>(new ConcurrentHashMap<>(), ConcurrentHashMap::new) {
             @Override
             protected int getAndIncrement(String rename) {
                 AtomicInteger counter = usedRenames.computeIfAbsent(rename, x->new AtomicInteger());
