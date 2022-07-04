@@ -66,7 +66,9 @@ public abstract class EDIFWriteLegalNameCache<T> {
         if (rename.equals(name)) {
             return MARKER_NO_RENAME;
         }
-        int previousCount = getAndIncrement(rename);
+        // Vivado does not like renames that only differ in case. Normalize to lower case
+        // before checking if we already saw this rename.
+        int previousCount = getAndIncrement(rename.toLowerCase());
         if (previousCount == 0) {
             return rename.getBytes(StandardCharsets.UTF_8);
         }
