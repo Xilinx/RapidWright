@@ -7,29 +7,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestEDIFParseCellNames {
-    /*@Test
-    public void asdf() {
-        final EDIFNetlist netlist = TestEDIF.createEmptyNetlist();
-        EDIFCell cellA = new EDIFCell();
-        cellA.setName("duplicate");
-        cellA.setEDIFRename("renameA");
-        cellA.addPort(new EDIFPort("portA", EDIFDirection.INPUT, 1));
-        EDIFCell cellB = new EDIFCell();
-        cellB.setName("duplicate");
-        cellB.setEDIFRename("renameB");
-        cellB.addPort(new EDIFPort("portB", EDIFDirection.INPUT, 1));
-
-
-        netlist.getWorkLibrary().addCell(cellA);
-        netlist.getWorkLibrary().addCell(cellB);
-
-        new EDIFCellInst("instA", cellA, netlist.getTopCell());
-        new EDIFCellInst("instB", cellB, netlist.getTopCell());
-
-        verifyNetlist(netlist);
-
-        netlist.exportEDIF("/home/jakobw/git/RapidWright/RapidWright/test/RapidWrightDCP/duplicateCellNames.edf");
-    }*/
 
     private void verifyNetlist(EDIFNetlist netlist) {
         final EDIFCell cellA = netlist.getTopCell().getCellInst("instA").getCellType();
