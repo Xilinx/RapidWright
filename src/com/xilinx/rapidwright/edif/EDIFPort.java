@@ -221,15 +221,6 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
 	    }
 	    return getBusName() + "[" + index + "]";     
 	}
-	
-	@Override
-	protected byte[] getEDIFRename(EDIFWriteLegalNameCache<?> cache) {
-		final byte[] edifName = cache.getEDIFRename(getBusName());
-		if (edifName == null && isBus()) { //Always renaming buses
-			return getBusName().getBytes(StandardCharsets.UTF_8);
-		}
-		return edifName;
-	}
 
 	public static final byte[] EXPORT_CONST_PORT_BEGIN = "(port ".getBytes(StandardCharsets.UTF_8);
 	public static final byte[] EXPORT_CONST_ARRAY_BEGIN = "(array ".getBytes(StandardCharsets.UTF_8);
