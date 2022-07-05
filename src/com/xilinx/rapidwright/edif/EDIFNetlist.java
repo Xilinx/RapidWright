@@ -106,9 +106,9 @@ public class EDIFNetlist extends EDIFName {
 	private List<String> encryptedCells; 
 	
 	private boolean trackCellChanges = false;
-	
+
 	private Map<EDIFCell, List<EDIFChange>> modifiedCells = null;
-	
+
 	private boolean DEBUG = false;
 
 	/**
@@ -570,7 +570,7 @@ public class EDIFNetlist extends EDIFName {
 					"'" + cell.getName() + "' in library '" + destLib.getName() + "'");
 		}
 	}
-	
+
 	private boolean checkIfAlreadyInLib(EDIFCell cell, EDIFLibrary lib) {
 		EDIFCell existing = lib.getCell(cell.getName());
 		if(existing == cell && lib.getNetlist() == cell.getLibrary().getNetlist()) {
@@ -685,10 +685,10 @@ public class EDIFNetlist extends EDIFName {
 			os.write(EXPORT_CONST_EDIF_HEAD);
 			exportEDIFName(os, cache);
 			os.write(EXPORT_CONST_EDIF_VERSION);
-			SimpleDateFormat formatter = new SimpleDateFormat("yyyy MM dd HH mm ss");
 			if (stable) {
-				os.write(formatter.format(new Date(0)).getBytes(StandardCharsets.UTF_8));
+				os.write("1970 01 01 00 00 00".getBytes(StandardCharsets.UTF_8));
 			} else {
+				SimpleDateFormat formatter = new SimpleDateFormat("yyyy MM dd HH mm ss");
 				os.write(formatter.format(new Date()).getBytes(StandardCharsets.UTF_8));
 			}
 			os.write(EXPORT_CONST_PROGRAM);
@@ -770,7 +770,7 @@ public class EDIFNetlist extends EDIFName {
 	public void exportEDIF(String fileName) {
 		exportEDIF(Paths.get(fileName));
 	}
-			
+
 
 	/**
 	 * Based on a hierarchical string, this method will get the instance corresponding
@@ -1790,7 +1790,7 @@ public class EDIFNetlist extends EDIFName {
 	public void writeBinaryEDIF(OutputStream os) {
 		BinaryEDIFWriter.writeBinaryEDIF(os, this);
 	}
-    
+
     public void writeBinaryEDIF(String fileName) {
         BinaryEDIFWriter.writeBinaryEDIF(fileName, this);
     }
@@ -1815,13 +1815,13 @@ public class EDIFNetlist extends EDIFName {
     public void setTrackCellChanges(boolean trackCellChanges) {
         this.trackCellChanges = trackCellChanges;
     }
-    
+
     public void trackChange(EDIFCell cell, EDIFChangeType type, String objectName) {
         if(isTrackingCellChanges()) {
             addTrackingChange(cell, new EDIFChange(type, objectName));
         }
     }
-    
+
     public void addTrackingChange(EDIFCell cell, EDIFChange change) {
         getModifiedCells().computeIfAbsent(cell, l -> new ArrayList<>()).add(change);
     }
@@ -1830,7 +1830,7 @@ public class EDIFNetlist extends EDIFName {
         if(modifiedCells == null) modifiedCells = new HashMap<>();
         return modifiedCells;
     }
-    
+
     public static void main(String[] args) throws FileNotFoundException {
 		CodePerfTracker t = new CodePerfTracker("EDIF Import/Export", true);
 		t.start("Read EDIF");
