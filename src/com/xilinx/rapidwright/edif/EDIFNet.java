@@ -314,11 +314,15 @@ public class EDIFNet extends EDIFPropertyObject {
 	public static final byte[] EXPORT_CONST_JOINED_END = "          )\n".getBytes(StandardCharsets.UTF_8);
 	public static final byte[] EXPORT_CONST_NET_END = "         )\n".getBytes(StandardCharsets.UTF_8);
 
+	private static final Comparator<EDIFPortInst> edifPortInstComparator =
+			Comparator.comparing((EDIFPortInst e)->e.getCellInst()!=null?e.getCellInst().getName():"")
+					.thenComparing(EDIFPortInst::getName);
+
 	public void exportEDIF(OutputStream os, EDIFWriteLegalNameCache<?> cache, boolean stable) throws IOException {
 		os.write(EXPORT_CONST_NET_START);
 		exportEDIFName(os, cache);
 		os.write(EXPORT_CONST_JOINED);
-		for(EDIFPortInst p : EDIFTools.sortIfStable(getPortInsts(), Comparator.comparing(EDIFPortInst::getName), stable)){
+		for(EDIFPortInst p : EDIFTools.sortIfStable(getPortInsts(), edifPortInstComparator, stable)){
 			p.writeEDIFExport(os, EXPORT_CONST_PORT_INDENT, cache);
 		}
 		os.write(EXPORT_CONST_JOINED_END); // joined end
