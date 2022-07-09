@@ -549,8 +549,12 @@ public class EDIFTools {
 	        if(createdSrcNet && snkNet.getParentCell() == finalSrc.getNet().getParentCell()) {
 	            // Let's delete the net we created and use the existing snkNet instead
 	            EDIFNet net = finalSrc.getNet();
-	            net.getParentCell().removeNet(net);
-	            snkNet.addPortInst(finalSrc.getPortInst());
+	            if(snkNet != net) {
+	                net.getParentCell().removeNet(net);
+	                snkNet.addPortInst(finalSrc.getPortInst());
+	            } else {
+	                return;
+	            }
 	        }else {
 	            snkNet.removePortInst(finalSnk.getPortInst());	            
 	        }
