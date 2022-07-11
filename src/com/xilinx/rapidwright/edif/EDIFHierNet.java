@@ -25,6 +25,9 @@
  */
 package com.xilinx.rapidwright.edif;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 import java.util.Objects;
 
 import org.jetbrains.annotations.NotNull;
@@ -148,4 +151,23 @@ public class EDIFHierNet {
 	public EDIFHierCellInst getHierarchicalInst() {
 		return hierarchicalInst;
 	}
+
+	public List<EDIFHierPortInst> getPortInsts() {
+		Collection<EDIFPortInst> portInsts = net.getPortInsts();
+		List<EDIFHierPortInst> hierPortInsts = new ArrayList<>(portInsts.size());
+		for (EDIFPortInst portInst : portInsts) {
+			hierPortInsts.add(new EDIFHierPortInst(hierarchicalInst, portInst));
+		}
+		return hierPortInsts;
+	}
+
+	public List<EDIFHierPortInst> getSourcePortInsts(boolean includeTopLevelPorts) {
+		List<EDIFPortInst> portInsts = net.getSourcePortInsts(includeTopLevelPorts);
+		List<EDIFHierPortInst> hierPortInsts = new ArrayList<>(portInsts.size());
+		for (EDIFPortInst portInst : portInsts) {
+			hierPortInsts.add(new EDIFHierPortInst(hierarchicalInst, portInst));
+		}
+		return hierPortInsts;
+	}
+
 }

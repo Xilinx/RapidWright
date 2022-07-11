@@ -1187,10 +1187,13 @@ public class EDIFNetlist extends EDIFName {
 				boolean isToplevelInput = p.getHierarchicalInst().isTopLevelInst() && relP.getCellInst() == null && p.isInput();
 				if(isToplevelInput || (isCellPin && p.isOutput())){
 					if (parentNet != null) {
-						throw new RuntimeException("Multiple sources!");
+						System.out.println("Net '" + net.getHierarchicalNetName() + "' has multiple sources" +
+								" (e.g. '"+ parentNet.getHierarchicalNetName() + "')!");
+						// throw new RuntimeException("Multiple sources!");
+					} else {
+						source = p;
+						parentNet = net;
 					}
-					source = p;
-					parentNet = net;
 				}
 
 
@@ -1198,7 +1201,7 @@ public class EDIFNetlist extends EDIFName {
 					// Moving up in hierarchy
 					if (!p.getHierarchicalInst().isTopLevelInst()) {
 						final EDIFHierPortInst upPort = p.getPortInParent();
-						if (upPort != null) {
+						if (upPort != null && upPort.getNet() != null) {
 							queue.add(upPort.getHierarchicalNet());
 						}
 					}
@@ -1341,6 +1344,7 @@ public class EDIFNetlist extends EDIFName {
 		}
 
 		for(EDIFHierPortInst pr : queue){
+			if (pr.getNet() == null) continue;
 			EDIFHierNet parentNetName = pr.getHierarchicalNet();
 			for(EDIFHierNet alias : getNetAliases(parentNetName)){
 				parentNetMap.put(alias, parentNetName);

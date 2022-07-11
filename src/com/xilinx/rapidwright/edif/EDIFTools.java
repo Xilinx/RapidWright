@@ -154,7 +154,7 @@ public class EDIFTools {
 	public static final boolean RW_ENABLE_EDIF_BINARY_CACHING = 
 	        System.getenv("RW_ENABLE_EDIF_BINARY_CACHING") != null;
 	
-	private static String getUniqueSuffix() {
+	public static String getUniqueSuffix() {
 	    return "_rw_created" + UNIQUE_COUNT++;
 	}
 	
@@ -462,11 +462,29 @@ public class EDIFTools {
 		return Math.abs(left - right) + 1;
 	}
 
-	private static EDIFNet createUniqueNet(EDIFCell parentCell, String netName) {
-	    if(parentCell.getNet(netName) != null) {
-            netName += getUniqueSuffix();
-        }
-        return new EDIFNet(netName, parentCell);
+	public static EDIFNet createUniqueNet(EDIFCell parentCell, String netName) {
+		if(parentCell.getNet(netName) != null
+				// Because RapidWright doesn't track net busses (only port busses)
+				// such that we can't reliably tell if the name 'foo[9]' could collide
+				// with a bus 'foo' (which is stored individually as 'foo[0-9+]') then
+				// we have to play it safe
+				|| !EDIFTools.getRootBusName(netName).equals(netName)) {
+			netName += getUniqueSuffix();
+		}
+		// String rootBusNetName;
+		// if(parentCell.getNet(netName) != null ||
+		// 		// Check for existence of bus
+		// 		(!(rootBusNetName = EDIFTools.getRootBusName(netName)).equals(netName) && parentCell.getNet(rootBusNetName) != null)) {
+		// 	netName += getUniqueSuffix();
+		// }
+		// if (parentCell.getName().equals("fx_top") && netName.equals("Q[9]")) {
+		// 	rootBusNetName = EDIFTools.getRootBusName(netName);
+		// 	System.out.println("CREATEUNIQUENET");
+		// 	System.out.println(rootBusNetName);
+		// 	System.out.println(parentCell.getPort(rootBusNetName));
+		// 	System.out.println(netName);
+		// }
+		return new EDIFNet(netName, parentCell);
 	}
 	
 	/**
@@ -518,8 +536,11 @@ public class EDIFTools {
 	                // no port to the parent cell above exists, create one
 	                EDIFCell cellType = hierParentInst.getCellType();
 	                String newPortName = newName;
-	                if(cellType.getPort(newPortName) != null) {
-	                    newPortName += getUniqueSuffix(); 
+	                String rootBusNewName;
+	                if((cellType.getPort(newPortName) != null) ||
+							// Check for existence of bus
+							(!(rootBusNewName = EDIFTools.getRootBusName(newName)).equals(newName) && cellType.getPort(rootBusNewName) != null)) {
+	                    newPortName += getUniqueSuffix();
 	                }
 	                EDIFPort port = cellType.createPort(newPortName, 
 	                        hierPortInst == src ? EDIFDirection.OUTPUT : EDIFDirection.INPUT, 1);
@@ -534,6 +555,27 @@ public class EDIFTools {
 	                    currNet = createUniqueNet(hierParentInst.getCellType(), newName);
 	                }
 	                outerPortInst = currNet.createPortInst(port, prevInst);
+// if (currNet.getName().startsWith("fifo_entries[0]")) {
+// 	System.out.println(currNet);					// Q[9]
+// 	System.out.println(currNet.getParentCell());	// ss_db
+// 	System.out.println(outerPortInst);				// pg2/Q[9]_rw_created6383
+// 	System.out.println(hierParentInst);				// design/U0_M0_F11/U0_M0_F11_core/top/ss_db
+// 	System.out.println(commonAncestor);				// ""
+// 	System.out.println(commonAncestor.isTopLevelInst());
+// }
+// if (newPortName.startsWith("fifo_entries[0]")) {
+if (snk.toString().equals("wc_ip_top/zpv_hs_data[41833]")) {
+	System.out.println("currNet = " + currNet);					// Q[9]
+	System.out.println("currNet.getParentCell() = " + currNet.getParentCell());	// ss_db
+	System.out.println("outerPortInst = " + outerPortInst);				// pg2/Q[9]_rw_created6383
+	System.out.println("hierParentInst = " + hierParentInst);				// design/U0_M0_F11/U0_M0_F11_core/top/ss_db
+	System.out.println("commonAncestor = " + commonAncestor);				// ""
+	System.out.println("commonAncestor.isTopLevelInst() = " + commonAncestor.isTopLevelInst());
+	System.out.println("hierPortInst = " + hierPortInst);
+	System.out.println("src = " + src);
+	System.out.println("snk = " + snk);
+	System.out.println("outerPortInst.getNet() = " + outerPortInst.getNet());
+}
 	            }
 	            EDIFHierPortInst currPortInst = new EDIFHierPortInst(hierParentInst, outerPortInst);
 	            if(hierPortInst == src) {
@@ -550,17 +592,87 @@ public class EDIFTools {
 	            // Let's delete the net we created and use the existing snkNet instead
 	            EDIFNet net = finalSrc.getNet();
 	            if(snkNet != net) {
+System.out.println("MOVING");
+System.out.println(net);
+System.out.println(snkNet);
 	                net.getParentCell().removeNet(net);
 	                snkNet.addPortInst(finalSrc.getPortInst());
 	            } else {
+System.out.println("HERE");
+System.out.println(net);
+System.out.println(net.getPortInsts());
 	                return;
 	            }
 	        }else {
-	            snkNet.removePortInst(finalSnk.getPortInst());	            
+System.out.println("Disconnecting " + finalSnk.getPortInst() + " from net " + snkNet);
+	            snkNet.removePortInst(finalSnk.getPortInst());
 	        }
 	    }
+		if (snk.toString().equals("wc_ip_top/zpv_hs_data[41833]")) {
+			System.out.println("Connecting " + finalSrc.getNet() + " on " + finalSrc + " to " + finalSnk.getPortInst());
+		}
+
 	    // Make final connection in the common ancestor instance
 	    finalSrc.getNet().addPortInst(finalSnk.getPortInst());   
+	}
+
+	public static void connectPortInstsThruHier(EDIFHierNet net, EDIFHierPortInst pin,
+												String newName) {
+		EDIFHierPortInst src;
+		EDIFHierPortInst snk;
+
+		EDIFHierCellInst netInst = net.getHierarchicalInst();
+		EDIFCell cellType = netInst.getCellType();
+		String newPortName = newName;
+		String rootBusNewName;
+		if((cellType.getPort(newPortName) != null) ||
+				// Check for existence of bus
+				(!(rootBusNewName = EDIFTools.getRootBusName(newName)).equals(newName) && cellType.getPort(rootBusNewName) != null)) {
+			newPortName += getUniqueSuffix();
+		}
+
+		// FIXME: This method always punches a new port upwards
+		//  -- what if the src/snk was in a lower part of the hierarchy?
+
+		if (pin.isOutput()) {
+			src = pin;
+
+			// Find an input portInst to use
+			snk = null;
+			for (EDIFHierPortInst pi : net.getPortInsts()) {
+				if (pi.isInput()) {
+					snk = pi;
+					break;
+				}
+			}
+			if (snk == null) {
+				// Create one if one doesn't exist
+				EDIFPort port = cellType.createPort(newPortName, EDIFDirection.INPUT, 1);
+				net.getNet().createPortInst(port);
+
+				// EDIFTools.connectPortInstsThruHier() does not support top-level portInsts;
+				// need to create a port inst in the parent cell too
+				EDIFNet upperNet = createUniqueNet(netInst.getParent().getCellType(), newName);
+				snk = new EDIFHierPortInst(netInst.getParent(), upperNet.createPortInst(port, netInst.getInst()));
+			}
+		} else {
+			List<EDIFHierPortInst> sources = net.getSourcePortInsts(false);
+			if (!sources.isEmpty()) {
+				src = sources.get(0);
+			} else {
+				EDIFPort port = cellType.createPort(newPortName, EDIFDirection.OUTPUT, 1);
+				net.getNet().createPortInst(port);
+
+				// EDIFTools.connectPortInstsThruHier() does not support top-level portInsts;
+				// need to create a port inst in the parent cell too
+				EDIFNet upperNet = createUniqueNet(netInst.getParent().getCellType(), newName);
+				src = new EDIFHierPortInst(netInst.getParent(), upperNet.createPortInst(port, netInst.getInst()));
+			}
+
+			snk = pin;
+		}
+
+		connectPortInstsThruHier(src, snk, newName);
 	}
 
 	/**
