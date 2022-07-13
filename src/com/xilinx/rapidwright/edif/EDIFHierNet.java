@@ -155,9 +155,24 @@ public class EDIFHierNet {
 		return hierarchicalInst;
 	}
 	
-	public List<EDIFHierPortInst> getLeafHierPortInsts(){
+	/**
+	 * Gets all connected leaf port instances on this hierarchical net and its aliases.  
+	 * @return The list of all leaf cell port instances connected to this hierarchical net and its 
+	 * aliases.
+	 */
+	public List<EDIFHierPortInst> getLeafHierPortInsts() {
+	    return getLeafHierPortInsts(true);
+	}
+	
+	/**
+	 * Gets all connected leaf port instances on this hierarchical net and its aliases.
+	 * @param includeSourcePins A flag to include source pins in the result.  Setting this to false
+	 * only returns the sinks.
+	 * @return The list of all leaf cell port instances connected to this hierarchical net and its 
+     * aliases.
+	 */
+	public List<EDIFHierPortInst> getLeafHierPortInsts(boolean includeSourcePins) {
 	    List<EDIFHierPortInst> leafCellPins = new ArrayList<>();
-	    List<EDIFHierNet> aliases = new ArrayList<>();
 	    Queue<EDIFHierNet> queue = new ArrayDeque<>();
 	    queue.add(this);
 	    HashSet<EDIFHierNet> visited = new HashSet<>();
@@ -168,13 +183,14 @@ public class EDIFHierNet {
 	        if (!visited.add(net)) {
 	            continue;
 	        }
-	        aliases.add(net);
 	        for(EDIFPortInst relP : net.getNet().getPortInsts()){
 	            EDIFHierPortInst p = new EDIFHierPortInst(net.getHierarchicalInst(), relP);
 
 	            boolean isCellPin = relP.getCellInst() != null && relP.getCellInst().getCellType().isLeafCellOrBlackBox();
 	            if(isCellPin) {
-	                leafCellPins.add(p);
+	                if(p.isInput() || (includeSourcePins && p.isOutput())) {
+	                    leafCellPins.add(p);
+	                }
 	            }
 
 	            boolean isToplevelInput = p.getHierarchicalInst().isTopLevelInst() && relP.getCellInst() == null && p.isInput();
