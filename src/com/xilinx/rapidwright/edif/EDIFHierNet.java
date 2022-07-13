@@ -147,7 +147,7 @@ public class EDIFHierNet {
 	 */
 	@Override
 	public String toString() {
-		return "EDIFHierNet [hierarchicalInstName=" + hierarchicalInst + ", net=" + net + "]";
+		return getHierarchicalNetName();
 	}
 
 
