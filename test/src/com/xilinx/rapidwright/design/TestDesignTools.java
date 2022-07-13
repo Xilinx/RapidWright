@@ -34,12 +34,8 @@ import java.util.Map.Entry;
 import java.util.Set;
 
 import com.xilinx.rapidwright.device.BELPin;
-<<<<<<< HEAD
-=======
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.PIP;
-import com.xilinx.rapidwright.edif.EDIFHierCellInst;
->>>>>>> 093cf32... Fix DesignTools.getTrimmablePIPsFromPins() with test
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.Pair;
