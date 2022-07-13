@@ -1033,16 +1033,45 @@ public class DesignTools {
 	 */
 	public static void unroutePins(Net net, Collection<SitePinInst> pins) {
 	    Set<PIP> toRemove = getTrimmablePIPsFromPins(net, pins);
-	    ArrayList<PIP> updatedPIPs = new ArrayList<>();
-	    for(PIP pip : net.getPIPs()){
-	        if(!toRemove.contains(pip)) updatedPIPs.add(pip);
+	    if(toRemove.size() > 0) {
+	        ArrayList<PIP> updatedPIPs = new ArrayList<>();
+	        for(PIP pip : net.getPIPs()){
+	            if(!toRemove.contains(pip)) updatedPIPs.add(pip);
+	        }
+	        net.setPIPs(updatedPIPs);
 	    }
-	    net.setPIPs(updatedPIPs);
 	    for(SitePinInst pin : pins) {
 	        pin.setRouted(false);
 	    }	    
 	}
-
+	
+	public static Set<PIP> getPIPsDrivenBySourcePin(SitePinInst src) {
+	    if(!src.isOutPin() || src.getNet() == null) return Collections.emptySet();
+	    Node srcNode = src.getConnectedNode();
+	    Set<PIP> pipsUsed = new HashSet<>();
+	    
+	    Map<Node, List<PIP>> pipMap = new HashMap<>();
+	    for(PIP pip : src.getNet().getPIPs()) {
+	        Node node = pip.getStartNode();
+	        pipMap.computeIfAbsent(node, k -> new ArrayList<>()).add(pip);
+	    }
+	    
+	    Queue<Node> q = new LinkedList<>();
+	    q.add(srcNode);
+	    while(!q.isEmpty()) {
+	        Node curr = q.poll();
+	        List<PIP> pips = pipMap.get(curr);
+	        if(pips != null) {
+	            for(PIP p : pips) {
+	                q.add(p.getEndNode());
+	                pipsUsed.add(p);
+	            }
+	        }
+	    }
+	    
+	    return pipsUsed;
+	}
+	
 	/**
 	 * For the given set of pins, if they were removed, determine which PIPs could be trimmed as 
 	 * they no longer route to any specific sink.
@@ -1092,6 +1121,11 @@ public class DesignTools {
 	        if(p.getNet() != net) continue;
 	        Node sink = p.getConnectedNode();
 
+	        if(p.isOutPin() && sink != null) {
+	            toRemove.addAll(getPIPsDrivenBySourcePin(p));
+	            continue;
+	        }
+	        
 	        ArrayList<PIP> curr = reverseConns.get(sink);
 	        Integer fanoutCount = fanout.get(sink);
 	        fanoutCount = fanoutCount == null ? 0 : fanoutCount;
@@ -2600,8 +2634,8 @@ public class DesignTools {
 	        }
 	        EDIFHierNet parentHierNet = netParentMap.get(hierNet);
 	        if(parentHierNet == null) {
-	            System.out.println("WARNING: Couldn't find parent net for '" +
-	                    hierNet.getHierarchicalNetName() + "'");
+	            // System.out.println("WARNING: Couldn't find parent net for '" +
+	            //         hierNet.getHierarchicalNetName() + "'");
 	            continue;
 	        }
 	        if(!hierNet.equals(parentHierNet)) {
