@@ -552,9 +552,8 @@ public class EDIFTools {
 	            if(snkNet != net) {
 	                net.getParentCell().removeNet(net);
 	                snkNet.addPortInst(finalSrc.getPortInst());
-	            } else {
-	                return;
 	            }
+	            return;
 	        }else {
 	            snkNet.removePortInst(finalSnk.getPortInst());	            
 	        }
