@@ -936,7 +936,7 @@ public class DesignTools {
 				if(alias != null) {
 					// Move this non-parent net physical information to the parent
 					for(SiteInst si : alias.getSiteInsts()) {
-						Set<String> siteWires = si.getSiteWiresFromNet(alias);
+						List<String> siteWires = si.getSiteWiresFromNet(alias);
 						if(siteWires != null) {
 							for(String siteWire : new ArrayList<>(siteWires)) {
 								BELPin belPin = si.getSite().getBELPins(siteWire)[0];
