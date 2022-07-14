@@ -1056,7 +1056,7 @@ public class DesignTools {
 	    Map<Node,ArrayList<PIP>> reverseConns = new HashMap<>();
 	    Map<Node,ArrayList<PIP>> reverseConnsStart = new HashMap<>();
 	    Map<Node,Integer> fanout = new HashMap<>();
-		Design design = net.getDesign();
+	    Design design = net.getDesign();
 	    for(PIP pip : net.getPIPs()){
 	        Node endNode = pip.getEndNode();
 	        Node startNode = pip.getStartNode();
@@ -1077,13 +1077,18 @@ public class DesignTools {
 	            rPips.add(pip);
 	        }
 
+	        int fanoutCount = 1;
 	        SitePin sp = startNode.getSitePin();
-	        SiteInst si = (sp != null && sp.isInput()) ? design.getSiteInstFromSite(sp.getSite()) : null;
-	        SitePinInst spi = (si != null) ? si.getSitePinInst(sp.getPinName()) : null;
-
-		// If a site pin was found and it belongs to this net, add an extra fanout to
-		// reflect that it was both used for downstream connection as well as this site pin
-	        int fanoutCount = (spi != null && spi.getNet().equals(net)) ? 2 : 1;
+	        if(sp != null && sp.isInput()) {
+	            SiteInst si = design.getSiteInstFromSite(sp.getSite());
+	            SitePinInst spi = (si != null) ? si.getSitePinInst(sp.getPinName()) : null;
+    
+		    // If a site pin was found and it belongs to this net, add an extra fanout to
+		    // reflect that it was both used for downstream connection as well as this site pin
+	            if(spi != null && spi.getNet().equals(net)) {
+	                fanoutCount = 2;
+	            }
+	        }
 	        fanout.merge(startNode, fanoutCount, Integer::sum);
 	    }
 
