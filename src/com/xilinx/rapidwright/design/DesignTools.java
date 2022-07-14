@@ -1228,7 +1228,7 @@ public class DesignTools {
 	                Cell otherCell = siteInst.getCell(otherPin.getBEL());
 	                if(otherCell == null) continue;
 	                if(otherCell.isRoutethru()) {
-	                    // Follow routethru TODO
+	                    // This will be handled below in SiteInst.unrouteIntraSiteNet()
 	                    continue;
 	                }
 	                String logicalPinName = otherCell.getLogicalPinMapping(otherPin.getName());
