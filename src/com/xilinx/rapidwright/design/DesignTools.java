@@ -1032,28 +1032,43 @@ public class DesignTools {
 	 * removed.
 	 */
 	public static void unroutePins(Net net, Collection<SitePinInst> pins) {
-	    Set<PIP> toRemove = getTrimmablePIPsFromPins(net, pins);
-	    if(toRemove.size() > 0) {
-	        ArrayList<PIP> updatedPIPs = new ArrayList<>();
-	        for(PIP pip : net.getPIPs()){
-	            if(!toRemove.contains(pip)) updatedPIPs.add(pip);
-	        }
-	        net.setPIPs(updatedPIPs);
-	    }
+	    removePIPsFromNet(net,getTrimmablePIPsFromPins(net, pins));
 	    for(SitePinInst pin : pins) {
 	        pin.setRouted(false);
 	    }	    
 	}
 	
-	public static Set<PIP> getPIPsDrivenBySourcePin(SitePinInst src) {
+	private static void removePIPsFromNet(Net net, Set<PIP> pipsToRemove) {
+	    if(pipsToRemove.size() > 0) {
+	        List<PIP> updatedPIPs = new ArrayList<>();
+	        for(PIP pip : net.getPIPs()){
+	            if(!pipsToRemove.contains(pip)) updatedPIPs.add(pip);
+	        }
+	        net.setPIPs(updatedPIPs);
+	    }	    
+	}
+	
+	/**
+	 * Unroutes a SitePinInst of a net.  This is desirable when a net has multiple SitePinInst
+	 * source pins (multiple outputs of a Site) and only a particular branch is desired to be 
+	 * unrouted.  If the entire net is to be unrouted, a more efficient method is {@link Net#unroute()}. 
+	 * @param src The source pin of the net from which to remove the routing 
+	 * @return The set of PIPs that were unrouted from the net.
+	 */
+	public static Set<PIP> unrouteSourcePin(SitePinInst src) {
 	    if(!src.isOutPin() || src.getNet() == null) return Collections.emptySet();
 	    Node srcNode = src.getConnectedNode();
-	    Set<PIP> pipsUsed = new HashSet<>();
+	    Set<PIP> pipsToRemove = new HashSet<>();
 	    
 	    Map<Node, List<PIP>> pipMap = new HashMap<>();
 	    for(PIP pip : src.getNet().getPIPs()) {
 	        Node node = pip.getStartNode();
 	        pipMap.computeIfAbsent(node, k -> new ArrayList<>()).add(pip);
+	    }
+	    
+	    Map<Node,SitePinInst> sinkNodes = new HashMap<>();
+	    for(SitePinInst sinkPin : src.getNet().getSinkPins()) {
+	        sinkNodes.put(sinkPin.getConnectedNode(), sinkPin);
 	    }
 	    
 	    Queue<Node> q = new LinkedList<>();
@@ -1063,18 +1078,26 @@ public class DesignTools {
 	        List<PIP> pips = pipMap.get(curr);
 	        if(pips != null) {
 	            for(PIP p : pips) {
-	                q.add(p.getEndNode());
-	                pipsUsed.add(p);
+	                Node endNode = p.getEndNode();
+	                q.add(endNode);
+	                pipsToRemove.add(p);
+	                SitePinInst sink = sinkNodes.get(endNode);
+	                if(sink != null) {
+	                    sink.setRouted(false);
+	                }
 	            }
 	        }
 	    }
 	    
-	    return pipsUsed;
+	    src.setRouted(false);
+        removePIPsFromNet(src.getNet(), pipsToRemove);
+	    return pipsToRemove;
 	}
 	
 	/**
 	 * For the given set of pins, if they were removed, determine which PIPs could be trimmed as 
-	 * they no longer route to any specific sink.
+	 * they no longer route to any specific sink.  This method is intended only for sink pins.  
+	 * See {@link #unrouteSourcePin(SitePinInst)} for handling source pin unroutes.
 	 * @param net The current net
 	 * @param pins The set of pins to remove.
 	 * @return The set of redundant (trimmable) PIPs that cane safely be removed when removing the
@@ -1121,11 +1144,6 @@ public class DesignTools {
 	        if(p.getNet() != net) continue;
 	        Node sink = p.getConnectedNode();
 
-	        if(p.isOutPin() && sink != null) {
-	            toRemove.addAll(getPIPsDrivenBySourcePin(p));
-	            continue;
-	        }
-	        
 	        ArrayList<PIP> curr = reverseConns.get(sink);
 	        Integer fanoutCount = fanout.get(sink);
 	        fanoutCount = fanoutCount == null ? 0 : fanoutCount;
