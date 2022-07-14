@@ -172,25 +172,25 @@ public class TestDesignTools {
     @ParameterizedTest
     @ValueSource(strings = {"DX", "D_I"})
     public void testGetTrimmablePIPsFromPins(String pinName) {
-        Design design = new Design("top", "xcvu19p");
+        Design design = new Design("top", "xcau10p");
         Device device = design.getDevice();
         Net net = design.createNet("net");
         String[] pips = new String[]{
-                "INT_X150Y392/INT.LOGIC_OUTS_E27->INT_NODE_SDQ_41_INT_OUT1",            // Output pin
-                "INT_X150Y392/INT.INT_NODE_SDQ_41_INT_OUT1->>SS1_E_BEG7",
-                "INT_X150Y391/INT.SS1_E_END7->>INT_NODE_IMUX_25_INT_OUT1",
-                "INT_X150Y391/INT.INT_NODE_IMUX_25_INT_OUT1->>BOUNCE_E_13_FT0",
-                "INT_X150Y392/INT.BOUNCE_E_BLN_13_FT1->>INT_NODE_IMUX_30_INT_OUT0",
-                "INT_X150Y392/INT.INT_NODE_IMUX_30_INT_OUT0->>BYPASS_E4",
-                "INT_X150Y392/INT.BYPASS_E4->>INT_NODE_IMUX_0_INT_OUT0",
-                "INT_X150Y392/INT.INT_NODE_IMUX_0_INT_OUT0->>BYPASS_E3",                // DX input pin
-                "INT_X150Y392/INT.BYPASS_E3->>INT_NODE_IMUX_12_INT_OUT1",
-                "INT_X150Y392/INT.INT_NODE_IMUX_12_INT_OUT1->>BYPASS_E7",               // D_I input pin
+                "INT_X24Y92/INT.LOGIC_OUTS_E27->INT_NODE_SDQ_41_INT_OUT1",            // Output pin
+                "INT_X24Y92/INT.INT_NODE_SDQ_41_INT_OUT1->>SS1_E_BEG7",
+                "INT_X24Y91/INT.SS1_E_END7->>INT_NODE_IMUX_25_INT_OUT1",
+                "INT_X24Y91/INT.INT_NODE_IMUX_25_INT_OUT1->>BOUNCE_E_13_FT0",
+                "INT_X24Y92/INT.BOUNCE_E_BLN_13_FT1->>INT_NODE_IMUX_30_INT_OUT0",
+                "INT_X24Y92/INT.INT_NODE_IMUX_30_INT_OUT0->>BYPASS_E4",
+                "INT_X24Y92/INT.BYPASS_E4->>INT_NODE_IMUX_0_INT_OUT0",
+                "INT_X24Y92/INT.INT_NODE_IMUX_0_INT_OUT0->>BYPASS_E3",                // DX input pin
+                "INT_X24Y92/INT.BYPASS_E3->>INT_NODE_IMUX_12_INT_OUT1",
+                "INT_X24Y92/INT.INT_NODE_IMUX_12_INT_OUT1->>BYPASS_E7",               // D_I input pin
         };
         for (String pip : pips) {
             net.addPIP(device.getPIP(pip));
         }
-        SiteInst si = design.createSiteInst("SLICE_X289Y392");
+        SiteInst si = design.createSiteInst("SLICE_X38Y92");
         net.createPin("DQ2", si);
         net.createPin("D_I", si);
         net.createPin("DX", si);
@@ -203,8 +203,8 @@ public class TestDesignTools {
         } else if (pinName.equals("D_I")) {
             Assertions.assertEquals(2, trimmable.size());
             Assertions.assertTrue(trimmable.containsAll(Arrays.asList(
-                    device.getPIP("INT_X150Y392/INT.BYPASS_E3->>INT_NODE_IMUX_12_INT_OUT1"),
-                    device.getPIP("INT_X150Y392/INT.INT_NODE_IMUX_12_INT_OUT1->>BYPASS_E7")
+                    device.getPIP("INT_X24Y92/INT.BYPASS_E3->>INT_NODE_IMUX_12_INT_OUT1"),
+                    device.getPIP("INT_X24Y92/INT.INT_NODE_IMUX_12_INT_OUT1->>BYPASS_E7")
             )));
         } else {
             Assertions.fail();
