@@ -1095,9 +1095,9 @@ public class DesignTools {
 	        Node sink = p.getConnectedNode();
 	        Integer fanoutCount = fanout.getOrDefault(sink, 0);
 	        if (fanoutCount > 1) {
-	        	// This node is used to connect another downstream pin, no more
-	        	// analysis necessary
-	        	continue;
+	            // This node is used to connect another downstream pin, no more
+	            // analysis necessary
+	            continue;
 	        }
 
 	        ArrayList<PIP> curr = reverseConns.get(sink);
