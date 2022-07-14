@@ -1056,7 +1056,6 @@ public class DesignTools {
 	    Map<Node,ArrayList<PIP>> reverseConns = new HashMap<>();
 	    Map<Node,ArrayList<PIP>> reverseConnsStart = new HashMap<>();
 	    Map<Node,Integer> fanout = new HashMap<>();
-	    Design design = net.getDesign();
 	    Set<Node> nodeSinkPins = new HashSet<>();
 	    for(SitePinInst sinkPin : net.getSinkPins()) {
 	        nodeSinkPins.add(sinkPin.getConnectedNode());
@@ -1081,8 +1080,8 @@ public class DesignTools {
 	            rPips.add(pip);
 	        }
 
-		// If a site pin was found and it belongs to this net, add an extra fanout to
-		// reflect that it was both used for downstream connection as well as this site pin
+	        // If a site pin was found and it belongs to this net, add an extra fanout to
+	        // reflect that it was both used for downstream connection as well as this site pin
 	        int fanoutCount = nodeSinkPins.contains(startNode) ? 2 : 1;
 	        fanout.merge(startNode, fanoutCount, Integer::sum);
 	    }
