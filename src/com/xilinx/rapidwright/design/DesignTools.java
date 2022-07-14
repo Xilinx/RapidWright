@@ -1080,8 +1080,8 @@ public class DesignTools {
 	        SiteInst si = (sp != null && sp.isInput()) ? net.getDesign().getSiteInstFromSite(sp.getSite()) : null;
 	        SitePinInst spi = (si != null) ? si.getSitePinInst(sp.getPinName()) : null;
 
-			// If a site pin was found and it belongs to this net, add an extra fanout to
-			// reflect that it was both used for downstream connection as well as this site pin
+		// If a site pin was found and it belongs to this net, add an extra fanout to
+		// reflect that it was both used for downstream connection as well as this site pin
 	        int fanoutCount = (spi != null && spi.getNet().equals(net)) ? 2 : 1;
 	        fanout.merge(startNode, fanoutCount, Integer::sum);
 	    }
@@ -1095,7 +1095,7 @@ public class DesignTools {
 	        Node sink = p.getConnectedNode();
 	        Integer fanoutCount = fanout.getOrDefault(sink, 0);
 	        if (fanoutCount > 1) {
-	            // This node is used to connect another downstream pin, no more
+	            // This node is also used to connect another downstream pin, no more
 	            // analysis necessary
 	            continue;
 	        }
