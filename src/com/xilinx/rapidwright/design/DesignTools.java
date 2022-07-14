@@ -1096,7 +1096,7 @@ public class DesignTools {
 	
 	/**
 	 * For the given set of pins, if they were removed, determine which PIPs could be trimmed as 
-	 * they no longer route to any specific sink.  This method is intended only for sink pins.  
+	 * they no longer route to any specific sink.  This method only works for sink pins.  
 	 * See {@link #unrouteSourcePin(SitePinInst)} for handling source pin unroutes.
 	 * @param net The current net
 	 * @param pins The set of pins to remove.
