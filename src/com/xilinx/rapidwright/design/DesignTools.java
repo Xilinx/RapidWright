@@ -1056,6 +1056,7 @@ public class DesignTools {
 	    Map<Node,ArrayList<PIP>> reverseConns = new HashMap<>();
 	    Map<Node,ArrayList<PIP>> reverseConnsStart = new HashMap<>();
 	    Map<Node,Integer> fanout = new HashMap<>();
+		Design design = net.getDesign();
 	    for(PIP pip : net.getPIPs()){
 	        Node endNode = pip.getEndNode();
 	        Node startNode = pip.getStartNode();
@@ -1077,7 +1078,7 @@ public class DesignTools {
 	        }
 
 	        SitePin sp = startNode.getSitePin();
-	        SiteInst si = (sp != null && sp.isInput()) ? net.getDesign().getSiteInstFromSite(sp.getSite()) : null;
+	        SiteInst si = (sp != null && sp.isInput()) ? design.getSiteInstFromSite(sp.getSite()) : null;
 	        SitePinInst spi = (si != null) ? si.getSitePinInst(sp.getPinName()) : null;
 
 		// If a site pin was found and it belongs to this net, add an extra fanout to
