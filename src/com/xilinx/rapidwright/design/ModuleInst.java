@@ -37,6 +37,8 @@ import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
+import com.xilinx.rapidwright.edif.EDIFCell;
+import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.util.MessageGenerator;
 import com.xilinx.rapidwright.util.Utils;
 
@@ -300,7 +302,9 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 			Tile newTile = module.getCorrespondingTile(templateSite.getTile(), newAnchorSite.getTile());
 			Site newSite = templateSite.getCorrespondingSite(inst.getSiteTypeEnum(), newTile);
 
-			if(newSite == null){
+			SiteInst existingSiteInst = design.getSiteInstFromSite(newSite);
+			
+			if(newSite == null || existingSiteInst != null){
 				//MessageGenerator.briefError("ERROR: No matching site found." +
 				//	" (Template Site:"	+ templateSite.getName() + 
 				//	", Template Tile:" + templateSite.getTile() +
@@ -678,6 +682,13 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 		ModuleInst modInst = this;
 		if (p0.isOutPort()) {
 			physicalNet = getCorrespondingNet(p0);
+			if(physicalNet == null) {
+			    // This is a pass-thru situation and we'll need to create the net
+			    EDIFCell top = getCellInst().getParentCell();
+			    String newNetName = super.getNewNetName(portName, busIndex0, other, otherPortName, busIndex1);
+			    EDIFNet logicalNet = top.getNet(newNetName);
+			    physicalNet = design.createNet(newNetName, logicalNet);
+			}
 			inPort = p1;
 			modInst = other;
 		} else {

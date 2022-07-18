@@ -178,13 +178,12 @@ public abstract class AbstractModuleInst<ModuleT, T extends AbstractModuleInst<M
 
     public void connect(String portName, int busIndex0, T other, String otherPortName, int busIndex1){
         EDIFCell top = cellInst.getParentCell();
-        EDIFCellInst eci0 = cellInst;
-        if(eci0 == null) throw new RuntimeException("ERROR: Couldn't find logical cell instance for " + getName());
+        if(cellInst == null) throw new RuntimeException("ERROR: Couldn't find logical cell instance for " + getName());
         if(other == null) {
             // Connect to a top-level port
             EDIFPort port = top.getPort(otherPortName);
 
-            String netName = busIndex1 == -1 ? otherPortName : port.getBusName() + "[" + busIndex1 + "]";
+            String netName = getNewNetName(portName, busIndex0, other, otherPortName, busIndex1); 
             EDIFNet net = top.getNet(netName);
             if(net == null){
                 net = top.createNet(netName);
@@ -192,18 +191,27 @@ public abstract class AbstractModuleInst<ModuleT, T extends AbstractModuleInst<M
             if(net.getPortInst(null, netName) == null){
                 net.createPortInst(port, busIndex1);
             }
-            net.createPortInst(portName, busIndex0, eci0);
+            net.createPortInst(portName, busIndex0, cellInst);
 
             return;
         }
         EDIFCellInst eci1 = other.getCellInst();
         if(eci1 == null) throw new RuntimeException("ERROR: Couldn't find logical cell instance for " + getName());
 
-        String netName = busIndex0 == -1 ? getName() + "_" + portName : getName() + "_" + portName + "["+busIndex0+"]";
+        String netName = getNewNetName(portName, busIndex0, other, otherPortName, busIndex1);
         EDIFNet net = top.createNet(netName);
-        net.createPortInst(portName, busIndex0, eci0);
+        net.createPortInst(portName, busIndex0, cellInst);
         net.createPortInst(otherPortName, busIndex1, eci1);
     }
 
+    public String getNewNetName(String portName, int busIndex0, T other, String otherPortName, int busIndex1) {
+        if(other == null) {
+            EDIFPort port = cellInst.getParentCell().getPort(otherPortName);
+            return busIndex1 == -1 ? otherPortName : port.getBusName() + "[" + busIndex1 + "]";
+        } else {
+            return busIndex0 == -1 ? getName() + "_" + portName : getName() + "_" + portName + "["+busIndex0+"]";
+        }
+    }
+    
     public abstract RelocatableTileRectangle getBoundingBox();
 }
