@@ -26,7 +26,6 @@ import java.io.IOException;
 import java.lang.ref.SoftReference;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -43,6 +42,7 @@ import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
@@ -65,8 +65,7 @@ public class TestEDIF {
     }
 
     @Test
-    public void checkEdifRoundtrip() throws IOException {
-        Path tempDir = Paths.get("/tmp/edif");
+    public void checkEdifRoundtrip(@TempDir Path tempDir) throws IOException {
         //Use separate files for writing/reading so we can identify identify leaking file handles by filename
         final Path filenameWrite = tempDir.resolve("testWrite.edf");
         final Path filenameRead = tempDir.resolve("testRead.edf");
