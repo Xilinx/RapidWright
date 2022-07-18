@@ -214,7 +214,7 @@ public class ParallelEDIFParser implements AutoCloseable{
                 }
                 currentToken = parsed.getToken();
 
-                currentLibrary = parsed.addToNetlist(netlist, currentLibrary, cellsByLegalName);
+                currentLibrary = parsed.addToNetlist(netlist, currentLibrary, cellsByLegalName, cache);
             }
         }
         return cellsByLegalName;

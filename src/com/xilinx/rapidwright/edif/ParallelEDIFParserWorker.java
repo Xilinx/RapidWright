@@ -398,7 +398,7 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParserWorker implement
             return token;
         }
 
-        public abstract EDIFLibrary addToNetlist(EDIFNetlist netlist, EDIFLibrary currentLibrary, Map<EDIFLibrary, Map<String, EDIFCell>> cellsByLegalName);
+        public abstract EDIFLibrary addToNetlist(EDIFNetlist netlist, EDIFLibrary currentLibrary, Map<EDIFLibrary, Map<String, EDIFCell>> cellsByLegalName, EDIFReadLegalNameCache cache);
     }
 
     static class LibraryResult extends LibraryOrCellResult {
@@ -410,14 +410,13 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParserWorker implement
         }
 
         @Override
-        public EDIFLibrary addToNetlist(EDIFNetlist netlist, EDIFLibrary currentLibrary, Map<EDIFLibrary, Map<String, EDIFCell>> cellsByLegalName) {
+        public EDIFLibrary addToNetlist(EDIFNetlist netlist, EDIFLibrary currentLibrary, Map<EDIFLibrary, Map<String, EDIFCell>> cellsByLegalName, EDIFReadLegalNameCache cache) {
             netlist.addLibrary(library);
             return library;
         }
     }
 
-    //TODO jakobw not static anymore. pass reference instead?
-    class CellResult extends LibraryOrCellResult {
+    static class CellResult extends LibraryOrCellResult {
         private final EDIFCell cell;
         CellResult(EDIFToken token, EDIFCell cell) {
             super(token);
@@ -425,7 +424,7 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParserWorker implement
         }
 
         @Override
-        public EDIFLibrary addToNetlist(EDIFNetlist netlist, EDIFLibrary currentLibrary, Map<EDIFLibrary, Map<String, EDIFCell>> cellsByLegalName) {
+        public EDIFLibrary addToNetlist(EDIFNetlist netlist, EDIFLibrary currentLibrary, Map<EDIFLibrary, Map<String, EDIFCell>> cellsByLegalName, EDIFReadLegalNameCache cache) {
             if (currentLibrary == null) {
                 throw new IllegalStateException("Saw first cell before first library");
             }
