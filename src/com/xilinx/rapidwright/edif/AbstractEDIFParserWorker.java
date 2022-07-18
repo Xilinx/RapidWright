@@ -176,7 +176,6 @@ public abstract class AbstractEDIFParserWorker {
     protected EDIFCell parseEDIFCell(String libraryLegalName, String cellToken){
         expect(CELL, cellToken);
         EDIFCell cell = parseEDIFNameObject(new EDIFCell());
-        //TODO jakobw
         cell = updateEDIFRefCellMap(libraryLegalName, cell);
         Map<String, EDIFCellInst> instanceLookup = new HashMap<>();
         expect(LEFT_PAREN, getNextToken(true));
