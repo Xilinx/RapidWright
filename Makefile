@@ -12,7 +12,7 @@ CURR_YEAR = $(shell date +%Y)
 TMP_HEADER = TMP_HEADER_TXT
 
 
-.PHONY: compile update_jars
+.PHONY: compile update_jars ensure_headers check_headers pre_commit enable_pre_commit_hook
 compile: $(CLASSES)
 $(CLASSES): $(SOURCES) $(JARFILES)
 	rm -rf $(BIN)
@@ -42,3 +42,10 @@ check_headers:
 
 
 pre_commit: check_headers
+
+enable_pre_commit_hook:
+	@ hook_file=$$(git rev-parse --git-path hooks/pre-commit) && \
+	echo "#!/bin/bash" > $$hook_file && \
+	echo "make pre_commit" >> $$hook_file && \
+	chmod +x $$hook_file && \
+	echo "Enabled pre-commit hook at $$hook_file"

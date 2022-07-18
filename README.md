@@ -56,9 +56,10 @@ gradlew update_jars
 
 ### Development setup
 
-RapidWright includes a git pre-commit hook that runs some quick checks before commits. The hook is installed by creating a file in the subdirectory `.git/hooks` of your checked out repository. In that directory, create an executable file `pre-commit` with the following content:
+RapidWright includes a git pre-commit hook that runs some quick checks before commits. After cloning the repository, the hook is not enabled by default. To enable it, run this command:
 
 ```
-#!/bin/bash
-make pre_commit
+make enable_pre_commit_hook
 ```
+
+You will only have to do this once.
