@@ -740,9 +740,9 @@ public class EDIFNetlist extends EDIFName {
 			if (design != null) {
 				design.exportEDIFName(os, cache);
 				os.write(EXPORT_CONST_CELLREF);
-				os.write(design.getTopCell().getLegalEDIFName(cache));
+				os.write(cache.getLegalEDIFName(design.getTopCell().getName()));
 				os.write(EXPORT_CONST_LIBRARYREF);
-				os.write(design.getTopCell().getLibrary().getLegalEDIFName(cache));
+				os.write(cache.getLegalEDIFName(design.getTopCell().getLibrary().getName()));
 				os.write(EXPORT_CONST_CLOSE_REF);
 				design.exportEDIFProperties(os, EXPORT_CONST_PROP_INDENT, cache, stable);
 				os.write(EXPORT_CONST_CLOSE_DESIGN);

@@ -256,11 +256,11 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
         os.write(EXPORT_CONST_INSTANCE_BEGIN);
         exportEDIFName(os, cache);
         os.write(EXPORT_CONST_VIEWREF);
-        os.write(getViewref().getLegalEDIFName(cache));
+        os.write(cache.getLegalEDIFName(getViewref().getName()));
         os.write(EXPORT_CONST_CELLREF);
-        os.write(cellType.getLegalEDIFName(cache));
+        os.write(cache.getLegalEDIFName(cellType.getName()));
         os.write(EXPORT_CONST_LIBRARYREF);
-        os.write(cellType.getLibrary().getLegalEDIFName(cache));
+        os.write(cache.getLegalEDIFName(cellType.getLibrary().getName()));
         if(getPropertiesMap().size() > 0){
             os.write(EXPORT_CONST_CLOSE_WITH_PROPS);
             exportEDIFProperties(os,EXPORT_CONST_PROP_INDENT, cache, stable);

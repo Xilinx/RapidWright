@@ -106,4 +106,9 @@ public abstract class EDIFWriteLegalNameCache<T> {
             }
         };
     }
+
+    public byte[] getLegalEDIFName(String name) {
+        byte[] rename = getEDIFRename(name);
+        return rename == null ? name.getBytes(StandardCharsets.UTF_8) : rename;
+    }
 }
