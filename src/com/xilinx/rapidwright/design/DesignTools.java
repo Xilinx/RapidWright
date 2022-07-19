@@ -1088,7 +1088,7 @@ public class DesignTools {
 	    ArrayList<Node> updateFanout = new ArrayList<>();
         
 	    for(SitePinInst p : pins) {
-	        if(p.getSite() == null) continue;
+	        if(p.getSiteInst() == null || p.getSite() == null) continue;
 	        if(p.getNet() != net) continue;
 	        Node sink = p.getConnectedNode();
 
@@ -1149,9 +1149,11 @@ public class DesignTools {
 	            // the net is using dual exit points from the site as is common in
 	            // SLICEs -- we should unroute the sitenet
 	            SitePin sPin = sink.getSitePin();
-	            SiteInst si = net.getSource().getSiteInst();
-	            BELPin belPin = sPin.getBELPin();
-	            si.unrouteIntraSiteNet(belPin, belPin);
+	            if(net.getSource() != null) {
+	                SiteInst si = net.getSource().getSiteInst();
+	                BELPin belPin = sPin.getBELPin();
+	                si.unrouteIntraSiteNet(belPin, belPin);
+	            }
 	        }
 	        for(Node startNode : updateFanout) {
 	            Integer newFanout = fanout.get(startNode);
@@ -1417,6 +1419,8 @@ public class DesignTools {
 
 		List<EDIFHierCellInst> allLeafs = d.getNetlist().getAllLeafDescendants(hierarchicalCell);
 
+		Map<Net, Set<SitePinInst>> pinsToRemove = new HashMap<>();
+
 		// Remove all placement and routing information related to the cell to be blackboxed
 		for(EDIFHierCellInst i : allLeafs){
 			// Get the physical cell, make sure we can unplace/unroute it first 
@@ -1433,7 +1437,7 @@ public class DesignTools {
 				if(pin == null) continue;
 				if(pin.getNet() == null) continue;
 				Net net = pin.getNet();
-				net.removePin(pin, true);
+				pinsToRemove.computeIfAbsent(net, ($) -> new HashSet<>()).add(pin);
 				if(boundaryNets.containsKey(net.getName())) continue;
 				if(net.isStaticNet()) continue;
 				d.removeNet(net);
@@ -1480,7 +1484,16 @@ public class DesignTools {
 		}
 		
 		t.stop().start("cleanup siteinsts");
-		
+
+		for(SiteInst siteInst : touched){
+		    for(SitePinInst pin : siteInst.getSitePinInsts()) {
+		        Net net = pin.getNet();
+		        if(net == null) continue;
+		        pinsToRemove.computeIfAbsent(net, ($) -> new HashSet<>()).add(pin);
+		    }
+		}
+		batchRemoveSitePins(pinsToRemove, true);
+
 		// Clean up SiteInst objects
 		for(SiteInst siteInst : touched){
 			d.removeSiteInst(siteInst);
