@@ -32,6 +32,7 @@ import java.util.Map.Entry;
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Unisim;
+import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
@@ -74,6 +75,28 @@ public class LUTTools {
 	    int index = lutLetter - (lutLetter >= 'a' ? 'a' : 'A');
 	    if(index < 0 || index >= lutLetters.length) return empty;
 	    return lutMap[index];
+	}
+	
+	/**
+	 * Gets the BEL's companion LUT.  For example the A5LUT bel's companion would be A6LUT and vice 
+	 * versa.
+	 * @param lut The LUT bel in question.
+	 * @return The name of the companion LUT or null if undetermined.
+	 */
+	public static String getCompanionLUTName(BEL lut) {
+	    if(!lut.isLUT()) return null;
+	    return getCompanionLUTName(lut.getName());
+	}
+	
+	/**
+	 * Get the companion LUT name of the provided LUT name. For example the A5LUT bel's companion 
+	 * would be A6LUT and vice versa.
+	 * @param lutName Name of the LUT in question.
+	 * @return The companion LUT name or null if undetermined.
+	 */
+	public static String getCompanionLUTName(String lutName) {
+            String[] belNames = getLUTBELNames(lutName.charAt(0));
+            return belNames[(lutName.charAt(1) == '6') ? 1 : 0];	    
 	}
 	
 	/**
