@@ -72,6 +72,7 @@ import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysBelPin
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysCell;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysCellType;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysNet;
+import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysNode;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysPIP;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysSitePIP;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysSitePin;
@@ -372,6 +373,16 @@ public class PhysNetlistReader {
                 readRouteBranch(branchReader, net, design, strings, null);
             }
 
+            // Stub Nodes
+            StructList.Reader<PhysNode.Reader> stubNodes = netReader.getStubNodes();
+            int stubNodeCount = stubNodes.size();
+            Device device = design.getDevice();
+            for(int j=0; j < stubNodeCount; j++) {
+                PhysNode.Reader stubNodeReader = stubNodes.get(j);
+                Tile tile = device.getTile(strings.get(stubNodeReader.getTile()));
+                PIP pip = new PIP(tile, stubNodeReader.getWire(), PIP.NULL_END_WIRE_IDX);
+                net.addPIP(pip);
+            }
         }
     }
 

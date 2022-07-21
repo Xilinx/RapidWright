@@ -34,6 +34,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 
 import com.xilinx.rapidwright.device.BELPin;
+import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.Pair;
@@ -162,6 +163,35 @@ public class TestDesignTools {
             if (dualOutputNets.contains(net.getName())) {
                 Assertions.assertTrue(net.getSource() != null && net.getAlternateSource() != null);
             }
+        }
+    }
+    
+    @Test
+    public void testBlackBoxCreation() {
+        Design design = RapidWrightDCP.loadDCP("bnn.dcp");
+        String hierCellName = "bd_0_i/hls_inst/inst/dmem_V_U";
+        List<EDIFHierCellInst> leafCells = design.getNetlist().getAllLeafDescendants(hierCellName);
+        Set<String> placedCellsInBlackBox = new HashSet<>();
+        for(EDIFHierCellInst inst : leafCells) {
+            String name = inst.getFullHierarchicalInstName();
+            Cell cell = design.getCell(name);
+            if(cell != null && cell.isPlaced()) {
+                placedCellsInBlackBox.add(name);
+            }
+        }
+        Set<String> allOtherPlacedCells = new HashSet<>();
+        for(Cell cell : design.getCells()) {
+            if(placedCellsInBlackBox.contains(cell.getName())) continue;
+            allOtherPlacedCells.add(cell.getName());
+        }
+        
+        DesignTools.makeBlackBox(design, hierCellName);
+        Assertions.assertTrue(design.getNetlist().getCellInstFromHierName(hierCellName).isBlackBox());
+        for(String cellName : placedCellsInBlackBox) {
+            Assertions.assertNull(design.getCell(cellName));
+        }
+        for(String cellName : allOtherPlacedCells) {
+            Assertions.assertNotNull(design.getCell(cellName));
         }
     }
 }

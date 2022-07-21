@@ -60,6 +60,7 @@ import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysBelPin
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysCell;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysCellType;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysNet;
+import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysNode;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysPIP;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysSitePIP;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysSitePin;
@@ -317,8 +318,13 @@ public class PhysNetlistWriter {
             
             // We need to traverse the net inside sites to fully populate routing spec
             ArrayList<RouteBranchNode> routingSources = new ArrayList<>();
+            List<PIP> stubNodes = new ArrayList<>();
             for(PIP p : net.getPIPs()) {
-                routingSources.add(new RouteBranchNode(p));
+                if(p.getEndWireName() == null) {
+                    stubNodes.add(p);
+                }else {
+                    routingSources.add(new RouteBranchNode(p));
+                }
             }
             for(SitePinInst spi : net.getPins()) {
                 routingSources.add(new RouteBranchNode(spi));
@@ -326,6 +332,16 @@ public class PhysNetlistWriter {
             ArrayList<RouteBranchNode> segments = netSiteRouting.remove(net);
             if(segments != null) routingSources.addAll(segments);
             populateRouting(routingSources, physNet, strings);
+            if(stubNodes.size() > 0) {
+                StructList.Builder<PhysNode.Builder> physNodes = physNet.initStubNodes(stubNodes.size());
+                for(int j=0; j < stubNodes.size(); j++) {
+                    PhysNode.Builder physNode = physNodes.get(j);
+                    PIP stubPIP = stubNodes.get(j);
+                    physNode.setTile(strings.getIndex(stubPIP.getTile().getName()));
+                    physNode.setWire(stubPIP.getStartWireIndex());
+                    physNode.setIsFixed(stubPIP.isPIPFixed());
+                }
+            }
             i++;
         }
 
