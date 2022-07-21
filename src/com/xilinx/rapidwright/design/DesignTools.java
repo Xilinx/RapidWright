@@ -1056,6 +1056,10 @@ public class DesignTools {
 	    Map<Node,ArrayList<PIP>> reverseConns = new HashMap<>();
 	    Map<Node,ArrayList<PIP>> reverseConnsStart = new HashMap<>();
 	    Map<Node,Integer> fanout = new HashMap<>();
+	    Set<Node> nodeSinkPins = new HashSet<>();
+	    for(SitePinInst sinkPin : net.getSinkPins()) {
+	        nodeSinkPins.add(sinkPin.getConnectedNode());
+	    }
 	    for(PIP pip : net.getPIPs()){
 	        Node endNode = pip.getEndNode();
 	        Node startNode = pip.getStartNode();
@@ -1076,12 +1080,10 @@ public class DesignTools {
 	            rPips.add(pip);
 	        }
 
-	        Integer count = fanout.get(startNode);
-	        if(count == null){
-	            fanout.put(startNode, 1);
-	        }else{
-	            fanout.put(startNode, count+1);
-	        }
+	        // If a site pin was found and it belongs to this net, add an extra fanout to
+	        // reflect that it was both used for downstream connection as well as this site pin
+	        int fanoutCount = nodeSinkPins.contains(startNode) ? 2 : 1;
+	        fanout.merge(startNode, fanoutCount, Integer::sum);
 	    }
 
 	    HashSet<PIP> toRemove = new HashSet<>();
@@ -1091,10 +1093,14 @@ public class DesignTools {
 	        if(p.getSiteInst() == null || p.getSite() == null) continue;
 	        if(p.getNet() != net) continue;
 	        Node sink = p.getConnectedNode();
+	        Integer fanoutCount = fanout.getOrDefault(sink, 0);
+	        if (fanoutCount > 1) {
+	            // This node is also used to connect another downstream pin, no more
+	            // analysis necessary
+	            continue;
+	        }
 
 	        ArrayList<PIP> curr = reverseConns.get(sink);
-	        Integer fanoutCount = fanout.get(sink);
-	        fanoutCount = fanoutCount == null ? 0 : fanoutCount;
 	        boolean atReversedBidirectionalPip = false;
 	        if (curr == null) {
 	            // must be at a reversed bidirectional PIP
@@ -1123,8 +1129,7 @@ public class DesignTools {
 	                }
 	            }
 	            atReversedBidirectionalPip = false;
-	            fanoutCount = fanout.get(sink);
-	            fanoutCount = fanoutCount == null ? 0 : fanoutCount;
+	            fanoutCount = fanout.getOrDefault(sink, 0);
 	            SitePin sitePin = sink.getSitePin();
 	            if (curr == null && !(sitePin != null || sink.getWireName().contains(Net.VCC_WIRE_NAME) ||
 	                    sink.getWireName().contains(Net.GND_WIRE_NAME))) {
@@ -1134,14 +1139,6 @@ public class DesignTools {
 	                curr.remove(pip);
 	                fanoutCount--;
 	                atReversedBidirectionalPip = true;
-	            }
-	            if(sitePin != null && sitePin.isInput()){
-	                SiteInst si = p.getSiteInst().getDesign().getSiteInstFromSite(sitePin.getSite());
-	                if(si != null){
-	                    if(net.equals(si.getNetFromSiteWire(sitePin.getPinName()))){
-	                        fanoutCount = 2;
-	                    }
-	                }
 	            }
 	        }
 	        if(curr == null && fanout.size() == 1 && !net.isStaticNet()){
