@@ -675,15 +675,17 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 
 		Net physicalNet;
 		Port inPort;
+		ModuleInst modInst = this;
 		if (p0.isOutPort()) {
 			physicalNet = getCorrespondingNet(p0);
 			inPort = p1;
+			modInst = other;
 		} else {
 			physicalNet = other.getCorrespondingNet(p1);
 			inPort = p0;
 		}
 
-		for (SitePinInst inPin : getCorrespondingPins(inPort)) {
+		for (SitePinInst inPin : modInst.getCorrespondingPins(inPort)) {
 			physicalNet.addPin(inPin);
 		}
 	}
