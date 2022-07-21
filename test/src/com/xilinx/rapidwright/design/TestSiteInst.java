@@ -72,4 +72,31 @@ public class TestSiteInst {
             if(d.getDevice().getSeries() == Series.Series7 && letter == 'D') break;
         }
     }
+
+    @Test
+    public void testUnrouteIntraSiteNet() {
+        Design design = RapidWrightDCP.loadDCP("bnn.dcp");
+
+        SiteInst si = design.getSiteInstFromSiteName("SLICE_X78Y212");
+
+        for(BELPin src : new BELPin[] {si.getBELPin("D5LUT","O5"), si.getBELPin("FFMUXD2","D5")} ) {
+            for(BELPin snk : new BELPin[] {si.getBELPin("DFF2","D"), si.getBELPin("FFMUXD2","OUT2")} ) {
+                Net net = si.getNetFromSiteWire("D5LUT_O5");
+                Assertions.assertNotNull(net);
+                Assertions.assertEquals(si.getUsedSitePIP("FFMUXD2").getInputPinName(), "D5");
+                Assertions.assertNotNull(si.getNetFromSiteWire("FFMUXD2_OUT2"));
+                
+                Assertions.assertTrue(si.unrouteIntraSiteNet(src, snk));
+                
+                Assertions.assertNull(si.getNetFromSiteWire("D5LUT_O5"));
+                Assertions.assertNull(si.getNetFromSiteWire("FFMUXD2_OUT2"));
+                
+                Assertions.assertTrue(si.routeIntraSiteNet(net, src, snk));
+            }
+        }
+
+        Assertions.assertNotNull(si.getNetFromSiteWire("D5LUT_O5"));
+        Assertions.assertEquals(si.getUsedSitePIP("FFMUXD2").getInputPinName(), "D5");
+        Assertions.assertNotNull(si.getNetFromSiteWire("FFMUXD2_OUT2"));
+    }  
 }
