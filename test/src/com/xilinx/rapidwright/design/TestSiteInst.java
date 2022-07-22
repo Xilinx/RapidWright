@@ -79,6 +79,7 @@ public class TestSiteInst {
 
         SiteInst si = design.getSiteInstFromSiteName("SLICE_X78Y212");
 
+        // Test cross product of {LUT opin, SitePIP ipin} x {FF ipin, SitePIP opin}
         for(BELPin src : new BELPin[] {si.getBELPin("D5LUT","O5"), si.getBELPin("FFMUXD2","D5")} ) {
             for(BELPin snk : new BELPin[] {si.getBELPin("DFF2","D"), si.getBELPin("FFMUXD2","OUT2")} ) {
                 Net net = si.getNetFromSiteWire("D5LUT_O5");
