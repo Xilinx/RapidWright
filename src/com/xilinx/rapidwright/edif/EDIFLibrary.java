@@ -249,7 +249,8 @@ public class EDIFLibrary extends EDIFName {
 	/**
 	 * Creates an ordered list of cells such that each cell that appears
 	 * in the list only references cells that have already been seen in 
-	 * the list.  This is a requirement when exporting the EDIF to a file.
+	 * the list. This is a requirement when exporting the EDIF to a file.
+	 * @param stable makes sure that the list is always the same for the same input
 	 * @return The ordered list.
 	 */
 	public List<EDIFCell> getValidCellExportOrder(boolean stable){

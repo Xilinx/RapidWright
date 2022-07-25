@@ -183,7 +183,6 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
 
 	public EDIFCellInst getCellInst(String name) {
 		if (instances == null) return null;
-		;
 		return instances.get(name);
 	}
 
@@ -568,7 +567,7 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
 
 	/**
 	 * Recursively finds all leaf cell descendants of this cell
-	 * <p>
+	 * 
 	 * The returned EDIFHierCellInsts are relative to this cell.
 	 *
 	 * @return A list of all leaf cell descendants of this cell
