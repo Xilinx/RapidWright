@@ -258,7 +258,7 @@ public abstract class AbstractEDIFParserWorker {
                 parseProperty(new EDIFPropertyObject(), commentOrMetax);
                 continue;
             }else{
-                expect(COMMENT + "|" + METAX, commentOrMetax);
+                expect(COMMENT + "|" + METAX + "|" + PROPERTY, commentOrMetax);
             }
             expect(RIGHT_PAREN, getNextToken(true));
         }
