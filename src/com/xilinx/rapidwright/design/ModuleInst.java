@@ -283,7 +283,7 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 	 * does not match the floorplan according to the original module and simply leave it unplaced.  
 	 * Setting to false will cause placement to fail on first mismatch of floorplan placement 
 	 * attempt.
-	 * @param allowOverlap Return false if the module will overlap with existing placed logic.
+	 * @param allowOverlap True if the module instance is allowed to overlap with existing placed logic.
 	 * @return True if placement was successful, false otherwise.
 	 */
 	public boolean place(Site newAnchorSite, boolean skipIncompatible, boolean allowOverlap){	
