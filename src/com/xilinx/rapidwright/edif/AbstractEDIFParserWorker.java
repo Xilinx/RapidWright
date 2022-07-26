@@ -249,13 +249,16 @@ public abstract class AbstractEDIFParserWorker {
             String commentOrMetax = getNextToken(true);
             if(commentOrMetax.equals(COMMENT)){
                 currNetlist.addComment(getNextToken(false));
-
             }else if(commentOrMetax.equals(METAX)){
                 String key = getNextToken(false);
                 EDIFPropertyValue value = parsePropertyValue();
                 currNetlist.addMetax(key,value);
+            } else if(commentOrMetax.equals(PROPERTY)){
+                // Discard this property for now
+                parseProperty(new EDIFPropertyObject(), commentOrMetax);
+                continue;
             }else{
-                expect(COMMENT + "|" + METAX, commentOrMetax);
+                expect(COMMENT + "|" + METAX + "|" + PROPERTY, commentOrMetax);
             }
             expect(RIGHT_PAREN, getNextToken(true));
         }

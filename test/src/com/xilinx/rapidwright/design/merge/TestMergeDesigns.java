@@ -35,6 +35,7 @@ import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFDirection;
 import com.xilinx.rapidwright.edif.EDIFNet;
+import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.router.Router;
@@ -82,14 +83,15 @@ public class TestMergeDesigns {
             clk.connect(testBufg,"O");
             clk.connect(ff0, "C");
             clk.connect(ff1, "C");
-            
+
+            EDIFNetlist netlist = a.getNetlist();
             Net vcc = a.getVccNet();
-            vcc.setLogicalNet(EDIFTools.getStaticNet(NetType.VCC, a.getTopEDIFCell(), a.getNetlist()));
+            vcc.setLogicalHierNet(EDIFTools.getStaticNet(NetType.VCC, netlist.getTopHierCellInst(), netlist));
             vcc.connect(ff0, "CE");
             vcc.connect(ff1, "CE");
             vcc.connect(testBufg, "CE");
             Net gnd = a.getGndNet();
-            gnd.setLogicalNet(EDIFTools.getStaticNet(NetType.GND, a.getTopEDIFCell(), a.getNetlist()));
+            gnd.setLogicalHierNet(EDIFTools.getStaticNet(NetType.GND, netlist.getTopHierCellInst(), netlist));
             gnd.connect(ff0, "R");
             gnd.connect(ff1, "R");
             
