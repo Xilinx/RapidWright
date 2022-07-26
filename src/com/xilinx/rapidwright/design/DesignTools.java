@@ -1151,7 +1151,7 @@ public class DesignTools {
 	                si.unrouteIntraSiteNet(belPin, belPin);
 	            }
 	        }
-	            }
+	        }
 	        for(Node startNode : updateFanout) {
 	            fanout.compute(startNode, ($,v) -> {
 	                    if (v == null) throw new RuntimeException();
