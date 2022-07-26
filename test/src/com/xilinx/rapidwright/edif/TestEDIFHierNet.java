@@ -23,14 +23,12 @@
 package com.xilinx.rapidwright.edif;
 
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
-
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 public class TestEDIFHierNet {
 
@@ -49,6 +47,25 @@ public class TestEDIFHierNet {
                 Assertions.assertTrue(testSet.remove(portInst));
             }
             Assertions.assertTrue(testSet.isEmpty());
+
+            EDIFHierPortInst goldSource = findOutput(goldSet);
+
+            goldSet.stream().map(EDIFHierPortInst::getHierarchicalNet).distinct().forEach(net -> {
+                Assertions.assertEquals(goldSource, net.getLeafSource());
+            });
         }
+    }
+
+    private EDIFHierPortInst findOutput(Set<EDIFHierPortInst> set) {
+        EDIFHierPortInst source = null;
+        for (EDIFHierPortInst edifHierPortInst : set) {
+            if (edifHierPortInst.isOutput()) {
+                if (source != null) {
+                    Assertions.fail("multiple sources, at least "+ source +" and "+ edifHierPortInst);
+                }
+                source = edifHierPortInst;
+            }
+        }
+        return source;
     }
 }

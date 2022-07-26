@@ -241,4 +241,34 @@ public class EDIFHierNet {
 
 	    return leafCellPins;
 	}
+
+	/**
+	 * Gets a single connected leaf output port instances on this hierarchical net and its aliases.
+	 * This output port instance sources the whole net.
+	 *
+	 * If there are multiple drivers, this returns an arbitrary one.
+	 * @return A hierarchical output port instance or null
+	 */
+	public EDIFHierPortInst getLeafSource() {
+		for (EDIFPortInst portInst : getNet().getPortInsts()) {
+			if (portInst.getCellInst() == null) {
+				if (portInst.isInput()) {
+					//We are sourced from the outside
+					final EDIFHierPortInst hierarchical = new EDIFHierPortInst(hierarchicalInst, portInst);
+					if (hierarchical.getHierarchicalInst().isTopLevelInst()) {
+						return null;
+					}
+					return hierarchical.getPortInParent().getHierarchicalNet().getLeafSource();
+				}
+			} else if (portInst.isOutput()) {
+				final EDIFHierPortInst hierarchical = new EDIFHierPortInst(hierarchicalInst, portInst);
+				if (hierarchical.getPortInst().getCellInst().getCellType().isLeafCellOrBlackBox()) {
+					return hierarchical;
+				} else {
+					return hierarchical.getInternalNet().getLeafSource();
+				}
+			}
+		}
+		return null;
+	}
 }
