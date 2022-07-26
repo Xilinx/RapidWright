@@ -1,3 +1,6 @@
+/* 
+ * Copyright (c) 2021 Xilinx, Inc. 
+ * All rights reserved.
  *
  * Author: Eddie Hung, Xilinx Research Labs.
  *  
