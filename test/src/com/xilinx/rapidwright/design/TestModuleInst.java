@@ -155,4 +155,36 @@ public class TestModuleInst {
             Assertions.assertTrue(mi.place(ds, skipIncompatible));
         }
     }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true,false})
+    public void testModuleAllowOverlap(boolean allowOverlap) {
+        String dcpPath = RapidWrightDCP.getString("picoblaze_ooc_X10Y235.dcp");
+        Design design = Design.readCheckpoint(dcpPath, CodePerfTracker.SILENT);
+
+        Design emptyDesign = new Design("emptyDesign", design.getPartName());
+
+        Module module = new Module(design, false);
+        design = null;
+
+        ModuleInst mi1 = emptyDesign.createModuleInst("inst1", module);
+        ModuleInst mi2 = emptyDesign.createModuleInst("inst2", module);
+        ModuleInst mi3 = emptyDesign.createModuleInst("inst3", module);
+        if (allowOverlap) {
+            // Default is allowOverlap = true
+            Assertions.assertTrue(mi1.placeOnOriginalAnchor());
+            Assertions.assertTrue(mi2.placeOnOriginalAnchor());
+            Assertions.assertTrue(mi3.placeOnOriginalAnchor());
+            Assertions.assertTrue(mi1.isPlaced());
+            Assertions.assertTrue(mi2.isPlaced());
+            Assertions.assertTrue(mi3.isPlaced());
+        } else {
+            Assertions.assertTrue(mi1.place(module.getAnchor(), false, allowOverlap));
+            Assertions.assertFalse(mi2.place(module.getAnchor(), false, allowOverlap));
+            Assertions.assertFalse(mi3.place(module.getAnchor(), false, allowOverlap));
+            Assertions.assertTrue(mi1.isPlaced());
+            Assertions.assertFalse(mi2.isPlaced());
+            Assertions.assertFalse(mi3.isPlaced());
+        }
+    }
 }

@@ -37,6 +37,8 @@ import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
+import com.xilinx.rapidwright.edif.EDIFCell;
+import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.util.MessageGenerator;
 import com.xilinx.rapidwright.util.Utils;
 
@@ -236,23 +238,43 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 
 	/**
 	 * Places the module instance anchor at the newAnchorSite as well as all other 
-	 * instances and nets within the module instance at their relative offsets of the new site.
+	 * instances and nets within the module instance at their relative offsets of the new site. Note
+	 * that this method allows placement overlap by default.  See 
+	 * {@link #place(Site, boolean, boolean)} to disallow module overlap.
 	 * @param newAnchorSite The new site for the anchor of the module instance.
 	 * @return True if placement was successful, false otherwise.
 	 */
 	public boolean place(Site newAnchorSite){	
-		return place(newAnchorSite, false);
+	    return place(newAnchorSite, false);
 	}
-	
+
 	/**
 	 * Places the module instance on the module's anchor site (original location of the module).  
-	 * This is the same as place(getModule().getAnchor().getSite()). 
+	 * This is the same as place(getModule().getAnchor().getSite()). Note
+	 * that this method allows placement overlap by default.  See 
+	 * {@link #place(Site, boolean, boolean)} to disallow module overlap.
 	 * @return True if the placement was successful, false otherwise.
 	 */
 	public boolean placeOnOriginalAnchor() {
-		return place(module.getAnchor(), false);
+	    return place(module.getAnchor(), false);
 	}
-	
+
+	/**
+	 * Places the module instance anchor at the newAnchorSite as well as all other 
+	 * instances and nets within the module instance at their relative offsets of the new site.  Note
+	 * that this method allows placement overlap by default.  See 
+	 * {@link #place(Site, boolean, boolean)} to disallow module overlap.
+	 * @param newAnchorSite The new site for the anchor of the module instance.
+	 * @param skipIncompatible Flag telling the placement checks to skip any incompatible site that
+	 * does not match the floorplan according to the original module and simply leave it unplaced.  
+	 * Setting to false will cause placement to fail on first mismatch of floorplan placement 
+	 * attempt.  
+	 * @return True if placement was successful, false otherwise.
+	 */
+	public boolean place(Site newAnchorSite, boolean skipIncompatible){
+	    return place(newAnchorSite, skipIncompatible, true);
+	}
+
 	/**
 	 * Places the module instance anchor at the newAnchorSite as well as all other 
 	 * instances and nets within the module instance at their relative offsets of the new site.
@@ -261,9 +283,10 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 	 * does not match the floorplan according to the original module and simply leave it unplaced.  
 	 * Setting to false will cause placement to fail on first mismatch of floorplan placement 
 	 * attempt.
+	 * @param allowOverlap True if the module instance is allowed to overlap with existing placed logic.
 	 * @return True if placement was successful, false otherwise.
 	 */
-	public boolean place(Site newAnchorSite, boolean skipIncompatible){	
+	public boolean place(Site newAnchorSite, boolean skipIncompatible, boolean allowOverlap){	
 		// Check if parameters are null
 		if(newAnchorSite == null){
 			return false;
@@ -300,7 +323,9 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 			Tile newTile = module.getCorrespondingTile(templateSite.getTile(), newAnchorSite.getTile());
 			Site newSite = templateSite.getCorrespondingSite(inst.getSiteTypeEnum(), newTile);
 
-			if(newSite == null){
+			SiteInst existingSiteInst = allowOverlap ? null : design.getSiteInstFromSite(newSite);
+			
+			if(newSite == null || existingSiteInst != null){
 				//MessageGenerator.briefError("ERROR: No matching site found." +
 				//	" (Template Site:"	+ templateSite.getName() + 
 				//	", Template Tile:" + templateSite.getTile() +
@@ -678,6 +703,13 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 		ModuleInst modInst = this;
 		if (p0.isOutPort()) {
 			physicalNet = getCorrespondingNet(p0);
+			if(physicalNet == null) {
+			    // This is a pass-thru situation and we'll need to create the net
+			    EDIFCell top = getCellInst().getParentCell();
+			    String newNetName = super.getNewNetName(portName, busIndex0, other, otherPortName, busIndex1);
+			    EDIFNet logicalNet = top.getNet(newNetName);
+			    physicalNet = design.createNet(newNetName, logicalNet);
+			}
 			inPort = p1;
 			modInst = other;
 		} else {
