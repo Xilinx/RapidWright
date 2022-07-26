@@ -1097,9 +1097,8 @@ public class DesignTools {
 	        if (fanoutCount > 1) {
 	            // This node is also used to connect another downstream pin, no more
 	            // analysis necessary
-	            continue;
-	        }
-
+	            updateFanout.add(sink);
+	        } else {
 	        ArrayList<PIP> curr = reverseConns.get(sink);
 	        boolean atReversedBidirectionalPip = false;
 	        if (curr == null) {
@@ -1152,12 +1151,12 @@ public class DesignTools {
 	                si.unrouteIntraSiteNet(belPin, belPin);
 	            }
 	        }
+	        }
 	        for(Node startNode : updateFanout) {
-	            Integer newFanout = fanout.get(startNode);
-	            if(newFanout != null) {
-	                newFanout--;
-	                fanout.put(startNode, newFanout);
-	            }
+	            fanout.compute(startNode, ($,v) -> {
+	                    if (v == null) throw new RuntimeException();
+	                    return v-1;
+	            });
 	        }
 	    }
 	    return toRemove;

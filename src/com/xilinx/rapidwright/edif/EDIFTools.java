@@ -659,6 +659,18 @@ public class EDIFTools {
 	}
 
 	/**
+	 * Creates and/or gets the static net (GND/VCC) in the specified cell.
+	 * @param type The type of net to get or create
+	 * @param cellInst The hier cell inst that should have a static net
+	 * @param netlist The netlist of interest
+	 * @return An existing or newly created static hier net for the cell provided.
+	 */
+	public static EDIFHierNet getStaticNet(NetType type, EDIFHierCellInst cellInst, EDIFNetlist netlist){
+		EDIFNet n = getStaticNet(type, cellInst.getCellType(), netlist);
+		return new EDIFHierNet(cellInst, n);
+	}
+
+	/**
 	 * Creates and/or gets the static net (GND/VCC) in the specified cell.  
 	 * @param type The type of net to get or create
 	 * @param cell The cell that should have a static net
