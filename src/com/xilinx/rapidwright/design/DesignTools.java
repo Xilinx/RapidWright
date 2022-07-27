@@ -1099,58 +1099,58 @@ public class DesignTools {
 	            // analysis necessary
 	            updateFanout.add(sink);
 	        } else {
-	        ArrayList<PIP> curr = reverseConns.get(sink);
-	        boolean atReversedBidirectionalPip = false;
-	        if (curr == null) {
-	            // must be at a reversed bidirectional PIP
-	            curr = reverseConnsStart.get(sink);
-	            fanoutCount--;
-	            atReversedBidirectionalPip = true;
-	        }
-	        updateFanout.clear();
-	        while(curr != null && curr.size() == 1 && fanoutCount < 2){
-	            PIP pip = curr.get(0);
-	            
-	            toRemove.add(pip);
-	            Node startNode = pip.getStartNode();
-	            updateFanout.add(startNode);
-	            if (new Node(pip.getTile(), pip.getStartWireIndex()).equals(sink) && !atReversedBidirectionalPip) {
-	                // reached the source and there is another branch starting with a reversed
-	                // bidirectional PIP ... don't traverse it
-	                break;
+	            ArrayList<PIP> curr = reverseConns.get(sink);
+	            boolean atReversedBidirectionalPip = false;
+	            if (curr == null) {
+	            	// must be at a reversed bidirectional PIP
+	            	curr = reverseConnsStart.get(sink);
+	            	fanoutCount--;
+	            	atReversedBidirectionalPip = true;
 	            }
-	            sink = new Node(pip.getTile(), atReversedBidirectionalPip ? pip.getEndWireIndex() :
-	                pip.getStartWireIndex());
-	            curr = reverseConns.get(sink);
-	            if(curr != null && curr.size() > 1 && atReversedBidirectionalPip) {
-	                for(PIP reversePIP : toRemove) {
-	                    curr.remove(reversePIP);
-	                }
+	            updateFanout.clear();
+	            while(curr != null && curr.size() == 1 && fanoutCount < 2){
+	            	PIP pip = curr.get(0);
+
+	            	toRemove.add(pip);
+	            	Node startNode = pip.getStartNode();
+	            	updateFanout.add(startNode);
+	            	if (new Node(pip.getTile(), pip.getStartWireIndex()).equals(sink) && !atReversedBidirectionalPip) {
+	            		// reached the source and there is another branch starting with a reversed
+	            		// bidirectional PIP ... don't traverse it
+	            		break;
+	            	}
+	            	sink = new Node(pip.getTile(), atReversedBidirectionalPip ? pip.getEndWireIndex() :
+	            		pip.getStartWireIndex());
+	            	curr = reverseConns.get(sink);
+	            	if(curr != null && curr.size() > 1 && atReversedBidirectionalPip) {
+	            		for(PIP reversePIP : toRemove) {
+	            			curr.remove(reversePIP);
+	            		}
+	            	}
+	            	atReversedBidirectionalPip = false;
+	            	fanoutCount = fanout.getOrDefault(sink, 0);
+	            	SitePin sitePin = sink.getSitePin();
+	            	if (curr == null && !(sitePin != null || sink.getWireName().contains(Net.VCC_WIRE_NAME) ||
+	            			sink.getWireName().contains(Net.GND_WIRE_NAME))) {
+	            		// curr should only be null when we're at the source site, so we've hit a reversed bidirectional PIP
+	            		// on our linear path
+	            		curr = reverseConnsStart.get(sink);
+	            		curr.remove(pip);
+	            		fanoutCount--;
+	            		atReversedBidirectionalPip = true;
+	            	}
 	            }
-	            atReversedBidirectionalPip = false;
-	            fanoutCount = fanout.getOrDefault(sink, 0);
-	            SitePin sitePin = sink.getSitePin();
-	            if (curr == null && !(sitePin != null || sink.getWireName().contains(Net.VCC_WIRE_NAME) ||
-	                    sink.getWireName().contains(Net.GND_WIRE_NAME))) {
-	                // curr should only be null when we're at the source site, so we've hit a reversed bidirectional PIP
-	                // on our linear path
-	                curr = reverseConnsStart.get(sink);
-	                curr.remove(pip);
-	                fanoutCount--;
-	                atReversedBidirectionalPip = true;
+	            if(curr == null && fanout.size() == 1 && !net.isStaticNet()){
+	            	// We got all the way back to the source site. It is likely that
+	            	// the net is using dual exit points from the site as is common in
+	            	// SLICEs -- we should unroute the sitenet
+	            	SitePin sPin = sink.getSitePin();
+	            	if(net.getSource() != null) {
+	            		SiteInst si = net.getSource().getSiteInst();
+	            		BELPin belPin = sPin.getBELPin();
+	            		si.unrouteIntraSiteNet(belPin, belPin);
+	            	}
 	            }
-	        }
-	        if(curr == null && fanout.size() == 1 && !net.isStaticNet()){
-	            // We got all the way back to the source site. It is likely that 
-	            // the net is using dual exit points from the site as is common in
-	            // SLICEs -- we should unroute the sitenet
-	            SitePin sPin = sink.getSitePin();
-	            if(net.getSource() != null) {
-	                SiteInst si = net.getSource().getSiteInst();
-	                BELPin belPin = sPin.getBELPin();
-	                si.unrouteIntraSiteNet(belPin, belPin);
-	            }
-	        }
 	        }
 	        for(Node startNode : updateFanout) {
 	            fanout.compute(startNode, ($,v) -> {
