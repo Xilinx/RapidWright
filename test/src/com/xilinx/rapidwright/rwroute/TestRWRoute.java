@@ -31,6 +31,7 @@ import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.support.LargeTest;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -80,6 +81,9 @@ public class TestRWRoute {
 	 */
 	@Test
 	public void testNonTimingDrivenFullRoutingWithClkDesign() {
+        // Sporadically failing due to OutOfMemoryException (see #439)
+        long maxMemoryNeeded = 1024L*1024L*1024L*8L; 
+        Assumptions.assumeTrue(Runtime.getRuntime().maxMemory() >= maxMemoryNeeded);
 		String dcpPath = RapidWrightDCP.getString("optical-flow.dcp");
 		Design design = Design.readCheckpoint(dcpPath);
 		RWRoute.routeDesignFullNonTimingDriven(design);
@@ -93,6 +97,9 @@ public class TestRWRoute {
 	 */
 	@Test
 	public void testNonTimingDrivenPartialRouting() {
+        // Sporadically failing due to OutOfMemoryException (see #439)
+        long maxMemoryNeeded = 1024L*1024L*1024L*8L; 
+        Assumptions.assumeTrue(Runtime.getRuntime().maxMemory() >= maxMemoryNeeded);
 		String dcpPath = RapidWrightDCP.getString("picoblaze_partial.dcp");
 		Design design = Design.readCheckpoint(dcpPath);
 		DesignTools.createMissingSitePinInsts(design);

@@ -568,7 +568,7 @@ public class EDIFNetlist extends EDIFName {
 			}
 			return newCell;
 		} else {
-			if (copiedCells.contains(existingCell)) {
+			if (destLib.isHDIPrimitivesLibrary() || copiedCells.contains(existingCell)) {
 				return existingCell;
 			}
 			throw new RuntimeException("ERROR: Destination netlist already contains EDIFCell named " +
@@ -1471,42 +1471,7 @@ public class EDIFNetlist extends EDIFName {
 	 * of the provided net 
 	 */
 	public List<EDIFHierPortInst> getSinksFromNet(EDIFHierNet net){
-		Queue<EDIFHierNet> q = new LinkedList<>();
-		q.add(net);
-		ArrayList<EDIFHierPortInst> sinks = new ArrayList<>();
-		HashSet<EDIFHierNet> visited = new HashSet<>();
-		while(!q.isEmpty()){
-			EDIFHierNet curr = q.poll();
-			if(!visited.add(curr)) continue;
-			for(EDIFPortInst portInst : curr.getNet().getPortInsts()){
-				if(portInst.isOutput()) continue;
-				final EDIFHierPortInst hierPort = new EDIFHierPortInst(curr.getHierarchicalInst(), portInst);
-				if(portInst.isTopLevelPort()){
-					// Going up in hierarchy
-					final EDIFHierNet hierarchicalNet = hierPort.getHierarchicalInst().isTopLevelInst() ?
-					        null : hierPort.getPortInParent().getHierarchicalNet();
-					if (hierarchicalNet == null) {
-						continue;
-					}
-					q.add(hierarchicalNet);
-				}else {
-					if(portInst.getCellInst().getCellType().isPrimitive()){
-						// We found a sink
-						sinks.add(hierPort);
-						continue;
-					}else{
-						// Going down in hierarchy
-						EDIFHierNet internalNet = hierPort.getInternalNet();
-						if(internalNet != null) {
-							q.add(internalNet);
- 						}
-					}
-				}
-			}
-			
-		}
-		
-		return sinks;
+		return net.getLeafHierPortInsts(false);
 	}
 	
 	/**
