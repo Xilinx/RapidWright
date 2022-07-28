@@ -255,7 +255,8 @@ public class RelocationTools {
 
             Collection<SitePinInst> pins = n.getPins();
             Collection<SitePinInst> nonMatchingPins = pins.stream().filter(
-                    (spi) -> !oldSite.containsKey(spi.getSiteInst())).collect(Collectors.toList());
+                    (spi) -> !oldSite.containsKey(spi.getSiteInst()))
+                    .collect(Collectors.toList());
             if (nonMatchingPins.size() == pins.size()) {
                 continue;
             }
@@ -266,8 +267,9 @@ public class RelocationTools {
                 for (SitePinInst spi : nonMatchingPins) {
                     System.out.println("INFO: Unrouting SitePinInst '" + spi + "' branch of Net '" + n.getName() +
                             "' since it does not belong to SiteInsts to be relocated");
-                    n.unroutePin(spi);
                 }
+
+                DesignTools.unroutePins(n, nonMatchingPins);
             }
 
             boolean isClockNet = n.isClockNet() || n.hasGapRouting();
