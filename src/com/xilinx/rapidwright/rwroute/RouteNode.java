@@ -160,7 +160,8 @@ abstract public class RouteNode {
 				baseCost = 0.15f*length;// HLONGs have length 6 and 7
 				break;
 			case NODE_VLONG:
-				assert(length != 0);
+				// Not true for UltraScale? (e.g. seen on VU440)
+				// assert(length != 0);
 				baseCost = 0.7f;
 				break;	
 			default:

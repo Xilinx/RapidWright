@@ -25,6 +25,8 @@ package com.xilinx.rapidwright.rwroute;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -1160,7 +1162,7 @@ public class RWRoute{
 			if(config.isTimingDriven()) connection.updateRouteDelay();	
 		}else {
 			connection.getSink().setRouted(false);
-			connection.getSinkRnode().setTarget(false);
+			connection.setTarget(false);
 			routingGraph.resetExpansion();
 		}
 	}
@@ -1238,8 +1240,8 @@ public class RWRoute{
 	 * @param connection The routed target connection.
 	 */
 	protected void finishRouteConnection(Connection connection){
-		saveRouting(connection);	
-		connection.getSinkRnode().setTarget(false);
+		saveRouting(connection);
+		connection.setTarget(false);
 		routingGraph.resetExpansion();
 		updateUsersAndPresentCongestionCost(connection);
 	}
@@ -1250,6 +1252,10 @@ public class RWRoute{
 	 */
 	private void saveRouting(Connection connection){
 		RouteNode rnode = connection.getSinkRnode();
+		if (rnode.getPrev() == null) {
+			rnode = connection.getAltSinkRnode();
+		}
+		assert(rnode.getPrev() != null);
 		while (rnode != null) {
 			connection.addRnode(rnode);
 			rnode = rnode.getPrev();
@@ -1273,15 +1279,24 @@ public class RWRoute{
 								  float rnodeDelayWeight, float rnodeEstDlyWeight){
 		boolean longParent = config.isTimingDriven() && DelayEstimatorBase.isLong(rnode.getNode());
 		for(RouteNode childRNode:rnode.getChildren()){
-			if(childRNode.isVisited()) continue;
+			if(childRNode.isVisited()) {
+				// Note: it is possible that another (cheaper) path to a rnode is found here
+				// However, because the PriorityQueue class does not support reducing the cost
+				// of nodes already in the queue, this opportunity is discarded
+				continue;
+			}
 			if(childRNode.isTarget()){
-				queue.clear();
+				// Despite the limitation above, on encountering a target do not terminate
+				// immediately by clearing the queue, as this target could be expensive
+				// (due to overuse) and there could be an alternate target that ends up being
+				// cheaper
+				// queue.clear();
 			} else {
+				if (!isAccessible(childRNode, connection)) {
+					continue;
+				}
 				switch (childRNode.getType()) {
 					case WIRE:
-						if (!isAccessible(childRNode, connection)) {
-							continue;
-						}
 						if (!config.isUseUTurnNodes() && childRNode.getDelay() > 10000) {
 							// To filter out those nodes that are considered to be excluded with the masking resource approach,
 							// such as U-turn shape nodes near the boundary
@@ -1289,17 +1304,11 @@ public class RWRoute{
 						}
 						break;
 					case PINBOUNCE:
-						if (!isAccessible(childRNode, connection)) {
-							continue;
-						}
 						if (!usablePINBounce(childRNode, connection.getSinkRnode())) {
 							continue;
 						}
 						break;
 					case PINFEED_I:
-						if (!connection.isCrossSLR()) {
-							continue;
-						}
 						break;
 					default:
 						throw new RuntimeException();
@@ -1319,7 +1328,10 @@ public class RWRoute{
 	 * @param connection The connection to route.
 	 * @return true, if no bounding box constraints, or if the routing resource is within the connection's bounding box when use the bounding box constraint.
 	 */
-	private boolean isAccessible(RouteNode child, Connection connection) {
+	protected boolean isAccessible(RouteNode child, Connection connection) {
+		if (child.getType() == RouteNodeType.PINFEED_I) {
+			return connection.isCrossSLR();
+		}
 		return !config.isUseBoundingBox() || child.isInConnectionBoundingBox(connection);
 	}
 	
@@ -1434,8 +1446,8 @@ public class RWRoute{
 		connection.resetRoute();
 		queue.clear();	
 		
-		// Sets the sink rnode of the connection as the target
-		connection.getSinkRnode().setTarget(true);
+		// Sets the sink rnode(s) of the connection as the target(s)
+		connection.setTarget(true);
 		
 		// Adds the source rnode to the queue
 		push(connection.getSourceRnode(), null, 0, 0);
@@ -1455,6 +1467,14 @@ public class RWRoute{
 
 	protected int getNumIndirectConnectionPins() {
 		return indirectConnections.size();
+	}
+
+	protected int getNumConnectionsCrossingSLRs() {
+		int numCrossingSLRs = 0;
+		for (Connection c : indirectConnections) {
+			numCrossingSLRs += c.isCrossSLR() ? 1 : 0;
+		}
+		return numCrossingSLRs;
 	}
 	
 	private int getNumStaticNetPins() {
@@ -1516,6 +1536,7 @@ public class RWRoute{
 		int staticPins = getNumStaticNetPins();
 		printFormattedString("  All site pins to be routed: ", (indirectPins + staticPins + clkPins));
 		printFormattedString("    Connections to be routed: ", indirectPins);
+		printFormattedString("      With SLR crossings: ", getNumConnectionsCrossingSLRs());
 		printFormattedString("    Static net pins: ", getNumStaticNetPins());
 		printFormattedString("    Clock pins: ", clkPins);
 		printFormattedString("Nets not needing routing: ", numNotNeedingRoutingNets);
