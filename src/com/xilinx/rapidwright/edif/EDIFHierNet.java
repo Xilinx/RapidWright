@@ -25,9 +25,9 @@
  */
 package com.xilinx.rapidwright.edif;
 
-import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Collection;
+import java.util.ArrayDeque;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -154,7 +154,25 @@ public class EDIFHierNet {
 	public EDIFHierCellInst getHierarchicalInst() {
 		return hierarchicalInst;
 	}
-	
+
+	public List<EDIFHierPortInst> getPortInsts() {
+		Collection<EDIFPortInst> portInsts = net.getPortInsts();
+		List<EDIFHierPortInst> hierPortInsts = new ArrayList<>(portInsts.size());
+		for (EDIFPortInst portInst : portInsts) {
+			hierPortInsts.add(new EDIFHierPortInst(hierarchicalInst, portInst));
+		}
+		return hierPortInsts;
+	}
+
+	public List<EDIFHierPortInst> getSourcePortInsts(boolean includeTopLevelPorts) {
+		List<EDIFPortInst> portInsts = net.getSourcePortInsts(includeTopLevelPorts);
+		List<EDIFHierPortInst> hierPortInsts = new ArrayList<>(portInsts.size());
+		for (EDIFPortInst portInst : portInsts) {
+			hierPortInsts.add(new EDIFHierPortInst(hierarchicalInst, portInst));
+		}
+		return hierPortInsts;
+	}
+
 	/**
 	 * Gets all connected leaf port instances on this hierarchical net and its aliases.  
 	 * @return The list of all leaf cell port instances connected to this hierarchical net and its 

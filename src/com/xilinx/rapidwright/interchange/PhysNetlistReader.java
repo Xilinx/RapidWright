@@ -443,17 +443,21 @@ public class PhysNetlistReader {
                     if (branchesCount == 0) {
                         // ... and it routed through a LUT along the way
                         if (routeThruLutInput != null) {
-                            // Then place a route-thru LUT
-
-                            // Make sure nothing placed there already
-                            assert(siteInst.getCell(routeThruLutInput.getBEL()) == null);
+                            // Check that a routethru cell exists
 
                             Cell belCell = siteInst.getCell(bel);
-                            Cell c = new Cell(belCell.getName(), routeThruLutInput.getBEL());
-                            c.setSiteInst(siteInst);
-                            siteInst.getCellMap().put(routeThruLutInput.getBELName(), c);
-                            c.setRoutethru(true);
-                            c.addPinMapping(routeThruLutInput.getName(), belCell.getLogicalPinMapping(belPinName));
+                            Cell routeThruCell = siteInst.getCell(routeThruLutInput.getBEL());
+                            if (routeThruCell == null) {
+                                throw new RuntimeException("Expected routethru cell at " + siteInst.getSiteName() +
+                                        "/" + routeThruLutInput.getBELName());
+                            }
+                            String physicalPin = routeThruLutInput.getName();
+                            String logicalPin = belCell.getLogicalPinMapping(belPinName);
+                            if (routeThruCell.getSiteInst() != siteInst ||
+                                !routeThruCell.isRoutethru() ||
+                                !routeThruCell.getLogicalPinMapping(physicalPin).equals(logicalPin)) {
+                                throw new RuntimeException("Invalid routethru cell: " + routeThruCell);
+                            }
                         }
                     } else if (belName.endsWith("LUT")) {
                         assert (routeThruLutInput == null);

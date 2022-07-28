@@ -1198,7 +1198,8 @@ public class EDIFNetlist extends EDIFName {
 					// Moving up in hierarchy
 					if (!p.getHierarchicalInst().isTopLevelInst()) {
 						final EDIFHierPortInst upPort = p.getPortInParent();
-						if (upPort != null) {
+						// FIXME: Why would upPort.getNet() be null?
+						if (upPort != null && upPort.getNet() != null) {
 							queue.add(upPort.getHierarchicalNet());
 						}
 					}
@@ -1341,6 +1342,7 @@ public class EDIFNetlist extends EDIFName {
 		}
 
 		for(EDIFHierPortInst pr : queue){
+			if (pr.getNet() == null) continue;
 			EDIFHierNet parentNetName = pr.getHierarchicalNet();
 			for(EDIFHierNet alias : getNetAliases(parentNetName)){
 				parentNetMap.put(alias, parentNetName);

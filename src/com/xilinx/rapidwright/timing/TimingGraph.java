@@ -151,7 +151,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         }
         String seriesName = design.getDevice().getSeries().name().toLowerCase();
         intrasiteAndLogicDelayModel = DelayModelBuilder.getDelayModel(seriesName);
-          
+
         if(routerTimer != null) routerTimer.createRuntimeTracker("determine logic dly", "build timing graph").start();
         myCellMap = design.getNetlist().generateCellInstMap();
         if(!isPartialRouting) {
@@ -162,12 +162,11 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         if(routerTimer != null) routerTimer.getRuntimeTracker("determine logic dly").stop();
         
         if(routerTimer != null) routerTimer.createRuntimeTracker("add net dly edges", "build timing graph").start();
-        for (Net net : design.getNets()) {
+        // for (Net net : design.getNets()) {
+        for (Net net : targetNets) {
             if(net.isClockNet()) continue;//this is for getting rid of the problem in addNetDelayEdges() of clock net
             if(net.isStaticNet()) continue;
-            if(!isPartialRouting || !net.hasPIPs()) {
-            	addNetDelayEdges(net);
-            }
+            addNetDelayEdges(net);
         }
         
         addTimingEdgesOfNets(isPartialRouting, targetNets);
@@ -1633,7 +1632,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     }
     
     public boolean overwriteBUGCEDelay = false;
-    int addNetDelayEdges(Net net) {
+    public int addNetDelayEdges(Net net) {
     	EDIFNet edifNet = net.getLogicalNet();
     	boolean haveIntrasiteNet = (net.getSinkPins().size() == 0);
     	SitePinInst spi_source = net.getSource();
@@ -1892,6 +1891,9 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                 sinkSitePinInstTimingEdges.put(spi_sink, connectionEdges);
             }
         }
+
+        // Clear the topological order so that it will be recomputed
+        orderedTimingVertices.clear();
         return 1;
     }
     

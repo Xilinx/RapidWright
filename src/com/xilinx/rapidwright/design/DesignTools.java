@@ -1032,6 +1032,14 @@ public class DesignTools {
 	 * removed.
 	 */
 	public static void unroutePins(Net net, Collection<SitePinInst> pins) {
+		// Unroute the entire net if it contains an output pin, in case of stubs
+		// (TODO: Revisit pending https://github.com/Xilinx/RapidWright/pull/475)
+		for (SitePinInst pin : pins) {
+			if (pin.isOutPin()) {
+				net.unroute();
+				return;
+			}
+		}
 	    Set<PIP> toRemove = getTrimmablePIPsFromPins(net, pins);
 	    ArrayList<PIP> updatedPIPs = new ArrayList<>();
 	    for(PIP pip : net.getPIPs()){
@@ -2596,8 +2604,8 @@ public class DesignTools {
 	        }
 	        EDIFHierNet parentHierNet = netParentMap.get(hierNet);
 	        if(parentHierNet == null) {
-	            System.out.println("WARNING: Couldn't find parent net for '" +
-	                    hierNet.getHierarchicalNetName() + "'");
+	            // System.out.println("WARNING: Couldn't find parent net for '" +
+	            //         hierNet.getHierarchicalNetName() + "'");
 	            continue;
 	        }
 	        if(!hierNet.equals(parentHierNet)) {

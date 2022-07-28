@@ -173,6 +173,10 @@ abstract public class RouteNode {
 		}else if(type == RouteNodeType.PINFEED_O){
 			baseCost = 1f;
 		}
+
+		// Node.getNode("INT_X182Y535/WW4_W_BEG7", Device.getDevice("xcvu19p")).getAllWiresInNode()
+		// returns two wires, both X182Y535
+		// assert(baseCost != 0);
 	}
 
 	/**
