@@ -1091,7 +1091,7 @@ public class DesignTools {
 	    }
 	    
 	    src.setRouted(false);
-        removePIPsFromNet(src.getNet(), pipsToRemove);
+	    removePIPsFromNet(src.getNet(), pipsToRemove);
 	    return pipsToRemove;
 	}
 	
