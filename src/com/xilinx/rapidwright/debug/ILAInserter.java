@@ -148,7 +148,6 @@ public class ILAInserter {
 		// Turn ILA into a module and instantiate it into the design
 		Module m = new Module(ila);
 		ModuleInst mi = original.createModuleInst(ila.getName(), m);
-		original.getNetlist().migrateCellAndSubCells(ila.getTopEDIFCell());
 		if(m.getAnchor() != null) {
 			mi.place(m.getAnchor());
 		}

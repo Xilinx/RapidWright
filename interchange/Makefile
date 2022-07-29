@@ -27,7 +27,7 @@ $(JAVA_SCHEMA):
 	wget https://raw.githubusercontent.com/capnproto/capnproto-java/master/compiler/src/main/schema/capnp/java.capnp -O $(JAVA_SCHEMA)
 
 $(INTERCHANGE_REPO_PATH):
-	cd $(dir $(INTERCHANGE_REPO_PATH)) && git clone https://github.com/chipsalliance/$(INTERCHANGE_REPO_NAME).git
+	git submodule update --init $(INTERCHANGE_REPO_NAME)
 
 update_interchange: | $(INTERCHANGE_REPO_PATH)
 	cd $(INTERCHANGE_REPO_PATH) && git pull
