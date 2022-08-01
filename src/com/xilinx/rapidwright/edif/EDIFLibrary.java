@@ -110,7 +110,7 @@ public class EDIFLibrary extends EDIFName {
 		if (preferredSuffix == null) {
 			preferredSuffix = "collisionRename";
 		}
-		String newName = findUniqueCellName(cell.getName()+"_HDI_"+preferredSuffix);
+		String newName = findUniqueCellName(cell.getName()+"_RW_"+preferredSuffix);
 		System.err.println("EDIF library "+getName()+" contains cells with same name \""+cell.getName()+"\". Changing name of one of those instances to "+newName);
 		cell.setName(newName);
 
