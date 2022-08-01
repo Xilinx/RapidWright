@@ -240,18 +240,18 @@ public class EDIFPortInst {
 		os.write(indent);
 		os.write(EXPORT_CONST_PORTREF);
 		if(index == -1) {
-            os.write(cache.getLegalEDIFName(getPort().getName()));
+ 		    os.write(cache.getLegalEDIFName(getPort().getName()));
 		}
 		else {
 			os.write(EXPORT_CONST_MEMBER);
-            os.write(cache.getLegalEDIFName(getPort().getName()));
+			os.write(cache.getLegalEDIFName(getPort().getName()));
 			os.write(' ');
 			os.write(Integer.toString(index).getBytes(StandardCharsets.UTF_8));
 			os.write(')');
 		}
 		if(getCellInst() != null){
 			os.write(EXPORT_CONST_INSTANCEREF);
-            os.write(cache.getLegalEDIFName(getCellInst().getName()));
+			os.write(cache.getLegalEDIFName(getCellInst().getName()));
 			os.write(')');
 		}
 		os.write(EXPORT_CONST_CLOSE_PORT_INST);
