@@ -483,12 +483,14 @@ public class EDIFTools {
 	            src.getHierarchicalInst().getCommonAncestor(snk.getHierarchicalInst());
 	    EDIFHierPortInst finalSrc = src;
 	    EDIFHierPortInst finalSnk = snk;
+	    boolean createdSrcNet = false;
 	    // Trace existing connections or make new connections between src and snk to the common 
 	    // ancestor.   
 	    for(EDIFHierPortInst hierPortInst : new EDIFHierPortInst[] {src, snk}) {
 	        EDIFHierCellInst hierParentInst = hierPortInst.getHierarchicalInst();
 	        EDIFNet currNet = hierPortInst.getNet();
 	        if(currNet == null && !(hierParentInst.equals(commonAncestor) && hierPortInst == snk)) {
+	            if(hierPortInst == src) createdSrcNet = true;
 	            currNet = createUniqueNet(hierParentInst.getCellType(), newName);
 	            currNet.addPortInst(hierPortInst.getPortInst());
 	        }
@@ -541,7 +543,17 @@ public class EDIFTools {
 	    // Disconnect sink from existing net if connected
 	    EDIFNet snkNet = finalSnk.getNet();
 	    if(snkNet != null) {
-	        snkNet.removePortInst(finalSnk.getPortInst());
+	        if(createdSrcNet && snkNet.getParentCell() == finalSrc.getNet().getParentCell()) {
+	            // Let's delete the net we created and use the existing snkNet instead
+	            EDIFNet net = finalSrc.getNet();
+	            if(snkNet != net) {
+	                net.getParentCell().removeNet(net);
+	                snkNet.addPortInst(finalSrc.getPortInst());
+	            }
+	            return;
+	        }else {
+	            snkNet.removePortInst(finalSnk.getPortInst());	            
+	        }
 	    }
 	    // Make final connection in the common ancestor instance
 	    finalSrc.getNet().addPortInst(finalSnk.getPortInst());   
@@ -641,6 +653,18 @@ public class EDIFTools {
 			topCell.addNet(net);				
 		}
 		return probeInput;
+	}
+
+	/**
+	 * Creates and/or gets the static net (GND/VCC) in the specified cell.
+	 * @param type The type of net to get or create
+	 * @param cellInst The hier cell inst that should have a static net
+	 * @param netlist The netlist of interest
+	 * @return An existing or newly created static hier net for the cell provided.
+	 */
+	public static EDIFHierNet getStaticNet(NetType type, EDIFHierCellInst cellInst, EDIFNetlist netlist){
+		EDIFNet n = getStaticNet(type, cellInst.getCellType(), netlist);
+		return new EDIFHierNet(cellInst, n);
 	}
 
 	/**

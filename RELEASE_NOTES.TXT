@@ -1,3 +1,35 @@
+============= RapidWright 2022.1.2-beta released on 2022-07-27 ================
+Notes: 
+ * Includes some memory usage improvements of 8-14% for a parsed EDIF netlist (#428)
+ * Placement memory reduction by 19% or ~4.7% for a design
+ * For 2022.1 DCPs, enables placement & routing information to be read in parallel, or load DCPs up 
+   to 44% faster. 
+ * Fix to DeviceBrowser to browse devices prior to downloading their database file (#427)
+ * Fixes placed (but not routed) design import/export for Interchange-based files (#467)
+ * Design.createModuleInst() now copies netlist cells rather than migrate them
+ * Properly unroutes routethru in SiteInst.unrouteIntraSiteNet()
+ * Net and Cell classes now keep lazy reference to hierarchical netlist object
+ * Net.unroutePin() now uses code in DesignTools.unroutePins()
+ * Fix to unique-ify netlist (or previously flatten netlist) (#430)  
+ * Bumps Gradle Wrapper version from 7.1 to 7.4.2 to enable Java 18 support (#453)
+ * Replacing EDIF in DCP now also removes existing binary netlist equivalent (.xn)   
+ * Includes PRs: #409, #417, #424, #427, #428, #429, #430, #431, #432, #437, #442, #443, #445, #446,
+                 #449, #450, #451, #453, #455, #459, #461, #462, #465, #469, #470, #471, #472, #476, 
+                 #477
+ * Fixes Issues: #136, #419, #441, #444, #454, #464 
+ - API Additions:
+   - com.xilinx.rapidwright.design.Cell "public EDIFHierCellInst getEDIFHierCellInst()"
+   - com.xilinx.rapidwright.design.Design "public Net createNet(EDIFHierNet net)"
+   - com.xilinx.rapidwright.design.Design "public static boolean replaceEDIFinDCP(String inDcpFileName, String edfFileName, String outDcpFileName)"
+   - com.xilinx.rapidwright.design.Net "public Design getDesign()"
+   - com.xilinx.rapidwright.design.Net "public EDIFHierNet getLogicalHierNet()"
+   - com.xilinx.rapidwright.design.Net "public Net(String name, EDIFHierNet logicalHierNet)"
+   - com.xilinx.rapidwright.design.Net "public void setDesign(Design design)"
+   - com.xilinx.rapidwright.design.Net "public void setLogicalHierNet(EDIFHierNet logicalHierNet)"
+   - com.xilinx.rapidwright.design.SiteInst "public BELPin getBELPin(String belName, String pinName)"
+   - com.xilinx.rapidwright.device.BELPin "public BELPin getConnectedInputPinOnBEL(BEL bel)"
+
+
 ============= RapidWright 2022.1.1-beta released on 2022-05-13 ================
 Notes: 
  * Fixes crash issue while reading DCPs created by Vivado 2022.1
