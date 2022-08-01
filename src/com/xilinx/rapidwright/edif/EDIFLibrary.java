@@ -165,7 +165,6 @@ public class EDIFLibrary extends EDIFName {
 	 * @param name The name of the cell to remove
 	 * @return The removed cell, or null if it did not exist in the library.
 	 */
-	//TODO this method changed from legal name to regular name. Do we want to do anything special?
 	public EDIFCell removeCell(String name){
 		return cells == null ? null : cells.remove(name);
 	}
@@ -185,7 +184,6 @@ public class EDIFLibrary extends EDIFName {
 	 * @param name The name of the cell to query in the library.
 	 * @return True if a cell by such name was found in the library, False otherwise.
 	 */
-	//TODO this method changed from legal name to regular name. Do we want to do anything special?
 	public boolean containsCell(String name){
 		return cells == null ? false : cells.containsKey(name);
 	}
