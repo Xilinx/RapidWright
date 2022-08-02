@@ -26,7 +26,8 @@
 package com.xilinx.rapidwright.edif;
 
 import java.io.IOException;
-import java.io.Writer;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -241,21 +242,31 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
         return false;
     }
 
-    public void exportEDIF(Writer wr) throws IOException{
-        wr.write("         (instance ");
-        exportEDIFName(wr);
-        wr.write(" (viewref ");
-        wr.write( getViewref().getLegalEDIFName());
-        wr.write(" (cellref ");
-        wr.write(cellType.getLegalEDIFName());
-        wr.write(" (libraryref ");
-        wr.write(cellType.getLibrary().getLegalEDIFName());
-        if(getProperties().size() > 0){
-            wr.write(")))\n");
-            exportEDIFProperties(wr, "           ");
-            wr.write("         )\n");               
+    public static final byte[] EXPORT_CONST_INSTANCE_BEGIN = "         (instance ".getBytes(StandardCharsets.UTF_8);
+    public static final byte[] EXPORT_CONST_VIEWREF = " (viewref ".getBytes(StandardCharsets.UTF_8);
+    public static final byte[] EXPORT_CONST_CELLREF = " (cellref ".getBytes(StandardCharsets.UTF_8);
+    public static final byte[] EXPORT_CONST_LIBRARYREF = " (libraryref ".getBytes(StandardCharsets.UTF_8);
+    public static final byte[] EXPORT_CONST_CLOSE_WITH_PROPS = ")))\n".getBytes(StandardCharsets.UTF_8);
+    public static final byte[] EXPORT_CONST_PROP_INDENT = "           ".getBytes(StandardCharsets.UTF_8);
+    public static final byte[] EXPORT_CONST_CLOSE = "         )\n".getBytes(StandardCharsets.UTF_8);
+    public static final byte[] EXPORT_CONST_CLOSE_NO_PROPS = "))))\n".getBytes(StandardCharsets.UTF_8);
+
+
+    public void exportEDIF(OutputStream os, EDIFWriteLegalNameCache<?> cache, boolean stable) throws IOException{
+        os.write(EXPORT_CONST_INSTANCE_BEGIN);
+        exportEDIFName(os, cache);
+        os.write(EXPORT_CONST_VIEWREF);
+        os.write(cache.getLegalEDIFName(getViewref().getName()));
+        os.write(EXPORT_CONST_CELLREF);
+        os.write(cache.getLegalEDIFName(cellType.getName()));
+        os.write(EXPORT_CONST_LIBRARYREF);
+        os.write(cache.getLegalEDIFName(cellType.getLibrary().getName()));
+        if(getPropertiesMap().size() > 0){
+            os.write(EXPORT_CONST_CLOSE_WITH_PROPS);
+            exportEDIFProperties(os,EXPORT_CONST_PROP_INDENT, cache, stable);
+            os.write(EXPORT_CONST_CLOSE);
         }else{
-            wr.write("))))\n");
+            os.write(EXPORT_CONST_CLOSE_NO_PROPS);
         }
     }
 

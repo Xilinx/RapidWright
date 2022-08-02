@@ -50,7 +50,7 @@ public class ParallelEDIFParserTestSpecificOffsets extends ParallelEDIFParser{
     protected void initializeWorkers() throws IOException {
         workers.clear();
         for (ParseStart  startOffset : startOffsets) {
-            workers.add(new TestingParallelEDIFParserWorker(fileName, inputStreamSupplier.get(), startOffset.offset, uniquifier, maxTokenLength, startOffset.name));
+            workers.add(new TestingParallelEDIFParserWorker(fileName, inputStreamSupplier.get(), startOffset.offset, uniquifier, maxTokenLength, startOffset.name, cache));
         }
     }
 
@@ -62,8 +62,8 @@ public class ParallelEDIFParserTestSpecificOffsets extends ParallelEDIFParser{
 
         private final String name;
 
-        public TestingParallelEDIFParserWorker(Path fileName, InputStream in, long offset, StringPool uniquifier, int maxTokenLength, String name) {
-            super(fileName, in, offset, uniquifier, maxTokenLength);
+        public TestingParallelEDIFParserWorker(Path fileName, InputStream in, long offset, StringPool uniquifier, int maxTokenLength, String name, EDIFReadLegalNameCache cache) {
+            super(fileName, in, offset, uniquifier, maxTokenLength, cache);
             this.name = name;
         }
 
