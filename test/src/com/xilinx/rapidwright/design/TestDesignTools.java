@@ -251,6 +251,7 @@ public class TestDesignTools {
     public void testRemoveSourcePin() {
         Design design = new Design("test", Device.KCU105);
         
+        // Net with one source (AQ2) and two sinks (A_I & FX) and a stub (INT_NODE_IMUX_71_INT_OUT)
         Net net1 = createTestNet(design, "net1", new String[]{
                 // Translocated from example in 
                 // https://github.com/Xilinx/RapidWright/pull/475#issuecomment-1188337848
@@ -281,6 +282,7 @@ public class TestDesignTools {
         }
 
         
+        // Net with one output (HMUX) and one input (SRST_B2)
         Net net2 = createTestNet(design, "net2", new String[]{
             "INT_X42Y158/INT.LOGIC_OUTS_E16->>INT_NODE_SINGLE_DOUBLE_46_INT_OUT", 
             "INT_X42Y158/INT.INT_NODE_SINGLE_DOUBLE_46_INT_OUT->>INT_INT_SINGLE_51_INT_OUT", 
@@ -306,6 +308,7 @@ public class TestDesignTools {
         design.removeSiteInst(design.getSiteInstFromSiteName("SLICE_X64Y158"));
         
         
+        // Net with two outputs (HMUX primary and H_O alternate) and two sinks (SRST_B2 & B2)
         Net net3 = createTestNet(design, "net3", new String[]{
                 // SLICE_X65Y158/HMUX-> SLICE_X64Y158/SRST_B2
                 "INT_X42Y158/INT.LOGIC_OUTS_E16->>INT_NODE_SINGLE_DOUBLE_46_INT_OUT", 
@@ -340,6 +343,7 @@ public class TestDesignTools {
             SitePinInst altSnk = net3.createPin("B2", si);
             altSnk.setRouted(true);
             
+            // Unroute just the H_O alternate source
             Set<PIP> unroutedPIPs = DesignTools.unrouteSourcePin(net3.getAlternateSource());
             Assertions.assertEquals(11, unroutedPIPs.size());
             Assertions.assertEquals(4, net3.getPIPs().size());
