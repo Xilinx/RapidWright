@@ -1028,24 +1028,77 @@ public class DesignTools {
 	 * pins individually.
 	 * @param net The current net to modify routing and to which all pins will have their routing 
 	 * removed. If any pin passed in is not of this net, it is skipped and no effect is taken.
-	 * @param pins Pins that belong to the provided net that should have their selective routing 
-	 * removed.
+	 * @param pins Sink pins that belong to the provided net that should have their selective routing 
+	 * removed. This method only works for sink pins.  
+	 * See {@link #unrouteSourcePin(SitePinInst)} for handling source pin unroutes.
 	 */
 	public static void unroutePins(Net net, Collection<SitePinInst> pins) {
-	    Set<PIP> toRemove = getTrimmablePIPsFromPins(net, pins);
-	    ArrayList<PIP> updatedPIPs = new ArrayList<>();
-	    for(PIP pip : net.getPIPs()){
-	        if(!toRemove.contains(pip)) updatedPIPs.add(pip);
-	    }
-	    net.setPIPs(updatedPIPs);
+	    removePIPsFromNet(net,getTrimmablePIPsFromPins(net, pins));
 	    for(SitePinInst pin : pins) {
 	        pin.setRouted(false);
 	    }	    
 	}
-
+	
+	private static void removePIPsFromNet(Net net, Set<PIP> pipsToRemove) {
+	    if(pipsToRemove.size() > 0) {
+	        List<PIP> updatedPIPs = new ArrayList<>();
+	        for(PIP pip : net.getPIPs()){
+	            if(!pipsToRemove.contains(pip)) updatedPIPs.add(pip);
+	        }
+	        net.setPIPs(updatedPIPs);
+	    }	    
+	}
+	
+	/**
+	 * Unroutes a SitePinInst of a net.  This is desirable when a net has multiple SitePinInst
+	 * source pins (multiple outputs of a Site) and only a particular branch is desired to be 
+	 * unrouted.  If the entire net is to be unrouted, a more efficient method is {@link Net#unroute()}. 
+	 * @param src The source pin of the net from which to remove the routing 
+	 * @return The set of PIPs that were unrouted from the net.
+	 */
+	public static Set<PIP> unrouteSourcePin(SitePinInst src) {
+	    if(!src.isOutPin() || src.getNet() == null) return Collections.emptySet();
+	    Node srcNode = src.getConnectedNode();
+	    Set<PIP> pipsToRemove = new HashSet<>();
+	    
+	    Map<Node, List<PIP>> pipMap = new HashMap<>();
+	    for(PIP pip : src.getNet().getPIPs()) {
+	        Node node = pip.getStartNode();
+	        pipMap.computeIfAbsent(node, k -> new ArrayList<>()).add(pip);
+	    }
+	    
+	    Map<Node,SitePinInst> sinkNodes = new HashMap<>();
+	    for(SitePinInst sinkPin : src.getNet().getSinkPins()) {
+	        sinkNodes.put(sinkPin.getConnectedNode(), sinkPin);
+	    }
+	    
+	    Queue<Node> q = new LinkedList<>();
+	    q.add(srcNode);
+	    while(!q.isEmpty()) {
+	        Node curr = q.poll();
+	        List<PIP> pips = pipMap.get(curr);
+	        if(pips != null) {
+	            for(PIP p : pips) {
+	                Node endNode = p.getEndNode();
+	                q.add(endNode);
+	                pipsToRemove.add(p);
+	                SitePinInst sink = sinkNodes.get(endNode);
+	                if(sink != null) {
+	                    sink.setRouted(false);
+	                }
+	            }
+	        }
+	    }
+	    
+	    src.setRouted(false);
+	    removePIPsFromNet(src.getNet(), pipsToRemove);
+	    return pipsToRemove;
+	}
+	
 	/**
 	 * For the given set of pins, if they were removed, determine which PIPs could be trimmed as 
-	 * they no longer route to any specific sink.
+	 * they no longer route to any specific sink.  This method only works for sink pins.  
+	 * See {@link #unrouteSourcePin(SitePinInst)} for handling source pin unroutes.
 	 * @param net The current net
 	 * @param pins The set of pins to remove.
 	 * @return The set of redundant (trimmable) PIPs that cane safely be removed when removing the
@@ -2596,8 +2649,8 @@ public class DesignTools {
 	        }
 	        EDIFHierNet parentHierNet = netParentMap.get(hierNet);
 	        if(parentHierNet == null) {
-	            System.out.println("WARNING: Couldn't find parent net for '" +
-	                    hierNet.getHierarchicalNetName() + "'");
+	            // System.out.println("WARNING: Couldn't find parent net for '" +
+	            //         hierNet.getHierarchicalNetName() + "'");
 	            continue;
 	        }
 	        if(!hierNet.equals(parentHierNet)) {
