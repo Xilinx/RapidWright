@@ -32,6 +32,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Queue;
+import java.util.Set;
 
 import org.jetbrains.annotations.NotNull;
 
@@ -181,19 +182,31 @@ public class EDIFHierNet {
 	public List<EDIFHierPortInst> getLeafHierPortInsts() {
 	    return getLeafHierPortInsts(true);
 	}
+
+	/**
+	 * Gets all connected leaf port instances on this hierarchical net and its aliases.
+	 * @param includeSourcePins A flag to include source pins in the result.  Setting this to false
+	 * only returns the sinks.
+	 * @return The list of all leaf cell port instances connected to this hierarchical net and its
+	 * aliases.
+	 */
+	public List<EDIFHierPortInst> getLeafHierPortInsts(boolean includeSourcePins) {
+		return getLeafHierPortInsts(includeSourcePins, new HashSet<>());
+	}
 	
 	/**
 	 * Gets all connected leaf port instances on this hierarchical net and its aliases.
 	 * @param includeSourcePins A flag to include source pins in the result.  Setting this to false
 	 * only returns the sinks.
+	 * @param visited An initial set of EDIFHierNet-s that have already been visited and will not
+	 * be visited again. Initializing this set can be useful for blocking traversal.
 	 * @return The list of all leaf cell port instances connected to this hierarchical net and its 
      * aliases.
 	 */
-	public List<EDIFHierPortInst> getLeafHierPortInsts(boolean includeSourcePins) {
+	public List<EDIFHierPortInst> getLeafHierPortInsts(boolean includeSourcePins, Set<EDIFHierNet> visited) {
 	    List<EDIFHierPortInst> leafCellPins = new ArrayList<>();
 	    Queue<EDIFHierNet> queue = new ArrayDeque<>();
 	    queue.add(this);
-	    HashSet<EDIFHierNet> visited = new HashSet<>();
 
 	    EDIFHierNet parentNet = null;
 	    while (!queue.isEmpty()) {
