@@ -1028,11 +1028,18 @@ public class DesignTools {
 	 * pins individually.
 	 * @param net The current net to modify routing and to which all pins will have their routing 
 	 * removed. If any pin passed in is not of this net, it is skipped and no effect is taken.
-	 * @param pins Sink pins that belong to the provided net that should have their selective routing 
-	 * removed. This method only works for sink pins.  
-	 * See {@link #unrouteSourcePin(SitePinInst)} for handling source pin unroutes.
+	 * @param pins Pins that belong to the provided net that should have their selective routing
+	 * removed.
+	 * Source pins are handled by {@link #unrouteSourcePin(SitePinInst)}.
 	 */
 	public static void unroutePins(Net net, Collection<SitePinInst> pins) {
+		pins.removeIf((spi) -> {
+			if (spi.isOutPin()) {
+				DesignTools.unrouteSourcePin(spi);
+				return true;
+			}
+			return false;
+		});
 	    removePIPsFromNet(net,getTrimmablePIPsFromPins(net, pins));
 	    for(SitePinInst pin : pins) {
 	        pin.setRouted(false);
