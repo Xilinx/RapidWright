@@ -183,9 +183,9 @@ public class PartialRouter extends RWRoute{
 
 			NetWrapper netWrapper = e.getValue();
 			for (Connection connection : netWrapper.getConnections()) {
-				if (!connection.getSink().isRouted())
-					continue;
-				finishRouteConnection(connection);
+				if (connection.getSink().isRouted()) {
+					finishRouteConnection(connection);
+				}
 			}
 		}
 	}

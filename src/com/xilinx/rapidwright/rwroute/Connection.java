@@ -47,6 +47,7 @@ public class Connection implements Comparable<Connection>{
 	 */
 	private RouteNode sourceRnode;
 	private RouteNode sinkRnode;
+	private RouteNode altSinkRnode;
 	/** 
 	 * true to indicate the source and the sink are connected through dedicated resources, 
 	 * such as the carry chain connections and connections between cascaded BRAMs.
@@ -261,6 +262,10 @@ public class Connection implements Comparable<Connection>{
 	public void setSinkRnode(RouteNode childRnode) {
 		sinkRnode = childRnode;
 	}
+
+	public RouteNode getAltSinkRnode() { return altSinkRnode; }
+
+	public void setAltSinkRnode(RouteNode childRnode) { altSinkRnode = childRnode; }
 	
 	public short getXMinBB() {
 		return xMinBB;
@@ -423,6 +428,13 @@ public class Connection implements Comparable<Connection>{
 		s.append(String.format("criticality = %4.3f ", getCriticality()));
 		
 		return s.toString();
+	}
+
+	public void setTarget(boolean target) {
+		sinkRnode.setTarget(target);
+		if (altSinkRnode != null) {
+			altSinkRnode.setTarget(target);
+		}
 	}
 	
 }

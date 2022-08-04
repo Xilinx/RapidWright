@@ -290,7 +290,7 @@ public class DesignImplementationDiff {
 			EDIFNetlist netlist = design.getNetlist();
 			Map<Net, Set<SiteBELPin>> m = new HashMap<>();
 			for (SiteInst si : design.getSiteInsts()) {
-				for(Map.Entry<Net,HashSet<String>> e : si.getSiteCTags().entrySet()) {
+				for(Map.Entry<Net,List<String>> e : si.getNetToSiteWiresMap().entrySet()) {
 					if(e.getValue() != null && e.getValue().size() > 0) {
 						for(String siteWire : e.getValue()) {
 							BELPin[] belPins = si.getSiteWirePins(siteWire);

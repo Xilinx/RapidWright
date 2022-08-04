@@ -471,19 +471,6 @@ public class EDIFTools {
 				|| !EDIFTools.getRootBusName(netName).equals(netName)) {
 			netName += getUniqueSuffix();
 		}
-		// String rootBusNetName;
-		// if(parentCell.getNet(netName) != null ||
-		// 		// Check for existence of bus
-		// 		(!(rootBusNetName = EDIFTools.getRootBusName(netName)).equals(netName) && parentCell.getNet(rootBusNetName) != null)) {
-		// 	netName += getUniqueSuffix();
-		// }
-		// if (parentCell.getName().equals("fx_top") && netName.equals("Q[9]")) {
-		// 	rootBusNetName = EDIFTools.getRootBusName(netName);
-		// 	System.out.println("CREATEUNIQUENET");
-		// 	System.out.println(rootBusNetName);
-		// 	System.out.println(parentCell.getPort(rootBusNetName));
-		// 	System.out.println(netName);
-		// }
 		return new EDIFNet(netName, parentCell);
 	}
 	
@@ -555,27 +542,6 @@ public class EDIFTools {
 	                    currNet = createUniqueNet(hierParentInst.getCellType(), newName);
 	                }
 	                outerPortInst = currNet.createPortInst(port, prevInst);
-// if (currNet.getName().startsWith("fifo_entries[0]")) {
-// 	System.out.println(currNet);					// Q[9]
-// 	System.out.println(currNet.getParentCell());	// ss_db
-// 	System.out.println(outerPortInst);				// pg2/Q[9]_rw_created6383
-// 	System.out.println(hierParentInst);				// design/U0_M0_F11/U0_M0_F11_core/top/ss_db
-// 	System.out.println(commonAncestor);				// ""
-// 	System.out.println(commonAncestor.isTopLevelInst());
-// }
-// if (newPortName.startsWith("fifo_entries[0]")) {
-if (snk.toString().equals("wc_ip_top/zpv_hs_data[41833]")) {
-	System.out.println("currNet = " + currNet);					// Q[9]
-	System.out.println("currNet.getParentCell() = " + currNet.getParentCell());	// ss_db
-	System.out.println("outerPortInst = " + outerPortInst);				// pg2/Q[9]_rw_created6383
-	System.out.println("hierParentInst = " + hierParentInst);				// design/U0_M0_F11/U0_M0_F11_core/top/ss_db
-	System.out.println("commonAncestor = " + commonAncestor);				// ""
-	System.out.println("commonAncestor.isTopLevelInst() = " + commonAncestor.isTopLevelInst());
-	System.out.println("hierPortInst = " + hierPortInst);
-	System.out.println("src = " + src);
-	System.out.println("snk = " + snk);
-	System.out.println("outerPortInst.getNet() = " + outerPortInst.getNet());
-}
 	            }
 	            EDIFHierPortInst currPortInst = new EDIFHierPortInst(hierParentInst, outerPortInst);
 	            if(hierPortInst == src) {
@@ -592,25 +558,14 @@ if (snk.toString().equals("wc_ip_top/zpv_hs_data[41833]")) {
 	            // Let's delete the net we created and use the existing snkNet instead
 	            EDIFNet net = finalSrc.getNet();
 	            if(snkNet != net) {
-System.out.println("MOVING");
-System.out.println(net);
-System.out.println(snkNet);
 	                net.getParentCell().removeNet(net);
 	                snkNet.addPortInst(finalSrc.getPortInst());
-	            } else {
-System.out.println("HERE");
-System.out.println(net);
-System.out.println(net.getPortInsts());
-	                return;
 	            }
+	            return;
 	        }else {
-System.out.println("Disconnecting " + finalSnk.getPortInst() + " from net " + snkNet);
 	            snkNet.removePortInst(finalSnk.getPortInst());
 	        }
 	    }
-		if (snk.toString().equals("wc_ip_top/zpv_hs_data[41833]")) {
-			System.out.println("Connecting " + finalSrc.getNet() + " on " + finalSrc + " to " + finalSnk.getPortInst());
-		}
 
 	    // Make final connection in the common ancestor instance
 	    finalSrc.getNet().addPortInst(finalSnk.getPortInst());   
@@ -769,6 +724,18 @@ System.out.println("Disconnecting " + finalSnk.getPortInst() + " from net " + sn
 			topCell.addNet(net);				
 		}
 		return probeInput;
+	}
+
+	/**
+	 * Creates and/or gets the static net (GND/VCC) in the specified cell.
+	 * @param type The type of net to get or create
+	 * @param cellInst The hier cell inst that should have a static net
+	 * @param netlist The netlist of interest
+	 * @return An existing or newly created static hier net for the cell provided.
+	 */
+	public static EDIFHierNet getStaticNet(NetType type, EDIFHierCellInst cellInst, EDIFNetlist netlist){
+		EDIFNet n = getStaticNet(type, cellInst.getCellType(), netlist);
+		return new EDIFHierNet(cellInst, n);
 	}
 
 	/**

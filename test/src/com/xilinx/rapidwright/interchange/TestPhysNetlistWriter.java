@@ -130,7 +130,9 @@ public class TestPhysNetlistWriter {
                 Cell belCell = siteInst.getCell(allStrings.get(pinMapping.getBel()));
                 Assertions.assertNotNull(belCell);
 
-                Assertions.assertFalse(belCell.isRoutethru());
+                String belName = belCell.getBELName();
+                boolean expectRT = belName.equals("A5LUT") || belName.equals("A6LUT");
+                Assertions.assertEquals(expectRT, belCell.isRoutethru());
             }
         }
     }

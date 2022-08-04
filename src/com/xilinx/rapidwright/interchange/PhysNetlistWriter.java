@@ -62,6 +62,7 @@ import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysBelPin
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysCell;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysCellType;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysNet;
+import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysNode;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysPIP;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysSitePIP;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysSitePin;
@@ -108,7 +109,7 @@ public class PhysNetlistWriter {
     {
         writePlacement(physNetlist, design, strings, design.getSiteInsts());
     }
-    
+
     public static void writePlacement(PhysNetlist.Builder physNetlist, Design design,
             Enumerator<String> strings, Collection<SiteInst> siteInsts) {
         HashMap<String,PhysCellType> physCells = new HashMap<>();
@@ -215,11 +216,11 @@ public class PhysNetlistWriter {
     	return idx;
     }
 
-    public static Map<Net, List<RouteBranchNode>> extractSiteRouting(Collection<SiteInst> siteInsts)
+    public static Map<Net, List<RouteBranchNode>> extractSiteRouting(Collection<SiteInst> siteInsts,
+                                                                     List<RouteBranchNode> nullNetStubs)
     {
         // Extract out site routing first, for partially routed designs...
         Map<Net, List<RouteBranchNode>> netSiteRouting = new HashMap<>();
-        // List<RouteBranchNode> nullNetStubs = new ArrayList<>();
         for(SiteInst siteInst : siteInsts) {
             Site site = siteInst.getSite();
             for(SitePIP sitePIP : siteInst.getUsedSitePIPs()) {
@@ -233,17 +234,21 @@ public class PhysNetlistWriter {
                     }
                 }
                 SitePIPStatus status = siteInst.getSitePIPStatus(sitePIP);
-                // if(net == null) {
-                //     nullNetStubs.add(new RouteBranchNode(site, sitePIP, status.isFixed()));
-                //     continue;
-                // }
+                if(net == null) {
+                    nullNetStubs.add(new RouteBranchNode(site, sitePIP, status.isFixed()));
+                    continue;
+                }
 
                 List<RouteBranchNode> segments = netSiteRouting.computeIfAbsent(net, (n) -> new ArrayList<>());
                 segments.add(new RouteBranchNode(site, sitePIP, status.isFixed()));
             }
-
-            for(Entry<Net,HashSet<String>> e : siteInst.getSiteCTags().entrySet()) {
-                List<RouteBranchNode> segments = netSiteRouting.computeIfAbsent(e.getKey(), (n) -> new ArrayList<>());
+            
+            for(Entry<Net,List<String>> e : siteInst.getNetToSiteWiresMap().entrySet()) {
+                List<RouteBranchNode> segments = netSiteRouting.get(e.getKey());
+                if(segments == null) {
+                	segments = new ArrayList<RouteBranchNode>();
+                	netSiteRouting.put(e.getKey(), segments);
+                }
                 if(e.getValue() != null && e.getValue().size() > 0) {
                     for(String siteWire : e.getValue()) {
                         BELPin[] belPins = siteInst.getSiteWirePins(siteWire);
@@ -273,15 +278,12 @@ public class PhysNetlistWriter {
 
         return netSiteRouting;
     }
-    
+
     private static void writePhysNets(PhysNetlist.Builder physNetlist, Design design, 
                                         Enumerator<String> strings) {
 
-        Map<Net, List<RouteBranchNode>> netSiteRouting = extractSiteRouting(design.getSiteInsts());
-        List<RouteBranchNode> nullNetStubs = netSiteRouting.remove(null);
-        if (nullNetStubs == null) {
-            nullNetStubs = Collections.EMPTY_LIST;
-        }
+        List<RouteBranchNode> nullNetStubs = new ArrayList<>();
+        Map<Net, List<RouteBranchNode>> netSiteRouting = extractSiteRouting(design.getSiteInsts(), nullNetStubs);
 
     	PhysNet.Builder nullNet = physNetlist.getNullNet();
     	Builder<RouteBranch.Builder> stubs = nullNet.initStubs(nullNetStubs.size());
@@ -322,9 +324,14 @@ public class PhysNetlistWriter {
             }
             
             // We need to traverse the net inside sites to fully populate routing spec
-            List<RouteBranchNode> routingSources = new ArrayList<>();
+            ArrayList<RouteBranchNode> routingSources = new ArrayList<>();
+            List<PIP> stubNodes = new ArrayList<>();
             for(PIP p : net.getPIPs()) {
-                routingSources.add(new RouteBranchNode(p));
+                if(p.getEndWireName() == null) {
+                    stubNodes.add(p);
+                }else {
+                    routingSources.add(new RouteBranchNode(p));
+                }
             }
             for(SitePinInst spi : net.getPins()) {
                 routingSources.add(new RouteBranchNode(spi));
@@ -332,6 +339,16 @@ public class PhysNetlistWriter {
             List<RouteBranchNode> segments = netSiteRouting.remove(net);
             if(segments != null) routingSources.addAll(segments);
             populateRouting(routingSources, physNet, strings);
+            if(stubNodes.size() > 0) {
+                StructList.Builder<PhysNode.Builder> physNodes = physNet.initStubNodes(stubNodes.size());
+                for(int j=0; j < stubNodes.size(); j++) {
+                    PhysNode.Builder physNode = physNodes.get(j);
+                    PIP stubPIP = stubNodes.get(j);
+                    physNode.setTile(strings.getIndex(stubPIP.getTile().getName()));
+                    physNode.setWire(stubPIP.getStartWireIndex());
+                    physNode.setIsFixed(stubPIP.isPIPFixed());
+                }
+            }
             i++;
         }
 

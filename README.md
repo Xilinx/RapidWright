@@ -53,3 +53,13 @@ git pull
 # resolve any issues
 gradlew update_jars
 ```
+
+### Development setup
+
+RapidWright includes a git pre-commit hook that runs some quick checks before commits. After cloning the repository, the hook is not enabled by default. To enable it, run this command:
+
+```
+make enable_pre_commit_hook
+```
+
+You will only have to do this once.
