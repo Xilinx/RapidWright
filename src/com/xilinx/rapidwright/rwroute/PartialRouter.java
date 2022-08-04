@@ -160,6 +160,15 @@ public class PartialRouter extends RWRoute{
 	}
 
 	@Override
+	protected int getNumConnectionsCrossingSLRs() {
+		int numCrossingSLRs = 0;
+		for (Connection c : indirectConnections) {
+			numCrossingSLRs += (c.getSink().isRouted() || !c.isCrossSLR()) ? 0 : 1;
+		}
+		return numCrossingSLRs;
+	}
+
+	@Override
 	protected void determineRoutingTargets() {
 		super.determineRoutingTargets();
 
