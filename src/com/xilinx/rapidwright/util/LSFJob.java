@@ -38,13 +38,11 @@ import org.json.JSONObject;
  */
 public class LSFJob extends Job {
 	
-	public static String LSF_RESOURCE = "select[osver=ws7]";//"select[type=X86_64 && osdistro=rhel && (osver=ws6 || osver=sv6)] rusage[mem=6000]";
+	public static final String LSF_RESOURCE = "select[osver=ws7]";//"select[type=X86_64 && osdistro=rhel && (osver=ws6 || osver=sv6)] rusage[mem=6000]";
 	
-	public static String LSF_PROJECT = "RapidWright";
+	public static final String LSF_PROJECT = "RapidWright";
 	
-	public static String LSF_QUEUE = "medium";
-
-	public static String LSF_SLOTS = "1";
+	public static final String LSF_QUEUE = "medium";
 
 	private String lsfResource = LSF_RESOURCE;
 	private String lsfProject = LSF_PROJECT;
@@ -99,8 +97,6 @@ public class LSFJob extends Job {
 				lsfProject +"-"+ System.getenv("USER"),
 				"-q", 
 				lsfQueue,
-				"-n",
-				LSF_SLOTS,
 				FileTools.isWindows() ? "cmd.exe" : "/bin/bash",
 				launchScriptNames.getFirst()};
 
@@ -214,35 +210,4 @@ public class LSFJob extends Job {
 		}
 	}
 
-	public static void main(String[] args) throws InterruptedException {
-		if (args.length == 0) {
-			System.out.println("Usage: <command>");
-			return;
-		}
-
-		LSFJob job = new LSFJob();
-
-		String memLimit = System.getProperty("LSFJob.ResourceMemoryLimit");
-		if (memLimit != null) {
-			job.setLsfResourceMemoryLimit(Integer.parseInt(memLimit));
-		}
-
-		job.setCommand(String.join(" ", args));
-		job.launchJob();
-		System.out.println("STATUS=PEND");
-
-		boolean running = false;
-		while (!job.isFinished()) {
-			if (!running && job.getJobState() == JobState.RUNNING) {
-				running = true;
-				System.out.println("STATUS=RUN");
-			}
-			Thread.sleep(2000);
-		}
-
-		int exitCode = job.getStatus().getSecond();
-		System.out.println("STATUS=EXIT (code=" + exitCode +")");
-
-		System.exit(exitCode);
-	}
 }
