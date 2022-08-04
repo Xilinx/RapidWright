@@ -1033,15 +1033,16 @@ public class DesignTools {
 	 * Source pins are handled by {@link #unrouteSourcePin(SitePinInst)}.
 	 */
 	public static void unroutePins(Net net, Collection<SitePinInst> pins) {
-		pins.removeIf((spi) -> {
+		List<SitePinInst> sinkPins = new ArrayList<>(pins.size());
+		pins.forEach((spi) -> {
 			if (spi.isOutPin()) {
 				DesignTools.unrouteSourcePin(spi);
-				return true;
+			} else {
+				sinkPins.add(spi);
 			}
-			return false;
 		});
-	    removePIPsFromNet(net,getTrimmablePIPsFromPins(net, pins));
-	    for(SitePinInst pin : pins) {
+	    removePIPsFromNet(net,getTrimmablePIPsFromPins(net, sinkPins));
+	    for(SitePinInst pin : sinkPins) {
 	        pin.setRouted(false);
 	    }	    
 	}
