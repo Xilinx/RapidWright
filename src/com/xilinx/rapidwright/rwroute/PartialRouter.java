@@ -25,6 +25,7 @@ package com.xilinx.rapidwright.rwroute;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -154,7 +155,7 @@ public class PartialRouter extends RWRoute{
 	protected int getNumIndirectConnectionPins() {
 		int totalSitePins = 0;
         for(Connection connection : indirectConnections) {
-			totalSitePins += (connection.getSink().isRouted()) ? 0 : 1;
+			totalSitePins += (connection.getSink().isRouted() && !connection.isCongested()) ? 0 : 1;
         }
         return totalSitePins;
 	}
@@ -163,9 +164,27 @@ public class PartialRouter extends RWRoute{
 	protected int getNumConnectionsCrossingSLRs() {
 		int numCrossingSLRs = 0;
 		for (Connection c : indirectConnections) {
-			numCrossingSLRs += (c.getSink().isRouted() || !c.isCrossSLR()) ? 0 : 1;
+			numCrossingSLRs += (!c.isCrossSLR() || (c.getSink().isRouted() && !c.isCongested())) ? 0 : 1;
 		}
 		return numCrossingSLRs;
+	}
+
+	@Override
+	protected void routeStaticNets() {
+		Net gnd = design.getGndNet();
+		Net vcc = design.getVccNet();
+
+		// Copy existing PIPs
+		List<PIP> gndPips = new ArrayList<>(gnd.getPIPs());
+		List<PIP> vccPips = new ArrayList<>(vcc.getPIPs());
+
+		// Perform static net routing (which does no rip-up)
+		super.routeStaticNets();
+
+		// Since super.routeStaticNets() clobbers the PIPs list,
+		// re-insert those existing PIPs
+		gnd.getPIPs().addAll(gndPips);
+		vcc.getPIPs().addAll(vccPips);
 	}
 
 	@Override
@@ -197,6 +216,25 @@ public class PartialRouter extends RWRoute{
 				}
 			}
 		}
+
+		// Mark each static sink node -- if it exists -- as being used, unpreserving any nets
+		// using those nodes (likely bounce points) as needed
+		for(Map.Entry<Net,List<SitePinInst>> e : staticNetAndRoutingTargets.entrySet()) {
+			Net staticNet = e.getKey();
+			List<SitePinInst> netRouteTargetPins = e.getValue();
+			for(SitePinInst sink : netRouteTargetPins) {
+				Node node = sink.getConnectedNode();
+				Net preservedNet = routingGraph.getPreservedNet(node);
+				if (preservedNet != null && !preservedNet.equals(staticNet)) {
+					unpreserveNet(preservedNet);
+				}
+
+				RouteNode rnode = routingGraph.getNode(node);
+				if (rnode != null) {
+					rnode.incrementUser(null);
+				}
+			}
+		}
 	}
 
 	@Override
@@ -211,20 +249,18 @@ public class PartialRouter extends RWRoute{
 	
 	@Override
 	protected void addStaticNetRoutingTargets(Net staticNet){
+		preserveNet(staticNet);
+
 		List<SitePinInst> sinks = staticNet.getSinkPins();
 		if(sinks.size() > 0) {
-			if(!staticNet.hasPIPs()) {
-				List<Node> sinkNodes = new ArrayList<>(sinks.size());
-				sinks.forEach((p) -> sinkNodes.add(p.getConnectedNode()));
-				addPreservedNodes(sinkNodes, staticNet);
-				addStaticNetRoutingTargets(staticNet, sinks);
-			}else {
-				preserveNet(staticNet);
+			sinks.removeIf((spi) -> spi.isRouted());
+			if(sinks.isEmpty()) {
 				increaseNumPreservedStaticNets();
-			}	
+			} else {
+				addStaticNetRoutingTargets(staticNet, sinks);
+			}
 			
 		}else {// internally routed (sinks.size = 0)
-			preserveNet(staticNet);
 			increaseNumNotNeedingRouting();
 		}
 	}

@@ -173,6 +173,7 @@ public class RWRoute{
 			nodesDelays = new HashMap<>();
 		}
 		rnodesCreatedThisIteration = 0;
+		routethruHelper = new RouteThruHelper(design.getDevice());
 
 		routerTimer.createRuntimeTracker("determine route targets", "Initialization").start();
 		determineRoutingTargets();
@@ -187,7 +188,6 @@ public class RWRoute{
 		}
 		
 		sortedIndirectConnections = new ArrayList<>(indirectConnections.size());
-		routethruHelper = new RouteThruHelper(design.getDevice());		
 		connectionsRouted = 0;
 		connectionsRoutedIteration = 0;
 		nodesPopped = 0;
@@ -400,8 +400,10 @@ public class RWRoute{
 		// the nodes connected to pins of other nets must be preserved.
 		unavailableNodes.addAll(routingGraph.getNodes());
 
-		for(Net net : staticNetAndRoutingTargets.keySet()){
-			System.out.println("INFO: Route " + net.getSinkPins().size() + " pins of " + net);
+		for(Map.Entry<Net,List<SitePinInst>> e : staticNetAndRoutingTargets.entrySet()){
+			Net net = e.getKey();
+			List<SitePinInst> pins = e.getValue();
+			System.out.println("INFO: Route " + pins.size() + " pins of " + net);
 			Map<SitePinInst, List<Node>> sinksRoutingPaths = GlobalSignalRouting.routeStaticNet(net, unavailableNodes, design, routethruHelper);
 
 			for(Entry<SitePinInst, List<Node>> sinkPath : sinksRoutingPaths.entrySet()) {
@@ -767,16 +769,13 @@ public class RWRoute{
 	 * @return true, if the connection should be routed.
 	 */
 	private boolean shouldRoute(Connection connection) {
-		if(routeIteration == 1) {
-			// In the partial routing case, it is possible that the
-			// connection exists but does not need routing
-			return !connection.getSink().isRouted();
-		}else {
+		if(routeIteration > 1) {
 			if(connection.getCriticality() > minRerouteCriticality) {
 				return true;
 			}
-			return connection.isCongested() || !connection.getSink().isRouted();
 		}
+
+		return !connection.getSink().isRouted() || connection.isCongested() ;
 	}
 	
 	/**
