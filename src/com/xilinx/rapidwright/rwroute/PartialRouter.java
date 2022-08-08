@@ -171,6 +171,9 @@ public class PartialRouter extends RWRoute{
 
 	@Override
 	protected void routeStaticNets() {
+		if (staticNetAndRoutingTargets.isEmpty())
+			return;
+
 		Net gnd = design.getGndNet();
 		Net vcc = design.getVccNet();
 
