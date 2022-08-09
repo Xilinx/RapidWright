@@ -26,9 +26,11 @@
 package com.xilinx.rapidwright.edif;
 
 import java.io.IOException;
-import java.io.Writer;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * This class serves as the universal common ancestor for most all EDIF netlist
@@ -39,8 +41,6 @@ import java.util.Map;
 public class EDIFName implements Comparable<EDIFName> {
 	/** Name of the EDIF object */
 	private String name;
-	/** Legal EDIF rename of the original name */
-	private String edifRename;
 	
 	
 	protected EDIFName(){
@@ -49,7 +49,6 @@ public class EDIFName implements Comparable<EDIFName> {
 	
 	public EDIFName(String name){
 		this.name = name;
-		updateEDIFRename();
 	}
 	
 	/**
@@ -58,67 +57,41 @@ public class EDIFName implements Comparable<EDIFName> {
 	 */
 	public EDIFName(EDIFName edifName) {
 		this.name = edifName.name;
-		this.edifRename = edifName.edifRename;
 	}
-	
-	/**
-	 * Forces the object to update its EDIF legal equivalent name based on 
-	 * the current name.  If the name is the same, the edifRename will be
-	 * null.
-	 * @return The newly updated EDIF rename string.
-	 */
-	protected String updateEDIFRename(){
-		String tmp = EDIFTools.makeNameEDIFCompatible(name); 
-		if(!tmp.equals(name)){
-			edifRename = tmp;
-		}else{
-			edifRename = null;
-		}
-		return edifRename;
-	}
-	
-	protected String updateEDIFRename(int unique){
-		updateEDIFRename();
-		edifRename =  getLegalEDIFName() + "_" + unique;
-		return edifRename;
-	}
-	
+
 	public String getName(){
 		return name;
-	}
-	
-	protected String getEDIFName(){
-		return edifRename;
 	}
 	
 	protected void setName(String name){
 		this.name = name;
 	}
-	
-	protected void setEDIFRename(String edifRename){
-		this.edifRename = edifRename;
+
+	public static final byte[] EXPORT_CONST_RENAME_START = "(rename ".getBytes(StandardCharsets.UTF_8);
+
+
+	public static void exportSomeEDIFName(OutputStream os, String name, byte[] legalName) throws IOException {
+		if (legalName == null) {
+			os.write(name.getBytes(StandardCharsets.UTF_8));
+			return;
+		}
+		os.write(EXPORT_CONST_RENAME_START);
+		os.write(legalName);
+		os.write(' ');
+		os.write('"');
+		os.write(name.getBytes(StandardCharsets.UTF_8));
+		os.write('"');
+		os.write(')');
 	}
-	
-	public String getLegalEDIFName(){
-		return edifRename == null ? name : edifRename;
-	}
-	
+
 	/**
 	 * Writes out valid EDIF syntax the name and/or rename of this object to
 	 * the provided output writer.
-	 * @param wr The writer to export the EDIF syntax to.
+	 * @param os The stream to export the EDIF syntax to.
 	 * @throws IOException
 	 */
-	public void exportEDIFName(Writer wr) throws IOException{
-		if(edifRename == null) {
-			wr.write(name);
-			return;
-		}
-		wr.write("(rename ");
-		wr.write(edifRename);
-		wr.write(" \"");
-		wr.write(name);
-		wr.write("\")");
+	public void exportEDIFName(OutputStream os, EDIFWriteLegalNameCache<?> cache) throws IOException{
+		exportSomeEDIFName(os, getName(), cache.getEDIFRename(getName()));
 	}
 
 	/* (non-Javadoc)
@@ -126,11 +99,7 @@ public class EDIFName implements Comparable<EDIFName> {
 	 */
 	@Override
 	public int hashCode() {
-		final int prime = 31;
-		int result = 1;
-		result = prime * result + ((edifRename == null) ? 0 : edifRename.hashCode());
-		result = prime * result + ((name == null) ? 0 : name.hashCode());
-		return result;
+		return Objects.hashCode(name);
 	}
 
 	/* (non-Javadoc)
@@ -145,11 +114,6 @@ public class EDIFName implements Comparable<EDIFName> {
 		if (getClass() != obj.getClass())
 			return false;
 		EDIFName other = (EDIFName) obj;
-		if (edifRename == null) {
-			if (other.edifRename != null)
-				return false;
-		} else if (!edifRename.equals(other.edifRename))
-			return false;
 		if (name == null) {
 			if (other.name != null)
 				return false;
@@ -162,7 +126,7 @@ public class EDIFName implements Comparable<EDIFName> {
 		return name;
 	}
 	
-	public <K, V> Map<K, V> getNewMap(){
+	public static <K, V> Map<K, V> getNewMap(){
 		//Save some memory for small maps
 		return new HashMap<K,V>(2);
 	}
@@ -170,4 +134,5 @@ public class EDIFName implements Comparable<EDIFName> {
 	public int compareTo(EDIFName o) {
 		return this.getName().compareTo(o.getName());
 	}
+
 }
