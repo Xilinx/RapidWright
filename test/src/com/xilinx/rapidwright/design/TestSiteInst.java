@@ -54,24 +54,38 @@ public class TestSiteInst {
         Assertions.assertEquals(si.getSiteWiresFromNet(net).size(), 0);
     }
 
-    private void routeLUTRouteThruHelper(Design d, SiteInst si, char letter, boolean primary) {
-        BEL bel;
-        if(d.getDevice().getSeries() == Series.Series7) {
-            bel = si.getBEL(letter + (primary ? "" : "5") + "FF");
-        } else {
-            bel = si.getBEL(letter + "FF" + (primary ? "" : "2"));
-        }
-        d.createAndPlaceCell(d.getTopEDIFCell(), bel.getName() + "_inst", Unisim.FDRE,
+    private void routeLUTRouteThruHelper(Design d, SiteInst si, char letter, boolean primary, BELPin snk, Unisim cellType) {
+        BEL bel = snk.getBEL();
+        d.createAndPlaceCell(d.getTopEDIFCell(), bel.getName() + "_inst", cellType,
                 si.getSiteName() + "/" + bel.getName());
         Net net = d.createNet(bel.getName() + "_net");
         BELPin src = si.getSite().getBELPin(letter + (primary ? "5": "4"));
-        BELPin snk = bel.getPin("D");
         Assertions.assertTrue(si.routeIntraSiteNet(net, src, snk));
         Cell lut = si.getCell(letter + (primary ? "6": "5") + "LUT");
         Assertions.assertNotNull(lut);
         Assertions.assertTrue(lut.isRoutethru());
     }
 
+    private void routeLUTRouteThruHelperFF(Design d, SiteInst si, char letter, boolean primary) {
+        BEL bel;
+        if(d.getDevice().getSeries() == Series.Series7) {
+            bel = si.getBEL(letter + (primary ? "" : "5") + "FF");
+        } else {
+            bel = si.getBEL(letter + "FF" + (primary ? "" : "2"));
+        }
+        routeLUTRouteThruHelper(d, si, letter, primary, bel.getPin("D"), Unisim.FDRE);
+    }
+
+    private void routeLUTRouteThruHelperCarry(Design d, SiteInst si, char letter, boolean primary) {
+        BEL bel;
+        if(d.getDevice().getSeries() == Series.Series7) {
+            bel = si.getBEL("CARRY4");
+        } else {
+            bel = si.getBEL("CARRY8");
+        }
+        char index = Character.forDigit(letter - 'A', 10);
+        routeLUTRouteThruHelper(d, si, letter, primary, bel.getPin((primary ? "S" : "DI") + index), Unisim.CARRY8);
+    }
 
     @ParameterizedTest
     @ValueSource(strings = {Device.KCU105, Device.PYNQ_Z1})
@@ -81,8 +95,8 @@ public class TestSiteInst {
         SiteInst si = d.createSiteInst(d.getDevice().getSite("SLICE_X32Y73"));
         
         for(char letter : LUTTools.lutLetters) {
-            routeLUTRouteThruHelper(d, si, letter, true);
-            routeLUTRouteThruHelper(d, si, letter, false);
+            routeLUTRouteThruHelperFF(d, si, letter, true);
+            routeLUTRouteThruHelperFF(d, si, letter, false);
             if(d.getDevice().getSeries() == Series.Series7 && letter == 'D') break;
         }
     }
@@ -95,8 +109,8 @@ public class TestSiteInst {
         SiteInst si = d.createSiteInst(d.getDevice().getSite("SLICE_X32Y73"));
 
         for(char letter : LUTTools.lutLetters) {
-            routeLUTRouteThruHelper(d, si, letter, true);
-            routeLUTRouteThruHelper(d, si, letter, false);
+            routeLUTRouteThruHelperFF(d, si, letter, true);
+            routeLUTRouteThruHelperFF(d, si, letter, false);
 
             // Unroute 6LUT
             {
@@ -152,5 +166,19 @@ public class TestSiteInst {
         Assertions.assertNotNull(si.getNetFromSiteWire("D5LUT_O5"));
         Assertions.assertEquals(si.getUsedSitePIP("FFMUXD2").getInputPinName(), "D5");
         Assertions.assertNotNull(si.getNetFromSiteWire("FFMUXD2_OUT2"));
-    }  
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {Device.KCU105, Device.PYNQ_Z1})
+    public void testRouteLUTRouteThruToCarry(String deviceName) {
+        Design d = new Design("testRouteLutRtCarry", deviceName);
+
+        SiteInst si = d.createSiteInst(d.getDevice().getSite("SLICE_X32Y73"));
+
+        for(char letter : LUTTools.lutLetters) {
+            routeLUTRouteThruHelperCarry(d, si, letter, true);
+            routeLUTRouteThruHelperCarry(d, si, letter, false);
+            if(d.getDevice().getSeries() == Series.Series7 && letter == 'D') break;
+        }
+    }
 }
