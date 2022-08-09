@@ -178,6 +178,7 @@ public class EDIFHierNet {
 	    HashSet<EDIFHierNet> visited = new HashSet<>();
 
 	    EDIFHierNet parentNet = null;
+        EDIFHierPortInst seenSource = null;
 	    while (!queue.isEmpty()) {
 	        EDIFHierNet net = queue.poll();
 	        if (!visited.add(net)) {
@@ -196,17 +197,19 @@ public class EDIFHierNet {
 	            boolean isToplevelInput = p.getHierarchicalInst().isTopLevelInst() && relP.getCellInst() == null && p.isInput();
 	            if(isToplevelInput || (isCellPin && p.isOutput())){
 	                if (parentNet != null) {
-	                    throw new RuntimeException("Multiple sources!");
+	                    throw new RuntimeException("Multiple sources! At least "+p+" and "+ seenSource);
 	                }
 	                parentNet = net;
+					seenSource = p;
 	            }
 
 	            if(p.getPortInst().getCellInst() == null){
 	                // Moving up in hierarchy
 	                if (!p.getHierarchicalInst().isTopLevelInst()) {
 	                    final EDIFHierPortInst upPort = p.getPortInParent();
-	                    if (upPort != null) {
-	                        queue.add(upPort.getHierarchicalNet());
+	                    if (upPort != null && upPort.getNet() != null) {
+							final EDIFHierNet hierarchicalNet = upPort.getHierarchicalNet();
+							queue.add(hierarchicalNet);
 	                    }
 	                }
 	            } else{
