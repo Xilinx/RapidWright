@@ -78,13 +78,16 @@ public class TestSiteInst {
 
     private void routeLUTRouteThruHelperCarry(Design d, SiteInst si, char letter, boolean primary) {
         BEL bel;
+        Unisim cellType;
         if(d.getDevice().getSeries() == Series.Series7) {
             bel = si.getBEL("CARRY4");
+            cellType = Unisim.CARRY4;
         } else {
             bel = si.getBEL("CARRY8");
+            cellType = Unisim.CARRY8;
         }
         char index = Character.forDigit(letter - 'A', 10);
-        routeLUTRouteThruHelper(d, si, letter, primary, bel.getPin((primary ? "S" : "DI") + index), Unisim.CARRY8);
+        routeLUTRouteThruHelper(d, si, letter, primary, bel.getPin((primary ? "S" : "DI") + index), cellType);
     }
 
     @ParameterizedTest
