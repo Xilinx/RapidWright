@@ -135,6 +135,11 @@ public class PhysNetlistReader {
         Device device = design.getDevice();
         StructList.Reader<SiteInstance.Reader> siteInsts = physNetlist.getSiteInsts();
         int siteInstCount = siteInsts.size();
+        if(siteInstCount == 0 && physNetlist.getPlacements().size() > 0) {
+            System.out.println("WARNING: Missing SiteInst information in phys file.  RapidWright "
+                    + "will attempt to infer the proper SiteInst, however, it is recommended that " 
+                    + "SiteInst information be specified to avoid SiteTypeEnum mismatch problems.");
+        }
         for(int i=0; i < siteInstCount; i++) {
             SiteInstance.Reader si = siteInsts.get(i);
             String siteName = strings.get(si.getSite());
@@ -166,6 +171,9 @@ public class PhysNetlistReader {
             EDIFCellInst cellInst = null;
             Site site = device.getSite(strings.get(placement.getSite()));
             SiteInst siteInst = design.getSiteInstFromSite(site);
+            if(siteInst == null) {
+                siteInst = design.createSiteInst(site);
+            }
             String belName = strings.get(placement.getBel());
             HashSet<String> otherBELLocs = null;
             if(physCells.get(cellName) == PhysCellType.LOCKED) {
@@ -228,6 +236,9 @@ public class PhysNetlistReader {
                 Cell cell = new Cell(cellName, siteInst, bel);
                 cell.setBELFixed(placement.getIsBelFixed());
                 cell.setSiteFixed(placement.getIsSiteFixed());
+                if(cellInst != null) {
+                    cell.setType(cellInst.getCellType().getName());                    
+                }
 
                 PrimitiveList.Int.Reader otherBELs = placement.getOtherBels();
                 int otherBELCount = otherBELs.size();
