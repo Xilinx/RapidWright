@@ -37,8 +37,8 @@ public class TestNet {
 
         Net net = new Net("foo");
         List<SitePinInst> pins = Arrays.asList(
-                new SitePinInst(true, "A_O", si),
-                new SitePinInst(true, "AMUX", si)
+                new SitePinInst("A_O", si),
+                new SitePinInst("AMUX", si)
         );
 
         Assertions.assertTrue(net.setPins(pins));
@@ -53,9 +53,9 @@ public class TestNet {
 
         Net net = d.getVccNet();
         List<SitePinInst> pins = Arrays.asList(
-                new SitePinInst(true, "A_O", si),
-                new SitePinInst(true, "B_O", si),
-                new SitePinInst(true, "C_O", si)
+                new SitePinInst("A_O", si),
+                new SitePinInst("B_O", si),
+                new SitePinInst("C_O", si)
         );
 
         Assertions.assertTrue(net.setPins(pins));
