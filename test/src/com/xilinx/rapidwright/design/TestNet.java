@@ -20,6 +20,8 @@ public class TestNet {
         );
 
         Assertions.assertTrue(net.setPins(pins));
+        Assertions.assertEquals(pins.get(0), net.getSource());
+        Assertions.assertEquals(pins.get(1), net.getAlternateSource());
     }
 
     @Test
@@ -35,5 +37,7 @@ public class TestNet {
         );
 
         Assertions.assertTrue(net.setPins(pins));
+        Assertions.assertNull(net.getSource());
+        Assertions.assertNull(net.getAlternateSource());
     }
 }
