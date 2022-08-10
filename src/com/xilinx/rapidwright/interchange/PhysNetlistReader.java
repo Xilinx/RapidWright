@@ -136,7 +136,8 @@ public class PhysNetlistReader {
         StructList.Reader<SiteInstance.Reader> siteInsts = physNetlist.getSiteInsts();
         int siteInstCount = siteInsts.size();
         if(siteInstCount == 0 && physNetlist.getPlacements().size() > 0) {
-            System.out.println("WARNING: Missing SiteInst information in phys file.  RapidWright "
+            System.out.println("WARNING: Missing SiteInst information in *.phys file.  RapidWright "
+
                     + "will attempt to infer the proper SiteInst, however, it is recommended that " 
                     + "SiteInst information be specified to avoid SiteTypeEnum mismatch problems.");
         }
