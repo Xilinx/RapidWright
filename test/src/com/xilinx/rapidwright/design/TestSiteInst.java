@@ -27,6 +27,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import com.xilinx.rapidwright.design.Cell;
+import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.SiteInst;
+import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELPin;
@@ -56,8 +61,11 @@ public class TestSiteInst {
 
     private void routeLUTRouteThruHelper(Design d, SiteInst si, char letter, boolean primary, BELPin snk, Unisim cellType) {
         BEL bel = snk.getBEL();
-        d.createAndPlaceCell(d.getTopEDIFCell(), bel.getName() + "_inst", cellType,
-                si.getSiteName() + "/" + bel.getName());
+        String cellName = bel.getName() + "_inst";
+        if(d.getCell(cellName) == null) {
+            d.createAndPlaceCell(d.getTopEDIFCell(), cellName, cellType,
+                    si.getSiteName() + "/" + bel.getName());            
+        }
         Net net = d.createNet(bel.getName() + "_net");
         BELPin src = si.getSite().getBELPin(letter + (primary ? "5": "4"));
         Assertions.assertTrue(si.routeIntraSiteNet(net, src, snk));
