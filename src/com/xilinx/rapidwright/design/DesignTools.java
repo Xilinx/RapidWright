@@ -1327,7 +1327,10 @@ public class DesignTools {
 
 	    // Remove Logical Cell
 	    for(EDIFPortInst portInst : cell.getEDIFCellInst().getPortInsts()) {
-	        portInst.getNet().removePortInst(portInst);
+	        EDIFNet en = portInst.getNet();
+	        if (en != null) {
+	            en.removePortInst(portInst);
+	        }
 	    }
 	    cell.getParentCell().removeCellInst(cell.getEDIFCellInst());
 	}
