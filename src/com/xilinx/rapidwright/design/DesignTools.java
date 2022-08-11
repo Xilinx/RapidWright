@@ -1297,9 +1297,14 @@ public class DesignTools {
 	        if(otherUser == false) {
 	            // Unroute site routing back to pin and remove site pin
 	            String sitePinName = getRoutedSitePinFromPhysicalPin(cell, net, pin.getName());
+	            BELPin srcPin = siteInst.getSite().getBELPin(sitePinName);
+	            siteInst.unrouteIntraSiteNet(srcPin, pin);
 	            SitePinInst spi = siteInst.getSitePinInst(sitePinName);
-	            siteInst.unrouteIntraSiteNet(spi.getBELPin(), pin);
-	            handlePinRemovals(spi, deferRemovals);
+	            // It's possible site wire could be set (e.g. reserved using GLOBAL_USEDNET)
+	            // but no inter-site routing (thus no SPI) associated
+	            if (spi != null) {
+	            	handlePinRemovals(spi, deferRemovals);
+	            }
 	        }
 	    }
 
