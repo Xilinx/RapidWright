@@ -38,11 +38,11 @@ public class RunSATRouterExample {
 
 	public static void main(String[] args) {
 		// Check args
-		if(args.length != 3){
+		if(args.length != 3 && args.length != 4){
 			System.out.println("USAGE: java " + RunSATRouterExample.class.getCanonicalName() + " " 
-							+ "<placed_dcp_filename> <pblock_area_constraint> <output_dcp>");
+							+ "<placed_dcp_filename> <pblock_area_constraint> <output_dcp> [random seed]");
 			return;
-		}
+		}		
 		// Check for Vivado
 		String vivadoPath = FileTools.getVivadoPath();
 		if(vivadoPath == null || vivadoPath.length() == 0){
@@ -57,6 +57,10 @@ public class RunSATRouterExample {
 		
 		// Create and invoke SAT router
 		SATRouter satRouter = new SATRouter(design, pblock);
+		if(args.length == 4) {
+		    satRouter.SEED = Long.parseLong(args[3]);
+		    System.out.println("Set SAT Router SEED = " + satRouter.SEED);
+		}
 		satRouter.route();
 		
 		// Write out the results
