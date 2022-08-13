@@ -24,12 +24,13 @@ package com.xilinx.rapidwright.gui;
 
 import java.util.ArrayList;
 
-import com.trolltech.qt.core.QPointF;
-import com.trolltech.qt.gui.QBrush;
-import com.trolltech.qt.gui.QColor;
-import com.trolltech.qt.gui.QGraphicsPolygonItem;
-import com.trolltech.qt.gui.QPen;
-import com.trolltech.qt.gui.QPolygonF;
+import io.qt.core.Qt;
+import io.qt.core.QPointF;
+import io.qt.gui.QBrush;
+import io.qt.gui.QColor;
+import io.qt.widgets.QGraphicsPolygonItem;
+import io.qt.gui.QPen;
+import io.qt.gui.QPolygonF;
 import com.xilinx.rapidwright.design.ModuleInst;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.Tile;
@@ -66,8 +67,8 @@ public class ModuleInstanceScene extends TileScene {
                 QPolygonF poly = ghmpi.getShape().clone();
                 QGraphicsPolygonItem polyItem = new QGraphicsPolygonItem();
                 polyItem.setPolygon(poly);
-                polyItem.setBrush(QBrush.NoBrush);
-                polyItem.setPen(new QPen(QColor.red, 5));
+                polyItem.setBrush(new QBrush());
+                polyItem.setPen(new QPen(new QColor(Qt.GlobalColor.red), 5));
                 QPointF tilePos = getTilePos(placement.getTile());
                 polyItem.setPos(tilePos.subtract(ghmpi.getAnchorOffset()));
                 addItem(polyItem);

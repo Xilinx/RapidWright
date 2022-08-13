@@ -21,7 +21,7 @@
  */
 package com.xilinx.rapidwright.gui;
 
-import com.trolltech.qt.gui.QColor;
+import io.qt.gui.QColor;
 import com.xilinx.rapidwright.design.TileRectangle;
 
 /**

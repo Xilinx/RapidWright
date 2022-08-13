@@ -11,6 +11,10 @@ plugins {
 
 apply from: 'common.gradle'
 
+if (System.getProperty("os.name").toLowerCase().contains("mac")) {
+    applicationDefaultJvmArgs = ["-XstartOnFirstThread"]
+}
+
 mainClassName = "com.xilinx.rapidwright.MainEntrypoint"
 
 def read_rapidwright_version() {

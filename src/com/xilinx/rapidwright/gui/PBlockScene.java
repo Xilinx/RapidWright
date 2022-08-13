@@ -27,13 +27,13 @@ import java.util.List;
 import java.util.function.BiConsumer;
 import java.util.stream.Stream;
 
-import com.trolltech.qt.core.QRect;
-import com.trolltech.qt.core.QRectF;
-import com.trolltech.qt.core.Qt;
-import com.trolltech.qt.gui.QBrush;
-import com.trolltech.qt.gui.QColor;
-import com.trolltech.qt.gui.QFont;
-import com.trolltech.qt.gui.QPainter;
+import io.qt.core.QRect;
+import io.qt.core.QRectF;
+import io.qt.core.Qt;
+import io.qt.gui.QBrush;
+import io.qt.gui.QColor;
+import io.qt.gui.QFont;
+import io.qt.gui.QPainter;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.TileRectangle;
 import com.xilinx.rapidwright.device.Tile;
@@ -71,7 +71,7 @@ public class PBlockScene extends TileScene {
     }
 
     private void drawIntConnections(QPainter painter) {
-        painter.setPen(QColor.white);
+        painter.setPen(new QColor(Qt.GlobalColor.white));
         for (Tile tile: device.getAllTiles()) {
             Arrays.stream(tile.getSites())
                     .flatMap(s-> {
@@ -139,7 +139,7 @@ public class PBlockScene extends TileScene {
         //We draw all backgrounds, all outlines and then all texts to better support overlapped pblocks.
 
         forAllRects((block, rect) -> {
-            final QColor transparent = block.color.clone();
+            final QColor transparent = new QColor(block.color.rgba64());
             if (block.opacity == null) {
                 transparent.setAlpha(blockOpacity);
             } else {
@@ -157,7 +157,7 @@ public class PBlockScene extends TileScene {
 
             painter.drawText(
                     rect,
-                    Qt.AlignmentFlag.createQFlags(Qt.AlignmentFlag.AlignVCenter, Qt.AlignmentFlag.AlignCenter).value(),
+                    Qt.AlignmentFlag.flags(Qt.AlignmentFlag.AlignVCenter, Qt.AlignmentFlag.AlignCenter).value(),
                     block.name
             );
         });

@@ -25,22 +25,18 @@ package com.xilinx.rapidwright.examples.tilebrowser;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.trolltech.qt.core.QModelIndex;
-import com.trolltech.qt.core.Qt.DockWidgetArea;
-import com.trolltech.qt.core.Qt.ItemDataRole;
-import com.trolltech.qt.core.Qt.WindowModality;
-import com.trolltech.qt.gui.QApplication;
-import com.trolltech.qt.gui.QDockWidget;
-import com.trolltech.qt.gui.QLabel;
-import com.trolltech.qt.gui.QMainWindow;
-import com.trolltech.qt.gui.QProgressDialog;
-import com.trolltech.qt.gui.QStatusBar;
-import com.trolltech.qt.gui.QTreeWidget;
-import com.trolltech.qt.gui.QWidget;
-import com.trolltech.qt.gui.QDockWidget.DockWidgetFeature;
+import io.qt.core.QModelIndex;
+import io.qt.core.Qt;
+import io.qt.widgets.QApplication;
+import io.qt.widgets.QDockWidget;
+import io.qt.widgets.QLabel;
+import io.qt.widgets.QMainWindow;
+import io.qt.widgets.QProgressDialog;
+import io.qt.widgets.QStatusBar;
+import io.qt.widgets.QTreeWidget;
+import io.qt.widgets.QWidget;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.gui.WidgetMaker;
-import com.xilinx.rapidwright.util.MessageGenerator;
 
 /**
  * This class is an example of how RapidWright could be used to build
@@ -50,7 +46,7 @@ import com.xilinx.rapidwright.util.MessageGenerator;
  * jars to run.
  * @author marc
  */
-public class PartTileBrowser extends QMainWindow{
+public class PartTileBrowser extends QMainWindow {
 	/** This is the Qt View object for the tile browser */
 	private PartTileBrowserView view;
 	/** This is the container for the text in the Status Bar at the bottom of the screen */
@@ -69,9 +65,6 @@ public class PartTileBrowser extends QMainWindow{
 	 * @param args
 	 */
 	public static void main(String[] args){
-		// This line fixes slow performance under Linux
-		QApplication.setGraphicsSystem("raster");
-		
 		QApplication.initialize(args);
 		PartTileBrowser testPTB = new PartTileBrowser(null);
 		testPTB.show();
@@ -114,22 +107,22 @@ public class PartTileBrowser extends QMainWindow{
 		treeWidget.doubleClicked.connect(this,"showPart(QModelIndex)");
 		
 		QDockWidget dockWidget = new QDockWidget(tr("Part Browser"), this);
-		dockWidget.setAllowedAreas(DockWidgetArea.LeftDockWidgetArea);
+		dockWidget.setAllowedAreas(Qt.DockWidgetArea.LeftDockWidgetArea);
 		dockWidget.setWidget(treeWidget);
-		dockWidget.setFeatures(DockWidgetFeature.NoDockWidgetFeatures);
-		addDockWidget(DockWidgetArea.LeftDockWidgetArea, dockWidget);
+		dockWidget.setFeatures(QDockWidget.DockWidgetFeature.NoDockWidgetFeatures);
+		addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, dockWidget);
 	}
 
 	@SuppressWarnings("unused")
 	private void showPart(QModelIndex qmIndex){
-		Object data = qmIndex.data(ItemDataRole.AccessibleDescriptionRole);
+		Object data = qmIndex.data(Qt.ItemDataRole.AccessibleDescriptionRole);
 		if( data != null){
 			if(currPartName.equals(data))
 				return;
 			currPartName = (String) data;
 			QProgressDialog progress = new QProgressDialog("Loading "+currPartName.toUpperCase()+"...", "", 0, 100, this);
 			progress.setWindowTitle("Load Progress");
-			progress.setWindowModality(WindowModality.WindowModal);
+			progress.setWindowModality(Qt.WindowModality.WindowModal);
 			progress.setCancelButton(null);
 			progress.show();
 			progress.setValue(10);

@@ -28,41 +28,34 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 
-import com.trolltech.qt.core.QPointF;
-import com.trolltech.qt.core.Qt;
-import com.trolltech.qt.core.Qt.CursorShape;
-import com.trolltech.qt.core.Qt.DockWidgetArea;
-import com.trolltech.qt.core.Qt.MatchFlag;
-import com.trolltech.qt.core.Qt.MatchFlags;
-import com.trolltech.qt.core.Qt.WindowModality;
-import com.trolltech.qt.gui.QAction;
-import com.trolltech.qt.gui.QApplication;
-import com.trolltech.qt.gui.QComboBox;
-import com.trolltech.qt.gui.QCursor;
-import com.trolltech.qt.gui.QDockWidget;
-import com.trolltech.qt.gui.QFileDialog;
-import com.trolltech.qt.gui.QGraphicsItemInterface;
-import com.trolltech.qt.gui.QIcon;
-import com.trolltech.qt.gui.QKeySequence;
-import com.trolltech.qt.gui.QLabel;
-import com.trolltech.qt.gui.QMainWindow;
-import com.trolltech.qt.gui.QMenu;
-import com.trolltech.qt.gui.QMessageBox;
-import com.trolltech.qt.gui.QPainter;
-import com.trolltech.qt.gui.QPrinter;
-import com.trolltech.qt.gui.QProgressDialog;
-import com.trolltech.qt.gui.QStatusBar;
-import com.trolltech.qt.gui.QTableWidget;
-import com.trolltech.qt.gui.QTableWidgetItem;
-import com.trolltech.qt.gui.QToolBar;
-import com.trolltech.qt.gui.QTreeWidget;
-import com.trolltech.qt.gui.QTreeWidgetItem;
-import com.trolltech.qt.gui.QUndoStack;
-import com.trolltech.qt.gui.QWidget;
-import com.trolltech.qt.gui.QAbstractItemView.SelectionMode;
-import com.trolltech.qt.gui.QKeySequence.StandardKey;
-import com.trolltech.qt.gui.QPrinter.OutputFormat;
-import com.trolltech.qt.gui.QPrinter.PageSize;
+import io.qt.core.QPointF;
+import io.qt.core.Qt;
+import io.qt.gui.QAction;
+import io.qt.widgets.QApplication;
+import io.qt.widgets.QComboBox;
+import io.qt.gui.QCursor;
+import io.qt.widgets.QDockWidget;
+import io.qt.widgets.QFileDialog;
+import io.qt.widgets.QGraphicsItem;
+import io.qt.gui.QIcon;
+import io.qt.gui.QKeySequence;
+import io.qt.widgets.QLabel;
+import io.qt.widgets.QMainWindow;
+import io.qt.widgets.QMenu;
+import io.qt.widgets.QMessageBox;
+import io.qt.gui.QPainter;
+import io.qt.printsupport.QPrinter;
+import io.qt.widgets.QProgressDialog;
+import io.qt.widgets.QStatusBar;
+import io.qt.widgets.QTableWidget;
+import io.qt.widgets.QTableWidgetItem;
+import io.qt.widgets.QToolBar;
+import io.qt.widgets.QTreeWidget;
+import io.qt.widgets.QTreeWidgetItem;
+import io.qt.gui.QUndoStack;
+import io.qt.widgets.QWidget;
+import io.qt.widgets.QAbstractItemView;
+import io.qt.gui.QPageSize;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.blocks.UtilizationType;
@@ -97,7 +90,6 @@ public class ModuleOptimizer extends QMainWindow {
 		
 	
 	public static void main(String[] args) {
-		QApplication.setGraphicsSystem("raster");
 		QApplication.initialize(args);
 
 		boolean debugPlacer = false;
@@ -178,9 +170,9 @@ public class ModuleOptimizer extends QMainWindow {
 		if(macroList.hasFocus())
 			return;
 		macroList.clearSelection();
-		for(QGraphicsItemInterface item : scene.selectedItems()){
+		for(QGraphicsItem item : scene.selectedItems()){
 			String modInstName = ((GUIModuleInst)item).getModuleInst().getName();
-			List<QTreeWidgetItem> itemList = macroList.findItems(modInstName, new MatchFlags(MatchFlag.MatchExactly), 0);
+			List<QTreeWidgetItem> itemList = macroList.findItems(modInstName, new Qt.MatchFlags(Qt.MatchFlag.MatchExactly), 0);
 			if(itemList.size() > 0){
 				itemList.get(0).setSelected(true);
 			}
@@ -233,10 +225,10 @@ public class ModuleOptimizer extends QMainWindow {
 		}
 		
 		QDockWidget dockWidget = new QDockWidget(tr("PBlock Utilization"), this);
-		dockWidget.setAllowedAreas(DockWidgetArea.RightDockWidgetArea,
-				DockWidgetArea.LeftDockWidgetArea);
+		dockWidget.setAllowedAreas(Qt.DockWidgetArea.RightDockWidgetArea,
+				Qt.DockWidgetArea.LeftDockWidgetArea);
 		dockWidget.setWidget(utilTable);
-		addDockWidget(DockWidgetArea.RightDockWidgetArea, dockWidget);
+		addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dockWidget);
 	}
 	
 	private void updateUtilizationTable(Design d){
@@ -253,7 +245,7 @@ public class ModuleOptimizer extends QMainWindow {
 	private void createModuleList() {
 		
 		macroList = new QTreeWidget();
-		macroList.setSelectionMode(SelectionMode.ExtendedSelection);
+		macroList.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection);
 		macroList.setColumnCount(2);
 		ArrayList<String> headerList = new ArrayList<String>();
 		headerList.add("Module Instance");
@@ -263,10 +255,10 @@ public class ModuleOptimizer extends QMainWindow {
 		
 		
 		QDockWidget dockWidget = new QDockWidget(tr("Module List"), this);
-		dockWidget.setAllowedAreas(DockWidgetArea.RightDockWidgetArea,
-				DockWidgetArea.LeftDockWidgetArea);
+		dockWidget.setAllowedAreas(Qt.DockWidgetArea.RightDockWidgetArea,
+				Qt.DockWidgetArea.LeftDockWidgetArea);
 		dockWidget.setWidget(macroList);
-		addDockWidget(DockWidgetArea.RightDockWidgetArea, dockWidget);
+		addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dockWidget);
 	}
 	
 	protected void about() {
@@ -276,7 +268,7 @@ public class ModuleOptimizer extends QMainWindow {
 
 	protected void openDesign(){
 		String fileName = QFileDialog.getOpenFileName(this, "Choose a file...",
-				".", FileFilters.dcpFilter);
+				".", FileFilters.dcpFilter).toString();
 		if(fileName.endsWith(".dcp")){
 			internalOpenDesign(fileName);
 		}
@@ -287,7 +279,7 @@ public class ModuleOptimizer extends QMainWindow {
 		String shortFileName = fileName.substring(fileName.lastIndexOf('/')+1);
 		QProgressDialog progress = new QProgressDialog("Loading "+currOpenFileName+"...", "", 0, 100, this);
 		progress.setWindowTitle("Load Progress");
-		progress.setWindowModality(WindowModality.WindowModal);
+		progress.setWindowModality(Qt.WindowModality.WindowModal);
 		progress.setCancelButton(null);
 		progress.show();
 		progress.setValue(0);	
@@ -323,7 +315,7 @@ public class ModuleOptimizer extends QMainWindow {
 	protected void saveAsDesign(){
 		if(scene.getDesign() == null)
 			return;
-		String fileName = QFileDialog.getSaveFileName(this, tr("Save As"),".", FileFilters.dcpFilter);
+		String fileName = QFileDialog.getSaveFileName(this, tr("Save As"),".", FileFilters.dcpFilter).toString();
         if (fileName.length() == 0)
             return;
         scene.getDesign().flattenDesign();
@@ -334,13 +326,13 @@ public class ModuleOptimizer extends QMainWindow {
 	protected void saveAsPDFDesign(){
 		if(scene.getDesign() == null)
 			return;
-		String fileName = QFileDialog.getSaveFileName(this, tr("Save As PDF"),".", FileFilters.pdfFilter);
+		String fileName = QFileDialog.getSaveFileName(this, tr("Save As PDF"),".", FileFilters.pdfFilter).toString();
         if (fileName.length() == 0)
             return;
         QPrinter printer = new QPrinter();
-        printer.setOutputFormat(OutputFormat.PdfFormat);
+        printer.setOutputFormat(QPrinter.OutputFormat.PdfFormat);
         printer.setOutputFileName(fileName);
-        printer.setPageSize(PageSize.Letter);
+        printer.setPageSize(new QPageSize(QPageSize.PageSizeId.Letter));
         QPainter pdfPainter = new QPainter(printer);
         scene.render(pdfPainter);
         pdfPainter.end();
@@ -376,13 +368,13 @@ public class ModuleOptimizer extends QMainWindow {
 		QMenu fileMenu = new QMenu(tr("&File"), this);
 		menuBar().addMenu(fileMenu);
 
-		action(tr("Open"), "fileopen", StandardKey.Open, "openDesign()",fileMenu, tb);
+		action(tr("Open"), "fileopen", QKeySequence.StandardKey.Open, "openDesign()",fileMenu, tb);
 		fileMenu.addSeparator();
-		action(tr("&Save"), "filesave", StandardKey.Save, "saveDesign()", fileMenu, tb);
-		action(tr("&Save As"), "filesaveas", StandardKey.SaveAs, "saveAsDesign()", fileMenu, tb);
+		action(tr("&Save"), "filesave", QKeySequence.StandardKey.Save, "saveDesign()", fileMenu, tb);
+		action(tr("&Save As"), "filesaveas", QKeySequence.StandardKey.SaveAs, "saveAsDesign()", fileMenu, tb);
 		action(tr("&Save As PDF"), "exportpdf", null, "saveAsPDFDesign()", fileMenu, tb);
 		fileMenu.addSeparator();
-		action(tr("&Print"), "fileprint", StandardKey.Print, null, fileMenu, tb);		
+		action(tr("&Print"), "fileprint", QKeySequence.StandardKey.Print, null, fileMenu, tb);
 		fileMenu.addSeparator();
 		action(tr("&Quit"), null, "Ctrl+Q", "close()", fileMenu, null);
 	}
@@ -395,11 +387,11 @@ public class ModuleOptimizer extends QMainWindow {
 		QMenu m = new QMenu(tr("&Edit"), this);
 		menuBar().addMenu(m);
 
-		actionUndo = action(tr("&Undo"), "editundo", StandardKey.Undo, null, m,
+		actionUndo = action(tr("&Undo"), "editundo", QKeySequence.StandardKey.Undo, null, m,
 				b);
 		actionUndo.setEnabled(false);
 		actionUndo.triggered.connect(undoStack, "undo()");
-		actionRedo = action(tr("&Redo"), "editredo", StandardKey.Redo, null, m,
+		actionRedo = action(tr("&Redo"), "editredo", QKeySequence.StandardKey.Redo, null, m,
 				b);
 		actionRedo.setEnabled(false);
 		actionRedo.triggered.connect(undoStack, "redo()");
@@ -423,7 +415,7 @@ public class ModuleOptimizer extends QMainWindow {
 		netViewCombo.currentIndexChanged.connect(scene,"changeNetView(int)");
 		tb.addWidget(netViewCombo);
 		
-		actionZoomIn = action(tr("&Zoom Out"), "zoomout", StandardKey.ZoomOut, "zoomout()", m, tb);
+		actionZoomIn = action(tr("&Zoom Out"), "zoomout", QKeySequence.StandardKey.ZoomOut, "zoomout()", m, tb);
 		actionZoomOut = action(tr("&Zoom In"), "zoomin", "Ctrl+=", "zoomin()", m, tb);
 		actionZoomSelection = action(tr("&Zoom Selection"), "zoomselection", null, "zoomselection()", m, tb);
 		actionZoomIn.setEnabled(false);
@@ -442,7 +434,7 @@ public class ModuleOptimizer extends QMainWindow {
 	@SuppressWarnings("unused")
 	private void zoomselection(){
 		double top=-1,left=-1,right=-1,bottom=-1;
-		for(QGraphicsItemInterface item : scene.selectedItems()){
+		for(QGraphicsItem item : scene.selectedItems()){
 			QPointF gmiTL = item.pos();
 			QPointF gmiBR = item.pos().add(item.boundingRect().bottomRight());
 			if(top < 0 || gmiTL.y() < top)
@@ -454,12 +446,12 @@ public class ModuleOptimizer extends QMainWindow {
 			if(right < 0 || gmiBR.x() > right)
 				right = gmiBR.x();
 		}
-		view.fitInView(left, top, right-left, bottom-top, Qt.AspectRatioMode.KeepAspectRatio);	
+		view.fitInView(left, top, right-left, bottom-top, Qt.AspectRatioMode.KeepAspectRatio);
 	}
 	@SuppressWarnings("unused")
 	private void addPblock(){
 		System.out.println("Adding a PBlock...");
 		view.addPBlockMode(true);
-		view.setCursor(new QCursor(CursorShape.CrossCursor));
+		view.setCursor(new QCursor(Qt.CursorShape.CrossCursor));
 	}
 }

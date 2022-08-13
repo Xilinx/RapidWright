@@ -25,18 +25,17 @@
  */
 package com.xilinx.rapidwright.design.blocks;
 
-import com.trolltech.qt.QVariant;
-import com.trolltech.qt.core.QPointF;
-import com.trolltech.qt.core.QRectF;
-import com.trolltech.qt.core.Qt.PenStyle;
-import com.trolltech.qt.gui.QBrush;
-import com.trolltech.qt.gui.QColor;
-import com.trolltech.qt.gui.QGraphicsPolygonItem;
-import com.trolltech.qt.gui.QGraphicsSceneMouseEvent;
-import com.trolltech.qt.gui.QPen;
-import com.trolltech.qt.gui.QPolygonF;
-import com.trolltech.qt.gui.QGraphicsItem.GraphicsItemChange;
-import com.trolltech.qt.gui.QGraphicsItem.GraphicsItemFlag;
+import io.qt.core.QVariant;
+import io.qt.core.QStaticMemberSignals;
+import io.qt.core.QPointF;
+import io.qt.core.QRectF;
+import io.qt.core.Qt;
+import io.qt.gui.QBrush;
+import io.qt.gui.QColor;
+import io.qt.widgets.QGraphicsPolygonItem;
+import io.qt.widgets.QGraphicsSceneMouseEvent;
+import io.qt.gui.QPen;
+import io.qt.gui.QPolygonF;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.gui.TileScene;
 
@@ -51,10 +50,10 @@ public class GUIPBlock extends QGraphicsPolygonItem {
 	
 	private PBlock pb;
 	
-	public Signal1<Boolean> selected = new Signal1<Boolean>();
-	
-	public Signal0 moved = new Signal0();
-	
+	public final static QStaticMemberSignals.Signal1<Boolean> selected = new QStaticMemberSignals.Signal1<Boolean>();
+
+	public final static QStaticMemberSignals.Signal0 moved = new QStaticMemberSignals.Signal0();
+
 	private TileScene scene;
 
 	private boolean isSelected;
@@ -90,7 +89,7 @@ public class GUIPBlock extends QGraphicsPolygonItem {
 		QPolygonF pPolygon = new QPolygonF(pRect);
 		setPolygon(pPolygon);
 		setToolTip(pb.toString());
-		this.setPen(new QPen(QColor.yellow,5.0,PenStyle.DotLine));
+		this.setPen(new QPen(new QColor(Qt.GlobalColor.yellow),5.0, Qt.PenStyle.DotLine));
 		this.setBrush(new QBrush(transYellow));
 	}
 	
