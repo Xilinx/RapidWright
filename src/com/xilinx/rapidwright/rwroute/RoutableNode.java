@@ -131,10 +131,10 @@ public class RoutableNode implements Routable{
 		children = new ArrayList<>();
 		List<Node> allDownHillNodes = node.getAllDownhillNodes();
 		
-		for(Node node:allDownHillNodes){		
+		for(Node node : allDownHillNodes){
 			if(reserved.contains(node)) continue;		
 			if(isExcluded(node, timingDriven)) continue;
-			if(routethruHelper.isRouteThru(node, node)) continue;
+			if(routethruHelper.isRouteThru(this.node, node)) continue;
 			
 			Routable child = createdRoutable.get(node);
 			if(child == null) {
