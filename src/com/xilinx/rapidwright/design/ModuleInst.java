@@ -24,17 +24,21 @@ package com.xilinx.rapidwright.design;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.design.blocks.PBlockRange;
+import com.xilinx.rapidwright.design.noc.NOCClient;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
+import com.xilinx.rapidwright.edif.EDIFCell;
+import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.util.MessageGenerator;
 import com.xilinx.rapidwright.util.Utils;
 
@@ -58,7 +62,9 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 	private ArrayList<SiteInst> instances;
 	/** A list of all nets internal to this module instance */
 	private ArrayList<Net> nets;
-	
+	/** A list of all NOCClients belonging to this instance **/
+	private ArrayList<NOCClient> nocClients;
+
 	/**
 	 * Constructor initializing instance module name
 	 * @param name Name of the module instance
@@ -191,7 +197,18 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 	}
 	
 	public boolean isPlaced(){
-		return anchor.isPlaced();
+		return anchor != null && anchor.isPlaced();
+	}
+	
+	public void addNOCClient(NOCClient nc) {
+		getNOCClients().add(nc);
+	}
+	
+	public List<NOCClient> getNOCClients() {
+		if(nocClients == null) {
+		    nocClients = new ArrayList<NOCClient>();
+		}
+		return nocClients;
 	}
 	
 	/**
@@ -221,23 +238,43 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 
 	/**
 	 * Places the module instance anchor at the newAnchorSite as well as all other 
-	 * instances and nets within the module instance at their relative offsets of the new site.
+	 * instances and nets within the module instance at their relative offsets of the new site. Note
+	 * that this method allows placement overlap by default.  See 
+	 * {@link #place(Site, boolean, boolean)} to disallow module overlap.
 	 * @param newAnchorSite The new site for the anchor of the module instance.
 	 * @return True if placement was successful, false otherwise.
 	 */
 	public boolean place(Site newAnchorSite){	
-		return place(newAnchorSite, false);
+	    return place(newAnchorSite, false);
 	}
-	
+
 	/**
 	 * Places the module instance on the module's anchor site (original location of the module).  
-	 * This is the same as place(getModule().getAnchor().getSite()). 
+	 * This is the same as place(getModule().getAnchor().getSite()). Note
+	 * that this method allows placement overlap by default.  See 
+	 * {@link #place(Site, boolean, boolean)} to disallow module overlap.
 	 * @return True if the placement was successful, false otherwise.
 	 */
 	public boolean placeOnOriginalAnchor() {
-		return place(module.getAnchor().getSite(), false);
+	    return place(module.getAnchor(), false);
 	}
-	
+
+	/**
+	 * Places the module instance anchor at the newAnchorSite as well as all other 
+	 * instances and nets within the module instance at their relative offsets of the new site.  Note
+	 * that this method allows placement overlap by default.  See 
+	 * {@link #place(Site, boolean, boolean)} to disallow module overlap.
+	 * @param newAnchorSite The new site for the anchor of the module instance.
+	 * @param skipIncompatible Flag telling the placement checks to skip any incompatible site that
+	 * does not match the floorplan according to the original module and simply leave it unplaced.  
+	 * Setting to false will cause placement to fail on first mismatch of floorplan placement 
+	 * attempt.  
+	 * @return True if placement was successful, false otherwise.
+	 */
+	public boolean place(Site newAnchorSite, boolean skipIncompatible){
+	    return place(newAnchorSite, skipIncompatible, true);
+	}
+
 	/**
 	 * Places the module instance anchor at the newAnchorSite as well as all other 
 	 * instances and nets within the module instance at their relative offsets of the new site.
@@ -246,9 +283,10 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 	 * does not match the floorplan according to the original module and simply leave it unplaced.  
 	 * Setting to false will cause placement to fail on first mismatch of floorplan placement 
 	 * attempt.
+	 * @param allowOverlap True if the module instance is allowed to overlap with existing placed logic.
 	 * @return True if placement was successful, false otherwise.
 	 */
-	public boolean place(Site newAnchorSite, boolean skipIncompatible){	
+	public boolean place(Site newAnchorSite, boolean skipIncompatible, boolean allowOverlap){	
 		// Check if parameters are null
 		if(newAnchorSite == null){
 			return false;
@@ -257,7 +295,7 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 		
 		// Do some error checking on the newAnchorSite
 		if(module.getAnchor() == null) return false;
-		Site p = module.getAnchor().getSite();
+		Site p = module.getAnchor();
 		Tile t = newAnchorSite.getTile();
 		Site newValidSite = p.getCorrespondingSite(module.getAnchor().getSiteTypeEnum(), t);
 		if(!newAnchorSite.equals(newValidSite)){
@@ -285,7 +323,9 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 			Tile newTile = module.getCorrespondingTile(templateSite.getTile(), newAnchorSite.getTile());
 			Site newSite = templateSite.getCorrespondingSite(inst.getSiteTypeEnum(), newTile);
 
-			if(newSite == null){
+			SiteInst existingSiteInst = allowOverlap ? null : design.getSiteInstFromSite(newSite);
+			
+			if(newSite == null || existingSiteInst != null){
 				//MessageGenerator.briefError("ERROR: No matching site found." +
 				//	" (Template Site:"	+ templateSite.getName() + 
 				//	", Template Tile:" + templateSite.getTile() +
@@ -349,7 +389,26 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 				//}
 				net.addPIP(newPip);
 			}
+
+			// Because only one VCC/GND net is allowed for each Design,
+			// this net is just a placeholder for module-specific PIPs
+			// (that were relocated above) -- add those to Design's
+			// singleton net here
+			if (templateNet.isStaticNet()) {
+				Net designNet = design.getNet(templateNet.getName());
+				designNet.getPIPs().addAll(net.getPIPs());
+			}
 		}
+		//Update location of NOCClients
+		for(NOCClient nc : getNOCClients()) {
+			Site templateSite = dev.getSite(nc.getLocation());
+			if(templateSite == null) 
+				continue;
+			Tile newTile = module.getCorrespondingTile(templateSite.getTile(), newAnchorSite.getTile());
+			Site newSite = templateSite.getCorrespondingSite(templateSite.getSiteTypeEnum(), newTile);
+			nc.setLocation(newSite != null ? newSite.getName() : null);
+		}
+		
 		return true;
 	}
 	
@@ -363,6 +422,19 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 		}
 		//unplace nets (remove pips)
 		for(Net net : nets){
+			// Because only one VCC/GND net is allowed for each Design,
+			// this net is just a placeholder for any module-specific PIPs
+			// that would have been inserted into Design's static net, so
+			// surgically remove those here
+			if (net.isStaticNet()) {
+				Net templateNet = net.getModuleTemplateNet();
+				Net designNet = design.getNet(templateNet.getName());
+
+				HashSet<PIP> pips = new HashSet<>(net.getPIPs());
+				designNet.getPIPs().removeIf((p) -> pips.remove(p));
+				assert(pips.isEmpty());
+			}
+
 			net.getPIPs().clear();
 		}
 	}
@@ -500,10 +572,10 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 	 */
 	public Site getLowerLeftPlacement(SiteTypeEnum type){
 		// Calculate anchor offset
-		SiteInst anchor = getModule().getAnchor();
+		Site anchor = getModule().getAnchor();
 		if(anchor == null) return null;
 		
-		Tile origAnchor = anchor.getSite().getTile();
+		Tile origAnchor = anchor.getTile();
 		Tile currAnchor = getAnchor().getSite().getTile();
 		int dx = currAnchor.getTileXCoordinate() - origAnchor.getTileXCoordinate();
 		int dy = currAnchor.getTileYCoordinate() - origAnchor.getTileYCoordinate();
@@ -590,9 +662,9 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 		Tile newAnchorTile = getModule().getCorrespondingAnchorTile(targetTile, ipTile, dev);
 		if(newAnchorTile == null) return false;
 		
-		SiteInst anchor = getModule().getAnchor();
+		Site anchor = getModule().getAnchor();
 		if(anchor == null) return false;
-		Site moduleAnchor = anchor.getSite();
+		Site moduleAnchor = anchor;
 		boolean success = place(newAnchorTile.getSites()[moduleAnchor.getTile().getSiteIndex(moduleAnchor)]);
 		
 		if(!success) System.out.println("Failed placement attempt, TargetTile="+targetTile.getName()+" ipTile="+ipTile.getName());
@@ -628,15 +700,24 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 
 		Net physicalNet;
 		Port inPort;
+		ModuleInst modInst = this;
 		if (p0.isOutPort()) {
 			physicalNet = getCorrespondingNet(p0);
+			if(physicalNet == null) {
+			    // This is a pass-thru situation and we'll need to create the net
+			    EDIFCell top = getCellInst().getParentCell();
+			    String newNetName = super.getNewNetName(portName, busIndex0, other, otherPortName, busIndex1);
+			    EDIFNet logicalNet = top.getNet(newNetName);
+			    physicalNet = design.createNet(newNetName, logicalNet);
+			}
 			inPort = p1;
+			modInst = other;
 		} else {
 			physicalNet = other.getCorrespondingNet(p1);
 			inPort = p0;
 		}
 
-		for (SitePinInst inPin : getCorrespondingPins(inPort)) {
+		for (SitePinInst inPin : modInst.getCorrespondingPins(inPort)) {
 			physicalNet.addPin(inPin);
 		}
 	}

@@ -1,12 +1,24 @@
 apply plugin: 'application'
 apply plugin: 'java-library'
+apply plugin: "java-test-fixtures"
 
 sourceCompatibility = 8
 targetCompatibility = 8
 
-def rapidwrightDir = System.getenv("RAPIDWRIGHT_PATH") ?: file('.').toString()
-
 repositories {
+    if (project.hasProperty('additionalMavenRepo')) {
+      project.logger.lifecycle('Adding Maven Repository at '+additionalMavenRepo)
+      exclusiveContent {
+        forRepository {
+          maven {
+            url additionalMavenRepo
+          }
+        }
+        filter {
+          includeModule("com.xilinx.rapidwright", "rapidwright-api-lib")
+        }
+      }
+    }
     if (project.hasProperty('useMavenLocal') && useMavenLocal == "True") {
        project.logger.lifecycle('Using Maven Local Repository')
        mavenLocal()
@@ -31,30 +43,39 @@ dependencies {
   api 'com.jcraft:jzlib:1.1.3'
   api 'commons-io:commons-io:2.11.0'
   api 'com.xilinx.rapidwright:qtjambi-'+os+':4.5.2_01'
-  api 'com.xilinx.rapidwright:jupyter-kernel-jsr223:1.0.0'
-  testImplementation 'org.junit.jupiter:junit-jupiter-api:5.7.1'
-  testImplementation 'org.junit.jupiter:junit-jupiter-engine:5.7.1'
-  testImplementation 'org.junit.jupiter:junit-jupiter-params:5.7.1'
+  api 'com.xilinx.rapidwright:jupyter-kernel-jsr223:1.0.1'
+  testFixturesApi 'org.junit.jupiter:junit-jupiter-api:5.7.1'
+  testFixturesApi 'org.junit.jupiter:junit-jupiter-engine:5.7.1'
+  testFixturesApi 'org.junit.jupiter:junit-jupiter-params:5.7.1'
 }
-
-import java.util.stream.Collectors
-
 //Kryo needs to access sun.nio.ch.DirectBuffer. This is forbidden by default in Java 16 and up. Check if we need to add a jvm arg.
 if (org.gradle.api.JavaVersion.current().isJava10Compatible()) {
 	applicationDefaultJvmArgs = ["--add-exports=java.base/sun.nio.ch=ALL-UNNAMED"]
 }
+if(project.hasProperty('limitToSingleProc') && limitToSingleProc.equals("single-threaded")) {
+	applicationDefaultJvmArgs << "-XX:ActiveProcessorCount=1"
+}
+
 
 configurations.implementation.canBeResolved = true
 configurations.testImplementation.canBeResolved = true
+configurations.testFixturesImplementation.canBeResolved = true
 configurations.api.canBeResolved = true
 
 tasks.withType(Test) {
-  maxHeapSize = "5G"
+  if (System.getenv("GITHUB_ACTION")) {
+    maxHeapSize = "5G"
+  } else {
+    maxHeapSize = "10G"
+  }
   //Propagate JVM settings to test JVM
   jvmArgs applicationDefaultJvmArgs
+
+  environment 'RAPIDWRIGHT_PATH', gradle.ext.rapidwrightDir
+
   //We need to rerun tests when the data files change
-  if (file(rapidwrightDir + '/data').exists()) {
-    inputs.dir file(rapidwrightDir + '/data')
+  if (new File(gradle.ext.rapidwrightDir, 'data').exists()) {
+    inputs.dir new File(gradle.ext.rapidwrightDir, 'data')
   }
 }
 
@@ -63,6 +84,7 @@ task testJava(type:Test) {
   description = "Runs the Java unit tests."
 
   useJUnitPlatform()
+  systemProperty("junit.jupiter.extensions.autodetection.enabled", true)
 }
 
 test {

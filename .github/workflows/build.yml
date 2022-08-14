@@ -5,13 +5,14 @@ on:
   pull_request:
 
 env:
-  RAPIDWRIGHT_VERSION: v2021.2.1-beta
+  RAPIDWRIGHT_VERSION: v2022.1.2-beta
 
 jobs:
   build:
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest]
+        single_threaded: [multi-threaded, single-threaded]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
@@ -46,17 +47,17 @@ jobs:
         run: ./gradlew assemble
 
       - name: Test
-        run: ./gradlew test
+        run: ./gradlew -PlimitToSingleProc=${{ matrix.single_threaded }} test 
 
       - name: Archive Java Test Report
         uses: actions/upload-artifact@v2
-        if: matrix.os == 'ubuntu-latest'
+        if: always() && matrix.os == 'ubuntu-latest'
         with:
           name: Java Test Report
           path: build/reports/tests/testJava
 
       - name: Upload Test Results
-        if: matrix.os == 'ubuntu-latest'
+        if: always() && matrix.os == 'ubuntu-latest'
         uses: actions/upload-artifact@v2
         with:
           name: Unit Test Results

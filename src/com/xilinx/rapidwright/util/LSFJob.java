@@ -38,13 +38,48 @@ import org.json.JSONObject;
  */
 public class LSFJob extends Job {
 	
-	public static String LSF_RESOURCE = "select[osver=ws7]";//"select[type=X86_64 && osdistro=rhel && (osver=ws6 || osver=sv6)] rusage[mem=6000]";
+	public static final String LSF_RESOURCE = "select[osver=ws7]";//"select[type=X86_64 && osdistro=rhel && (osver=ws6 || osver=sv6)] rusage[mem=6000]";
 	
-	public static String LSF_PROJECT = "RapidWright";
+	public static final String LSF_PROJECT = "RapidWright";
 	
-	public static String LSF_QUEUE = "medium";
-	
-	
+	public static final String LSF_QUEUE = "medium";
+
+	private String lsfResource = LSF_RESOURCE;
+	private String lsfProject = LSF_PROJECT;
+	private String lsfQueue = LSF_QUEUE;
+
+
+	public String getLsfResource() {
+		return lsfResource;
+	}
+
+	public void setLsfResource(String lsfResource) {
+		this.lsfResource = lsfResource;
+	}
+
+	/**
+	 * Appends a memory liimt to this Job's LSF Resource.
+	 */
+	public void setLsfResourceMemoryLimit(int memLimitMb) {
+		this.lsfResource += " rusage[mem="+memLimitMb+"]";
+	}
+
+	public String getLsfProject() {
+		return lsfProject;
+	}
+
+	public void setLsfProject(String lsfProject) {
+		this.lsfProject = lsfProject;
+	}
+
+	public String getLsfQueue() {
+		return lsfQueue;
+	}
+
+	public void setLsfQueue(String lsfQueue) {
+		this.lsfQueue = lsfQueue;
+	}
+
 	/* (non-Javadoc)
 	 * @see com.xilinx.rapidwright.util.Job#launchJob()
 	 */
@@ -53,15 +88,15 @@ public class LSFJob extends Job {
 		Pair<String,String> launchScriptNames = createLaunchScript();
 		String[] cmd = new String[]{
 				"bsub","-R",
-				LSF_RESOURCE,
+				lsfResource,
 				"-J",
 				getRunDir()==null? System.getProperty("user.dir") : getRunDir(),
 				"-oo",
 				launchScriptNames.getSecond().replace(DEFAULT_LOG_EXTENSION, "_lsf_%J" + DEFAULT_LOG_EXTENSION),
 				"-P",
-				LSF_PROJECT +"-"+ System.getenv("USER"), 
+				lsfProject +"-"+ System.getenv("USER"),
 				"-q", 
-				LSF_QUEUE,
+				lsfQueue,
 				FileTools.isWindows() ? "cmd.exe" : "/bin/bash",
 				launchScriptNames.getFirst()};
 
@@ -90,9 +125,9 @@ public class LSFJob extends Job {
 	 * Get the Job's status
 	 * @return Pair of (Finished, exit code)
 	 */
-	private Pair<Boolean, Integer> getStatus() {
+	private Pair<JobState, Integer> getStatus() {
 		if (savedExitCode != null) {
-			return new Pair<>(true, savedExitCode);
+			return new Pair<>(JobState.EXITED, savedExitCode);
 		}
 		List<String> cmdOutput = FileTools.getCommandOutput(new String[]{"bjobs", "-o", "jobid stat exit_code exit_reason", "-json", Long.toString(getJobNumber())});
 		String outputString = String.join("\n", cmdOutput);
@@ -112,45 +147,47 @@ public class LSFJob extends Job {
 				String error = jobInfo.getString("ERROR");
 				if (error.contains("is not found")) {
 					//We assume the job has not yet started
-					return new Pair<>(false, 0);
+					return new Pair<>(JobState.PENDING, 0);
 				} else {
 					throw new RuntimeException("LSF Error: "+error);
 				}
 			}
 
-			String status = jobInfo.getString("STAT");
-
-			//Finished without error?
-			boolean isDone = status.equals("DONE");
-			if (isDone) {
-				savedExitCode = 0;
-				return new Pair<>(true, 0);
+			final String stateString = jobInfo.getString("STAT");
+			switch (stateString) {
+				case "DONE":
+					savedExitCode = 0;
+					return new Pair<>(JobState.EXITED, 0);
+				case "EXIT":
+					String exitcode = jobInfo.getString("EXIT_CODE");
+					int exitInt = Integer.parseInt(exitcode);
+					if (exitInt == 0) {
+						throw new RuntimeException("Status claims exit with error, but exitCode is 0!");
+					}
+					savedExitCode = exitInt;
+					return new Pair<>(JobState.EXITED, exitInt);
+				case "RUN":
+					return new Pair<>(JobState.RUNNING, 0);
+				case "PEND":
+					return new Pair<>(JobState.PENDING, 0);
+				case "PSUSP":
+				case "USUSP":
+				case "SSUSP":
+					return new Pair<>(JobState.SUSPENDED, 0);
+				default:
+					throw new RuntimeException("Unknown job state: "+stateString);
 			}
 
-			//Finished with error?
-			boolean isExited = status.equals("EXIT");
-			if (!isExited) {
-				//Not finished yet
-				return new Pair<>(false, 0);
-			}
-
-			String exitcode = jobInfo.getString("EXIT_CODE");
-			int exitInt = Integer.parseInt(exitcode);
-			if (exitInt == 0) {
-				throw new RuntimeException("Status claims exit with error, but exitCode is 0!");
-			}
-			savedExitCode = exitInt;
-			return new Pair<>(true, exitInt);
 		} catch (RuntimeException e) {
 			throw new RuntimeException("Failed getting status. cmd Output: \n"+outputString, e);
 		}
 	}
 
 	/* (non-Javadoc)
-	 * @see com.xilinx.rapidwright.util.Job#isFinished()
+	 * @see com.xilinx.rapidwright.util.Job#getJobState()
 	 */
 	@Override
-	public boolean isFinished() {
+	public JobState getJobState() {
 		return getStatus().getFirst();
 	}
 

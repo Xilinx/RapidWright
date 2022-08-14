@@ -68,7 +68,6 @@ public class CodePerfTracker {
 	
 	
 	public CodePerfTracker(String name){
-		super();
 		init(name,true);
 	}
 	
@@ -77,9 +76,8 @@ public class CodePerfTracker {
 	}
 	
 	public CodePerfTracker(String name, boolean printProgress, boolean isVerbose){
-		super();
 		verbose = isVerbose;
-		init(name,true);
+		init(name,printProgress);
 	}
 	
 	public void init(String name, boolean printProgress){
@@ -131,7 +129,6 @@ public class CodePerfTracker {
 
 	public CodePerfTracker start(String segmentName){
 		if(!GLOBAL_DEBUG || this == SILENT) return this;
-		int idx = runtimes.size();
 		if(isUsingGCCallsToTrackMemory()) System.gc();
 		long currUsage = rt.totalMemory() - rt.freeMemory();
 		segmentNames.add(segmentName);
@@ -187,10 +184,18 @@ public class CodePerfTracker {
 
 	private void print(String segmentName, Long runtime, Long memUsage, boolean nested){
 		if(isUsingGCCallsToTrackMemory()){
-			System.out.printf("%"+maxSegmentNameSize+"s: %"+maxRuntimeSize+".3fs %"+maxUsageSize+".3fMBs\n", 
-				segmentName,
-				(runtime)/1000000000.0,
-				(memUsage)/(1024.0*1024.0));
+			if (nested) {
+				System.out.printf("%"+maxSegmentNameSize+"s: %"+maxRuntimeSize+"s %" + maxUsageSize + "s      (%" + maxRuntimeSize + ".3fs)\n",
+						segmentName,
+						"",
+						"",
+						(runtime)/1000000000.0);
+			} else {
+				System.out.printf("%"+maxSegmentNameSize+"s: %"+maxRuntimeSize+".3fs %"+maxUsageSize+".3fMBs\n",
+						segmentName,
+						(runtime)/1000000000.0,
+						(memUsage)/(1024.0*1024.0));
+			}
 		} else {
 			if (nested) {
 				System.out.printf("%" + maxSegmentNameSize + "s: %" + maxRuntimeSize + "s  (%" + maxRuntimeSize + ".3fs)\n",
@@ -247,6 +252,13 @@ public class CodePerfTracker {
 		segmentNames.add(totalName);
 		if(maxSegmentNameSize < totalName.length()) maxSegmentNameSize = totalName.length();
 	}
+
+	private void removeTotalEntry(){
+		final int idx = runtimes.size() - 1;
+		runtimes.remove(idx);
+		memUsages.remove(idx);
+		segmentNames.remove(idx);
+	}
 	
 	public void printSummary(){
 		if(!GLOBAL_DEBUG || this == SILENT) return;
@@ -260,5 +272,6 @@ public class CodePerfTracker {
 			}
 			print(i);
 		}
+		removeTotalEntry();
 	}
 }

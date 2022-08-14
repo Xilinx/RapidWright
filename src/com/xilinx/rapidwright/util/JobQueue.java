@@ -26,11 +26,14 @@
 package com.xilinx.rapidwright.util;
 
 import java.io.File;
-import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.stream.Collectors;
 
 /**
  * Used to manage a batch of task jobs to run in parallel. 
@@ -43,8 +46,10 @@ public class JobQueue {
 	
 	public static int MAX_LSF_CONCURRENT_JOBS = 120;
 	
-	public static boolean USE_LSF_IF_AVAILABLE = true; 
-	
+	public static boolean USE_LSF_IF_AVAILABLE = true;
+
+	private final boolean printJobStart;
+
 	private Queue<Job> waitingToRun;
 	
 	private ConcurrentLinkedQueue<Job> running;
@@ -56,10 +61,14 @@ public class JobQueue {
 	public static final String LSF_QUEUE_OPTION = "-lsf_queue";
 	
 	
-	public JobQueue(){
+	public JobQueue(boolean printJobStart){
 		waitingToRun = new LinkedList<>();
 		running = new ConcurrentLinkedQueue<>();
 		finished = new LinkedList<>();
+		this.printJobStart = printJobStart;
+	}
+	public JobQueue() {
+		this(true);
 	}
 	
 	public boolean addJob(Job j){
@@ -76,32 +85,41 @@ public class JobQueue {
 	
 	public boolean runAllToCompletion(int maxNumRunningJobs){
 		while(!waitingToRun.isEmpty() || !running.isEmpty()){
+
+			final Map<JobState, List<Job>> jobsByState = running.stream().collect(Collectors.groupingBy(Job::getJobState, ()->new EnumMap<>(JobState.class), Collectors.toList()));
+			final List<Job> exited = jobsByState.get(JobState.EXITED);
+			if (exited != null) {
+				for (Job job : exited) {
+					running.remove(job);
+					finished.add(job);
+				}
+				//Removing from map so they don't show up in our printout
+				jobsByState.remove(JobState.EXITED);
+			}
 			boolean launched = false;
 			while(!waitingToRun.isEmpty() && maxNumRunningJobs > running.size()){
 				Job j = waitingToRun.poll();
 				long pid = j.launchJob();
 				running.add(j);
-				System.out.println("Running job [" + pid + "] " + j.getCommand() + " in " + j.getRunDir());
+				if (printJobStart) {
+					System.out.println("Running job [" + pid + "] " + j.getCommand() + " in " + j.getRunDir());
+				}
 				launched = true;
 			}
 
-			if(!launched){
-				try {
-					System.out.println("Waiting on " + running.size() + " jobs still running, "+waitingToRun.size()+" not yet started...");
-					Thread.sleep(2000);
-				} catch (InterruptedException e) {
-					killAllRunningJobs();
-					throw new RuntimeException("ERROR: Jobs killed due to InterruptedException");
-				}
+			if(!launched || !printJobStart){
+				System.out.print("Waiting on ");
+				jobsByState.forEach((state, jobs) -> {
+					System.out.print(jobs.size()+" "+state.getName()+", ");
+				});
+				System.out.println(waitingToRun.size()+" not yet started...");
 			}
+
 			try {
-				Thread.sleep(200);
+				Thread.sleep(2000);
 			} catch (InterruptedException e) {
-				e.printStackTrace();
-			}
-			for(Job j : running){
-				if(j.isFinished()) running.remove(j);
-				finished.add(j);
+				killAllRunningJobs();
+				throw new RuntimeException("ERROR: Jobs killed due to InterruptedException");
 			}
 		}
 		int failedCount = 0;
@@ -111,25 +129,24 @@ public class JobQueue {
 			if(!curr){
 				if(failedCount == 0){
 					// Let's just print the first error output
-					String logFileName = j.getRunDir() + File.separator + Job.DEFAULT_COMMAND_LOG_FILE;
-					if(logFileName != null && new File(logFileName).exists()){
-						ArrayList<String> lines = FileTools.getLinesFromTextFile(logFileName);
+					j.getLastLogLines().ifPresent(lastLogLines -> {
 						System.err.println("***************************************************************************");
 						System.err.println("* ERROR: Job " + j.getJobNumber() + " failed");
-						System.err.println("* LOG FILE: " + logFileName);
+						System.err.println("* LOG FILE: " + j.getLogFilename());
 						System.err.println("*  Here are the last few lines of the log:");
-						int start = lines.size() >= 8 ? lines.size()-8 : 0; 
-						for(int i=start; i < lines.size(); i++){
-							System.err.println(lines.get(i));
+						for (String l : lastLogLines) {
+							System.err.println(l);
 						}
 						System.err.println("***************************************************************************");
-					}
+					});
 				}
 				failedCount++;
 			}
 			success &= curr;
 		}
-		//if(failedCount > 0) System.err.println("Failed Job Count: " + failedCount);
+		if(failedCount > 0)  {
+			System.err.println("Failed Job Count: " + failedCount);
+		}
 		return success;
 	}
 	

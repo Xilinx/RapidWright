@@ -1,6 +1,27 @@
+/* 
+ * Copyright (c) 2020 Xilinx, Inc. 
+ * All rights reserved.
+ *
+ * Author: Chris Lavin, Xilinx Research Labs.
+ *  
+ * This file is part of RapidWright. 
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * 
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * 
+ */
+ 
 package com.xilinx.rapidwright.interchange;
 
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -18,7 +39,6 @@ import java.util.Queue;
 
 import org.capnproto.MessageBuilder;
 import org.capnproto.PrimitiveList;
-import org.capnproto.SerializePacked;
 import org.capnproto.StructList;
 import org.capnproto.Text;
 import org.capnproto.TextList;
@@ -28,7 +48,6 @@ import org.capnproto.Void;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.SiteInst;
-import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.design.VivadoPropType;
 import com.xilinx.rapidwright.design.VivadoProp;
@@ -45,7 +64,6 @@ import com.xilinx.rapidwright.device.IOStandard;
 import com.xilinx.rapidwright.device.PackagePin;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.PIPType;
-import com.xilinx.rapidwright.device.PIPWires;
 import com.xilinx.rapidwright.device.PseudoPIPHelper;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePIP;
@@ -55,15 +73,9 @@ import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
-import com.xilinx.rapidwright.edif.EDIFDesign;
 import com.xilinx.rapidwright.edif.EDIFLibrary;
-import com.xilinx.rapidwright.edif.EDIFName;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
-import com.xilinx.rapidwright.edif.EDIFPort;
-import com.xilinx.rapidwright.edif.EDIFPortInst;
-import com.xilinx.rapidwright.edif.EDIFPropertyValue;
 import com.xilinx.rapidwright.edif.EDIFTools;
-import com.xilinx.rapidwright.interchange.EnumerateCellBelMapping;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.BELCategory;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.BELInverter;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.CellInversion;
@@ -85,7 +97,6 @@ import com.xilinx.rapidwright.interchange.DeviceResources.Device.ParameterMapRul
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.Direction;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.PropertyMap;
-import com.xilinx.rapidwright.interchange.WireType;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.Pair;
 
@@ -309,7 +320,7 @@ public class DeviceResourcesWriter {
                 EDIFCell macroCell = macros.getCell(instCell.getName());
                 if(macroCell != null && !unsupportedMacros.contains(macroCell)) {
                     // remap cell definition to macro library
-                    inst.updateCellType(macroCell);
+                    inst.setCellType(macroCell);
                 }
             }
         }
@@ -880,9 +891,9 @@ public class DeviceResourcesWriter {
         }
     }
     public static void writeWireTypes(Enumerator<String> allStrings, DeviceResources.Device.Builder devBuilder) {
-        IntentCode[] intents = IntentCode.values();
-        StructList.Builder<DeviceResources.Device.WireType.Builder> wireTypesObj = devBuilder.initWireTypes(intents.length);
-        for (IntentCode intent : IntentCode.values()) {
+        StructList.Builder<DeviceResources.Device.WireType.Builder> wireTypesObj = 
+                devBuilder.initWireTypes(IntentCode.values.length);
+        for (IntentCode intent : IntentCode.values) {
             DeviceResources.Device.WireType.Builder wireType = wireTypesObj.get(intent.ordinal());
             wireType.setName(allStrings.getIndex(intent.toString()));
             wireType.setCategory(WireType.intentToCategory(intent));

@@ -71,11 +71,26 @@ public class EDIFNet extends EDIFPropertyObject {
 	 */
 	public void addPortInst(EDIFPortInst portInst){
 		if(portInsts == null) portInsts = new EDIFPortInstList();
-		if(parentCell != null && portInst.getCellInst() == null) {
+		boolean isParentCellNonNull = parentCell != null;
+		EDIFCellInst inst = portInst.getCellInst();
+		if(isParentCellNonNull && inst == null) {
 			parentCell.addInternalPortMapEntry(portInst.getName(), this);
 		}
 		portInst.setParentNet(this);
+		if(isParentCellNonNull) {
+		    // This does not explicitly track the port instance index, in most cases the name should be sufficient.
+		    trackChanges(EDIFChangeType.PORT_INST_ADD, inst, portInst.getName());
+		}
 		portInsts.add(portInst);
+	}
+	
+	public void trackChanges(EDIFChangeType type, EDIFCellInst inst, String portInstName) {
+        EDIFNetlist netlist = parentCell.getNetlist();
+        if(netlist != null && netlist.isTrackingCellChanges()) {
+            String instName = inst == null ? null : inst.getName();
+            EDIFChangeNet change = new EDIFChangeNet(type, portInstName, getName(), instName);
+            netlist.addTrackingChange(parentCell, change);
+        }
 	}
 	
 	public EDIFPortInst createPortInst(EDIFPort port){
@@ -201,6 +216,35 @@ public class EDIFNet extends EDIFPropertyObject {
 	}
 
 	/**
+	 * Gets the first top level port instance from the stored list in the net.  If multiple top level
+	 * port instances exist on the net, this only returns the first found. For a comprehensive list
+	 * call {@link #getAllTopLevelPortInsts()}.
+	 * @return The first top level port instance found in the net, or null if none exists.
+	 */
+	public EDIFPortInst getTopLevelPortInst() {
+	    for(EDIFPortInst portInst : getPortInsts()) {
+	        if(portInst.isTopLevelPort()) {
+	            return portInst;
+	        }
+	    }
+	    return null;
+	}
+	
+	/**
+	 * Gets all top level port instances connected to this net.  
+	 * @return A list of all top level port instances connected to this net.
+	 */
+	public List<EDIFPortInst> getAllTopLevelPortInsts() {
+	    List<EDIFPortInst> topPortInsts = new ArrayList<>();
+	    for(EDIFPortInst portInst : getPortInsts()) {
+            if(portInst.isTopLevelPort()) {
+                topPortInsts.add(portInst);
+            }
+        }
+	    return topPortInsts;
+	}
+	
+	/**
 	 * Removes the port instance provided from the net. The net stores the port instances using a 
 	 * sorted ArrayList (@link EDIFPortInstList).  Worst case O(n) to remove.
 	 * @param portInst The port instance to remove from the net.
@@ -238,6 +282,10 @@ public class EDIFNet extends EDIFPropertyObject {
 	 */
 	public EDIFPortInst removePortInst(EDIFCellInst inst, String portInstName){
         if (portInsts == null) return null;
+        if(parentCell != null) {
+            // This does not explicitly track the port instance index, in most cases the name should be sufficient.
+            trackChanges(EDIFChangeType.PORT_INST_REMOVE, inst, portInstName);
+        }
         EDIFPortInst tmp = portInsts.remove(inst, portInstName);
 		if(tmp != null) tmp.setParentNet(null);
 		return tmp;
@@ -255,6 +303,7 @@ public class EDIFNet extends EDIFPropertyObject {
 	 */
 	public void setParentCell(EDIFCell parentCell) {
 		this.parentCell = parentCell;
+		parentCell.trackChange(EDIFChangeType.NET_ADD, getName());
 	}
 	
 	public void exportEDIF(Writer wr) throws IOException {
@@ -271,5 +320,19 @@ public class EDIFNet extends EDIFPropertyObject {
 		}
 		wr.write("         )\n"); // Nets end
 
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		EDIFNet other = (EDIFNet) obj;
+		if (!parentCell.equals(other.parentCell))
+			return false;
+		return super.equals(obj);
 	}
 }

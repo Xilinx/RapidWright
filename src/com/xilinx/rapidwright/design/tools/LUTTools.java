@@ -32,6 +32,7 @@ import java.util.Map.Entry;
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Unisim;
+import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
@@ -50,7 +51,53 @@ public class LUTTools {
 
 	public static final int MAX_LUT_SIZE = 6;
 	
-
+	public static final String[][] lutMap;
+	
+	public static final char[] lutLetters = new char[] {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'};
+	
+	public static final String[] empty = new String[0];
+	
+	static {
+	    lutMap = new String[lutLetters.length][];
+	    for(char letter : lutLetters) {
+	        lutMap[letter - 'A'] = new String[] {letter + "6LUT", letter + "5LUT"};
+	    }
+	}
+	
+	/**
+	 * Gets the corresponding BEL site names for a given LUT letter.  For example, 'A' will return
+	 * ["A6LUT", "A5LUT"]
+	 * @param lutLetter The letter of the LUT of interest.  Valid values are 'A'..'H', 
+	 * case insensitive.
+	 * @return The list of corresponding BEL site names or an empty list if none were found.
+	 */
+	public static String[] getLUTBELNames(char lutLetter) {
+	    int index = lutLetter - (lutLetter >= 'a' ? 'a' : 'A');
+	    if(index < 0 || index >= lutLetters.length) return empty;
+	    return lutMap[index];
+	}
+	
+	/**
+	 * Gets the BEL's companion LUT.  For example the A5LUT bel's companion would be A6LUT and vice 
+	 * versa.
+	 * @param lut The LUT bel in question.
+	 * @return The name of the companion LUT or null if undetermined.
+	 */
+	public static String getCompanionLUTName(BEL lut) {
+	    if(!lut.isLUT()) return null;
+	    return getCompanionLUTName(lut.getName());
+	}
+	
+	/**
+	 * Get the companion LUT name of the provided LUT name. For example the A5LUT bel's companion 
+	 * would be A6LUT and vice versa.
+	 * @param lutName Name of the LUT in question.
+	 * @return The companion LUT name or null if undetermined.
+	 */
+	public static String getCompanionLUTName(String lutName) {
+            String[] belNames = getLUTBELNames(lutName.charAt(0));
+            return belNames[(lutName.charAt(1) == '6') ? 1 : 0];	    
+	}
 	
 	/**
 	 * Checks if this cell is a LUT (LUT1, LUT2, LUT3,...). A CFGLUT5 will return false.

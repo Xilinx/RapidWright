@@ -123,7 +123,13 @@ public enum IntentCode {
     NODE_GLOBAL_GCLK,
     NODE_GLOBAL_HROUTE_HSR,
     NODE_GLOBAL_HDISTR_HSR,
-    NODE_GLOBAL_HDISTR_LOCAL;
+    NODE_GLOBAL_HDISTR_LOCAL,
+    NODE_SLL_INPUT,
+    NODE_SLL_OUTPUT,
+    NODE_SLL_DATA,
+    NODE_GLOBAL_VDISTR_LVL3,
+    NODE_GLOBAL_VDISTR_LVL21,
+    NODE_GLOBAL_VDISTR_SHARED;
 
 
     public static boolean isLongWire(Tile tile, int wire){
@@ -131,12 +137,12 @@ public enum IntentCode {
     }
     
     public static boolean isLongWire(int intentCode){
-    	IntentCode ic = values()[intentCode];
+    	IntentCode ic = values[intentCode];
     	return NODE_VLONG == ic || NODE_HLONG == ic || VLONG == ic || HLONG == ic || VLONG12 == ic || SVLONG == ic;
     }
     
     public static boolean isUltraScaleClocking(Tile tile, int wire){
-    	return values()[tile.getWireIntentCode(wire).ordinal()].isUltraScaleClocking();	
+    	return values[tile.getWireIntentCode(wire).ordinal()].isUltraScaleClocking();	
     }
     
     public boolean isUltraScaleClocking(){
@@ -160,6 +166,7 @@ public enum IntentCode {
     private static final int ULTRASCALEPLUS_START_IDX = ULTRASCALE_START_IDX;
     private static final int ULTRASCALEPLUS_END_IDX = ULTRASCALE_END_IDX + 4;
 
+    public static final IntentCode[] values = values();
     
     /**
      * Returns an array of the intent codes specific the provided series.
@@ -168,11 +175,11 @@ public enum IntentCode {
      */
     public static IntentCode[] getIntentCodesBySeries(Series s){
     	if(s == Series.Series7){
-    		return Arrays.copyOfRange(IntentCode.values(), SERIES7_START_IDX, SERIES7_END_IDX);
+    		return Arrays.copyOfRange(IntentCode.values, SERIES7_START_IDX, SERIES7_END_IDX);
     	}else if(s == Series.UltraScale){
-    		return Arrays.copyOfRange(IntentCode.values(), ULTRASCALE_START_IDX, ULTRASCALE_END_IDX);
+    		return Arrays.copyOfRange(IntentCode.values, ULTRASCALE_START_IDX, ULTRASCALE_END_IDX);
     	}else if(s == Series.UltraScalePlus){
-    		return Arrays.copyOfRange(IntentCode.values(), ULTRASCALEPLUS_START_IDX, ULTRASCALEPLUS_END_IDX);
+    		return Arrays.copyOfRange(IntentCode.values, ULTRASCALEPLUS_START_IDX, ULTRASCALEPLUS_END_IDX);
     	} 
     	return null;
     }

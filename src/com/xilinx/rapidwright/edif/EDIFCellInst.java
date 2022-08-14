@@ -61,7 +61,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
         super(name);
         setCellType(cellType);
         if(parentCell != null) parentCell.addCellInst(this);
-        viewref = cellType != null ? cellType.getEDIFView() : DEFAULT_VIEWREF;
+        setViewref(cellType != null ? cellType.getEDIFView() : DEFAULT_VIEWREF);
     }
     
     /**
@@ -72,7 +72,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
         super((EDIFPropertyObject)inst);
         this.parentCell = parentCell;
         this.cellType = inst.cellType;
-        this.viewref = new EDIFName(inst.viewref);
+        setViewref(new EDIFName(inst.viewref));
     }
     
     /**
@@ -86,7 +86,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
      * @param viewref the viewref to set
      */
     public void setViewref(EDIFName viewref) {
-        this.viewref = viewref;
+        this.viewref = EDIFCell.DEFAULT_VIEW.equals(viewref) ? EDIFCell.DEFAULT_VIEW : viewref;
     }
     
     /**
@@ -112,7 +112,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
      */
     protected void addPortInst(EDIFPortInst epr) {
         if(portInsts == null) portInsts = new EDIFPortInstList();
-        if(!epr.getCellInst().equals(this)) 
+        if(!epr.getCellInst().equals(this))
             throw new RuntimeException("ERROR: Incorrect EDIFPortInst '"+
                 epr.getFullName()+"' being added to EDIFCellInst " + toString());
         portInsts.add(epr);
@@ -181,6 +181,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
      */
     public void setParentCell(EDIFCell parent) {
         this.parentCell = parent;
+        parent.trackChange(EDIFChangeType.CELL_INST_ADD, getName());
     }
 
     /**
@@ -199,15 +200,20 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
     }
 
     /**
+     * Forcibly modify the cell being instantiated without updating portInsts
+     * @param cellType the cellType to set
+     */
+    public void setCellTypeRaw(EDIFCell cellType) {
+        this.cellType = cellType;
+        setViewref(cellType != null ? cellType.getEDIFView() : null);
+    }
+
+    /**
+     * Modify the cell being instantiated and update port refs on portInsts
      * @param cellType the cellType to set
      */
     public void setCellType(EDIFCell cellType) {
-        this.cellType = cellType;
-        this.viewref = cellType != null ? cellType.getEDIFView() : null;
-    }
-    
-    public void updateCellType(EDIFCell cellType) {
-        setCellType(cellType);
+        setCellTypeRaw(cellType);
         for(EDIFPortInst portInst : getPortInsts()) {
             EDIFPort origPort = portInst.getPort();
             EDIFPort port = cellType.getPort(origPort.getBusName());
@@ -216,6 +222,13 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
             }
             portInst.setPort(port);
         }
+    }
+
+    /**
+     * @deprecated
+     */
+    public void updateCellType(EDIFCell cellType) {
+        setCellType(cellType);
     }
 	
 	public boolean isBlackBox(){
@@ -249,5 +262,25 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
     @Override
     public String getUniqueKey() {
         return getCellType().getUniqueKey() + "_" + getParentCell().getUniqueKey() + "_" + getName();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        if (!super.equals(o))
+            return false;
+        EDIFCellInst that = (EDIFCellInst) o;
+
+        if (!parentCell.equals(that.parentCell))
+            return false;
+
+        if (!cellType.equals(that.cellType))
+            return false;
+
+        if (!viewref.equals(that.viewref))
+            return false;
+
+        return true;
     }
 }

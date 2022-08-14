@@ -22,10 +22,9 @@
 
 package com.xilinx.rapidwright.util;
 
-import org.jetbrains.annotations.NotNull;
-
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Deque;
 import java.util.Iterator;
 import java.util.List;
@@ -40,6 +39,11 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RunnableFuture;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
+import java.util.function.Function;
+
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Utilities to aid in parallel processing
@@ -50,30 +54,57 @@ import java.util.concurrent.TimeUnit;
  */
 public class ParallelismTools {
     /**
-     * Name of the environment variable to enable parallel processing
+     * Name of the environment variable to disable parallel processing, set RW_PARALLEL=0 to disable
      */
     public static final String RW_PARALLEL = "RW_PARALLEL";
 
-    private static boolean parallel = System.getenv(RW_PARALLEL) != null;
+    private static final AtomicInteger threadId = new AtomicInteger(0);
 
     /** A fixed-size thread pool with as many threads as there are processors
      * minus one, fed by a single task queue */
-    private static final ThreadPoolExecutor pool = new ThreadPoolExecutor(
-            Runtime.getRuntime().availableProcessors() - 1,
-            Runtime.getRuntime().availableProcessors() - 1,
-            0, TimeUnit.MILLISECONDS,
-            new LinkedBlockingQueue<>(),
-            (r) -> {
-                Thread t = Executors.defaultThreadFactory().newThread(r);
-                t.setDaemon(true);
-                return t;
-            });
+    private static final ThreadPoolExecutor pool;
+
+    private static boolean parallel;
+
+    static {
+        final int maxParallelism = maxParallelism();
+        final String value = System.getenv(RW_PARALLEL);
+
+        if (value == null) {
+            // Enable parallelism by default only if maxParallelism > 1
+            parallel = (maxParallelism > 1);
+        } else {
+            parallel = !(value.equals("0") || value.equalsIgnoreCase("false"));
+        }
+
+        if (parallel) {
+            pool = new ThreadPoolExecutor(
+                    maxParallelism - 1,
+                    maxParallelism - 1,
+                    0, TimeUnit.MILLISECONDS,
+                    new LinkedBlockingQueue<>(),
+                    (r) -> {
+                        Thread t = Executors.defaultThreadFactory().newThread(r);
+                        t.setDaemon(true);
+                        t.setName("RapidWright-ParallelismTools-Worker-" + threadId.getAndIncrement());
+                        return t;
+                    });
+            pool.prestartAllCoreThreads();
+        } else {
+            pool = null;
+        }
+    }
 
     /**
      * Global setter to control parallel processing.
      * @param parallel Enable parallel processing.
      */
     public static void setParallel(boolean parallel) {
+        final int maxParallelism = maxParallelism();
+        if (maxParallelism == 1) {
+            System.out.println("WARNING: Parallel execution unsupported since maxParallelism() == 1.");
+            return;
+        }
         ParallelismTools.parallel = parallel;
         if (parallel) {
             pool.prestartAllCoreThreads();
@@ -223,17 +254,17 @@ public class ParallelismTools {
      *                submitted tasks.
      * @param <T> Type returned by all tasks.
      */
-    public static <T> void join(List<Future<T>> futures) {
+    public static <T> void join(List<? extends Future<? extends T>> futures) {
         if (getParallel()) {
             // Walk backwards and try and steal those not done
-            ListIterator<Future<T>> it = futures.listIterator(futures.size());
+            ListIterator<? extends Future<? extends T>> it = futures.listIterator(futures.size());
             while (it.hasPrevious()) {
                 trySteal(it.previous());
             }
         }
 
         // Now block to wait for other threads to finish their tasks
-        for (Future<T> f : futures) {
+        for (Future<? extends T> f : futures) {
             get(f);
         }
     }
@@ -250,11 +281,27 @@ public class ParallelismTools {
     }
 
     /**
+     * Run the specified task on all items
+     * @param items the items to call the task with
+     * @param task the task that should be executed for all items
+     * @param <T> item type
+     */
+    public static <T> void invokeAllRunnable(Collection<T> items, Consumer<T> task) {
+        final Runnable[] runnables = items.stream()
+                .map(i -> (Runnable)() -> task.accept(i))
+                .toArray(Runnable[]::new);
+        invokeAll(runnables);
+    }
+
+    /**
      * Given a list of tasks-without-return-value, block until all tasks
      * have been completed.
      * @param tasks List of tasks-without-return-value.
      */
     public static void invokeAll(@NotNull Runnable... tasks) {
+        if (tasks.length == 0) {
+            return;
+        }
         if (!getParallel()) {
             for (Runnable task : tasks) {
                 task.run();
@@ -290,6 +337,18 @@ public class ParallelismTools {
     }
 
     /**
+     * Run the specified task on all items
+     * @param items the items to call the task with
+     * @param task the task that should be executed for all items
+     * @param <T> item type
+     */
+    public static <T,R> List<Future<R>> invokeAll(Collection<T> items, Function<T,R> task) {
+        final Callable<R>[] callables = items.stream()
+                .map(i -> (Callable<R>)() -> task.apply(i))
+                .toArray(value -> (Callable<R>[])new Callable[value]); //Can't create generic arrays, so we need to cast
+        return invokeAll(callables);
+    }
+    /**
      * Given a list of tasks-with-return-value, block until all tasks
      * have been completed.
      * @param tasks List of tasks-with-return-value.
@@ -298,6 +357,9 @@ public class ParallelismTools {
      */
     public static <T> List<Future<T>> invokeAll(Callable<T>... tasks) {
         List<Future<T>> futures = new ArrayList<>(tasks.length);
+        if (tasks.length == 0) {
+            return futures;
+        }
 
         if (!getParallel()) {
             for (Callable<T> task : tasks) {
@@ -354,5 +416,13 @@ public class ParallelismTools {
      */
     public static <T> RunnableFuture<T> adapt(Callable<T> task) {
         return new FutureTask<>(task);
+    }
+
+    /**
+     * The number of parallel threads we want to use
+     * @return number of parallel threads
+     */
+    public static int maxParallelism() {
+        return Runtime.getRuntime().availableProcessors();
     }
 }

@@ -14,5 +14,8 @@ jobs:
           submodules: recursive
 
       - run: |
-          git submodule foreach --recursive git merge-base --is-ancestor HEAD origin/master
+          git submodule foreach --recursive git fetch --unshallow
+
+      - run: |
+          git submodule foreach --recursive 'git merge-base --is-ancestor HEAD origin/master || git merge-base --is-ancestor HEAD origin/main'
 

@@ -104,6 +104,10 @@ public class EDIFNetlist extends EDIFName {
 	
 	private List<String> encryptedCells; 
 	
+	private boolean trackCellChanges = false;
+	
+	private Map<EDIFCell, List<EDIFChange>> modifiedCells = null;
+	
 	private boolean DEBUG = false;
 
 	/**
@@ -447,7 +451,7 @@ public class EDIFNetlist extends EDIFName {
 		if(existingCell == null){
 			destLib.addCell(cell);
 			for(EDIFCellInst inst : cell.getCellInsts()){
-				inst.updateCellType(migrateCellAndSubCellsWorker(inst.getCellType()));
+				inst.setCellType(migrateCellAndSubCellsWorker(inst.getCellType()));
 				//The view might have changed
 				inst.getViewref().setName(inst.getCellType().getView());
 			}
@@ -457,6 +461,11 @@ public class EDIFNetlist extends EDIFName {
 		}
 	}
 	
+	/**
+	 * This moves the cell and all of its descendants into this netlist.  This is a destructive 
+	 * operation for the source netlist.
+	 * @param cell The cell (and all its descendants) to move into this netlist's libraries
+	 */
 	public void migrateCellAndSubCells(EDIFCell cell) {
 		migrateCellAndSubCellsWorker(cell);
 	}
@@ -526,6 +535,44 @@ public class EDIFNetlist extends EDIFName {
 				destLibSub.addCell(instCellType);
 				cells.add(instCellType);
 			}
+		}
+	}
+
+	/**
+	 * This copies the cell and all of its descendants into this netlist.
+	 * @param cell The cell (and all its descendants) to copy into this netlist's libraries
+	 */
+	public void copyCellAndSubCells(EDIFCell cell) {
+		Set<EDIFCell> copiedCells = new HashSet<>();
+		copyCellAndSubCellsWorker(cell, copiedCells);
+	}
+
+	private EDIFCell copyCellAndSubCellsWorker(EDIFCell cell, Set<EDIFCell> copiedCells) {
+		EDIFLibrary destLib = getLibrary(cell.getLibrary().getName());
+		if(destLib == null){
+			if(cell.getLibrary().isHDIPrimitivesLibrary()){
+				destLib = getHDIPrimitivesLibrary();
+			}else{
+				destLib = getWorkLibrary();
+			}
+		}
+
+		EDIFCell existingCell = destLib.getCell(cell.getLegalEDIFName());
+		if(existingCell == null){
+			EDIFCell newCell = new EDIFCell(destLib, cell, cell.getName());
+			copiedCells.add(newCell);
+			for(EDIFCellInst inst : newCell.getCellInsts()){
+				inst.setCellType(copyCellAndSubCellsWorker(inst.getCellType(), copiedCells));
+				//The view might have changed
+				inst.getViewref().setName(inst.getCellType().getView());
+			}
+			return newCell;
+		} else {
+			if (destLib.isHDIPrimitivesLibrary() || copiedCells.contains(existingCell)) {
+				return existingCell;
+			}
+			throw new RuntimeException("ERROR: Destination netlist already contains EDIFCell named " +
+					"'" + cell.getName() + "' in library '" + destLib.getName() + "'");
 		}
 	}
 	
@@ -1111,7 +1158,7 @@ public class EDIFNetlist extends EDIFName {
 	public List<EDIFHierNet> getNetAliases(EDIFHierNet initialNet){
 		if(physicalNetPinMap == null){
 			physicalNetPinMap = new HashMap<>();
-			physicalVccPins = new ArrayList<>();
+			physicalGndPins = new ArrayList<>();
 			physicalVccPins = new ArrayList<>();
 		}
 		ArrayList<EDIFHierPortInst> leafCellPins = new ArrayList<>();
@@ -1194,7 +1241,8 @@ public class EDIFNetlist extends EDIFName {
 	 * @return The physical/parent net name or null if none could be found.
 	 */
 	public String getParentNetName(String netAlias){
-		return getParentNetMap().get(getHierNetFromName(netAlias)).getHierarchicalNetName();
+		EDIFHierNet parentNet = getParentNetMap().get(getHierNetFromName(netAlias));
+		return (parentNet != null) ? parentNet.getHierarchicalNetName() : null;
 	}
 	/**
 	 * Gets the canonical net for this net name.  This corresponds to the driving net
@@ -1423,42 +1471,7 @@ public class EDIFNetlist extends EDIFName {
 	 * of the provided net 
 	 */
 	public List<EDIFHierPortInst> getSinksFromNet(EDIFHierNet net){
-		Queue<EDIFHierNet> q = new LinkedList<>();
-		q.add(net);
-		ArrayList<EDIFHierPortInst> sinks = new ArrayList<>();
-		HashSet<EDIFHierNet> visited = new HashSet<>();
-		while(!q.isEmpty()){
-			EDIFHierNet curr = q.poll();
-			if(!visited.add(curr)) continue;
-			for(EDIFPortInst portInst : curr.getNet().getPortInsts()){
-				if(portInst.isOutput()) continue;
-				final EDIFHierPortInst hierPort = new EDIFHierPortInst(curr.getHierarchicalInst(), portInst);
-				if(portInst.isTopLevelPort()){
-					// Going up in hierarchy
-					final EDIFHierNet hierarchicalNet = hierPort.getHierarchicalInst().isTopLevelInst() ?
-					        null : hierPort.getPortInParent().getHierarchicalNet();
-					if (hierarchicalNet == null) {
-						continue;
-					}
-					q.add(hierarchicalNet);
-				}else {
-					if(portInst.getCellInst().getCellType().isPrimitive()){
-						// We found a sink
-						sinks.add(hierPort);
-						continue;
-					}else{
-						// Going down in hierarchy
-						EDIFHierNet internalNet = hierPort.getInternalNet();
-						if(internalNet != null) {
-							q.add(internalNet);
- 						}
-					}
-				}
-			}
-			
-		}
-		
-		return sinks;
+		return net.getLeafHierPortInsts(false);
 	}
 	
 	/**
@@ -1619,10 +1632,6 @@ public class EDIFNetlist extends EDIFName {
 							throw new RuntimeException("failed to find cell macro "+cellName+", we are in "+lib.getName());
 						}
 						inst.setCellType(newCell);
-						for(EDIFPortInst portInst : inst.getPortInsts()) {
-							String portName = portInst.getPort().getBusName();
-							portInst.setPort(newCell.getPort(portName));
-						}
 					}
 				}
 			}
@@ -1710,7 +1719,62 @@ public class EDIFNetlist extends EDIFName {
         addEncryptedCells(encryptedCells);
     }
 
-	public static void main(String[] args) throws FileNotFoundException {
+    public static EDIFNetlist readBinaryEDIF(Path path) {
+        return BinaryEDIFReader.readBinaryEDIF(path);
+    }
+    
+    public static EDIFNetlist readBinaryEDIF(String fileName) {
+        return BinaryEDIFReader.readBinaryEDIF(fileName);
+    }
+    
+    public void writeBinaryEDIF(Path path) {
+        BinaryEDIFWriter.writeBinaryEDIF(path, this);
+    }
+	public void writeBinaryEDIF(OutputStream os) {
+		BinaryEDIFWriter.writeBinaryEDIF(os, this);
+	}
+    
+    public void writeBinaryEDIF(String fileName) {
+        BinaryEDIFWriter.writeBinaryEDIF(fileName, this);
+    }
+    
+    /**
+     * Checks a flag indicating if this netlist is currently tracking changes to its EDIFCells.
+     * Modified EDIFCells are tracked in a set which can be queried with {@link #getModifiedCells()}.
+     * EDIFCells are determined as modified if one of the following is true: 
+     *   (1) A port was removed, added or modified
+     *   (2) A net was removed, added or modified
+     *   (3) An instance was removed, added or modified 
+     * @return True if this netlist is tracking EDIFCell changes, false otherwise.
+     */
+	public boolean isTrackingCellChanges() {
+        return trackCellChanges;
+    }
+
+    /**
+     * Flag to track changes to EDIFCell changes to this netlist. See {@link #isTrackingCellChanges()}
+     * @param trackCellChanges True to enable tracking of EDIFCells, false to stop tracking
+     */
+    public void setTrackCellChanges(boolean trackCellChanges) {
+        this.trackCellChanges = trackCellChanges;
+    }
+    
+    public void trackChange(EDIFCell cell, EDIFChangeType type, String objectName) {
+        if(isTrackingCellChanges()) {
+            addTrackingChange(cell, new EDIFChange(type, objectName));
+        }
+    }
+    
+    public void addTrackingChange(EDIFCell cell, EDIFChange change) {
+        getModifiedCells().computeIfAbsent(cell, l -> new ArrayList<>()).add(change);
+    }
+
+    public Map<EDIFCell, List<EDIFChange>> getModifiedCells(){
+        if(modifiedCells == null) modifiedCells = new HashMap<>();
+        return modifiedCells;
+    }
+    
+    public static void main(String[] args) throws FileNotFoundException {
 		CodePerfTracker t = new CodePerfTracker("EDIF Import/Export", true);
 		t.start("Read EDIF");
 		EDIFParser p = new EDIFParser(args[0]);

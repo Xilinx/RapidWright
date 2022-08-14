@@ -1,5 +1,5 @@
 /* 
- * Copyright (c) 2021 Xilinx, Inc. 
+ * Copyright (c) 2022 Xilinx, Inc. 
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -19,6 +19,7 @@
  * limitations under the License.
  * 
  */
+ 
 /**
  * 
  */
@@ -29,7 +30,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 
 /**
- * Generated on: Thu Nov 04 18:03:17 2021
+ * Generated on: Wed Apr 27 13:18:34 2022
  * by: com.xilinx.rapidwright.release.PartNamePopulator
  * 
  * Class used to uniquely represent a Xilinx part.
@@ -254,12 +255,16 @@ public class Part {
 				FamilyType.VIRTEXUPLUSHBMES1, 
 				FamilyType.ZYNQUPLUS, 
 				FamilyType.ZYNQUPLUSRFSOC, 
-				FamilyType.ZYNQUPLUSRFSOCES1, 
 		};
 		ultraScalePlus = new HashSet<FamilyType>(Arrays.asList(ultraScalePlusTypes));
 		versalTypes = new FamilyType[] {
+				FamilyType.QRVERSALAICORE, 
+				FamilyType.QVERSALAICORE, 
+				FamilyType.QVERSALPRIME, 
 				FamilyType.VERSAL, 
 				FamilyType.VERSALAICORE, 
+				FamilyType.VERSALAIEDGE, 
+				FamilyType.VERSALPREMIUM, 
 				FamilyType.VERSALPRIME, 
 		};
 		versal = new HashSet<FamilyType>(Arrays.asList(versalTypes));

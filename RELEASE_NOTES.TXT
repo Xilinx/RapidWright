@@ -1,3 +1,100 @@
+============= RapidWright 2022.1.2-beta released on 2022-07-27 ================
+Notes: 
+ * Includes some memory usage improvements of 8-14% for a parsed EDIF netlist (#428)
+ * Placement memory reduction by 19% or ~4.7% for a design
+ * For 2022.1 DCPs, enables placement & routing information to be read in parallel, or load DCPs up 
+   to 44% faster. 
+ * Fix to DeviceBrowser to browse devices prior to downloading their database file (#427)
+ * Fixes placed (but not routed) design import/export for Interchange-based files (#467)
+ * Design.createModuleInst() now copies netlist cells rather than migrate them
+ * Properly unroutes routethru in SiteInst.unrouteIntraSiteNet()
+ * Net and Cell classes now keep lazy reference to hierarchical netlist object
+ * Net.unroutePin() now uses code in DesignTools.unroutePins()
+ * Fix to unique-ify netlist (or previously flatten netlist) (#430)  
+ * Bumps Gradle Wrapper version from 7.1 to 7.4.2 to enable Java 18 support (#453)
+ * Replacing EDIF in DCP now also removes existing binary netlist equivalent (.xn)   
+ * Includes PRs: #409, #417, #424, #427, #428, #429, #430, #431, #432, #437, #442, #443, #445, #446,
+                 #449, #450, #451, #453, #455, #459, #461, #462, #465, #469, #470, #471, #472, #476, 
+                 #477
+ * Fixes Issues: #136, #419, #441, #444, #454, #464 
+ - API Additions:
+   - com.xilinx.rapidwright.design.Cell "public EDIFHierCellInst getEDIFHierCellInst()"
+   - com.xilinx.rapidwright.design.Design "public Net createNet(EDIFHierNet net)"
+   - com.xilinx.rapidwright.design.Design "public static boolean replaceEDIFinDCP(String inDcpFileName, String edfFileName, String outDcpFileName)"
+   - com.xilinx.rapidwright.design.Net "public Design getDesign()"
+   - com.xilinx.rapidwright.design.Net "public EDIFHierNet getLogicalHierNet()"
+   - com.xilinx.rapidwright.design.Net "public Net(String name, EDIFHierNet logicalHierNet)"
+   - com.xilinx.rapidwright.design.Net "public void setDesign(Design design)"
+   - com.xilinx.rapidwright.design.Net "public void setLogicalHierNet(EDIFHierNet logicalHierNet)"
+   - com.xilinx.rapidwright.design.SiteInst "public BELPin getBELPin(String belName, String pinName)"
+   - com.xilinx.rapidwright.device.BELPin "public BELPin getConnectedInputPinOnBEL(BEL bel)"
+
+
+============= RapidWright 2022.1.1-beta released on 2022-05-13 ================
+Notes: 
+ * Fixes crash issue while reading DCPs created by Vivado 2022.1
+ * Adds more granularity to runtime reporting in reading 2022.1 DCPs
+
+============= RapidWright 2022.1.0-beta released on 2022-05-05 ================
+Notes: 
+ * Support for Vivado 2022.1 devices and read of DCPs
+ * Enables parallel EDIF parsing by default (except when EDIF is readable inside DCP).  Depending on
+   file size and number of available threads, speedup can achieve 2.5-10X faster runtimes. 
+ * Adds facilities to track logical netlist and physical netlist changes to keep a record of 
+   incremental changes in a design.
+ * Preserves AI Engine and NOC data when writing DCPs from RapidWright
+ * Disallows turning multiple sitePIPs on on the same RBEL at the same time
+ * Enables LUT routethru routing on intrasite nets
+ * Net.addPin() to add output pin as an alternate source if a source on the net already exists
+ * The anchor object on the Module class has been changed from a SiteInst to a Site
+ * Allows better recovery of augmented tile cache generation failure 
+ * Includes PRs: #378, #379, #380, #381, #382, #383, #385, #387, #396, #395, #397, #400, #401, #402, 
+                 #405, #406, #404, #407
+ * Fixes Issues: #392
+ - API Additions:
+   - com.xilinx.rapidwright.design.Design public "void clearTrackedChanges()"
+   - com.xilinx.rapidwright.design.Design public "void setTrackingChanges(boolean trackChanges)"
+   - com.xilinx.rapidwright.design.Design public "boolean isTrackingSiteInstChanges()"
+   - com.xilinx.rapidwright.design.Design public "void setTrackSiteInstChanges(boolean trackSiteInstChanges)"
+   - com.xilinx.rapidwright.design.Design public "boolean isTrackingNetChanges()"
+   - com.xilinx.rapidwright.design.Design public "void setTrackNetChanges(boolean trackNetChanges)"
+   - com.xilinx.rapidwright.design.Design public "Set<SiteInst> getModifiedSiteInsts()"
+   - com.xilinx.rapidwright.design.Design public "Set<Net> getModifiedNets()"
+   - com.xilinx.rapidwright.design.Design public "boolean addModifiedNet(Net net)"
+   - com.xilinx.rapidwright.design.Design public "boolean addModifiedSiteInst(SiteInst siteInst)"
+   - com.xilinx.rapidwright.device.Device public "Tile getArbitraryTileOfType(TileTypeEnum type)"
+
+
+============= RapidWright 2021.2.2-beta released on 2022-03-17 ================
+Notes: 
+ * Parallelism enabled by default (#365), can be turned off with:
+   - ParallelismTools.setParallel(false) or 
+   - Set the environment variable to RW_PARALLEL=0.
+ * Contains bitstream relocation tools for specific UltraScale+ scenarios (#334, #357, #373)   
+ * EDIF netlist memory optimization - netlist uses ~70% less memory when loaded (#339)
+ * Binary EDIF format - loads ~5x faster (writes ~2x slower) than plain-text EDIF.  After EDIF reads
+   this format can be cached with setting the environment variable RW_ENABLE_EDIF_BINARY_CACHING (#359)
+ * 'make update_jars' now pulls the jars from Maven Central instead of the rapidwright_jars.zip (#366) 
+ * Caches to a file the uncommon node map generated at runtime for a device (see #362)  
+ * Includes PRs: #321, #343, #339, #352, #353, #348, #346, #362, #359, #361, #344, #357, #334, #365,
+                 #350, #366, #341, #370, #372, #373, #374, #375, #376, #377 
+ * Fixes Issues: #117, #342, #349
+ - API Additions:
+   - com.xilinx.rapidwright.bitstream.Bitstream "public static void checkIfDeviceSupported(String partName)"
+   - com.xilinx.rapidwright.bitstream.BlockType "public static final BlockType[] values"
+   - com.xilinx.rapidwright.bitstream.ConfigArray "public static final int FRAME_OVERHEAD_COUNT_PER_ROW"
+   - com.xilinx.rapidwright.bitstream.OpCode "public static final OpCode[] values"
+   - com.xilinx.rapidwright.bitstream.PacketType "public static final PacketType[] values"
+   - com.xilinx.rapidwright.bitstream.RegisterType "public static final RegisterType[] values"
+   - com.xilinx.rapidwright.design.Module "public Module(Design design, String metadataFileName, boolean unrouteStaticNets)"
+   - com.xilinx.rapidwright.design.Module "public Module(Design design, boolean unrouteStaticNets)"
+   - com.xilinx.rapidwright.design.Module "public Site getCorrespondingSite(SiteInst inst, Site anchorSite)"
+   - com.xilinx.rapidwright.design.SiteInst "public Set<Net> getConnectedNets()"
+   - com.xilinx.rapidwright.device.Device "public static final String DEVICE_CACHE_FILE_VERSION"
+ 
+ 
+ 
+ 
 ============= RapidWright 2021.2.1-beta released on 2022-02-03 ================
 Notes: 
  * 3-4X faster DCP write times using a new parallel, multi-threaded approach (See #337), Enable with:
