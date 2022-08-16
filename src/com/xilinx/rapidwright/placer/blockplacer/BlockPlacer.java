@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Random;
 import java.util.Set;
 
@@ -622,7 +623,7 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
 	
 	private void getNextMove(){
 		HardMacro selected = hardMacros.get(rand.nextInt(hardMacros.size()));
-		ArrayList<Site> validSites = selected.getValidPlacements();
+		List<Site> validSites = selected.getValidPlacements();
 		Site site0 = selected.getTempAnchorSite();
 		Site site1 = null;
 		HardMacro hm0 = selected;

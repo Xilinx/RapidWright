@@ -71,6 +71,9 @@ public class ModuleImplsInst extends AbstractModuleInst<ModuleImpls, ModuleImpls
 
     public void place(ModulePlacement placement) {
         unplace();
+        if (placement.implementationIndex < 0 || placement.implementationIndex>=module.size()) {
+            throw new IllegalStateException("illegal implementation index in new placement "+placement+" for "+this);
+        }
         this.placement = placement;
     }
 

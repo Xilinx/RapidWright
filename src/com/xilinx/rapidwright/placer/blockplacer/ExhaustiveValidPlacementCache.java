@@ -31,8 +31,8 @@ import java.util.stream.Collectors;
  * @param <PlacementT> The placement class
  */
 public class ExhaustiveValidPlacementCache<PlacementT> extends AbstractValidPlacementCache<PlacementT> {
-    private final List<PlacementT> placements;
-    private final BlockPlacer2<?,?,PlacementT, ?> placer;
+    protected final List<PlacementT> placements;
+    protected final BlockPlacer2<?,?,PlacementT, ?> placer;
 
     public ExhaustiveValidPlacementCache(List<PlacementT> placements, BlockPlacer2<?, ?, PlacementT, ?> placer) {
         this.placements = placements;

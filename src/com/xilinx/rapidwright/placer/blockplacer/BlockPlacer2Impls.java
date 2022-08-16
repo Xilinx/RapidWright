@@ -58,19 +58,19 @@ public class BlockPlacer2Impls extends BlockPlacer2<ModuleImpls, ModuleImplsInst
 
     private final Map<ModuleImplsInst, Set<ImplsPath>> modulesToPaths = new HashMap<>();
 
-    public BlockPlacer2Impls(Design design, List<ModuleImplsInst> moduleInstances, boolean ignoreMostUsedNets, Path graphData, AbstractOverlapCache overlapCache) {
-        super(design, ignoreMostUsedNets, graphData);
+    public BlockPlacer2Impls(Design design, List<ModuleImplsInst> moduleInstances, boolean ignoreMostUsedNets, Path graphData, boolean denseDesign, float effort, boolean focusOnWorstModules, AbstractOverlapCache overlapCache) {
+        super(design, ignoreMostUsedNets, graphData, denseDesign, effort, focusOnWorstModules);
 
         this.moduleInstances = moduleInstances;
         overlaps = overlapCache;
     }
 
-    public BlockPlacer2Impls(Design design, List<ModuleImplsInst> moduleInstances, boolean ignoreMostUsedNets, Path graphData) {
-        this(design, moduleInstances, ignoreMostUsedNets, graphData, new RegionBasedOverlapCache(design.getDevice(), moduleInstances));
+    public BlockPlacer2Impls(Design design, List<ModuleImplsInst> moduleInstances, boolean ignoreMostUsedNets, Path graphData, boolean denseDesign, float effort, boolean focusOnWorstModules) {
+        this(design, moduleInstances, ignoreMostUsedNets, graphData, denseDesign, effort, focusOnWorstModules, new RegionBasedOverlapCache(design.getDevice(), moduleInstances));
     }
 
     public BlockPlacer2Impls(Design design, List<ModuleImplsInst> moduleInstances) {
-        this(design, moduleInstances, true, null);
+        this(design, moduleInstances, true, null, DEFAULT_DENSE, DEFAULT_EFFORT, DEFAULT_FOCUS_ON_WORST);
     }
 
     @Override
@@ -84,7 +84,7 @@ public class BlockPlacer2Impls extends BlockPlacer2<ModuleImpls, ModuleImplsInst
     }
 
     @Override
-    Collection<ModulePlacement> getAllPlacements(ModuleImplsInst hm) {
+    List<ModulePlacement> getAllPlacements(ModuleImplsInst hm) {
         return hm.getModule().getAllPlacements();
     }
 

@@ -45,14 +45,14 @@ import com.xilinx.rapidwright.util.Utils;
 
 public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Path>{
     /** The current location of all hard macros */
-    private HashMap<Site, HardMacro> currentPlacements;
+    private HashMap<Site, HardMacro> currentPlacements = new HashMap<>();
     private Map<ModuleInst, HardMacro> macroMap;
 
-    public BlockPlacer2Module(Design design, boolean ignoreMostUsedNets, java.nio.file.Path graphData) {
-        super(design, ignoreMostUsedNets, graphData);
+    public BlockPlacer2Module(Design design, boolean ignoreMostUsedNets, java.nio.file.Path graphData, boolean denseDesign, float effort, boolean focusOnWorstModules) {
+        super(design, ignoreMostUsedNets, graphData, denseDesign, effort, focusOnWorstModules);
     }
     public BlockPlacer2Module(Design design) {
-        super(design, true, null);
+        super(design, true, null, DEFAULT_DENSE, DEFAULT_EFFORT, DEFAULT_FOCUS_ON_WORST);
     }
 
     @Override
@@ -88,6 +88,9 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
             HardMacro hm = new HardMacro(mi);
             hardMacros.add(hm);
             hm.setValidPlacements();
+            if (mi.isPlaced()) {
+                hm.setTempAnchorSite(mi.getAnchor().getSite(), currentPlacements);
+            }
             macroMap.put(mi, hm);
         }
         return hardMacros;
@@ -106,7 +109,6 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
 
     @Override
     protected void initialPlacement() {
-        currentPlacements = new HashMap<>();
         super.initialPlacement();
     }
 
@@ -236,7 +238,7 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
     }
 
     @Override
-    Collection<Site> getAllPlacements(HardMacro hm) {
+    List<Site> getAllPlacements(HardMacro hm) {
         return hm.getValidPlacements();
     }
 

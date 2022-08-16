@@ -37,9 +37,11 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.PrimitiveIterator;
 import java.util.PriorityQueue;
 import java.util.Random;
 import java.util.Set;
+import java.util.stream.StreamSupport;
 
 import com.xilinx.rapidwright.design.AbstractModuleInst;
 import com.xilinx.rapidwright.design.Design;
@@ -57,6 +59,20 @@ import com.xilinx.rapidwright.util.MessageGenerator;
  * @author Chris Lavin
  */
 public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleInst<ModuleT, ?>, PlacementT, PathT extends AbstractPath<?, ModuleInstT>> extends AbstractBlockPlacer<ModuleInstT, PlacementT> {
+
+	/**
+	 * Default value for constructor parameter denseDesign
+	 */
+	public static final boolean DEFAULT_DENSE = false;
+	/**
+	 * Default value for constructor parameter effort
+	 */
+	public static final float DEFAULT_EFFORT = 1;
+	/**
+	 * Default value for constructor parameter focusOnWorstModules
+	 */
+	public static final boolean DEFAULT_FOCUS_ON_WORST = true;
+
 	/** Enable extra sanity checks? */
 	protected static final boolean PARANOID = false;
 	/** The current design */
@@ -80,8 +96,8 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 	/** Measures the current move acceptance rate */
 	private double moveAcceptanceRate = 1.0;
 	/** */
-	//private double goldenRate = 0.44;
-	private final double goldenRate = 0.20;
+	private double goldenRate = 0.44;
+	//private final double goldenRate = 0.20;
 	private long seed;
 
 	// Final Results
@@ -103,8 +119,11 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 	private final double beta;
 
 	private final boolean ignoreMostUsedNets;
+	private final boolean denseDesign;
+	private final float effort;
+	private final boolean focusOnWorstModules;
 
-    // Update. Added variable to support partial .dcp
+	// Update. Added variable to support partial .dcp
     public boolean save_partial_dcp = true;
 
     private PrintWriter graphDataWriter = null;
@@ -117,14 +136,24 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 
     private Map<ModuleInstT, Site> lockedPlacements = null;
 
+
 	/**
-	 * Empty Constructor
-	 *
+	 * @param design the design
+	 * @param ignoreMostUsedNets ignore nets that are used almost everywhere. they are likely clocks, which use special
+	 *                           routing ressources. making them small does not gain QoR, but costs placer runtime
+	 * @param graphData output file for key placer stats to later graph them
+	 * @param denseDesign if set to true, tune algorithm towards having many overlaps. For sparse designs,
+	 *                    setting this will make the placer slower
+	 * @param effort Placer effort. Higher values will achieve better QoR. Linearly increases runtime.
+	 * @param focusOnWorstModules Spend more time on modules with worst placement
 	 */
-	public BlockPlacer2(Design design, boolean ignoreMostUsedNets, Path graphData){
+	public BlockPlacer2(Design design, boolean ignoreMostUsedNets, Path graphData, boolean denseDesign, float effort, boolean focusOnWorstModules){
 		this.design = design;
 		this.dev = design.getDevice();
 		this.ignoreMostUsedNets = ignoreMostUsedNets;
+		this.denseDesign = denseDesign;
+		this.effort = effort;
+		this.focusOnWorstModules = focusOnWorstModules;
 		alpha = 1.0;
 		beta = 1.0;
 		seed = 2;
@@ -137,8 +166,8 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 		}
 	}
 
-	public BlockPlacer2(Design design, boolean ignoreMostUsedNets, Path graphData, Map<ModuleInstT, Site> lockedPlacements) {
-	    this(design, ignoreMostUsedNets, graphData);
+	public BlockPlacer2(Design design, boolean ignoreMostUsedNets, Path graphData, boolean denseDesign, float effort, boolean focusOnWorstModules, Map<ModuleInstT, Site> lockedPlacements) {
+	    this(design, ignoreMostUsedNets, graphData, denseDesign, effort, focusOnWorstModules);
 	    this.lockedPlacements = lockedPlacements;
 	}
 
@@ -187,7 +216,7 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 	 * @param hm macro
 	 * @return possible placements, ordered by column
 	 */
-	abstract Collection<PlacementT> getAllPlacements(ModuleInstT hm);
+	abstract List<PlacementT> getAllPlacements(ModuleInstT hm);
 	abstract void unsetTempAnchorSite(ModuleInstT hm);
 	abstract Comparator<PlacementT> getInitialPlacementComparator();
 	abstract void placeHm(ModuleInstT hm, PlacementT placement);
@@ -208,9 +237,9 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 		// Place hard macros for initial placement
 		for(ModuleInstT hm : hardMacros){
 			PriorityQueue<PlacementT> sites = new PriorityQueue<>(1024, getInitialPlacementComparator());
-			final Collection<PlacementT> allPlacements = getAllPlacements(hm);
+			final List<PlacementT> allPlacements = getAllPlacements(hm);
 
-			possiblePlacements.put(hm.getModule(), allPlacements.stream().collect(SortedValidPlacementCache.collector(this)));
+			possiblePlacements.put(hm.getModule(), SortedValidPlacementCache.fromList(allPlacements, this, denseDesign));
 			sites.addAll(allPlacements);
 			boolean found = false;
 			while(!sites.isEmpty()){
@@ -411,8 +440,8 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 		prevSystemCost = currentSystemCost();
 		currSystemCost = prevSystemCost;
 		bestSoFar = currSystemCost;
-		rangeLimit = Math.max(dev.getColumns(), dev.getRows());
-		maxInnerIteration = (int)(1 * Math.pow(hardMacros.size(), 1.3333));
+		rangeLimit = getMaxRangeLimit();
+		maxInnerIteration = (int)(effort * Math.pow(hardMacros.size(), 1.3333));
 		//maxInnerIteration = (int)(Math.pow(Math.max(dev.getColumns(), dev.getRows()), 1.3333));
 		if(hardMacros.size() < 2 || allPaths.size() == 0){
 			finished = true;
@@ -422,9 +451,9 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 			temperatureStep(maxInnerIteration);
 
 			rangeLimit = rangeLimit * (1.0-goldenRate + moveAcceptanceRate);
-			double upperLimit = Math.max(dev.getColumns(), dev.getRows());
-			rangeLimit = Math.min(rangeLimit, upperLimit);
-			rangeLimit = Math.max(rangeLimit, 1.0);
+			rangeLimit = Math.min(rangeLimit, getMaxRangeLimit());
+			rangeLimit = Math.max(rangeLimit, 5.0);
+			System.out.println("rangeLimit = " + rangeLimit);
 
 			currentTemp = updateTemperature();
 
@@ -508,6 +537,10 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 
 		doFinalPlacement();
 
+		System.out.println("average connection length");
+		avgConnectionLength().entrySet().stream().sorted(Comparator.comparing(e->e.getKey().getName()))
+				.forEach(e-> System.out.println(e.getKey().getName()+": "+e.getValue()));
+
 
 		if (graphDataWriter != null) {
 			graphDataWriter.close();
@@ -515,8 +548,24 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 		return finalSystemCost;
 	}
 
+	private List<ModuleInstT> weighByAvgConnection() {
+		if (focusOnWorstModules) {
+			final Map<ModuleInstT, Float> avgLength = avgConnectionLength();
+			List<ModuleInstT> weighted = new ArrayList<>();
+			avgLength.forEach((mi, weight) -> {
+				int count = Math.max(1, weight.intValue());
+				for (int i = 0; i < count; i++) {
+					weighted.add(mi);
+				}
+			});
+			return weighted;
+		}
+		return hardMacros;
+	}
+
 	private void temperatureStep(int maxInnerIteration) {
-		double r;
+		final List<ModuleInstT> weighted = weighByAvgConnection();
+
 		currentAcceptedMoveCount = 0;
 		moveCount = 0;
 		int badMoveCount = 0;
@@ -525,7 +574,8 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 		for(int inner_iterate = 0; inner_iterate< maxInnerIteration; inner_iterate++){
 		//for(int inner_iterate = 0; inner_iterate< (10*rangeLimit); inner_iterate++){
 		//for(int inner_iterate = 0; inner_iterate< (dev.getColumns()*dev.getRows()); inner_iterate++){
-			ModuleInstT selectedHD = hardMacros.get(rand.nextInt(hardMacros.size()-1));
+			//ModuleInstT selectedHD = hardMacros.get(rand.nextInt(hardMacros.size()-1));
+			ModuleInstT selectedHD = weighted.get(rand.nextInt(weighted.size()-1));
 			saveAllCosts();
 
 
@@ -567,7 +617,7 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 					//}
 				}
 
-				r = rand.nextDouble();
+				double r = rand.nextDouble();
 				int numPath0 = 0;
 				int numPath1 = 0;
 				double tmp =0.0;
@@ -673,6 +723,10 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 		return allPaths;
 	}
 
+	public int getMaxRangeLimit() {
+		return Math.max(dev.getColumns(), dev.getRows());
+	}
+
 	enum Direction{UP, DOWN, LEFT, RIGHT};
 
 
@@ -720,59 +774,30 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 		PlacementT site1 = null;
 		ModuleInstT hm0 = selected;
 		ModuleInstT hm1 = null;
-		int iterations = 0;
-		/*int minX = 0;
-		int maxX = 0;
-		int minY = 0;
-		int maxY = 0;
-		minX = Math.max(1,Math.abs((site0.getTile().getRow()-(int)rangeLimit)));
-		maxX = Math.min((int)rangeLimit, site0.getTile().getRow()+(int)rangeLimit);
-		minY = Math.max(1,site0.getTile().getColumn()-(int)rangeLimit);
-		maxY = Math.min(dev.getColumns(), site0.getTile().getColumn()+(int)rangeLimit);
-		for(Site s : validSites){
-			if (s.getTile().getColumn()>=minY && s.getTile().getColumn()<=maxY){
-				validSiteRange.add(s);
-			}
-		}*/
-		List<PlacementT> validSiteRange = possiblePlacements.get(hm0.getModule()).getByRangeAround((int) rangeLimit, site0);
+
+		final AbstractValidPlacementCache<PlacementT> pp = possiblePlacements.get(hm0.getModule());
+		if (pp==null) {
+			throw new RuntimeException("what?");
+		}
+		List<PlacementT> validSiteRange = pp.getByRangeAround((int) rangeLimit, site0);
 
 
 		// Updated code. Store initial number of valid Sites
 		int nr_valid_sites = validSiteRange.size();
-		int rand_site = 0;
+		LinearCongruentialGenerator lcg = new LinearCongruentialGenerator(nr_valid_sites, rand);
 
 		PlacementT site1Previous = null;
 		int costBefore = 0;
-		while(true){
-			/*if(iterations > 10*validSites.size()){
-				selected = hardMacros.get(rand.nextInt(hardMacros.size()-1));
-				validSites = selected.getValidPlacements();
-				site0 = selected.getTempAnchorSite();
-				hm0 = selected;
-				iterations = 0;
-			}*/
-			if(iterations >=  nr_valid_sites){  // Updated code. Maximum trial nr = nr valid Sites
-				//System.out.println("could not find placement 1");
-                return false;
-			}
-			iterations++;
 
-			//site1 = validSites.get(rand.nextInt(validSites.size()-1));
-			if (validSiteRange.size()> 0){
-				if (validSiteRange.size()>1){
-                    rand_site = rand.nextInt(validSiteRange.size()-1);
-					site1 = validSiteRange.get(rand_site);
-				}else{
-					//site1 = validSiteRange.get(rand.nextInt(validSiteRange.size()));
-                    rand_site = 0;
-					site1 = validSiteRange.get(0);
-				}
-			}else{
-				return false;
-			}
+
+		final PrimitiveIterator.OfInt iterator = StreamSupport.intStream(lcg, false)
+				.iterator();
+		while (iterator.hasNext()) {
+			int rand_site = iterator.nextInt();
+			site1 = validSiteRange.get(rand_site);
+
 			if(site0.equals(site1)) {
 				//if(DEBUG_LEVEL > 1) System.out.println("  SAME SITE");
-                validSiteRange.remove(rand_site); // Updated code. Remove sites that were already checked
                 continue;
 			}
 			//TODO this only works when the same anchor is chosen for the other module.
@@ -802,7 +827,6 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 					setTempAnchorSite(hm1, site1Previous);
 					setTempAnchorSite(hm0, site0);
 					//if(DEBUG_LEVEL > 1) System.out.println("  BAD SWAP");
-					validSiteRange.remove(rand_site); // Updated code. Remove sites that were already checked
 					site1Previous = null;
                     continue;
 				}
@@ -816,7 +840,6 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 					setTempAnchorSite(hm0, site0);
 					//hm0.setTempAnchorSite(site0, currentPlacements);
 					//if(DEBUG_LEVEL > 1) System.out.println("  BAD SITE0");
-                    validSiteRange.remove(rand_site); // Updated code. Remove sites that were already checked
                     continue;
 				}
 				//System.out.println(hm0.getName()+"-> EMPTY");
@@ -908,5 +931,19 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 		rect.extendTo(b);
 		final int largerDimension = rect.getLargerDimension();
 		return largerDimension;
+	}
+
+	private Map<ModuleInstT, Float> avgConnectionLength() {
+		Map<ModuleInstT, Float> result = new HashMap<>();
+		for (ModuleInstT hardMacro : hardMacros) {
+			float length = 0;
+			final Collection<PathT> paths = getConnectedPaths(hardMacro);
+			for (PathT p : paths) {
+				length += p.getLength();
+			}
+			final float value = paths.size()>0 ? length / paths.size() : 0;
+			result.put(hardMacro, value);
+		}
+		return result;
 	}
 }

@@ -323,7 +323,7 @@ public class PicoBlazeArray {
 
 			@Override
 			public BlockPlacer2<?, ? extends ModuleInst, ?, ?> createPlacer(Design design, Path graphDataFile) {
-				return new BlockPlacer2Module(design, true, graphDataFile);
+				return new BlockPlacer2Module(design, true, graphDataFile, BlockPlacer2.DEFAULT_DENSE, BlockPlacer2.DEFAULT_EFFORT, BlockPlacer2.DEFAULT_FOCUS_ON_WORST);
 			}
 
 			@Override
@@ -350,7 +350,7 @@ public class PicoBlazeArray {
 
 			@Override
 			public BlockPlacer2<?, ModuleImplsInst, ?, ?> createPlacer(Design design, Path graphDataFile) {
-				placer = new BlockPlacer2Impls(design, getInstances(), true, graphDataFile);
+				placer = new BlockPlacer2Impls(design, getInstances(), true, graphDataFile, BlockPlacer2.DEFAULT_DENSE, BlockPlacer2.DEFAULT_EFFORT, BlockPlacer2.DEFAULT_FOCUS_ON_WORST);
 				return placer;
 			}
 

@@ -77,7 +77,7 @@ public class Move<ModuleInstT extends AbstractModuleInst<?,?>, PlacementT> {
 	 */
 	@Override
 	public String toString() {
-		return "Move " + (getBlock0() == null ? "null" : getBlock0().getName()) + " -> " + site1 + ", " + (getBlock1() == null ? "null" : getBlock1().getName()) + " -> " + site0;
+		return "Move " + (getBlock0() == null ? "null" : getBlock0().getName()) + " -> " + site1 + ", " + (getBlock1() == null ? "null" : getBlock1().getName()) + " -> " + site0+" cost: "+deltaCost;
 	}
 
 	/**

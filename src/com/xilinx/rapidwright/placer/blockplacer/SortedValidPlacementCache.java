@@ -21,6 +21,7 @@
  */
 package com.xilinx.rapidwright.placer.blockplacer;
 
+import java.util.AbstractList;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -37,12 +38,22 @@ import com.xilinx.rapidwright.device.Tile;
  * This allows for optimized querying of placements near a central placement.
  * @param <PlacementT> The placement class
  */
-public class SortedValidPlacementCache<PlacementT> extends AbstractValidPlacementCache<PlacementT> {
+public abstract class SortedValidPlacementCache<PlacementT> extends AbstractValidPlacementCache<PlacementT> {
+    public static <PlacementT> AbstractValidPlacementCache<PlacementT> fromList(List<PlacementT> allPlacements, BlockPlacer2<?,?,PlacementT, ?> placer, boolean designIsDense) {
+        final SortedValidPlacementCache1D<SortedValidPlacementCache1D<List<PlacementT>>> data = allPlacements.stream().collect(SortedValidPlacementCache.collector(placer));
+        if (designIsDense) {
+            return new DenseSortedValidPlacementCache<>(placer, data, allPlacements);
+        } else {
+            return new SparseSortedValidPlacementCache<>(placer, data, allPlacements);
+        }
+    }
+
     private static class SortedValidPlacementCache1D<T>{
         /**
          * Actual Items
          */
         public final List<T> items;
+        private final ToIntFunction<T> countItem;
 
         /**
          * Lower bound for searching for keys
@@ -57,15 +68,18 @@ public class SortedValidPlacementCache<PlacementT> extends AbstractValidPlacemen
          */
         public final int[] maxIdx;
 
+        private final int[] itemCounts;
+
         /**
          * Create a new 1D placement collection
          * @param items items, ordered by keys
          * @param keys the key values
          */
-        public SortedValidPlacementCache1D(List<T> items, int[] keys) {
+        public SortedValidPlacementCache1D(List<T> items, int[] keys, ToIntFunction<T> countItem) {
             this.items = items;
+            this.countItem = countItem;
 
-            int biggestKey = keys[keys.length-1];
+            int biggestKey = keys.length == 0 ? 0 : keys[keys.length-1];
 
             minIdx = new int[biggestKey+2];
             maxIdx = new int[biggestKey+2];
@@ -82,6 +96,17 @@ public class SortedValidPlacementCache<PlacementT> extends AbstractValidPlacemen
                     minIdx[key] = insertionPoint;
                     maxIdx[key] = insertionPoint - 1; //Exclude the insertion point
                 }
+            }
+
+            if (countItem != null) {
+                itemCounts = new int[items.size()];
+                int count = 0;
+                for (int i = 0; i < items.size(); i++) {
+                    count += countItem.applyAsInt(items.get(i));
+                    itemCounts[i] = count;
+                }
+            } else {
+                itemCounts = null;
             }
         }
 
@@ -102,11 +127,11 @@ public class SortedValidPlacementCache<PlacementT> extends AbstractValidPlacemen
             return fromArr(key, minIdx);
         }
 
-        public static <T,U>Collector<T,?, SortedValidPlacementCache1D<U>> collector(ToIntFunction<T> keyExtractor, Collector<T,?,U> downstreamCollector) {
+        public static <T,U>Collector<T,?, SortedValidPlacementCache1D<U>> collector(ToIntFunction<T> keyExtractor, ToIntFunction<U> countItem, Collector<T,?,U> downstreamCollector) {
             return Collectors.collectingAndThen(Collectors.groupingBy(keyExtractor::applyAsInt, downstreamCollector), (Map<Integer, U> byKey) -> {
                 int[] keys = byKey.keySet().stream().sorted().mapToInt(x -> x).toArray();
                 List<U> items = Arrays.stream(keys).mapToObj(byKey::get).collect(Collectors.toList());
-                return new SortedValidPlacementCache1D<>(items, keys);
+                return new SortedValidPlacementCache1D<>(items, keys, countItem);
             });
         }
 
@@ -122,55 +147,66 @@ public class SortedValidPlacementCache<PlacementT> extends AbstractValidPlacemen
             }
             return items.get(min);
         }
+
+
+        private int getEntryCountUpTo(int idx) {
+            if (idx<0) {
+                return 0;
+            }
+            return itemCounts[idx];
+        }
     }
 
-    private final BlockPlacer2<?,?,PlacementT, ?> placer;
+    protected final BlockPlacer2<?,?,PlacementT, ?> placer;
 
     /**
      * The actual data that we store.
      *
      * When multiple module implementations are present, they may map to the same anchor location, so we store a list of items for each position.
      */
-    private final SortedValidPlacementCache1D<SortedValidPlacementCache1D<List<PlacementT>>> collection;
+    protected final SortedValidPlacementCache1D<SortedValidPlacementCache1D<List<PlacementT>>> collection;
+    protected final List<PlacementT> allData;
 
-    private SortedValidPlacementCache(BlockPlacer2<?, ?, PlacementT, ?> placer, SortedValidPlacementCache1D<SortedValidPlacementCache1D<List<PlacementT>>> collection) {
+    private SortedValidPlacementCache(
+            BlockPlacer2<?, ?, PlacementT, ?> placer,
+            SortedValidPlacementCache1D<SortedValidPlacementCache1D<List<PlacementT>>> collection,
+            List<PlacementT> allData
+    ) {
         this.placer = placer;
 
         this.collection = collection;
+        this.allData = allData;
     }
 
-    public static <PlacementT> Collector<PlacementT, ?, SortedValidPlacementCache<PlacementT>> collector(BlockPlacer2<?,?,PlacementT, ?> placer) {
-        Collector<PlacementT, ?, SortedValidPlacementCache1D<SortedValidPlacementCache1D<List<PlacementT>>>> createColl =
-                SortedValidPlacementCache1D.collector(
+    public static <PlacementT> Collector<PlacementT, ?, SortedValidPlacementCache1D<SortedValidPlacementCache1D<List<PlacementT>>>> collector(BlockPlacer2<?,?,PlacementT, ?> placer) {
+        return SortedValidPlacementCache1D.collector(
                         p -> placer.getPlacementTile(p).getColumn(),
+                        null,
                         SortedValidPlacementCache1D.collector(
                                 p -> placer.getPlacementTile(p).getRow(),
+                                (List<PlacementT> l)->l.size(),
                                 Collectors.toList()
                         )
                 );
-        return Collectors.collectingAndThen(createColl, c -> new SortedValidPlacementCache<>(placer, c));
+    }
+
+    @FunctionalInterface
+    interface ArrayIndexToPlacement<PlacementT> {
+        PlacementT apply(int index, int innerIndex);
     }
 
 
-    @Override
-    public List<PlacementT> getByRangeAround(int rangeLimit, PlacementT centerPlacement) {
-
-        Tile center = placer.getPlacementTile(centerPlacement);
-
-        List<PlacementT> result = new ArrayList<>();
-
-        final int maxColumn = collection.getMaxIdx(center.getColumn()+rangeLimit);
-        for (int col = collection.getMinIdx(center.getColumn() - rangeLimit); col <= maxColumn; col++) {
-            final SortedValidPlacementCache1D<List<PlacementT>> currentCol = collection.get(col);
-
-            final int maxRow = currentCol.getMaxIdx(center.getRow()+rangeLimit);
-            for (int row = currentCol.getMinIdx(center.getRow()-rangeLimit); row <= maxRow; row++) {
-                result.addAll(currentCol.items.get(row));
-            }
+    private static <PlacementT> PlacementT findInnerArrayIndex(int targetIndex, int[] itemCounts, ArrayIndexToPlacement<PlacementT> f) {
+        //We are storing counts but are looking up by index -> add one
+        int index = Arrays.binarySearch(itemCounts, targetIndex+1);
+        if (index<0) {
+            index = -index - 1;
         }
-
-        return result;
+        int itemsBefore = index == 0 ? 0 : itemCounts[index-1];
+        int innerIndex = targetIndex - itemsBefore;
+        return f.apply(index, innerIndex);
     }
+
 
     @Override
     public boolean contains(PlacementT placement) {
@@ -186,4 +222,92 @@ public class SortedValidPlacementCache<PlacementT> extends AbstractValidPlacemen
         }
         return row.contains(placement);
     }
+
+    private static class SparseSortedValidPlacementCache<PlacementT> extends SortedValidPlacementCache<PlacementT> {
+
+        private SparseSortedValidPlacementCache(BlockPlacer2<?, ?, PlacementT, ?> placer, SortedValidPlacementCache1D<SortedValidPlacementCache1D<List<PlacementT>>> collection, List<PlacementT> allData) {
+            super(placer, collection, allData);
+        }
+
+        @Override
+        public List<PlacementT> getByRangeAround(int rangeLimit, PlacementT centerPlacement) {
+            Tile center = placer.getPlacementTile(centerPlacement);
+
+            final int maxColumn = collection.getMaxIdx(center.getColumn()+ rangeLimit);
+            final int minColumn = collection.getMinIdx(center.getColumn() - rangeLimit);
+            int[] columnCounts = new int[maxColumn-minColumn+1];
+            int[] minRows = new int[maxColumn-minColumn+1];
+            int[] maxRows = new int[maxColumn-minColumn+1];
+
+
+            int count = 0;
+            for (int col = minColumn; col <= maxColumn; col++) {
+                final SortedValidPlacementCache1D<List<PlacementT>> currentCol = collection.get(col);
+
+                final int arrIdx = col - minColumn;
+                minRows[arrIdx] = currentCol.getMinIdx(center.getRow() - rangeLimit);
+                maxRows[arrIdx] = currentCol.getMaxIdx(center.getRow() + rangeLimit);
+
+                int thisColCount =
+                        currentCol.getEntryCountUpTo(maxRows[arrIdx])
+                                - currentCol.getEntryCountUpTo(minRows[arrIdx]-1);
+
+                count += thisColCount;
+                columnCounts[arrIdx] = count;
+
+            }
+            int totalCount = count;
+            return new AbstractList<PlacementT>() {
+                @Override
+                public int size() {
+                    return totalCount;
+                }
+
+                @Override
+                public PlacementT get(int index) {
+
+
+                    return findInnerArrayIndex(index, columnCounts, (colIdx, inColumnIdx) -> {
+                        final SortedValidPlacementCache1D<List<PlacementT>> column = collection.get(colIdx + minColumn);
+
+                        int inColumnIdxShift = inColumnIdx+column.getEntryCountUpTo(minRows[colIdx]-1);
+
+                        return findInnerArrayIndex(inColumnIdxShift, column.itemCounts,
+                                (rowIdx, listIdx) -> {
+                                    return column.get(rowIdx).get(listIdx);
+                                }
+                        );
+                    });
+                }
+            };
+        }
+
+    }
+    private static class DenseSortedValidPlacementCache<PlacementT> extends SortedValidPlacementCache<PlacementT> {
+        private DenseSortedValidPlacementCache(BlockPlacer2<?, ?, PlacementT, ?> placer, SortedValidPlacementCache1D<SortedValidPlacementCache1D<List<PlacementT>>> collection, List<PlacementT> allData) {
+            super(placer, collection, allData);
+        }
+
+        @Override
+        public List<PlacementT> getByRangeAround(int rangeLimit, PlacementT centerPlacement) {
+            Tile center = placer.getPlacementTile(centerPlacement);
+
+            List<PlacementT> result = new ArrayList<>();
+
+            final int maxColumn = collection.getMaxIdx(center.getColumn()+ rangeLimit);
+            for (int col = collection.getMinIdx(center.getColumn() - rangeLimit); col <= maxColumn; col++) {
+                final SortedValidPlacementCache1D<List<PlacementT>> currentCol = collection.get(col);
+
+                final int maxRow = currentCol.getMaxIdx(center.getRow()+ rangeLimit);
+                for (int row = currentCol.getMinIdx(center.getRow()- rangeLimit); row <= maxRow; row++) {
+                    result.addAll(currentCol.items.get(row));
+                }
+            }
+
+            return result;
+        }
+    }
+
+
+
 }

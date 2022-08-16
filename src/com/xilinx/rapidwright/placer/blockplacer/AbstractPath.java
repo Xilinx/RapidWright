@@ -68,4 +68,8 @@ public abstract class AbstractPath<PortT, ModuleInstT extends AbstractModuleInst
     public int countConnectedModules() {
         return moduleInsts.size();
     }
+
+    public Set<ModuleInstT> getModuleInsts() {
+        return moduleInsts;
+    }
 }

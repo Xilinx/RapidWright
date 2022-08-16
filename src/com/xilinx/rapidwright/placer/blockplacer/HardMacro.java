@@ -25,9 +25,10 @@ package com.xilinx.rapidwright.placer.blockplacer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.design.ModuleInst;
-//import com.xilinx.rapidwright.design.ModuleInst;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.RelocatableTileRectangle;
 import com.xilinx.rapidwright.design.SiteInst;
@@ -42,6 +43,7 @@ import com.xilinx.rapidwright.device.Tile;
  *
  */
 public class HardMacro extends ModuleInst implements Comparable<Object> {
+	private final ModuleInst original;
 	
 	private HashSet<Site> validSiteSet;
 	
@@ -59,6 +61,7 @@ public class HardMacro extends ModuleInst implements Comparable<Object> {
 		super(moduleInst);
 		setConnectedPortWires(new ArrayList<PortWire>());
 		connectedPaths = new HashSet<Path>();
+		original = moduleInst;
 	}
 
 	/**
@@ -80,8 +83,8 @@ public class HardMacro extends ModuleInst implements Comparable<Object> {
 	/**
 	 * @return the validPlacements
 	 */
-	public ArrayList<Site> getValidPlacements() {
-		return getModule().getAllValidPlacements();
+	public List<Site> getValidPlacements() {
+		return getModule().getAllValidPlacements().stream().filter(p->p.getTile().getRow()<=300).collect(Collectors.toList());
 	}
 
 	public boolean isValidPlacement(){
@@ -182,5 +185,9 @@ public class HardMacro extends ModuleInst implements Comparable<Object> {
 	 */
 	public void setTileSize(int tileSize) {
 		this.tileSize = tileSize;
+	}
+
+	public ModuleInst getOriginal() {
+		return original;
 	}
 }

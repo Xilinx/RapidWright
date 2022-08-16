@@ -27,6 +27,7 @@ package com.xilinx.rapidwright.design;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.List;
 import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 
@@ -117,9 +118,9 @@ public class ModuleImpls extends ArrayList<Module> {
 		checkSameNetlist();
 	}
 
-	private Collection<ModulePlacement> allPlacements;
+	private List<ModulePlacement> allPlacements;
 
-	public Collection<ModulePlacement> getAllPlacements() {
+	public List<ModulePlacement> getAllPlacements() {
 		if (allPlacements == null) {
 			allPlacements = stream()
 					.flatMap(mod ->
