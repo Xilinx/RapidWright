@@ -30,12 +30,15 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.Set;
 
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.BELPin;
@@ -323,12 +326,14 @@ public class RouterHelper {
 	/**
 	 * Inverts all possible GND sink pins to VCC pins.
 	 * @param design The target design.
-	 * @param staticNet The static net, should be VCC only.
+	 * @param pins The static net pins.
 	 */
-	public static void invertPossibleGndPinsToVccPins(Design design, Net staticNet) {
-		if(!staticNet.getName().equals(Net.GND_NET)) return;
-		List<SitePinInst> toInvertPins = new ArrayList<>();
-		for(SitePinInst currSitePinInst:staticNet.getPins()) {
+	public static void invertPossibleGndPinsToVccPins(Design design, List<SitePinInst> pins) {
+		Net staticNet = design.getGndNet();
+		Set<SitePinInst> toInvertPins = new HashSet<>();
+		for(SitePinInst currSitePinInst : pins) {
+			if (!currSitePinInst.getNet().equals(staticNet))
+				throw new RuntimeException(currSitePinInst.toString());
 			BELPin[] belPins = currSitePinInst.getSiteInst().getSiteWirePins(currSitePinInst.getName());
 			// DSP or BRAM
 			if(belPins.length == 2) {
@@ -349,11 +354,12 @@ public class RouterHelper {
 	           }
 			}
 		}
-		
+
+		DesignTools.batchRemoveSitePins(new HashMap<Net, Set<SitePinInst>>() {{
+			put(staticNet, toInvertPins);
+		}}, true);
 		for(SitePinInst toinvert:toInvertPins) {
-			boolean success = staticNet.removePin(toinvert, true);
-            success |= design.getVccNet().addPin(toinvert);
-            if(!success) {
+            if (!design.getVccNet().addPin(toinvert)) {
                   throw new RuntimeException("ERROR: Couldn't invert site pin " +
                 		  toinvert);
             }

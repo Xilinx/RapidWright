@@ -294,6 +294,7 @@ public class GlobalSignalRouting {
 		}
 		
 		for(SitePinInst sink : currNet.getPins()) {
+			if(sink.isRouted()) continue;
 			if(sink.isOutPin()) continue;
 			int watchdog = 10000;	
 			if(debug) {

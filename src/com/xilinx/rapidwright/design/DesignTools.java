@@ -1033,15 +1033,16 @@ public class DesignTools {
 	 * Source pins are handled by {@link #unrouteSourcePin(SitePinInst)}.
 	 */
 	public static void unroutePins(Net net, Collection<SitePinInst> pins) {
-		pins.removeIf((spi) -> {
+		List<SitePinInst> sinkPins = new ArrayList<>(pins.size());
+		pins.forEach((spi) -> {
 			if (spi.isOutPin()) {
 				DesignTools.unrouteSourcePin(spi);
-				return true;
+			} else {
+				sinkPins.add(spi);
 			}
-			return false;
 		});
-	    removePIPsFromNet(net,getTrimmablePIPsFromPins(net, pins));
-	    for(SitePinInst pin : pins) {
+	    removePIPsFromNet(net,getTrimmablePIPsFromPins(net, sinkPins));
+	    for(SitePinInst pin : sinkPins) {
 	        pin.setRouted(false);
 	    }	    
 	}
@@ -1296,9 +1297,14 @@ public class DesignTools {
 	        if(otherUser == false) {
 	            // Unroute site routing back to pin and remove site pin
 	            String sitePinName = getRoutedSitePinFromPhysicalPin(cell, net, pin.getName());
+	            BELPin srcPin = siteInst.getSite().getBELPin(sitePinName);
+	            siteInst.unrouteIntraSiteNet(srcPin, pin);
 	            SitePinInst spi = siteInst.getSitePinInst(sitePinName);
-	            siteInst.unrouteIntraSiteNet(spi.getBELPin(), pin);
-	            handlePinRemovals(spi, deferRemovals);
+	            // It's possible site wire could be set (e.g. reserved using GLOBAL_USEDNET)
+	            // but no inter-site routing (thus no SPI) associated
+	            if (spi != null) {
+	            	handlePinRemovals(spi, deferRemovals);
+	            }
 	        }
 	    }
 
@@ -1321,7 +1327,10 @@ public class DesignTools {
 
 	    // Remove Logical Cell
 	    for(EDIFPortInst portInst : cell.getEDIFCellInst().getPortInsts()) {
-	        portInst.getNet().removePortInst(portInst);
+	        EDIFNet en = portInst.getNet();
+	        if (en != null) {
+	            en.removePortInst(portInst);
+	        }
 	    }
 	    cell.getParentCell().removeCellInst(cell.getEDIFCellInst());
 	}
