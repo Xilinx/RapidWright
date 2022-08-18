@@ -37,6 +37,7 @@ public enum IOStandard {
 	ANALOG,
 	ANALOG_SE,
 	BLVDS_25,
+	DEFAULT,
 	DIFF_AIO12_LVAUX,
 	DIFF_HSTL_I,
 	DIFF_HSTL_II,

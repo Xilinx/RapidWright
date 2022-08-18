@@ -126,6 +126,7 @@ public class EDIFNetlist extends EDIFName {
 	static {
 	    EnumSet<IOStandard> obufExpansion = EnumSet.of(
                                 	            IOStandard.BLVDS_25,
+                                	            IOStandard.DEFAULT,
                                 	            IOStandard.DIFF_HSTL_I,
                                 	            IOStandard.DIFF_HSTL_I_12,
                                 	            IOStandard.DIFF_HSTL_I_18,
@@ -1137,7 +1138,7 @@ public class EDIFNetlist extends EDIFName {
 		return u.hasTransform(device == null ? Series.UltraScale : device.getSeries());
 	}
 
-	private NetType identifyNetType(EDIFHierPortInst source) {
+	public static NetType identifyNetType(EDIFHierPortInst source) {
 		String cellType = source.getPortInst().getCellInst() == null ? "" : source.getPortInst().getCellInst().getCellType().getName();
 		if (cellType.equals("GND")) {
 			return NetType.GND;
@@ -1582,17 +1583,16 @@ public class EDIFNetlist extends EDIFName {
 
 		// Find the macro primitives to replace
 		Set<String> toReplace = new HashSet<String>();
+		Set<String> possibleExceptions = macroExpandExceptionMap.keySet();
 		for(EDIFCell c : netlistPrims.getCells()) {
 			if(macros.containsCell(c.getName())) {
 				toReplace.addAll(getAllDecendantCellTypes(macros.getCell(c.getName())));
 			}
+			if(possibleExceptions.contains(c.getName())) {
+			    toReplace.add(c.getName());
+			}
 		}
 		
-		for(String cellName : macroExpandExceptionMap.keySet()) {
-		    if(toReplace.contains(cellName)) {
-		        toReplace.add(macroExpandExceptionMap.get(cellName).getFirst());
-		    }
-		}
 		
 		// Replace macro primitives in library and import pre-requisite cells if needed
 		for(String cellName : toReplace) {
@@ -1619,6 +1619,9 @@ public class EDIFNetlist extends EDIFName {
 						    Pair<String, EnumSet<IOStandard>> exception = macroExpandExceptionMap.get(cellName);
 						    if(exception != null) {
 						        EDIFPropertyValue value = inst.getProperty(IOSTANDARD_PROP);
+						        if(value == null) {
+						            value = inst.getProperty(IOSTANDARD_PROP.toUpperCase());
+						        }
 						        if(value != null) {
                                     IOStandard ioStandard = IOStandard.valueOf(value.getValue());
 						            if(exception.getSecond().contains(ioStandard)) {
@@ -1629,7 +1632,23 @@ public class EDIFNetlist extends EDIFName {
 						}
 						EDIFCell newCell = netlistPrims.getCell(cellName);
 						if (newCell == null) {
-							throw new RuntimeException("failed to find cell macro "+cellName+", we are in "+lib.getName());
+						    EDIFCell macro = macros.getCell(cellName);
+						    if(macro == null) {
+						        throw new RuntimeException("failed to find cell macro "+cellName+", we are in "+lib.getName());
+						    }
+						    primsToRemoveOnCollapse.add(cellName);
+						    EDIFCell copy = new EDIFCell(netlistPrims, macro);
+						    if(copy.getCellInsts().size() > 0) {
+						        for(EDIFCellInst copyInst : copy.getCellInsts()) {
+						            EDIFCell primCell = netlistPrims.getCell(copyInst.getCellType().getName());
+						            if(primCell == null) {
+						                primCell = new EDIFCell(netlistPrims, copyInst.getCellType());
+						                primsToRemoveOnCollapse.add(copyInst.getCellType().getName());
+						            }
+						            copyInst.setCellType(primCell);
+						        }
+						    }
+						    newCell = copy;
 						}
 						inst.setCellType(newCell);
 					}
