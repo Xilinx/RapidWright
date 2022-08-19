@@ -215,7 +215,7 @@ public class PartialRouter extends RWRoute{
 			NetWrapper netWrapper = e.getValue();
 			for (Connection connection : netWrapper.getConnections()) {
 				if (connection.getSink().isRouted()) {
-					finishRouteConnection(connection);
+					finishRouteConnection(connection, connection.getSinkRnode());
 				}
 			}
 		}
@@ -419,7 +419,7 @@ public class PartialRouter extends RWRoute{
 			// Use the prev pointers to update the routing for each connection
 			for (Connection netnewConnection : netWrapper.getConnections()) {
 				assert(netnewConnection.getSink().isRouted());
-				finishRouteConnection(netnewConnection);
+				finishRouteConnection(netnewConnection, netnewConnection.getSinkRnode());
 			}
 
 			// Update the timing graph

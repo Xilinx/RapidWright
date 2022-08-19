@@ -267,12 +267,6 @@ public class Connection implements Comparable<Connection>{
 
 	public void setAltSinkRnode(RouteNode childRnode) { altSinkRnode = childRnode; }
 
-	public void swapAltSinkRnode() {
-		RouteNode rn = sinkRnode;
-		sinkRnode = altSinkRnode;
-		altSinkRnode = rn;
-	}
-	
 	public short getXMinBB() {
 		return xMinBB;
 	}

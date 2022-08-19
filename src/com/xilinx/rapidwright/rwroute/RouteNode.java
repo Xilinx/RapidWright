@@ -60,9 +60,11 @@ abstract public class RouteNode {
 	/** The base cost of a rnode */
 	private float baseCost;
 	/** A flag to indicate if this rnode is the target */
-	private boolean isTarget;
+	private volatile boolean isTarget;
 	/** The children (downhill rnodes) of this rnode */
 	protected RouteNode[] children;
+	/** The parent (uphill rnodes) of this rnode */
+	protected RouteNode[] parents;
 	
 	/** Present congestion cost */
 	private float presentCongestionCost;
@@ -70,10 +72,13 @@ abstract public class RouteNode {
 	private float historicalCongestionCost;
 	/** Upstream path cost */
 	private float upstreamPathCost;
+	private float downstreamPathCost;
 	/** Lower bound of the total path cost */
 	private float lowerBoundTotalPathCost;
+	private float lowerBoundTotalPathCostBack;
 	/** A variable that stores the parent of a rnode during expansion to facilitate tracing back */
 	private RouteNode prev;
+	private RouteNode next;
 	/**
 	 * A map that records users of a rnode based on all routed connections.
 	 * Each user is a {@link NetWrapper} instance that corresponds to a {@link Net} instance.
@@ -122,6 +127,26 @@ abstract public class RouteNode {
 		}
 		children = childrenList.toArray(EMPTY_ARRAY);
 		setChildrenTimer.stop();
+	}
+
+	protected void setParents(RuntimeTracker setParentsTimer){
+		if (parents != null)
+			return;
+		setParentsTimer.start();
+		List<Node> allUphillNodes = node.getAllUphillNodes();
+		List<RouteNode> parentsList = new ArrayList<>(allUphillNodes.size());
+		for(Node uphill: allUphillNodes){
+			if(!mustInclude(uphill, node)) {
+				if (isPreserved(uphill) || isExcluded(uphill, node))
+					continue;
+			}
+
+			final RouteNodeType type = RouteNodeType.WIRE;
+			RouteNode child = getOrCreate(uphill, type);
+			parentsList.add(child);//the sink rnode of a target connection has been created up-front
+		}
+		parents = parentsList.toArray(EMPTY_ARRAY);
+		setParentsTimer.stop();
 	}
 	
 	private void setBaseCost(RouteNodeType type){
@@ -355,6 +380,14 @@ abstract public class RouteNode {
 	}
 
 	/**
+	 * Gets the parents of a RouteNode Object.
+	 * @return A list of RouteNode Objects.
+	 */
+	public RouteNode[] getParents() {
+		return parents != null ? parents : EMPTY_ARRAY;
+	}
+
+	/**
 	 * Gets whether the given RouteNode Object is already a child.
 	 * @param rnode Child node to search for.
 	 * @return True if child already present.
@@ -417,12 +450,20 @@ abstract public class RouteNode {
 		lowerBoundTotalPathCost = totalPathCost;
 	}
 
+	public void setLowerBoundTotalPathCostBack(float totalPathCost) {
+		lowerBoundTotalPathCostBack = totalPathCost;
+	}
+
 	/**
 	 * Sets the upstream path cost.
 	 * @param newPartialPathCost The new value to be set.
 	 */
 	public void setUpstreamPathCost(float newPartialPathCost) {
 		this.upstreamPathCost = newPartialPathCost;
+	}
+
+	public void setDownstreamPathCost(float newPartialPathCost) {
+		this.downstreamPathCost = newPartialPathCost;
 	}
 
 	/**
@@ -433,12 +474,20 @@ abstract public class RouteNode {
 		return lowerBoundTotalPathCost;
 	}
 
+	public float getLowerBoundTotalPathCostBack() {
+		return lowerBoundTotalPathCostBack;
+	}
+
 	/**
 	 * Gets the upstream path cost.
 	 * @return The upstream path cost.
 	 */
 	public float getUpstreamPathCost() {
 		return upstreamPathCost;
+	}
+
+	public float getDownstreamPathCost() {
+		return downstreamPathCost;
 	}
 
 	/**
@@ -547,12 +596,20 @@ abstract public class RouteNode {
 		return prev;
 	}
 
+	public RouteNode getNext() {
+		return next;
+	}
+
 	/**
 	 * Sets the parent RouteNode instance for routing a connection.
 	 * @param prev The driving RouteNode instance to set.
 	 */
 	public void setPrev(RouteNode prev) {
 		this.prev = prev;
+	}
+
+	public void setNext(RouteNode next) {
+		this.next = next;
 	}
 
 	/**
@@ -601,7 +658,7 @@ abstract public class RouteNode {
 	 * @return true, if a RouteNode instance has been visited before.
 	 */
 	public boolean isVisited() {
-		return getPrev() != null;
+		return prev != null;
 	}
 
 	/**
@@ -609,6 +666,7 @@ abstract public class RouteNode {
 	 */
 	public void reset() {
 		setPrev(null);
+		setNext(null);
 		setTarget(false);
 	}
 	

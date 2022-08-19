@@ -36,6 +36,7 @@ import com.xilinx.rapidwright.util.ParallelismTools;
 import com.xilinx.rapidwright.util.RuntimeTracker;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -70,8 +71,10 @@ public class RouteNodeGraph {
      * Visited rnodes data during connection routing
      */
     final protected Collection<RouteNode> visited;
+    final protected Collection<RouteNode> visitedBack;
 
     final protected RuntimeTracker setChildrenTimer;
+    final protected RuntimeTracker setParentsTimer;
 
     private long totalVisited;
 
@@ -118,17 +121,25 @@ public class RouteNodeGraph {
         }
 
         @Override
+        public RouteNode[] getParents() {
+            setParents(setParentsTimer);
+            return super.getParents();
+        }
+
+        @Override
         public int getSLRIndex() {
              return intYToSLRIndex[getEndTileYCoordinate()];
         }
     }
 
-    public RouteNodeGraph(RuntimeTracker setChildrenTimer, Design design) {
-        nodesMap = new HashMap<>();
+    public RouteNodeGraph(RuntimeTracker setChildrenTimer, /*RuntimeTracker setParentsTimer,*/ Design design) {
+        nodesMap = new ConcurrentHashMap<>();
         preservedMap = new ConcurrentHashMap<>();
         asyncPreserveOutstanding = new CountUpDownLatch();
         visited = new ArrayList<>();
+        visitedBack = new ArrayList<>();
         this.setChildrenTimer = setChildrenTimer;
+        this.setParentsTimer = setChildrenTimer;
         this.design = design;
 
         Device device = design.getDevice();
@@ -290,15 +301,21 @@ public class RouteNodeGraph {
         visited.add(rnode);
     }
 
+    public void visitBack(RouteNode rnode) {
+        visitedBack.add(rnode);
+    }
+
     /**
      * Resets the expansion history.
      */
     public void resetExpansion() {
-        for (RouteNode node : visited) {
-            node.reset();
+        for (Collection<RouteNode> c : Arrays.asList(visited, visitedBack)) {
+            for (RouteNode node : c) {
+                node.reset();
+            }
+            totalVisited += c.size();
+            c.clear();
         }
-        totalVisited += visited.size();
-        visited.clear();
     }
 
     public long getTotalVisited() {
