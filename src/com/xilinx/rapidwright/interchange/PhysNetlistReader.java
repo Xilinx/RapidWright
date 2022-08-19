@@ -296,6 +296,11 @@ public class PhysNetlistReader {
                             strings.get(otherCell.getMultiCell()),
                             strings.get(otherCell.getMultiType())));
                 }else {
+                    if(c.getBEL().getPin(belPinName) == null) {
+                        System.err.println("WARNING: On cell " + c.getName() + ", a logical pin '" +
+                                c.getType() + "." + cellPinName + "' is being mapped on to a BEL pin '" 
+                                + c.getBELName() + "." + belPinName + "' that does not exist.");
+                    }
                     c.addPinMapping(belPinName, cellPinName);
                     if(pinMapping.getIsFixed()) {
                         c.fixPin(belPinName);
