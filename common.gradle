@@ -8,8 +8,15 @@ targetCompatibility = 8
 repositories {
     if (project.hasProperty('additionalMavenRepo')) {
       project.logger.lifecycle('Adding Maven Repository at '+additionalMavenRepo)
-      maven{
-        url additionalMavenRepo
+      exclusiveContent {
+        forRepository {
+          maven {
+            url additionalMavenRepo
+          }
+        }
+        filter {
+          includeModule("com.xilinx.rapidwright", "rapidwright-api-lib")
+        }
       }
     }
     if (project.hasProperty('useMavenLocal') && useMavenLocal == "True") {

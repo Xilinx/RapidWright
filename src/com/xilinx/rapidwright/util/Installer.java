@@ -570,14 +570,14 @@ public class Installer {
 			if(returnVal != 0){
 				System.err.println("  ERROR: Looks like the DeviceBrowser did not run or crashed. Please examine\n"
 						+ "  the output for clues as to what went wrong.  If you are stumped, please request help\n"
-						+ "  on the RapidWright Google Group Forum: https://groups.google.com/forum/#!forum/rapidwright.");
+						+ "  on the RapidWright GitHub Discussions: https://github.com/Xilinx/RapidWright/discussions.");
 				if(!isWindows()){
 					System.err.println("\n*** If you are running Linux ***"); 
 					System.err.println("If you are running Linux, a common problem is to be missing libpng12.so.0.\n" +
 									   "If you are running a CentOS/RedHat/Fedora distro, try the following:\n" + 
 									   "    sudo yum install libpng12\n\n" + 
 									   "If you are running a Debian/Ubuntu distro, try the following:\n" + 
-									   "    wget -q -O /tmp/libpng12.deb http://mirrors.kernel.org/ubuntu/pool/main/libp/libpng/libpng12-0_1.2.54-1ubuntu1_amd64.deb && sudo dpkg -i /tmp/libpng12.deb && rm /tmp/libpng12.deb");
+									   "    wget -q -O /tmp/libpng12.deb https://snapshot.debian.org/archive/debian/20160413T160058Z/pool/main/libp/libpng/libpng12-0_1.2.54-6_amd64.deb && sudo dpkg -i /tmp/libpng12.deb && rm /tmp/libpng12.deb");
 				}
 				System.exit(1);
 			}		
