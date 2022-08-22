@@ -201,6 +201,13 @@ public abstract class SortedValidPlacementCache<PlacementT> extends AbstractVali
         int index = Arrays.binarySearch(itemCounts, targetIndex+1);
         if (index<0) {
             index = -index - 1;
+        } else {
+            //We may have the same value repeat in the array if the filtered part of a column is empty
+            //Move to the lowest repeat index in that case.
+            //This is a rare case, so it's not worth it to update the arrays
+            while (index>0 && itemCounts[index-1]==(targetIndex+1)) {
+                index--;
+            }
         }
         int itemsBefore = index == 0 ? 0 : itemCounts[index-1];
         int innerIndex = targetIndex - itemsBefore;
@@ -235,8 +242,11 @@ public abstract class SortedValidPlacementCache<PlacementT> extends AbstractVali
 
             final int maxColumn = collection.getMaxIdx(center.getColumn()+ rangeLimit);
             final int minColumn = collection.getMinIdx(center.getColumn() - rangeLimit);
+            //This stores how many matching entries are in each column
             int[] columnCounts = new int[maxColumn-minColumn+1];
+            //This stores the first matching row for each column
             int[] minRows = new int[maxColumn-minColumn+1];
+            //This stores the last matching row for each column
             int[] maxRows = new int[maxColumn-minColumn+1];
 
 
