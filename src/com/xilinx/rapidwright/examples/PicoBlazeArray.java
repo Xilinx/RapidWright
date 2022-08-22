@@ -146,7 +146,6 @@ public class PicoBlazeArray {
 				updateAnchorToBRAM(mod);
 				picoBlazeImpls.add(mod);
 			}
-			netlist.migrateCellAndSubCells(moduleNetlist.getTopCell());
 
 			t.stop().start("Place PicoBlaze modules");
 

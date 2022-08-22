@@ -1,3 +1,6 @@
 [submodule "test/RapidWrightDCP"]
 	path = test/RapidWrightDCP
 	url = https://github.com/eddieh-xlnx/RapidWrightDCP
+[submodule "interchange/fpga-interchange-schema"]
+	path = interchange/fpga-interchange-schema
+	url = https://github.com/chipsalliance/fpga-interchange-schema.git

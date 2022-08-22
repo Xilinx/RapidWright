@@ -57,8 +57,12 @@ public abstract class Job {
 	public static final String DEFAULT_COMMAND_LOG_FILE = DEFAULT_COMMAND_NAME + DEFAULT_LOG_EXTENSION;
 	
 	public abstract long launchJob();
+
+	public abstract JobState getJobState();
 	
-	public abstract boolean isFinished();
+	public final boolean isFinished() {
+		return getJobState() == JobState.EXITED;
+	}
 
 	public abstract boolean jobWasSuccessful();
 	

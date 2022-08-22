@@ -69,7 +69,6 @@ public class RelocateModulesIntoBlackboxes {
 				-> {return (a.getSecond() == cellAnchor ? 1 : b.getSecond() == cellAnchor ? -1 : a.getSecond().compareTo(b.getSecond()));}
 		);
 
-		EDIFNetlist netlist = top.getNetlist();
 		top.setAutoIOBuffers(false);
 
 		Site frSite = mod.getAnchor();
