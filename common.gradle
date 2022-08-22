@@ -127,3 +127,14 @@ tasks.withType(Test) {
   finalizedBy remindSubmodules
 }
 
+task testLsf(type: JavaExec) {
+  group = "verification"
+  description = "Run the tests on lsf"
+  classpath = sourceSets.test.runtimeClasspath
+  mainClass = "com.xilinx.rapidwright.util.lsf.LaunchTestsOnLsf"
+  workingDir = file("build/test-lsf")
+  doFirst {
+    project.mkdir(workingDir)
+  }
+}
+
