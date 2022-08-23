@@ -30,13 +30,17 @@ import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
+import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.edif.EDIFTools;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -44,16 +48,19 @@ import java.util.regex.Pattern;
 public class MakeHardwareContract {
 
     /**
-     * Relocate constraints from module to the top design.
+     * Relocate prohibit constraints for each relocated cell.
      *
      * @param top         The design with black boxes to fill
      * @param constraints The constraints. A module created from a design does not carry the constraints.
      *                    In addition, the creation destroys the constriants. Thus, need to capture it before and pass them.
-     * @param cellAnchor The reference INT tile used as the handle to {@code mod} parameter
-     * @param blackboxes The list of pairs of a black box cell to be filled and its reference INT tile.
+     * @param cellAnchor  The reference INT tile used as the handle to {@code mod} parameter
+     * @param blackboxes  The list of pairs of a black box cell to be filled and its reference INT tile.
      *                    The x-coordinate of this INT tile must match that of the cellAnchor.
      */
     public static boolean relocateConstraints(Design top, List<String> constraints, String cellAnchor, ArrayList<Pair<String, String>> blackboxes) {
+
+        // The cell to relocated contain static sources. To prevent placing over them, prohibit property is set of those sources.
+        // Relocation does not handle those properties and this method will relocate them.
 
         List<String> prohibitBels = new ArrayList<>();
 
@@ -94,6 +101,27 @@ public class MakeHardwareContract {
         }
 
         return true;
+    }
+
+
+    /**
+     * Copy a cell from a design as a new design.
+     * @param src The source design with or without implementation
+     * @param cellName The full hierarchy cell name to be extracted as another design
+     * @param  keepStaticRouting A flag to indicate whether to keep the routes of static nets or not.
+     * @return A newly created design copied from the source
+     */
+    public static Design createDesignFromCell(Design src, String cellName, boolean keepStaticRouting) {
+        EDIFNetlist srcCellNetlist = EDIFTools.createNewNetlist(src.getNetlist().getHierCellInstFromName(cellName).getInst());
+        EDIFTools.ensureCorrectPartInEDIF(srcCellNetlist, src.getPartName());
+        Design d2 = new Design(srcCellNetlist);
+        d2.setAutoIOBuffers(false);
+        d2.setDesignOutOfContext(true);
+
+        // TODO: Skip this step if the design was not implemented.
+        Map<String, String> cellMap = Collections.singletonMap(cellName, "");
+        DesignTools.copyImplementation(src, d2,  keepStaticRouting, true, true, true, cellMap);
+        return d2;
     }
 
     public static void main(String[] args) {
@@ -213,7 +241,7 @@ INT_X0Y0
         }
 
         boolean keepStaticRouting = true;
-        Design hwct = DesignTools.createDesignFromCell(srcDesign, ci.get(0).getFullHierarchicalInstName(), !keepStaticRouting );
+        Design hwct = createDesignFromCell(srcDesign, ci.get(0).getFullHierarchicalInstName(), !keepStaticRouting );
         // The source is also a target in another design
         targets.add(new Pair<>(srcCellName, cellAnchor));
         for (Pair<String, String> cell : targets) {
@@ -221,7 +249,7 @@ INT_X0Y0
         }
 
 
-        Design d2 = DesignTools.createDesignFromCell(srcDesign, srcCell.get(0).getFullHierarchicalInstName(), keepStaticRouting );
+        Design d2 = createDesignFromCell(srcDesign, srcCell.get(0).getFullHierarchicalInstName(), keepStaticRouting );
         // Use d2 directly without write/readCheckpoint will cause Vivado to crash later
         d2.writeCheckpoint("temp.dcp");
         Design hwct_component = Design.readCheckpoint("temp.dcp");
