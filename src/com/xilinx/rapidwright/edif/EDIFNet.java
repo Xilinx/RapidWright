@@ -333,4 +333,18 @@ public class EDIFNet extends EDIFPropertyObject {
 		os.write(EXPORT_CONST_NET_END); // Nets end
 
 	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		EDIFNet other = (EDIFNet) obj;
+		if (!parentCell.equals(other.parentCell))
+			return false;
+		return super.equals(obj);
+	}
 }
