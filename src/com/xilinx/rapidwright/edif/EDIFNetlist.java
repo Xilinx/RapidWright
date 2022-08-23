@@ -1611,7 +1611,7 @@ public class EDIFNetlist extends EDIFName {
 		// Update all cell references to macro versions
 		for(EDIFLibrary lib : getLibraries()) {
 			boolean isHDILib = lib.isHDIPrimitivesLibrary(); 
-			for(EDIFCell cell : lib.getCells()) { 
+			for(EDIFCell cell : new ArrayList<>(lib.getCells())) { 
 				for(EDIFCellInst inst : cell.getCellInsts()) {
 					String cellName = inst.getCellType().getName();
 					if(toReplace.contains(cellName)) {
@@ -1651,6 +1651,15 @@ public class EDIFNetlist extends EDIFName {
 						    newCell = copy;
 						}
 						inst.setCellType(newCell);
+						for(EDIFCellInst childInst : newCell.getCellInsts()) {
+						    // Check if we already have a copy
+						    EDIFCell existingCellType = netlistPrims.getCell(childInst.getCellName()); 
+						    if(existingCellType == null) {
+						        existingCellType = new EDIFCell(netlistPrims, childInst.getCellType());
+						        primsToRemoveOnCollapse.add(existingCellType.getName());
+						    }
+						    childInst.setCellType(existingCellType);
+						}
 					}
 				}
 			}
