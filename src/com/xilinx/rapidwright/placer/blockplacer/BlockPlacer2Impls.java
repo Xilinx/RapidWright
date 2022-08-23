@@ -43,6 +43,7 @@ import com.xilinx.rapidwright.design.ModuleImpls;
 import com.xilinx.rapidwright.design.ModuleImplsInst;
 import com.xilinx.rapidwright.design.ModulePlacement;
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.design.TileRectangle;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
@@ -58,19 +59,19 @@ public class BlockPlacer2Impls extends BlockPlacer2<ModuleImpls, ModuleImplsInst
 
     private final Map<ModuleImplsInst, Set<ImplsPath>> modulesToPaths = new HashMap<>();
 
-    public BlockPlacer2Impls(Design design, List<ModuleImplsInst> moduleInstances, boolean ignoreMostUsedNets, Path graphData, boolean denseDesign, float effort, boolean focusOnWorstModules, AbstractOverlapCache overlapCache) {
-        super(design, ignoreMostUsedNets, graphData, denseDesign, effort, focusOnWorstModules);
+    public BlockPlacer2Impls(Design design, List<ModuleImplsInst> moduleInstances, boolean ignoreMostUsedNets, Path graphData, boolean denseDesign, float effort, boolean focusOnWorstModules, TileRectangle placementArea, AbstractOverlapCache overlapCache) {
+        super(design, ignoreMostUsedNets, graphData, denseDesign, effort, focusOnWorstModules, placementArea);
 
         this.moduleInstances = moduleInstances;
         overlaps = overlapCache;
     }
 
-    public BlockPlacer2Impls(Design design, List<ModuleImplsInst> moduleInstances, boolean ignoreMostUsedNets, Path graphData, boolean denseDesign, float effort, boolean focusOnWorstModules) {
-        this(design, moduleInstances, ignoreMostUsedNets, graphData, denseDesign, effort, focusOnWorstModules, new RegionBasedOverlapCache(design.getDevice(), moduleInstances));
+    public BlockPlacer2Impls(Design design, List<ModuleImplsInst> moduleInstances, boolean ignoreMostUsedNets, Path graphData, boolean denseDesign, float effort, boolean focusOnWorstModules, TileRectangle placementArea) {
+        this(design, moduleInstances, ignoreMostUsedNets, graphData, denseDesign, effort, focusOnWorstModules, placementArea, new RegionBasedOverlapCache(design.getDevice(), moduleInstances));
     }
 
     public BlockPlacer2Impls(Design design, List<ModuleImplsInst> moduleInstances) {
-        this(design, moduleInstances, true, null, DEFAULT_DENSE, DEFAULT_EFFORT, DEFAULT_FOCUS_ON_WORST);
+        this(design, moduleInstances, true, null, DEFAULT_DENSE, DEFAULT_EFFORT, DEFAULT_FOCUS_ON_WORST, null);
     }
 
     @Override

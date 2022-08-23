@@ -35,9 +35,9 @@ import com.xilinx.rapidwright.design.Module;
 import com.xilinx.rapidwright.design.ModuleImpls;
 import com.xilinx.rapidwright.design.ModuleInst;
 import com.xilinx.rapidwright.design.Net;
-import com.xilinx.rapidwright.design.SimpleTileRectangle;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.design.TileRectangle;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.Tile;
@@ -49,11 +49,11 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
     private HashMap<Site, HardMacro> currentPlacements = new HashMap<>();
     private Map<ModuleInst, HardMacro> macroMap;
 
-    public BlockPlacer2Module(Design design, boolean ignoreMostUsedNets, java.nio.file.Path graphData, boolean denseDesign, float effort, boolean focusOnWorstModules) {
-        super(design, ignoreMostUsedNets, graphData, denseDesign, effort, focusOnWorstModules);
+    public BlockPlacer2Module(Design design, boolean ignoreMostUsedNets, java.nio.file.Path graphData, boolean denseDesign, float effort, boolean focusOnWorstModules, TileRectangle placementArea) {
+        super(design, ignoreMostUsedNets, graphData, denseDesign, effort, focusOnWorstModules, placementArea);
     }
     public BlockPlacer2Module(Design design) {
-        super(design, true, null, DEFAULT_DENSE, DEFAULT_EFFORT, DEFAULT_FOCUS_ON_WORST);
+        super(design, true, null, DEFAULT_DENSE, DEFAULT_EFFORT, DEFAULT_FOCUS_ON_WORST, null);
     }
 
     @Override

@@ -41,6 +41,7 @@ import java.util.PrimitiveIterator;
 import java.util.PriorityQueue;
 import java.util.Random;
 import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
 import com.xilinx.rapidwright.design.AbstractModuleInst;
@@ -100,6 +101,8 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 	//private final double goldenRate = 0.20;
 	private long seed;
 
+	protected final TileRectangle placementArea;
+
 	// Final Results
 	/** */
 	public double finalSystemCost;
@@ -146,14 +149,16 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 	 *                    setting this will make the placer slower
 	 * @param effort Placer effort. Higher values will achieve better QoR. Linearly increases runtime.
 	 * @param focusOnWorstModules Spend more time on modules with worst placement
+	 * @param placementArea Only place in specific area
 	 */
-	public BlockPlacer2(Design design, boolean ignoreMostUsedNets, Path graphData, boolean denseDesign, float effort, boolean focusOnWorstModules){
+	public BlockPlacer2(Design design, boolean ignoreMostUsedNets, Path graphData, boolean denseDesign, float effort, boolean focusOnWorstModules, TileRectangle placementArea){
 		this.design = design;
 		this.dev = design.getDevice();
 		this.ignoreMostUsedNets = ignoreMostUsedNets;
 		this.denseDesign = denseDesign;
 		this.effort = effort;
 		this.focusOnWorstModules = focusOnWorstModules;
+		this.placementArea = placementArea;
 		alpha = 1.0;
 		beta = 1.0;
 		seed = 2;
@@ -166,8 +171,8 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 		}
 	}
 
-	public BlockPlacer2(Design design, boolean ignoreMostUsedNets, Path graphData, boolean denseDesign, float effort, boolean focusOnWorstModules, Map<ModuleInstT, Site> lockedPlacements) {
-	    this(design, ignoreMostUsedNets, graphData, denseDesign, effort, focusOnWorstModules);
+	public BlockPlacer2(Design design, boolean ignoreMostUsedNets, Path graphData, boolean denseDesign, float effort, boolean focusOnWorstModules, TileRectangle placementArea, Map<ModuleInstT, Site> lockedPlacements) {
+	    this(design, ignoreMostUsedNets, graphData, denseDesign, effort, focusOnWorstModules, placementArea);
 	    this.lockedPlacements = lockedPlacements;
 	}
 
@@ -237,7 +242,12 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 		// Place hard macros for initial placement
 		for(ModuleInstT hm : hardMacros){
 			PriorityQueue<PlacementT> sites = new PriorityQueue<>(1024, getInitialPlacementComparator());
-			final List<PlacementT> allPlacements = getAllPlacements(hm);
+			List<PlacementT> allPlacements = getAllPlacements(hm);
+
+			if (placementArea != null) {
+				allPlacements = allPlacements.stream().filter(p->placementArea.isInside(getPlacementTile(p)))
+						.collect(Collectors.toList());
+			}
 
 			possiblePlacements.put(hm.getModule(), SortedValidPlacementCache.fromList(allPlacements, this, denseDesign));
 			sites.addAll(allPlacements);
