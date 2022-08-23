@@ -35,6 +35,7 @@ import com.xilinx.rapidwright.design.Module;
 import com.xilinx.rapidwright.design.ModuleImpls;
 import com.xilinx.rapidwright.design.ModuleInst;
 import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.SimpleTileRectangle;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.PIP;
@@ -187,6 +188,9 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
                         hm.unplace();
                     } else
                         MessageGenerator.briefErrorAndExit("ERROR: Placement failed, couldn't find valid site for " + hm.getName());
+                } else {
+
+                    System.out.println("could not place "+hm.getName()+" at "+hm.getTempAnchorSite()+". Choosing "+hm.getAnchor().getSite()+" instead");
                 }
             }
             else{

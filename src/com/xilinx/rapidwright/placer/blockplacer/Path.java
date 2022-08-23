@@ -23,10 +23,11 @@
 package com.xilinx.rapidwright.placer.blockplacer;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 import com.xilinx.rapidwright.design.ModuleInst;
-import com.xilinx.rapidwright.design.SiteInst;
+import com.xilinx.rapidwright.design.SimpleTileRectangle;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Tile;
 
@@ -86,34 +87,17 @@ public class Path extends AbstractPath<PathPort, HardMacro>{
 	}
 
 	public void calculateHPWL(){
-		hpwl = 0;
-		int crossingPenalty = 1;
-		int fanOutPenalty = 1;
-		int size = getSize();
-		Tile tmp = ports.get(0).getPortTile();
-		int xMin = tmp.getColumn();
-		int xMax = tmp.getColumn();
-		int yMin = tmp.getRow();
-		int yMax = tmp.getRow();
-		for (int i = 1; i < size; i++) {
-			Tile next = ports.get(i).getPortTile();
-			int tmpX = next.getColumn();
-			int tmpY = next.getRow();
-			if(tmpX < xMin){
-				xMin = tmpX;
-			} else if(tmpX > xMax){
-				xMax = tmpX;
-			}
-			if(tmpY < yMin){
-				yMin = tmpY;
-			} else if(tmpY > yMax){
-				yMax = tmpY;
-			}
+
+		SimpleTileRectangle rect = new SimpleTileRectangle();
+		for (PathPort port : ports) {
+			rect.extendTo(port.getPortTile());
 		}
-		if (size > 30){
+
+		int fanOutPenalty  = 1;
+		if (getSize() > 30){
 			fanOutPenalty = 3;
 		}
-		hpwl = (Math.abs(xMin - xMax) + Math.abs(yMin - yMax)) * crossingPenalty * fanOutPenalty;
+		hpwl = rect.hpwl()*fanOutPenalty;
 	}
 
 
@@ -159,26 +143,21 @@ public class Path extends AbstractPath<PathPort, HardMacro>{
 	 * @param map Map of module instance to hard macros
 	 */
 	public void addPin(SitePinInst p, Map<ModuleInst, HardMacro> map){
-		PathPort pp = new PathPort();
-		pp.setSitePinInst(p);
-		pp.setBlock(map.get(p.getSiteInst().getModuleInst()));
-		if(pp.getBlock() != null){
-			Tile anchorTile = pp.getBlock().getModule().getAnchor().getTile();
-			SiteInst templateInst = pp.getSitePinInst().getSiteInst().getModuleTemplateInst();
-			if(templateInst == null){
-				System.out.println(pp.getSitePinInst().toString() + " on " + pp.getSitePinInst().getSiteInst().toString() + " has no template instance");
-			}
-			Tile sourceTile = templateInst.getTile();
-			pp.setRowOffset(anchorTile.getRow() - sourceTile.getRow());
-			pp.setColumnOffset(anchorTile.getColumn() - sourceTile.getColumn());
+		final HardMacro block = map.get(p.getSiteInst().getModuleInst());
+		Tile tile = p.getTile();
+		if(block != null) {
+			tile = p.getSiteInst().getModuleTemplateInst().getTile();
+
+			moduleInsts.add(block);
 		}
-		ports.add(pp);
-		if (pp.getBlock() != null) {
-			moduleInsts.add(pp.getBlock());
-		}
+		ports.add(new PathPort(p, block, tile));
 	}
 
 	public PathPort get(int index) {
 		return ports.get(index);
+	}
+
+	public List<PathPort> getPorts() {
+		return ports;
 	}
 }

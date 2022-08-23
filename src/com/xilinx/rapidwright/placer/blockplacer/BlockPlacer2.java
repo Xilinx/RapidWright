@@ -537,11 +537,6 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 
 		doFinalPlacement();
 
-		System.out.println("average connection length");
-		avgConnectionLength().entrySet().stream().sorted(Comparator.comparing(e->e.getKey().getName()))
-				.forEach(e-> System.out.println(e.getKey().getName()+": "+e.getValue()));
-
-
 		if (graphDataWriter != null) {
 			graphDataWriter.close();
 		}
@@ -831,7 +826,6 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
                     continue;
 				}
 				//System.out.println(hm0.getName()+"<->"+hm1.getName());
-				break;
 			}
 			else{
 				setTempAnchorSite(hm0, site1);
@@ -843,13 +837,16 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
                     continue;
 				}
 				//System.out.println(hm0.getName()+"-> EMPTY");
-				break;
 			}
+
+
+			currentMove.setMove(site0, site1, hm0, hm1, site1Previous);
+			int costAfter = calcConnectedCost(hm0, hm1);
+			currentMove.setDeltaCost(costAfter - costBefore);
+			return true;
+
 		}
-        currentMove.setMove(site0, site1, hm0, hm1, site1Previous);
-		int costAfter = calcConnectedCost(hm0, hm1);
-		currentMove.setDeltaCost(costAfter - costBefore);
-		return true;
+		return false;
 	}
 
 	private Path printPlacements(String name, List<PlacementT> validSiteRange, PlacementT center) {

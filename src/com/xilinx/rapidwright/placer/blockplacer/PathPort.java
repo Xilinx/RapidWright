@@ -32,36 +32,28 @@ import com.xilinx.rapidwright.device.Tile;
  */
 public class PathPort {
 	
-	private SitePinInst sitePinInst;
-	private HardMacro block;
-	private int rowOffset;
-	private int columnOffset;
-	
+	private final SitePinInst sitePinInst;
+	private final HardMacro block;
+	private final Tile tile;
+
+	public PathPort(SitePinInst sitePinInst, HardMacro block, Tile tile) {
+		this.sitePinInst = sitePinInst;
+		this.block = block;
+		this.tile = tile;
+	}
+
 	public Tile getPortTile(){
 		if(block == null){
 			return sitePinInst.getTile();
 		}
 		Tile anchor = block.getTempAnchorSite().getTile();
-		return anchor.getDevice().getTile(anchor.getRow()-rowOffset, anchor.getColumn()-columnOffset);
-	}
-	
-	public Tile getMovedTile(){
-		if(block == null){
-			return sitePinInst.getTile();
+		final Tile correspondingTile = block.getModule().getCorrespondingTile(tile, anchor);
+		if (correspondingTile==null) {
+			throw new RuntimeException("what");
 		}
-		Tile pinTile = sitePinInst.getTile();
-		Tile anchor = block.getAnchor().getTile();
-		Tile newAnchorTile = block.getTempAnchorSite().getTile();
-		int tileXOffset = pinTile.getTileXCoordinate() - anchor.getTileXCoordinate();
-		int tileYOffset = pinTile.getTileYCoordinate() - anchor.getTileYCoordinate();
-		int newTileX = newAnchorTile.getTileXCoordinate() + tileXOffset;
-		int newTileY = newAnchorTile.getTileYCoordinate() + tileYOffset;
-		String oldName = pinTile.getName();
-		String newName = oldName.substring(0, oldName.lastIndexOf('X')+1) + newTileX + "Y" + newTileY;
-		Tile correspondingTile = block.getDesign().getDevice().getTile(newName); 
 		return correspondingTile;
-		//return anchor.getDevice().getTile(anchor.getRow()-rowOffset, anchor.getColumn()-columnOffset);
 	}
+
 	
 	/**
 	 * @return the pin
@@ -70,12 +62,6 @@ public class PathPort {
 		return sitePinInst;
 	}
 
-	/**
-	 * @param sitePinInst the pin to set
-	 */
-	public void setSitePinInst(SitePinInst sitePinInst) {
-		this.sitePinInst = sitePinInst;
-	}
 
 	/**
 	 * @return the block
@@ -84,40 +70,7 @@ public class PathPort {
 		return block;
 	}
 
-	/**
-	 * @param block the block to set
-	 */
-	public void setBlock(HardMacro block) {
-		this.block = block;
-	}
-	
-	/**
-	 * @return the rowOffset
-	 */
-	public int getRowOffset() {
-		return rowOffset;
-	}
 
-	/**
-	 * @param rowOffset the rowOffset to set
-	 */
-	public void setRowOffset(int rowOffset) {
-		this.rowOffset = rowOffset;
-	}
-
-	/**
-	 * @return the columnOffset
-	 */
-	public int getColumnOffset() {
-		return columnOffset;
-	}
-
-	/**
-	 * @param columnOffset the columnOffset to set
-	 */
-	public void setColumnOffset(int columnOffset) {
-		this.columnOffset = columnOffset;
-	}
 
 	/* (non-Javadoc)
 	 * @see java.lang.Object#hashCode()
