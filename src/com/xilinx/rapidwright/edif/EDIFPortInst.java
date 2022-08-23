@@ -26,7 +26,8 @@
 package com.xilinx.rapidwright.edif;
 
 import java.io.IOException;
-import java.io.Writer;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 
 /**
  * Represents an instance of a port on an {@link EDIFCellInst}.
@@ -229,24 +230,31 @@ public class EDIFPortInst {
 	public void setParentNet(EDIFNet parentNet) {
 		this.parentNet = parentNet;
 	}
+
+	public static final byte[] EXPORT_CONST_PORTREF = "(portref ".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_MEMBER = "(member ".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_INSTANCEREF = " (instanceref ".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_CLOSE_PORT_INST = ")\n".getBytes(StandardCharsets.UTF_8);
 	
-	public void writeEDIFExport(Writer wr, String indent) throws IOException{
-		wr.write(indent);
-		wr.write("(portref ");
+	public void writeEDIFExport(OutputStream os, byte[] indent, EDIFWriteLegalNameCache<?> cache) throws IOException{
+		os.write(indent);
+		os.write(EXPORT_CONST_PORTREF);
 		if(index == -1) {
-			wr.write(getPort().getLegalEDIFName());
+ 		    os.write(cache.getLegalEDIFName(getPort().getName()));
 		}
 		else {
-			wr.write("(member ");
-			wr.write(getPort().getLegalEDIFName());
-			wr.write(" " + index);
-			wr.write(")");
+			os.write(EXPORT_CONST_MEMBER);
+			os.write(cache.getLegalEDIFName(getPort().getName()));
+			os.write(' ');
+			os.write(Integer.toString(index).getBytes(StandardCharsets.UTF_8));
+			os.write(')');
 		}
 		if(getCellInst() != null){
-			wr.write(" (instanceref ");
-			wr.write(getCellInst().getLegalEDIFName() + ")");			
+			os.write(EXPORT_CONST_INSTANCEREF);
+			os.write(cache.getLegalEDIFName(getCellInst().getName()));
+			os.write(')');
 		}
-		wr.write(")\n");
+		os.write(EXPORT_CONST_CLOSE_PORT_INST);
 	}
 
 	/* (non-Javadoc)

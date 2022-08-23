@@ -137,7 +137,7 @@ public class TestModuleInst {
         EDIFNetlist netlist = module.getNetlist();
         EDIFNetlist emptyDesignNetlist = emptyDesign.getNetlist();
         EDIFCell moduleTopCell = netlist.getTopCell();
-        String moduleTopCellName = moduleTopCell.getLegalEDIFName();
+        String moduleTopCellName = moduleTopCell.getName();
         EDIFCell copiedModuleTopCell = emptyDesignNetlist.getCell(moduleTopCellName);
         Assertions.assertNotNull(copiedModuleTopCell);
         Assertions.assertEquals(copiedModuleTopCell, mi.getCellInst().getCellType());
