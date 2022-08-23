@@ -2418,7 +2418,7 @@ public class DesignTools {
 		// However, getTrimmablePIPsFromPins return only the pips from X to T1.
 
 		// Map from a node to its driver PIP
-		// Note: Some PIPs are bidirectional. But, every PIP performs only one direction.
+		// Note: Some PIPs are bidirectional. But, every PIP allows the signal to flow in only one direction.
 		// The direction of a bidirectional PIP is determined from the context, ie., its connecting directional PIPs.
 		// To determine that context, go through directional PIPs first. This process does not support consecutive bidirectional PIPs.
 		Map<Net,Map<Node,PIP>> netToUphillPIPMap = new HashMap<>();
