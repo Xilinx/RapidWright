@@ -238,9 +238,6 @@ public abstract class SortedValidPlacementCache<PlacementT> extends AbstractVali
 
         @Override
         public List<PlacementT> getByRangeAround(int rangeLimit, PlacementT centerPlacement) {
-            if (rangeLimit>= placer.getMaxRangeLimit()) {
-                return allData;
-            }
             Tile center = placer.getPlacementTile(centerPlacement);
 
             final int maxColumn = collection.getMaxIdx(center.getColumn()+ rangeLimit);
@@ -303,9 +300,6 @@ public abstract class SortedValidPlacementCache<PlacementT> extends AbstractVali
 
         @Override
         public List<PlacementT> getByRangeAround(int rangeLimit, PlacementT centerPlacement) {
-            if (rangeLimit>= placer.getMaxRangeLimit()) {
-                return allData;
-            }
             Tile center = placer.getPlacementTile(centerPlacement);
 
             List<PlacementT> result = new ArrayList<>();
