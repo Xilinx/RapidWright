@@ -97,6 +97,29 @@ public class DesignTools {
 
 	private static int uniqueBlackBoxCount = 0;
 
+	// Map from site_pin to list of bels
+	// TODO: derive from architecture.
+	private static HashMap<String, List<String>> sitePin2Bels = new HashMap<>()
+	{{
+		put("A_O",  Arrays.asList("A5LUT", "A6LUT"));
+		put("AMUX", Arrays.asList("A5LUT", "A6LUT"));
+		put("B_O",  Arrays.asList("B5LUT", "B6LUT"));
+		put("BMUX", Arrays.asList("B5LUT", "B6LUT"));
+		put("C_O",  Arrays.asList("C5LUT", "C6LUT"));
+		put("CMUX", Arrays.asList("C5LUT", "C6LUT"));
+		put("D_O",  Arrays.asList("D5LUT", "D6LUT"));
+		put("DMUX", Arrays.asList("D5LUT", "D6LUT"));
+		put("E_O",  Arrays.asList("E5LUT", "E6LUT"));
+		put("EMUX", Arrays.asList("E5LUT", "E6LUT"));
+		put("F_O",  Arrays.asList("F5LUT", "F6LUT"));
+		put("FMUX", Arrays.asList("F5LUT", "F6LUT"));
+		put("G_O",  Arrays.asList("G5LUT", "G6LUT"));
+		put("GMUX", Arrays.asList("G5LUT", "G6LUT"));
+		put("H_O",  Arrays.asList("H5LUT", "H6LUT"));
+		put("HMUX", Arrays.asList("H5LUT", "H6LUT"));
+	}};
+
+
 	/**
 	 * Tries to identify the clock pin source for the given user signal output by
 	 * tracing back to a FF within a SLICE.  TODO - This method is not very robust.
@@ -2229,26 +2252,6 @@ public class DesignTools {
 	}
 
 	/**
-	 * Copy a cell from a design as a new design.
-	 * @param src The source design with or without implementation
-	 * @param cellName The full hierarchy cell name to be extracted as another design
-	 * @param  keepStaticRouting A flag to indicate whether to keep the routes of static nets or not.
-	 * @return A newly created design copied from the source
-	 */
-	public static Design createDesignFromCell(Design src, String cellName, boolean keepStaticRouting) {
-		EDIFNetlist srcCellNetlist = EDIFTools.createNewNetlist(src.getNetlist().getHierCellInstFromName(cellName).getInst());
-		EDIFTools.ensureCorrectPartInEDIF(srcCellNetlist, src.getPartName());
-		Design d2 = new Design(srcCellNetlist);
-		d2.setAutoIOBuffers(false);
-		d2.setDesignOutOfContext(true);
-
-		// TODO: Skip this step if the design was not implemented.
-		Map<String, String> cellMap = Collections.singletonMap(cellName, "");
-		DesignTools.copyImplementation(src, d2,  keepStaticRouting, true, true, true, cellMap);
-		return d2;
-	}
-
-	/**
 	 * Copies the logic and implementation of a set of cells from one design to another.  This will
 	 * replace the destination logical cell instances with those of the source design. 
 	 * @param src The source design (with partial or full implementation)
@@ -2409,27 +2412,10 @@ public class DesignTools {
 	 * @param siteInstsOfCells The set of SiteInst containing the sinks of the static nets
 	 */
 	private static void copyStaticNets(Design dest, List<Net> staticNets, Set<SiteInst> siteInstsOfCells) {
-
-		// build map to from site_pin to list of bels
-		HashMap<String, List<String>> sitePin2Bels = new HashMap<String,List<String>>()
-		{{
-			put("A_O",  Arrays.asList("A5LUT", "A6LUT"));
-			put("AMUX", Arrays.asList("A5LUT", "A6LUT"));
-			put("B_O",  Arrays.asList("B5LUT", "B6LUT"));
-			put("BMUX", Arrays.asList("B5LUT", "B6LUT"));
-			put("C_O",  Arrays.asList("C5LUT", "C6LUT"));
-			put("CMUX", Arrays.asList("C5LUT", "C6LUT"));
-			put("D_O",  Arrays.asList("D5LUT", "D6LUT"));
-			put("DMUX", Arrays.asList("D5LUT", "D6LUT"));
-			put("E_O",  Arrays.asList("E5LUT", "E6LUT"));
-			put("EMUX", Arrays.asList("E5LUT", "E6LUT"));
-			put("F_O",  Arrays.asList("F5LUT", "F6LUT"));
-			put("FMUX", Arrays.asList("F5LUT", "F6LUT"));
-			put("G_O",  Arrays.asList("G5LUT", "G6LUT"));
-			put("GMUX", Arrays.asList("G5LUT", "G6LUT"));
-			put("H_O",  Arrays.asList("H5LUT", "H6LUT"));
-			put("HMUX", Arrays.asList("H5LUT", "H6LUT"));
-		}};
+		// This method traces a route similar to that in getTrimmablePIPsFromPins. However, there is one subtle difference.
+		// Let's consider a route from one GND source (S) to two sinks (T1 and T2) and the last common node/pip is X.
+		// If only T1 is in a cell to be copied, the tracing code here will extract all pips from S to T1.
+		// However, getTrimmablePIPsFromPins return only the pips from X to T1.
 
 		// Map from a node to its driver PIP
 		// Note: Some PIPs are bidirectional. But, every PIP performs only one direction.
@@ -2503,6 +2489,8 @@ public class DesignTools {
 			}
 		}
 
+		// When we copy the static nets, we must preserve their sources so that nothing should be placed on it.
+		// TODO: need to annotate so that RapidWright placer avoids placing on these bels.
 		for (String bel : prohibitBels) {
 			dest.addXDCConstraint(ConstraintGroup.LATE, "set_property PROHIBIT true [get_bels " + bel + "]");
 		}
