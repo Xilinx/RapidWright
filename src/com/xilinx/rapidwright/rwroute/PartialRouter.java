@@ -24,11 +24,15 @@
 package com.xilinx.rapidwright.rwroute;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.device.Node;
+import com.xilinx.rapidwright.device.PIP;
 
 /**
  * A class extends {@link RWRoute} for partial routing.
@@ -68,6 +72,8 @@ public class PartialRouter extends RWRoute{
 				}
 				addStaticNetRoutingTargets(staticNet, sinks);
 			}else {
+				List<SitePinInst> unroutedSinks = findUnroutedSinks(staticNet, sinks);
+				addStaticNetRoutingTargets(staticNet, unroutedSinks);
 				preserveNet(staticNet);
 				increaseNumPreservedStaticNets();
 			}	
@@ -76,6 +82,23 @@ public class PartialRouter extends RWRoute{
 			preserveNet(staticNet);
 			increaseNumNotNeedingRouting();
 		}
+	}
+	
+	private List<SitePinInst> findUnroutedSinks(Net net, List<SitePinInst> sinks) {
+	    Set<Node> usedNodes = new HashSet<>();
+	    List<SitePinInst> unroutedSinks = new ArrayList<>();
+	    for(PIP p : net.getPIPs()) {
+	        usedNodes.add(p.getStartNode());
+	        usedNodes.add(p.getEndNode());
+	    }
+	    for(SitePinInst sink : sinks) {
+	        if(!usedNodes.contains(sink.getConnectedNode())) {
+	            unroutedSinks.add(sink);
+	        }else {
+	            sink.setRouted(true);
+	        }
+	    }
+	    return unroutedSinks;
 	}
 	
 	@Override
