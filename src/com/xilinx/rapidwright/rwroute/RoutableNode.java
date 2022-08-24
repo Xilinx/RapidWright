@@ -117,8 +117,8 @@ public class RoutableNode implements Routable{
 		setEndTileXYCoordinates();
 		setBaseCost();
 		presentCongestionCost = 1;
-    	historicalCongestionCost = 1;
-    	setVisited(false);
+		historicalCongestionCost = 1;
+		setVisited(false);
 		usersConnectionCounts = null;
 		driversCounts = null;
 		prev = null;
