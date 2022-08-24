@@ -135,17 +135,10 @@ public class TestDesignTools {
         Map<String, String> cellMap = Collections.singletonMap(cellName, "");
         DesignTools.copyImplementation(src, d2,  keepStaticRouting, true, true, true, cellMap);
 
-
-        List<Net> staticNets = new ArrayList();
-        for (Net net : d2.getNets()) {
-            if (net.isStaticNet()) {
-                staticNets.add(net);
-                continue;
-            }
-        }
-        for (Net net : staticNets) {
-            Assertions.assertEquals(numPIPs.get(net.getName()), net.getPIPs().size());
-        }
+        Net vccNet = d2.getVccNet();
+        Assertions.assertEquals(numPIPs.get(vccNet.getName()), vccNet.getPIPs().size());
+        Net gndNet = d2.getGndNet();
+        Assertions.assertEquals(numPIPs.get(gndNet.getName()), gndNet.getPIPs().size());
     }
 
     @Test
