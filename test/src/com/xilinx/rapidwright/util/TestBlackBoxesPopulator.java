@@ -21,25 +21,28 @@ public class TestBlackBoxesPopulator {
         add(new Pair<>("hw_contract_pr2", "INT_X0Y0"));
     }};
 
-    private Pair<Design,Design> helper() {
-        Design top = Design.readCheckpoint(topDCPName);
-        Design template = Design.readCheckpoint(cellDCPName);
-        Module mod = new Module(template, false);
-
-        BlackboxesPopulator.relocateModuleInsts(top, mod, cellAnchor, targets);
-
-        return new Pair<>(top, template);
-    }
-
     @Test
     void testRelocateModuleInsts() {
-        Pair<Design,Design> designs = helper();
-        Design top = designs.getFirst();
-        Design template = designs.getSecond();
+        Design top = Design.readCheckpoint(topDCPName);
+        int numCellTop = top.getCells().size();
+        int numVccNetTop = (top.getVccNet() == null) ? 0 : 1;
+        int numGndNetTop = (top.getGndNet() == null) ? 0 : 1;
+        int numSignalNetTop = top.getNets().size() - numVccNetTop - numGndNetTop;
 
-        Assertions.assertEquals(targets.size()*template.getCells().size(), top.getCells().size());
-        // There are 2 static nets that will not be copied.
-        Assertions.assertEquals(targets.size()*(template.getNets().size()-2)+2, top.getNets().size());
+        Design template = Design.readCheckpoint(cellDCPName);
+        int numVccNetTemplate = (template.getVccNet() == null) ? 0 : 1;
+        int numGndNetTemplate = (template.getGndNet() == null) ? 0 : 1;
+        int numSignalNetTemplate = template.getNets().size() - numVccNetTemplate - numGndNetTemplate;
+
+        Module mod = new Module(template, false);
+        BlackboxesPopulator.relocateModuleInsts(top, mod, cellAnchor, targets);
+
+        Assertions.assertEquals(targets.size()*template.getCells().size()+numCellTop, top.getCells().size()
+                ,"Wrong number of cells!");
+
+        int numExpectedNets = targets.size()*numSignalNetTemplate + numSignalNetTop
+                              + Math.max(numVccNetTop, numVccNetTemplate) + Math.max(numGndNetTop, numGndNetTemplate);
+        Assertions.assertEquals(numExpectedNets, top.getNets().size(),"Wrong number of nets!");
     }
 
 }
