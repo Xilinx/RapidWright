@@ -26,7 +26,7 @@ public class TestBlackBoxesPopulator {
         Design template = Design.readCheckpoint(cellDCPName);
         Module mod = new Module(template, false);
 
-        RelocateModulesIntoBlackboxes.relocateModuleInsts(top, mod, cellAnchor, targets);
+        BlackboxesPopulator.relocateModuleInsts(top, mod, cellAnchor, targets);
 
         return new Pair<>(top, template);
     }
