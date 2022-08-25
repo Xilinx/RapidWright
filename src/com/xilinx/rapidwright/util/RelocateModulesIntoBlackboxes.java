@@ -108,7 +108,7 @@ public class RelocateModulesIntoBlackboxes {
 	}
 
 	/**
-	 * Process the design after filing black boxes.
+	 * Process the design after filing black boxes to match what Vivado expectation.
 	 * @param top The design to process
 	 * @param blackboxes The black boxes that was filled
 	 */
@@ -155,7 +155,7 @@ public class RelocateModulesIntoBlackboxes {
 	 * @param net The net to check
 	 * @return True if the net is a clock net
 	 */
-	public static boolean isClockNet(Net net) {
+	private static boolean isClockNet(Net net) {
 		// TODO: rely on attribute instead of name
 		for (SitePinInst sink : net.getSinkPins()) {
 			if (sink.getName().contains("CLK")) return true;
@@ -171,7 +171,7 @@ public class RelocateModulesIntoBlackboxes {
 	 * @param top      The design with black boxes to fill
 	 * @param cellName A black box name
 	 */
-	public static void combinePIPonClockNets(Design top, String cellName) {
+	private static void combinePIPonClockNets(Design top, String cellName) {
 		System.out.println("Combine PIPs on clock nets of " + cellName);
 
 		List<String> clockNets = new ArrayList<>();
@@ -224,7 +224,7 @@ public class RelocateModulesIntoBlackboxes {
 	 * @param prop The full property name to set
 	 * @param val  The value to set to
 	 */
-	public static void setPropertyValueInLateXDC(Design top, String prop, String val) {
+	private static void setPropertyValueInLateXDC(Design top, String prop, String val) {
 		ArrayList<String> xdcList = new ArrayList<String>(top.getXDCConstraints(ConstraintGroup.LATE));
 		int lineNum = 0;
 		for (; lineNum < xdcList.size(); lineNum++) {

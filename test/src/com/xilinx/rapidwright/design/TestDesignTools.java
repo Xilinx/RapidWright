@@ -119,7 +119,7 @@ public class TestDesignTools {
 
 
     private void testCopyImplementationHelper(boolean keepStaticRouting, HashMap<String, Integer> numPIPs) {
-        String dcpPath = RapidWrightDCP.getString("testCopyImplementation.dcp");
+        String dcpPath = RapidWrightDCP.getString("hwct_pr1.dcp");
         String srcCellName = "clock_isolation";
 
         Design src = Design.readCheckpoint(dcpPath);
@@ -146,8 +146,8 @@ public class TestDesignTools {
         boolean keepStaticRouting = true;
         HashMap<String, Integer> numPIPs = new HashMap<>()
         {{
-            put("GLOBAL_LOGIC0",  201);
-            put("GLOBAL_LOGIC1",  601);
+            put("GLOBAL_LOGIC0",  218);
+            put("GLOBAL_LOGIC1",  604);
         }};
 
         testCopyImplementationHelper(keepStaticRouting, numPIPs);
