@@ -144,7 +144,7 @@ public class TestDesignTools {
     @Test
     public void testCopyImplementationWithCopyStaticNets() {
         boolean keepStaticRouting = true;
-        HashMap<String, Integer> numPIPs = new HashMap<>()
+        HashMap<String, Integer> numPIPs = new HashMap<String, Integer>()
         {{
             put("GLOBAL_LOGIC0",  201);
             put("GLOBAL_LOGIC1",  601);
@@ -155,7 +155,7 @@ public class TestDesignTools {
     @Test
     public void testCopyImplementation() {
         boolean keepStaticRouting = false;
-        HashMap<String, Integer> numPIPs = new HashMap<>()
+        HashMap<String, Integer> numPIPs = new HashMap<String, Integer>()
         {{
             put("GLOBAL_LOGIC0",  0);
             put("GLOBAL_LOGIC1",  0);
