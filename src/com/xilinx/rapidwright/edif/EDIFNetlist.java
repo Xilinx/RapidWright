@@ -553,7 +553,7 @@ public class EDIFNetlist extends EDIFName {
 			if(cell.getLibrary().isHDIPrimitivesLibrary()){
 				destLib = getHDIPrimitivesLibrary();
 			}else{
-				destLib = getWorkLibrary();
+				destLib = addLibrary(new EDIFLibrary(cell.getLibrary().getName()));
 			}
 		}
 
