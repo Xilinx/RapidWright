@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2022 Xilinx, Inc.
+ * All rights reserved.
+ *
+ * Author: Pongstorn Maidee, Xilinx Research Labs.
+ *
+ * This file is part of RapidWright.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
 package com.xilinx.rapidwright.util;
 
 import com.xilinx.rapidwright.design.Design;
@@ -14,7 +36,7 @@ public class TestBlackBoxesPopulator {
     private static String topDCPName = RapidWrightDCP.getString("hwct.dcp");
     private static String cellDCPName = RapidWrightDCP.getString("hwct_pr1.dcp");
     private static String cellAnchor = "INT_X0Y60";
-    private static List<Pair<String, String>> targets = new ArrayList<>()
+    private static List<Pair<String, String>> targets = new ArrayList<Pair<String, String>>()
     {{
         add(new Pair<>("hw_contract_pr0", "INT_X0Y120"));
         add(new Pair<>("hw_contract_pr1", "INT_X0Y60"));
