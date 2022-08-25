@@ -99,7 +99,7 @@ public class DesignTools {
 
 	// Map from site_pin to list of bels
 	// TODO: derive from architecture.
-	private static HashMap<String, List<String>> sitePin2Bels = new HashMap<>()
+	private static HashMap<String, List<String>> sitePin2Bels = new HashMap<String, List<String>>()
 	{{
 		put("A_O",  Arrays.asList("A5LUT", "A6LUT"));
 		put("AMUX", Arrays.asList("A5LUT", "A6LUT"));
