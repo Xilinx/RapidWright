@@ -26,6 +26,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.AbstractMap;
 import java.util.HashMap;
@@ -142,6 +143,7 @@ public class DeviceResourcesVerifier {
         verifiedSiteTypes = new HashSet<SiteTypeEnum>();
 
         Device device = Device.getDevice(deviceName);
+        Series series = device.getSeries();
 
         Design design = new Design();
         design.setPartName(deviceName);
@@ -500,10 +502,12 @@ public class DeviceResourcesVerifier {
                     (size > 1 ? "ies" : "y")+": " + libsFound);
         }
 
+        Map<String, Pair<String, EnumSet<IOStandard>>> macroCollapseExceptionMap = 
+                EDIFNetlist.macroCollapseExceptionMap.getOrDefault(series, Collections.emptyMap());
         Set<Unisim> unisimsExpected = new HashSet<Unisim>();
         for(EDIFLibrary lib : primsAndMacros.getLibraries()) {
             EDIFLibrary reference = lib.isHDIPrimitivesLibrary() ? Design.getPrimitivesLibrary(design.getDevice().getName()) :
-                                                    Design.getMacroPrimitives(device.getSeries());
+                                                    Design.getMacroPrimitives(series);
 
             Set<String> cellsFound = new HashSet<String>();
             cellsFound.addAll(lib.getCellMap().keySet());
@@ -513,7 +517,7 @@ public class DeviceResourcesVerifier {
 
             for(String cellName : reference.getCellMap().keySet()) {
                 if(!lib.isHDIPrimitivesLibrary()) {
-                    Pair<String,EnumSet<IOStandard>> entry = EDIFNetlist.macroCollapseExceptionMap.get(cellName);
+                    Pair<String,EnumSet<IOStandard>> entry = macroCollapseExceptionMap.get(cellName);
                     if(entry != null) {
                         cellName = entry.getFirst();
                     }
@@ -549,14 +553,16 @@ public class DeviceResourcesVerifier {
         verifyCellInversions(device, dReader, unisimsExpected);
 
         StructList.Reader<PrimToMacroExpansion.Reader> exceptionMap = dReader.getExceptionMap();
-        Map<String,MacroParamRule[]> rulesMap = MacroParamMappingRules.macroRules.get(device.getSeries());
+        Map<String,MacroParamRule[]> rulesMap = MacroParamMappingRules.macroRules.get(series);
+        Map<String, Pair<String, EnumSet<IOStandard>>> macroExpandExceptionMap = 
+                EDIFNetlist.macroExpandExceptionMap.getOrDefault(series, Collections.emptyMap());
         int mapSize = exceptionMap.size();
         for(int i=0; i < mapSize; i++) {
             PrimToMacroExpansion.Reader entry = exceptionMap.get(i);
             String macroName = allStrings.get(entry.getMacroName());
             if(entry.hasParameters()) {
                 String primName = allStrings.get(entry.getPrimName());
-                Pair<String,EnumSet<IOStandard>> mapping = EDIFNetlist.macroExpandExceptionMap.get(primName);
+                Pair<String,EnumSet<IOStandard>> mapping = macroExpandExceptionMap.get(primName);
                 EnumSet<IOStandard> ioStdSet = mapping.getSecond();
                 if(!mapping.getFirst().equals(macroName)) {
                     throw new RuntimeException("Exception map mismatch: " +
