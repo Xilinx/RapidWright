@@ -24,6 +24,7 @@
 package com.xilinx.rapidwright.rwroute;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -99,6 +100,27 @@ public class PartialRouter extends RWRoute{
 	        }
 	    }
 	    return unroutedSinks;
+	}
+
+	@Override
+	protected void routeStaticNets() {
+		if (staticNetAndRoutingTargets.isEmpty())
+			return;
+
+		Net gnd = design.getGndNet();
+		Net vcc = design.getVccNet();
+
+		// Copy existing PIPs
+		List<PIP> gndPips = (staticNetAndRoutingTargets.containsKey(gnd)) ? new ArrayList<>(gnd.getPIPs()) : Collections.emptyList();
+		List<PIP> vccPips = (staticNetAndRoutingTargets.containsKey(vcc)) ? new ArrayList<>(vcc.getPIPs()) : Collections.emptyList();
+
+		// Perform static net routing (which does no rip-up)
+		super.routeStaticNets();
+
+		// Since super.routeStaticNets() clobbers the PIPs list,
+		// re-insert those existing PIPs
+		gnd.getPIPs().addAll(gndPips);
+		vcc.getPIPs().addAll(vccPips);
 	}
 	
 	@Override

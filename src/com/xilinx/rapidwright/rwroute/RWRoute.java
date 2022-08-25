@@ -78,7 +78,7 @@ public class RWRoute{
 	/** A list of global clock nets */
 	private List<Net> clkNets;
 	/** Static nets */
-	private Map<Net, List<SitePinInst>> staticNetAndRoutingTargets;
+	protected Map<Net, List<SitePinInst>> staticNetAndRoutingTargets;
 	/** Nets with conflicting nodes that should be added to the routing targets */
 	protected Set<Net> conflictNets;
 	/** Several integers to indicate the netlist info */
@@ -398,7 +398,7 @@ public class RWRoute{
 	/**
 	 * Routes static nets with preserved resources list supplied to avoid conflicting nodes.
 	 */
-	private void routeStaticNets(){
+	protected void routeStaticNets(){
 		for(List<SitePinInst> netRouteTargetPins : staticNetAndRoutingTargets.values()) {
 			for(SitePinInst sink : netRouteTargetPins) {
 				preservedNodes.remove(sink.getConnectedNode());
@@ -414,8 +414,10 @@ public class RWRoute{
 		// the nodes connected to pins of other nets must be preserved.
 		unavailableNodes.addAll(rnodesCreated.keySet());
 		
-		for(Net net : staticNetAndRoutingTargets.keySet()){
-			System.out.println("INFO: Route " + net.getSinkPins().size() + " pins of " + net);
+		for(Map.Entry<Net,List<SitePinInst>> e : staticNetAndRoutingTargets.entrySet()){
+			Net net = e.getKey();
+			List<SitePinInst> pins = e.getValue();
+			System.out.println("INFO: Route " + pins.size() + " pins of " + net);
 			Map<SitePinInst, List<Node>> sinksRoutingPaths = GlobalSignalRouting.routeStaticNet(net, unavailableNodes, design, routethruHelper);
 			
 			for(Entry<SitePinInst, List<Node>> sinkPath : sinksRoutingPaths.entrySet()) {
