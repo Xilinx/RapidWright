@@ -404,8 +404,12 @@ public class RWRoute{
 				preservedNodes.remove(sink.getConnectedNode());
 			}
 		}
-		
-		RouterHelper.invertPossibleGndPinsToVccPins(design, design.getGndNet());
+
+		Net gndNet = design.getGndNet();
+		List<SitePinInst> gndPins = staticNetAndRoutingTargets.get(gndNet);
+		if (gndPins != null) {
+			RouterHelper.invertPossibleGndPinsToVccPins(design, gndPins);
+		}
 		
 		// If connections of other nets are routed first, used resources should be preserved.
 		Set<Node> unavailableNodes = getAllUsedNodesOfRoutedConnections();

@@ -341,12 +341,14 @@ public class RouterHelper {
 	/**
 	 * Inverts all possible GND sink pins to VCC pins.
 	 * @param design The target design.
-	 * @param staticNet The static net, should be VCC only.
+	 * @param gndPins List of GND pins.
 	 */
-	public static void invertPossibleGndPinsToVccPins(Design design, Net staticNet) {
-		if(!staticNet.getName().equals(Net.GND_NET)) return;
-		List<SitePinInst> toInvertPins = new ArrayList<>();
-		for(SitePinInst currSitePinInst:staticNet.getPins()) {
+	public static void invertPossibleGndPinsToVccPins(Design design, List<SitePinInst> gndPins) {
+		Net staticNet = design.getGndNet();
+		Set<SitePinInst> toInvertPins = new HashSet<>();
+		for(SitePinInst currSitePinInst : gndPins) {
+			if (!currSitePinInst.getNet().equals(staticNet))
+				throw new RuntimeException(currSitePinInst.toString());
 			BELPin[] belPins = currSitePinInst.getSiteInst().getSiteWirePins(currSitePinInst.getName());
 			// DSP or BRAM
 			if(belPins.length == 2) {
