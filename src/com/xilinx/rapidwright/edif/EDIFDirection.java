@@ -25,6 +25,8 @@
  */
 package com.xilinx.rapidwright.edif;
 
+import java.nio.charset.StandardCharsets;
+
 import com.xilinx.rapidwright.design.PinType;
 import com.xilinx.rapidwright.device.BELPin.Direction;
 
@@ -37,7 +39,14 @@ public enum EDIFDirection {
 	INPUT,
 	OUTPUT,
 	INOUT;
-	
+
+	private final byte[] arr;
+
+	EDIFDirection() {
+		arr = toString().getBytes(StandardCharsets.UTF_8);
+	}
+
+
 	public static EDIFDirection getEnum(String s){
 		s = s.toUpperCase();
 		if(s.equals("BIDIR")) return INOUT;
@@ -54,5 +63,9 @@ public enum EDIFDirection {
 		if(p == Direction.INPUT) return INPUT;
 		if(p == Direction.OUTPUT) return OUTPUT;
 		return INOUT;
+	}
+
+	public byte[] toByteArray() {
+		return arr;
 	}
 }

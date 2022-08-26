@@ -25,11 +25,11 @@
  */
 package com.xilinx.rapidwright.edif;
 
-import java.io.BufferedWriter;
+import java.io.BufferedOutputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.io.OutputStreamWriter;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -38,6 +38,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Date;
 import java.util.Deque;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -63,11 +64,11 @@ import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.IOStandard;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
-import com.xilinx.rapidwright.util.ParallelDCPInput;
-import com.xilinx.rapidwright.util.ParallelDCPOutput;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.MessageGenerator;
 import com.xilinx.rapidwright.util.Pair;
+import com.xilinx.rapidwright.util.ParallelDCPInput;
+import com.xilinx.rapidwright.util.ParallelDCPOutput;
 import com.xilinx.rapidwright.util.ParallelismTools;
 
 /**
@@ -105,9 +106,9 @@ public class EDIFNetlist extends EDIFName {
 	private List<String> encryptedCells; 
 	
 	private boolean trackCellChanges = false;
-	
+
 	private Map<EDIFCell, List<EDIFChange>> modifiedCells = null;
-	
+
 	private boolean DEBUG = false;
 
 	/**
@@ -169,7 +170,7 @@ public class EDIFNetlist extends EDIFName {
 	    	macroCollapseExceptionMap.put(e.getValue().getFirst(), newPair);
 	    }
 	}
-	
+
 	public EDIFNetlist(String name){
 		super(name);
 		init();
@@ -253,17 +254,13 @@ public class EDIFNetlist extends EDIFName {
 	
 	public void renameNetlistAndTopCell(String newName){
 		this.setName(newName);
-		this.updateEDIFRename();
 		design.setName(newName);
-		design.updateEDIFRename();
 		EDIFLibrary topLib = design.getTopCell().getLibrary();
 		EDIFCell top = topLib.removeCell(design.getTopCell());
 		top.setName(newName);
-		top.updateEDIFRename();
 		topLib.addCell(top);
 		if(topCellInstance != null){
 			topCellInstance.setName(newName);
-			topCellInstance.updateEDIFRename();
 		}
 	}
 	
@@ -282,7 +279,7 @@ public class EDIFNetlist extends EDIFName {
 			throw new RuntimeException("ERROR: Cell " + cell + " references unknown library " 
 					+ libName);
 		}
-		libCells.remove(cell.getLegalEDIFName());
+		libCells.remove(cell.getName());
 	}
 	
 	/**
@@ -312,10 +309,10 @@ public class EDIFNetlist extends EDIFName {
 	public void removeUnusedCellsFromWorkLibrary(){
 		HashMap<String,EDIFCell> cellsToRemove = new HashMap<>(getWorkLibrary().getCellMap());
 		
-		cellsToRemove.remove(getTopCell().getLegalEDIFName());
+		cellsToRemove.remove(getTopCell().getName());
 		for(EDIFHierCellInst i : getAllDescendants("", null, false)){
 			if(i.getCellType().getLibrary().getName().equals(EDIFTools.EDIF_LIBRARY_WORK_NAME)){
-				cellsToRemove.remove(i.getCellType().getLegalEDIFName());
+				cellsToRemove.remove(i.getCellType().getName());
 			}
 		}
 		
@@ -448,7 +445,7 @@ public class EDIFNetlist extends EDIFName {
 			}
 		}
 
-		EDIFCell existingCell = destLib.getCell(cell.getLegalEDIFName());
+		EDIFCell existingCell = destLib.getCell(cell.getName());
 		if(existingCell == null){
 			destLib.addCell(cell);
 			for(EDIFCellInst inst : cell.getCellInsts()){
@@ -463,7 +460,7 @@ public class EDIFNetlist extends EDIFName {
 	}
 	
 	/**
-	 * This moves the cell and all of its descendants into this netlist.  This is a destructive 
+	 * This moves the cell and all of its descendants into this netlist.  This is a destructive
 	 * operation for the source netlist.
 	 * @param cell The cell (and all its descendants) to move into this netlist's libraries
 	 */
@@ -497,7 +494,6 @@ public class EDIFNetlist extends EDIFName {
 		while (destLibTop.containsCell(cell)) {
 			cell.setName(currentCellName + "_parameterized" + i);
 			cell.setView(currentCellName + "_parameterized" + i);
-			cell.updateEDIFRename();
 			i++;
 		}
 		destLibTop.addCell(cell);
@@ -529,7 +525,6 @@ public class EDIFNetlist extends EDIFName {
 					String newName = currentCellName + "_parameterized" + i;
 					instCellType.setName(newName);
 					instCellType.setView(newName);
-					instCellType.updateEDIFRename();
 					i++;
 				}
 				inst.setCellType(instCellType); // updating the celltype, which could be changed due to adding suffix
@@ -558,7 +553,7 @@ public class EDIFNetlist extends EDIFName {
 			}
 		}
 
-		EDIFCell existingCell = destLib.getCell(cell.getLegalEDIFName());
+		EDIFCell existingCell = destLib.getCell(cell.getName());
 		if(existingCell == null){
 			EDIFCell newCell = new EDIFCell(destLib, cell, cell.getName());
 			copiedCells.add(newCell);
@@ -576,9 +571,9 @@ public class EDIFNetlist extends EDIFName {
 					"'" + cell.getName() + "' in library '" + destLib.getName() + "'");
 		}
 	}
-	
+
 	private boolean checkIfAlreadyInLib(EDIFCell cell, EDIFLibrary lib) {
-		EDIFCell existing = lib.getCell(cell.getLegalEDIFName());
+		EDIFCell existing = lib.getCell(cell.getName());
 		if(existing == cell && lib.getNetlist() == cell.getLibrary().getNetlist()) {
 			return true;
 		}
@@ -664,52 +659,68 @@ public class EDIFNetlist extends EDIFName {
 		return new ArrayList<>(toExport);
 	}
 
-	public void exportEDIF(OutputStream out) throws IOException {
-		try (BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(out))) {
-			bw.write("(edif ");
-			exportEDIFName(bw);
-			bw.write("\n");
-			bw.write("  (edifversion 2 0 0)\n");
-			bw.write("  (edifLevel 0)\n");
-			bw.write("  (keywordmap (keywordlevel 0))\n");
-			bw.write("(status\n");
-			bw.write(" (written\n");
-			bw.write("  (timeStamp ");
-			SimpleDateFormat formatter = new SimpleDateFormat("yyyy MM dd HH mm ss");
-			bw.write(formatter.format(new java.util.Date()));
-			bw.write(")\n");
-			bw.write("  (program \"" + Device.FRAMEWORK_NAME + "\" (version \"" + Device.RAPIDWRIGHT_VERSION + "\"))\n");
+	public static final byte[] EXPORT_CONST_EDIF_VERSION = "\n  (edifversion 2 0 0)\n  (edifLevel 0)\n  (keywordmap (keywordlevel 0))\n(status\n (written\n  (timeStamp ".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_EDIF_HEAD = "(edif ".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_PROGRAM = (")\n  (program \"" + Device.FRAMEWORK_NAME + "\" (version \"" + Device.RAPIDWRIGHT_VERSION + "\"))\n").getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_CLOSE_NL = ")\n".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_QUOTE_CLOSE_NL = "\")\n".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_COMMENT = "  (comment \"".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_META_X = "(metax ".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_DOUBLE_CLOSE = " )\n)\n".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_DESIGN_START = "(comment \"Reference To The Cell Of Highest Level\")\n\n  (design ".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_CELLREF = "\n    (cellref ".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_LIBRARYREF = " (libraryref ".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_CLOSE_REF = "))\n".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_PROP_INDENT = "    ".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_CLOSE_DESIGN = "  )\n".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_CLOSE_EDIF = ")\n".getBytes(StandardCharsets.UTF_8);
+
+
+	public void exportEDIF(OutputStream out, boolean stable) throws IOException {
+		try (BufferedOutputStream os = new BufferedOutputStream(out)) {
+			final ParallelDCPOutput dos = ParallelismTools.getParallel() ?
+					ParallelDCPOutput.cast(out) : null;
+
+			EDIFWriteLegalNameCache<?> cache = dos!=null ? EDIFWriteLegalNameCache.multiThreaded() : EDIFWriteLegalNameCache.singleThreaded();
+
+			os.write(EXPORT_CONST_EDIF_HEAD);
+			exportEDIFName(os, cache);
+			os.write(EXPORT_CONST_EDIF_VERSION);
+			if (stable) {
+				os.write("1970 01 01 00 00 00".getBytes(StandardCharsets.UTF_8));
+			} else {
+				SimpleDateFormat formatter = new SimpleDateFormat("yyyy MM dd HH mm ss");
+				os.write(formatter.format(new Date()).getBytes(StandardCharsets.UTF_8));
+			}
+			os.write(EXPORT_CONST_PROGRAM);
 			for (String comment : getComments()) {
-				bw.write("  (comment \"");
-				bw.write(comment);
-				bw.write("\")\n");
+				os.write(EXPORT_CONST_COMMENT);
+				os.write(comment.getBytes(StandardCharsets.UTF_8));
+				os.write(EXPORT_CONST_QUOTE_CLOSE_NL);
 			}
-			for (Entry<String, EDIFPropertyValue> e : metax.entrySet()) {
-				bw.write("(metax ");
-				bw.write(e.getKey());
-				bw.write(" ");
-				e.getValue().writeEDIFString(bw);
-				bw.write(")\n");
+			for (Entry<String, EDIFPropertyValue> e : EDIFTools.sortIfStable(metax, stable)) {
+				os.write(EXPORT_CONST_META_X);
+				os.write(e.getKey().getBytes(StandardCharsets.UTF_8));
+				os.write(' ');
+				e.getValue().writeEDIFString(os);
+				os.write(EXPORT_CONST_CLOSE_NL);
 			}
-			bw.write(" )\n");
-			bw.write(")\n");
+			os.write(EXPORT_CONST_DOUBLE_CLOSE);
 
 			List<EDIFLibrary> librariesToWrite = new ArrayList<>();
 			librariesToWrite.add(getHDIPrimitivesLibrary());
-			for(EDIFLibrary lib : getLibrariesMap().values()){
+			for(EDIFLibrary lib : EDIFTools.sortIfStable(getLibrariesMap().values(), stable)){
 				if(lib.getName().equals(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME)) continue;
 				librariesToWrite.add(lib);
 			}
 
-			final ParallelDCPOutput dos = ParallelismTools.getParallel() ?
-					ParallelDCPOutput.cast(out) : null;
 			if (dos != null) {
 				Deque<Future<ParallelDCPInput>> streamFutures = new ArrayDeque<>();
 				for (EDIFLibrary lib : librariesToWrite) {
-					streamFutures.addAll(lib.exportEDIF());
+					streamFutures.addAll(lib.exportEDIF(cache));
 				}
 
-				bw.flush();
+				os.flush();
 
 				while (!streamFutures.isEmpty()) {
 					try {
@@ -721,29 +732,40 @@ public class EDIFNetlist extends EDIFName {
 				}
 			} else {
 				for (EDIFLibrary lib : librariesToWrite) {
-					lib.exportEDIF(bw);
+					lib.exportEDIF(os, cache, stable);
 				}
 			}
 
-			bw.write("(comment \"Reference To The Cell Of Highest Level\")\n\n");
-			bw.write("  (design ");
+			os.write(EXPORT_CONST_DESIGN_START);
 			EDIFDesign design = getDesign();
-			design.exportEDIFName(bw);
-			bw.write("\n    (cellref " + design.getTopCell().getLegalEDIFName() + " (libraryref ");
-			bw.write(design.getTopCell().getLibrary().getLegalEDIFName() + "))\n");
-			design.exportEDIFProperties(bw, "    ");
-			bw.write("  )\n");
-			bw.write(")\n");
+			if (design != null) {
+				design.exportEDIFName(os, cache);
+				os.write(EXPORT_CONST_CELLREF);
+				os.write(cache.getLegalEDIFName(design.getTopCell().getName()));
+				os.write(EXPORT_CONST_LIBRARYREF);
+				os.write(cache.getLegalEDIFName(design.getTopCell().getLibrary().getName()));
+				os.write(EXPORT_CONST_CLOSE_REF);
+				design.exportEDIFProperties(os, EXPORT_CONST_PROP_INDENT, cache, stable);
+				os.write(EXPORT_CONST_CLOSE_DESIGN);
+			}
+			os.write(EXPORT_CONST_CLOSE_EDIF);
 		}
 	}
+	public void exportEDIF(OutputStream out) throws IOException {
+		exportEDIF(out, false);
+	}
 
-	public void exportEDIF(Path fileName){
+	public void exportEDIF(Path fileName, boolean stable){
 		try (OutputStream out = Files.newOutputStream(fileName)){
-			exportEDIF(out);
+			exportEDIF(out, stable);
 		} catch (IOException e) {
 			MessageGenerator.briefError("ERROR: Failed to export EDIF file " + fileName);
 			e.printStackTrace();
 		}
+	}
+
+	public void exportEDIF(Path fileName){
+		exportEDIF(fileName, false);
 	}
 
 	public void exportEDIF(String fileName) {
@@ -1761,7 +1783,7 @@ public class EDIFNetlist extends EDIFName {
 	public void writeBinaryEDIF(OutputStream os) {
 		BinaryEDIFWriter.writeBinaryEDIF(os, this);
 	}
-    
+
     public void writeBinaryEDIF(String fileName) {
         BinaryEDIFWriter.writeBinaryEDIF(fileName, this);
     }
@@ -1769,10 +1791,10 @@ public class EDIFNetlist extends EDIFName {
     /**
      * Checks a flag indicating if this netlist is currently tracking changes to its EDIFCells.
      * Modified EDIFCells are tracked in a set which can be queried with {@link #getModifiedCells()}.
-     * EDIFCells are determined as modified if one of the following is true: 
+     * EDIFCells are determined as modified if one of the following is true:
      *   (1) A port was removed, added or modified
      *   (2) A net was removed, added or modified
-     *   (3) An instance was removed, added or modified 
+     *   (3) An instance was removed, added or modified
      * @return True if this netlist is tracking EDIFCell changes, false otherwise.
      */
 	public boolean isTrackingCellChanges() {
@@ -1786,13 +1808,13 @@ public class EDIFNetlist extends EDIFName {
     public void setTrackCellChanges(boolean trackCellChanges) {
         this.trackCellChanges = trackCellChanges;
     }
-    
+
     public void trackChange(EDIFCell cell, EDIFChangeType type, String objectName) {
         if(isTrackingCellChanges()) {
             addTrackingChange(cell, new EDIFChange(type, objectName));
         }
     }
-    
+
     public void addTrackingChange(EDIFCell cell, EDIFChange change) {
         getModifiedCells().computeIfAbsent(cell, l -> new ArrayList<>()).add(change);
     }
@@ -1801,7 +1823,7 @@ public class EDIFNetlist extends EDIFName {
         if(modifiedCells == null) modifiedCells = new HashMap<>();
         return modifiedCells;
     }
-    
+
     public static void main(String[] args) throws FileNotFoundException {
 		CodePerfTracker t = new CodePerfTracker("EDIF Import/Export", true);
 		t.start("Read EDIF");
@@ -1811,5 +1833,4 @@ public class EDIFNetlist extends EDIFName {
 		n.exportEDIF(args[1]);
 		t.stop().printSummary();
 	}
-
 }
