@@ -2820,6 +2820,18 @@ public class DesignTools {
                     net = si.getDesign().getGndNet();
                 }
             }
+            String belName = belPin.getBELName();
+            if (belName.endsWith("LUT")) {
+            	if (belName.charAt(1) == '6') {
+            		// Anything placed on a LUT6 does not require A6 to be tied to VCC
+            		return;
+            	}
+            	String lut6Name = belName.replace('5', '6');
+            	// Thus it can only be a LUT5
+            	if (belName.charAt(1) != '5') {
+            		throw new RuntimeException("Expected " + lut6Name + " instead of " + belName);
+            	}
+            }
             SitePinInst pin = si.getSitePinInst(siteWireName);
             if(pin == null) {
                 net.createPin(siteWireName, si);

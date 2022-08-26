@@ -1778,9 +1778,7 @@ public class RWRoute{
 	protected static Design routeDesign(Design design, RWRouteConfig config, Supplier<RWRoute> newRouter) {
 		// Pre-processing of the design regarding physical net names pins
 		DesignTools.makePhysNetNamesConsistent(design);
-		if(!config.isPartialRouting() || (!design.getVccNet().hasPIPs() && !design.getGndNet().hasPIPs())) {
-			DesignTools.createPossiblePinsToStaticNets(design);
-		}
+		DesignTools.createPossiblePinsToStaticNets(design);
 		DesignTools.createMissingSitePinInsts(design);
 		
 		// Instantiates router object
