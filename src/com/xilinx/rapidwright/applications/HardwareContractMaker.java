@@ -20,7 +20,7 @@
  * limitations under the License.
  *
  */
-package com.xilinx.rapidwright.util;
+package com.xilinx.rapidwright.applications;
 
 import com.xilinx.rapidwright.design.ConstraintGroup;
 import com.xilinx.rapidwright.design.Design;
@@ -32,6 +32,8 @@ import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFTools;
+import com.xilinx.rapidwright.util.BlackboxesPopulator;
+import com.xilinx.rapidwright.util.Pair;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -45,7 +47,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 
-public class MakeHardwareContract {
+public class HardwareContractMaker {
 
     /**
      * Relocate prohibit constraints for each relocated cell.
@@ -140,6 +142,7 @@ public class MakeHardwareContract {
                 "  2) The black box for -to must be a direct child of hw_contract cell.");
 
 /*
+        example:
         -in        post_route.dcp
         -fromCell  video_cp_i/composable/dfx_decouplers/hw_contract/hw_contract_pr1  INT_X0Y60
         -into      hwct.dcp
@@ -147,19 +150,6 @@ public class MakeHardwareContract {
         -to        hw_contract_pr1 INT_X0Y60
         -to        hw_contract_pr2 INT_X0Y0
         -out       hwctdirect2.dcp
-
-        -in
-post_route_apr23.dcp
--fromCell
-hw_contract_pr0
-INT_X0Y120
--to
-hw_contract_pr1
-INT_X0Y60
--to
-hw_contract_pr2
-INT_X0Y0
--out
  */
 
         ArrayList<Pair<String, String>> targets = new ArrayList<>();
@@ -266,11 +256,11 @@ INT_X0Y0
 
 
         Module mod = new Module(hwct_component, false);
-        if (RelocateModulesIntoBlackboxes.relocateModuleInsts(hwct, mod, cellAnchor, targets)
+        if (BlackboxesPopulator.relocateModuleInsts(hwct, mod, cellAnchor, targets)
            && relocateConstraints(hwct, constraints, cellAnchor, targets)) {
             // TODO: remove the use of relocateConstraints, once RapidWright can carry xdc through module creation and relocation
 
-            RelocateModulesIntoBlackboxes.postProcessing(hwct, targets);
+            BlackboxesPopulator.postProcessing(hwct, targets);
 
             System.out.println("\n");
             hwct.writeCheckpoint(outDCPName );
