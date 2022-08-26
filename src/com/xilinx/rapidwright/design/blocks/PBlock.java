@@ -80,6 +80,11 @@ public class PBlock extends ArrayList<PBlockRange> {
 		
 	}
 	
+	public PBlock(String name) {
+	    super();
+	    setName(name);
+	}
+	
 	/**
 	 * Creates a new pblock object from a Vivado-style PBlock string. 
 	 * @param dev The device for which to create the pblock.
