@@ -443,7 +443,7 @@ public class EDIFNetlist extends EDIFName {
 			if(cell.getLibrary().getName().equals(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME)){
 				destLib = getHDIPrimitivesLibrary();
 			}else{
-				destLib = getWorkLibrary();
+				destLib = addLibrary(new EDIFLibrary(cell.getLibrary().getName()));
 			}
 		}
 
@@ -486,7 +486,7 @@ public class EDIFNetlist extends EDIFName {
 			if(cell.getLibrary().getName().equals(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME)){
 				destLibTop = getHDIPrimitivesLibrary();
 			}else{
-				destLibTop = getWorkLibrary();
+				destLibTop = addLibrary(new EDIFLibrary(cell.getLibrary().getName()));
 			}
 		}
 		if (destLibTop.containsCell(cell) && destLibTop.getName().equals(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME))
@@ -513,7 +513,7 @@ public class EDIFNetlist extends EDIFName {
 					if (instCellType.getLibrary().getName().equals(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME)) {
 						destLibSub = getHDIPrimitivesLibrary();
 					} else {
-						destLibSub = getWorkLibrary();
+						destLibSub = addLibrary(new EDIFLibrary(instCellType.getLibrary().getName()));
 					}
 				}
 				if (destLibSub.containsCell(instCellType) && destLibSub.getName().equals(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME))
@@ -553,7 +553,7 @@ public class EDIFNetlist extends EDIFName {
 			if(cell.getLibrary().isHDIPrimitivesLibrary()){
 				destLib = getHDIPrimitivesLibrary();
 			}else{
-				destLib = getWorkLibrary();
+				destLib = addLibrary(new EDIFLibrary(cell.getLibrary().getName()));
 			}
 		}
 
