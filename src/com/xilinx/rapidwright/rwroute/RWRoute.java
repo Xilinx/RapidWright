@@ -408,7 +408,15 @@ public class RWRoute{
 		Net gndNet = design.getGndNet();
 		List<SitePinInst> gndPins = staticNetAndRoutingTargets.get(gndNet);
 		if (gndPins != null) {
-			RouterHelper.invertPossibleGndPinsToVccPins(design, gndPins);
+			List<SitePinInst> vccPins = new ArrayList<>();
+			RouterHelper.invertPossibleGndPinsToVccPins(design, gndPins, vccPins);
+			if (!vccPins.isEmpty()) {
+				staticNetAndRoutingTargets.compute(design.getVccNet(), (k,v) -> {
+					if (v == null) return vccPins;
+					v.addAll(vccPins);
+					return v;
+				});
+			}
 		}
 		
 		// If connections of other nets are routed first, used resources should be preserved.

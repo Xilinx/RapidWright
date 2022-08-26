@@ -28,6 +28,7 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -37,7 +38,9 @@ import java.util.Queue;
 import java.util.Set;
 
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.IntentCode;
@@ -337,18 +340,30 @@ public class RouterHelper {
 		}
 		return belPin.getBEL().canInvert();
 	}
+
+	private static boolean isInvertibleLagunaBELPin(BELPin belPin) {
+		String belName = belPin.getBELName();
+		if(belName.equals("RX_OPTINV_SR") || belName.equals("TX_OPTINV_SR")) {
+			//NEED TO BE INVERTED when BEL.canInvert returns false
+			return true;
+		}
+		return belPin.getBEL().canInvert();
+	}
 	
 	/**
 	 * Inverts all possible GND sink pins to VCC pins.
 	 * @param design The target design.
-	 * @param gndPins List of GND pins.
+	 * @param gndPins List of GND pins (from which inverted pins are removed)
+	 * @param vccPins List of VCC pins (on which inverted pins are inserted)
 	 */
-	public static void invertPossibleGndPinsToVccPins(Design design, List<SitePinInst> gndPins) {
-		Net staticNet = design.getGndNet();
+	public static void invertPossibleGndPinsToVccPins(Design design, List<SitePinInst> gndPins, List<SitePinInst> vccPins) {
+		Net gndNet = design.getGndNet();
 		Set<SitePinInst> toInvertPins = new HashSet<>();
 		for(SitePinInst currSitePinInst : gndPins) {
-			if (!currSitePinInst.getNet().equals(staticNet))
+			if (!currSitePinInst.getNet().equals(gndNet))
 				throw new RuntimeException(currSitePinInst.toString());
+			SiteInst si = currSitePinInst.getSiteInst();
+			String siteName = si.getSiteName();
 			BELPin[] belPins = currSitePinInst.getSiteInst().getSiteWirePins(currSitePinInst.getName());
 			// DSP or BRAM
 			if(belPins.length == 2) {
@@ -356,28 +371,48 @@ public class RouterHelper {
 					if(belPin.isSitePort())	continue;
 					// DO NOT invert CLK_OPTINV_CLKB_L and CLK_OPTINV_CLKB_U
 					if(belPin.getBEL().getName().contains("CLKB")) continue;
-					if(currSitePinInst.toString().contains("RAM")) {
+					if(siteName.contains("RAM")) {
 						if(belPin.getBEL().canInvert()) {
 							// SRST2 of SLICE also has an inverter, but should not be invertible
 							toInvertPins.add(currSitePinInst);
 		                }
-					}else if (currSitePinInst.toString().contains("DSP")) {
+					}else if (siteName.contains("DSP")) {
 						if(isInvertibleDSPBELPin(belPin)) {
+							toInvertPins.add(currSitePinInst);
+						}
+					}else if (siteName.startsWith("LAGUNA_")) {
+						if(isInvertibleLagunaBELPin(belPin)) {
 							toInvertPins.add(currSitePinInst);
 						}
 					}
 	           }
 			}
 		}
-		
+
+		DesignTools.unroutePins(gndNet, toInvertPins);
+
+		// Temporarily move all PIPs out of gndNet, since Net.removePin() will insist
+		// on either unrouting the whole net, or attempting to unroute the pin at
+		// great expense
+		List<PIP> gndPIPs = gndNet.getPIPs();
+		gndNet.setPIPs(Collections.emptyList());
+
+		Net vccNet = design.getVccNet();
 		for(SitePinInst toinvert:toInvertPins) {
-			boolean success = staticNet.removePin(toinvert, true);
-            success |= design.getVccNet().addPin(toinvert);
+			boolean success = gndNet.removePin(toinvert);
+			success |= vccNet.addPin(toinvert);
+
             if(!success) {
                   throw new RuntimeException("ERROR: Couldn't invert site pin " +
                 		  toinvert);
             }
 		}
+
+		// Restore all gndNet's PIPs
+		gndNet.setPIPs(gndPIPs);
+
+		gndPins.removeIf(toInvertPins::contains);
+		vccPins.addAll(toInvertPins);
 	}
 	
 	/**
