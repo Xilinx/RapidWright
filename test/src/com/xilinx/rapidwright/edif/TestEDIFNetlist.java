@@ -144,4 +144,25 @@ class TestEDIFNetlist {
         Assertions.assertEquals("ERROR: Destination netlist already contains EDIFCell named 'picoblaze_top' in library 'work'",
                 e.getMessage());
     }
+
+    @Test
+    public void testCopyCellsAndSubCellsNewLibrary() {
+        EDIFDesign srcDesign = new EDIFDesign();
+        EDIFNetlist srcNetlist = EDIFTools.createNewNetlist("srcNetlist");
+        srcNetlist.setDesign(srcDesign);
+        EDIFLibrary srcLibrary = srcNetlist.addLibrary(new EDIFLibrary("srcLibrary"));
+        EDIFCell srcCell = new EDIFCell(srcLibrary, "srcCell");
+        srcDesign.setTopCell(srcCell);
+
+        EDIFNetlist dstNetlist = EDIFTools.createNewNetlist("dstNetlist");
+        dstNetlist.copyCellAndSubCells(srcNetlist.getTopCell());
+
+        EDIFLibrary dstLibrary = dstNetlist.getLibrary(srcLibrary.getName());
+        Assertions.assertNotNull(dstLibrary);
+        Assertions.assertFalse(srcLibrary == dstLibrary);
+
+        EDIFCell dstCell = dstLibrary.getCell(srcCell.getName());
+        Assertions.assertNotNull(dstCell);
+        Assertions.assertFalse(srcCell == dstCell);
+    }
 }

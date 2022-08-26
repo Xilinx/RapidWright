@@ -26,6 +26,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -37,6 +38,8 @@ import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
+import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.Pair;
@@ -114,6 +117,52 @@ public class TestDesignTools {
         }
     }
 
+
+    private void testCopyImplementationHelper(boolean keepStaticRouting, HashMap<String, Integer> numPIPs) {
+        String dcpPath = RapidWrightDCP.getString("hwct_pr1.dcp");
+        String srcCellName = "clock_isolation";
+
+        Design src = Design.readCheckpoint(dcpPath);
+
+        List<EDIFHierCellInst> srcCell = src.getNetlist().findCellInsts("*"+ srcCellName);
+        String cellName = srcCell.get(0).getFullHierarchicalInstName();
+        EDIFNetlist srcCellNetlist = EDIFTools.createNewNetlist(src.getNetlist().getHierCellInstFromName(cellName).getInst());
+        EDIFTools.ensureCorrectPartInEDIF(srcCellNetlist, src.getPartName());
+        Design d2 = new Design(srcCellNetlist);
+        d2.setAutoIOBuffers(false);
+        d2.setDesignOutOfContext(true);
+
+        Map<String, String> cellMap = Collections.singletonMap(cellName, "");
+        DesignTools.copyImplementation(src, d2,  keepStaticRouting, true, true, true, cellMap);
+
+        Net vccNet = d2.getVccNet();
+        Assertions.assertEquals(numPIPs.get(vccNet.getName()), vccNet.getPIPs().size());
+        Net gndNet = d2.getGndNet();
+        Assertions.assertEquals(numPIPs.get(gndNet.getName()), gndNet.getPIPs().size());
+    }
+
+    @Test
+    public void testCopyImplementationWithCopyStaticNets() {
+        boolean keepStaticRouting = true;
+        HashMap<String, Integer> numPIPs = new HashMap<String, Integer>()
+        {{
+            put("GLOBAL_LOGIC0",  218);
+            put("GLOBAL_LOGIC1",  604);
+        }};
+
+        testCopyImplementationHelper(keepStaticRouting, numPIPs);
+    }
+    @Test
+    public void testCopyImplementation() {
+        boolean keepStaticRouting = false;
+        HashMap<String, Integer> numPIPs = new HashMap<String, Integer>()
+        {{
+            put("GLOBAL_LOGIC0",  0);
+            put("GLOBAL_LOGIC1",  0);
+        }};
+
+        testCopyImplementationHelper(keepStaticRouting, numPIPs);
+    }
     @Test
     public void testBatchRemoveSitePins() {
         Path dcpPath = RapidWrightDCP.getPath("picoblaze_ooc_X10Y235.dcp");
