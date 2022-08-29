@@ -111,8 +111,10 @@ public class PartialRouter extends RWRoute{
 		Net vcc = design.getVccNet();
 
 		// Copy existing PIPs
-		List<PIP> gndPips = (staticNetAndRoutingTargets.containsKey(gnd)) ? new ArrayList<>(gnd.getPIPs()) : Collections.emptyList();
-		List<PIP> vccPips = (staticNetAndRoutingTargets.containsKey(vcc)) ? new ArrayList<>(vcc.getPIPs()) : Collections.emptyList();
+		List<PIP> gndPips = (staticNetAndRoutingTargets.containsKey(gnd)) ? gnd.getPIPs() : Collections.emptyList();
+		List<PIP> vccPips = (staticNetAndRoutingTargets.containsKey(vcc)) ? vcc.getPIPs() : Collections.emptyList();
+		if (!gndPips.isEmpty()) gnd.setPIPs(new ArrayList<>());
+		if (!vccPips.isEmpty()) vcc.setPIPs(new ArrayList<>());
 
 		// Perform static net routing (which does no rip-up)
 		super.routeStaticNets();

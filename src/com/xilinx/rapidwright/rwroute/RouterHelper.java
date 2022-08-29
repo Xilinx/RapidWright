@@ -389,6 +389,7 @@ public class RouterHelper {
 			}
 		}
 
+		// Batch unroute all to-be-inverted pins
 		DesignTools.unroutePins(gndNet, toInvertPins);
 
 		// Temporarily move all PIPs out of gndNet, since Net.removePin() will insist
@@ -411,6 +412,7 @@ public class RouterHelper {
 		// Restore all gndNet's PIPs
 		gndNet.setPIPs(gndPIPs);
 
+		// Move inverted pins from gnd to vcc net
 		gndPins.removeIf(toInvertPins::contains);
 		vccPins.addAll(toInvertPins);
 	}

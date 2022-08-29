@@ -2821,7 +2821,7 @@ public class DesignTools {
                 }
             }
             String belName = belPin.getBELName();
-            if (belName.endsWith("LUT")) {
+            if (DesignTools.isBELALut(belName)) {
             	if (belName.charAt(1) == '6') {
             		// Anything placed on a LUT6 does not require A6 to be tied to VCC
             		return;
