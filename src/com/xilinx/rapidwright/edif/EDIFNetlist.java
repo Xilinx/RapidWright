@@ -114,18 +114,19 @@ public class EDIFNetlist extends EDIFName {
 	 * Map that stores prim to macro expansions conditional based on IOStandards
 	 * (Start Prim to End Macro (if set IOStandard is in set))
 	 */
-	public static final Map<String,Pair<String,EnumSet<IOStandard>>> macroExpandExceptionMap;
+	public static final Map<Series, Map<String,Pair<String,EnumSet<IOStandard>>>> macroExpandExceptionMap;
 	/**
      * Reverse map that stores macro to prim collapse conditional based on IOStandards
      * (Macro to Prim (if set IOStandard is in set))
      */
-	public static final Map<String,Pair<String,EnumSet<IOStandard>>> macroCollapseExceptionMap;
+	public static final Map<Series, Map<String,Pair<String,EnumSet<IOStandard>>>> macroCollapseExceptionMap;
 
 	public static final String IOSTANDARD_PROP = "IOStandard";
 	
 	static {
 	    EnumSet<IOStandard> obufExpansion = EnumSet.of(
                                 	            IOStandard.BLVDS_25,
+                                	            IOStandard.DEFAULT,
                                 	            IOStandard.DIFF_HSTL_I,
                                 	            IOStandard.DIFF_HSTL_I_12,
                                 	            IOStandard.DIFF_HSTL_I_18,
@@ -158,14 +159,22 @@ public class EDIFNetlist extends EDIFName {
 	                                        );
 
 	    macroExpandExceptionMap = new HashMap<>();
-	    // Prim -> Macro (when set IOStandard matches expansion set)
-	    macroExpandExceptionMap.put("OBUFDS", new Pair<>("OBUFDS_DUAL_BUF", obufExpansion));
-	    macroExpandExceptionMap.put("OBUFTDS", new Pair<>("OBUFTDS_DUAL_BUF", obufExpansion));
-	    
 	    macroCollapseExceptionMap = new HashMap<>();
-	    for(Entry<String,Pair<String,EnumSet<IOStandard>>> e : macroExpandExceptionMap.entrySet()) {
-	        Pair<String,EnumSet<IOStandard>> newPair = new Pair<>(e.getKey(), e.getValue().getSecond());
-	    	macroCollapseExceptionMap.put(e.getValue().getFirst(), newPair);
+	    for(Series s : Series.values()) {
+	        Map<String,Pair<String,EnumSet<IOStandard>>> seriesMacroExpandExceptionMap = new HashMap<>();
+	        Map<String,Pair<String,EnumSet<IOStandard>>> seriesMacroCollapseExceptionMap = new HashMap<>();
+	        
+	        if(s == Series.Versal) continue;
+	        // Prim -> Macro (when set IOStandard matches expansion set)
+	        seriesMacroExpandExceptionMap.put("OBUFDS", new Pair<>("OBUFDS_DUAL_BUF", obufExpansion));
+	        seriesMacroExpandExceptionMap.put("OBUFTDS", new Pair<>("OBUFTDS_DUAL_BUF", obufExpansion));
+	        macroExpandExceptionMap.put(s, seriesMacroCollapseExceptionMap);
+	        
+	        for(Entry<String,Pair<String,EnumSet<IOStandard>>> e : seriesMacroExpandExceptionMap.entrySet()) {
+	            Pair<String,EnumSet<IOStandard>> newPair = new Pair<>(e.getKey(), e.getValue().getSecond());
+	            seriesMacroCollapseExceptionMap.put(e.getValue().getFirst(), newPair);
+	        }
+	        macroCollapseExceptionMap.put(s, seriesMacroCollapseExceptionMap);
 	    }
 	}
 	
@@ -1137,7 +1146,7 @@ public class EDIFNetlist extends EDIFName {
 		return u.hasTransform(device == null ? Series.UltraScale : device.getSeries());
 	}
 
-	private NetType identifyNetType(EDIFHierPortInst source) {
+	public static NetType identifyNetType(EDIFHierPortInst source) {
 		String cellType = source.getPortInst().getCellInst() == null ? "" : source.getPortInst().getCellInst().getCellType().getName();
 		if (cellType.equals("GND")) {
 			return NetType.GND;
@@ -1580,18 +1589,20 @@ public class EDIFNetlist extends EDIFName {
 		EDIFLibrary macros = Design.getMacroPrimitives(series);
 		EDIFLibrary netlistPrims = getHDIPrimitivesLibrary();
 
+		Map<String, Pair<String, EnumSet<IOStandard>>> seriesMacroExpandExceptionMap = 
+		                       macroExpandExceptionMap.getOrDefault(series, Collections.emptyMap());
+		
 		// Find the macro primitives to replace
 		Set<String> toReplace = new HashSet<String>();
+		Set<String> possibleExceptions = seriesMacroExpandExceptionMap == null ? 
+		        Collections.emptySet() : seriesMacroExpandExceptionMap.keySet();
 		for(EDIFCell c : netlistPrims.getCells()) {
 			if(macros.containsCell(c.getName())) {
 				toReplace.addAll(getAllDecendantCellTypes(macros.getCell(c.getName())));
 			}
-		}
-		
-		for(String cellName : macroExpandExceptionMap.keySet()) {
-		    if(toReplace.contains(cellName)) {
-		        toReplace.add(macroExpandExceptionMap.get(cellName).getFirst());
-		    }
+			if(possibleExceptions.contains(c.getName())) {
+			    toReplace.add(c.getName());
+			}
 		}
 		
 		// Replace macro primitives in library and import pre-requisite cells if needed
@@ -1611,14 +1622,17 @@ public class EDIFNetlist extends EDIFName {
 		// Update all cell references to macro versions
 		for(EDIFLibrary lib : getLibraries()) {
 			boolean isHDILib = lib.isHDIPrimitivesLibrary(); 
-			for(EDIFCell cell : lib.getCells()) { 
+			for(EDIFCell cell : new ArrayList<>(lib.getCells())) { 
 				for(EDIFCellInst inst : cell.getCellInsts()) {
 					String cellName = inst.getCellType().getName();
 					if(toReplace.contains(cellName)) {
 						if(!isHDILib) {
-						    Pair<String, EnumSet<IOStandard>> exception = macroExpandExceptionMap.get(cellName);
+						    Pair<String, EnumSet<IOStandard>> exception = seriesMacroExpandExceptionMap.get(cellName);
 						    if(exception != null) {
 						        EDIFPropertyValue value = inst.getProperty(IOSTANDARD_PROP);
+						        if(value == null) {
+						            value = inst.getProperty(IOSTANDARD_PROP.toUpperCase());
+						        }
 						        if(value != null) {
                                     IOStandard ioStandard = IOStandard.valueOf(value.getValue());
 						            if(exception.getSecond().contains(ioStandard)) {
@@ -1629,9 +1643,34 @@ public class EDIFNetlist extends EDIFName {
 						}
 						EDIFCell newCell = netlistPrims.getCell(cellName);
 						if (newCell == null) {
-							throw new RuntimeException("failed to find cell macro "+cellName+", we are in "+lib.getName());
+						    EDIFCell macro = macros.getCell(cellName);
+						    if(macro == null) {
+						        throw new RuntimeException("failed to find cell macro "+cellName+", we are in "+lib.getName());
+						    }
+						    primsToRemoveOnCollapse.add(cellName);
+						    EDIFCell copy = new EDIFCell(netlistPrims, macro);
+						    if(copy.getCellInsts().size() > 0) {
+						        for(EDIFCellInst copyInst : copy.getCellInsts()) {
+						            EDIFCell primCell = netlistPrims.getCell(copyInst.getCellType().getName());
+						            if(primCell == null) {
+						                primCell = new EDIFCell(netlistPrims, copyInst.getCellType());
+						                primsToRemoveOnCollapse.add(copyInst.getCellType().getName());
+						            }
+						            copyInst.setCellType(primCell);
+						        }
+						    }
+						    newCell = copy;
 						}
 						inst.setCellType(newCell);
+						for(EDIFCellInst childInst : newCell.getCellInsts()) {
+						    // Check if we already have a copy
+						    EDIFCell existingCellType = netlistPrims.getCell(childInst.getCellName()); 
+						    if(existingCellType == null) {
+						        existingCellType = new EDIFCell(netlistPrims, childInst.getCellType());
+						        primsToRemoveOnCollapse.add(existingCellType.getName());
+						    }
+						    childInst.setCellType(existingCellType);
+						}
 					}
 				}
 			}
@@ -1647,11 +1686,13 @@ public class EDIFNetlist extends EDIFName {
 		EDIFLibrary macros = Design.getMacroPrimitives(series);
 		EDIFLibrary prims = getHDIPrimitivesLibrary();
 		ArrayList<EDIFCell> reinsert = new ArrayList<EDIFCell>();
+		Map<String, Pair<String, EnumSet<IOStandard>>> seriesMacroCollapseExceptionMap = 
+		        macroCollapseExceptionMap.getOrDefault(series, Collections.emptyMap());
 		for(EDIFCell cell : prims.getCells()) {
 			if(macros.containsCell(cell.getName())) {
 				cell.makePrimitive();
-				if(macroCollapseExceptionMap.containsKey(cell.getName())) {
-					cell.rename(macroCollapseExceptionMap.get(cell.getName()).getFirst());
+				if(seriesMacroCollapseExceptionMap.containsKey(cell.getName())) {
+					cell.rename(seriesMacroCollapseExceptionMap.get(cell.getName()).getFirst());
 					reinsert.add(cell);
 				}
 			}
