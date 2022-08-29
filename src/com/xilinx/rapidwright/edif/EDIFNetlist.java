@@ -170,7 +170,6 @@ public class EDIFNetlist extends EDIFName {
 	        seriesMacroExpandExceptionMap.put("OBUFTDS", new Pair<>("OBUFTDS_DUAL_BUF", obufExpansion));
 	        macroExpandExceptionMap.put(s, seriesMacroCollapseExceptionMap);
 	        
-	        
 	        for(Entry<String,Pair<String,EnumSet<IOStandard>>> e : seriesMacroExpandExceptionMap.entrySet()) {
 	            Pair<String,EnumSet<IOStandard>> newPair = new Pair<>(e.getKey(), e.getValue().getSecond());
 	            seriesMacroCollapseExceptionMap.put(e.getValue().getFirst(), newPair);
@@ -1605,7 +1604,6 @@ public class EDIFNetlist extends EDIFName {
 			    toReplace.add(c.getName());
 			}
 		}
-		
 		
 		// Replace macro primitives in library and import pre-requisite cells if needed
 		for(String cellName : toReplace) {
