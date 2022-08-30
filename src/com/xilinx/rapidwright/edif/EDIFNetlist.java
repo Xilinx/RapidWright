@@ -1640,7 +1640,7 @@ public class EDIFNetlist extends EDIFName {
 						            value = DEFAULT_PROP_VALUE;
 						        }
 						        if (value != null) {
-                                    IOStandard ioStandard = IOStandard.valueOf(value.getValue());
+						            IOStandard ioStandard = IOStandard.valueOf(value.getValue());
 						            if(exception.getSecond().contains(ioStandard)) {
 						                cellName = exception.getFirst();
 						            }
