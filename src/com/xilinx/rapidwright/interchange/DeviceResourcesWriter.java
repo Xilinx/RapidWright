@@ -25,6 +25,7 @@ package com.xilinx.rapidwright.interchange;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -168,7 +169,9 @@ public class DeviceResourcesWriter {
             }
 
         }
-        for(Entry<String,Pair<String, EnumSet<IOStandard>>> e : EDIFNetlist.macroExpandExceptionMap.entrySet()) {
+        Map<String, Pair<String, EnumSet<IOStandard>>> macroExpandExceptionMap = 
+                EDIFNetlist.macroExpandExceptionMap.getOrDefault(device.getSeries(), Collections.emptyMap()); 
+        for(Entry<String,Pair<String, EnumSet<IOStandard>>> e : macroExpandExceptionMap.entrySet()) {
             allStrings.addObject(e.getKey());
             allStrings.addObject(e.getValue().getFirst());
             for(IOStandard ioStd : e.getValue().getSecond()) {
@@ -266,6 +269,7 @@ public class DeviceResourcesWriter {
                                                                 String fileName) throws IOException {
         Design design = new Design();
         design.setPartName(part);
+        Series series = device.getSeries();
 
         t.start("populateEnums");
         populateEnumerations(design, device);
@@ -293,7 +297,7 @@ public class DeviceResourcesWriter {
         t.stop().start("Prims&Macros");
         // Create an EDIFNetlist populated with just primitive and macro libraries
         EDIFLibrary prims = Design.getPrimitivesLibrary(device.getName());
-        EDIFLibrary macros = Design.getMacroPrimitives(device.getSeries());
+        EDIFLibrary macros = Design.getMacroPrimitives(series);
         Set<EDIFCell> unsupportedMacros = new HashSet<>();
         EDIFNetlist netlist = new EDIFNetlist("PrimitiveLibs");
         netlist.addLibrary(prims);
@@ -333,22 +337,24 @@ public class DeviceResourcesWriter {
         	}
         }
 
+        Map<String, Pair<String, EnumSet<IOStandard>>> macroCollapseExceptionMap = 
+                EDIFNetlist.macroCollapseExceptionMap.getOrDefault(series, Collections.emptyMap());
         List<Unisim> unisims = new ArrayList<Unisim>();
         for(EDIFCell cell : macros.getCells()) {
             String cellName = cell.getName();
-            Pair<String, EnumSet<IOStandard>> entry = EDIFNetlist.macroCollapseExceptionMap.get(cellName);
+            Pair<String, EnumSet<IOStandard>> entry = macroCollapseExceptionMap.get(cellName);
             if(entry != null) {
                 cellName = entry.getFirst();
             }
             Unisim unisim = Unisim.valueOf(cellName);
-            Map<String,String> invertiblePins = DesignTools.getInvertiblePinMap(device.getSeries(), unisim);
+            Map<String,String> invertiblePins = DesignTools.getInvertiblePinMap(series, unisim);
             if(invertiblePins != null && invertiblePins.size() > 0) {
                 unisims.add(unisim);
             }
         }
         for(EDIFCell cell : prims.getCells()) {
             Unisim unisim = Unisim.valueOf(cell.getName());
-            Map<String,String> invertiblePins = DesignTools.getInvertiblePinMap(device.getSeries(), unisim);
+            Map<String,String> invertiblePins = DesignTools.getInvertiblePinMap(series, unisim);
             if(invertiblePins != null && invertiblePins.size() > 0) {
                 unisims.add(unisim);
             }
@@ -360,7 +366,7 @@ public class DeviceResourcesWriter {
             CellInversion.Builder cellInversion = cellInversions.get(i);
             cellInversion.setCell(allStrings.getIndex(unisim.name()));
 
-            Map<String,String> invertiblePins = DesignTools.getInvertiblePinMap(device.getSeries(), unisim);
+            Map<String,String> invertiblePins = DesignTools.getInvertiblePinMap(series, unisim);
             StructList.Builder<CellPinInversion.Builder> cellPinInversions = cellInversion.initCellPins(invertiblePins.size());
 
             int j = 0;
@@ -389,16 +395,17 @@ public class DeviceResourcesWriter {
         netlistBuilder.setName(netlist.getName());
         LogNetlistWriter writer = new LogNetlistWriter(allStrings, new HashMap<String, String>() {{
                     put(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME, LogNetlistWriter.DEVICE_PRIMITIVES_LIB);
-                    put(device.getSeries()+"_"+EDIFTools.MACRO_PRIMITIVES_LIB, LogNetlistWriter.DEVICE_MACROS_LIB);
+                    put(series+"_"+EDIFTools.MACRO_PRIMITIVES_LIB, LogNetlistWriter.DEVICE_MACROS_LIB);
                 }}
             );
         writer.populateNetlistBuilder(netlist, netlistBuilder);
 
-        writeCellParameterDefinitions(device.getSeries(), netlist, devBuilder.getParameterDefs());
+        writeCellParameterDefinitions(series, netlist, devBuilder.getParameterDefs());
 
         // Write macro exception map
-        Map<String, Pair<String, EnumSet<IOStandard>>> expandMap = EDIFNetlist.macroExpandExceptionMap;
-        Map<String, MacroParamRule[]> paramRules = MacroParamMappingRules.macroRules.get(device.getSeries());
+        Map<String, Pair<String, EnumSet<IOStandard>>> expandMap = 
+                EDIFNetlist.macroExpandExceptionMap.getOrDefault(series, Collections.emptyMap());
+        Map<String, MacroParamRule[]> paramRules = MacroParamMappingRules.macroRules.get(series);
         Set<String> exceptionMacros = new TreeSet<>(expandMap.keySet());
         exceptionMacros.addAll(paramRules.keySet());
         int size = exceptionMacros.size();
