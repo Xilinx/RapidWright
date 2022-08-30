@@ -123,7 +123,7 @@ public class EDIFNetlist extends EDIFName {
 
 	public static final String IOSTANDARD_PROP = "IOStandard";
 
-	private static final EDIFPropertyValue DEFAULT_PROP_VALUE = new EDIFPropertyValue("Default", EDIFValueType.STRING);
+	private static final EDIFPropertyValue DEFAULT_PROP_VALUE = new EDIFPropertyValue("DEFAULT", EDIFValueType.STRING);
 	
 	static {
 	    EnumSet<IOStandard> obufExpansion = EnumSet.of(
@@ -1639,11 +1639,10 @@ public class EDIFNetlist extends EDIFName {
 						            // If the IOStandard is not set, use default
 						            value = DEFAULT_PROP_VALUE;
 						        }
-						        if (value != null) {
-						            IOStandard ioStandard = IOStandard.valueOf(value.getValue());
-						            if(exception.getSecond().contains(ioStandard)) {
-						                cellName = exception.getFirst();
-						            }
+						        IOStandard ioStandard = IOStandard.valueOf(value.getValue());
+						        if(exception.getSecond().contains(ioStandard)) {
+						            cellName = exception.getFirst();
+						        }
 						        }
 						    }
 						}
