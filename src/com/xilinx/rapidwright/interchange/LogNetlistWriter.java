@@ -275,15 +275,29 @@ public class LogNetlistWriter {
      * collapse macros in the netlist before writing.
      * @param n RapidWright netlist
      * @param fileName Name of the file to write
+     * @param collapseMacros If true, will attempt to collapse macros in netlist before writing.
      * @throws IOException
      */
     public static void writeLogNetlist(EDIFNetlist n, String fileName) throws IOException {
-        Device device = n.getDevice();
-        if(device != null) {
-            n.collapseMacroUnisims(device.getSeries());
-        } else {
-            System.err.println("WARNING: Could not collapse macros in netlist as part target device"
-                    + " could not be identified.");
+        writeLogNetlist(n, fileName, true);
+    }
+    
+    /**
+     * Writes a RapidWright netlist to a Cap'n Proto serialized file.
+     * @param n RapidWright netlist
+     * @param fileName Name of the file to write
+     * @param collapseMacros If true, will attempt to collapse macros in netlist before writing.
+     * @throws IOException
+     */
+    public static void writeLogNetlist(EDIFNetlist n, String fileName, boolean collapseMacros) throws IOException {
+        if(collapseMacros) {
+            Device device = n.getDevice();
+            if(device != null) {
+                n.collapseMacroUnisims(device.getSeries());
+            } else {
+                System.err.println("WARNING: Could not collapse macros in netlist as part target device"
+                        + " could not be identified.");
+            }            
         }
         
         MessageBuilder message = new MessageBuilder();

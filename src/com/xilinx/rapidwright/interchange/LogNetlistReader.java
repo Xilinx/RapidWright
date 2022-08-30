@@ -321,7 +321,24 @@ public class LogNetlistReader {
         }
     }
 
+    /**
+     * Reads an Interchange netlist from Cap'n Proto reader.  Will expand macros by default. 
+     * @param netlist The Cap'n Proto netlist reader
+     * @param skipTopStuff If true, skips netlist design object
+     * @return The logical netlist.
+     */
     public EDIFNetlist readLogNetlist(Netlist.Reader netlist, boolean skipTopStuff) {
+        return readLogNetlist(netlist, skipTopStuff, true);
+    }
+    
+    /**
+     * Reads an Interchange netlist from Cap'n Proto reader.  
+     * @param netlist The Cap'n Proto netlist reader
+     * @param skipTopStuff If true, skips netlist design object
+     * @param expandMacros If true, expands the macros in the netlist before returning it to the caller.
+     * @return The logical netlist.
+     */
+    public EDIFNetlist readLogNetlist(Netlist.Reader netlist, boolean skipTopStuff, boolean expandMacros) {
         EDIFNetlist n = new EDIFNetlist(netlist.getName().toString());
 
         readPorts(netlist);
@@ -349,14 +366,16 @@ public class LogNetlistReader {
             n.addLibrary(lib);
         }
 
-        String partName = EDIFTools.getPartName(n);
-        if(partName != null) {
-            n.expandMacroUnisims(PartNameTools.getPart(partName).getSeries());
-        } else {
-            System.err.println("WARNING: Could not determine target device from netlist.  Macro "
-                + "unisims are not expanded.  Please add a top netlist property to indicate the "
-                + "target part such as [part=xcvu095-ffva2104-2-e].  Macro expansion can also be" 
-                + " run manually with EDIFNetlist.expandMacroUnisims(Series)");
+        if(expandMacros) {
+            String partName = EDIFTools.getPartName(n);
+            if(partName != null) {
+                n.expandMacroUnisims(PartNameTools.getPart(partName).getSeries());
+            } else {
+                System.err.println("WARNING: Could not determine target device from netlist.  Macro "
+                    + "unisims are not expanded.  Please add a top netlist property to indicate the "
+                    + "target part such as [part=xcvu095-ffva2104-2-e].  Macro expansion can also be" 
+                    + " run manually with EDIFNetlist.expandMacroUnisims(Series)");
+            }            
         }
         
         return n;

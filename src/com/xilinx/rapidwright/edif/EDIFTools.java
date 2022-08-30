@@ -778,8 +778,13 @@ public class EDIFTools {
 	}
 
 	public static void ensureCorrectPartInEDIF(EDIFNetlist edif, String partName){
-		Map<EDIFName, EDIFPropertyValue> propMap = edif.getDesign().getProperties();
-		if(propMap == null){
+		EDIFDesign design = edif.getDesign();
+		if(design == null) {
+		    design = new EDIFDesign(edif.getName());
+		    edif.setDesign(design);
+		}
+		Map<EDIFName, EDIFPropertyValue> propMap = design.getProperties();
+		if(propMap == null || propMap.size() == 0){
 			edif.getDesign().addProperty(EDIF_PART_PROP, partName);
 			return;
 		}
