@@ -882,7 +882,7 @@ public class DesignTools {
 		}
 		
 		// Add routing information
-		for(Net net : cell.getNets()){
+		for(Net net : new ArrayList<>(cell.getNets())){
 			if(net.getName().equals(Net.USED_NET)) continue;
 			if(net.isStaticNet()){
 				Net staticNet = design.getStaticNet(net.getType());
