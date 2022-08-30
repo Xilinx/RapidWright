@@ -768,7 +768,7 @@ public class EDIFTools {
 		    design = new EDIFDesign(edif.getName());
 		    edif.setDesign(design);
 		}
-		Map<EDIFName, EDIFPropertyValue> propMap = design.getProperties();
+		Map<String, EDIFPropertyValue> propMap = design.getPropertiesMap();
 		if(propMap == null || propMap.size() == 0){
 			edif.getDesign().addProperty(EDIF_PART_PROP, partName);
 			return;
