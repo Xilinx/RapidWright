@@ -34,6 +34,8 @@ import org.capnproto.Text;
 import org.capnproto.TextList;
 import org.capnproto.Void;
 
+import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFLibrary;
@@ -44,6 +46,7 @@ import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFPropertyObject;
 import com.xilinx.rapidwright.edif.EDIFPropertyValue;
+import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.Bus;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.Cell;
@@ -268,12 +271,21 @@ public class LogNetlistWriter {
     }
 
     /**
-     * Writes a RapidWright netlist to a Cap'n Proto serialized file
+     * Writes a RapidWright netlist to a Cap'n Proto serialized file.  The method attempts to 
+     * collapse macros in the netlist before writing.
      * @param n RapidWright netlist
      * @param fileName Name of the file to write
      * @throws IOException
      */
     public static void writeLogNetlist(EDIFNetlist n, String fileName) throws IOException {
+        Device device = n.getDevice();
+        if(device != null) {
+            n.collapseMacroUnisims(device.getSeries());
+        } else {
+            System.err.println("WARNING: Could not collapse macros in netlist as part target device"
+                    + " could not be identified.");
+        }
+        
         MessageBuilder message = new MessageBuilder();
         Netlist.Builder netlist = message.initRoot(Netlist.factory);
 
@@ -284,7 +296,7 @@ public class LogNetlistWriter {
 
         Interchange.writeInterchangeFile(fileName, message);
     }
-
+    
     /**
      * Helper method to populate the logical netlist object with an existing builder.
      * @param n The EDIF Netlist to serialize
