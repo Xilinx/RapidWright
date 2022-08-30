@@ -310,6 +310,7 @@ public class LogNetlistWriter {
 
         Interchange.writeInterchangeFile(fileName, message);
     }
+
     /**
      * Helper method to populate the logical netlist object with an existing builder.
      * @param n The EDIF Netlist to serialize
