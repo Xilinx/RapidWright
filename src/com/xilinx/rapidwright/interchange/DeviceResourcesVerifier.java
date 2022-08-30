@@ -486,7 +486,7 @@ public class DeviceResourcesVerifier {
                 }}
             );
         EDIFNetlist primsAndMacros = netlistReader.readLogNetlist(primLibs,
-                /*skipTopStuff=*/true);
+                /*skipTopStuff=*/true, /*expandMacros=*/false);
 
         Set<String> libsFound = new HashSet<String>();
         libsFound.addAll(primsAndMacros.getLibrariesMap().keySet());
