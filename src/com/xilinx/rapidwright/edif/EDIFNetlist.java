@@ -123,7 +123,7 @@ public class EDIFNetlist extends EDIFName {
 
 	public static final String IOSTANDARD_PROP = "IOStandard";
 
-	private static final EDIFPropertyValue DEFAULT_PROP_VALUE = new EDIFPropertyValue("DEFAULT", EDIFValueType.STRING);
+	private static final EDIFPropertyValue DEFAULT_PROP_VALUE = new EDIFPropertyValue(IOStandard.DEFAULT.name(), EDIFValueType.STRING);
 	
 	static {
 	    EnumSet<IOStandard> obufExpansion = EnumSet.of(
@@ -1642,7 +1642,6 @@ public class EDIFNetlist extends EDIFName {
 						        IOStandard ioStandard = IOStandard.valueOf(value.getValue());
 						        if(exception.getSecond().contains(ioStandard)) {
 						            cellName = exception.getFirst();
-						        }
 						        }
 						    }
 						}
