@@ -877,12 +877,17 @@ public class DesignTools {
 				c.updateName(hierarchicalCellName + "/" + c.getName());
 				if(!c.isRoutethru())
 					design.addCell(c);
+				else {
+				    for(Entry<String, AltPinMapping> p : c.getAltPinMappings().entrySet()) {
+				        p.getValue().setAltCellName(hierarchicalCellName + "/" + p.getValue().getAltCellName()); 
+				    }
+				}
 			}
 			design.addSiteInst(si);
 		}
 		
 		// Add routing information
-		for(Net net : cell.getNets()){
+		for(Net net : new ArrayList<>(cell.getNets())){
 			if(net.getName().equals(Net.USED_NET)) continue;
 			if(net.isStaticNet()){
 				Net staticNet = design.getStaticNet(net.getType());
