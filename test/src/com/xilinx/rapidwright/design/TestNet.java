@@ -25,6 +25,8 @@ package com.xilinx.rapidwright.design;
 import com.xilinx.rapidwright.device.Device;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.Arrays;
 import java.util.List;
@@ -63,8 +65,9 @@ public class TestNet {
         Assertions.assertNull(net.getAlternateSource());
     }
 
-    @Test
-    public void testRemovePrimarySourcePinPreserve() {
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testRemovePrimarySourcePinPreserve(boolean preserveOtherRoutes) {
         Design design = new Design("test", Device.KCU105);
 
         // Net with two outputs (HMUX primary and H_O alternate) and two sinks (SRST_B2 & B2)
@@ -102,11 +105,16 @@ public class TestNet {
         altSnk.setRouted(true);
 
         // Remove the primary source pin
-        net.removePin(src, true);
+        net.removePin(src, preserveOtherRoutes);
         Assertions.assertEquals(net.getSource(), altSrc);
         Assertions.assertNull(net.getAlternateSource());
-        Assertions.assertEquals(11, net.getPIPs().size());
         Assertions.assertFalse(snk.isRouted());
-        Assertions.assertTrue(altSnk.isRouted());
+        if (preserveOtherRoutes) {
+            Assertions.assertEquals(11, net.getPIPs().size());
+            Assertions.assertTrue(altSnk.isRouted());
+        } else {
+            Assertions.assertEquals(0, net.getPIPs().size());
+            Assertions.assertFalse(altSnk.isRouted());
+        }
     }
 }
