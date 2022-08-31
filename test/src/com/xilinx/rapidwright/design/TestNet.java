@@ -62,4 +62,51 @@ public class TestNet {
         Assertions.assertNull(net.getSource());
         Assertions.assertNull(net.getAlternateSource());
     }
+
+    @Test
+    public void testRemovePrimarySourcePinPreserve() {
+        Design design = new Design("test", Device.KCU105);
+
+        // Net with two outputs (HMUX primary and H_O alternate) and two sinks (SRST_B2 & B2)
+        Net net = TestDesignTools.createTestNet(design, "net", new String[]{
+                // SLICE_X65Y158/HMUX-> SLICE_X64Y158/SRST_B2
+                "INT_X42Y158/INT.LOGIC_OUTS_E16->>INT_NODE_SINGLE_DOUBLE_46_INT_OUT",
+                "INT_X42Y158/INT.INT_NODE_SINGLE_DOUBLE_46_INT_OUT->>INT_INT_SINGLE_51_INT_OUT",
+                "INT_X42Y158/INT.INT_INT_SINGLE_51_INT_OUT->>INT_NODE_GLOBAL_3_OUT1",
+                "INT_X42Y158/INT.INT_NODE_GLOBAL_3_OUT1->>CTRL_W_B7",
+                // Adding dual output net
+                // SLICE_X65Y158/H_O-> SLICE_X64Y158/B2
+                "INT_X42Y158/INT.LOGIC_OUTS_E29->>INT_NODE_QUAD_LONG_5_INT_OUT",
+                "INT_X42Y158/INT.INT_NODE_QUAD_LONG_5_INT_OUT->>NN16_BEG3",
+                "INT_X42Y174/INT.NN16_END3->>INT_NODE_QUAD_LONG_53_INT_OUT",
+                "INT_X42Y174/INT.INT_NODE_QUAD_LONG_53_INT_OUT->>WW4_BEG14",
+                "INT_X40Y174/INT.WW4_END14->>INT_NODE_QUAD_LONG_117_INT_OUT",
+                "INT_X40Y174/INT.INT_NODE_QUAD_LONG_117_INT_OUT->>SS16_BEG3",
+                "INT_X40Y158/INT.SS16_END3->>INT_NODE_QUAD_LONG_84_INT_OUT",
+                "INT_X40Y158/INT.INT_NODE_QUAD_LONG_84_INT_OUT->>EE4_BEG12",
+                "INT_X42Y158/INT.EE4_END12->>INT_NODE_GLOBAL_8_OUT1",
+                "INT_X42Y158/INT.INT_NODE_GLOBAL_8_OUT1->>INT_NODE_IMUX_61_INT_OUT",
+                "INT_X42Y158/INT.INT_NODE_IMUX_61_INT_OUT->>IMUX_W0",
+        });
+
+        SiteInst si = design.createSiteInst(design.getDevice().getSite("SLICE_X65Y158"));
+        SitePinInst src = net.createPin("HMUX", si);
+        SitePinInst altSrc = net.createPin("H_O", si);
+        Assertions.assertNotNull(net.getAlternateSource());
+        Assertions.assertTrue(net.getAlternateSource().getName().equals("H_O"));
+
+        si = design.createSiteInst(design.getDevice().getSite("SLICE_X64Y158"));
+        SitePinInst snk = net.createPin("SRST_B2", si);
+        snk.setRouted(true);
+        SitePinInst altSnk = net.createPin("B2", si);
+        altSnk.setRouted(true);
+
+        // Remove the primary source pin
+        net.removePin(src, true);
+        Assertions.assertEquals(net.getSource(), altSrc);
+        Assertions.assertNull(net.getAlternateSource());
+        Assertions.assertEquals(11, net.getPIPs().size());
+        Assertions.assertFalse(snk.isRouted());
+        Assertions.assertTrue(altSnk.isRouted());
+    }
 }
