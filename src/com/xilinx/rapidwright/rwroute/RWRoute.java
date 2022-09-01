@@ -1195,33 +1195,30 @@ public class RWRoute{
 	private boolean swapOutputPin(Connection connection) {
 		NetWrapper netWrapper = connection.getNetWrapper();
 		Net net = netWrapper.getNet();
-		SitePinInst altSource = DesignTools.getLegalAlternativeOutputPin(net);
-		if(altSource == null) {
-			System.out.println("INFO: No alternative source to swap");	
-			return false;
-		}
-		
-		System.out.println("INFO: Swap source from " + net.getSource() + " to " + altSource + "\n");
-		
-		Node source = connection.getSource().getConnectedNode();
-		if (!routingGraph.isPreserved(source)) {
-			// Net.replaceSource() calls Net.removePin() (which in turn calls
-			// Net.unroute()) -- only do this if the source is not on a preserved net
-			net.replaceSource(altSource);
-			net.setAlternateSource(connection.getSource());
-		} else {
-			net.setAlternateSource(altSource);
+
+		SitePinInst altSource = net.getAlternateSource();
+		if (net.getAlternateSource() == null) {
+			altSource = DesignTools.getLegalAlternativeOutputPin(net);
+			if(altSource == null) {
+				System.out.println("INFO: No alternative source to swap");
+				return false;
+			}
+
+			DesignTools.routeAlternativeOutputSitePin(net, altSource);
 		}
 
-		DesignTools.routeAlternativeOutputSitePin(net, altSource);
-
-		Node sourceINTNode = RouterHelper.projectOutputPinToINTNode(altSource);
-		RouteNode sourceR = getOrCreateRouteNode(sourceINTNode, RouteNodeType.PINFEED_O);
-		for(Connection otherConnectionOfNet : netWrapper.getConnections()) {
-			otherConnectionOfNet.setSource(altSource);
-			otherConnectionOfNet.setSourceRnode(sourceR);
+		SitePinInst source = connection.getSource();
+		if (source.equals(altSource)) {
+			altSource = net.getSource();
 		}
-			
+		System.out.println("INFO: Swap source from " + source + " to " + altSource + "\n");
+
+		Node altSourceNode = RouterHelper.projectOutputPinToINTNode(altSource);
+		RouteNode altSourceRnode = getOrCreateRouteNode(altSourceNode, RouteNodeType.PINFEED_O);
+		connection.setSource(altSource);
+		connection.setSourceRnode(altSourceRnode);
+		connection.getSink().setRouted(false);
+
 		return true;
 	}
 
