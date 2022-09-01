@@ -1196,14 +1196,11 @@ public class RWRoute{
 		NetWrapper netWrapper = connection.getNetWrapper();
 		Net net = netWrapper.getNet();
 
-		SitePinInst altSource = net.getAlternateSource();
-		if (net.getAlternateSource() == null) {
-			altSource = DesignTools.getLegalAlternativeOutputPin(net);
-			if(altSource == null) {
-				System.out.println("INFO: No alternative source to swap");
-				return false;
-			}
-
+		SitePinInst altSource = DesignTools.getLegalAlternativeOutputPin(net);
+		if(altSource == null) {
+			System.out.println("INFO: No alternative source to swap");
+			return false;
+		} else if (net.getAlternateSource() == null) {
 			DesignTools.routeAlternativeOutputSitePin(net, altSource);
 		}
 
@@ -1264,22 +1261,25 @@ public class RWRoute{
 		RouteNode sourceRnode = rnodes.get(rnodes.size()-1);
 		// Update the connection source, in case we backtracked onto the alternate source
 		if (!sourceRnode.equals(connection.getSourceRnode())) {
-			SitePinInst altSource = connection.getNetWrapper().getNet().getAlternateSource();
-			if (altSource != null) {
-				Node altSourceINTNode = RouterHelper.projectOutputPinToINTNode(altSource);
-				if (!altSourceINTNode.equals(sourceRnode.getNode())) {
-					throw new RuntimeException(connection + " expected " + altSourceINTNode +
-							" or " + connection.getSourceRnode().getNode() +
-							" got " + sourceRnode.getNode());
-				}
-
-				RouteNode altSourceRnode = sourceRnode;
-				connection.setSource(altSource);
-				connection.setSourceRnode(altSourceRnode);
-			} else {
+			Net net = connection.getNetWrapper().getNet();
+			SitePinInst altSource = DesignTools.getLegalAlternativeOutputPin(net);
+			if (altSource == null) {
 				throw new RuntimeException(connection + " expected " + connection.getSourceRnode().getNode() +
 						" got " + sourceRnode.getNode());
+			} else if (net.getAlternateSource() == null) {
+				DesignTools.routeAlternativeOutputSitePin(net, altSource);
 			}
+
+			Node altSourceINTNode = RouterHelper.projectOutputPinToINTNode(altSource);
+			if (!altSourceINTNode.equals(sourceRnode.getNode())) {
+				throw new RuntimeException(connection + " expected " + altSourceINTNode +
+						" or " + connection.getSourceRnode().getNode() +
+						" got " + sourceRnode.getNode());
+			}
+
+			RouteNode altSourceRnode = sourceRnode;
+			connection.setSource(altSource);
+			connection.setSourceRnode(altSourceRnode);
 		}
 	}
 	
