@@ -1262,6 +1262,28 @@ public class RWRoute{
 			connection.addRnode(rnode);
 			rnode = rnode.getPrev();
 		}
+
+		List<RouteNode> rnodes = connection.getRnodes();
+		RouteNode sourceRnode = rnodes.get(rnodes.size()-1);
+		// Update the connection source, in case we backtracked onto the alternate source
+		if (!sourceRnode.equals(connection.getSourceRnode())) {
+			SitePinInst altSource = connection.getNetWrapper().getNet().getAlternateSource();
+			if (altSource != null) {
+				Node altSourceINTNode = RouterHelper.projectOutputPinToINTNode(altSource);
+				if (!altSourceINTNode.equals(sourceRnode.getNode())) {
+					throw new RuntimeException(connection + " expected " + altSourceINTNode +
+							" or " + connection.getSourceRnode().getNode() +
+							" got " + sourceRnode.getNode());
+				}
+
+				RouteNode altSourceRnode = sourceRnode;
+				connection.setSource(altSource);
+				connection.setSourceRnode(altSourceRnode);
+			} else {
+				throw new RuntimeException(connection + " expected " + connection.getSourceRnode().getNode() +
+						" got " + sourceRnode.getNode());
+			}
+		}
 	}
 	
 	/**
