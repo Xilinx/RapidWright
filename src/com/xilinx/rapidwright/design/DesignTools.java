@@ -1177,6 +1177,9 @@ public class DesignTools {
 	            	toRemove.add(pip);
 	            	Node startNode = pip.getStartNode();
 	            	updateFanout.add(startNode);
+	            	if (atReversedBidirectionalPip) {
+	            		updateFanout.add(pip.getEndNode());
+	            	}
 	            	if (new Node(pip.getTile(), pip.getStartWireIndex()).equals(sink) && !atReversedBidirectionalPip) {
 	            		// reached the source and there is another branch starting with a reversed
 	            		// bidirectional PIP ... don't traverse it
