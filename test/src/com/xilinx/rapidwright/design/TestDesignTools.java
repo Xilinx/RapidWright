@@ -238,8 +238,9 @@ public class TestDesignTools {
         }
     }
 
-    @Test
-    public void testGetTrimmablePIPsFromPinsBidir() {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    public void testGetTrimmablePIPsFromPinsBidir(boolean unrouteAll) {
         Design design = new Design("test", "xcvu19p-fsva3824-1-e");
         Device device = design.getDevice();
 
@@ -268,16 +269,25 @@ public class TestDesignTools {
         SitePinInst E1 = net.createPin("E1", si);
         E1.setRouted(true);
 
-        Set<PIP> trimmable = DesignTools.getTrimmablePIPsFromPins(net, Arrays.asList(B_I, E1));
-        Assertions.assertEquals(6, trimmable.size());
-        Assertions.assertTrue(trimmable.containsAll(Arrays.asList(
-                device.getPIP("INT_X102Y428/INT.LOGIC_OUTS_W30->>INODE_W_60_FT0"),
-                device.getPIP("INT_X102Y429/INT.INODE_W_BLN_60_FT1->>IMUX_W2"),
-                device.getPIP("INT_X102Y429/INT.INT_NODE_IMUX_62_INT_OUT0->>BYPASS_W5"),
-                device.getPIP("INT_X102Y428/INT.INT_NODE_IMUX_50_INT_OUT0<<->>BYPASS_W14"),
-                device.getPIP("INT_X102Y428/INT.INT_NODE_IMUX_50_INT_OUT0->>BOUNCE_W_13_FT0"),
-                device.getPIP("INT_X102Y429/INT.BOUNCE_W_BLN_13_FT1->>INT_NODE_IMUX_62_INT_OUT0")
-        )));
+        List<SitePinInst> pinsToUnroute = new ArrayList<>(3);
+        pinsToUnroute.add(B_I);
+        pinsToUnroute.add(E1);
+        if (unrouteAll)
+            pinsToUnroute.add(EX);
+        Set<PIP> trimmable = DesignTools.getTrimmablePIPsFromPins(net, pinsToUnroute);
+        if (unrouteAll) {
+            Assertions.assertEquals(net.getPIPs().size(), trimmable.size());
+        } else {
+            Assertions.assertEquals(6, trimmable.size());
+            Assertions.assertTrue(trimmable.containsAll(Arrays.asList(
+                    device.getPIP("INT_X102Y428/INT.LOGIC_OUTS_W30->>INODE_W_60_FT0"),
+                    device.getPIP("INT_X102Y429/INT.INODE_W_BLN_60_FT1->>IMUX_W2"),
+                    device.getPIP("INT_X102Y429/INT.INT_NODE_IMUX_62_INT_OUT0->>BYPASS_W5"),
+                    device.getPIP("INT_X102Y428/INT.INT_NODE_IMUX_50_INT_OUT0<<->>BYPASS_W14"),
+                    device.getPIP("INT_X102Y428/INT.INT_NODE_IMUX_50_INT_OUT0->>BOUNCE_W_13_FT0"),
+                    device.getPIP("INT_X102Y429/INT.BOUNCE_W_BLN_13_FT1->>INT_NODE_IMUX_62_INT_OUT0")
+            )));
+        }
     }
 
     private Net createTestNet(Design design, String netName, String[] pips) {
