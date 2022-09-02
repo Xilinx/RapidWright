@@ -221,7 +221,9 @@ public class PartialRouter extends RWRoute{
 				if (spi == null) continue;
 				Node n = RouterHelper.projectOutputPinToINTNode(spi);
 				RouteNode rn = routingGraph.getNode(n);
-				rn.setPrev(null);
+				if (rn != null) {
+					rn.setPrev(null);
+				}
 			}
 
 			// Use the prev pointers to update the routing for each connection
@@ -436,7 +438,9 @@ public class PartialRouter extends RWRoute{
 				if (spi == null) continue;
 				Node n = RouterHelper.projectOutputPinToINTNode(spi);
 				RouteNode rn = routingGraph.getNode(n);
-				rn.setPrev(null);
+				if (rn != null) {
+					rn.setPrev(null);
+				}
 			}
 
 			// Use the prev pointers to update the routing for each connection
