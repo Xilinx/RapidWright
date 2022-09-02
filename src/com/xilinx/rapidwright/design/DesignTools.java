@@ -1139,6 +1139,8 @@ public class DesignTools {
 	                reverseConnsStart.put(startNode, rPips);
 	            }
 	            rPips.add(pip);
+
+	            fanout.merge(endNode, 1, Integer::sum);
 	        }
 
 	        // If a site pin was found and it belongs to this net, add an extra fanout to
