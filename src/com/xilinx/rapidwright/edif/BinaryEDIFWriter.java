@@ -48,7 +48,7 @@ import com.xilinx.rapidwright.util.FileTools;
 public class BinaryEDIFWriter {
     
     public static final String EDIF_BINARY_FILE_TAG = "RAPIDWRIGHT_EDIF_BINARY";
-    public static final String EDIF_BINARY_FILE_VERSION = "0.0.1";
+    public static final String EDIF_BINARY_FILE_VERSION = "0.0.2";
     
     public static final int EDIF_NAME_FLAG = 0x80000000;
     public static final int EDIF_UNIQUE_VIEW_FLAG = 0x80000000;
@@ -80,18 +80,14 @@ public class BinaryEDIFWriter {
     
     private static void addNameToStringMap(EDIFName o, Map<String,Integer> stringMap) {
         addStringToStringMap(o.getName(), stringMap);
-        addStringToStringMap(o.getLegalEDIFName(), stringMap);
     }
     
     private static void addObjectToStringMap(EDIFPropertyObject o, Map<String,Integer> stringMap) {
         addNameToStringMap(o, stringMap);
-        for(Entry<EDIFName, EDIFPropertyValue> e : o.getProperties().entrySet()) {
-            addNameToStringMap(e.getKey(), stringMap);
+        for(Entry<String, EDIFPropertyValue> e : o.getPropertiesMap().entrySet()) {
+            addStringToStringMap(e.getKey(), stringMap);
             addStringToStringMap(e.getValue().getValue(), stringMap);
-        }
-        String owner = o.getOwner();
-        if(owner != null) {
-            addStringToStringMap(owner, stringMap);
+            addStringToStringMap(e.getValue().getOwner(), stringMap);
         }
     }
     
@@ -151,10 +147,6 @@ public class BinaryEDIFWriter {
      */
     private static void writeEDIFName(EDIFName o, Output os, Map<String,Integer> stringMap, 
             boolean hasPropMap) {
-        if(o.getEDIFName() != null) {
-            int edifName = stringMap.get(o.getEDIFName());
-            os.writeInt(EDIF_NAME_FLAG | edifName);
-        }
         os.writeInt((hasPropMap ? EDIF_PROP_FLAG : 0) | stringMap.get(o.getName()));
     }
     
@@ -166,24 +158,24 @@ public class BinaryEDIFWriter {
      * @see #readEDIFObject(EDIFPropertyObject, Output, Map)
      */
     private static void writeEDIFObject(EDIFPropertyObject o, Output os, Map<String,Integer> stringMap) {
-        boolean hasProperties = o.getProperties().size() > 0;
+        boolean hasProperties = o.getPropertiesMap().size() > 0;
         writeEDIFName(o, os, stringMap, hasProperties);
         if(hasProperties) {
-            if(o.getProperties().size() > 0x0000ffff) {
+            if(o.getPropertiesMap().size() > 0x0000ffff) {
                 throw new RuntimeException("ERROR: EDIF object exceeded number of encoded "
                         + "properties on object '" + o.getName() + "'");
             }
-            String owner = o.getOwner();
-            if(owner != null) {
-                os.writeInt(EDIF_HAS_OWNER | o.getProperties().size());
-                os.writeInt(stringMap.get(owner));
-            }else {
-                os.writeInt(o.getProperties().size());                
-            }
-            for(Entry<EDIFName, EDIFPropertyValue> e : o.getProperties().entrySet()) {
-                writeEDIFName(e.getKey(), os, stringMap);
+
+            os.writeInt(o.getPropertiesMap().size());
+
+            for(Entry<String, EDIFPropertyValue> e : o.getPropertiesMap().entrySet()) {
+                int ownerFlag = e.getValue().getOwner() != null ? EDIF_HAS_OWNER : 0;
+                os.writeInt(ownerFlag | stringMap.get(e.getKey()));
                 int propType = e.getValue().getType().ordinal();
                 os.writeInt(propType << EDIF_PROP_TYPE_BIT | stringMap.get(e.getValue().getValue()));
+                if (e.getValue().getOwner() != null) {
+                    os.writeInt(stringMap.get(e.getValue().getOwner()));
+                }
             }            
         }
     }
@@ -214,7 +206,7 @@ public class BinaryEDIFWriter {
     static void writeEDIFCellRef(EDIFCell ref, Output os, Map<String,Integer> stringMap,
                                          EDIFLibrary parentCellLib) {
         int libMask = ref.getLibrary().equals(parentCellLib) ? EDIF_SAME_LIB_FLAG : 0; 
-        os.writeInt(libMask | stringMap.get(ref.getLegalEDIFName()));            
+        os.writeInt(libMask | stringMap.get(ref.getName()));
         if(libMask != EDIF_SAME_LIB_FLAG) {
             os.writeInt(stringMap.get(ref.getLibrary().getName()));
         }
@@ -248,9 +240,6 @@ public class BinaryEDIFWriter {
                 dirAndWidth |= EDIF_DIR_OUTPUT_MASK;
             }else if(dir == EDIFDirection.INOUT) {
                 dirAndWidth |= EDIF_DIR_INOUT_MASK;
-            }
-            if(!p.getLegalEDIFName().equals(p.getName())){
-                dirAndWidth |= EDIF_RENAME_MASK; 
             }
             os.writeInt(dirAndWidth);
         }
@@ -333,7 +322,7 @@ public class BinaryEDIFWriter {
             for(EDIFLibrary lib : netlist.getLibrariesInExportOrder()) {
                 writeEDIFName(lib, os, stringMap);
                 os.writeInt(lib.getCells().size());
-                for(EDIFCell cell : lib.getValidCellExportOrder()) {
+                for(EDIFCell cell : lib.getValidCellExportOrder(false)) {
                     writeEDIFCell(cell, os, stringMap);
                 }
             }
