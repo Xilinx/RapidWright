@@ -26,6 +26,7 @@ package com.xilinx.rapidwright.rwroute;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Set;
@@ -40,24 +41,25 @@ import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 public class RouteFixer{
 	private NetWrapper netp;
 	private Map<Node, NodeWithDelay> nodeMap;
-	private NodeWithDelay source;
+	private Set<NodeWithDelay> sources;
 	private int vertexId;
 	
 	public RouteFixer(NetWrapper netp, RouteNodeGraph routingGraph){
 		this.netp = netp;
 		nodeMap = new HashMap<>();
-		source = null;
+		sources = new HashSet<>();
 		vertexId = 0;
 		buildGraph(netp, routingGraph);
 	}
 	
 	private void buildGraph(NetWrapper netWrapper, RouteNodeGraph routingGraph){
 		for(Connection connection:netWrapper.getConnections()){
+			List<Node> nodes = connection.getNodes();
 			// nodes of connections are in the order from sink to source
-			int vertexSize = connection.getNodes().size();
+			int vertexSize = nodes.size();
 			for(int i = vertexSize - 1; i > 0; i--){
-				Node cur = connection.getNodes().get(i);
-				Node next = connection.getNodes().get(i - 1);
+				Node cur = nodes.get(i);
+				Node next = nodes.get(i - 1);
 				
 				RouteNode currRnode = routingGraph.getNode(cur);
 				RouteNode nextRnode = routingGraph.getNode(next);
@@ -70,7 +72,7 @@ public class RouteFixer{
 					newNext.setSink(true);
 				}
 				if(i == vertexSize - 1) {
-					source = newCur;
+					sources.add(newCur);
 				}
 				newCur.addChildren(newNext);
 			}
@@ -99,9 +101,11 @@ public class RouteFixer{
 		PriorityQueue<NodeWithDelay> queue = new PriorityQueue<>(NodeWithDelayComparator);
 
 		queue.clear();
-		source.cost = source.delay;
-		source.setPrev(null);
-		queue.add(source);
+		for (NodeWithDelay source : sources) {
+			source.cost = source.delay;
+			source.setPrev(null);
+			queue.add(source);
+		}
 		
 		while(!queue.isEmpty()) {
 			NodeWithDelay cur = queue.poll();
