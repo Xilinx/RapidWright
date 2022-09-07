@@ -201,16 +201,16 @@ public class TestSiteInst {
         SiteInst si = d.createSiteInst(d.getDevice().getSite("SLICE_X32Y73"));
 
         BEL carry;
-        if(d.getDevice().getSeries() == Series.Series7) {
+        if (d.getDevice().getSeries() == Series.Series7) {
             carry = si.getBEL("CARRY4");
         } else {
             carry = si.getBEL("CARRY8");
         }
 
-        for(char letter : LUTTools.lutLetters) {
+        for (char letter : LUTTools.lutLetters) {
             routeLUTRouteThruHelperCarry(d, si, letter, true);
             routeLUTRouteThruHelperCarry(d, si, letter, false);
-            if(d.getDevice().getSeries() == Series.Series7 && letter == 'D') break;
+            if (d.getDevice().getSeries() == Series.Series7 && letter == 'D') break;
 
             char index = Character.forDigit(letter - 'A', 10);
             // Unroute 6LUT
@@ -232,5 +232,38 @@ public class TestSiteInst {
                 Assertions.assertNull(lut5);
             }
         }
+    }
+    
+    @ParameterizedTest
+    @ValueSource(strings = {"F6","E6"})
+    public void testSiteRoutingToF8MUX(String inputPin) {
+        Design d = new Design("testSiteRoutingToFMUX", Device.KCU105);
+        Cell c = d.createAndPlaceCell("testFMUX", Unisim.MUXF8, "SLICE_X32Y73/F8MUX_TOP");
+        SiteInst si = c.getSiteInst();
+
+        Net n = d.createNet("muxf8_input");
+        n.getLogicalNet().createPortInst("I1", c.getEDIFCellInst());
+        n.createPin(inputPin, si);
+        
+        BELPin src = si.getBELPin(inputPin, inputPin);
+        BELPin snk = si.getBELPin("F8MUX_TOP", "1");
+        Assertions.assertTrue(si.routeIntraSiteNet(n, src, snk));
+        
+        String[] siteWires = new String[] {inputPin, "F7MUX_EF_OUT", inputPin.charAt(0)+ "_O"};
+        
+        for(String siteWire : siteWires) {
+            Assertions.assertEquals(n, si.getNetFromSiteWire(siteWire));
+        }
+        Net staticSelectNet = inputPin.equals("F6") ? d.getGndNet() : d.getVccNet(); 
+        Assertions.assertEquals(staticSelectNet, si.getNetFromSiteWire("EX"));
+        Assertions.assertEquals(staticSelectNet, si.getSitePinInst("EX").getNet());
+        
+        Assertions.assertTrue(si.unrouteIntraSiteNet(src, snk));
+
+        for(String siteWire : siteWires) {
+            Assertions.assertNull(si.getNetFromSiteWire(siteWire));
+        }
+        Assertions.assertNull(si.getNetFromSiteWire("EX"));
+        Assertions.assertNull(si.getSitePinInst("EX"));
     }
 }
