@@ -106,6 +106,7 @@ public class TestNet {
 
         // Remove the primary source pin
         net.removePin(src, preserveOtherRoutes);
+        // Check that alternate source has been promoted to primary
         Assertions.assertEquals(net.getSource(), altSrc);
         Assertions.assertNull(net.getAlternateSource());
         Assertions.assertFalse(snk.isRouted());
