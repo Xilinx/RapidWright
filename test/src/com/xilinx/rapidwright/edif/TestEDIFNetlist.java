@@ -116,7 +116,7 @@ class TestEDIFNetlist {
             EDIFLibrary dstLib = dstNetlist.getLibrary(srcLib.getName());
             Assertions.assertEquals(srcLib, dstLib);
             for (EDIFCell srcCell : srcLib.getCells()) {
-                EDIFCell dstCell = dstLib.getCell(srcCell.getLegalEDIFName());
+                EDIFCell dstCell = dstLib.getCell(srcCell.getName());
                 // Check contents are equal, but not pointers
                 Assertions.assertEquals(srcCell, dstCell);
                 Assertions.assertTrue(srcCell != dstCell);
