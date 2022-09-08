@@ -193,7 +193,15 @@ public class TestSiteInst {
         BELPin src = si.getBELPin(inputPin, inputPin);
         BELPin snk = si.getBELPin("F8MUX_TOP", "1");
         Assertions.assertTrue(si.routeIntraSiteNet(n, src, snk));
-        
+
+        Cell lut = si.getCell(si.getBEL(inputPin.charAt(0) + "6LUT"));
+        Assertions.assertNotNull(lut);
+        Assertions.assertTrue(lut.isRoutethru());
+
+        Cell f7mux = si.getCell(si.getBEL("F7MUX_EF"));
+        Assertions.assertNotNull(f7mux);
+        Assertions.assertTrue(f7mux.isRoutethru());
+
         String[] siteWires = new String[] {inputPin, "F7MUX_EF_OUT", inputPin.charAt(0)+ "_O"};
         
         for(String siteWire : siteWires) {
@@ -202,8 +210,15 @@ public class TestSiteInst {
         Net staticSelectNet = inputPin.equals("F6") ? d.getGndNet() : d.getVccNet(); 
         Assertions.assertEquals(staticSelectNet, si.getNetFromSiteWire("EX"));
         Assertions.assertEquals(staticSelectNet, si.getSitePinInst("EX").getNet());
-        
+
+        // Now unroute
         Assertions.assertTrue(si.unrouteIntraSiteNet(src, snk));
+
+        lut = si.getCell(si.getBEL(inputPin.charAt(0) + "6LUT"));
+        Assertions.assertNull(lut);
+
+        f7mux = si.getCell(si.getBEL("F7MUX_EF"));
+        Assertions.assertNull(f7mux);
 
         for(String siteWire : siteWires) {
             Assertions.assertNull(si.getNetFromSiteWire(siteWire));
