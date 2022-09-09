@@ -22,22 +22,16 @@
  
 package com.xilinx.rapidwright.design;
 
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
-
-import com.xilinx.rapidwright.design.Cell;
-import com.xilinx.rapidwright.design.Design;
-import com.xilinx.rapidwright.design.Net;
-import com.xilinx.rapidwright.design.SiteInst;
-import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestSiteInst {
 
@@ -177,6 +171,43 @@ public class TestSiteInst {
         Assertions.assertNotNull(si.getNetFromSiteWire("D5LUT_O5"));
         Assertions.assertEquals(si.getUsedSitePIP("FFMUXD2").getInputPinName(), "D5");
         Assertions.assertNotNull(si.getNetFromSiteWire("FFMUXD2_OUT2"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"C1","D2"})
+    public void testSiteRoutingToF7MUX(String inputPin) {
+        Design d = new Design("testSiteRoutingToF7MUX", Device.KCU105);
+        Cell c = d.createAndPlaceCell("testFMUX", Unisim.MUXF7, "SLICE_X32Y73/F7MUX_CD");
+        SiteInst si = c.getSiteInst();
+
+        Net n = d.createNet("muxf7_input");
+        String muxInput = (inputPin.charAt(0) == 'C') ? "1" : "0";
+        n.getLogicalNet().createPortInst("I" + muxInput, c.getEDIFCellInst());
+        n.createPin(inputPin, si);
+
+        BELPin src = si.getBELPin(inputPin, inputPin);
+        BELPin snk = si.getBELPin("F7MUX_CD", muxInput);
+        Assertions.assertTrue(si.routeIntraSiteNet(n, src, snk));
+
+        // Check that routethru cells have been placed
+        Cell lut = si.getCell(si.getBEL(inputPin.charAt(0) + "6LUT"));
+        Assertions.assertNotNull(lut);
+        Assertions.assertTrue(lut.isRoutethru());
+
+        // Check that inserting this RT cells hasn't clobbered the non-RT cell
+        Assertions.assertEquals(c, d.getCell(c.getName()));
+
+        String[] siteWires = new String[] {inputPin, inputPin.charAt(0)+ "_O"};
+
+        for(String siteWire : siteWires) {
+            Assertions.assertEquals(n, si.getNetFromSiteWire(siteWire));
+        }
+
+        // Now unroute
+        Assertions.assertTrue(si.unrouteIntraSiteNet(src, snk));
+
+        lut = si.getCell(si.getBEL(inputPin.charAt(0) + "6LUT"));
+        Assertions.assertNull(lut);
     }
     
     @ParameterizedTest
