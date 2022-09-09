@@ -237,7 +237,7 @@ public class TestSiteInst {
     @ParameterizedTest
     @ValueSource(strings = {"F6","E6"})
     public void testSiteRoutingToF8MUX(String inputPin) {
-        Design d = new Design("testSiteRoutingToFMUX", Device.KCU105);
+        Design d = new Design("testSiteRoutingToF8MUX", Device.KCU105);
         Cell c = d.createAndPlaceCell("testFMUX", Unisim.MUXF8, "SLICE_X32Y73/F8MUX_TOP");
         SiteInst si = c.getSiteInst();
 
@@ -249,6 +249,7 @@ public class TestSiteInst {
         BELPin snk = si.getBELPin("F8MUX_TOP", "1");
         Assertions.assertTrue(si.routeIntraSiteNet(n, src, snk));
 
+        // Check that both routethru cells have been placed
         Cell lut = si.getCell(si.getBEL(inputPin.charAt(0) + "6LUT"));
         Assertions.assertNotNull(lut);
         Assertions.assertTrue(lut.isRoutethru());
@@ -256,6 +257,10 @@ public class TestSiteInst {
         Cell f7mux = si.getCell(si.getBEL("F7MUX_EF"));
         Assertions.assertNotNull(f7mux);
         Assertions.assertTrue(f7mux.isRoutethru());
+
+        // Check that inserting either of these RT cells hasn't clobbered the
+        // non-RT cell
+        Assertions.assertEquals(c, d.getCell(c.getName()));
 
         String[] siteWires = new String[] {inputPin, "F7MUX_EF_OUT", inputPin.charAt(0)+ "_O"};
         
