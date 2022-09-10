@@ -388,7 +388,7 @@ public class PerformanceExplorer {
 			accepts(PLACER_DIRECTIVES_OPT).withOptionalArg().defaultsTo(placerDirectiveDefaults).describedAs("Comma separated list of place_design -directives");
 			accepts(ROUTER_DIRECTIVES_OPT).withOptionalArg().defaultsTo(routerDirectiveDefaults).describedAs("Comma separated list of route_design -directives");
 			accepts(CLK_UNCERTAINTY_OPT).withOptionalArg().describedAs("Comma separated list of clk uncertainty values (ns)");
-			accepts(PBLOCK_FILE_OPT).withRequiredArg().describedAs("PBlock file, one set of ranges per line with list of optional cell names to be constrained.  Use '|' after ranges to denote list of cell names separated by spaces");
+			accepts(PBLOCK_FILE_OPT).withRequiredArg().describedAs("PBlock file, one set of ranges per line with list of optional cell names to be constrained.  Use '|' after ranges to denote list of cell names separated by spaces, for example: 'SLICE_X0Y0:SLICE_X0Y1 DSP48E2_X0Y0:DSP48E2_X0Y1 | cell_name0 cell_name1'");
 			accepts(MIN_CLK_UNCERTAINTY_OPT).withOptionalArg().defaultsTo(printNS(DEFAULT_MIN_CLK_UNCERT)).describedAs("Min clk uncertainty (ns)");
 			accepts(MAX_CLK_UNCERTAINTY_OPT).withOptionalArg().defaultsTo(printNS(DEFAULT_MAX_CLK_UNCERT)).describedAs("Max clk uncertainty (ns)");
 			accepts(CLK_UNCERTAINTY_STEP_OPT).withOptionalArg().defaultsTo(printNS(DEFAULT_STEP_CLK_UNCERT)).describedAs("Clk uncertainty step (ns)");
