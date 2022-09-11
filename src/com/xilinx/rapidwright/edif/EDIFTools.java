@@ -1031,7 +1031,7 @@ public class EDIFTools {
 	 * @return An array [0:width-1] of port refs.
 	 */
 	public static EDIFPortInst[] createPortInsts(EDIFCell parent, String name, EDIFDirection dir, int width){
-		String portName = name +"[" + (width-1) +":0]";
+		String portName = name + (width==1 ? "" : "[" + (width-1) +":0]");
 		EDIFPort port = parent.createPort(portName, dir, width);
 		EDIFPortInst[] portInsts = new EDIFPortInst[width];
 		for(int i=0; i < width; i++){
