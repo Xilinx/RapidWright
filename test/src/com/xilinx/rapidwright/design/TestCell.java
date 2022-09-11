@@ -46,7 +46,8 @@ public class TestCell {
         Device device = Device.getDevice(deviceName);
         Cell cell = new Cell("cell", device.getSite(siteName).getBEL(belName));
         cell.addPinMapping(physicalPinName, logicalPinName);
-        List<String> sitePinNames = cell.getAllCorrespondingSitePinNames(logicalPinName);
+        final boolean considerLutRoutethru = true;
+        List<String> sitePinNames = cell.getAllCorrespondingSitePinNames(logicalPinName, considerLutRoutethru);
         Assertions.assertEquals(expectedSitePins, sitePinNames.toString());
     }
 }
