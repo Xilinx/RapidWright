@@ -877,12 +877,17 @@ public class DesignTools {
 				c.updateName(hierarchicalCellName + "/" + c.getName());
 				if(!c.isRoutethru())
 					design.addCell(c);
+				else {
+				    for(Entry<String, AltPinMapping> p : c.getAltPinMappings().entrySet()) {
+				        p.getValue().setAltCellName(hierarchicalCellName + "/" + p.getValue().getAltCellName()); 
+				    }
+				}
 			}
 			design.addSiteInst(si);
 		}
 		
 		// Add routing information
-		for(Net net : cell.getNets()){
+		for(Net net : new ArrayList<>(cell.getNets())){
 			if(net.getName().equals(Net.USED_NET)) continue;
 			if(net.isStaticNet()){
 				Net staticNet = design.getStaticNet(net.getType());
@@ -1139,6 +1144,8 @@ public class DesignTools {
 	                reverseConnsStart.put(startNode, rPips);
 	            }
 	            rPips.add(pip);
+
+	            fanout.merge(endNode, 1, Integer::sum);
 	        }
 
 	        // If a site pin was found and it belongs to this net, add an extra fanout to
@@ -1175,6 +1182,9 @@ public class DesignTools {
 	            	toRemove.add(pip);
 	            	Node startNode = pip.getStartNode();
 	            	updateFanout.add(startNode);
+	            	if (atReversedBidirectionalPip) {
+	            		updateFanout.add(pip.getEndNode());
+	            	}
 	            	if (new Node(pip.getTile(), pip.getStartWireIndex()).equals(sink) && !atReversedBidirectionalPip) {
 	            		// reached the source and there is another branch starting with a reversed
 	            		// bidirectional PIP ... don't traverse it
@@ -1915,11 +1925,11 @@ public class DesignTools {
 	                SitePIP sitePIP = inst.getUsedSitePIP(source.getBELName());
 	                if(sitePIP == null) return null;
 	                queue.add(sitePIP.getInputPin());
-	            } else if(source.getBELName().contains("LUT")) {
+	            } else if(source.getBELName().contains("LUT") || source.getBELName().contains("MUX")) {
 	            	Cell possibleRouteThru = inst.getCell(source.getBEL());
 	            	if(possibleRouteThru != null && possibleRouteThru.isRoutethru()) {
 	            		String routeThru = possibleRouteThru.getPinMappingsP2L().keySet().iterator().next();
-	            		return source.getBEL().getPin(routeThru).getSourcePin().getName();
+	            		queue.add(source.getBEL().getPin(routeThru));
 	            	}
 	            } else {
 	                return null;
@@ -2276,7 +2286,7 @@ public class DesignTools {
 			    if(destLib == null){
 			        destLib = destNetlist.getWorkLibrary();
 			    }
-			    EDIFCell existingCell = destLib.getCell(cellInst.getCellType().getLegalEDIFName());
+			    EDIFCell existingCell = destLib.getCell(cellInst.getCellType().getName());
 			    if(existingCell != null) {
 			        destLib.removeCell(existingCell);
 			    }

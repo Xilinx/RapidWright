@@ -172,10 +172,13 @@ public class GlobalSignalRouting {
 		
 		RouteNode centroidHRouteNode = UltraScaleClockRouting.routeToCentroid(clk, clkRoutingLine, centroid, true, true);
 		
-		RouteNode vrouteUp;
+		RouteNode vrouteUp = null;
 		RouteNode vrouteDown;	
 		// Two VROUTEs going up and down
-		vrouteUp = UltraScaleClockRouting.routeToCentroid(clk, centroidHRouteNode, centroid.getNeighborClockRegion(1, 0), true, false);	
+		ClockRegion aboveCentroid = centroid.getNeighborClockRegion(1, 0);
+		if(aboveCentroid != null) {
+		    vrouteUp = UltraScaleClockRouting.routeToCentroid(clk, centroidHRouteNode, aboveCentroid, true, false);
+		}
 		vrouteDown = UltraScaleClockRouting.routeToCentroid(clk, centroidHRouteNode, centroid.getNeighborClockRegion(0, 0), true, false);
 		
 		List<ClockRegion> upClockRegions = new ArrayList<>();
@@ -184,8 +187,10 @@ public class GlobalSignalRouting {
 		divideClockRegions(clockRegions, centroid, upClockRegions, downClockRegions);
 		
 		List<RouteNode> upDownDistLines = new ArrayList<>();
-		List<RouteNode> upLines = UltraScaleClockRouting.routeToHorizontalDistributionLines(clk, vrouteUp, upClockRegions, false);
-		if(upLines != null) upDownDistLines.addAll(upLines);
+		if(aboveCentroid != null) {
+		    List<RouteNode> upLines = UltraScaleClockRouting.routeToHorizontalDistributionLines(clk, vrouteUp, upClockRegions, false);
+		    if(upLines != null) upDownDistLines.addAll(upLines);
+		}
 		
 		List<RouteNode> downLines = UltraScaleClockRouting.routeToHorizontalDistributionLines(clk, vrouteDown, downClockRegions, true);//TODO this is where the antenna node shows up
 		if(downLines != null) upDownDistLines.addAll(downLines);
@@ -218,7 +223,7 @@ public class GlobalSignalRouting {
 	private static void divideClockRegions(List<ClockRegion> clockRegions, ClockRegion centroid, List<ClockRegion> upClockRegions,
 			List<ClockRegion> downClockRegions){
 		for(ClockRegion cr : clockRegions) {
-			if(cr.getInstanceY() >= centroid.getInstanceY()) {
+			if(cr.getInstanceY() > centroid.getInstanceY()) {
 				upClockRegions.add(cr);
 			}else {
 				downClockRegions.add(cr);

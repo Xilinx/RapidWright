@@ -24,6 +24,7 @@
 package com.xilinx.rapidwright.rwroute;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -197,6 +198,7 @@ public class PartialRouter extends RWRoute{
 		// Go through all nets to be routed
 		for (Map.Entry<Net, NetWrapper> e : nets.entrySet()) {
 			Net net = e.getKey();
+			NetWrapper netWrapper = e.getValue();
 
 			// Create all nodes used by this net and set its previous pointer so that:
 			// (a) the routing for each connection can be recovered by
@@ -212,7 +214,19 @@ public class PartialRouter extends RWRoute{
 				rend.setPrev(rstart);
 			}
 
-			NetWrapper netWrapper = e.getValue();
+			// Erase the prev pointer for all RouteNode-s upstream of projected
+			// INT node, otherwise finishRouteConnection() will complain that
+			// backtracking doesn't terminate at Net's source
+			for (SitePinInst spi : Arrays.asList(net.getSource(), net.getAlternateSource())) {
+				if (spi == null) continue;
+				Node n = RouterHelper.projectOutputPinToINTNode(spi);
+				RouteNode rn = routingGraph.getNode(n);
+				if (rn != null) {
+					rn.setPrev(null);
+				}
+			}
+
+			// Use the prev pointers to update the routing for each connection
 			for (Connection connection : netWrapper.getConnections()) {
 				if (connection.getSink().isRouted()) {
 					finishRouteConnection(connection, connection.getSinkRnode());
@@ -366,7 +380,8 @@ public class PartialRouter extends RWRoute{
 		NetWrapper netWrapper = nets.get(net);
 		if (netWrapper != null) {
 			// Net already exists -- any unrouted connection will cause the
-			// net to exist, but already routed connections may still be preserved
+			// net to exist, but already routed connections will already have
+			// been preserved
 
 			boolean removed = partiallyPreservedNets.remove(netWrapper);
 			assert(removed);
@@ -390,8 +405,8 @@ public class PartialRouter extends RWRoute{
 				boolean endPreserved = routingGraph.unpreserve(end);
 				assert(rendAdded == endPreserved);
 
-				// Also set the prev pointer according to the PIP
-				rend.setPrev(rstart);
+				// Also check the prev pointer according to the PIP
+				assert(rend.getPrev().equals(rstart));
 			}
 		} else {
 			// Net needs to be created
@@ -416,10 +431,23 @@ public class PartialRouter extends RWRoute{
 				rend.setPrev(rstart);
 			}
 
+			// Erase the prev pointer for all RouteNode-s upstream of projected
+			// INT node, otherwise finishRouteConnection() will complain that
+			// backtracking doesn't terminate at Net's source
+			for (SitePinInst spi : Arrays.asList(net.getSource(), net.getAlternateSource())) {
+				if (spi == null) continue;
+				Node n = RouterHelper.projectOutputPinToINTNode(spi);
+				RouteNode rn = routingGraph.getNode(n);
+				if (rn != null) {
+					rn.setPrev(null);
+				}
+			}
+
 			// Use the prev pointers to update the routing for each connection
 			for (Connection netnewConnection : netWrapper.getConnections()) {
-				assert(netnewConnection.getSink().isRouted());
-				finishRouteConnection(netnewConnection, netnewConnection.getSinkRnode());
+				if (netnewConnection.getSink().isRouted()) {
+					finishRouteConnection(netnewConnection, netnewConnection.getSinkRnode());
+				}
 			}
 
 			// Update the timing graph

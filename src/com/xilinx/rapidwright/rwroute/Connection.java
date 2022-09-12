@@ -419,9 +419,12 @@ public class Connection implements Comparable<Connection>{
 		s.append(", ");
 		s.append(String.format("net fanout = %3s", netWrapper.getConnections().size()));
 		s.append(", ");
-		s.append(String.format("source = %s", getSource().getName()));
+		s.append(String.format("source = %s", getSource().getSitePinName()));
 		s.append(", ");
-		s.append("sink = " + getSink().getName());
+		s.append("sink = " + getSink().getSitePinName());
+		s.append(", ");
+		RouteNode alt = getAltSinkRnode();
+		s.append("alt = " + (alt != null ? alt.getNode() : null));
 		s.append(", ");
 		s.append(String.format("delay = %4d ", (short)(getTimingEdges() == null? 0:getTimingEdges().get(0).getNetDelay())));
 		s.append(", ");

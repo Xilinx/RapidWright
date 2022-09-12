@@ -30,36 +30,56 @@ package com.xilinx.rapidwright.util;
  * Created on: Mar 20, 2018
  */
 public enum RouterDirective {
-	
-	/** Causes the Vivado router to explore different critical path
-	      routes based on timing, after an initial route. */
-	Explore, 
-	/** Prevents the router from relaxing timing to
-	      complete routing. If the router has difficulty meeting timing, it will
-	      run longer to try to meet the original timing constraints. */
-	NoTimingRelaxation, 
-	/** Uses detailed timing analysis throughout all
-	      stages instead of just the final stages, and will run more global
-	      iterations even when timing improves only slightly. */
-	MoreGlobalIterations, 
-	/** Adjusts the router`s internal cost functions to
-	      emphasize delay over iterations, allowing a trade-off of runtime for
-	      better performance. */
-	HigherDelayCost, 
-	/** Uses more accurate skew modeling throughout all
-	      routing stages which may improve design performance on higher-skew
-	      clock networks. */
-	AdvancedSkewModeling, 
-	/** (UltraScale only) Chooses alternate routing
-	      algorithms that require extra runtime but may help resolve routing
-	      congestion. */
-	AlternateCLBRouting, 
-	/** Run fewest iterations, trade higher design
-	      performance for faster runtime. */
-	RuntimeOptimized, 
-	/** Absolute fastest runtime, non-timing-driven, performs the
-	      minimum required routing for a legal design. */
-	Quick, 
-	/** Run route_design with default settings. */
-	Default, 
+
+    /**
+     * Causes the Vivado router to explore different critical path routes based on
+     * timing, after an initial route.
+     */
+    Explore,
+    /**
+     * Directs the router to further expand its exploration of critical path routes
+     * while maintaining original timing budgets. The router runtime might be
+     * significantly higher compared to the Explore directive as the router uses
+     * more aggressive optimization thresholds to attempt to meet timing
+     * constraints.
+     */
+    AggressiveExplore,
+    /**
+     * Prevents the router from relaxing timing to complete routing. If the router
+     * has difficulty meeting timing, it will run longer to try to meet the original
+     * timing constraints.
+     */
+    NoTimingRelaxation,
+    /**
+     * Uses detailed timing analysis throughout all stages instead of just the final
+     * stages, and will run more global iterations even when timing improves only
+     * slightly.
+     */
+    MoreGlobalIterations,
+    /**
+     * Adjusts the router`s internal cost functions to emphasize delay over
+     * iterations, allowing a trade-off of runtime for better performance.
+     */
+    HigherDelayCost,
+    /**
+     * Uses more accurate skew modeling throughout all routing stages which may
+     * improve design performance on higher-skew clock networks.
+     */
+    AdvancedSkewModeling,
+    /**
+     * (UltraScale only) Chooses alternate routing algorithms that require extra
+     * runtime but may help resolve routing congestion.
+     */
+    AlternateCLBRouting,
+    /**
+     * Run fewest iterations, trade higher design performance for faster runtime.
+     */
+    RuntimeOptimized,
+    /**
+     * Absolute fastest runtime, non-timing-driven, performs the minimum required
+     * routing for a legal design.
+     */
+    Quick,
+    /** Run route_design with default settings. */
+    Default,
 }

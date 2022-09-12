@@ -37,6 +37,8 @@ import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class TestEDIFNetlist {
 
@@ -114,7 +116,7 @@ class TestEDIFNetlist {
             EDIFLibrary dstLib = dstNetlist.getLibrary(srcLib.getName());
             Assertions.assertEquals(srcLib, dstLib);
             for (EDIFCell srcCell : srcLib.getCells()) {
-                EDIFCell dstCell = dstLib.getCell(srcCell.getLegalEDIFName());
+                EDIFCell dstCell = dstLib.getCell(srcCell.getName());
                 // Check contents are equal, but not pointers
                 Assertions.assertEquals(srcCell, dstCell);
                 Assertions.assertTrue(srcCell != dstCell);
@@ -143,5 +145,96 @@ class TestEDIFNetlist {
                 () -> dstNetlist.copyCellAndSubCells(srcNetlist.getTopCell()));
         Assertions.assertEquals("ERROR: Destination netlist already contains EDIFCell named 'picoblaze_top' in library 'work'",
                 e.getMessage());
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    public void testCopyCellsAndSubCellsIntoLibrary(boolean existing) {
+        EDIFDesign srcDesign = new EDIFDesign();
+        EDIFNetlist srcNetlist = EDIFTools.createNewNetlist("srcNetlist");
+        srcNetlist.setDesign(srcDesign);
+        EDIFLibrary srcLibrary = srcNetlist.addLibrary(new EDIFLibrary("srcLibrary"));
+        EDIFCell srcCell = new EDIFCell(srcLibrary, "srcCell");
+        srcDesign.setTopCell(srcCell);
+
+        EDIFNetlist dstNetlist = EDIFTools.createNewNetlist("dstNetlist");
+        EDIFLibrary dstLibraryBefore = null;
+        if (existing) {
+            dstLibraryBefore = dstNetlist.addLibrary(new EDIFLibrary(srcLibrary.getName()));
+        }
+
+        dstNetlist.copyCellAndSubCells(srcNetlist.getTopCell());
+
+        EDIFLibrary dstLibraryAfter = dstNetlist.getLibrary(srcLibrary.getName());
+        Assertions.assertNotNull(dstLibraryAfter);
+        if (existing) {
+            Assertions.assertTrue(dstLibraryBefore == dstLibraryAfter);
+        }
+        Assertions.assertFalse(srcLibrary == dstLibraryAfter);
+
+        EDIFCell dstCell = dstLibraryAfter.getCell(srcCell.getName());
+        Assertions.assertNotNull(dstCell);
+        // Copy really makes a copy of the source cell
+        Assertions.assertFalse(srcCell == dstCell);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    public void testMigrateCellsAndSubCellsIntoLibrary(boolean existing) {
+        EDIFDesign srcDesign = new EDIFDesign();
+        EDIFNetlist srcNetlist = EDIFTools.createNewNetlist("srcNetlist");
+        srcNetlist.setDesign(srcDesign);
+        EDIFLibrary srcLibrary = srcNetlist.addLibrary(new EDIFLibrary("srcLibrary"));
+        EDIFCell srcCell = new EDIFCell(srcLibrary, "srcCell");
+        srcDesign.setTopCell(srcCell);
+
+        EDIFNetlist dstNetlist = EDIFTools.createNewNetlist("dstNetlist");
+        EDIFLibrary dstLibraryBefore = null;
+        if (existing) {
+            dstLibraryBefore = dstNetlist.addLibrary(new EDIFLibrary(srcLibrary.getName()));
+        }
+
+        dstNetlist.migrateCellAndSubCells(srcNetlist.getTopCell());
+
+        EDIFLibrary dstLibraryAfter = dstNetlist.getLibrary(srcLibrary.getName());
+        Assertions.assertNotNull(dstLibraryAfter);
+        if (existing) {
+            Assertions.assertTrue(dstLibraryBefore == dstLibraryAfter);
+        }
+        Assertions.assertFalse(srcLibrary == dstLibraryAfter);
+
+        EDIFCell dstCell = dstLibraryAfter.getCell(srcCell.getName());
+        Assertions.assertNotNull(dstCell);
+        // Migration re-uses the same cell
+        Assertions.assertTrue(srcCell == dstCell);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    public void testMigrateCellsAndSubCells(boolean uniquify) {
+        EDIFNetlist dstNetlist = EDIFTools.createNewNetlist("dstNetlist");
+        final String srcLibraryName = "srcLibrary";
+        final String srcCellName = "srcCell";
+        for (int i = 0; i < 3; i++) {
+            EDIFDesign srcDesign = new EDIFDesign();
+            EDIFNetlist srcNetlist = EDIFTools.createNewNetlist("srcNetlist");
+            srcNetlist.setDesign(srcDesign);
+            EDIFLibrary srcLibrary = srcNetlist.addLibrary(new EDIFLibrary(srcLibraryName));
+            EDIFCell srcCell = new EDIFCell(srcLibrary, srcCellName);
+            srcDesign.setTopCell(srcCell);
+
+            dstNetlist.migrateCellAndSubCells(srcNetlist.getTopCell(), uniquify);
+        }
+
+        EDIFLibrary dstLibrary = dstNetlist.getLibrary(srcLibraryName);
+        Assertions.assertNotNull(dstLibrary);
+        Assertions.assertNotNull(dstLibrary.getCell(srcCellName));
+        if (uniquify) {
+            Assertions.assertNotNull(dstLibrary.getCell(srcCellName + "_parameterized0"));
+            Assertions.assertNotNull(dstLibrary.getCell(srcCellName + "_parameterized1"));
+            Assertions.assertEquals(dstLibrary.getCells().size(), 3);
+        } else {
+            Assertions.assertEquals(dstLibrary.getCells().size(), 1);
+        }
     }
 }

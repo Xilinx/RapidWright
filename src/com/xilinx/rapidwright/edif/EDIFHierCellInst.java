@@ -22,6 +22,7 @@
  */
 package com.xilinx.rapidwright.edif;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -278,6 +279,18 @@ public class EDIFHierCellInst {
             return null;
         }
         return new EDIFHierPortInst(getParent(), port);
+    }
+    
+    /**
+     * Gets the hierarchical port insts on this cell instance
+     * @return The list of hierarchical port insts corresponding to this cell inst
+     */
+    public List<EDIFHierPortInst> getHierPortInsts() {
+        List<EDIFHierPortInst> hierPortInsts = new ArrayList<>();
+        for(EDIFPortInst portInst : getInst().getPortInsts()) {
+            hierPortInsts.add(new EDIFHierPortInst(this.getParent(), portInst));   
+        }
+        return hierPortInsts;
     }
 
     /**

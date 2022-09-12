@@ -33,13 +33,14 @@ public class EDIFPortCache {
     private final Map<String, EDIFPort> cache;
     private final EDIFCell cell;
 
-    public EDIFPortCache(EDIFCell cell) {
+    public EDIFPortCache(EDIFCell cell, EDIFReadLegalNameCache nameCache) {
         this.cell = cell;
         cache = new HashMap<>(cell.getPortMap());
         final Collection<EDIFPort> ports = cell.getPorts();
         for (EDIFPort port : ports) {
-            if (port.getEDIFName() != null) {
-                cache.put(port.getEDIFName(), port);
+            final String edifName = nameCache.getLegalEDIFName(port);
+            if (edifName != null) {
+                cache.put(edifName, port);
             }
         }
 
