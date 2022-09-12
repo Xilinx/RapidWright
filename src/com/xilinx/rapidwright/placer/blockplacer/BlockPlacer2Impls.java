@@ -265,7 +265,7 @@ public class BlockPlacer2Impls extends BlockPlacer2<ModuleImpls, ModuleImplsInst
     }
 
     @Override
-    protected Collection<ImplsPath> getConnectedPaths(ModuleImplsInst module) {
+    public Collection<ImplsPath> getConnectedPaths(ModuleImplsInst module) {
         return modulesToPaths.get(module);
     }
 

@@ -110,7 +110,7 @@ public class ImplsPath extends AbstractPath<ImplsInstancePort, ModuleImplsInst>{
     @Override
     public void restoreUndo() {
         if (undoCache == null) {
-            throw new RuntimeException("No cached undo value present");
+            throw new RuntimeException("No cached undo value present in "+getName());
         }
 
         current = undoCache;

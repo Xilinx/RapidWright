@@ -169,7 +169,6 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
 
     @Override
     protected void doFinalPlacement() {
-
         // Sort hard macros, largest first to place them first
         HardMacro[] array = new HardMacro[hardMacros.size()];
         array = hardMacros.toArray(array);
@@ -242,7 +241,7 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
     }
 
     @Override
-    protected Collection<Path> getConnectedPaths(HardMacro module) {
+    public Collection<Path> getConnectedPaths(HardMacro module) {
         return module.getConnectedPaths();
     }
 

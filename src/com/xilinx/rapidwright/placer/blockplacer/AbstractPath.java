@@ -41,6 +41,8 @@ public abstract class AbstractPath<PortT, ModuleInstT extends AbstractModuleInst
 
     protected int weight = 1;
 
+    public int undoCount = 0;
+
     /**
      *
      */

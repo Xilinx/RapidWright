@@ -130,7 +130,7 @@ public class RegionBasedOverlapCache<PlacementT, ModuleInstT extends AbstractMod
 
     @Override
     public boolean isValidPlacement(ModuleInstT mii) {
-        return allTouchedRegionsMatch(mii, l-> doesNotOverlapAny(mii, l));
+        return allTouchedRegionsMatch(mii, l -> doesNotOverlapAny(mii, l));
     }
 
     private void checkCorrectness() {
