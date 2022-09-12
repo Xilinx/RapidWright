@@ -43,6 +43,8 @@ public class Move2<ModuleInstT extends AbstractModuleInst<?,?,?>, PlacementT, Pa
 	Set<ModuleInstT> blocksSet = new HashSet<>();
 	List<PlacementT> placements = new ArrayList<>();
 
+	List<PathT> paths = new ArrayList<>();
+
 	private int deltaCost;
 
 
@@ -56,24 +58,13 @@ public class Move2<ModuleInstT extends AbstractModuleInst<?,?,?>, PlacementT, Pa
 			placer.setTempAnchorSite(blocks.get(i), placements.get(i));
 		}
 
-		int undoCount = placer.incUndoCount();
-
-		for (int i = 0; i < blocks.size(); i++) {
-			ModuleInstT block = blocks.get(i);
-			for (PathT path : placer.getConnectedPaths(block)) {
-
-				if (path.undoCount == undoCount) {
-					continue;
-				}
-				path.undoCount = undoCount;
-
-				path.restoreUndo();
-				if (BlockPlacer2.PARANOID) {
-					final int length = path.getLength();
-					path.calculateLength();
-					if (path.getLength() != length) {
-						throw new RuntimeException("Improper cost change.");
-					}
+		for (PathT path : paths) {
+			path.restoreUndo();
+			if (BlockPlacer2.PARANOID) {
+				final int length = path.getLength();
+				path.calculateLength();
+				if (path.getLength() != length) {
+					throw new RuntimeException("Improper cost change.");
 				}
 			}
 		}
@@ -84,28 +75,6 @@ public class Move2<ModuleInstT extends AbstractModuleInst<?,?,?>, PlacementT, Pa
 		blocks.clear();
 		placements.clear();
 		blocksSet.clear();
-	}
-
-
-	private int calcConnectedCost(boolean moved) {
-		int cost = 0;
-		int undoCount = placer.incUndoCount();
-		for (ModuleInstT block : blocks) {
-			for (PathT path : placer.getConnectedPaths(block)) {
-				if (path.undoCount==undoCount) {
-					continue;
-				}
-				path.undoCount = undoCount;
-				if (moved) {
-					path.saveUndo();
-					path.calculateLength();
-				}
-				int length = path.getLength();
-				cost+= length;
-			}
-
-		}
-		return cost;
 	}
 
 	public int getDeltaCost() {
@@ -121,8 +90,24 @@ public class Move2<ModuleInstT extends AbstractModuleInst<?,?,?>, PlacementT, Pa
 	}
 
 	public void calcDeltaCost() {
-		int costBefore = calcConnectedCost(false);
-		int costAfter = calcConnectedCost(true);
-		deltaCost = costAfter - costBefore;
+		paths.clear();
+
+		deltaCost = 0;
+		int undoCount = placer.incUndoCount();
+		for (ModuleInstT block : blocks) {
+			for (PathT path : placer.getConnectedPaths(block)) {
+				if (path.undoCount==undoCount) {
+					continue;
+				}
+				path.undoCount = undoCount;
+
+				path.saveUndo();
+				deltaCost -= path.getLength();
+				path.calculateLength();
+				deltaCost += path.getLength();
+				paths.add(path);
+			}
+
+		}
 	}
 }
