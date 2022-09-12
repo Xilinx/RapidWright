@@ -34,10 +34,12 @@ import com.xilinx.rapidwright.design.AbstractModuleInst;
  * @param <PortT> Port Type
  * @param <ModuleInstT> Module Instance Type
  */
-public abstract class AbstractPath<PortT, ModuleInstT extends AbstractModuleInst<?,?>> implements Iterable<PortT> {
+public abstract class AbstractPath<PortT, ModuleInstT extends AbstractModuleInst<?,?,?>> implements Iterable<PortT> {
 
     protected List<PortT> ports = new ArrayList<>();
     protected Set<ModuleInstT> moduleInsts = new HashSet<>();
+
+    protected int weight = 1;
 
     /**
      *
@@ -69,7 +71,21 @@ public abstract class AbstractPath<PortT, ModuleInstT extends AbstractModuleInst
         return moduleInsts.size();
     }
 
-    public Set<ModuleInstT> getModuleInsts() {
-        return moduleInsts;
+    public void saveUndo() {
+
+    }
+
+    public void restoreUndo() {
+        calculateLength();
+    }
+
+    public abstract Set<?> getPathConnections();
+
+    public void increaseWeight() {
+        weight++;
+    }
+
+    public int getWeight() {
+        return weight;
     }
 }

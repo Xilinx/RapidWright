@@ -28,10 +28,12 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 
 
@@ -131,5 +133,44 @@ public class ModuleImpls extends ArrayList<Module> {
 					.collect(Collectors.toList());
 		}
 		return allPlacements;
+	}
+
+	private Collection<String> getAllPorts() {
+		final Set<Set<String>> allPortSets = this.stream()
+				.map(m -> m.getPorts().stream().map(Port::getName).collect(Collectors.toSet()))
+				.collect(Collectors.toSet());
+		if (allPortSets.isEmpty()) {
+			return null;
+		}
+		if (allPortSets.size()>1) {
+			throw new RuntimeException("Module variants do not have identical ports: "+allPortSets);
+		}
+		return allPortSets.iterator().next();
+	}
+
+	/**
+	 * Get all Tiles a port connects to in the different module variants
+	 * @param port the port to query
+	 * @return all tiles
+	 */
+	public List<Set<Tile>> getPortTiles(String port) {
+		return this.stream()
+				.map(m->
+						m.getPort(port).getSitePinInsts()
+								.stream()
+								.map(SitePinInst::getTile)
+								.collect(Collectors.toSet())
+				)
+				.collect(Collectors.toList());
+	}
+
+	public Collection<List<String>> getSameTilePorts() {
+		final Collection<String> allPorts = getAllPorts();
+		if (allPorts == null) {
+			return null;
+		}
+		return allPorts.stream()
+				.collect(Collectors.groupingBy(this::getPortTiles))
+				.values();
 	}
 }

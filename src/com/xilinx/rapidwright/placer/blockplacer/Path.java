@@ -25,6 +25,8 @@ package com.xilinx.rapidwright.placer.blockplacer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.design.ModuleInst;
 import com.xilinx.rapidwright.design.SimpleTileRectangle;
@@ -39,8 +41,11 @@ import com.xilinx.rapidwright.device.Tile;
 public class Path extends AbstractPath<PathPort, HardMacro>{
 	private final String name;
 
-	// Half Perimeter Wire Length
 	protected int hpwl;
+	protected SimpleTileRectangle current;
+	protected SimpleTileRectangle undoCache;
+	protected int undoHpwl;
+
 	protected ArrayList<Integer> delay;
 	protected int maxDelay;
 
@@ -86,57 +91,42 @@ public class Path extends AbstractPath<PathPort, HardMacro>{
 		return name;
 	}
 
-	public void calculateHPWL(){
+	private void rectToHpwl() {
 
-		SimpleTileRectangle rect = new SimpleTileRectangle();
-		for (PathPort port : ports) {
-			rect.extendTo(port.getPortTile());
-		}
 
 		int fanOutPenalty  = 1;
 		if (getSize() > 30){
 			fanOutPenalty = 3;
 		}
-		hpwl = rect.hpwl()*fanOutPenalty;
+		hpwl = current.hpwl()*fanOutPenalty*weight;
 	}
 
+	public void calculateHPWL(){
 
-	@Override
-	public String toString(){
-		StringBuilder sb = new StringBuilder();
-		for(PathPort pp : ports){
-			sb.append(pp.getSitePinInst().getSitePinName()).append("->");
+		current = new SimpleTileRectangle();
+		for (PathPort port : ports) {
+			current.extendTo(port.getPortTile());
 		}
-		return sb.toString();
+		rectToHpwl();
 	}
 
-	/* (non-Javadoc)
-	 * @see java.lang.Object#hashCode()
-	 */
-	@Override
-	public int hashCode() {
-		StringBuilder sb = new StringBuilder();
-		for(PathPort p : ports){
-			sb.append(p.getSitePinInst().getSitePinName());
+	public void saveUndo() {
+		undoCache = current;
+		undoHpwl = hpwl;
+	}
+
+
+	public void restoreUndo() {
+
+		if (undoCache == null) {
+			throw new RuntimeException("No cached undo value present");
 		}
 
-		return sb.toString().hashCode();
+		hpwl = undoHpwl;
+		current = undoCache;
+		undoCache = null;
 	}
 
-	/* (non-Javadoc)
-	 * @see java.lang.Object#equals(java.lang.Object)
-	 */
-	@Override
-	public boolean equals(Object obj) {
-		if (this == obj)
-			return true;
-		if (!super.equals(obj))
-			return false;
-		if (getClass() != obj.getClass())
-			return false;
-		Path other = (Path) obj;
-		return ports.equals(other.ports);
-	}
 	/**
 	 * Adds a pin the to path.
 	 * @param p The pin to add
@@ -159,5 +149,10 @@ public class Path extends AbstractPath<PathPort, HardMacro>{
 
 	public List<PathPort> getPorts() {
 		return ports;
+	}
+
+	@Override
+	public Set<?> getPathConnections() {
+		return getPorts().stream().map(port -> port.getBlock() + "." + port.getTemplateTile()).collect(Collectors.toSet());
 	}
 }

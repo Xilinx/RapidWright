@@ -29,7 +29,7 @@ import com.xilinx.rapidwright.design.AbstractModuleInst;
  * @author clavin
  *
  */
-public class Move<ModuleInstT extends AbstractModuleInst<?,?>, PlacementT> {
+public class Move<ModuleInstT extends AbstractModuleInst<?,?,?>, PlacementT> {
 
 	private final AbstractBlockPlacer<ModuleInstT, PlacementT> placer;
 	PlacementT site0;

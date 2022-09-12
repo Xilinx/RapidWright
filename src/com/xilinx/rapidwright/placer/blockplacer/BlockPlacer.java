@@ -182,7 +182,6 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
 		for(ModuleInst mi : design.getModuleInsts()){
 			HardMacro hm = new HardMacro(mi);
 			hardMacros.add(hm);
-			hm.setValidPlacements();
 			macroMap.put(mi, hm);
 		}
 
@@ -244,7 +243,6 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
 	}
 	
 	private boolean checkValidPlacement(HardMacro hm){
-		if(!hm.isValidPlacement()) return false;
 		for(HardMacro hardMacro : hardMacros){
 			if(hardMacro.equals(hm)) continue;
 			if(hm.getTempAnchorSite().equals(hardMacro.getTempAnchorSite())) return false;

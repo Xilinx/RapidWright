@@ -23,30 +23,30 @@ package com.xilinx.rapidwright.placer.blockplacer;
 
 import java.util.Collection;
 
-import com.xilinx.rapidwright.design.ModuleImplsInst;
+import com.xilinx.rapidwright.design.AbstractModuleInst;
 
 /**
  * Naive implementation of overlap checking. Always checks against all other instances
  */
-public class ExhaustiveOverlapCache extends AbstractOverlapCache {
-    private final Collection<ModuleImplsInst> instances;
+public class ExhaustiveOverlapCache<PlacementT, ModuleInstT extends AbstractModuleInst<?,PlacementT,ModuleInstT>>  extends AbstractOverlapCache<PlacementT, ModuleInstT> {
+    private final Collection<ModuleInstT> instances;
 
-    public ExhaustiveOverlapCache(Collection<ModuleImplsInst> instances) {
+    public ExhaustiveOverlapCache(Collection<ModuleInstT> instances) {
         this.instances = instances;
     }
 
     @Override
-    public void unplace(ModuleImplsInst mii) {
+    public void unplace(ModuleInstT mii) {
         //Everything gets recalculated, nothing to do
     }
 
     @Override
-    public void place(ModuleImplsInst mii) {
+    public void place(ModuleInstT mii) {
         //Everything gets recalculated, nothing to do
     }
 
     @Override
-    public boolean isValidPlacement(ModuleImplsInst mii) {
+    public boolean isValidPlacement(ModuleInstT mii) {
         return doesNotOverlapAny(mii, instances);
     }
 

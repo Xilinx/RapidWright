@@ -22,6 +22,7 @@
  */
 package com.xilinx.rapidwright.placer.blockplacer;
 
+import com.xilinx.rapidwright.design.Module;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Tile;
 
@@ -35,23 +36,32 @@ public class PathPort {
 	private final SitePinInst sitePinInst;
 	private final HardMacro block;
 	private final Tile tile;
+	private final Tile[][] nameRootTiles;
 
 	public PathPort(SitePinInst sitePinInst, HardMacro block, Tile tile) {
 		this.sitePinInst = sitePinInst;
 		this.block = block;
 		this.tile = tile;
+		this.nameRootTiles = tile.getDevice().getTilesByNameRoot(tile.getNameRoot());
 	}
+
+	private Tile cachedAnchor;
+	private Tile cachedRelocate;
 
 	public Tile getPortTile(){
 		if(block == null){
-			return sitePinInst.getTile();
+			return tile;
 		}
 		Tile anchor = block.getTempAnchorSite().getTile();
-		final Tile correspondingTile = block.getModule().getCorrespondingTile(tile, anchor);
-		if (correspondingTile==null) {
-			throw new RuntimeException("what");
+
+		if (cachedAnchor == anchor) {
+			return cachedRelocate;
 		}
-		return correspondingTile;
+
+		final Tile res = Module.getCorrespondingTile(tile, anchor, block.getModule().getAnchor().getTile(), nameRootTiles);
+		cachedAnchor = anchor;
+		cachedRelocate = res;
+		return res;
 	}
 
 	
@@ -70,7 +80,9 @@ public class PathPort {
 		return block;
 	}
 
-
+	public Tile getTemplateTile() {
+		return tile;
+	}
 
 	/* (non-Javadoc)
 	 * @see java.lang.Object#hashCode()

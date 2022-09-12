@@ -38,7 +38,7 @@ import com.xilinx.rapidwright.placer.blockplacer.ImplsInstancePort;
  * This is achieved by calling {@link DesignTools#createModuleInstsFromModuleImplsInsts(Design, Collection, Collection)}
  *
  */
-public class ModuleImplsInst extends AbstractModuleInst<ModuleImpls, ModuleImplsInst> {
+public class ModuleImplsInst extends AbstractModuleInst<ModuleImpls, ModulePlacement, ModuleImplsInst> {
     final ModuleImpls module;
     private ModulePlacement placement;
 

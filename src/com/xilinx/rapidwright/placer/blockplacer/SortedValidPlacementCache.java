@@ -21,15 +21,21 @@
  */
 package com.xilinx.rapidwright.placer.blockplacer;
 
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.nio.file.Files;
 import java.util.AbstractList;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.function.ToIntFunction;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
 
+import com.xilinx.rapidwright.design.SimpleTileRectangle;
+import com.xilinx.rapidwright.design.TileRectangle;
 import com.xilinx.rapidwright.device.Tile;
 
 /**
@@ -230,6 +236,29 @@ public abstract class SortedValidPlacementCache<PlacementT> extends AbstractVali
         return row.contains(placement);
     }
 
+    public static <PlacementT> void writeList(List<PlacementT> list, java.nio.file.Path fn, int rangeLimit, PlacementT center, BlockPlacer2<?, ?, PlacementT, ?> placer) {
+        try (PrintWriter pw = new PrintWriter(Files.newBufferedWriter(fn))) {
+            final Tile centerTile = placer.getPlacementTile(center);
+            for (PlacementT placementT : list) {
+                final Tile t = placer.getPlacementTile(placementT);
+
+                TileRectangle rect = new SimpleTileRectangle();
+                rect.extendTo(centerTile);
+                rect.extendTo(t);
+                int dist = rect.getLargerDimension();
+
+                pw.println(placementT+" "+dist);
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public Collection<PlacementT> getAll() {
+        return allData;
+    }
+
     private static class SparseSortedValidPlacementCache<PlacementT> extends SortedValidPlacementCache<PlacementT> {
 
         private SparseSortedValidPlacementCache(BlockPlacer2<?, ?, PlacementT, ?> placer, SortedValidPlacementCache1D<SortedValidPlacementCache1D<List<PlacementT>>> collection, List<PlacementT> allData) {
@@ -238,9 +267,10 @@ public abstract class SortedValidPlacementCache<PlacementT> extends AbstractVali
 
         @Override
         public List<PlacementT> getByRangeAround(int rangeLimit, PlacementT centerPlacement) {
-            if (rangeLimit>= placer.getMaxRangeLimit()) {
+
+            /*if (rangeLimit>= placer.getMaxRangeLimit()) {
                 return allData;
-            }
+            }*/
             Tile center = placer.getPlacementTile(centerPlacement);
 
             final int maxColumn = collection.getMaxIdx(center.getColumn()+ rangeLimit);
@@ -270,7 +300,7 @@ public abstract class SortedValidPlacementCache<PlacementT> extends AbstractVali
 
             }
             int totalCount = count;
-            return new AbstractList<PlacementT>() {
+            final AbstractList<PlacementT> res = new AbstractList<PlacementT>() {
                 @Override
                 public int size() {
                     return totalCount;
@@ -283,7 +313,7 @@ public abstract class SortedValidPlacementCache<PlacementT> extends AbstractVali
                     return findInnerArrayIndex(index, columnCounts, (colIdx, inColumnIdx) -> {
                         final SortedValidPlacementCache1D<List<PlacementT>> column = collection.get(colIdx + minColumn);
 
-                        int inColumnIdxShift = inColumnIdx+column.getEntryCountUpTo(minRows[colIdx]-1);
+                        int inColumnIdxShift = inColumnIdx + column.getEntryCountUpTo(minRows[colIdx] - 1);
 
                         return findInnerArrayIndex(inColumnIdxShift, column.itemCounts,
                                 (rowIdx, listIdx) -> {
@@ -293,6 +323,22 @@ public abstract class SortedValidPlacementCache<PlacementT> extends AbstractVali
                     });
                 }
             };
+
+            /*if (rangeLimit>= placer.getMaxRangeLimit()) {
+
+                final VerifySameLists<PlacementT> verifySameLists = new VerifySameLists<>("svp return " + rangeLimit + " around " + centerPlacement, allData, res);
+                / *try {
+                    for (PlacementT verifySameList : verifySameLists) {
+
+                    }
+                } catch (RuntimeException e) {
+                    SortedValidPlacementCache.writeList(allData, Paths.get("/tmp/vpl_all.txt"), rangeLimit, centerPlacement, placer);
+                    SortedValidPlacementCache.writeList(res, Paths.get("/tmp/vpl_res.txt"), rangeLimit, centerPlacement, placer);
+                    throw e;
+                }* /
+                return verifySameLists;
+            }*/
+            return res;
         }
 
     }

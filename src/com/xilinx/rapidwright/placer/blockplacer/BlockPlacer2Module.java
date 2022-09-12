@@ -24,7 +24,6 @@ package com.xilinx.rapidwright.placer.blockplacer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -45,6 +44,9 @@ import com.xilinx.rapidwright.util.MessageGenerator;
 import com.xilinx.rapidwright.util.Utils;
 
 public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Path>{
+
+    private AbstractOverlapCache<Site, ModuleInst> overlaps;
+
     /** The current location of all hard macros */
     private HashMap<Site, HardMacro> currentPlacements = new HashMap<>();
     private Map<ModuleInst, HardMacro> macroMap;
@@ -88,24 +90,23 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
         for(ModuleInst mi : design.getModuleInsts()){
             HardMacro hm = new HardMacro(mi);
             hardMacros.add(hm);
-            hm.setValidPlacements();
             if (mi.isPlaced()) {
                 hm.setTempAnchorSite(mi.getAnchor().getSite(), currentPlacements);
             }
             macroMap.put(mi, hm);
         }
+        overlaps = new RegionBasedOverlapCache<>(design.getDevice(), hardMacros);
         return hardMacros;
     }
 
-    @Override
-    Comparator<Site> getInitialPlacementComparator() {
-        Tile center = dev.getTile(dev.getRows()/2, dev.getColumns()/2);
-        return Comparator.comparingInt(i -> i.getTile().getManhattanDistance(center));
-    }
 
     @Override
     public void setTempAnchorSite(HardMacro hm, Site site) {
+        if (hm.getPlacement() != null) {
+            overlaps.unplace(hm);
+        }
         hm.setTempAnchorSite(site, currentPlacements);
+        overlaps.place(hm);
     }
 
     @Override
@@ -132,9 +133,7 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
         hm.unsetTempAnchorSite();
     }
 
-    @Override
-    protected boolean checkValidPlacement(HardMacro hm) {
-        if(!hm.isValidPlacement()) return false;
+    private boolean checkValidPlacementLegacy(HardMacro hm){
         for(HardMacro hardMacro : hardMacros){
             if(hardMacro.equals(hm)) continue;
             if(hm.getTempAnchorSite().equals(hardMacro.getTempAnchorSite())) return false;
@@ -143,6 +142,12 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
             }
         }
         return true;
+
+    }
+
+    @Override
+    protected boolean checkValidPlacement(HardMacro hm) {
+        return overlaps.isValidPlacement(hm);
     }
 
     @Override
@@ -283,6 +288,9 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
         if (allPaths.isEmpty()) {
             throw new RuntimeException("no paths found");
         }
+
+        pruneSameConnectionPaths();
+
         for(Path pa : allPaths){
             for(PathPort po : pa){
                 if(po.getBlock() != null){

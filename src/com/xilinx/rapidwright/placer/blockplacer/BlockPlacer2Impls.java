@@ -27,7 +27,6 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collection;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -67,7 +66,7 @@ public class BlockPlacer2Impls extends BlockPlacer2<ModuleImpls, ModuleImplsInst
     }
 
     public BlockPlacer2Impls(Design design, List<ModuleImplsInst> moduleInstances, boolean ignoreMostUsedNets, Path graphData, boolean denseDesign, float effort, boolean focusOnWorstModules, TileRectangle placementArea) {
-        this(design, moduleInstances, ignoreMostUsedNets, graphData, denseDesign, effort, focusOnWorstModules, placementArea, new RegionBasedOverlapCache(design.getDevice(), moduleInstances));
+        this(design, moduleInstances, ignoreMostUsedNets, graphData, denseDesign, effort, focusOnWorstModules, placementArea, new RegionBasedOverlapCache<>(design.getDevice(), moduleInstances));
     }
 
     public BlockPlacer2Impls(Design design, List<ModuleImplsInst> moduleInstances) {
@@ -92,12 +91,6 @@ public class BlockPlacer2Impls extends BlockPlacer2<ModuleImpls, ModuleImplsInst
     @Override
     void unsetTempAnchorSite(ModuleImplsInst hm) {
         unplaceHm(hm);
-    }
-
-    @Override
-    Comparator<ModulePlacement> getInitialPlacementComparator() {
-        Tile center = dev.getTile(dev.getRows()/2, dev.getColumns()/2);
-        return Comparator.comparingInt(i -> i.placement.getTile().getManhattanDistance(center));
     }
 
     @Override
@@ -186,13 +179,18 @@ public class BlockPlacer2Impls extends BlockPlacer2<ModuleImpls, ModuleImplsInst
             if (path.getSize() > 1) {
                 allPaths.add(path);
 
-                for (ImplsInstancePort port : path.ports) {
-                    if (!(port instanceof ImplsInstancePort.InstPort)) {
-                        continue;
-                    }
-                    ModuleImplsInst instance = ((ImplsInstancePort.InstPort) port).getInstance();
-                    modulesToPaths.computeIfAbsent(instance, x -> new HashSet<>()).add(path);
+            }
+        }
+        pruneSameConnectionPaths();
+
+
+        for (ImplsPath path : allPaths) {
+            for (ImplsInstancePort port : path.ports) {
+                if (!(port instanceof ImplsInstancePort.InstPort)) {
+                    continue;
                 }
+                ModuleImplsInst instance = ((ImplsInstancePort.InstPort) port).getInstance();
+                modulesToPaths.computeIfAbsent(instance, x -> new HashSet<>()).add(path);
             }
         }
     }

@@ -26,7 +26,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.design.ModuleInst;
 import com.xilinx.rapidwright.design.Net;
@@ -44,8 +43,6 @@ import com.xilinx.rapidwright.device.Tile;
  */
 public class HardMacro extends ModuleInst implements Comparable<Object> {
 	private final ModuleInst original;
-	
-	private HashSet<Site> validSiteSet;
 	
 	private ArrayList<PortWire> connectedPortWires;
 	
@@ -84,21 +81,8 @@ public class HardMacro extends ModuleInst implements Comparable<Object> {
 	 * @return the validPlacements
 	 */
 	public List<Site> getValidPlacements() {
-		return getModule().getAllValidPlacements().stream().filter(p->p.getTile().getRow()<=300).collect(Collectors.toList());
+		return getModule().getAllValidPlacements();
 	}
-
-	public boolean isValidPlacement(){
-		return validSiteSet.contains(tempAnchorSite);
-	}
-	
-	public void setValidPlacements() {
-		validSiteSet = new HashSet<Site>(getValidPlacements());
-	}
-	
-	public void lockPlacement(Site anchorLocation) {
-	    validSiteSet = new HashSet<>();
-        validSiteSet.add(anchorLocation);
-    }
 	
 	public void unsetTempAnchorSite(){
 		this.tempAnchorSite = null;
@@ -150,25 +134,19 @@ public class HardMacro extends ModuleInst implements Comparable<Object> {
 		return connectedPaths;
 	}
 
-	/**
-	 * Determines if the hard macros overlap.  Hard macros are considered 
-	 * overlapping if their bounding boxes overlap.
-	 * @param hm Hard macro to check against.
-	 * @return
-	 */
-	public boolean overlaps(HardMacro hm){
-		if(hm.getTempAnchorSite() == null){
-			return false;
-		}
-
-		return tempAnchorBoundingBox.overlaps(hm.tempAnchorBoundingBox);
-	}
-
 	@Override
 	public int compareTo(Object other){
 		return ((HardMacro)other).getTileSize() - getTileSize();
 	}
-	
+
+	@Override
+	public RelocatableTileRectangle getBoundingBox() {
+		if (getTempAnchorSite()!=null) {
+			return tempAnchorBoundingBox;
+		}
+		return super.getBoundingBox();
+	}
+
 	public String toString(){
 		return getName();
 	}
@@ -189,5 +167,18 @@ public class HardMacro extends ModuleInst implements Comparable<Object> {
 
 	public ModuleInst getOriginal() {
 		return original;
+	}
+
+	@Override
+	public Site getPlacement() {
+		if(tempAnchorSite!=null) {
+			return tempAnchorSite;
+		}
+		return super.getPlacement();
+	}
+
+	@Override
+	public boolean isPlaced() {
+		return super.isPlaced() || tempAnchorSite!=null;
 	}
 }

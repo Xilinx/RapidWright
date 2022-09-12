@@ -22,6 +22,7 @@
 package com.xilinx.rapidwright.placer.blockplacer;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
@@ -57,5 +58,10 @@ public class ExhaustiveValidPlacementCache<PlacementT> extends AbstractValidPlac
     @Override
     public boolean contains(PlacementT site0) {
         return placements.contains(site0);
+    }
+
+    @Override
+    public Collection<PlacementT> getAll() {
+        return placements;
     }
 }

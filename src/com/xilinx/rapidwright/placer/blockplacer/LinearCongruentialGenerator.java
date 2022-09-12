@@ -22,6 +22,10 @@
  
 package com.xilinx.rapidwright.placer.blockplacer;
 
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Random;
 import java.util.Spliterator;
 import java.util.Spliterators;
@@ -40,12 +44,24 @@ public class LinearCongruentialGenerator extends Spliterators.AbstractIntSpliter
     private final int modulus;
     private int outputCount;
 
-    private int nextPowerOf2(int i) {
+    public static int nextPowerOf2(int i) {
         int r = 1;
         while (r<i) {
             r=r*2;
         }
         return r;
+    }
+
+    private LinearCongruentialGenerator(
+            int max, int value, int offset, int multiplier, int modulus, int outputCount
+    ) {
+        super(max, Spliterator.DISTINCT|Spliterator.ORDERED|Spliterator.SIZED);
+        this.max = max;
+        this.value = value;
+        this.offset = offset;
+        this.multiplier = multiplier;
+        this.modulus = modulus;
+        this.outputCount = outputCount;
     }
 
     public LinearCongruentialGenerator(int max, Random random) {
@@ -72,5 +88,18 @@ public class LinearCongruentialGenerator extends Spliterators.AbstractIntSpliter
         } while (value>=max);
         outputCount ++;
         return true;
+    }
+
+    @Override
+    public LinearCongruentialGenerator clone() {
+        return new LinearCongruentialGenerator(max, value, offset, multiplier, modulus, outputCount);
+    }
+
+    public void dump(Path p) {
+        try (PrintWriter pw = new PrintWriter(Files.newBufferedWriter(p))) {
+            forEachRemaining((int i)->pw.println(i));
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 }
