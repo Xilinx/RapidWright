@@ -805,11 +805,13 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 	protected abstract boolean isInRange(PlacementT current, PlacementT newPlacement);
 
 
-	private int calcConnectedCost(ModuleInstT hm0, ModuleInstT hm1) {
+	private int calcConnectedCost(ModuleInstT hm0, ModuleInstT hm1, boolean moved) {
 		int cost = 0;
 		for (PathT path : getConnectedPaths(hm0)) {
-			path.saveUndo();
-			path.calculateLength();
+			if (moved) {
+				path.saveUndo();
+				path.calculateLength();
+			}
 			int length = path.getLength();
 			cost+= length;
 		}
@@ -819,8 +821,10 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 					//We have already counted the path in the above loop. Don't double count it!
 					continue;
 				}
-				path.saveUndo();
-				path.calculateLength();
+				if (moved) {
+					path.saveUndo();
+					path.calculateLength();
+				}
 				int length = path.getLength();
 				cost += length;
 			}
@@ -870,7 +874,7 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 					hm1 = null;
 				}
 
-				costBefore = calcConnectedCost(hm0, hm1);
+				costBefore = calcConnectedCost(hm0, hm1, false);
 
 				if (hm1 != null) {
 					site1Previous = getCurrentPlacement(hm1);
@@ -909,7 +913,7 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 
 
 				currentMove.setMove(site0, site1, hm0, hm1, site1Previous);
-				int costAfter = calcConnectedCost(hm0, hm1);
+				int costAfter = calcConnectedCost(hm0, hm1, true);
 				currentMove.setDeltaCost(costAfter - costBefore);
 				return true;
 
@@ -1027,9 +1031,6 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 			PathT seenPath = seenTileSets.get(tileSet);
 			if (seenPath!=null) {
 				seenPath.increaseWeight();
-
-				System.out.println("path "+p.getName()+" has same tiles "+tileSet+" as already seen path "+seenPath.getName());
-
 				return true;
 			} else {
 				seenTileSets.put(tileSet, p);
