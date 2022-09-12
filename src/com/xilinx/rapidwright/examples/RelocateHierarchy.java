@@ -22,8 +22,11 @@
 
 package com.xilinx.rapidwright.examples;
 
+import java.util.Set;
+
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.tools.RelocationTools;
+import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 
 /**
@@ -41,8 +44,8 @@ import com.xilinx.rapidwright.tests.CodePerfTracker;
 public class RelocateHierarchy {
 
     public static void main(String[] args) {
-        if (args.length != 5) {
-            System.out.println("USAGE: <input_dcp> <hierarchical_path> <tile_col_offset> <tile_row_offset> <output_dcp>");
+        if (args.length != 5 && args.length != 6) {
+            System.out.println("USAGE: <input_dcp> <hierarchical_path> <tile_col_offset> <tile_row_offset> <output_dcp> [comma separated list of additional SiteTypeEnums to relocate]");
             return;
         }
 
@@ -57,7 +60,15 @@ public class RelocateHierarchy {
         int colOffset = Integer.parseInt(args[2]);
         int rowOffset = Integer.parseInt(args[3]);
 
-        if (!RelocationTools.relocate(design, hierarchyPrefix, colOffset, rowOffset)) {
+        Set<SiteTypeEnum> customSet = RelocationTools.defaultSiteTypes;
+        
+        if(args.length == 6) {
+            for(String siteTypeEnum : args[5].split(",")) {
+                customSet.add(SiteTypeEnum.valueOf(siteTypeEnum));                
+            }
+        }
+        
+        if (!RelocationTools.relocate(design, hierarchyPrefix, colOffset, rowOffset, customSet)) {
             throw new RuntimeException("ERROR: Relocation failed");
         }
 
