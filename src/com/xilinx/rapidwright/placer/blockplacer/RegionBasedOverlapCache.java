@@ -215,4 +215,33 @@ public class RegionBasedOverlapCache<PlacementT, ModuleInstT extends AbstractMod
         System.out.println("Areas per Inst: "+areasPerInst);
 
     }
+
+    @Override
+    public ModuleInstT getSingularOverlap(ModuleInstT mii) {
+
+        if (mii.getPlacement() == null) {
+            throw new RuntimeException(mii+" is not placed!");
+        }
+        final ModuleInstT[] overlap = (ModuleInstT[]) new AbstractModuleInst[]{null};
+        if (!allTouchedRegionsMatch(mii, l -> {
+            for (ModuleInstT other : l) {
+                if (other == mii) {
+                    continue;
+                }
+                if (other.getPlacement() == null) {
+                    continue;
+                }
+                if (mii.overlaps(other)){
+                    if (overlap[0] != null) {
+                        return false;
+                    }
+                    overlap[0] = other;
+                }
+            }
+            return true;
+        })) {
+            return null;
+        }
+        return overlap[0];
+    }
 }

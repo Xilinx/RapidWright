@@ -26,6 +26,8 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import com.xilinx.rapidwright.design.AbstractModuleInst;
 
@@ -43,7 +45,7 @@ public class Move2<ModuleInstT extends AbstractModuleInst<?,?,?>, PlacementT, Pa
 	Set<ModuleInstT> blocksSet = new HashSet<>();
 	List<PlacementT> placements = new ArrayList<>();
 
-	List<PathT> paths = new ArrayList<>();
+	List<PathT> paths = null;
 
 	private int deltaCost;
 
@@ -58,15 +60,19 @@ public class Move2<ModuleInstT extends AbstractModuleInst<?,?,?>, PlacementT, Pa
 			placer.setTempAnchorSite(blocks.get(i), placements.get(i));
 		}
 
-		for (PathT path : paths) {
-			path.restoreUndo();
-			if (BlockPlacer2.PARANOID) {
-				final int length = path.getLength();
-				path.calculateLength();
-				if (path.getLength() != length) {
-					throw new RuntimeException("Improper cost change.");
+		//Have we even changed the paths?
+		if (paths != null) {
+			for (PathT path : paths) {
+				path.restoreUndo();
+				if (BlockPlacer2.PARANOID) {
+					final int length = path.getLength();
+					path.calculateLength();
+					if (path.getLength() != length) {
+						throw new RuntimeException("Improper cost change.");
+					}
 				}
 			}
+			paths = null;
 		}
 
 	}
@@ -81,16 +87,17 @@ public class Move2<ModuleInstT extends AbstractModuleInst<?,?,?>, PlacementT, Pa
 		return deltaCost;
 	}
 
-	public void addBlock(ModuleInstT block, PlacementT placement) {
+	public boolean addBlock(ModuleInstT block, PlacementT placement) {
 		if (!blocksSet.add(block)) {
-			throw new RuntimeException("tried to double move "+block);
+			return false;
 		}
 		blocks.add(block);
 		placements.add(placement);
+		return true;
 	}
 
 	public void calcDeltaCost() {
-		paths.clear();
+		paths = new ArrayList<>();
 
 		deltaCost = 0;
 		int undoCount = placer.incUndoCount();
@@ -109,5 +116,24 @@ public class Move2<ModuleInstT extends AbstractModuleInst<?,?,?>, PlacementT, Pa
 			}
 
 		}
+	}
+
+	public boolean addBlock(ModuleInstT block) {
+		return addBlock(block, placer.getCurrentPlacement(block));
+	}
+
+	public void removeLastBlock() {
+		placer.setTempAnchorSite(blocks.remove(blocks.size()-1), placements.remove(placements.size()-1));
+	}
+
+	@Override
+	public String toString() {
+		return IntStream.range(0, blocks.size())
+				.mapToObj(i-> {
+					final ModuleInstT block = blocks.get(i);
+					final PlacementT from = placements.get(i);
+					final PlacementT to = placer.getCurrentPlacement(block);
+					return block.getName()+": "+from+"->"+to;
+				}).collect(Collectors.joining(", ", "[","]"));
 	}
 }

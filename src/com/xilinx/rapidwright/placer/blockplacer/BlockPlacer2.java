@@ -303,6 +303,7 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 	protected abstract void populateAllPaths();
 
 	protected abstract boolean checkValidPlacement(ModuleInstT hm);
+	protected abstract ModuleInstT getSingularOverlap(ModuleInstT hm);
 
 	public double calculateStartTemp(int maxInnerIteration){
 		double stdDev = 0.0;
@@ -722,94 +723,70 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 
 	protected abstract Tile getPlacementTile(PlacementT placement);
 
+	private boolean getNextMoveRec(ModuleInstT selected, int pushAwayAllowance) {
+		PlacementT site0 = getCurrentPlacement(selected);
+		if (!currentMove.addBlock(selected, site0)) {
+			return false;
+		}
+
+		final AbstractValidPlacementCache<PlacementT> pp = possiblePlacements.get(selected.getModule());
+		List<PlacementT> validSiteRange = pp.getByRangeAround((int) rangeLimit, site0);
+
+
+		int nr_valid_sites = validSiteRange.size();
+		if (nr_valid_sites==0) {
+			currentMove.removeLastBlock();
+			return false;
+		}
+		LinearCongruentialGenerator lcg = new LinearCongruentialGenerator(nr_valid_sites, rand);
+		final PrimitiveIterator.OfInt iterator = StreamSupport.intStream(lcg, false)
+				.iterator();
+
+
+		while (iterator.hasNext()) {
+			int rand_site = iterator.nextInt();
+			PlacementT site1 = validSiteRange.get(rand_site);
+
+			if (site0.equals(site1)) {
+				//if(DEBUG_LEVEL > 1) System.out.println("  SAME SITE");
+				continue;
+			}
+
+			setTempAnchorSite(selected, site1);
+
+			if (checkValidPlacement(selected)) {
+				return true;
+			}
+
+			if (pushAwayAllowance == 0) {
+				//Not allowed to move other
+				continue;
+			}
+
+
+			ModuleInstT other = getSingularOverlap(selected);
+			if (other == null) {
+				//Multiple overlaps
+				continue;
+			}
+
+			if (getNextMoveRec(other, pushAwayAllowance - 1)) {
+				return true;
+			}
+
+		}
+		currentMove.removeLastBlock();
+		return false;
+	}
+
 	private boolean getNextMove(ModuleInstT selected){
 		currentMove.clear();
-		try {
-			//HardMacro selected = hardMacros.get(rand.nextInt(hardMacros.size()-1));
 
-			PlacementT site0 = getCurrentPlacement(selected);
-			PlacementT site1 = null;
-			ModuleInstT hm0 = selected;
-			ModuleInstT hm1 = null;
-
-			currentMove.addBlock(selected, site0);
-
-			final AbstractValidPlacementCache<PlacementT> pp = possiblePlacements.get(hm0.getModule());
-			if (pp == null) {
-				throw new RuntimeException("what?");
-			}
-			List<PlacementT> validSiteRange = pp.getByRangeAround((int) rangeLimit, site0);
-
-
-			// Updated code. Store initial number of valid Sites
-			int nr_valid_sites = validSiteRange.size();
-			LinearCongruentialGenerator lcg = new LinearCongruentialGenerator(nr_valid_sites, rand);
-			final PrimitiveIterator.OfInt iterator = StreamSupport.intStream(lcg, false)
-					.iterator();
-
-			PlacementT site1Previous = null;
-
-
-			while (iterator.hasNext()) {
-				int rand_site = iterator.nextInt();
-				site1 = validSiteRange.get(rand_site);
-
-				if (site0.equals(site1)) {
-					//if(DEBUG_LEVEL > 1) System.out.println("  SAME SITE");
-					continue;
-				}
-				//TODO this only works when the same anchor is chosen for the other module.
-				hm1 = getHmCurrentlyAtPlacement(site1);
-				if (hm1 == hm0) {
-					hm1 = null;
-				}
-
-
-
-				if (hm1 != null) {
-					site1Previous = getCurrentPlacement(hm1);
-					//System.out.println("swapping with "+hm1.getName()+", which is currently at "+site1Previous);
-
-					//Can we swap?
-					boolean newContains = possiblePlacements.get(hm1.getModule()).contains(site0);
-				/*boolean oldContains = getAllPlacements(hm1).contains(site0);
-				if (oldContains != newContains) {
-					throw new RuntimeException("contains bug");
-				}*/
-					if (!newContains) {
-						continue;
-					}
-					setTempAnchorSite(hm1, site0);
-					setTempAnchorSite(hm0, site1);
-					if ((!checkValidPlacement(hm0)) || (!checkValidPlacement(hm1))) {
-						setTempAnchorSite(hm1, site1Previous);
-						setTempAnchorSite(hm0, site0);
-						//if(DEBUG_LEVEL > 1) System.out.println("  BAD SWAP");
-						site1Previous = null;
-						continue;
-					}
-					currentMove.addBlock(hm1, site1Previous);
-					//System.out.println(hm0.getName()+"<->"+hm1.getName());
-				} else {
-					setTempAnchorSite(hm0, site1);
-					//hm0.setTempAnchorSite(site1, currentPlacements);
-					if (!checkValidPlacement(hm0)) {
-						setTempAnchorSite(hm0, site0);
-						//hm0.setTempAnchorSite(site0, currentPlacements);
-						//if(DEBUG_LEVEL > 1) System.out.println("  BAD SITE0");
-						continue;
-					}
-					//System.out.println(hm0.getName()+"-> EMPTY");
-				}
-
-				currentMove.calcDeltaCost();
-				return true;
-
-			}
-			return false;
-		} catch (RuntimeException e) {
-			throw new RuntimeException("failed to move "+selected+", a "+selected.getModule(), e);
+		if (getNextMoveRec(selected, 2)) {
+			currentMove.calcDeltaCost();
+			return true;
 		}
+		return false;
 	}
 
 	private Path printPlacements(String name, List<PlacementT> validSiteRange, PlacementT center) {

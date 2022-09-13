@@ -37,6 +37,8 @@ public abstract class AbstractOverlapCache<PlacementT, ModuleInstT extends Abstr
 
     public abstract boolean isValidPlacement(ModuleInstT mii);
 
+    public abstract ModuleInstT getSingularOverlap(ModuleInstT mii);
+
     protected boolean doesNotOverlapAny(ModuleInstT mii, Collection<ModuleInstT> l) {
         if (mii.getPlacement() == null) {
             return true;

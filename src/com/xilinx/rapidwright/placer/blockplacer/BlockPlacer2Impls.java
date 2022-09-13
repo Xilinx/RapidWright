@@ -54,11 +54,11 @@ public class BlockPlacer2Impls extends BlockPlacer2<ModuleImpls, ModuleImplsInst
     private final List<ModuleImplsInst> moduleInstances;
     private Map<Site, ModuleImplsInst> currentAnchors = new HashMap<>();
 
-    private final AbstractOverlapCache overlaps;
+    private final AbstractOverlapCache<ModulePlacement, ModuleImplsInst> overlaps;
 
     private final Map<ModuleImplsInst, Set<ImplsPath>> modulesToPaths = new HashMap<>();
 
-    public BlockPlacer2Impls(Design design, List<ModuleImplsInst> moduleInstances, boolean ignoreMostUsedNets, Path graphData, boolean denseDesign, float effort, boolean focusOnWorstModules, TileRectangle placementArea, AbstractOverlapCache overlapCache) {
+    public BlockPlacer2Impls(Design design, List<ModuleImplsInst> moduleInstances, boolean ignoreMostUsedNets, Path graphData, boolean denseDesign, float effort, boolean focusOnWorstModules, TileRectangle placementArea, AbstractOverlapCache<ModulePlacement, ModuleImplsInst> overlapCache) {
         super(design, ignoreMostUsedNets, graphData, denseDesign, effort, focusOnWorstModules, placementArea);
 
         this.moduleInstances = moduleInstances;
@@ -202,6 +202,11 @@ public class BlockPlacer2Impls extends BlockPlacer2<ModuleImpls, ModuleImplsInst
         }
 
         return overlaps.isValidPlacement(hm);
+    }
+
+    @Override
+    protected ModuleImplsInst getSingularOverlap(ModuleImplsInst hm) {
+        return overlaps.getSingularOverlap(hm);
     }
 
     private boolean checkValidPlacementLegacy(ModuleImplsInst hm) {

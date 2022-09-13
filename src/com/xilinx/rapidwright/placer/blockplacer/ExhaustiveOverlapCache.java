@@ -51,6 +51,29 @@ public class ExhaustiveOverlapCache<PlacementT, ModuleInstT extends AbstractModu
     }
 
     @Override
+    public ModuleInstT getSingularOverlap(ModuleInstT mii) {
+        if (mii.getPlacement() == null) {
+            throw new RuntimeException(mii+" is not placed!");
+        }
+        ModuleInstT overlap = null;
+        for (ModuleInstT other : instances) {
+            if (other == mii) {
+                continue;
+            }
+            if (other.getPlacement() == null) {
+                continue;
+            }
+            if (mii.overlaps(other)){
+                if (overlap != null) {
+                    return null;
+                }
+                overlap = other;
+            }
+        }
+        return overlap;
+    }
+
+    @Override
     public void printStats() {
 
     }

@@ -151,6 +151,11 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
     }
 
     @Override
+    protected HardMacro getSingularOverlap(HardMacro hm) {
+        return (HardMacro) overlaps.getSingularOverlap(hm);
+    }
+
+    @Override
     protected boolean isInRange(Site current, Site newPlacement) {
         return getDistance(current.getTile(), newPlacement.getTile()) <= rangeLimit;
     }
@@ -179,8 +184,9 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
         boolean save_and_exit = false;
         // Perform final placement of all hard macros
         for(HardMacro hm : array){
+            hm.place(hm.getTempAnchorSite());
             //System.out.println(moveCount.get(hm) + " " + hm.tileSize + " " + hm.getName());
-            HashSet<Tile> footPrint = isValidPlacement((ModuleInst)hm, hm.getModule().getAnchor(), hm.getTempAnchorSite().getTile(), usedTiles);
+            /*HashSet<Tile> footPrint = isValidPlacement((ModuleInst)hm, hm.getModule().getAnchor(), hm.getTempAnchorSite().getTile(), usedTiles);
             if(footPrint == null){
 
                 if(!placeModuleNear((ModuleInst)hm, hm.getTempAnchorSite().getTile(), usedTiles)){
@@ -208,7 +214,7 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
                     } else
                         MessageGenerator.briefErrorAndExit("ERROR: Problem placing " + hm.getName() + " on site: " + hm.getTempAnchorSite());
                 }
-            }
+            }*/
         }
 
         System.out.println("Cost = " + currentSystemCost());
