@@ -21,14 +21,16 @@
  */
 package com.xilinx.rapidwright.placer.blockplacer;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 
 import com.xilinx.rapidwright.design.AbstractModuleInst;
 
 /**
  * Naive implementation of overlap checking. Always checks against all other instances
  */
-public class ExhaustiveOverlapCache<PlacementT, ModuleInstT extends AbstractModuleInst<?,PlacementT,ModuleInstT>>  extends AbstractOverlapCache<PlacementT, ModuleInstT> {
+public class ExhaustiveOverlapCache<PlacementT, ModuleInstT extends AbstractModuleInst<?,PlacementT,? super ModuleInstT>>  extends AbstractOverlapCache<PlacementT, ModuleInstT> {
     private final Collection<ModuleInstT> instances;
 
     public ExhaustiveOverlapCache(Collection<ModuleInstT> instances) {
@@ -51,26 +53,10 @@ public class ExhaustiveOverlapCache<PlacementT, ModuleInstT extends AbstractModu
     }
 
     @Override
-    public ModuleInstT getSingularOverlap(ModuleInstT mii) {
-        if (mii.getPlacement() == null) {
-            throw new RuntimeException(mii+" is not placed!");
-        }
-        ModuleInstT overlap = null;
-        for (ModuleInstT other : instances) {
-            if (other == mii) {
-                continue;
-            }
-            if (other.getPlacement() == null) {
-                continue;
-            }
-            if (mii.overlaps(other)){
-                if (overlap != null) {
-                    return null;
-                }
-                overlap = other;
-            }
-        }
-        return overlap;
+    public List<ModuleInstT> getAllOverlaps(ModuleInstT mii) {
+        List<ModuleInstT> overlaps = new ArrayList<>();
+        enterOverlaps(mii, instances, overlaps);
+        return overlaps;
     }
 
     @Override

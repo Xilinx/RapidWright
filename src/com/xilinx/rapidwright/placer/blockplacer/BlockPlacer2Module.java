@@ -45,7 +45,7 @@ import com.xilinx.rapidwright.util.Utils;
 
 public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Path>{
 
-    private AbstractOverlapCache<Site, ModuleInst> overlaps;
+    private AbstractOverlapCache<Site, HardMacro> overlaps;
 
     /** The current location of all hard macros */
     private HashMap<Site, HardMacro> currentPlacements = new HashMap<>();
@@ -151,8 +151,8 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
     }
 
     @Override
-    protected HardMacro getSingularOverlap(HardMacro hm) {
-        return (HardMacro) overlaps.getSingularOverlap(hm);
+    protected List<HardMacro> getAllOverlaps(HardMacro hm) {
+        return overlaps.getAllOverlaps(hm);
     }
 
     @Override

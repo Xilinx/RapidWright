@@ -53,7 +53,7 @@ public class TestLinearCongruentialGenerator {
     @Test
     public void testLcg() {
         for (int i=1;i<100;i++) {
-            final IntStream stream = StreamSupport.intStream(new LinearCongruentialGenerator(i, new Random(42)), false);
+            final IntStream stream = StreamSupport.intStream(new LinearCongruentialGenerator(i, new Random(42)).spliterator(), false);
             verifyOutput(i, stream);
         }
     }
@@ -62,7 +62,7 @@ public class TestLinearCongruentialGenerator {
     public void testLargeList() {
 
         final int max = 36516;
-        final IntStream stream = StreamSupport.intStream(new LinearCongruentialGenerator(max, new Random(42)), false);
+        final IntStream stream = StreamSupport.intStream(new LinearCongruentialGenerator(max, new Random(42)).spliterator(), false);
         verifyOutput(max, stream);
     }
 }

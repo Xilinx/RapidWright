@@ -205,30 +205,8 @@ public class BlockPlacer2Impls extends BlockPlacer2<ModuleImpls, ModuleImplsInst
     }
 
     @Override
-    protected ModuleImplsInst getSingularOverlap(ModuleImplsInst hm) {
-        return overlaps.getSingularOverlap(hm);
-    }
-
-    private boolean checkValidPlacementLegacy(ModuleImplsInst hm) {
-        final boolean debugValidPlacement = false;
-        for(ModuleImplsInst other : hardMacros){
-            if (other == hm) {
-                continue;
-            }
-            if (other.getPlacement() == null) {
-                continue;
-            }
-            if (hm.getPlacement().placement == other.getPlacement().placement) {
-                if (debugValidPlacement) System.out.println("not valid because "+ hm.getName()+" has same anchor as "+other.getName()+": "+ hm.getPlacement().placement);
-
-                return false;
-            }
-            if (hm.overlaps(other)){
-                if (debugValidPlacement) System.out.println("not valid because "+ hm.getName()+" overlaps "+other.getName());
-                return false;
-            }
-        }
-        return true;
+    protected List<ModuleImplsInst> getAllOverlaps(ModuleImplsInst hm) {
+        return overlaps.getAllOverlaps(hm);
     }
 
     @Override

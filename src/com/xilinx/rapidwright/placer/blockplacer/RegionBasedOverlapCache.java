@@ -21,6 +21,7 @@
  */
 package com.xilinx.rapidwright.placer.blockplacer;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
@@ -39,7 +40,7 @@ import com.xilinx.rapidwright.device.Device;
  * the region are stored. When a module is moved, overlap detection only needs to be performed for modules that
  * touch the same regions as the module that is being moved.
  */
-public class RegionBasedOverlapCache<PlacementT, ModuleInstT extends AbstractModuleInst<?,PlacementT,ModuleInstT>>  extends AbstractOverlapCache<PlacementT, ModuleInstT> {
+public class RegionBasedOverlapCache<PlacementT, ModuleInstT extends AbstractModuleInst<?,PlacementT,? super ModuleInstT>>  extends AbstractOverlapCache<PlacementT, ModuleInstT> {
     private final Device device;
     private final List<? extends ModuleInstT> instances;
     private final Collection<ModuleInstT>[][] modulesInArea;
@@ -217,31 +218,12 @@ public class RegionBasedOverlapCache<PlacementT, ModuleInstT extends AbstractMod
     }
 
     @Override
-    public ModuleInstT getSingularOverlap(ModuleInstT mii) {
-
-        if (mii.getPlacement() == null) {
-            throw new RuntimeException(mii+" is not placed!");
-        }
-        final ModuleInstT[] overlap = (ModuleInstT[]) new AbstractModuleInst[]{null};
-        if (!allTouchedRegionsMatch(mii, l -> {
-            for (ModuleInstT other : l) {
-                if (other == mii) {
-                    continue;
-                }
-                if (other.getPlacement() == null) {
-                    continue;
-                }
-                if (mii.overlaps(other)){
-                    if (overlap[0] != null) {
-                        return false;
-                    }
-                    overlap[0] = other;
-                }
-            }
+    public List<ModuleInstT> getAllOverlaps(ModuleInstT mii) {
+        List<ModuleInstT> overlaps = new ArrayList<>();
+        allTouchedRegionsMatch(mii, l -> {
+            enterOverlaps(mii, l, overlaps);
             return true;
-        })) {
-            return null;
-        }
-        return overlap[0];
+        });
+        return overlaps;
     }
 }

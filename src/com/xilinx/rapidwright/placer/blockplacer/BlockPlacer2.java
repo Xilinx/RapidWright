@@ -35,12 +35,10 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.PrimitiveIterator;
 import java.util.PriorityQueue;
 import java.util.Random;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.stream.StreamSupport;
 
 import com.xilinx.rapidwright.design.AbstractModuleInst;
 import com.xilinx.rapidwright.design.Design;
@@ -65,14 +63,23 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 	/**
 	 * Default value for constructor parameter effort
 	 */
-	public static final float DEFAULT_EFFORT = 1;
+	public static final float DEFAULT_EFFORT = 5;
 	/**
 	 * Default value for constructor parameter focusOnWorstModules
 	 */
-	public static final boolean DEFAULT_FOCUS_ON_WORST = true;
+	public static final boolean DEFAULT_FOCUS_ON_WORST = false;
 
 	/** Enable extra sanity checks? */
 	protected static final boolean PARANOID = false;
+
+	/**
+	 * The number of recursion steps we may take to push other modules out of the way
+	 */
+	private static final int PUSH_AWAY_RECURSION_DEPTH = 1;
+	/**
+	 * The maximum number of modules that may be pushed out of the way in each recursion step
+	 */
+	private static final int MAX_PUSHED_MIS = 1;
 	/** The current design */
 	protected final Design design;
 	/** The current device being targeted by the design */
@@ -303,7 +310,7 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 	protected abstract void populateAllPaths();
 
 	protected abstract boolean checkValidPlacement(ModuleInstT hm);
-	protected abstract ModuleInstT getSingularOverlap(ModuleInstT hm);
+	protected abstract List<ModuleInstT> getAllOverlaps(ModuleInstT hm);
 
 	public double calculateStartTemp(int maxInnerIteration){
 		double stdDev = 0.0;
@@ -723,14 +730,15 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 
 	protected abstract Tile getPlacementTile(PlacementT placement);
 
-	private boolean getNextMoveRec(ModuleInstT selected, int pushAwayAllowance) {
+	private boolean getNextMoveRec(ModuleInstT selected, int pushAwayDepth, PlacementT center) {
 		PlacementT site0 = getCurrentPlacement(selected);
 		if (!currentMove.addBlock(selected, site0)) {
 			return false;
 		}
 
 		final AbstractValidPlacementCache<PlacementT> pp = possiblePlacements.get(selected.getModule());
-		List<PlacementT> validSiteRange = pp.getByRangeAround((int) rangeLimit, site0);
+		int rl = pushAwayDepth == 0 ? 5 : (int) rangeLimit;
+		List<PlacementT> validSiteRange = pp.getByRangeAround(rl, center);
 
 
 		int nr_valid_sites = validSiteRange.size();
@@ -738,10 +746,7 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 			currentMove.removeLastBlock();
 			return false;
 		}
-		LinearCongruentialGenerator lcg = new LinearCongruentialGenerator(nr_valid_sites, rand);
-		final PrimitiveIterator.OfInt iterator = StreamSupport.intStream(lcg, false)
-				.iterator();
-
+		LinearCongruentialGenerator iterator = new LinearCongruentialGenerator(nr_valid_sites, rand);
 
 		while (iterator.hasNext()) {
 			int rand_site = iterator.nextInt();
@@ -754,35 +759,65 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 
 			setTempAnchorSite(selected, site1);
 
-			if (checkValidPlacement(selected)) {
+
+			final List<ModuleInstT> overlaps = getAllOverlaps(selected);
+			if (overlaps.isEmpty()) {
 				return true;
 			}
 
-			if (pushAwayAllowance == 0) {
+			if (pushAwayDepth == 0) {
 				//Not allowed to move other
 				continue;
 			}
 
-
-			ModuleInstT other = getSingularOverlap(selected);
-			if (other == null) {
-				//Multiple overlaps
-				continue;
-			}
-
-			if (getNextMoveRec(other, pushAwayAllowance - 1)) {
+			if (pushAwayOthers(selected, site0, overlaps, pushAwayDepth)) {
 				return true;
 			}
-
 		}
 		currentMove.removeLastBlock();
 		return false;
 	}
 
+	private boolean pushAwayOthers(ModuleInstT selected, PlacementT site0, List<ModuleInstT> overlaps, int pushAwayDepth) {
+
+		if (overlaps.size()>MAX_PUSHED_MIS) {
+			return false;
+		}
+		int count = currentMove.countBlocks();
+		for (ModuleInstT other : overlaps) {
+
+			PlacementT first = getCurrentPlacement(selected);
+			PlacementT second = site0;
+
+			//Randomly swap
+			/*if (rand.nextBoolean()) {
+				PlacementT temp = second;
+				second = first;
+				first = temp;
+			}*/
+
+			/*if (getNextMoveRec(other, pushAwayAllowance - 1, first)) {
+				continue;
+			}*/
+
+			if (getNextMoveRec(other, pushAwayDepth - 1, second)) {
+				continue;
+			}
+
+
+			//Abort
+			while (currentMove.countBlocks()>count) {
+				currentMove.removeLastBlock();
+			}
+			return false;
+		}
+		return true;
+	}
+
 	private boolean getNextMove(ModuleInstT selected){
 		currentMove.clear();
 
-		if (getNextMoveRec(selected, 2)) {
+		if (getNextMoveRec(selected, PUSH_AWAY_RECURSION_DEPTH, getCurrentPlacement(selected))) {
 			currentMove.calcDeltaCost();
 			return true;
 		}

@@ -136,4 +136,8 @@ public class Move2<ModuleInstT extends AbstractModuleInst<?,?,?>, PlacementT, Pa
 					return block.getName()+": "+from+"->"+to;
 				}).collect(Collectors.joining(", ", "[","]"));
 	}
+
+	public int countBlocks() {
+		return blocks.size();
+	}
 }

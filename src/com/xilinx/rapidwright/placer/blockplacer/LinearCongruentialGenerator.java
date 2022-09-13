@@ -26,17 +26,17 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.PrimitiveIterator;
 import java.util.Random;
 import java.util.Spliterator;
 import java.util.Spliterators;
-import java.util.function.IntConsumer;
 
 /**
  * This class creates a random permutation of all ints from 0 (inclusive) to a given maximum (exclusive) with no repeats.
  *
  * It implements a linear congruential generator and achieves O(N) in runtime, O(1) in memory.
  */
-public class LinearCongruentialGenerator extends Spliterators.AbstractIntSpliterator {
+public class LinearCongruentialGenerator implements PrimitiveIterator.OfInt {
     private final int max;
     private int value;
     private final int offset;
@@ -55,7 +55,6 @@ public class LinearCongruentialGenerator extends Spliterators.AbstractIntSpliter
     private LinearCongruentialGenerator(
             int max, int value, int offset, int multiplier, int modulus, int outputCount
     ) {
-        super(max, Spliterator.DISTINCT|Spliterator.ORDERED|Spliterator.SIZED);
         this.max = max;
         this.value = value;
         this.offset = offset;
@@ -65,7 +64,6 @@ public class LinearCongruentialGenerator extends Spliterators.AbstractIntSpliter
     }
 
     public LinearCongruentialGenerator(int max, Random random) {
-        super(max, Spliterator.DISTINCT|Spliterator.ORDERED|Spliterator.SIZED);
         this.max = max;
         value = random.nextInt(max);
 
@@ -78,18 +76,20 @@ public class LinearCongruentialGenerator extends Spliterators.AbstractIntSpliter
 
 
     @Override
-    public boolean tryAdvance(IntConsumer action) {
-        if (outputCount == max) {
-            return false;
-        }
-        action.accept(value);
+    public boolean hasNext() {
+        return outputCount<max;
+    }
+
+    @Override
+    public int nextInt() {
+        int output = value;
         do {
             //Using long here, because value * multiplier might take us above the limit of int
             long v = value;
             value = (int) ((v * multiplier + offset) % modulus);
         } while (value>=max);
         outputCount ++;
-        return true;
+        return output;
     }
 
     @Override
@@ -103,5 +103,9 @@ public class LinearCongruentialGenerator extends Spliterators.AbstractIntSpliter
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public Spliterator.OfInt spliterator() {
+        return Spliterators.spliterator(this, max-outputCount, Spliterator.DISTINCT|Spliterator.ORDERED|Spliterator.SIZED);
     }
 }
