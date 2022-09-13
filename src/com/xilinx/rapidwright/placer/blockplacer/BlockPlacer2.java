@@ -450,7 +450,6 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 			rangeLimit = rangeLimit * (1.0-goldenRate + moveAcceptanceRate);
 			rangeLimit = Math.min(rangeLimit, getMaxRangeLimit());
 			rangeLimit = Math.max(rangeLimit, 5.0);
-			System.out.println("rangeLimit = " + rangeLimit);
 
 			currentTemp = updateTemperature();
 
