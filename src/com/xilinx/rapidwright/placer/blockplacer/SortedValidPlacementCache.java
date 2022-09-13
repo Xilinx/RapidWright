@@ -308,6 +308,9 @@ public abstract class SortedValidPlacementCache<PlacementT> extends AbstractVali
 
                 @Override
                 public PlacementT get(int index) {
+                    if (index<0 || index>=size()) {
+                        throw new IndexOutOfBoundsException("index "+index+" out of bounds for svp result of size "+totalCount+" for range "+rangeLimit+" around "+centerPlacement);
+                    }
 
 
                     return findInnerArrayIndex(index, columnCounts, (colIdx, inColumnIdx) -> {

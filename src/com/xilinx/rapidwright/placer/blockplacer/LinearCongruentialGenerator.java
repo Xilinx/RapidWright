@@ -84,7 +84,9 @@ public class LinearCongruentialGenerator extends Spliterators.AbstractIntSpliter
         }
         action.accept(value);
         do {
-            value = (value * multiplier + offset) % modulus;
+            //Using long here, because value * multiplier might take us above the limit of int
+            long v = value;
+            value = (int) ((v * multiplier + offset) % modulus);
         } while (value>=max);
         outputCount ++;
         return true;

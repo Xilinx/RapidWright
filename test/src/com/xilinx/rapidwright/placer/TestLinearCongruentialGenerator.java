@@ -38,8 +38,16 @@ public class TestLinearCongruentialGenerator {
         System.out.println(list);
         Assertions.assertEquals(max, list.size());
 
+
+        StringBuilder sb = new StringBuilder();
         for (int i = 0; i < max; i++) {
-            Assertions.assertTrue(list.contains(i), "Sequence should contain "+i);
+            if (!list.contains(i)) {
+                sb.append("Sequence does not contain ").append(i).append('\n');
+            }
+        }
+        final String errors = sb.toString();
+        if (!errors.isEmpty()) {
+            Assertions.fail(errors);
         }
     }
     @Test
@@ -48,5 +56,13 @@ public class TestLinearCongruentialGenerator {
             final IntStream stream = StreamSupport.intStream(new LinearCongruentialGenerator(i, new Random(42)), false);
             verifyOutput(i, stream);
         }
+    }
+
+    @Test
+    public void testLargeList() {
+
+        final int max = 36516;
+        final IntStream stream = StreamSupport.intStream(new LinearCongruentialGenerator(max, new Random(42)), false);
+        verifyOutput(max, stream);
     }
 }
