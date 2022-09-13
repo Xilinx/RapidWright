@@ -141,6 +141,7 @@ task testLsf(type: JavaExec) {
   classpath = files( { -> project.configurations.testRuntimeClasspath.getFiles() + project.tasks.findByName('testJar').getArchiveFile().get() })
   mainClass = "com.xilinx.rapidwright.util.lsf.LaunchTestsOnLsf"
   workingDir = file("build/test-lsf")
+  args project.tasks.findByName('testJar').getArchiveFile().get()
   doFirst {
     project.mkdir(workingDir)
   }
