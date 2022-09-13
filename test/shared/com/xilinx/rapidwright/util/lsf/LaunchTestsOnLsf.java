@@ -24,7 +24,12 @@ package com.xilinx.rapidwright.util.lsf;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -100,6 +105,10 @@ public class LaunchTestsOnLsf {
                 .filter(ti -> RunTest.isLsfTest(ti, ids))
                 .map(ti -> new Pair<>(ti.getUniqueId(), requireLsfMem(ti, ids)));
 
+        if (ids.isEmpty()) {
+            throw new RuntimeException("did not find any test?!");
+        }
+
         return Stream.concat(lsfTests, Stream.of(new Pair<>("", LargeTest.DEFAULT_MAX_MEMORY_GB)));
     }
 
@@ -109,9 +118,11 @@ public class LaunchTestsOnLsf {
             throw new RuntimeException("could not empty working dir");
         }
 
+        Path testsJar = Paths.get(args[0]);
+
         Launcher launcher = LauncherFactory.create();
 
-        LauncherDiscoveryRequest request = getLauncherDiscoveryRequestBuilder().build();
+        LauncherDiscoveryRequest request = getLauncherDiscoveryRequestBuilder(testsJar).build();
         TestPlan testPlan = launcher.discover(request);
 
         JobQueue jq = new JobQueue(false);
@@ -121,7 +132,7 @@ public class LaunchTestsOnLsf {
             int memMB = pair.getSecond()*1024;
             LSFJob job = new LSFJob();
             job.setRunDir(toJobDir(pair.getFirst()));
-            job.setRapidWrightCommand(RunTest.class, memMB,'"'+pair.getFirst()+'"');
+            job.setRapidWrightCommand(RunTest.class, memMB,'"'+testsJar.toString()+"\" \""+pair.getFirst()+'"');
             job.setLsfResourceMemoryLimit(memMB);
             jq.addJob(job);
             jobsToTests.put(job, pair.getFirst());
@@ -180,13 +191,13 @@ public class LaunchTestsOnLsf {
     }
 
     @NotNull
-    public static LauncherDiscoveryRequestBuilder getLauncherDiscoveryRequestBuilder() {
+    public static LauncherDiscoveryRequestBuilder getLauncherDiscoveryRequestBuilder(Path testsJar) {
         return LauncherDiscoveryRequestBuilder.request()
                 .configurationParameter(
                         JupiterConfiguration.EXTENSIONS_AUTODETECTION_ENABLED_PROPERTY_NAME, "true"
                 )
                 .configurationParameter(LauncherConstants.CAPTURE_STDOUT_PROPERTY_NAME, "true")
                 .configurationParameter(LauncherConstants.CAPTURE_STDERR_PROPERTY_NAME, "true")
-                .selectors(DiscoverySelectors.selectPackage(""));
+                .selectors(DiscoverySelectors.selectClasspathRoots(Collections.singleton(testsJar)));
     }
 }

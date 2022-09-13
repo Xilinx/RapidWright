@@ -24,6 +24,7 @@ package com.xilinx.rapidwright.util.lsf;
 
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Map;
@@ -65,11 +66,11 @@ public class RunTest {
 
 
 
-    private void executeTests(PrintWriter out, Predicate<TestDescriptor> discoveryFilter, UniqueId filterName) {
+    private void executeTests(PrintWriter out, Predicate<TestDescriptor> discoveryFilter, UniqueId filterName, Path testsJar) {
         Launcher launcher = LauncherFactory.create();
         SummaryGeneratingListener summaryListener = registerListeners(out, launcher, filterName);
 
-        LauncherDiscoveryRequest discoveryRequest = LaunchTestsOnLsf.getLauncherDiscoveryRequestBuilder()
+        LauncherDiscoveryRequest discoveryRequest = LaunchTestsOnLsf.getLauncherDiscoveryRequestBuilder(testsJar)
                         .filters((PostDiscoveryFilter) descriptor -> {
                             if (!discoveryFilter.test(descriptor)) {
                                 return FilterResult.excluded("not our test");
@@ -109,7 +110,8 @@ public class RunTest {
 
     public static void main(String[] args) throws IOException {
         Predicate<TestDescriptor> discoveryFilter;
-        UniqueId filterArg = args[0].isEmpty() ? null : UniqueId.parse(args[0]);
+        Path testsJar = Paths.get(args[0]);
+        UniqueId filterArg = args[1].isEmpty() ? null : UniqueId.parse(args[1]);
         if (filterArg == null) {
             discoveryFilter = (TestDescriptor descriptor) -> !RunTest.isLsfTest(descriptor.getTags());
         } else {
@@ -119,7 +121,7 @@ public class RunTest {
             LsfInterceptor.ENABLED = true;
             LsfInterceptor.allowedId = filterArg.toString();
         }
-        new RunTest().executeTests(new PrintWriter(System.out), discoveryFilter, filterArg);
+        new RunTest().executeTests(new PrintWriter(System.out), discoveryFilter, filterArg, testsJar);
 
         XmlReportPatcher.fixOutputXmls(Paths.get("."));
     }
