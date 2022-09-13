@@ -384,14 +384,14 @@ public class PerformanceExplorer {
 		OptionParser p = new OptionParser() {{
 			accepts(INPUT_DCP_OPT).withRequiredArg().required().describedAs("Input DCP");
 			accepts(CLK_NAME_OPT).withRequiredArg().required().describedAs("Name of clock to optimize");
-			accepts(TARGET_PERIOD_OPT).withRequiredArg().required().describedAs("Target clock period (ns)");
+			accepts(TARGET_PERIOD_OPT).withRequiredArg().ofType(Double.class).required().describedAs("Target clock period (ns)");
 			accepts(PLACER_DIRECTIVES_OPT).withOptionalArg().defaultsTo(placerDirectiveDefaults).describedAs("Comma separated list of place_design -directives");
 			accepts(ROUTER_DIRECTIVES_OPT).withOptionalArg().defaultsTo(routerDirectiveDefaults).describedAs("Comma separated list of route_design -directives");
 			accepts(CLK_UNCERTAINTY_OPT).withOptionalArg().describedAs("Comma separated list of clk uncertainty values (ns)");
 			accepts(PBLOCK_FILE_OPT).withRequiredArg().describedAs("PBlock file, one set of ranges per line with list of optional cell names to be constrained.  Use '|' after ranges to denote list of cell names separated by spaces, for example: 'SLICE_X0Y0:SLICE_X0Y1 DSP48E2_X0Y0:DSP48E2_X0Y1 | cell_name0 cell_name1'");
-			accepts(MIN_CLK_UNCERTAINTY_OPT).withOptionalArg().defaultsTo(printNS(DEFAULT_MIN_CLK_UNCERT)).describedAs("Min clk uncertainty (ns)");
-			accepts(MAX_CLK_UNCERTAINTY_OPT).withOptionalArg().defaultsTo(printNS(DEFAULT_MAX_CLK_UNCERT)).describedAs("Max clk uncertainty (ns)");
-			accepts(CLK_UNCERTAINTY_STEP_OPT).withOptionalArg().defaultsTo(printNS(DEFAULT_STEP_CLK_UNCERT)).describedAs("Clk uncertainty step (ns)");
+			accepts(MIN_CLK_UNCERTAINTY_OPT).withOptionalArg().ofType(Double.class).defaultsTo(DEFAULT_MIN_CLK_UNCERT).describedAs("Min clk uncertainty (ns)");
+			accepts(MAX_CLK_UNCERTAINTY_OPT).withOptionalArg().ofType(Double.class).defaultsTo(DEFAULT_MAX_CLK_UNCERT).describedAs("Max clk uncertainty (ns)");
+			accepts(CLK_UNCERTAINTY_STEP_OPT).withOptionalArg().ofType(Double.class).defaultsTo(DEFAULT_STEP_CLK_UNCERT).describedAs("Clk uncertainty step (ns)");
 			accepts(ADD_EDIF_METADATA_OPT).withOptionalArg().ofType(Boolean.class).defaultsTo(DEFAULT_ADD_EDIF_METADATA).describedAs("Create EDIF and Metadata");
 			accepts(RUN_DIR_OPT).withOptionalArg().defaultsTo("<current directory>").describedAs("Run directory (jobs data location)");
 			accepts(VIVADO_PATH_OPT).withOptionalArg().defaultsTo(DEFAULT_VIVADO).describedAs("Specifies vivado path");
@@ -434,7 +434,7 @@ public class PerformanceExplorer {
 		
 		String dcpInputName = (String) opts.valueOf(INPUT_DCP_OPT);
 		String clkName = (String) opts.valueOf(CLK_NAME_OPT);
-		double targetPeriod = Double.parseDouble((String)  opts.valueOf(TARGET_PERIOD_OPT));
+		double targetPeriod = (double) opts.valueOf(TARGET_PERIOD_OPT);
 		String runDir = opts.hasArgument(RUN_DIR_OPT) ? (String) opts.valueOf(RUN_DIR_OPT) : System.getProperty("user.dir");
 		
 		Design d = Design.readCheckpoint(dcpInputName);
@@ -448,9 +448,9 @@ public class PerformanceExplorer {
 			String clkUncertaintyValues = (String) opts.valueOf(CLK_UNCERTAINTY_OPT);
 			pe.setClockUncertaintyValues(clkUncertaintyValues.split("[,]"));			
 		} else{
-			pe.setMinClockUncertainty(Double.parseDouble((String) opts.valueOf(MIN_CLK_UNCERTAINTY_OPT)));
-			pe.setMaxClockUncertainty(Double.parseDouble((String) opts.valueOf(MAX_CLK_UNCERTAINTY_OPT)));
-			pe.setClockUncertaintyStep(Double.parseDouble((String) opts.valueOf(CLK_UNCERTAINTY_STEP_OPT)));
+			pe.setMinClockUncertainty((double) opts.valueOf(MIN_CLK_UNCERTAINTY_OPT));
+			pe.setMaxClockUncertainty((double) opts.valueOf(MAX_CLK_UNCERTAINTY_OPT));
+			pe.setClockUncertaintyStep((double) opts.valueOf(CLK_UNCERTAINTY_STEP_OPT));
 			pe.updateClockUncertaintyValues();
 		}
 		String placerDirValues = (String) opts.valueOf(PLACER_DIRECTIVES_OPT);
