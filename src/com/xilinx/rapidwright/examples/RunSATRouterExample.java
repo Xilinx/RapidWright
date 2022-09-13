@@ -42,7 +42,7 @@ public class RunSATRouterExample {
 			System.out.println("USAGE: java " + RunSATRouterExample.class.getCanonicalName() + " " 
 							+ "<placed_dcp_filename> <pblock_area_constraint> <output_dcp> [random seed]");
 			return;
-		}		
+		}
 		// Check for Vivado
 		String vivadoPath = FileTools.getVivadoPath();
 		if(vivadoPath == null || vivadoPath.length() == 0){
