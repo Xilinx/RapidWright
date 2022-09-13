@@ -127,14 +127,21 @@ tasks.withType(Test) {
   finalizedBy remindSubmodules
 }
 
+task testJar(type: Jar) {
+    classifier = 'tests'
+    from sourceSets.test.output
+    dependsOn project.tasks.findByName('testFixturesJar')
+    dependsOn project.tasks.findByName('jar')
+}
+
 task testLsf(type: JavaExec) {
   group = "verification"
   description = "Run the tests on lsf"
-  classpath = sourceSets.test.runtimeClasspath
+  //Using a closure here, otherwise the test classpath gets messed up and compileTestClasses fails.
+  classpath = files( { -> project.configurations.testRuntimeClasspath.getFiles() + project.tasks.findByName('testJar').getArchiveFile().get() })
   mainClass = "com.xilinx.rapidwright.util.lsf.LaunchTestsOnLsf"
   workingDir = file("build/test-lsf")
   doFirst {
     project.mkdir(workingDir)
   }
 }
-
