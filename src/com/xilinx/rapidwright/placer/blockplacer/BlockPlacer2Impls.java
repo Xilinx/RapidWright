@@ -43,7 +43,6 @@ import com.xilinx.rapidwright.design.ModuleImplsInst;
 import com.xilinx.rapidwright.design.ModulePlacement;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.TileRectangle;
-import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFNet;
@@ -52,7 +51,6 @@ import com.xilinx.rapidwright.edif.EDIFPortInst;
 public class BlockPlacer2Impls extends BlockPlacer2<ModuleImpls, ModuleImplsInst, ModulePlacement, ImplsPath> {
 
     private final List<ModuleImplsInst> moduleInstances;
-    private Map<Site, ModuleImplsInst> currentAnchors = new HashMap<>();
 
     private final AbstractOverlapCache<ModulePlacement, ModuleImplsInst> overlaps;
 
@@ -96,11 +94,7 @@ public class BlockPlacer2Impls extends BlockPlacer2<ModuleImpls, ModuleImplsInst
     @Override
     void placeHm(ModuleImplsInst hm, ModulePlacement placement) {
         if (hm.getPlacement() != null) {
-            currentAnchors.remove(hm.getPlacement().placement);
             overlaps.unplace(hm);
-        }
-        if (!currentAnchors.containsKey(placement.placement)) {
-            currentAnchors.put(placement.placement, hm);
         }
         hm.place(placement);
         overlaps.place(hm);
@@ -110,7 +104,6 @@ public class BlockPlacer2Impls extends BlockPlacer2<ModuleImpls, ModuleImplsInst
     void unplaceHm(ModuleImplsInst hm) {
         if (hm.getPlacement() != null) {
             overlaps.unplace(hm);
-            currentAnchors.remove(hm.getPlacement().placement);
         }
         hm.unplace();
     }
@@ -235,11 +228,6 @@ public class BlockPlacer2Impls extends BlockPlacer2<ModuleImpls, ModuleImplsInst
     @Override
     protected Tile getPlacementTile(ModulePlacement placement) {
         return placement.placement.getTile();
-    }
-
-    @Override
-    protected ModuleImplsInst getHmCurrentlyAtPlacement(ModulePlacement placement) {
-        return currentAnchors.get(placement.placement);
     }
 
     @Override

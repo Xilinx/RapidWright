@@ -841,8 +841,6 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 
 	}
 
-	protected abstract ModuleInstT getHmCurrentlyAtPlacement(PlacementT placement);
-
 	protected abstract PlacementT getCurrentPlacement(ModuleInstT selected);
 
 	private double updateTemperature(){

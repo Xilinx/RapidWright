@@ -48,7 +48,6 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
     private AbstractOverlapCache<Site, HardMacro> overlaps;
 
     /** The current location of all hard macros */
-    private HashMap<Site, HardMacro> currentPlacements = new HashMap<>();
     private Map<ModuleInst, HardMacro> macroMap;
 
     public BlockPlacer2Module(Design design, boolean ignoreMostUsedNets, java.nio.file.Path graphData, boolean denseDesign, float effort, boolean focusOnWorstModules, TileRectangle placementArea) {
@@ -91,7 +90,7 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
             HardMacro hm = new HardMacro(mi);
             hardMacros.add(hm);
             if (mi.isPlaced()) {
-                hm.setTempAnchorSite(mi.getAnchor().getSite(), currentPlacements);
+                hm.setTempAnchorSite(mi.getAnchor().getSite(), null);
             }
             macroMap.put(mi, hm);
         }
@@ -105,7 +104,7 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
         if (hm.getPlacement() != null) {
             overlaps.unplace(hm);
         }
-        hm.setTempAnchorSite(site, currentPlacements);
+        hm.setTempAnchorSite(site, null);
         overlaps.place(hm);
     }
 
@@ -303,12 +302,6 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
                 }
             }
         }
-    }
-
-    @Override
-    protected HardMacro getHmCurrentlyAtPlacement(Site placement) {
-
-        return currentPlacements.get(placement);
     }
 
     public boolean placeModuleNear(ModuleInst modInst, Tile tile, HashSet<Tile> usedTiles){

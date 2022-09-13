@@ -101,8 +101,10 @@ public class HardMacro extends ModuleInst implements Comparable<Object> {
 	public void setTempAnchorSite(Site tempAnchorSite, HashMap<Site, HardMacro> currentPlacements) {
 
 		// perform the move
-		currentPlacements.remove(this.tempAnchorSite);
-		currentPlacements.put(tempAnchorSite, this);
+		if (currentPlacements != null) {
+			currentPlacements.remove(this.tempAnchorSite);
+			currentPlacements.put(tempAnchorSite, this);
+		}
 
 		this.tempAnchorSite = tempAnchorSite;
 		this.tempAnchorBoundingBox = getModule().getBoundingBox().getCorresponding(tempAnchorSite.getTile(), getModule().getAnchor().getTile());
