@@ -284,10 +284,12 @@ public class TestSiteInst {
         Cell lut = si.getCell(si.getBEL(inputPin.charAt(0) + "6LUT"));
         Assertions.assertNotNull(lut);
         Assertions.assertTrue(lut.isRoutethru());
+        Assertions.assertTrue(lut.getType().equals("MUXF8"));
 
         Cell f7mux = si.getCell(si.getBEL("F7MUX_EF"));
         Assertions.assertNotNull(f7mux);
         Assertions.assertTrue(f7mux.isRoutethru());
+        Assertions.assertTrue(f7mux.getType().equals("MUXF8"));
 
         // Check that inserting either of these RT cells hasn't clobbered the
         // non-RT cell
