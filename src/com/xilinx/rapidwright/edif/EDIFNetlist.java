@@ -122,6 +122,8 @@ public class EDIFNetlist extends EDIFName {
 	public static final Map<Series, Map<String,Pair<String,EnumSet<IOStandard>>>> macroCollapseExceptionMap;
 
 	public static final String IOSTANDARD_PROP = "IOStandard";
+
+	private static final EDIFPropertyValue DEFAULT_PROP_VALUE = new EDIFPropertyValue(IOStandard.DEFAULT.name(), EDIFValueType.STRING);
 	
 	static {
 	    EnumSet<IOStandard> obufExpansion = EnumSet.of(
@@ -168,7 +170,7 @@ public class EDIFNetlist extends EDIFName {
 	        // Prim -> Macro (when set IOStandard matches expansion set)
 	        seriesMacroExpandExceptionMap.put("OBUFDS", new Pair<>("OBUFDS_DUAL_BUF", obufExpansion));
 	        seriesMacroExpandExceptionMap.put("OBUFTDS", new Pair<>("OBUFTDS_DUAL_BUF", obufExpansion));
-	        macroExpandExceptionMap.put(s, seriesMacroCollapseExceptionMap);
+	        macroExpandExceptionMap.put(s, seriesMacroExpandExceptionMap);
 	        
 	        for(Entry<String,Pair<String,EnumSet<IOStandard>>> e : seriesMacroExpandExceptionMap.entrySet()) {
 	            Pair<String,EnumSet<IOStandard>> newPair = new Pair<>(e.getKey(), e.getValue().getSecond());
@@ -1633,11 +1635,13 @@ public class EDIFNetlist extends EDIFName {
 						        if(value == null) {
 						            value = inst.getProperty(IOSTANDARD_PROP.toUpperCase());
 						        }
-						        if(value != null) {
-                                    IOStandard ioStandard = IOStandard.valueOf(value.getValue());
-						            if(exception.getSecond().contains(ioStandard)) {
-						                cellName = exception.getFirst();
-						            }
+						        if(value == null) {
+						            // If the IOStandard is not set, use default
+						            value = DEFAULT_PROP_VALUE;
+						        }
+						        IOStandard ioStandard = IOStandard.valueOf(value.getValue());
+						        if(exception.getSecond().contains(ioStandard)) {
+						            cellName = exception.getFirst();
 						        }
 						    }
 						}
