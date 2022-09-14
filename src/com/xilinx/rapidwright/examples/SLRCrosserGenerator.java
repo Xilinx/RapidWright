@@ -615,9 +615,12 @@ public class SLRCrosserGenerator {
 					lagunaSite + "' not found on part " + partName);
 			}
 			ClockRegion curr = s.getTile().getClockRegion();
-			ClockRegion below = s.getNeighborSite(0, -1).getTile().getClockRegion();
-			if(curr.equals(below) || (curr.getRow() - below.getRow() == 1) || s.getInstanceX() % 2 != 0) 
-			    throw new RuntimeException("ERROR: Laguna site '" + s + "' is not a bottom row LAGUNA site.");
+			Site southernNeighborSite = s.getNeighborSite(0, -1);
+			if (southernNeighborSite != null) {
+				ClockRegion below = southernNeighborSite.getTile().getClockRegion();
+				if(curr.equals(below) || (curr.getRow() - below.getRow() == 1) || s.getInstanceX() % 2 != 0)
+					throw new RuntimeException("ERROR: Laguna site '" + s + "' is not a bottom row LAGUNA site.");
+			}
 		}
 		
 		List<String> busNames = new ArrayList<>();
