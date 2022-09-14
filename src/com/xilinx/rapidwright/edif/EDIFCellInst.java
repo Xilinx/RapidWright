@@ -31,6 +31,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * A cell instance in a logical (EDIF) netlist.  Instantiates
@@ -272,7 +273,8 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
             return false;
         EDIFCellInst that = (EDIFCellInst) o;
 
-        if (!parentCell.equals(that.parentCell))
+        
+        if (!Objects.equals(parentCell,that.parentCell))
             return false;
 
         if (!cellType.equals(that.cellType))

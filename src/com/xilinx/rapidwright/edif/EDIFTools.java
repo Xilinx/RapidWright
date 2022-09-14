@@ -778,8 +778,13 @@ public class EDIFTools {
 	}
 
 	public static void ensureCorrectPartInEDIF(EDIFNetlist edif, String partName){
-		Map<EDIFName, EDIFPropertyValue> propMap = edif.getDesign().getProperties();
-		if(propMap == null){
+		EDIFDesign design = edif.getDesign();
+		if(design == null) {
+		    design = new EDIFDesign(edif.getName());
+		    edif.setDesign(design);
+		}
+		Map<EDIFName, EDIFPropertyValue> propMap = design.getProperties();
+		if(propMap == null || propMap.size() == 0){
 			edif.getDesign().addProperty(EDIF_PART_PROP, partName);
 			return;
 		}
@@ -1027,7 +1032,7 @@ public class EDIFTools {
 	 * @return An array [0:width-1] of port refs.
 	 */
 	public static EDIFPortInst[] createPortInsts(EDIFCell parent, String name, EDIFDirection dir, int width){
-		String portName = name +"[" + (width-1) +":0]";
+		String portName = name + (width==1 ? "" : "[" + (width-1) +":0]");
 		EDIFPort port = parent.createPort(portName, dir, width);
 		EDIFPortInst[] portInsts = new EDIFPortInst[width];
 		for(int i=0; i < width; i++){
