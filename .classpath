@@ -52,5 +52,7 @@
 	<classpathentry kind="lib" path="jars/commons-io-2.11.0.jar"/>
 	<classpathentry kind="lib" path="jars/jzlib-1.1.3.jar"/>
 	<classpathentry kind="lib" path="jars/jeromq-0.5.2.jar"/>
+	<classpathentry kind="lib" path="jars/junit-platform-launcher-1.7.1.jar"/>
+	<classpathentry kind="lib" path="jars/junit-platform-reporting-1.7.1.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
