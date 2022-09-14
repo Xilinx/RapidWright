@@ -900,12 +900,17 @@ public class DesignTools {
 				c.updateName(hierarchicalCellName + "/" + c.getName());
 				if(!c.isRoutethru())
 					design.addCell(c);
+				else {
+				    for(Entry<String, AltPinMapping> p : c.getAltPinMappings().entrySet()) {
+				        p.getValue().setAltCellName(hierarchicalCellName + "/" + p.getValue().getAltCellName()); 
+				    }
+				}
 			}
 			design.addSiteInst(si);
 		}
 		
 		// Add routing information
-		for(Net net : cell.getNets()){
+		for(Net net : new ArrayList<>(cell.getNets())){
 			if(net.getName().equals(Net.USED_NET)) continue;
 			if(net.isStaticNet()){
 				Net staticNet = design.getStaticNet(net.getType());
@@ -1154,6 +1159,8 @@ public class DesignTools {
 	                reverseConnsStart.put(startNode, rPips);
 	            }
 	            rPips.add(pip);
+
+	            fanout.merge(endNode, 1, Integer::sum);
 	        }
 
 	        // If a site pin was found and it belongs to this net, add an extra fanout to
@@ -1190,6 +1197,9 @@ public class DesignTools {
 	            	toRemove.add(pip);
 	            	Node startNode = pip.getStartNode();
 	            	updateFanout.add(startNode);
+	            	if (atReversedBidirectionalPip) {
+	            		updateFanout.add(pip.getEndNode());
+	            	}
 	            	if (new Node(pip.getTile(), pip.getStartWireIndex()).equals(sink) && !atReversedBidirectionalPip) {
 	            		// reached the source and there is another branch starting with a reversed
 	            		// bidirectional PIP ... don't traverse it
@@ -2294,7 +2304,8 @@ public class DesignTools {
 		// Populate black boxes with existing logical netlist cells
 		HashSet<String> instsWithSeparator = new HashSet<>();
 		for(Entry<String,String> e : srcToDestInstNames.entrySet()) {
-			EDIFHierCellInst cellInst = src.getNetlist().getHierCellInstFromName(e.getKey());
+			EDIFHierCellInst cellInst = e.getKey().length()==0 ? src.getNetlist().getTopHierCellInst() 
+			        : src.getNetlist().getHierCellInstFromName(e.getKey());
 			if(e.getValue().length() == 0) {
 			    // If its the top cell, remove the top cell from destNetlist
 			    EDIFLibrary destLib = destNetlist.getLibrary(cellInst.getCellType().getLibrary().getName());
@@ -2316,7 +2327,11 @@ public class DesignTools {
 		
 		Map<String,String> prefixes = new HashMap<>();
 		for(String srcPrefix : srcToDestInstNames.keySet()) {
-			prefixes.put(srcPrefix + "/", srcPrefix);
+		    if(srcPrefix.length()==0) {
+		        prefixes.put(srcPrefix, srcPrefix);
+		    }else {
+	                prefixes.put(srcPrefix + "/", srcPrefix);
+		    }
 		}
 		
 		// Identify cells to copy placement
@@ -2389,7 +2404,7 @@ public class DesignTools {
 			if((prefixMatch = StringTools.startsWithAny(net.getName(), prefixes.keySet())) != null) {
 			    newNetName = getNewHierName(newNetName, srcToDestInstNames, prefixes, prefixMatch);
 			}
-			EDIFNet logicalNet = destNetlist.getNetFromHierName(net.getName());
+			EDIFNet logicalNet = destNetlist.getNetFromHierName(newNetName);
 			Net copiedNet = dest.createNet(newNetName, logicalNet);
 			for(PIP p : net.getPIPs()) {
 				if(pipsToRemove.contains(p)) continue;
@@ -2397,6 +2412,14 @@ public class DesignTools {
 				if(lockRouting) {
 					p.setIsPIPFixed(true);
 				}
+			}
+			for(SitePinInst spi : net.getPins()) {
+				if(pinsToRemove.contains(spi)) continue;
+				SiteInst siteInst = dest.getSiteInstFromSite(spi.getSite());
+				if(siteInst == null) {
+					dest.createSiteInst(spi.getSite());
+				}
+				copiedNet.createPin(spi.getName(), siteInst);
 			}
 		}
 
@@ -2511,6 +2534,9 @@ public class DesignTools {
 	                                        Map<String,String> prefixes, String prefixMatch) {
 		String newCellPrefix = srcToDestInstNames.get(prefixes.get(prefixMatch));
 		int idx = prefixMatch.length() - (newCellPrefix.length() == 0 ? 0 : 1);
+		if(idx == -1) {
+		    return newCellPrefix + "/" + srcName;
+		}
 		return newCellPrefix + srcName.substring(idx);
 	}
 	

@@ -32,26 +32,25 @@ LICENSE.TXT for full details.
 
 ## Installation
 
-### Easiest way to Setup a RapidWright Repo Locally:
+### Easiest way to Checkout and Compile a RapidWright Repo Locally:
 
 ```
-wget http://www.rapidwright.io/docs/_downloads/rapidwright-installer.jar
-java -jar rapidwright-installer.jar -t
-source rapidwright.sh
+git clone https://github.com/Xilinx/RapidWright.git
 cd RapidWright
+./gradlew compileJava
 ```
 
 More details here:
 http://www.rapidwright.io/docs/Automatic_Install.html#automatic-install
 
 
-### How to Update RapidWright to the Most Recent Release
+### How to Update RapidWright to the Latest Revision
 
 ```
 cd $RAPIDWRIGHT_PATH
 git pull
 # resolve any issues
-gradlew update_jars
+./gradlew updateJars
 ```
 
 ### Development setup
