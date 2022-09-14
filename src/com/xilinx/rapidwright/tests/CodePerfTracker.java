@@ -24,11 +24,15 @@
  */
 package com.xilinx.rapidwright.tests;
 
+import java.lang.management.ManagementFactory;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
+import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.MessageGenerator;
+import com.xilinx.rapidwright.util.Pair;
 
 /**
  * Simple tool for measuring code runtime and memory and reporting.
@@ -47,6 +51,8 @@ public class CodePerfTracker {
 
 	private Map<String,Long> inflightTimes;
 	
+	private List<Pair<Long,Long>> totalPeakMemUsages;
+	
 	private Runtime rt;
 	
 	private int maxRuntimeSize = 9;
@@ -55,6 +61,8 @@ public class CodePerfTracker {
 	private boolean printProgress = true;
 	private boolean trackMemoryUsingGC = false;
 
+	private Integer linuxProcID = null;
+	
 	public static final CodePerfTracker SILENT;
 	
 	static {
@@ -134,6 +142,9 @@ public class CodePerfTracker {
 		segmentNames.add(segmentName);
 		memUsages.add(currUsage);
 		runtimes.add(System.nanoTime());
+		if(linuxProcID != null) {
+		    totalPeakMemUsages.add(null);
+		}
 		return this;
 	}
 
@@ -150,10 +161,27 @@ public class CodePerfTracker {
 		runtimes.set(idx, end-start);
 		memUsages.set(idx,	currUsage-prevUsage);
 		
+		if(linuxProcID != null) {
+		    totalPeakMemUsages.set(idx, getTotalPeakMemUsage());
+		}
+		
 		if(printProgress && isVerbose()){
 			print(idx);
 		}
 		return this;
+	}
+	
+	private Pair<Long,Long> getTotalPeakMemUsage() {
+	    if(linuxProcID == null) return null;
+	    Pair<Long,Long> totalPeakMemUsage = new Pair<>();
+	    for(String line : FileTools.getLinesFromTextFile("/proc/" + linuxProcID + "/status")) {
+	        if(line.startsWith("VmHWM:")) {
+	            totalPeakMemUsage.setSecond(Long.parseLong(line.split("\\s+")[1]));
+	        }else if(line.startsWith("VmRSS:")) {
+	            totalPeakMemUsage.setFirst(Long.parseLong(line.split("\\s+")[1]));
+	        }
+	    }
+	    return totalPeakMemUsage;
 	}
 
 	public synchronized CodePerfTracker start(String segmentName, boolean nested) {
@@ -173,16 +201,16 @@ public class CodePerfTracker {
 
 		long end = System.nanoTime();
 		if (printProgress && isVerbose()) {
-			print("(" + segmentName + ")", end-start, null, true);
+			print("(" + segmentName + ")", end-start, null, null, true);
 		}
 		return this;
 	}
 
-	private void print(String segmentName, Long runtime, Long memUsage) {
-		print(segmentName, runtime, memUsage, false);
+	private void print(String segmentName, Long runtime, Long memUsage, Pair<Long,Long> totalPeakUsage) {
+		print(segmentName, runtime, memUsage, totalPeakUsage, false);
 	}
 
-	private void print(String segmentName, Long runtime, Long memUsage, boolean nested){
+	private void print(String segmentName, Long runtime, Long memUsage, Pair<Long,Long> totalPeakUsage, boolean nested){
 		if(isUsingGCCallsToTrackMemory()){
 			if (nested) {
 				System.out.printf("%"+maxSegmentNameSize+"s: %"+maxRuntimeSize+"s %" + maxUsageSize + "s      (%" + maxRuntimeSize + ".3fs)\n",
@@ -191,10 +219,20 @@ public class CodePerfTracker {
 						"",
 						(runtime)/1000000000.0);
 			} else {
-				System.out.printf("%"+maxSegmentNameSize+"s: %"+maxRuntimeSize+".3fs %"+maxUsageSize+".3fMBs\n",
-						segmentName,
-						(runtime)/1000000000.0,
-						(memUsage)/(1024.0*1024.0));
+			    if(totalPeakUsage != null) {
+		            System.out.printf("%"+maxSegmentNameSize+"s: %"+maxRuntimeSize+".3fs %"+maxUsageSize+".3fMBs | %"+maxUsageSize+".3fMBs (curr) %"+maxUsageSize+".3fMBs (peak)\n",
+		                        segmentName,
+		                        (runtime)/1000000000.0,
+		                        (memUsage)/(1024.0*1024.0),
+		                        (totalPeakUsage.getFirst())/1024.0,
+		                        (totalPeakUsage.getSecond())/1024.0);
+
+			    }else {
+	                System.out.printf("%"+maxSegmentNameSize+"s: %"+maxRuntimeSize+".3fs %"+maxUsageSize+".3fMBs\n",
+	                        segmentName,
+	                        (runtime)/1000000000.0,
+	                        (memUsage)/(1024.0*1024.0));
+			    }
 			}
 		} else {
 			if (nested) {
@@ -211,7 +249,8 @@ public class CodePerfTracker {
 	}
 
 	private void print(int idx) {
-		print(segmentNames.get(idx), runtimes.get(idx), memUsages.get(idx));
+		Pair<Long,Long> usages = totalPeakMemUsages == null ? null : totalPeakMemUsages.get(idx);
+		print(segmentNames.get(idx), runtimes.get(idx), memUsages.get(idx), usages);
 	}
 	
 	/**
@@ -234,6 +273,14 @@ public class CodePerfTracker {
 	 */
 	public void useGCToTrackMemory(boolean useGCCalls) {
 		this.trackMemoryUsingGC = useGCCalls;
+		if(!FileTools.isWindows()) {
+		    String id = ManagementFactory.getRuntimeMXBean().getName();
+		    int idx = id.indexOf('@');
+		    if(idx > 0) {
+		        linuxProcID = Integer.parseInt(id.substring(0, idx));
+		        totalPeakMemUsages = new ArrayList<>();
+		    }
+		}
 	}
 
 	private void addTotalEntry(){
@@ -250,6 +297,9 @@ public class CodePerfTracker {
 		memUsages.add(totalUsage);
 		String totalName = isUsingGCCallsToTrackMemory() ? "*Total*" : " [No GC] *Total*";  
 		segmentNames.add(totalName);
+		if(linuxProcID != null) {
+		    totalPeakMemUsages.add(getTotalPeakMemUsage());
+		}
 		if(maxSegmentNameSize < totalName.length()) maxSegmentNameSize = totalName.length();
 	}
 
@@ -258,6 +308,9 @@ public class CodePerfTracker {
 		runtimes.remove(idx);
 		memUsages.remove(idx);
 		segmentNames.remove(idx);
+		if(totalPeakMemUsages != null) {
+		    totalPeakMemUsages.remove(idx);
+		}
 	}
 	
 	public void printSummary(){
