@@ -29,7 +29,7 @@ import com.xilinx.rapidwright.edif.EDIFPort;
 /**
  * Abstract base class for {@link ModuleInst} and {@link ModuleImplsInst}
  */
-public abstract class AbstractModuleInst<ModuleT, T extends AbstractModuleInst<ModuleT, T>> {
+public abstract class AbstractModuleInst<ModuleT, PlacementT, T extends AbstractModuleInst<ModuleT, PlacementT, T>> {
 
     /** Name of the module instance */
     private String name;
@@ -94,7 +94,7 @@ public abstract class AbstractModuleInst<ModuleT, T extends AbstractModuleInst<M
             return false;
         if(getClass() != obj.getClass())
             return false;
-        AbstractModuleInst<?,?> other = (AbstractModuleInst<?,?>) obj;
+        AbstractModuleInst<?,?,?> other = (AbstractModuleInst<?,?,?>) obj;
         if(name == null){
             if(other.name != null)
                 return false;
@@ -214,4 +214,8 @@ public abstract class AbstractModuleInst<ModuleT, T extends AbstractModuleInst<M
     }
     
     public abstract RelocatableTileRectangle getBoundingBox();
+
+
+    public abstract PlacementT getPlacement();
+    public abstract boolean overlaps(T hm);
 }

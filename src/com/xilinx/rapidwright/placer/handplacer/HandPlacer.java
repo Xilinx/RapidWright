@@ -260,6 +260,7 @@ public class HandPlacer extends QMainWindow {
 		for(GUINetLine netLine : netLineList){
 			estimate += netLine.line().length();
 		}
+		statusBar().showMessage("Wiring cost: "+estimate, 2000);
 	}
 	
 	public void hmMoved(List<GUIModuleInst> movedHMList, List<QPointF> oldPosList) {
