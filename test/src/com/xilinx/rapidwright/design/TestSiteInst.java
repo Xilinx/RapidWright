@@ -22,22 +22,16 @@
  
 package com.xilinx.rapidwright.design;
 
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
-
-import com.xilinx.rapidwright.design.Cell;
-import com.xilinx.rapidwright.design.Design;
-import com.xilinx.rapidwright.design.Net;
-import com.xilinx.rapidwright.design.SiteInst;
-import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestSiteInst {
 
@@ -201,16 +195,16 @@ public class TestSiteInst {
         SiteInst si = d.createSiteInst(d.getDevice().getSite("SLICE_X32Y73"));
 
         BEL carry;
-        if(d.getDevice().getSeries() == Series.Series7) {
+        if (d.getDevice().getSeries() == Series.Series7) {
             carry = si.getBEL("CARRY4");
         } else {
             carry = si.getBEL("CARRY8");
         }
 
-        for(char letter : LUTTools.lutLetters) {
+        for (char letter : LUTTools.lutLetters) {
             routeLUTRouteThruHelperCarry(d, si, letter, true);
             routeLUTRouteThruHelperCarry(d, si, letter, false);
-            if(d.getDevice().getSeries() == Series.Series7 && letter == 'D') break;
+            if (d.getDevice().getSeries() == Series.Series7 && letter == 'D') break;
 
             char index = Character.forDigit(letter - 'A', 10);
             // Unroute 6LUT
@@ -232,5 +226,97 @@ public class TestSiteInst {
                 Assertions.assertNull(lut5);
             }
         }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"C1","D2"})
+    public void testSiteRoutingToF7MUX(String inputPin) {
+        Design d = new Design("testSiteRoutingToF7MUX", Device.KCU105);
+        Cell c = d.createAndPlaceCell("testFMUX", Unisim.MUXF7, "SLICE_X32Y73/F7MUX_CD");
+        SiteInst si = c.getSiteInst();
+
+        Net n = d.createNet("muxf7_input");
+        String muxInput = (inputPin.charAt(0) == 'C') ? "1" : "0";
+        n.getLogicalNet().createPortInst("I" + muxInput, c.getEDIFCellInst());
+        n.createPin(inputPin, si);
+
+        BELPin src = si.getBELPin(inputPin, inputPin);
+        BELPin snk = si.getBELPin("F7MUX_CD", muxInput);
+        Assertions.assertTrue(si.routeIntraSiteNet(n, src, snk));
+
+        // Check that routethru cells have been placed
+        Cell lut = si.getCell(si.getBEL(inputPin.charAt(0) + "6LUT"));
+        Assertions.assertNotNull(lut);
+        Assertions.assertTrue(lut.isRoutethru());
+
+        // Check that inserting this RT cells hasn't clobbered the non-RT cell
+        Assertions.assertEquals(c, d.getCell(c.getName()));
+
+        String[] siteWires = new String[] {inputPin, inputPin.charAt(0)+ "_O"};
+
+        for(String siteWire : siteWires) {
+            Assertions.assertEquals(n, si.getNetFromSiteWire(siteWire));
+        }
+
+        // Now unroute
+        Assertions.assertTrue(si.unrouteIntraSiteNet(src, snk));
+
+        lut = si.getCell(si.getBEL(inputPin.charAt(0) + "6LUT"));
+        Assertions.assertNull(lut);
+    }
+    
+    @ParameterizedTest
+    @ValueSource(strings = {"F6","E6"})
+    public void testSiteRoutingToF8MUX(String inputPin) {
+        Design d = new Design("testSiteRoutingToF8MUX", Device.KCU105);
+        Cell c = d.createAndPlaceCell("testFMUX", Unisim.MUXF8, "SLICE_X32Y73/F8MUX_TOP");
+        SiteInst si = c.getSiteInst();
+
+        Net n = d.createNet("muxf8_input");
+        n.getLogicalNet().createPortInst("I1", c.getEDIFCellInst());
+        n.createPin(inputPin, si);
+        
+        BELPin src = si.getBELPin(inputPin, inputPin);
+        BELPin snk = si.getBELPin("F8MUX_TOP", "1");
+        Assertions.assertTrue(si.routeIntraSiteNet(n, src, snk));
+
+        // Check that both routethru cells have been placed
+        Cell lut = si.getCell(si.getBEL(inputPin.charAt(0) + "6LUT"));
+        Assertions.assertNotNull(lut);
+        Assertions.assertTrue(lut.isRoutethru());
+        Assertions.assertTrue(lut.getType().equals("MUXF8"));
+
+        Cell f7mux = si.getCell(si.getBEL("F7MUX_EF"));
+        Assertions.assertNotNull(f7mux);
+        Assertions.assertTrue(f7mux.isRoutethru());
+        Assertions.assertTrue(f7mux.getType().equals("MUXF8"));
+
+        // Check that inserting either of these RT cells hasn't clobbered the
+        // non-RT cell
+        Assertions.assertEquals(c, d.getCell(c.getName()));
+
+        String[] siteWires = new String[] {inputPin, "F7MUX_EF_OUT", inputPin.charAt(0)+ "_O"};
+        
+        for(String siteWire : siteWires) {
+            Assertions.assertEquals(n, si.getNetFromSiteWire(siteWire));
+        }
+        Net staticSelectNet = inputPin.equals("F6") ? d.getGndNet() : d.getVccNet(); 
+        Assertions.assertEquals(staticSelectNet, si.getNetFromSiteWire("EX"));
+        Assertions.assertEquals(staticSelectNet, si.getSitePinInst("EX").getNet());
+
+        // Now unroute
+        Assertions.assertTrue(si.unrouteIntraSiteNet(src, snk));
+
+        lut = si.getCell(si.getBEL(inputPin.charAt(0) + "6LUT"));
+        Assertions.assertNull(lut);
+
+        f7mux = si.getCell(si.getBEL("F7MUX_EF"));
+        Assertions.assertNull(f7mux);
+
+        for(String siteWire : siteWires) {
+            Assertions.assertNull(si.getNetFromSiteWire(siteWire));
+        }
+        Assertions.assertNull(si.getNetFromSiteWire("EX"));
+        Assertions.assertNull(si.getSitePinInst("EX"));
     }
 }
