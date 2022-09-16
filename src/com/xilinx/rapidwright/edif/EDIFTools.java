@@ -980,12 +980,28 @@ public class EDIFTools {
 	 * @return The newly created netlist from the provided cell inst.
 	 */
 	public static EDIFNetlist createNewNetlist(EDIFCellInst cellInst){
+	    List<String> librariesOrder = new ArrayList<>(cellInst.getCellType().getNetlist().getLibrariesMap().keySet());
 	    EDIFNetlist n = new EDIFNetlist(cellInst.getName());
 	    n.generateBuildComments();
 	    EDIFDesign eDesign = new EDIFDesign(cellInst.getName());
 	    n.setDesign(eDesign);
-	    eDesign.setTopCell(cellInst.getCellType());
-	    n.migrateCellAndSubCells(cellInst.getCellType());
+	    EDIFCell topCell = cellInst.getCellType();
+	    n.copyCellAndSubCells(topCell);
+	    eDesign.setTopCell(n.getLibrary(topCell.getLibrary().getName()).getCell(topCell.getName()));
+	    if(n.getLibraries().size() > 2) {
+	        // Put libraries in the same order as source netlist
+	        Map<String, EDIFLibrary> libs = new HashMap<>();
+	        for(EDIFLibrary lib : n.getLibraries()) {
+	            libs.put(lib.getName(), lib);
+	        }
+	        n.getLibrariesMap().clear();
+	        for(String libName : librariesOrder) {
+	            EDIFLibrary lib = libs.get(libName);
+	            if(lib != null) {
+	                n.getLibrariesMap().put(libName, lib);	                
+	            }
+	        }
+	    }
 	    return n;
 	}
 	
