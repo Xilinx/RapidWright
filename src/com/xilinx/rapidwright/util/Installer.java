@@ -201,9 +201,9 @@ public class Installer {
             while(ze != null){
                 String fileName = ze.getName();
                 File newFile = new File(destDir, fileName);
-             if(!newFile.toPath().normalize().startsWith(destDir)) {
-              throw new RuntimeException("Bad zip entry");
-             }
+                if(!newFile.toPath().normalize().startsWith(destDir)) {
+                    throw new RuntimeException("Bad zip entry");
+                }
                 System.out.println("Unzipping to "+newFile.getAbsolutePath());
                 
                 if(ze.isDirectory()){
