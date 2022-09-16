@@ -1307,11 +1307,13 @@ public class RWRoute{
 				continue;
 			}
 			if(childRNode.isTarget()){
-				// Despite the limitation above, on encountering a target do not terminate
-				// immediately by clearing the queue, as this target could be expensive
-				// (due to overuse) and there could be an alternate target that ends up being
-				// cheaper
-				// queue.clear();
+				// Despite the limitation above, on encountering a target only terminate
+				// immediately by clearing the queue if this target is not overused since
+				// there could be an alternate target that would be less congested
+				int occ = childRNode.getOccupancy();
+				if (occ == 0 || (occ == 1 && childRNode.countConnectionsOfUser(connection.getNetWrapper()) != 0)) {
+					queue.clear();
+				}
 			} else {
 				if (!isAccessible(childRNode, connection)) {
 					continue;
