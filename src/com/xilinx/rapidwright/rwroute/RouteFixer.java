@@ -86,12 +86,16 @@ public class RouteFixer{
 		setShortestPathToEachVertex();
 		
 		for(Connection connection : netp.getConnections()) {
-			NodeWithDelay csink = nodeMap.get(connection.getNodes().get(0));
-			connection.getNodes().clear();
-			connection.getNodes().add(csink.getNode());
+			List<Node> nodes = connection.getNodes();
+			if (nodes.isEmpty()) {
+				continue;
+			}
+			NodeWithDelay csink = nodeMap.get(nodes.get(0));
+			nodes.clear();
+			nodes.add(csink.getNode());
 			NodeWithDelay prev = csink.getPrev();
 			while(prev != null) {
-				connection.getNodes().add(prev.getNode());
+				nodes.add(prev.getNode());
 				prev = prev.getPrev();
 			}
 		}
