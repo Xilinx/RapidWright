@@ -1036,6 +1036,7 @@ public class DesignTools {
 		List<SitePinInst> sinkPins = new ArrayList<>(pins.size());
 		pins.forEach((spi) -> {
 			if (spi.isOutPin()) {
+				// TODO - This can lead to a slow down in VCC and GND nets as it is not batched                        
 				DesignTools.unrouteSourcePin(spi);
 			} else {
 				sinkPins.add(spi);
