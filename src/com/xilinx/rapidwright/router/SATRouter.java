@@ -129,7 +129,7 @@ public class SATRouter {
 	
 	private int commonNodeWeight = 10;
 	
-	private final long SEED = 82;
+	public long SEED = 82;
 	
 	private int[] lutInputWeights = new int[]{50, 45, 35, 30, 20, 10};
 	/**
@@ -773,7 +773,7 @@ public class SATRouter {
 		createNetsFiles();
 		createPipFile();
 		int result = runEvRouter();
-		if(result != 0){
+		if(result != 0 && result != 1){
 			int lastLineCount = 10;
 			List<String> lastLines = FileTools.getLastNLinesFromTextFile(satLogFile, lastLineCount);
 			StringBuilder sb = new StringBuilder();
