@@ -468,27 +468,12 @@ public class PartialRouter extends RWRoute{
 			// Each rnode should be added as a child to all of its parents
 			// that already exist, unless it was already present
 			for(Node uphill : toBuild.getAllUphillNodes()) {
-				// Without this routethru check, there will be Invalid Programming for Site error shown in Vivado.
-				// Do not use those nodes, because we do not know if the routethru is available or not
-				if(routethruHelper.isRouteThru(uphill, toBuild)) continue;
 				RouteNode parent = routingGraph.getNode(uphill);
 				if (parent == null)
 					continue;
 
-				// Parent has never been expanded, let it expand naturally
-				if (!parent.everExpanded())
-					continue;
-
-				// Parent has been expanded, and if it is the prev node,
-				// then it must already be its child
-				if (rnode.getPrev() == parent) {
-					assert(parent.containsChild(rnode));
-					continue;
-				}
-
-				// Otherwise there's no reason for it to exist as a child
-				assert(!parent.containsChild(rnode));
-				parent.addChild(rnode);
+				// Reset its list of children so that they may be regenerated to include newly unpreserved node
+				parent.resetChildren();
 			}
 
 			// Clear the prev pointer (as it is also used to track

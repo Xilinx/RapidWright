@@ -357,34 +357,10 @@ abstract public class RouteNode {
 	}
 
 	/**
-	 * Gets whether the given RouteNode Object is already a child.
-	 * @param rnode Child node to search for.
-	 * @return True if child already present.
+	 * Clears the children of this node so that it can be regenerated.
 	 */
-	public boolean containsChild(RouteNode rnode) {
-		assert(children != null);
-
-		// This linear search is rather inefficient, but is currently only used in
-		// an assertion inside PartialRouter.unpreserveNet()
-		for (RouteNode child : children) {
-			if (child == rnode) {
-				return true;
-			}
-		}
-		return false;
-	}
-
-	/**
-	 * Adds a child to this node.
-	 * @param rnode Child to be added.
-	 */
-	public void addChild(RouteNode rnode) {
-		assert(children != null);
-
-		// This add-just-one method is rather inefficient, but is currently only used by
-		// PartialRouter.unpreserveNet() which is not expected to be called often
-		children = Arrays.copyOf(children, children.length + 1);
-		children[children.length - 1] = rnode;
+	public void resetChildren() {
+		children = null;
 	}
 
 	private void setType(RouteNodeType type) {
