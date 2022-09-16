@@ -20,18 +20,21 @@
  * 
  */
  
-package com.xilinx.rapidwright;
+package com.xilinx.rapidwright.support;
 
-import java.io.IOException;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
 
-import com.xilinx.rapidwright.support.CheckOpenFilesExtension;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.Tag;
 
-public class TestCheckOpenFilesInstalled {
-    @Test
-    @ExtendWith(CheckOpenFilesExtension.CheckOpenFilesWorkingExtension.class)
-    public void test() throws IOException {
-        //Actual test is in extension
-    }
+/**
+ * Marker Annotation to indicate that a test is resource heavy.
+ */
+@Retention(RetentionPolicy.RUNTIME)
+@Tag(LargeTest.LARGE_TEST)
+public @interface LargeTest {
+    String LARGE_TEST = "LARGE_TEST";
+    int DEFAULT_MAX_MEMORY_GB = 5;
+
+    int max_memory_gb() default LargeTest.DEFAULT_MAX_MEMORY_GB;
 }

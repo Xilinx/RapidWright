@@ -30,7 +30,10 @@ import java.io.IOException;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 
 import com.xilinx.rapidwright.design.ConstraintGroup;
 import com.xilinx.rapidwright.design.Design;
@@ -69,7 +72,8 @@ public class PerformanceExplorer {
 	
 	double targetPeriod;
 	
-	private ArrayList<PBlock> pblocks;
+	/** Maps a pblock to optional named cell(s) to be constrained by the pblock */
+	private Map<PBlock, String> pblocks;
 	
 	private boolean containRouting;
 	
@@ -93,12 +97,12 @@ public class PerformanceExplorer {
 		init(d, testDir, clkName, targetPeriod, null);
 	}
 	
-	public PerformanceExplorer(Design d, String testDir, String clkName, double targetPeriod, ArrayList<PBlock> pblocks){
+	public PerformanceExplorer(Design d, String testDir, String clkName, double targetPeriod, Map<PBlock, String> pblocks){
 		init(d, testDir, clkName, targetPeriod, pblocks);
 
 	}
 	
-	private void init(Design d, String testDir, String clkName, double targetPeriod, ArrayList<PBlock> pblocks){
+	private void init(Design d, String testDir, String clkName, double targetPeriod, Map<PBlock, String> pblocks){
 		this.design = d;
 		this.runDirectory = testDir;
 		this.clkName = clkName;
@@ -153,11 +157,11 @@ public class PerformanceExplorer {
 	}
 	
 
-	public ArrayList<PBlock> getPBlocks() {
+	public Map<PBlock, String> getPBlocks() {
 		return pblocks;
 	}
 
-	public void setPBlocks(ArrayList<PBlock> pblocks) {
+	public void setPBlocks(Map<PBlock, String> pblocks) {
 		this.pblocks = pblocks;
 	}
 
@@ -257,7 +261,9 @@ public class PerformanceExplorer {
 	}
 
 	public ArrayList<String> createTclScript(String initialDcp, String instDirectory, 
-			PlacerDirective p, RouterDirective r, String clockUncertainty, PBlock pblock){
+			PlacerDirective p, RouterDirective r, String clockUncertainty, Entry<PBlock, String> pblockEntry){
+	    PBlock pblock = pblockEntry.getKey();
+	    String pblockCells = pblockEntry.getValue();
 		ArrayList<String> lines = new ArrayList<>();
 		lines.add("open_checkpoint " + initialDcp);
 		lines.add("set_clock_uncertainty -setup "+clockUncertainty+" [get_clocks "+clkName+"]");
@@ -265,7 +271,7 @@ public class PerformanceExplorer {
 			String pblockName = pblock.getName() == null ? "pe_pblock_1" : pblock.getName();
 			lines.add("create_pblock " + pblockName);
 			lines.add("resize_pblock "+pblockName+" -add {"+pblock.toString()+"}");
-			lines.add("add_cells_to_pblock "+pblockName+" -top");
+			lines.add("add_cells_to_pblock "+pblockName+" " + (pblockCells == null ? "-top" : "[get_cells {"+ pblockCells +"}]" ));
 			if(containRouting){
 				lines.add("set_property CONTAIN_ROUTING 1 [get_pblocks "+ pblockName+"]");
 			}
@@ -314,12 +320,13 @@ public class PerformanceExplorer {
 		JobQueue jobs = new JobQueue();
 		
 		if(pblocks == null){
-			pblocks = new ArrayList<>();
-			pblocks.add(null);
+			pblocks = new HashMap<>();
+			pblocks.put(null, null);
 		}
 		
-		for(int pb=0; pb < pblocks.size(); pb++){
-			PBlock pblock = pblocks.get(pb);
+		int pb = 0;
+		for(Entry<PBlock, String> e : pblocks.entrySet()){
+			PBlock pblock = e.getKey();
 			for(PlacerDirective p : getPlacerDirectives()){
 				for(RouterDirective r : getRouterDirectives()){
 					for(double c : getClockUncertaintyValues()){
@@ -331,7 +338,7 @@ public class PerformanceExplorer {
 						System.out.println(uniqueID);
 						String instDir = runDirectory + File.separator + uniqueID;
 						FileTools.makeDir(instDir);
-						ArrayList<String> tcl = createTclScript(dcpName, instDir, p, r, roundedC, pblock);
+						ArrayList<String> tcl = createTclScript(dcpName, instDir, p, r, roundedC, e);
 						String scriptName = instDir + File.separator + RUN_TCL_NAME;
 						FileTools.writeLinesToTextFile(tcl, scriptName);
 						
@@ -343,7 +350,8 @@ public class PerformanceExplorer {
 						jobs.addRunningJob(j);
 					}
 				}
-			}			
+			}
+			pb++;
 		}
 		
 		boolean success = jobs.runAllToCompletion();
@@ -376,14 +384,14 @@ public class PerformanceExplorer {
 		OptionParser p = new OptionParser() {{
 			accepts(INPUT_DCP_OPT).withRequiredArg().required().describedAs("Input DCP");
 			accepts(CLK_NAME_OPT).withRequiredArg().required().describedAs("Name of clock to optimize");
-			accepts(TARGET_PERIOD_OPT).withRequiredArg().required().describedAs("Target clock period (ns)");
+			accepts(TARGET_PERIOD_OPT).withRequiredArg().ofType(Double.class).required().describedAs("Target clock period (ns)");
 			accepts(PLACER_DIRECTIVES_OPT).withOptionalArg().defaultsTo(placerDirectiveDefaults).describedAs("Comma separated list of place_design -directives");
 			accepts(ROUTER_DIRECTIVES_OPT).withOptionalArg().defaultsTo(routerDirectiveDefaults).describedAs("Comma separated list of route_design -directives");
 			accepts(CLK_UNCERTAINTY_OPT).withOptionalArg().describedAs("Comma separated list of clk uncertainty values (ns)");
-			accepts(PBLOCK_FILE_OPT).withRequiredArg().describedAs("PBlock file, one set of ranges per line");
-			accepts(MIN_CLK_UNCERTAINTY_OPT).withOptionalArg().defaultsTo(printNS(DEFAULT_MIN_CLK_UNCERT)).describedAs("Min clk uncertainty (ns)");
-			accepts(MAX_CLK_UNCERTAINTY_OPT).withOptionalArg().defaultsTo(printNS(DEFAULT_MAX_CLK_UNCERT)).describedAs("Max clk uncertainty (ns)");
-			accepts(CLK_UNCERTAINTY_STEP_OPT).withOptionalArg().defaultsTo(printNS(DEFAULT_STEP_CLK_UNCERT)).describedAs("Clk uncertainty step (ns)");
+			accepts(PBLOCK_FILE_OPT).withRequiredArg().describedAs("PBlock file, one set of ranges per line with list of optional cell names to be constrained.  Use '|' after ranges to denote list of cell names separated by spaces, for example: 'SLICE_X0Y0:SLICE_X0Y1 DSP48E2_X0Y0:DSP48E2_X0Y1 | cell_name0 cell_name1'");
+			accepts(MIN_CLK_UNCERTAINTY_OPT).withOptionalArg().ofType(Double.class).defaultsTo(DEFAULT_MIN_CLK_UNCERT).describedAs("Min clk uncertainty (ns)");
+			accepts(MAX_CLK_UNCERTAINTY_OPT).withOptionalArg().ofType(Double.class).defaultsTo(DEFAULT_MAX_CLK_UNCERT).describedAs("Max clk uncertainty (ns)");
+			accepts(CLK_UNCERTAINTY_STEP_OPT).withOptionalArg().ofType(Double.class).defaultsTo(DEFAULT_STEP_CLK_UNCERT).describedAs("Clk uncertainty step (ns)");
 			accepts(ADD_EDIF_METADATA_OPT).withOptionalArg().ofType(Boolean.class).defaultsTo(DEFAULT_ADD_EDIF_METADATA).describedAs("Create EDIF and Metadata");
 			accepts(RUN_DIR_OPT).withOptionalArg().defaultsTo("<current directory>").describedAs("Run directory (jobs data location)");
 			accepts(VIVADO_PATH_OPT).withOptionalArg().defaultsTo(DEFAULT_VIVADO).describedAs("Specifies vivado path");
@@ -426,7 +434,7 @@ public class PerformanceExplorer {
 		
 		String dcpInputName = (String) opts.valueOf(INPUT_DCP_OPT);
 		String clkName = (String) opts.valueOf(CLK_NAME_OPT);
-		double targetPeriod = Double.parseDouble((String)  opts.valueOf(TARGET_PERIOD_OPT));
+		double targetPeriod = (double) opts.valueOf(TARGET_PERIOD_OPT);
 		String runDir = opts.hasArgument(RUN_DIR_OPT) ? (String) opts.valueOf(RUN_DIR_OPT) : System.getProperty("user.dir");
 		
 		Design d = Design.readCheckpoint(dcpInputName);
@@ -440,9 +448,9 @@ public class PerformanceExplorer {
 			String clkUncertaintyValues = (String) opts.valueOf(CLK_UNCERTAINTY_OPT);
 			pe.setClockUncertaintyValues(clkUncertaintyValues.split("[,]"));			
 		} else{
-			pe.setMinClockUncertainty(Double.parseDouble((String) opts.valueOf(MIN_CLK_UNCERTAINTY_OPT)));
-			pe.setMaxClockUncertainty(Double.parseDouble((String) opts.valueOf(MAX_CLK_UNCERTAINTY_OPT)));
-			pe.setClockUncertaintyStep(Double.parseDouble((String) opts.valueOf(CLK_UNCERTAINTY_STEP_OPT)));
+			pe.setMinClockUncertainty((double) opts.valueOf(MIN_CLK_UNCERTAINTY_OPT));
+			pe.setMaxClockUncertainty((double) opts.valueOf(MAX_CLK_UNCERTAINTY_OPT));
+			pe.setClockUncertaintyStep((double) opts.valueOf(CLK_UNCERTAINTY_STEP_OPT));
 			pe.updateClockUncertaintyValues();
 		}
 		String placerDirValues = (String) opts.valueOf(PLACER_DIRECTIVES_OPT);
@@ -456,14 +464,23 @@ public class PerformanceExplorer {
 		
 		if(opts.hasArgument(PBLOCK_FILE_OPT)){
 			String fileName = (String) opts.valueOf(PBLOCK_FILE_OPT);
-			ArrayList<PBlock> pblockList = new ArrayList<>();
+			Map<PBlock,String> pblocks = new HashMap<>();
 			for(String line : FileTools.getLinesFromTextFile(fileName)){
 				if(line.trim().startsWith("#")) continue;
 				if(line.trim().length()==0) continue;
-				PBlock pblock = new PBlock(d.getDevice(), line.trim());
-				pblockList.add(pblock);
+				String pblockRanges = null;
+				String cellNames = null;
+				int idx = line.indexOf('|');
+				if(idx >= 0) {
+				     pblockRanges = line.substring(0, idx).trim();
+				     cellNames = line.substring(idx+1).trim();
+				}else {
+				    pblockRanges = line.trim();
+				}
+				PBlock pblock = new PBlock(d.getDevice(), pblockRanges);
+				pblocks.put(pblock, cellNames);
 			}
-			pe.setPBlocks(pblockList);
+			pe.setPBlocks(pblocks);
 		}
 		
 		pe.explorePerformance();

@@ -117,8 +117,8 @@ public class RoutableNode implements Routable{
 		setEndTileXYCoordinates();
 		setBaseCost();
 		presentCongestionCost = 1;
-    	historicalCongestionCost = 1;
-    	setVisited(false);
+		historicalCongestionCost = 1;
+		setVisited(false);
 		usersConnectionCounts = null;
 		driversCounts = null;
 		prev = null;
@@ -131,16 +131,16 @@ public class RoutableNode implements Routable{
 		children = new ArrayList<>();
 		List<Node> allDownHillNodes = node.getAllDownhillNodes();
 		
-		for(Node node:allDownHillNodes){		
-			if(reserved.contains(node)) continue;		
-			if(isExcluded(node, timingDriven)) continue;
-			if(routethruHelper.isRouteThru(node, node)) continue;
+		for(Node downhill : allDownHillNodes){
+			if(reserved.contains(downhill)) continue;
+			if(isExcluded(downhill, timingDriven)) continue;
+			if(routethruHelper.isRouteThru(node, downhill)) continue;
 			
-			Routable child = createdRoutable.get(node);
+			Routable child = createdRoutable.get(downhill);
 			if(child == null) {
 				RoutableType type = RoutableType.WIRE;		
-				child = new RoutableNode(globalIndex++, node, type);
-				createdRoutable.put(node, child);
+				child = new RoutableNode(globalIndex++, downhill, type);
+				createdRoutable.put(downhill, child);
 			}
 			children.add(child);//the sink rnode of a target connection has been created up-front
 		}

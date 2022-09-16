@@ -44,6 +44,7 @@ import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.interchange.PhysNetlistWriter;
 import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.Utils;
 
@@ -90,7 +91,7 @@ public class RelocationTools {
                                    int tileRowOffset,
                                    Set<SiteTypeEnum> siteTypes) {
         EDIFNetlist netlist = design.getNetlist();
-        EDIFHierCellInst instanceCell = netlist.getHierCellInstFromName(instanceName);
+        EDIFHierCellInst instanceCell = instanceName.length()==0 ? netlist.getTopHierCellInst() : netlist.getHierCellInstFromName(instanceName);
         if (instanceCell == null) {
             System.out.println("ERROR: Logical cell with instance name '" + instanceName + "' not found");
             return false;
@@ -130,7 +131,7 @@ public class RelocationTools {
         boolean error = false;
         for (SiteInst si : siteInsts) {
             for (Cell c : si.getCells()) {
-                if (!c.isLocked() && !cells.contains(c)) {
+                if (!c.isLocked() && !cells.contains(c) && !c.getType().equals(PhysNetlistWriter.PORT)) {
                     System.out.println("ERROR: Failed to relocate SiteInst '" + si.getName()
                             + "' as it contains Cells both inside and outside of '" + instanceName + "'");
                     error = true;
@@ -254,8 +255,11 @@ public class RelocationTools {
             }
 
             Collection<SitePinInst> pins = n.getPins();
-            Collection<SitePinInst> nonMatchingPins = pins.stream().filter(
-                    (spi) -> !oldSite.containsKey(spi.getSiteInst())).collect(Collectors.toList());
+            Collection<SitePinInst> nonMatchingPins = pins.stream()
+                    .filter((spi) -> !oldSite.containsKey(spi.getSiteInst()))
+                    // Filter out SPIs on a "STATIC_SOURCE" SiteInst that would have been unplaced above
+                    .filter((spi) -> spi.getSiteInst().isPlaced())
+                    .collect(Collectors.toList());
             if (nonMatchingPins.size() == pins.size()) {
                 continue;
             }
@@ -266,8 +270,9 @@ public class RelocationTools {
                 for (SitePinInst spi : nonMatchingPins) {
                     System.out.println("INFO: Unrouting SitePinInst '" + spi + "' branch of Net '" + n.getName() +
                             "' since it does not belong to SiteInsts to be relocated");
-                    n.unroutePin(spi);
                 }
+
+                DesignTools.unroutePins(n, nonMatchingPins);
             }
 
             boolean isClockNet = n.isClockNet() || n.hasGapRouting();

@@ -25,9 +25,12 @@ package com.xilinx.rapidwright.design;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.Tile;
+import com.xilinx.rapidwright.edif.EDIFCell;
+import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -52,7 +55,7 @@ public class TestModuleInst {
         design = null;
 
         ModuleInst mi = emptyDesign.createModuleInst("inst", module);
-        mi.placeOnOriginalAnchor();
+        Assertions.assertTrue(mi.placeOnOriginalAnchor());
 
         Assertions.assertTrue(emptyDesign.getVccNet().hasPIPs());
         Assertions.assertTrue(emptyDesign.getGndNet().hasPIPs());
@@ -75,7 +78,7 @@ public class TestModuleInst {
 
             boolean skipIncompatible = true; // Otherwise it fails when trying to move
                                              // the gap routing in the clock net
-            mi.place(ds, skipIncompatible);
+            Assertions.assertTrue(mi.place(ds, skipIncompatible));
         }
 
         HashSet<PIP> newVccPips = new HashSet<>(emptyDesign.getVccNet().getPIPs());
@@ -115,6 +118,73 @@ public class TestModuleInst {
             // Now they should be equal
             Assertions.assertEquals(expectedVccPips, newVccPips);
             Assertions.assertEquals(expectedGndPips, newGndPips);
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {1,2,5})
+    void testEDIFNetlistIsCopied(int copies) {
+        String dcpPath = RapidWrightDCP.getString("picoblaze_ooc_X10Y235.dcp");
+        Design design = Design.readCheckpoint(dcpPath, CodePerfTracker.SILENT);
+        Design emptyDesign = new Design("emptyDesign", design.getPartName());
+
+        Module module = new Module(design, false);
+        design = null;
+
+        ModuleInst mi = emptyDesign.createModuleInst("inst", module);
+        Assertions.assertTrue(mi.placeOnOriginalAnchor());
+
+        EDIFNetlist netlist = module.getNetlist();
+        EDIFNetlist emptyDesignNetlist = emptyDesign.getNetlist();
+        EDIFCell moduleTopCell = netlist.getTopCell();
+        String moduleTopCellName = moduleTopCell.getLegalEDIFName();
+        EDIFCell copiedModuleTopCell = emptyDesignNetlist.getCell(moduleTopCellName);
+        Assertions.assertNotNull(copiedModuleTopCell);
+        Assertions.assertEquals(copiedModuleTopCell, mi.getCellInst().getCellType());
+
+        Site ss = module.getAnchor();
+        Tile st = ss.getTile();
+        for (int i = 1; i < copies; i++) {
+            Tile dt = st.getTileXYNeighbor(0, -i * 5);
+            Site ds = ss.getCorrespondingSite(ss.getSiteTypeEnum(), dt);
+
+            mi = emptyDesign.createModuleInst("inst_copy" + i, module);
+            Assertions.assertEquals(emptyDesignNetlist, mi.getCellInst().getCellType().getNetlist());
+            boolean skipIncompatible = true; // Otherwise it fails when trying to move
+                                             // the gap routing in the clock net
+            Assertions.assertTrue(mi.place(ds, skipIncompatible));
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true,false})
+    public void testModuleAllowOverlap(boolean allowOverlap) {
+        String dcpPath = RapidWrightDCP.getString("picoblaze_ooc_X10Y235.dcp");
+        Design design = Design.readCheckpoint(dcpPath, CodePerfTracker.SILENT);
+
+        Design emptyDesign = new Design("emptyDesign", design.getPartName());
+
+        Module module = new Module(design, false);
+        design = null;
+
+        ModuleInst mi1 = emptyDesign.createModuleInst("inst1", module);
+        ModuleInst mi2 = emptyDesign.createModuleInst("inst2", module);
+        ModuleInst mi3 = emptyDesign.createModuleInst("inst3", module);
+        if (allowOverlap) {
+            // Default is allowOverlap = true
+            Assertions.assertTrue(mi1.placeOnOriginalAnchor());
+            Assertions.assertTrue(mi2.placeOnOriginalAnchor());
+            Assertions.assertTrue(mi3.placeOnOriginalAnchor());
+            Assertions.assertTrue(mi1.isPlaced());
+            Assertions.assertTrue(mi2.isPlaced());
+            Assertions.assertTrue(mi3.isPlaced());
+        } else {
+            Assertions.assertTrue(mi1.place(module.getAnchor(), false, allowOverlap));
+            Assertions.assertFalse(mi2.place(module.getAnchor(), false, allowOverlap));
+            Assertions.assertFalse(mi3.place(module.getAnchor(), false, allowOverlap));
+            Assertions.assertTrue(mi1.isPlaced());
+            Assertions.assertFalse(mi2.isPlaced());
+            Assertions.assertFalse(mi3.isPlaced());
         }
     }
 }

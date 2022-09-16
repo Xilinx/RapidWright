@@ -20,18 +20,21 @@
  * 
  */
  
-package com.xilinx.rapidwright;
+package com.xilinx.rapidwright.util;
 
-import java.io.IOException;
+public enum JobState {
+    RUNNING("running"),
+    EXITED("exited"),
+    SUSPENDED("suspended"),
+    PENDING("pending");
 
-import com.xilinx.rapidwright.support.CheckOpenFilesExtension;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
+    private final String name;
 
-public class TestCheckOpenFilesInstalled {
-    @Test
-    @ExtendWith(CheckOpenFilesExtension.CheckOpenFilesWorkingExtension.class)
-    public void test() throws IOException {
-        //Actual test is in extension
+    JobState(String name) {
+        this.name = name;
+    }
+
+    public String getName() {
+        return name;
     }
 }

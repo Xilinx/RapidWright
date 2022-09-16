@@ -107,11 +107,7 @@ public class TestDesign {
         Module module = new Module(createSampleDesign());
 
         Design design = new Design("top", device.getDeviceName());
-        EDIFNetlist netlist = design.getNetlist();
-        netlist.migrateCellAndSubCells(module.getNetlist().getTopCell());
-
         ModuleInst mi = design.createModuleInst("inst", module);
-        mi.getCellInst().setCellType(module.getNetlist().getTopCell());
         mi.placeOnOriginalAnchor();
         String oldAnchor = mi.getAnchor().toString();
 
@@ -240,5 +236,13 @@ public class TestDesign {
         JobQueue queue = new JobQueue();
         queue.addJob(job);
         Assertions.assertTrue(queue.runAllToCompletion());
+    }
+    
+    @Test
+    public void testCopyCell() {
+        Design d = new Design("test", "xcvc1902-vsvd1760-2MP-e-S");
+        Cell orig = d.createAndPlaceCell("orig", Unisim.DSP_PREADD58, "DSP_X0Y0/DSP_PREADD");
+        Design d2 = new Design("test2", d.getPartName());
+        Assertions.assertNotNull(d2.copyCell(orig, "copy"));
     }
 }

@@ -25,7 +25,13 @@
  */
 package com.xilinx.rapidwright.edif;
 
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Objects;
+import java.util.Queue;
 
 import org.jetbrains.annotations.NotNull;
 
@@ -141,11 +147,80 @@ public class EDIFHierNet {
 	 */
 	@Override
 	public String toString() {
-		return "EDIFHierNet [hierarchicalInstName=" + hierarchicalInst + ", net=" + net + "]";
+		return getHierarchicalNetName();
 	}
 
 
 	public EDIFHierCellInst getHierarchicalInst() {
 		return hierarchicalInst;
+	}
+	
+	/**
+	 * Gets all connected leaf port instances on this hierarchical net and its aliases.  
+	 * @return The list of all leaf cell port instances connected to this hierarchical net and its 
+	 * aliases.
+	 */
+	public List<EDIFHierPortInst> getLeafHierPortInsts() {
+	    return getLeafHierPortInsts(true);
+	}
+	
+	/**
+	 * Gets all connected leaf port instances on this hierarchical net and its aliases.
+	 * @param includeSourcePins A flag to include source pins in the result.  Setting this to false
+	 * only returns the sinks.
+	 * @return The list of all leaf cell port instances connected to this hierarchical net and its 
+     * aliases.
+	 */
+	public List<EDIFHierPortInst> getLeafHierPortInsts(boolean includeSourcePins) {
+	    List<EDIFHierPortInst> leafCellPins = new ArrayList<>();
+	    Queue<EDIFHierNet> queue = new ArrayDeque<>();
+	    queue.add(this);
+	    HashSet<EDIFHierNet> visited = new HashSet<>();
+
+	    EDIFHierNet parentNet = null;
+	    while (!queue.isEmpty()) {
+	        EDIFHierNet net = queue.poll();
+	        if (!visited.add(net)) {
+	            continue;
+	        }
+	        for(EDIFPortInst relP : net.getNet().getPortInsts()){
+	            EDIFHierPortInst p = new EDIFHierPortInst(net.getHierarchicalInst(), relP);
+
+	            boolean isCellPin = relP.getCellInst() != null && relP.getCellInst().getCellType().isLeafCellOrBlackBox();
+	            if(isCellPin) {
+	                if(p.isInput() || (includeSourcePins && p.isOutput())) {
+	                    leafCellPins.add(p);
+	                }
+	            }
+
+	            boolean isToplevelInput = p.getHierarchicalInst().isTopLevelInst() && relP.getCellInst() == null && p.isInput();
+	            if(isToplevelInput || (isCellPin && p.isOutput())){
+	                if (parentNet != null) {
+	                    throw new RuntimeException("Multiple sources!");
+	                }
+	                parentNet = net;
+	            }
+
+	            if(p.getPortInst().getCellInst() == null){
+	                // Moving up in hierarchy
+	                if (!p.getHierarchicalInst().isTopLevelInst()) {
+	                    final EDIFHierPortInst upPort = p.getPortInParent();
+	                    if (upPort != null) {
+	                        queue.add(upPort.getHierarchicalNet());
+	                    }
+	                }
+	            } else{
+	                // Moving down in hierarchy
+	                EDIFHierNet otherNet = p.getInternalNet();
+	                if(otherNet == null){
+	                    // Looks unconnected
+	                    continue;
+	                }
+	                queue.add(otherNet);
+	            }
+	        }
+	    }
+
+	    return leafCellPins;
 	}
 }

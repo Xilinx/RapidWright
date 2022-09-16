@@ -31,6 +31,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.UncheckedIOException;
 import java.lang.ProcessBuilder.Redirect;
@@ -101,22 +102,33 @@ public class Installer {
      * @return Checksum result String or null if no file was found.
      */
     public static String calculateMD5OfFile(Path path){
-        MessageDigest md5 = null;
-        try {
-            md5 = MessageDigest.getInstance("MD5");
-        } catch (NoSuchAlgorithmException e1) {
-            throw new RuntimeException("ERROR: Couldn't find an MD5 algorithm provider "
-                    + "in current Java environment.");
-        }
-        try (DigestInputStream dig = new DigestInputStream(Files.newInputStream(path), md5)) {            
-            byte[] buffer = new byte[1024];
-            while(dig.read(buffer) != -1){}
-            byte[] checksum = md5.digest();
-            return bytesToString(checksum);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+		try (InputStream inputStream = Files.newInputStream(path)) {
+			return calculateMD5OfStream(inputStream);
+		} catch (IOException e) {
+			throw new UncheckedIOException(e);
+		}
     }
+
+	/**
+	 * Performs an MD5 checksum on the provided input stream and returns the result.
+	 */
+	public static String calculateMD5OfStream(InputStream is) {
+		MessageDigest md5 = null;
+		try {
+			md5 = MessageDigest.getInstance("MD5");
+		} catch (NoSuchAlgorithmException e1) {
+			throw new RuntimeException("ERROR: Couldn't find an MD5 algorithm provider "
+					+ "in current Java environment.");
+		}
+		try (DigestInputStream dig = new DigestInputStream(is, md5)) {
+			byte[] buffer = new byte[1024];
+			while(dig.read(buffer) != -1){}
+			byte[] checksum = md5.digest();
+			return Installer.bytesToString(checksum);
+		} catch (IOException e) {
+			throw new UncheckedIOException(e);
+		}
+	}
 
     /**
      * Validates an already downloaded RapidWright release file using the MD5 hash
@@ -188,7 +200,10 @@ public class Installer {
             ZipEntry ze = zis.getNextEntry();
             while(ze != null){
                 String fileName = ze.getName();
-                File newFile = new File(destDir + File.separator + fileName);
+                File newFile = new File(destDir, fileName);
+                if(!newFile.toPath().normalize().startsWith(destDir)) {
+                    throw new RuntimeException("Bad zip entry");
+                }
                 System.out.println("Unzipping to "+newFile.getAbsolutePath());
                 
                 if(ze.isDirectory()){
@@ -558,14 +573,14 @@ public class Installer {
 			if(returnVal != 0){
 				System.err.println("  ERROR: Looks like the DeviceBrowser did not run or crashed. Please examine\n"
 						+ "  the output for clues as to what went wrong.  If you are stumped, please request help\n"
-						+ "  on the RapidWright Google Group Forum: https://groups.google.com/forum/#!forum/rapidwright.");
+						+ "  on the RapidWright GitHub Discussions: https://github.com/Xilinx/RapidWright/discussions.");
 				if(!isWindows()){
 					System.err.println("\n*** If you are running Linux ***"); 
 					System.err.println("If you are running Linux, a common problem is to be missing libpng12.so.0.\n" +
 									   "If you are running a CentOS/RedHat/Fedora distro, try the following:\n" + 
 									   "    sudo yum install libpng12\n\n" + 
 									   "If you are running a Debian/Ubuntu distro, try the following:\n" + 
-									   "    wget -q -O /tmp/libpng12.deb http://mirrors.kernel.org/ubuntu/pool/main/libp/libpng/libpng12-0_1.2.54-1ubuntu1_amd64.deb && sudo dpkg -i /tmp/libpng12.deb && rm /tmp/libpng12.deb");
+									   "    wget -q -O /tmp/libpng12.deb https://snapshot.debian.org/archive/debian/20160413T160058Z/pool/main/libp/libpng/libpng12-0_1.2.54-6_amd64.deb && sudo dpkg -i /tmp/libpng12.deb && rm /tmp/libpng12.deb");
 				}
 				System.exit(1);
 			}		
