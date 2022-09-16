@@ -97,8 +97,8 @@ abstract public class RouteNode {
 		setEndTileXYCoordinates();
 		setBaseCost(type);
 		presentCongestionCost = 1;
-    	historicalCongestionCost = 1;
-    	setVisited(false);
+		historicalCongestionCost = 1;
+		setVisited(false);
 		usersConnectionCounts = null;
 		driversCounts = null;
 		setPrev(null);
