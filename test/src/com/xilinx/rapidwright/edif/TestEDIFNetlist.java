@@ -265,4 +265,25 @@ class TestEDIFNetlist {
             Assertions.assertEquals(dstLibrary.getCells().size(), 1);
         }
     }
+    
+    @Test
+    public void testGetHier() {
+        final EDIFNetlist netlist = EDIFTools.createNewNetlist("test");
+
+        EDIFCell top = netlist.getTopCell();
+        EDIFCell lut2 = Design.getPrimitivesLibrary().getCell("LUT2");
+        top.createChildCellInst("fred", lut2);
+        top.createChildCellInst("fred/barney", lut2);
+
+        Assertions.assertNotNull(netlist.getHierCellInstFromName("fred"));
+        Assertions.assertNotNull(netlist.getHierCellInstFromName("fred/barney"));
+
+        EDIFCell hierCell = new EDIFCell(netlist.getWorkLibrary(), "flintstones");
+        top.createChildCellInst("flintstones", hierCell);
+        hierCell.createChildCellInst("wilma", lut2);
+        hierCell.createChildCellInst("wilma/betty", lut2);
+
+        Assertions.assertNotNull(netlist.getHierCellInstFromName("flintstones/wilma"));
+        Assertions.assertNotNull(netlist.getHierCellInstFromName("flintstones/wilma/betty"));
+    }
 }
