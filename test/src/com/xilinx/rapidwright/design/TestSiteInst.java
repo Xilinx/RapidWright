@@ -174,6 +174,61 @@ public class TestSiteInst {
     }
 
     @ParameterizedTest
+    @ValueSource(strings = {Device.KCU105, Device.PYNQ_Z1})
+    public void testRouteLUTRouteThruToCarry(String deviceName) {
+        Design d = new Design("testRouteLutRtCarry", deviceName);
+
+        SiteInst si = d.createSiteInst(d.getDevice().getSite("SLICE_X32Y73"));
+
+        for(char letter : LUTTools.lutLetters) {
+            routeLUTRouteThruHelperCarry(d, si, letter, true);
+            routeLUTRouteThruHelperCarry(d, si, letter, false);
+            if(d.getDevice().getSeries() == Series.Series7 && letter == 'D') break;
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {Device.KCU105, Device.PYNQ_Z1})
+    public void testUnrouteLUTRouteThruToCarry(String deviceName) {
+        Design d = new Design("testUnrouteLutRtCarry", deviceName);
+
+        SiteInst si = d.createSiteInst(d.getDevice().getSite("SLICE_X32Y73"));
+
+        BEL carry;
+        if (d.getDevice().getSeries() == Series.Series7) {
+            carry = si.getBEL("CARRY4");
+        } else {
+            carry = si.getBEL("CARRY8");
+        }
+
+        for (char letter : LUTTools.lutLetters) {
+            routeLUTRouteThruHelperCarry(d, si, letter, true);
+            routeLUTRouteThruHelperCarry(d, si, letter, false);
+            if (d.getDevice().getSeries() == Series.Series7 && letter == 'D') break;
+
+            char index = Character.forDigit(letter - 'A', 10);
+            // Unroute 6LUT
+            {
+                BELPin src = si.getSite().getBELPin(letter + "5");
+                BELPin snk = carry.getPin("S" + index);
+                Assertions.assertTrue(si.unrouteIntraSiteNet(src, snk));
+                Cell lut6 = si.getCell(letter + "6LUT");
+                Assertions.assertNull(lut6);
+                Cell lut5 = si.getCell(letter + "5LUT");
+                Assertions.assertNotNull(lut5);
+            }
+            // Unroute 5LUT
+            {
+                BELPin src = si.getSite().getBELPin(letter + "4");
+                BELPin snk = carry.getPin("DI" + index);
+                Assertions.assertTrue(si.unrouteIntraSiteNet(src, snk));
+                Cell lut5 = si.getCell(letter + "5LUT");
+                Assertions.assertNull(lut5);
+            }
+        }
+    }
+
+    @ParameterizedTest
     @ValueSource(strings = {"C1","D2"})
     public void testSiteRoutingToF7MUX(String inputPin) {
         Design d = new Design("testSiteRoutingToF7MUX", Device.KCU105);
@@ -229,10 +284,12 @@ public class TestSiteInst {
         Cell lut = si.getCell(si.getBEL(inputPin.charAt(0) + "6LUT"));
         Assertions.assertNotNull(lut);
         Assertions.assertTrue(lut.isRoutethru());
+        Assertions.assertTrue(lut.getType().equals("MUXF8"));
 
         Cell f7mux = si.getCell(si.getBEL("F7MUX_EF"));
         Assertions.assertNotNull(f7mux);
         Assertions.assertTrue(f7mux.isRoutethru());
+        Assertions.assertTrue(f7mux.getType().equals("MUXF8"));
 
         // Check that inserting either of these RT cells hasn't clobbered the
         // non-RT cell
@@ -261,60 +318,5 @@ public class TestSiteInst {
         }
         Assertions.assertNull(si.getNetFromSiteWire("EX"));
         Assertions.assertNull(si.getSitePinInst("EX"));
-    }
-
-    @ParameterizedTest
-    @ValueSource(strings = {Device.KCU105, Device.PYNQ_Z1})
-    public void testRouteLUTRouteThruToCarry(String deviceName) {
-        Design d = new Design("testRouteLutRtCarry", deviceName);
-
-        SiteInst si = d.createSiteInst(d.getDevice().getSite("SLICE_X32Y73"));
-
-        for(char letter : LUTTools.lutLetters) {
-            routeLUTRouteThruHelperCarry(d, si, letter, true);
-            routeLUTRouteThruHelperCarry(d, si, letter, false);
-            if(d.getDevice().getSeries() == Series.Series7 && letter == 'D') break;
-        }
-    }
-
-    @ParameterizedTest
-    @ValueSource(strings = {Device.KCU105, Device.PYNQ_Z1})
-    public void testUnrouteLUTRouteThruToCarry(String deviceName) {
-        Design d = new Design("testUnrouteLutRtCarry", deviceName);
-
-        SiteInst si = d.createSiteInst(d.getDevice().getSite("SLICE_X32Y73"));
-
-        BEL carry;
-        if(d.getDevice().getSeries() == Series.Series7) {
-            carry = si.getBEL("CARRY4");
-        } else {
-            carry = si.getBEL("CARRY8");
-        }
-
-        for(char letter : LUTTools.lutLetters) {
-            routeLUTRouteThruHelperCarry(d, si, letter, true);
-            routeLUTRouteThruHelperCarry(d, si, letter, false);
-            if(d.getDevice().getSeries() == Series.Series7 && letter == 'D') break;
-
-            char index = Character.forDigit(letter - 'A', 10);
-            // Unroute 6LUT
-            {
-                BELPin src = si.getSite().getBELPin(letter + "5");
-                BELPin snk = carry.getPin("S" + index);
-                Assertions.assertTrue(si.unrouteIntraSiteNet(src, snk));
-                Cell lut6 = si.getCell(letter + "6LUT");
-                Assertions.assertNull(lut6);
-                Cell lut5 = si.getCell(letter + "5LUT");
-                Assertions.assertNotNull(lut5);
-            }
-            // Unroute 5LUT
-            {
-                BELPin src = si.getSite().getBELPin(letter + "4");
-                BELPin snk = carry.getPin("DI" + index);
-                Assertions.assertTrue(si.unrouteIntraSiteNet(src, snk));
-                Cell lut5 = si.getCell(letter + "5LUT");
-                Assertions.assertNull(lut5);
-            }
-        }
     }
 }

@@ -290,7 +290,7 @@ public class TestDesignTools {
         }
     }
 
-    private Net createTestNet(Design design, String netName, String[] pips) {
+    public static Net createTestNet(Design design, String netName, String[] pips) {
         Net net = design.createNet(netName);
         Device device = design.getDevice();
         for (String pip : pips) {

@@ -99,7 +99,7 @@ public class PicoBlazeArray {
 		}
 	}
 
-	public static abstract class PicoBlazeArrayCreator<T extends AbstractModuleInst<?,T>> {
+	public static abstract class PicoBlazeArrayCreator<T extends AbstractModuleInst<?, ?, T>> {
 
 		public List<T> getInstances() {
 			return instances;
@@ -311,6 +311,9 @@ public class PicoBlazeArray {
 
 	public static PicoBlazeArrayCreator<ModuleInst> makeModuleCreator() {
 		return new PicoBlazeArrayCreator<ModuleInst>() {
+
+			private BlockPlacer2Module placer;
+
 			@Override
 			protected ModuleInst createInstance(Design design, String name, Module impl, ModuleImpls impls) {
 				return design.createModuleInst(name, impl);
@@ -323,7 +326,8 @@ public class PicoBlazeArray {
 
 			@Override
 			public BlockPlacer2<?, ? extends ModuleInst, ?, ?> createPlacer(Design design, Path graphDataFile) {
-				return new BlockPlacer2Module(design, true, graphDataFile);
+				placer = new BlockPlacer2Module(design, true, graphDataFile, BlockPlacer2.DEFAULT_DENSE, BlockPlacer2.DEFAULT_EFFORT, BlockPlacer2.DEFAULT_FOCUS_ON_WORST, null);
+				return placer;
 			}
 
 			@Override
@@ -350,7 +354,7 @@ public class PicoBlazeArray {
 
 			@Override
 			public BlockPlacer2<?, ModuleImplsInst, ?, ?> createPlacer(Design design, Path graphDataFile) {
-				placer = new BlockPlacer2Impls(design, getInstances(), true, graphDataFile);
+				placer = new BlockPlacer2Impls(design, getInstances(), true, graphDataFile, BlockPlacer2.DEFAULT_DENSE, BlockPlacer2.DEFAULT_EFFORT, BlockPlacer2.DEFAULT_FOCUS_ON_WORST, null);
 				return placer;
 			}
 

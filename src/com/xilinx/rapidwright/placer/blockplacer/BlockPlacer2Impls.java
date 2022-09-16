@@ -27,7 +27,6 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collection;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -43,7 +42,7 @@ import com.xilinx.rapidwright.design.ModuleImpls;
 import com.xilinx.rapidwright.design.ModuleImplsInst;
 import com.xilinx.rapidwright.design.ModulePlacement;
 import com.xilinx.rapidwright.design.SitePinInst;
-import com.xilinx.rapidwright.device.Site;
+import com.xilinx.rapidwright.design.TileRectangle;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFNet;
@@ -52,25 +51,24 @@ import com.xilinx.rapidwright.edif.EDIFPortInst;
 public class BlockPlacer2Impls extends BlockPlacer2<ModuleImpls, ModuleImplsInst, ModulePlacement, ImplsPath> {
 
     private final List<ModuleImplsInst> moduleInstances;
-    private Map<Site, ModuleImplsInst> currentAnchors = new HashMap<>();
 
-    private final AbstractOverlapCache overlaps;
+    private final AbstractOverlapCache<ModulePlacement, ModuleImplsInst> overlaps;
 
     private final Map<ModuleImplsInst, Set<ImplsPath>> modulesToPaths = new HashMap<>();
 
-    public BlockPlacer2Impls(Design design, List<ModuleImplsInst> moduleInstances, boolean ignoreMostUsedNets, Path graphData, AbstractOverlapCache overlapCache) {
-        super(design, ignoreMostUsedNets, graphData);
+    public BlockPlacer2Impls(Design design, List<ModuleImplsInst> moduleInstances, boolean ignoreMostUsedNets, Path graphData, boolean denseDesign, float effort, boolean focusOnWorstModules, TileRectangle placementArea, AbstractOverlapCache<ModulePlacement, ModuleImplsInst> overlapCache) {
+        super(design, ignoreMostUsedNets, graphData, denseDesign, effort, focusOnWorstModules, placementArea);
 
         this.moduleInstances = moduleInstances;
         overlaps = overlapCache;
     }
 
-    public BlockPlacer2Impls(Design design, List<ModuleImplsInst> moduleInstances, boolean ignoreMostUsedNets, Path graphData) {
-        this(design, moduleInstances, ignoreMostUsedNets, graphData, new RegionBasedOverlapCache(design.getDevice(), moduleInstances));
+    public BlockPlacer2Impls(Design design, List<ModuleImplsInst> moduleInstances, boolean ignoreMostUsedNets, Path graphData, boolean denseDesign, float effort, boolean focusOnWorstModules, TileRectangle placementArea) {
+        this(design, moduleInstances, ignoreMostUsedNets, graphData, denseDesign, effort, focusOnWorstModules, placementArea, new RegionBasedOverlapCache<>(design.getDevice(), moduleInstances));
     }
 
     public BlockPlacer2Impls(Design design, List<ModuleImplsInst> moduleInstances) {
-        this(design, moduleInstances, true, null);
+        this(design, moduleInstances, true, null, DEFAULT_DENSE, DEFAULT_EFFORT, DEFAULT_FOCUS_ON_WORST, null);
     }
 
     @Override
@@ -84,7 +82,7 @@ public class BlockPlacer2Impls extends BlockPlacer2<ModuleImpls, ModuleImplsInst
     }
 
     @Override
-    Collection<ModulePlacement> getAllPlacements(ModuleImplsInst hm) {
+    List<ModulePlacement> getAllPlacements(ModuleImplsInst hm) {
         return hm.getModule().getAllPlacements();
     }
 
@@ -94,19 +92,9 @@ public class BlockPlacer2Impls extends BlockPlacer2<ModuleImpls, ModuleImplsInst
     }
 
     @Override
-    Comparator<ModulePlacement> getInitialPlacementComparator() {
-        Tile center = dev.getTile(dev.getRows()/2, dev.getColumns()/2);
-        return Comparator.comparingInt(i -> i.placement.getTile().getManhattanDistance(center));
-    }
-
-    @Override
     void placeHm(ModuleImplsInst hm, ModulePlacement placement) {
         if (hm.getPlacement() != null) {
-            currentAnchors.remove(hm.getPlacement().placement);
             overlaps.unplace(hm);
-        }
-        if (!currentAnchors.containsKey(placement.placement)) {
-            currentAnchors.put(placement.placement, hm);
         }
         hm.place(placement);
         overlaps.place(hm);
@@ -116,7 +104,6 @@ public class BlockPlacer2Impls extends BlockPlacer2<ModuleImpls, ModuleImplsInst
     void unplaceHm(ModuleImplsInst hm) {
         if (hm.getPlacement() != null) {
             overlaps.unplace(hm);
-            currentAnchors.remove(hm.getPlacement().placement);
         }
         hm.unplace();
     }
@@ -185,13 +172,18 @@ public class BlockPlacer2Impls extends BlockPlacer2<ModuleImpls, ModuleImplsInst
             if (path.getSize() > 1) {
                 allPaths.add(path);
 
-                for (ImplsInstancePort port : path.ports) {
-                    if (!(port instanceof ImplsInstancePort.InstPort)) {
-                        continue;
-                    }
-                    ModuleImplsInst instance = ((ImplsInstancePort.InstPort) port).getInstance();
-                    modulesToPaths.computeIfAbsent(instance, x -> new HashSet<>()).add(path);
+            }
+        }
+        pruneSameConnectionPaths();
+
+
+        for (ImplsPath path : allPaths) {
+            for (ImplsInstancePort port : path.ports) {
+                if (!(port instanceof ImplsInstancePort.InstPort)) {
+                    continue;
                 }
+                ModuleImplsInst instance = ((ImplsInstancePort.InstPort) port).getInstance();
+                modulesToPaths.computeIfAbsent(instance, x -> new HashSet<>()).add(path);
             }
         }
     }
@@ -205,26 +197,9 @@ public class BlockPlacer2Impls extends BlockPlacer2<ModuleImpls, ModuleImplsInst
         return overlaps.isValidPlacement(hm);
     }
 
-    private boolean checkValidPlacementLegacy(ModuleImplsInst hm) {
-        final boolean debugValidPlacement = false;
-        for(ModuleImplsInst other : hardMacros){
-            if (other == hm) {
-                continue;
-            }
-            if (other.getPlacement() == null) {
-                continue;
-            }
-            if (hm.getPlacement().placement == other.getPlacement().placement) {
-                if (debugValidPlacement) System.out.println("not valid because "+ hm.getName()+" has same anchor as "+other.getName()+": "+ hm.getPlacement().placement);
-
-                return false;
-            }
-            if (hm.overlaps(other)){
-                if (debugValidPlacement) System.out.println("not valid because "+ hm.getName()+" overlaps "+other.getName());
-                return false;
-            }
-        }
-        return true;
+    @Override
+    protected List<ModuleImplsInst> getAllOverlaps(ModuleImplsInst hm) {
+        return overlaps.getAllOverlaps(hm);
     }
 
     @Override
@@ -256,17 +231,12 @@ public class BlockPlacer2Impls extends BlockPlacer2<ModuleImpls, ModuleImplsInst
     }
 
     @Override
-    protected ModuleImplsInst getHmCurrentlyAtPlacement(ModulePlacement placement) {
-        return currentAnchors.get(placement.placement);
-    }
-
-    @Override
     protected ModulePlacement getCurrentPlacement(ModuleImplsInst selected) {
         return selected.getPlacement();
     }
 
     @Override
-    protected Collection<ImplsPath> getConnectedPaths(ModuleImplsInst module) {
+    public Collection<ImplsPath> getConnectedPaths(ModuleImplsInst module) {
         return modulesToPaths.get(module);
     }
 

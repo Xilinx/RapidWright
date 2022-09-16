@@ -22,13 +22,14 @@
  
 package com.xilinx.rapidwright.design;
 
-import com.xilinx.rapidwright.device.Site;
-import com.xilinx.rapidwright.device.Tile;
-
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collector;
+
+import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.Site;
+import com.xilinx.rapidwright.device.Tile;
 
 /**
  * A Rectangle of tiles, i.e. a Bounding Box around some Set of Tiles.
@@ -148,4 +149,14 @@ public abstract class TileRectangle {
      * @param rect The Rectangle to include
      */
     public abstract void extendTo(RelocatableTileRectangle rect);
+
+    public Tile getCenter(Device device) {
+        if (isEmpty()) {
+            throw new RuntimeException("Cannot get center of empty tile rectangle");
+        }
+        return device.getTile(
+                (getMaxColumn()+getMinColumn())/2,
+                (getMaxRow()+getMinRow())/2
+        );
+    }
 }

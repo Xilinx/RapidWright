@@ -30,6 +30,6 @@ import com.xilinx.rapidwright.design.AbstractModuleInst;
  * @param <ModuleInstT> the type of module instance
  * @param <PlacementT> the type of placement
  */
-public abstract class AbstractBlockPlacer<ModuleInstT extends AbstractModuleInst<?,?>, PlacementT> {
+public abstract class AbstractBlockPlacer<ModuleInstT extends AbstractModuleInst<?,?,?>, PlacementT> {
     public abstract void setTempAnchorSite(ModuleInstT hm, PlacementT placement);
 }
