@@ -50,7 +50,7 @@ import com.xilinx.rapidwright.util.Utils;
  * 
  * @author Chris Lavin Created on: Jun 22, 2010
  */
-public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
+public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
 
 	/** The design which contains this module instance */
 	private transient Design design;
@@ -725,5 +725,18 @@ public class ModuleInst extends AbstractModuleInst<Module, ModuleInst>{
 	@Override
 	public RelocatableTileRectangle getBoundingBox() {
 		return module.getBoundingBox().getCorresponding(getAnchor().getTile(), module.getAnchor().getTile());
+	}
+
+	@Override
+	public Site getPlacement() {
+		return getAnchor().getSite();
+	}
+
+	@Override
+	public boolean overlaps(ModuleInst hm) {
+		if (!hm.isPlaced()) {
+			return false;
+		}
+		return getBoundingBox().overlaps(hm.getBoundingBox());
 	}
 }

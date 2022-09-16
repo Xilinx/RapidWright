@@ -31,12 +31,12 @@ import com.trolltech.qt.core.QPointF;
 import com.trolltech.qt.core.QRectF;
 import com.trolltech.qt.gui.QBrush;
 import com.trolltech.qt.gui.QColor;
+import com.trolltech.qt.gui.QGraphicsItem.GraphicsItemChange;
+import com.trolltech.qt.gui.QGraphicsItem.GraphicsItemFlag;
 import com.trolltech.qt.gui.QGraphicsPolygonItem;
 import com.trolltech.qt.gui.QGraphicsSceneMouseEvent;
 import com.trolltech.qt.gui.QPen;
 import com.trolltech.qt.gui.QPolygonF;
-import com.trolltech.qt.gui.QGraphicsItem.GraphicsItemChange;
-import com.trolltech.qt.gui.QGraphicsItem.GraphicsItemFlag;
 import com.xilinx.rapidwright.design.ModuleInst;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SiteInst;
@@ -45,7 +45,6 @@ import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
-import com.xilinx.rapidwright.gui.TileScene;
 import com.xilinx.rapidwright.placer.handplacer.GUIMultiNetLine;
 import com.xilinx.rapidwright.util.Utils;
 
@@ -61,6 +60,7 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
 	private QPointF anchorOffset;
 	private QPolygonF shape;
 	private boolean grabbed;
+	private QPointF grabOffset;
 	private ArrayList<Integer> occupiedTilesX;
 	private ArrayList<Integer> occupiedTilesY;
 	private ArrayList<GUIMultiNetLine> myLines;
@@ -322,10 +322,17 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
 		
 		boolean isPlacementValid = true;
 		boolean isColliding = false;
+
+		boolean isValidAnchor = false;
+		if (anchorOffset != null) {
+			final Tile tile = scene.getTile(scenePos().x() + anchorOffset.x(), scenePos().y() + anchorOffset.y());
+			isValidAnchor = moduleInst.getModule().getAllValidPlacements().stream().anyMatch(p->p.getTile()==tile);
+		}
 		
 		for (HMTile hmTile : this.hmTiles) {
 			//Check to see if this HMTile collides with any other GMIs (other than parent)
-			
+
+
 			boolean tileColliding = false;
 			
 			int x = (int) Math.floor(hmTile.scenePos().x()
@@ -366,7 +373,12 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
 				isPlacementValid = false;
 			}
 		}
-		isValidlyPlaced = isPlacementValid;
+
+		if (isValidAnchor){
+			//Workaround for relocation issues in this code
+			isPlacementValid = true;
+		}
+		isValidlyPlaced = isPlacementValid ;
 
 		if (isPlacementValid) {
 			if(isColliding){
@@ -426,44 +438,74 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
 		} else if (change == GraphicsItemChange.ItemPositionChange
 				&& scene() != null) {
 			// value is the new position.
-			QPointF newPos = (QPointF) value;
-			QRectF rect = scene().sceneRect();
 
-			double width = this.boundingRect().width();
-			width = Math.floor(width / scene.tileSize);
-			double height = this.boundingRect().height();
-			height = Math.floor(height / scene.tileSize);
-			QPointF p = rect.bottomRight();
-			//p.setX((fpScene.device.getColumns() - width) * fpScene.tileSize);
-			//p.setY((fpScene.device.getRows() - height) * fpScene.tileSize);
-			
-			p.setX((scene.cols - width) * scene.tileSize);
-			p.setY((scene.rows - height) * scene.tileSize);
-			rect.setBottomRight(p);
-			if (!rect.contains(newPos)) {
-				// Keep the item inside the scene rect.
-				newPos.setX(Math.min(rect.right(), Math.max(newPos.x(), rect
-						.left())));
-				newPos.setY(Math.min(rect.bottom(), Math.max(newPos.y(), rect
-						.top())));
-			}
-			long x = Math.round(newPos.x() / scene.tileSize)
-					* scene.tileSize;
-			long y = Math.round(newPos.y() / scene.tileSize)
-					* scene.tileSize;
-			newPos.setX(x);
-			newPos.setY(y);
-			return newPos;
+			return makeValidPosition((QPointF) value);
 		}
 		return super.itemChange(change, value);
 	}
-	
+
+	private Tile toTile(QPointF newPos) {
+
+		//newPos = newPos.subtract(grabOffset);
+
+
+
+		QRectF rect = scene().sceneRect();
+		double width = this.boundingRect().width();
+		width = Math.floor(width / scene.tileSize);
+		double height = this.boundingRect().height();
+		height = Math.floor(height / scene.tileSize);
+		QPointF p = rect.bottomRight();
+		//p.setX((fpScene.device.getColumns() - width) * fpScene.tileSize);
+		//p.setY((fpScene.device.getRows() - height) * fpScene.tileSize);
+
+		p.setX((scene.cols - width) * scene.tileSize);
+		p.setY((scene.rows - height) * scene.tileSize);
+		rect.setBottomRight(p);
+		if (!rect.contains(newPos)) {
+			// Keep the item inside the scene rect.
+			newPos.setX(Math.min(rect.right(), Math.max(newPos.x(), rect
+					.left())));
+			newPos.setY(Math.min(rect.bottom(), Math.max(newPos.y(), rect
+					.top())));
+		}
+		return scene.getTile(newPos.x(), newPos.y());
+	}
+
+	private QPointF makeValidPosition(QPointF newPos) {
+
+		final Tile target = toTile(newPos);
+		Tile result = null;
+		float bestDistance = Float.POSITIVE_INFINITY;
+
+		for (Site placement : moduleInst.getModule().getAllValidPlacements()) {
+			float xDiff = placement.getTile().getColumn() - target.getColumn();
+			float yDiff = placement.getTile().getRow() - target.getRow();
+			float dist = xDiff * xDiff + yDiff * yDiff;
+
+			if (dist < bestDistance) {
+				bestDistance = dist;
+				result = placement.getTile();
+			}
+		}
+
+		//Only snap to valid placement if it is close
+		if (bestDistance > 200) {
+			result = target;
+		}
+
+		return new QPointF(scene.getDrawnTileX(result)*scene.tileSize, scene.getDrawnTileY(result)*scene.tileSize)
+				.subtract(getAnchorOffset());
+
+	}
+
 	public boolean isGrabbed() {
 		return grabbed;
 	}
 
 	public void mousePressEvent(QGraphicsSceneMouseEvent event) {
 		grabbed = true;
+		grabOffset = this.pos().subtract(event.pos());
 		super.mousePressEvent(event);
 	}
 	

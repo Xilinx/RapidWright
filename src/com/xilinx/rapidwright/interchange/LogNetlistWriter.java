@@ -34,6 +34,8 @@ import org.capnproto.Text;
 import org.capnproto.TextList;
 import org.capnproto.Void;
 
+import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFLibrary;
@@ -44,6 +46,7 @@ import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFPropertyObject;
 import com.xilinx.rapidwright.edif.EDIFPropertyValue;
+import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.Bus;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.Cell;
@@ -135,7 +138,7 @@ public class LogNetlistWriter {
         // Enumerate all cells, ports and instances to break cyclic reference dependency
         // in netlist description
         for (EDIFLibrary lib : n.getLibrariesInExportOrder()) {
-            for (EDIFCell cell : lib.getValidCellExportOrder()) {
+            for (EDIFCell cell : lib.getValidCellExportOrder(false)) {
                 allCells.addObject(cell);
                 for (EDIFPort port : cell.getPorts()) {
                     allPorts.addObject(port);
@@ -268,12 +271,35 @@ public class LogNetlistWriter {
     }
 
     /**
-     * Writes a RapidWright netlist to a Cap'n Proto serialized file
+     * Writes a RapidWright netlist to a Cap'n Proto serialized file.  The method attempts to 
+     * collapse macros in the netlist before writing.
      * @param n RapidWright netlist
      * @param fileName Name of the file to write
+     * @param collapseMacros If true, will attempt to collapse macros in netlist before writing.
      * @throws IOException
      */
     public static void writeLogNetlist(EDIFNetlist n, String fileName) throws IOException {
+        writeLogNetlist(n, fileName, true);
+    }
+    
+    /**
+     * Writes a RapidWright netlist to a Cap'n Proto serialized file.
+     * @param n RapidWright netlist
+     * @param fileName Name of the file to write
+     * @param collapseMacros If true, will attempt to collapse macros in netlist before writing.
+     * @throws IOException
+     */
+    public static void writeLogNetlist(EDIFNetlist n, String fileName, boolean collapseMacros) throws IOException {
+        if(collapseMacros) {
+            Device device = n.getDevice();
+            if(device != null) {
+                n.collapseMacroUnisims(device.getSeries());
+            } else {
+                System.err.println("WARNING: Could not collapse macros in netlist as part target device"
+                        + " could not be identified.");
+            }            
+        }
+        
         MessageBuilder message = new MessageBuilder();
         Netlist.Builder netlist = message.initRoot(Netlist.factory);
 
