@@ -887,6 +887,22 @@ public class EDIFNetlist extends EDIFName {
 					if(checkInst == null) i++;
 				}
 				if (checkInst == null) {
+					// Try searching other direction
+					String prefixHierName = ""; 
+					for(int j=0; j < cells.size(); j++) {
+					    EDIFCellInst curr = cells.get(j);
+					    prefixHierName += curr == getTopCellInst() ? "" : (curr.getName() + "/");
+					    int index = name.indexOf(prefixHierName);
+					    String suffixHierName = name.substring(index + prefixHierName.length()); 
+					    EDIFCellInst match = curr.getCellType().getCellInst(suffixHierName);
+					    if(match != null) {
+			                        for(int k=cells.size()-1; k > j; k--) {
+			                            cells.remove(k);
+			                        }
+			                        cells.add(match);
+			                        return new Pair<>(cells, null);
+					    }
+					}
 					//Not found
 					return new Pair<>(cells, sb.toString());
 				}
