@@ -974,13 +974,12 @@ public class EDIFTools {
 	}
 
 	/**
-	 * Creates a new netlist from an existing EDIFCellInst in a netlist.  This operation is 
-	 * destructive to the source netlist.   
+	 * Creates a new netlist from an existing EDIFCellInst in a netlist.  This operation does not 
+	 * modify the source netlist.   
 	 * @param cellInst The new top cell/top cell inst in the netlist.
 	 * @return The newly created netlist from the provided cell inst.
 	 */
 	public static EDIFNetlist createNewNetlist(EDIFCellInst cellInst){
-	    List<String> librariesOrder = new ArrayList<>(cellInst.getCellType().getNetlist().getLibrariesMap().keySet());
 	    EDIFNetlist n = new EDIFNetlist(cellInst.getName());
 	    n.generateBuildComments();
 	    EDIFDesign eDesign = new EDIFDesign(cellInst.getName());
@@ -995,7 +994,7 @@ public class EDIFTools {
 	            libs.put(lib.getName(), lib);
 	        }
 	        n.getLibrariesMap().clear();
-	        for(String libName : librariesOrder) {
+	        for(String libName : cellInst.getCellType().getNetlist().getLibrariesMap().keySet()) {
 	            EDIFLibrary lib = libs.get(libName);
 	            if(lib != null) {
 	                n.getLibrariesMap().put(libName, lib);	                
