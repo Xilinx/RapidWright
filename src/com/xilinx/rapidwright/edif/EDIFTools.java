@@ -988,6 +988,8 @@ public class EDIFTools {
 	    EDIFCell topCell = cellInst.getCellType();
 	    n.copyCellAndSubCells(topCell);
 	    eDesign.setTopCell(n.getLibrary(topCell.getLibrary().getName()).getCell(topCell.getName()));
+	    // If we have more than the primitives and work library, lets order the libraries in the same way 
+	    // from the source netlist
 	    if(n.getLibraries().size() > 2) {
 	        // Put libraries in the same order as source netlist
 	        Map<String, EDIFLibrary> libs = new HashMap<>();
