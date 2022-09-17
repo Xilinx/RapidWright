@@ -26,19 +26,16 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
-import com.trolltech.qt.core.QModelIndex;
-import com.trolltech.qt.core.Qt.DockWidgetArea;
-import com.trolltech.qt.core.Qt.ItemDataRole;
-import com.trolltech.qt.core.Qt.SortOrder;
-import com.trolltech.qt.gui.QApplication;
-import com.trolltech.qt.gui.QDockWidget;
-import com.trolltech.qt.gui.QLabel;
-import com.trolltech.qt.gui.QMainWindow;
-import com.trolltech.qt.gui.QStatusBar;
-import com.trolltech.qt.gui.QTreeWidget;
-import com.trolltech.qt.gui.QTreeWidgetItem;
-import com.trolltech.qt.gui.QWidget;
-import com.trolltech.qt.gui.QDockWidget.DockWidgetFeature;
+import io.qt.core.QModelIndex;
+import io.qt.core.Qt;
+import io.qt.widgets.QApplication;
+import io.qt.widgets.QLabel;
+import io.qt.widgets.QMainWindow;
+import io.qt.widgets.QStatusBar;
+import io.qt.widgets.QTreeWidget;
+import io.qt.widgets.QTreeWidgetItem;
+import io.qt.widgets.QWidget;
+import io.qt.widgets.QDockWidget;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.Tile;
@@ -57,7 +54,7 @@ import com.xilinx.rapidwright.gui.WidgetMaker;
  * @author Chris Lavin and Marc Padilla
  * Created on: Nov 26, 2010
  */
-public class DeviceBrowser extends QMainWindow{
+public class DeviceBrowser extends QMainWindow {
 	/** The Qt View for the browser */
 	protected TileView view;
 	/** The Qt Scene for the browser */
@@ -85,7 +82,7 @@ public class DeviceBrowser extends QMainWindow{
 	 * @param args
 	 */
 	public static void main(String[] args){
-		QApplication.setGraphicsSystem("raster");
+		// https://doc.qt.io/qt-5/sourcebreaks.html#changes-to-qapplication
 		QApplication.initialize(args);
 
 		String defaultPart = null;
@@ -164,8 +161,8 @@ public class DeviceBrowser extends QMainWindow{
 		
 		QDockWidget dockWidget = new QDockWidget(tr("Part Browser"), this);
 		dockWidget.setWidget(treeWidget);
-		dockWidget.setFeatures(DockWidgetFeature.DockWidgetMovable);
-		addDockWidget(DockWidgetArea.LeftDockWidgetArea, dockWidget);
+		dockWidget.setFeatures(QDockWidget.DockWidgetFeature.DockWidgetMovable);
+		addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, dockWidget);
 		
 		// Create the primitive site list window
 		primitiveList = new QTreeWidget();
@@ -178,8 +175,8 @@ public class DeviceBrowser extends QMainWindow{
 		
 		QDockWidget dockWidget2 = new QDockWidget(tr("Primitive List"), this);
 		dockWidget2.setWidget(primitiveList);
-		dockWidget2.setFeatures(DockWidgetFeature.DockWidgetMovable);
-		addDockWidget(DockWidgetArea.LeftDockWidgetArea, dockWidget2);
+		dockWidget2.setFeatures(QDockWidget.DockWidgetFeature.DockWidgetMovable);
+		addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, dockWidget2);
 		
 		// Create the wire list window
 		wireList = new QTreeWidget();
@@ -191,8 +188,8 @@ public class DeviceBrowser extends QMainWindow{
 		wireList.setSortingEnabled(true);
 		QDockWidget dockWidget3 = new QDockWidget(tr("Wire List"), this);
 		dockWidget3.setWidget(wireList);
-		dockWidget3.setFeatures(DockWidgetFeature.DockWidgetMovable);
-		addDockWidget(DockWidgetArea.LeftDockWidgetArea, dockWidget3);
+		dockWidget3.setFeatures(QDockWidget.DockWidgetFeature.DockWidgetMovable);
+		addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, dockWidget3);
 
 		// Draw wire connections when the wire name is double clicked
 		wireList.doubleClicked.connect(this, "wireDoubleClicked(QModelIndex)");
@@ -251,7 +248,7 @@ public class DeviceBrowser extends QMainWindow{
 			treeItem.setText(1, String.format("%3d", connections == null ? 0 : connections.size()));
 			wireList.insertTopLevelItem(0, treeItem);
 		}
-		wireList.sortByColumn(0, SortOrder.AscendingOrder);
+		wireList.sortByColumn(0, Qt.SortOrder.AscendingOrder);
 	}
 
 	/**
@@ -260,7 +257,7 @@ public class DeviceBrowser extends QMainWindow{
 	 * @param qmIndex The index of the part to load.
 	 */
 	protected void showPart(QModelIndex qmIndex){
-		Object data = qmIndex.data(ItemDataRole.AccessibleDescriptionRole);
+		Object data = qmIndex.data(Qt.ItemDataRole.AccessibleDescriptionRole);
 		if( data != null){
 			if(currPart.equals(data))
 				return;

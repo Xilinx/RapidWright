@@ -26,33 +26,29 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.trolltech.qt.core.QPointF;
-import com.trolltech.qt.core.QRectF;
-import com.trolltech.qt.core.QSizeF;
-import com.trolltech.qt.core.Qt;
-import com.trolltech.qt.core.Qt.DockWidgetArea;
-import com.trolltech.qt.core.Qt.MatchFlag;
-import com.trolltech.qt.core.Qt.MatchFlags;
-import com.trolltech.qt.gui.QAbstractItemView.SelectionMode;
-import com.trolltech.qt.gui.QAction;
-import com.trolltech.qt.gui.QApplication;
-import com.trolltech.qt.gui.QComboBox;
-import com.trolltech.qt.gui.QDockWidget;
-import com.trolltech.qt.gui.QFileDialog;
-import com.trolltech.qt.gui.QGraphicsItemInterface;
-import com.trolltech.qt.gui.QIcon;
-import com.trolltech.qt.gui.QKeySequence;
-import com.trolltech.qt.gui.QKeySequence.StandardKey;
-import com.trolltech.qt.gui.QLabel;
-import com.trolltech.qt.gui.QMainWindow;
-import com.trolltech.qt.gui.QMenu;
-import com.trolltech.qt.gui.QMessageBox;
-import com.trolltech.qt.gui.QStatusBar;
-import com.trolltech.qt.gui.QToolBar;
-import com.trolltech.qt.gui.QTreeWidget;
-import com.trolltech.qt.gui.QTreeWidgetItem;
-import com.trolltech.qt.gui.QUndoStack;
-import com.trolltech.qt.gui.QWidget;
+import io.qt.core.QPointF;
+import io.qt.core.QRectF;
+import io.qt.core.QSizeF;
+import io.qt.core.Qt;
+import io.qt.widgets.QAbstractItemView;
+import io.qt.gui.QAction;
+import io.qt.widgets.QApplication;
+import io.qt.widgets.QComboBox;
+import io.qt.widgets.QDockWidget;
+import io.qt.widgets.QFileDialog;
+import io.qt.widgets.QGraphicsItem;
+import io.qt.gui.QIcon;
+import io.qt.gui.QKeySequence;
+import io.qt.widgets.QLabel;
+import io.qt.widgets.QMainWindow;
+import io.qt.widgets.QMenu;
+import io.qt.widgets.QMessageBox;
+import io.qt.widgets.QStatusBar;
+import io.qt.widgets.QToolBar;
+import io.qt.widgets.QTreeWidget;
+import io.qt.widgets.QTreeWidgetItem;
+import io.qt.gui.QUndoStack;
+import io.qt.widgets.QWidget;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Tile;
@@ -90,7 +86,6 @@ public class HandPlacer extends QMainWindow {
 	public QToolBar toolbar;
 	
 	public static void main(String[] args) {
-		QApplication.setGraphicsSystem("raster");
 		QApplication.initialize(args);
 
 		boolean debugPlacer = false;
@@ -111,7 +106,6 @@ public class HandPlacer extends QMainWindow {
 	}
 	
 	public static void openDesign(Design d){
-		QApplication.setGraphicsSystem("raster");
 		QApplication.initialize(new String[]{});
 		
 		HandPlacer handPlacer = new HandPlacer(null, d);
@@ -231,9 +225,9 @@ public class HandPlacer extends QMainWindow {
 		if(macroList.hasFocus())
 			return;
 		macroList.clearSelection();
-		for(QGraphicsItemInterface item : scene.selectedItems()){
+		for(QGraphicsItem item : scene.selectedItems()){
 			String modInstName = ((GUIModuleInst)item).getModuleInst().getName();
-			List<QTreeWidgetItem> itemList = macroList.findItems(modInstName, new MatchFlags(MatchFlag.MatchExactly), 0);
+			List<QTreeWidgetItem> itemList = macroList.findItems(modInstName, new Qt.MatchFlags(Qt.MatchFlag.MatchExactly), 0);
 			if(itemList.size() > 0){
 				itemList.get(0).setSelected(true);
 			}
@@ -272,7 +266,7 @@ public class HandPlacer extends QMainWindow {
 	private void createModuleList() {
 		
 		macroList = new QTreeWidget();
-		macroList.setSelectionMode(SelectionMode.ExtendedSelection);
+		macroList.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection);
 		macroList.setColumnCount(2);
 		ArrayList<String> headerList = new ArrayList<String>();
 		headerList.add("Module Instance");
@@ -282,10 +276,10 @@ public class HandPlacer extends QMainWindow {
 		
 		
 		macroListDockWidget = new QDockWidget(tr("Module List"), this);
-		macroListDockWidget.setAllowedAreas(DockWidgetArea.RightDockWidgetArea,
-				DockWidgetArea.LeftDockWidgetArea);
+		macroListDockWidget.setAllowedAreas(Qt.DockWidgetArea.RightDockWidgetArea,
+				Qt.DockWidgetArea.LeftDockWidgetArea);
 		macroListDockWidget.setWidget(macroList);
-		addDockWidget(DockWidgetArea.RightDockWidgetArea, macroListDockWidget);
+		addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, macroListDockWidget);
 	}
 	
 	protected void about() {
@@ -313,7 +307,7 @@ public class HandPlacer extends QMainWindow {
 	
 	protected void openWithAutoPlacer(){
 		String fileName = QFileDialog.getOpenFileName(this, "Choose a file...",
-				".", FileFilters.xdlFilter);
+				".", FileFilters.xdlFilter).toString();
 		if (fileName.endsWith(".xdl")){
 			debugPlacer = true;
 			scene.debugPlacer = true;
@@ -328,7 +322,7 @@ public class HandPlacer extends QMainWindow {
 	protected void saveAsDCPDesign(){
 		if(scene.getDesign() == null)
 			return;
-		String fileName = QFileDialog.getSaveFileName(this, tr("Save As"),".", FileFilters.dcpFilter);
+		String fileName = QFileDialog.getSaveFileName(this, tr("Save As"),".", FileFilters.dcpFilter).toString();
         if (fileName.length() == 0)
             return;
         scene.getDesign().flattenDesign();
@@ -339,7 +333,7 @@ public class HandPlacer extends QMainWindow {
 	protected void saveAsPDFDesign(){
 		if(scene.getDesign() == null)
 			return;
-		String fileName = QFileDialog.getSaveFileName(this, tr("Save As PDF"),".", FileFilters.pdfFilter);
+		String fileName = QFileDialog.getSaveFileName(this, tr("Save As PDF"),".", FileFilters.pdfFilter).toString();
         if (fileName.length() == 0)
             return;
         UiTools.saveAsPdf(scene, new File(fileName));
@@ -374,15 +368,15 @@ public class HandPlacer extends QMainWindow {
 		QMenu fileMenu = new QMenu(tr("&File"), this);
 		menuBar().addMenu(fileMenu);
 
-		action(tr("Open"), "fileopen", StandardKey.Open, "openDesign()",fileMenu, toolbar);
+		action(tr("Open"), "fileopen", QKeySequence.StandardKey.Open, "openDesign()",fileMenu, toolbar);
 		action(tr("Open w/Auto Placer"), "opendebug", null, "openWithAutoPlacer()",fileMenu, toolbar);
 		fileMenu.addSeparator();
 		//action(tr("&Save"), "filesave", StandardKey.Save, "saveDesign()", fileMenu, tb);
 		//action(tr("&Save As"), "filesaveas", null, "saveAsDesign()", fileMenu, tb);
-		action(tr("&Save As DCP"), "filesaveas", StandardKey.SaveAs, "saveAsDCPDesign()", fileMenu, toolbar);
+		action(tr("&Save As DCP"), "filesaveas", QKeySequence.StandardKey.SaveAs, "saveAsDCPDesign()", fileMenu, toolbar);
 		action(tr("&Save As PDF"), "exportpdf", null, "saveAsPDFDesign()", fileMenu, toolbar);
 		fileMenu.addSeparator();
-		action(tr("&Print"), "fileprint", StandardKey.Print, null, fileMenu, toolbar);		
+		action(tr("&Print"), "fileprint", QKeySequence.StandardKey.Print, null, fileMenu, toolbar);
 		fileMenu.addSeparator();
 		action(tr("&Quit"), null, "Ctrl+Q", "close()", fileMenu, null);
 	}
@@ -394,11 +388,11 @@ public class HandPlacer extends QMainWindow {
 		QMenu m = new QMenu(tr("&Edit"), this);
 		menuBar().addMenu(m);
 
-		actionUndo = action(tr("&Undo"), "editundo", StandardKey.Undo, null, m,
+		actionUndo = action(tr("&Undo"), "editundo", QKeySequence.StandardKey.Undo, null, m,
 				toolbar);
 		actionUndo.setEnabled(false);
 		actionUndo.triggered.connect(undoStack, "undo()");
-		actionRedo = action(tr("&Redo"), "editredo", StandardKey.Redo, null, m,
+		actionRedo = action(tr("&Redo"), "editredo", QKeySequence.StandardKey.Redo, null, m,
 				toolbar);
 		actionRedo.setEnabled(false);
 		actionRedo.triggered.connect(undoStack, "redo()");
@@ -419,7 +413,7 @@ public class HandPlacer extends QMainWindow {
 		netViewCombo.currentIndexChanged.connect(scene,"changeNetView(int)");
 		toolbar.addWidget(netViewCombo);
 		
-		actionZoomIn = action(tr("&Zoom Out"), "zoomout", StandardKey.ZoomOut, "zoomout()", m, toolbar);
+		actionZoomIn = action(tr("&Zoom Out"), "zoomout", QKeySequence.StandardKey.ZoomOut, "zoomout()", m, toolbar);
 		actionZoomOut = action(tr("&Zoom In"), "zoomin", "Ctrl+=", "zoomin()", m, toolbar);
 		actionZoomSelection = action(tr("&Zoom Selection"), "zoomselection", null, "zoomselection()", m, toolbar);
 		actionZoomIn.setEnabled(false);
@@ -437,7 +431,7 @@ public class HandPlacer extends QMainWindow {
 	@SuppressWarnings("unused")
 	private void zoomselection(){
 		double top=-1,left=-1,right=-1,bottom=-1;
-		for(QGraphicsItemInterface item : scene.selectedItems()){
+		for(QGraphicsItem item : scene.selectedItems()){
 			QPointF gmiTL = item.pos();
 			QPointF gmiBR = item.pos().add(item.boundingRect().bottomRight());
 			if(top < 0 || gmiTL.y() < top)

@@ -29,15 +29,14 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
 
-import com.trolltech.qt.core.Qt.MouseButton;
-import com.trolltech.qt.core.Qt.PenStyle;
-import com.trolltech.qt.gui.QAction;
-import com.trolltech.qt.gui.QBrush;
-import com.trolltech.qt.gui.QColor;
-import com.trolltech.qt.gui.QGraphicsLineItem;
-import com.trolltech.qt.gui.QGraphicsSceneMouseEvent;
-import com.trolltech.qt.gui.QMenu;
-import com.trolltech.qt.gui.QPen;
+import io.qt.core.Qt;
+import io.qt.gui.QAction;
+import io.qt.gui.QBrush;
+import io.qt.gui.QColor;
+import io.qt.widgets.QGraphicsLineItem;
+import io.qt.widgets.QGraphicsSceneMouseEvent;
+import io.qt.widgets.QMenu;
+import io.qt.gui.QPen;
 import com.xilinx.rapidwright.router.RouteNode;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Tile;
@@ -49,9 +48,9 @@ import com.xilinx.rapidwright.gui.TileScene;
  * This class was written specifically for the DeviceBrowser class.  It
  * provides the scene content of the 2D tile array.
  */
-public class DeviceBrowserScene extends TileScene{
+public class DeviceBrowserScene extends TileScene {
 	/**	 */
-	public Signal1<Tile> updateTile = new Signal1<Tile>();
+	final Signal1<Tile> updateTile = new Signal1<Tile>();
 	/**	 */
 	private QPen wirePen;
 	/**	 */
@@ -67,7 +66,7 @@ public class DeviceBrowserScene extends TileScene{
 	public DeviceBrowserScene(Device device, boolean hideTiles, boolean drawPrimitives, DeviceBrowser browser){
 		super(device, hideTiles, drawPrimitives);
 		currLines = new ArrayList<QGraphicsLineItem>();
-		wirePen = new QPen(QColor.yellow, 0.25, PenStyle.SolidLine);
+		wirePen = new QPen(new QColor(Qt.GlobalColor.yellow), 0.25, Qt.PenStyle.SolidLine);
 		this.browser = browser;
 	}
 	
@@ -196,7 +195,7 @@ public class DeviceBrowserScene extends TileScene{
 	
 	@Override
 	public void mouseReleaseEvent(QGraphicsSceneMouseEvent event){
-		if(event.button().equals(MouseButton.RightButton)){
+		if(event.button().equals(Qt.MouseButton.RightButton)){
 			if(browser.view.hasPanned){
 				browser.view.hasPanned = false;
 

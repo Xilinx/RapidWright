@@ -27,8 +27,9 @@ package com.xilinx.rapidwright.placer.handplacer;
 
 import java.util.*;
 
-import com.trolltech.qt.core.*;
-import com.trolltech.qt.gui.*;
+import io.qt.core.QPointF;
+import io.qt.gui.QUndoCommand;
+import static io.qt.core.QObject.tr;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Site;

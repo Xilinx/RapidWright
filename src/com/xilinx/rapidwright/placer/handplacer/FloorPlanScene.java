@@ -32,16 +32,17 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 
-import com.trolltech.qt.core.Qt;
-import com.trolltech.qt.core.QPointF;
-import com.trolltech.qt.gui.QBrush;
-import com.trolltech.qt.gui.QColor;
-import com.trolltech.qt.gui.QGraphicsItemInterface;
-import com.trolltech.qt.gui.QGraphicsLineItem;
-import com.trolltech.qt.gui.QGraphicsRectItem;
-import com.trolltech.qt.gui.QGraphicsSceneMouseEvent;
-import com.trolltech.qt.gui.QPen;
-import com.trolltech.qt.gui.QPolygonF;
+import io.qt.core.QStaticMemberSignals;
+import io.qt.core.Qt;
+import io.qt.core.QPointF;
+import io.qt.gui.QBrush;
+import io.qt.gui.QColor;
+import io.qt.widgets.QGraphicsItem;
+import io.qt.widgets.QGraphicsLineItem;
+import io.qt.widgets.QGraphicsRectItem;
+import io.qt.widgets.QGraphicsSceneMouseEvent;
+import io.qt.gui.QPen;
+import io.qt.gui.QPolygonF;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Module;
 import com.xilinx.rapidwright.design.ModuleInst;
@@ -64,9 +65,9 @@ public class FloorPlanScene extends TileScene {
 	/**  */
 	List<GUIModuleInst> movingHMList;
 	/**  */
-	public Signal2<List<GUIModuleInst>, List<QPointF>> hmMoved = new Signal2<List<GUIModuleInst>, List<QPointF>>();
+	public final static QStaticMemberSignals.Signal2<List<GUIModuleInst>, List<QPointF>> hmMoved = new QStaticMemberSignals.Signal2<List<GUIModuleInst>, List<QPointF>>();
 	/**  */
-	public Signal0 mousePressed = new Signal0();
+	public final static QStaticMemberSignals.Signal0 mousePressed = new QStaticMemberSignals.Signal0();
 	/**  */
 	protected ArrayList<QPointF> movingPosList;
 	/**  */
@@ -96,7 +97,7 @@ public class FloorPlanScene extends TileScene {
 		this.debugPlacer = debugPlacer;
 		initializeScene();
 		// Let's not use a cursor
-		cursorPen = new QPen(QColor.transparent);
+		cursorPen = new QPen(new QColor(Qt.GlobalColor.transparent));
 	}
 	
 	public void initializeScene() {
@@ -312,20 +313,20 @@ public class FloorPlanScene extends TileScene {
 						if(destY < 0) 
 							destY = (destTile.getRow() >= rows)? (rows-1)*tileSize : destTile.getRow()*tileSize;
 						QGraphicsLineItem line = new QGraphicsLineItem(10+srcX, 10+srcY, 10+destX, 10+destY);
-						line.setPen(new QPen(QColor.cyan, 2));
+						line.setPen(new QPen(new QColor(Qt.GlobalColor.cyan), 2));
 						addItem(line);
 						continue;
 					}
 				}
 				//Module-to-module + Module-to-IOB connections
-				QGraphicsItemInterface gmiSrc = getGMI(srcMIName);
+				QGraphicsItem gmiSrc = getGMI(srcMIName);
 				//for IOB connections, create immovable HMTile for net connection
 				if(gmiSrc == null){
 					HMTile hmTile = new HMTile(srcTile, this, null);
 					hmTile.moveBy(getDrawnTileX(srcTile) * this.tileSize, getDrawnTileY(srcTile) * this.tileSize);
 					gmiSrc = hmTile;
 				}
-				QGraphicsItemInterface gmiDest = getGMI(destMIName);
+				QGraphicsItem gmiDest = getGMI(destMIName);
 				if(gmiDest == null){
 					HMTile hmTile = new HMTile(destTile, this, null);
 					hmTile.moveBy(getDrawnTileX(destTile) * this.tileSize, getDrawnTileY(destTile) * this.tileSize);

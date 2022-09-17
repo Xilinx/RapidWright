@@ -24,9 +24,10 @@ package com.xilinx.rapidwright.gui;
 
 import java.io.File;
 
-import com.trolltech.qt.gui.QPainter;
-import com.trolltech.qt.gui.QPrinter;
-import com.trolltech.qt.svg.QSvgGenerator;
+import io.qt.gui.QPageSize;
+import io.qt.gui.QPainter;
+import io.qt.printsupport.QPrinter;
+import io.qt.svg.QSvgGenerator;
 
 public class UiTools {
     private UiTools(){
@@ -52,7 +53,7 @@ public class UiTools {
         QPrinter printer = new QPrinter();
         printer.setOutputFormat(QPrinter.OutputFormat.PdfFormat);
         printer.setOutputFileName(file.toString());
-        printer.setPageSize(QPrinter.PageSize.Letter);
+        printer.setPageSize(new QPageSize(QPageSize.PageSizeId.Letter));
         QPainter pdfPainter = new QPainter(printer);
         scene.render(pdfPainter);
         pdfPainter.end();
