@@ -237,6 +237,7 @@ public class HardwareContractMaker {
         for (Pair<String, String> cell : targets) {
             DesignTools.makeBlackBox(hwct,cell.getFirst());
         }
+        hwct.getNetlist().removeUnusedCellsFromAllWorkLibraries();
 
 
         Design d2 = createDesignFromCell(srcDesign, srcCell.get(0).getFullHierarchicalInstName(), keepStaticRouting );
