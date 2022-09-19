@@ -298,9 +298,18 @@ public class TestDesignTools {
         }
         return net;
     }
-    
-    @Test
-    public void testRemoveSourcePin() {
+
+    private void removeSourcePinHelper(boolean useUnroutePins, SitePinInst spi, int expectedPIPs) {
+        if (useUnroutePins) {
+            DesignTools.unroutePins(spi.getNet(), Arrays.asList(spi));
+        } else {
+            Assertions.assertEquals(expectedPIPs, DesignTools.unrouteSourcePin(spi).size());
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testRemoveSourcePin(boolean useUnroutePins) {
         Design design = new Design("test", Device.KCU105);
         
         // Net with one source (AQ2) and two sinks (A_I & FX) and a stub (INT_NODE_IMUX_71_INT_OUT)
@@ -325,9 +334,8 @@ public class TestDesignTools {
         net1.createPin("AQ2", si).setRouted(true);
         net1.createPin("A_I", si).setRouted(true);
         net1.createPin("FX", si).setRouted(true);
-        
-        Assertions.assertEquals(12, DesignTools.unrouteSourcePin(net1.getSource()).size());
-        
+
+        removeSourcePinHelper(useUnroutePins, net1.getSource(), 12);
         Assertions.assertEquals(0, net1.getPIPs().size());
         for(SitePinInst pin : net1.getPins()) {
             Assertions.assertFalse(pin.isRouted());
@@ -346,9 +354,8 @@ public class TestDesignTools {
         net2.createPin("HMUX", si).setRouted(true);
         si = design.createSiteInst(design.getDevice().getSite("SLICE_X64Y158"));
         net2.createPin("SRST_B2", si).setRouted(true);
-        
-        Assertions.assertEquals(4, DesignTools.unrouteSourcePin(net2.getSource()).size());
-        
+
+        removeSourcePinHelper(useUnroutePins, net2.getSource(), 4);
         Assertions.assertEquals(0, net2.getPIPs().size());
         for(SitePinInst pin : net2.getPins()) {
             Assertions.assertFalse(pin.isRouted());
@@ -396,8 +403,7 @@ public class TestDesignTools {
         altSnk.setRouted(true);
 
         // Unroute just the H_O alternate source
-        Set<PIP> unroutedPIPs = DesignTools.unrouteSourcePin(net3.getAlternateSource());
-        Assertions.assertEquals(11, unroutedPIPs.size());
+        removeSourcePinHelper(useUnroutePins, net3.getAlternateSource(), 11);
         Assertions.assertEquals(4, net3.getPIPs().size());
         Assertions.assertTrue(src.isRouted());
         Assertions.assertFalse(altSrc.isRouted());
