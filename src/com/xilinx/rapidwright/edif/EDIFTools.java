@@ -974,8 +974,8 @@ public class EDIFTools {
 	}
 
 	/**
-	 * Creates a new netlist from an existing EDIFCellInst in a netlist.  This operation is 
-	 * destructive to the source netlist.   
+	 * Creates a new netlist from an existing EDIFCellInst in a netlist.  This operation does not 
+	 * modify the source netlist.   
 	 * @param cellInst The new top cell/top cell inst in the netlist.
 	 * @return The newly created netlist from the provided cell inst.
 	 */
@@ -984,8 +984,25 @@ public class EDIFTools {
 	    n.generateBuildComments();
 	    EDIFDesign eDesign = new EDIFDesign(cellInst.getName());
 	    n.setDesign(eDesign);
-	    eDesign.setTopCell(cellInst.getCellType());
-	    n.migrateCellAndSubCells(cellInst.getCellType());
+	    EDIFCell topCell = cellInst.getCellType();
+	    n.copyCellAndSubCells(topCell);
+	    eDesign.setTopCell(n.getLibrary(topCell.getLibrary().getName()).getCell(topCell.getName()));
+	    // If we have more than the primitives and work library, lets order the libraries in the same way 
+	    // from the source netlist
+	    if(n.getLibraries().size() > 2) {
+	        // Put libraries in the same order as source netlist
+	        Map<String, EDIFLibrary> libs = new HashMap<>();
+	        for(EDIFLibrary lib : n.getLibraries()) {
+	            libs.put(lib.getName(), lib);
+	        }
+	        n.getLibrariesMap().clear();
+	        for(String libName : cellInst.getCellType().getNetlist().getLibrariesMap().keySet()) {
+	            EDIFLibrary lib = libs.get(libName);
+	            if(lib != null) {
+	                n.getLibrariesMap().put(libName, lib);	                
+	            }
+	        }
+	    }
 	    return n;
 	}
 	

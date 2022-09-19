@@ -489,7 +489,7 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
 	/**
 	 * Deletes internal representation.  
 	 */
-	protected void makePrimitive() { 
+	public void makePrimitive() { 
 		EDIFNetlist netlist = getNetlist();
 		if(netlist!= null && netlist.isTrackingCellChanges()) {
 		    for(EDIFCellInst inst : getCellInsts()) {
