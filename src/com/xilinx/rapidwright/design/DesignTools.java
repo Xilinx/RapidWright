@@ -2294,7 +2294,7 @@ public class DesignTools {
 			}
 			destNetlist.migrateCellAndSubCells(cellInst.getCellType());
 			EDIFHierCellInst bbInst = destNetlist.getHierCellInstFromName(e.getValue());
-			EDIFCell destCell = destNetlist.getCell(cellInst.getCellType().getLegalEDIFName());
+			EDIFCell destCell = destNetlist.getCell(cellInst.getCellType().getName());
 			if(destNetlist.getTopCell() == bbInst.getCellType()) {
 			    destNetlist.getDesign().setTopCell(destCell);
 			}
