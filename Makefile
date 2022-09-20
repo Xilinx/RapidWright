@@ -29,7 +29,7 @@ ensure_headers:
 	@rm $(TMP_HEADER)
 
 check_headers:
-	@ NO_LICENSE_FILES=$$(git grep --files-without-match --cached 'Apache' -- '*.java'); \
+	@ NO_LICENSE_FILES=$$(git grep --files-without-match 'Apache' -- '*.java'); \
 	if [ ! -z "$$NO_LICENSE_FILES" ] ;\
 	then \
 		echo "These files are missing a license header:" ;\
@@ -41,7 +41,7 @@ check_headers:
 	fi
 
 check_tabs:
-	@ FILES_CONTAINING_TABS=$$(git grep --cached $$'\t' -- '*.java'); \
+	@ FILES_CONTAINING_TABS=$$(git grep  $$'\t' -- '*.java'); \
 	if [ ! -z "$$FILES_CONTAINING_TABS" ] ;\
 	then \
 		echo "These files contain tab characters, please replace tabs with 4 spaces:" ;\

@@ -9,8 +9,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-        with:
-              fetch-depth: "0"
       - run: |
           make check_tabs
 
