@@ -484,43 +484,6 @@ public class RWRoute{
 	
 	private Map<Short, Integer> connectionSpan = new HashMap<>();
 
-	/**
-	 * Gets any and all nodes that do not have a driver.  This is useful for partial routing when
-	 * a net has all its sinks routed but now needs to connect a source.
-	 * @param net The partially routed net
-	 * @return The list of all nodes without a driver
-	 */
-	public static Set<Node>[] getAntennaRootsAndLeaves(Net net) {
-		Set<Node> roots = new HashSet<>();
-		Set<Node> leaves = new HashSet<>();
-		for(PIP p : net.getPIPs()) {
-			if (p.isBidirectional()) {
-				// Don't bother tracking bidirectional PIPs
-				continue;
-			}
-			Node start = p.getStartNode();
-			if(start != null) {
-				roots.add(start);
-			}
-			Node end = p.getEndNode();
-			if(end != null) {
-				leaves.add(end);
-			}
-		}
-		for (SitePinInst spi : net.getPins()) {
-			Node node = spi.getConnectedNode();
-			if (spi.isOutPin()) {
-				roots.remove(node);
-			} else {
-				leaves.remove(node);
-			}
-		}
-		Set<Node> rootsCopy = new HashSet<>(roots);
-		roots.removeAll(leaves);
-		leaves.removeAll(rootsCopy);
-		return new Set[]{roots,leaves};
-	}
-
 	protected SitePinInst getNetSource(Net net) {
 		return net.getSource();
 	}
