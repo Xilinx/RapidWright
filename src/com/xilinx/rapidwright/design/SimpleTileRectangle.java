@@ -22,11 +22,11 @@
  
 package com.xilinx.rapidwright.design;
 
-import com.xilinx.rapidwright.device.Site;
-import com.xilinx.rapidwright.device.Tile;
-
 import java.util.Objects;
 import java.util.stream.Collector;
+
+import com.xilinx.rapidwright.device.Site;
+import com.xilinx.rapidwright.device.Tile;
 
 /**
  * A {@link TileRectangle} that uses Row/Column indices for storage. Fast, but not relocatable.
@@ -72,18 +72,10 @@ public class SimpleTileRectangle extends TileRectangle {
             return;
         }
 
-        if (otherMinColumn < minColumn) {
-            minColumn = otherMinColumn;
-        }
-        if (otherMaxColumn > maxColumn) {
-            maxColumn = otherMaxColumn;
-        }
-        if (otherMinRow < minRow) {
-            minRow = otherMinRow;
-        }
-        if (otherMaxRow > maxRow) {
-            maxRow = otherMaxRow;
-        }
+        minColumn = Math.min(minColumn, otherMinColumn);
+        maxColumn = Math.max(maxColumn, otherMaxColumn);
+        minRow = Math.min(minRow, otherMinRow);
+        maxRow = Math.max(maxRow, otherMaxRow);
     }
 
     /**
@@ -92,7 +84,9 @@ public class SimpleTileRectangle extends TileRectangle {
      */
     @Override
     public void extendTo(Tile tile) {
-        extendToRect(tile.getColumn(), tile.getColumn(), tile.getRow(), tile.getRow());
+        final int column = tile.getColumn();
+        final int row = tile.getRow();
+        extendToRect(column, column, row, row);
     }
 
     /**

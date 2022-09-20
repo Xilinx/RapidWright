@@ -2287,14 +2287,14 @@ public class DesignTools {
 			    if(destLib == null){
 			        destLib = destNetlist.getWorkLibrary();
 			    }
-			    EDIFCell existingCell = destLib.getCell(cellInst.getCellType().getLegalEDIFName());
+			    EDIFCell existingCell = destLib.getCell(cellInst.getCellType().getName());
 			    if(existingCell != null) {
 			        destLib.removeCell(existingCell);
 			    }
 			}
 			destNetlist.migrateCellAndSubCells(cellInst.getCellType());
 			EDIFHierCellInst bbInst = destNetlist.getHierCellInstFromName(e.getValue());
-			EDIFCell destCell = destNetlist.getCell(cellInst.getCellType().getLegalEDIFName());
+			EDIFCell destCell = destNetlist.getCell(cellInst.getCellType().getName());
 			if(destNetlist.getTopCell() == bbInst.getCellType()) {
 			    destNetlist.getDesign().setTopCell(destCell);
 			}

@@ -22,24 +22,24 @@
  */
 package com.xilinx.rapidwright.edif;
 
-import com.xilinx.rapidwright.util.NoCloseOutputStream;
-import com.xilinx.rapidwright.util.ParallelismTools;
-import com.xilinx.rapidwright.util.ParallelDCPInput;
-import com.xilinx.rapidwright.util.ParallelDCPOutput;
-
-import java.io.BufferedWriter;
+import java.io.BufferedOutputStream;
 import java.io.IOException;
-import java.io.OutputStreamWriter;
-import java.io.Writer;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Future;
+
+import com.xilinx.rapidwright.util.NoCloseOutputStream;
+import com.xilinx.rapidwright.util.ParallelDCPInput;
+import com.xilinx.rapidwright.util.ParallelDCPOutput;
+import com.xilinx.rapidwright.util.ParallelismTools;
 
 /**
  * Keeps track of a set of {@link EDIFCell} objects 
@@ -63,13 +63,13 @@ public class EDIFLibrary extends EDIFName {
 	
 	/**
 	 * Adds the provided cell to the library. All cells 
-	 * must be unique by their legal EDIF name (rename construct).  
+	 * must be unique by their name.
 	 * @param cell The cell to add to the library.
 	 * @return The cell that has been added.
 	 */
 	public EDIFCell addCell(EDIFCell cell){
 		if(cells == null) cells = getNewMap(); 
-		EDIFCell collision = cells.put(cell.getLegalEDIFName(), cell);
+		EDIFCell collision = cells.put(cell.getName(), cell);
 		if(collision != null && cell != collision){
 			throw new RuntimeException("ERROR: Failed to add cell " + 
 				cell.getName() + " to library " + getName()+". The library "
@@ -79,16 +79,55 @@ public class EDIFLibrary extends EDIFName {
 		return cell;
 	}
 
+	private String findUniqueCellName(String name) {
+		int counter = 0;
+		String counterName = name; //First try without suffix
+		while (cells.containsKey(counterName)) {
+			counter++;
+			counterName = name+"_"+counter;
+		}
+		return counterName;
+	}
+
+	/**
+	 * Adds the provided cell to the library. If a cell by this name already exists, append a suffix to uniqueify the
+	 * name.
+	 * @param cell The cell to add to the library.
+	 * @param preferredSuffix If a suffix needs to be appended for uniquification, use this one
+	 * @return The cell that has been added.
+	 */
+	public EDIFCell addCellRenameDuplicates(EDIFCell cell, String preferredSuffix) {
+		if(cells == null) cells = getNewMap();
+		cell.setLibrary(this);
+
+		EDIFCell collision = cells.put(cell.getName(), cell);
+		if (collision == null) {
+			return cell;
+		}
+		//Restore the old mapping
+		cells.put(cell.getName(), collision);
+
+		if (preferredSuffix == null) {
+			preferredSuffix = "collisionRename";
+		}
+		String newName = findUniqueCellName(cell.getName()+"_RW_"+preferredSuffix);
+		System.err.println("EDIF library "+getName()+" contains cells with same name \""+cell.getName()+"\". Changing name of one of those instances to "+newName);
+		cell.setName(newName);
+
+		cells.put(newName, cell);
+		return cell;
+	}
+
 	/**
 	 * Gets the name of the cell using the EDIF name (rename construct).  This is 
 	 * to avoid collisions that Vivado generates with parameterized cells (end with _HDI_###).
 	 * Note that 
-	 * @param legalEdifName The name of the cell as would be returned by getLegalEDIFName().  
+	 * @param name The name of the cell as would be returned by getLegalEDIFName().
 	 * When the original name was already legal, it is the same.
 	 * @return The cell in the library by the given legal EDIF name, or null if none exists.
 	 */
-	public EDIFCell getCell(String legalEdifName){
-		return cells == null ? null : cells.get(legalEdifName);
+	public EDIFCell getCell(String name){
+		return cells == null ? null : cells.get(name);
 	}
 	
 	/**
@@ -118,16 +157,16 @@ public class EDIFLibrary extends EDIFName {
 	 * @return The removed cell.
 	 */
 	public EDIFCell removeCell(EDIFCell cell){
-		return removeCell(cell.getLegalEDIFName());
+		return removeCell(cell.getName());
 	}
 	
 	/**
-	 * Removes the cell by 'legal EDIF name' (rename construct)
-	 * @param legalEdifName The legal EDIF name (rename) of the cell to remove
+	 * Removes the cell by name
+	 * @param name The name of the cell to remove
 	 * @return The removed cell, or null if it did not exist in the library.
 	 */
-	public EDIFCell removeCell(String legalEdifName){
-		return cells == null ? null : cells.remove(legalEdifName);
+	public EDIFCell removeCell(String name){
+		return cells == null ? null : cells.remove(name);
 	}
 	
 	/**
@@ -137,16 +176,16 @@ public class EDIFLibrary extends EDIFName {
 	 * @return True if the cell exists in the library, False otherwise.
 	 */
 	public boolean containsCell(EDIFCell cell){
-		return containsCell(cell.getLegalEDIFName());
+		return containsCell(cell.getName());
 	}
 	
 	/**
-	 * Checks if the library contains a cell with the legal EDIF Name provided.
-	 * @param legalEDIFName The legal EDIF name of the cell to query in the library.
+	 * Checks if the library contains a cell with the name provided.
+	 * @param name The name of the cell to query in the library.
 	 * @return True if a cell by such name was found in the library, False otherwise.
 	 */
-	public boolean containsCell(String legalEDIFName){
-		return cells == null ? false : cells.containsKey(legalEDIFName);
+	public boolean containsCell(String name){
+		return cells == null ? false : cells.containsKey(name);
 	}
 	
 	/**
@@ -194,16 +233,13 @@ public class EDIFLibrary extends EDIFName {
 	 * This method prepares all the cells in the library for a merger with another
 	 * library by adding a unique prefix to all cell names.  This method aims to
 	 * address EDIF naming convention.
-	 * @param name The prefix to add to all cells
+	 * @param prefix The prefix to add to all cells
 	 */
-	public void uniqueifyCellsWithPrefix(String name){
+	public void uniqueifyCellsWithPrefix(String prefix){
 		ArrayList<EDIFCell> renamedCells = new ArrayList<>(getCells());
 		cells.clear();
 		for(EDIFCell c : renamedCells){
-			c.setName(name + c.getName());
-			if(c.getEDIFName() != null){
-				c.setEDIFRename(EDIFTools.makeNameEDIFCompatible(name + c.getEDIFName()));
-			}
+			c.setName(prefix + c.getName());
 			addCell(c);
 		}
 	}
@@ -211,15 +247,21 @@ public class EDIFLibrary extends EDIFName {
 	/**
 	 * Creates an ordered list of cells such that each cell that appears
 	 * in the list only references cells that have already been seen in 
-	 * the list.  This is a requirement when exporting the EDIF to a file.
+	 * the list. This is a requirement when exporting the EDIF to a file.
+	 * @param stable makes sure that the list is always the same for the same input
 	 * @return The ordered list.
 	 */
-	public List<EDIFCell> getValidCellExportOrder(){
+	public List<EDIFCell> getValidCellExportOrder(boolean stable){
 		List<EDIFCell> visited = new ArrayList<>();
-		Map<String,EDIFCell> yetToVisit = new HashMap<>(getCellMap());		
-		while(!yetToVisit.isEmpty()){
-			EDIFCell c = yetToVisit.values().iterator().next();
-			visit(c, visited, yetToVisit);
+		Iterable<EDIFCell> cells;
+		if (stable) {
+			cells = getCells().stream().sorted(Comparator.comparing(EDIFName::getName))::iterator;
+		} else {
+			cells = getCells();
+		}
+		Set<EDIFCell> visitedSet = new HashSet<>();
+		for (EDIFCell cell : cells) {
+			visit(cell, visited, visitedSet, stable);
 		}
 		
 		return visited;
@@ -243,52 +285,56 @@ public class EDIFLibrary extends EDIFName {
 		return getName().equals(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME);
 	}
 
-	private void visit(EDIFCell cell, List<EDIFCell> visited, Map<String,EDIFCell> yetToVisit){
-		yetToVisit.remove(cell.getLegalEDIFName());
-		for(EDIFCellInst i : cell.getCellInsts()){
+	private void visit(EDIFCell cell, List<EDIFCell> visitedList, Set<EDIFCell> visitedSet, boolean stable){
+		if (!visitedSet.add(cell)) {
+			return;
+		}
+		final Iterable<EDIFCellInst> cellInsts;
+		if (stable) {
+			cellInsts = cell.getCellInsts().stream().sorted(Comparator.comparing(EDIFName::getName))::iterator;
+		} else {
+			cellInsts = cell.getCellInsts();
+		}
+		for(EDIFCellInst i : cellInsts){
 			EDIFCell childCell = i.getCellType();
-			if(childCell.getLibrary() == this && yetToVisit.containsKey(childCell.getLegalEDIFName())){
-				visit(childCell,visited,yetToVisit);
+			if(childCell.getLibrary() == this){
+				visit(childCell,visitedList,visitedSet, stable);
 			}
 		}
-		visited.add(cell);
+		visitedList.add(cell);
 	}
-	
-	protected void ensureValidEDIFCellNames(){
-		HashSet<String> names = new HashSet<>();
-		for(EDIFCell c : getCells()){
-			String setLegalName = c.getLegalEDIFName();
-			if(!names.add(setLegalName.toLowerCase())){
-				names.add(c.updateEDIFRename(netlist.nameSpaceUniqueCount++).toLowerCase());
-			}
-		}
-	}
-	
-	void exportEDIF(List<EDIFCell> cells, Writer w, boolean writeHeader, boolean writeFooter) throws IOException {
+
+	private static final byte[] EXPORT_CONST_LIBRARY_START = "  (Library ".getBytes(StandardCharsets.UTF_8);
+	private static final byte[] EXPORT_CONST_TECHNOLOGY = "\n    (edifLevel 0)\n    (technology (numberDefinition ))\n".getBytes(StandardCharsets.UTF_8);
+	private static final byte[] EXPORT_CONST_LIBRARY_END = "  )\n".getBytes(StandardCharsets.UTF_8);
+
+	void exportEDIF(List<EDIFCell> cells, OutputStream os, boolean writeHeader, boolean writeFooter, EDIFWriteLegalNameCache<?> cache, boolean stable) throws IOException {
 		if (writeHeader) {
-			w.write("  (Library ");
-			exportEDIFName(w);
-			w.write("\n    (edifLevel 0)\n");
-			w.write("    (technology (numberDefinition ))\n");
+			os.write(EXPORT_CONST_LIBRARY_START);
+			exportEDIFName(os, cache);
+			os.write(EXPORT_CONST_TECHNOLOGY);
 		}
 		for (EDIFCell c : cells) {
-			c.exportEDIF(w);
+			c.exportEDIF(os, cache, stable);
 		}
 		if (writeFooter) {
-			w.write("  )\n");
+			os.write(EXPORT_CONST_LIBRARY_END);
 		}
 	}
 
-	public void exportEDIF(BufferedWriter bw) throws IOException {
-		exportEDIF(getValidCellExportOrder(), bw, true, true);
+	public void exportEDIF(OutputStream os, EDIFWriteLegalNameCache<?> cache, boolean stable) throws IOException {
+		exportEDIF(getValidCellExportOrder(stable), os, true, true, cache, stable);
+	}
+	public void exportEDIF(OutputStream os, EDIFWriteLegalNameCache<?> cache) throws IOException {
+		exportEDIF(os, cache, false);
 	}
 
-	public List<Future<ParallelDCPInput>> exportEDIF() throws IOException{
+	public List<Future<ParallelDCPInput>> exportEDIF(EDIFWriteLegalNameCache<?> cache) throws IOException{
 		if (!ParallelismTools.getParallel()) {
 			throw new RuntimeException();
 		}
 
-		List<EDIFCell> validCellOrder = getValidCellExportOrder();
+		List<EDIFCell> validCellOrder = getValidCellExportOrder(false);
 		final int chunkSize = 256;
 
 		List<Future<ParallelDCPInput>> streamFutures = new ArrayList<>();
@@ -299,8 +345,8 @@ public class EDIFLibrary extends EDIFName {
 
 			streamFutures.add(ParallelismTools.submit(
 					() -> ParallelDCPOutput.newStream((os) -> {
-						try (OutputStreamWriter ow = new OutputStreamWriter(new NoCloseOutputStream(os))) {
-							exportEDIF(chunk, ow, firstChunk, lastChunk);
+						try (BufferedOutputStream bs = new BufferedOutputStream(new NoCloseOutputStream(os))) {
+							exportEDIF(chunk, bs, firstChunk, lastChunk, cache, false);
 						} catch (IOException e) {
 							throw new RuntimeException(e);
 						}
