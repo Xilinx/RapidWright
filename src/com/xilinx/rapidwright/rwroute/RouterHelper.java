@@ -329,28 +329,6 @@ public class RouterHelper {
 	}
 	
 	/**
-	 * Checks if a DSP {@link BELPin} instance is invertible.
-	 * @param belPin The bel pin in question.
-	 * @return true, if the bel pin is invertible.
-	 */
-	private static boolean isInvertibleDSPBELPin(BELPin belPin) {
-		if(belPin.getBELName().equals("CLKINV")) {
-			//NEED TO BE INVERTED when BEL.canInvert returns false
-			return true;
-		}
-		return belPin.getBEL().canInvert();
-	}
-
-	private static boolean isInvertibleLagunaBELPin(BELPin belPin) {
-		String belName = belPin.getBELName();
-		if(belName.equals("RX_OPTINV_SR") || belName.equals("TX_OPTINV_SR")) {
-			//NEED TO BE INVERTED when BEL.canInvert returns false
-			return true;
-		}
-		return belPin.getBEL().canInvert();
-	}
-	
-	/**
 	 * Inverts all possible GND sink pins to VCC pins.
 	 * @param design The target design.
 	 * @param gndPins List of GND pins (from which inverted pins are removed)
@@ -371,19 +349,11 @@ public class RouterHelper {
 					if(belPin.isSitePort())	continue;
 					// DO NOT invert CLK_OPTINV_CLKB_L and CLK_OPTINV_CLKB_U
 					if(belPin.getBEL().getName().contains("CLKB")) continue;
-					if(siteName.contains("RAM")) {
+					if(siteName.contains("RAM") || siteName.contains("DSP") || siteName.startsWith("LAGUNA")) {
 						if(belPin.getBEL().canInvert()) {
 							// SRST2 of SLICE also has an inverter, but should not be invertible
 							toInvertPins.add(currSitePinInst);
 		                }
-					}else if (siteName.contains("DSP")) {
-						if(isInvertibleDSPBELPin(belPin)) {
-							toInvertPins.add(currSitePinInst);
-						}
-					}else if (siteName.startsWith("LAGUNA_")) {
-						if(isInvertibleLagunaBELPin(belPin)) {
-							toInvertPins.add(currSitePinInst);
-						}
 					}
 	           }
 			}
