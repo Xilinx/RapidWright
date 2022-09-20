@@ -74,7 +74,7 @@ public class Utils{
      * @param s The string to be converted to an enum type
      * @return The SiteTypeEnum corresponding to the string s, null if none exists.
      */
-    public static SiteTypeEnum createSiteType(String s){
+    public static SiteTypeEnum createSiteType(String s) {
         return SiteTypeEnum.valueOf(s.toUpperCase());
     }
 
@@ -84,7 +84,7 @@ public class Utils{
      * @param s The string to be converted to an enum type
      * @return The TileTypeEnum corresponding to String s, null if none exists.
      */
-    public static TileTypeEnum createTileType(String s){
+    public static TileTypeEnum createTileType(String s) {
         return TileTypeEnum.valueOf(s.toUpperCase());
     }
     
@@ -94,7 +94,7 @@ public class Utils{
      * @param type The tile type to test for.
      * @return True if this tile type has SLICE (any kind) primitive sites.
      */
-    public static boolean isCLB(TileTypeEnum type){
+    public static boolean isCLB(TileTypeEnum type) {
         return clbs.contains(type);
     }
     
@@ -103,7 +103,7 @@ public class Utils{
      * @param type
      * @return
      */
-    public static boolean isCLBM(TileTypeEnum type){
+    public static boolean isCLBM(TileTypeEnum type) {
         return clbms.contains(type);
     }
     
@@ -113,7 +113,7 @@ public class Utils{
      * @param type The tile type to test for.
      * @return True if this tile type has DSP (any kind) primitive sites.
      */
-    public static boolean isDSP(TileTypeEnum type){
+    public static boolean isDSP(TileTypeEnum type) {
         return dsps.contains(type);
     }
     
@@ -123,7 +123,7 @@ public class Utils{
      * @param type The tile type to test for.
      * @return True if this tile type has BRAM (any kind) primitive sites.
      */
-    public static boolean isBRAM(TileTypeEnum type){
+    public static boolean isBRAM(TileTypeEnum type) {
         return brams.contains(type);
     }
     
@@ -133,7 +133,7 @@ public class Utils{
      * @param type The tile type to test for.
      * @return True if this tile type has BRAM (any kind) primitive sites.
      */
-    public static boolean isSwitchBox(TileTypeEnum type){
+    public static boolean isSwitchBox(TileTypeEnum type) {
         return ints.contains(type);
     }
     
@@ -143,7 +143,7 @@ public class Utils{
      * @param type The tile type to test for.
      * @return True if this tile type has GT (any kind) primitive sites.
      */
-    public static boolean isGt(TileTypeEnum type){
+    public static boolean isGt(TileTypeEnum type) {
         return gts.contains(type);
     }
     
@@ -153,7 +153,7 @@ public class Utils{
      * @param type The tile type to test for.
      * @return True if this tile type has INTERCONNECT (any kind) primitive sites.
      */
-    public static boolean isInterConnect(TileTypeEnum type){
+    public static boolean isInterConnect(TileTypeEnum type) {
         return interconnects.contains(type);
     }
 
@@ -161,63 +161,63 @@ public class Utils{
         return urams.contains(type);
     }
     
-    public static boolean isLockedSiteType(SiteTypeEnum type){
+    public static boolean isLockedSiteType(SiteTypeEnum type) {
         return lockedSiteTypes.contains(type);
     }
     
-    public static boolean isModuleSiteType(SiteTypeEnum type){
+    public static boolean isModuleSiteType(SiteTypeEnum type) {
         return moduleSiteTypes.contains(type);
     }
     
-    public static Set<TileTypeEnum> getIntTileTypes(){
+    public static Set<TileTypeEnum> getIntTileTypes() {
         return interconnects;
     }
     
-    public static Set<TileTypeEnum> getCLBTileTypes(){
+    public static Set<TileTypeEnum> getCLBTileTypes() {
         return clbs;
     }
 
-    public static Set<TileTypeEnum> getCLBMTileTypes(){
+    public static Set<TileTypeEnum> getCLBMTileTypes() {
         return clbms;
     }
     
-    public static Set<TileTypeEnum> getDSPTileTypes(){
+    public static Set<TileTypeEnum> getDSPTileTypes() {
         return dsps;
     }
 
-    public static Set<TileTypeEnum> getBRAMTileTypes(){
+    public static Set<TileTypeEnum> getBRAMTileTypes() {
         return brams;
     }
 
-    public static Set<TileTypeEnum> getURAMTileTypes(){
+    public static Set<TileTypeEnum> getURAMTileTypes() {
         return urams;
     }
     
-    public static Set<SiteTypeEnum> getLockedSiteTypes(){
+    public static Set<SiteTypeEnum> getLockedSiteTypes() {
         return lockedSiteTypes;
     }
 
-    public static Set<SiteTypeEnum> getModuleSiteTypes(){
+    public static Set<SiteTypeEnum> getModuleSiteTypes() {
         return moduleSiteTypes;
     }
     
-    public static boolean isSLICE(SiteInst s){
+    public static boolean isSLICE(SiteInst s) {
         return sliceTypes.contains(s.getSiteTypeEnum());
     }
 
-    public static boolean isSLICE(SiteTypeEnum s){
+    public static boolean isSLICE(SiteTypeEnum s) {
         return sliceTypes.contains(s);
     }
 
-    public static boolean isDSP(SiteInst s){
+    public static boolean isDSP(SiteInst s) {
         return dspTypes.contains(s.getSiteTypeEnum());
     }
 
-    public static boolean isBRAM(SiteInst s){
+    public static boolean isBRAM(SiteInst s) {
         return bramTypes.contains(s.getSiteTypeEnum());
     }
     
-    public static boolean isURAM(SiteInst s){
+    public static boolean isURAM(SiteInst s) {
         return uramTypes.contains(s.getSiteTypeEnum());
     }
     

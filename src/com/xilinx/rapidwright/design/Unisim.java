@@ -1305,7 +1305,7 @@ public enum Unisim {
      * @param s The architectural series in question.
      * @return True if unisim is transformed for the given architecture, false otherwise.
      */
-    public boolean hasTransform(Series s){
+    public boolean hasTransform(Series s) {
         final EDIFLibrary macroPrimitives = Design.getMacroPrimitives(s);
         return macroPrimitives.containsCell(this.name());
     }
@@ -1319,7 +1319,7 @@ public enum Unisim {
      * @return An array populated with the set of unisims that emulate
      * this unisim or an empty array if no such transform is needed.
      */
-    public Unisim[] getTransform(Series s){
+    public Unisim[] getTransform(Series s) {
         final EDIFLibrary macroPrimitives = Design.getMacroPrimitives(s);
         final EDIFCell cell = macroPrimitives.getCell(this.name());
 

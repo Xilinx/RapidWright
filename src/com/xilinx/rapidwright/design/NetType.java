@@ -36,7 +36,7 @@ public enum NetType{
     VCC,
     UNKNOWN;
     
-    public static NetType getNetTypeFromNetName(String name){
+    public static NetType getNetTypeFromNetName(String name) {
         if(name == null || name.isEmpty()) return UNKNOWN;
         if(name.equals(Net.GND_NET)) return GND;
         if(name.equals(Net.VCC_NET)) return VCC;
@@ -45,7 +45,7 @@ public enum NetType{
         return WIRE;
     }
     
-    public boolean isStaticNetType(){
+    public boolean isStaticNetType() {
         return this == GND || this == VCC; 
     }
     

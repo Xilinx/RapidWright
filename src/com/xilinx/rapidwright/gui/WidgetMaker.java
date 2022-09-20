@@ -48,7 +48,7 @@ public class WidgetMaker {
         return devices;
     }
     
-    public static QTreeWidget createAvailablePartTreeWidget(String header){
+    public static QTreeWidget createAvailablePartTreeWidget(String header) {
         QTreeWidget treeWidget = new QTreeWidget();
         treeWidget.setColumnCount(1);
         treeWidget.setHeaderLabel(header);
@@ -62,7 +62,7 @@ public class WidgetMaker {
                     //FamilyType type = p.getArchitecture();
                     String type = PartNameTools.getFullArchitectureName(p.getArchitecture());
                     QTreeWidgetItem familyItem = familyItems.get(type);
-                    if(familyItem == null){
+                    if(familyItem == null) {
                         familyItem = new QTreeWidgetItem(treeWidget);
                         familyItem.setText(0, type);
                         familyItems.put(type, familyItem);

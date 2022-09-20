@@ -267,7 +267,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
      */
     public void setOrderedTimingVertexLists() {
         TopologicalOrderIterator<TimingVertex, TimingEdge> orderIterator = new TopologicalOrderIterator<>(this);
-        while(orderIterator.hasNext()){
+        while(orderIterator.hasNext()) {
             TimingVertex v = orderIterator.next();
             orderedTimingVertice.add(v);
         }
@@ -284,7 +284,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         for(TimingVertex v : orderedTimingVertice) {
             Set<TimingEdge> outgoings = this.outgoingEdgesOf(v);
             if(this.inDegreeOf(v) == 0) v.setArrivalTime(0);
-            for (TimingEdge e : outgoings){
+            for (TimingEdge e : outgoings) {
                 float arrival = e.getSrc().getArrivalTime() + e.getDelay();
                 e.getDst().setMaxArrivalTime(arrival, v);
             }
@@ -312,13 +312,13 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
      * Set the required time of each timing vertex in the graph
      * @param requirement, the required time of the design
      */
-    public void setTimingRequirementTopologicalOrder(float requirement){
+    public void setTimingRequirementTopologicalOrder(float requirement) {
         if(reversedOrderedTimingVertice.isEmpty()) {
             reversedOrderedTimingVertice = this.getReversedOrder();
         }
-        for(TimingVertex v : reversedOrderedTimingVertice){
+        for(TimingVertex v : reversedOrderedTimingVertice) {
             Set<TimingEdge> incomings = this.incomingEdgesOf(v);
-            if(this.outDegreeOf(v) == 0){
+            if(this.outDegreeOf(v) == 0) {
                 if(v.equals(this.superSink)) {
                     v.setMinRequiredTime(requirement);
                 }else {
@@ -326,7 +326,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                 }
             }
             
-            for (TimingEdge e : incomings){
+            for (TimingEdge e : incomings) {
                 float remainingRequiredTime = e.getDst().getRequiredTime() - e.getDelay();
                 e.getSrc().setMinRequiredTime(remainingRequiredTime);
             }
@@ -336,8 +336,8 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     /**
      * Reset the required and arrival time to be null
      */
-    public void resetRequiredAndArrivalTime(){
-        for(TimingVertex v : this.vertexSet()){
+    public void resetRequiredAndArrivalTime() {
+        for(TimingVertex v : this.vertexSet()) {
             v.resetArrivalTime();
             v.resetRequiredTime();
             v.setPrev(null);
@@ -347,11 +347,11 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     /**
      * Get the maximum delay, i.e., the maximum arrival time, and corresponding timing path sink of the design
      */
-    public Pair<Float, TimingVertex> getMaxDelay(){
+    public Pair<Float, TimingVertex> getMaxDelay() {
         return new Pair<>(this.superSink.getArrivalTime(), this.superSink);
     }
     
-    private List<TimingVertex> getReversedOrder(){
+    private List<TimingVertex> getReversedOrder() {
         List<TimingVertex> reversedOrderedTimingVertices = new ArrayList<>();
         reversedOrderedTimingVertices.addAll(orderedTimingVertice);
 
@@ -364,11 +364,11 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
      * @param maxV The timing vertex with the maximum arrival time
      * @return A list of timing edges consisting of the critical path
      */
-    public List<TimingEdge> getCriticalTimingEdgesInOrder(TimingVertex maxV){
+    public List<TimingEdge> getCriticalTimingEdgesInOrder(TimingVertex maxV) {
         List<TimingEdge> criticalTimingEdges = new ArrayList<>();
         TimingVertex timingVertex = maxV;
         
-        while(incomingEdgesOf(timingVertex).size() != 0){
+        while(incomingEdgesOf(timingVertex).size() != 0) {
             TimingEdge e = this.getCriticalSourceTimingVertex(timingVertex);
             if(e == null) break;
             timingVertex = e.getSrc();
@@ -379,10 +379,10 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         return criticalTimingEdges;
     }
     
-    private TimingEdge getCriticalSourceTimingVertex(TimingVertex sinkV){
+    private TimingEdge getCriticalSourceTimingVertex(TimingVertex sinkV) {
         Set<TimingEdge> incomingEdges = incomingEdgesOf(sinkV);
         
-        for(TimingEdge e : incomingEdges){
+        for(TimingEdge e : incomingEdges) {
             if(e.getSrc().equals(sinkV.getPrev())) {
                 return e;
             }
@@ -397,14 +397,14 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
      */
     // output vertices only
     // return null if path not found in the graph
-    public List<TimingEdge> getTimingEdgeOfPath(List<String> verticesNames){
+    public List<TimingEdge> getTimingEdgeOfPath(List<String> verticesNames) {
         boolean verbose = true;
         
         if(verbose) System.out.println("\nGET DELAY OF GIVEN PATH:\n");
         List<TimingVertex> vertices = new ArrayList<>();
-        for(String str : verticesNames){
+        for(String str : verticesNames) {
             TimingVertex v = this.safeVertexCheck.get(str);
-            if(v != null){
+            if(v != null) {
                 vertices.add(v);
             }else{
                 System.err.println("graph does not contain: " + str);
@@ -413,23 +413,23 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         if(verbose) System.out.println(vertices.size() + " / " + verticesNames.size() + " vertices from the path found in TimingGraph");
         List<TimingEdge> edges = new ArrayList<>();
         // Q -> O -> O -> --- -> D
-        for(int i = 0; i < vertices.size() - 1; i++){
+        for(int i = 0; i < vertices.size() - 1; i++) {
             if(verbose) {
                 if(i > 0) {//skip superSource outgoing timing edges printout as there are too many
                     System.out.println(vertices.get(i) + " outgoing timing eges:\n " + outgoingEdgesOf(vertices.get(i)));
                 }
             }
             boolean found = false;
-            for(TimingEdge e : outgoingEdgesOf(vertices.get(i))){
+            for(TimingEdge e : outgoingEdgesOf(vertices.get(i))) {
                 if(found) {
                     break;
                 }
                 if(outgoingEdgesOf(e.getDst()).size() == 0)
                     System.out.println(e.getDst() + " no outgoing edges, delay =  " + e.getDelay());
-                for(TimingEdge nexte : outgoingEdgesOf(e.getDst())){
+                for(TimingEdge nexte : outgoingEdgesOf(e.getDst())) {
                     // this means the hops between adjacent pins could be more than two
                     // otherwise, it will report as NULL TimingEdge found
-                    if(nexte.getDst().equals(vertices.get(i+1))){
+                    if(nexte.getDst().equals(vertices.get(i+1))) {
                         if(verbose) System.out.println("TimingEdge found between: \n  " + vertices.get(i) + ", " + vertices.get(i+1));
                         edges.add(e);
                         edges.add(nexte);
@@ -806,7 +806,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                 sources.add(s1);
             } else if (s1.getFlopInput() && this.outDegreeOf(s1) == 0 && this.inDegreeOf(s1) > 0) {
                 sinks.add(s1);
-            }else if(s1.getName().endsWith("VCLK")){// for DSP
+            }else if(s1.getName().endsWith("VCLK")) {// for DSP
                 sinks.add(s1);
             }else {
                 // All pins to "D" of BRAM must go to super sink, if it goes somewhere else, something is wrong
@@ -1521,7 +1521,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                         }
                     }
                 }
-            }else if(mycellInst.getCellType().toString().contains("DSP_")){//contains DSP_, and FD, VCC
+            }else if(mycellInst.getCellType().toString().contains("DSP_")) {//contains DSP_, and FD, VCC
                 this.dspTimingDataPathCheck();
                 String dspBlockFullHierName = c.getParentHierarchicalInstName();
                 DSPTimingData dspTimingData = dspNameDataMapping.get(dspBlockFullHierName);
@@ -1536,7 +1536,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                 for(EDIFPortInst portInst : portInstList) {
                     String s1 = portInst.getName();
                     if(s1.endsWith(("CLK"))) {
-                        if(dspTimingData.containsPortInst(portInst.getName())){
+                        if(dspTimingData.containsPortInst(portInst.getName())) {
                             dspTimingData.addPinMapping("CLK", portInst.getName());
                             this.dspTimingDataSet.add(dspTimingData);
                         }
@@ -1905,7 +1905,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         return delay;
     }
     
-    public DelayModel getintraSiteAndLogicDelayModel(){
+    public DelayModel getintraSiteAndLogicDelayModel() {
         return this.intrasiteAndLogicDelayModel;
     }
 
@@ -1950,7 +1950,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
      * @param bitIndex
      * @return Single bit from indexed location will be zero or one.
      */
-    protected static int getBit(int value, int bitIndex){
+    protected static int getBit(int value, int bitIndex) {
         return (value >> bitIndex) & 0x1;
     }
 
@@ -1960,11 +1960,11 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
      * @param bitIndex
      * @return Single bit from indexed location will be zero or one.
      */
-    protected static int getBit(long value, int bitIndex){
+    protected static int getBit(long value, int bitIndex) {
         return (int)(value >> bitIndex) & 0x1;
     }
     
-    public Map<TimingEdge, Connection> getTimingEdgeConnectionMap(){
+    public Map<TimingEdge, Connection> getTimingEdgeConnectionMap() {
         return this.timingEdgeConnectionMap;
     }
     
@@ -1988,7 +1988,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                 throw new RuntimeException("ERROR: No timing edges for connection from: " + connection.getSource() + " to " + connection.getSink());
             }
             connection.setTimingEdges(timingEdges);
-            for(TimingEdge edge : connection.getTimingEdges()){
+            for(TimingEdge edge : connection.getTimingEdges()) {
                 this.timingEdgeConnectionMap.put(edge, connection); // for getting critical path delay breakdown in the timing report
             }
         }

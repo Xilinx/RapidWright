@@ -48,11 +48,11 @@ class LUTEquationEvaluator {
     
     private int row;
 
-    public LUTEquationEvaluator(String equation){
+    public LUTEquationEvaluator(String equation) {
         this.equation = equation;
     }
     
-    public void setRow(int row){
+    public void setRow(int row) {
         this.row = row;
     }
     

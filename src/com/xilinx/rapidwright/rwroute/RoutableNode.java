@@ -109,7 +109,7 @@ public class RoutableNode implements Routable{
         maskNodesCrossRCLK = mask;
     }
     
-    public RoutableNode(int index, Node node, RoutableType type){
+    public RoutableNode(int index, Node node, RoutableType type) {
         this.index = index;
         this.type = type;
         this.node = node;
@@ -123,16 +123,16 @@ public class RoutableNode implements Routable{
         usersConnectionCounts = null;
         driversCounts = null;
         prev = null;
-        if(timingDriven){
+        if(timingDriven) {
             setDelay(RouterHelper.computeNodeDelay(delayEstimator, node));
         }
     }
     
-    public int setChildren(int globalIndex, Map<Node, Routable> createdRoutable, Set<Node> reserved, RouteThruHelper routethruHelper){
+    public int setChildren(int globalIndex, Map<Node, Routable> createdRoutable, Set<Node> reserved, RouteThruHelper routethruHelper) {
         children = new ArrayList<>();
         List<Node> allDownHillNodes = node.getAllDownhillNodes();
         
-        for(Node downhill : allDownHillNodes){
+        for(Node downhill : allDownHillNodes) {
             if(reserved.contains(downhill)) continue;
             if(isExcluded(downhill, timingDriven)) continue;
             if(routethruHelper.isRouteThru(node, downhill)) continue;
@@ -148,8 +148,8 @@ public class RoutableNode implements Routable{
         return globalIndex;
     }
     
-    public void setBaseCost(){
-        if(type == RoutableType.WIRE){
+    public void setBaseCost() {
+        if(type == RoutableType.WIRE) {
             baseCost = 0.4f;
             // NOTE: IntentCode is device-dependent
             IntentCode ic = node.getIntentCode();
@@ -183,9 +183,9 @@ public class RoutableNode implements Routable{
                 type = RoutableType.WIRE;
                 break;
             }    
-        }else if(type == RoutableType.PINFEED_I){
+        }else if(type == RoutableType.PINFEED_I) {
             baseCost = 0.4f;
-        }else if(type == RoutableType.PINFEED_O){
+        }else if(type == RoutableType.PINFEED_O) {
             baseCost = 1f;
         }
     }
@@ -196,12 +196,12 @@ public class RoutableNode implements Routable{
     }
     
     @Override
-    public boolean isUsed(){
+    public boolean isUsed() {
         return getOccupancy() > 0;
     }
     
     @Override
-    public boolean hasMultiDrivers(){
+    public boolean hasMultiDrivers() {
         return Routable.capacity < uniqueDriverCount();
     }
 
@@ -242,7 +242,7 @@ public class RoutableNode implements Routable{
     }
     
     @Override
-    public String toString(){
+    public String toString() {
         String coordinate = "";    
         coordinate = "(" + endTileXCoordinate + "," + endTileYCoordinate + ")";
         StringBuilder s = new StringBuilder();
@@ -266,7 +266,7 @@ public class RoutableNode implements Routable{
     }
     
     @Override
-    public int hashCode(){
+    public int hashCode() {
         return node.hashCode();
     }
     

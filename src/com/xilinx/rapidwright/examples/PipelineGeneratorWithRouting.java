@@ -124,7 +124,7 @@ public class PipelineGeneratorWithRouting {
      * @return
      */
     public static PBlock createPipeline(Design d, Site startingPoint, int width, int depth, 
-                                        int distanceX, int distanceY, direction dir, boolean route){
+                                        int distanceX, int distanceY, direction dir, boolean route) {
 
         if (dir == direction.vertical && (distanceY < Math.ceil(width/8))) {
             System.err.println("Error: the width (="+width+") and distance (="+distanceY+") "
@@ -339,15 +339,15 @@ public class PipelineGeneratorWithRouting {
                 rstNet.getLogicalNet().createPortInst("R", ffCell);
                 ceNet.getLogicalNet().createPortInst("CE", ffCell);
 
-                if(ff_si.getSitePinInst(clkPinName) == null){
+                if(ff_si.getSitePinInst(clkPinName) == null) {
                     clkNet.createPin(true, clkPinName, ff_si);
                     ff_si.addSitePIP(clkPinName + "INV","CLK");
                 }
-                if(ff_si.getSitePinInst(rstPinName) == null){
+                if(ff_si.getSitePinInst(rstPinName) == null) {
                     rstNet.createPin(true, rstPinName, ff_si);
                     ff_si.addSitePIP("RST_"+(isLowerSlice ? "ABCD" : "EFGH")+"INV","RST");
                 }
-                if(ff_si.getSitePinInst(cePinName) == null){
+                if(ff_si.getSitePinInst(cePinName) == null) {
                     ceNet.createPin(true, cePinName, ff_si);
                 }
             }
@@ -370,7 +370,7 @@ public class PipelineGeneratorWithRouting {
         boolean useDistanceBasedRouter = false;
 
         // Route intersites
-        if(useDistanceBasedRouter){
+        if(useDistanceBasedRouter) {
             Router r = new Router(d); // the non-timing driven router from RW library
             r.setRoutingPblock(footprint);
             r.setSupressWarningsErrors(false);
@@ -760,7 +760,7 @@ public class PipelineGeneratorWithRouting {
     static String designName;
     static String outputDCPFileName;
 
-    private static OptionParser createOptionParser(){
+    private static OptionParser createOptionParser() {
 
         // Defaults, please modify these to experiment
         String partName = "xcvu3p-ffvc1517-2-e";
@@ -809,7 +809,7 @@ public class PipelineGeneratorWithRouting {
         return p;
     }
 
-    private static void printHelp(OptionParser p){
+    private static void printHelp(OptionParser p) {
         MessageGenerator.printHeader("Pipeline Generator");
         System.out.println("This RapidWright program creates an example pipelined bus as a placed and routed DCP. \n"
             + "See the RapidWright documentation for more information.\n");
@@ -830,7 +830,7 @@ public class PipelineGeneratorWithRouting {
         OptionSet opts = p.parse(args);
         boolean verbose1 = (boolean) opts.valueOf(VERBOSE_OPT);
         boolean verbose2 = true;  // extra verbose messages, modify this to remove some messages
-        if(opts.has(HELP_OPT)){
+        if(opts.has(HELP_OPT)) {
             printHelp(p);
             return;
         }
@@ -855,7 +855,7 @@ public class PipelineGeneratorWithRouting {
 
         // Perform some error checking on inputs
         Part part = PartNameTools.getPart(partName);
-        if(part == null || part.isSeries7()){
+        if(part == null || part.isSeries7()) {
             throw new RuntimeException("ERROR: Invalid/unsupported part " + partName + 
                                                 ".  This example was coded "+
                                                   "for UltraScale or UltraScale+ devices.");
@@ -883,7 +883,7 @@ public class PipelineGeneratorWithRouting {
 
         float clkPeriodPs = (float)clkPeriodConstraint*1000;
 
-        if (verbose1){
+        if (verbose1) {
             ///////////////////////
             // Reporting timing on the routed design
             TimingManager tm = new TimingManager(d);

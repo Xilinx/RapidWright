@@ -42,15 +42,15 @@ public class HashPool<E> extends HashMap<Integer,ArrayList<E>> {
     
     private HashMap<E,ArrayList<Integer>> enumerationMap;
     
-    public HashPool(){
+    public HashPool() {
         super();
         enumerations = new ArrayList<E>();
         enumerationMap = new HashMap<E,ArrayList<Integer>>();
     }
     
-    private void addToEnumerationMap(E obj, Integer enumeration){
+    private void addToEnumerationMap(E obj, Integer enumeration) {
         ArrayList<Integer> enumerationMatches = enumerationMap.get(obj);
-        if(enumerationMatches == null){
+        if(enumerationMatches == null) {
             enumerationMatches = new ArrayList<Integer>();
             enumerationMatches.add(enumeration);
             enumerationMap.put(obj, enumerationMatches);
@@ -65,20 +65,20 @@ public class HashPool<E> extends HashMap<Integer,ArrayList<E>> {
      * @param obj The object to get an enumeration value for.
      * @return The enumeration value of the object obj, or -1 if none exists.
      */
-    public Integer getEnumerationValue(E obj){
+    public Integer getEnumerationValue(E obj) {
         ArrayList<Integer> enumerationMatches = enumerationMap.get(obj);
-        if(enumerationMatches == null){
+        if(enumerationMatches == null) {
             System.out.println("Object does not have enumeration value: " + obj.toString() + " in class: " + this.getClass().getCanonicalName());
             throw new IllegalArgumentException();
             //return -1;
         }
         else{
-            for(Integer i : enumerationMatches){
-                if(enumerations.get(i) == null && obj == null){
+            for(Integer i : enumerationMatches) {
+                if(enumerations.get(i) == null && obj == null) {
                     return i;
                 }
                     
-                if(enumerations.get(i).equals(obj)){
+                if(enumerations.get(i).equals(obj)) {
                     return i;
                 }
             }
@@ -93,10 +93,10 @@ public class HashPool<E> extends HashMap<Integer,ArrayList<E>> {
      * @param obj The object to be added
      * @return The unique object contained in the HashPool
      */
-    public E add(E obj){
+    public E add(E obj) {
         int hash = obj == null ? 0 : obj.hashCode();
         ArrayList<E> hashMatches = get(hash);
-        if(hashMatches == null){
+        if(hashMatches == null) {
             hashMatches = new ArrayList<E>();
             hashMatches.add(obj);
             put(hash, hashMatches);
@@ -105,8 +105,8 @@ public class HashPool<E> extends HashMap<Integer,ArrayList<E>> {
             return obj;
         }
         else{
-            for(E e :hashMatches){
-                if(e.equals(obj)){
+            for(E e :hashMatches) {
+                if(e.equals(obj)) {
                     return e;
                 }
             }
@@ -123,13 +123,13 @@ public class HashPool<E> extends HashMap<Integer,ArrayList<E>> {
      * @param obj The object to check for.
      * @return True if the HashPool contains the object, false otherwise.
      */
-    public boolean contains(E obj){
+    public boolean contains(E obj) {
         ArrayList<E> hashMatches = get(obj.hashCode());
-        if(hashMatches == null){
+        if(hashMatches == null) {
             return false;
         }
-        for(E e :hashMatches){
-            if(e.equals(obj)){
+        for(E e :hashMatches) {
+            if(e.equals(obj)) {
                 return true;
             }
         }
@@ -142,13 +142,13 @@ public class HashPool<E> extends HashMap<Integer,ArrayList<E>> {
      * @param obj The object to find in the pool
      * @return The object in the pool that is equal to obj, null otherwise.
      */
-    public E find(E obj){
+    public E find(E obj) {
         ArrayList<E> hashMatches = get(obj.hashCode());
-        if(hashMatches == null){
+        if(hashMatches == null) {
             return null;
         }
-        for(E e :hashMatches){
-            if(e.equals(obj)){
+        for(E e :hashMatches) {
+            if(e.equals(obj)) {
                 return e;
             }
         }

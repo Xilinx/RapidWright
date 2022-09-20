@@ -88,7 +88,7 @@ public class PipelineGenerator {
     enum direction {vertical, horizontal;}
 
 
-    public static PBlock createPipeline(Design d, Site startingPoint, int width, int depth, int distance, direction dir, boolean route){
+    public static PBlock createPipeline(Design d, Site startingPoint, int width, int depth, int distance, direction dir, boolean route) {
 
         if (dir == direction.vertical && (distance < Math.ceil(width/8))) {
             System.err.println("Error: the width (="+width+") and distance (="+distance+") parameters conflict in a way "+
@@ -295,15 +295,15 @@ public class PipelineGenerator {
                 rstNet.getLogicalNet().createPortInst("R", ffCell);
                 ceNet.getLogicalNet().createPortInst("CE", ffCell);
 
-                if(ff_si.getSitePinInst(clkPinName) == null){
+                if(ff_si.getSitePinInst(clkPinName) == null) {
                     clkNet.createPin(false, clkPinName, ff_si);
                     ff_si.addSitePIP(clkPinName + "INV","CLK");
                 }
-                if(ff_si.getSitePinInst(rstPinName) == null){
+                if(ff_si.getSitePinInst(rstPinName) == null) {
                     rstNet.createPin(false, rstPinName, ff_si);
                     ff_si.addSitePIP("RST_"+(isLowerSlice ? "ABCD" : "EFGH")+"INV","RST");
                 }
-                if(ff_si.getSitePinInst(cePinName) == null){
+                if(ff_si.getSitePinInst(cePinName) == null) {
                     ceNet.createPin(false, cePinName, ff_si);
                 }
             }
@@ -316,7 +316,7 @@ public class PipelineGenerator {
         // Find rectangular area consumed
         PBlock footprint = new PBlock(d.getDevice(),used);
 
-        if(route){
+        if(route) {
             Router r = new Router(d); // the Manhattan distance router
             r.setRoutingPblock(footprint);
             r.setSupressWarningsErrors(false);
@@ -326,7 +326,7 @@ public class PipelineGenerator {
         return footprint;
     }
 
-    private static OptionParser createOptionParser(){
+    private static OptionParser createOptionParser() {
 
         // Defaults, please modify these to experiment
         String partName = "xcvu3p-ffvc1517-2-e";
@@ -360,7 +360,7 @@ public class PipelineGenerator {
         return p;
     }
 
-    private static void printHelp(OptionParser p){
+    private static void printHelp(OptionParser p) {
         MessageGenerator.printHeader("Pipeline Generator");
         System.out.println("This RapidWright program creates an example pipelined bus as a placed and routed DCP. \n"
             + "See the RapidWright documentation for more information.\n");
@@ -378,7 +378,7 @@ public class PipelineGenerator {
         OptionParser p = createOptionParser();
         OptionSet opts = p.parse(args);
         boolean verbose = (boolean) opts.valueOf(VERBOSE_OPT);
-        if(opts.has(HELP_OPT)){
+        if(opts.has(HELP_OPT)) {
             printHelp(p);
             return;
         }
@@ -401,7 +401,7 @@ public class PipelineGenerator {
 
         // Perform some error checking on inputs
         Part part = PartNameTools.getPart(partName);
-        if(part == null || part.isSeries7()){
+        if(part == null || part.isSeries7()) {
             throw new RuntimeException("ERROR: Invalid/unsupported part " + partName + ".  This example was coded "+
                               "for UltraScale or UltraScale+ devices.");
         }

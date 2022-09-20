@@ -49,9 +49,9 @@ import com.xilinx.rapidwright.util.FileTools;
 
 public class ProbeRouter {
 
-    public static Map<String,String> readProbeRequestFile(String fileName){
+    public static Map<String,String> readProbeRequestFile(String fileName) {
         Map<String,String> map = new TreeMap<>();
-        for(String line : FileTools.getLinesFromTextFile(fileName)){
+        for(String line : FileTools.getLinesFromTextFile(fileName)) {
             if(line.trim().startsWith("#")) continue;
             String[] parts = line.split(" ");
             map.put(parts[0], parts[1]);
@@ -65,7 +65,7 @@ public class ProbeRouter {
      * @param d The existing placed and routed design with an ILA.
      * @param probeToTargetNets A map from probe names to desired net names (full hierarchical names).
      */    
-    public static void updateProbeConnections(Design d, Map<String,String> probeToTargetNets){
+    public static void updateProbeConnections(Design d, Map<String,String> probeToTargetNets) {
         updateProbeConnections(d, probeToTargetNets, null);
     }
     
@@ -76,9 +76,9 @@ public class ProbeRouter {
      * @param probeToTargetNets A map from probe names to desired net names (full hierarchical names).
      * @param pblock An optional pblock (area constraint) to contain routing within a certain area.
      */
-    public static void updateProbeConnections(Design d, Map<String,String> probeToTargetNets, PBlock pblock){
+    public static void updateProbeConnections(Design d, Map<String,String> probeToTargetNets, PBlock pblock) {
         ArrayList<SitePinInst> pinsToRoute = new ArrayList<>(); 
-        for(Entry<String,String> e : probeToTargetNets.entrySet()){
+        for(Entry<String,String> e : probeToTargetNets.entrySet()) {
             String hierPinName = e.getKey();
             String cellInstName = EDIFTools.getHierarchicalRootFromPinName(hierPinName);
             EDIFCellInst i = d.getNetlist().getCellInstFromHierName(cellInstName);
@@ -135,7 +135,7 @@ public class ProbeRouter {
             BELPin inPin = c.getBEL().getPin(c.getPhysicalPinMapping(sinkFlop.getPortInst().getName()));
             c.getSiteInst().routeIntraSiteNet(destPhysNet, c.getSite().getBELPin(sitePinName), inPin);
             
-            if(physProbeInPin == null){
+            if(physProbeInPin == null) {
                 // Previous connection was internal to site, need to route out to site pin
                 physProbeInPin = new SitePinInst(false, sitePinName, c.getSiteInst());
             }
@@ -150,13 +150,13 @@ public class ProbeRouter {
         r.routePinsReEntrant(pinsToRoute, false);
     }
     
-    public static List<EDIFHierCellInst> findILAs(Design d){
+    public static List<EDIFHierCellInst> findILAs(Design d) {
         List<EDIFHierCellInst> candidates = d.getNetlist().getAllDescendants("", "u_ila_*", false);
         ArrayList<EDIFHierCellInst> ilas = new ArrayList<EDIFHierCellInst>();
-        nextInst: for(EDIFHierCellInst i : candidates){
-            if(i.getCellName().contains("u_ila_")){
-                for(EDIFPort p : i.getCellType().getPorts()){
-                    if(p.getName().contains("SL_IPORT_")){
+        nextInst: for(EDIFHierCellInst i : candidates) {
+            if(i.getCellName().contains("u_ila_")) {
+                for(EDIFPort p : i.getCellType().getPorts()) {
+                    if(p.getName().contains("SL_IPORT_")) {
                         ilas.add(i);
                         continue nextInst;
                     }
@@ -168,13 +168,13 @@ public class ProbeRouter {
     
     private static final String PBLOCK_SWITCH = "--pblock";
     
-    private static void printHelp(){
+    private static void printHelp() {
         System.out.println("USAGE: <input.dcp> <probes.txt> <output.dcp> ["+
             PBLOCK_SWITCH+" 'CLOCKREGION_X0Y10:CLOCKREGION_X5Y14 CLOCKREGION_X0Y0:CLOCKREGION_X3Y9']");
     }
     
     public static void main(String[] args) {
-        if(args.length < 3 || args.length > 5){
+        if(args.length < 3 || args.length > 5) {
             printHelp();
             return;
         }
@@ -186,7 +186,7 @@ public class ProbeRouter {
         CodePerfTracker t = new CodePerfTracker("Probe Router");
         Design d = Design.readCheckpoint(inputDCP,t);
         
-        if(args.length == 5){
+        if(args.length == 5) {
             if(!args[3].equals(PBLOCK_SWITCH)) {
                 printHelp();
                 return;

@@ -53,13 +53,13 @@ import com.xilinx.rapidwright.design.VivadoProp;
 public class PinMapTester {
 
     public static void main(String[] args) {
-        if(args.length < 5){
+        if(args.length < 5) {
             System.out.println("USAGE: <partname> <cell name> <site> <site type> <bel> <parameters>");
             return;
         }
         String partName = args[0];
         Part part = PartNameTools.getPart(partName);
-        if(part == null){
+        if(part == null) {
             throw new RuntimeException("The partname " + args[0] + " is invalid or unrecognized, cannot load device.");
         }
 

@@ -66,7 +66,7 @@ public class IsolateLeafClkBuffer {
         botLCBIndices = new HashSet<>(Arrays.asList(botIndices));
     }
     
-    private static boolean isLCBPIPInTop(PIP pip){
+    private static boolean isLCBPIPInTop(PIP pip) {
         int lcbIndex = Integer.parseInt(pip.getEndWireName()
                 .replace("CLK_LEAF_SITES_", "")
                 .replace("_CLK_LEAF", "")
@@ -74,19 +74,19 @@ public class IsolateLeafClkBuffer {
         return topLCBIndices.contains(lcbIndex);
     }
     
-    private static List<PIP> findRoute(RouteNode src, RouteNode snk, Set<RouteNode> used){
+    private static List<PIP> findRoute(RouteNode src, RouteNode snk, Set<RouteNode> used) {
         Set<RouteNode> visited = new HashSet<>();
         Queue<RouteNode> q = RouteNode.getPriorityQueue();
         
         RouteNode curr = null;
         q.add(src);
-        while(!q.isEmpty()){
+        while(!q.isEmpty()) {
             curr = q.poll();
-            if(curr.equals(snk)){
+            if(curr.equals(snk)) {
                 return curr.getPIPsBackToSource();
             }
             visited.add(curr);
-            for(Wire w : curr.getConnections()){
+            for(Wire w : curr.getConnections()) {
                 RouteNode nextNode = new RouteNode(w,curr);
                 if(visited.contains(nextNode)) continue;
                 if(used.contains(nextNode)) continue;
@@ -98,16 +98,16 @@ public class IsolateLeafClkBuffer {
         return null;
     }
     
-    public static List<PIP> routeNewLCB(SitePinInst clkPin){        
+    public static List<PIP> routeNewLCB(SitePinInst clkPin) {        
         Node sink = clkPin.getConnectedNode();
         Net net = clkPin.getNet();
         Map<Node, PIP> reversePaths = new HashMap<Node, PIP>();
-        for(PIP p : net.getPIPs()){
+        for(PIP p : net.getPIPs()) {
             reversePaths.put(p.getEndNode(), p);
         }
         Node curr = sink;
         //RCLK_INT_L_X49Y449/RCLK_INT_L.CLK_LEAF_SITES_10_CLK_IN->>CLK_LEAF_SITES_10_CLK_LEAF
-        while(!curr.getWireName().startsWith("CLK_LEAF_SITES")){
+        while(!curr.getWireName().startsWith("CLK_LEAF_SITES")) {
             curr = reversePaths.get(curr).getStartNode();
         }
         PIP currLCB = reversePaths.get(curr);
@@ -117,7 +117,7 @@ public class IsolateLeafClkBuffer {
         
         
         Net clk = clkPin.getNet();
-        if(!clk.removePin(clkPin, true)){
+        if(!clk.removePin(clkPin, true)) {
             throw new RuntimeException("ERROR: Couldn't disconnect clk pin " +
                 clkPin + " on site " + clkPin.getSite());
         }
@@ -126,8 +126,8 @@ public class IsolateLeafClkBuffer {
         RouteNode src = drivingPIP.getStartRouteNode();
         RouteNode snk = new RouteNode(sink);
         Set<RouteNode> used = new HashSet<>();
-        for(Net n : net.getSource().getSiteInst().getDesign().getNets()){
-            for(PIP p : n.getPIPs()){
+        for(Net n : net.getSource().getSiteInst().getDesign().getNets()) {
+            for(PIP p : n.getPIPs()) {
                 used.add(p.getStartRouteNode());
                 used.add(p.getEndRouteNode());
             }
@@ -135,12 +135,12 @@ public class IsolateLeafClkBuffer {
 
         List<PIP> route = findRoute(src, snk, used);
 
-        if(route == null){
+        if(route == null) {
             throw new RuntimeException("ERROR: Couldn't find new LCB path");
         }
         
         System.out.println("New Clock Path PIPs:");
-        for(PIP p : route){
+        for(PIP p : route) {
             System.out.println("\t" + p);
         }
         
@@ -149,7 +149,7 @@ public class IsolateLeafClkBuffer {
     }
     
     public static void main(String[] args) {
-        if(args.length != 3){
+        if(args.length != 3) {
             System.out.println("USAGE: <input.dcp> <cell_clk_pin_name> <output.dcp>");
         }
         Design d = Design.readCheckpoint(args[0]);

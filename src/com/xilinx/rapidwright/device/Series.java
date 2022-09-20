@@ -78,7 +78,7 @@ public enum Series {
         this.cleHeight = cleHeight;
     }
 
-    public Pattern getArchRegex(){
+    public Pattern getArchRegex() {
         return archRegex;
     }
 

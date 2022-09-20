@@ -46,7 +46,7 @@ public class EDIFPortInst {
     
     private EDIFCellInst cellInst;
 
-    public EDIFPortInst(EDIFPort port, EDIFNet parentNet){
+    public EDIFPortInst(EDIFPort port, EDIFNet parentNet) {
         this(port, parentNet, -1, null);
     }
 
@@ -62,7 +62,7 @@ public class EDIFPortInst {
         this.cellInst = null;
     }
     
-    public EDIFPortInst(EDIFPort port, EDIFNet parentNet, int index){
+    public EDIFPortInst(EDIFPort port, EDIFNet parentNet, int index) {
         this(port,parentNet,index,null);
     }
     /**
@@ -72,7 +72,7 @@ public class EDIFPortInst {
      * @param parentNet The net this port ref should belong to
      * @param cellInst The instance this port ref belongs to
      */
-    public EDIFPortInst(EDIFPort port, EDIFNet parentNet, EDIFCellInst cellInst){
+    public EDIFPortInst(EDIFPort port, EDIFNet parentNet, EDIFCellInst cellInst) {
         this(port, parentNet, -1, cellInst);        
     }
     
@@ -85,15 +85,15 @@ public class EDIFPortInst {
      * the bussed array, for single bit ports, it should be -1.
      * @param cellInst This instance on which this port ref corresponds.
      */
-    public EDIFPortInst(EDIFPort port, EDIFNet parentNet, int index, EDIFCellInst cellInst){
+    public EDIFPortInst(EDIFPort port, EDIFNet parentNet, int index, EDIFCellInst cellInst) {
         if(index == -1 && port.isBus()) {
             throw new RuntimeException("ERROR: Use a different constructor, "
                     + "need index for bussed port " + port.getName());
         }
-        if(cellInst != null){
-            if(!port.equals(cellInst.getPort(port.getBusName()))){
+        if(cellInst != null) {
+            if(!port.equals(cellInst.getPort(port.getBusName()))) {
                 // check for name collision
-                if(!port.equals(cellInst.getPort(port.getName()))){
+                if(!port.equals(cellInst.getPort(port.getName()))) {
                     throw new RuntimeException("ERROR: Provided port '"+ 
                             port.getName() + "' does not exist on EDIFCell type '" + 
                             cellInst.getCellType().getName() + "' when adding port "
@@ -108,19 +108,19 @@ public class EDIFPortInst {
         if(parentNet != null) parentNet.addPortInst(this);
     }
     
-    protected EDIFPortInst(){
+    protected EDIFPortInst() {
         
     }
     
-    public String getPortInstNameFromPort(){
+    public String getPortInstNameFromPort() {
         return port.getPortInstNameFromPort(index);
     }
     
-    public String getName(){
+    public String getName() {
         return name;
     }
     
-    protected void setName(String name){
+    protected void setName(String name) {
         this.name = name;
     }
     
@@ -138,7 +138,7 @@ public class EDIFPortInst {
         this.index = index;
     }
 
-    public EDIFCell getParentCell(){
+    public EDIFCell getParentCell() {
         return parentNet.getParentCell();
     }
     
@@ -154,11 +154,11 @@ public class EDIFPortInst {
      * @param cellInst the cellInst to set
      */
     public void setCellInst(EDIFCellInst cellInst) {
-        if(this.cellInst != null){
+        if(this.cellInst != null) {
             this.cellInst.removePortInst(this);
         }
         this.cellInst = cellInst;
-        if(cellInst != null){
+        if(cellInst != null) {
             cellInst.addPortInst(this);
         }
     }
@@ -171,16 +171,16 @@ public class EDIFPortInst {
      * Checks if this is an output of a GND or VCC primitive cell.
      * @return True if the underlying cell is a static output from GND or VCC, false otherwise.
      */
-    public boolean isPrimitiveStaticSource(){
+    public boolean isPrimitiveStaticSource() {
         if(cellInst == null) return false;
         String name = cellInst.getCellType().getName();
         if(name.equals("GND") || name.equals("VCC")) return true;
         return false;
     }
 
-    public String getFullName(){
+    public String getFullName() {
         String fullName = getName();
-        if(port == null && index != -1){
+        if(port == null && index != -1) {
             // This is a special case only during parsing that needs to be
             // added to avoid name collisions in the EDIFNet portInsts map.
             fullName = fullName + "[" + index + "]";
@@ -189,27 +189,27 @@ public class EDIFPortInst {
         return getCellInst().getName() + EDIFTools.EDIF_HIER_SEP + fullName;
     }
 
-    public EDIFPort getPort(){
+    public EDIFPort getPort() {
         return port;
     }
     
-    public void setPort(EDIFPort port){
+    public void setPort(EDIFPort port) {
         this.port = port;
     }
     
-    public EDIFDirection getDirection(){
+    public EDIFDirection getDirection() {
         return getPort().getDirection();
     }
     
-    public boolean isOutput(){
+    public boolean isOutput() {
         return getDirection() == EDIFDirection.OUTPUT;
     }
     
-    public boolean isInput(){
+    public boolean isInput() {
         return getDirection() == EDIFDirection.INPUT;
     }
     
-    public boolean isTopLevelPort(){
+    public boolean isTopLevelPort() {
         return getCellInst() == null;
     }
     
@@ -220,7 +220,7 @@ public class EDIFPortInst {
         return parentNet;
     }
 
-    public EDIFNet getInternalNet(){
+    public EDIFNet getInternalNet() {
         if(cellInst == null) return null;
         return cellInst.getCellType().getInternalNet(this);
     }
@@ -250,7 +250,7 @@ public class EDIFPortInst {
             os.write(Integer.toString(index).getBytes(StandardCharsets.UTF_8));
             os.write(')');
         }
-        if(getCellInst() != null){
+        if(getCellInst() != null) {
             os.write(EXPORT_CONST_INSTANCEREF);
             os.write(cache.getLegalEDIFName(getCellInst().getName()));
             os.write(')');
@@ -298,7 +298,7 @@ public class EDIFPortInst {
         return true;
     }
 
-    public String toString(){
+    public String toString() {
         if(cellInst == null) return name;
         return cellInst.getName() + EDIFTools.EDIF_HIER_SEP + name;
     }

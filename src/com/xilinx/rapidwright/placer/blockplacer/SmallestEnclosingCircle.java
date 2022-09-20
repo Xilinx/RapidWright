@@ -44,12 +44,12 @@ public class SmallestEnclosingCircle {
      * @param pointsSet the points in the set to consider.
      * @return Point, the center of the smallest enclosing circle.
      */
-    public static Point getCenterPoint(HashSet<Point> pointsSet){
+    public static Point getCenterPoint(HashSet<Point> pointsSet) {
         ArrayList<Point> points = new ArrayList<Point>(pointsSet);
         Point center = new Point(-1,-1);
         ArrayList<Point> convexHull = null;
         
-        switch(points.size()){
+        switch(points.size()) {
         case 0:
             //returns a bogus point when there are no points in the set.
             return center;
@@ -82,27 +82,27 @@ public class SmallestEnclosingCircle {
         Point s2 = convexHull.get(1);
         Point minPoint = null;
         
-        while(!finished){
+        while(!finished) {
             double minAngle = Math.PI;
             minPoint = null;
-            for(Point v: convexHull){
-                if(v.equals(s1) || v.equals(s2)){
+            for(Point v: convexHull) {
+                if(v.equals(s1) || v.equals(s2)) {
                     continue;
                 }
                 //compute the angle subtended by s;
                 double subtended = angle(s1, v, s2);
-                if(subtended < minAngle){
+                if(subtended < minAngle) {
                     minAngle = subtended;
                     minPoint = v;
                 }
             }
-            if(minAngle > (Math.PI / 2)){
+            if(minAngle > (Math.PI / 2)) {
                 //use the side S to determine the circle
                 finished = true;
-            }else if(angle(s1, s2, minPoint) > (Math.PI / 2)){
+            }else if(angle(s1, s2, minPoint) > (Math.PI / 2)) {
                 //this angle is obtuse, set the side S accordingly
                 s2 = minPoint;
-            }else if(angle(s2, s1, minPoint) > (Math.PI / 2)){
+            }else if(angle(s2, s1, minPoint) > (Math.PI / 2)) {
                 //this angle is obtuse, set the side S accordingly
                 s1 = minPoint;
             }else{
@@ -112,7 +112,7 @@ public class SmallestEnclosingCircle {
             }
         }
         
-        if(useMinPoint){
+        if(useMinPoint) {
             //use the side S and the minPoint to determine the circle
             Point circumcenter = getCircumcenter( s1, s2, minPoint);
             center.x = circumcenter.x;
@@ -133,7 +133,7 @@ public class SmallestEnclosingCircle {
      * @param points the input set of points
      * @return The set of points in the convex hull
      */
-    public static ArrayList<Point> convexHull(ArrayList<Point> points){
+    public static ArrayList<Point> convexHull(ArrayList<Point> points) {
         ArrayList<Point> convexHull = new ArrayList<Point>();
         
         int n = points.size();
@@ -145,21 +145,21 @@ public class SmallestEnclosingCircle {
         sortedPoints = points.toArray(sortedPoints);
         Arrays.sort(sortedPoints);
         
-        for(int i = 0; i < n; i++){
-            while(k >= 2 && crossProduct(hull[k-2], hull[k-1], sortedPoints[i]) <= 0){
+        for(int i = 0; i < n; i++) {
+            while(k >= 2 && crossProduct(hull[k-2], hull[k-1], sortedPoints[i]) <= 0) {
                 k--;
             }
             hull[k++] = sortedPoints[i];
         }
-        for(int i = n-2, t = k+1; i >= 0; i--){
-            while(k >= t && crossProduct(hull[k-2], hull[k-1], sortedPoints[i]) <= 0){
+        for(int i = n-2, t = k+1; i >= 0; i--) {
+            while(k >= t && crossProduct(hull[k-2], hull[k-1], sortedPoints[i]) <= 0) {
                 k--;
             }
             hull[k++] = sortedPoints[i];
         }
         
         //only k-1 distinct points.  the kth point is the same as the 1st point
-        for(int i = 0; i < k-1; i++){
+        for(int i = 0; i < k-1; i++) {
             convexHull.add(hull[i]);
         }
         
@@ -174,7 +174,7 @@ public class SmallestEnclosingCircle {
      * @param c Point C of the triangle
      * @return Point, the circumcenter
      */
-    public static Point getCircumcenter(Point a, Point b, Point c){
+    public static Point getCircumcenter(Point a, Point b, Point c) {
         double d = 2 * ( a.x * ( b.y - c.y ) + b.x * ( c.y - a.y ) + c.x * ( a.y - b.y ) );
         double x = (    ( Math.pow(a.y, 2) + Math.pow(a.x, 2) ) * ( b.y - c.y ) +
                         ( Math.pow(b.y, 2) + Math.pow(b.x, 2) ) * ( c.y - a.y ) +
@@ -195,12 +195,12 @@ public class SmallestEnclosingCircle {
      * @param b Point B
      * @return int, the cross product
      */
-    public static int crossProduct(Point o, Point a, Point b){
+    public static int crossProduct(Point o, Point a, Point b) {
         return (a.x - o.x) * (b.y - o.y) - (a.y - o.y)* (b.x - o.x); 
     }
     
-    public static void printPoints(HashSet<Point> points){
-        for(Point p : points){
+    public static void printPoints(HashSet<Point> points) {
+        for(Point p : points) {
             System.out.println("\tX: " + p.x + "\tY: " + p.y);
         }
     }
@@ -213,7 +213,7 @@ public class SmallestEnclosingCircle {
      * @param c Point C
      * @return double, the angle
      */
-    public static double angle(Point a, Point b, Point c){
+    public static double angle(Point a, Point b, Point c) {
         return Math.acos(dotProduct(a, b, c));
     }
     
@@ -225,7 +225,7 @@ public class SmallestEnclosingCircle {
      * @param c Point C
      * @return double, the dot product
      */
-    public static double dotProduct(Point a, Point b, Point c){
+    public static double dotProduct(Point a, Point b, Point c) {
         double v1x = a.x - b.x;
         double v1y = a.y - b.y;
         double v2x = c.x - b.x;
@@ -237,7 +237,7 @@ public class SmallestEnclosingCircle {
      * Command line interface for debug.
      * @param args No args defined for this main()
      */
-    public static void main(String args[]){
+    public static void main(String args[]) {
         HashSet<Point> testPoints = new HashSet<Point>();
         testPoints.add(new Point(1,4));
         testPoints.add(new Point(1,1));

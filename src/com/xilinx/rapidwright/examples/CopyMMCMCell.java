@@ -37,7 +37,7 @@ public class CopyMMCMCell {
 
     
     public static void main(String[] args) {
-        if(args.length != 3){
+        if(args.length != 3) {
             System.out.println("USAGE: <source MMCM DCP> <input DCP> <output DCP>");
             return;
         }
@@ -45,8 +45,8 @@ public class CopyMMCMCell {
         Design input = Design.readCheckpoint(args[1], args[1].replace(".dcp", ".edf"));
         
         Cell mmcm = null;
-        for(Cell c : clkPath.getCells()){
-            if(c.getBEL().getName().contains("MMCM")){
+        for(Cell c : clkPath.getCells()) {
+            if(c.getBEL().getName().contains("MMCM")) {
                 mmcm = c;
                 break;
             }

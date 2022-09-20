@@ -37,12 +37,12 @@ import java.util.List;
  */
 public class StringTools {
     
-    public static String makeCamelCase(String name){
+    public static String makeCamelCase(String name) {
         StringBuilder sb = new StringBuilder();
-        for(int i=0; i < name.length(); i++){
+        for(int i=0; i < name.length(); i++) {
             char c = name.charAt(i);
             if(c == '_') continue;
-            if(i != 0 && name.charAt(i-1) == '_'){
+            if(i != 0 && name.charAt(i-1) == '_') {
                 sb.append(Character.toUpperCase(c));
             }else{
                 sb.append(Character.toLowerCase(c));                
@@ -51,11 +51,11 @@ public class StringTools {
         return sb.toString();
     }
     
-    public static String lowerCaseFirstLetter(String name){
+    public static String lowerCaseFirstLetter(String name) {
         return name.substring(0, 1).toLowerCase() + name.substring(1);
     }
     
-    public static String makeUpperCamelCase(String name){
+    public static String makeUpperCamelCase(String name) {
         return Character.toUpperCase(name.charAt(0)) + makeCamelCase(name).substring(1);
     }
     
@@ -64,12 +64,12 @@ public class StringTools {
      * @param s
      * @return
      */
-    public static String removeOuterQuotes(String s){
+    public static String removeOuterQuotes(String s) {
         if(s == null) return s;
         int len = s.length();
         if(len == 0) return s; 
         boolean atFront = s.charAt(0) == '\"';
-        if(len == 1){
+        if(len == 1) {
             return atFront ? "" : s;
         }
         boolean atBack = s.charAt(len-1) == '\"';
@@ -88,7 +88,7 @@ public class StringTools {
                 ,null
                 };
         
-        for(String s : tests){
+        for(String s : tests) {
             String result = removeOuterQuotes(s);
             System.out.println("<<" + s + ">>  <<" + result + ">>");
         }
@@ -98,15 +98,15 @@ public class StringTools {
     
     static {
         naturalComparator = new Comparator<String>() {
-            private boolean isDigit(char c){
+            private boolean isDigit(char c) {
                 return 0x30 <= c && c <= 0x39;
             }
             
             @Override
-            public int compare(String a, String b){
+            public int compare(String a, String b) {
                 int ai = 0, bi = 0;
-                while(ai < a.length() && bi < b.length()){
-                    if(isDigit(a.charAt(ai)) && isDigit(b.charAt(bi))){
+                while(ai < a.length() && bi < b.length()) {
+                    if(isDigit(a.charAt(ai)) && isDigit(b.charAt(bi))) {
                         int aStart = ai, bStart = bi;
                         while(ai < a.length() && isDigit(a.charAt(ai))) ai++;
                         while(bi < b.length() && isDigit(b.charAt(bi))) bi++;
@@ -137,7 +137,7 @@ public class StringTools {
      * @param strings The list of strings to sort
      * @return The natural sorted list of strings.
      */
-    public static List<String> naturalSort(List<String> strings){
+    public static List<String> naturalSort(List<String> strings) {
         strings.sort(naturalComparator);
         return strings;
     }
@@ -149,8 +149,8 @@ public class StringTools {
      * @return The file path with File.separator removed or the original 
      * string if 
      */
-    public static String removeLastSeparator(String s){
-        if(s.endsWith(File.separator)){
+    public static String removeLastSeparator(String s) {
+        if(s.endsWith(File.separator)) {
             return s.substring(0, s.length()-1);
         }
         return s;
@@ -163,13 +163,13 @@ public class StringTools {
      * @param strings The array of strings to sort
      * @return The natural sorted array of strings.
      */
-    public static String[] naturalSort(String[] strings){
+    public static String[] naturalSort(String[] strings) {
         Arrays.sort(strings, naturalComparator);
         return strings;
     }
     
-    public static boolean isInteger(String s){
-        for(int i=0; i < s.length(); i++){
+    public static boolean isInteger(String s) {
+        for(int i=0; i < s.length(); i++) {
             if(!Character.isDigit(s.charAt(i))) return false;
         }
         return true;
@@ -185,10 +185,10 @@ public class StringTools {
      * @return The string with angle bracket around last integer or
      * no change if no integer is found.
      */
-    public static String addIndexingAngleBrackets(String s){
+    public static String addIndexingAngleBrackets(String s) {
         int i = s.length() -1;
         if(!Character.isDigit(s.charAt(i))) return s;
-        while(Character.isDigit(s.charAt(i))){
+        while(Character.isDigit(s.charAt(i))) {
             i--;
         }
         StringBuilder sb = new StringBuilder(s.substring(0, i+1));
@@ -289,7 +289,7 @@ public class StringTools {
             "TEMPERATURE_GRADE_LETTER",
         };
         
-        for(String s : tests){
+        for(String s : tests) {
             System.out.println(s + " = " + makeCamelCase(s) + " " + makeUpperCamelCase(s));
         }
     }

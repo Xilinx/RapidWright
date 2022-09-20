@@ -130,11 +130,11 @@ public class TimingVertex {
         this.slack = requiredTime - arrivalTime;
     }
     
-    public void setMinRequiredTime(float requiredTime){
-        if(this.requiredTime == null){
+    public void setMinRequiredTime(float requiredTime) {
+        if(this.requiredTime == null) {
             this.requiredTime = requiredTime;
         }else{
-            if(this.requiredTime > requiredTime){
+            if(this.requiredTime > requiredTime) {
                 this.requiredTime = requiredTime;
             }
         }
@@ -146,30 +146,30 @@ public class TimingVertex {
      * @param arrivalTime Arrival time in picoseconds.  This is the sum of delay edges leading to 
      * this vertex 
      */
-    public void setMaxArrivalTime(float arrivalTime){
-        if(this.arrivalTime == null){
+    public void setMaxArrivalTime(float arrivalTime) {
+        if(this.arrivalTime == null) {
             this.arrivalTime = arrivalTime;
-        }else if(this.arrivalTime < arrivalTime){
+        }else if(this.arrivalTime < arrivalTime) {
             this.arrivalTime = arrivalTime;
         }
     }
     
-    public void setMaxArrivalTime(float arrivalTime, TimingVertex prev){
-        if(this.arrivalTime == null){
+    public void setMaxArrivalTime(float arrivalTime, TimingVertex prev) {
+        if(this.arrivalTime == null) {
             this.arrivalTime = arrivalTime;
             this.setPrev(prev);
-        }else if(this.arrivalTime < arrivalTime){
+        }else if(this.arrivalTime < arrivalTime) {
             this.arrivalTime = arrivalTime;
             this.setPrev(prev);
         }
     }
     
-    public void resetRequiredTime(){
+    public void resetRequiredTime() {
         this.requiredTime = null;
     }
     
     
-    public void resetArrivalTime(){
+    public void resetArrivalTime() {
         this.arrivalTime = null;
     }
     

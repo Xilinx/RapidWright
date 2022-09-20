@@ -261,15 +261,15 @@ public class TimingEdge extends DefaultEdge {
         this.intraSiteDelay = intraSiteDelay;
     }
     
-    public String toStringOnSitePinInsts(){
+    public String toStringOnSitePinInsts() {
         return this.getFirstPin().toString() + " -> " + this.getSecondPin().toString();
     }
     
-    public String delaysInfo(){
+    public String delaysInfo() {
         return "logic = " + this.logicDelay + ", intrasite = " + this.intraSiteDelay + ", net = " + this.netDelay + ", total = " + this.delay;
     }
     
-    public void setRouteDelay(float routeDelay){
+    public void setRouteDelay(float routeDelay) {
         this.netDelay = this.intraSiteDelay + routeDelay;
         this.delay = logicDelay + this.netDelay;
         if (timingGraph.containsEdge(this))

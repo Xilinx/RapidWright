@@ -61,7 +61,7 @@ public class TileView extends QGraphicsView{
      * Constructor
      * @param scene The DeviceBrowser scene
      */
-    public TileView(QGraphicsScene scene){
+    public TileView(QGraphicsScene scene) {
         super(scene);
     }
 
@@ -70,15 +70,15 @@ public class TileView extends QGraphicsView{
      * In this case, a right click will allow the user to pan
      * the array of tiles.
      */
-    public void mousePressEvent(QMouseEvent event){
-        if (event.button().equals(Qt.MouseButton.RightButton)){
+    public void mousePressEvent(QMouseEvent event) {
+        if (event.button().equals(Qt.MouseButton.RightButton)) {
             // For panning the view
             rightPressed = true;
             hasPanned = false;
             lastPan = event.pos();
             setCursor(new QCursor(CursorShape.ClosedHandCursor));
         }
-        if(addingAPBlock && event.button().equals(Qt.MouseButton.LeftButton)){
+        if(addingAPBlock && event.button().equals(Qt.MouseButton.LeftButton)) {
             // Start drawing a Pblock
             System.out.println("Begin drawing pblock...");
             
@@ -90,12 +90,12 @@ public class TileView extends QGraphicsView{
      * This method is called when any mouse button is released.
      * In this case, this will disallow the user to pan.
      */
-    public void mouseReleaseEvent(QMouseEvent event){
-        if(event.button().equals(Qt.MouseButton.RightButton)){
+    public void mouseReleaseEvent(QMouseEvent event) {
+        if(event.button().equals(Qt.MouseButton.RightButton)) {
             rightPressed = false;
             setCursor(new QCursor(CursorShape.ArrowCursor));
         }
-        if(addingAPBlock && event.button().equals(Qt.MouseButton.LeftButton)){
+        if(addingAPBlock && event.button().equals(Qt.MouseButton.LeftButton)) {
             // Stop drawing a Pblock, save it, return cursor to arrow
             System.out.println("Done drawing pblock!");
             addPBlockMode(false);
@@ -107,8 +107,8 @@ public class TileView extends QGraphicsView{
      * This method is called when the mouse moves in the window.
      * This will reset the window based on the mouse panning.
      */
-    public void mouseMoveEvent(QMouseEvent event){
-        if (rightPressed){
+    public void mouseMoveEvent(QMouseEvent event) {
+        if (rightPressed) {
             if (lastPan != null && !lastPan.isNull()) {
                 hasPanned = true;
                 // Get how much we panned
@@ -132,7 +132,7 @@ public class TileView extends QGraphicsView{
      * In this case, it allows the user to zoom in and out of the 
      * array of tiles. 
      */
-    public void wheelEvent(QWheelEvent event){
+    public void wheelEvent(QWheelEvent event) {
         // Get the position of the mouse before scaling, in scene coords
         QPointF pointBeforeScale = mapToScene(event.pos());
 
@@ -166,26 +166,26 @@ public class TileView extends QGraphicsView{
      * In this case, if the '=' key is pressed, it zooms in.  If the
      * '-' key is pressed, it zooms out.
      */
-    public void keyPressEvent(QKeyEvent event){
+    public void keyPressEvent(QKeyEvent event) {
         double scaleFactor = 1.15; 
-        if (event.key() == Key.Key_Equal.value()){
+        if (event.key() == Key.Key_Equal.value()) {
             // Zoom in (if not at limit)
             if(this.matrix().m11() < zoomMax)
                 scale(scaleFactor, scaleFactor);
-        } else if(event.key() == Key.Key_Minus.value()){
+        } else if(event.key() == Key.Key_Minus.value()) {
             // Zoom out (if not at limit)
             if(this.matrix().m11() > zoomMin)
                 scale(1.0 / scaleFactor, 1.0 / scaleFactor);
         }        
     }
     
-    public void zoomIn(){ 
+    public void zoomIn() { 
         // Zoom in (if not at limit)
         if(this.matrix().m11() < zoomMax)
             scale(scaleFactor, scaleFactor);
     }
     
-    public void zoomOut(){
+    public void zoomOut() {
         // Zoom out (if not at limit)
         if(this.matrix().m11() > zoomMin)
             scale(1.0 / scaleFactor, 1.0 / scaleFactor);
@@ -196,7 +196,7 @@ public class TileView extends QGraphicsView{
      */
     public void addPBlockMode(boolean b) {
         this.addingAPBlock = b;
-        if(this.addingAPBlock == false){
+        if(this.addingAPBlock == false) {
             setCursor(new QCursor(CursorShape.ArrowCursor));
         }
     }

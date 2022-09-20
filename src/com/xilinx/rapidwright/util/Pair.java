@@ -36,11 +36,11 @@ public class Pair<T,U> {
     
     private U second;
     
-    public Pair(){
+    public Pair() {
         
     }
     
-    public Pair(T first, U second){
+    public Pair(T first, U second) {
         this.first = first;
         this.second = second;
     }
@@ -61,7 +61,7 @@ public class Pair<T,U> {
         this.second = second;
     }
 
-    public String toString(){
+    public String toString() {
         return "<" + first + "," + second + ">";
     }
     
@@ -72,12 +72,12 @@ public class Pair<T,U> {
      * @param u Second array, stored in the second location
      * @return An array of populated Pair objects or null if input was invalid.
      */
-    public static <V,W> Pair<V,W>[] zip(V[] t, W[] u){
+    public static <V,W> Pair<V,W>[] zip(V[] t, W[] u) {
         if(t==null || u == null) return null;
         if(t.length != u.length) return null;
         @SuppressWarnings("unchecked")
         Pair<V,W>[] arr = new Pair[t.length];
-        for(int i=0; i < t.length; i++){
+        for(int i=0; i < t.length; i++) {
             arr[i].first = t[i];
             arr[i].second = u[i];
         }

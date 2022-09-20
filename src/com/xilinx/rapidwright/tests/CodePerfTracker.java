@@ -68,20 +68,20 @@ public class CodePerfTracker {
     private boolean verbose = true;
     
     
-    public CodePerfTracker(String name){
+    public CodePerfTracker(String name) {
         init(name,true);
     }
     
-    public CodePerfTracker(String name, boolean printProgress){
+    public CodePerfTracker(String name, boolean printProgress) {
         init(name,printProgress);
     }
     
-    public CodePerfTracker(String name, boolean printProgress, boolean isVerbose){
+    public CodePerfTracker(String name, boolean printProgress, boolean isVerbose) {
         verbose = isVerbose;
         init(name,printProgress);
     }
     
-    public void init(String name, boolean printProgress){
+    public void init(String name, boolean printProgress) {
         if(!GLOBAL_DEBUG) return; 
         this.name = name;
         this.printProgress = printProgress;
@@ -90,19 +90,19 @@ public class CodePerfTracker {
         segmentNames = new ArrayList<String>();
         inflightTimes = new HashMap<>();
         rt = Runtime.getRuntime();        
-        if(this.printProgress && isVerbose() && name != null){
+        if(this.printProgress && isVerbose() && name != null) {
             MessageGenerator.printHeader(name);
         }
     }
     
-    public void updateName(String name){
+    public void updateName(String name) {
         this.name = name;
     }
     
-    private int getSegmentIndex(String segmentName){
+    private int getSegmentIndex(String segmentName) {
         int i=0;
-        for(String name : segmentNames){
-            if(name.equals(segmentName)){
+        for(String name : segmentNames) {
+            if(name.equals(segmentName)) {
                 return i;
             }
             i++;
@@ -110,12 +110,12 @@ public class CodePerfTracker {
         return -1;
     }
     
-    public Long getRuntime(String segmentName){
+    public Long getRuntime(String segmentName) {
         int i = getSegmentIndex(segmentName);
         return i == -1 ? null : runtimes.get(i);
     }
     
-    public Long getMemUsage(String segmentName){
+    public Long getMemUsage(String segmentName) {
         int i = getSegmentIndex(segmentName);
         return i == -1 ? null : memUsages.get(i);        
     }
@@ -128,7 +128,7 @@ public class CodePerfTracker {
         this.verbose = verbose;
     }
 
-    public CodePerfTracker start(String segmentName){
+    public CodePerfTracker start(String segmentName) {
         if(!GLOBAL_DEBUG || this == SILENT) return this;
         if(isUsingGCCallsToTrackMemory()) System.gc();
         long currUsage = rt.totalMemory() - rt.freeMemory();
@@ -138,7 +138,7 @@ public class CodePerfTracker {
         return this;
     }
 
-    public CodePerfTracker stop(){
+    public CodePerfTracker stop() {
         if(!GLOBAL_DEBUG || this == SILENT) return this;
         long end = System.nanoTime();
         int idx = runtimes.size()-1;
@@ -151,7 +151,7 @@ public class CodePerfTracker {
         runtimes.set(idx, end-start);
         memUsages.set(idx,    currUsage-prevUsage);
         
-        if(printProgress && isVerbose()){
+        if(printProgress && isVerbose()) {
             print(idx);
         }
         return this;
@@ -183,8 +183,8 @@ public class CodePerfTracker {
         print(segmentName, runtime, memUsage, false);
     }
 
-    private void print(String segmentName, Long runtime, Long memUsage, boolean nested){
-        if(isUsingGCCallsToTrackMemory()){
+    private void print(String segmentName, Long runtime, Long memUsage, boolean nested) {
+        if(isUsingGCCallsToTrackMemory()) {
             if (nested) {
                 System.out.printf("%"+maxSegmentNameSize+"s: %"+maxRuntimeSize+"s %" + maxUsageSize + "s      (%" + maxRuntimeSize + ".3fs)\n",
                         segmentName,
@@ -237,11 +237,11 @@ public class CodePerfTracker {
         this.trackMemoryUsingGC = useGCCalls;
     }
 
-    private void addTotalEntry(){
+    private void addTotalEntry() {
         long totalRuntime = 0L;
         long totalUsage = 0L;
 //        maxSegmentNameSize = 0;
-        for(int i=0; i < runtimes.size(); i++){
+        for(int i=0; i < runtimes.size(); i++) {
             totalRuntime += runtimes.get(i);
             totalUsage += memUsages.get(i);
             int len = segmentNames.get(i).length() + 1;
@@ -254,21 +254,21 @@ public class CodePerfTracker {
         if(maxSegmentNameSize < totalName.length()) maxSegmentNameSize = totalName.length();
     }
 
-    private void removeTotalEntry(){
+    private void removeTotalEntry() {
         final int idx = runtimes.size() - 1;
         runtimes.remove(idx);
         memUsages.remove(idx);
         segmentNames.remove(idx);
     }
     
-    public void printSummary(){
+    public void printSummary() {
         if(!GLOBAL_DEBUG || this == SILENT) return;
         if(!isVerbose()) return;
         if(!printProgress) MessageGenerator.printHeader(name);
         addTotalEntry();
         int start = printProgress ? runtimes.size()-1 : 0;
-        for(int i=start; i < runtimes.size(); i++){
-            if(i == runtimes.size()-1){
+        for(int i=start; i < runtimes.size(); i++) {
+            if(i == runtimes.size()-1) {
                 System.out.println("------------------------------------------------------------------------------");
             }
             print(i);

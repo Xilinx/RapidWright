@@ -96,10 +96,10 @@ public class HandPlacer extends QMainWindow {
 
         boolean debugPlacer = false;
         String fileToOpen = null;
-        if(args.length > 0){
+        if(args.length > 0) {
             fileToOpen = args[0];
         }
-        if(args.length == 2 && args[1].equalsIgnoreCase("-g")){
+        if(args.length == 2 && args[1].equalsIgnoreCase("-g")) {
             System.out.println("DEBUG MODE");
             debugPlacer = true;
         }
@@ -111,7 +111,7 @@ public class HandPlacer extends QMainWindow {
         QApplication.exec();
     }
     
-    public static void openDesign(Design d){
+    public static void openDesign(Design d) {
         QApplication.setGraphicsSystem("raster");
         QApplication.initialize(new String[]{});
         
@@ -123,8 +123,8 @@ public class HandPlacer extends QMainWindow {
         
     }
     
-    public static void openDesign(Design d, boolean nonBlocking){
-        if(nonBlocking){
+    public static void openDesign(Design d, boolean nonBlocking) {
+        if(nonBlocking) {
             new Thread(new Runnable() {
                  public void run() {
                       openDesign(d);
@@ -136,7 +136,7 @@ public class HandPlacer extends QMainWindow {
         }
     }
     
-    public HandPlacer(QWidget parent, Design design){
+    public HandPlacer(QWidget parent, Design design) {
         super(parent);
         
         init(false);
@@ -159,13 +159,13 @@ public class HandPlacer extends QMainWindow {
         view.fitInView(new QRectF(new QPointF(0, 0), new QSizeF(scene.getSceneSize())), Qt.AspectRatioMode.KeepAspectRatio);
     }
     
-    public HandPlacer(QWidget parent, String fileToOpen, boolean debugPlacer){
+    public HandPlacer(QWidget parent, String fileToOpen, boolean debugPlacer) {
         super(parent);
         
         init(debugPlacer);
 
-        if(fileToOpen != null && new File(fileToOpen).exists()){
-            if(debugPlacer){
+        if(fileToOpen != null && new File(fileToOpen).exists()) {
+            if(debugPlacer) {
                 //internalOpenWithAutoPlacer(fileToOpen);
             }
             else{
@@ -177,7 +177,7 @@ public class HandPlacer extends QMainWindow {
         resize(1024, 768);
     }
     
-    private void init(boolean debugPlacer){
+    private void init(boolean debugPlacer) {
         undoStack = new QUndoStack();
         scene = new FloorPlanScene(null, debugPlacer);
         view = new TileView(scene);
@@ -211,13 +211,13 @@ public class HandPlacer extends QMainWindow {
     }
     
     @SuppressWarnings("unused")
-    private void setStatusText(String text, Tile tile){
+    private void setStatusText(String text, Tile tile) {
         statusLabel.setText(text);
     }
     
-    private void populateMacroList(){
+    private void populateMacroList() {
         macroList.clear();
-        for(GUIModuleInst macro : scene.getMacroList()){
+        for(GUIModuleInst macro : scene.getMacroList()) {
             QTreeWidgetItem treeItem = new QTreeWidgetItem();
             treeItem.setText(0, macro.getModuleInst().getName());
             String sizeFMT = String.format("%5d", macro.getSizeInTiles());
@@ -228,37 +228,37 @@ public class HandPlacer extends QMainWindow {
     }
     
     @SuppressWarnings("unused")
-    private void updateListSelection(){
+    private void updateListSelection() {
         if(macroList.hasFocus())
             return;
         macroList.clearSelection();
-        for(QGraphicsItemInterface item : scene.selectedItems()){
+        for(QGraphicsItemInterface item : scene.selectedItems()) {
             String modInstName = ((GUIModuleInst)item).getModuleInst().getName();
             List<QTreeWidgetItem> itemList = macroList.findItems(modInstName, new MatchFlags(MatchFlag.MatchExactly), 0);
-            if(itemList.size() > 0){
+            if(itemList.size() > 0) {
                 itemList.get(0).setSelected(true);
             }
         }
     }
     
     @SuppressWarnings("unused")
-    private void updateSceneSelection(){
+    private void updateSceneSelection() {
         if(scene.hasFocus())
             return;
         scene.clearSelection();
-        for(QTreeWidgetItem item : macroList.selectedItems()){
+        for(QTreeWidgetItem item : macroList.selectedItems()) {
             String modInstName = item.text(0);
             GUIModuleInst gmi = scene.getGMI(modInstName);
-            if(gmi != null){
+            if(gmi != null) {
                 gmi.setSelected(true);
             }
         }
     }
     
-    private void updateWireEstimate(){
+    private void updateWireEstimate() {
         ArrayList<GUINetLine> netLineList = scene.getNetLineList();
         double estimate = 0;
-        for(GUINetLine netLine : netLineList){
+        for(GUINetLine netLine : netLineList) {
             estimate += netLine.line().length();
         }
         statusBar().showMessage("Wiring cost: "+estimate, 2000);
@@ -295,39 +295,39 @@ public class HandPlacer extends QMainWindow {
                 "This is the first try \nat a manual Block Placer.");
     }
 
-    public void updateDesign(ArrayList<PartitionLine> lines){
+    public void updateDesign(ArrayList<PartitionLine> lines) {
         scene.openNewDesign(debugDesign);
-        if(lines != null){
-            for(PartitionLine line : lines){
+        if(lines != null) {
+            for(PartitionLine line : lines) {
                 line.drawPartitionLine(scene);
             }            
         }
     }
     
-    protected void openDesign(){
+    protected void openDesign() {
         /*String fileName = QFileDialog.getOpenFileName(this, "Choose a file...",
                 ".", FileFilters.xdlFilter);
-        if(fileName.endsWith(".xdl")){
+        if(fileName.endsWith(".xdl")) {
             internalOpenDesign(fileName);
         }*/
         System.out.println("TODO: Need modular design open method");
     }
     
-    protected void openWithAutoPlacer(){
+    protected void openWithAutoPlacer() {
         String fileName = QFileDialog.getOpenFileName(this, "Choose a file...",
                 ".", FileFilters.xdlFilter);
-        if (fileName.endsWith(".xdl")){
+        if (fileName.endsWith(".xdl")) {
             debugPlacer = true;
             scene.debugPlacer = true;
             //internalOpenWithAutoPlacer(fileName);
         }        
     }
         
-    protected void openRecentFile(){
+    protected void openRecentFile() {
         
     }
     
-    protected void saveAsDCPDesign(){
+    protected void saveAsDCPDesign() {
         if(scene.getDesign() == null)
             return;
         String fileName = QFileDialog.getSaveFileName(this, tr("Save As"),".", FileFilters.dcpFilter);
@@ -338,7 +338,7 @@ public class HandPlacer extends QMainWindow {
         statusBar().showMessage(fileName + " saved.", 2000);
     }
     
-    protected void saveAsPDFDesign(){
+    protected void saveAsPDFDesign() {
         if(scene.getDesign() == null)
             return;
         String fileName = QFileDialog.getSaveFileName(this, tr("Save As PDF"),".", FileFilters.pdfFilter);
@@ -407,7 +407,7 @@ public class HandPlacer extends QMainWindow {
 
     }
     
-    private void setupViewActions(){
+    private void setupViewActions() {
         toolbar.setWindowTitle(tr("View Actions"));
         addToolBar(toolbar);
         QMenu m = new QMenu(tr("&View"), this);
@@ -429,17 +429,17 @@ public class HandPlacer extends QMainWindow {
         actionZoomSelection.setEnabled(false);
     }
     @SuppressWarnings("unused")
-    private void zoomin(){
+    private void zoomin() {
         view.zoomIn();
     }
     @SuppressWarnings("unused")
-    private void zoomout(){
+    private void zoomout() {
         view.zoomOut();
     }
     @SuppressWarnings("unused")
-    private void zoomselection(){
+    private void zoomselection() {
         double top=-1,left=-1,right=-1,bottom=-1;
-        for(QGraphicsItemInterface item : scene.selectedItems()){
+        for(QGraphicsItemInterface item : scene.selectedItems()) {
             QPointF gmiTL = item.pos();
             QPointF gmiBR = item.pos().add(item.boundingRect().bottomRight());
             if(top < 0 || gmiTL.y() < top)

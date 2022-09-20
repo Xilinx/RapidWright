@@ -215,7 +215,7 @@ public class DefaultDesignMerger extends AbstractDesignMerger {
             EDIFNet net1 = portInst1.getNet();
             if(net0.getParentCell() == net1.getParentCell()) {
                 // This pin has already been moved over from a duplicate port, it should be removed
-                if(net0.getName().equals(net1.getName())){
+                if(net0.getName().equals(net1.getName())) {
                     net1.removePortInst(portInst1);
                 }else {
                     net0.removePortInst(portInst0);

@@ -39,7 +39,7 @@ public class MessageGenerator{
      * program.
      * @param msg The message to print to standard error
      */
-    public static void generalErrorAndExit(String msg){
+    public static void generalErrorAndExit(String msg) {
         generalError(msg);
         System.exit(1);
     }
@@ -49,7 +49,7 @@ public class MessageGenerator{
      * std.err. Prints the stack trace from this point.
      * @param msg The message to print to standard error
      */
-    public static void generalError(String msg){
+    public static void generalError(String msg) {
         System.err.println(msg);
         Exception e = new Exception();
         e.printStackTrace();        
@@ -61,7 +61,7 @@ public class MessageGenerator{
      * @param msg The message to print to standard error
      * @deprecated
      */
-    public static void briefErrorAndExit(String msg){
+    public static void briefErrorAndExit(String msg) {
         briefError(msg);
         System.exit(1);
     }
@@ -71,7 +71,7 @@ public class MessageGenerator{
      * std.err. 
      * @param msg The message to print to standard error
      */
-    public static void briefError(String msg){
+    public static void briefError(String msg) {
         System.err.println(msg);
     }
     
@@ -81,7 +81,7 @@ public class MessageGenerator{
      * @param msg The message to print to standard outs
      * @deprecated Use 'System.out.println()' and 'return' instead.
      */
-    public static void briefMessageAndExit(String msg){
+    public static void briefMessageAndExit(String msg) {
         briefMessage(msg);
         System.exit(0);
     }
@@ -91,14 +91,14 @@ public class MessageGenerator{
      * std.out. 
      * @param msg The message to print to standard out
      */
-    public static void briefMessage(String msg){
+    public static void briefMessage(String msg) {
         System.out.println(msg);
     }
     
     /**
      * Prompts the user to press any key to continue execution.
      */
-    public static void waitOnAnyKey(){
+    public static void waitOnAnyKey() {
         System.out.print("Press Enter to continue...");
         waitOnAnyKeySilent();
     }
@@ -106,11 +106,11 @@ public class MessageGenerator{
     /**
      * Pauses execution until a key is pressed.
      */
-    public static void waitOnAnyKeySilent(){
+    public static void waitOnAnyKeySilent() {
         try{
             System.in.read();
         }
-        catch(IOException e){
+        catch(IOException e) {
             e.printStackTrace();
         }
     }
@@ -122,9 +122,9 @@ public class MessageGenerator{
      * @return A string of all the objects toStrings() concatenated 
      * with spaces in between.
      */
-    public static String createStringFromArray(Object[] objs){
+    public static String createStringFromArray(Object[] objs) {
         StringBuilder sb = new StringBuilder();
-        for(Object o : objs){
+        for(Object o : objs) {
             sb.append(o.toString() + " ");
         }
         return sb.toString();
@@ -134,7 +134,7 @@ public class MessageGenerator{
      * Prints a generic header to standard out to separate operations.
      * @param s
      */
-    public static void printHeader(String s){
+    public static void printHeader(String s) {
         String bar = "==============================================================================";
         String left;
         String right;
@@ -151,11 +151,11 @@ public class MessageGenerator{
      * @param length Number of spaces in the string.
      * @return The newly created whitespace string.
      */
-    public static String makeWhiteSpace(int length){
+    public static String makeWhiteSpace(int length) {
         if (length < 1)
             return "";
         StringBuilder sb = new StringBuilder(length);
-        for(int i=0; i<length; i++){
+        for(int i=0; i<length; i++) {
             sb.append(" ");
         }
         return sb.toString();
@@ -165,24 +165,24 @@ public class MessageGenerator{
      * This will prompt the user to type y or n to either continue
      * with a process or to exit.
      */
-    public static void promptToContinue(){
+    public static void promptToContinue() {
         System.out.print("Would you like to continue(y/n)? ");
         int ch;
         try{
             ch = System.in.read();
-            while(ch != 'y' && ch != 'n' && ch != 'Y' && ch != 'N'){
+            while(ch != 'y' && ch != 'n' && ch != 'Y' && ch != 'N') {
                 while((ch = System.in.read()) != '\n');
                 System.out.print("Would you like to continue(y/n)? ");
                 ch = System.in.read();
             }
-            if(ch == 'y' || ch == 'Y'){
+            if(ch == 'y' || ch == 'Y') {
                 return;
             }
             else{
                 System.exit(1);
             }
         }
-        catch(IOException e){
+        catch(IOException e) {
             throw new UncheckedIOException("Error reading user input", e);
         }
     }
@@ -191,24 +191,24 @@ public class MessageGenerator{
      * This will prompt the user to type y or n to either continue
      * with a process or to exit.
      */
-    public static void agreeToContinue(){
+    public static void agreeToContinue() {
         System.out.print("(y/n)? ");
         int ch;
         try{
             ch = System.in.read();
-            while(ch != 'y' && ch != 'n' && ch != 'Y' && ch != 'N'){
+            while(ch != 'y' && ch != 'n' && ch != 'Y' && ch != 'N') {
                 while((ch = System.in.read()) != '\n');
                 System.out.print("Would you like to continue(y/n)? ");
                 ch = System.in.read();
             }
-            if(ch == 'y' || ch == 'Y'){
+            if(ch == 'y' || ch == 'Y') {
                 return;
             }
             else{
                 System.exit(1);
             }
         }
-        catch(IOException e){
+        catch(IOException e) {
             throw new UncheckedIOException("Error reading user input", e);
         }
     }

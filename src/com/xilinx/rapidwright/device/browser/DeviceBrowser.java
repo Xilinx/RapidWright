@@ -85,7 +85,7 @@ public class DeviceBrowser extends QMainWindow{
      * Main method setting up the Qt environment for the program to run.
      * @param args
      */
-    public static void main(String[] args){
+    public static void main(String[] args) {
         QApplication.setGraphicsSystem("raster");
         QApplication.initialize(args);
 
@@ -103,7 +103,7 @@ public class DeviceBrowser extends QMainWindow{
      * Constructor which initializes the GUI and loads the first part found.
      * @param parent The Parent widget, used to add this window into other GUIs.
      */
-    public DeviceBrowser(QWidget parent, String defaultPart){
+    public DeviceBrowser(QWidget parent, String defaultPart) {
         super(parent);
         
         // set the title of the window
@@ -113,7 +113,7 @@ public class DeviceBrowser extends QMainWindow{
         
         // Gets the available parts in RapidWright and populates the selection tree
         Set<String> parts = WidgetMaker.getSupportedDevices();
-        if(parts.size() < 1){
+        if(parts.size() < 1) {
             throw new RuntimeException("Error: No available parts. " +
                     "Please generate part database files.");
         }
@@ -121,7 +121,7 @@ public class DeviceBrowser extends QMainWindow{
         if (defaultPart == null) {
             defaultPart = "xcku040";
         }
-        if(parts.contains(defaultPart)){
+        if(parts.contains(defaultPart)) {
             currPart = defaultPart;
         } else{
             currPart = parts.iterator().next();
@@ -159,7 +159,7 @@ public class DeviceBrowser extends QMainWindow{
      * currently available in this installation of RapidWright.  It also creates
      * the windows for the primitive site list and wire list.
      */
-    private void initializeSideBar(){
+    private void initializeSideBar() {
         treeWidget = WidgetMaker.createAvailablePartTreeWidget("Select a part...");
         treeWidget.doubleClicked.connect(this,"showPart(QModelIndex)");
         
@@ -203,13 +203,13 @@ public class DeviceBrowser extends QMainWindow{
      * This method will draw all of the wire connections based on the wire given.
      * @param index The index of the wire in the wire list.
      */
-    public void wireDoubleClicked(QModelIndex index){
+    public void wireDoubleClicked(QModelIndex index) {
         scene.clearCurrentLines();
         if(currTile == null) return;
         int currWire = currTile.getWireIndex(index.data().toString());
         if(currWire < 0) return;
         if(currTile.getWireConnections(index.data().toString()) == null) return;
-        for(Wire wire : currTile.getWireConnections(index.data().toString())){
+        for(Wire wire : currTile.getWireConnections(index.data().toString())) {
             scene.drawWire(currTile, currWire, wire.getTile(), wire.getWireIndex());
         }
     }
@@ -217,7 +217,7 @@ public class DeviceBrowser extends QMainWindow{
     /**
      * This method gets called each time a user double clicks on a tile.
      */
-    protected void updateTile(Tile tile){
+    protected void updateTile(Tile tile) {
         currTile = tile;
         updatePrimitiveList();
         updateWireList();
@@ -227,10 +227,10 @@ public class DeviceBrowser extends QMainWindow{
      * This will update the primitive list window based on the current
      * selected tile.
      */
-    protected void updatePrimitiveList(){
+    protected void updatePrimitiveList() {
         primitiveList.clear();
         if(currTile == null) return;
-        for(Site ps : currTile.getSites()){
+        for(Site ps : currTile.getSites()) {
             QTreeWidgetItem treeItem = new QTreeWidgetItem();
             treeItem.setText(0, ps.getName());
             treeItem.setText(1, ps.getSiteTypeEnum().toString());
@@ -242,7 +242,7 @@ public class DeviceBrowser extends QMainWindow{
      * This will update the wire list window based on the current
      * selected tile.
      */
-    protected void updateWireList(){
+    protected void updateWireList() {
         wireList.clear();
         if(currTile == null || currTile.getWireNames() == null) return;
         for(String wire : currTile.getWireNames()) {
@@ -260,9 +260,9 @@ public class DeviceBrowser extends QMainWindow{
      * treeWidget.
      * @param qmIndex The index of the part to load.
      */
-    protected void showPart(QModelIndex qmIndex){
+    protected void showPart(QModelIndex qmIndex) {
         Object data = qmIndex.data(ItemDataRole.AccessibleDescriptionRole);
-        if( data != null){
+        if( data != null) {
             if(currPart.equals(data))
                 return;
             currPart = (String) data;            
@@ -277,7 +277,7 @@ public class DeviceBrowser extends QMainWindow{
      * This method updates the status bar each time the mouse moves from a 
      * different tile.
      */
-    protected void updateStatus(String text, Tile tile){
+    protected void updateStatus(String text, Tile tile) {
         statusLabel.setText(text);
         //currTile = tile;
         //System.out.println("currTile=" + tile);

@@ -49,7 +49,7 @@ import com.xilinx.rapidwright.device.Site;
  */
 public class BufferTapTool {
     public static void main(String[] args) {
-        if(args.length < 2){
+        if(args.length < 2) {
             System.out.println("BASIC USAGE:\n <input.dcp> <--read <file directory> or --set <file>> <output directory>\n");
             return;
         }

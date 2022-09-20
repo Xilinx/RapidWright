@@ -53,14 +53,14 @@ public abstract class AbstractModuleInst<ModuleT, PlacementT, T extends Abstract
     /**
      * @return the name of this module instance
      */
-    public String getName(){
+    public String getName() {
         return name;
     }
 
     /**
      * @param name the name to set
      */
-    public void setName(String name){
+    public void setName(String name) {
         this.name = name;
     }
 
@@ -77,7 +77,7 @@ public abstract class AbstractModuleInst<ModuleT, PlacementT, T extends Abstract
      * @see java.lang.Object#hashCode()
      */
     @Override
-    public int hashCode(){
+    public int hashCode() {
         final int prime = 31;
         int result = 1;
         result = prime * result + ((name == null) ? 0 : name.hashCode());
@@ -88,7 +88,7 @@ public abstract class AbstractModuleInst<ModuleT, PlacementT, T extends Abstract
      * @see java.lang.Object#equals(java.lang.Object)
      */
     @Override
-    public boolean equals(Object obj){
+    public boolean equals(Object obj) {
         if(this == obj)
             return true;
         if(obj == null)
@@ -96,7 +96,7 @@ public abstract class AbstractModuleInst<ModuleT, PlacementT, T extends Abstract
         if(getClass() != obj.getClass())
             return false;
         AbstractModuleInst<?,?,?> other = (AbstractModuleInst<?,?,?>) obj;
-        if(name == null){
+        if(name == null) {
             if(other.name != null)
                 return false;
         }
@@ -104,7 +104,7 @@ public abstract class AbstractModuleInst<ModuleT, PlacementT, T extends Abstract
             return false;
         return true;
     }
-    public String toString(){
+    public String toString() {
         return name;
     }
 
@@ -117,7 +117,7 @@ public abstract class AbstractModuleInst<ModuleT, PlacementT, T extends Abstract
      * @param otherPortName The top-level port of the the cell instance.
      *
      */
-    public void connect(String portName, String otherPortName){
+    public void connect(String portName, String otherPortName) {
         connect(portName, null, otherPortName, -1);
     }
 
@@ -129,7 +129,7 @@ public abstract class AbstractModuleInst<ModuleT, PlacementT, T extends Abstract
      * @param otherPortName The top-level port of the the cell instance.
      * @param busIndex If the port is multi-bit, specify the index to connect or -1 if single bit bus.
      */
-    public void connect(String portName, String otherPortName, int busIndex){
+    public void connect(String portName, String otherPortName, int busIndex) {
         connect(portName, null, otherPortName, busIndex);
     }
 
@@ -143,7 +143,7 @@ public abstract class AbstractModuleInst<ModuleT, PlacementT, T extends Abstract
      * @param otherPortName The port name on the other module instance to connect to or
      * the top-level port of the the cell instance.
      */
-    public void connect(String portName, T other, String otherPortName){
+    public void connect(String portName, T other, String otherPortName) {
         connect(portName, other, otherPortName, -1);
     }
 
@@ -158,7 +158,7 @@ public abstract class AbstractModuleInst<ModuleT, PlacementT, T extends Abstract
      * the top-level port of the the cell instance.
      * @param busIndex If the port is multi-bit, specify the index to connect or -1 if single bit bus.
      */
-    public void connect(String portName, T other, String otherPortName, int busIndex){
+    public void connect(String portName, T other, String otherPortName, int busIndex) {
         connect(portName, busIndex, other, otherPortName, busIndex);
     }
 
@@ -177,7 +177,7 @@ public abstract class AbstractModuleInst<ModuleT, PlacementT, T extends Abstract
      * specify the index to connect or -1 if single bit bus.
      */
 
-    public void connect(String portName, int busIndex0, T other, String otherPortName, int busIndex1){
+    public void connect(String portName, int busIndex0, T other, String otherPortName, int busIndex1) {
         EDIFCell top = cellInst.getParentCell();
         if(cellInst == null) throw new RuntimeException("ERROR: Couldn't find logical cell instance for " + getName());
         if(other == null) {
@@ -186,10 +186,10 @@ public abstract class AbstractModuleInst<ModuleT, PlacementT, T extends Abstract
 
             String netName = getNewNetName(portName, busIndex0, other, otherPortName, busIndex1); 
             EDIFNet net = top.getNet(netName);
-            if(net == null){
+            if(net == null) {
                 net = top.createNet(netName);
             }
-            if(net.getPortInst(null, netName) == null){
+            if(net.getPortInst(null, netName) == null) {
                 net.createPortInst(port, busIndex1);
             }
             net.createPortInst(portName, busIndex0, cellInst);

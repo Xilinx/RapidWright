@@ -48,7 +48,7 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
     
     private String busName;
     
-    public EDIFPort(String name, EDIFDirection direction, int width){
+    public EDIFPort(String name, EDIFDirection direction, int width) {
         super(name);
         setDirection(direction);
         setWidth(width);
@@ -67,7 +67,7 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
         this.busName = port.busName;
     }
     
-    protected EDIFPort(){
+    protected EDIFPort() {
         
     }
     
@@ -87,19 +87,19 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
      * @return True if this bus is little endian, false otherwise. Not 
      * applicable for single bit ports.   
      */
-    public boolean isLittleEndian(){
+    public boolean isLittleEndian() {
         return isLittleEndian;
     }
     
-    protected void setIsLittleEndian(){
+    protected void setIsLittleEndian() {
         if(width == 1) return;
         String name = getName();
-        if(name.charAt(name.length()-1) != ']' || !Character.isDigit(name.charAt(name.length()-2))){
+        if(name.charAt(name.length()-1) != ']' || !Character.isDigit(name.charAt(name.length()-2))) {
             throw new RuntimeException("ERROR: Port " + getName() + " does not have proper bus suffix");
         }
         int colonIdx = -1;
         int leftBracket = -1;
-        for(int i=name.length()-3; i >= 0; i--){
+        for(int i=name.length()-3; i >= 0; i--) {
             char c = name.charAt(i);
             if(c == ':') colonIdx = i;
             else if(c == '[') {
@@ -107,7 +107,7 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
                 break;
             }
         }
-        if(colonIdx == -1 || leftBracket == -1){
+        if(colonIdx == -1 || leftBracket == -1) {
             throw new RuntimeException("ERROR: Interpreting port " + getName() + ", couldn't identify indicies.");
         }
         
@@ -116,11 +116,11 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
         isLittleEndian = left > right;
     }
     
-    public boolean isOutput(){
+    public boolean isOutput() {
         return direction == EDIFDirection.OUTPUT;
     }
     
-    public boolean isInput(){
+    public boolean isInput() {
         return direction == EDIFDirection.INPUT;
     }
     
@@ -145,20 +145,20 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
         this.width = width;
     }
     
-    public String getBusName(){
-        if(busName == null){
+    public String getBusName() {
+        if(busName == null) {
             int idx = EDIFTools.lengthOfNameWithoutBus(getName().toCharArray());
             busName = getName().substring(0, idx);                        
         }
         return busName;
     }
     
-    public String getStemName(){
+    public String getStemName() {
         int leftBracket = getName().indexOf('[');
         return leftBracket == -1 ? getName() : getName().substring(0, leftBracket); 
     }
     
-    public Integer getLeft(){
+    public Integer getLeft() {
         if(!isBus()) return null;
         int leftBracket = getName().lastIndexOf('[');
         int colon = getName().lastIndexOf(':');
@@ -167,7 +167,7 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
     }
     
 
-    public Integer getRight(){
+    public Integer getRight() {
         if(!isBus()) return null;
         int rightBracket = getName().lastIndexOf(']');
         int colon = getName().lastIndexOf(':');
@@ -182,7 +182,7 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
      * connected (such as in a primitive cell), a null entry will be present at the corresponding 
      * index.
      */
-    public List<EDIFNet> getInternalNets(){
+    public List<EDIFNet> getInternalNets() {
         List<EDIFNet> nets = new ArrayList<>(width);
         for(int i=0; i < width; i++) {
             nets.add(getInternalNet(i));
@@ -217,7 +217,7 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
      */
     public String getPortInstNameFromPort(int index) {
         if(!isBus()) return getBusName();
-        if(isLittleEndian()){
+        if(isLittleEndian()) {
             index = (getWidth()-1) - index;
         }
         return getBusName() + "[" + index + "]";     
@@ -242,7 +242,7 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
         os.write(EXPORT_CONST_DIRECTION_START);
         os.write(direction.toByteArray());
         os.write(')');
-        if(getPropertiesMap().size() > 0){
+        if(getPropertiesMap().size() > 0) {
             os.write('\n');
             exportEDIFProperties(os, EXPORT_CONST_CHILD_INDENT, cache, stable);
             os.write(EXPORT_CONST_INDENT);
@@ -273,7 +273,7 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
         return width > 1 || !getName().equals(getBusName());
     }
     
-    public int[] getBitBlastedIndicies(){
+    public int[] getBitBlastedIndicies() {
         int lastLeftBracket = getName().lastIndexOf('[');
         if(getName().contains(":")) 
             return EDIFTools.bitBlastBus(getName().substring(lastLeftBracket));

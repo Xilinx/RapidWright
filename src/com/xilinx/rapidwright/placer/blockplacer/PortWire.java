@@ -116,24 +116,24 @@ public class PortWire {
         this.sink = sink;
     }
     
-    private Tile getSourceBlockTile(){
+    private Tile getSourceBlockTile() {
         Tile anchor = sourceBlock.getTempAnchorSite().getTile();
         return sourceBlock.getDesign().getDevice().getTile(anchor.getRow()-sourceRowOffset, anchor.getColumn()-sourceColumnOffset);
     }
     
-    private Tile getSinkBlockTile(){
+    private Tile getSinkBlockTile() {
         Tile anchor = sinkBlock.getTempAnchorSite().getTile();
         return sinkBlock.getDesign().getDevice().getTile(anchor.getRow()-sinkRowOffset, anchor.getColumn()-sinkColumnOffset);
         
     }
     
-    public void calculateLength(){
+    public void calculateLength() {
         Tile src = sourceBlock == null ? source.getTile() : getSourceBlockTile();
         Tile snk = sinkBlock == null ? sink.getTile() : getSinkBlockTile();        
         length = src.getManhattanDistance(snk) + 4*(source.getNet().getFanOut());            
     }
     
-    public int getLength(){
+    public int getLength() {
         return length;
     }
 

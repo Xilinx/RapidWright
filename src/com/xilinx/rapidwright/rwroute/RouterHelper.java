@@ -61,7 +61,7 @@ public class RouterHelper {
      * @param net The net to be checked.
      * @return true, if the net has source and sink pins.
      */
-    public static boolean isRoutableNetWithSourceSinks(Net net){
+    public static boolean isRoutableNetWithSourceSinks(Net net) {
         return net.getSource() != null && net.getSinkPins().size() > 0;
     }
     
@@ -70,7 +70,7 @@ public class RouterHelper {
      * @param net The net to be checked.
      * @return true, if the nets is driver-less or load-less.
      */
-    public static boolean isDriverLessOrLoadLessNet(Net net){
+    public static boolean isDriverLessOrLoadLessNet(Net net) {
         return (isDriverLessNet(net) || isLoadLessNet(net));
     }
     
@@ -97,7 +97,7 @@ public class RouterHelper {
      * @param net The net to be checked.
      * @return true, if the net does not have pins.
      */
-    public static boolean isInternallyRoutedNet(Net net){
+    public static boolean isInternallyRoutedNet(Net net) {
         return net.getPins().size() == 0;
     }
     
@@ -109,7 +109,7 @@ public class RouterHelper {
      * @param sink The sink SitePinInst of this connection.
      * @return true, if the source is a COUT while the sink is not CIN.
      */
-    public static boolean isExternalConnectionToCout(SitePinInst source, SitePinInst sink){
+    public static boolean isExternalConnectionToCout(SitePinInst source, SitePinInst sink) {
         return source.getName().equals("COUT") && (!sink.getName().equals("CIN"));
     }
     
@@ -191,7 +191,7 @@ public class RouterHelper {
      * @param connection The {@link Connection} instance that has been routed with a list of {@link Node} instances.
      * @return A list of PIPs for the connection.
      */
-    public static List<PIP> getConnectionPIPs(Connection connection){
+    public static List<PIP> getConnectionPIPs(Connection connection) {
         return getPIPsFromListOfReversedNodes(connection.getNodes());
     }
     
@@ -200,15 +200,15 @@ public class RouterHelper {
      * @param connectionNodes The list of nodes of a routed {@link Connection} instance.
      * @return A list of PIPs generated from the list of nodes.
      */
-    public static List<PIP> getPIPsFromListOfReversedNodes(List<Node> connectionNodes){
+    public static List<PIP> getPIPsFromListOfReversedNodes(List<Node> connectionNodes) {
         List<PIP> connectionPIPs = new ArrayList<>();
         if(connectionNodes == null) return connectionPIPs;
         // Nodes of a connection are added to the list starting from its sink to its source
-        for(int i = connectionNodes.size() -1; i > 0; i--){
+        for(int i = connectionNodes.size() -1; i > 0; i--) {
             Node driver = connectionNodes.get(i);
             Node load = connectionNodes.get(i-1);        
             PIP pip = findPIPbetweenNodes(driver, load);    
-            if(pip != null){
+            if(pip != null) {
                 connectionPIPs.add(pip);
             }else{
                 System.err.println("ERROR: Null PIP connecting these two nodes: " + driver.toString() + ", " + load.toString());
@@ -223,7 +223,7 @@ public class RouterHelper {
      * @param load The load node.
      * @return The PIP connecting the two nodes.
      */
-    public static PIP findPIPbetweenNodes(Node driver, Node load){
+    public static PIP findPIPbetweenNodes(Node driver, Node load) {
         PIP pip = getPIP(load.getTile(), driver.getAllWiresInNode(), load.getWire());
         if(pip == null) {
             // for other scenarios regarding bidirectional nodes, such as LAG tile nodes, LAG_LAG_X12Y250/LAG_MUX_ATOM_0_TXOUT to node LAG_LAG_X12Y310/UBUMP0 
@@ -242,10 +242,10 @@ public class RouterHelper {
      */
     public static PIP getPIP(Tile loadTile, Wire[] driverWires, int loadWire) {
         PIP pip = null;
-        for(Wire wire : driverWires){
-            if(wire.getTile().equals(loadTile)){
+        for(Wire wire : driverWires) {
+            if(wire.getTile().equals(loadTile)) {
                 pip = loadTile.getPIP(wire.getWireIndex(), loadWire);
-                if(pip != null){
+                if(pip != null) {
                     break;
                 }
             }
@@ -278,7 +278,7 @@ public class RouterHelper {
      * @param net The target net.
      * @return All nodes used by the net.
      */
-    public static List<Node> getNodesOfNet(Net net){
+    public static List<Node> getNodesOfNet(Net net) {
         List<Node> nodes = new ArrayList<>();
         if(net.getSource() != null) nodes.add(net.getSource().getConnectedNode());
         for(SitePinInst pin : net.getSinkPins()) {
@@ -304,7 +304,7 @@ public class RouterHelper {
      * @param net The target net.
      * @return A set of nodes used by a net.
      */
-    public static Set<Node> getUsedNodesOfNet(Net net){
+    public static Set<Node> getUsedNodesOfNet(Net net) {
         Set<Node> nodes = new HashSet<>();
         if(net.getSource() != null) nodes.add(net.getSource().getConnectedNode());
         for(SitePinInst pin : net.getSinkPins()) {
@@ -351,7 +351,7 @@ public class RouterHelper {
             BELPin[] belPins = currSitePinInst.getSiteInst().getSiteWirePins(currSitePinInst.getName());
             // DSP or BRAM
             if(belPins.length == 2) {
-                for(BELPin belPin : belPins){
+                for(BELPin belPin : belPins) {
                     if(belPin.isSitePort())    continue;
                     // DO NOT invert CLK_OPTINV_CLKB_L and CLK_OPTINV_CLKB_U
                     if(belPin.getBEL().getName().contains("CLKB")) continue;
@@ -509,7 +509,7 @@ public class RouterHelper {
      * @param directConnection The target direct connection.
      * @return true, if the connection is successfully routed.
      */
-    public static boolean routeDirectConnection(Connection directConnection){
+    public static boolean routeDirectConnection(Connection directConnection) {
         directConnection.newNodes();
         directConnection.setNodes(findPathBetweenNodes(directConnection.getSource().getConnectedNode(), directConnection.getSink().getConnectedNode()));
         return directConnection.getNodes() != null? true : false;
@@ -521,7 +521,7 @@ public class RouterHelper {
      * @param sink The sink node.
      * @return A list of nodes making up the path.
      */
-    public static List<Node> findPathBetweenNodes(Node source, Node sink){
+    public static List<Node> findPathBetweenNodes(Node source, Node sink) {
         List<Node> path = new ArrayList<>();        
         if(source.equals(sink)) {
             return path; // for pins without additional projected int_node    

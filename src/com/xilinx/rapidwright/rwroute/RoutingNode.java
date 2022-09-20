@@ -37,7 +37,7 @@ public class RoutingNode{
     /** Accumulative delay from a source to a {@link RoutingNode} instance */
     private float delayFromSource;
     
-    RoutingNode (Node node){
+    RoutingNode (Node node) {
         this.node = node;
         prev = null;
         isTarget = false;

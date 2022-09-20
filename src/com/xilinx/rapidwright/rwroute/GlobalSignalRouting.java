@@ -62,8 +62,8 @@ public class GlobalSignalRouting {
     private static HashSet<String> lutOutputPinNames;
     static {
         lutOutputPinNames = new HashSet<String>();
-        for(String cle : new String[]{"L", "M"}){
-            for(String pin : new String[]{"A", "B", "C", "D", "E", "F", "G", "H"}){
+        for(String cle : new String[]{"L", "M"}) {
+            for(String pin : new String[]{"A", "B", "C", "D", "E", "F", "G", "H"}) {
                 lutOutputPinNames.add("CLE_CLE_" + cle + "_SITE_0_" + pin + "_O");
             }
         }
@@ -111,7 +111,7 @@ public class GlobalSignalRouting {
             String crName = crRouteNode.getKey();
             ClockRegion cr = dev.getClockRegion(crName);
             Set<RouteNode> routeNodes = startingPoints.get(cr);
-            if(routeNodes == null){
+            if(routeNodes == null) {
                 routeNodes = new HashSet<>();
                 startingPoints.put(cr, routeNodes);
             }
@@ -120,7 +120,7 @@ public class GlobalSignalRouting {
         return startingPoints;
     }
     
-    private static String getDominateClockRegionOfNode(Node node){
+    private static String getDominateClockRegionOfNode(Node node) {
         // This is needed because a HDISTR for clock region X3Y2 can have a base tile in clock region X2Y2, 
         // observed with clock routing of the optical-flow design.
         Map<String, Integer> crCounts = new HashMap<>();
@@ -158,7 +158,7 @@ public class GlobalSignalRouting {
      * @param routes The given routes consisting of node names.
      * @return A map storing a list of nodes for each destination.
      */
-    private static Map<String, List<Node>> getListOfNodesFromRoutes(Device device, Map<String, List<String>> routes){
+    private static Map<String, List<Node>> getListOfNodesFromRoutes(Device device, Map<String, List<String>> routes) {
         Map<String, List<Node>> dstPaths = new HashMap<>();
         for(Entry<String, List<String>> dstRoute : routes.entrySet()) {
             String dst = dstRoute.getKey();
@@ -239,7 +239,7 @@ public class GlobalSignalRouting {
     }
     
     private static void divideClockRegions(List<ClockRegion> clockRegions, ClockRegion centroid, List<ClockRegion> upClockRegions,
-            List<ClockRegion> downClockRegions){
+            List<ClockRegion> downClockRegions) {
         for(ClockRegion cr : clockRegions) {
             if(cr.getInstanceY() > centroid.getInstanceY()) {
                 upClockRegions.add(cr);
@@ -254,9 +254,9 @@ public class GlobalSignalRouting {
      * @param clk The clock net in question.
      * @return A map between leaf clock buffer nodes and sink SitePinInsts.
      */
-    private static Map<RouteNode, ArrayList<SitePinInst>> getLCBPinMappings(Net clk){
+    private static Map<RouteNode, ArrayList<SitePinInst>> getLCBPinMappings(Net clk) {
         Map<RouteNode, ArrayList<SitePinInst>> lcbMappings = new HashMap<>();
-        for(SitePinInst p : clk.getPins()){
+        for(SitePinInst p : clk.getPins()) {
             if(p.isOutPin()) continue;
             Node n = null;// n should be a node whose name ends with "CLK_LEAF"
             for(Node prev : p.getConnectedNode().getAllUphillNodes()) {
@@ -273,7 +273,7 @@ public class GlobalSignalRouting {
             RouteNode rn = n != null? new RouteNode(n.getTile(), n.getWire()):null;
             if(rn == null) throw new RuntimeException("ERROR: No mapped LCB to SitePinInst " + p);
             ArrayList<SitePinInst> sinks = lcbMappings.get(rn);
-            if(sinks == null){
+            if(sinks == null) {
                 sinks = new ArrayList<>();
                 lcbMappings.put(rn, sinks);
             }
@@ -308,7 +308,7 @@ public class GlobalSignalRouting {
      * @param design The {@link Design} instance to use.
      * @param routeThruHelper The {@link RouteThruHelper} instance to use.
      */
-    public static Map<SitePinInst, List<Node>> routeStaticNet(Net currNet, Set<Node> unavailableNodes, Design design, RouteThruHelper routeThruHelper){
+    public static Map<SitePinInst, List<Node>> routeStaticNet(Net currNet, Set<Node> unavailableNodes, Design design, RouteThruHelper routeThruHelper) {
         NetType netType = currNet.getType();
         Set<PIP> netPIPs = new HashSet<>();
         Map<SitePinInst, List<Node>> sinkPathNodes = new HashMap<>();
@@ -337,18 +337,18 @@ public class GlobalSignalRouting {
             sinkRNode.setPrev(null);    
             q.add(sinkRNode);
             boolean success = false;
-            while(!q.isEmpty()){
+            while(!q.isEmpty()) {
                 RoutingNode routingNode = q.poll();
                 visitedRoutingNodes.add(routingNode);        
                 if(debug) System.out.println("DEQUEUE:" + routingNode);
                 if(debug) System.out.println(", PREV = " + routingNode.getPrev() == null ? " null" : routingNode.getPrev());        
-                if(success = isThisOurStaticSource(design, routingNode, netType, usedRoutingNodes)){        
+                if(success = isThisOurStaticSource(design, routingNode, netType, usedRoutingNodes)) {        
                     //trace back for a complete path
-                    if(debug){
+                    if(debug) {
                         System.out.println("SINK: TILE = " + sink.getTile().getName() + " NODE = " + sink.getConnectedNode().toString());
                         System.out.println("SOURCE " + routingNode.toString() + " found");
                     }    
-                    while(routingNode != null){
+                    while(routingNode != null) {
                         usedRoutingNodes.add(routingNode);// use routed RNodes as the source
                         pathNodes.add(routingNode.getNode());
                         
@@ -357,17 +357,17 @@ public class GlobalSignalRouting {
                     }
                     Collections.reverse(pathNodes);
                     sinkPathNodes.put(sink, pathNodes);
-                    if(debug){
-                        for(Node pathNode:pathNodes){
+                    if(debug) {
+                        for(Node pathNode:pathNodes) {
                             System.out.println(pathNode.toString());
                         }
                     }
                     break;
                 }
-                if(debug){
+                if(debug) {
                     System.out.println("KEEP LOOKING FOR A SOURCE...");
                 }
-                for(Node uphillNode : routingNode.getNode().getAllUphillNodes()){
+                for(Node uphillNode : routingNode.getNode().getAllUphillNodes()) {
                     if(routeThruHelper.isRouteThru(uphillNode, routingNode.getNode())) continue;
                     RoutingNode nParent = RouterHelper.createRoutingNode(uphillNode, createdRoutingNodes);
                     if(nParent == null) continue;
@@ -381,14 +381,14 @@ public class GlobalSignalRouting {
                     break;
                 }
             }
-            if(!success){
+            if(!success) {
                 System.err.println("ERROR: Failed to route " + currNet.getName() + " pin " + sink.toString());
             }else{
                 sink.setRouted(true);
             }
         }
         
-        for(List<Node> nodes:sinkPathNodes.values()){
+        for(List<Node> nodes:sinkPathNodes.values()) {
             netPIPs.addAll(RouterHelper.getPIPsFromListOfReversedNodes(nodes));
         }
         
@@ -403,10 +403,10 @@ public class GlobalSignalRouting {
      * @param visitedRoutingNodes RoutingNode instances that have been visited.
      * @return true, if the RoutingNode instance should not be considered as an available resource.
      */
-    private static boolean pruneNode(RoutingNode routingNode, Set<Node> unavailableNodes, Set<RoutingNode> visitedRoutingNodes){
+    private static boolean pruneNode(RoutingNode routingNode, Set<Node> unavailableNodes, Set<RoutingNode> visitedRoutingNodes) {
         Node node = routingNode.getNode();
         IntentCode ic = node.getTile().getWireIntentCode(node.getWire());
-        switch(ic){
+        switch(ic) {
             case NODE_GLOBAL_VDISTR:
             case NODE_GLOBAL_HROUTE:
             case NODE_GLOBAL_HDISTR:
@@ -430,7 +430,7 @@ public class GlobalSignalRouting {
      * @param usedRoutingNodes The used RoutingNode instances by of the given net type representing the VCC or GND net.
      * @return true if this sources is usable, false otherwise. 
      */
-    private static boolean isThisOurStaticSource(Design design, RoutingNode routingNode, NetType type, Set<RoutingNode> usedRoutingNodes){
+    private static boolean isThisOurStaticSource(Design design, RoutingNode routingNode, NetType type, Set<RoutingNode> usedRoutingNodes) {
         if(usedRoutingNodes != null && usedRoutingNodes.contains(routingNode))
             return true;
         Node node = routingNode.getNode();
@@ -445,16 +445,16 @@ public class GlobalSignalRouting {
      * @param design The design instance to use for getting corresponding {@link SiteInst} instance info. 
      * @return True if the pin is a hard source or an unused LUT output that can be repurposed as a source.
      */
-    private static boolean isNodeUsableStaticSource(Node node, NetType type, Design design){
+    private static boolean isNodeUsableStaticSource(Node node, NetType type, Design design) {
         // We should look for 3 different potential sources
         // before we stop:
         // (1) GND_WIRE 
         // (2) VCC_WIRE 
         // (3) Unused LUT Outputs (A_0, B_0,...,H_0)
         String pinName = type == NetType.VCC ? Net.VCC_WIRE_NAME : Net.GND_WIRE_NAME;        
-        if(node.getWireName().startsWith(pinName)){
+        if(node.getWireName().startsWith(pinName)) {
             return true;
-        }else if(lutOutputPinNames.contains(node.getWireName())){
+        }else if(lutOutputPinNames.contains(node.getWireName())) {
             Site slice = node.getTile().getSites()[0];
             SiteInst i = design.getSiteInstFromSite(slice);            
             if(i == null) return true; // Site is not used

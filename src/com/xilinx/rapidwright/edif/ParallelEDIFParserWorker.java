@@ -104,7 +104,7 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParserWorker implement
      */
     private boolean parseToNextCellWithinLibrary() {
         String currToken = getNextToken(true);
-        if (LEFT_PAREN.equals(currToken)){
+        if (LEFT_PAREN.equals(currToken)) {
             return true;
         }
         expect(RIGHT_PAREN, currToken);
@@ -125,22 +125,22 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParserWorker implement
         }
 
         String currToken = getNextToken(true);
-        while(LEFT_PAREN.equals(currToken)){
+        while(LEFT_PAREN.equals(currToken)) {
             EDIFToken nextToken = getNextTokenWithOffset(true);
             if (nextToken.text.equalsIgnoreCase(STATUS)) {
                 parseStatus(netlist);
-            } else if(nextToken.text.equalsIgnoreCase(LIBRARY) || nextToken.text.equalsIgnoreCase(EXTERNAL)){
+            } else if(nextToken.text.equalsIgnoreCase(LIBRARY) || nextToken.text.equalsIgnoreCase(EXTERNAL)) {
                 EDIFLibrary library = parseEdifLibraryHead();
                 librariesAndCells.add(new LibraryResult(nextToken, library));
                 if (parseToNextCellWithinLibrary()) {
                     inLibrary = true;
                     return true;
                 }
-            } else if(nextToken.text.equalsIgnoreCase(COMMENT)){
+            } else if(nextToken.text.equalsIgnoreCase(COMMENT)) {
                 // Final Comment on Reference To The Cell Of Highest Level
                 String comment = getNextToken(true);
                 expect(RIGHT_PAREN, getNextToken(true));
-            } else if(nextToken.text.equalsIgnoreCase(DESIGN)){
+            } else if(nextToken.text.equalsIgnoreCase(DESIGN)) {
                 edifDesign = parseEDIFNameObject(new EDIFDesign());
                 expect(LEFT_PAREN, getNextToken(true));
                 expect(CELLREF, getNextToken(true));
@@ -152,7 +152,7 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParserWorker implement
                 expect(RIGHT_PAREN, getNextToken(true));
                 expect(RIGHT_PAREN, getNextToken(true));
                 currToken = null;
-                while(LEFT_PAREN.equals(currToken = getNextToken(true))){
+                while(LEFT_PAREN.equals(currToken = getNextToken(true))) {
                     parseProperty(edifDesign, getNextToken(true));
                 }
                 expect(RIGHT_PAREN, currToken);

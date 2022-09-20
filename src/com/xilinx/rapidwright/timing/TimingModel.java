@@ -1185,7 +1185,7 @@ public class TimingModel {
     }
 
     //TODO check
-    public float getIntraSiteDelay(){
+    public float getIntraSiteDelay() {
         return this.intrasiteDelay;
     }
 
@@ -1551,13 +1551,13 @@ public class TimingModel {
         switch (groupDistance) {
             case SAME:
                 for (TimingGroup ts : unfiltered) {
-                    if ((ts.dist == 0 && ts.getDelayType() != GroupDelayType.PINFEED)// && (ts.dist == 0 && ts.getDelayType() != TimingGroup.GroupDelayType.GLOBAL) //(ts.dist == 0) || (ts.dist == 1 && ts.getDirection() == null)//){// && (ts.getDirection() == targetDirection || ts.getDirection() == null)) {
+                    if ((ts.dist == 0 && ts.getDelayType() != GroupDelayType.PINFEED)// && (ts.dist == 0 && ts.getDelayType() != TimingGroup.GroupDelayType.GLOBAL) //(ts.dist == 0) || (ts.dist == 1 && ts.getDirection() == null)//) {// && (ts.getDirection() == targetDirection || ts.getDirection() == null)) {
                     ) {
                         result.add(ts);
                     }
                 }
                 for (TimingGroup ts : unfiltered) {
-                    if ((ts.dist == 0 && ts.getDelayType() == GroupDelayType.PINFEED) //(ts.dist == 0) || (ts.dist == 1 && ts.getDirection() == null)//){// && (ts.getDirection() == targetDirection || ts.getDirection() == null)) {
+                    if ((ts.dist == 0 && ts.getDelayType() == GroupDelayType.PINFEED) //(ts.dist == 0) || (ts.dist == 1 && ts.getDirection() == null)//) {// && (ts.getDirection() == targetDirection || ts.getDirection() == null)) {
                     ) {
                         result.add(ts);
                     }

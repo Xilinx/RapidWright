@@ -49,8 +49,8 @@ public class PathPort {
     private Tile cachedAnchor;
     private Tile cachedRelocate;
 
-    public Tile getPortTile(){
-        if(block == null){
+    public Tile getPortTile() {
+        if(block == null) {
             return tile;
         }
         Tile anchor = block.getTempAnchorSite().getTile();

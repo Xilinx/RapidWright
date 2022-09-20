@@ -49,7 +49,7 @@ public final class DeviceResources {
     public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
       new org.capnproto.StructList.Factory<Builder, Reader>(factory);
     public static final class Builder extends org.capnproto.StructBuilder {
-      Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+      Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
         super(segment, data, pointers, dataSize, pointerCount);
       }
       public final Reader asReader() {
@@ -75,7 +75,7 @@ public final class DeviceResources {
     }
 
     public static final class Reader extends org.capnproto.StructReader {
-      Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+      Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
         super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
       }
 
@@ -117,7 +117,7 @@ public final class DeviceResources {
     public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
       new org.capnproto.StructList.Factory<Builder, Reader>(factory);
     public static final class Builder extends org.capnproto.StructBuilder {
-      Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+      Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
         super(segment, data, pointers, dataSize, pointerCount);
       }
       public final Reader asReader() {
@@ -153,7 +153,7 @@ public final class DeviceResources {
     }
 
     public static final class Reader extends org.capnproto.StructReader {
-      Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+      Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
         super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
       }
 
@@ -200,7 +200,7 @@ public final class DeviceResources {
     public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
       new org.capnproto.StructList.Factory<Builder, Reader>(factory);
     public static final class Builder extends org.capnproto.StructBuilder {
-      Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+      Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
         super(segment, data, pointers, dataSize, pointerCount);
       }
       public final Reader asReader() {
@@ -236,7 +236,7 @@ public final class DeviceResources {
     }
 
     public static final class Reader extends org.capnproto.StructReader {
-      Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+      Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
         super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
       }
 
@@ -283,7 +283,7 @@ public final class DeviceResources {
     public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
       new org.capnproto.StructList.Factory<Builder, Reader>(factory);
     public static final class Builder extends org.capnproto.StructBuilder {
-      Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+      Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
         super(segment, data, pointers, dataSize, pointerCount);
       }
       public final Reader asReader() {
@@ -326,7 +326,7 @@ public final class DeviceResources {
     }
 
     public static final class Reader extends org.capnproto.StructReader {
-      Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+      Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
         super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
       }
 
@@ -377,7 +377,7 @@ public final class DeviceResources {
     public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
       new org.capnproto.StructList.Factory<Builder, Reader>(factory);
     public static final class Builder extends org.capnproto.StructBuilder {
-      Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+      Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
         super(segment, data, pointers, dataSize, pointerCount);
       }
       public final Reader asReader() {
@@ -420,7 +420,7 @@ public final class DeviceResources {
     }
 
     public static final class Reader extends org.capnproto.StructReader {
-      Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+      Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
         super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
       }
 
@@ -471,7 +471,7 @@ public final class DeviceResources {
     public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
       new org.capnproto.StructList.Factory<Builder, Reader>(factory);
     public static final class Builder extends org.capnproto.StructBuilder {
-      Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+      Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
         super(segment, data, pointers, dataSize, pointerCount);
       }
       public final Reader asReader() {
@@ -507,7 +507,7 @@ public final class DeviceResources {
     }
 
     public static final class Reader extends org.capnproto.StructReader {
-      Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+      Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
         super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
       }
 
@@ -554,7 +554,7 @@ public final class DeviceResources {
     public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
       new org.capnproto.StructList.Factory<Builder, Reader>(factory);
     public static final class Builder extends org.capnproto.StructBuilder {
-      Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+      Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
         super(segment, data, pointers, dataSize, pointerCount);
       }
       public final Reader asReader() {
@@ -597,7 +597,7 @@ public final class DeviceResources {
     }
 
     public static final class Reader extends org.capnproto.StructReader {
-      Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+      Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
         super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
       }
 
@@ -648,7 +648,7 @@ public final class DeviceResources {
     public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
       new org.capnproto.StructList.Factory<Builder, Reader>(factory);
     public static final class Builder extends org.capnproto.StructBuilder {
-      Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+      Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
         super(segment, data, pointers, dataSize, pointerCount);
       }
       public final Reader asReader() {
@@ -684,7 +684,7 @@ public final class DeviceResources {
     }
 
     public static final class Reader extends org.capnproto.StructReader {
-      Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+      Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
         super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
       }
 
@@ -731,7 +731,7 @@ public final class DeviceResources {
     public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
       new org.capnproto.StructList.Factory<Builder, Reader>(factory);
     public static final class Builder extends org.capnproto.StructBuilder {
-      Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+      Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
         super(segment, data, pointers, dataSize, pointerCount);
       }
       public final Reader asReader() {
@@ -767,7 +767,7 @@ public final class DeviceResources {
     }
 
     public static final class Reader extends org.capnproto.StructReader {
-      Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+      Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
         super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
       }
 
@@ -814,7 +814,7 @@ public final class DeviceResources {
     public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
       new org.capnproto.StructList.Factory<Builder, Reader>(factory);
     public static final class Builder extends org.capnproto.StructBuilder {
-      Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+      Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
         super(segment, data, pointers, dataSize, pointerCount);
       }
       public final Reader asReader() {
@@ -1039,7 +1039,7 @@ public final class DeviceResources {
     }
 
     public static final class Reader extends org.capnproto.StructReader {
-      Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+      Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
         super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
       }
 
@@ -1200,7 +1200,7 @@ public final class DeviceResources {
       public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
         new org.capnproto.StructList.Factory<Builder, Reader>(factory);
       public static final class Builder extends org.capnproto.StructBuilder {
-        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
           super(segment, data, pointers, dataSize, pointerCount);
         }
         public final Reader asReader() {
@@ -1295,7 +1295,7 @@ public final class DeviceResources {
       }
 
       public static final class Reader extends org.capnproto.StructReader {
-        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
           super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
         }
 
@@ -1376,7 +1376,7 @@ public final class DeviceResources {
       public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
         new org.capnproto.StructList.Factory<Builder, Reader>(factory);
       public static final class Builder extends org.capnproto.StructBuilder {
-        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
           super(segment, data, pointers, dataSize, pointerCount);
         }
         public final Reader asReader() {
@@ -1397,7 +1397,7 @@ public final class DeviceResources {
       }
 
       public static final class Reader extends org.capnproto.StructReader {
-        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
           super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
         }
 
@@ -1435,7 +1435,7 @@ public final class DeviceResources {
       public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
         new org.capnproto.StructList.Factory<Builder, Reader>(factory);
       public static final class Builder extends org.capnproto.StructBuilder {
-        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
           super(segment, data, pointers, dataSize, pointerCount);
         }
         public final Reader asReader() {
@@ -1475,7 +1475,7 @@ public final class DeviceResources {
       }
 
       public static final class Reader extends org.capnproto.StructReader {
-        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
           super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
         }
 
@@ -1524,7 +1524,7 @@ public final class DeviceResources {
       public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
         new org.capnproto.StructList.Factory<Builder, Reader>(factory);
       public static final class Builder extends org.capnproto.StructBuilder {
-        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
           super(segment, data, pointers, dataSize, pointerCount);
         }
         public final Reader asReader() {
@@ -1588,7 +1588,7 @@ public final class DeviceResources {
       }
 
       public static final class Reader extends org.capnproto.StructReader {
-        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
           super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
         }
 
@@ -1651,7 +1651,7 @@ public final class DeviceResources {
       public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
         new org.capnproto.StructList.Factory<Builder, Reader>(factory);
       public static final class Builder extends org.capnproto.StructBuilder {
-        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
           super(segment, data, pointers, dataSize, pointerCount);
         }
         public final Reader asReader() {
@@ -1674,7 +1674,7 @@ public final class DeviceResources {
       }
 
       public static final class Reader extends org.capnproto.StructReader {
-        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
           super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
         }
 
@@ -1713,7 +1713,7 @@ public final class DeviceResources {
       public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
         new org.capnproto.StructList.Factory<Builder, Reader>(factory);
       public static final class Builder extends org.capnproto.StructBuilder {
-        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
           super(segment, data, pointers, dataSize, pointerCount);
         }
         public Which which() {
@@ -1795,7 +1795,7 @@ public final class DeviceResources {
       }
 
       public static final class Reader extends org.capnproto.StructReader {
-        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
           super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
         }
 
@@ -1890,7 +1890,7 @@ public final class DeviceResources {
       public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
         new org.capnproto.StructList.Factory<Builder, Reader>(factory);
       public static final class Builder extends org.capnproto.StructBuilder {
-        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
           super(segment, data, pointers, dataSize, pointerCount);
         }
         public final Reader asReader() {
@@ -1913,7 +1913,7 @@ public final class DeviceResources {
       }
 
       public static final class Reader extends org.capnproto.StructReader {
-        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
           super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
         }
 
@@ -1952,7 +1952,7 @@ public final class DeviceResources {
       public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
         new org.capnproto.StructList.Factory<Builder, Reader>(factory);
       public static final class Builder extends org.capnproto.StructBuilder {
-        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
           super(segment, data, pointers, dataSize, pointerCount);
         }
         public final Reader asReader() {
@@ -2020,7 +2020,7 @@ public final class DeviceResources {
       }
 
       public static final class Reader extends org.capnproto.StructReader {
-        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
           super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
         }
 
@@ -2085,7 +2085,7 @@ public final class DeviceResources {
       public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
         new org.capnproto.StructList.Factory<Builder, Reader>(factory);
       public static final class Builder extends org.capnproto.StructBuilder {
-        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
           super(segment, data, pointers, dataSize, pointerCount);
         }
         public final Reader asReader() {
@@ -2120,7 +2120,7 @@ public final class DeviceResources {
       }
 
       public static final class Reader extends org.capnproto.StructReader {
-        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
           super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
         }
 
@@ -2168,7 +2168,7 @@ public final class DeviceResources {
       public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
         new org.capnproto.StructList.Factory<Builder, Reader>(factory);
       public static final class Builder extends org.capnproto.StructBuilder {
-        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
           super(segment, data, pointers, dataSize, pointerCount);
         }
         public final Reader asReader() {
@@ -2196,7 +2196,7 @@ public final class DeviceResources {
       }
 
       public static final class Reader extends org.capnproto.StructReader {
-        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
           super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
         }
 
@@ -2238,7 +2238,7 @@ public final class DeviceResources {
       public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
         new org.capnproto.StructList.Factory<Builder, Reader>(factory);
       public static final class Builder extends org.capnproto.StructBuilder {
-        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
           super(segment, data, pointers, dataSize, pointerCount);
         }
         public final Reader asReader() {
@@ -2270,7 +2270,7 @@ public final class DeviceResources {
       }
 
       public static final class Reader extends org.capnproto.StructReader {
-        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
           super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
         }
 
@@ -2316,7 +2316,7 @@ public final class DeviceResources {
       public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
         new org.capnproto.StructList.Factory<Builder, Reader>(factory);
       public static final class Builder extends org.capnproto.StructBuilder {
-        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
           super(segment, data, pointers, dataSize, pointerCount);
         }
         public final Reader asReader() {
@@ -2369,7 +2369,7 @@ public final class DeviceResources {
       }
 
       public static final class Reader extends org.capnproto.StructReader {
-        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
           super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
         }
 
@@ -2425,7 +2425,7 @@ public final class DeviceResources {
         public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
           new org.capnproto.StructList.Factory<Builder, Reader>(factory);
         public static final class Builder extends org.capnproto.StructBuilder {
-          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
             super(segment, data, pointers, dataSize, pointerCount);
           }
           public Which which() {
@@ -2486,7 +2486,7 @@ public final class DeviceResources {
         }
 
         public static final class Reader extends org.capnproto.StructReader {
-          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
             super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
           }
 
@@ -2567,7 +2567,7 @@ public final class DeviceResources {
       public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
         new org.capnproto.StructList.Factory<Builder, Reader>(factory);
       public static final class Builder extends org.capnproto.StructBuilder {
-        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
           super(segment, data, pointers, dataSize, pointerCount);
         }
         public final Reader asReader() {
@@ -2597,7 +2597,7 @@ public final class DeviceResources {
       }
 
       public static final class Reader extends org.capnproto.StructReader {
-        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
           super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
         }
 
@@ -2647,7 +2647,7 @@ public final class DeviceResources {
       public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
         new org.capnproto.StructList.Factory<Builder, Reader>(factory);
       public static final class Builder extends org.capnproto.StructBuilder {
-        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
           super(segment, data, pointers, dataSize, pointerCount);
         }
         public final Reader asReader() {
@@ -2675,7 +2675,7 @@ public final class DeviceResources {
       }
 
       public static final class Reader extends org.capnproto.StructReader {
-        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
           super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
         }
 
@@ -2719,7 +2719,7 @@ public final class DeviceResources {
       public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
         new org.capnproto.StructList.Factory<Builder, Reader>(factory);
       public static final class Builder extends org.capnproto.StructBuilder {
-        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
           super(segment, data, pointers, dataSize, pointerCount);
         }
         public final Reader asReader() {
@@ -2747,7 +2747,7 @@ public final class DeviceResources {
       }
 
       public static final class Reader extends org.capnproto.StructReader {
-        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
           super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
         }
 
@@ -2789,7 +2789,7 @@ public final class DeviceResources {
       public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
         new org.capnproto.StructList.Factory<Builder, Reader>(factory);
       public static final class Builder extends org.capnproto.StructBuilder {
-        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
           super(segment, data, pointers, dataSize, pointerCount);
         }
         public Which which() {
@@ -2883,7 +2883,7 @@ public final class DeviceResources {
       }
 
       public static final class Reader extends org.capnproto.StructReader {
-        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
           super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
         }
 
@@ -2973,7 +2973,7 @@ public final class DeviceResources {
       public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
         new org.capnproto.StructList.Factory<Builder, Reader>(factory);
       public static final class Builder extends org.capnproto.StructBuilder {
-        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
           super(segment, data, pointers, dataSize, pointerCount);
         }
         public final Reader asReader() {
@@ -3001,7 +3001,7 @@ public final class DeviceResources {
       }
 
       public static final class Reader extends org.capnproto.StructReader {
-        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
           super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
         }
 
@@ -3043,7 +3043,7 @@ public final class DeviceResources {
       public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
         new org.capnproto.StructList.Factory<Builder, Reader>(factory);
       public static final class Builder extends org.capnproto.StructBuilder {
-        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
           super(segment, data, pointers, dataSize, pointerCount);
         }
         public final Reader asReader() {
@@ -3076,7 +3076,7 @@ public final class DeviceResources {
       }
 
       public static final class Reader extends org.capnproto.StructReader {
-        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
           super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
         }
 
@@ -3123,7 +3123,7 @@ public final class DeviceResources {
       public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
         new org.capnproto.StructList.Factory<Builder, Reader>(factory);
       public static final class Builder extends org.capnproto.StructBuilder {
-        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
           super(segment, data, pointers, dataSize, pointerCount);
         }
         public final Reader asReader() {
@@ -3146,7 +3146,7 @@ public final class DeviceResources {
       }
 
       public static final class Reader extends org.capnproto.StructReader {
-        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
           super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
         }
 
@@ -3185,7 +3185,7 @@ public final class DeviceResources {
       public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
         new org.capnproto.StructList.Factory<Builder, Reader>(factory);
       public static final class Builder extends org.capnproto.StructBuilder {
-        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
           super(segment, data, pointers, dataSize, pointerCount);
         }
         public Which which() {
@@ -3269,7 +3269,7 @@ public final class DeviceResources {
       }
 
       public static final class Reader extends org.capnproto.StructReader {
-        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
           super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
         }
 
@@ -3355,7 +3355,7 @@ public final class DeviceResources {
       public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
         new org.capnproto.StructList.Factory<Builder, Reader>(factory);
       public static final class Builder extends org.capnproto.StructBuilder {
-        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
           super(segment, data, pointers, dataSize, pointerCount);
         }
         public Which which() {
@@ -3426,7 +3426,7 @@ public final class DeviceResources {
       }
 
       public static final class Reader extends org.capnproto.StructReader {
-        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
           super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
         }
 
@@ -3503,7 +3503,7 @@ public final class DeviceResources {
       public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
         new org.capnproto.StructList.Factory<Builder, Reader>(factory);
       public static final class Builder extends org.capnproto.StructBuilder {
-        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
           super(segment, data, pointers, dataSize, pointerCount);
         }
         public final Reader asReader() {
@@ -3555,7 +3555,7 @@ public final class DeviceResources {
       }
 
       public static final class Reader extends org.capnproto.StructReader {
-        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
           super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
         }
 
@@ -3611,7 +3611,7 @@ public final class DeviceResources {
       public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
         new org.capnproto.StructList.Factory<Builder, Reader>(factory);
       public static final class Builder extends org.capnproto.StructBuilder {
-        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
           super(segment, data, pointers, dataSize, pointerCount);
         }
         public final Reader asReader() {
@@ -3634,7 +3634,7 @@ public final class DeviceResources {
       }
 
       public static final class Reader extends org.capnproto.StructReader {
-        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
           super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
         }
 
@@ -3673,7 +3673,7 @@ public final class DeviceResources {
       public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
         new org.capnproto.StructList.Factory<Builder, Reader>(factory);
       public static final class Builder extends org.capnproto.StructBuilder {
-        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
           super(segment, data, pointers, dataSize, pointerCount);
         }
         public final Reader asReader() {
@@ -3701,7 +3701,7 @@ public final class DeviceResources {
       }
 
       public static final class Reader extends org.capnproto.StructReader {
-        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
           super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
         }
 
@@ -3743,7 +3743,7 @@ public final class DeviceResources {
       public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
         new org.capnproto.StructList.Factory<Builder, Reader>(factory);
       public static final class Builder extends org.capnproto.StructBuilder {
-        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
           super(segment, data, pointers, dataSize, pointerCount);
         }
         public final Reader asReader() {
@@ -3776,7 +3776,7 @@ public final class DeviceResources {
       }
 
       public static final class Reader extends org.capnproto.StructReader {
-        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
           super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
         }
 
@@ -3821,7 +3821,7 @@ public final class DeviceResources {
       public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
         new org.capnproto.StructList.Factory<Builder, Reader>(factory);
       public static final class Builder extends org.capnproto.StructBuilder {
-        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
           super(segment, data, pointers, dataSize, pointerCount);
         }
         public final Reader asReader() {
@@ -3853,7 +3853,7 @@ public final class DeviceResources {
       }
 
       public static final class Reader extends org.capnproto.StructReader {
-        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
           super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
         }
 
@@ -3899,7 +3899,7 @@ public final class DeviceResources {
       public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
         new org.capnproto.StructList.Factory<Builder, Reader>(factory);
       public static final class Builder extends org.capnproto.StructBuilder {
-        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
           super(segment, data, pointers, dataSize, pointerCount);
         }
         public final Reader asReader() {
@@ -3932,7 +3932,7 @@ public final class DeviceResources {
       }
 
       public static final class Reader extends org.capnproto.StructReader {
-        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
           super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
         }
 
@@ -3977,7 +3977,7 @@ public final class DeviceResources {
       public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
         new org.capnproto.StructList.Factory<Builder, Reader>(factory);
       public static final class Builder extends org.capnproto.StructBuilder {
-        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
           super(segment, data, pointers, dataSize, pointerCount);
         }
         public final Reader asReader() {
@@ -4017,7 +4017,7 @@ public final class DeviceResources {
       }
 
       public static final class Reader extends org.capnproto.StructReader {
-        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
           super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
         }
 
@@ -4063,7 +4063,7 @@ public final class DeviceResources {
         public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
           new org.capnproto.StructList.Factory<Builder, Reader>(factory);
         public static final class Builder extends org.capnproto.StructBuilder {
-          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
             super(segment, data, pointers, dataSize, pointerCount);
           }
           public final Reader asReader() {
@@ -4097,7 +4097,7 @@ public final class DeviceResources {
         }
 
         public static final class Reader extends org.capnproto.StructReader {
-          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
             super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
           }
 
@@ -4137,7 +4137,7 @@ public final class DeviceResources {
           public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
             new org.capnproto.StructList.Factory<Builder, Reader>(factory);
           public static final class Builder extends org.capnproto.StructBuilder {
-            Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+            Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
               super(segment, data, pointers, dataSize, pointerCount);
             }
             public Which which() {
@@ -4178,7 +4178,7 @@ public final class DeviceResources {
           }
 
           public static final class Reader extends org.capnproto.StructReader {
-            Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+            Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
               super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
             }
 
@@ -4239,7 +4239,7 @@ public final class DeviceResources {
           public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
             new org.capnproto.StructList.Factory<Builder, Reader>(factory);
           public static final class Builder extends org.capnproto.StructBuilder {
-            Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+            Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
               super(segment, data, pointers, dataSize, pointerCount);
             }
             public Which which() {
@@ -4280,7 +4280,7 @@ public final class DeviceResources {
           }
 
           public static final class Reader extends org.capnproto.StructReader {
-            Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+            Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
               super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
             }
 
@@ -4344,7 +4344,7 @@ public final class DeviceResources {
         public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
           new org.capnproto.StructList.Factory<Builder, Reader>(factory);
         public static final class Builder extends org.capnproto.StructBuilder {
-          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
             super(segment, data, pointers, dataSize, pointerCount);
           }
           public final Reader asReader() {
@@ -4374,7 +4374,7 @@ public final class DeviceResources {
         }
 
         public static final class Reader extends org.capnproto.StructReader {
-          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
             super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
           }
 
@@ -4427,7 +4427,7 @@ public final class DeviceResources {
       public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
         new org.capnproto.StructList.Factory<Builder, Reader>(factory);
       public static final class Builder extends org.capnproto.StructBuilder {
-        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
           super(segment, data, pointers, dataSize, pointerCount);
         }
         public final Reader asReader() {
@@ -4542,7 +4542,7 @@ public final class DeviceResources {
       }
 
       public static final class Reader extends org.capnproto.StructReader {
-        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
           super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
         }
 
@@ -4631,7 +4631,7 @@ public final class DeviceResources {
         public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
           new org.capnproto.StructList.Factory<Builder, Reader>(factory);
         public static final class Builder extends org.capnproto.StructBuilder {
-          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
             super(segment, data, pointers, dataSize, pointerCount);
           }
           public final Reader asReader() {
@@ -4666,7 +4666,7 @@ public final class DeviceResources {
         }
 
         public static final class Reader extends org.capnproto.StructReader {
-          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
             super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
           }
 
@@ -4714,7 +4714,7 @@ public final class DeviceResources {
         public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
           new org.capnproto.StructList.Factory<Builder, Reader>(factory);
         public static final class Builder extends org.capnproto.StructBuilder {
-          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
             super(segment, data, pointers, dataSize, pointerCount);
           }
           public final Reader asReader() {
@@ -4756,7 +4756,7 @@ public final class DeviceResources {
         }
 
         public static final class Reader extends org.capnproto.StructReader {
-          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
             super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
           }
 
@@ -4808,7 +4808,7 @@ public final class DeviceResources {
         public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
           new org.capnproto.StructList.Factory<Builder, Reader>(factory);
         public static final class Builder extends org.capnproto.StructBuilder {
-          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
             super(segment, data, pointers, dataSize, pointerCount);
           }
           public final Reader asReader() {
@@ -4843,7 +4843,7 @@ public final class DeviceResources {
         }
 
         public static final class Reader extends org.capnproto.StructReader {
-          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
             super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
           }
 
@@ -4898,7 +4898,7 @@ public final class DeviceResources {
         public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
           new org.capnproto.StructList.Factory<Builder, Reader>(factory);
         public static final class Builder extends org.capnproto.StructBuilder {
-          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
             super(segment, data, pointers, dataSize, pointerCount);
           }
           public final Reader asReader() {
@@ -4926,7 +4926,7 @@ public final class DeviceResources {
         }
 
         public static final class Reader extends org.capnproto.StructReader {
-          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
             super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
           }
 
@@ -4970,7 +4970,7 @@ public final class DeviceResources {
         public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
           new org.capnproto.StructList.Factory<Builder, Reader>(factory);
         public static final class Builder extends org.capnproto.StructBuilder {
-          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
             super(segment, data, pointers, dataSize, pointerCount);
           }
           public final Reader asReader() {
@@ -4998,7 +4998,7 @@ public final class DeviceResources {
         }
 
         public static final class Reader extends org.capnproto.StructReader {
-          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
             super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
           }
 
@@ -5040,7 +5040,7 @@ public final class DeviceResources {
         public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
           new org.capnproto.StructList.Factory<Builder, Reader>(factory);
         public static final class Builder extends org.capnproto.StructBuilder {
-          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
             super(segment, data, pointers, dataSize, pointerCount);
           }
           public Which which() {
@@ -5081,7 +5081,7 @@ public final class DeviceResources {
         }
 
         public static final class Reader extends org.capnproto.StructReader {
-          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
             super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
           }
 
@@ -5142,7 +5142,7 @@ public final class DeviceResources {
         public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
           new org.capnproto.StructList.Factory<Builder, Reader>(factory);
         public static final class Builder extends org.capnproto.StructBuilder {
-          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
             super(segment, data, pointers, dataSize, pointerCount);
           }
           public Which which() {
@@ -5183,7 +5183,7 @@ public final class DeviceResources {
         }
 
         public static final class Reader extends org.capnproto.StructReader {
-          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
             super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
           }
 
@@ -5247,7 +5247,7 @@ public final class DeviceResources {
       public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
         new org.capnproto.StructList.Factory<Builder, Reader>(factory);
       public static final class Builder extends org.capnproto.StructBuilder {
-        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
           super(segment, data, pointers, dataSize, pointerCount);
         }
         public Which which() {
@@ -5291,7 +5291,7 @@ public final class DeviceResources {
       }
 
       public static final class Reader extends org.capnproto.StructReader {
-        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
           super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
         }
 
@@ -5355,7 +5355,7 @@ public final class DeviceResources {
       public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
         new org.capnproto.StructList.Factory<Builder, Reader>(factory);
       public static final class Builder extends org.capnproto.StructBuilder {
-        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
           super(segment, data, pointers, dataSize, pointerCount);
         }
         public final Reader asReader() {
@@ -5389,7 +5389,7 @@ public final class DeviceResources {
       }
 
       public static final class Reader extends org.capnproto.StructReader {
-        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
           super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
         }
 
@@ -5438,7 +5438,7 @@ public final class DeviceResources {
       public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
         new org.capnproto.StructList.Factory<Builder, Reader>(factory);
       public static final class Builder extends org.capnproto.StructBuilder {
-        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
           super(segment, data, pointers, dataSize, pointerCount);
         }
         public final Reader asReader() {
@@ -5466,7 +5466,7 @@ public final class DeviceResources {
       }
 
       public static final class Reader extends org.capnproto.StructReader {
-        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
           super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
         }
 
@@ -5508,7 +5508,7 @@ public final class DeviceResources {
       public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
         new org.capnproto.StructList.Factory<Builder, Reader>(factory);
       public static final class Builder extends org.capnproto.StructBuilder {
-        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
           super(segment, data, pointers, dataSize, pointerCount);
         }
         public final Reader asReader() {
@@ -5564,7 +5564,7 @@ public final class DeviceResources {
       }
 
       public static final class Reader extends org.capnproto.StructReader {
-        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
           super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
         }
 
@@ -5630,7 +5630,7 @@ public final class DeviceResources {
       public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
         new org.capnproto.StructList.Factory<Builder, Reader>(factory);
       public static final class Builder extends org.capnproto.StructBuilder {
-        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
           super(segment, data, pointers, dataSize, pointerCount);
         }
         public Which which() {
@@ -5682,7 +5682,7 @@ public final class DeviceResources {
       }
 
       public static final class Reader extends org.capnproto.StructReader {
-        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
           super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
         }
 
@@ -5765,7 +5765,7 @@ public final class DeviceResources {
       public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
         new org.capnproto.StructList.Factory<Builder, Reader>(factory);
       public static final class Builder extends org.capnproto.StructBuilder {
-        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
           super(segment, data, pointers, dataSize, pointerCount);
         }
         public final Reader asReader() {
@@ -5792,7 +5792,7 @@ public final class DeviceResources {
       }
 
       public static final class Reader extends org.capnproto.StructReader {
-        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
           super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
         }
 
@@ -5837,7 +5837,7 @@ public final class DeviceResources {
       public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
         new org.capnproto.StructList.Factory<Builder, Reader>(factory);
       public static final class Builder extends org.capnproto.StructBuilder {
-        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
           super(segment, data, pointers, dataSize, pointerCount);
         }
         public final Reader asReader() {
@@ -5891,7 +5891,7 @@ public final class DeviceResources {
       }
 
       public static final class Reader extends org.capnproto.StructReader {
-        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
           super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
         }
 
@@ -5957,7 +5957,7 @@ public final class DeviceResources {
       public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
         new org.capnproto.StructList.Factory<Builder, Reader>(factory);
       public static final class Builder extends org.capnproto.StructBuilder {
-        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
           super(segment, data, pointers, dataSize, pointerCount);
         }
         public final Reader asReader() {
@@ -5984,7 +5984,7 @@ public final class DeviceResources {
       }
 
       public static final class Reader extends org.capnproto.StructReader {
-        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
           super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
         }
 
@@ -6020,7 +6020,7 @@ public final class DeviceResources {
         public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
           new org.capnproto.StructList.Factory<Builder, Reader>(factory);
         public static final class Builder extends org.capnproto.StructBuilder {
-          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
             super(segment, data, pointers, dataSize, pointerCount);
           }
           public Which which() {
@@ -6064,7 +6064,7 @@ public final class DeviceResources {
         }
 
         public static final class Reader extends org.capnproto.StructReader {
-          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
             super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
           }
 
@@ -6128,7 +6128,7 @@ public final class DeviceResources {
         public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
           new org.capnproto.StructList.Factory<Builder, Reader>(factory);
         public static final class Builder extends org.capnproto.StructBuilder {
-          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
             super(segment, data, pointers, dataSize, pointerCount);
           }
           public Which which() {
@@ -6172,7 +6172,7 @@ public final class DeviceResources {
         }
 
         public static final class Reader extends org.capnproto.StructReader {
-          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
             super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
           }
 
@@ -6239,7 +6239,7 @@ public final class DeviceResources {
       public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
         new org.capnproto.StructList.Factory<Builder, Reader>(factory);
       public static final class Builder extends org.capnproto.StructBuilder {
-        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
           super(segment, data, pointers, dataSize, pointerCount);
         }
         public final Reader asReader() {
@@ -6275,7 +6275,7 @@ public final class DeviceResources {
       }
 
       public static final class Reader extends org.capnproto.StructReader {
-        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
           super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
         }
 
@@ -6315,7 +6315,7 @@ public final class DeviceResources {
         public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
           new org.capnproto.StructList.Factory<Builder, Reader>(factory);
         public static final class Builder extends org.capnproto.StructBuilder {
-          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
             super(segment, data, pointers, dataSize, pointerCount);
           }
           public Which which() {
@@ -6356,7 +6356,7 @@ public final class DeviceResources {
         }
 
         public static final class Reader extends org.capnproto.StructReader {
-          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
             super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
           }
 
@@ -6417,7 +6417,7 @@ public final class DeviceResources {
         public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
           new org.capnproto.StructList.Factory<Builder, Reader>(factory);
         public static final class Builder extends org.capnproto.StructBuilder {
-          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
             super(segment, data, pointers, dataSize, pointerCount);
           }
           public Which which() {
@@ -6458,7 +6458,7 @@ public final class DeviceResources {
         }
 
         public static final class Reader extends org.capnproto.StructReader {
-          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
             super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
           }
 
@@ -6519,7 +6519,7 @@ public final class DeviceResources {
         public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
           new org.capnproto.StructList.Factory<Builder, Reader>(factory);
         public static final class Builder extends org.capnproto.StructBuilder {
-          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
             super(segment, data, pointers, dataSize, pointerCount);
           }
           public Which which() {
@@ -6560,7 +6560,7 @@ public final class DeviceResources {
         }
 
         public static final class Reader extends org.capnproto.StructReader {
-          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
             super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
           }
 
@@ -6624,7 +6624,7 @@ public final class DeviceResources {
       public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
         new org.capnproto.StructList.Factory<Builder, Reader>(factory);
       public static final class Builder extends org.capnproto.StructBuilder {
-        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
           super(segment, data, pointers, dataSize, pointerCount);
         }
         public final Reader asReader() {
@@ -6669,7 +6669,7 @@ public final class DeviceResources {
       }
 
       public static final class Reader extends org.capnproto.StructReader {
-        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
           super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
         }
 
@@ -6718,7 +6718,7 @@ public final class DeviceResources {
         public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
           new org.capnproto.StructList.Factory<Builder, Reader>(factory);
         public static final class Builder extends org.capnproto.StructBuilder {
-          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
             super(segment, data, pointers, dataSize, pointerCount);
           }
           public final Reader asReader() {
@@ -6757,7 +6757,7 @@ public final class DeviceResources {
         }
 
         public static final class Reader extends org.capnproto.StructReader {
-          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
             super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
           }
 
@@ -6802,7 +6802,7 @@ public final class DeviceResources {
         public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
           new org.capnproto.StructList.Factory<Builder, Reader>(factory);
         public static final class Builder extends org.capnproto.StructBuilder {
-          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
             super(segment, data, pointers, dataSize, pointerCount);
           }
           public Which which() {
@@ -6909,7 +6909,7 @@ public final class DeviceResources {
         }
 
         public static final class Reader extends org.capnproto.StructReader {
-          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
             super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
           }
 
@@ -7000,7 +7000,7 @@ public final class DeviceResources {
         public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
           new org.capnproto.StructList.Factory<Builder, Reader>(factory);
         public static final class Builder extends org.capnproto.StructBuilder {
-          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
             super(segment, data, pointers, dataSize, pointerCount);
           }
           public final Reader asReader() {
@@ -7039,7 +7039,7 @@ public final class DeviceResources {
         }
 
         public static final class Reader extends org.capnproto.StructReader {
-          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
             super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
           }
 
@@ -7084,7 +7084,7 @@ public final class DeviceResources {
         public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
           new org.capnproto.StructList.Factory<Builder, Reader>(factory);
         public static final class Builder extends org.capnproto.StructBuilder {
-          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
             super(segment, data, pointers, dataSize, pointerCount);
           }
           public final Reader asReader() {
@@ -7135,7 +7135,7 @@ public final class DeviceResources {
         }
 
         public static final class Reader extends org.capnproto.StructReader {
-          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
             super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
           }
 
@@ -7187,7 +7187,7 @@ public final class DeviceResources {
         public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
           new org.capnproto.StructList.Factory<Builder, Reader>(factory);
         public static final class Builder extends org.capnproto.StructBuilder {
-          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
             super(segment, data, pointers, dataSize, pointerCount);
           }
           public final Reader asReader() {
@@ -7226,7 +7226,7 @@ public final class DeviceResources {
         }
 
         public static final class Reader extends org.capnproto.StructReader {
-          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
             super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
           }
 
@@ -7271,7 +7271,7 @@ public final class DeviceResources {
         public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
           new org.capnproto.StructList.Factory<Builder, Reader>(factory);
         public static final class Builder extends org.capnproto.StructBuilder {
-          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
             super(segment, data, pointers, dataSize, pointerCount);
           }
           public Which which() {
@@ -7340,7 +7340,7 @@ public final class DeviceResources {
         }
 
         public static final class Reader extends org.capnproto.StructReader {
-          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
             super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
           }
 
@@ -7413,7 +7413,7 @@ public final class DeviceResources {
         public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
           new org.capnproto.StructList.Factory<Builder, Reader>(factory);
         public static final class Builder extends org.capnproto.StructBuilder {
-          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
             super(segment, data, pointers, dataSize, pointerCount);
           }
           public Which which() {
@@ -7479,7 +7479,7 @@ public final class DeviceResources {
         }
 
         public static final class Reader extends org.capnproto.StructReader {
-          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
             super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
           }
 
@@ -7552,7 +7552,7 @@ public final class DeviceResources {
         public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
           new org.capnproto.StructList.Factory<Builder, Reader>(factory);
         public static final class Builder extends org.capnproto.StructBuilder {
-          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
             super(segment, data, pointers, dataSize, pointerCount);
           }
           public Which which() {
@@ -7620,7 +7620,7 @@ public final class DeviceResources {
         }
 
         public static final class Reader extends org.capnproto.StructReader {
-          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
             super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
           }
 
@@ -7695,7 +7695,7 @@ public final class DeviceResources {
         public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
           new org.capnproto.StructList.Factory<Builder, Reader>(factory);
         public static final class Builder extends org.capnproto.StructBuilder {
-          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
             super(segment, data, pointers, dataSize, pointerCount);
           }
           public Which which() {
@@ -7766,7 +7766,7 @@ public final class DeviceResources {
         }
 
         public static final class Reader extends org.capnproto.StructReader {
-          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
             super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
           }
 
@@ -7843,7 +7843,7 @@ public final class DeviceResources {
         public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
           new org.capnproto.StructList.Factory<Builder, Reader>(factory);
         public static final class Builder extends org.capnproto.StructBuilder {
-          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
             super(segment, data, pointers, dataSize, pointerCount);
           }
           public Which which() {
@@ -7910,7 +7910,7 @@ public final class DeviceResources {
         }
 
         public static final class Reader extends org.capnproto.StructReader {
-          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
             super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
           }
 
@@ -7984,7 +7984,7 @@ public final class DeviceResources {
       public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
         new org.capnproto.StructList.Factory<Builder, Reader>(factory);
       public static final class Builder extends org.capnproto.StructBuilder {
-        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
           super(segment, data, pointers, dataSize, pointerCount);
         }
         public final Reader asReader() {
@@ -8017,7 +8017,7 @@ public final class DeviceResources {
       }
 
       public static final class Reader extends org.capnproto.StructReader {
-        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
           super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
         }
 
@@ -8059,7 +8059,7 @@ public final class DeviceResources {
         public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
           new org.capnproto.StructList.Factory<Builder, Reader>(factory);
         public static final class Builder extends org.capnproto.StructBuilder {
-          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
             super(segment, data, pointers, dataSize, pointerCount);
           }
           public final Reader asReader() {
@@ -8104,7 +8104,7 @@ public final class DeviceResources {
         }
 
         public static final class Reader extends org.capnproto.StructReader {
-          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
             super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
           }
 
@@ -8150,7 +8150,7 @@ public final class DeviceResources {
           public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
             new org.capnproto.StructList.Factory<Builder, Reader>(factory);
           public static final class Builder extends org.capnproto.StructBuilder {
-            Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+            Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
               super(segment, data, pointers, dataSize, pointerCount);
             }
             public Which which() {
@@ -8200,7 +8200,7 @@ public final class DeviceResources {
           }
 
           public static final class Reader extends org.capnproto.StructReader {
-            Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+            Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
               super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
             }
 
@@ -8266,7 +8266,7 @@ public final class DeviceResources {
         public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
           new org.capnproto.StructList.Factory<Builder, Reader>(factory);
         public static final class Builder extends org.capnproto.StructBuilder {
-          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
             super(segment, data, pointers, dataSize, pointerCount);
           }
           public final Reader asReader() {
@@ -8331,7 +8331,7 @@ public final class DeviceResources {
         }
 
         public static final class Reader extends org.capnproto.StructReader {
-          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
             super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
           }
 
@@ -8391,7 +8391,7 @@ public final class DeviceResources {
         public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
           new org.capnproto.StructList.Factory<Builder, Reader>(factory);
         public static final class Builder extends org.capnproto.StructBuilder {
-          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
             super(segment, data, pointers, dataSize, pointerCount);
           }
           public final Reader asReader() {
@@ -8419,7 +8419,7 @@ public final class DeviceResources {
         }
 
         public static final class Reader extends org.capnproto.StructReader {
-          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
             super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
           }
 
@@ -8461,7 +8461,7 @@ public final class DeviceResources {
         public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
           new org.capnproto.StructList.Factory<Builder, Reader>(factory);
         public static final class Builder extends org.capnproto.StructBuilder {
-          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+          Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
             super(segment, data, pointers, dataSize, pointerCount);
           }
           public final Reader asReader() {
@@ -8497,7 +8497,7 @@ public final class DeviceResources {
         }
 
         public static final class Reader extends org.capnproto.StructReader {
-          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+          Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
             super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
           }
 
@@ -8557,7 +8557,7 @@ public final class DeviceResources {
       public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
         new org.capnproto.StructList.Factory<Builder, Reader>(factory);
       public static final class Builder extends org.capnproto.StructBuilder {
-        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
           super(segment, data, pointers, dataSize, pointerCount);
         }
         public final Reader asReader() {
@@ -8599,7 +8599,7 @@ public final class DeviceResources {
       }
 
       public static final class Reader extends org.capnproto.StructReader {
-        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
           super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
         }
 
@@ -8655,7 +8655,7 @@ public final class DeviceResources {
       public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
         new org.capnproto.StructList.Factory<Builder, Reader>(factory);
       public static final class Builder extends org.capnproto.StructBuilder {
-        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
           super(segment, data, pointers, dataSize, pointerCount);
         }
         public final Reader asReader() {
@@ -8683,7 +8683,7 @@ public final class DeviceResources {
       }
 
       public static final class Reader extends org.capnproto.StructReader {
-        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
           super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
         }
 
@@ -8725,7 +8725,7 @@ public final class DeviceResources {
       public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
         new org.capnproto.StructList.Factory<Builder, Reader>(factory);
       public static final class Builder extends org.capnproto.StructBuilder {
-        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+        Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount) {
           super(segment, data, pointers, dataSize, pointerCount);
         }
         public final Reader asReader() {
@@ -8746,7 +8746,7 @@ public final class DeviceResources {
       }
 
       public static final class Reader extends org.capnproto.StructReader {
-        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+        Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit) {
           super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
         }
 

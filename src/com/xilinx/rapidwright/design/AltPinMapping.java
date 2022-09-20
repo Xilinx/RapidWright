@@ -134,7 +134,7 @@ public class AltPinMapping {
         this.altCellType = altCellType;
     }
     
-    public AltPinMapping(){
+    public AltPinMapping() {
         
     }
     

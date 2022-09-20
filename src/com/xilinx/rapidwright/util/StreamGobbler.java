@@ -36,23 +36,23 @@ import java.io.InputStreamReader;
 public class StreamGobbler extends Thread{
     InputStream is;
     boolean verbose;
-    public StreamGobbler(InputStream is, boolean verbose){
+    public StreamGobbler(InputStream is, boolean verbose) {
         this.is = is;
         this.verbose = verbose;
     }
 
-    public void run(){
+    public void run() {
         try{
             InputStreamReader isr = new InputStreamReader(is);
             BufferedReader br = new BufferedReader(isr);
             String str = null;
-            while( (str = br.readLine()) != null){
-                if(verbose){
+            while( (str = br.readLine()) != null) {
+                if(verbose) {
                     System.out.println(str);
                 }
             }
         } 
-        catch (IOException ioe){
+        catch (IOException ioe) {
             ioe.printStackTrace();  
         }
     }

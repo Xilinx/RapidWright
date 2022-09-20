@@ -288,7 +288,7 @@ public class PseudoPIPHelper {
      * @param end The end site pin
      * @return The list of BELPins occupied when the pseudo PIP is in use for the site.
      */
-    private static List<BELPin> getPath(SitePin start, SitePin end){
+    private static List<BELPin> getPath(SitePin start, SitePin end) {
         BELPin startBELPin = start.getBELPin();
         BELPin endBELPin = end.getBELPin();
 
@@ -342,7 +342,7 @@ public class PseudoPIPHelper {
      * @param output The output BELPin of a BEL to find backwards arcs through.
      * @return The list of potential source BELPins traveling through a BEL for a pseudo PIP.
      */
-    private static List<BELPin> getRoutableInputs(BELPin output){
+    private static List<BELPin> getRoutableInputs(BELPin output) {
         List<BELPin> pins = new ArrayList<BELPin>();
         for(SitePIP pip : output.getSitePIPs()) {
             pins.add(pip.getInputPin());

@@ -61,7 +61,7 @@ public class WireConnectionLine extends QGraphicsLineItem{
      * @param wire The wire.
      */
     public WireConnectionLine(double x1, double y1, double x2, double y2, 
-            TileScene scene, Tile tile, int wire){
+            TileScene scene, Tile tile, int wire) {
         super(x1, y1, x2, y2);
         this.scene = scene;
         this.tile = tile;
@@ -70,18 +70,18 @@ public class WireConnectionLine extends QGraphicsLineItem{
     }
     
     @Override
-    public void hoverEnterEvent(QGraphicsSceneHoverEvent event){
+    public void hoverEnterEvent(QGraphicsSceneHoverEvent event) {
         this.setPen(highlighted);
     }
     
     @Override
-    public void hoverLeaveEvent(QGraphicsSceneHoverEvent event){
+    public void hoverLeaveEvent(QGraphicsSceneHoverEvent event) {
         this.setPen(unHighlighted);
     }
     
     @Override
-    public void mousePressEvent(QGraphicsSceneMouseEvent event){
-        if(scene.getClass().equals(DeviceBrowserScene.class)){
+    public void mousePressEvent(QGraphicsSceneMouseEvent event) {
+        if(scene.getClass().equals(DeviceBrowserScene.class)) {
             ((DeviceBrowserScene)scene).drawConnectingWires(tile, wire);            
         }
     }

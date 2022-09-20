@@ -132,12 +132,12 @@ class MoveCommand extends QUndoCommand {
         }
     }
     
-    private void undoDesign(){
+    private void undoDesign() {
         Device device = design.getDevice();
         for (int i = 0; i < myGhmList.size(); i++) {
             GUIModuleInst ghm = myGhmList.get(i);
             Site oldAnchorSite = prevAnchorSiteList.get(i);
-            if(oldAnchorSite == null){
+            if(oldAnchorSite == null) {
                 ghm.getModuleInst().unplace();
             }else{
                 ghm.getModuleInst().place(oldAnchorSite);
@@ -150,7 +150,7 @@ class MoveCommand extends QUndoCommand {
         for (int i = 0; i < myGhmList.size(); i++) {
             GUIModuleInst ghm = myGhmList.get(i);
             Site newAnchorSite = newAnchorSiteList.get(i);
-            if(newAnchorSite == null){
+            if(newAnchorSite == null) {
                 ghm.getModuleInst().unplace();
             }else{
                 ghm.getModuleInst().place(newAnchorSite);

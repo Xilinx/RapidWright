@@ -109,9 +109,9 @@ public class TimingManager {
      * @param illegalNets {@link NetWrapper} instances in question.
      * @param nodesDelays Stored nodes and their delay values.
      */
-    public void updateIllegalNetsDelays(Set<NetWrapper> illegalNets, Map<Node, Float> nodesDelays){
-         for(NetWrapper netWrapper:illegalNets){
-             for(Connection connection:netWrapper.getConnections()){
+    public void updateIllegalNetsDelays(Set<NetWrapper> illegalNets, Map<Node, Float> nodesDelays) {
+         for(NetWrapper netWrapper:illegalNets) {
+             for(Connection connection:netWrapper.getConnections()) {
                  float netDelay = 0;
                  if(connection.isDirect()) continue;
                  for(int i = connection.getNodes().size() - 2; i >= 0; i--) {
@@ -148,7 +148,7 @@ public class TimingManager {
     /**
      * Calculates and returns the maximum arrival time and the associated TimingVertex
      */
-    public Pair<Float, TimingVertex> calculateArrivalRequireTimes(){
+    public Pair<Float, TimingVertex> calculateArrivalRequireTimes() {
         Pair<Float, TimingVertex> maxs;
         
         this.timingGraph.resetRequiredAndArrivalTime();
@@ -171,7 +171,7 @@ public class TimingManager {
         }
     }
     
-    public void getCriticalPathInfo(Pair<Float, TimingVertex> maxDelayTimingVertex, boolean useRoutable, Map<Node, Routable> rnodesCreated){
+    public void getCriticalPathInfo(Pair<Float, TimingVertex> maxDelayTimingVertex, boolean useRoutable, Map<Node, Routable> rnodesCreated) {
         TimingVertex maxV = maxDelayTimingVertex.getSecond();
         float maxDelay = maxDelayTimingVertex.getFirst();
         System.out.printf(MessageGenerator.formatString("Timing requirement (ps):", timingRequirement));
@@ -216,7 +216,7 @@ public class TimingManager {
         if(rnodesCreated == null) return;
         if(!verbose) return;
         for(TimingEdge edge : criticalEdges) {
-            if(timingEdgeConnctionMap.containsKey(edge)){
+            if(timingEdgeConnctionMap.containsKey(edge)) {
                 System.out.println(timingEdgeConnctionMap.get(edge));
                 if(useRoutable) {
                     List<Routable> groups = timingEdgeConnctionMap.get(edge).getRnodes();
@@ -250,7 +250,7 @@ public class TimingManager {
                 "Netlist Resource(s)"
                 );
         System.out.printf("----------  --------------------------  ----------    ------------------------\n");
-        for(TimingEdge e : path){
+        for(TimingEdge e : path) {
             System.out.printf("%10d  %8d  %16d  %10d    %-25s\n",
                     (short) e.getLogicDelay(),
                     (short) e.getNetDelay(),
@@ -299,12 +299,12 @@ public class TimingManager {
      * @param criticalityExponent The criticality exponent to use. For more information, please refer to the {@link RWRouteConfig} class file.
      * @param maxDelay The maximum delay used to normalize the slack of a connection.
      */
-    public void calculateCriticality(List<Connection> connections, float maxCriticality, float criticalityExponent, float maxDelay){
-        for(Connection connection:connections){
+    public void calculateCriticality(List<Connection> connections, float maxCriticality, float criticalityExponent, float maxDelay) {
+        for(Connection connection:connections) {
             connection.resetCriticality();
         }
         float maxCriti = 0;
-        for(Connection connection : connections){
+        for(Connection connection : connections) {
             connection.calculateCriticality(maxDelay, maxCriticality, criticalityExponent);
             if(connection.getCriticality() > maxCriti)
                 maxCriti = connection.getCriticality();

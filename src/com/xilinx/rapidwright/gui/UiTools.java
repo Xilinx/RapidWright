@@ -30,7 +30,7 @@ import com.trolltech.qt.gui.QPrinter;
 import com.trolltech.qt.svg.QSvgGenerator;
 
 public class UiTools {
-    private UiTools(){
+    private UiTools() {
 
     }
 

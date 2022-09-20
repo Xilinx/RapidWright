@@ -65,13 +65,13 @@ public class HardMacro extends ModuleInst implements Comparable<Object> {
     /**
      * Updates the total number of tiles used in the hard macro.
      */
-    public void calculateTileSize(){
+    public void calculateTileSize() {
         HashSet<Tile> tileSet = new HashSet<Tile>(); 
-        for(SiteInst i : getSiteInsts()){
+        for(SiteInst i : getSiteInsts()) {
             tileSet.add(i.getTile());
         }
-        for(Net n : getNets()){
-            for(PIP p : n.getPIPs()){
+        for(Net n : getNets()) {
+            for(PIP p : n.getPIPs()) {
                 tileSet.add(p.getTile());
             }
         }
@@ -85,7 +85,7 @@ public class HardMacro extends ModuleInst implements Comparable<Object> {
         return getModule().getAllValidPlacements();
     }
     
-    public void unsetTempAnchorSite(){
+    public void unsetTempAnchorSite() {
         this.tempAnchorSite = null;
     }
     
@@ -125,20 +125,20 @@ public class HardMacro extends ModuleInst implements Comparable<Object> {
         return connectedPortWires;
     }
 
-    public void addConnectedPortWire(PortWire wire){
+    public void addConnectedPortWire(PortWire wire) {
         connectedPortWires.add(wire);
     }
     
-    public void addConnectedPath(Path path){
+    public void addConnectedPath(Path path) {
         connectedPaths.add(path);
     }
     
-    public HashSet<Path> getConnectedPaths(){
+    public HashSet<Path> getConnectedPaths() {
         return connectedPaths;
     }
 
     @Override
-    public int compareTo(Object other){
+    public int compareTo(Object other) {
         return ((HardMacro)other).getTileSize() - getTileSize();
     }
 
@@ -150,7 +150,7 @@ public class HardMacro extends ModuleInst implements Comparable<Object> {
         return super.getBoundingBox();
     }
 
-    public String toString(){
+    public String toString() {
         return getName();
     }
 

@@ -536,16 +536,16 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
         os.write(EXPORT_CONST_CELLTYPE);
         view.exportEDIFName(os, cache);
         os.write(EXPORT_CONST_VIEWTYPE);
-        for(EDIFPort port : EDIFTools.sortIfStable(getPorts(), stable)){
+        for(EDIFPort port : EDIFTools.sortIfStable(getPorts(), stable)) {
             port.exportEDIF(os, cache, stable);
         }
         os.write(EXPORT_CONST_INTERFACE_END); // Interface end
         if (hasContents()) {
             os.write(EXPORT_CONST_CONTENTS);
-            for(EDIFCellInst i : EDIFTools.sortIfStable(getCellInsts(), stable)){
+            for(EDIFCellInst i : EDIFTools.sortIfStable(getCellInsts(), stable)) {
                 i.exportEDIF(os, cache, stable);
             }
-            for(EDIFNet n : EDIFTools.sortIfStable(getNets(), stable)){
+            for(EDIFNet n : EDIFTools.sortIfStable(getNets(), stable)) {
                 n.exportEDIF(os, cache, stable);
             }
             os.write(EXPORT_CONST_CONTENTS_END); // Contents end

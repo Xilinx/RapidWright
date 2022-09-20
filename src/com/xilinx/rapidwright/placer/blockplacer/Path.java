@@ -58,32 +58,32 @@ public class Path extends AbstractPath<PathPort, HardMacro>{
         this.name = null;
     }
 
-    public int getLength(){
+    public int getLength() {
         return hpwl;
     }
 
-    public int getHPWL(){
+    public int getHPWL() {
         return hpwl;
     }
 
-    public ArrayList<Integer> getDelay(){
+    public ArrayList<Integer> getDelay() {
         return delay;
     }
 
-    public int getMaxDelay(){
+    public int getMaxDelay() {
         return maxDelay;
     }
 
 
-    public void setDelay(ArrayList<Integer> estimatedDelay){
+    public void setDelay(ArrayList<Integer> estimatedDelay) {
         delay = estimatedDelay;
     }
 
-    public void setMaxDelay(int pathMaxDelay){
+    public void setMaxDelay(int pathMaxDelay) {
         maxDelay = pathMaxDelay;
     }
 
-    public void calculateLength(){
+    public void calculateLength() {
         calculateHPWL();
     }
 
@@ -96,13 +96,13 @@ public class Path extends AbstractPath<PathPort, HardMacro>{
 
 
         int fanOutPenalty  = 1;
-        if (getSize() > 30){
+        if (getSize() > 30) {
             fanOutPenalty = 3;
         }
         hpwl = current.hpwl()*fanOutPenalty*weight;
     }
 
-    public void calculateHPWL(){
+    public void calculateHPWL() {
 
         current = new SimpleTileRectangle();
         for (PathPort port : ports) {
@@ -133,7 +133,7 @@ public class Path extends AbstractPath<PathPort, HardMacro>{
      * @param p The pin to add
      * @param map Map of module instance to hard macros
      */
-    public void addPin(SitePinInst p, Map<ModuleInst, HardMacro> map){
+    public void addPin(SitePinInst p, Map<ModuleInst, HardMacro> map) {
         final HardMacro block = map.get(p.getSiteInst().getModuleInst());
         Tile tile = p.getTile();
         if(block != null) {

@@ -61,7 +61,7 @@ public class ImplsPath extends AbstractPath<ImplsInstancePort, ModuleImplsInst>{
         return length;
     }
 
-    public void calculateLength(){
+    public void calculateLength() {
 
         current = new SimpleTileRectangle();
         for (ImplsInstancePort port : ports) {
@@ -74,7 +74,7 @@ public class ImplsPath extends AbstractPath<ImplsInstancePort, ModuleImplsInst>{
         }
 
         int fanOutPenalty = 1;
-        if (getSize() > 30){
+        if (getSize() > 30) {
             fanOutPenalty = 3;
         }
 

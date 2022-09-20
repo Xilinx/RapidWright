@@ -302,7 +302,7 @@ public class BinaryEDIFWriter {
      * @see BinaryEDIFReader#readBinaryEDIF(Path)
      */
     public static void writeBinaryEDIF(Path path, EDIFNetlist netlist) {
-        try (final OutputStream outputStream = Files.newOutputStream(path)){
+        try (final OutputStream outputStream = Files.newOutputStream(path)) {
             writeBinaryEDIF(outputStream, netlist);
         } catch (IOException e) {
             throw new RuntimeException(e);

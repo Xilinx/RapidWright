@@ -46,7 +46,7 @@ public class RapidStreamRoute extends PartialRouter{
      * Overrides to enable routing of conflict nets in the partial routing mode. 
      */
     @Override
-    protected void determineRoutingTargets(){
+    protected void determineRoutingTargets() {
         categorizeNets();
         if(config.isResolveConflictNets()) handleConflictNets();
     }

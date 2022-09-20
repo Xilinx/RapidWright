@@ -52,12 +52,12 @@ public class RapidWright {
     public static final String JUPYTER_JYTHON_KERNEL_NAME = "jython27";
     public static final String[] RAPIDWRIGHT_OPTIONS = new String[]{CREATE_JUPYTER_KERNEL, HELP_OPTION_NAME, UNPACK_OPTION_NAME};
     
-    private static String toWindowsPath(String linuxPath){
+    private static String toWindowsPath(String linuxPath) {
         linuxPath = linuxPath.startsWith("/") ? linuxPath.substring(1) : linuxPath;
         return linuxPath.replace("/", "\\\\");
     }
     
-    public static void createJupyterKernelFile(){
+    public static void createJupyterKernelFile() {
         try {
             FileTools.makeDirs(JUPYTER_JYTHON_KERNEL_NAME);
             File f = new File(JUPYTER_JYTHON_KERNEL_NAME + File.separator + JUPYTER_KERNEL_FILENAME);
@@ -76,22 +76,22 @@ public class RapidWright {
             boolean isWindows = FileTools.isWindows();
             String location = src.getLocation().getPath();
             location = isWindows ? toWindowsPath(location) : location;
-            if(location.toLowerCase().endsWith(".jar")){
+            if(location.toLowerCase().endsWith(".jar")) {
                 bw.write("          \""+location+"\",\n");
             }else{
                 bw.write("          \""+location+ "");
                 File binFolder = new File(location);
-                if(binFolder.isDirectory() && binFolder.getName().equals("bin")){
+                if(binFolder.isDirectory() && binFolder.getName().equals("bin")) {
                     location = binFolder.getParentFile().getAbsolutePath();
                 }
                 File jarDir = new File(location + File.separator + FileTools.JARS_FOLDER_NAME);
-                if(jarDir != null && jarDir.isDirectory()){
-                    for(String jar : jarDir.list()){
+                if(jarDir != null && jarDir.isDirectory()) {
+                    for(String jar : jarDir.list()) {
                         if(isWindows && jar.contains("-linux64-")) continue;
                         if(!isWindows && jar.contains("-win64-")) continue;
                         if(jar.contains("javadoc")) continue;
                         String jarPath = jarDir.getAbsolutePath() + File.separator;
-                        if(isWindows){
+                        if(isWindows) {
                             jarPath = jarPath.replace("\\", "\\\\");
                         }
                         bw.write(File.pathSeparator + jarPath + jar);
@@ -120,7 +120,7 @@ public class RapidWright {
     }
     
     public static void main(String[] args) {
-        if(args.length == 0){
+        if(args.length == 0) {
             // If no arguments, import all major rapidwright packages for ease of use
             @SuppressWarnings("rawtypes")
             Class[] primerClass = new Class[]{
@@ -183,17 +183,17 @@ public class RapidWright {
             args[0] = "-i";
             args[1] = "-c";
             StringBuilder importCmd = new StringBuilder();
-            for(@SuppressWarnings("rawtypes") Class c : primerClass){
+            for(@SuppressWarnings("rawtypes") Class c : primerClass) {
                 String pkg = c.getPackage().getName();
                 importCmd.append("from " + pkg + " import " + c.getSimpleName() + ";");
             }
             args[2] = importCmd.toString();
             System.err.println(Device.FRAMEWORK_NAME + " " + Device.RAPIDWRIGHT_VERSION + " (Jython "+PySystemState.version+")");
         } else {
-            for(String s : args){
-                if(s.equals(UNPACK_OPTION_NAME)){
+            for(String s : args) {
+                if(s.equals(UNPACK_OPTION_NAME)) {
                     boolean success = FileTools.unPackSupportingJarData();
-                    if(success){
+                    if(success) {
                         System.out.println("Successfully unpacked "
                             + " RapidWright jar data to "+FileTools.getExecJarStoragePath()+". "
                             + "To override, please set the environment variable RAPIDWRIGHT_PATH to"
@@ -205,12 +205,12 @@ public class RapidWright {
                             + "from RapidWright jar.");
                     }
                     
-                }else if(s.equals(CREATE_JUPYTER_KERNEL)){
+                }else if(s.equals(CREATE_JUPYTER_KERNEL)) {
                     createJupyterKernelFile();
                     return;
-                }else if(s.equals(HELP_OPTION_NAME)){
+                }else if(s.equals(HELP_OPTION_NAME)) {
                     System.out.println("*** RapidWright specific options: ***");
-                    for(String option : RAPIDWRIGHT_OPTIONS){
+                    for(String option : RAPIDWRIGHT_OPTIONS) {
                         System.out.println("\t" + option);
                     }
                     System.out.println("*** Jython --help output: ***");

@@ -36,7 +36,7 @@ public class ValidPlacementPolygon extends QGraphicsPolygonItem {
     
     private QPointF anchorOffset;
 
-    public ValidPlacementPolygon(QPolygonF polygon, QPointF anchorOffset){
+    public ValidPlacementPolygon(QPolygonF polygon, QPointF anchorOffset) {
         setPolygon(polygon);
         this.anchorOffset = anchorOffset;
     }

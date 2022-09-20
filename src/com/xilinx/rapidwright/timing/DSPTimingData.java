@@ -63,7 +63,7 @@ public class DSPTimingData{
     /** A flag to indicate if the input file of the DSP is valid */
     private boolean valid;
     
-    public DSPTimingData(String fullName, String dspTimingDataFolder){
+    public DSPTimingData(String fullName, String dspTimingDataFolder) {
         this.setBlockName(fullName);
         File dspTimingFile = new File(dspTimingDataFolder + fullName.replace("/", "-") + ".txt");
         if(dspTimingFile.exists()) {
@@ -110,7 +110,7 @@ public class DSPTimingData{
                 return;
             }
             
-            if (!line.startsWith("#")){// comment line starts with #            
+            if (!line.startsWith("#")) {// comment line starts with #            
                 //explicit implicit
                 // delay with clk: clk-out and in-clk 
                 if(line.contains("clk")) {

@@ -76,11 +76,11 @@ public class HMTile extends QGraphicsRectItem {
         return tile;
     }
     
-    public boolean containsSLICEM(){
+    public boolean containsSLICEM() {
         return containsSLICEM;
     }
     
-    public void setState(GUIShapeState newState){
+    public void setState(GUIShapeState newState) {
         
         switch (newState) {
             case VALID:

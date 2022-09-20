@@ -517,7 +517,7 @@ public class EnumerateCellBelMapping {
                     parameterSets.add(parameters);
                 }
             }else if(cellName.equals("DSP_PREADD_DATA58") || cellName.equals("DSP_SRCMX_OPTINV")) {
-                for(String mode : new String[] {"INT24", "INT8", "FP32", "CINT18"}){
+                for(String mode : new String[] {"INT24", "INT8", "FP32", "CINT18"}) {
                     List<String> parameters = new ArrayList<String>();
                     parameters.add("DSP_MODE=" + mode);
                     parameterSets.add(parameters);
@@ -525,7 +525,7 @@ public class EnumerateCellBelMapping {
             }else if(cellName.equals("IBUF") || cellName.equals("IBUFE3") || 
                      cellName.equals("IBUF_IBUFDISABLE") || cellName.equals("IOBUF") || 
                      cellName.equals("IOBUFE3") || cellName.equals("IOBUF_DCIEN")) {
-                for(String mode : new String[] {"LVCMOS15", "LVCMOS12", "LVDCI_15"}){
+                for(String mode : new String[] {"LVCMOS15", "LVCMOS12", "LVDCI_15"}) {
                     List<String> parameters = new ArrayList<String>();
                     parameters.add("IOSTANDARD=" + mode);
                     parameterSets.add(parameters);

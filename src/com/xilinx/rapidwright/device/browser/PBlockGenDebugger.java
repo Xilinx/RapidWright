@@ -76,11 +76,11 @@ public class PBlockGenDebugger extends DeviceBrowser {
     private class DebugPBGen extends Thread{
         PBlockGenerator pbgen; 
         
-        public DebugPBGen(PBlockGenerator pbgen){
+        public DebugPBGen(PBlockGenerator pbgen) {
             this.pbgen = pbgen;
         }
         
-        public void run(){
+        public void run() {
             PBlockGenerator.debug = true;
             
              
@@ -97,9 +97,9 @@ public class PBlockGenDebugger extends DeviceBrowser {
                     "-o", "1.5"
             };
             PBlockGenerator.main(pBlockArgs);
-            /*for(int x=0; x < 100; x++){
+            /*for(int x=0; x < 100; x++) {
                 pBlockArgs[5] = Integer.toString(x);
-                if(x==49){
+                if(x==49) {
                     System.out.println(Arrays.toString(pBlockArgs));
                     //PBlockGenerator.main(pBlockArgs);
                     PBlockGenerator.main(pBlockArgs);
@@ -112,17 +112,17 @@ public class PBlockGenDebugger extends DeviceBrowser {
         }
     }
     
-    public void debugPBlockGenerator(){
+    public void debugPBlockGenerator() {
         DebugPBGen d = new DebugPBGen(pbGen);
         d.start();
     }
     
-    public void highlightTile(Tile t){
+    public void highlightTile(Tile t) {
         ((PBlockGenScene)scene).highlightTile(t);
     }
     
     
-    public static void main(String[] args){
+    public static void main(String[] args) {
         QApplication.setGraphicsSystem("raster");
         QApplication.initialize(args);
         PBlockGenDebugger pbDebugger = new PBlockGenDebugger(null);

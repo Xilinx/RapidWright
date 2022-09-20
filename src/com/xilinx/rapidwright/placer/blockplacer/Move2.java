@@ -51,12 +51,12 @@ public class Move2<ModuleInstT extends AbstractModuleInst<?,?,?>, PlacementT, Pa
     private int deltaCost;
 
 
-    public Move2(BlockPlacer2<?, ModuleInstT, PlacementT, PathT> placer){
+    public Move2(BlockPlacer2<?, ModuleInstT, PlacementT, PathT> placer) {
 
         this.placer = placer;
     }
 
-    public void undoMove(){
+    public void undoMove() {
         for (int i = 0; i < placements.size(); i++) {
             placer.setTempAnchorSite(blocks.get(i), placements.get(i));
         }

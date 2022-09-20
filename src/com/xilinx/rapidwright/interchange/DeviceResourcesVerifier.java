@@ -642,7 +642,7 @@ public class DeviceResourcesVerifier {
             Direction dir = spReader.getDir();
             boolean isInput = site.isInputPin(pinName);
             boolean isOutput = site.isOutputPin(pinName);
-            if( (isInput != (dir == Direction.INPUT)) || (isOutput != (dir == Direction.OUTPUT)) ){
+            if( (isInput != (dir == Direction.INPUT)) || (isOutput != (dir == Direction.OUTPUT)) ) {
                 throw new RuntimeException("ERROR: Mismatch on site pin direction, site pin " + pinName + " for site " + site.getName());
             }
         }

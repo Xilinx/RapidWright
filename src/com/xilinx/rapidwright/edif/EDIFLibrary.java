@@ -54,11 +54,11 @@ public class EDIFLibrary extends EDIFName {
     
     private Map<String,EDIFCell> cells;
     
-    public EDIFLibrary(String name){
+    public EDIFLibrary(String name) {
         super(name);
     }
     
-    protected EDIFLibrary(){
+    protected EDIFLibrary() {
         
     }
     
@@ -68,10 +68,10 @@ public class EDIFLibrary extends EDIFName {
      * @param cell The cell to add to the library.
      * @return The cell that has been added.
      */
-    public EDIFCell addCell(EDIFCell cell){
+    public EDIFCell addCell(EDIFCell cell) {
         if(cells == null) cells = getNewMap(); 
         EDIFCell collision = cells.put(cell.getName(), cell);
-        if(collision != null && cell != collision){
+        if(collision != null && cell != collision) {
             throw new RuntimeException("ERROR: Failed to add cell " + 
                 cell.getName() + " to library " + getName()+". The library "
                 + "already contains a cell with the same name.");
@@ -127,7 +127,7 @@ public class EDIFLibrary extends EDIFName {
      * When the original name was already legal, it is the same.
      * @return The cell in the library by the given legal EDIF name, or null if none exists.
      */
-    public EDIFCell getCell(String name){
+    public EDIFCell getCell(String name) {
         return cells == null ? null : cells.get(name);
     }
     
@@ -157,7 +157,7 @@ public class EDIFLibrary extends EDIFName {
      * @param cell The cell to remove.
      * @return The removed cell.
      */
-    public EDIFCell removeCell(EDIFCell cell){
+    public EDIFCell removeCell(EDIFCell cell) {
         return removeCell(cell.getName());
     }
     
@@ -166,7 +166,7 @@ public class EDIFLibrary extends EDIFName {
      * @param name The name of the cell to remove
      * @return The removed cell, or null if it did not exist in the library.
      */
-    public EDIFCell removeCell(String name){
+    public EDIFCell removeCell(String name) {
         return cells == null ? null : cells.remove(name);
     }
     
@@ -176,7 +176,7 @@ public class EDIFLibrary extends EDIFName {
      * @param cell The cell in question.
      * @return True if the cell exists in the library, False otherwise.
      */
-    public boolean containsCell(EDIFCell cell){
+    public boolean containsCell(EDIFCell cell) {
         return containsCell(cell.getName());
     }
     
@@ -185,7 +185,7 @@ public class EDIFLibrary extends EDIFName {
      * @param name The name of the cell to query in the library.
      * @return True if a cell by such name was found in the library, False otherwise.
      */
-    public boolean containsCell(String name){
+    public boolean containsCell(String name) {
         return cells == null ? false : cells.containsKey(name);
     }
     
@@ -194,7 +194,7 @@ public class EDIFLibrary extends EDIFName {
      * are keyed by the legal EDIF name of the cell.
      * @return The map containing the cells for this library.
      */
-    public Map<String,EDIFCell> getCellMap(){
+    public Map<String,EDIFCell> getCellMap() {
         return cells == null ? Collections.emptyMap() : cells;
     }
     
@@ -204,11 +204,11 @@ public class EDIFLibrary extends EDIFName {
      * @return A newly created list of all cells that contains any instances
      * of cells not located within this library.
      */
-    public List<EDIFCell> getExternallyReferencedCells(){
+    public List<EDIFCell> getExternallyReferencedCells() {
         List<EDIFCell> list = new ArrayList<>();
-        for(EDIFCell c : getCells()){
-            for(EDIFCellInst i : c.getCellInsts()){
-                if(!containsCell(i.getCellType())){
+        for(EDIFCell c : getCells()) {
+            for(EDIFCellInst i : c.getCellInsts()) {
+                if(!containsCell(i.getCellType())) {
                     list.add(i.getCellType());
                 }
             }
@@ -222,9 +222,9 @@ public class EDIFLibrary extends EDIFName {
      * @return A collection of libraries that are referenced by 
      * cell instances found within cells of this library.
      */
-    public Collection<EDIFLibrary> getExternallyReferencedLibraries(){
+    public Collection<EDIFLibrary> getExternallyReferencedLibraries() {
         Set<EDIFLibrary> set = new HashSet<>();
-        for(EDIFCell c : getExternallyReferencedCells()){
+        for(EDIFCell c : getExternallyReferencedCells()) {
             set.add(c.getLibrary());
         }
         return set;
@@ -236,10 +236,10 @@ public class EDIFLibrary extends EDIFName {
      * address EDIF naming convention.
      * @param prefix The prefix to add to all cells
      */
-    public void uniqueifyCellsWithPrefix(String prefix){
+    public void uniqueifyCellsWithPrefix(String prefix) {
         ArrayList<EDIFCell> renamedCells = new ArrayList<>(getCells());
         cells.clear();
-        for(EDIFCell c : renamedCells){
+        for(EDIFCell c : renamedCells) {
             c.setName(prefix + c.getName());
             addCell(c);
         }
@@ -252,7 +252,7 @@ public class EDIFLibrary extends EDIFName {
      * @param stable makes sure that the list is always the same for the same input
      * @return The ordered list.
      */
-    public List<EDIFCell> getValidCellExportOrder(boolean stable){
+    public List<EDIFCell> getValidCellExportOrder(boolean stable) {
         List<EDIFCell> visited = new ArrayList<>();
         Iterable<EDIFCell> cells;
         if (stable) {
@@ -286,7 +286,7 @@ public class EDIFLibrary extends EDIFName {
         return getName().equals(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME);
     }
 
-    private void visit(EDIFCell cell, List<EDIFCell> visitedList, Set<EDIFCell> visitedSet, boolean stable){
+    private void visit(EDIFCell cell, List<EDIFCell> visitedList, Set<EDIFCell> visitedSet, boolean stable) {
         if (!visitedSet.add(cell)) {
             return;
         }
@@ -296,9 +296,9 @@ public class EDIFLibrary extends EDIFName {
         } else {
             cellInsts = cell.getCellInsts();
         }
-        for(EDIFCellInst i : cellInsts){
+        for(EDIFCellInst i : cellInsts) {
             EDIFCell childCell = i.getCellType();
-            if(childCell.getLibrary() == this){
+            if(childCell.getLibrary() == this) {
                 visit(childCell,visitedList,visitedSet, stable);
             }
         }

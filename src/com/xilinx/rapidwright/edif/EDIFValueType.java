@@ -39,7 +39,7 @@ public enum EDIFValueType {
     public static final EDIFValueType[] values = values();
     
     @Override
-    public String toString(){
+    public String toString() {
         return this.name().toLowerCase();
     }
 }

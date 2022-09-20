@@ -48,7 +48,7 @@ import com.xilinx.rapidwright.util.Pair;
 public class SourceToSinkINTTileDelayWriter {
     @SuppressWarnings("unchecked")
     public static void main(String[] args) {
-        if(args.length < 4){
+        if(args.length < 4) {
             System.out.println("BASIC USAGE:\n <input.dcp> --net <net name> <output file> --allSinkDelay\n");
             return;
         }

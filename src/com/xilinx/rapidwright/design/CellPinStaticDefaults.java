@@ -41,7 +41,7 @@ public class CellPinStaticDefaults {
     private static Map<Series, Map<Unisim, Map<String, NetType>>> cellPinDefaultsMap;
     
     @SuppressWarnings("unchecked")
-    public static synchronized Map<Series, Map<Unisim, Map<String, NetType>>> getCellPinDefaultsMap(){
+    public static synchronized Map<Series, Map<Unisim, Map<String, NetType>>> getCellPinDefaultsMap() {
         if(cellPinDefaultsMap == null) {
             InputStream is = FileTools.getRapidWrightResourceInputStream(
                     FileTools.CELL_PIN_DEFAULTS_FILE_NAME);

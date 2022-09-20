@@ -39,10 +39,10 @@ import com.xilinx.rapidwright.device.Wire;
  */
 public class BrowseDevice{
 
-    public static void run(Device dev){
+    public static void run(Device dev) {
         BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
         Tile t = null;
-        while(true){
+        while(true) {
             System.out.println("Commands: ");
             System.out.println(" 1: Get wire connections in tile");
             System.out.println(" 2: Check if wire is a PIP wire");
@@ -53,7 +53,7 @@ public class BrowseDevice{
             System.out.println(" 7: Exit");
             try {
                 Integer cmd = Integer.parseInt(br.readLine().trim());
-                switch(cmd){
+                switch(cmd) {
                     case 1:
                         System.out.println("Enter tile name: ");
                         t = dev.getTile(br.readLine().trim());
@@ -62,7 +62,7 @@ public class BrowseDevice{
                         System.out.println("Enter wire name: ");
                         String wire = br.readLine().trim();
                         List<Wire> wires = t.getWireConnections(t.getWireIndex(wire));
-                        for(Wire w : wires){
+                        for(Wire w : wires) {
                             System.out.println("  " + w.toString());
                         }
                         break;
@@ -74,7 +74,7 @@ public class BrowseDevice{
                         break;
                     case 3:
                         System.out.println("PIPRouteThroughs");
-                        /*for(WireConnection w : dev.getRouteThroughMap().keySet()){
+                        /*for(WireConnection w : dev.getRouteThroughMap().keySet()) {
                             System.out.println("  " + w.toString(we) + " " + dev.getRouteThroughMap().get(w).toString(we));
                         }*/
                         break;
@@ -86,8 +86,8 @@ public class BrowseDevice{
                         System.out.println("Enter start wire name: ");
                         String startWire = br.readLine().trim();
                         
-                        while(true){
-                            if(t.getWireConnections(t.getWireIndex(startWire)) == null){
+                        while(true) {
+                            if(t.getWireConnections(t.getWireIndex(startWire)) == null) {
                                 System.out.println("This wire has no connections, it may be a sink");
                                 break;
                             }
@@ -95,11 +95,11 @@ public class BrowseDevice{
                             System.out.println(t.getName() + " " + startWire + ":");
                             for (int i = 0; i < wireConnections.size(); i++) {
                                 System.out.println("  " + i + ". " + wireConnections.get(i).getTile() +" " + t.getWireName(wireConnections.get(i).getWireIndex()) + " ("+wireConnections.get(i).getIntentCode()+")");
-                                if(true){
+                                if(true) {
                                     // print next hop
                                     Tile tmpTile = wireConnections.get(i).getTile();
                                     String tmpWire = tmpTile.getWireName(wireConnections.get(i).getWireIndex());
-                                    for(Wire w : tmpTile.getWireConnections(t.getWireIndex(tmpWire))){
+                                    for(Wire w : tmpTile.getWireConnections(t.getWireIndex(tmpWire))) {
                                         System.out.println("     ->  " + w.getTile() +" " + w.getWireName() + " ("+w.getIntentCode()+")");
                                     }
                                 }
@@ -111,7 +111,7 @@ public class BrowseDevice{
                                 t = wireConnections.get(ndx).getTile();
                                 startWire = t.getWireName(wireConnections.get(ndx).getWireIndex());
                             }
-                            catch(Exception e){
+                            catch(Exception e) {
                                 System.out.println("Did not understand, try again.");
                                 continue;
                             }
@@ -123,11 +123,11 @@ public class BrowseDevice{
                         t = dev.getTile(br.readLine().trim());
                         System.out.println("Choosen Tile: " + t.getName());
 
-                        if(t.getSites().length == 0){
+                        if(t.getSites().length == 0) {
                             System.out.println(t.getName() + " has no primitive sites.");
                         }
                         else{
-                            for(Site p : t.getSites()){
+                            for(Site p : t.getSites()) {
                                 System.out.println("  " + p.getName());
                             }
                         }
@@ -137,7 +137,7 @@ public class BrowseDevice{
                         System.out.println("Enter tile name: ");
                         String siteName = br.readLine().trim();
                         Site site = dev.getSite(siteName);
-                        if(site == null){
+                        if(site == null) {
                             System.out.println("No primitive site called \"" + siteName +  "\" exists.");
                         }
                         else {
@@ -153,9 +153,9 @@ public class BrowseDevice{
             }
         }
     }
-    public static void main(String[] args){
+    public static void main(String[] args) {
         MessageGenerator.printHeader(" RapidWright Device Browser");        
-        if(args.length != 1){
+        if(args.length != 1) {
             System.out.println("USAGE: <device part name, ex: xc4vfx12ff668 >");
             return;
         }

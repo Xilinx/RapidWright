@@ -66,7 +66,7 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
     private ArrayList<Integer> occupiedTilesY;
     private ArrayList<GUIMultiNetLine> myLines;
 
-    public GUIModuleInst(ModuleInst modInst, TileScene scene, boolean movable){
+    public GUIModuleInst(ModuleInst modInst, TileScene scene, boolean movable) {
         this.moduleInst = modInst;
         this.scene = scene;
         this.hmTiles = new ArrayList<HMTile>();
@@ -115,7 +115,7 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
 
         for (SiteInst inst : instances) {
             Tile tile = inst.getTile();
-            if(inst.getSiteTypeEnum().equals(SiteTypeEnum.SLICEM)){
+            if(inst.getSiteTypeEnum().equals(SiteTypeEnum.SLICEM)) {
                 tilesWithSLICEM.add(tile);
             }
             if (!occupiedTiles.contains(tile)) {
@@ -223,8 +223,8 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
                         break;
                     }
                 }
-                for (int j = leftJ + 1; j < rightJ; j++){
-                    if(!hmTileMap[i][j]){
+                for (int j = leftJ + 1; j < rightJ; j++) {
+                    if(!hmTileMap[i][j]) {
                         hmTileMap[i][j] = true;
                         changed = true;
                     }
@@ -251,7 +251,7 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
                     }
                 }
                 for (int i = topI + 1; i < bottomI; i++)
-                    if(!hmTileMap[i][j]){
+                    if(!hmTileMap[i][j]) {
                         hmTileMap[i][j] = true;
                         changed = true;
                     }
@@ -313,7 +313,7 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
     
         HashSet<GUIModuleInst> prevCollidingGMIs = new HashSet<GUIModuleInst>();
         HashSet<GUIModuleInst> newCollidingGMIs = new HashSet<GUIModuleInst>();
-        for(int i=0; i<occupiedTilesX.size(); i++){
+        for(int i=0; i<occupiedTilesX.size(); i++) {
             HashSet<GUIModuleInst> prevGMISet = scene.tileOccupantCount[occupiedTilesY.get(i)][occupiedTilesX.get(i)];
             prevGMISet.remove(this);
             prevCollidingGMIs.addAll(prevGMISet);
@@ -340,7 +340,7 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
                     / scene.tileSize);
             int y = (int) Math.floor(hmTile.scenePos().y()
                     / scene.tileSize);
-            if (x >= scene.cols || y >= scene.rows || x < 0 || y < 0){
+            if (x >= scene.cols || y >= scene.rows || x < 0 || y < 0) {
                 System.out.println("ERROR - Moved out of bounds:"+this.moduleInst.getName());
                 break;
             }
@@ -362,8 +362,8 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
             
             TileTypeEnum devType = scene.drawnTiles[y][x].getTileTypeEnum();
             if (myType.equals(devType) 
-                    || Utils.isInterConnect(myType) && Utils.isInterConnect(devType)){
-                if(tileColliding){
+                    || Utils.isInterConnect(myType) && Utils.isInterConnect(devType)) {
+                if(tileColliding) {
                     hmTile.setState(GUIShapeState.COLLIDING);
                     isColliding = true;
                 }else{
@@ -375,14 +375,14 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
             }
         }
 
-        if (isValidAnchor){
+        if (isValidAnchor) {
             //Workaround for relocation issues in this code
             isPlacementValid = true;
         }
         isValidlyPlaced = isPlacementValid ;
 
         if (isPlacementValid) {
-            if(isColliding){
+            if(isColliding) {
                 this.setState(GUIShapeState.COLLIDING);
             }else{
                 this.setState(GUIShapeState.VALID);    
@@ -396,24 +396,24 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
         //This is here to prevent infinite recursion.  It makes sure
         // that checkPlacement is only called on the colliding GMIs iff
         // this function was called by something other than itself
-        if(!aParentStack.getMethodName().equals("checkPlacement")){
-            for(GUIModuleInst gmi : prevCollidingGMIs){
+        if(!aParentStack.getMethodName().equals("checkPlacement")) {
+            for(GUIModuleInst gmi : prevCollidingGMIs) {
                 gmi.checkPlacement();
             }
-            for(GUIModuleInst gmi : newCollidingGMIs){
+            for(GUIModuleInst gmi : newCollidingGMIs) {
                 gmi.checkPlacement();
             }
         }
 
     }
-    public void showGuts(){
+    public void showGuts() {
         for (HMTile hmTile : this.hmTiles) {
             hmTile.show();
         }
         this.setBrush(new QBrush(QColor.transparent));
         checkPlacement();
     }
-    public void hideGuts(){
+    public void hideGuts() {
         for (HMTile hmTile : this.hmTiles) {
             hmTile.hide();
         }
@@ -542,21 +542,21 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
         return anchorOffset;
     }
     
-    public HMTile getHMTile(Tile tile){
+    public HMTile getHMTile(Tile tile) {
         if(tile == null)
             return null;
-        for(HMTile hmTile : hmTiles){
+        for(HMTile hmTile : hmTiles) {
             if(hmTile.getTile().equals(tile))
                 return hmTile;
         }
         return null;
     }
     
-    public int getSizeInTiles(){
+    public int getSizeInTiles() {
         return hmTiles.size();
     }
     
-    public void setState(GUIShapeState newState){
+    public void setState(GUIShapeState newState) {
         switch (newState) {
             case VALID:
                 this.setPen(new QPen(HMTile.GREEN));
@@ -598,24 +598,24 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
         this.shape = shape;
     }
     
-    public void addLine(GUIMultiNetLine line){
-        if(myLines == null){
+    public void addLine(GUIMultiNetLine line) {
+        if(myLines == null) {
             myLines = new ArrayList<GUIMultiNetLine>();
         }
         myLines.add(line);
     }
     
-    public void showMyLines(){
-        if(myLines != null){
-            for(GUIMultiNetLine line : myLines){
+    public void showMyLines() {
+        if(myLines != null) {
+            for(GUIMultiNetLine line : myLines) {
                 line.show();
             }
         }
     }
     
-    public void hideMyLines(){
-        if(myLines != null){
-            for(GUIMultiNetLine line : myLines){
+    public void hideMyLines() {
+        if(myLines != null) {
+            for(GUIMultiNetLine line : myLines) {
                 line.hide();
             }
         }

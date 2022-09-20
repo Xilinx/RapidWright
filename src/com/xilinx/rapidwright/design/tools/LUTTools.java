@@ -105,7 +105,7 @@ public class LUTTools {
      * @param c The cell in question
      * @return True if this is a LUT[1-6], false otherwise.
      */
-    public static boolean isCellALUT(Cell c){
+    public static boolean isCellALUT(Cell c) {
         return isCellALUT(c.getEDIFCellInst());
     }
     
@@ -114,7 +114,7 @@ public class LUTTools {
      * @param i The cell in question
      * @return True if this is a LUT[1-6], false otherwise.
      */
-    public static boolean isCellALUT(EDIFCellInst i){
+    public static boolean isCellALUT(EDIFCellInst i) {
         if(i == null) return false;
         EDIFCell ec = i.getCellType();
         if(ec == null) return false;
@@ -130,7 +130,7 @@ public class LUTTools {
      * @param c The LUT cell
      * @return The number of LUT inputs or 0 if cell is not a LUT.
      */
-    public static int getLUTSize(Cell c){
+    public static int getLUTSize(Cell c) {
         return getLUTSize(c.getEDIFCellInst());
     }
     
@@ -140,7 +140,7 @@ public class LUTTools {
      * @param c The LUT cell
      * @return The number of LUT inputs or 0 if cell is not a LUT.
      */
-    public static int getLUTSize(EDIFCellInst c){
+    public static int getLUTSize(EDIFCellInst c) {
         if(!isCellALUT(c)) return 0;
         return Character.getNumericValue(c.getCellType().getName().charAt(3));
     }
@@ -150,7 +150,7 @@ public class LUTTools {
      * @param init The init string.
      * @return The init length.
      */
-    public static int initLength(String init){
+    public static int initLength(String init) {
         int idx = init.indexOf('\'');
         if(idx == -1) throw new RuntimeException("ERROR: Bad " + LUT_INIT +
                                 " String \"" + init +"\", missing \'");
@@ -163,10 +163,10 @@ public class LUTTools {
      * @param init The LUT's init string.
      * @return Size of the LUT by number of inputs (1-6).
      */
-    public static int getLUTSize(String init){
+    public static int getLUTSize(String init) {
         int lutSize = 0;
         int initLength = initLength(init);
-        switch (initLength){
+        switch (initLength) {
         case 2:
             lutSize = 1;
             break;
@@ -196,7 +196,7 @@ public class LUTTools {
      * cell is not a LUT, it prints nothing.
      * @param c The Cell in question.
      */
-    public static void printTruthTable(Cell c){
+    public static void printTruthTable(Cell c) {
         printTruthTable(c.getEDIFCellInst());
     }
 
@@ -205,19 +205,19 @@ public class LUTTools {
      * cell is not a LUT, it prints nothing.
      * @param c The cell instance in question.
      */
-    public static void printTruthTable(EDIFCellInst c){
+    public static void printTruthTable(EDIFCellInst c) {
         if(!isCellALUT(c)) return;
         String init = c.getProperty(LUT_INIT).getValue();
         int lutSize = getLUTSize(init);
         int initLength = initLength(init);
         long initValue = getInitValue(init);
         
-        for(int i=lutSize-1; i >= 0; i--){
+        for(int i=lutSize-1; i >= 0; i--) {
             System.out.print("I" + i + " ");
         }
         System.out.println("| " + getLUTEquation(init));
-        for(int i=0; i < initLength; i++){
-            for(int j=lutSize-1; j >= 0; j--){
+        for(int i=0; i < initLength; i++) {
+            for(int j=lutSize-1; j >= 0; j--) {
                 System.out.print(" " + getBit(i,j) + " ");
             }
             System.out.println("| " + getBit(initValue,i));
@@ -230,7 +230,7 @@ public class LUTTools {
      * @param init The LUT INIT string.
      * @return
      */
-    public static long getInitValue(String init){
+    public static long getInitValue(String init) {
         int idx = init.indexOf('\'');
         if(idx == -1) throw new RuntimeException("ERROR: Bad " + LUT_INIT +
                                 " String \"" + init +"\", missing \'");
@@ -244,15 +244,15 @@ public class LUTTools {
                     LUT_INIT + " string \'" + init + "'");
     }
     
-    protected static long setBit(long value, int bitIndex){
+    protected static long setBit(long value, int bitIndex) {
         return value | (1L << bitIndex);
     }
     
-    protected static int getBit(int value, int bitIndex){
+    protected static int getBit(int value, int bitIndex) {
         return (value >> bitIndex) & 0x1;
     }
     
-    protected static int getBit(long value, int bitIndex){
+    protected static int getBit(long value, int bitIndex) {
         return (int)(value >> bitIndex) & 0x1;
     }
     
@@ -284,11 +284,11 @@ public class LUTTools {
      * @param lutSize LUT size (input count), supported sizes are: 1,2,3,4,5,6 
      * @return The INIT string to program the LUT of the provided size
      */
-    public static String getLUTInitFromEquation(String equation, int lutSize){
+    public static String getLUTInitFromEquation(String equation, int lutSize) {
         int length = 1 << lutSize;
         long init = 0;
         LUTEquationEvaluator b = new LUTEquationEvaluator(equation);
-        for(int i=0; i < length; i++){
+        for(int i=0; i < length; i++) {
             boolean result = b.eval(i);
             if(result) init = setBit(init,i);
         }
@@ -301,7 +301,7 @@ public class LUTTools {
      * @param equation The desired programming of the LUT using Vivado LUT equation syntax.
      * @return The previous LUT init string or null if none.
      */
-    public static EDIFPropertyValue configureLUT(Cell c, String equation){
+    public static EDIFPropertyValue configureLUT(Cell c, String equation) {
         int size = getLUTSize(c);
         if(size == 0) throw new RuntimeException("ERROR: Cell " + c.getName() + " is not a LUT");
         String init = getLUTInitFromEquation(equation, size);
@@ -314,7 +314,7 @@ public class LUTTools {
      * @param equation The desired programming of the LUT using Vivado LUT equation syntax.
      * @return The previous LUT init string or null if none.
      */
-    public static EDIFPropertyValue configureLUT(EDIFCellInst c, String equation){
+    public static EDIFPropertyValue configureLUT(EDIFCellInst c, String equation) {
         int size = getLUTSize(c);
         if(size == 0) throw new RuntimeException("ERROR: Cell " + c.getName() + " is not a LUT");
         String init = getLUTInitFromEquation(equation, size);
@@ -326,7 +326,7 @@ public class LUTTools {
      * @param c The LUT instance 
      * @return The equation following LUT equation syntax or null if cell is not configured.
      */
-    public static String getLUTEquation(Cell c){
+    public static String getLUTEquation(Cell c) {
         return getLUTEquation(c.getEDIFCellInst());
     }
     
@@ -335,7 +335,7 @@ public class LUTTools {
      * @param i The LUT instance 
      * @return The equation following LUT equation syntax or null if cell is not configured.
      */
-    public static String getLUTEquation(EDIFCellInst i){
+    public static String getLUTEquation(EDIFCellInst i) {
         String init = i.getProperty(LUT_INIT).getValue();
         if(init == null) return null;
         return getLUTEquation(init);
@@ -349,16 +349,16 @@ public class LUTTools {
      * @param init The existing INIT string configuring a LUT.
      * @return A Vivado LUT Equation Editor compatible equation. 
      */
-    public static String getLUTEquation(String init){
+    public static String getLUTEquation(String init) {
         long value = getInitValue(init);
         int length = initLength(init);
         int lutSize = getLUTSize(init);
         StringBuilder sb = new StringBuilder("O=");
         int termCount = 0;
-        for(int i=0; i < length; i++){
-            if(getBit(value,i) == 1){
+        for(int i=0; i < length; i++) {
+            if(getBit(value,i) == 1) {
                 if(termCount > 0) sb.append(" + ");
-                for(int j=lutSize-1; j >= 0; j--){
+                for(int j=lutSize-1; j >= 0; j--) {
                     sb.append(getBit(i,j) == 1 ? "" : "!");
                     sb.append("I" + j);
                     if(j > 0) sb.append(" & ");
@@ -376,7 +376,7 @@ public class LUTTools {
     
     static{
         tests = new ArrayList<>();
-        for(int i=0; i < MAX_LUT_SIZE; i++){
+        for(int i=0; i < MAX_LUT_SIZE; i++) {
             int lutSize = i+1;
             tests.add(new LinkedHashMap<>());
             Map<String,String> test = tests.get(i);
@@ -385,14 +385,14 @@ public class LUTTools {
             long initValue = lutInitLength == 64 ? -1L : (1L << (lutInitLength))-1; 
             test.put("O=1", lutInitLength + "'h" + Long.toUnsignedString(initValue,16).toUpperCase());
             
-            if(lutSize > 1){
+            if(lutSize > 1) {
                 char[] repeatTemplate = new char[(int) (lutInitLength >> 2)]; 
                 test.put("O=I0 "+LUTEquationEvaluator.XOR+ " I1", lutInitLength + "'h" + new String(repeatTemplate).replace("\0", "6"));
                 test.put("O=I0 "+LUTEquationEvaluator.XOR2+" I1", lutInitLength + "'h" + new String(repeatTemplate).replace("\0", "6"));
             }
             if(lutSize == 3)
                 test.put("O=!I2 & I1 & !I0 + !I2 & I1 & I0 + I2 & !I1 & I0 + I2 & I1 & I0", "8'hAC");
-            if(lutSize == 6){
+            if(lutSize == 6) {
                 test.put("O=!I0 + ~I1 * (I2 ^ (I3 & I4 . I5))","64'h5775757575757575");
                 test.put("O=I0 & I1 & !I3 & !I4 + !I1 & I2 & !I3 & !I4 + I3 & I5 + !I3 & I4 & I5","64'hFFFFFFB8000000B8");
                 test.put("O=!(I0 + ~I1) @ (I2 ^ I3) + (I4 . I5)","64'hFFFF4BB44BB44BB4");
@@ -408,25 +408,25 @@ public class LUTTools {
     public static void main(String[] args) {
         Design d = new Design("test_design",Device.PYNQ_Z1);
         
-        for(int k=1; k <= 6; k++){
+        for(int k=1; k <= 6; k++) {
             String name = "fred_" + k;
             Cell c = d.createCell(name, Design.getUnisimCell(Unisim.valueOf("LUT" + k)));
             EDIFCellInst i = c.getEDIFCellInst();
             System.out.println("==== LUT" + k + " TESTS ====");
             Map<String,String> lutTests = tests.get(k-1);
-            for(Entry<String,String> e : lutTests.entrySet()){
+            for(Entry<String,String> e : lutTests.entrySet()) {
                 String equation = e.getKey();
                 String init = e.getValue();
                 i.addProperty(LUT_INIT, init);
                 String altInit = getLUTInitFromEquation(equation, k);
                 System.out.println((init.equals(altInit) ? "PASS" : "FAIL") + "ED:" + init);
-                if(!init.equals(altInit)){
+                if(!init.equals(altInit)) {
                     System.out.println("  FAILED INIT: " + altInit);
                 }
                 String altEq = getLUTEquation(init);
                 altInit = getLUTInitFromEquation(altEq, k);
                 System.out.println((init.equals(altInit) ? "PASS" : "FAIL") + "ED:" + altEq);
-                if(!init.equals(altInit)){
+                if(!init.equals(altInit)) {
                     System.out.println("  FAILED INIT: " + altInit);
                 }
             }

@@ -55,11 +55,11 @@ public enum UtilizationType {
     
     public static final UtilizationType[] values = values();
     
-    private UtilizationType(String name){
+    private UtilizationType(String name) {
         this.name = name;
     }
     
-    public String getString(){
+    public String getString() {
         return name;
     }
 

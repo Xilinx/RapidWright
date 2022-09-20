@@ -79,7 +79,7 @@ public class RouteThruHelper {
         }
     }
     
-    private void readFile(){
+    private void readFile() {
         routeThrus = new HashMap<TileTypeEnum, HashSet<Integer>>();
         try (Input in = FileTools.getKryoInputStream(getSerializedFileName(device))) {
             int count = in.readInt();

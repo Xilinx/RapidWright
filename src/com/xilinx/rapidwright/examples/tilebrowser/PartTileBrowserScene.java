@@ -159,7 +159,7 @@ public class PartTileBrowserScene extends QGraphicsScene {
         
     }
     
-    public void drawBackground(QPainter painter, QRectF rect){
+    public void drawBackground(QPainter painter, QRectF rect) {
         super.drawBackground(painter, rect);
         painter.drawImage(0, 0, qImage);
     }

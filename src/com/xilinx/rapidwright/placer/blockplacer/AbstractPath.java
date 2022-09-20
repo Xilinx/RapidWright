@@ -52,7 +52,7 @@ public abstract class AbstractPath<PortT, ModuleInstT extends AbstractModuleInst
 
     public abstract int getLength();
 
-    public int getSize(){
+    public int getSize() {
         return ports.size();
     }
 

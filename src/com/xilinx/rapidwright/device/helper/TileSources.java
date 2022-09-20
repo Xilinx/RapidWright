@@ -37,7 +37,7 @@ public class TileSources implements Serializable{
     /** Sources of the tile */
     public int[] sources;
     
-    public TileSources(int[] sources){
+    public TileSources(int[] sources) {
         this.sources = sources;
     }
 
@@ -48,12 +48,12 @@ public class TileSources implements Serializable{
     public int hashCode() {
         int hash = 0;
         
-        if(sources == null){
+        if(sources == null) {
             return hash;
         }
         else{
             Arrays.sort(sources);
-            for(Integer i : sources){
+            for(Integer i : sources) {
                 hash += i * 7;
             }
             return hash;
@@ -72,16 +72,16 @@ public class TileSources implements Serializable{
         if (getClass() != obj.getClass())
             return false;
         TileSources other = (TileSources) obj;
-        if(other.sources == null && sources == null){
+        if(other.sources == null && sources == null) {
             return true;
         }
-        if(other.sources == null || sources == null){
+        if(other.sources == null || sources == null) {
             return false;
         }
         Arrays.sort(other.sources);
         Arrays.sort(sources);
-        for(int i=0; i< sources.length; i++){
-            if(sources[i] != other.sources[i]){
+        for(int i=0; i< sources.length; i++) {
+            if(sources[i] != other.sources[i]) {
                 return false;
             }
         }

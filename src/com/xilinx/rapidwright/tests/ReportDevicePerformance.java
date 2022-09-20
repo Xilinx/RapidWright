@@ -46,7 +46,7 @@ public class ReportDevicePerformance {
                 "xczu19eg"
         };
         String deviceLoad = "Device Load";
-        for(String partName : partNames){
+        for(String partName : partNames) {
             CodePerfTracker p = new CodePerfTracker(partName,false);
             p.start(deviceLoad);
             Device d = Device.getDevice(partName);

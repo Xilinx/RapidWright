@@ -69,7 +69,7 @@ public class PartTileBrowser extends QMainWindow{
      * Main method
      * @param args
      */
-    public static void main(String[] args){
+    public static void main(String[] args) {
         // This line fixes slow performance under Linux
         QApplication.setGraphicsSystem("raster");
         
@@ -89,7 +89,7 @@ public class PartTileBrowser extends QMainWindow{
 
         createTreeView();
         List<String> parts = Device.getAvailableDevices();
-        if(parts.size() < 1){
+        if(parts.size() < 1) {
             throw new RuntimeException("Error: No available parts. Please generate part database files.");
         }
         currPartName = parts.get(0);
@@ -122,9 +122,9 @@ public class PartTileBrowser extends QMainWindow{
     }
 
     @SuppressWarnings("unused")
-    private void showPart(QModelIndex qmIndex){
+    private void showPart(QModelIndex qmIndex) {
         Object data = qmIndex.data(ItemDataRole.AccessibleDescriptionRole);
-        if( data != null){
+        if( data != null) {
             if(currPartName.equals(data))
                 return;
             currPartName = (String) data;
@@ -146,7 +146,7 @@ public class PartTileBrowser extends QMainWindow{
     void updateStatus() {
         int x = (int) scene.getCurrX();
         int y = (int) scene.getCurrY();
-        if (x >= 0 && x < device.getColumns() && y >= 0 && y < device.getRows()){
+        if (x >= 0 && x < device.getColumns() && y >= 0 && y < device.getRows()) {
             String tileName = device.getTile(y, x).getName();
             statusLabel.setText("Part: "+currPartName.toUpperCase() +"  Tile: "+ tileName+" ("+x+","+y+")");
         }

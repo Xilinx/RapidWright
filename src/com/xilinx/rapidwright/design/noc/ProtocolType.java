@@ -43,7 +43,7 @@ public enum ProtocolType {
 
     private final String p;
 
-    ProtocolType(String p){
+    ProtocolType(String p) {
         this.p = p;
     }
 

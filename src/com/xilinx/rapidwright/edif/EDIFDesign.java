@@ -36,11 +36,11 @@ public class EDIFDesign extends EDIFPropertyObject {
     
     private EDIFCell topCell;
 
-    public EDIFDesign(String name){
+    public EDIFDesign(String name) {
         super(name);
     }
     
-    protected EDIFDesign(){
+    protected EDIFDesign() {
         
     }
     

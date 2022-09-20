@@ -105,7 +105,7 @@ public class TileScene extends QGraphicsScene{
     /**
      * Empty constructor
      */
-    public TileScene(){
+    public TileScene() {
         setDesign(null);
         initializeScene(true, true);
     }
@@ -116,7 +116,7 @@ public class TileScene extends QGraphicsScene{
      * @param hideTiles A flag to hide/show certain tiles to make the fabric appear more homogeneous.
      * @param drawPrimitives A flag to draw boxes to represent primitives. 
      */
-    public TileScene(Design design, boolean hideTiles, boolean drawPrimitives){
+    public TileScene(Design design, boolean hideTiles, boolean drawPrimitives) {
         setDesign(design);
         initializeScene(hideTiles, drawPrimitives);
     }
@@ -127,12 +127,12 @@ public class TileScene extends QGraphicsScene{
      * @param hideTiles A flag to hide/show certain tiles to make the fabric appear more homogeneous.
      * @param drawPrimitives A flag to draw boxes to represent primitives. 
      */
-    public TileScene(Device device, boolean hideTiles, boolean drawPrimitives){
+    public TileScene(Device device, boolean hideTiles, boolean drawPrimitives) {
         setDevice(device);
         initializeScene(hideTiles, drawPrimitives);
     }
     
-    public QSize getSceneSize(){
+    public QSize getSceneSize() {
         return sceneSize;
     }
 
@@ -152,7 +152,7 @@ public class TileScene extends QGraphicsScene{
      * @param drawPrimitives
      */
     @SuppressWarnings("unchecked")
-    public void initializeScene(boolean hideTiles, boolean drawPrimitives){
+    public void initializeScene(boolean hideTiles, boolean drawPrimitives) {
         this.clear();
         this.drawPrimitives = drawPrimitives;
         prevX = 0;
@@ -161,11 +161,11 @@ public class TileScene extends QGraphicsScene{
         // Used to avoid a bug in Qt
         System.gc();
 
-        if(device != null){
+        if(device != null) {
             tileColumnTypesToHide = new HashSet<TileTypeEnum>();
             tileRowTypesToHide = new HashSet<TileTypeEnum>();
 
-            if(hideTiles){
+            if(hideTiles) {
                 populateTileTypesToHide();
             }
 
@@ -182,8 +182,8 @@ public class TileScene extends QGraphicsScene{
         //this array is used to determine how many hard macros are
         // attempting to use each tile.
         tileOccupantCount = new HashSet[rows][cols];
-        for(int y=0;y<rows;y++){
-            for(int x=0;x<cols;x++){
+        for(int y=0;y<rows;y++) {
+            for(int x=0;x<cols;x++) {
                 tileOccupantCount[y][x] = new HashSet<GUIModuleInst>();
             }
         }
@@ -211,19 +211,19 @@ public class TileScene extends QGraphicsScene{
     TreeSet<Integer> colsToSkip;
     TreeSet<Integer> rowsToSkip;
 
-    private void calculateSkippedTiles(){
+    private void calculateSkippedTiles() {
 
 
         // Determine which columns and rows to not draw
         colsToSkip = new TreeSet<Integer>();
         rowsToSkip = new TreeSet<Integer>();
-        for(Tile[] tileRow : device.getTiles()){
-            for(Tile tile : tileRow){
+        for(Tile[] tileRow : device.getTiles()) {
+            for(Tile tile : tileRow) {
                 TileTypeEnum type = tile.getTileTypeEnum();
-                if(tileColumnTypesToHide.contains(type)){
+                if(tileColumnTypesToHide.contains(type)) {
                     colsToSkip.add(tile.getColumn());
                 }
-                if(tileRowTypesToHide.contains(type)){
+                if(tileRowTypesToHide.contains(type)) {
                     rowsToSkip.add(tile.getRow());
                 }
             }
@@ -260,13 +260,13 @@ public class TileScene extends QGraphicsScene{
         QPen missingTileLinePen = new QPen(QColor.lightGray, 2, PenStyle.DashLine);
         painter.setPen(missingTileLinePen);
         i = 0;
-        for(int col : colsToSkip){
+        for(int col : colsToSkip) {
             int realCol = col - i;
             painter.drawLine(tileSize*realCol-1, 0, tileSize*realCol-1, rows*tileSize-3);
             i++;
         }
         i=0;
-        for(int row : rowsToSkip){
+        for(int row : rowsToSkip) {
             int realRow = row - i;
             painter.drawLine(0,tileSize*realRow-1, cols*tileSize-3,tileSize*realRow-1);
             i++;
@@ -275,8 +275,8 @@ public class TileScene extends QGraphicsScene{
         // Draw the tile layout
         int offset = (int) Math.ceil((lineWidth / 2.0));
 
-        for(int y = 0; y < rows; y++){
-            for(int x = 0; x < cols; x++){
+        for(int y = 0; y < rows; y++) {
+            for(int x = 0; x < cols; x++) {
                 Tile tile = drawnTiles[y][x];
                 TileTypeEnum tileTypeEnum = tile.getTileTypeEnum();
 
@@ -288,16 +288,16 @@ public class TileScene extends QGraphicsScene{
                 int rectY = y * tileSize;
                 int rectSide = tileSize - 2 * offset;
 
-                if(drawPrimitives){
-                    if(Utils.isCLB(tileTypeEnum)){
+                if(drawPrimitives) {
+                    if(Utils.isCLB(tileTypeEnum)) {
                         drawCLB(painter, rectX, rectY, rectSide);
-                    }else if(Utils.isSwitchBox(tileTypeEnum)){
+                    }else if(Utils.isSwitchBox(tileTypeEnum)) {
                         drawSwitchBox(painter, rectX, rectY, rectSide);
-                    }else if(Utils.isBRAM(tileTypeEnum)){
+                    }else if(Utils.isBRAM(tileTypeEnum)) {
                         drawBRAM(painter, rectX, rectY, rectSide, offset, color);
-                    }else if(Utils.isDSP(tileTypeEnum)){
+                    }else if(Utils.isDSP(tileTypeEnum)) {
                         drawDSP(painter, rectX, rectY, rectSide, offset, color);
-                    }else if (Utils.isURAM(tileTypeEnum)){
+                    }else if (Utils.isURAM(tileTypeEnum)) {
                         drawURAM(painter, rectX, rectY, rectSide, offset, color);
                     }else{ // Just fill the tile in with a color
                         colorTile(painter, x, y, offset, color);
@@ -310,7 +310,7 @@ public class TileScene extends QGraphicsScene{
         }
     }
 
-    public void drawBackground(QPainter painter, QRectF rect){
+    public void drawBackground(QPainter painter, QRectF rect) {
         super.drawBackground(painter, rect);
         if (useImage) {
             if (qImage == null) {
@@ -330,10 +330,10 @@ public class TileScene extends QGraphicsScene{
      * @param y The y location on the screen.
      * @return The tile at the x,y location or null if none exist.
      */
-    public Tile getTile(double x, double y){
+    public Tile getTile(double x, double y) {
         currX = (int) Math.floor(x / tileSize);
         currY = (int) Math.floor(y / tileSize);
-        if (currX >= 0 && currY >= 0 && currX < cols && currY < rows){// && (currX != prevX || currY != prevY)){
+        if (currX >= 0 && currY >= 0 && currX < cols && currY < rows) {// && (currX != prevX || currY != prevY)) {
             return drawnTiles[currY][currX];
         }
         return null;
@@ -344,7 +344,7 @@ public class TileScene extends QGraphicsScene{
      * @param event The recent mouse event
      * @return The tile under which the mouse event occurred.
      */
-    public Tile getTile(QGraphicsSceneMouseEvent event){
+    public Tile getTile(QGraphicsSceneMouseEvent event) {
         return getTile(event.scenePos().x(), event.scenePos().y());
     }
     
@@ -353,12 +353,12 @@ public class TileScene extends QGraphicsScene{
         QPointF mousePos = event.scenePos();
         if (device != null) {
             Tile tile = getTile(mousePos.x(), mousePos.y());
-            if(tile != null){
+            if(tile != null) {
                 String siteNames = "";
-                if(tile.getSites().length > 0){
+                if(tile.getSites().length > 0) {
                     siteNames = " | " + tile.getSites()[0].getName();
                 }
-                if(tile.getSites().length > 1){
+                if(tile.getSites().length > 1) {
                     siteNames += " ...";
                 }                
                 String tileName = device.getName() + " | " +  tile.getName() +
@@ -372,20 +372,20 @@ public class TileScene extends QGraphicsScene{
     }
     
     @Override
-    public void mouseDoubleClickEvent(QGraphicsSceneMouseEvent event){
+    public void mouseDoubleClickEvent(QGraphicsSceneMouseEvent event) {
         QPointF mousePos = event.scenePos();
         currX = (int) Math.floor((mousePos.x()) / tileSize);
         currY = (int) Math.floor((mousePos.y()) / tileSize);
 
-        if (currX >= 0 && currY >= 0 && currX < cols && currY < rows){
+        if (currX >= 0 && currY >= 0 && currX < cols && currY < rows) {
             updateCursor();
         }            
     
         super.mousePressEvent(event);
     }
     
-    public void updateCursor(){
-        if(highlit != null){
+    public void updateCursor() {
+        if(highlit != null) {
             highlit.dispose();
         }
         highlit = addRect(currX * tileSize, currY * tileSize, tileSize - 2,
@@ -393,7 +393,7 @@ public class TileScene extends QGraphicsScene{
         highlit.setZValue(10);
     }
     
-    public void updateCurrXY(int currX, int currY){
+    public void updateCurrXY(int currX, int currY) {
         this.currX = currX;
         this.currY = currY;
     }
@@ -402,14 +402,14 @@ public class TileScene extends QGraphicsScene{
      * Getters and Setters
      */
     
-    public int getDrawnTileX(Tile tile){
+    public int getDrawnTileX(Tile tile) {
         Integer tmp = tileXMap.get(tile);
         if(tmp == null)
             return -1;
         return tmp;
     }
     
-    public int getDrawnTileY(Tile tile){
+    public int getDrawnTileY(Tile tile) {
         Integer tmp = tileYMap.get(tile);
         if(tmp == null)
             return -1;
@@ -417,34 +417,34 @@ public class TileScene extends QGraphicsScene{
     }
     
 
-    public Design getDesign(){
+    public Design getDesign() {
         return design;
     }
 
-    public void setDesign(Design design){
+    public void setDesign(Design design) {
         this.design = design;
-        if(this.design != null){
+        if(this.design != null) {
             setDevice(design.getDevice());
         }
     }
     
-    public Device getDevice(){
+    public Device getDevice() {
         return device;
     }
     
-    public void setDevice(Device device){
+    public void setDevice(Device device) {
         this.device = device;
     }
 
-    public double getCurrX(){
+    public double getCurrX() {
         return currX;
     }
 
-    public double getCurrY(){
+    public double getCurrY() {
         return currY;
     }
     
-    public int getTileSize(){
+    public int getTileSize() {
         return tileSize;
     }
     
@@ -453,9 +453,9 @@ public class TileScene extends QGraphicsScene{
      */
 
 
-    private void drawCLB(QPainter painter, int rectX, int rectY, int rectSide){
+    private void drawCLB(QPainter painter, int rectX, int rectY, int rectSide) {
         
-        switch(device.getSeries()){
+        switch(device.getSeries()) {
             case Series7:
             case Versal:
                 painter.drawRect(rectX, rectY + rectSide / 2, rectSide / 2 - 1, rectSide / 2 - 1);
@@ -477,8 +477,8 @@ public class TileScene extends QGraphicsScene{
             painter.drawRect(rectX+2, y, rectSide - 5, h-2);
         }
     }
-    private void drawBRAM(QPainter painter, int rectX, int rectY, int rectSide, int offset, QColor color){
-        switch(device.getSeries()){
+    private void drawBRAM(QPainter painter, int rectX, int rectY, int rectSide, int offset, QColor color) {
+        switch(device.getSeries()) {
             case Series7:
             case UltraScale:
             case UltraScalePlus:
@@ -491,7 +491,7 @@ public class TileScene extends QGraphicsScene{
         }
     }
 
-    private void drawURAM(QPainter painter, int rectX, int rectY, int rectSide, int offset, QColor color){
+    private void drawURAM(QPainter painter, int rectX, int rectY, int rectSide, int offset, QColor color) {
         switch(device.getSeries()) {
             case Series7:
             case UltraScale:
@@ -504,8 +504,8 @@ public class TileScene extends QGraphicsScene{
         }
     }
 
-    private void drawDSP(QPainter painter, int rectX, int rectY, int rectSide, int offset, QColor color){
-        switch(device.getSeries()){
+    private void drawDSP(QPainter painter, int rectX, int rectY, int rectSide, int offset, QColor color) {
+        switch(device.getSeries()) {
             case Series7:
             case UltraScale:
             case UltraScalePlus:
@@ -523,19 +523,19 @@ public class TileScene extends QGraphicsScene{
 
     }
     
-    private void drawSwitchBox(QPainter painter, int rectX, int rectY, int rectSide){
+    private void drawSwitchBox(QPainter painter, int rectX, int rectY, int rectSide) {
         painter.drawRect(rectX+1, rectY+1, rectSide-2, rectSide-2);
     }
     
-    private void colorTile(QPainter painter, int x, int y, int offset, QColor color){
+    private void colorTile(QPainter painter, int x, int y, int offset, QColor color) {
         painter.fillRect(x * tileSize, y * tileSize,
                 tileSize - 2 * offset, tileSize - 2 * offset, new QBrush(color));
     }
     
     
     @SuppressWarnings("incomplete-switch")
-    private void populateTileTypesToHide(){
-        switch(device.getSeries()){
+    private void populateTileTypesToHide() {
+        switch(device.getSeries()) {
             case UltraScale:
                 tileColumnTypesToHide.add(TileTypeEnum.CFRM_CBRK_L);
                 tileRowTypesToHide.add(TileTypeEnum.RCLK_INT_L);

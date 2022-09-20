@@ -94,19 +94,19 @@ public class MetadataParser {
     
     private Module m;
     
-    public MetadataParser(Device dev, Module m){
+    public MetadataParser(Device dev, Module m) {
         this.dev = dev;
         this.m = m;
     }
                                 
-    public String getOriginalInstName(String metadataFileName){
+    public String getOriginalInstName(String metadataFileName) {
         File dir = new File(metadataFileName).getParentFile();
         File xciFile = new File(dir.getAbsolutePath() + "/" + dir.getName() + ".xci");
         try {
             BufferedReader br = new BufferedReader(new FileReader(xciFile));
             String line = null;
-            while((line = br.readLine()) != null){
-                if(line.contains("instanceName")){
+            while((line = br.readLine()) != null) {
+                if(line.contains("instanceName")) {
                     br.close();
                     return line.substring(line.indexOf('>')+1, line.indexOf("</", 0));
                 }
@@ -120,7 +120,7 @@ public class MetadataParser {
         return null;
     }
     
-    public void parse(String metadataFileName){
+    public void parse(String metadataFileName) {
         String originalInstName = getOriginalInstName(metadataFileName);
         this.fileName = metadataFileName;
         int clockCount = -1;
@@ -135,8 +135,8 @@ public class MetadataParser {
         br = FileTools.getProperInputStream(metadataFileName);
         getNextLine();
         getNextLine();
-        outer: while(line != null){
-            switch(currState){
+        outer: while(line != null) {
+            switch(currState) {
                 case BLOCK_BEGIN:{
                     expect(BEGIN, tokens[0]);
                     expect(BLOCK, tokens[1]);
@@ -146,7 +146,7 @@ public class MetadataParser {
                 case BLOCK_NAME:{
                     expect(NAME, tokens[1]);
                     if(originalInstName != null) expect(originalInstName,tokens[2]);
-                    if(nextTokens[1].equals(CLOCKS)){
+                    if(nextTokens[1].equals(CLOCKS)) {
                         currState = MDParserState.BLOCK_CLOCKS;
                     }else{
                         currState = MDParserState.BLOCK_PBLOCKS;                        
@@ -174,9 +174,9 @@ public class MetadataParser {
                 case BLOCK_OUTPUTS:{
                     expect(OUTPUTS, tokens[1]);
                     outputCount = Integer.parseInt(tokens[2]);
-                    if(nextTokens[2].equals(PBLOCK)){
+                    if(nextTokens[2].equals(PBLOCK)) {
                         currState = MDParserState.PBLOCK_BEGIN;
-                    }else if(nextTokens[2].equals(CLOCK)){
+                    }else if(nextTokens[2].equals(CLOCK)) {
                         currState = MDParserState.CLOCK_BEGIN;
                     }else{
                         currState = MDParserState.PORT_BEGIN;
@@ -206,8 +206,8 @@ public class MetadataParser {
                     expect(END, tokens[1]);
                     expect(PBLOCK, tokens[2]);
                     pblockCount--;
-                    if(pblockCount == 0){
-                        if(clockCount > 0){
+                    if(pblockCount == 0) {
+                        if(clockCount > 0) {
                             currState = MDParserState.CLOCK_BEGIN;
                         }else{
                             currState = MDParserState.PORT_BEGIN;
@@ -240,7 +240,7 @@ public class MetadataParser {
                     expect(END, tokens[1]);
                     expect(CLOCK, tokens[2]);
                     clockCount--;
-                    if(clockCount == 0){
+                    if(clockCount == 0) {
                         currState = MDParserState.PORT_BEGIN;
                     }else{
                         currState = MDParserState.CLOCK_BEGIN;
@@ -250,11 +250,11 @@ public class MetadataParser {
                 case PORT_BEGIN:{
                     expect(BEGIN,tokens[1]);
                     currPort = new Port();
-                    if(inputCount > 0){
+                    if(inputCount > 0) {
                         expect(INPUT, tokens[2]);
                         inputCount--;
                         currPort.setOutputPort(false);
-                    }else if(outputCount > 0){
+                    }else if(outputCount > 0) {
                         expect(OUTPUT, tokens[2]);
                         currPort.setOutputPort(true);
                         outputCount--;
@@ -267,9 +267,9 @@ public class MetadataParser {
                 case PORT_NAME:{
                     expect(NAME,tokens[1]);
                     currPort.setName(tokens[2]);
-                    if(nextTokens[1].equals(TYPE)){
+                    if(nextTokens[1].equals(TYPE)) {
                         currState = MDParserState.PORT_TYPE;
-                    }else if(nextTokens[1].equals(PPLOCS)){
+                    }else if(nextTokens[1].equals(PPLOCS)) {
                         currState = MDParserState.PORT_PPLOCS;
                     }else{
                         currState = MDParserState.PORT_NET;
@@ -279,7 +279,7 @@ public class MetadataParser {
                 case PORT_PPLOCS:{
                     expect(PPLOCS, tokens[1]);
                     currPort.setPartitionPinLoc(dev.getTile(tokens[2]));
-                    if(nextTokens[1].equals(TYPE)){
+                    if(nextTokens[1].equals(TYPE)) {
                         currState = MDParserState.PORT_TYPE;
                     }else{
                         currState = MDParserState.PORT_NET;
@@ -289,7 +289,7 @@ public class MetadataParser {
                 case PORT_NET:{
                     expect(NETNAME, tokens[1]);
                     currPortNet = m.getNet(tokens[2]);
-                    /*if(currPortNet == null){
+                    /*if(currPortNet == null) {
                         expect("<Net Name>",tokens[2]);
                     }*/
                     currState = MDParserState.PORT_NUMPRIMS;
@@ -305,7 +305,7 @@ public class MetadataParser {
                     expect(TYPE, tokens[1]);
                     expect(currPort.isOutPort() ? OUTPUT : INPUT,tokens[2]);
                     String type = tokens[3];
-                    if(type.equals(CLOCK)){
+                    if(type.equals(CLOCK)) {
                         if(tokens[4].equals("local")) currPort.setType(PortType.LOCAL_CLOCK);
                         else if(tokens[4].equals("global")) currPort.setType(PortType.GLOBAL_CLOCK);
                         else if(tokens[4].equals("regional")) currPort.setType(PortType.REGIONAL_CLOCK);
@@ -324,7 +324,7 @@ public class MetadataParser {
                 case PORT_MAXDELAY:{
                     expect(MAXDELAY,tokens[1]);
                     currPort.setWorstCasePortDelay(Float.parseFloat(tokens[2]));
-                    if(nextTokens[1].equals(END)){
+                    if(nextTokens[1].equals(END)) {
                         currState = MDParserState.PORT_END;
                     }else{
                         currState = MDParserState.PORT_CONNS_BEGIN;
@@ -342,15 +342,15 @@ public class MetadataParser {
                     break;
                 }
                 case PORT_CONNS_PIN:{
-                    if(tokens[1].equals(PIN)){
+                    if(tokens[1].equals(PIN)) {
                         String logPinName = tokens[2];
-                        if(tokens.length > 4){
+                        if(tokens.length > 4) {
                             String siteName = tokens.length > 3 ? tokens[3] : null;
                             String sitePinName = tokens.length > 4 ? tokens[4] : null;
                             String pinName = sitePinName.substring(sitePinName.indexOf('/')+1); 
-                            if(tokens.length > 5 && currPort.isOutPort()){
+                            if(tokens.length > 5 && currPort.isOutPort()) {
                                 SiteInst i = m.getSiteInstAtSite(dev.getSite(siteName));
-                                if(i.getSitePinInst(pinName) == null){
+                                if(i.getSitePinInst(pinName) == null) {
                                     sitePinName = tokens.length > 5 ? tokens[5] : sitePinName;
                                     pinName = sitePinName.substring(sitePinName.indexOf('/')+1);
                                 }
@@ -358,9 +358,9 @@ public class MetadataParser {
                             SiteInst si = m.getSiteInstAtSite(dev.getSite(siteName));
                             
                             SitePinInst p = si.getSitePinInst(pinName);
-                            if(p == null){                            
+                            if(p == null) {                            
                                 Net n = si.getNetFromSiteWire(pinName);
-                                if(n == null){
+                                if(n == null) {
                                     // Check if alternate site type
                                     if(si.getSiteTypeEnum() != si.getSite().getSiteTypeEnum()) {
                                         String altPinName = si.getAlternateSitePinName(pinName);
@@ -381,12 +381,12 @@ public class MetadataParser {
                                 }
                             }
                         }
-                    }else if(tokens[1].equals(PORT)){
+                    }else if(tokens[1].equals(PORT)) {
                         currPort.addPassThruPortName(tokens[2]);
                     }else{
                         expect("<pin|port>",tokens[1]);
                     }
-                    if(nextTokens[1].equals(END)){
+                    if(nextTokens[1].equals(END)) {
                         currState = MDParserState.PORT_CONNS_END;
                     }
                     break;
@@ -402,10 +402,10 @@ public class MetadataParser {
                     expect(currPort.isOutPort() ? OUTPUT : INPUT, tokens[2]);
                     m.addPort(currPort);
                     currPort = null;
-                    if(nextTokens[1].equals(BEGIN)){
+                    if(nextTokens[1].equals(BEGIN)) {
                         currState = MDParserState.PORT_BEGIN;
                     }
-                    else if(nextTokens[0].equals(END)){
+                    else if(nextTokens[0].equals(END)) {
                         currState = MDParserState.BLOCK_END;                        
                     }
                     break;
@@ -423,13 +423,13 @@ public class MetadataParser {
         }
         try {
             br.close();
-        } catch (IOException e){
+        } catch (IOException e) {
             throw new RuntimeException("ERROR: IOException encountered on closing file " + fileName + "\nStack Trace:");
         }
     }
     
-    private boolean expect(String expected, String found){
-        if(!expected.equals(found)){
+    private boolean expect(String expected, String found) {
+        if(!expected.equals(found)) {
             throw new RuntimeException("\nERROR: While parsing "+fileName+":\n   '" +
                 line + "' (line number " + lineNumber + ")\n" + "   Expected: '" +
                     expected + "'\n      Found: '" + found + "'\nStack Trace:");
@@ -437,13 +437,13 @@ public class MetadataParser {
         return true;
     }
     
-    private void getNextLine(){
+    private void getNextLine() {
         try {
             tokens = nextTokens;
             line = nextLine;
             nextLine = br.readLine();
             lineNumber++;
-            while(nextLine != null && (nextLine.trim().isEmpty() || nextLine.startsWith("#"))){
+            while(nextLine != null && (nextLine.trim().isEmpty() || nextLine.startsWith("#"))) {
                 nextLine = br.readLine();
                 lineNumber++;
             }
@@ -458,7 +458,7 @@ public class MetadataParser {
     
     public static void main(String[] args) {
         // Test parser
-        if(args.length != 2){
+        if(args.length != 2) {
             System.out.println("USAGE: <module.dcp> <metadata.txt>");
             return;
         }

@@ -116,15 +116,15 @@ public class DesignInstrumentor {
      * is written for ease of implementation, not speed.  
      * @param fileName Name of the instrumentation details file.
      */
-    public void loadInstrumentationDetailsFile(String fileName){
-        for(String line : FileTools.getLinesFromTextFile(fileName)){
+    public void loadInstrumentationDetailsFile(String fileName) {
+        for(String line : FileTools.getLinesFromTextFile(fileName)) {
             // Skip comments and empty lines
             if(line.startsWith("#")) continue;
             if(line.trim().isEmpty()) continue;
             
             // Every line should be a key value pair
             String[] tokens = line.split("\\s+");
-            if(line.startsWith(SAMPLE_DEPTH_KEYWORD)){
+            if(line.startsWith(SAMPLE_DEPTH_KEYWORD)) {
                 sampleDepth = Integer.parseInt(tokens[1]);
             }else{
                 netNames.put(tokens[0], tokens[1]);
@@ -137,7 +137,7 @@ public class DesignInstrumentor {
      * Specifically, it add the input pin ports of the debug block onto
      * the user design nets of interest.
      */
-    public void stitchProbesOnILA(ModuleInst mi, EDIFCellInst debugCore){
+    public void stitchProbesOnILA(ModuleInst mi, EDIFCellInst debugCore) {
         EDIFCell topCell = design.getNetlist().getTopCell();
         HashMap<EDIFCell, ArrayList<EDIFCellInst>> instMap = EDIFTools.generateCellInstMap(design.getNetlist().getTopCellInst());
         
@@ -148,28 +148,28 @@ public class DesignInstrumentor {
         Module m = mi.getModule();
         SitePinInst clockPin = null;
         String portPrefix = "probe0"; // TODO - This should be data driven
-        for(Entry<String,String> netNamePair : netNames.entrySet()){
+        for(Entry<String,String> netNamePair : netNames.entrySet()) {
             String netName = netNamePair.getKey();
             String routedNetName = netNamePair.getValue();
             // Watch out for two nets with equivalent physical routed nets
             if(alreadyConnected.contains(routedNetName)) continue;
             
             Net n = design.getNet(routedNetName);
-            if(n.getPins().size() < 2){
+            if(n.getPins().size() < 2) {
                 MessageGenerator.briefError("WARNING: Net "+ netName +" has no source, routing probe to GND.  (" +
                         routedNetName + " is the routing net alias)");
                 n = design.getNet(Net.GND_NET);
             }
             
             // Identify clock net
-            if(clockPin == null && n.getSource() != null){
+            if(clockPin == null && n.getSource() != null) {
                 clockPin = DesignTools.identifyClockSource(n.getSource());
             }
             
             String portName = portPrefix + "[" + probeCount + "]";
             Port p = m.getPort(portName);
             Net portNet = mi.getCorrespondingNet(p);
-            if(portNet == null || portNet.getPins().size() != 1){
+            if(portNet == null || portNet.getPins().size() != 1) {
                 MessageGenerator.briefError("WARNING: Couldn't get probe net for port " + portName);
             }
             
@@ -179,7 +179,7 @@ public class DesignInstrumentor {
             
             // Connect EDIF in same way
             EDIFPortInst currDebugPort = debugCore.getPortInst(portName);
-            if(n.isStaticNet()){
+            if(n.isStaticNet()) {
                 EDIFNet debugNet = EDIFTools.getStaticNet(n.getType(), topCell, design.getNetlist());
                 EDIFTools.addDebugPort(debugNet, topCell, currDebugPort, debugCore);
             }else{
@@ -195,18 +195,18 @@ public class DesignInstrumentor {
         }
         
         // TODO ASSUMPTION: All probed signals are on the same clock
-        if(clockPin == null){
+        if(clockPin == null) {
             MessageGenerator.briefError("WARNING: Couldn't definitely identify clock net for probe signals! Choosing clock with largest fanout...");
             int largestFanout = 0;
-            for(Net clkNet : design.getNets()){
-                if(clkNet.isClockNet() && clkNet.getFanOut() > largestFanout){
+            for(Net clkNet : design.getNets()) {
+                if(clkNet.isClockNet() && clkNet.getFanOut() > largestFanout) {
                     clockPin = clkNet.getSource();
                     largestFanout = clkNet.getFanOut();
                 }                
             }
         }
         
-        if(clockPin != null){
+        if(clockPin != null) {
             String clkDebugNet = "clk_probe_net";
             String clkDebugPort = "clk_probe_port";
             EDIFPortInst clkPort = debugCore.getPortInst("clk");
@@ -227,7 +227,7 @@ public class DesignInstrumentor {
     }
     
     public void stitchDebugHubToILA(ModuleInst ilaCorePhysical, EDIFCellInst ilaCoreLogical, 
-                                    ModuleInst dhCorePhysical, EDIFCellInst dhCoreLogical){
+                                    ModuleInst dhCorePhysical, EDIFCellInst dhCoreLogical) {
         String dhInput = "sl_oport0_i";
         String dhOutput = "sl_iport0_o";
         String ilaInput = "sl_iport0";
@@ -237,7 +237,7 @@ public class DesignInstrumentor {
         
         EDIFCell topCell = design.getNetlist().getTopCell();
         
-        for(int i=0; i < oportWidth; i++){
+        for(int i=0; i < oportWidth; i++) {
             String suffix = "["+i+"]";
             String dhPortName = dhOutput + suffix;
             String ilaPortName = ilaInput + suffix; 
@@ -247,14 +247,14 @@ public class DesignInstrumentor {
             Port dhPort = dhCorePhysical.getModule().getPort(dhPortName); 
             Net dhNet = dhCorePhysical.getCorrespondingNet(dhPort);
             design.movePinsToNewNetDeleteOldNet(ilaNet, dhNet, false);
-            for(SitePinInst p : dhNet.getPins()){
+            for(SitePinInst p : dhNet.getPins()) {
                 if(p.isOutPin()) continue;
                 pinsToRoute.add(p);
             }
         }
         EDIFTools.connectPortBus(topCell, dhCoreLogical, ilaCoreLogical, dhOutput, ilaInput, oportWidth);
         
-        for(int i=0; i < iportWidth; i++){
+        for(int i=0; i < iportWidth; i++) {
             String suffix = "["+i+"]";
             String dhPortName = dhInput + suffix;
             String ilaPortName = ilaOutput + suffix; 
@@ -264,7 +264,7 @@ public class DesignInstrumentor {
             Port dhPort = dhCorePhysical.getModule().getPort(dhPortName); 
             Net dhNet = dhCorePhysical.getCorrespondingNet(dhPort);
             design.movePinsToNewNetDeleteOldNet(dhNet, ilaNet, false);
-            for(SitePinInst p : ilaNet.getPins()){
+            for(SitePinInst p : ilaNet.getPins()) {
                 if(p.isOutPin()) continue;
                 pinsToRoute.add(p);
             }
@@ -289,12 +289,12 @@ public class DesignInstrumentor {
      *   (4) Place blocks in empty locations within user design
      *   (5) Route updated nets
      */
-    public void instrumentDesign(){
+    public void instrumentDesign() {
         // Step 1 - Choose which pre-compiled block to load based on requested parameters
         // TODO - For now, we'll just load one of the ILA cores
         String ilaCoreFileName = null;
         String debugHubCoreFileName = "design_1_xsdbm_0_0_opt_routed_routed";
-        if(netNames.size() > 32){
+        if(netNames.size() > 32) {
             ilaCoreFileName = "design_1_ila_1_0_opt_routed_routed";
         }else{
             ilaCoreFileName = "design_1_ila_0_0_opt_routed_routed";
@@ -319,12 +319,12 @@ public class DesignInstrumentor {
         BlockPlacer placer = new BlockPlacer();
         placer.placeDesign(design,true);
         int unplacedInsts = 0;
-        for(SiteInst si : design.getSiteInsts()){
-            if(!si.isPlaced()){
+        for(SiteInst si : design.getSiteInsts()) {
+            if(!si.isPlaced()) {
                 unplacedInsts++;
             }
         }
-        if(unplacedInsts > 0){
+        if(unplacedInsts > 0) {
             throw new RuntimeException("ERROR: " + unplacedInsts + "Unplaced instances!");
         }
         
@@ -336,7 +336,7 @@ public class DesignInstrumentor {
     /**
     * Uses list of signals marked for debug to produce debug netlist (.ltx) file for debugging.
     */
-    public void createLTX(String name){
+    public void createLTX(String name) {
         // 1. Create list of strings that will make up .ltx, get header into it.
         ArrayList<String> ltx_strings = new ArrayList<>(header);
 
@@ -353,23 +353,23 @@ public class DesignInstrumentor {
         *    base_microblaze example design used
         *    We want the actual net name probed for debug, not the "parent" name. --> This assumption looks correct.
         **/
-        for(String probeLine : probe_template){
+        for(String probeLine : probe_template) {
             // Ensure "busType" is "net" if there's only one net, "bus" for >1 net.
-            if(probeLine.trim().startsWith("<probe t")){
+            if(probeLine.trim().startsWith("<probe t")) {
                 if(netNames.size() > 1)
                     ltx_strings.add("    <probe type=\"ila\" busType=\"bus\" source=\"netlist\" spec=\"ILA_V2_RT\">");
                 else
                     ltx_strings.add("    <probe type=\"ila\" busType=\"net\" source=\"netlist\" spec=\"ILA_V2_RT\">");
             }
             // Make sure port bit count is accurate on the PROBE_PORT_BIT_COUNT line.
-            else if(probeLine.trim().startsWith("<Option Id=\"PROBE_PORT_BIT_")){
+            else if(probeLine.trim().startsWith("<Option Id=\"PROBE_PORT_BIT_")) {
                 ltx_strings.add("        <Option Id=\"PROBE_PORT_BIT_COUNT\" value=\"" + netNames.size() + "\"/>");
             }
             // Iterate through and add all signals marked for debug if we've reached the list of nets.
-            else if(probeLine.trim().startsWith("<net n")){
+            else if(probeLine.trim().startsWith("<net n")) {
                 //System.out.println("Adding nets marked for debug to .ltx!");
                 int count = netNames.size()-1;
-                for(Entry<String,String> netNamePair : netNames.entrySet()){
+                for(Entry<String,String> netNamePair : netNames.entrySet()) {
                     String netName = netNamePair.getKey().split("\\[")[0];
                     ltx_strings.add("        <net name=\"" + netName + "[" + count + "]\"/>");
                     count--;
@@ -400,7 +400,7 @@ public class DesignInstrumentor {
      *  These are the instrumented XPN and EDIF files respectively.
      */
     public static void main(String[] args) {
-        if(args.length != 3){
+        if(args.length != 3) {
             System.out.println("USAGE: <instrumentation file name> <XPN file name> <EDIF file name>");
             return;
         }

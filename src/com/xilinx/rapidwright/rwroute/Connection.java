@@ -83,7 +83,7 @@ public class Connection implements Comparable<Connection>{
     /** List of nodes assigned to a connection to form the path for generating PIPs */
     private List<Node> nodes;
     
-    public Connection(int id, SitePinInst source, SitePinInst sink, NetWrapper netWrapper){
+    public Connection(int id, SitePinInst source, SitePinInst sink, NetWrapper netWrapper) {
         this.id = id;
         this.source = source;
         this.sink = sink;
@@ -166,7 +166,7 @@ public class Connection implements Comparable<Connection>{
      * @param maxCriticality The maximum criticality.
      * @param criticalityExponent The exponent to separate critical connections and non-critical connections.
      */
-    public void calculateCriticality(float maxDelay, float maxCriticality, float criticalityExponent){
+    public void calculateCriticality(float maxDelay, float maxCriticality, float criticalityExponent) {
         float slackCon = Float.MAX_VALUE;
         for(TimingEdge e : getTimingEdges()) {
             float tmpslackCon = e.getDst().getRequiredTime() - e.getSrc().getArrivalTime() - e.getDelay();
@@ -187,7 +187,7 @@ public class Connection implements Comparable<Connection>{
      * @return
      */
     public boolean isCongested() {
-        for(Routable rn : getRnodes()){
+        for(Routable rn : getRnodes()) {
             if(rn.isOverUsed()) {
                 return true;
             }
@@ -200,7 +200,7 @@ public class Connection implements Comparable<Connection>{
      * @return
      */
     public boolean useRnodesWithMultiDrivers() {
-        for(Routable rn : getRnodes()){
+        for(Routable rn : getRnodes()) {
             if(rn.hasMultiDrivers()) {
                 return true;
             }
@@ -212,12 +212,12 @@ public class Connection implements Comparable<Connection>{
         rnodes.add(rn);    
     }
     
-    public void updateRouteDelay(){    
+    public void updateRouteDelay() {    
         setTimingEdgesDelay(getRouteDelay());
     }
     
-    public void setTimingEdgesDelay(float routeDelay){
-        for(TimingEdge e : getTimingEdges()){
+    public void setTimingEdgesDelay(float routeDelay) {
+        for(TimingEdge e : getTimingEdges()) {
             e.setRouteDelay(routeDelay);
         }
     }
@@ -233,19 +233,19 @@ public class Connection implements Comparable<Connection>{
         return routeDelay;
     }
     
-    public void setCriticality(float criticality){
+    public void setCriticality(float criticality) {
         this.criticality = criticality;
     }
     
-    public void resetCriticality(){
+    public void resetCriticality() {
         criticality = 0;
     }
     
-    public float getCriticality(){
+    public float getCriticality() {
         return criticality;
     }
     
-    public void resetRoute(){
+    public void resetRoute() {
         getRnodes().clear();
         sink.setRouted(false);
     }
@@ -298,11 +298,11 @@ public class Connection implements Comparable<Connection>{
         this.yMaxBB = yMaxBB;
     }
 
-    public void setNetWrapper(NetWrapper netWrapper){
+    public void setNetWrapper(NetWrapper netWrapper) {
         this.netWrapper = netWrapper;
     }
     
-    public NetWrapper getNetWrapper(){
+    public NetWrapper getNetWrapper() {
         return this.netWrapper;
     }
     
@@ -366,11 +366,11 @@ public class Connection implements Comparable<Connection>{
         this.crossSLR = crossSLR;
     }
     
-    public void newNodes(){
+    public void newNodes() {
         setNodes(new ArrayList<>());
     }
     
-    public void addNode(Node node){
+    public void addNode(Node node) {
         getNodes().add(node);
     }
     
@@ -392,7 +392,7 @@ public class Connection implements Comparable<Connection>{
     }
     
     @Override
-    public int hashCode(){
+    public int hashCode() {
         return id;
     }
     

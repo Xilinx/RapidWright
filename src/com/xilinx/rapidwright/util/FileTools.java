@@ -166,7 +166,7 @@ public class FileTools {
     //===================================================================================//
     /* Get Streams                                                                       */
     //===================================================================================//
-    public static Output getKryoOutputStream(String fileName){
+    public static Output getKryoOutputStream(String fileName) {
         FileOutputStream fos = null;
         try {
             fos = new FileOutputStream(fileName);
@@ -176,17 +176,17 @@ public class FileTools {
         return getKryoOutputStream(fos);
     }
     
-    public static Output getKryoOutputStream(OutputStream os){
+    public static Output getKryoOutputStream(OutputStream os) {
         return getKryoOutputStreamWithoutDeflater(new DeflaterOutputStream(os));
     }
 
-    public static Output getKryoOutputStreamWithoutDeflater(OutputStream os){
+    public static Output getKryoOutputStreamWithoutDeflater(OutputStream os) {
         return useUnsafeStreams() ? new UnsafeOutput(os) 
                                   : new Output(os);
     }
     
     
-    public static Input getKryoInputStream(String fileName){
+    public static Input getKryoInputStream(String fileName) {
         FileInputStream fis = null;
         try {
             fis = new FileInputStream(fileName);
@@ -196,11 +196,11 @@ public class FileTools {
         return getKryoInputStream(fis);
     }
     
-    public static Input getKryoInputStream(InputStream in){
+    public static Input getKryoInputStream(InputStream in) {
         return getKryoInputStreamWithoutInflater(new InflaterInputStream(in));
     }
 
-    public static Input getKryoInputStreamWithoutInflater(InputStream in){
+    public static Input getKryoInputStreamWithoutInflater(InputStream in) {
         return useUnsafeStreams() ? new UnsafeInput(in) 
                                   : new Input(in);
     }
@@ -246,19 +246,19 @@ public class FileTools {
      * @param fileName Name of the text or gzipped file
      * @return An opened BufferedReader to the file.
      */
-    public static BufferedReader getProperInputStream(String fileName){
+    public static BufferedReader getProperInputStream(String fileName) {
         BufferedReader in = null;
         try{
-            if(fileName.endsWith(".gz")){
+            if(fileName.endsWith(".gz")) {
                 in = new BufferedReader(new InputStreamReader(new GZIPInputStream(new FileInputStream(fileName))));
             }else{
                 in = new BufferedReader(new FileReader(fileName));
             }
         }
-        catch(FileNotFoundException e){
+        catch(FileNotFoundException e) {
             throw new UncheckedIOException("ERROR: Could not find file: " + fileName, e);
         }
-        catch(IOException e){
+        catch(IOException e) {
             throw new UncheckedIOException("ERROR: Problem reading file: " + fileName, e);
         }
 
@@ -272,17 +272,17 @@ public class FileTools {
      * @param fileName Name of the output file.  Will be gzipped if has *.gz extension.
      * @return The opened BufferedWriter to the named file.
      */
-    public static BufferedWriter getProperOutputStream(String fileName){
+    public static BufferedWriter getProperOutputStream(String fileName) {
         BufferedWriter out = null;
 
         try{
-            if(fileName.endsWith(".gz")){
+            if(fileName.endsWith(".gz")) {
                 out = new BufferedWriter(new OutputStreamWriter(new GZIPOutputStream(new FileOutputStream(fileName))));
             }else{
                 out = new BufferedWriter(new FileWriter(fileName));
             }            
         }
-        catch(IOException e){
+        catch(IOException e) {
             e.printStackTrace();
         }
 
@@ -293,60 +293,60 @@ public class FileTools {
     //===================================================================================//
     /* Custom Read/Write File Functions for Device/WireEnumeration Class                 */
     //===================================================================================//
-    public static HashMap<String,Integer> readHashMap(Input dis, Integer[] allInts){
+    public static HashMap<String,Integer> readHashMap(Input dis, Integer[] allInts) {
         int count;
         HashMap<String,Integer> tileMap = null;
         String[] keys;
         count = dis.readInt();
         tileMap = new HashMap<String,Integer>(count);
         keys = new String[count];
-        for(int i = 0; i < keys.length; i++){
+        for(int i = 0; i < keys.length; i++) {
             keys[i] = dis.readString();
         }
-        for(int i=0; i < count; i++){
+        for(int i=0; i < count; i++) {
             tileMap.put(keys[i], allInts[dis.readInt()]);
         }
         return tileMap;
     }
 
-    public static boolean writeHashMap(Output dos, HashMap<String,Integer> map){
+    public static boolean writeHashMap(Output dos, HashMap<String,Integer> map) {
         int size = map.size();
         dos.writeInt(size);
         ArrayList<Integer> values = new ArrayList<Integer>(map.size());
-        for(String s : map.keySet()){
+        for(String s : map.keySet()) {
             values.add(map.get(s));
             dos.writeString(s);
         }
-        for(Integer i : values){
+        for(Integer i : values) {
             dos.writeInt(i.intValue());
         }
         return true;
     }
     
-    public static boolean writeStringArray(Output dos, String[] stringArray){
+    public static boolean writeStringArray(Output dos, String[] stringArray) {
         dos.writeInt(stringArray.length);
-        for(int i=0; i<stringArray.length; i++){
+        for(int i=0; i<stringArray.length; i++) {
             dos.writeString(stringArray[i]);
         }
         return true;
     }
         
-    public static String[] readStringArray(Input dis){
+    public static String[] readStringArray(Input dis) {
         int size;
         String[] wireArray = null;
         size = dis.readInt();
-        if(size == 0){
+        if(size == 0) {
             return emptyStringArray;
         }
         wireArray = new String[size];
-        for(int i = 0; i < wireArray.length; i++){
+        for(int i = 0; i < wireArray.length; i++) {
             wireArray[i] = dis.readString();
         }
         return wireArray;
     }
     
-    public static boolean writeIntArray(Output dos, int[] intArray){
-        if(intArray == null){
+    public static boolean writeIntArray(Output dos, int[] intArray) {
+        if(intArray == null) {
             dos.writeInt(0);
             return true;
         }
@@ -355,8 +355,8 @@ public class FileTools {
         return true;
     }
 
-    public static boolean writeShortArray(Output dos, short[] intArray){
-        if(intArray == null){
+    public static boolean writeShortArray(Output dos, short[] intArray) {
+        if(intArray == null) {
             dos.writeShort(0);
             return true;
         }
@@ -365,19 +365,19 @@ public class FileTools {
         return true;
     }
     
-    public static int[] readIntArray(Input dis){
+    public static int[] readIntArray(Input dis) {
         int length = dis.readInt();
         if(length == 0) return emptyIntArray;
         return dis.readInts(length);
     }
 
-    public static short[] readShortArray(Input dis){
+    public static short[] readShortArray(Input dis) {
         int length = dis.readShort();
         if(length == 0) return emptyShortArray;
         return dis.readShorts(length);
     }
     
-    public static boolean writeString(DataOutputStream dos, String str){
+    public static boolean writeString(DataOutputStream dos, String str) {
         try {
             dos.writeInt(str.length());
             dos.write(str.getBytes());
@@ -387,7 +387,7 @@ public class FileTools {
         return true;
     }
     
-    public static String readString(DataInputStream dis){
+    public static String readString(DataInputStream dis) {
         byte[] buffer;
         try {
             buffer = new byte[dis.readInt()];
@@ -407,12 +407,12 @@ public class FileTools {
      * @return The Object de-serialized from the file or null if there was an error.
      */
     @SuppressWarnings("resource")
-    public static Object loadFromFile(String fileName){
+    public static Object loadFromFile(String fileName) {
         File inputFile = new File(fileName);
 
         try (FileInputStream fis = new FileInputStream(inputFile);
             BufferedInputStream bis = new BufferedInputStream(fis);
-            ObjectInputStream ois  = new ObjectInputStream(bis)){
+            ObjectInputStream ois  = new ObjectInputStream(bis)) {
             return ois.readObject();
         }
         catch (FileNotFoundException e) {
@@ -427,7 +427,7 @@ public class FileTools {
             MessageGenerator.briefError("Improper file found: ");
 
         }
-        catch (OutOfMemoryError e){
+        catch (OutOfMemoryError e) {
             MessageGenerator.briefError("The JVM ran out of memory trying to load the object in " +
                 fileName + ". Try using the JVM switch to increase the heap space (" +
                         "ex: java -Xmx1600M).");
@@ -441,11 +441,11 @@ public class FileTools {
      * @param fileName Name of the file to serialize the object to.
      * @return True if operation was successful, false otherwise.
      */
-    public static boolean saveToFile(Object o, String fileName){
+    public static boolean saveToFile(Object o, String fileName) {
         File objectFile = new File(fileName);
         try (FileOutputStream fos = new FileOutputStream(objectFile);
             BufferedOutputStream bos = new BufferedOutputStream(fos);
-            ObjectOutputStream oos = new ObjectOutputStream(bos)){
+            ObjectOutputStream oos = new ObjectOutputStream(bos)) {
             oos.writeObject(o);
             return true;
         } catch (IOException e) {
@@ -462,12 +462,12 @@ public class FileTools {
     public static void writeLinesToTextFile(List<String> lines, String fileName) {
         String nl = System.getProperty("line.separator");
         try (FileWriter fw = new FileWriter(fileName);
-            BufferedWriter bw = new BufferedWriter(fw)){
+            BufferedWriter bw = new BufferedWriter(fw)) {
             for(String line : lines) {
                 bw.write(line + nl);
             }
         }
-        catch(IOException e){
+        catch(IOException e) {
             throw new UncheckedIOException("Error writing file: " +
                 fileName + File.separator + e.getMessage(), e);
         }
@@ -484,7 +484,7 @@ public class FileTools {
             BufferedWriter bw = new BufferedWriter(fw)) {
             bw.write(text + nl);
         }
-        catch(IOException e){
+        catch(IOException e) {
             throw new UncheckedIOException("Error writing file: " +
                 fileName + File.separator + e.getMessage(), e);
         }
@@ -497,20 +497,20 @@ public class FileTools {
      * @param fileName Name of the text file to load.
      * @return An ArrayList containing strings of each line in the file. 
      */
-    public static ArrayList<String> getLinesFromTextFile(String fileName){
+    public static ArrayList<String> getLinesFromTextFile(String fileName) {
         String line;
 
         ArrayList<String> lines = new ArrayList<String>();
         try (FileReader fr = new FileReader(fileName);
             BufferedReader br = new BufferedReader(fr)) {
-            while((line = br.readLine()) != null){
+            while((line = br.readLine()) != null) {
                 lines.add(line);
             }
         }
-        catch(FileNotFoundException e){
+        catch(FileNotFoundException e) {
             throw new UncheckedIOException("ERROR: Could not find file: " + fileName, e);
         } 
-        catch(IOException e){
+        catch(IOException e) {
             throw new UncheckedIOException("ERROR: Could not read from file: " + fileName, e);
         }
         
@@ -524,20 +524,20 @@ public class FileTools {
      * @return A list of the last n lines in the text file.  If the file has less than or equal
      * to n lines in the file, it returns all lines in the file.
      */
-    public static List<String> getLastNLinesFromTextFile(String fileName, int n){
+    public static List<String> getLastNLinesFromTextFile(String fileName, int n) {
         if(n <= 0) return Collections.emptyList();
         ArrayList<String> lines = getLinesFromTextFile(fileName);
         if(lines.size() <= n) {
             return lines;
         }
         ArrayList<String> toReturn = new ArrayList<>();
-        for(int i=(lines.size()-(n+1)); i < lines.size(); i++){
+        for(int i=(lines.size()-(n+1)); i < lines.size(); i++) {
             toReturn.add(lines.get(i));
         }
         return toReturn;
     }
     
-    public static ArrayList<String> getLinesFromInputStream(InputStream in){
+    public static ArrayList<String> getLinesFromInputStream(InputStream in) {
         String line = null;
         ArrayList<String> lines = new ArrayList<String>();
         BufferedReader br = new BufferedReader(new InputStreamReader(in));
@@ -561,9 +561,9 @@ public class FileTools {
      * @param fileName The input file name 
      * @return the substring of fileName if it contains a '.', it returns fileName otherwise
      */
-    public static String removeFileExtension(String fileName){
+    public static String removeFileExtension(String fileName) {
         int endIndex = fileName.lastIndexOf('.');
-        if(endIndex != -1){
+        if(endIndex != -1) {
             return fileName.substring(0, endIndex);
         }
         else{
@@ -576,9 +576,9 @@ public class FileTools {
      * @param dirName Name of the directory to be created.
      * @return True if the directory was created or already exists, false otherwise.
      */
-    public static boolean makeDir(String dirName){
+    public static boolean makeDir(String dirName) {
         File dir = new File(dirName); 
-        if(!(dir.exists())){
+        if(!(dir.exists())) {
             return dir.mkdir();
         }
         return true;
@@ -589,7 +589,7 @@ public class FileTools {
      * @param dirName Name of the directory to be created.
      * @return True if the directory and implicit parent directories were created, false otherwise.
      */
-    public static boolean makeDirs(String dirName){
+    public static boolean makeDirs(String dirName) {
         return new File(dirName).mkdirs();
     }
     
@@ -598,7 +598,7 @@ public class FileTools {
      * @param fileName Name of the file to get the size of.
      * @return The number of bytes used by the file.
      */
-    public static long getFileSize(String fileName){
+    public static long getFileSize(String fileName) {
         return new File(fileName).length();
     }
     
@@ -607,12 +607,12 @@ public class FileTools {
      * @param fileName Name of the file to delete
      * @return True for successful deletion, false otherwise.
      */
-    public static boolean deleteFile(String fileName){
+    public static boolean deleteFile(String fileName) {
         // A File object to represent the filename
         File f = new File(fileName);
 
         // Make sure the file or directory exists and isn't write protected
-        if (!f.exists()){
+        if (!f.exists()) {
             MessageGenerator.briefError("WARNING: Attempted to delete file " + fileName + " but it wasn't there.");
             return false;
         }
@@ -644,24 +644,24 @@ public class FileTools {
      * @param path The path to the folder where all its contents will be deleted.
      * @return True if operation was successful, false otherwise.
      */
-    public static boolean deleteFolderContents(String path){
+    public static boolean deleteFolderContents(String path) {
         File currDirectory = new File(path);
-        if(currDirectory.exists()){
+        if(currDirectory.exists()) {
             try {
-                for(File file : currDirectory.listFiles()){
-                    if(file.isDirectory()){
-                        if(!deleteFolder(file.getCanonicalPath())){
+                for(File file : currDirectory.listFiles()) {
+                    if(file.isDirectory()) {
+                        if(!deleteFolder(file.getCanonicalPath())) {
                             return false;
                         }
                     }
                     else{
-                        if(!deleteFile(file.getCanonicalPath())){
+                        if(!deleteFile(file.getCanonicalPath())) {
                             return false;
                         }
                     }
                 }                
             }
-            catch(IOException e){
+            catch(IOException e) {
                 return false;
             }
             return true;
@@ -674,20 +674,20 @@ public class FileTools {
      * @param folderName
      * @return true for successful deletion, false otherwise
      */
-    public static boolean deleteFolder(String folderName){
+    public static boolean deleteFolder(String folderName) {
         // A file object to represent the filename
         File f = new File(folderName);
         
-        if(!f.exists() || !f.isDirectory()){
+        if(!f.exists() || !f.isDirectory()) {
             MessageGenerator.briefError("WARNING: Attempted to delete folder " + folderName + " but it wasn't there.");
             return false;
         }
         
-        for(File i: f.listFiles()){
-            if(i.isDirectory()){
+        for(File i: f.listFiles()) {
+            if(i.isDirectory()) {
                 deleteFolder(i.getAbsolutePath());
-            }else if(i.isFile()){
-                if(!i.delete()){
+            }else if(i.isFile()) {
+                if(!i.delete()) {
                     throw new IllegalArgumentException("Delete: deletion failed: " + i.getAbsolutePath());
                 }
             }
@@ -695,7 +695,7 @@ public class FileTools {
         return deleteFile(folderName);
     }
 
-    public static boolean renameFile(String oldFileName, String newFileName){
+    public static boolean renameFile(String oldFileName, String newFileName) {
         File oldFile = new File(oldFileName);
         return oldFile.renameTo(new File(newFileName));
     }
@@ -707,11 +707,11 @@ public class FileTools {
      * @param dst Destination file to write to
      * @return True if operation was successful, false otherwise.
      */
-    public static boolean copyFile(String src, String dst){
+    public static boolean copyFile(String src, String dst) {
         File srcFile = new File(src);
         try (FileInputStream fis = new FileInputStream(srcFile);
             FileChannel inChannel = fis.getChannel()) {
-            if(new File(dst).isDirectory()){
+            if(new File(dst).isDirectory()) {
                 dst = dst + File.separator + srcFile.getName();
             }
             try (FileOutputStream fos = new FileOutputStream(dst);
@@ -719,12 +719,12 @@ public class FileTools {
                 inChannel.transferTo(0, inChannel.size(), outChannel);
             }
         }
-        catch (FileNotFoundException e){
+        catch (FileNotFoundException e) {
             e.printStackTrace();
             MessageGenerator.briefError("ERROR could not find/access file(s): " + src + " and/or " + dst);
             return false;
         } 
-        catch (IOException e){
+        catch (IOException e) {
             MessageGenerator.briefError("ERROR copying file: " + src + " to " + dst);
             return false;
         }
@@ -740,21 +740,21 @@ public class FileTools {
      * @param recursive A flag denoting if the sub folders of source should be copied.
      * @return True if operation was successful, false otherwise.
      */
-    public static boolean copyFolder(String srcDirectoryPath, String dstDirectoryPath, boolean recursive){
+    public static boolean copyFolder(String srcDirectoryPath, String dstDirectoryPath, boolean recursive) {
         File srcDirectory = new File(srcDirectoryPath);
         File dstDirectory = new File(dstDirectoryPath + File.separator + srcDirectory.getName());
-        if(srcDirectory.exists() && srcDirectory.isDirectory()){
-            if(!dstDirectory.exists()){
+        if(srcDirectory.exists() && srcDirectory.isDirectory()) {
+            if(!dstDirectory.exists()) {
                 dstDirectory.mkdirs();
             }
-            for(File file : srcDirectory.listFiles()){
-                if(!file.isDirectory()){
-                    if(!copyFile(file.getAbsolutePath(), dstDirectory.getAbsolutePath() + File.separator + file.getName())){
+            for(File file : srcDirectory.listFiles()) {
+                if(!file.isDirectory()) {
+                    if(!copyFile(file.getAbsolutePath(), dstDirectory.getAbsolutePath() + File.separator + file.getName())) {
                         return false;
                     }
                 }
-                else if(file.isDirectory() && recursive){
-                    if(!copyFolder(file.getAbsolutePath(), dstDirectory.getAbsolutePath(), true)){
+                else if(file.isDirectory() && recursive) {
+                    if(!copyFolder(file.getAbsolutePath(), dstDirectory.getAbsolutePath(), true)) {
                         return false;
                     }
                 }
@@ -776,21 +776,21 @@ public class FileTools {
      * copied.
      * @return True if operation is successful, false otherwise.
      */
-    public static boolean copyFolderContents(String src, String dst, boolean recursive){
+    public static boolean copyFolderContents(String src, String dst, boolean recursive) {
         File srcDirectory = new File(src);
         File dstDirectory = new File(dst);
-        if(srcDirectory.exists() && srcDirectory.isDirectory()){
-            if(!dstDirectory.exists()){
+        if(srcDirectory.exists() && srcDirectory.isDirectory()) {
+            if(!dstDirectory.exists()) {
                 MessageGenerator.briefError("ERROR: Could find destination directory " + dstDirectory.getAbsolutePath());
             }
-            for(File file : srcDirectory.listFiles()){
-                if(!file.isDirectory()){
-                    if(!copyFile(file.getAbsolutePath(), dstDirectory.getAbsolutePath() + File.separator + file.getName())){
+            for(File file : srcDirectory.listFiles()) {
+                if(!file.isDirectory()) {
+                    if(!copyFile(file.getAbsolutePath(), dstDirectory.getAbsolutePath() + File.separator + file.getName())) {
                         return false;
                     }
                 }
-                else if(file.isDirectory() && recursive){
-                    if(!copyFolder(file.getAbsolutePath(), dst, true)){
+                else if(file.isDirectory() && recursive) {
+                    if(!copyFolder(file.getAbsolutePath(), dst, true)) {
                         MessageGenerator.briefError("ERROR: While copying folder " + file.getAbsolutePath() +
                                 " to " + dst + File.separator + file.getName());
                         return false;
@@ -807,7 +807,7 @@ public class FileTools {
      * Convenience assertion to assert that a file exists 
      * @param fileName Name of the file to check
      */
-    public static void errorIfFileDoesNotExist(String fileName){
+    public static void errorIfFileDoesNotExist(String fileName) {
         File f = new File(fileName);
         if(!f.exists())
             MessageGenerator.generalErrorAndExit("ERROR: Couldn't find file '" + fileName +
@@ -827,11 +827,11 @@ public class FileTools {
      * @return The string of the path to the RapidWright, or null if running from within
      * a jar file and RAPIDWRIGHT_PATH is not set.
      */
-    public static String getRapidWrightPath(){
+    public static String getRapidWrightPath() {
         String path = System.getenv(RAPIDWRIGHT_VARIABLE_NAME);
-        if(path == null){
+        if(path == null) {
             final File f = new File(FileTools.class.getProtectionDomain().getCodeSource().getLocation().getPath());
-            if(f.isDirectory()){
+            if(f.isDirectory()) {
                 File rootFolder = f.getParentFile();
                 if(rootFolder != null) {
                     return rootFolder.getAbsolutePath();
@@ -841,7 +841,7 @@ public class FileTools {
             unPackSupportingJarData();
             return getExecJarStoragePath();
         }
-        if(path.endsWith(File.separator)){
+        if(path.endsWith(File.separator)) {
             path.substring(0, path.length()-1);
         }
         return path;
@@ -985,7 +985,7 @@ public class FileTools {
      * @param name Name of the resource.
      * @return An InputStream to the resource or null if it could not be found.
      */
-    public static InputStream getRapidWrightResourceInputStream(String name){
+    public static InputStream getRapidWrightResourceInputStream(String name) {
         ensureCorrectDataFile(name);
         File resourceFile = new File(getRapidWrightPath() + File.separator + name);
         try {
@@ -1007,7 +1007,7 @@ public class FileTools {
      */
     public static boolean checkIfRapidWrightResourceExists(String name) {
         String rwPath = getRapidWrightPath();
-        if(rwPath != null){
+        if(rwPath != null) {
             boolean foundFile = new File(rwPath + File.separator + name).exists();
             if (foundFile) return foundFile;
         }
@@ -1020,9 +1020,9 @@ public class FileTools {
      * @param name Name of the RapidWright resource
      * @return The full file name path, or null if one could not be found.
      */
-    public static String getRapidWrightResourceFileName(String name){
+    public static String getRapidWrightResourceFileName(String name) {
         String rwPath = getRapidWrightPath();
-        if(rwPath != null){
+        if(rwPath != null) {
             return rwPath + File.separator + name;
         }
         
@@ -1033,7 +1033,7 @@ public class FileTools {
      * Gets an input stream to the file containing valid cell placements of the hdi primitives.
      * @return An input stream to the valid cell placements map file.
      */
-    public static InputStream getUnisimDataResourceStream(){
+    public static InputStream getUnisimDataResourceStream() {
         return getRapidWrightResourceInputStream(UNISIM_DATA_FILE_NAME);
     }
     
@@ -1041,7 +1041,7 @@ public class FileTools {
      * Gets an input stream to the file containing a CSV file of valid parts for RapidWright.
      * @return An input stream to the valid cell placements map file.
      */
-    public static InputStream getPartDumpResourceStream(){
+    public static InputStream getPartDumpResourceStream() {
         return getRapidWrightResourceInputStream(PART_DUMP_FILE_NAME);
     }
 
@@ -1051,7 +1051,7 @@ public class FileTools {
      * @param part The part to get its corresponding folder path.
      * @return The path of the folder where the parts files resides.
      */
-    public static String getPartFolderResourceName(Part part){
+    public static String getPartFolderResourceName(Part part) {
         FamilyType ft = part.getRevision().isEmpty() ? part.getArchitecture() : part.getFamily();
         return     DEVICE_FOLDER_NAME + 
                 File.separator + 
@@ -1064,7 +1064,7 @@ public class FileTools {
      * @param familyType The family type corresponding folder path.
      * @return The path of the folder where the parts of familyType reside.
      */
-    public static String getPartFolderResourceName(FamilyType familyType){
+    public static String getPartFolderResourceName(FamilyType familyType) {
         familyType = PartNameTools.getArchitectureFromFamilyType(familyType);
         return     DEVICE_FOLDER_NAME + 
                 File.separator + 
@@ -1072,11 +1072,11 @@ public class FileTools {
                 File.separator;
     }
     
-    public static String getDeviceFolderResourceName(){
+    public static String getDeviceFolderResourceName() {
         return DEVICE_FOLDER_NAME;        
     }
     
-    public static String getDeviceResourceName(Part part){
+    public static String getDeviceResourceName(Part part) {
         return getDeviceResourceSuffix(part) + DEVICE_FILE_SUFFIX;
     }
     
@@ -1094,17 +1094,17 @@ public class FileTools {
      * @param type The specified family type.
      * @return A list of available Xilinx parts for the given family type 
      */
-    public static List<String> getAvailableParts(FamilyType type){
+    public static List<String> getAvailableParts(FamilyType type) {
         ArrayList<String> allParts = new ArrayList<String>();
         String pattern = DEVICE_FILE_SUFFIX;
         File dir = new File(FileTools.getDeviceFolderResourceName() + File.separator + type.toString().toLowerCase());
-        if(!dir.exists()){
+        if(!dir.exists()) {
             MessageGenerator.briefError("ERROR: No part files exist.  Please download "
                     + "see RapidWright installation instructions for help.");
             return Collections.emptyList();
         }
-        for(String part : dir.list()){
-            if(part.endsWith(pattern)){
+        for(String part : dir.list()) {
+            if(part.endsWith(pattern)) {
                 allParts.add(part.replace(pattern, ""));
             }
         }
@@ -1118,12 +1118,12 @@ public class FileTools {
     public static List<FamilyType> getAvailableFamilies() {
         ArrayList<FamilyType> allFamilies = new ArrayList<FamilyType>();
         File dir = new File(FileTools.getDeviceFolderResourceName());
-        if(!dir.exists()){
+        if(!dir.exists()) {
             MessageGenerator.briefError("ERROR: No part files exist.  Please download "
                     + "see RapidWright installation instructions for help.");
             return Collections.emptyList();
         }
-        for(String partFamily : dir.list()){
+        for(String partFamily : dir.list()) {
             if(PART_DB_PATH.endsWith(partFamily)) continue;
             FamilyType type = FamilyType.valueOf(partFamily.toUpperCase());
             if (type != null) allFamilies.add(type);
@@ -1139,7 +1139,7 @@ public class FileTools {
      * which is "EEE MMM dd HH:mm:ss yyyy".
      * @return Current date and time as a formatted string.
      */
-    public static String getTimeString(){
+    public static String getTimeString() {
         SimpleDateFormat formatter = new SimpleDateFormat("EEE MMM dd HH:mm:ss yyyy");
         return formatter.format(new java.util.Date());
     }
@@ -1147,8 +1147,8 @@ public class FileTools {
     /**
      * Gets and returns the file separator character for the given OS
      */
-    public static String getDirectorySeparator(){
-        if(FileTools.cygwinInstalled()){
+    public static String getDirectorySeparator() {
+        if(FileTools.cygwinInstalled()) {
             return "/";
         }
         else{
@@ -1159,22 +1159,22 @@ public class FileTools {
     /**
      * Checks if Cygwin is installed on the system
      */
-    public static boolean cygwinInstalled(){
+    public static boolean cygwinInstalled() {
         return System.getenv("CYGWIN") != null;
     }
     
-    public static void writeObjectToKryoFile(Path fileName, Object o){
+    public static void writeObjectToKryoFile(Path fileName, Object o) {
         writeObjectToKryoFile(fileName, o, false);
     }
 
-    public static void writeObjectToKryoFile(String fileName, Object o){
+    public static void writeObjectToKryoFile(String fileName, Object o) {
         writeObjectToKryoFile(Paths.get(fileName), o);
     }
 
 
-    public static void writeObjectToKryoFile(Path fileName, Object o, boolean writeClass){
+    public static void writeObjectToKryoFile(Path fileName, Object o, boolean writeClass) {
         Kryo kryo = getKryoInstance();
-        try (Output out = new Output(Files.newOutputStream(fileName))){
+        try (Output out = new Output(Files.newOutputStream(fileName))) {
             if(writeClass)
                 kryo.writeClassAndObject(out, o);
             else
@@ -1192,9 +1192,9 @@ public class FileTools {
         return readObjectFromKryoFile(Paths.get(fileName));
     }
     
-    public static Object readObjectFromKryoFile(Path fileName){
+    public static Object readObjectFromKryoFile(Path fileName) {
         Kryo kryo = getKryoInstance();
-        try (Input i = new Input(Files.newInputStream(fileName))){
+        try (Input i = new Input(Files.newInputStream(fileName))) {
             return kryo.readClassAndObject(i);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
@@ -1204,7 +1204,7 @@ public class FileTools {
     public static <T> T readObjectFromKryoFile(String fileName, Class<T> c) {
         return readObjectFromKryoFile(Paths.get(fileName), c);
     }
-    public static <T> T readObjectFromKryoFile(Path fileName, Class<T> c){
+    public static <T> T readObjectFromKryoFile(Path fileName, Class<T> c) {
         try (InputStream is = Files.newInputStream(fileName)) {
             return readObjectFromKryoFile(is, c);
         } catch (IOException e) {
@@ -1212,22 +1212,22 @@ public class FileTools {
         }
     }
 
-    public static <T> T readObjectFromKryoFile(InputStream in, Class<T> c){
+    public static <T> T readObjectFromKryoFile(InputStream in, Class<T> c) {
         Kryo kryo = getKryoInstance();
         try (Input i = new Input(in)) {
             return kryo.readObject(i, c);
         }
     }
 
-    public static Object readObjectFromKryoFile(InputStream in){
+    public static Object readObjectFromKryoFile(InputStream in) {
         Kryo kryo = getKryoInstance();
         try (Input i = new Input(in)) {
             return kryo.readClassAndObject(i);
         }
     }
     
-    public static Kryo getKryoInstance(){
-        if(kryo == null){
+    public static Kryo getKryoInstance() {
+        if(kryo == null) {
             kryo = new Kryo();
             kryo.setRegistrationRequired(false);
         }
@@ -1256,19 +1256,19 @@ public class FileTools {
      * @param fileName2
      * @return
      */
-    public static boolean isFileNewer(String fileName1, String fileName2){
+    public static boolean isFileNewer(String fileName1, String fileName2) {
         return isFileNewer(Paths.get(fileName1), Paths.get(fileName2));
     }
     
-    public static Pair<InputStream,Long> getInputStreamFromZipFile(String zipFileName, String fileEndsWith){
+    public static Pair<InputStream,Long> getInputStreamFromZipFile(String zipFileName, String fileEndsWith) {
         try {
             final ZipFile zip = new ZipFile(zipFileName);
             Enumeration<? extends ZipEntry> entries = zip.entries();
             ZipEntry match = null;
-            while(entries.hasMoreElements()){
+            while(entries.hasMoreElements()) {
                 ZipEntry entry = entries.nextElement();
-                if(entry.getName().endsWith(fileEndsWith)){
-                    if(match != null){
+                if(entry.getName().endsWith(fileEndsWith)) {
+                    if(match != null) {
                         throw new RuntimeException("ERROR: Found 2 or more matching files in zip file: " +
                                 zipFileName + " with ending: '" + fileEndsWith + "'");
                     }
@@ -1310,7 +1310,7 @@ public class FileTools {
      * @param command The command to run
      * @return A list of standard output lines followed by the standard error lines
      */
-    public static ArrayList<String> getCommandOutput(String[] command){
+    public static ArrayList<String> getCommandOutput(String[] command) {
         Process p;
         try {
             p = Runtime.getRuntime().exec(command);
@@ -1347,7 +1347,7 @@ public class FileTools {
      * command's output (both std.out and std.err) to std.out.  
      * @return The return value of the process if it terminated, if there was a problem it returns null.
      */
-    public static Integer runCommand(String command, boolean verbose){
+    public static Integer runCommand(String command, boolean verbose) {
         if(verbose) System.out.println(command);
         int returnValue = 0;
         Process p = null;
@@ -1358,11 +1358,11 @@ public class FileTools {
             input.start();
             err.start();
             returnValue = p.waitFor();
-        } catch (IOException e){
+        } catch (IOException e) {
             e.printStackTrace();
             MessageGenerator.briefError("ERROR: In running the command \"" + command + "\"");
             return null;
-        } catch (InterruptedException e){
+        } catch (InterruptedException e) {
             e.printStackTrace();
             MessageGenerator.briefError("ERROR: The command was interrupted: \"" + command + "\"");
             return null;
@@ -1378,7 +1378,7 @@ public class FileTools {
      * @param logFileName Name of the log file to produce that will capture stderr and stdout.  
      * @return The return value of the process if it terminated, if there was a problem it returns null.
      */
-    public static Integer runCommand(List<String> command, String logFileName){
+    public static Integer runCommand(List<String> command, String logFileName) {
         System.out.println("External Command: " + command);
         System.out.println("Log File: " + logFileName);
         ProcessBuilder pb = new ProcessBuilder(command);
@@ -1397,7 +1397,7 @@ public class FileTools {
         return returnVal;
     }
     
-    public static String getUniqueProcessAndHostID(){
+    public static String getUniqueProcessAndHostID() {
         return ManagementFactory.getRuntimeMXBean().getName() + "_" + Thread.currentThread().getId();
     }
     
@@ -1408,7 +1408,7 @@ public class FileTools {
      * @param fileName Name of the file to check.
      * @return True if the file is considered binary, false otherwise.
      */
-    public static boolean isFileBinary(Path fileName){
+    public static boolean isFileBinary(Path fileName) {
         try (BufferedInputStream br = new BufferedInputStream(Files.newInputStream(fileName))) {
             return isDataBinary(br);
         } catch (IOException e) {
@@ -1423,25 +1423,25 @@ public class FileTools {
      * @param fileName Name of the file to check.
      * @return True if the file is considered binary, false otherwise.
      */
-    public static boolean isFileBinary(String fileName){
+    public static boolean isFileBinary(String fileName) {
         return isFileBinary(Paths.get(fileName));
     }
     
     public static final int BINARY_CHECK_LENGTH = 8192;
     private static byte[] binaryCheckData; 
 
-    public static boolean isDataBinary(InputStream is){
-        if(!is.markSupported()){
+    public static boolean isDataBinary(InputStream is) {
+        if(!is.markSupported()) {
             throw new RuntimeException("ERROR: Cannot determine if input stream is binary without mark support.");
         }
-        if(binaryCheckData == null){
+        if(binaryCheckData == null) {
             binaryCheckData = new byte[BINARY_CHECK_LENGTH];
         }
         boolean isBinary = false;
         try {
             is.mark(BINARY_CHECK_LENGTH+1);
             int count = is.read(binaryCheckData);
-            for(int i=0; i < count; i++){
+            for(int i=0; i < count; i++) {
                 if(binaryCheckData[i] == 0x00) {
                     isBinary = true;
                     break;
@@ -1470,7 +1470,7 @@ public class FileTools {
      * @param command The command with arguments separated.
      * @return The list of lines of output from the command.
      */
-    public static List<String> execCommandGetOutput(boolean includeError, String... command){
+    public static List<String> execCommandGetOutput(boolean includeError, String... command) {
         ProcessBuilder pb = new ProcessBuilder(command);
         Process p = null;
         String line = null;
@@ -1479,12 +1479,12 @@ public class FileTools {
         try {
             p = pb.start();
             p.waitFor();  // wait for process to finish then continue.
-            try (BufferedReader bri = new BufferedReader(new InputStreamReader(p.getInputStream()))){
+            try (BufferedReader bri = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
                 while ((line = bri.readLine()) != null) {
                     output.add(line);
                 }
             }        
-            if(includeError){
+            if(includeError) {
                 try (BufferedReader bre = new BufferedReader(new InputStreamReader(p.getErrorStream()))) {
                     while ((line = bre.readLine()) != null) {
                         output.add(line);
@@ -1507,9 +1507,9 @@ public class FileTools {
      * @param execName Name of the executable (ex: vivado)
      * @return True if the executable is available in the current path, false otherwise.
      */
-    public static boolean isExecutableOnPath(String execName){
+    public static boolean isExecutableOnPath(String execName) {
         List<String> lines = execCommandGetOutput(true, isWindows() ? "where" : "which",execName);
-        for(String line : lines){
+        for(String line : lines) {
             if(line.startsWith("which:")) return false;
             if(line.contains("INFO: Could not find files")) return false;
             if(line.contains(File.separator + execName)) return true;
@@ -1521,7 +1521,7 @@ public class FileTools {
      * Checks if vivado is available on current PATH (uses unix 'which' or windows 'where').  
      * @return true if vivado is on current PATH, false otherwise.
      */
-    public static boolean isVivadoOnPath(){
+    public static boolean isVivadoOnPath() {
         return isExecutableOnPath("vivado");
     }
     
@@ -1530,18 +1530,18 @@ public class FileTools {
      * compatible with the version of vivado available.  Vivado versions that match or
      * are older than RapidWright are presumed compatible.
      */
-    public static boolean isVivadoCompatible(){
-        if(isVivadoOnPath()){
+    public static boolean isVivadoCompatible() {
+        if(isVivadoOnPath()) {
             List<String> lines = execCommandGetOutput(true, "vivado", "-version");
-            for(String line : lines){
-                if(line.startsWith("Vivado ")){
+            for(String line : lines) {
+                if(line.startsWith("Vivado ")) {
                     int dot = line.indexOf('.');
                     int year = Integer.parseInt(line.substring(line.indexOf(" v")+2,dot));
                     int quarter = Integer.parseInt(line.substring(dot+1, dot+2));
-                    if(year > Device.RAPIDWRIGHT_YEAR_VERSION){
+                    if(year > Device.RAPIDWRIGHT_YEAR_VERSION) {
                         return false;
                     }
-                    if(year == Device.RAPIDWRIGHT_YEAR_VERSION && quarter > Device.RAPIDWRIGHT_QUARTER_VERSION){
+                    if(year == Device.RAPIDWRIGHT_YEAR_VERSION && quarter > Device.RAPIDWRIGHT_QUARTER_VERSION) {
                         return false;
                     }
                     return true;
@@ -1556,10 +1556,10 @@ public class FileTools {
      * @return The string version representation of the Vivado version available on the system PATH.
      */
     public static String getVivadoVersion() {
-        if(isVivadoOnPath()){
+        if(isVivadoOnPath()) {
             List<String> lines = execCommandGetOutput(true, "vivado", "-version");
-            for(String line : lines){
-                if(line.startsWith("Vivado ")){
+            for(String line : lines) {
+                if(line.startsWith("Vivado ")) {
                     String[] tokens = line.split("\\s+");
                     return tokens[1];
                 }
@@ -1573,10 +1573,10 @@ public class FileTools {
      * environment variable. Works for Windows and Linux.
      * @return Full path to vivado executable, or throws RuntimeException if not found.  
      */
-    public static String getVivadoPath(){
+    public static String getVivadoPath() {
         String[] cmd = new String[]{isWindows() ? "where" : "which",isWindows() ? "vivado.bat" : "vivado"};
         final List<String> fullOutput = execCommandGetOutput(true, cmd);
-        if(fullOutput.isEmpty() || fullOutput.get(0).contains("INFO:") || fullOutput.get(0).contains("which: no")){
+        if(fullOutput.isEmpty() || fullOutput.get(0).contains("INFO:") || fullOutput.get(0).contains("which: no")) {
             throw new RuntimeException("ERROR: Couldn't find vivado on PATH");
         }
         return fullOutput.get(0).trim().replace("\\", "/");
@@ -1584,29 +1584,29 @@ public class FileTools {
     
     private static String currentOS = null;
     
-    public static String getOSName(){
-        if(currentOS == null){
+    public static String getOSName() {
+        if(currentOS == null) {
             currentOS = System.getProperty("os.name");
         }
         return currentOS;
     }
     
-    public static boolean isWindows(){
+    public static boolean isWindows() {
         return getOSName().startsWith("Windows");
     }
     
-    public static void unzipFile(String zipFileName, String destDirectory){
+    public static void unzipFile(String zipFileName, String destDirectory) {
         File destDir = new File(destDirectory);
         byte[] buffer = new byte[1024*16];
-        if(!destDir.exists()){
+        if(!destDir.exists()) {
             destDir.mkdirs();
         }
         try (FileInputStream fis = new FileInputStream(zipFileName);
             ZipInputStream zin = new ZipInputStream(fis)) {
             ZipEntry e;
-            while((e = zin.getNextEntry()) != null){
+            while((e = zin.getNextEntry()) != null) {
                 String destFilePath = destDirectory + File.separator + e.getName();
-                if(e.isDirectory()){
+                if(e.isDirectory()) {
                     new File(destFilePath).mkdirs();
                 }else{
                     File currFile = new File(destFilePath);
@@ -1615,7 +1615,7 @@ public class FileTools {
                     try (FileOutputStream fos = new FileOutputStream(destFilePath);
                         BufferedOutputStream bos = new BufferedOutputStream(fos)) {
                         int read;
-                        while( (read = zin.read(buffer)) != -1){
+                        while( (read = zin.read(buffer)) != -1) {
                             bos.write(buffer,0,read);
                         }
                     }
@@ -1628,7 +1628,7 @@ public class FileTools {
     
     private static FilenameFilter ednFilter = new FilenameFilter() {
         @Override
-        public boolean accept(File dir, String name){
+        public boolean accept(File dir, String name) {
             return name.toLowerCase().endsWith(".edn");
         }
     };
@@ -1637,13 +1637,13 @@ public class FileTools {
      * Gets a filename filter for EDN files (ends with .edn).
      * @return The EDN filename filter
      */
-    public static FilenameFilter getEDNFilenameFilter(){
+    public static FilenameFilter getEDNFilenameFilter() {
         return ednFilter;
     }
 
     private static FilenameFilter dcpFilter = new FilenameFilter() {
         @Override
-        public boolean accept(File dir, String name){
+        public boolean accept(File dir, String name) {
             return name.toLowerCase().endsWith(".dcp");
         }
     };
@@ -1652,7 +1652,7 @@ public class FileTools {
      * Gets a filename filter for DCP files (ends with .dcp).
      * @return The DCP filename filter
      */
-    public static FilenameFilter getDCPFilenameFilter(){
+    public static FilenameFilter getDCPFilenameFilter() {
         return dcpFilter;
     }
     
@@ -1662,10 +1662,10 @@ public class FileTools {
      * @param matches Uses the String.matches() to match filename.
      * @return The newly created filename filter object.
      */
-    public static FilenameFilter getFilenameFilter(String matches){
+    public static FilenameFilter getFilenameFilter(String matches) {
         FilenameFilter filter = new FilenameFilter() {
             @Override
-            public boolean accept(File dir, String name){
+            public boolean accept(File dir, String name) {
                 return name.matches(matches);
             }
         };
@@ -1678,9 +1678,9 @@ public class FileTools {
      * for regular use by RapidWright.
      * @return True if operation succeeds, false otherwise.
      */
-    public static boolean unPackSupportingJarData(){
+    public static boolean unPackSupportingJarData() {
         String outputPath = getExecJarStoragePath();
-        for(String folderName : FileTools.UNPACK_FOLDERS){
+        for(String folderName : FileTools.UNPACK_FOLDERS) {
             if(new File(outputPath + File.separator + folderName).exists()) continue;
             try{
                 CodeSource src = Device.class.getProtectionDomain().getCodeSource();
@@ -1693,17 +1693,17 @@ public class FileTools {
                     ZipInputStream zip = new ZipInputStream(is)) {
                     ZipEntry e;
                     byte[] buffer = new byte[1024];
-                    while((e = zip.getNextEntry()) != null){
+                    while((e = zip.getNextEntry()) != null) {
                         String name = e.getName();
-                        if(name.startsWith(folderName)){
-                            if(!e.isDirectory()){
+                        if(name.startsWith(folderName)) {
+                            if(!e.isDirectory()) {
                                 String fileName = outputPath + File.separator + e.getName();
                                 System.out.println("Unpacking " + fileName);
                                 File newFile = new File(fileName);
                                 new File(newFile.getParent()).mkdirs();
                                 try(FileOutputStream fos = new FileOutputStream(newFile)) {
                                     int len;
-                                    while((len = zip.read(buffer)) > 0){
+                                    while((len = zip.read(buffer)) > 0) {
                                         fos.write(buffer, 0, len);
                                     }
                                 }
@@ -1711,7 +1711,7 @@ public class FileTools {
                         }
                     }
                 }
-            } catch(IOException e){
+            } catch(IOException e) {
                 e.printStackTrace();
                 return false;
             }
@@ -1725,7 +1725,7 @@ public class FileTools {
      * @return True if the the file/folder name is free (unused), false otherwise.
      * @deprecated
      */
-    public static boolean folderCheck(String name){
+    public static boolean folderCheck(String name) {
         return !(new File(name).exists());
     }
 

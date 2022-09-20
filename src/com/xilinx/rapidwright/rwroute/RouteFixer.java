@@ -44,7 +44,7 @@ public class RouteFixer{
     private NodeWithDelay source;
     private int vertexId;
     
-    public RouteFixer(NetWrapper netp, Map<Node, Routable> rnodesCreated){
+    public RouteFixer(NetWrapper netp, Map<Node, Routable> rnodesCreated) {
         this.netp = netp;
         nodeMap = new HashMap<>();
         source = null;
@@ -52,11 +52,11 @@ public class RouteFixer{
         buildGraph(netp, rnodesCreated);
     }
     
-    private void buildGraph(NetWrapper netWrapper, Map<Node, Routable> rnodesCreated){
-        for(Connection connection:netWrapper.getConnections()){
+    private void buildGraph(NetWrapper netWrapper, Map<Node, Routable> rnodesCreated) {
+        for(Connection connection:netWrapper.getConnections()) {
             // nodes of connections are in the order from sink to source
             int vertexSize = connection.getNodes().size();
-            for(int i = vertexSize - 1; i > 0; i--){
+            for(int i = vertexSize - 1; i > 0; i--) {
                 Node cur = connection.getNodes().get(i);
                 Node next = connection.getNodes().get(i - 1);
                 
@@ -82,7 +82,7 @@ public class RouteFixer{
     /**
      * Finalizes the route of each connection based on the delay-aware path merging.
      */
-    public void finalizeRoutesOfConnections(){
+    public void finalizeRoutesOfConnections() {
         setShortestPathToEachVertex();
         
         for(Connection connection : netp.getConnections()) {
@@ -127,7 +127,7 @@ public class RouteFixer{
     private static Comparator<NodeWithDelay> NodeWithDelayComparator = new Comparator<NodeWithDelay>() {
         @Override
         public int compare(NodeWithDelay a, NodeWithDelay b) {
-            if(a.getDelay() < b.getDelay()){
+            if(a.getDelay() < b.getDelay()) {
                 return -1;
             }else {
                 return 1;
@@ -145,7 +145,7 @@ public class RouteFixer{
         private boolean visited;
         private Set<NodeWithDelay> children;
          
-        public NodeWithDelay(int id, Node node, float delay){
+        public NodeWithDelay(int id, Node node, float delay) {
             this.id = id;
             this.node = node;
             this.delay = delay;
@@ -192,7 +192,7 @@ public class RouteFixer{
             return delay;
         }
         
-        public Node getNode(){
+        public Node getNode() {
             return node;
         }
         
@@ -201,12 +201,12 @@ public class RouteFixer{
         }
         
         @Override
-        public int hashCode(){
+        public int hashCode() {
             return node.hashCode();
         }
         
         @Override
-        public String toString(){
+        public String toString() {
             return id + ", " + node.toString() + ", delay = " + delay + ", sink? " + isSink;
         }
     }

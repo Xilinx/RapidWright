@@ -46,17 +46,17 @@ public class EDIFPropertyValue {
 
     private String owner;
 
-    public EDIFPropertyValue(){
+    public EDIFPropertyValue() {
 
     }
 
-    public EDIFPropertyValue(String value, EDIFValueType type, String owner){
+    public EDIFPropertyValue(String value, EDIFValueType type, String owner) {
         this.value = value;
         this.type = type;
         this.owner = owner;
     }
 
-    public EDIFPropertyValue(String value, EDIFValueType type){
+    public EDIFPropertyValue(String value, EDIFValueType type) {
         this.value = value;
         this.type = type;
     }
@@ -207,11 +207,11 @@ public class EDIFPropertyValue {
         os.write('(');
         os.write(type.toString().getBytes(StandardCharsets.UTF_8));
         os.write(' ');
-        if(type == EDIFValueType.STRING){
+        if(type == EDIFValueType.STRING) {
             os.write('\"');
             os.write(value.getBytes(StandardCharsets.UTF_8));
             os.write('\"');
-        }else if(type == EDIFValueType.BOOLEAN){
+        }else if(type == EDIFValueType.BOOLEAN) {
             os.write('(');
             os.write(value.getBytes(StandardCharsets.UTF_8));
             os.write(')');

@@ -35,7 +35,7 @@ import com.xilinx.rapidwright.design.SitePinInst;
  * A class extends {@link RWRoute} for partial routing.
  */
 public class PartialRouter extends RWRoute{
-    public PartialRouter(Design design, RWRouteConfig config){
+    public PartialRouter(Design design, RWRouteConfig config) {
         super(design, config);
     }
     
@@ -55,9 +55,9 @@ public class PartialRouter extends RWRoute{
     }
     
     @Override
-    protected void addStaticNetRoutingTargets(Net staticNet){
+    protected void addStaticNetRoutingTargets(Net staticNet) {
         List<SitePinInst> sinks = new ArrayList<>();
-        for(SitePinInst sink : staticNet.getPins()){
+        for(SitePinInst sink : staticNet.getPins()) {
             if(sink.isOutPin()) continue;
             sinks.add(sink);
         }

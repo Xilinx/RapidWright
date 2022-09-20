@@ -79,7 +79,7 @@ public class EDIFHierNet {
      * @param port The reference port of the instance.
      * @return Full hierarchical name of the instance attached to the port.
      */
-    public String getHierarchicalInstName(EDIFPortInst port){
+    public String getHierarchicalInstName(EDIFPortInst port) {
         StringBuilder sb = new StringBuilder();
         if (hierarchicalInst.enterHierarchicalName(sb)) {
             sb.append(EDIFTools.EDIF_HIER_SEP);
@@ -88,7 +88,7 @@ public class EDIFHierNet {
         return sb.toString();
     }
     
-    public String getHierarchicalNetName(){
+    public String getHierarchicalNetName() {
         StringBuilder sb = new StringBuilder();
         if (hierarchicalInst.enterHierarchicalName(sb)) {
             sb.append(EDIFTools.EDIF_HIER_SEP);
@@ -184,7 +184,7 @@ public class EDIFHierNet {
             if (!visited.add(net)) {
                 continue;
             }
-            for(EDIFPortInst relP : net.getNet().getPortInsts()){
+            for(EDIFPortInst relP : net.getNet().getPortInsts()) {
                 EDIFHierPortInst p = new EDIFHierPortInst(net.getHierarchicalInst(), relP);
 
                 boolean isCellPin = relP.getCellInst() != null && relP.getCellInst().getCellType().isLeafCellOrBlackBox();
@@ -195,14 +195,14 @@ public class EDIFHierNet {
                 }
 
                 boolean isToplevelInput = p.getHierarchicalInst().isTopLevelInst() && relP.getCellInst() == null && p.isInput();
-                if(isToplevelInput || (isCellPin && p.isOutput())){
+                if(isToplevelInput || (isCellPin && p.isOutput())) {
                     if (parentNet != null) {
                         throw new RuntimeException("Multiple sources!");
                     }
                     parentNet = net;
                 }
 
-                if(p.getPortInst().getCellInst() == null){
+                if(p.getPortInst().getCellInst() == null) {
                     // Moving up in hierarchy
                     if (!p.getHierarchicalInst().isTopLevelInst()) {
                         final EDIFHierPortInst upPort = p.getPortInParent();
@@ -213,7 +213,7 @@ public class EDIFHierNet {
                 } else{
                     // Moving down in hierarchy
                     EDIFHierNet otherNet = p.getInternalNet();
-                    if(otherNet == null){
+                    if(otherNet == null) {
                         // Looks unconnected
                         continue;
                     }

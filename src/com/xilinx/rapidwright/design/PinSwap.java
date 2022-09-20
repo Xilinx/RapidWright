@@ -160,7 +160,7 @@ public class PinSwap {
      * check for a LUT5 and vice versa.  
      * @return Cell in the overlapping LUT BEL site.
      */
-    public Cell checkForCompanionCell(){
+    public Cell checkForCompanionCell() {
         if(companionCell != null) return companionCell;
         String otherBEL = cell.getBELName().charAt(1) == '5' ? cell.getBELName().replace('5', '6') : cell.getBELName().replace('6', '5');
         return cell.getSiteInst().getCell(otherBEL);
@@ -174,7 +174,7 @@ public class PinSwap {
         this.companionLogicalName = companionLogicalName;
     }
 
-    public String getCompanionLogicalName(){
+    public String getCompanionLogicalName() {
         return this.companionLogicalName;
     }
     
@@ -221,7 +221,7 @@ public class PinSwap {
         return true;
     }
     
-    public String toString(){
+    public String toString() {
         return cell.getBELName().charAt(1) + "LUT/" + logicalName + ":" + oldPhysicalName +"->" + newPhysicalName; 
     }
 }

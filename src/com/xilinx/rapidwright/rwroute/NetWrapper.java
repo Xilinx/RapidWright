@@ -48,14 +48,14 @@ public class NetWrapper{
     /** A flag to indicate if the source has been swapped */
     private boolean sourceChanged;
     
-    public NetWrapper(int id, Net net){
+    public NetWrapper(int id, Net net) {
         this.id = id;
         this.net = net;
         connections = new ArrayList<>();
         setSourceChanged(false);
     }
     
-    public void computeHPWLAndCenterCoordinates(){
+    public void computeHPWLAndCenterCoordinates() {
         short xMin = 1<<10;
         short xMax = 0;
         short yMin = 1<<10;
@@ -99,7 +99,7 @@ public class NetWrapper{
         setYCenter(ySum / yArray.size());
     }
     
-    public Net getNet(){
+    public Net getNet() {
         return net;
     }
     
@@ -107,11 +107,11 @@ public class NetWrapper{
         return id;
     }
     
-    public void addConnection(Connection connection){
+    public void addConnection(Connection connection) {
         connections.add(connection);    
     }
     
-    public List<Connection> getConnections(){
+    public List<Connection> getConnections() {
         return connections;
     }
 
@@ -148,7 +148,7 @@ public class NetWrapper{
     }
     
     @Override
-    public int hashCode(){
+    public int hashCode() {
         return id;
     }
     

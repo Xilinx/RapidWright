@@ -79,25 +79,25 @@ public class LocalJob extends Job {
     }
 
     
-    public long getProcessID(){
+    public long getProcessID() {
         /* -- This technique uses reflective access to private members of protected JDK classes
          * -- and causes warnings and potentially future errors.  We will just use a running
          * -- count for unique IDs.
         String className = p.getClass().getName();
-        if(className.equals("java.lang.UNIXProcess")){
+        if(className.equals("java.lang.UNIXProcess")) {
             try{
                 Field f = p.getClass().getDeclaredField("pid");
                 f.setAccessible(true);
                 return f.getInt(p);
-            }catch(Exception e){
+            }catch(Exception e) {
                 return -1;
             }
-        }else if(className.equals("java.lang.ProcessImpl") || className.equals("java.lang.Win32Process")){
+        }else if(className.equals("java.lang.ProcessImpl") || className.equals("java.lang.Win32Process")) {
             try{
                 Field f = p.getClass().getDeclaredField("handle");
                 f.setAccessible(true);
                 return (int)f.getLong(p);
-            }catch(Exception e){
+            }catch(Exception e) {
                 return -1;
             }
         }

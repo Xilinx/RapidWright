@@ -91,9 +91,9 @@ public class PicoBlazeArray {
      * the anchor to the BRAM instance 
      * @param m The module whose anchor should be updated
      */
-    public static void updateAnchorToBRAM(Module m){
-        for(SiteInst i : m.getSiteInsts()){
-            if(i.getSite().getSiteTypeEnum() == SiteTypeEnum.RAMBFIFO36){
+    public static void updateAnchorToBRAM(Module m) {
+        for(SiteInst i : m.getSiteInsts()) {
+            if(i.getSite().getSiteTypeEnum() == SiteTypeEnum.RAMBFIFO36) {
                 m.setAnchor(i.getSite());
                 m.calculateAllValidPlacements(m.getDevice());
             }
@@ -128,7 +128,7 @@ public class PicoBlazeArray {
             ModuleImpls picoBlazeImpls = new ModuleImpls();
 
             EDIFNetlist moduleNetlist = null;
-            for(int i=0; i < implementationCount; i++){
+            for(int i=0; i < implementationCount; i++) {
                 String dcpName = srcDir + File.separator + PBLOCK_DCP_PREFIX+i+".dcp";
                 String metaName = srcDir + File.separator + PBLOCK_DCP_PREFIX+i+"_"+i+"_metadata.txt";
                 t.stop().start("Loading " + PBLOCK_DCP_PREFIX+i+".dcp");
@@ -158,13 +158,13 @@ public class PicoBlazeArray {
 
             Map<String, T> instances = new HashMap<>();
 
-            for(int x=0; x < bramColumns; x++){
+            for(int x=0; x < bramColumns; x++) {
                 // we will skip top and bottom clock region rows to avoid laguna tiles and U-turn routing
-                for(int y=BRAMS_IN_CLOCK_REGION_HEIGHT; y < bramRows-BRAMS_IN_CLOCK_REGION_HEIGHT; y++){
+                for(int y=BRAMS_IN_CLOCK_REGION_HEIGHT; y < bramRows-BRAMS_IN_CLOCK_REGION_HEIGHT; y++) {
                     Site bram = device.getSite("RAMB36_X" + x + "Y" + y);
                     Module impl = null;
-                    for(Module m : picoBlazeImpls){
-                        if(canCreateModuleAtSite(design, bram, m, instances.values())){
+                    for(Module m : picoBlazeImpls) {
+                        if(canCreateModuleAtSite(design, bram, m, instances.values())) {
                             impl = m;
                             break;
                         }
@@ -193,23 +193,23 @@ public class PicoBlazeArray {
 
             // Connect pre-implemented modules together
             String busRange = "["+(PICOBLAZE_BUS_WIDTH-1)+":0]";
-            for(int x=0; x < bramColumns; x++){
+            for(int x=0; x < bramColumns; x++) {
                 top.createPort(TOP_INPUT_PREFIX + x + busRange, EDIFDirection.INPUT, PICOBLAZE_BUS_WIDTH);
                 top.createPort(TOP_OUTPUT_PREFIX + x + busRange, EDIFDirection.OUTPUT, PICOBLAZE_BUS_WIDTH);
                 // we will skip top and bottom clock region rows to avoid laguna tiles and U-turn routing
-                for(int y=BRAMS_IN_CLOCK_REGION_HEIGHT; y < bramRows-BRAMS_IN_CLOCK_REGION_HEIGHT; y++){
+                for(int y=BRAMS_IN_CLOCK_REGION_HEIGHT; y < bramRows-BRAMS_IN_CLOCK_REGION_HEIGHT; y++) {
                     T curr = instances.get(makeName(x, y));
                     if(curr==null) continue;
 
                     clk.createPortInst(CLK, curr.getCellInst());
                     curr.connect(RST, RST);
 
-                    for(int i=0; i < PICOBLAZE_BUS_WIDTH; i++){
-                        for(int j=0; j < CONN_ARRAY.length; j++){
+                    for(int i=0; i < PICOBLAZE_BUS_WIDTH; i++) {
+                        for(int j=0; j < CONN_ARRAY.length; j++) {
                             T other = instances.get(makeName(x, y + CONN_ARRAY[j]));
-                            if(other == null){
+                            if(other == null) {
                                 curr.connect(PICOBLAZE_INPUTS [j], TOP_INPUT_PREFIX  + x, i);
-                                if(y == bramRows-BRAMS_IN_CLOCK_REGION_HEIGHT-1 && j==3){
+                                if(y == bramRows-BRAMS_IN_CLOCK_REGION_HEIGHT-1 && j==3) {
                                     curr.connect(PICOBLAZE_OUTPUTS[j], TOP_OUTPUT_PREFIX + x, i);
                                 }
                             }else{

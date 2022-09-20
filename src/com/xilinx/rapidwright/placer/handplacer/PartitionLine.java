@@ -34,12 +34,12 @@ public class PartitionLine{
     
     public Tile end;
     
-    public PartitionLine(Tile start, Tile end){
+    public PartitionLine(Tile start, Tile end) {
         this.start = start;
         this.end = end;
     }
     
-    public void drawPartitionLine(FloorPlanScene scene){
+    public void drawPartitionLine(FloorPlanScene scene) {
         QPen pen = new QPen(QColor.white, 20);
         pen.setStyle(PenStyle.DashLine);
         scene.addLine(start.getColumn()*scene.tileSize,

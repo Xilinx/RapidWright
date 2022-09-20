@@ -94,16 +94,16 @@ public class PerformanceExplorer {
 
     private String vivadoPath = DEFAULT_VIVADO;
     
-    public PerformanceExplorer(Design d, String testDir, String clkName, double targetPeriod){
+    public PerformanceExplorer(Design d, String testDir, String clkName, double targetPeriod) {
         init(d, testDir, clkName, targetPeriod, null);
     }
     
-    public PerformanceExplorer(Design d, String testDir, String clkName, double targetPeriod, Map<PBlock, String> pblocks){
+    public PerformanceExplorer(Design d, String testDir, String clkName, double targetPeriod, Map<PBlock, String> pblocks) {
         init(d, testDir, clkName, targetPeriod, pblocks);
 
     }
     
-    private void init(Design d, String testDir, String clkName, double targetPeriod, Map<PBlock, String> pblocks){
+    private void init(Design d, String testDir, String clkName, double targetPeriod, Map<PBlock, String> pblocks) {
         this.design = d;
         this.runDirectory = testDir;
         this.clkName = clkName;
@@ -118,9 +118,9 @@ public class PerformanceExplorer {
         updateClockUncertaintyValues();
     }
     
-    public void updateClockUncertaintyValues(){
+    public void updateClockUncertaintyValues() {
         this.clockUncertaintyValues = new ArrayList<>();
-        for(double i=minClockUncertainty; i < maxClockUncertainty; i+=clockUncertaintyStep){
+        for(double i=minClockUncertainty; i < maxClockUncertainty; i+=clockUncertaintyStep) {
             clockUncertaintyValues.add(i);
         }
     }
@@ -206,9 +206,9 @@ public class PerformanceExplorer {
         this.clockUncertaintyValues = clockUncertaintyValues;
     }
     
-    public void setClockUncertaintyValues(String[] values){
+    public void setClockUncertaintyValues(String[] values) {
         this.clockUncertaintyValues = new ArrayList<Double>();
-        for(String val : values){
+        for(String val : values) {
             clockUncertaintyValues.add(Double.parseDouble(val));
         }
     }
@@ -262,18 +262,18 @@ public class PerformanceExplorer {
     }
 
     public ArrayList<String> createTclScript(String initialDcp, String instDirectory, 
-            PlacerDirective p, RouterDirective r, String clockUncertainty, Entry<PBlock, String> pblockEntry){
+            PlacerDirective p, RouterDirective r, String clockUncertainty, Entry<PBlock, String> pblockEntry) {
         PBlock pblock = pblockEntry.getKey();
         String pblockCells = pblockEntry.getValue();
         ArrayList<String> lines = new ArrayList<>();
         lines.add("open_checkpoint " + initialDcp);
         lines.add("set_clock_uncertainty -setup "+clockUncertainty+" [get_clocks "+clkName+"]");
-        if(pblock != null){
+        if(pblock != null) {
             String pblockName = pblock.getName() == null ? "pe_pblock_1" : pblock.getName();
             lines.add("create_pblock " + pblockName);
             lines.add("resize_pblock "+pblockName+" -add {"+pblock.toString()+"}");
             lines.add("add_cells_to_pblock "+pblockName+" " + (pblockCells == null ? "-top" : "[get_cells {"+ pblockCells +"}]" ));
-            if(containRouting){
+            if(containRouting) {
                 lines.add("set_property CONTAIN_ROUTING 1 [get_pblocks "+ pblockName+"]");
             }
         }
@@ -284,21 +284,21 @@ public class PerformanceExplorer {
         lines.add("route_design -directive " + r.name());
         lines.add("report_timing -file "+instDirectory + File.separator+ROUTED_TIMING_RESULT);
         lines.add("write_checkpoint -force " + instDirectory + File.separator + "routed.dcp");
-        if(addEDIFAndMetadata){
+        if(addEDIFAndMetadata) {
             lines.add("write_edif -force " + instDirectory + File.separator + "routed.edf");
             lines.add("source " + FileTools.getRapidWrightPath() + File.separator + "tcl" + File.separator + "rapidwright.tcl");
             lines.add("generate_metadata "+ instDirectory + File.separator + "routed.dcp false 0");
         }
-        for (int i = 0 ; i < lines.size(); i++){
+        for (int i = 0 ; i < lines.size(); i++) {
             lines.set(i, lines.get(i).replace('\\', '/'));
         }
         return lines;
     }
     
     
-    public void explorePerformance(){
+    public void explorePerformance() {
         
-        if(vivadoPath.equals(DEFAULT_VIVADO) && !FileTools.isVivadoOnPath()){
+        if(vivadoPath.equals(DEFAULT_VIVADO) && !FileTools.isVivadoOnPath()) {
             throw new RuntimeException("ERROR: Couldn't find \n"
                 + "    vivado on PATH, please update PATH or specify path with option -" + VIVADO_PATH_OPT);
         }
@@ -307,11 +307,11 @@ public class PerformanceExplorer {
         runDirectory = new File(runDirectory).getAbsolutePath();        
         String dcpName = runDirectory + File.separator + INITIAL_DCP_NAME;
         // Update clock period constraint
-        for(ConstraintGroup g : ConstraintGroup.values()){
+        for(ConstraintGroup g : ConstraintGroup.values()) {
             List<String> xdcList = design.getXDCConstraints(g);
-            for(int i=0; i < xdcList.size(); i++){
+            for(int i=0; i < xdcList.size(); i++) {
                 String xdc = xdcList.get(i);
-                if(xdc.contains("create_clock") && xdc.contains("-name " + clkName)){
+                if(xdc.contains("create_clock") && xdc.contains("-name " + clkName)) {
                     // TODO - For now, user will need to update DCP beforehand
                 }
             }        
@@ -320,20 +320,20 @@ public class PerformanceExplorer {
         design.writeCheckpoint(dcpName); 
         JobQueue jobs = new JobQueue();
         
-        if(pblocks == null){
+        if(pblocks == null) {
             pblocks = new HashMap<>();
             pblocks.put(null, null);
         }
         
         int pb = 0;
-        for(Entry<PBlock, String> e : pblocks.entrySet()){
+        for(Entry<PBlock, String> e : pblocks.entrySet()) {
             PBlock pblock = e.getKey();
-            for(PlacerDirective p : getPlacerDirectives()){
-                for(RouterDirective r : getRouterDirectives()){
-                    for(double c : getClockUncertaintyValues()){
+            for(PlacerDirective p : getPlacerDirectives()) {
+                for(RouterDirective r : getRouterDirectives()) {
+                    for(double c : getClockUncertaintyValues()) {
                         String roundedC = printNS(c);
                         String uniqueID = p.name() + "_" + r.name() + "_" + roundedC;
-                        if(pblock != null){
+                        if(pblock != null) {
                             uniqueID = uniqueID + "_pblock" + pb;
                         }
                         System.out.println(uniqueID);
@@ -378,7 +378,7 @@ public class PerformanceExplorer {
     private static final String VIVADO_PATH_OPT = "y";
     private static final String MAX_CONCURRENT_JOBS_OPT = "z";
     
-    private static OptionParser createOptionParser(){
+    private static OptionParser createOptionParser() {
         // Defaults        
         String placerDirectiveDefaults = DEFAULT_PLACE_DIRECTIVES.toString().replace("[", "").replace("]", "");
         String routerDirectiveDefaults = DEFAULT_ROUTE_DIRECTIVES.toString().replace("[", "").replace("]", "");
@@ -404,7 +404,7 @@ public class PerformanceExplorer {
         return p;
     }
     
-    private static void printHelp(OptionParser p){
+    private static void printHelp(OptionParser p) {
         MessageGenerator.printHeader("DCP Performance Explorer");
         System.out.println("This RapidWright program will place and route the same DCP in a variety of \n"
                          + "ways with the goal of achieving higher performance in timing closure. This \n"
@@ -420,7 +420,7 @@ public class PerformanceExplorer {
     }
 
     
-    public static String printNS(double num){
+    public static String printNS(double num) {
         return df.format(num);
     }
     
@@ -428,7 +428,7 @@ public class PerformanceExplorer {
         OptionParser p = createOptionParser();
         OptionSet opts = p.parse(args);
         
-        if(opts.has(HELP_OPT)){
+        if(opts.has(HELP_OPT)) {
             printHelp(p);
             return;
         }
@@ -441,11 +441,11 @@ public class PerformanceExplorer {
         Design d = Design.readCheckpoint(dcpInputName);
         PerformanceExplorer pe = new PerformanceExplorer(d, runDir, clkName, targetPeriod);
 
-        if(opts.hasArgument(MAX_CONCURRENT_JOBS_OPT)){
+        if(opts.hasArgument(MAX_CONCURRENT_JOBS_OPT)) {
             JobQueue.MAX_LOCAL_CONCURRENT_JOBS = (int) opts.valueOf(MAX_CONCURRENT_JOBS_OPT);
         }
         
-        if(opts.hasArgument(CLK_UNCERTAINTY_OPT)){
+        if(opts.hasArgument(CLK_UNCERTAINTY_OPT)) {
             String clkUncertaintyValues = (String) opts.valueOf(CLK_UNCERTAINTY_OPT);
             pe.setClockUncertaintyValues(clkUncertaintyValues.split("[,]"));            
         } else{
@@ -463,10 +463,10 @@ public class PerformanceExplorer {
         pe.setAddEDIFAndMetadata((boolean)opts.valueOf(ADD_EDIF_METADATA_OPT));
 
         
-        if(opts.hasArgument(PBLOCK_FILE_OPT)){
+        if(opts.hasArgument(PBLOCK_FILE_OPT)) {
             String fileName = (String) opts.valueOf(PBLOCK_FILE_OPT);
             Map<PBlock,String> pblocks = new HashMap<>();
-            for(String line : FileTools.getLinesFromTextFile(fileName)){
+            for(String line : FileTools.getLinesFromTextFile(fileName)) {
                 if(line.trim().startsWith("#")) continue;
                 if(line.trim().length()==0) continue;
                 String pblockRanges = null;

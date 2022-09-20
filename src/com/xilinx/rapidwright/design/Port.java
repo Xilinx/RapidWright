@@ -62,7 +62,7 @@ public class Port implements Serializable, Cloneable{
     /**
      * Default constructor, everything is null.
      */
-    public Port(){
+    public Port() {
         name = null;
     }
     
@@ -71,7 +71,7 @@ public class Port implements Serializable, Cloneable{
      * @param name Name of the port.
      * @param sitePinInst Pin which the port references
      */
-    public Port(String name, SitePinInst sitePinInst){
+    public Port(String name, SitePinInst sitePinInst) {
         this.name = name;
         addSitePinInst(sitePinInst);
     }
@@ -80,7 +80,7 @@ public class Port implements Serializable, Cloneable{
      * @param name Name of the port.
      * @param sitePinInsts Pins which the port references
      */
-    public Port(String name, Collection<SitePinInst> sitePinInsts){
+    public Port(String name, Collection<SitePinInst> sitePinInsts) {
         this.name = name;
         for (SitePinInst sitePinInst : sitePinInsts) {
             addSitePinInst(sitePinInst);
@@ -94,7 +94,7 @@ public class Port implements Serializable, Cloneable{
      * @param isOutputPort Flag denoting if this port is an output or input
      * @param initialPassThruPinName The name of the pass-thru port this port connects to
      */
-    public Port(String name, boolean isOutputPort, String initialPassThruPinName){
+    public Port(String name, boolean isOutputPort, String initialPassThruPinName) {
         this.name = name;
         setOutputPort(isOutputPort);
         addPassThruPortName(initialPassThruPinName);
@@ -111,7 +111,7 @@ public class Port implements Serializable, Cloneable{
      * Gets and returns the name of the port.
      * @return The name of the port.
      */
-    public String getName(){
+    public String getName() {
         return name;
     }
     
@@ -119,7 +119,7 @@ public class Port implements Serializable, Cloneable{
      * Sets the name of the port.
      * @param name The new name of the port.
      */
-    public void setName(String name){
+    public void setName(String name) {
         this.name = name;
     }
     
@@ -127,7 +127,7 @@ public class Port implements Serializable, Cloneable{
      * Gets and returns the instance name.
      * @return The name of the instance where this port resides.
      */
-    public String getSingleSiteInstName(){
+    public String getSingleSiteInstName() {
         SitePinInst singleSitePinInst = getSingleSitePinInst();
         return singleSitePinInst == null ? "null" : (singleSitePinInst.getSiteInst() == null ? "null" : singleSitePinInst.getSiteInstName());
     }
@@ -136,7 +136,7 @@ public class Port implements Serializable, Cloneable{
      *  Gets the pin name of the instance where the port resides.
      * @return The pin name of the port.
      */
-    public String getSingleSitePinInstName(){
+    public String getSingleSitePinInstName() {
         SitePinInst singleSitePinInst = getSingleSitePinInst();
         return singleSitePinInst == null ? "null" : singleSitePinInst.getName();
     }
@@ -203,7 +203,7 @@ public class Port implements Serializable, Cloneable{
      * its direction.
      * @return True if this port is an output, false otherwise.
      */
-    public boolean isOutPort(){
+    public boolean isOutPort() {
         setInternalDirectionFromPins();
         return isOutputPort;
     }
@@ -232,7 +232,7 @@ public class Port implements Serializable, Cloneable{
         this.passThruPortNames = passThruPinNames;
     }
 
-    public void addPassThruPortName(String portName){
+    public void addPassThruPortName(String portName) {
         if(passThruPortNames == null) passThruPortNames = new ArrayList<String>();
         passThruPortNames.add(portName);
     }
@@ -267,7 +267,7 @@ public class Port implements Serializable, Cloneable{
      * Generates hashCode for this port based on instance name, port name, and pin name.
      */
     @Override
-    public int hashCode(){
+    public int hashCode() {
         final int prime = 31;
         int result = 1;
         result = prime * result + sitePinInsts.hashCode();
@@ -279,7 +279,7 @@ public class Port implements Serializable, Cloneable{
      * instance name and pin name.
      */
     @Override
-    public boolean equals(Object obj){
+    public boolean equals(Object obj) {
         if(this == obj)
             return true;
         if(obj == null)
@@ -289,7 +289,7 @@ public class Port implements Serializable, Cloneable{
         Port other = (Port) obj;
         if (!sitePinInsts.equals(other.sitePinInsts))
             return false;
-        if(name == null){
+        if(name == null) {
             if(other.name != null)
                 return false;
         }
@@ -299,7 +299,7 @@ public class Port implements Serializable, Cloneable{
     }
     
     @Override
-    public String toString(){
+    public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append("port ");
         sb.append(name);

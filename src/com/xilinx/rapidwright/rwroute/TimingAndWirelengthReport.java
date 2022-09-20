@@ -99,7 +99,7 @@ public class TimingAndWirelengthReport{
             if(net.getSource().toString().contains("CLK")) continue;
             NetWrapper netplus = this.createNetWrapper(net);        
             List<Node> netNodes = RouterHelper.getNodesOfNet(net);            
-            for(Node node:netNodes){    
+            for(Node node:netNodes) {    
                 if(node.getTile().getTileTypeEnum() != TileTypeEnum.INT) continue;
                 usedNodes++;    
                 int wl = RouterHelper.getLengthOfNode(node);    
@@ -120,10 +120,10 @@ public class TimingAndWirelengthReport{
         NetWrapper netWrapper = new NetWrapper(this.numWireNetsToRoute++, net);            
         SitePinInst source = net.getSource();
         Node sourceINTNode = null;
-        for(SitePinInst sink:net.getSinkPins()){
-            if(RouterHelper.isExternalConnectionToCout(source, sink)){
+        for(SitePinInst sink:net.getSinkPins()) {
+            if(RouterHelper.isExternalConnectionToCout(source, sink)) {
                 source = net.getAlternateSource();
-                if(source == null){
+                if(source == null) {
                     String errMsg = "Null alternate source is for COUT-CIN connection: " + net.toStringFull();
                      throw new IllegalArgumentException(errMsg);
                 }
@@ -183,7 +183,7 @@ public class TimingAndWirelengthReport{
     }
     
     public static void main(String[] args) {
-        if(args.length < 1){
+        if(args.length < 1) {
             System.out.println("USAGE:\n <input.dcp>");
         }
         Design design = Design.readCheckpoint(args[0]);

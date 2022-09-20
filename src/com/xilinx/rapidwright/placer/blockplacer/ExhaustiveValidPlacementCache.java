@@ -48,7 +48,7 @@ public class ExhaustiveValidPlacementCache<PlacementT> extends AbstractValidPlac
     @Override
     public List<PlacementT> getByRangeAround(int rangeLimit, PlacementT placement) {
         List<PlacementT> result = new ArrayList<>();
-        for(PlacementT s : placements){
+        for(PlacementT s : placements) {
             if (placer.isInRange(placement, s)) {
                 result.add(s);
             }

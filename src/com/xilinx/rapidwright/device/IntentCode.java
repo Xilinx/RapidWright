@@ -133,28 +133,28 @@ public enum IntentCode {
     NODE_GLOBAL_VDISTR_SHARED;
 
 
-    public static boolean isLongWire(Tile tile, int wire){
+    public static boolean isLongWire(Tile tile, int wire) {
         return isLongWire(tile.getWireIntentCode(wire).ordinal());
     }
     
-    public static boolean isLongWire(int intentCode){
+    public static boolean isLongWire(int intentCode) {
         IntentCode ic = values[intentCode];
         return NODE_VLONG == ic || NODE_HLONG == ic || VLONG == ic || HLONG == ic || VLONG12 == ic || SVLONG == ic;
     }
     
-    public static boolean isUltraScaleClocking(Tile tile, int wire){
+    public static boolean isUltraScaleClocking(Tile tile, int wire) {
         return values[tile.getWireIntentCode(wire).ordinal()].isUltraScaleClocking();    
     }
     
-    public boolean isUltraScaleClocking(){
+    public boolean isUltraScaleClocking() {
         return NODE_GLOBAL_HDISTR == this || NODE_GLOBAL_VDISTR == this || NODE_GLOBAL_HROUTE == this || NODE_GLOBAL_LEAF == this || NODE_GLOBAL_VROUTE == this;
     }
     
-    public boolean isUltraScaleClockRouting(){
+    public boolean isUltraScaleClockRouting() {
         return NODE_GLOBAL_HROUTE == this || NODE_GLOBAL_VROUTE == this;
     }
     
-    public boolean isUltraScaleClockDistribution(){
+    public boolean isUltraScaleClockDistribution() {
         return NODE_GLOBAL_HDISTR == this || NODE_GLOBAL_VDISTR == this;
     }
     
@@ -174,26 +174,26 @@ public enum IntentCode {
      * @param s The series (or generation) 
      * @return The array of relevant intent codes or null if not available.
      */
-    public static IntentCode[] getIntentCodesBySeries(Series s){
-        if(s == Series.Series7){
+    public static IntentCode[] getIntentCodesBySeries(Series s) {
+        if(s == Series.Series7) {
             return Arrays.copyOfRange(IntentCode.values, SERIES7_START_IDX, SERIES7_END_IDX);
-        }else if(s == Series.UltraScale){
+        }else if(s == Series.UltraScale) {
             return Arrays.copyOfRange(IntentCode.values, ULTRASCALE_START_IDX, ULTRASCALE_END_IDX);
-        }else if(s == Series.UltraScalePlus){
+        }else if(s == Series.UltraScalePlus) {
             return Arrays.copyOfRange(IntentCode.values, ULTRASCALEPLUS_START_IDX, ULTRASCALEPLUS_END_IDX);
         } 
         return null;
     }
     
-    public static void printIntentCodesBySeries(Series s){
+    public static void printIntentCodesBySeries(Series s) {
         System.out.println(s.name() + ":");
-        for(IntentCode i : getIntentCodesBySeries(s)){
+        for(IntentCode i : getIntentCodesBySeries(s)) {
             System.out.printf("%3d. %s\n", i.ordinal(), i.name());
         }
     }
     
     public static void main(String[] args) {
-        for(Series s : Series.values()){
+        for(Series s : Series.values()) {
             printIntentCodesBySeries(s);
         }
     }

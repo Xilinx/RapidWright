@@ -88,7 +88,7 @@ public class TileWindow extends QMainWindow{
     void updateStatus() {
         int x = (int) scene.getCurrX();
         int y = (int) scene.getCurrY();
-        if (x >= 0 && x < scene.getDevice().getColumns() && y >= 0 && y < scene.getDevice().getRows()){
+        if (x >= 0 && x < scene.getDevice().getColumns() && y >= 0 && y < scene.getDevice().getRows()) {
             final Tile tile = scene.getDevice().getTile(y, x);
             String tileName = tile.getName();
             final String sites = tile.getSites() ==null ? "" : tile.getSites().length>5 ? "too may too show" : Arrays.stream(tile.getSites()).map(Site::getName).sorted().collect(Collectors.joining(", "));
@@ -102,7 +102,7 @@ public class TileWindow extends QMainWindow{
         tileWindow.show();
         QApplication.exec();
     }
-    protected void saveAsPDFDesign(){
+    protected void saveAsPDFDesign() {
         if(scene.getDesign() == null)
             return;
         String fileName = QFileDialog.getSaveFileName(this, tr("Save As PDF"),".", FileFilters.pdfFilter);

@@ -120,7 +120,7 @@ public class PhysNetlistReader {
         return design;
     }
 
-    public static Enumerator<String> readAllStrings(PhysNetlist.Reader physNetlist){
+    public static Enumerator<String> readAllStrings(PhysNetlist.Reader physNetlist) {
         Enumerator<String> allStrings = new Enumerator<>();
         TextList.Reader strListReader = physNetlist.getStrList();
         int strCount = strListReader.size();
@@ -185,7 +185,7 @@ public class PhysNetlistReader {
                 }
                 siteInst.setSiteLocked(true);
                 Cell c = siteInst.getCell(belName);
-                if(c == null){
+                if(c == null) {
                     BEL bel = siteInst.getBEL(belName);
                     c = new Cell(PhysNetlistWriter.LOCKED, bel);
                     c.setBELFixed(placement.getIsBelFixed());
@@ -290,7 +290,7 @@ public class PhysNetlistReader {
                     }
                 }
                 // Remote pin mappings from other cells
-                if(c.getLogicalPinMapping(belPinName) != null && pinMapping.hasOtherCell()){
+                if(c.getLogicalPinMapping(belPinName) != null && pinMapping.hasOtherCell()) {
                     c.setRoutethru(true);
                     MultiCellPinMapping.Reader otherCell = pinMapping.getOtherCell();
                     c.addAltPinMapping(belPinName, new AltPinMapping(cellPinName,
@@ -500,7 +500,7 @@ public class PhysNetlistReader {
                 PhysSitePin.Reader spReader = segment.getSitePin();
                 SiteInst siteInst = getSiteInst(spReader.getSite(), design, strings);
                 String pinName = strings.get(spReader.getPin());
-                if(siteInst == null && net.isStaticNet()){
+                if(siteInst == null && net.isStaticNet()) {
                     Site site = design.getDevice().getSite(strings.get(spReader.getSite()));
                     siteInst = new SiteInst(STATIC_SOURCE + tieoffInstanceCount++, site.getSiteTypeEnum());
                     siteInst.place(site);

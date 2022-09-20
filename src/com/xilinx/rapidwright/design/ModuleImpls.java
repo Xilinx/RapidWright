@@ -53,15 +53,15 @@ public class ModuleImpls extends ArrayList<Module> {
     private static final long serialVersionUID = -8931048535637180230L;
 
     
-    public String getName(){
+    public String getName() {
         return size() > 0 ? get(0).getName() : null;
     }
     
-    public Device getDevice(){
+    public Device getDevice() {
         return size() > 0 ? get(0).getDevice() : null;
     }
     
-    public EDIFNetlist getNetlist(){
+    public EDIFNetlist getNetlist() {
         return size() > 0 ? get(0).getNetlist() : null;
     }
 

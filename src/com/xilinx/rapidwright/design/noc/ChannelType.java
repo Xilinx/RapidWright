@@ -45,7 +45,7 @@ public enum ChannelType {
 
     private final String nc;
 
-    ChannelType(String nc){
+    ChannelType(String nc) {
         this.nc = nc;
     }
 

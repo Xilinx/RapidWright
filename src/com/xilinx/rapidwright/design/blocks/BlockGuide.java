@@ -62,7 +62,7 @@ public class BlockGuide {
     /** Cached copy of MD5 hash representing collection of settings */
     private String md5Hash;
     
-    public BlockGuide(){
+    public BlockGuide() {
         implementations = new ArrayList<>();
         insts = new LinkedHashMap<>();
         clocks = new LinkedHashMap<>();
@@ -106,11 +106,11 @@ public class BlockGuide {
         this.insts = insts;
     }
     
-    public void addImplementation(int index, PBlock pblock){
+    public void addImplementation(int index, PBlock pblock) {
         implementations.add(index, pblock);
     }
     
-    public BlockInst getInst(String name){
+    public BlockInst getInst(String name) {
         return insts.get(name);
     }
     
@@ -121,36 +121,36 @@ public class BlockGuide {
         insts.put(bi.getName(), bi);
     }
     
-    public void addClock(String clockName, Float constraint){
+    public void addClock(String clockName, Float constraint) {
         clocks.put(clockName, constraint);
     }
     
-    public void addClockBuffer(String clockName, Site clkBuffer){
+    public void addClockBuffer(String clockName, Site clkBuffer) {
         clockBuffers.put(clockName, clkBuffer);
     }
     
-    public Set<String> getClocks(){
+    public Set<String> getClocks() {
         return clocks.keySet();
     }
     
-    public Float getClockPeriod(String clkPortName){
+    public Float getClockPeriod(String clkPortName) {
         return clocks.get(clkPortName);
     }
     
-    public Site getClockBuffer(String clkPortName){
+    public Site getClockBuffer(String clkPortName) {
         return clockBuffers.get(clkPortName);
     }
     
-    public Set<String> getClocksWithBuffers(){
+    public Set<String> getClocksWithBuffers() {
         return clockBuffers.keySet();
     }
     
-    public void addXDCCommand(String xdc){
+    public void addXDCCommand(String xdc) {
         if(xdcCommands == null) xdcCommands = new ArrayList<>();
         xdcCommands.add(xdc);
     }
     
-    public List<String> getXDCCommands(){
+    public List<String> getXDCCommands() {
         if(xdcCommands == null) return Collections.emptyList();
         return xdcCommands;
     }
@@ -162,8 +162,8 @@ public class BlockGuide {
      * it should restart.  
      * @return
      */
-    public String getMD5Hash(){
-        if(md5Hash == null){
+    public String getMD5Hash() {
+        if(md5Hash == null) {
             MessageDigest md5 = null;
             
             try {
@@ -174,24 +174,24 @@ public class BlockGuide {
 
             // Add all data to md5sum
             md5.update(cacheID.getBytes());
-            for(PBlock pb : implementations){
+            for(PBlock pb : implementations) {
                 md5.update(pb.toString().getBytes());
-                if(pb.getSubPBlocks() != null){
-                    for(SubPBlock sub : pb.getSubPBlocks()){
+                if(pb.getSubPBlocks() != null) {
+                    for(SubPBlock sub : pb.getSubPBlocks()) {
                         md5.update(sub.getGetCellsArgs().getBytes());
                         md5.update(sub.toString().getBytes());
                     }
                 }
             }
-            for(Entry<String,Float> e : clocks.entrySet()){
+            for(Entry<String,Float> e : clocks.entrySet()) {
                 md5.update(e.getKey().getBytes());
                 md5.update(e.getValue().toString().getBytes());
             }
-            for(Entry<String,Site> e : clockBuffers.entrySet()){
+            for(Entry<String,Site> e : clockBuffers.entrySet()) {
                 md5.update(e.getKey().getBytes());
                 md5.update(e.getValue().toString().getBytes());
             }
-            for(String xdc : getXDCCommands()){
+            for(String xdc : getXDCCommands()) {
                 md5.update(xdc.getBytes());
             }
             

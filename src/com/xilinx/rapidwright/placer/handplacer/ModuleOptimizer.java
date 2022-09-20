@@ -103,10 +103,10 @@ public class ModuleOptimizer extends QMainWindow {
 
         boolean debugPlacer = false;
         String fileToOpen = null;
-        if(args.length > 0){
+        if(args.length > 0) {
             fileToOpen = args[0];
         }
-        if(args.length == 2 && args[1].equalsIgnoreCase("-g")){
+        if(args.length == 2 && args[1].equalsIgnoreCase("-g")) {
             System.out.println("DEBUG MODE");
             debugPlacer = true;
         }
@@ -118,7 +118,7 @@ public class ModuleOptimizer extends QMainWindow {
         QApplication.exec();
     }
     
-    public ModuleOptimizer(QWidget parent, String fileToOpen, boolean debugPlacer){
+    public ModuleOptimizer(QWidget parent, String fileToOpen, boolean debugPlacer) {
         super(parent);
         
         undoStack = new QUndoStack();
@@ -150,7 +150,7 @@ public class ModuleOptimizer extends QMainWindow {
         setStatusBar(statusBar);
 
 
-        if(fileToOpen != null && new File(fileToOpen).exists()){
+        if(fileToOpen != null && new File(fileToOpen).exists()) {
             internalOpenDesign(fileToOpen);
         }
         // Set the opening default window size to 1024x768 pixels
@@ -158,13 +158,13 @@ public class ModuleOptimizer extends QMainWindow {
     }
     
     @SuppressWarnings("unused")
-    private void setStatusText(String text, Tile tile){
+    private void setStatusText(String text, Tile tile) {
         statusLabel.setText(text);
     }
     
-    private void populateMacroList(){
+    private void populateMacroList() {
         macroList.clear();
-        for(GUIModuleInst macro : scene.getMacroList()){
+        for(GUIModuleInst macro : scene.getMacroList()) {
             QTreeWidgetItem treeItem = new QTreeWidgetItem();
             treeItem.setText(0, macro.getModuleInst().getName());
             String sizeFMT = String.format("%5d", macro.getSizeInTiles());
@@ -175,37 +175,37 @@ public class ModuleOptimizer extends QMainWindow {
     }
     
     @SuppressWarnings("unused")
-    private void updateListSelection(){
+    private void updateListSelection() {
         if(macroList.hasFocus())
             return;
         macroList.clearSelection();
-        for(QGraphicsItemInterface item : scene.selectedItems()){
+        for(QGraphicsItemInterface item : scene.selectedItems()) {
             String modInstName = ((GUIModuleInst)item).getModuleInst().getName();
             List<QTreeWidgetItem> itemList = macroList.findItems(modInstName, new MatchFlags(MatchFlag.MatchExactly), 0);
-            if(itemList.size() > 0){
+            if(itemList.size() > 0) {
                 itemList.get(0).setSelected(true);
             }
         }
     }
     
     @SuppressWarnings("unused")
-    private void updateSceneSelection(){
+    private void updateSceneSelection() {
         if(scene.hasFocus())
             return;
         scene.clearSelection();
-        for(QTreeWidgetItem item : macroList.selectedItems()){
+        for(QTreeWidgetItem item : macroList.selectedItems()) {
             String modInstName = item.text(0);
             GUIModuleInst gmi = scene.getGMI(modInstName);
-            if(gmi != null){
+            if(gmi != null) {
                 gmi.setSelected(true);
             }
         }
     }
     
-    private void updateWireEstimate(){
+    private void updateWireEstimate() {
         ArrayList<GUINetLine> netLineList = scene.getNetLineList();
         double estimate = 0;
-        for(GUINetLine netLine : netLineList){
+        for(GUINetLine netLine : netLineList) {
             estimate += netLine.line().length();
         }
     }
@@ -215,21 +215,21 @@ public class ModuleOptimizer extends QMainWindow {
         updateWireEstimate();
     }
 
-    private void createUtilizationTable(){
+    private void createUtilizationTable() {
         
         List<String> headerList = Arrays.asList("Used", "Avail", "%Util");
         List<String> vHeaderList = new ArrayList<String>(UtilizationType.values().length);
-        for(UtilizationType type : UtilizationType.values()){
+        for(UtilizationType type : UtilizationType.values()) {
             vHeaderList.add(type.getString());
         }
         utilTable = new QTableWidget(vHeaderList.size(), headerList.size());
         
         utilTable.setHorizontalHeaderLabels(headerList);
         utilTable.setVerticalHeaderLabels(vHeaderList);
-        for(int i=0; i < vHeaderList.size(); i++){
+        for(int i=0; i < vHeaderList.size(); i++) {
             utilTable.setRowHeight(i, 20);
         }
-        for(int i=0; i < headerList.size(); i++){
+        for(int i=0; i < headerList.size(); i++) {
             utilTable.setColumnWidth(i, 50);
         }
         
@@ -240,10 +240,10 @@ public class ModuleOptimizer extends QMainWindow {
         addDockWidget(DockWidgetArea.RightDockWidgetArea, dockWidget);
     }
     
-    private void updateUtilizationTable(Design d){
+    private void updateUtilizationTable(Design d) {
         HashMap<UtilizationType,Integer> map = DesignTools.calculateUtilization(d);
         
-        for(int i=0; i < UtilizationType.values.length; i++){
+        for(int i=0; i < UtilizationType.values.length; i++) {
             Integer count = map.get(UtilizationType.values[i]);
             utilTable.setItem(i, 0, new QTableWidgetItem(count.toString()));
         }
@@ -275,15 +275,15 @@ public class ModuleOptimizer extends QMainWindow {
                 "Interactive Module Optimization Tool\n built on RapidWright.");
     }
 
-    protected void openDesign(){
+    protected void openDesign() {
         String fileName = QFileDialog.getOpenFileName(this, "Choose a file...",
                 ".", FileFilters.dcpFilter);
-        if(fileName.endsWith(".dcp")){
+        if(fileName.endsWith(".dcp")) {
             internalOpenDesign(fileName);
         }
     }
     
-    private void internalOpenDesign(String fileName){
+    private void internalOpenDesign(String fileName) {
         currOpenFileName = fileName;
         String shortFileName = fileName.substring(fileName.lastIndexOf('/')+1);
         QProgressDialog progress = new QProgressDialog("Loading "+currOpenFileName+"...", "", 0, 100, this);
@@ -314,14 +314,14 @@ public class ModuleOptimizer extends QMainWindow {
         progress.setValue(100);
     }
     
-    protected void saveDesign(){
+    protected void saveDesign() {
         if(scene.getDesign() == null || currOpenFileName == null)
             return;
         scene.getDesign().writeCheckpoint(currOpenFileName);
         statusBar().showMessage(currOpenFileName + " saved.", 2000);
     }
     
-    protected void saveAsDesign(){
+    protected void saveAsDesign() {
         if(scene.getDesign() == null)
             return;
         String fileName = QFileDialog.getSaveFileName(this, tr("Save As"),".", FileFilters.dcpFilter);
@@ -332,7 +332,7 @@ public class ModuleOptimizer extends QMainWindow {
         statusBar().showMessage(fileName + " saved.", 2000);
     }
     
-    protected void saveAsPDFDesign(){
+    protected void saveAsPDFDesign() {
         if(scene.getDesign() == null)
             return;
         String fileName = QFileDialog.getSaveFileName(this, tr("Save As PDF"),".", FileFilters.pdfFilter);
@@ -409,7 +409,7 @@ public class ModuleOptimizer extends QMainWindow {
         actionAddPBlock.setEnabled(true);
     }
     
-    private void setupViewActions(){
+    private void setupViewActions() {
         QToolBar tb = new QToolBar(this);
         tb.setWindowTitle(tr("View Actions"));
         addToolBar(tb);
@@ -433,17 +433,17 @@ public class ModuleOptimizer extends QMainWindow {
     }
 
     @SuppressWarnings("unused")
-    private void zoomin(){
+    private void zoomin() {
         view.zoomIn();
     }
     @SuppressWarnings("unused")
-    private void zoomout(){
+    private void zoomout() {
         view.zoomOut();
     }
     @SuppressWarnings("unused")
-    private void zoomselection(){
+    private void zoomselection() {
         double top=-1,left=-1,right=-1,bottom=-1;
-        for(QGraphicsItemInterface item : scene.selectedItems()){
+        for(QGraphicsItemInterface item : scene.selectedItems()) {
             QPointF gmiTL = item.pos();
             QPointF gmiBR = item.pos().add(item.boundingRect().bottomRight());
             if(top < 0 || gmiTL.y() < top)
@@ -458,7 +458,7 @@ public class ModuleOptimizer extends QMainWindow {
         view.fitInView(left, top, right-left, bottom-top, Qt.AspectRatioMode.KeepAspectRatio);    
     }
     @SuppressWarnings("unused")
-    private void addPblock(){
+    private void addPblock() {
         System.out.println("Adding a PBlock...");
         view.addPBlockMode(true);
         view.setCursor(new QCursor(CursorShape.CrossCursor));

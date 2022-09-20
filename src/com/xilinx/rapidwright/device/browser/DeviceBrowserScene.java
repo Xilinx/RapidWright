@@ -65,14 +65,14 @@ public class DeviceBrowserScene extends TileScene{
     private ArrayList<NumberedHighlightedTile> currentTiles = new ArrayList<NumberedHighlightedTile>();
     
     
-    public DeviceBrowserScene(Device device, boolean hideTiles, boolean drawPrimitives, DeviceBrowser browser){
+    public DeviceBrowserScene(Device device, boolean hideTiles, boolean drawPrimitives, DeviceBrowser browser) {
         super(device, hideTiles, drawPrimitives);
         currLines = new ArrayList<QGraphicsLineItem>();
         wirePen = new QPen(QColor.yellow, 0.25, PenStyle.SolidLine);
         this.browser = browser;
     }
     
-    public void drawWire(Tile src, Tile dst){
+    public void drawWire(Tile src, Tile dst) {
         QGraphicsLineItem line = new QGraphicsLineItem(
                 src.getColumn()*tileSize  + tileSize/2,
                 src.getRow()*tileSize + tileSize/2,
@@ -82,15 +82,15 @@ public class DeviceBrowserScene extends TileScene{
         addItem(line);
     }
 
-    public void clearCurrentLines(){
-        for(QGraphicsLineItem line : currLines){
+    public void clearCurrentLines() {
+        for(QGraphicsLineItem line : currLines) {
             this.removeItem(line);
             line.dispose();
         }
         currLines.clear();
     }
     
-    public void drawWire(Tile src, int wireSrc, Tile dst, int wireDst){
+    public void drawWire(Tile src, int wireSrc, Tile dst, int wireDst) {
         double enumSize = src.getWireCount();
         double x1 = (double) tileXMap.get(src)*tileSize  + (wireSrc%tileSize);
         double y1 = (double) tileYMap.get(src)*tileSize  + (wireSrc*tileSize)/enumSize;
@@ -105,39 +105,39 @@ public class DeviceBrowserScene extends TileScene{
         currLines.add(line);
     }
 
-    public void drawConnectingWires(Tile tile, int wire){
+    public void drawConnectingWires(Tile tile, int wire) {
         clearCurrentLines();
         if(tile == null) return;
-        for(Wire w : tile.getWireConnections(wire)){
+        for(Wire w : tile.getWireConnections(wire)) {
             drawWire(tile, wire, w.getTile(), w.getWireIndex());
         }
     }
 
-    private HashMap<Tile, Integer> findReachability(Tile t, Integer hops){
+    private HashMap<Tile, Integer> findReachability(Tile t, Integer hops) {
         HashMap<Tile, Integer> reachabilityMap = new HashMap<Tile, Integer>();
         
         Queue<RouteNode> queue = new LinkedList<RouteNode>();
-        for(int wire = 0; wire < t.getWireCount(); wire++){
+        for(int wire = 0; wire < t.getWireCount(); wire++) {
             List<Wire> connections = t.getWireConnections(wire);
             if(connections == null) continue;
-            for(Wire wc : connections){
+            for(Wire wc : connections) {
                 queue.add(new RouteNode(wc.getTile(),wc.getWireIndex()));
             }
         }
         
-        while(!queue.isEmpty()){
+        while(!queue.isEmpty()) {
             RouteNode currNode = queue.poll();
             Integer i = reachabilityMap.get(currNode.getTile());
-            if(i == null){
+            if(i == null) {
                 i = 1;
                 reachabilityMap.put(currNode.getTile(), i);
             }
             else{
                 reachabilityMap.put(currNode.getTile(), i+1);                        
             }
-            if(currNode.getLevel() < hops-1){
+            if(currNode.getLevel() < hops-1) {
                 List<Wire> connections = currNode.getConnections();
-                for(Wire wc : connections){
+                for(Wire wc : connections) {
                     queue.add(new RouteNode(wc.getTile(),wc.getWireIndex()));
                 }
             }
@@ -145,9 +145,9 @@ public class DeviceBrowserScene extends TileScene{
         return reachabilityMap;
     }
     
-    private void drawReachability(HashMap<Tile, Integer> map){
+    private void drawReachability(HashMap<Tile, Integer> map) {
         menuReachabilityClear();
-        for(Tile t : map.keySet()){
+        for(Tile t : map.keySet()) {
             int color = map.get(t)*16 > 255 ? 255 : map.get(t)*16;
             NumberedHighlightedTile tile = new NumberedHighlightedTile(t, this, map.get(t));
             tile.setBrush(new QBrush(new QColor(0, color, 0)));
@@ -156,32 +156,32 @@ public class DeviceBrowserScene extends TileScene{
     }
     
     @SuppressWarnings("unused")
-    private void menuReachability1(){
+    private void menuReachability1() {
         drawReachability(findReachability(reachabilityTile, 1));
     }
 
     @SuppressWarnings("unused")
-    private void menuReachability2(){
+    private void menuReachability2() {
         drawReachability(findReachability(reachabilityTile, 2));
     }
     
     @SuppressWarnings("unused")
-    private void menuReachability3(){
+    private void menuReachability3() {
         drawReachability(findReachability(reachabilityTile, 3));
     }
 
     @SuppressWarnings("unused")
-    private void menuReachability4(){
+    private void menuReachability4() {
         drawReachability(findReachability(reachabilityTile, 4));
     }
 
     @SuppressWarnings("unused")
-    private void menuReachability5(){
+    private void menuReachability5() {
         drawReachability(findReachability(reachabilityTile, 5));
     }
     
-    private void menuReachabilityClear(){
-        for(NumberedHighlightedTile rect : currentTiles){
+    private void menuReachabilityClear() {
+        for(NumberedHighlightedTile rect : currentTiles) {
             rect.remove();
         }
         currentTiles.clear();
@@ -189,16 +189,16 @@ public class DeviceBrowserScene extends TileScene{
 
     
     @Override
-    public void mouseDoubleClickEvent(QGraphicsSceneMouseEvent event){
+    public void mouseDoubleClickEvent(QGraphicsSceneMouseEvent event) {
         Tile t = getTile(event);
         this.updateTile.emit(t);
         super.mouseDoubleClickEvent(event);
     }
     
     @Override
-    public void mouseReleaseEvent(QGraphicsSceneMouseEvent event){
-        if(event.button().equals(MouseButton.RightButton)){
-            if(browser.view.hasPanned){
+    public void mouseReleaseEvent(QGraphicsSceneMouseEvent event) {
+        if(event.button().equals(MouseButton.RightButton)) {
+            if(browser.view.hasPanned) {
                 browser.view.hasPanned = false;
 
             }

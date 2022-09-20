@@ -44,11 +44,11 @@ public class EDIFName implements Comparable<EDIFName> {
     private String name;
     
     
-    protected EDIFName(){
+    protected EDIFName() {
         
     }
     
-    public EDIFName(String name){
+    public EDIFName(String name) {
         this.name = name;
     }
     
@@ -60,11 +60,11 @@ public class EDIFName implements Comparable<EDIFName> {
         this.name = edifName.name;
     }
 
-    public String getName(){
+    public String getName() {
         return name;
     }
     
-    protected void setName(String name){
+    protected void setName(String name) {
         this.name = name;
     }
 
@@ -123,11 +123,11 @@ public class EDIFName implements Comparable<EDIFName> {
         return true;
     }
     
-    public String toString(){
+    public String toString() {
         return name;
     }
     
-    public static <K, V> Map<K, V> getNewMap(){
+    public static <K, V> Map<K, V> getNewMap() {
         //Save some memory for small maps
         return new HashMap<K,V>(2);
     }

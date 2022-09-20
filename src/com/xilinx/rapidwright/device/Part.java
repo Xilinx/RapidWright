@@ -271,23 +271,23 @@ public class Part {
         versal = new HashSet<FamilyType>(Arrays.asList(versalTypes));
     }
     
-    public boolean isSeries7(){
+    public boolean isSeries7() {
         return series7.contains(architecture);
     }
     
-    public boolean isUltraScale(){
+    public boolean isUltraScale() {
         return ultraScale.contains(architecture);
     }
     
-    public boolean isUltraScalePlus(){
+    public boolean isUltraScalePlus() {
         return ultraScalePlus.contains(architecture);
     }
     
-    public boolean isVersal(){
+    public boolean isVersal() {
         return versal.contains(architecture);
     }
     
-    public String toString(){
+    public String toString() {
         return name;
     }
     

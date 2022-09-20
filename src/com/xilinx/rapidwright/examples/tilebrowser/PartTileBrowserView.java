@@ -124,13 +124,13 @@ public class PartTileBrowserView extends QGraphicsView {
     }
 
     
-    public void keyPressEvent(QKeyEvent event){
+    public void keyPressEvent(QKeyEvent event) {
         double scaleFactor = 1.15; 
         if (event.key() == Key.Key_Equal.value()) {
             // Zoom in (if not at limit)
             if(this.matrix().m11() < zoomMax)
                 scale(scaleFactor, scaleFactor);
-        } else if(event.key() == Key.Key_Minus.value()){
+        } else if(event.key() == Key.Key_Minus.value()) {
             // Zoom out (if not at limit)
             if(this.matrix().m11() > zoomMin)
                 scale(1.0 / scaleFactor, 1.0 / scaleFactor);

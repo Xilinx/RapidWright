@@ -52,7 +52,7 @@ public abstract class AbstractOverlapCache<PlacementT, ModuleInstT extends Abstr
             if (other.getPlacement() == null) {
                 continue;
             }
-            if (mii.overlaps(other)){
+            if (mii.overlaps(other)) {
                 overlaps.add(other);
             }
         }
@@ -69,7 +69,7 @@ public abstract class AbstractOverlapCache<PlacementT, ModuleInstT extends Abstr
             if (other.getPlacement() == null) {
                 continue;
             }
-            if (mii.overlaps(other)){
+            if (mii.overlaps(other)) {
                 return false;
             }
         }

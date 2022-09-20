@@ -44,7 +44,7 @@ public class EDIFPropertyObject extends EDIFName {
 
     private Map<String,EDIFPropertyValue> properties;
 
-    public EDIFPropertyObject(String name){
+    public EDIFPropertyObject(String name) {
         super(name);
     }
     
@@ -53,7 +53,7 @@ public class EDIFPropertyObject extends EDIFName {
         properties = obj.createDuplicatePropertiesMap();
     }
     
-    protected EDIFPropertyObject(){
+    protected EDIFPropertyObject() {
         
     }
     
@@ -64,7 +64,7 @@ public class EDIFPropertyObject extends EDIFName {
      * @param type The type of value (string, boolean, integer)
      * @return The previous property value stored under the provided key
      */
-    public EDIFPropertyValue addProperty(String key, String value, EDIFValueType type){
+    public EDIFPropertyValue addProperty(String key, String value, EDIFValueType type) {
         EDIFName k = new EDIFName(key);
         EDIFPropertyValue p = new EDIFPropertyValue(value, type);
         return addProperty(k,p);
@@ -76,7 +76,7 @@ public class EDIFPropertyObject extends EDIFName {
      * @param value The value of the property
      * @return The previous property value stored under the provided key
      */
-    public EDIFPropertyValue addProperty(String key, String value){
+    public EDIFPropertyValue addProperty(String key, String value) {
         EDIFPropertyValue p = new EDIFPropertyValue(value, EDIFValueType.STRING);
         return addProperty(key,p);
     }
@@ -87,7 +87,7 @@ public class EDIFPropertyObject extends EDIFName {
      * @param value The value of the property
      * @return The previous property value stored under the provided key
      */
-    public EDIFPropertyValue addProperty(String key, int value){
+    public EDIFPropertyValue addProperty(String key, int value) {
         EDIFName k = new EDIFName(key);
         EDIFPropertyValue p = new EDIFPropertyValue(Integer.toString(value), EDIFValueType.INTEGER);
         return addProperty(k,p);
@@ -99,7 +99,7 @@ public class EDIFPropertyObject extends EDIFName {
      * @param value The value of the property
      * @return The previous property value stored under the provided key
      */
-    public EDIFPropertyValue addProperty(String key, boolean value){
+    public EDIFPropertyValue addProperty(String key, boolean value) {
         EDIFName k = new EDIFName(key);
         EDIFPropertyValue p = new EDIFPropertyValue(value ? "true" : "false", EDIFValueType.BOOLEAN);
         return addProperty(k,p);
@@ -122,7 +122,7 @@ public class EDIFPropertyObject extends EDIFName {
      * @return Old property value for the provided key
      */
     @Deprecated
-    public EDIFPropertyValue addProperty(EDIFName key, EDIFPropertyValue value){
+    public EDIFPropertyValue addProperty(EDIFName key, EDIFPropertyValue value) {
         return addProperty(key.getName(), value);
     }
 
@@ -132,19 +132,19 @@ public class EDIFPropertyObject extends EDIFName {
      * @param value Value entry for the property
      * @return Old property value for the provided key
      */
-    public EDIFPropertyValue addProperty(String key, EDIFPropertyValue value){
+    public EDIFPropertyValue addProperty(String key, EDIFPropertyValue value) {
         if(properties == null) properties = getNewMap();
         return properties.put(key, value);
     }
 
     @Deprecated
-    public void addProperties(Map<EDIFName,EDIFPropertyValue> properties){
-        for(Entry<EDIFName,EDIFPropertyValue> p : properties.entrySet()){
+    public void addProperties(Map<EDIFName,EDIFPropertyValue> properties) {
+        for(Entry<EDIFName,EDIFPropertyValue> p : properties.entrySet()) {
             addProperty(p.getKey(),p.getValue());
         }
     }
     
-    public EDIFPropertyValue getProperty(String key){
+    public EDIFPropertyValue getProperty(String key) {
         if(properties == null) return null;
         return properties.get(key);
     }
@@ -168,7 +168,7 @@ public class EDIFPropertyObject extends EDIFName {
      * Creates a completely new copy of the map
      * @return
      */
-    public Map<String, EDIFPropertyValue> createDuplicatePropertiesMap(){
+    public Map<String, EDIFPropertyValue> createDuplicatePropertiesMap() {
         if(properties == null) return null;
         Map<String, EDIFPropertyValue> newMap = new HashMap<>();
         for(Entry<String, EDIFPropertyValue> e : properties.entrySet()) {
@@ -221,7 +221,7 @@ public class EDIFPropertyObject extends EDIFName {
                 EDIFName.exportSomeEDIFName(os, e.getKey(), cache.getEDIFRename(e.getKey()));
                 os.write(' ');
                 e.getValue().writeEDIFString(os);
-                if(e.getValue().getOwner() != null){
+                if(e.getValue().getOwner() != null) {
                     os.write(EXPORT_CONST_OWNER_START);
                     os.write(e.getValue().getOwner().getBytes(StandardCharsets.UTF_8));
                     os.write(EXPORT_CONST_OWNER_END);

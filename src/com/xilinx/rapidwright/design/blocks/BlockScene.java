@@ -42,7 +42,7 @@ public class BlockScene extends TileScene {
     
     private ArrayList<GUIPBlock> guiPBlocks;
     
-    public BlockScene(){
+    public BlockScene() {
         super();
         guiPBlocks = new ArrayList<>();
     }
@@ -62,8 +62,8 @@ public class BlockScene extends TileScene {
         
         // Update list of PBlocks
         guiPBlocks.clear();
-        for(BlockGuide b : implGuide.getBlocks()){
-            for(PBlock pb : b.getImplementations()){
+        for(BlockGuide b : implGuide.getBlocks()) {
+            for(PBlock pb : b.getImplementations()) {
                 GUIPBlock guiPb = new GUIPBlock(pb, this);
                 guiPBlocks.add(guiPb);
                 addItem(guiPb);

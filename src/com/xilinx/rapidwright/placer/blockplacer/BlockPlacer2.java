@@ -156,7 +156,7 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
      * @param focusOnWorstModules Spend more time on modules with worst placement
      * @param placementArea Only place in specific area
      */
-    public BlockPlacer2(Design design, boolean ignoreMostUsedNets, Path graphData, boolean denseDesign, float effort, boolean focusOnWorstModules, TileRectangle placementArea){
+    public BlockPlacer2(Design design, boolean ignoreMostUsedNets, Path graphData, boolean denseDesign, float effort, boolean focusOnWorstModules, TileRectangle placementArea) {
         this.design = design;
         this.dev = design.getDevice();
         this.ignoreMostUsedNets = ignoreMostUsedNets;
@@ -185,7 +185,7 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
      * Sets the random seed to be used in this placer
      * @param seed
      */
-    public void setSeed(long seed){
+    public void setSeed(long seed) {
         this.seed = seed;
     }
 
@@ -206,7 +206,7 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
     /**
      * Performs all of the initialization steps to prepare for placement
      */
-    public void initializePlacer(boolean debugFlow){
+    public void initializePlacer(boolean debugFlow) {
         currentMove = new Move2<>(this);
         totalMoves = 0;
         allPaths = new HashSet<PathT>();
@@ -237,9 +237,9 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
     abstract void placeHm(ModuleInstT hm, PlacementT placement);
     abstract void unplaceHm(ModuleInstT hm);
 
-    protected void initialPlacement(){
+    protected void initialPlacement() {
         if (hardMacros.stream().allMatch(hm->getCurrentPlacement(hm) != null)) {
-            for(PathT path : allPaths){
+            for(PathT path : allPaths) {
                 path.calculateLength();
             }
 
@@ -250,7 +250,7 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
         possiblePlacements = new HashMap<>();
 
         // Place hard macros for initial placement
-        for(ModuleInstT hm : hardMacros){
+        for(ModuleInstT hm : hardMacros) {
             PriorityQueue<PlacementT> sites = new PriorityQueue<>(1024, getInitialPlacementComparator(placementArea));
 
             final AbstractValidPlacementCache<PlacementT> placementCache = possiblePlacements.computeIfAbsent(hm.getModule(), module -> {
@@ -267,10 +267,10 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 
             sites.addAll(placementCache.getAll());
             boolean found = false;
-            while(!sites.isEmpty()){
+            while(!sites.isEmpty()) {
                 PlacementT site = sites.remove();
                 setTempAnchorSite(hm, site);
-                if(checkValidPlacement(hm)){
+                if(checkValidPlacement(hm)) {
                     placeHm(hm, site);
                     found = true;
                     break;
@@ -281,12 +281,12 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
             }
         }
 
-        for(PathT path : allPaths){
+        for(PathT path : allPaths) {
             path.calculateLength();
         }
 
         ArrayList<ModuleInstT> prunedList = new ArrayList<>();
-        for(ModuleInstT hm : new ArrayList<>(hardMacros)){
+        for(ModuleInstT hm : new ArrayList<>(hardMacros)) {
             if(getAllPlacements(hm).size() > 2) prunedList.add(hm);
             else {
                 System.err.println("Not adding HM since it only has one placement: "+hm.getName());
@@ -295,11 +295,11 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
         hardMacros = prunedList;
     }
 
-    private void unplaceDesign(){
+    private void unplaceDesign() {
         // Place hard macros for initial placement
         currentMove = new Move2<>(this);
         totalMoves = 0;
-        for(ModuleInstT hm : hardMacros){
+        for(ModuleInstT hm : hardMacros) {
             unplaceHm(hm);
             unsetTempAnchorSite(hm);
         }
@@ -313,7 +313,7 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
     protected abstract boolean checkValidPlacement(ModuleInstT hm);
     protected abstract List<ModuleInstT> getAllOverlaps(ModuleInstT hm);
 
-    public double calculateStartTemp(int maxInnerIteration){
+    public double calculateStartTemp(int maxInnerIteration) {
         double stdDev = 0.0;
         double myTemp = 1e30;// very high temperature to accept all moves
         double currentCost = 0.0;
@@ -357,12 +357,12 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
                 }
             }// Move loop
         }
-        if(acceptedMoveCount>0){
+        if(acceptedMoveCount>0) {
             avgCost = avgCost/acceptedMoveCount;
         }else{
             avgCost = 0;
         }
-        for(double c : arrayCosts){
+        for(double c : arrayCosts) {
             double tmp = c - avgCost;
             stdDev = stdDev + (tmp*tmp);
         }
@@ -404,7 +404,7 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 
     protected abstract PlacementT getTempAnchorSite(ModuleInstT mi);
 
-    public double placeDesign(boolean debugFlow){
+    public double placeDesign(boolean debugFlow) {
         rand = new Random(seed);
         boolean finished = false;
         double r;
@@ -416,7 +416,7 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
         initialPlacement();
         //HandPlacer.openDesign(design);
         int totalFootprint = 0;
-        for(ModuleInstT hm : hardMacros){
+        for(ModuleInstT hm : hardMacros) {
             totalFootprint += getTileSize(hm);
         }
         int squareWidth = (int) (Math.sqrt(totalFootprint) * 1.5);
@@ -425,7 +425,7 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 
         int maxInnerIteration = (int)(effort * Math.pow(hardMacros.size(), 1.3333));
         //maxInnerIteration = (int)(Math.pow(Math.max(dev.getColumns(), dev.getRows()), 1.3333));
-        if(hardMacros.size() < 2 || allPaths.size() == 0){
+        if(hardMacros.size() < 2 || allPaths.size() == 0) {
             finished = true;
             maxInnerIteration = 0;
         }
@@ -445,7 +445,7 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
         currSystemCost = prevSystemCost;
         bestSoFar = currSystemCost;
         rangeLimit = getMaxRangeLimit();
-        OUTER: while(!finished){
+        OUTER: while(!finished) {
             temperatureStep(maxInnerIteration);
 
             rangeLimit = rangeLimit * (1.0-goldenRate + moveAcceptanceRate);
@@ -454,7 +454,7 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 
             currentTemp = updateTemperature();
 
-            if (currentTemp < 0.005 * (prevSystemCost /allPaths.size())){
+            if (currentTemp < 0.005 * (prevSystemCost /allPaths.size())) {
                 finished = true;
                 //WriteFinalCost(prevSystemCost);
             }
@@ -478,24 +478,24 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
         /*
         HashSet<HardMacro> fineTunePlacement = new HashSet<HardMacro>();
 
-        for(HardMacro hm : hardMacros){
-            if(hm.tileSize < 60){
+        for(HardMacro hm : hardMacros) {
+            if(hm.tileSize < 60) {
                 fineTunePlacement.add(hm);
             }
         }
 
-        for(HardMacro hm : fineTunePlacement){
+        for(HardMacro hm : fineTunePlacement) {
             // Keep the original spot, in the case we suggest a worst spot
             Site original = hm.getTempAnchorSite();
             int originalMaxLength = 0;
             // Determine all of the connecting points to this hard macro
             HashSet<Point> pointsList = new HashSet<Point>();
-            for(Path path : hm.getConnectedPaths()){
-                if(path.getLength() > originalMaxLength){
+            for(Path path : hm.getConnectedPaths()) {
+                if(path.getLength() > originalMaxLength) {
                     originalMaxLength = path.getLength();
                 }
-                for(PathPort pp : path){
-                    if(pp.getBlock()== null || !pp.getBlock().equals(hm)){
+                for(PathPort pp : path) {
+                    if(pp.getBlock()== null || !pp.getBlock().equals(hm)) {
                         pointsList.add(new Point(pp.getPortTile()));
                     }
                 }
@@ -504,23 +504,23 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
             Point center = SmallestEnclosingCircle.getCenterPoint(pointsList);
             Tile centroid = dev.getTile("INT_X" + center.x + "Y" + center.y);
             Site newCandidateSite = null;
-            if(centroid != null && centroid.getSites() != null && centroid.getSites().length > 0){
+            if(centroid != null && centroid.getSites() != null && centroid.getSites().length > 0) {
                 newCandidateSite = centroid.getSites()[0];
             }
 
 
-            if(newCandidateSite != null){
+            if(newCandidateSite != null) {
                 if(DEBUG_LEVEL > 0) System.out.println("Moving " + hm.getName() + " from " + original.getTile() + " to " + newCandidateSite.getTile());
                 currentMove.setMove(newCandidateSite, original, null, hm);
                 hm.setTempAnchorSite(newCandidateSite, currentPlacements);
                 currentSystemCost();
                 int longestPath = 0;
-                for(Path path : hm.getConnectedPaths()){
-                    if(path.getLength() > longestPath){
+                for(Path path : hm.getConnectedPaths()) {
+                    if(path.getLength() > longestPath) {
                         longestPath = path.getLength();
                     }
                 }
-                if(originalMaxLength+5 < longestPath){
+                if(originalMaxLength+5 < longestPath) {
                     if(DEBUG_LEVEL > 0) System.out.println("  Undo move: old max length: " + originalMaxLength + " new max length " + longestPath);
                     currentMove.undoMove(currentPlacements);
                     currentSystemCost();
@@ -563,9 +563,9 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
         int badMoveCount = 0;
         int badAcceptedMoveCount = 0;
         double totalMovesCost = 0.0;
-        for(int inner_iterate = 0; inner_iterate< maxInnerIteration; inner_iterate++){
-        //for(int inner_iterate = 0; inner_iterate< (10*rangeLimit); inner_iterate++){
-        //for(int inner_iterate = 0; inner_iterate< (dev.getColumns()*dev.getRows()); inner_iterate++){
+        for(int inner_iterate = 0; inner_iterate< maxInnerIteration; inner_iterate++) {
+        //for(int inner_iterate = 0; inner_iterate< (10*rangeLimit); inner_iterate++) {
+        //for(int inner_iterate = 0; inner_iterate< (dev.getColumns()*dev.getRows()); inner_iterate++) {
             //ModuleInstT selectedHD = hardMacros.get(rand.nextInt(hardMacros.size()-1));
             ModuleInstT selectedHD = weighted.get(rand.nextInt(weighted.size()-1));
 
@@ -577,7 +577,7 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
                 }
             }
 
-            if (getNextMove(selectedHD)){
+            if (getNextMove(selectedHD)) {
                 totalMoves++;
                 double changeInCost = currentMove.getDeltaCost() * alpha;
                 currSystemCost = prevSystemCost + changeInCost; //TODO Loss of precision?
@@ -597,9 +597,9 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 
                 moveCount++;
                 totalMovesCost += changeInCost;
-                if(currSystemCost < bestSoFar){
+                if(currSystemCost < bestSoFar) {
                     bestSoFar = currSystemCost;
-                    //if (bestSoFar==18875.0){
+                    //if (bestSoFar==18875.0) {
                         //break OUTER;
                     //}
                 }
@@ -609,8 +609,8 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
                 int numPath1 = 0;
                 double tmp =0.0;
                 double AvgChange = 0.0;
-                /*if(currentMove.getBlock0() != null){
-                    for(PathT wire : getConnectedPaths(currentMove.getBlock0())){
+                /*if(currentMove.getBlock0() != null) {
+                    for(PathT wire : getConnectedPaths(currentMove.getBlock0())) {
                         wire.calculateLength();
                         tmp = tmp + wire.getLength();
                     }
@@ -618,8 +618,8 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
                     AvgChange = AvgChange + tmp/numPath0;
                 }
                 tmp =0.0;
-                if(currentMove.getBlock1() != null){
-                    for(PathT wire : getConnectedPaths(currentMove.getBlock1())){
+                if(currentMove.getBlock1() != null) {
+                    for(PathT wire : getConnectedPaths(currentMove.getBlock1())) {
                         wire.calculateLength();
                         tmp = tmp + wire.getLength();
                     }
@@ -645,7 +645,7 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
                 //boolean acceptMove = (randomDouble < Math.exp(-AvgChange/currentTemp*numPaths));
                 if(changeInCost > 0) badMoveCount++;
 
-                if(acceptMove){
+                if(acceptMove) {
                     currentAcceptedMoveCount++;
                     prevSystemCost = currSystemCost;
                     if(changeInCost > 0) badAcceptedMoveCount++;
@@ -666,7 +666,7 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
             }// Move loop
 
         }//inner loop
-        if (moveCount >0){
+        if (moveCount >0) {
             moveAcceptanceRate = ((double)currentAcceptedMoveCount) / moveCount;
         } else {
             moveAcceptanceRate = 0;
@@ -715,9 +715,9 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 
 
 
-    public Site getPrimitiveSiteFromTile(Tile tile, SiteTypeEnum type){
-        for(Site p : tile.getSites()){
-            if(p.isCompatibleSiteType(type)){
+    public Site getPrimitiveSiteFromTile(Tile tile, SiteTypeEnum type) {
+        for(Site p : tile.getSites()) {
+            if(p.isCompatibleSiteType(type)) {
                 return p;
             }
         }
@@ -814,7 +814,7 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
         return true;
     }
 
-    private boolean getNextMove(ModuleInstT selected){
+    private boolean getNextMove(ModuleInstT selected) {
         currentMove.clear();
 
         if (getNextMoveRec(selected, PUSH_AWAY_RECURSION_DEPTH, getCurrentPlacement(selected))) {
@@ -843,14 +843,14 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 
     protected abstract PlacementT getCurrentPlacement(ModuleInstT selected);
 
-    private double updateTemperature(){
+    private double updateTemperature() {
         double tmpCurrentTemp = currentTemp;
-        if(moveAcceptanceRate>0.96){
+        if(moveAcceptanceRate>0.96) {
             tmpCurrentTemp = tmpCurrentTemp * 0.5;
-        }else if(moveAcceptanceRate > 0.8){
+        }else if(moveAcceptanceRate > 0.8) {
             tmpCurrentTemp = tmpCurrentTemp * 0.9;
-        //}else if(moveAcceptanceRate > 0.15 || rangeLimit > 1.0){
-        }else if(moveAcceptanceRate > 0.15){
+        //}else if(moveAcceptanceRate > 0.15 || rangeLimit > 1.0) {
+        }else if(moveAcceptanceRate > 0.15) {
             tmpCurrentTemp = tmpCurrentTemp * 0.95;
         }else {
             tmpCurrentTemp = tmpCurrentTemp * 0.8;
@@ -860,26 +860,26 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 
     public abstract Collection<PathT> getConnectedPaths(ModuleInstT module);
 
-    protected double currentSystemCost(){
+    protected double currentSystemCost() {
         int totalWireLength = 0;
         /*int tmp = 0;
-        if(currentMove.getBlock0() != null){
-            for(PathT wire : getConnectedPaths(currentMove.getBlock0())){
+        if(currentMove.getBlock0() != null) {
+            for(PathT wire : getConnectedPaths(currentMove.getBlock0())) {
                 wire.calculateLength();
                 tmp = tmp + wire.getLength();
             }
             //System.out.println(currentMove.block0.getName()+":"+currentMove.block0.getConnectedPaths().size());
         }
         tmp = 0;
-        if(currentMove.getBlock1() != null){
-            for(PathT wire : getConnectedPaths(currentMove.getBlock1())){
+        if(currentMove.getBlock1() != null) {
+            for(PathT wire : getConnectedPaths(currentMove.getBlock1())) {
                 wire.calculateLength();
                 tmp = tmp + wire.getLength();
             }
             //System.out.println(currentMove.block1.getName()+":"+currentMove.block1.getConnectedPaths().size());
         }*/
         int maxPathLength = 0;
-        for(PathT path : allPaths){
+        for(PathT path : allPaths) {
             if (PARANOID) {
                 int prevLength = path.getLength();
                 path.calculateLength();
@@ -888,7 +888,7 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
                 }
             }
             totalWireLength += path.getLength();
-            if(path.getLength() > maxPathLength){
+            if(path.getLength() > maxPathLength) {
                 maxPathLength = path.getLength();
             }
         }

@@ -60,7 +60,7 @@ public class PartNameTools {
             String[] strings = FileTools.readStringArray(his);
             int partCount = 0;
             partCount = his.readInt();
-            for(int i=0; i < partCount; i++){
+            for(int i=0; i < partCount; i++) {
                 int[] part = FileTools.readIntArray(his);
                 Part tmpPart = new Part(
                     strings[part[0]],
@@ -105,10 +105,10 @@ public class PartNameTools {
     public static Part getPart(String partName) {
         String normalizedName = partName.toLowerCase();
         Part p = partMap.get(normalizedName);
-        if(p == null && !normalizedName.startsWith("xc")){
+        if(p == null && !normalizedName.startsWith("xc")) {
             p = partMap.get("xc" + normalizedName);
         }
-        if(p == null){
+        if(p == null) {
             throw new RuntimeException("\n\n\tERROR: Couldn't identify " + normalizedName + " in RapidWright part database. ");
         }
         return p;
@@ -117,7 +117,7 @@ public class PartNameTools {
      * Returns a collection of all known parts
      * @return
      */
-    public static Collection<Part> getParts(){
+    public static Collection<Part> getParts() {
         return partMap.values();
     }
     /**
@@ -126,7 +126,7 @@ public class PartNameTools {
      * @return The base architecture as a family type
      */
     public static FamilyType getArchitectureFromFamilyType(FamilyType type) {
-        switch(type){
+        switch(type) {
             case AARTIX7: return FamilyType.ARTIX7;
             case AKINTEX7: return FamilyType.KINTEX7;
             case ARTIX7: return FamilyType.ARTIX7;
@@ -177,7 +177,7 @@ public class PartNameTools {
      * @return The formal family name or null if none exists.
      */
     public static String getFullArchitectureName(FamilyType type) {
-        switch(type){
+        switch(type) {
             case AARTIX7: return "Artix-7";
             case AKINTEX7: return "Kintex-7";
             case ARTIX7: return "Artix-7";
@@ -229,7 +229,7 @@ public class PartNameTools {
      * @return The series or technology generation or null if unknown.
      */
     public static Series getSeriesFromFamilyType(FamilyType type) {
-        switch(type){
+        switch(type) {
             case AARTIX7: return Series.Series7;
             case AKINTEX7: return Series.Series7;
             case ARTIX7: return Series.Series7;
@@ -292,9 +292,9 @@ public class PartNameTools {
      * @return A list of all parts that are available for
      * the provided series.
      */
-    public static List<Part> getAllParts(Series series){
+    public static List<Part> getAllParts(Series series) {
         ArrayList<Part> parts = new ArrayList<>();
-        for(Part p : getParts()){
+        for(Part p : getParts()) {
             if(p.getSeries() == series) parts.add(p);
         }
         return parts;

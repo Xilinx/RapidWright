@@ -45,7 +45,7 @@ public enum CommunicationType {
 
     private final String ct;
 
-    CommunicationType(String ct){
+    CommunicationType(String ct) {
         this.ct = ct;
     }
 

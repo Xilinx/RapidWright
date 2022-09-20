@@ -69,16 +69,16 @@ public class PolynomialGenerator {
     
     public static String partName = Device.AWS_F1;
     
-    public static void buildOperatorTree(String[] tokens, Design d, EDIFPortInst[] resultPortInsts){
+    public static void buildOperatorTree(String[] tokens, Design d, EDIFPortInst[] resultPortInsts) {
         int width = resultPortInsts.length;
-        if(tokens.length == 1){
+        if(tokens.length == 1) {
             String name = tokens[0];
             EDIFCell top = d.getTopEDIFCell();
-            if(StringTools.isInteger(name)){
+            if(StringTools.isInteger(name)) {
                 int value = Integer.parseInt(name);
                 EDIFNet gnd = EDIFTools.getStaticNet(NetType.GND, top, d.getNetlist());
                 EDIFNet vcc = EDIFTools.getStaticNet(NetType.VCC, top, d.getNetlist());
-                for(int i=0; i < width; i++){
+                for(int i=0; i < width; i++) {
                     int bit = (value >> i) & 0x1;
                     EDIFNet src = bit == 1 ? vcc : gnd;
                     src.addPortInst(resultPortInsts[i]);
@@ -86,13 +86,13 @@ public class PolynomialGenerator {
                 return;
             }
             EDIFPortInst[] srcs = null;
-            if(top.getPort(name) == null){
+            if(top.getPort(name) == null) {
                 srcs = EDIFTools.createPortInsts(top, name, EDIFDirection.INPUT, resultPortInsts.length);
             }
-            for(int i=0; i < width; i++){
+            for(int i=0; i < width; i++) {
                 String netName = name + "[" + i + "]"; 
                 EDIFNet net = top.getNet(netName);
-                if(net == null){
+                if(net == null) {
                     net = top.createNet(netName);
                     net.addPortInst(srcs[i]);
                 }
@@ -103,10 +103,10 @@ public class PolynomialGenerator {
         
         ArrayList<Integer> addSubOps = new ArrayList<>();
         ArrayList<Integer> multOps = new ArrayList<>();
-        for(int i=0; i < tokens.length; i++){
-            if(tokens[i].equals("+") || tokens[i].equals("-")){
+        for(int i=0; i < tokens.length; i++) {
+            if(tokens[i].equals("+") || tokens[i].equals("-")) {
                 addSubOps.add(i);
-            }else if(tokens[i].equals("*")){
+            }else if(tokens[i].equals("*")) {
                 multOps.add(i);
             }
         }
@@ -123,13 +123,13 @@ public class PolynomialGenerator {
         EDIFCell top = d.getNetlist().getTopCell();
         EDIFPortInst[] inputA = EDIFTools.createPortInsts(inA, EDIFDirection.INPUT, width, mi.getCellInst());
         EDIFPortInst[] inputB = EDIFTools.createPortInsts(inB, EDIFDirection.INPUT, width, mi.getCellInst());
-        for(int i=0; i < width; i++){
+        for(int i=0; i < width; i++) {
             String netName = RESULT_NAME + "_" + (instanceCount++) + "[" + i + "]";
             EDIFNet net = top.createNet(netName);
             net.addPortInst(resultPortInsts[i]);
             net.createPortInst(outResult, i, mi.getCellInst());
         }
-        if(!isMult){
+        if(!isMult) {
             EDIFNet vcc = EDIFTools.getStaticNet(NetType.VCC, top, d.getNetlist());
             vcc.createPortInst("rst", mi.getCellInst());
             vcc.createPortInst("ce",mi.getCellInst());
@@ -140,7 +140,7 @@ public class PolynomialGenerator {
         buildOperatorTree(right,d,inputB);
     }
     
-    public static Map<String,Module> initializeOperators(Design d, int width){
+    public static Map<String,Module> initializeOperators(Design d, int width) {
         operators = new HashMap<>();
         CodePerfTracker silent = new CodePerfTracker("", false, false);
         silent.setVerbose(false);
@@ -190,12 +190,12 @@ public class PolynomialGenerator {
         sub.setNetlist(subDesign2.getNetlist());
         operators.put("-o", sub2);
         
-        for(Design design : new Design[]{multDesign,multDesign2,adderDesign,adderDesign2,subDesign,subDesign2}){
-            for(EDIFCell cell : design.getNetlist().getWorkLibrary().getCells()){
+        for(Design design : new Design[]{multDesign,multDesign2,adderDesign,adderDesign2,subDesign,subDesign2}) {
+            for(EDIFCell cell : design.getNetlist().getWorkLibrary().getCells()) {
                 d.getNetlist().getWorkLibrary().addCell(cell);
             }
             EDIFLibrary hdi = d.getNetlist().getHDIPrimitivesLibrary(); 
-            for(EDIFCell cell : design.getNetlist().getHDIPrimitivesLibrary().getCells()){
+            for(EDIFCell cell : design.getNetlist().getHDIPrimitivesLibrary().getCells()) {
                 if(!hdi.containsCell(cell)) hdi.addCell(cell);
             }            
         }
@@ -204,21 +204,21 @@ public class PolynomialGenerator {
     
     public static int sliceyOther;
     public static boolean setSliceY = false;
-    private static void placeModuleInst(ModuleInst mi, String type){
-        if(!setSliceY){
+    private static void placeModuleInst(ModuleInst mi, String type) {
+        if(!setSliceY) {
             sliceyOther = slicey;
             setSliceY = true;
         }
         String siteName = null;
         SiteTypeEnum sType = null;
-        if(type.startsWith("*")){
+        if(type.startsWith("*")) {
             siteName = "DSP48E2_X" + dspx + "Y" + dspy;
             dspy += /*(dspx % 2 == 1) ? -2 :*/ 1;
-            if(dspy == 204){
+            if(dspy == 204) {
                 dspx++;
                 dspy = 202;
             }
-            if(dspy < 0){
+            if(dspy < 0) {
                 dspx++;
                 dspy+=2;
             }
@@ -239,8 +239,8 @@ public class PolynomialGenerator {
     public static boolean oddDSP = true;
     public static boolean oddAddSub = true;
     
-    private static ModuleInst instantiateOperator(Design d, String type){ 
-        if(type.equals("*")){
+    private static ModuleInst instantiateOperator(Design d, String type) { 
+        if(type.equals("*")) {
             oddDSP = !oddDSP;
             type = type + (oddDSP ? "o" : "");
         }else{
@@ -258,17 +258,17 @@ public class PolynomialGenerator {
         
         
         top.getNet(CLK_NAME).createPortInst(CLK_NAME, ci);
-        if(!type.startsWith("*")){
+        if(!type.startsWith("*")) {
             EDIFNet vcc = EDIFTools.getStaticNet(NetType.VCC, top, d.getNetlist());
             vcc.createPortInst("rst", ci);
             vcc.createPortInst("ce", ci);
         }else{
             EDIFCellInst dsp = mi.getCellInst().getCellType().getCellInst(MULT_NAME);
             SiteInst si = mi.getSiteInsts().get(0);
-            for(EDIFPortInst p : dsp.getPortInsts()){
+            for(EDIFPortInst p : dsp.getPortInsts()) {
                 if(p.getName().startsWith("ACIN") || p.getName().startsWith("BCIN") || p.getName().startsWith("PCIN")) continue;
                 if(p.getName().startsWith("CARRYCASCIN") || p.getName().startsWith("MULTSIGNIN") ) continue;
-                if(p.getNet().getName().equals(EDIFTools.LOGICAL_VCC_NET_NAME)){
+                if(p.getNet().getName().equals(EDIFTools.LOGICAL_VCC_NET_NAME)) {
                     String portName = p.getName().replace("[", "").replace("]", "");
                     if(si.getSitePinInst(portName) == null) {
                         d.getVccNet().createPin(portName, si);
@@ -280,21 +280,21 @@ public class PolynomialGenerator {
         return mi;
     }
     
-    private static String convPowerToMultiply(String s){
+    private static String convPowerToMultiply(String s) {
         String[] parts = s.split("\\^");
         String var = parts[0];
         int power = Integer.parseInt(parts[1]);
         if(power == 0) return "";
         StringBuilder sb = new StringBuilder(var);
-        for(int i=1; i < power; i++){
+        for(int i=1; i < power; i++) {
             sb.append("*");
             sb.append(var);
         }
         return sb.toString();
     }
     
-    public static String[] parsePolynomial(String p){
-        if(!Character.isDigit(p.charAt(0)) && !Character.isLetter(p.charAt(0))){
+    public static String[] parsePolynomial(String p) {
+        if(!Character.isDigit(p.charAt(0)) && !Character.isLetter(p.charAt(0))) {
             throw new RuntimeException("ERROR: First character must be alphanumeric (don't start with negatives)");
         }
         
@@ -303,9 +303,9 @@ public class PolynomialGenerator {
         boolean inExponent = false;
         int startExponent = 0;
         boolean lastWasAlpha = false;
-        for(int i=0; i < p.length(); i++){
+        for(int i=0; i < p.length(); i++) {
             char ch = p.charAt(i);
-            if(Character.isLetter(ch)){
+            if(Character.isLetter(ch)) {
                 if(lastWasAlpha)
                     throw new RuntimeException("ERROR: Only supports variables names of length one");
                 else
@@ -313,16 +313,16 @@ public class PolynomialGenerator {
             }else{
                 lastWasAlpha = false;
             }
-            if(inExponent && !Character.isDigit(ch)){
+            if(inExponent && !Character.isDigit(ch)) {
                 powers.add(p.substring(startExponent, i));
                 inExponent = false;
             }
-            if(p.charAt(i) == '^'){
+            if(p.charAt(i) == '^') {
                 inExponent = true;
                 startExponent = i-1;
             }
         }
-        for(String power : powers){
+        for(String power : powers) {
             p = p.replace(power, convPowerToMultiply(power));
         }
         
@@ -331,11 +331,11 @@ public class PolynomialGenerator {
         return p.split(String.format(delimiters, delimiter_list));
     }
     
-    public static Design generatePolynomial(String polynomial, int width, boolean route){
+    public static Design generatePolynomial(String polynomial, int width, boolean route) {
         return generatePolynomial(polynomial, "polygen", width, route, "out.dcp", null);
     }
     
-    public static Design generatePolynomial(String polynomial, String name, int width, boolean route, String outputDCP, PBlock pblock){
+    public static Design generatePolynomial(String polynomial, String name, int width, boolean route, String outputDCP, PBlock pblock) {
         int init_dspx = dspx;
         int init_dspy = dspy;
         int init_slicex = slicex;
@@ -388,19 +388,19 @@ public class PolynomialGenerator {
         
         
         Map<String,String> parentNetMap = n.getParentNetMapNames();
-        for(Net net : new ArrayList<>(d.getNets())){
-            if(net.getPins().size() > 0 && net.getSource() == null){
+        for(Net net : new ArrayList<>(d.getNets())) {
+            if(net.getPins().size() > 0 && net.getSource() == null) {
                 if(net.isStaticNet()) continue;
                 String parentNet = parentNetMap.get(net.getName());
-                if(parentNet.equals(EDIFTools.LOGICAL_VCC_NET_NAME)){
+                if(parentNet.equals(EDIFTools.LOGICAL_VCC_NET_NAME)) {
                     d.movePinsToNewNetDeleteOldNet(net, d.getVccNet(), true);
                     continue;
-                }else if(parentNet.equals(EDIFTools.LOGICAL_GND_NET_NAME)){
+                }else if(parentNet.equals(EDIFTools.LOGICAL_GND_NET_NAME)) {
                     d.movePinsToNewNetDeleteOldNet(net, d.getGndNet(), true);
                     continue;
                 }
                 Net parent = d.getNet(parentNet);
-                if(parent == null){
+                if(parent == null) {
                     continue;
                 }
                 d.movePinsToNewNetDeleteOldNet(net, parent, true);
@@ -410,15 +410,15 @@ public class PolynomialGenerator {
         
         //SLRCrosserDCPCreator.placeBUFGCE(d, d.getDevice().getSite("BUFGCE_X0Y218"), "bufgceInst");
                 
-        if(route){
+        if(route) {
             Router r = new Router(d);
             r.setSupressWarningsErrors(true);
             /*int xmin = Integer.MAX_VALUE;
             int xmax = 0;
             int ymin = Integer.MAX_VALUE;
             int ymax = 0;
-            for(SiteInstance si : d.getSiteInstances()){
-                if(si.getSiteName().startsWith("SLICE")){
+            for(SiteInstance si : d.getSiteInstances()) {
+                if(si.getSiteName().startsWith("SLICE")) {
                     if(si.getSite().getInstanceX() < xmin) xmin = si.getSite().getInstanceX();
                     if(si.getSite().getInstanceX() > xmax) xmax = si.getSite().getInstanceX();
                     if(si.getSite().getInstanceY() < ymin) ymin = si.getSite().getInstanceY();
@@ -430,17 +430,17 @@ public class PolynomialGenerator {
             int[] maxoffset = new int[] { 1, 2,  0};
             String lowerLeft = null;
             String upperRight = null;
-            for(int i=0; i < 3; i++){
+            for(int i=0; i < 3; i++) {
                 lowerLeft = "SLICE_X" + (xmin+minoffset[i]) + "Y" + (ymin+minoffset[i]);
                 upperRight = "SLICE_X" + (xmax+maxoffset[i]) + "Y" + (ymax+maxoffset[i]);
-                if(d.getDevice().getSite(lowerLeft) != null && d.getDevice().getSite(upperRight) != null){
+                if(d.getDevice().getSite(lowerLeft) != null && d.getDevice().getSite(upperRight) != null) {
                     break;
                 }else{
                     lowerLeft = null;
                     upperRight = null;                    
                 }
             }
-            if(lowerLeft == null || upperRight == null){
+            if(lowerLeft == null || upperRight == null) {
                 System.err.println("ERROR: Couldn't find appropriate routing containment Pblock ");
             }else{
                 r.setRoutingPblock(new PBlock(d.getDevice(),lowerLeft+":"+upperRight));
@@ -451,7 +451,7 @@ public class PolynomialGenerator {
         }
         
         t.stop();
-        if(outputDCP != null){
+        if(outputDCP != null) {
             t.start("Write DCP");
             CodePerfTracker tt = new CodePerfTracker("",false,false);
             d.writeCheckpoint(outputDCP,tt);
@@ -469,7 +469,7 @@ public class PolynomialGenerator {
     }
     
     public static void main(String[] args) {
-        if(args.length != 2){
+        if(args.length != 2) {
             System.out.println("USAGE: <polynomial> <bit width>");
             return;
         }

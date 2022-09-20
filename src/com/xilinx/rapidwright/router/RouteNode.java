@@ -64,7 +64,7 @@ public class RouteNode{
      * Empty constructor, sets tile and wires to null. Sets wire and cost to -1.
      * level and history are set to 0 and isPIP is set to false.
      */
-    public RouteNode(){
+    public RouteNode() {
         tile = null;
         wire = -1;
         cost = -1;
@@ -77,7 +77,7 @@ public class RouteNode{
      * @param tile The tile of the new node.
      * @param wire The wire of the new node.
      */
-    public RouteNode(Tile tile, int wire){
+    public RouteNode(Tile tile, int wire) {
         setTile(tile);
         setWire(wire);
         setParent(null);
@@ -89,7 +89,7 @@ public class RouteNode{
      * @param wire Wire object to construct route node from
      * @param parent The parent of the wire in the expanion search
      */
-    public RouteNode(Wire wire, RouteNode parent){
+    public RouteNode(Wire wire, RouteNode parent) {
         setTile(wire.getTile());
         setWire(wire.getWireIndex());
         setParent(parent);
@@ -103,19 +103,19 @@ public class RouteNode{
      * @param parent The parent of the new node, or null if none.
      * @param level The number of nodes between this node and the source node.
      */
-    public RouteNode(Tile tile, int wire, RouteNode parent, int level){
+    public RouteNode(Tile tile, int wire, RouteNode parent, int level) {
         setTile(tile);
         setWire(wire);
         setParent(parent);
         setLevel(level);
     }
     
-    public RouteNode(SitePinInst p){
+    public RouteNode(SitePinInst p) {
         setTile(p.getTile());
         setWire(p.getConnectedTileWire());
     }
     
-    public RouteNode(Node n){
+    public RouteNode(Node n) {
         setTile(n.getTile());
         setWire(n.getWire());
     }
@@ -126,7 +126,7 @@ public class RouteNode{
      * @param nodeName Name of the node
      * @param dev Device to which the node belongs
      */
-    public RouteNode(String nodeName, Device dev){
+    public RouteNode(String nodeName, Device dev) {
         String tileName = nodeName.substring(0, nodeName.indexOf('/'));
         setTile(dev.getTile(tileName));
         if(tile == null) throw new RuntimeException("ERROR: Tile '" + tileName + "' not found in device " + dev.getName() );
@@ -140,12 +140,12 @@ public class RouteNode{
      * @param tile The new tile of the node.
      * @param wire The new wire of the node.
      */
-    public void setTileAndWire(Tile tile, int wire){
+    public void setTileAndWire(Tile tile, int wire) {
         setTile(tile);
         setWire(wire);
     }
     
-    public void setTileAndWire(Wire wire){
+    public void setTileAndWire(Wire wire) {
         setTile(wire.getTile());
         setWire(wire.getWireIndex());
     }
@@ -154,7 +154,7 @@ public class RouteNode{
      * Gets all the possible connections to leaving this node
      * @return The list of all possible connections leaving this node 
      */
-    public List<Wire> getConnections(){
+    public List<Wire> getConnections() {
         return tile.getWireConnections(wire);
     }
     
@@ -162,67 +162,67 @@ public class RouteNode{
      * Returns the current cost of this node
      * @return The cost of this node
      */
-    public int getCost(){
+    public int getCost() {
         return this.cost;
     }
     
     /**
      * @return the number of hops from the source this node is
      */
-    public int getLevel(){
+    public int getLevel() {
         return level;
     }
 
     /**
      * @param level the number of hops from the source to this node
      */
-    public void setLevel(int level){
+    public void setLevel(int level) {
         this.level = level;
     }
 
     /**
      * @return the tile
      */
-    public Tile getTile(){
+    public Tile getTile() {
         return tile;
     }
 
     /**
      * @param tile the tile to set
      */
-    public void setTile(Tile tile){
+    public void setTile(Tile tile) {
         this.tile = tile;
     }
     
-    public void setCost(int cost){
+    public void setCost(int cost) {
         this.cost = cost;
     }
 
     /**
      * @return the parent
      */
-    public RouteNode getParent(){
+    public RouteNode getParent() {
         return parent;
     }
 
     /**
      * @param parent the parent to set
      */
-    public void setParent(RouteNode parent){
+    public void setParent(RouteNode parent) {
         this.parent = parent;
     }
 
     /**
      * @return the wire
      */
-    public int getWire(){
+    public int getWire() {
         return wire;
     }
 
     /**
      * @param wire the wire to set
      */
-    public void setWire(int wire){
+    public void setWire(int wire) {
         this.wire = wire;
     }
 
@@ -240,21 +240,21 @@ public class RouteNode{
         this.history = history;
     }
     
-    public int getManhattanDistance(RouteNode snk){
+    public int getManhattanDistance(RouteNode snk) {
         return tile.getManhattanDistance(snk.getTile());
     }
     
     /**
      * The priority queue will use strictly the cost to evaluate priority
      */
-    //public int compareTo(RouteNode node){
+    //public int compareTo(RouteNode node) {
     //    return this.cost - node.cost;
     //}
     
     /**
      * Quick check to see if the tile/wire combination match this node. 
      */
-    public boolean matches(String tileName, String wireName){
+    public boolean matches(String tileName, String wireName) {
          return getTile().getName().equals(tileName) && (getWireName().equals(wireName));
     }
     
@@ -262,7 +262,7 @@ public class RouteNode{
      * @see java.lang.Object#hashCode()
      */
     @Override
-    public int hashCode(){
+    public int hashCode() {
         final int prime = 31;
         int result = 1;
         result = prime * result + ((tile == null) ? 0 : tile.hashCode());
@@ -274,7 +274,7 @@ public class RouteNode{
      * @see java.lang.Object#equals(java.lang.Object)
      */
     @Override
-    public boolean equals(Object obj){
+    public boolean equals(Object obj) {
         if (this == obj)
             return true;
         if (obj == null)
@@ -284,7 +284,7 @@ public class RouteNode{
         RouteNode other = (RouteNode) obj;
         if (wire != other.wire)
             return false;
-        if (tile == null){
+        if (tile == null) {
             if (other.tile != null)
                 return false;
         } else if (!tile.equals(other.tile))
@@ -292,35 +292,35 @@ public class RouteNode{
         return true;
     }
 
-    public String toString(){
+    public String toString() {
         return this.tile + "/" + getWireName() + " " + this.cost + " " + this.level + " " + getIntentCode();
     }
     
-    public String getName(){
+    public String getName() {
         return this.tile + "/" + getWireName();
     }
     
-    public String getWireName(){
+    public String getWireName() {
         return tile.getWireName(wire);
     }
     
-    public int getWireIndex(String wireName){
+    public int getWireIndex(String wireName) {
         return getTile().getWireIndex(wireName);
     }
     
-    public List<Wire> getWireConnections(){
+    public List<Wire> getWireConnections() {
         return tile.getWireConnections(wire);
     }
     
-    public List<PIP> getBackwardPIPs(){
+    public List<PIP> getBackwardPIPs() {
         return getTile().getBackwardPIPs(getWire());
     }
     
-    public List<PIP> getForwardPIPs(){
+    public List<PIP> getForwardPIPs() {
         return getTile().getPIPs(getWire());
     }
     
-    public IntentCode getIntentCode(){
+    public IntentCode getIntentCode() {
         return tile.getWireIntentCode(getWire());
     }
 
@@ -331,21 +331,21 @@ public class RouteNode{
         return tile.getBackwardConnections(wire);
     }
     
-    public RouteNode getBaseWire(){
+    public RouteNode getBaseWire() {
         Node n = Node.getNode(tile,wire);
         return new RouteNode(n);
     }
     
-    public ArrayList<PIP> getPIPsForwardToSink(){
+    public ArrayList<PIP> getPIPsForwardToSink() {
         ArrayList<PIP> pips = new ArrayList<>();
         RouteNode curr = this;
-        while(curr.parent != null){
+        while(curr.parent != null) {
             for(Wire currWire : Arrays.asList(curr.getWiresInNode())) {
                 if(!currWire.getTile().equals(curr.parent.getTile()))
                     continue;
-                for(Wire w1 : curr.parent.tile.getWireConnections(currWire.getWireIndex())){
-                    if(w1.getWireIndex() == curr.parent.wire){
-                        if(w1.isEndPIPWire()){
+                for(Wire w1 : curr.parent.tile.getWireConnections(currWire.getWireIndex())) {
+                    if(w1.getWireIndex() == curr.parent.wire) {
+                        if(w1.isEndPIPWire()) {
                             pips.add(new PIP(curr.parent.tile, currWire.getWireIndex(), curr.parent.wire, w1.getPIPType()));
                             break;
                         }
@@ -357,16 +357,16 @@ public class RouteNode{
         return pips;
     }
     
-    public ArrayList<PIP> getPIPsBackToSource(){
+    public ArrayList<PIP> getPIPsBackToSource() {
         ArrayList<PIP> pips = new ArrayList<>();
         RouteNode curr = this;
-        while(curr.parent != null){
+        while(curr.parent != null) {
             for(Wire parentWire : Arrays.asList(curr.parent.getWiresInNode())) {
                 if(!parentWire.getTile().equals(curr.getTile()))
                     continue;
-                for(Wire w1 : curr.tile.getWireConnections(parentWire.getWireIndex())){
-                    if(w1.getWireIndex() == curr.wire){
-                        if(w1.isEndPIPWire()){
+                for(Wire w1 : curr.tile.getWireConnections(parentWire.getWireIndex())) {
+                    if(w1.getWireIndex() == curr.wire) {
+                        if(w1.isEndPIPWire()) {
                             pips.add(new PIP(curr.tile, parentWire.getWireIndex(), curr.wire, w1.getPIPType()));
                             break;
                         }
@@ -378,7 +378,7 @@ public class RouteNode{
         return pips;
     }
     
-    public Wire[] getWiresInNode(){
+    public Wire[] getWiresInNode() {
         return Node.getWiresInNode(getTile(),getWire());
     }
     
@@ -386,7 +386,7 @@ public class RouteNode{
      * Creates a new node representing the start wire of this PIP
      * @return
      */
-    public RouteNode getStartNode(PIP p){
+    public RouteNode getStartNode(PIP p) {
         return new RouteNode(p.getTile(), p.getStartWireIndex());
     }
     
@@ -394,15 +394,15 @@ public class RouteNode{
      * Creates a new node representing the end wire of this PIP
      * @return
      */
-    public RouteNode getEndNode(PIP p){
+    public RouteNode getEndNode(PIP p) {
         return new RouteNode(p.getTile(), p.getEndWireIndex());
     }
     
-    public RouteNode createNode(Wire w){
+    public RouteNode createNode(Wire w) {
         return new RouteNode(w.getTile(), w.getWireIndex());
     }
     
-    public RouteNode createNode(Wire w, RouteNode parent){
+    public RouteNode createNode(Wire w, RouteNode parent) {
         RouteNode n = new RouteNode(w.getTile(), w.getWireIndex());
         n.setParent(parent);
         return n;
@@ -414,7 +414,7 @@ public class RouteNode{
      * their lowest cost (see {@link RouteNode#getCost()}).  
      * @return The newly created priority queue.
      */
-    public static PriorityQueue<RouteNode> getPriorityQueue(){
+    public static PriorityQueue<RouteNode> getPriorityQueue() {
         return new PriorityQueue<RouteNode>(16, new Comparator<RouteNode>() {
             public int compare(RouteNode i, RouteNode j) {return i.getCost() - j.getCost();}});
     }

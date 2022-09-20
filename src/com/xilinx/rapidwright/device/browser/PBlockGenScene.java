@@ -49,7 +49,7 @@ public class PBlockGenScene extends DeviceBrowserScene {
     private static QPen highlightPen = new QPen(highlightColor);
     private static QBrush highlightBrush = new QBrush(highlightColor);
     
-    public void highlightTile(Tile t){        
+    public void highlightTile(Tile t) {        
         QGraphicsRectItem rect = addRect(tileSize,tileSize, tileSize - 2, tileSize - 2, highlightPen, highlightBrush);
         rect.setPos(t.getColumn() * tileSize, t.getRow() * tileSize);
     }

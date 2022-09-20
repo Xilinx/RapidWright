@@ -58,7 +58,7 @@ public class EDIFParser extends AbstractEDIFParserWorker implements AutoCloseabl
         this(Paths.get(fileName));
     }
 
-    public EDIFParser(InputStream in){
+    public EDIFParser(InputStream in) {
         super(null, in, StringPool.singleThreadedPool(), EDIFReadLegalNameCache.createSingleThreaded());
     }
     
@@ -70,10 +70,10 @@ public class EDIFParser extends AbstractEDIFParserWorker implements AutoCloseabl
      * @return The existing EDIFCell or a newly created one that will be populated  
      * when the cell is parsed.
      */
-    private EDIFCell getRefEDIFCell(String edifCellName, String libraryName){
+    private EDIFCell getRefEDIFCell(String edifCellName, String libraryName) {
         Map<String, EDIFCell> lib = edifInstCellMap.computeIfAbsent(libraryName, k -> new HashMap<>());
         EDIFCell cell = lib.get(edifCellName);
-        if(cell == null){
+        if(cell == null) {
             cell = new EDIFCell();
             lib.put(edifCellName, cell);
         }
@@ -81,22 +81,22 @@ public class EDIFParser extends AbstractEDIFParserWorker implements AutoCloseabl
     }
 
     @SuppressWarnings("unused")
-    public EDIFNetlist parseEDIFNetlist(){
+    public EDIFNetlist parseEDIFNetlist() {
         EDIFNetlist currNetlist = parseEDIFNetlistHead();
 
         String currToken;
         
-        while(LEFT_PAREN.equals(currToken = getNextToken(true))){
+        while(LEFT_PAREN.equals(currToken = getNextToken(true))) {
             String nextToken = getNextToken(true);
             if (nextToken.equalsIgnoreCase(STATUS)) {
                 parseStatus(currNetlist);
-            } else if(nextToken.equalsIgnoreCase(LIBRARY) || nextToken.equalsIgnoreCase(EXTERNAL)){
+            } else if(nextToken.equalsIgnoreCase(LIBRARY) || nextToken.equalsIgnoreCase(EXTERNAL)) {
                 currNetlist.addLibrary(parseEDIFLibrary());
-            } else if(nextToken.equalsIgnoreCase(COMMENT)){
+            } else if(nextToken.equalsIgnoreCase(COMMENT)) {
                 // Final Comment on Reference To The Cell Of Highest Level
                 String comment = getNextToken(true);
                 expect(RIGHT_PAREN, getNextToken(true));
-            } else if(nextToken.equalsIgnoreCase(DESIGN)){
+            } else if(nextToken.equalsIgnoreCase(DESIGN)) {
                 EDIFDesign design = parseEDIFNameObject(new EDIFDesign());
                 currNetlist.setDesign(design);
                 expect(LEFT_PAREN, getNextToken(true));
@@ -109,7 +109,7 @@ public class EDIFParser extends AbstractEDIFParserWorker implements AutoCloseabl
                 expect(RIGHT_PAREN, getNextToken(true));
                 expect(RIGHT_PAREN, getNextToken(true));
                 currToken = null;
-                while(LEFT_PAREN.equals(currToken = getNextToken(true))){
+                while(LEFT_PAREN.equals(currToken = getNextToken(true))) {
                     parseProperty(design, getNextToken(true));
                 }
                 expect(RIGHT_PAREN, currToken);
@@ -129,11 +129,11 @@ public class EDIFParser extends AbstractEDIFParserWorker implements AutoCloseabl
         return currNetlist;
     }
 
-    private EDIFLibrary parseEDIFLibrary(){
+    private EDIFLibrary parseEDIFLibrary() {
         EDIFLibrary library = parseEdifLibraryHead();
 
         String currToken;
-        while(LEFT_PAREN.equals(currToken = getNextToken(true))){
+        while(LEFT_PAREN.equals(currToken = getNextToken(true))) {
             final EDIFCell cell = parseEDIFCell(library.getName(), getNextToken(true));
             library.addCellRenameDuplicates(cell, cache.getEDIFRename(cell));
         }
@@ -153,11 +153,11 @@ public class EDIFParser extends AbstractEDIFParserWorker implements AutoCloseabl
      * @return The reference cell to be used going forward.
      */
     @Override
-    protected EDIFCell updateEDIFRefCellMap(String libraryLegalName, EDIFCell cell){
+    protected EDIFCell updateEDIFRefCellMap(String libraryLegalName, EDIFCell cell) {
         Map<String, EDIFCell> map = edifInstCellMap.computeIfAbsent(libraryLegalName, k -> new HashMap<>());
         final String legalEDIFName = cache.getLegalEDIFName(cell);
         EDIFCell existingCell = map.get(legalEDIFName);
-        if(existingCell != null){
+        if(existingCell != null) {
             existingCell.setName(cell.getName());
             return existingCell;
         }

@@ -31,7 +31,7 @@ import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 
 public class FindBlackBoxes {
 
-    public static List<EDIFHierCellInst> getBlackBoxes(Design design){
+    public static List<EDIFHierCellInst> getBlackBoxes(Design design) {
         ArrayList<EDIFHierCellInst> blackBoxInsts = new ArrayList<EDIFHierCellInst>(); 
         for(EDIFHierCellInst inst : design.getNetlist().getAllDescendants("", "*", false)) {
             if(inst.getInst().isBlackBox()) {

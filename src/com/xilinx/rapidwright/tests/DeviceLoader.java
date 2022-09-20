@@ -38,12 +38,12 @@ import com.xilinx.rapidwright.util.MessageGenerator;
 public class DeviceLoader {
 
     public static void main(String[] args) {
-        if(args.length != 1){
+        if(args.length != 1) {
             System.out.println("USAGE: <partname>");
             return;
         }
         Part p = PartNameTools.getPart(args[0]);
-        if(p == null){
+        if(p == null) {
             throw new RuntimeException("The partname " + args[0] + " is invalid or unrecognized, cannot load device.");
         }
         CodePerfTracker track = new CodePerfTracker("Load Device for Part " + p.getName());

@@ -44,7 +44,7 @@ public class TileColors {
      * @param tile The tile for which to get the color suggestion.
      * @return A suggested color, or null if none exists.
      */
-    public static QColor getSuggestedTileColor(Tile tile){
+    public static QColor getSuggestedTileColor(Tile tile) {
         return tileColors.get(tile.getTileTypeEnum());
     }
     

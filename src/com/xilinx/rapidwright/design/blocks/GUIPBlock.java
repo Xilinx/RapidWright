@@ -68,7 +68,7 @@ public class GUIPBlock extends QGraphicsPolygonItem {
     
     private Tile lastSnapToBottomLeftTile = null;
     
-    public GUIPBlock(PBlock pb, TileScene scene){
+    public GUIPBlock(PBlock pb, TileScene scene) {
         this.pb = pb;
         this.scene = scene;
         
@@ -80,7 +80,7 @@ public class GUIPBlock extends QGraphicsPolygonItem {
         this.selected.connect(this, "showCompatibleLocations(boolean)");
     }
     
-    public void updatePBlock(){
+    public void updatePBlock() {
         lastSnapToBottomLeftTile = pb.getBottomLeftTile();
         Tile tl = pb.getTopLeftTile();
         Tile br = pb.getBottomRightTile();
@@ -138,7 +138,7 @@ public class GUIPBlock extends QGraphicsPolygonItem {
 //            System.out.println("Moving pblock: " + tileX + " " + tileY);
             System.out.println("****************************");
             System.out.println("* " + pb.toString());
-            if(pb.movePBlock(tileX, tileY)){
+            if(pb.movePBlock(tileX, tileY)) {
                 Tile newLowerLeft = pb.getBottomLeftTile();
                 lastSnapToDx = (newLowerLeft.getColumn() - lastSnapToBottomLeftTile.getColumn()) * ts;
                 lastSnapToDy = (newLowerLeft.getRow() - lastSnapToBottomLeftTile.getRow()) * ts;
@@ -154,7 +154,7 @@ public class GUIPBlock extends QGraphicsPolygonItem {
     }
 
     
-    public void showCompatibleLocations(boolean value){
+    public void showCompatibleLocations(boolean value) {
         System.out.println("TODO - GuiPBlock.showCompatibleLocations()");
     }
     

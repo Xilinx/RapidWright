@@ -62,7 +62,7 @@ public class JobQueue {
     public static final String LSF_QUEUE_OPTION = "-lsf_queue";
     
     
-    public JobQueue(boolean printJobStart){
+    public JobQueue(boolean printJobStart) {
         waitingToRun = new LinkedList<>();
         running = new ConcurrentLinkedQueue<>();
         finished = new LinkedList<>();
@@ -72,11 +72,11 @@ public class JobQueue {
         this(true);
     }
     
-    public boolean addJob(Job j){
+    public boolean addJob(Job j) {
         return waitingToRun.add(Objects.requireNonNull(j));
     }
     
-    public boolean addRunningJob(Job j){
+    public boolean addRunningJob(Job j) {
         return running.add(j);
     }
 
@@ -84,8 +84,8 @@ public class JobQueue {
         return runAllToCompletion(isLSFAvailable() ? JobQueue.MAX_LSF_CONCURRENT_JOBS : JobQueue.MAX_LOCAL_CONCURRENT_JOBS);
     }
     
-    public boolean runAllToCompletion(int maxNumRunningJobs){
-        while(!waitingToRun.isEmpty() || !running.isEmpty()){
+    public boolean runAllToCompletion(int maxNumRunningJobs) {
+        while(!waitingToRun.isEmpty() || !running.isEmpty()) {
 
             final Map<JobState, List<Job>> jobsByState = running.stream().collect(Collectors.groupingBy(Job::getJobState, ()->new EnumMap<>(JobState.class), Collectors.toList()));
             final List<Job> exited = jobsByState.get(JobState.EXITED);
@@ -98,7 +98,7 @@ public class JobQueue {
                 jobsByState.remove(JobState.EXITED);
             }
             boolean launched = false;
-            while(!waitingToRun.isEmpty() && maxNumRunningJobs > running.size()){
+            while(!waitingToRun.isEmpty() && maxNumRunningJobs > running.size()) {
                 Job j = waitingToRun.poll();
                 long pid = j.launchJob();
                 running.add(j);
@@ -108,7 +108,7 @@ public class JobQueue {
                 launched = true;
             }
 
-            if(!launched || !printJobStart){
+            if(!launched || !printJobStart) {
                 System.out.print("Waiting on ");
                 jobsByState.forEach((state, jobs) -> {
                     System.out.print(jobs.size()+" "+state.getName()+", ");
@@ -125,10 +125,10 @@ public class JobQueue {
         }
         int failedCount = 0;
         boolean success = true;
-        for(Job j : finished){
+        for(Job j : finished) {
             boolean curr = j.jobWasSuccessful();
-            if(!curr){
-                if(failedCount == 0){
+            if(!curr) {
+                if(failedCount == 0) {
                     // Let's just print the first error output
                     j.getLastLogLines().ifPresent(lastLogLines -> {
                         System.err.println("***************************************************************************");
@@ -152,13 +152,13 @@ public class JobQueue {
     }
     
     
-    public boolean killAllRunningJobs(){
+    public boolean killAllRunningJobs() {
         for(Job j : running) {
             j.killJob();
         }
         MessageGenerator.briefError("Killing all running jobs...");
         long watchdog = System.currentTimeMillis(); 
-        while(!running.isEmpty() && (System.currentTimeMillis() - watchdog < 5000)){
+        while(!running.isEmpty() && (System.currentTimeMillis() - watchdog < 5000)) {
             Job j = running.poll();
             if(j.isFinished()) finished.add(j);
             else {
@@ -166,7 +166,7 @@ public class JobQueue {
                 try{Thread.sleep(200);} catch (InterruptedException e) {break;}
             }
         }
-        if(!running.isEmpty()){
+        if(!running.isEmpty()) {
             MessageGenerator.briefError("ERROR: Couldn't kill all running jobs, still running are pid=" + running);
             return false;
         }
@@ -175,9 +175,9 @@ public class JobQueue {
     }
 
     private static Boolean lsfAvailable = null;
-    public static boolean isLSFAvailable(){
+    public static boolean isLSFAvailable() {
         if (lsfAvailable == null) {
-            if(FileTools.isExecutableOnPath("bsub")){
+            if(FileTools.isExecutableOnPath("bsub")) {
                 lsfAvailable = JobQueue.USE_LSF_IF_AVAILABLE;
             } else {
                 lsfAvailable = false;
@@ -201,28 +201,28 @@ public class JobQueue {
         JobQueue q = new JobQueue();
         
         // Run a test if no arguments
-        if(args.length == 0){
+        if(args.length == 0) {
             String mainDir = System.getenv("HOME") + File.separator+ "JobQueueTest" + File.separator;
-            for(int i=0; i < 10; i++){
+            for(int i=0; i < 10; i++) {
                 Job job = createJob();
                 job.setCommand("vivado -version");
                 job.setRunDir(mainDir + i);
                 q.addJob(job);
             }
         }else{
-            if(args[0].equalsIgnoreCase(LSF_AVAILABLE_OPTION)){
+            if(args[0].equalsIgnoreCase(LSF_AVAILABLE_OPTION)) {
                 System.out.println(Boolean.toString(isLSFAvailable()));
                 return;
-            }else if(args[0].equalsIgnoreCase(LSF_RESOURCE_OPTION)){
+            }else if(args[0].equalsIgnoreCase(LSF_RESOURCE_OPTION)) {
                 System.out.println(LSFJob.LSF_RESOURCE);
                 return;
-            }else if(args[0].equalsIgnoreCase(LSF_QUEUE_OPTION)){
+            }else if(args[0].equalsIgnoreCase(LSF_QUEUE_OPTION)) {
                 System.out.println(LSFJob.LSF_QUEUE);
                 return;
             }
             // Read a file in where each line is a job, command is first token, run directory is second
             // separated by '#'
-            for(String line : FileTools.getLinesFromTextFile(args[0])){
+            for(String line : FileTools.getLinesFromTextFile(args[0])) {
                 String[] parts = line.split("#");
                 Job j = createJob();
                 j.setCommand(parts[0].trim());

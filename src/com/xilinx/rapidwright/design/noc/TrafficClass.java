@@ -45,7 +45,7 @@ public enum TrafficClass {
 
     private final String tc;
 
-    TrafficClass(String tc){
+    TrafficClass(String tc) {
         this.tc = tc;
     }
 

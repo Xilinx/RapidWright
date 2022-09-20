@@ -34,12 +34,12 @@ public class Point implements Comparable<Point> {
     public int x;
     public int y;
     
-    public Point(int x, int y){
+    public Point(int x, int y) {
         this.x = x;
         this.y = y;
     }
     
-    public Point(Tile tile){
+    public Point(Tile tile) {
         this.x = tile.getTileXCoordinate();
         this.y = tile.getTileYCoordinate();
     }
@@ -83,7 +83,7 @@ public class Point implements Comparable<Point> {
         return true;
     }
     
-    public String toString(){
+    public String toString() {
         return "(" +x + "," + y + ")";
     }
     

@@ -36,7 +36,7 @@ import com.xilinx.rapidwright.device.Tile;
 public class PBlockGenEmitter extends QSignalEmitter{
     public Signal1<Tile> highlightTile = new Signal1<Tile>();
     
-    public void emitTile(Tile t){
+    public void emitTile(Tile t) {
         highlightTile.emit(t);
     }
 }

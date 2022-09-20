@@ -56,11 +56,11 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
     
     private EDIFPortInstList portInsts;
 
-    protected EDIFCellInst(){
+    protected EDIFCellInst() {
         
     }
     
-    public EDIFCellInst(String name, EDIFCell cellType, EDIFCell parentCell){
+    public EDIFCellInst(String name, EDIFCell cellType, EDIFCell parentCell) {
         super(name);
         setCellType(cellType);
         if(parentCell != null) parentCell.addCellInst(this);
@@ -99,7 +99,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
      * @return A map of EDIFPortInst names ({@link EDIFPortInst#getName()} to the corresponding objects.
      * @deprecated
      */
-    public Map<String, EDIFPortInst> getPortInstMap(){
+    public Map<String, EDIFPortInst> getPortInstMap() {
         if(portInsts == null) return Collections.emptyMap();
         HashMap<String, EDIFPortInst> map = new HashMap<>();
         for(EDIFPortInst e : getPortInsts()) {
@@ -127,7 +127,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
      * @param epr The port instance object to remove
      * @return The removed port instance, or null if it was not found.
      */
-    protected EDIFPortInst removePortInst(EDIFPortInst epr){
+    protected EDIFPortInst removePortInst(EDIFPortInst epr) {
         if(portInsts == null) return null;
         return portInsts.remove(epr);
     }
@@ -138,7 +138,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
      * @param portName Name of the port ref to remove ({@link EDIFPortInst#getName()})
      * @return The removed port instance, or null if none found by that name.
      */
-    protected EDIFPortInst removePortInst(String portName){
+    protected EDIFPortInst removePortInst(String portName) {
         if(portInsts == null) return null;
         return portInsts.remove(this, portName);
     }
@@ -149,7 +149,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
      * @param name Name of the port instance to get. 
      * @return The named port instance, or null if none found by that name. 
      */
-    public EDIFPortInst getPortInst(String name){
+    public EDIFPortInst getPortInst(String name) {
         if(portInsts == null) return null;
         return portInsts.get(this, name);
     }
@@ -160,7 +160,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
      * @param name Name of the port to get.
      * @return The port on the underlying cell type.
      */
-    public EDIFPort getPort(String name){
+    public EDIFPort getPort(String name) {
         return getCellType().getPort(name);
     }
     
@@ -168,7 +168,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
      * Gets the sorted ArrayList of EDIFPortInsts on this cell instance as a collection.
      * @return The collection of EDIFPortInsts on this cell.
      */
-    public Collection<EDIFPortInst> getPortInsts(){
+    public Collection<EDIFPortInst> getPortInsts() {
         return portInsts == null ? Collections.emptyList() : portInsts;
     }
     
@@ -194,11 +194,11 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
         return cellType;
     }
 
-    public Collection<EDIFPort> getCellPorts(){
+    public Collection<EDIFPort> getCellPorts() {
         return cellType.getPorts();
     }
     
-    public String getCellName(){
+    public String getCellName() {
         return cellType.getName();
     }
 
@@ -234,7 +234,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
         setCellType(cellType);
     }
     
-    public boolean isBlackBox(){
+    public boolean isBlackBox() {
         EDIFPropertyValue val = getProperty(BLACK_BOX_PROP);
         if(val != null && val.getValue().toLowerCase().equals("true")) 
             return true;
@@ -263,7 +263,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
         os.write(cache.getLegalEDIFName(cellType.getName()));
         os.write(EXPORT_CONST_LIBRARYREF);
         os.write(cache.getLegalEDIFName(cellType.getLibrary().getName()));
-        if(getPropertiesMap().size() > 0){
+        if(getPropertiesMap().size() > 0) {
             os.write(EXPORT_CONST_CLOSE_WITH_PROPS);
             exportEDIFProperties(os,EXPORT_CONST_PROP_INDENT, cache, stable);
             os.write(EXPORT_CONST_CLOSE);

@@ -122,7 +122,7 @@ class DelayModelSourceFromText extends DelayModelSource {
         try {
             Integer.parseInt(str);
             return true;
-        } catch(NumberFormatException e){
+        } catch(NumberFormatException e) {
             return false;
         }
     }
@@ -277,7 +277,7 @@ class DelayModelSourceFromText extends DelayModelSource {
         String siteName = null;
         String belName  = null;
 
-        try(InputStream inputStream = new FileInputStream(FileTools.getRapidWrightPath() + File.separator + fileName)){
+        try(InputStream inputStream = new FileInputStream(FileTools.getRapidWrightPath() + File.separator + fileName)) {
             sc = new Scanner(inputStream, "UTF-8");
             while (sc.hasNextLine()) {
                 // Make canonical from "," without spaces

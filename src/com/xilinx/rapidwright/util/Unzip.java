@@ -31,7 +31,7 @@ package com.xilinx.rapidwright.util;
  */
 public class Unzip {
     public static void main(String[] args) {
-        if(args.length != 2){
+        if(args.length != 2) {
             System.out.println("USAGE: <zip file> <dest dir>");
             return;
         }

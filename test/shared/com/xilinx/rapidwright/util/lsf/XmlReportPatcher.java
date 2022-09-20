@@ -67,7 +67,7 @@ public class XmlReportPatcher {
     /**
      * Patch one document
      */
-    private static void fixOutputXml(Path path){
+    private static void fixOutputXml(Path path) {
         DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
 
         Document doc;

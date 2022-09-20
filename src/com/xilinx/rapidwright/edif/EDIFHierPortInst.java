@@ -84,8 +84,8 @@ public class EDIFHierPortInst {
      * Returns the full hierarchical name of the instance on which this port resides.
      * @return The full hierarchical name.
      */
-    public String getFullHierarchicalInstName(){
-        if(portInst.getCellInst() == null){
+    public String getFullHierarchicalInstName() {
+        if(portInst.getCellInst() == null) {
             // Internal (inward-facing) side of a cell port
             return hierarchicalInst.getFullHierarchicalInstName();
         }
@@ -163,7 +163,7 @@ public class EDIFHierPortInst {
         return hierarchicalInst + "/" + portInst.getFullName();
     }
 
-    public String getHierarchicalNetName(){
+    public String getHierarchicalNetName() {
         StringBuilder sb = new StringBuilder();
         if (hierarchicalInst.enterHierarchicalName(sb)) {
             sb.append(EDIFTools.EDIF_HIER_SEP);
@@ -176,11 +176,11 @@ public class EDIFHierPortInst {
         return new EDIFHierNet(hierarchicalInst, portInst.getNet());
     }
     
-    public boolean isOutput(){
+    public boolean isOutput() {
         return portInst.getPort().isOutput();
     }
     
-    public boolean isInput(){
+    public boolean isInput() {
         return portInst.getPort().isInput();
     }
     

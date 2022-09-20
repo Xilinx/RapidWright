@@ -206,7 +206,7 @@ public class LSFJob extends Job {
      */
     @Override
     public void killJob() {
-        for(String line : FileTools.getCommandOutput(new String[]{"bkill " + getJobNumber()})){
+        for(String line : FileTools.getCommandOutput(new String[]{"bkill " + getJobNumber()})) {
             System.out.println(line);
         }
     }

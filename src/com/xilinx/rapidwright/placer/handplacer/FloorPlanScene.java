@@ -88,11 +88,11 @@ public class FloorPlanScene extends TileScene {
 
     private int netViewState = HIDE_NETS;
     
-    public FloorPlanScene(){
+    public FloorPlanScene() {
         this(null, false);
     }
     
-    public FloorPlanScene(Design design, boolean debugPlacer){
+    public FloorPlanScene(Design design, boolean debugPlacer) {
         super(design, true, true);
         this.debugPlacer = debugPlacer;
         initializeScene();
@@ -129,8 +129,8 @@ public class FloorPlanScene extends TileScene {
 
     @Override
     public void mouseReleaseEvent(QGraphicsSceneMouseEvent event) {
-        if(validPlacements.size() > 0){
-            for(ValidPlacementPolygon p : validPlacements){
+        if(validPlacements.size() > 0) {
+            for(ValidPlacementPolygon p : validPlacements) {
                 removeItem(p);
             }
         }
@@ -140,8 +140,8 @@ public class FloorPlanScene extends TileScene {
             if (!movingPosList.get(0).equals(movingHMList.get(0).pos())) {
                 hmMoved.emit(movingHMList, movingPosList);
             }
-            if(netViewState == HIDE_NETS){
-                for(GUIModuleInst gmi : movingHMList){
+            if(netViewState == HIDE_NETS) {
+                for(GUIModuleInst gmi : movingHMList) {
                     gmi.hideMyLines();
                 }                
             }
@@ -149,10 +149,10 @@ public class FloorPlanScene extends TileScene {
         super.mouseReleaseEvent(event);
     }
 
-    public void highlightValidPlacements(GUIModuleInst ghmpi){
+    public void highlightValidPlacements(GUIModuleInst ghmpi) {
         QPolygonF shape = new QPolygonF(ghmpi.getShape());
         
-        for(Site s : ghmpi.getModuleInst().getAllValidPlacements()){
+        for(Site s : ghmpi.getModuleInst().getAllValidPlacements()) {
             ValidPlacementPolygon item = new ValidPlacementPolygon(shape,ghmpi.getAnchorOffset());
             addItem(item);
         }
@@ -188,9 +188,9 @@ public class FloorPlanScene extends TileScene {
         HashMap<String, ModuleInst> modInstances = getDesign().getModuleInstMap();
         HashSet<Net> netsFound = new HashSet<Net>();
         // iterate through ModuleInsts
-        for (String key : modInstances.keySet()){
+        for (String key : modInstances.keySet()) {
             ModuleInst modInst = modInstances.get(key);
-            if(modInst.getSiteInsts().size() == 0){
+            if(modInst.getSiteInsts().size() == 0) {
                 continue;
             }
             GUIModuleInst ghmpi = new GUIModuleInst(modInst, this, true);
@@ -200,7 +200,7 @@ public class FloorPlanScene extends TileScene {
         }
         
         
-        for (String key : modInstances.keySet()){
+        for (String key : modInstances.keySet()) {
             List<SiteInst> instList = modInstances.get(key).getSiteInsts();
             if(instList.size() == 0) continue;
             SiteInst inst0 = instList.get(0);
@@ -231,14 +231,14 @@ public class FloorPlanScene extends TileScene {
 
             }
         }
-        if(netsFound.size() < 2){
-            nextNet: for(Net n : getDesign().getNets()){
+        if(netsFound.size() < 2) {
+            nextNet: for(Net n : getDesign().getNets()) {
                 if(n.isClockNet()) continue;
                 if(n.isStaticNet()) continue;
                 String modInstName = null;
-                for(SitePinInst p : n.getPins()){
+                for(SitePinInst p : n.getPins()) {
                     String curr = p.getModuleInstName();
-                    if(modInstName != null && curr != null && !modInstName.equals(curr)){
+                    if(modInstName != null && curr != null && !modInstName.equals(curr)) {
                         netsFound.add(n);
                         addNetToScene(n);
                         continue nextNet;
@@ -247,10 +247,10 @@ public class FloorPlanScene extends TileScene {
                 }
             }            
         }
-        if(debugPlacer){
+        if(debugPlacer) {
             Collection<SiteInst> insts = getDesign().getSiteInsts();
-            for(SiteInst inst : insts){
-                if(inst.getModuleTemplate() == null && inst.isPlaced()){
+            for(SiteInst inst : insts) {
+                if(inst.getModuleTemplate() == null && inst.isPlaced()) {
                     Tile t = inst.getTile();
                     HMTile myTile = new HMTile(t, this, null);
                     myTile.setBrush(new QBrush(new QColor(255,125,0,125)));
@@ -272,7 +272,7 @@ public class FloorPlanScene extends TileScene {
             String pinMIName = pinInst.getModuleInstName();
             
             
-            if(pinMIName == null && pinInst.isPlaced()){
+            if(pinMIName == null && pinInst.isPlaced()) {
                 if(debugPlacer)
                     pinMIName = "NOMODULE";
                 else
@@ -293,12 +293,12 @@ public class FloorPlanScene extends TileScene {
         }
         if (srcMIName != null) {
             //for (String destKey : destMINameList) {
-            for(int i=0;i<destMINameList.size();i++){
+            for(int i=0;i<destMINameList.size();i++) {
                 String destMIName = destMINameList.get(i);
                 Tile destTile = destTileList.get(i);
                 //Non-module-to-module connections
-                if(debugPlacer){
-                    if(srcMIName.equals("NOMODULE") || destMIName.equals("NOMODULE")){
+                if(debugPlacer) {
+                    if(srcMIName.equals("NOMODULE") || destMIName.equals("NOMODULE")) {
                     
                         int srcX = getDrawnTileX(srcTile);
                         if(srcX < 0) 
@@ -321,13 +321,13 @@ public class FloorPlanScene extends TileScene {
                 //Module-to-module + Module-to-IOB connections
                 QGraphicsItemInterface gmiSrc = getGMI(srcMIName);
                 //for IOB connections, create immovable HMTile for net connection
-                if(gmiSrc == null){
+                if(gmiSrc == null) {
                     HMTile hmTile = new HMTile(srcTile, this, null);
                     hmTile.moveBy(getDrawnTileX(srcTile) * this.tileSize, getDrawnTileY(srcTile) * this.tileSize);
                     gmiSrc = hmTile;
                 }
                 QGraphicsItemInterface gmiDest = getGMI(destMIName);
-                if(gmiDest == null){
+                if(gmiDest == null) {
                     HMTile hmTile = new HMTile(destTile, this, null);
                     hmTile.moveBy(getDrawnTileX(destTile) * this.tileSize, getDrawnTileY(destTile) * this.tileSize);
                     gmiDest = hmTile;
@@ -358,11 +358,11 @@ public class FloorPlanScene extends TileScene {
         return macroMap.get(name);
     }
     
-    public void changeNetView(int index){
+    public void changeNetView(int index) {
         netViewState = index;
         switch (index) {
         case HIDE_NETS://Nets hidden
-            for(String key : multiNetLineMap.keySet()){
+            for(String key : multiNetLineMap.keySet()) {
                 GUIMultiNetLine line = multiNetLineMap.get(key);
                 line.hide();
             }
@@ -370,7 +370,7 @@ public class FloorPlanScene extends TileScene {
                 line.hide();
             break;
         case MODULE_TO_MODULE://Module-to-module
-            for(String key : multiNetLineMap.keySet()){
+            for(String key : multiNetLineMap.keySet()) {
                 GUIMultiNetLine line = multiNetLineMap.get(key);
                 line.show();
             }
@@ -378,7 +378,7 @@ public class FloorPlanScene extends TileScene {
                 line.hide();
             break;
         case 2://All nets(not clk/rst)
-            for(String key : multiNetLineMap.keySet()){
+            for(String key : multiNetLineMap.keySet()) {
                 GUIMultiNetLine line = multiNetLineMap.get(key);
                 line.hide();
             }
@@ -395,7 +395,7 @@ public class FloorPlanScene extends TileScene {
         return netLineList;
     }
 
-    public ArrayList<GUIModuleInst>    getMacroList(){
+    public ArrayList<GUIModuleInst>    getMacroList() {
         return polyList;
     }
 }
