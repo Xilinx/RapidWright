@@ -740,7 +740,7 @@ public class RWRoute{
         long lastIterationRnodeId = 0;
         long lasterIterationRnodeTime = 0;
         
-        while(routeIteration < config.getMaxIterations()) {
+        while (routeIteration < config.getMaxIterations()) {
             long startIteration = System.nanoTime();
             connectionsRoutedIteration = 0;
             if (config.isTimingDriven()) {
@@ -1222,7 +1222,7 @@ public class RWRoute{
         float dlyWeight = connection.getCriticality() * oneMinusTimingWeight;
         float estDlyWeight = connection.getCriticality() * timingWeight;
         
-        while(!queue.isEmpty()) {
+        while (!queue.isEmpty()) {
             if (!targetReached() && !successRoute) {
                 Routable rnode = queue.poll();
                 nodesPopped++;

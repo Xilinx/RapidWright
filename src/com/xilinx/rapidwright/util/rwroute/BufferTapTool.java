@@ -116,7 +116,7 @@ public class BufferTapTool {
             BufferedReader myReader = new BufferedReader(new FileReader(file));
             String line;
             try {
-                while((line = myReader.readLine()) != null) {
+                while ((line = myReader.readLine()) != null) {
                     if (line.length() == 0 || line.startsWith("#") || !line.startsWith("BUFCE_")) {
                         break;
                     }

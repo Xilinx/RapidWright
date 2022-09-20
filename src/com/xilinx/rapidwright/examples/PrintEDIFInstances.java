@@ -49,7 +49,7 @@ public class PrintEDIFInstances {
             pw.println("DESIGN NAME: " + ee.getName());
             Queue<EDIFHierCellInst> queue = new LinkedList<EDIFHierCellInst>();
             queue.add(ee.getTopHierCellInst());
-            while(!queue.isEmpty()) {
+            while (!queue.isEmpty()) {
                 EDIFHierCellInst p = queue.poll();
                 EDIFCellInst i = p.getInst();
                 String curr = p.getFullHierarchicalInstName();

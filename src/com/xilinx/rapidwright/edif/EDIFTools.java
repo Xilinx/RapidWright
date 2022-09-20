@@ -265,7 +265,7 @@ public class EDIFTools {
         Queue<EDIFCellInst> q = new LinkedList<EDIFCellInst>();
         q.add(topCellInst);
         
-        while(!q.isEmpty()) {
+        while (!q.isEmpty()) {
             EDIFCellInst eci = q.poll();
 
             ArrayList<EDIFCellInst> insts = instanceMap.get(eci.getCellType());
@@ -416,11 +416,11 @@ public class EDIFTools {
         int len = name.length;
         int i = len-1;
         if (name[i--] != ']') return len;
-        while(Character.isDigit(name[i])) {
+        while (Character.isDigit(name[i])) {
             i--;
         }
         if (name[i--] != ':') return len;
-        while(Character.isDigit(name[i])) {
+        while (Character.isDigit(name[i])) {
             i--;
         }
         if (name[i] != '[') return len;
@@ -496,7 +496,7 @@ public class EDIFTools {
                 currNet.addPortInst(hierPortInst.getPortInst());
             }
 
-            while(hierParentInst.getInst() != commonAncestor.getInst()) {
+            while (hierParentInst.getInst() != commonAncestor.getInst()) {
                 EDIFPortInst exitPath = currNet.getTopLevelPortInst();
                 EDIFPortInst outerPortInst = null;
                 if (exitPath != null) {
@@ -575,7 +575,7 @@ public class EDIFTools {
         String currParentName = parentInst.getParent().getFullHierarchicalInstName();
         EDIFCellInst currInst = parentInst.getInst();
         // Need to check if we need to move up levels of hierarchy before we move down
-        while(!routedNetName.startsWith(currParentName)) {
+        while (!routedNetName.startsWith(currParentName)) {
             EDIFPort port = currInst.getCellType().createPort(newPortName, EDIFDirection.INPUT, 1);
             currNet.createPortInst(port);
             EDIFCellInst prevInst = currInst;
@@ -588,7 +588,7 @@ public class EDIFTools {
         String[] parts = routedNetName.split(EDIFTools.EDIF_HIER_SEP);
         int idx = 0;
         if (!netlist.getTopCell().equals(currInst.getCellType())) {
-            while( idx < parts.length) {
+            while ( idx < parts.length) {
                 if (parts[idx++].equals(currInst.getName())) {
                     break;
                 }
@@ -1072,7 +1072,7 @@ public class EDIFTools {
         Queue<EDIFHierPortInst> q = new LinkedList<>();
         q.add(startingInput);
         ArrayList<EDIFHierPortInst> sinks = new ArrayList<>();
-        while(!q.isEmpty()) {
+        while (!q.isEmpty()) {
             EDIFHierPortInst curr = q.poll();
             final EDIFHierCellInst cellInst = curr.getHierarchicalInst().getChild(curr.getPortInst().getCellInst());
 
@@ -1153,7 +1153,7 @@ public class EDIFTools {
             q.add(EDIFHierCellInst.createRelative(inst));
         }
         ArrayList<String> leafCells = new ArrayList<String>();
-        while(!q.isEmpty()) {
+        while (!q.isEmpty()) {
             EDIFHierCellInst inst = q.remove();
             if (inst.getCellType().isPrimitive()) {
                 leafCells.add(inst.getFullHierarchicalInstName());
@@ -1180,7 +1180,7 @@ public class EDIFTools {
         Queue<EDIFHierCellInst> toProcess = new LinkedList<EDIFHierCellInst>();
         netlist.getTopHierCellInst().addChildren(toProcess);
         
-        while(!toProcess.isEmpty()) {
+        while (!toProcess.isEmpty()) {
             EDIFHierCellInst curr = toProcess.poll();
             
             EDIFLibrary lib = curr.getCellType().getLibrary();
@@ -1356,7 +1356,7 @@ public class EDIFTools {
         String srcDupNetName = parentInstNameToLogNet.get(srcParentInstName).getName();
         EDIFNet currNet = null;
 
-        while(!currParentInstName.equals(sinkParentInstName)) {
+        while (!currParentInstName.equals(sinkParentInstName)) {
             currNet = parentInstNameToLogNet.get(currParentInstName);
             // Go up or down by one level of hierarchy
             String nextInstName = EDIFNetlist.getNextHierChildName(currParentInstName, sinkParentInstName);
@@ -1374,7 +1374,7 @@ public class EDIFTools {
                 // Create a new net and port, port instance for this current instance
                 EDIFCell currParent = netlist.getCellInstFromHierName(nextInstName).getCellType();
                 int i=0;
-                while(currParent.getNet(srcDupNetName + "_" + i) != null) {
+                while (currParent.getNet(srcDupNetName + "_" + i) != null) {
                     i++;
                 }
                 currNet = currParent.createNet(srcDupNetName + "_" + i);
@@ -1386,7 +1386,7 @@ public class EDIFTools {
                     EDIFCellInst currInst = netlist.getCellInstFromHierName(currParentInstName);
                     EDIFCell currCell = currInst.getCellType();
                     int j=0; 
-                    while(currCell.getPort(portName + "_" + j) != null) {
+                    while (currCell.getPort(portName + "_" + j) != null) {
                         j++;
                     }
                     EDIFPort port = currInst.getCellType().createPort(portName + "_" + j, EDIFDirection.OUTPUT, 1);
@@ -1397,7 +1397,7 @@ public class EDIFTools {
                     EDIFCellInst nextInst = netlist.getCellInstFromHierName(nextInstName);
                     EDIFCell nextCell = nextInst.getCellType();
                     int j=0; 
-                    while(nextCell.getPort(portName + "_" + j) != null) {
+                    while (nextCell.getPort(portName + "_" + j) != null) {
                         j++;
                     }
                     EDIFPort port = nextInst.getCellType().createPort(portName + "_" + j, EDIFDirection.INPUT, 1);

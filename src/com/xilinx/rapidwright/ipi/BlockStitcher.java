@@ -189,7 +189,7 @@ public class BlockStitcher {
             HashSet<String> netsAlreadyVisited = new HashSet<>();
             ArrayList<EDIFHierPortInst> topPorts = new ArrayList<>();
             Net newNet = null;
-            while(!q.isEmpty()) {
+            while (!q.isEmpty()) {
                 EDIFHierPortInst curr = q.poll();
                 if (visited.contains(curr.toString())) continue;
                 visited.add(curr.toString());
@@ -352,7 +352,7 @@ public class BlockStitcher {
         
         boolean first = true;
         int i=0;
-        while(uniqueModInstNames.contains(fullInstName)) {
+        while (uniqueModInstNames.contains(fullInstName)) {
             i++;
             if (first) {
                 fullInstName = fullInstName + "_" + i;
@@ -376,7 +376,7 @@ public class BlockStitcher {
             ipiBlockInstanceMap = new HashMap<String,ArrayList<EDIFCellInst>>();
             Queue<EDIFCell> q = new LinkedList<EDIFCell>();
             q.add(stitched.getNetlist().getTopCell());
-            while(!q.isEmpty()) {
+            while (!q.isEmpty()) {
                 EDIFCell curr = q.poll();
                 for (EDIFCellInst eci : curr.getCellInsts()) {
                     if (eci.getCellType().getName().equals("GND") || eci.getCellType().getName().equals("VCC")) {
@@ -419,7 +419,7 @@ public class BlockStitcher {
     private void populateModuleInstMaps(EDIFNetlist netlist) {
         Queue<EDIFHierCellInst> queue = new LinkedList<EDIFHierCellInst>();
         netlist.getTopHierCellInst().addChildren(queue);
-        while(!queue.isEmpty()) {
+        while (!queue.isEmpty()) {
             EDIFHierCellInst p = queue.poll();
             EDIFCellInst i = p.getInst();
             if (i.getName().equals("VCC") || i.getName().equals("GND")) continue;

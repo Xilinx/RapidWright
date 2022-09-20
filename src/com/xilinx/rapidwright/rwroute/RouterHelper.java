@@ -122,12 +122,12 @@ public class RouterHelper {
         Node intNode = output.getConnectedNode();
         int watchdog = 5;
         
-        while(intNode.getAllDownhillNodes().get(0).getTile().getTileTypeEnum() != TileTypeEnum.INT) {
+        while (intNode.getAllDownhillNodes().get(0).getTile().getTileTypeEnum() != TileTypeEnum.INT) {
             List<Node> downhills = intNode.getAllDownhillNodes();
             intNode = downhills.get(0);
             if (downhills.size() > 1) {
                 int i = 1;
-                while(intNode.getAllDownhillNodes().size() == 0) {
+                while (intNode.getAllDownhillNodes().size() == 0) {
                     intNode = downhills.get(i);
                     i++;
                 }
@@ -153,10 +153,10 @@ public class RouterHelper {
         Queue<RoutingNode> q = new LinkedList<>();
         q.add(sink);
         int watchdog = 1000;        
-        while(!q.isEmpty()) {
+        while (!q.isEmpty()) {
             RoutingNode n = q.poll();
             if (n.getNode().getTile().getTileTypeEnum() == TileTypeEnum.INT) {
-                while(n != null) {
+                while (n != null) {
                     sinkToSwitchBoxPath.add(n.getNode());
                     n = n.getPrev();
                 }
@@ -538,10 +538,10 @@ public class RouterHelper {
         
         int watchdog = 10000;
         boolean success = false;
-        while(!queue.isEmpty()) {
+        while (!queue.isEmpty()) {
             RoutingNode curr = queue.poll();        
             if (curr.getNode().equals(sink)) {
-                while(curr != null) {
+                while (curr != null) {
                     path.add(curr.getNode());
                     curr = curr.getPrev();
                 }

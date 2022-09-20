@@ -90,7 +90,7 @@ public class RouteFixer{
             connection.getNodes().clear();
             connection.getNodes().add(csink.getNode());
             NodeWithDelay prev = csink.getPrev();
-            while(prev != null) {
+            while (prev != null) {
                 connection.getNodes().add(prev.getNode());
                 prev = prev.getPrev();
             }
@@ -105,7 +105,7 @@ public class RouteFixer{
         source.setPrev(null);
         queue.add(source);
         
-        while(!queue.isEmpty()) {
+        while (!queue.isEmpty()) {
             NodeWithDelay cur = queue.poll();
             Set<NodeWithDelay> nexts = cur.children;
             if (nexts == null || nexts.isEmpty()) continue;

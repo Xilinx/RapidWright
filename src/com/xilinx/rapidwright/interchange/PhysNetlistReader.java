@@ -570,7 +570,7 @@ public class PhysNetlistReader {
         Queue<EDIFNet> netsToExpand = new ArrayDeque<EDIFNet>();
         netsToExpand.add(net);
 
-        while(!netsToExpand.isEmpty()) {
+        while (!netsToExpand.isEmpty()) {
             net = netsToExpand.remove();
             for (EDIFPortInst portInst : net.getPortInsts()) {
                 if (portInst.isOutput() && !portInst.isTopLevelPort()) {

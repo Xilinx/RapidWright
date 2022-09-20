@@ -337,7 +337,7 @@ public class GlobalSignalRouting {
             sinkRNode.setPrev(null);    
             q.add(sinkRNode);
             boolean success = false;
-            while(!q.isEmpty()) {
+            while (!q.isEmpty()) {
                 RoutingNode routingNode = q.poll();
                 visitedRoutingNodes.add(routingNode);        
                 if (debug) System.out.println("DEQUEUE:" + routingNode);
@@ -348,7 +348,7 @@ public class GlobalSignalRouting {
                         System.out.println("SINK: TILE = " + sink.getTile().getName() + " NODE = " + sink.getConnectedNode().toString());
                         System.out.println("SOURCE " + routingNode.toString() + " found");
                     }    
-                    while(routingNode != null) {
+                    while (routingNode != null) {
                         usedRoutingNodes.add(routingNode);// use routed RNodes as the source
                         pathNodes.add(routingNode.getNode());
                         

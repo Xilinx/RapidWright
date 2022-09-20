@@ -85,7 +85,7 @@ public class JobQueue {
     }
     
     public boolean runAllToCompletion(int maxNumRunningJobs) {
-        while(!waitingToRun.isEmpty() || !running.isEmpty()) {
+        while (!waitingToRun.isEmpty() || !running.isEmpty()) {
 
             final Map<JobState, List<Job>> jobsByState = running.stream().collect(Collectors.groupingBy(Job::getJobState, ()->new EnumMap<>(JobState.class), Collectors.toList()));
             final List<Job> exited = jobsByState.get(JobState.EXITED);
@@ -98,7 +98,7 @@ public class JobQueue {
                 jobsByState.remove(JobState.EXITED);
             }
             boolean launched = false;
-            while(!waitingToRun.isEmpty() && maxNumRunningJobs > running.size()) {
+            while (!waitingToRun.isEmpty() && maxNumRunningJobs > running.size()) {
                 Job j = waitingToRun.poll();
                 long pid = j.launchJob();
                 running.add(j);
@@ -158,7 +158,7 @@ public class JobQueue {
         }
         MessageGenerator.briefError("Killing all running jobs...");
         long watchdog = System.currentTimeMillis(); 
-        while(!running.isEmpty() && (System.currentTimeMillis() - watchdog < 5000)) {
+        while (!running.isEmpty() && (System.currentTimeMillis() - watchdog < 5000)) {
             Job j = running.poll();
             if (j.isFinished()) finished.add(j);
             else {

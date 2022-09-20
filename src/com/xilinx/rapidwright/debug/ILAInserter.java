@@ -169,7 +169,7 @@ public class ILAInserter {
             }
         }
         // Create new ports to wire clock to top level in order to connect it to the ILA
-        while(!clkNet.getHierarchicalInst().isTopLevelInst()) {
+        while (!clkNet.getHierarchicalInst().isTopLevelInst()) {
             // Create port on the instance
             EDIFPort port = clkNet.getHierarchicalInst().getCellType().createPort(ilaClkPort, EDIFDirection.OUTPUT, 1);
             // Connect the net to the port

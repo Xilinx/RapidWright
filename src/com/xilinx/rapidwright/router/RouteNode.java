@@ -339,7 +339,7 @@ public class RouteNode{
     public ArrayList<PIP> getPIPsForwardToSink() {
         ArrayList<PIP> pips = new ArrayList<>();
         RouteNode curr = this;
-        while(curr.parent != null) {
+        while (curr.parent != null) {
             for (Wire currWire : Arrays.asList(curr.getWiresInNode())) {
                 if (!currWire.getTile().equals(curr.parent.getTile()))
                     continue;
@@ -360,7 +360,7 @@ public class RouteNode{
     public ArrayList<PIP> getPIPsBackToSource() {
         ArrayList<PIP> pips = new ArrayList<>();
         RouteNode curr = this;
-        while(curr.parent != null) {
+        while (curr.parent != null) {
             for (Wire parentWire : Arrays.asList(curr.parent.getWiresInNode())) {
                 if (!parentWire.getTile().equals(curr.getTile()))
                     continue;

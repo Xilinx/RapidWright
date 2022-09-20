@@ -71,7 +71,7 @@ public class Enumerator<T> extends ArrayList<T> {
 
     public void ensureSize(int size) {
         ensureCapacity(size);
-        while(size() < size) {
+        while (size() < size) {
             add(null);
         }
     }

@@ -267,7 +267,7 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 
             sites.addAll(placementCache.getAll());
             boolean found = false;
-            while(!sites.isEmpty()) {
+            while (!sites.isEmpty()) {
                 PlacementT site = sites.remove();
                 setTempAnchorSite(hm, site);
                 if (checkValidPlacement(hm)) {
@@ -445,7 +445,7 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
         currSystemCost = prevSystemCost;
         bestSoFar = currSystemCost;
         rangeLimit = getMaxRangeLimit();
-        OUTER: while(!finished) {
+        OUTER: while (!finished) {
             temperatureStep(maxInnerIteration);
 
             rangeLimit = rangeLimit * (1.0-goldenRate + moveAcceptanceRate);

@@ -186,7 +186,7 @@ public class PBlockGenerator {
             int lutCount = 0;
             int carryCount = 0;
             double fractionalShapeArea = 0.0;
-            while((line = br.readLine()) != null) {
+            while ((line = br.readLine()) != null) {
                 if (line.startsWith("WxH: ")) {
                     int pos = line.lastIndexOf('x');
                     String[] parts = line.split("\\s+");
@@ -304,7 +304,7 @@ public class PBlockGenerator {
         int nullColumnsOnLeft = 0;
         int nullColumnsOnRight = 0;
         
-        while(slicesRequired > 0 || RAM36Required > 0 ||  RAMRequired > 0 || DSPRequired > 0 || carryBlocks > 0 || sliceMRequired > 0) {
+        while (slicesRequired > 0 || RAM36Required > 0 ||  RAMRequired > 0 || DSPRequired > 0 || carryBlocks > 0 || sliceMRequired > 0) {
             // check if the position of the spiral is within the tile bounds.
             if (c >= 0 && r >=0 && r < totalRows && c < totalColumns) {
                 // check if the tile is a needed resource
@@ -1158,12 +1158,12 @@ public class PBlockGenerator {
             int slrCLBHeight = (dev.getNumOfClockRegionRows() / dev.getNumOfSLRs()) * cleHeight;
             // If we're below master, add
             if (tmp.getRow() < master.getLowerRight().getRow()) {
-                while(tmp.getRow() < master.getLowerRight().getRow()) {
+                while (tmp.getRow() < master.getLowerRight().getRow()) {
                     tmpSite = tmpSite.getNeighborSite(0, -slrCLBHeight);
                     tmp = tmpSite.getTile();
                 }
             } else { // Subtract
-                while(tmp.getRow() > master.getUpperLeft().getRow()) {
+                while (tmp.getRow() > master.getUpperLeft().getRow()) {
                     tmpSite = tmpSite.getNeighborSite(0, slrCLBHeight);
                     tmp = tmpSite.getTile();
                 }

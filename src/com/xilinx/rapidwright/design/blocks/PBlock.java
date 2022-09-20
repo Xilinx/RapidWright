@@ -351,7 +351,7 @@ public class PBlock extends ArrayList<PBlockRange> {
                 //int incr = startTile.getColumn() > newDSPTile.getColumn() ? /*LEFT*/ -1 : /*RIGHT*/ 1;
                 int incr = startTile.getColumn() == newDSPTile.getColumn() ? 0 : (startTile.getColumn() > newDSPTile.getColumn() ? /*LEFT*/ -1 : /*RIGHT*/ 1);
                 int sliceXOffset = 0;
-                while(incr != 0 && startTile.getColumn() != newDSPTile.getColumn()) {
+                while (incr != 0 && startTile.getColumn() != newDSPTile.getColumn()) {
                     startTile = startTile.getDevice().getTile(newDSPTile.getRow(), startTile.getColumn()+incr);
                     if (startTile.getSites().length > 0) {
                         if (startTile.getSites()[0].getName().startsWith("SLICE")) {
@@ -382,7 +382,7 @@ public class PBlock extends ArrayList<PBlockRange> {
                 Tile newBRAMTile = placement.getTile();
                 int incr = startTile.getColumn() == newBRAMTile.getColumn() ? 0 : (startTile.getColumn() > newBRAMTile.getColumn() ? /*LEFT*/ -1 : /*RIGHT*/ 1);
                 int sliceXOffset = 0;
-                while(incr != 0 && startTile != newBRAMTile) {
+                while (incr != 0 && startTile != newBRAMTile) {
                     startTile = startTile.getDevice().getTile(newBRAMTile.getRow(), startTile.getColumn()+incr);
                     if (startTile == null) {
                         throw new RuntimeException("ERROR: Couldn't create new pblock at placement " + 
@@ -432,7 +432,7 @@ public class PBlock extends ArrayList<PBlockRange> {
                     int x = 0;
                     Site right = pbr.getUpperRightSite().getNeighborSite(x, 0);
                     int target = right.getTile().getColumn() + dx;
-                    while(right.getTile().getColumn() < target) {
+                    while (right.getTile().getColumn() < target) {
                         x++;
                         right = pbr.getUpperRightSite().getNeighborSite(x, 0);
                         if (right.getTile().getColumn() <= target) {
@@ -451,7 +451,7 @@ public class PBlock extends ArrayList<PBlockRange> {
                     int x = 0;
                     Site left = pbr.getLowerLeftSite().getNeighborSite(x, 0);
                     int target = left.getTile().getColumn() + dx;
-                    while(left.getTile().getColumn() > target) {
+                    while (left.getTile().getColumn() > target) {
                         x--;
                         left = pbr.getLowerLeftSite().getNeighborSite(x, 0);
                         if (left.getTile().getColumn() >= target) {
@@ -474,7 +474,7 @@ public class PBlock extends ArrayList<PBlockRange> {
                     int y = 0;
                     Site left = pbr.getLowerLeftSite().getNeighborSite(0, y);
                     int target = left.getTile().getRow() + dy;
-                    while(left.getTile().getRow() < target) {
+                    while (left.getTile().getRow() < target) {
                         y--;
                         left = pbr.getLowerLeftSite().getNeighborSite(0, y);
                         if (left.getTile().getRow() <= target) {
@@ -493,7 +493,7 @@ public class PBlock extends ArrayList<PBlockRange> {
                     int y = 0;
                     Site right = pbr.getUpperRightSite().getNeighborSite(0, y);
                     int target = right.getTile().getRow() + dy;
-                    while(right.getTile().getRow() > target) {
+                    while (right.getTile().getRow() > target) {
                         y++;
                         right = pbr.getUpperRightSite().getNeighborSite(0, y);
                         if (right.getTile().getRow() >= target) {

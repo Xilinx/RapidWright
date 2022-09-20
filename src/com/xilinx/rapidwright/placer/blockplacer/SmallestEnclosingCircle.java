@@ -82,7 +82,7 @@ public class SmallestEnclosingCircle {
         Point s2 = convexHull.get(1);
         Point minPoint = null;
         
-        while(!finished) {
+        while (!finished) {
             double minAngle = Math.PI;
             minPoint = null;
             for (Point v: convexHull) {
@@ -146,13 +146,13 @@ public class SmallestEnclosingCircle {
         Arrays.sort(sortedPoints);
         
         for (int i = 0; i < n; i++) {
-            while(k >= 2 && crossProduct(hull[k-2], hull[k-1], sortedPoints[i]) <= 0) {
+            while (k >= 2 && crossProduct(hull[k-2], hull[k-1], sortedPoints[i]) <= 0) {
                 k--;
             }
             hull[k++] = sortedPoints[i];
         }
         for (int i = n-2, t = k+1; i >= 0; i--) {
-            while(k >= t && crossProduct(hull[k-2], hull[k-1], sortedPoints[i]) <= 0) {
+            while (k >= t && crossProduct(hull[k-2], hull[k-1], sortedPoints[i]) <= 0) {
                 k--;
             }
             hull[k++] = sortedPoints[i];

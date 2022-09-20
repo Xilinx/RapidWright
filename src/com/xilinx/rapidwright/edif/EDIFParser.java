@@ -86,7 +86,7 @@ public class EDIFParser extends AbstractEDIFParserWorker implements AutoCloseabl
 
         String currToken;
         
-        while(LEFT_PAREN.equals(currToken = getNextToken(true))) {
+        while (LEFT_PAREN.equals(currToken = getNextToken(true))) {
             String nextToken = getNextToken(true);
             if (nextToken.equalsIgnoreCase(STATUS)) {
                 parseStatus(currNetlist);
@@ -109,7 +109,7 @@ public class EDIFParser extends AbstractEDIFParserWorker implements AutoCloseabl
                 expect(RIGHT_PAREN, getNextToken(true));
                 expect(RIGHT_PAREN, getNextToken(true));
                 currToken = null;
-                while(LEFT_PAREN.equals(currToken = getNextToken(true))) {
+                while (LEFT_PAREN.equals(currToken = getNextToken(true))) {
                     parseProperty(design, getNextToken(true));
                 }
                 expect(RIGHT_PAREN, currToken);
@@ -133,7 +133,7 @@ public class EDIFParser extends AbstractEDIFParserWorker implements AutoCloseabl
         EDIFLibrary library = parseEdifLibraryHead();
 
         String currToken;
-        while(LEFT_PAREN.equals(currToken = getNextToken(true))) {
+        while (LEFT_PAREN.equals(currToken = getNextToken(true))) {
             final EDIFCell cell = parseEDIFCell(library.getName(), getNextToken(true));
             library.addCellRenameDuplicates(cell, cache.getEDIFRename(cell));
         }

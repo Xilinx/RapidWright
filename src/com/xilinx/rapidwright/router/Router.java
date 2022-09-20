@@ -241,7 +241,7 @@ public class Router extends AbstractRouter {
     public RouteNode findSwitchBoxInput(RouteNode src) {        
         RouteNode curr = src;
         Queue<RouteNode> q = new LinkedList<RouteNode>();
-        while(!isSwitchBox(curr.getTile())) {
+        while (!isSwitchBox(curr.getTile())) {
             if (curr.getConnections() != null) {
                 for (Wire conn : curr.getConnections()) {
                     q.add(new RouteNode(conn.getTile(),conn.getWireIndex(), curr, curr.getLevel()+1));
@@ -365,7 +365,7 @@ public class Router extends AbstractRouter {
         int limit = distCost[src.getManhattanDistance(snk)] + 2;
         boolean debug = false;
         
-        while(!allNearestLongLines.contains(currNode)/*currNode.equals(snk)*/) {
+        while (!allNearestLongLines.contains(currNode)/*currNode.equals(snk)*/) {
             if (debug) System.out.println(" CurrNode: " + currNode.toString());
             List<Wire> conns = currNode.getConnections();
             if (conns != null && currNode.getLevel() <= limit) {
@@ -396,7 +396,7 @@ public class Router extends AbstractRouter {
         if (debug) {
             System.out.println("Return Path:");
             RouteNode n = currNode;
-            while(n != null) {
+            while (n != null) {
                 System.out.println("  " + n.toString());
                 n = n.getParent();
             }
@@ -448,7 +448,7 @@ public class Router extends AbstractRouter {
         closest = end;
         if (debug) System.out.println(" SRC: " + end.getTile().getName());
         if (debug) System.out.println("SINK: " + snk.getTile().getName());
-        while((Math.abs(x) > LONG_LINE_THRESHOLD || Math.abs(y) > LONG_LINE_THRESHOLD) && watchDog > 0 && !longLineQueue.isEmpty()) {
+        while ((Math.abs(x) > LONG_LINE_THRESHOLD || Math.abs(y) > LONG_LINE_THRESHOLD) && watchDog > 0 && !longLineQueue.isEmpty()) {
             if (debug) System.out.println(MessageGenerator.makeWhiteSpace(end.getLevel()) + end.toString());
             watchDog--;
             
@@ -528,7 +528,7 @@ public class Router extends AbstractRouter {
             return path;
         }
         
-        while(closestNode != null) {
+        while (closestNode != null) {
             path.add(closestNode);
             closestNode = closestNode.getParent();
         }
@@ -549,7 +549,7 @@ public class Router extends AbstractRouter {
         // as we go along. We are finished when we find the sink node.
         boolean debug = false;
         
-        while(!queue.isEmpty()) {
+        while (!queue.isEmpty()) {
             if (nodesProcessed > 100000) {
                 // If we haven't found a route by now, we probably never will
                 return;
@@ -575,7 +575,7 @@ public class Router extends AbstractRouter {
                     }
                     
                     // Add this connection as a PIP, and follow it back to the source
-                    while(currPathNode.getParent() != null) {
+                    while (currPathNode.getParent() != null) {
                         if (allowWireOverlap) {
                             if (usedNodes.contains(currPathNode)) {
                                 conflictNodes.add(currPathNode);
@@ -1128,7 +1128,7 @@ public class Router extends AbstractRouter {
         if (!usable) return false;
         RouteNode currPathNode = n;
         // Add this connection as a PIP, and follow it back to the source
-        while(currPathNode.getParent() != null) {
+        while (currPathNode.getParent() != null) {
             for (Wire w : currPathNode.getConnections()) {
                 if (w.getWireIndex() == currPathNode.getParent().getWire() && w.isEndPIPWire()) {
                     PIP p = new PIP(currPathNode.getTile(),currPathNode.getWire(),currPathNode.getParent().getWire(),w.getPIPType());
@@ -1160,7 +1160,7 @@ public class Router extends AbstractRouter {
             public int compare(RouteNode i, RouteNode j) {return i.getCost() - j.getCost();}});
         setClkCostDistance(clkHDistNode, currSink);
         tmpQueue.add(clkHDistNode);
-        while(!tmpQueue.isEmpty()) {
+        while (!tmpQueue.isEmpty()) {
             RouteNode currNode = tmpQueue.poll();
             Tile currTile = currNode.getTile();
             if (currTile.getColumn() != currSink.getTile().getColumn() && (currTile.getTileTypeEnum() == TileTypeEnum.RCLK_INT_L || currTile.getTileTypeEnum() == TileTypeEnum.RCLK_INT_R)) {
@@ -1227,7 +1227,7 @@ public class Router extends AbstractRouter {
         queue.add(src);
         //It means that we can use XIPHYs to reach to our destination
         if (crSink.getColumn()==crSource.getColumn()) {
-            while(!queue.isEmpty()) {    
+            while (!queue.isEmpty()) {    
                 RouteNode currRouteNode = queue.remove();
                 if (currRouteNode.getIntentCode()==IntentCode.NODE_GLOBAL_HDISTR||currRouteNode.getIntentCode()==IntentCode.NODE_GLOBAL_VDISTR) {
                     // TODO - Find a better way to check these conditions, Also making sure that "XIPHY_L" covers all the clock buffer tiles that we need!
@@ -1259,7 +1259,7 @@ public class Router extends AbstractRouter {
                 }
             }
         } else {
-            while(!queue.isEmpty()) {    
+            while (!queue.isEmpty()) {    
                 RouteNode currRouteNode = queue.remove();
                 if ((currRouteNode.getIntentCode()==IntentCode.NODE_GLOBAL_HROUTE||currRouteNode.getIntentCode()==IntentCode.NODE_GLOBAL_VROUTE||currRouteNode.getIntentCode()==IntentCode.NODE_GLOBAL_VDISTR)&&!checkClkResource(currRouteNode)) {
                     ClockRegion crNode = currRouteNode.getTile().getClockRegion();
@@ -1309,7 +1309,7 @@ public class Router extends AbstractRouter {
         ClockRegion crAvgSink = calcClockTreeCentroid();
         clockQueue.clear();
         clockQueue.add(clkRoute);
-        while(!clockQueue.isEmpty()) {
+        while (!clockQueue.isEmpty()) {
             RouteNode currNode = clockQueue.remove();
             List<Wire> connections = currNode.getWireConnections();
             for (Wire w : connections) {
@@ -1343,7 +1343,7 @@ public class Router extends AbstractRouter {
         clockQueue.clear();
         ClockRegion crSink = currSink.getTile().getClockRegion();
         clockQueue.add(routeNode);
-        while(!clockQueue.isEmpty()) {
+        while (!clockQueue.isEmpty()) {
             RouteNode currNode = clockQueue.remove();
             List<Wire> connections = currNode.getWireConnections();
             for (Wire w : connections) {
@@ -1374,7 +1374,7 @@ public class Router extends AbstractRouter {
         clockQueue.clear();
         ClockRegion crSink = currSink.getTile().getClockRegion();
         clockQueue.add(clkRoute);
-        while(!clockQueue.isEmpty()) {
+        while (!clockQueue.isEmpty()) {
             RouteNode currNode = clockQueue.remove();
             List<Wire> connections = currNode.getWireConnections();
             if (connections==null) continue;
@@ -1403,7 +1403,7 @@ public class Router extends AbstractRouter {
         clockQueue.clear();
         ClockRegion crSink = currSink.getTile().getClockRegion();
         clockQueue.add(hDistr);
-        while(!clockQueue.isEmpty()) {
+        while (!clockQueue.isEmpty()) {
             RouteNode currNode = clockQueue.remove();
             for (Wire w : currNode.getWireConnections()) {
                 Tile currTile = w.getTile();
@@ -1435,7 +1435,7 @@ public class Router extends AbstractRouter {
         if (debug) System.out.println("clkRoutestoClkRegion"+clkRoute.toString()+"->"+currSink.toString());
         clockQueue.clear();
         clockQueue.add(clkRoute);
-        while(!clockQueue.isEmpty()) {
+        while (!clockQueue.isEmpty()) {
             RouteNode currNode = clockQueue.remove();
             for (Wire w : currNode.getWireConnections()) {
                 if (currNode.getWireName().contains("VCC_WIRE")) continue;
@@ -1602,7 +1602,7 @@ public class Router extends AbstractRouter {
                 if (allowWireOverlap) {
                     conflictNodes = new HashSet<RouteNode>();
                 }
-                while(currPathNode.getParent() != null) {
+                while (currPathNode.getParent() != null) {
                     if (debug) System.out.println("CL: " + MessageGenerator.makeWhiteSpace(currPathNode.getLevel()) + currPathNode.toString());
                     if (allowWireOverlap) {
                         if (usedNodes.contains(currPathNode)) {
@@ -1737,7 +1737,7 @@ public class Router extends AbstractRouter {
             visitedNodes = new HashSet<RouteNode>();
             q.add(n);
             boolean success = false;
-            while(!q.isEmpty()) {
+            while (!q.isEmpty()) {
                 n = q.poll();
                 visitedNodes.add(n);
                 if (debug) System.out.println("DEQUEUE:" + n);
@@ -2125,11 +2125,11 @@ public class Router extends AbstractRouter {
         RouteNode n = new RouteNode(node.getTile(),node.getWire());
         Queue<RouteNode> q = new LinkedList<RouteNode>();
         q.add(n);
-        while(!q.isEmpty()) {
+        while (!q.isEmpty()) {
             n = q.poll(); 
             if (isSwitchBox(n.getTile())) {
                 ArrayList<RouteNode> path = new ArrayList<RouteNode>();
-                while(n != null) {
+                while (n != null) {
                     path.add(n);
                     n = n.getParent();
                 }

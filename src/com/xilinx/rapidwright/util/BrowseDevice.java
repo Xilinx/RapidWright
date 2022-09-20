@@ -42,7 +42,7 @@ public class BrowseDevice{
     public static void run(Device dev) {
         BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
         Tile t = null;
-        while(true) {
+        while (true) {
             System.out.println("Commands: ");
             System.out.println(" 1: Get wire connections in tile");
             System.out.println(" 2: Check if wire is a PIP wire");
@@ -86,7 +86,7 @@ public class BrowseDevice{
                         System.out.println("Enter start wire name: ");
                         String startWire = br.readLine().trim();
                         
-                        while(true) {
+                        while (true) {
                             if (t.getWireConnections(t.getWireIndex(startWire)) == null) {
                                 System.out.println("This wire has no connections, it may be a sink");
                                 break;

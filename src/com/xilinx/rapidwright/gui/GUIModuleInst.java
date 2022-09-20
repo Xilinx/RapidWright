@@ -256,7 +256,7 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
                         changed = true;
                     }
             }
-        }while(changed);        
+        }while (changed);        
         
         
         int tileSize = scene.tileSize;

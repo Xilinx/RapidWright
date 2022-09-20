@@ -317,7 +317,7 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
         int minColumn = column-1;
         int minRow = row;
         HashSet<Tile> tiles = null;
-        while(proposedAnchorTile != null && tiles == null) {
+        while (proposedAnchorTile != null && tiles == null) {
             switch(dir) {
                 case UP:
                     if (row == minRow) {

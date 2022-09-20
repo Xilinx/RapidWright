@@ -123,7 +123,7 @@ public class Installer {
         }
         try (DigestInputStream dig = new DigestInputStream(is, md5)) {
             byte[] buffer = new byte[1024];
-            while(dig.read(buffer) != -1) {}
+            while (dig.read(buffer) != -1) {}
             byte[] checksum = md5.digest();
             return Installer.bytesToString(checksum);
         } catch (IOException e) {
@@ -199,7 +199,7 @@ public class Installer {
         byte[] buffer = new byte[1024];
         try (ZipInputStream zis = new ZipInputStream(new FileInputStream(zipFile))) {
             ZipEntry ze = zis.getNextEntry();
-            while(ze != null) {
+            while (ze != null) {
                 String fileName = ze.getName();
                 File newFile = new File(destDir, fileName);
                 if (!newFile.toPath().normalize().startsWith(destDir)) {
@@ -326,7 +326,7 @@ public class Installer {
         String jarsZipUrl = null;
         try(BufferedReader reader = new BufferedReader(new InputStreamReader(url.openStream()))) {
             String line = null;
-            while((line = reader.readLine()) != null) {
+            while ((line = reader.readLine()) != null) {
                 for (String s : line.split(",")) {
                     if (s.contains("browser_download_url") && s.contains(JARS_ZIP)) {
                         String suffix = "_jars.zip";

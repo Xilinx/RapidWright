@@ -410,7 +410,7 @@ public class PhysNetlistWriter {
             
             // PASS 2: Any nodes not reachable by sources, go onto stubs list
             Queue<RouteBranchNode> queue = new LinkedList<>(sources);
-            while(!queue.isEmpty()) {
+            while (!queue.isEmpty()) {
                 RouteBranchNode curr = queue.poll();
                 if (curr.hasBeenVisited()) {
                     continue;

@@ -281,13 +281,13 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
         
         int extraMoves = 0;
         
-        while(!finished) {
+        while (!finished) {
             currentAcceptedMoveCount = 0;
             int moveCount = 0;
             int badMoveCount = 0;
             int badAcceptedMoveCount = 0;
             double totalMovesCost = 0.0;
-            while(currentAcceptedMoveCount < (movesPerTemperature + extraMoves)) {
+            while (currentAcceptedMoveCount < (movesPerTemperature + extraMoves)) {
                 getNextMove();
                 totalMoves++;
                 currSystemCost = currentSystemCost();
@@ -474,7 +474,7 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
         int minColumn = column-1;
         int minRow = row;
         HashSet<Tile> tiles = null;
-        while(proposedAnchorTile != null && tiles == null) {
+        while (proposedAnchorTile != null && tiles == null) {
             switch(dir) {
                 case UP:
                     if (row == minRow) {
@@ -629,7 +629,7 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
         HardMacro hm1 = null;
         int iterations = 0;
 
-        while(true) {
+        while (true) {
             if (iterations > 10*validSites.size()) {
                 selected = hardMacros.get(rand.nextInt(hardMacros.size()));
                 validSites = selected.getValidPlacements();

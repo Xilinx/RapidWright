@@ -48,7 +48,7 @@ public class DeviceTools {
         PriorityQueue<RouteNode> q = new PriorityQueue<RouteNode>(16, new Comparator<RouteNode>() {
             public int compare(RouteNode i, RouteNode j) {return j.getLevel() - i.getLevel();}});
         q.add(start);
-        while(!q.isEmpty()) {
+        while (!q.isEmpty()) {
             RouteNode curr = q.poll();
             if (curr.getLevel() > depth) continue;
             System.out.println(MessageGenerator.makeWhiteSpace(curr.getLevel()) + curr);

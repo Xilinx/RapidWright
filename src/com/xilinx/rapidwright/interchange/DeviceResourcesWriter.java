@@ -250,7 +250,7 @@ public class DeviceResourcesWriter {
         Queue<EDIFCell> q = new LinkedList<>(); 
         Set<EDIFCell> visited = new HashSet<>();
         q.add(cell);
-        while(!q.isEmpty()) {
+        while (!q.isEmpty()) {
             EDIFCell curr = q.poll();
             visited.add(curr);
             if (unusedMacros.contains(curr)) {

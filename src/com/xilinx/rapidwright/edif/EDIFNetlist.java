@@ -512,7 +512,7 @@ public class EDIFNetlist extends EDIFName {
 
         //Step 2: add the subcells, subsubcells... to the library.
         //Do it like before, but updating the celltype of each cellInst should be noticed.
-        while(!cells.isEmpty()) {
+        while (!cells.isEmpty()) {
             EDIFCell pollFromCells = cells.poll();
             for (EDIFCellInst inst : pollFromCells.getCellInsts()) {
                 EDIFCell instCellType = inst.getCellType();
@@ -646,7 +646,7 @@ public class EDIFNetlist extends EDIFName {
         int lastSize = q.size();
         int size = lastSize;
         int watchdog = 10;
-        while(!q.isEmpty()) {
+        while (!q.isEmpty()) {
             Entry<String,HashSet<EDIFLibrary>> curr = q.poll();
             size--;
             if (toExport.containsAll(curr.getValue())) {
@@ -903,7 +903,7 @@ public class EDIFNetlist extends EDIFName {
             if (checkInst == null) {
                 StringBuilder sb = new StringBuilder(parts[i]);
                 i++;
-                while(checkInst == null && i < parts.length) {
+                while (checkInst == null && i < parts.length) {
                     sb.append(EDIFTools.EDIF_HIER_SEP);
                     sb.append(parts[i]);
                     checkInst = currInst.getCellType().getCellInst(sb.toString());
@@ -1093,7 +1093,7 @@ public class EDIFNetlist extends EDIFName {
         Queue<EDIFHierCellInst> toProcess = new LinkedList<EDIFHierCellInst>();
         toProcess.add(instance);
         
-        while(!toProcess.isEmpty()) {
+        while (!toProcess.isEmpty()) {
             EDIFHierCellInst curr = toProcess.poll();
             if (curr.getCellType().isPrimitive()) {
                 leafCells.add(curr);
@@ -1151,7 +1151,7 @@ public class EDIFNetlist extends EDIFName {
         String pattern = convertWildcardToRegex(wildcardPattern);
         Pattern pat = wildcardPattern != null ? Pattern.compile(pattern) : null;
         
-        while(!q.isEmpty()) {
+        while (!q.isEmpty()) {
             EDIFHierCellInst i = q.poll();
             for (EDIFCellInst child : i.getInst().getCellType().getCellInsts()) {
                 EDIFHierCellInst newCell = i.getChild(child);
@@ -1374,7 +1374,7 @@ public class EDIFNetlist extends EDIFName {
         // Here we search for all leaf cell insts 
         Queue<EDIFHierCellInst> instQueue = new LinkedList<>();
         instQueue.add(getTopHierCellInst());
-        while(!instQueue.isEmpty()) {
+        while (!instQueue.isEmpty()) {
             EDIFHierCellInst currInst = instQueue.poll(); 
             for (EDIFCellInst eci : currInst.getInst().getCellType().getCellInsts()) {
                 // Checks if cell is primitive or black box
@@ -1410,7 +1410,7 @@ public class EDIFNetlist extends EDIFName {
         List<EDIFCellInst> insts = new ArrayList<>();
         Queue<EDIFCellInst> q = new LinkedList<>();
         q.add(getTopCellInst());
-        while(!q.isEmpty()) {
+        while (!q.isEmpty()) {
             EDIFCellInst curr = q.poll();
             for (EDIFCellInst eci : curr.getCellType().getCellInsts()) {
                 if (eci.getCellType().isPrimitive())
@@ -1540,7 +1540,7 @@ public class EDIFNetlist extends EDIFName {
 
         getTopHierCellInst().addChildren(toProcess);
                 
-        while(!toProcess.isEmpty()) {
+        while (!toProcess.isEmpty()) {
             EDIFHierCellInst curr = toProcess.poll();
             if (curr.getInst().getCellType().getNets() == null) continue;
             for (EDIFNet net : curr.getInst().getCellType().getNets()) {
@@ -1584,7 +1584,7 @@ public class EDIFNetlist extends EDIFName {
         Queue<EDIFHierCellInst> toProcess = new LinkedList<EDIFHierCellInst>();
         getTopHierCellInst().addChildren(toProcess);
         
-        while(!toProcess.isEmpty()) {
+        while (!toProcess.isEmpty()) {
             EDIFHierCellInst curr = toProcess.poll();
             if (curr.getInst().getCellType().isPrimitive()) {
                 primitiveInstances.put(curr.getFullHierarchicalInstName(), curr.getInst());
@@ -1601,7 +1601,7 @@ public class EDIFNetlist extends EDIFName {
         
         Queue<EDIFCell> q = new LinkedList<>();
         q.add(c);
-        while(!q.isEmpty()) {
+        while (!q.isEmpty()) {
             EDIFCell curr = q.poll();
             types.add(curr.getName());
             for (EDIFCellInst i : curr.getCellInsts()) {

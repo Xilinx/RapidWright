@@ -105,7 +105,7 @@ public class MetadataParser {
         try {
             BufferedReader br = new BufferedReader(new FileReader(xciFile));
             String line = null;
-            while((line = br.readLine()) != null) {
+            while ((line = br.readLine()) != null) {
                 if (line.contains("instanceName")) {
                     br.close();
                     return line.substring(line.indexOf('>')+1, line.indexOf("</", 0));
@@ -135,7 +135,7 @@ public class MetadataParser {
         br = FileTools.getProperInputStream(metadataFileName);
         getNextLine();
         getNextLine();
-        outer: while(line != null) {
+        outer: while (line != null) {
             switch(currState) {
                 case BLOCK_BEGIN:{
                     expect(BEGIN, tokens[0]);
@@ -443,7 +443,7 @@ public class MetadataParser {
             line = nextLine;
             nextLine = br.readLine();
             lineNumber++;
-            while(nextLine != null && (nextLine.trim().isEmpty() || nextLine.startsWith("#"))) {
+            while (nextLine != null && (nextLine.trim().isEmpty() || nextLine.startsWith("#"))) {
                 nextLine = br.readLine();
                 lineNumber++;
             }

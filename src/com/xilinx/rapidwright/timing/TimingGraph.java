@@ -267,7 +267,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
      */
     public void setOrderedTimingVertexLists() {
         TopologicalOrderIterator<TimingVertex, TimingEdge> orderIterator = new TopologicalOrderIterator<>(this);
-        while(orderIterator.hasNext()) {
+        while (orderIterator.hasNext()) {
             TimingVertex v = orderIterator.next();
             orderedTimingVertice.add(v);
         }
@@ -368,7 +368,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         List<TimingEdge> criticalTimingEdges = new ArrayList<>();
         TimingVertex timingVertex = maxV;
         
-        while(incomingEdgesOf(timingVertex).size() != 0) {
+        while (incomingEdgesOf(timingVertex).size() != 0) {
             TimingEdge e = this.getCriticalSourceTimingVertex(timingVertex);
             if (e == null) break;
             timingVertex = e.getSrc();

@@ -67,7 +67,7 @@ public class EDIFPortInstList extends ArrayList<EDIFPortInst> {
         String instName = inst == null ? null : inst.getName();
         int left = 0;
         int right = size()-1;
-        while(left <= right) {
+        while (left <= right) {
             int pivot = (left + right) >>> 1;
             int result = compare(get(pivot), instName, portInstName);
             if (result < 0) {

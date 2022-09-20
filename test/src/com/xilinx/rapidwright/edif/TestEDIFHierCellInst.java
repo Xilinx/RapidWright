@@ -43,7 +43,7 @@ public class TestEDIFHierCellInst {
         EDIFHierCellInst topInst = netlist.getTopHierCellInst();
         Queue<EDIFHierCellInst> q = new LinkedList<>();
         topInst.addChildren(q);
-        while(!q.isEmpty()) {
+        while (!q.isEmpty()) {
             EDIFHierCellInst curr = q.poll();
             Assertions.assertTrue(curr.isDescendantOf(topInst));
             Assertions.assertFalse(topInst.isDescendantOf(curr));

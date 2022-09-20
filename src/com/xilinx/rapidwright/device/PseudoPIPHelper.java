@@ -209,7 +209,7 @@ public class PseudoPIPHelper {
         Deque<BELPin> sinkBelPinsToExplore = new ArrayDeque<BELPin>();
         sinkBelPinsToExplore.addLast(startBELPin);
 
-        while(sinkBelPinsToExplore.size() > 0) {
+        while (sinkBelPinsToExplore.size() > 0) {
             BELPin belPin = sinkBelPinsToExplore.removeFirst();
             siteWires.add(belPin.getSiteWireIndex());
 
@@ -234,7 +234,7 @@ public class PseudoPIPHelper {
         nodesToExplore.addLast(firstNode);
 
         SiteNode result = null;
-        while(nodesToExplore.size() > 0) {
+        while (nodesToExplore.size() > 0) {
             SiteNode parentNode = nodesToExplore.removeFirst();
 
             BELPin sourceBelPin = parentNode.sinkBelPin.getSourcePin();
@@ -273,7 +273,7 @@ public class PseudoPIPHelper {
         // the other path, and isn't consumed by using this pseudo pip.
         belPins.addLast(result.sinkBelPin);
         SiteNode node_cursor = result.parent;
-        while(node_cursor != null) {
+        while (node_cursor != null) {
             belPins.addLast(node_cursor.sinkBelPin.getSourcePin());
             belPins.addLast(node_cursor.sinkBelPin);
             node_cursor = node_cursor.parent;

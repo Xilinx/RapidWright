@@ -137,7 +137,7 @@ public class EquivalentEDIF {
         List<String> lines = new ArrayList<>();
         try(BufferedReader br = new BufferedReader(new FileReader(path.toFile()))) {
             String line = null;
-            while((line = br.readLine()) != null) {
+            while ((line = br.readLine()) != null) {
                 if (line.contains("(metax")) continue;
                 if (line.contains("(timeStamp")) continue;
                 lines.add(line);

@@ -125,7 +125,7 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParserWorker implement
         }
 
         String currToken = getNextToken(true);
-        while(LEFT_PAREN.equals(currToken)) {
+        while (LEFT_PAREN.equals(currToken)) {
             EDIFToken nextToken = getNextTokenWithOffset(true);
             if (nextToken.text.equalsIgnoreCase(STATUS)) {
                 parseStatus(netlist);
@@ -152,7 +152,7 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParserWorker implement
                 expect(RIGHT_PAREN, getNextToken(true));
                 expect(RIGHT_PAREN, getNextToken(true));
                 currToken = null;
-                while(LEFT_PAREN.equals(currToken = getNextToken(true))) {
+                while (LEFT_PAREN.equals(currToken = getNextToken(true))) {
                     parseProperty(edifDesign, getNextToken(true));
                 }
                 expect(RIGHT_PAREN, currToken);

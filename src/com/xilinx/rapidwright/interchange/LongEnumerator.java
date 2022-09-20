@@ -58,7 +58,7 @@ public class LongEnumerator extends ArrayList<Long> {
 
     public void ensureSize(int size) {
         ensureCapacity(size);
-        while(size() < size) {
+        while (size() < size) {
             add(null);
         }
     }

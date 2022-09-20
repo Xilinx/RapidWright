@@ -62,7 +62,7 @@ public class UltraScaleClockRouting {
         Queue<RouteNode> q = new LinkedList<RouteNode>();
         q.add(new RouteNode(clk.getSource()));
         int watchDog = 300;
-        while(!q.isEmpty()) {
+        while (!q.isEmpty()) {
             RouteNode curr = q.poll();
             IntentCode c = curr.getIntentCode(); 
             if (c == IntentCode.NODE_GLOBAL_HROUTE) {
@@ -108,7 +108,7 @@ public class UltraScaleClockRouting {
         
         RouteNode centroidHRouteNode = null;
         
-        while(!q.isEmpty()) {
+        while (!q.isEmpty()) {
             RouteNode curr = q.poll();
             visited.add(curr);
 
@@ -125,7 +125,7 @@ public class UltraScaleClockRouting {
                         if (adjusted) {
                             if (findCentroidHroute) {
                                 centroidHRouteNode = curr.getParent();
-                                while(centroidHRouteNode.getIntentCode() != IntentCode.NODE_GLOBAL_HROUTE) {
+                                while (centroidHRouteNode.getIntentCode() != IntentCode.NODE_GLOBAL_HROUTE) {
                                     centroidHRouteNode = centroidHRouteNode.getParent();
                                 }
                                 clk.getPIPs().addAll(centroidHRouteNode.getPIPsBackToSource());
@@ -175,7 +175,7 @@ public class UltraScaleClockRouting {
         Tile tileTarget = centroid.getTile();
         
         int watchDog = 10000;
-        while(!q.isEmpty()) {
+        while (!q.isEmpty()) {
             RouteNode curr = q.poll();
             visited.add(curr);
 
@@ -238,7 +238,7 @@ public class UltraScaleClockRouting {
         q.add(centroidRouteLine);
         ClockRegion currCR = cr;
         int watchDog = 1000;
-        while(!q.isEmpty()) {
+        while (!q.isEmpty()) {
             RouteNode curr = q.poll();
             IntentCode c = curr.getIntentCode(); 
             if (curr.getTile().getClockRegion().equals(currCR) && c == IntentCode.NODE_GLOBAL_VDISTR) {
@@ -279,7 +279,7 @@ public class UltraScaleClockRouting {
             q.addAll(startingPoints);
             //q.add(centroidDistNode);
             Tile crTarget = cr.getApproximateCenter();
-            while(!q.isEmpty()) {
+            while (!q.isEmpty()) {
                 RouteNode curr = q.poll();
                 visited.add(curr);
                 IntentCode c = curr.getIntentCode();
@@ -324,7 +324,7 @@ public class UltraScaleClockRouting {
         nextClockRegion: for (Entry<ClockRegion,RouteNode> e : crMap.entrySet()) {
             q.clear();
             q.add(e.getValue());
-            while(!q.isEmpty()) {
+            while (!q.isEmpty()) {
                 RouteNode curr = q.poll(); 
                 IntentCode c = curr.getIntentCode();
                 if (e.getKey().equals(curr.getTile().getClockRegion()) && c == IntentCode.NODE_GLOBAL_HDISTR) {
@@ -379,7 +379,7 @@ public class UltraScaleClockRouting {
             visited.clear();
             ClockRegion currCR = lcb.getTile().getClockRegion();
             q.addAll(startingPoints.get(currCR));
-            while(!q.isEmpty()) {
+            while (!q.isEmpty()) {
                 RouteNode curr = q.poll(); 
                 visited.add(curr);
                 if (lcb.equals(curr)) {
@@ -429,7 +429,7 @@ public class UltraScaleClockRouting {
                 q.clear();
                 q.add(e.getKey());
             
-                while(!q.isEmpty()) {
+                while (!q.isEmpty()) {
                     RouteNode curr = q.poll(); 
                     if (target.equals(curr)) {
                         List<PIP> pips = curr.getPIPsBackToSource();

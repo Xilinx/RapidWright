@@ -80,7 +80,7 @@ public class IsolateLeafClkBuffer {
         
         RouteNode curr = null;
         q.add(src);
-        while(!q.isEmpty()) {
+        while (!q.isEmpty()) {
             curr = q.poll();
             if (curr.equals(snk)) {
                 return curr.getPIPsBackToSource();
@@ -107,7 +107,7 @@ public class IsolateLeafClkBuffer {
         }
         Node curr = sink;
         //RCLK_INT_L_X49Y449/RCLK_INT_L.CLK_LEAF_SITES_10_CLK_IN->>CLK_LEAF_SITES_10_CLK_LEAF
-        while(!curr.getWireName().startsWith("CLK_LEAF_SITES")) {
+        while (!curr.getWireName().startsWith("CLK_LEAF_SITES")) {
             curr = reversePaths.get(curr).getStartNode();
         }
         PIP currLCB = reversePaths.get(curr);

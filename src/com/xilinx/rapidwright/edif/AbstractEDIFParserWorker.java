@@ -195,16 +195,16 @@ public abstract class AbstractEDIFParserWorker {
         expect(LEFT_PAREN, getNextToken(true));
         expect(INTERFACE, getNextToken(true));
         String currToken = null;
-        while(LEFT_PAREN.equals(currToken = getNextToken(true))) {
+        while (LEFT_PAREN.equals(currToken = getNextToken(true))) {
             EDIFPort p = parseEDIFPort();
             cell.addPort(p);
         }
         expect(RIGHT_PAREN, currToken); // Interface end
 
-        while(LEFT_PAREN.equals(currToken = getNextToken(true))) {
+        while (LEFT_PAREN.equals(currToken = getNextToken(true))) {
             String contentsOrProperty = getNextToken(true);
             if (contentsOrProperty.equals(CONTENTS)) { // Optional content
-                while(LEFT_PAREN.equals(currToken = getNextToken(true))) {
+                while (LEFT_PAREN.equals(currToken = getNextToken(true))) {
                     String nextToken = getNextToken(true);
                     if (nextToken.equals(INSTANCE)) {
                         cell.addCellInst(parseEDIFCellInst(libraryLegalName, instanceLookup, cell, nextToken));
@@ -250,7 +250,7 @@ public abstract class AbstractEDIFParserWorker {
         expect(RIGHT_PAREN, getNextToken(true));
 
         String currToken;
-        while(LEFT_PAREN.equals(currToken = getNextToken(true))) {
+        while (LEFT_PAREN.equals(currToken = getNextToken(true))) {
             String commentOrMetax = getNextToken(true);
             if (commentOrMetax.equals(COMMENT)) {
                 currNetlist.addComment(getNextToken(false));
@@ -331,11 +331,11 @@ public abstract class AbstractEDIFParserWorker {
         expect(JOINED, getNextToken(true));
         String currToken = null;
         cell.addNet(net);
-        while(LEFT_PAREN.equals(currToken = getNextToken(true))) {
+        while (LEFT_PAREN.equals(currToken = getNextToken(true))) {
             parseEDIFPortInst(cell, instanceLookup,net);
         }
         expect(RIGHT_PAREN, currToken);
-        while(LEFT_PAREN.equals(currToken = getNextToken(true))) {
+        while (LEFT_PAREN.equals(currToken = getNextToken(true))) {
             parseProperty(net, getNextToken(true));
         }
         expect(RIGHT_PAREN,currToken);
@@ -418,7 +418,7 @@ public abstract class AbstractEDIFParserWorker {
         port.setDirection(EDIFDirection.valueOf(getNextToken(true)));
         expect(RIGHT_PAREN, getNextToken(true));
 
-        while(LEFT_PAREN.equals(currToken = getNextToken(true))) {
+        while (LEFT_PAREN.equals(currToken = getNextToken(true))) {
             parseProperty(port, getNextToken(true));
         }
         expect(RIGHT_PAREN, currToken);
@@ -451,7 +451,7 @@ public abstract class AbstractEDIFParserWorker {
         expect(RIGHT_PAREN, nextToken);
         expect(RIGHT_PAREN, getNextToken(true));
         String currToken = null;
-        while(LEFT_PAREN.equals(currToken = getNextToken(true))) {
+        while (LEFT_PAREN.equals(currToken = getNextToken(true))) {
             parseProperty(inst, getNextToken(true));
         }
         expect(RIGHT_PAREN, currToken);

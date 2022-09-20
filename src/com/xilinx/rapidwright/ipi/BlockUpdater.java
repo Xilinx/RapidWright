@@ -56,7 +56,7 @@ public class BlockUpdater {
         j.setCommand("vivado -mode batch -source " + tclScriptName);
         j.setRunDir(dirName);
         long id = j.launchJob();
-        while(!j.isFinished()) {
+        while (!j.isFinished()) {
             System.out.println("Job " + id + " is still running...");
             try {
                 Thread.sleep(5000);

@@ -100,7 +100,7 @@ public class SLRCrosserGenerator {
         q.add(new RouteNode(n.getSource()));
         String targetPinName = n.getSource().getName().replace("TXQ", "RXD");
         int watchDog = 300;
-        while(!q.isEmpty()) {
+        while (!q.isEmpty()) {
             RouteNode curr = q.poll();
             SitePin check = Node.getNode(curr.getTile(),curr.getWire()).getSitePin();
             if (check != null && check.getPinName().equals(targetPinName) && !check.getSite().equals(n.getSource().getSite())) {
@@ -327,7 +327,7 @@ public class SLRCrosserGenerator {
         int count = 0;
         // Some tiles don't belong to a clock region, we need to wiggle around 
         // until we find one that is
-        while(c.getClockRegion() == null) {
+        while (c.getClockRegion() == null) {
             int neighborOffset = (count % 2 == 0) ? dir*i : i; 
             c = c.getTileNeighbor(neighborOffset, 0);
             count++;

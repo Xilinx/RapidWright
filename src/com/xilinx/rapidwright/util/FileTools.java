@@ -503,7 +503,7 @@ public class FileTools {
         ArrayList<String> lines = new ArrayList<String>();
         try (FileReader fr = new FileReader(fileName);
             BufferedReader br = new BufferedReader(fr)) {
-            while((line = br.readLine()) != null) {
+            while ((line = br.readLine()) != null) {
                 lines.add(line);
             }
         }
@@ -542,7 +542,7 @@ public class FileTools {
         ArrayList<String> lines = new ArrayList<String>();
         BufferedReader br = new BufferedReader(new InputStreamReader(in));
         try {
-            while((line = br.readLine()) != null) {
+            while ((line = br.readLine()) != null) {
                 lines.add(line);
             }
         } catch (IOException e) {
@@ -1265,7 +1265,7 @@ public class FileTools {
             final ZipFile zip = new ZipFile(zipFileName);
             Enumeration<? extends ZipEntry> entries = zip.entries();
             ZipEntry match = null;
-            while(entries.hasMoreElements()) {
+            while (entries.hasMoreElements()) {
                 ZipEntry entry = entries.nextElement();
                 if (entry.getName().endsWith(fileEndsWith)) {
                     if (match != null) {
@@ -1604,7 +1604,7 @@ public class FileTools {
         try (FileInputStream fis = new FileInputStream(zipFileName);
             ZipInputStream zin = new ZipInputStream(fis)) {
             ZipEntry e;
-            while((e = zin.getNextEntry()) != null) {
+            while ((e = zin.getNextEntry()) != null) {
                 String destFilePath = destDirectory + File.separator + e.getName();
                 if (e.isDirectory()) {
                     new File(destFilePath).mkdirs();
@@ -1615,7 +1615,7 @@ public class FileTools {
                     try (FileOutputStream fos = new FileOutputStream(destFilePath);
                         BufferedOutputStream bos = new BufferedOutputStream(fos)) {
                         int read;
-                        while( (read = zin.read(buffer)) != -1) {
+                        while ( (read = zin.read(buffer)) != -1) {
                             bos.write(buffer,0,read);
                         }
                     }
@@ -1693,7 +1693,7 @@ public class FileTools {
                     ZipInputStream zip = new ZipInputStream(is)) {
                     ZipEntry e;
                     byte[] buffer = new byte[1024];
-                    while((e = zip.getNextEntry()) != null) {
+                    while ((e = zip.getNextEntry()) != null) {
                         String name = e.getName();
                         if (name.startsWith(folderName)) {
                             if (!e.isDirectory()) {
@@ -1703,7 +1703,7 @@ public class FileTools {
                                 new File(newFile.getParent()).mkdirs();
                                 try(FileOutputStream fos = new FileOutputStream(newFile)) {
                                     int len;
-                                    while((len = zip.read(buffer)) > 0) {
+                                    while ((len = zip.read(buffer)) > 0) {
                                         fos.write(buffer, 0, len);
                                     }
                                 }

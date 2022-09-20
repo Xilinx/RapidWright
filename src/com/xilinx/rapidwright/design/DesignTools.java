@@ -768,7 +768,7 @@ public class DesignTools {
         HashSet<Wire> visited = new HashSet<>();
         visited.add(new Wire(start.getTile(), start.getWire()));
         
-        while(!q.isEmpty()) {
+        while (!q.isEmpty()) {
             RouteNode curr = q.remove();
             if (curr.equals(end)) {
                 return curr.getPIPsBackToSource();
@@ -1000,7 +1000,7 @@ public class DesignTools {
         // Traverse the connected set of PIPs starting from the node
         Queue<Node> q = new LinkedList<>();
         q.add(node);
-        while(!q.isEmpty()) {
+        while (!q.isEmpty()) {
             Node curr = q.poll();
             ArrayList<PIP> pips = conns.get(curr);
             if (pips == null) continue;
@@ -1089,7 +1089,7 @@ public class DesignTools {
         
         Queue<Node> q = new LinkedList<>();
         q.add(srcNode);
-        while(!q.isEmpty()) {
+        while (!q.isEmpty()) {
             Node curr = q.poll();
             List<PIP> pips = pipMap.get(curr);
             if (pips != null) {
@@ -1178,7 +1178,7 @@ public class DesignTools {
                     atReversedBidirectionalPip = true;
                 }
                 updateFanout.clear();
-                while(curr != null && curr.size() == 1 && fanoutCount < 2) {
+                while (curr != null && curr.size() == 1 && fanoutCount < 2) {
                     PIP pip = curr.get(0);
 
                     toRemove.add(pip);
@@ -1278,7 +1278,7 @@ public class DesignTools {
             Queue<String> siteWires = new LinkedList<>();
             Set<String> visited = new HashSet<>();
             siteWires.add(pin.getSiteWireName());
-            while(!siteWires.isEmpty()) {
+            while (!siteWires.isEmpty()) {
                 String siteWire = siteWires.poll();
                 visited.add(siteWire);
                 for (BELPin otherPin : siteInst.getSiteWirePins(siteWire)) {
@@ -1357,7 +1357,7 @@ public class DesignTools {
      */
     public static String getSitePinSource(BELPin pin) {
         String currSitePinName = pin.getConnectedSitePinName();
-        outer: while(currSitePinName == null) {
+        outer: while (currSitePinName == null) {
             boolean changedPin = false;
             for (BELPin p : pin.getSiteConns()) {
                 if (p.getBEL().getBELClass() == BELClass.RBEL) {
@@ -1907,7 +1907,7 @@ public class DesignTools {
         String toReturn = null;
         Queue<BELPin> queue = new LinkedList<>();
         queue.add(cell.getBEL().getPin(belPinName));
-        while(!queue.isEmpty()) {
+        while (!queue.isEmpty()) {
             BELPin curr = queue.remove();
             String siteWireName = curr.getSiteWireName();
             if (!siteWires.contains(siteWireName)) {
@@ -2070,7 +2070,7 @@ public class DesignTools {
 
         // Fan out from logical source to all site pins
         BELPin alternateExit = null;
-        while(!q.isEmpty()) {
+        while (!q.isEmpty()) {
             BELPin currOutPin = q.poll();
             Net currNet = siteInst.getNetFromSiteWire(currOutPin.getSiteWireName());
             // Skip any resources used by another net
@@ -2488,7 +2488,7 @@ public class DesignTools {
             boolean routingForward = curr.isOutput();
             Queue<BELPin> q = new LinkedList<BELPin>();
             q.add(curr);
-            while(!q.isEmpty()) {
+            while (!q.isEmpty()) {
                 curr = q.poll();
                 if (routingForward) {
                     for (BELPin pin : curr.getSiteConns()) {
@@ -2614,7 +2614,7 @@ public class DesignTools {
             atReversedBidirectionalPip = true;
         }
         HashSet<PIP> toRemove = new HashSet<>();
-        while(curr != null && curr.size() == 1 && fanoutCount < 2) {
+        while (curr != null && curr.size() == 1 && fanoutCount < 2) {
             PIP pip = curr.get(0);
             toRemove.add(pip);
             if (new Node(pip.getTile(), pip.getStartWireIndex()).equals(sink)) {
@@ -2933,7 +2933,7 @@ public class DesignTools {
         Node curr = sinkNode;
         
         List<PIP> path = new ArrayList<>();
-        while(!curr.equals(srcNode)) {
+        while (!curr.equals(srcNode)) {
             PIP pip = reverseNodeToPIPMap.get(curr);
             path.add(pip);
             curr = pip.getStartNode();

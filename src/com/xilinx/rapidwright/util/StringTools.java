@@ -105,11 +105,11 @@ public class StringTools {
             @Override
             public int compare(String a, String b) {
                 int ai = 0, bi = 0;
-                while(ai < a.length() && bi < b.length()) {
+                while (ai < a.length() && bi < b.length()) {
                     if (isDigit(a.charAt(ai)) && isDigit(b.charAt(bi))) {
                         int aStart = ai, bStart = bi;
-                        while(ai < a.length() && isDigit(a.charAt(ai))) ai++;
-                        while(bi < b.length() && isDigit(b.charAt(bi))) bi++;
+                        while (ai < a.length() && isDigit(a.charAt(ai))) ai++;
+                        while (bi < b.length() && isDigit(b.charAt(bi))) bi++;
                         String aStr = a.substring(aStart,ai);
                         String bStr = b.substring(bStart,bi);
                         if (aStr.length() > 9 || bStr.length() > 9) {
@@ -188,7 +188,7 @@ public class StringTools {
     public static String addIndexingAngleBrackets(String s) {
         int i = s.length() -1;
         if (!Character.isDigit(s.charAt(i))) return s;
-        while(Character.isDigit(s.charAt(i))) {
+        while (Character.isDigit(s.charAt(i))) {
             i--;
         }
         StringBuilder sb = new StringBuilder(s.substring(0, i+1));
