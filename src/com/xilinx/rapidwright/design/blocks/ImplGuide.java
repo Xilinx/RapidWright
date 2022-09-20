@@ -121,9 +121,9 @@ public class ImplGuide {
                     int index = Integer.parseInt(tokens[1]);
                     int subImplCount = 0;
                     int tokenIdx = 0;
-                    try{
+                    try {
                         subImplCount = Integer.parseInt(tokens[2]);
-                    }catch (NumberFormatException e) {
+                    } catch (NumberFormatException e) {
                         subImplCount = 0;
                         tokenIdx = -1;
                     }

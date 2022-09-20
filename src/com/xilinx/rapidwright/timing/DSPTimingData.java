@@ -75,9 +75,9 @@ public class DSPTimingData{
         this.inputPorts = new ArrayList<>();
         this.outputPorts = new ArrayList<>();
         
-        try{
+        try {
             if(this.valid) this.parse(dspTimingFile);
-        }catch(Exception e) {
+        } catch(Exception e) {
             e.printStackTrace();
         }
     }

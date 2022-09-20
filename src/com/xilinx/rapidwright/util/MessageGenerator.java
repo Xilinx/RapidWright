@@ -107,7 +107,7 @@ public class MessageGenerator{
      * Pauses execution until a key is pressed.
      */
     public static void waitOnAnyKeySilent() {
-        try{
+        try {
             System.in.read();
         }
         catch(IOException e) {
@@ -168,7 +168,7 @@ public class MessageGenerator{
     public static void promptToContinue() {
         System.out.print("Would you like to continue(y/n)? ");
         int ch;
-        try{
+        try {
             ch = System.in.read();
             while(ch != 'y' && ch != 'n' && ch != 'Y' && ch != 'N') {
                 while((ch = System.in.read()) != '\n');
@@ -194,7 +194,7 @@ public class MessageGenerator{
     public static void agreeToContinue() {
         System.out.print("(y/n)? ");
         int ch;
-        try{
+        try {
             ch = System.in.read();
             while(ch != 'y' && ch != 'n' && ch != 'Y' && ch != 'N') {
                 while((ch = System.in.read()) != '\n');

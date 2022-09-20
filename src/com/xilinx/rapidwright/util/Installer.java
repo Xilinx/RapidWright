@@ -318,7 +318,7 @@ public class Installer {
     
     public static void updateJars() {
         URL url = null;
-        try{
+        try {
             url = new URL("https://api.github.com/repos/Xilinx/RapidWright/releases/latest");
         } catch (MalformedURLException e) {
             throw new UncheckedIOException(e);
@@ -431,10 +431,10 @@ public class Installer {
 
             // Check that the port is valid
             String port = value.substring(idx+1);
-            try{
+            try {
                 int p = Integer.parseInt(port);
                 if(p < 0 || p > 65535) throw new RuntimeException("Bad port number");
-            }catch (Exception e) {
+            } catch (Exception e) {
                 System.err.println("ERROR: Couldn't identify a valid port number designated by HTTPS_PROXY="
                             +value +", please use syntax: 'proxyname.com:8080'");
                 System.exit(1);

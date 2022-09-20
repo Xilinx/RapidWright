@@ -106,7 +106,7 @@ public class BrowseDevice{
                             }
                             System.out.print("Choose a wire: ");
                             int ndx;
-                            try{
+                            try {
                                 ndx = Integer.parseInt(br.readLine().trim());
                                 t = wireConnections.get(ndx).getTile();
                                 startWire = t.getWireName(wireConnections.get(ndx).getWireIndex());

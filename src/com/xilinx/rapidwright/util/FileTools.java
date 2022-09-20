@@ -248,7 +248,7 @@ public class FileTools {
      */
     public static BufferedReader getProperInputStream(String fileName) {
         BufferedReader in = null;
-        try{
+        try {
             if(fileName.endsWith(".gz")) {
                 in = new BufferedReader(new InputStreamReader(new GZIPInputStream(new FileInputStream(fileName))));
             } else {
@@ -275,7 +275,7 @@ public class FileTools {
     public static BufferedWriter getProperOutputStream(String fileName) {
         BufferedWriter out = null;
 
-        try{
+        try {
             if(fileName.endsWith(".gz")) {
                 out = new BufferedWriter(new OutputStreamWriter(new GZIPOutputStream(new FileOutputStream(fileName))));
             } else {
@@ -1682,7 +1682,7 @@ public class FileTools {
         String outputPath = getExecJarStoragePath();
         for(String folderName : FileTools.UNPACK_FOLDERS) {
             if(new File(outputPath + File.separator + folderName).exists()) continue;
-            try{
+            try {
                 CodeSource src = Device.class.getProtectionDomain().getCodeSource();
                 if(src == null) {
                     MessageGenerator.briefError("Couldn't locate code source domain");

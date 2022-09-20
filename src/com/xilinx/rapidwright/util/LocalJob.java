@@ -85,19 +85,19 @@ public class LocalJob extends Job {
          * -- count for unique IDs.
         String className = p.getClass().getName();
         if(className.equals("java.lang.UNIXProcess")) {
-            try{
+            try {
                 Field f = p.getClass().getDeclaredField("pid");
                 f.setAccessible(true);
                 return f.getInt(p);
-            }catch(Exception e) {
+            } catch(Exception e) {
                 return -1;
             }
         } else if(className.equals("java.lang.ProcessImpl") || className.equals("java.lang.Win32Process")) {
-            try{
+            try {
                 Field f = p.getClass().getDeclaredField("handle");
                 f.setAccessible(true);
                 return (int)f.getLong(p);
-            }catch(Exception e) {
+            } catch(Exception e) {
                 return -1;
             }
         }

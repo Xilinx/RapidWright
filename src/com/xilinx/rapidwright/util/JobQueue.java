@@ -163,7 +163,7 @@ public class JobQueue {
             if(j.isFinished()) finished.add(j);
             else {
                 running.add(j);
-                try{Thread.sleep(200);} catch (InterruptedException e) {break;}
+                try {Thread.sleep(200);} catch (InterruptedException e) {break;}
             }
         }
         if(!running.isEmpty()) {

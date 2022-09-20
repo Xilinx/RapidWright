@@ -1064,9 +1064,9 @@ public class RWRoute{
         // fix routes with cycles and / or multi-driver nodes
         for(NetWrapper route:illegalRoutes) {
             for(Connection connection : route.getConnections()) {
-                try{
+                try {
                     if(!connection.isDirect()) ripUp(connection);
-                }catch (Exception e) {
+                } catch (Exception e) {
                     e.printStackTrace();
                 }
             }
