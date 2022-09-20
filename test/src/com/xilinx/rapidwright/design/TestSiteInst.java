@@ -53,29 +53,29 @@ public class TestSiteInst {
         Assertions.assertEquals(si.getSiteWiresFromNet(net).size(), 0);
     }
 
-    private void routeLUTRouteThruHelper(Design d, SiteInst si, char letter, boolean primary, BELPin snk, Unisim cellType) {
+    private void routeLUTRouteThruHelper(Design d, SiteInst si, char letter, boolean lutPrimary, BELPin snk, Unisim cellType) {
         BEL bel = snk.getBEL();
         String cellName = bel.getName() + "_inst";
         if(d.getCell(cellName) == null) {
             d.createAndPlaceCell(d.getTopEDIFCell(), cellName, cellType,
                     si.getSiteName() + "/" + bel.getName());            
         }
-        Net net = d.createNet(bel.getName() + "_net");
-        BELPin src = si.getSite().getBELPin(letter + (primary ? "5": "4"));
+        BELPin src = si.getSite().getBELPin(letter + (lutPrimary ? "5": "4"));
+        Net net = d.createNet(src.getName() + "_net");
         Assertions.assertTrue(si.routeIntraSiteNet(net, src, snk));
-        Cell lut = si.getCell(letter + (primary ? "6": "5") + "LUT");
+        Cell lut = si.getCell(letter + (lutPrimary ? "6": "5") + "LUT");
         Assertions.assertNotNull(lut);
         Assertions.assertTrue(lut.isRoutethru());
     }
 
-    private void routeLUTRouteThruHelperFF(Design d, SiteInst si, char letter, boolean primary) {
+    private void routeLUTRouteThruHelperFF(Design d, SiteInst si, char letter, boolean lutPrimary, boolean ffPrimary) {
         BEL bel;
         if(d.getDevice().getSeries() == Series.Series7) {
-            bel = si.getBEL(letter + (primary ? "" : "5") + "FF");
+            bel = si.getBEL(letter + (ffPrimary ? "" : "5") + "FF");
         } else {
-            bel = si.getBEL(letter + "FF" + (primary ? "" : "2"));
+            bel = si.getBEL(letter + "FF" + (ffPrimary ? "" : "2"));
         }
-        routeLUTRouteThruHelper(d, si, letter, primary, bel.getPin("D"), Unisim.FDRE);
+        routeLUTRouteThruHelper(d, si, letter, lutPrimary, bel.getPin("D"), Unisim.FDRE);
     }
 
     private void routeLUTRouteThruHelperCarry(Design d, SiteInst si, char letter, boolean primary) {
@@ -100,8 +100,23 @@ public class TestSiteInst {
         SiteInst si = d.createSiteInst(d.getDevice().getSite("SLICE_X32Y73"));
         
         for(char letter : LUTTools.lutLetters) {
-            routeLUTRouteThruHelperFF(d, si, letter, true);
-            routeLUTRouteThruHelperFF(d, si, letter, false);
+            routeLUTRouteThruHelperFF(d, si, letter, true, true);
+            routeLUTRouteThruHelperFF(d, si, letter, false, false);
+            if(d.getDevice().getSeries() == Series.Series7 && letter == 'D') break;
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {Device.KCU105})
+    public void testRouteLUTRouteThruFFandFF2(String deviceName) {
+        Design d = new Design("testRouteLUTRTFFandFF2", deviceName);
+
+        SiteInst si = d.createSiteInst(d.getDevice().getSite("SLICE_X32Y73"));
+
+        for(char letter : LUTTools.lutLetters) {
+            routeLUTRouteThruHelperFF(d, si, letter, true, true);
+            routeLUTRouteThruHelperFF(d, si, letter, true, false);
+            Assertions.assertNull(si.getCell(letter + "5LUT"));
             if(d.getDevice().getSeries() == Series.Series7 && letter == 'D') break;
         }
     }
@@ -114,8 +129,8 @@ public class TestSiteInst {
         SiteInst si = d.createSiteInst(d.getDevice().getSite("SLICE_X32Y73"));
 
         for(char letter : LUTTools.lutLetters) {
-            routeLUTRouteThruHelperFF(d, si, letter, true);
-            routeLUTRouteThruHelperFF(d, si, letter, false);
+            routeLUTRouteThruHelperFF(d, si, letter, true, true);
+            routeLUTRouteThruHelperFF(d, si, letter, false, false);
 
             // Unroute 6LUT
             {
