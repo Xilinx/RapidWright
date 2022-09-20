@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2021 Xilinx, Inc.
+ * Copyright (c) 2021-2022, Xilinx, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Jakob Wenzel, Xilinx Research Labs.
@@ -47,7 +48,7 @@ public class ExhaustiveValidPlacementCache<PlacementT> extends AbstractValidPlac
     @Override
     public List<PlacementT> getByRangeAround(int rangeLimit, PlacementT placement) {
         List<PlacementT> result = new ArrayList<>();
-        for(PlacementT s : placements){
+        for (PlacementT s : placements) {
             if (placer.isInRange(placement, s)) {
                 result.add(s);
             }

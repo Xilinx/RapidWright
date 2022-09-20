@@ -105,7 +105,7 @@ public class CellPin {
 ## 4. Java Code Formatting
 ### 4.1 Whitespace 
 1. Lines are terminated with a single newline character ('\n') and not the windows style ("\r\n") or other types.
-2. Block indentation is currently 1 tab or 4 spaces.
+2. Block indentation is currently 4 spaces, no tab characters allowed.
 3. Each statement should be separated by a line break.
 4. Lines longer than ~100 characters should be broken into multiple lines.
 5. A blank line should separate consecutive elements inside a class (variables, constructors, methods, nested classes, static blocks, etc)

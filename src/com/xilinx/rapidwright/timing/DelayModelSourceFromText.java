@@ -1,6 +1,7 @@
 /*
  *
- * Copyright (c) 2019 Xilinx, Inc.
+ * Copyright (c) 2019-2022, Xilinx, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Pongstorn Maidee, Xilinx Research Labs.
@@ -56,7 +57,7 @@ class DelayModelSourceFromText extends DelayModelSource {
      */
     protected List<String> configNames;
     /**
-     * Contain all config values for this bel. Each entry is the array of possible values of the 
+     * Contain all config values for this bel. Each entry is the array of possible values of the
      * corresponding configName.
      */
     protected List<List<String>>   configValues;
@@ -121,7 +122,7 @@ class DelayModelSourceFromText extends DelayModelSource {
         try {
             Integer.parseInt(str);
             return true;
-        } catch(NumberFormatException e){
+        } catch (NumberFormatException e) {
             return false;
         }
     }
@@ -270,13 +271,13 @@ class DelayModelSourceFromText extends DelayModelSource {
      */
     private void readIntraSiteDelays(String fileName) {
 
-        
+
         Scanner sc = null;
 
         String siteName = null;
         String belName  = null;
 
-        try(InputStream inputStream = new FileInputStream(FileTools.getRapidWrightPath() + File.separator + fileName)){
+        try (InputStream inputStream = new FileInputStream(FileTools.getRapidWrightPath() + File.separator + fileName)) {
             sc = new Scanner(inputStream, "UTF-8");
             while (sc.hasNextLine()) {
                 // Make canonical from "," without spaces
