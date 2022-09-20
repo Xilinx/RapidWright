@@ -131,10 +131,10 @@ public class TimingVertex {
     }
     
     public void setMinRequiredTime(float requiredTime) {
-        if(this.requiredTime == null) {
+        if (this.requiredTime == null) {
             this.requiredTime = requiredTime;
         } else {
-            if(this.requiredTime > requiredTime) {
+            if (this.requiredTime > requiredTime) {
                 this.requiredTime = requiredTime;
             }
         }
@@ -147,18 +147,18 @@ public class TimingVertex {
      * this vertex 
      */
     public void setMaxArrivalTime(float arrivalTime) {
-        if(this.arrivalTime == null) {
+        if (this.arrivalTime == null) {
             this.arrivalTime = arrivalTime;
-        } else if(this.arrivalTime < arrivalTime) {
+        } else if (this.arrivalTime < arrivalTime) {
             this.arrivalTime = arrivalTime;
         }
     }
     
     public void setMaxArrivalTime(float arrivalTime, TimingVertex prev) {
-        if(this.arrivalTime == null) {
+        if (this.arrivalTime == null) {
             this.arrivalTime = arrivalTime;
             this.setPrev(prev);
-        } else if(this.arrivalTime < arrivalTime) {
+        } else if (this.arrivalTime < arrivalTime) {
             this.arrivalTime = arrivalTime;
             this.setPrev(prev);
         }

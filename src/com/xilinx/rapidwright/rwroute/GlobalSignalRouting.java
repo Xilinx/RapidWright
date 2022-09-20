@@ -111,7 +111,7 @@ public class GlobalSignalRouting {
             String crName = crRouteNode.getKey();
             ClockRegion cr = dev.getClockRegion(crName);
             Set<RouteNode> routeNodes = startingPoints.get(cr);
-            if(routeNodes == null) {
+            if (routeNodes == null) {
                 routeNodes = new HashSet<>();
                 startingPoints.put(cr, routeNodes);
             }
@@ -126,11 +126,11 @@ public class GlobalSignalRouting {
         Map<String, Integer> crCounts = new HashMap<>();
         for(Wire wire : node.getAllWiresInNode()) {
             ClockRegion cr = wire.getTile().getClockRegion();
-            if(cr == null) {
+            if (cr == null) {
                 continue;
             }
             Integer count = crCounts.get(cr.getName());
-            if(count == null) {
+            if (count == null) {
                 count = 1;
             } else {
                 count++;
@@ -143,7 +143,7 @@ public class GlobalSignalRouting {
         for(Entry<String, Integer> crCount : crCounts.entrySet()) {
             String cr = crCount.getKey();
             Integer count = crCount.getValue();
-            if(count > max) {
+            if (count > max) {
                 max = count;
                 dominate = cr;
             }
@@ -165,7 +165,7 @@ public class GlobalSignalRouting {
             List<Node> pathNodes = new ArrayList<>();
             for(String nodeName : dstRoute.getValue()) {
                 Node node = Node.getNode(nodeName, device);
-                if(node != null) {
+                if (node != null) {
                     pathNodes.add(node);
                 } else {
                     System.err.println("ERROR: Null Node found under name: " + nodeName);
@@ -192,7 +192,7 @@ public class GlobalSignalRouting {
         RouteNode vrouteDown;    
         // Two VROUTEs going up and down
         ClockRegion aboveCentroid = centroid.getNeighborClockRegion(1, 0);
-        if(aboveCentroid != null) {
+        if (aboveCentroid != null) {
             vrouteUp = UltraScaleClockRouting.routeToCentroid(clk, centroidHRouteNode, aboveCentroid, true, false);
         }
         vrouteDown = UltraScaleClockRouting.routeToCentroid(clk, centroidHRouteNode, centroid.getNeighborClockRegion(0, 0), true, false);
@@ -203,13 +203,13 @@ public class GlobalSignalRouting {
         divideClockRegions(clockRegions, centroid, upClockRegions, downClockRegions);
         
         List<RouteNode> upDownDistLines = new ArrayList<>();
-        if(aboveCentroid != null) {
+        if (aboveCentroid != null) {
             List<RouteNode> upLines = UltraScaleClockRouting.routeToHorizontalDistributionLines(clk, vrouteUp, upClockRegions, false);
-            if(upLines != null) upDownDistLines.addAll(upLines);
+            if (upLines != null) upDownDistLines.addAll(upLines);
         }
         
         List<RouteNode> downLines = UltraScaleClockRouting.routeToHorizontalDistributionLines(clk, vrouteDown, downClockRegions, true);//TODO this is where the antenna node shows up
-        if(downLines != null) upDownDistLines.addAll(downLines);
+        if (downLines != null) upDownDistLines.addAll(downLines);
         
         Map<RouteNode, ArrayList<SitePinInst>> lcbMappings = getLCBPinMappings(clk);
         UltraScaleClockRouting.routeDistributionToLCBs(clk, upDownDistLines, lcbMappings.keySet());
@@ -230,10 +230,10 @@ public class GlobalSignalRouting {
     private static List<ClockRegion> getClockRegionsOfNet(Net clk) {
         List<ClockRegion> clockRegions = new ArrayList<>();
         for(SitePinInst pin : clk.getPins()) {
-            if(pin.isOutPin()) continue;
+            if (pin.isOutPin()) continue;
             Tile t = pin.getTile();
             ClockRegion cr = t.getClockRegion();
-            if(!clockRegions.contains(cr)) clockRegions.add(cr);
+            if (!clockRegions.contains(cr)) clockRegions.add(cr);
         }
         return clockRegions;
     }
@@ -241,7 +241,7 @@ public class GlobalSignalRouting {
     private static void divideClockRegions(List<ClockRegion> clockRegions, ClockRegion centroid, List<ClockRegion> upClockRegions,
             List<ClockRegion> downClockRegions) {
         for(ClockRegion cr : clockRegions) {
-            if(cr.getInstanceY() > centroid.getInstanceY()) {
+            if (cr.getInstanceY() > centroid.getInstanceY()) {
                 upClockRegions.add(cr);
             } else {
                 downClockRegions.add(cr);
@@ -257,12 +257,12 @@ public class GlobalSignalRouting {
     private static Map<RouteNode, ArrayList<SitePinInst>> getLCBPinMappings(Net clk) {
         Map<RouteNode, ArrayList<SitePinInst>> lcbMappings = new HashMap<>();
         for(SitePinInst p : clk.getPins()) {
-            if(p.isOutPin()) continue;
+            if (p.isOutPin()) continue;
             Node n = null;// n should be a node whose name ends with "CLK_LEAF"
             for(Node prev : p.getConnectedNode().getAllUphillNodes()) {
-                if(prev.getTile().equals(p.getSite().getIntTile())) {
+                if (prev.getTile().equals(p.getSite().getIntTile())) {
                     for(Node prevPrev : prev.getAllUphillNodes()) {
-                        if(prevPrev.getIntentCode() == IntentCode.NODE_GLOBAL_LEAF) {
+                        if (prevPrev.getIntentCode() == IntentCode.NODE_GLOBAL_LEAF) {
                             n = prevPrev;
                             break;
                         }
@@ -271,9 +271,9 @@ public class GlobalSignalRouting {
             }
             
             RouteNode rn = n != null? new RouteNode(n.getTile(), n.getWire()):null;
-            if(rn == null) throw new RuntimeException("ERROR: No mapped LCB to SitePinInst " + p);
+            if (rn == null) throw new RuntimeException("ERROR: No mapped LCB to SitePinInst " + p);
             ArrayList<SitePinInst> sinks = lcbMappings.get(rn);
-            if(sinks == null) {
+            if (sinks == null) {
                 sinks = new ArrayList<>();
                 lcbMappings.put(rn, sinks);
             }
@@ -292,7 +292,7 @@ public class GlobalSignalRouting {
     private static ClockRegion findCentroid(Net clk, Device device) {
         HashSet<Point> sitePinInstTilePoints = new HashSet<>();    
         for(SitePinInst spi : clk.getPins()) {
-            if(spi.isOutPin()) continue;
+            if (spi.isOutPin()) continue;
             ClockRegion c = spi.getTile().getClockRegion();
             sitePinInstTilePoints.add(new Point(c.getColumn(),c.getRow()));
         }    
@@ -318,21 +318,21 @@ public class GlobalSignalRouting {
         Map<Node, RoutingNode> createdRoutingNodes = new HashMap<>();
         
         boolean debug = false;
-        if(debug) {
+        if (debug) {
             System.out.println("Net: " + currNet.getName());
         }
         
         for(SitePinInst sink : currNet.getPins()) {
-            if(sink.isOutPin()) continue;
+            if (sink.isOutPin()) continue;
             int watchdog = 10000;    
-            if(debug) {
+            if (debug) {
                 System.out.println("SINK: TILE = " + sink.getTile().getName() + " NODE = " + sink.getConnectedNode().toString());
             }
             q.clear();
             visitedRoutingNodes.clear();
             List<Node> pathNodes = new ArrayList<>();            
             Node node = sink.getConnectedNode();
-            if(debug) System.out.println(node);
+            if (debug) System.out.println(node);
             RoutingNode sinkRNode = RouterHelper.createRoutingNode(node, createdRoutingNodes);
             sinkRNode.setPrev(null);    
             q.add(sinkRNode);
@@ -340,11 +340,11 @@ public class GlobalSignalRouting {
             while(!q.isEmpty()) {
                 RoutingNode routingNode = q.poll();
                 visitedRoutingNodes.add(routingNode);        
-                if(debug) System.out.println("DEQUEUE:" + routingNode);
-                if(debug) System.out.println(", PREV = " + routingNode.getPrev() == null ? " null" : routingNode.getPrev());        
-                if(success = isThisOurStaticSource(design, routingNode, netType, usedRoutingNodes)) {        
+                if (debug) System.out.println("DEQUEUE:" + routingNode);
+                if (debug) System.out.println(", PREV = " + routingNode.getPrev() == null ? " null" : routingNode.getPrev());        
+                if (success = isThisOurStaticSource(design, routingNode, netType, usedRoutingNodes)) {        
                     //trace back for a complete path
-                    if(debug) {
+                    if (debug) {
                         System.out.println("SINK: TILE = " + sink.getTile().getName() + " NODE = " + sink.getConnectedNode().toString());
                         System.out.println("SOURCE " + routingNode.toString() + " found");
                     }    
@@ -352,36 +352,36 @@ public class GlobalSignalRouting {
                         usedRoutingNodes.add(routingNode);// use routed RNodes as the source
                         pathNodes.add(routingNode.getNode());
                         
-                        if(debug) System.out.println("  " + routingNode.toString());
+                        if (debug) System.out.println("  " + routingNode.toString());
                         routingNode = routingNode.getPrev();
                     }
                     Collections.reverse(pathNodes);
                     sinkPathNodes.put(sink, pathNodes);
-                    if(debug) {
+                    if (debug) {
                         for(Node pathNode:pathNodes) {
                             System.out.println(pathNode.toString());
                         }
                     }
                     break;
                 }
-                if(debug) {
+                if (debug) {
                     System.out.println("KEEP LOOKING FOR A SOURCE...");
                 }
                 for(Node uphillNode : routingNode.getNode().getAllUphillNodes()) {
-                    if(routeThruHelper.isRouteThru(uphillNode, routingNode.getNode())) continue;
+                    if (routeThruHelper.isRouteThru(uphillNode, routingNode.getNode())) continue;
                     RoutingNode nParent = RouterHelper.createRoutingNode(uphillNode, createdRoutingNodes);
-                    if(nParent == null) continue;
-                    if(!pruneNode(nParent, unavailableNodes, visitedRoutingNodes)) {
+                    if (nParent == null) continue;
+                    if (!pruneNode(nParent, unavailableNodes, visitedRoutingNodes)) {
                         nParent.setPrev(routingNode);
                         q.add(nParent);
                     }
                 }
                 watchdog--;
-                if(watchdog < 0) {
+                if (watchdog < 0) {
                     break;
                 }
             }
-            if(!success) {
+            if (!success) {
                 System.err.println("ERROR: Failed to route " + currNet.getName() + " pin " + sink.toString());
             } else {
                 sink.setRouted(true);
@@ -418,8 +418,8 @@ public class GlobalSignalRouting {
                 return true;
             default:
         }
-        if(unavailableNodes.contains(node)) return true;
-        if(visitedRoutingNodes.contains(routingNode)) return true;
+        if (unavailableNodes.contains(node)) return true;
+        if (visitedRoutingNodes.contains(routingNode)) return true;
         return false;
     }
     
@@ -431,7 +431,7 @@ public class GlobalSignalRouting {
      * @return true if this sources is usable, false otherwise. 
      */
     private static boolean isThisOurStaticSource(Design design, RoutingNode routingNode, NetType type, Set<RoutingNode> usedRoutingNodes) {
-        if(usedRoutingNodes != null && usedRoutingNodes.contains(routingNode))
+        if (usedRoutingNodes != null && usedRoutingNodes.contains(routingNode))
             return true;
         Node node = routingNode.getNode();
         return isNodeUsableStaticSource(node, type, design);
@@ -452,16 +452,16 @@ public class GlobalSignalRouting {
         // (2) VCC_WIRE 
         // (3) Unused LUT Outputs (A_0, B_0,...,H_0)
         String pinName = type == NetType.VCC ? Net.VCC_WIRE_NAME : Net.GND_WIRE_NAME;        
-        if(node.getWireName().startsWith(pinName)) {
+        if (node.getWireName().startsWith(pinName)) {
             return true;
-        } else if(lutOutputPinNames.contains(node.getWireName())) {
+        } else if (lutOutputPinNames.contains(node.getWireName())) {
             Site slice = node.getTile().getSites()[0];
             SiteInst i = design.getSiteInstFromSite(slice);            
-            if(i == null) return true; // Site is not used
+            if (i == null) return true; // Site is not used
             char uniqueId = node.getWireName().charAt(node.getWireName().length()-3);
             Net currNet = i.getNetFromSiteWire(uniqueId + "_O");
-            if(currNet == null) return true;
-            if(currNet.getType() == type) return true;
+            if (currNet == null) return true;
+            if (currNet.getType() == type) return true;
             return false;
         }
         return false;

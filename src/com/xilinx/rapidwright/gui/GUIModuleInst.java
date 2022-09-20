@@ -115,7 +115,7 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
 
         for (SiteInst inst : instances) {
             Tile tile = inst.getTile();
-            if(inst.getSiteTypeEnum().equals(SiteTypeEnum.SLICEM)) {
+            if (inst.getSiteTypeEnum().equals(SiteTypeEnum.SLICEM)) {
                 tilesWithSLICEM.add(tile);
             }
             if (!occupiedTiles.contains(tile)) {
@@ -224,7 +224,7 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
                     }
                 }
                 for (int j = leftJ + 1; j < rightJ; j++) {
-                    if(!hmTileMap[i][j]) {
+                    if (!hmTileMap[i][j]) {
                         hmTileMap[i][j] = true;
                         changed = true;
                     }
@@ -251,7 +251,7 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
                     }
                 }
                 for (int i = topI + 1; i < bottomI; i++)
-                    if(!hmTileMap[i][j]) {
+                    if (!hmTileMap[i][j]) {
                         hmTileMap[i][j] = true;
                         changed = true;
                     }
@@ -357,13 +357,13 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
             newCollidingGMIs.addAll(gmiSet);
             gmiSet.add(this);
             int tileOccupation = gmiSet.size();
-            if(tileOccupation > 1)
+            if (tileOccupation > 1)
                 tileColliding = true;
             
             TileTypeEnum devType = scene.drawnTiles[y][x].getTileTypeEnum();
             if (myType.equals(devType) 
                     || Utils.isInterConnect(myType) && Utils.isInterConnect(devType)) {
-                if(tileColliding) {
+                if (tileColliding) {
                     hmTile.setState(GUIShapeState.COLLIDING);
                     isColliding = true;
                 } else {
@@ -382,7 +382,7 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
         isValidlyPlaced = isPlacementValid ;
 
         if (isPlacementValid) {
-            if(isColliding) {
+            if (isColliding) {
                 this.setState(GUIShapeState.COLLIDING);
             } else {
                 this.setState(GUIShapeState.VALID);    
@@ -396,7 +396,7 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
         //This is here to prevent infinite recursion.  It makes sure
         // that checkPlacement is only called on the colliding GMIs iff
         // this function was called by something other than itself
-        if(!aParentStack.getMethodName().equals("checkPlacement")) {
+        if (!aParentStack.getMethodName().equals("checkPlacement")) {
             for(GUIModuleInst gmi : prevCollidingGMIs) {
                 gmi.checkPlacement();
             }
@@ -543,10 +543,10 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
     }
     
     public HMTile getHMTile(Tile tile) {
-        if(tile == null)
+        if (tile == null)
             return null;
         for(HMTile hmTile : hmTiles) {
-            if(hmTile.getTile().equals(tile))
+            if (hmTile.getTile().equals(tile))
                 return hmTile;
         }
         return null;
@@ -560,21 +560,21 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
         switch (newState) {
             case VALID:
                 this.setPen(new QPen(HMTile.GREEN));
-                if(gutsHidden)
+                if (gutsHidden)
                     this.setBrush(new QBrush(HMTile.GREEN));
                 else
                     this.setBrush(new QBrush(QColor.transparent));
                 break;
             case COLLIDING:
                 this.setPen(new QPen(HMTile.ORANGE));
-                if(gutsHidden)
+                if (gutsHidden)
                     this.setBrush(new QBrush(HMTile.ORANGE));
                 else
                     this.setBrush(new QBrush(QColor.transparent));
                 break;
             case INVALID:
                 this.setPen(new QPen(HMTile.RED));
-                if(gutsHidden)
+                if (gutsHidden)
                     this.setBrush(new QBrush(HMTile.RED));
                 else
                     this.setBrush(new QBrush(QColor.transparent));
@@ -599,14 +599,14 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
     }
     
     public void addLine(GUIMultiNetLine line) {
-        if(myLines == null) {
+        if (myLines == null) {
             myLines = new ArrayList<GUIMultiNetLine>();
         }
         myLines.add(line);
     }
     
     public void showMyLines() {
-        if(myLines != null) {
+        if (myLines != null) {
             for(GUIMultiNetLine line : myLines) {
                 line.show();
             }
@@ -614,7 +614,7 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
     }
     
     public void hideMyLines() {
-        if(myLines != null) {
+        if (myLines != null) {
             for(GUIMultiNetLine line : myLines) {
                 line.hide();
             }

@@ -41,8 +41,8 @@ public class PartialRouter extends RWRoute{
     
     @Override
     protected void addGlobalClkRoutingTargets(Net clk) {
-        if(!clk.hasPIPs()) {
-            if(RouterHelper.isRoutableNetWithSourceSinks(clk)) {
+        if (!clk.hasPIPs()) {
+            if (RouterHelper.isRoutableNetWithSourceSinks(clk)) {
                 addClkNet(clk);
             } else {
                 increaseNumNotNeedingRouting();
@@ -58,12 +58,12 @@ public class PartialRouter extends RWRoute{
     protected void addStaticNetRoutingTargets(Net staticNet) {
         List<SitePinInst> sinks = new ArrayList<>();
         for(SitePinInst sink : staticNet.getPins()) {
-            if(sink.isOutPin()) continue;
+            if (sink.isOutPin()) continue;
             sinks.add(sink);
         }
         
-        if(sinks.size() > 0 ) {
-            if(!staticNet.hasPIPs()) {
+        if (sinks.size() > 0 ) {
+            if (!staticNet.hasPIPs()) {
                 for(SitePinInst sink : sinks) {
                     addReservedNode(sink.getConnectedNode(), staticNet);
                 }
@@ -81,7 +81,7 @@ public class PartialRouter extends RWRoute{
     
     @Override
     protected void addNetConnectionToRoutingTargets(Net net) {
-        if(!net.hasPIPs()) {
+        if (!net.hasPIPs()) {
             createsNetWrapperAndConnections(net, config.getBoundingBoxExtensionX(), config.getBoundingBoxExtensionY(), isMultiSLRDevice());
         } else {
             // In partial routing mode, a net with PIPs is preserved.

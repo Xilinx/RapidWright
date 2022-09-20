@@ -74,7 +74,7 @@ public class LUTTools {
      */
     public static String[] getLUTBELNames(char lutLetter) {
         int index = lutLetter - (lutLetter >= 'a' ? 'a' : 'A');
-        if(index < 0 || index >= lutLetters.length) return empty;
+        if (index < 0 || index >= lutLetters.length) return empty;
         return lutMap[index];
     }
     
@@ -85,7 +85,7 @@ public class LUTTools {
      * @return The name of the companion LUT or null if undetermined.
      */
     public static String getCompanionLUTName(BEL lut) {
-        if(!lut.isLUT()) return null;
+        if (!lut.isLUT()) return null;
         return getCompanionLUTName(lut.getName());
     }
     
@@ -115,12 +115,12 @@ public class LUTTools {
      * @return True if this is a LUT[1-6], false otherwise.
      */
     public static boolean isCellALUT(EDIFCellInst i) {
-        if(i == null) return false;
+        if (i == null) return false;
         EDIFCell ec = i.getCellType();
-        if(ec == null) return false;
+        if (ec == null) return false;
         boolean isPrimitive = ec.isPrimitive();
         boolean startsWithLUT = ec.getName().startsWith("LUT");
-        if(isPrimitive && startsWithLUT) return true;
+        if (isPrimitive && startsWithLUT) return true;
         return false;
     }
     
@@ -141,7 +141,7 @@ public class LUTTools {
      * @return The number of LUT inputs or 0 if cell is not a LUT.
      */
     public static int getLUTSize(EDIFCellInst c) {
-        if(!isCellALUT(c)) return 0;
+        if (!isCellALUT(c)) return 0;
         return Character.getNumericValue(c.getCellType().getName().charAt(3));
     }
     
@@ -152,7 +152,7 @@ public class LUTTools {
      */
     public static int initLength(String init) {
         int idx = init.indexOf('\'');
-        if(idx == -1) throw new RuntimeException("ERROR: Bad " + LUT_INIT +
+        if (idx == -1) throw new RuntimeException("ERROR: Bad " + LUT_INIT +
                                 " String \"" + init +"\", missing \'");
         return Integer.parseInt(init.substring(0, idx));
     }
@@ -206,7 +206,7 @@ public class LUTTools {
      * @param c The cell instance in question.
      */
     public static void printTruthTable(EDIFCellInst c) {
-        if(!isCellALUT(c)) return;
+        if (!isCellALUT(c)) return;
         String init = c.getProperty(LUT_INIT).getValue();
         int lutSize = getLUTSize(init);
         int initLength = initLength(init);
@@ -232,13 +232,13 @@ public class LUTTools {
      */
     public static long getInitValue(String init) {
         int idx = init.indexOf('\'');
-        if(idx == -1) throw new RuntimeException("ERROR: Bad " + LUT_INIT +
+        if (idx == -1) throw new RuntimeException("ERROR: Bad " + LUT_INIT +
                                 " String \"" + init +"\", missing \'");
         String radix = init.substring(idx+1, idx+2).toLowerCase();
-        if(radix.equals("h")) return Long.parseUnsignedLong(init.substring(idx+2), 16);
-        if(radix.equals("d")) return Long.parseUnsignedLong(init.substring(idx+2), 10);
-        if(radix.equals("o")) return Long.parseUnsignedLong(init.substring(idx+2), 8);
-        if(radix.equals("b")) return Long.parseUnsignedLong(init.substring(idx+2), 2);
+        if (radix.equals("h")) return Long.parseUnsignedLong(init.substring(idx+2), 16);
+        if (radix.equals("d")) return Long.parseUnsignedLong(init.substring(idx+2), 10);
+        if (radix.equals("o")) return Long.parseUnsignedLong(init.substring(idx+2), 8);
+        if (radix.equals("b")) return Long.parseUnsignedLong(init.substring(idx+2), 2);
         
         throw new RuntimeException("Unsupported radix '" + radix + "' in " +
                     LUT_INIT + " string \'" + init + "'");
@@ -290,7 +290,7 @@ public class LUTTools {
         LUTEquationEvaluator b = new LUTEquationEvaluator(equation);
         for(int i=0; i < length; i++) {
             boolean result = b.eval(i);
-            if(result) init = setBit(init,i);
+            if (result) init = setBit(init,i);
         }
         return length + "'h" + Long.toUnsignedString(init, 16).toUpperCase();
     }
@@ -303,7 +303,7 @@ public class LUTTools {
      */
     public static EDIFPropertyValue configureLUT(Cell c, String equation) {
         int size = getLUTSize(c);
-        if(size == 0) throw new RuntimeException("ERROR: Cell " + c.getName() + " is not a LUT");
+        if (size == 0) throw new RuntimeException("ERROR: Cell " + c.getName() + " is not a LUT");
         String init = getLUTInitFromEquation(equation, size);
         return c.addProperty(LUT_INIT, init);
     }
@@ -316,7 +316,7 @@ public class LUTTools {
      */
     public static EDIFPropertyValue configureLUT(EDIFCellInst c, String equation) {
         int size = getLUTSize(c);
-        if(size == 0) throw new RuntimeException("ERROR: Cell " + c.getName() + " is not a LUT");
+        if (size == 0) throw new RuntimeException("ERROR: Cell " + c.getName() + " is not a LUT");
         String init = getLUTInitFromEquation(equation, size);
         return c.addProperty(LUT_INIT, init);
     }
@@ -337,7 +337,7 @@ public class LUTTools {
      */
     public static String getLUTEquation(EDIFCellInst i) {
         String init = i.getProperty(LUT_INIT).getValue();
-        if(init == null) return null;
+        if (init == null) return null;
         return getLUTEquation(init);
     }
     
@@ -356,18 +356,18 @@ public class LUTTools {
         StringBuilder sb = new StringBuilder("O=");
         int termCount = 0;
         for(int i=0; i < length; i++) {
-            if(getBit(value,i) == 1) {
-                if(termCount > 0) sb.append(" + ");
+            if (getBit(value,i) == 1) {
+                if (termCount > 0) sb.append(" + ");
                 for(int j=lutSize-1; j >= 0; j--) {
                     sb.append(getBit(i,j) == 1 ? "" : "!");
                     sb.append("I" + j);
-                    if(j > 0) sb.append(" & ");
+                    if (j > 0) sb.append(" & ");
                 }
                 termCount++;
             }
         }
-        if(termCount==0) return "O=0";
-        if(termCount==length) return "O=1";
+        if (termCount==0) return "O=0";
+        if (termCount==length) return "O=1";
         return sb.toString();
     }
 
@@ -385,14 +385,14 @@ public class LUTTools {
             long initValue = lutInitLength == 64 ? -1L : (1L << (lutInitLength))-1; 
             test.put("O=1", lutInitLength + "'h" + Long.toUnsignedString(initValue,16).toUpperCase());
             
-            if(lutSize > 1) {
+            if (lutSize > 1) {
                 char[] repeatTemplate = new char[(int) (lutInitLength >> 2)]; 
                 test.put("O=I0 "+LUTEquationEvaluator.XOR+ " I1", lutInitLength + "'h" + new String(repeatTemplate).replace("\0", "6"));
                 test.put("O=I0 "+LUTEquationEvaluator.XOR2+" I1", lutInitLength + "'h" + new String(repeatTemplate).replace("\0", "6"));
             }
-            if(lutSize == 3)
+            if (lutSize == 3)
                 test.put("O=!I2 & I1 & !I0 + !I2 & I1 & I0 + I2 & !I1 & I0 + I2 & I1 & I0", "8'hAC");
-            if(lutSize == 6) {
+            if (lutSize == 6) {
                 test.put("O=!I0 + ~I1 * (I2 ^ (I3 & I4 . I5))","64'h5775757575757575");
                 test.put("O=I0 & I1 & !I3 & !I4 + !I1 & I2 & !I3 & !I4 + I3 & I5 + !I3 & I4 & I5","64'hFFFFFFB8000000B8");
                 test.put("O=!(I0 + ~I1) @ (I2 ^ I3) + (I4 . I5)","64'hFFFF4BB44BB44BB4");
@@ -420,13 +420,13 @@ public class LUTTools {
                 i.addProperty(LUT_INIT, init);
                 String altInit = getLUTInitFromEquation(equation, k);
                 System.out.println((init.equals(altInit) ? "PASS" : "FAIL") + "ED:" + init);
-                if(!init.equals(altInit)) {
+                if (!init.equals(altInit)) {
                     System.out.println("  FAILED INIT: " + altInit);
                 }
                 String altEq = getLUTEquation(init);
                 altInit = getLUTInitFromEquation(altEq, k);
                 System.out.println((init.equals(altInit) ? "PASS" : "FAIL") + "ED:" + altEq);
-                if(!init.equals(altInit)) {
+                if (!init.equals(altInit)) {
                     System.out.println("  FAILED INIT: " + altInit);
                 }
             }

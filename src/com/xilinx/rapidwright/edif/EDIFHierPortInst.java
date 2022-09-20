@@ -85,7 +85,7 @@ public class EDIFHierPortInst {
      * @return The full hierarchical name.
      */
     public String getFullHierarchicalInstName() {
-        if(portInst.getCellInst() == null) {
+        if (portInst.getCellInst() == null) {
             // Internal (inward-facing) side of a cell port
             return hierarchicalInst.getFullHierarchicalInstName();
         }
@@ -112,7 +112,7 @@ public class EDIFHierPortInst {
     }
 
     public EDIFCell getCellType() {
-        if(portInst.getCellInst() == null) return null;
+        if (portInst.getCellInst() == null) return null;
         return portInst.getCellInst().getCellType();
     }
 
@@ -159,7 +159,7 @@ public class EDIFHierPortInst {
      */
     @Override
     public String toString() {
-        if(hierarchicalInst.isTopLevelInst()) return portInst.getFullName();
+        if (hierarchicalInst.isTopLevelInst()) return portInst.getFullName();
         return hierarchicalInst + "/" + portInst.getFullName();
     }
 
@@ -191,7 +191,7 @@ public class EDIFHierPortInst {
      */
     public SitePinInst getRoutedSitePinInst(Design design) {
         Cell cell = getPhysicalCell(design);
-        if(cell == null) return null;
+        if (cell == null) return null;
         return cell.getSitePinFromPortInst(getPortInst(), null);
     }
     
@@ -213,7 +213,7 @@ public class EDIFHierPortInst {
      */
     public Pair<SiteInst, BELPin> getRoutedBELPin(Design design) {
         Cell cell = getPhysicalCell(design);
-        if(cell == null) return null;
+        if (cell == null) return null;
         BELPin belPin = cell.getBELPin(this);
         return new Pair<>(cell.getSiteInst(), belPin);
     }
@@ -226,7 +226,7 @@ public class EDIFHierPortInst {
     public List<SitePinInst> getAllRoutedSitePinInsts(Design design) {
         String cellName = getFullHierarchicalInstName();
         Cell cell = design.getCell(cellName);
-        if(cell == null) return null;
+        if (cell == null) return null;
         return cell.getAllSitePinsFromPortInst(getPortInst(), null);
     }
 

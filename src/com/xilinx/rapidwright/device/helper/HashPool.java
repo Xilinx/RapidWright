@@ -50,7 +50,7 @@ public class HashPool<E> extends HashMap<Integer,ArrayList<E>> {
     
     private void addToEnumerationMap(E obj, Integer enumeration) {
         ArrayList<Integer> enumerationMatches = enumerationMap.get(obj);
-        if(enumerationMatches == null) {
+        if (enumerationMatches == null) {
             enumerationMatches = new ArrayList<Integer>();
             enumerationMatches.add(enumeration);
             enumerationMap.put(obj, enumerationMatches);
@@ -67,18 +67,18 @@ public class HashPool<E> extends HashMap<Integer,ArrayList<E>> {
      */
     public Integer getEnumerationValue(E obj) {
         ArrayList<Integer> enumerationMatches = enumerationMap.get(obj);
-        if(enumerationMatches == null) {
+        if (enumerationMatches == null) {
             System.out.println("Object does not have enumeration value: " + obj.toString() + " in class: " + this.getClass().getCanonicalName());
             throw new IllegalArgumentException();
             //return -1;
         }
         else {
             for(Integer i : enumerationMatches) {
-                if(enumerations.get(i) == null && obj == null) {
+                if (enumerations.get(i) == null && obj == null) {
                     return i;
                 }
                     
-                if(enumerations.get(i).equals(obj)) {
+                if (enumerations.get(i).equals(obj)) {
                     return i;
                 }
             }
@@ -96,7 +96,7 @@ public class HashPool<E> extends HashMap<Integer,ArrayList<E>> {
     public E add(E obj) {
         int hash = obj == null ? 0 : obj.hashCode();
         ArrayList<E> hashMatches = get(hash);
-        if(hashMatches == null) {
+        if (hashMatches == null) {
             hashMatches = new ArrayList<E>();
             hashMatches.add(obj);
             put(hash, hashMatches);
@@ -106,7 +106,7 @@ public class HashPool<E> extends HashMap<Integer,ArrayList<E>> {
         }
         else {
             for(E e :hashMatches) {
-                if(e.equals(obj)) {
+                if (e.equals(obj)) {
                     return e;
                 }
             }
@@ -125,11 +125,11 @@ public class HashPool<E> extends HashMap<Integer,ArrayList<E>> {
      */
     public boolean contains(E obj) {
         ArrayList<E> hashMatches = get(obj.hashCode());
-        if(hashMatches == null) {
+        if (hashMatches == null) {
             return false;
         }
         for(E e :hashMatches) {
-            if(e.equals(obj)) {
+            if (e.equals(obj)) {
                 return true;
             }
         }
@@ -144,11 +144,11 @@ public class HashPool<E> extends HashMap<Integer,ArrayList<E>> {
      */
     public E find(E obj) {
         ArrayList<E> hashMatches = get(obj.hashCode());
-        if(hashMatches == null) {
+        if (hashMatches == null) {
             return null;
         }
         for(E e :hashMatches) {
-            if(e.equals(obj)) {
+            if (e.equals(obj)) {
                 return e;
             }
         }

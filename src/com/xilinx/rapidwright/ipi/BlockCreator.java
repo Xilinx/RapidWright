@@ -108,13 +108,13 @@ public class BlockCreator {
             d.updateDesignWithCheckpointPlaceAndRoute(dcpName);
             SiteInst anchorCandidate = null;
             for(SiteInst i : d.getSiteInsts()) {
-                if(i.getName().startsWith("STATIC_SOURCE")) continue;
-                if(Utils.isModuleSiteType(i.getSite().getSiteTypeEnum())) {
+                if (i.getName().startsWith("STATIC_SOURCE")) continue;
+                if (Utils.isModuleSiteType(i.getSite().getSiteTypeEnum())) {
                     anchorCandidate = i;
                     break;                
                 }
             }
-            if(anchorCandidate == null) {
+            if (anchorCandidate == null) {
                 // No suitable anchor site instances, let's create a dummy one
                 d.createSiteInst(d.getDevice().getSite("SLICE_X0Y0"));
             }
@@ -130,11 +130,11 @@ public class BlockCreator {
             // Store PBlock with Module Here
             String guidedPblockFile = dcpName.replace("_routed.dcp", USED_PBLOCK_FILE_SUFFIX);
             List<String> lines = FileTools.getLinesFromTextFile(guidedPblockFile);
-            if(lines == null || lines.size() == 0) {
+            if (lines == null || lines.size() == 0) {
                 throw new RuntimeException("ERROR: Problem reading pblock from guided block file " + guidedPblockFile);
             }
             String pblockString = lines.get(0).trim();
-            if(pblockString.length() > 0 && !pblockString.contains("Failed!")) m.setPBlock(pblockString);
+            if (pblockString.length() > 0 && !pblockString.contains("Failed!")) m.setPBlock(pblockString);
         }
         return modImpls;
     }
@@ -183,12 +183,12 @@ public class BlockCreator {
 
     private static ArrayList<String> getRoutedDCPFileNames(String routedDCPFileName, int blockImplCount) {
         ArrayList<String> routedDCPFileNames = new ArrayList<String>();
-        if(blockImplCount == 1) {
+        if (blockImplCount == 1) {
             routedDCPFileNames.add(routedDCPFileName);
         } else {
             File f = new File(routedDCPFileName);
             for(File siblings :  f.getParentFile().listFiles()) {
-                if(siblings.getName().endsWith(ROUTED_DCP_SUFFIX)) {
+                if (siblings.getName().endsWith(ROUTED_DCP_SUFFIX)) {
                     routedDCPFileNames.add(siblings.toString());
                 }
             }
@@ -242,7 +242,7 @@ public class BlockCreator {
      */
     public static ModuleImpls readStoredModule(String commonFileName, String cellInstanceName) {
         EDIFNetlist netlist = FileTools.readObjectFromKryoFile(commonFileName+".kryo", EDIFNetlist.class);
-        if(cellInstanceName != null) {
+        if (cellInstanceName != null) {
             // For cached blocks, the cell instance name gets lost so we restore it here
             netlist.renameNetlistAndTopCell(cellInstanceName);
         }
@@ -265,7 +265,7 @@ public class BlockCreator {
             String cacheID = e.getValue();
 
             File cachedIPDir = new File(cacheDir + File.separator + cacheID);
-            if(cachedIPDir.list() == null || cachedIPDir.list().length == 0) {
+            if (cachedIPDir.list() == null || cachedIPDir.list().length == 0) {
                 throw new RuntimeException("ERROR: Cached entry " + cachedIPDir + " for ip " + blockName +" is empty!");
             }
             
@@ -274,24 +274,24 @@ public class BlockCreator {
             String optDcpFileName = null;
             int implCount = -1;
             for(String fileName : cachedIPDir.list()) {
-                if(fileName.startsWith(DONE_FILE_PREFIX)) {
+                if (fileName.startsWith(DONE_FILE_PREFIX)) {
                     doneFileName = fileName;
                     implCount = Integer.parseInt(doneFileName.substring(doneFileName.lastIndexOf('.')+1));
-                } else if(fileName.endsWith("_opt.dcp")) {
+                } else if (fileName.endsWith("_opt.dcp")) {
                     optDcpFileName = cachedIPDir + "/" + fileName;
                 }
             }
-            if(optDcpFileName == null) {
+            if (optDcpFileName == null) {
                 throw new RuntimeException("ERROR: Expected an _opt.dcp file in " + cachedIPDir.getAbsolutePath());
             }
             
-            if(doneFileName != null) {
-                if(implHelper != null && implHelper.hasBlock(cacheID)) {
+            if (doneFileName != null) {
+                if (implHelper != null && implHelper.hasBlock(cacheID)) {
                     ArrayList<String> lines = FileTools.getLinesFromTextFile(cachedIPDir + "/" + doneFileName);
-                    if(lines.size() > 0 && lines.get(0).equals(DONE_FILE_PATTERN)) {
+                    if (lines.size() > 0 && lines.get(0).equals(DONE_FILE_PATTERN)) {
                         BlockGuide blockHelper = implHelper.getBlock(cacheID);
                         String md5Hash = blockHelper.getMD5Hash();
-                        if(lines.get(1).equals(md5Hash)) {
+                        if (lines.get(1).equals(md5Hash)) {
                             continue;
                         }
                     }
@@ -302,7 +302,7 @@ public class BlockCreator {
             
             // implement the blocks
             int implIndex = 0;
-            if(implHelper != null && implHelper.hasBlock(cacheID)) {
+            if (implHelper != null && implHelper.hasBlock(cacheID)) {
                 // A helper entry exists for this block, we'll use the guides provided
                 BlockGuide blockHelper = implHelper.getBlock(cacheID);
                 ArrayList<PBlock> pblocks = blockHelper.getImplementations();
@@ -318,13 +318,13 @@ public class BlockCreator {
             } else {
                 // Create a run for each implementation of each module in pblock file
                 String pblockFileName = optDcpFileName.replace("_opt.dcp", "_pblock.txt");
-                if(new File(pblockFileName).exists()) {
+                if (new File(pblockFileName).exists()) {
                     ArrayList<String> pBlockLines = FileTools.getLinesFromTextFile(pblockFileName);
                     if (pBlockLines.get(0).startsWith("PBlockGenerator Failed!")) {
                         throw new RuntimeException("in " + cacheID+" "+String.join("\n", pBlockLines) +"\n for "+pblockFileName);
                     }
                     for(String pblock : pBlockLines) {
-                        if(pblock.startsWith("#")) continue;
+                        if (pblock.startsWith("#")) continue;
                         PBlock pblock2 = (pblock.trim().isEmpty() || pblock.contains("Failed!")) ? null : new PBlock(dev, pblock);
                         FileTools.writeStringToTextFile(pblock, optDcpFileName.replace("opt.dcp", +implIndex + USED_PBLOCK_FILE_SUFFIX));
                         Job job = createImplRun(optDcpFileName, pblock2, implIndex, null);
@@ -333,7 +333,7 @@ public class BlockCreator {
                         implIndex++;
                     }                    
                 }
-                else if(new File(optDcpFileName.replace("_opt.dcp", "_utilization.report")).exists()) {
+                else if (new File(optDcpFileName.replace("_opt.dcp", "_utilization.report")).exists()) {
                     Job job = createImplRun(optDcpFileName, null, implIndex, null);
                     jobs.addJob(job);
                     jobLocations.put(job.getJobNumber(), optDcpFileName + " " + implIndex);
@@ -348,9 +348,9 @@ public class BlockCreator {
         
         // Returns when all jobs are finished
         boolean success = jobs.runAllToCompletion();
-        if(!success)System.out.println("Job failures detected...");
+        if (!success)System.out.println("Job failures detected...");
         // When all jobs are done, check outputs to see if any failed
-        if(jobLocations.size() > 0) MessageGenerator.printHeader("OOC Implementation Runs Summary");
+        if (jobLocations.size() > 0) MessageGenerator.printHeader("OOC Implementation Runs Summary");
         boolean halt = false;
         for(Entry<Long, String> e : jobLocations.entrySet()) {
             int lastSlash = e.getValue().lastIndexOf('/');
@@ -363,39 +363,39 @@ public class BlockCreator {
             boolean pass = false;
             boolean noDCP = true;
             String doneFile = null;
-            if(routedFileExists) {
+            if (routedFileExists) {
                 for(String file : new File(dir).list()) {
-                    if(file.startsWith(DONE_FILE_PREFIX)) {
+                    if (file.startsWith(DONE_FILE_PREFIX)) {
                         doneFile = file;
                         break;
                     }
                 }
-                if(doneFile != null && FileTools.isFileNewer(routedFileName, dir + "/" + doneFile)) {
+                if (doneFile != null && FileTools.isFileNewer(routedFileName, dir + "/" + doneFile)) {
                     pass = true;
                     noDCP = false;
                 }
             }
             String wns = null;
             String timingFile = dir + "/route_timing" + implIndex + ".twr"; 
-            if(!noDCP && new File(timingFile).exists() && FileTools.isFileNewer(timingFile, dir + "/" + doneFile)) {
+            if (!noDCP && new File(timingFile).exists() && FileTools.isFileNewer(timingFile, dir + "/" + doneFile)) {
                 for(String line : FileTools.getLinesFromTextFile(timingFile)) {
-                    if(line.contains("Slack")) {
+                    if (line.contains("Slack")) {
                         String[] tokens = line.split("\\s+");
-                        if(tokens.length > 2) wns = tokens[3];
+                        if (tokens.length > 2) wns = tokens[3];
                         break;
                     }
                 }
             }
             boolean isNegSlack = wns == null ? true : Float.parseFloat(wns.replace("ns", "")) < 0;
             
-            if(wns == null || isNegSlack) pass = false;
+            if (wns == null || isNegSlack) pass = false;
             String timing = noDCP ? "NO DCP" : (wns == null ? "inf" : wns.toString());
             System.out.println( (pass ? "PASS" : (wns==null ? "N/A" : "FAIL")) + " | " + timing + " | " + routedFileName );
-            if(noDCP) {
+            if (noDCP) {
                 String logFile = dir + "/" + implIndex +"/vivado.log";
                 System.out.println("  VIVADO LOG: " + logFile);
                 for(String line : FileTools.getLinesFromTextFile(logFile)) {
-                    if(line.contains("ERROR"))
+                    if (line.contains("ERROR"))
                         System.out.println("  *** " + line + " ***");
                 }
                 
@@ -404,12 +404,12 @@ public class BlockCreator {
                 halt = true;
                 
                 // Delete the done file
-                if(doneFile != null && new File( dir + "/" + doneFile).exists())
+                if (doneFile != null && new File( dir + "/" + doneFile).exists())
                     FileTools.deleteFile( dir + "/" + doneFile);
             }
         }
         
-        if(halt) {
+        if (halt) {
             throw new RuntimeException("ERROR: Failure to generate all necessary OOC DCPs.  "
                 + "Please see error messages and logs above to resolve issues in order to continue.");
         }
@@ -417,7 +417,7 @@ public class BlockCreator {
     
     public static void createDoneFile(String fileName, BlockGuide bg) {
         ArrayList<String> doneFileContents = new ArrayList<>();
-        if(bg != null) {
+        if (bg != null) {
             doneFileContents.add(DONE_FILE_PATTERN);
             doneFileContents.add(bg.getMD5Hash());
         }
@@ -432,7 +432,7 @@ public class BlockCreator {
             e.printStackTrace();
             throw new RuntimeException("ERROR: Couldn't create Tcl script " + scriptName);
         }
-        if(FileTools.isWindows()) {
+        if (FileTools.isWindows()) {
             optDcpFileName = optDcpFileName.replace("\\", "/");
         }
 
@@ -448,7 +448,7 @@ public class BlockCreator {
 
         
         pw.println("open_checkpoint " + optDcpFileName);
-        if(blockGuide != null) {
+        if (blockGuide != null) {
             // Add Clock Constraints
             for(String clkPortName : blockGuide.getClocks()) {
                 pw.println("create_clock -name " + clkPortName + " -period " + Float.toString(blockGuide.getClockPeriod(clkPortName)) + " [get_ports " + clkPortName + "]");
@@ -456,7 +456,7 @@ public class BlockCreator {
             for(String clkPortName : blockGuide.getClocksWithBuffers()) {
                 pw.println("set_property HD.CLK_SRC " + blockGuide.getClockBuffer(clkPortName) + " [get_ports " + clkPortName + "]");
             }
-            if(blockGuide.getClocks().size() > 1) {
+            if (blockGuide.getClocks().size() > 1) {
                 pw.print("set_clock_groups -asynchronous");
                 for(String clkPortName : blockGuide.getClocks()) {
                     pw.print(" -group [get_clocks " + clkPortName +"]");
@@ -473,11 +473,11 @@ public class BlockCreator {
         pw.println("    if {[string trim $pblock] != {} }  {"); 
         pw.println("        create_pblock pblock_1");
         pw.println("        add_cells_to_pblock pblock_1 -instances $designCells");
-        //if(!optDcpFileName.contains("_slr"))
+        //if (!optDcpFileName.contains("_slr"))
         pw.println("        set_property CONTAIN_ROUTING true [get_pblocks pblock_1]");
         pw.println("        resize_pblock pblock_1 -add $pblock");
         int i = 2;
-        if(pblock != null) {
+        if (pblock != null) {
             for(SubPBlock subPBlock : pblock.getSubPBlocks()) {
                 String pblockName = "pblock_" + i; 
                 i++;
@@ -492,7 +492,7 @@ public class BlockCreator {
         }
         pw.println("    }");
         
-        if(blockGuide != null) {
+        if (blockGuide != null) {
             for(String xdc : blockGuide.getXDCCommands()) {
                 pw.println("    " + xdc);
             }                
@@ -546,24 +546,24 @@ public class BlockCreator {
         String cacheID = xciFileName.replace(".xci", "");
         cacheID = cacheID.substring(cacheID.lastIndexOf('/')+1, cacheID.length());
         ModuleImpls cachedModules = inMemModuleCache.get(cacheID);
-        if(cachedModules != null) {
+        if (cachedModules != null) {
             //System.out.println("Cache hit on " + cellInstanceName + " " + cacheID);
             return cachedModules;
         }
         //System.out.println("Cache miss on " + cellInstanceName + " " + cacheID);
         String datFileName = uniqueFileName+".dat";
         /*boolean storedModuleValid = new File(datFileName).exists() && new File(uniqueFileName+".kryo").exists(); 
-        if(storedModuleValid) {
+        if (storedModuleValid) {
             // Check that all *routed.dcp files are older than .dat
             for(String routedDCP : getRoutedDCPFileNames(routedDCPFileName, blockImplCount)) {
-                if(FileTools.isFileNewer(routedDCP, datFileName)) {
+                if (FileTools.isFileNewer(routedDCP, datFileName)) {
                     storedModuleValid = false;
                     break;
                 }
             }
         }
         
-        if(storedModuleValid) {
+        if (storedModuleValid) {
             // Module has already been built, load existing file
             //System.out.println("Reading Stored dat/kryo for " + uniqueFileName);
             ModuleImpls modules = readStoredModule(uniqueFileName, cellInstanceName);
@@ -587,7 +587,7 @@ public class BlockCreator {
     }
     
     public static void main(String[] args) {
-        if(args.length != 5) {
+        if (args.length != 5) {
             System.out.println("USAGE: <EDIF file name> <routed DCP file name> "
                     + "<XCI file name|path to store block> <part name> <blockImplCount>");
             return;
@@ -596,7 +596,7 @@ public class BlockCreator {
         String routedDCPFileName = args[1];
         int blockImplCount = Integer.parseInt(args[4]);
         System.out.println("BlockCreator: " + edifFileName + " " + routedDCPFileName + " " + args[2] + " " + args[3] + " " + args[4]);
-        if(args[2].toLowerCase().endsWith(".xci")) {
+        if (args[2].toLowerCase().endsWith(".xci")) {
             // Use the caching mechanism
             System.out.println(getMD5Checksum(args[2]));
             createOrRetrieveBlock(edifFileName, routedDCPFileName, args[2], args[3], blockImplCount);

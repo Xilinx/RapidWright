@@ -48,7 +48,7 @@ import com.xilinx.rapidwright.util.Pair;
 public class SourceToSinkINTTileDelayWriter {
     @SuppressWarnings("unchecked")
     public static void main(String[] args) {
-        if(args.length < 4) {
+        if (args.length < 4) {
             System.out.println("BASIC USAGE:\n <input.dcp> --net <net name> <output file> --allSinkDelay\n");
             return;
         }
@@ -61,10 +61,10 @@ public class SourceToSinkINTTileDelayWriter {
         DelayEstimatorBase estimator = new DelayEstimatorBase(design.getDevice(), new InterconnectInfo(), useUTurnNodes, 0);
         
         Net net = design.getNet(args[2]);
-        if(net == null) {
+        if (net == null) {
             System.err.println("ERROR: Cannot find net under name " + args[2]);
             return;
-        } else if(!net.hasPIPs()) {
+        } else if (!net.hasPIPs()) {
             System.err.println("ERROR: No PIPs found of net " + net.getName());
             return;
         }
@@ -77,7 +77,7 @@ public class SourceToSinkINTTileDelayWriter {
         try {
             FileWriter myWriter = new FileWriter(outputFile);
             
-            if(writeAllSinkDelay) {
+            if (writeAllSinkDelay) {
                 System.out.println("INFO: Write delay from source to all sink to file \n      " + outputFile);
                 for(Entry<Pair<SitePinInst, Node>, Short> sinkINTNodeDelay : sourceToSinkINTDelays.entrySet()) {
                     Node node = sinkINTNodeDelay.getKey().getSecond();
@@ -91,7 +91,7 @@ public class SourceToSinkINTTileDelayWriter {
                 for(Entry<Pair<SitePinInst, Node>, Short> sinkINTNodeDelay : sourceToSinkINTDelays.entrySet()) {
                     Node node = sinkINTNodeDelay.getKey().getSecond();
                     Short delay = sinkINTNodeDelay.getValue();
-                    if(sinkINTNodeDelay.getKey().getFirst().toString().contains("CLK_IN")) {
+                    if (sinkINTNodeDelay.getKey().getFirst().toString().contains("CLK_IN")) {
                         myWriter.write(node + " \t\t" + delay + "\n");
                     }
                 }

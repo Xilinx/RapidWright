@@ -136,7 +136,7 @@ public class Path extends AbstractPath<PathPort, HardMacro>{
     public void addPin(SitePinInst p, Map<ModuleInst, HardMacro> map) {
         final HardMacro block = map.get(p.getSiteInst().getModuleInst());
         Tile tile = p.getTile();
-        if(block != null) {
+        if (block != null) {
             tile = p.getSiteInst().getModuleTemplateInst().getTile();
 
             moduleInsts.add(block);

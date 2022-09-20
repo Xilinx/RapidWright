@@ -48,7 +48,7 @@ public class RapidStreamRoute extends PartialRouter{
     @Override
     protected void determineRoutingTargets() {
         categorizeNets();
-        if(config.isResolveConflictNets()) handleConflictNets();
+        if (config.isResolveConflictNets()) handleConflictNets();
     }
     
     /**
@@ -57,7 +57,7 @@ public class RapidStreamRoute extends PartialRouter{
     private void handleConflictNets() {
         List<Net> toPreserveNets = new ArrayList<>();
         for(Net net : conflictNets) {
-            if(!isTargetConflictNetToRoute(net)) {
+            if (!isTargetConflictNetToRoute(net)) {
                 toPreserveNets.add(net);
                 continue;
             }
@@ -81,23 +81,23 @@ public class RapidStreamRoute extends PartialRouter{
     protected boolean isTargetConflictNetToRoute(Net net) {
         // Skip successfully routed CLK, VCC, and GND nets
         // In the RapidStream flow, the target nets to route are 2-terminal FF-to-FF nets. So nets with more than one sink pin are skipped as well.
-        if(net.getType() != NetType.WIRE || net.getSinkPins().size() > 1) return false;
+        if (net.getType() != NetType.WIRE || net.getSinkPins().size() > 1) return false;
         boolean anchorNet = false;
         List<EDIFHierPortInst> ehportInsts = design.getNetlist().getPhysicalPins(net.getName());
         boolean input = false;
-        if(ehportInsts == null) { // e.g. encrypted DSP related nets
+        if (ehportInsts == null) { // e.g. encrypted DSP related nets
             return false;
         }
         for(EDIFHierPortInst eport : ehportInsts) {
-            if(eport.getFullHierarchicalInstName().contains(config.getAnchorNameKeyword())) {
+            if (eport.getFullHierarchicalInstName().contains(config.getAnchorNameKeyword())) {
                 //use the key word to identify target anchor nets
                 anchorNet = true;
-                if(eport.isInput()) input = true;
+                if (eport.isInput()) input = true;
                 break;
             }
         }
         Tile anchorTile = null;
-        if(input) {
+        if (input) {
             anchorTile = net.getSinkPins().get(0).getTile();
         } else {
             anchorTile = net.getSource().getTile();

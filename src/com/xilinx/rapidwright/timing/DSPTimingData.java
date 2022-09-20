@@ -66,7 +66,7 @@ public class DSPTimingData{
     public DSPTimingData(String fullName, String dspTimingDataFolder) {
         this.setBlockName(fullName);
         File dspTimingFile = new File(dspTimingDataFolder + fullName.replace("/", "-") + ".txt");
-        if(dspTimingFile.exists()) {
+        if (dspTimingFile.exists()) {
             this.valid = true;
         } else {
             this.valid = false;
@@ -76,7 +76,7 @@ public class DSPTimingData{
         this.outputPorts = new ArrayList<>();
         
         try {
-            if(this.valid) this.parse(dspTimingFile);
+            if (this.valid) this.parse(dspTimingFile);
         } catch(Exception e) {
             e.printStackTrace();
         }
@@ -113,9 +113,9 @@ public class DSPTimingData{
             if (!line.startsWith("#")) {// comment line starts with #            
                 //explicit implicit
                 // delay with clk: clk-out and in-clk 
-                if(line.contains("clk")) {
+                if (line.contains("clk")) {
                     String[] s = line.split("\\s+");
-                    if(s.length == 3) {
+                    if (s.length == 3) {
                         // clk    P[10]            1.62
                         this.addInputOutputPortDelay("CLK", s[1], (short) (Float.parseFloat(s[2])*1000));
                     } else {
@@ -124,7 +124,7 @@ public class DSPTimingData{
                         this.addInputOutputPortDelay(s[0], "VCLK", (short) (Float.parseFloat(s[2])*1000 + Float.parseFloat(s[3])*1000));
                     }
                     
-                } else if(line.contains(":")) {
+                } else if (line.contains(":")) {
                     String[] s = line.replaceAll(":", " ").split("\\s+");
                     //port index inclusive
                     for(short idin = Short.parseShort(s[1]); idin <= Short.parseShort(s[2]); idin++) {
@@ -136,13 +136,13 @@ public class DSPTimingData{
                         }
                     }
                     
-                } else if(line.contains("[")) {
+                } else if (line.contains("[")) {
                     String[] s = line.split("\\s+");
                     this.addInputOutputPortDelay(s[0], s[1], (short) (Float.parseFloat(s[2])*1000));
                 }
             }
         }
-        if(this.getPinMapping() != null) {
+        if (this.getPinMapping() != null) {
             this.valid = true;
         }
         reader.close();
@@ -183,7 +183,7 @@ public class DSPTimingData{
      * @param toplevelPortName The top-level block port name.
      */
     public void addPinMapping(String subblockPortName, String toplevelPortName) {
-        if(this.getPinMapping() == null) {
+        if (this.getPinMapping() == null) {
             this.setPinMapping(new HashMap<>());
         }
         // this.blockName + "/" + key + " -->> " +  this.blockName + "/" + value

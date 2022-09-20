@@ -43,14 +43,14 @@ public class TestEDIFPort {
                 boolean isLeaf = cell.isLeafCellOrBlackBox();
                 Map<String,EDIFNet> internalNetMap = cell.getInternalNetMap();
                 for(EDIFPort port : cell.getPorts()) {
-                   if(port.isBus()) {
+                   if (port.isBus()) {
                        List<EDIFNet> nets = port.getInternalNets();                      
                        for(int i=0; i < port.getWidth(); i ++) {
                            EDIFNet net = nets.get(i);
                            Assertions.assertEquals(port.getInternalNet(i), nets.get(i));
                            String portInstName = port.getPortInstNameFromPort(i);
                            Assertions.assertEquals(internalNetMap.get(portInstName), net);
-                           if(isLeaf) {
+                           if (isLeaf) {
                                Assertions.assertNull(net);
                            }
                        }
@@ -58,7 +58,7 @@ public class TestEDIFPort {
                        EDIFNet net = port.getInternalNet();
                        String portInstName = port.getPortInstNameFromPort(0);
                        Assertions.assertEquals(internalNetMap.get(portInstName), net);
-                       if(isLeaf) {
+                       if (isLeaf) {
                            Assertions.assertNull(net);
                        }
                    }

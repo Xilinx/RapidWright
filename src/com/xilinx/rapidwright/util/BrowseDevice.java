@@ -87,7 +87,7 @@ public class BrowseDevice{
                         String startWire = br.readLine().trim();
                         
                         while(true) {
-                            if(t.getWireConnections(t.getWireIndex(startWire)) == null) {
+                            if (t.getWireConnections(t.getWireIndex(startWire)) == null) {
                                 System.out.println("This wire has no connections, it may be a sink");
                                 break;
                             }
@@ -95,7 +95,7 @@ public class BrowseDevice{
                             System.out.println(t.getName() + " " + startWire + ":");
                             for (int i = 0; i < wireConnections.size(); i++) {
                                 System.out.println("  " + i + ". " + wireConnections.get(i).getTile() +" " + t.getWireName(wireConnections.get(i).getWireIndex()) + " ("+wireConnections.get(i).getIntentCode()+")");
-                                if(true) {
+                                if (true) {
                                     // print next hop
                                     Tile tmpTile = wireConnections.get(i).getTile();
                                     String tmpWire = tmpTile.getWireName(wireConnections.get(i).getWireIndex());
@@ -123,7 +123,7 @@ public class BrowseDevice{
                         t = dev.getTile(br.readLine().trim());
                         System.out.println("Choosen Tile: " + t.getName());
 
-                        if(t.getSites().length == 0) {
+                        if (t.getSites().length == 0) {
                             System.out.println(t.getName() + " has no primitive sites.");
                         }
                         else {
@@ -137,7 +137,7 @@ public class BrowseDevice{
                         System.out.println("Enter tile name: ");
                         String siteName = br.readLine().trim();
                         Site site = dev.getSite(siteName);
-                        if(site == null) {
+                        if (site == null) {
                             System.out.println("No primitive site called \"" + siteName +  "\" exists.");
                         }
                         else {
@@ -155,7 +155,7 @@ public class BrowseDevice{
     }
     public static void main(String[] args) {
         MessageGenerator.printHeader(" RapidWright Device Browser");        
-        if(args.length != 1) {
+        if (args.length != 1) {
             System.out.println("USAGE: <device part name, ex: xc4vfx12ff668 >");
             return;
         }

@@ -103,10 +103,10 @@ public class ModuleOptimizer extends QMainWindow {
 
         boolean debugPlacer = false;
         String fileToOpen = null;
-        if(args.length > 0) {
+        if (args.length > 0) {
             fileToOpen = args[0];
         }
-        if(args.length == 2 && args[1].equalsIgnoreCase("-g")) {
+        if (args.length == 2 && args[1].equalsIgnoreCase("-g")) {
             System.out.println("DEBUG MODE");
             debugPlacer = true;
         }
@@ -150,7 +150,7 @@ public class ModuleOptimizer extends QMainWindow {
         setStatusBar(statusBar);
 
 
-        if(fileToOpen != null && new File(fileToOpen).exists()) {
+        if (fileToOpen != null && new File(fileToOpen).exists()) {
             internalOpenDesign(fileToOpen);
         }
         // Set the opening default window size to 1024x768 pixels
@@ -176,13 +176,13 @@ public class ModuleOptimizer extends QMainWindow {
     
     @SuppressWarnings("unused")
     private void updateListSelection() {
-        if(macroList.hasFocus())
+        if (macroList.hasFocus())
             return;
         macroList.clearSelection();
         for(QGraphicsItemInterface item : scene.selectedItems()) {
             String modInstName = ((GUIModuleInst)item).getModuleInst().getName();
             List<QTreeWidgetItem> itemList = macroList.findItems(modInstName, new MatchFlags(MatchFlag.MatchExactly), 0);
-            if(itemList.size() > 0) {
+            if (itemList.size() > 0) {
                 itemList.get(0).setSelected(true);
             }
         }
@@ -190,13 +190,13 @@ public class ModuleOptimizer extends QMainWindow {
     
     @SuppressWarnings("unused")
     private void updateSceneSelection() {
-        if(scene.hasFocus())
+        if (scene.hasFocus())
             return;
         scene.clearSelection();
         for(QTreeWidgetItem item : macroList.selectedItems()) {
             String modInstName = item.text(0);
             GUIModuleInst gmi = scene.getGMI(modInstName);
-            if(gmi != null) {
+            if (gmi != null) {
                 gmi.setSelected(true);
             }
         }
@@ -278,7 +278,7 @@ public class ModuleOptimizer extends QMainWindow {
     protected void openDesign() {
         String fileName = QFileDialog.getOpenFileName(this, "Choose a file...",
                 ".", FileFilters.dcpFilter);
-        if(fileName.endsWith(".dcp")) {
+        if (fileName.endsWith(".dcp")) {
             internalOpenDesign(fileName);
         }
     }
@@ -315,14 +315,14 @@ public class ModuleOptimizer extends QMainWindow {
     }
     
     protected void saveDesign() {
-        if(scene.getDesign() == null || currOpenFileName == null)
+        if (scene.getDesign() == null || currOpenFileName == null)
             return;
         scene.getDesign().writeCheckpoint(currOpenFileName);
         statusBar().showMessage(currOpenFileName + " saved.", 2000);
     }
     
     protected void saveAsDesign() {
-        if(scene.getDesign() == null)
+        if (scene.getDesign() == null)
             return;
         String fileName = QFileDialog.getSaveFileName(this, tr("Save As"),".", FileFilters.dcpFilter);
         if (fileName.length() == 0)
@@ -333,7 +333,7 @@ public class ModuleOptimizer extends QMainWindow {
     }
     
     protected void saveAsPDFDesign() {
-        if(scene.getDesign() == null)
+        if (scene.getDesign() == null)
             return;
         String fileName = QFileDialog.getSaveFileName(this, tr("Save As PDF"),".", FileFilters.pdfFilter);
         if (fileName.length() == 0)
@@ -446,13 +446,13 @@ public class ModuleOptimizer extends QMainWindow {
         for(QGraphicsItemInterface item : scene.selectedItems()) {
             QPointF gmiTL = item.pos();
             QPointF gmiBR = item.pos().add(item.boundingRect().bottomRight());
-            if(top < 0 || gmiTL.y() < top)
+            if (top < 0 || gmiTL.y() < top)
                 top = gmiTL.y();
-            if(left < 0 || gmiTL.x() < left)
+            if (left < 0 || gmiTL.x() < left)
                 left = gmiTL.x();
-            if(bottom < 0 || gmiBR.y() > bottom)
+            if (bottom < 0 || gmiBR.y() > bottom)
                 bottom = gmiBR.y();
-            if(right < 0 || gmiBR.x() > right)
+            if (right < 0 || gmiBR.x() > right)
                 right = gmiBR.x();
         }
         view.fitInView(left, top, right-left, bottom-top, Qt.AspectRatioMode.KeepAspectRatio);    

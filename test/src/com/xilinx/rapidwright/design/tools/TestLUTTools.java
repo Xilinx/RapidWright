@@ -43,17 +43,17 @@ public class TestLUTTools {
     public void testGetCompanionLUTName() {
         Set<Series> tested = new HashSet<>();
         for(Part part : PartNameTools.getParts()) {
-            if(tested.contains(part.getSeries())) continue;
+            if (tested.contains(part.getSeries())) continue;
             Device device = Device.getDevice(part);
             for(SiteTypeEnum siteType : new SiteTypeEnum[]{SiteTypeEnum.SLICEL, SiteTypeEnum.SLICEM}) {
                 Site site = device.getAllCompatibleSites(siteType)[0];
                 for(BEL bel : site.getBELs()) {
-                    if(bel.isLUT()) {
+                    if (bel.isLUT()) {
                         String compLUTName = LUTTools.getCompanionLUTName(bel);
                         System.out.println(part + " " + siteType + " " + bel + " " + compLUTName);
-                        if(bel.getName().contains("5")) {
+                        if (bel.getName().contains("5")) {
                             Assertions.assertTrue(compLUTName.contains("6"));
-                        } else if(bel.getName().contains("6")) {
+                        } else if (bel.getName().contains("6")) {
                             Assertions.assertTrue(compLUTName.contains("5"));
                         }
                         Assertions.assertTrue(site.getBEL(compLUTName).isLUT());

@@ -1345,7 +1345,7 @@ public class TimingModel {
         netDelayCalc += checkForSitePinDelay(groups);
         
 //        //TODO debug on intra site delay
-//        if(startPinInst.toString().contains("SLICE_X26Y101.BMUX")) {
+//        if (startPinInst.toString().contains("SLICE_X26Y101.BMUX")) {
 //            this.checkIntraSiteDelay = true;
 //        } else {
 //            this.checkIntraSiteDelay = false;
@@ -1369,7 +1369,7 @@ public class TimingModel {
         if (debugFile)
             printStream.println();
 
-        if(verbose) {
+        if (verbose) {
             for (TimingGroup group : groups) {
                 System.out.println("\t" + group.getDelayType() + ":\t" + group.delay + "\t, d:" +
                                    group.d);
@@ -1606,7 +1606,7 @@ public class TimingModel {
     private void determineNodeListInitHelper(Net net) {
         pipEndNodeHashMap = new HashMap<>();
         for (PIP p : net.getPIPs()) {
-            if(p.getEndNode() != null) pipEndNodeHashMap.put(p.getEndNode().toString(), p);
+            if (p.getEndNode() != null) pipEndNodeHashMap.put(p.getEndNode().toString(), p);
         }
     }
 

@@ -40,7 +40,7 @@ public class EDIFPortInstList extends ArrayList<EDIFPortInst> {
     public boolean add(EDIFPortInst e) {
         int insertionPoint = binarySearch(e.getCellInst(), e.getName());
         // Do not allow duplicates
-        if(insertionPoint >= 0) {
+        if (insertionPoint >= 0) {
             return false;
         }
         super.add(insertionPoint >= 0 ? insertionPoint : ~insertionPoint, e);
@@ -49,7 +49,7 @@ public class EDIFPortInstList extends ArrayList<EDIFPortInst> {
     
     public EDIFPortInst get(EDIFCellInst i, String name) {
         int index = binarySearch(i, name);
-        if(index < 0) return null;
+        if (index < 0) return null;
         return get(index);
     }
     
@@ -59,7 +59,7 @@ public class EDIFPortInstList extends ArrayList<EDIFPortInst> {
 
     public EDIFPortInst remove(EDIFCellInst inst, String portInstName) {
         int index = binarySearch(inst, portInstName);
-        if(index < 0) return null;
+        if (index < 0) return null;
         return super.remove(index);
     }
     
@@ -70,7 +70,7 @@ public class EDIFPortInstList extends ArrayList<EDIFPortInst> {
         while(left <= right) {
             int pivot = (left + right) >>> 1;
             int result = compare(get(pivot), instName, portInstName);
-            if(result < 0) {
+            if (result < 0) {
                 left = pivot + 1;
             } else if (result > 0) {
                 right = pivot - 1;
@@ -94,14 +94,14 @@ public class EDIFPortInstList extends ArrayList<EDIFPortInst> {
      * left is lexicographically before right, or a number greater than 0 if left is after right. 
      */
     private int compare(EDIFPortInst left, String rightInstName, String rightPortInstName) {
-        if(left.getCellInst() == null) {
-            if(rightInstName == null) {
+        if (left.getCellInst() == null) {
+            if (rightInstName == null) {
                 // left and right are both a top-level port insts, compare their port insts name only
                 return left.getName().compareTo(rightPortInstName);
             }
             int compare = left.getName().compareTo(rightInstName);
             return compare == 0 ? -(rightPortInstName.length()) : compare;
-        } else if(rightInstName == null) {
+        } else if (rightInstName == null) {
             // right is a top-level port inst, but left is not. Compare left's inst name with 
             // right's port inst name.
             int compare = left.getCellInst().getName().compareTo(rightPortInstName);

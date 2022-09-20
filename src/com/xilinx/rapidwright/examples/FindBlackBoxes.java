@@ -34,7 +34,7 @@ public class FindBlackBoxes {
     public static List<EDIFHierCellInst> getBlackBoxes(Design design) {
         ArrayList<EDIFHierCellInst> blackBoxInsts = new ArrayList<EDIFHierCellInst>(); 
         for(EDIFHierCellInst inst : design.getNetlist().getAllDescendants("", "*", false)) {
-            if(inst.getInst().isBlackBox()) {
+            if (inst.getInst().isBlackBox()) {
                 blackBoxInsts.add(inst);
             }
         }
@@ -46,7 +46,7 @@ public class FindBlackBoxes {
      * @param args
      */
     public static void main(String[] args) {
-        if(args.length < 1 || args.length > 2) {
+        if (args.length < 1 || args.length > 2) {
             System.out.println("USAGE: <input.dcp> [input.edf]");
             return;
         }

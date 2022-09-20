@@ -32,7 +32,7 @@ import com.xilinx.rapidwright.tests.CodePerfTracker;
 public class PhysicalNetlistExample {
 
     public static void main(String[] args) throws IOException {
-        if(args.length < 2 || args.length > 4) {
+        if (args.length < 2 || args.length > 4) {
             System.out.println("USAGE: <input>.dcp [input.edf] <output>.dcp");
             System.out.println("   Example round trip test for a logical & physical netlist to start from a DCP,"
                     + " get converted to a\n   Cap'n Proto serialized file and then read back into "
@@ -48,7 +48,7 @@ public class PhysicalNetlistExample {
         
         String edifFileName = null;
         String outputDCPFileName = args[1];
-        if(args.length > 2) {
+        if (args.length > 2) {
             edifFileName = args[1];
             outputDCPFileName = args[2];
         }

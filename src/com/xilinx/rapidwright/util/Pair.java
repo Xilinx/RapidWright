@@ -73,8 +73,8 @@ public class Pair<T,U> {
      * @return An array of populated Pair objects or null if input was invalid.
      */
     public static <V,W> Pair<V,W>[] zip(V[] t, W[] u) {
-        if(t==null || u == null) return null;
-        if(t.length != u.length) return null;
+        if (t==null || u == null) return null;
+        if (t.length != u.length) return null;
         @SuppressWarnings("unchecked")
         Pair<V,W>[] arr = new Pair[t.length];
         for(int i=0; i < t.length; i++) {

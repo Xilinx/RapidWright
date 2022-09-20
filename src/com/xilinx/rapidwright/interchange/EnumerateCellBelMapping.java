@@ -95,25 +95,25 @@ public class EnumerateCellBelMapping {
     }
 
     private void checkSizeInvariance() throws RuntimeException {
-        if(sites != null && siteTypes.size() != sites.size()) {
+        if (sites != null && siteTypes.size() != sites.size()) {
             throw new RuntimeException(String.format(
                 "siteTypes.size() (%d) != sites.size() (%d)\n",
                 siteTypes.size(), sites.size()));
         }
 
-        if(siteTypes.size() != bels.size()) {
+        if (siteTypes.size() != bels.size()) {
             throw new RuntimeException(String.format(
                 "siteTypes.size() (%d) != bels.size() (%d)\n",
                 siteTypes.size(), bels.size()));
         }
 
-        if(siteTypes.size() != pinMappings.size()) {
+        if (siteTypes.size() != pinMappings.size()) {
             throw new RuntimeException(String.format(
                         "siteTypes.size() (%d) != pinMappings.size() (%d)\n",
                 siteTypes.size(), pinMappings.size()));
         }
 
-        if(siteTypes.size() != parameterSets.size()) {
+        if (siteTypes.size() != parameterSets.size()) {
             throw new RuntimeException(String.format(
                 "siteTypes.size() (%d) != parameterSets.size() (%d)\n",
                 siteTypes.size(), parameterSets.size()));
@@ -135,14 +135,14 @@ public class EnumerateCellBelMapping {
             key.add(parameterSets.get(i));
 
             Set<Site> sitesForKey = sitesforBels.get(key);
-            if(sitesForKey == null) {
+            if (sitesForKey == null) {
                 sitesForKey = new HashSet<Site>();
                 sitesforBels.put(key, sitesForKey);
             }
             sitesForKey.add(sites.get(i));
 
             Set<Site> sitesForSiteType = sitesForSiteTypes.get(siteTypes.get(i));
-            if(sitesForSiteType == null) {
+            if (sitesForSiteType == null) {
                 sitesForSiteType = new HashSet<Site>();
                 sitesForSiteTypes.put(siteTypes.get(i), sitesForSiteType);
             }
@@ -158,7 +158,7 @@ public class EnumerateCellBelMapping {
             key.add(pinMappings.get(i));
             key.add(parameterSets.get(i));
 
-            if(sitesTested.contains(key)) {
+            if (sitesTested.contains(key)) {
                 continue;
             }
             sitesTested.add(key);
@@ -166,7 +166,7 @@ public class EnumerateCellBelMapping {
             Set<Site> sitesForKey = sitesforBels.get(key);
             Set<Site> sitesForSiteType = sitesForSiteTypes.get(siteTypes.get(i));
 
-            if(!sitesForKey.equals(sitesForSiteType)) {
+            if (!sitesForKey.equals(sitesForSiteType)) {
                 throw new RuntimeException(String.format(
                     "Site invariance not met for site %s (%s) BEL %s",
                     sites.get(i).getName(), siteTypes.get(i).name(),
@@ -206,7 +206,7 @@ public class EnumerateCellBelMapping {
         for(int i = 0; i < siteTypes.size(); ++i) {
             Map.Entry<SiteTypeEnum, String> key = new AbstractMap.SimpleEntry<SiteTypeEnum, String>(siteTypes.get(i), bels.get(i));
             Set<Map.Entry<String, String>> pins = commonPins.get(key);
-            if(pins == null) {
+            if (pins == null) {
                 pins = new HashSet<Map.Entry<String, String>>();
                 pins.addAll(allPins);
                 commonPins.put(key, pins);
@@ -233,7 +233,7 @@ public class EnumerateCellBelMapping {
                             parameter));
 
                 Set<Map.Entry<String, String>> pins = parameterToPins.get(key);
-                if(pins == null) {
+                if (pins == null) {
                     pins = new HashSet<Map.Entry<String, String>>();
                     pins.addAll(allPins);
                     pins.removeAll(commonPins.get(commonPinsKey));
@@ -267,7 +267,7 @@ public class EnumerateCellBelMapping {
                 assembledPins.addAll(parameterToPins.get(key));
             }
 
-            if(!pinMappings.get(i).equals(assembledPins)) {
+            if (!pinMappings.get(i).equals(assembledPins)) {
                 Set<Map.Entry<String, String>> diff = new HashSet<Map.Entry<String, String>>();
 
                 diff.addAll(pinMappings.get(i));
@@ -314,7 +314,7 @@ public class EnumerateCellBelMapping {
         for(Map.Entry<SiteTypeEnum, String> siteTypeAndBel : siteTypesAndBels) {
             SiteTypeEnum siteType = siteTypeAndBel.getKey();
             Set<String> bels = siteTypesToBels.get(siteType);
-            if(bels == null) {
+            if (bels == null) {
                 bels = new HashSet<String>();
                 siteTypesToBels.put(siteType, bels);
             }
@@ -367,7 +367,7 @@ public class EnumerateCellBelMapping {
             PropertyMap.Entry.Builder property = entryObj.getParameter();
 
             String[] parameterParts = parameter.split("=", 2);
-            if(parameterParts.length != 2) {
+            if (parameterParts.length != 2) {
                 throw new RuntimeException(String.format(
                             "Failed to parse parameter '%s'",
                             parameter));
@@ -400,7 +400,7 @@ public class EnumerateCellBelMapping {
             Set<Map.Entry<String, String>> key = commonPin.getValue();
 
             Set<Map.Entry<SiteTypeEnum, String>> siteTypesAndBels = commonPinsRev.get(key);
-            if(siteTypesAndBels == null) {
+            if (siteTypesAndBels == null) {
                 siteTypesAndBels = new HashSet<Map.Entry<SiteTypeEnum, String>>();
                 commonPinsRev.put(key, siteTypesAndBels);
             }
@@ -426,7 +426,7 @@ public class EnumerateCellBelMapping {
             Set<Map.Entry<String, String>> key = parameterPin.getValue();
 
             Set<Map.Entry<SiteTypeEnum, Map.Entry<String, String>>> siteTypeBelAndParameters = parameterToPinsRev.get(key);
-            if(siteTypeBelAndParameters == null) {
+            if (siteTypeBelAndParameters == null) {
                 siteTypeBelAndParameters = new HashSet<Map.Entry<SiteTypeEnum, Map.Entry<String, String>>>();
                 parameterToPinsRev.put(key, siteTypeBelAndParameters);
             }
@@ -452,7 +452,7 @@ public class EnumerateCellBelMapping {
         @Override
         public int compare(Map.Entry<String, String> a, Map.Entry<String, String> b) {
             int result = a.getKey().compareTo(b.getKey());
-            if(result != 0) {
+            if (result != 0) {
                 return result;
             }
 
@@ -478,12 +478,12 @@ public class EnumerateCellBelMapping {
         @Override
         public int compare(Map.Entry<SiteTypeEnum, Map.Entry<String, String>> a, Map.Entry<SiteTypeEnum, Map.Entry<String, String>> b) {
             int result = a.getKey().name().compareTo(b.getKey().name());
-            if(result != 0) {
+            if (result != 0) {
                 return result;
             }
 
             result = a.getValue().getKey().compareTo(b.getValue().getKey());
-            if(result != 0) {
+            if (result != 0) {
                 return result;
             }
 
@@ -493,7 +493,7 @@ public class EnumerateCellBelMapping {
 
     private static void addSite(Map<SiteTypeEnum, List<Site>> siteMap, Site site, SiteTypeEnum siteType) {
         List<Site> sites = siteMap.get(siteType);
-        if(sites == null) {
+        if (sites == null) {
             sites = new ArrayList<Site>();
             siteMap.put(siteType, sites);
         }
@@ -503,8 +503,8 @@ public class EnumerateCellBelMapping {
 
     public static List<List<String>> getParametersFor(Series series, String cellName) {
         List<List<String>> parameterSets = new ArrayList<List<String>>();
-        if(series == Series.Versal) {
-            if(cellName.equals("URAM288E5_BASE") || cellName.equals("URAM288E5")) {
+        if (series == Series.Versal) {
+            if (cellName.equals("URAM288E5_BASE") || cellName.equals("URAM288E5")) {
                 int[] portWidths = {18, 36, 72};
                 String[] ports = {"A", "B"};
                 for(int portWidth : portWidths) {
@@ -516,13 +516,13 @@ public class EnumerateCellBelMapping {
                     }
                     parameterSets.add(parameters);
                 }
-            } else if(cellName.equals("DSP_PREADD_DATA58") || cellName.equals("DSP_SRCMX_OPTINV")) {
+            } else if (cellName.equals("DSP_PREADD_DATA58") || cellName.equals("DSP_SRCMX_OPTINV")) {
                 for(String mode : new String[] {"INT24", "INT8", "FP32", "CINT18"}) {
                     List<String> parameters = new ArrayList<String>();
                     parameters.add("DSP_MODE=" + mode);
                     parameterSets.add(parameters);
                 }
-            } else if(cellName.equals("IBUF") || cellName.equals("IBUFE3") || 
+            } else if (cellName.equals("IBUF") || cellName.equals("IBUFE3") || 
                      cellName.equals("IBUF_IBUFDISABLE") || cellName.equals("IOBUF") || 
                      cellName.equals("IOBUFE3") || cellName.equals("IOBUF_DCIEN")) {
                 for(String mode : new String[] {"LVCMOS15", "LVCMOS12", "LVDCI_15"}) {
@@ -534,7 +534,7 @@ public class EnumerateCellBelMapping {
                 parameterSets.add(new ArrayList<String>());
             } 
         } else {
-            if(cellName.equals("RAMB18E1") || cellName.equals("RAMB18E2")) {
+            if (cellName.equals("RAMB18E1") || cellName.equals("RAMB18E2")) {
                 int[] portWidths = {0, 1, 2, 4, 9, 18};
                 for(int writeWidthA : portWidths) {
                     for(int writeWidthB : portWidths) {
@@ -598,7 +598,7 @@ public class EnumerateCellBelMapping {
                     parameterSets.add(parameters);
                 }
             }
-            else if(cellName.equals("RAMB36E1") || cellName.equals("RAMB36E2")) {
+            else if (cellName.equals("RAMB36E1") || cellName.equals("RAMB36E2")) {
                 int[] portWidths = {0, 1, 2, 4, 9, 18, 36};
                 int[] portWidthsNoZero = {1, 2, 4, 9, 18, 36};
                 for(int writeWidthA : portWidthsNoZero) {
@@ -665,7 +665,7 @@ public class EnumerateCellBelMapping {
                     parameters.add("DOB_REG=0");
                     parameterSets.add(parameters);
                 }*/
-            } else if(cellName.equals("IDDR") || cellName.equals("IDDR_2CLK") || cellName.equals("ODDR")) {
+            } else if (cellName.equals("IDDR") || cellName.equals("IDDR_2CLK") || cellName.equals("ODDR")) {
                 {
                     List<String> parameters = new ArrayList<String>();
                     parameters.add("__SRVAL=FALSE");
@@ -677,7 +677,7 @@ public class EnumerateCellBelMapping {
                     parameterSets.add(parameters);
                 }
 
-            } else if(cellName.equals("URAM288")) {
+            } else if (cellName.equals("URAM288")) {
                 {
                     List<String> parameters = new ArrayList<String>();
                     parameters.add("EN_ECC_RD_A=FALSE");
@@ -749,7 +749,7 @@ public class EnumerateCellBelMapping {
         for(Map.Entry<SiteTypeEnum, String> possibleSite : entries) {
             SiteTypeEnum siteType = possibleSite.getKey();
             String bel = possibleSite.getValue();
-            if(!siteMap.containsKey(siteType)) {
+            if (!siteMap.containsKey(siteType)) {
                 continue;
             }
 
@@ -816,7 +816,7 @@ public class EnumerateCellBelMapping {
 
         int count = 0;
         for(EDIFCell cell : prims.getCells()) {
-            if(!macroCells.contains(cell.getName())) {
+            if (!macroCells.contains(cell.getName())) {
                 count += 1;
             }
         }
@@ -824,7 +824,7 @@ public class EnumerateCellBelMapping {
         int i = 0;
         StructList.Builder<CellBelMapping.Builder> cellMapping = devBuilder.initCellBelMap(count);
         for(EDIFCell cell : prims.getCells()) {
-            if(!macroCells.contains(cell.getName())) {
+            if (!macroCells.contains(cell.getName())) {
                 populateCellBelPin(allStrings, siteMap, cellMapping.get(i), topLevelCell, cell, design);
                 i += 1;
             }
@@ -832,7 +832,7 @@ public class EnumerateCellBelMapping {
     }
 
     public static void main(String[] args) throws IOException {
-        if(args.length != 1) {
+        if (args.length != 1) {
             System.out.println("USAGE: <device name>");
             System.out.println("   Example dump of device information for interchange format.");
             return;

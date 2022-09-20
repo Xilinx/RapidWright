@@ -484,19 +484,19 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
      */
     public boolean hasCompatibleInterface(EDIFCell cell) {
         Map<String,EDIFPort> portMap = new HashMap<>(ports);
-        if(portMap.size() != cell.getPortMap().size()) return false;
+        if (portMap.size() != cell.getPortMap().size()) return false;
 
         for(EDIFPort port : cell.getPorts()) {
             EDIFPort match = portMap.remove(port.getBusName());
-            if(match == null) {
+            if (match == null) {
                 match = portMap.remove(port.getName());
-                if(match == null) {
+                if (match == null) {
                     return false;
                 }
             }
-            if(!Objects.equals(port.getName(), match.getName())) return false;
-            if(!Objects.equals(port.getWidth(), match.getWidth())) return false;
-            if(!Objects.equals(port.getDirection(), match.getDirection())) return false;
+            if (!Objects.equals(port.getName(), match.getName())) return false;
+            if (!Objects.equals(port.getWidth(), match.getWidth())) return false;
+            if (!Objects.equals(port.getDirection(), match.getDirection())) return false;
         }
         return portMap.isEmpty();
     }

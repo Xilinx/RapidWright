@@ -52,7 +52,7 @@ public class EDIFNet extends EDIFPropertyObject {
 
     public EDIFNet(String name, EDIFCell parentCell) {
         super(name);
-        if(parentCell != null) parentCell.addNet(this);
+        if (parentCell != null) parentCell.addNet(this);
     }
     
     /**
@@ -73,14 +73,14 @@ public class EDIFNet extends EDIFPropertyObject {
      * @param portInst The port instance to add to this net.
      */
     public void addPortInst(EDIFPortInst portInst) {
-        if(portInsts == null) portInsts = new EDIFPortInstList();
+        if (portInsts == null) portInsts = new EDIFPortInstList();
         boolean isParentCellNonNull = parentCell != null;
         EDIFCellInst inst = portInst.getCellInst();
-        if(isParentCellNonNull && inst == null) {
+        if (isParentCellNonNull && inst == null) {
             parentCell.addInternalPortMapEntry(portInst.getName(), this);
         }
         portInst.setParentNet(this);
-        if(isParentCellNonNull) {
+        if (isParentCellNonNull) {
             // This does not explicitly track the port instance index, in most cases the name should be sufficient.
             trackChanges(EDIFChangeType.PORT_INST_ADD, inst, portInst.getName());
         }
@@ -89,7 +89,7 @@ public class EDIFNet extends EDIFPropertyObject {
     
     public void trackChanges(EDIFChangeType type, EDIFCellInst inst, String portInstName) {
         EDIFNetlist netlist = parentCell.getNetlist();
-        if(netlist != null && netlist.isTrackingCellChanges()) {
+        if (netlist != null && netlist.isTrackingCellChanges()) {
             String instName = inst == null ? null : inst.getName();
             EDIFChangeNet change = new EDIFChangeNet(type, portInstName, getName(), instName);
             netlist.addTrackingChange(parentCell, change);
@@ -106,15 +106,15 @@ public class EDIFNet extends EDIFPropertyObject {
     
     public EDIFPortInst createPortInst(String portName, EDIFCellInst cellInst) {
         EDIFPort port = cellInst.getPort(portName);
-        if(port == null) {
+        if (port == null) {
             // check if it is a bussed port
             int lengthRootName = portName.lastIndexOf('[');
-            if(lengthRootName == -1) return null;
+            if (lengthRootName == -1) return null;
             String name = portName.substring(0, lengthRootName);
             int idx = Integer.parseInt(portName.substring(lengthRootName+1, portName.lastIndexOf(']')));
             String portRootName = portName.substring(0,lengthRootName);
             port = cellInst.getPort(portRootName);
-            if(port == null) {
+            if (port == null) {
                 return null;
             }
             return createPortInst(name, port.getWidth()-idx-1, cellInst);
@@ -154,7 +154,7 @@ public class EDIFNet extends EDIFPropertyObject {
      * @deprecated
      */
     public Map<String, EDIFPortInst> getPortInstMap() {
-        if(portInsts == null) return Collections.emptyMap();
+        if (portInsts == null) return Collections.emptyMap();
         HashMap<String, EDIFPortInst> map = new HashMap<>();
         for(EDIFPortInst e : getPortInsts()) {
             map.put(e.getFullName(), e);
@@ -187,7 +187,7 @@ public class EDIFNet extends EDIFPropertyObject {
             boolean includePort =
                 (portInst.isOutput() && !portInst.isTopLevelPort()) ||
                 (portInst.isInput() && portInst.isTopLevelPort() && includeTopLevelPorts);
-            if(includePort) srcs.add(portInst);
+            if (includePort) srcs.add(portInst);
         }
         return srcs;
     }
@@ -225,7 +225,7 @@ public class EDIFNet extends EDIFPropertyObject {
      */
     public EDIFPortInst getTopLevelPortInst() {
         for(EDIFPortInst portInst : getPortInsts()) {
-            if(portInst.isTopLevelPort()) {
+            if (portInst.isTopLevelPort()) {
                 return portInst;
             }
         }
@@ -239,7 +239,7 @@ public class EDIFNet extends EDIFPropertyObject {
     public List<EDIFPortInst> getAllTopLevelPortInsts() {
         List<EDIFPortInst> topPortInsts = new ArrayList<>();
         for(EDIFPortInst portInst : getPortInsts()) {
-            if(portInst.isTopLevelPort()) {
+            if (portInst.isTopLevelPort()) {
                 topPortInsts.add(portInst);
             }
         }
@@ -265,7 +265,7 @@ public class EDIFNet extends EDIFPropertyObject {
      */
     public EDIFPortInst removePortInst(String portInstName) {
         int hierIdx = portInstName.lastIndexOf('/');
-        if(hierIdx == -1) {
+        if (hierIdx == -1) {
             return removePortInst(null, portInstName);
         }
         String instName = portInstName.substring(0, hierIdx);
@@ -284,12 +284,12 @@ public class EDIFNet extends EDIFPropertyObject {
      */
     public EDIFPortInst removePortInst(EDIFCellInst inst, String portInstName) {
         if (portInsts == null) return null;
-        if(parentCell != null) {
+        if (parentCell != null) {
             // This does not explicitly track the port instance index, in most cases the name should be sufficient.
             trackChanges(EDIFChangeType.PORT_INST_REMOVE, inst, portInstName);
         }
         EDIFPortInst tmp = portInsts.remove(inst, portInstName);
-        if(tmp != null) tmp.setParentNet(null);
+        if (tmp != null) tmp.setParentNet(null);
         return tmp;
     }
     
@@ -327,7 +327,7 @@ public class EDIFNet extends EDIFPropertyObject {
             p.writeEDIFExport(os, EXPORT_CONST_PORT_INDENT, cache);
         }
         os.write(EXPORT_CONST_JOINED_END); // joined end
-        if(getPropertiesMap().size() > 0) {
+        if (getPropertiesMap().size() > 0) {
             os.write('\n');
             exportEDIFProperties(os, EXPORT_CONST_PROP_INDENT, cache, stable);
         }

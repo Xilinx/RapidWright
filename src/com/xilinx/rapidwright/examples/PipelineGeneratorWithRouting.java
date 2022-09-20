@@ -339,15 +339,15 @@ public class PipelineGeneratorWithRouting {
                 rstNet.getLogicalNet().createPortInst("R", ffCell);
                 ceNet.getLogicalNet().createPortInst("CE", ffCell);
 
-                if(ff_si.getSitePinInst(clkPinName) == null) {
+                if (ff_si.getSitePinInst(clkPinName) == null) {
                     clkNet.createPin(true, clkPinName, ff_si);
                     ff_si.addSitePIP(clkPinName + "INV","CLK");
                 }
-                if(ff_si.getSitePinInst(rstPinName) == null) {
+                if (ff_si.getSitePinInst(rstPinName) == null) {
                     rstNet.createPin(true, rstPinName, ff_si);
                     ff_si.addSitePIP("RST_"+(isLowerSlice ? "ABCD" : "EFGH")+"INV","RST");
                 }
-                if(ff_si.getSitePinInst(cePinName) == null) {
+                if (ff_si.getSitePinInst(cePinName) == null) {
                     ceNet.createPin(true, cePinName, ff_si);
                 }
             }
@@ -370,7 +370,7 @@ public class PipelineGeneratorWithRouting {
         boolean useDistanceBasedRouter = false;
 
         // Route intersites
-        if(useDistanceBasedRouter) {
+        if (useDistanceBasedRouter) {
             Router r = new Router(d); // the non-timing driven router from RW library
             r.setRoutingPblock(footprint);
             r.setSupressWarningsErrors(false);
@@ -830,7 +830,7 @@ public class PipelineGeneratorWithRouting {
         OptionSet opts = p.parse(args);
         boolean verbose1 = (boolean) opts.valueOf(VERBOSE_OPT);
         boolean verbose2 = true;  // extra verbose messages, modify this to remove some messages
-        if(opts.has(HELP_OPT)) {
+        if (opts.has(HELP_OPT)) {
             printHelp(p);
             return;
         }
@@ -855,7 +855,7 @@ public class PipelineGeneratorWithRouting {
 
         // Perform some error checking on inputs
         Part part = PartNameTools.getPart(partName);
-        if(part == null || part.isSeries7()) {
+        if (part == null || part.isSeries7()) {
             throw new RuntimeException("ERROR: Invalid/unsupported part " + partName + 
                                                 ".  This example was coded "+
                                                   "for UltraScale or UltraScale+ devices.");
@@ -927,6 +927,6 @@ public class PipelineGeneratorWithRouting {
         ///////////////////////
         t.stop();
         d.writeCheckpoint(outputDCPFileName, t);
-        if(verbose1) System.out.println("Wrote final DCP: " + outputDCPFileName);
+        if (verbose1) System.out.println("Wrote final DCP: " + outputDCPFileName);
     }
 }

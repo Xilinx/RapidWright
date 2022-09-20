@@ -92,22 +92,22 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
     }
     
     protected void setIsLittleEndian() {
-        if(width == 1) return;
+        if (width == 1) return;
         String name = getName();
-        if(name.charAt(name.length()-1) != ']' || !Character.isDigit(name.charAt(name.length()-2))) {
+        if (name.charAt(name.length()-1) != ']' || !Character.isDigit(name.charAt(name.length()-2))) {
             throw new RuntimeException("ERROR: Port " + getName() + " does not have proper bus suffix");
         }
         int colonIdx = -1;
         int leftBracket = -1;
         for(int i=name.length()-3; i >= 0; i--) {
             char c = name.charAt(i);
-            if(c == ':') colonIdx = i;
-            else if(c == '[') {
+            if (c == ':') colonIdx = i;
+            else if (c == '[') {
                 leftBracket = i;
                 break;
             }
         }
-        if(colonIdx == -1 || leftBracket == -1) {
+        if (colonIdx == -1 || leftBracket == -1) {
             throw new RuntimeException("ERROR: Interpreting port " + getName() + ", couldn't identify indicies.");
         }
         
@@ -146,7 +146,7 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
     }
     
     public String getBusName() {
-        if(busName == null) {
+        if (busName == null) {
             int idx = EDIFTools.lengthOfNameWithoutBus(getName().toCharArray());
             busName = getName().substring(0, idx);                        
         }
@@ -159,7 +159,7 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
     }
     
     public Integer getLeft() {
-        if(!isBus()) return null;
+        if (!isBus()) return null;
         int leftBracket = getName().lastIndexOf('[');
         int colon = getName().lastIndexOf(':');
         int value = Integer.parseInt(getName().substring(leftBracket+1,colon)); 
@@ -168,7 +168,7 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
     
 
     public Integer getRight() {
-        if(!isBus()) return null;
+        if (!isBus()) return null;
         int rightBracket = getName().lastIndexOf(']');
         int colon = getName().lastIndexOf(':');
         int value = Integer.parseInt(getName().substring(colon+1, rightBracket)); 
@@ -216,8 +216,8 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
      * @return The name of the PortInst for the specified index
      */
     public String getPortInstNameFromPort(int index) {
-        if(!isBus()) return getBusName();
-        if(isLittleEndian()) {
+        if (!isBus()) return getBusName();
+        if (isLittleEndian()) {
             index = (getWidth()-1) - index;
         }
         return getBusName() + "[" + index + "]";     
@@ -232,9 +232,9 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
     public void exportEDIF(OutputStream os, EDIFWriteLegalNameCache<?> cache, boolean stable) throws IOException{
         os.write(EXPORT_CONST_INDENT);
         os.write(EXPORT_CONST_PORT_BEGIN);
-        if(width > 1) os.write(EXPORT_CONST_ARRAY_BEGIN);
+        if (width > 1) os.write(EXPORT_CONST_ARRAY_BEGIN);
         exportEDIFName(os, cache);
-        if(width > 1) {
+        if (width > 1) {
             os.write(' ');
             os.write(Integer.toString(width).getBytes(StandardCharsets.UTF_8));
             os.write(')');
@@ -242,7 +242,7 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
         os.write(EXPORT_CONST_DIRECTION_START);
         os.write(direction.toByteArray());
         os.write(')');
-        if(getPropertiesMap().size() > 0) {
+        if (getPropertiesMap().size() > 0) {
             os.write('\n');
             exportEDIFProperties(os, EXPORT_CONST_CHILD_INDENT, cache, stable);
             os.write(EXPORT_CONST_INDENT);
@@ -275,9 +275,9 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
     
     public int[] getBitBlastedIndicies() {
         int lastLeftBracket = getName().lastIndexOf('[');
-        if(getName().contains(":")) 
+        if (getName().contains(":")) 
             return EDIFTools.bitBlastBus(getName().substring(lastLeftBracket));
-        if(getName().contains("["))
+        if (getName().contains("["))
             return new int[] {Integer.parseInt(getName().substring(lastLeftBracket,getName().length()-1))};
         return null;
     }
@@ -293,7 +293,7 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
         int len = name.length()-leftBracket;
         String otherName = otherPort.getName();
         int otherLeftBracket = otherName.lastIndexOf('[');
-        if(leftBracket == -1 && otherLeftBracket == -1) return true;
+        if (leftBracket == -1 && otherLeftBracket == -1) return true;
         return name.regionMatches(leftBracket, otherName, otherLeftBracket, len);
     }
 }

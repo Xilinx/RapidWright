@@ -69,7 +69,7 @@ public class LongEnumerator extends ArrayList<Long> {
 
     @Override
     public Long get(int index) {
-        if(size() -1 < index) return null;
+        if (size() -1 < index) return null;
         return super.get(index);
     }
 

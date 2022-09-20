@@ -63,7 +63,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
     public EDIFCellInst(String name, EDIFCell cellType, EDIFCell parentCell) {
         super(name);
         setCellType(cellType);
-        if(parentCell != null) parentCell.addCellInst(this);
+        if (parentCell != null) parentCell.addCellInst(this);
         setViewref(cellType != null ? cellType.getEDIFView() : DEFAULT_VIEWREF);
     }
     
@@ -100,7 +100,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
      * @deprecated
      */
     public Map<String, EDIFPortInst> getPortInstMap() {
-        if(portInsts == null) return Collections.emptyMap();
+        if (portInsts == null) return Collections.emptyMap();
         HashMap<String, EDIFPortInst> map = new HashMap<>();
         for(EDIFPortInst e : getPortInsts()) {
             map.put(e.getName(), e);
@@ -114,8 +114,8 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
      * @param epr The port instance to add
      */
     protected void addPortInst(EDIFPortInst epr) {
-        if(portInsts == null) portInsts = new EDIFPortInstList();
-        if(!epr.getCellInst().equals(this))
+        if (portInsts == null) portInsts = new EDIFPortInstList();
+        if (!epr.getCellInst().equals(this))
             throw new RuntimeException("ERROR: Incorrect EDIFPortInst '"+
                 epr.getFullName()+"' being added to EDIFCellInst " + toString());
         portInsts.add(epr);
@@ -128,7 +128,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
      * @return The removed port instance, or null if it was not found.
      */
     protected EDIFPortInst removePortInst(EDIFPortInst epr) {
-        if(portInsts == null) return null;
+        if (portInsts == null) return null;
         return portInsts.remove(epr);
     }
     
@@ -139,7 +139,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
      * @return The removed port instance, or null if none found by that name.
      */
     protected EDIFPortInst removePortInst(String portName) {
-        if(portInsts == null) return null;
+        if (portInsts == null) return null;
         return portInsts.remove(this, portName);
     }
     
@@ -150,7 +150,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
      * @return The named port instance, or null if none found by that name. 
      */
     public EDIFPortInst getPortInst(String name) {
-        if(portInsts == null) return null;
+        if (portInsts == null) return null;
         return portInsts.get(this, name);
     }
     
@@ -220,7 +220,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
         for(EDIFPortInst portInst : getPortInsts()) {
             EDIFPort origPort = portInst.getPort();
             EDIFPort port = cellType.getPort(origPort.getBusName());
-            if(port == null || port.getWidth() != origPort.getWidth()) {
+            if (port == null || port.getWidth() != origPort.getWidth()) {
                 port = cellType.getPort(origPort.getName());
             }
             portInst.setPort(port);
@@ -236,10 +236,10 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
     
     public boolean isBlackBox() {
         EDIFPropertyValue val = getProperty(BLACK_BOX_PROP);
-        if(val != null && val.getValue().toLowerCase().equals("true")) 
+        if (val != null && val.getValue().toLowerCase().equals("true")) 
             return true;
         val = getProperty(BLACK_BOX_PROP_VERSAL);
-        if(val != null && val.getValue().toLowerCase().equals("1")) 
+        if (val != null && val.getValue().toLowerCase().equals("1")) 
             return true;
         return false;
     }
@@ -263,7 +263,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
         os.write(cache.getLegalEDIFName(cellType.getName()));
         os.write(EXPORT_CONST_LIBRARYREF);
         os.write(cache.getLegalEDIFName(cellType.getLibrary().getName()));
-        if(getPropertiesMap().size() > 0) {
+        if (getPropertiesMap().size() > 0) {
             os.write(EXPORT_CONST_CLOSE_WITH_PROPS);
             exportEDIFProperties(os,EXPORT_CONST_PROP_INDENT, cache, stable);
             os.write(EXPORT_CONST_CLOSE);

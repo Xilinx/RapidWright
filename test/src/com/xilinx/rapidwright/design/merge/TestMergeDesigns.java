@@ -102,14 +102,14 @@ public class TestMergeDesigns {
             
             a.setAutoIOBuffers(false);
             a.setDesignOutOfContext(true);
-            if(name.equals("a")) {
+            if (name.equals("a")) {
                 designs.setFirst(a);
             } else {
                 designs.setSecond(a);
             }
             
         }
-        if(reverse) {
+        if (reverse) {
             Design tmp = designs.getFirst();
             designs.setFirst(designs.getSecond());
             designs.setSecond(tmp);
@@ -152,7 +152,7 @@ public class TestMergeDesigns {
         HashSet<String> sites = new HashSet<>();
         for(Design design : designs) {
             for(SiteInst siteInst : design.getSiteInsts()) {
-                if(siteInst.isPlaced()) {
+                if (siteInst.isPlaced()) {
                     sites.add(siteInst.getSiteName());
                 }
             }

@@ -37,7 +37,7 @@ import com.xilinx.rapidwright.design.ConstraintGroup;
 public class PhysicalNetlistToDcp {
 
     public static void main(String[] args) throws IOException {
-        if(args.length != 4) {
+        if (args.length != 4) {
             System.out.println("USAGE: <input>.netlist <input>.phys <input>.xdc <output>.dcp");
             System.exit(1);
             return;

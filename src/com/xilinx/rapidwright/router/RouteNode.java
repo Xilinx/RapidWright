@@ -129,7 +129,7 @@ public class RouteNode{
     public RouteNode(String nodeName, Device dev) {
         String tileName = nodeName.substring(0, nodeName.indexOf('/'));
         setTile(dev.getTile(tileName));
-        if(tile == null) throw new RuntimeException("ERROR: Tile '" + tileName + "' not found in device " + dev.getName() );
+        if (tile == null) throw new RuntimeException("ERROR: Tile '" + tileName + "' not found in device " + dev.getName() );
         setWire(getTile().getWireIndex(nodeName.substring(nodeName.indexOf('/')+1)));
         setParent(null);
         setLevel(0);
@@ -341,11 +341,11 @@ public class RouteNode{
         RouteNode curr = this;
         while(curr.parent != null) {
             for(Wire currWire : Arrays.asList(curr.getWiresInNode())) {
-                if(!currWire.getTile().equals(curr.parent.getTile()))
+                if (!currWire.getTile().equals(curr.parent.getTile()))
                     continue;
                 for(Wire w1 : curr.parent.tile.getWireConnections(currWire.getWireIndex())) {
-                    if(w1.getWireIndex() == curr.parent.wire) {
-                        if(w1.isEndPIPWire()) {
+                    if (w1.getWireIndex() == curr.parent.wire) {
+                        if (w1.isEndPIPWire()) {
                             pips.add(new PIP(curr.parent.tile, currWire.getWireIndex(), curr.parent.wire, w1.getPIPType()));
                             break;
                         }
@@ -362,11 +362,11 @@ public class RouteNode{
         RouteNode curr = this;
         while(curr.parent != null) {
             for(Wire parentWire : Arrays.asList(curr.parent.getWiresInNode())) {
-                if(!parentWire.getTile().equals(curr.getTile()))
+                if (!parentWire.getTile().equals(curr.getTile()))
                     continue;
                 for(Wire w1 : curr.tile.getWireConnections(parentWire.getWireIndex())) {
-                    if(w1.getWireIndex() == curr.wire) {
-                        if(w1.isEndPIPWire()) {
+                    if (w1.getWireIndex() == curr.wire) {
+                        if (w1.isEndPIPWire()) {
                             pips.add(new PIP(curr.tile, parentWire.getWireIndex(), curr.wire, w1.getPIPType()));
                             break;
                         }

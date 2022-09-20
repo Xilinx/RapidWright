@@ -82,7 +82,7 @@ public class TestPartitionPin {
         int wireIdx = 10;
         int count = 0;
         for(EDIFPort port : design.getTopEDIFCell().getPorts()) {
-            if(port.isBus()) {
+            if (port.isBus()) {
                 for(int i : port.getBitBlastedIndicies()) {
                     Node node = Node.getNode(t, wireIdx++);
                     PartitionPin ppin = design.createPartitionPin(port, i, node);

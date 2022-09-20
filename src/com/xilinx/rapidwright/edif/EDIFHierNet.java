@@ -188,21 +188,21 @@ public class EDIFHierNet {
                 EDIFHierPortInst p = new EDIFHierPortInst(net.getHierarchicalInst(), relP);
 
                 boolean isCellPin = relP.getCellInst() != null && relP.getCellInst().getCellType().isLeafCellOrBlackBox();
-                if(isCellPin) {
-                    if(p.isInput() || (includeSourcePins && p.isOutput())) {
+                if (isCellPin) {
+                    if (p.isInput() || (includeSourcePins && p.isOutput())) {
                         leafCellPins.add(p);
                     }
                 }
 
                 boolean isToplevelInput = p.getHierarchicalInst().isTopLevelInst() && relP.getCellInst() == null && p.isInput();
-                if(isToplevelInput || (isCellPin && p.isOutput())) {
+                if (isToplevelInput || (isCellPin && p.isOutput())) {
                     if (parentNet != null) {
                         throw new RuntimeException("Multiple sources!");
                     }
                     parentNet = net;
                 }
 
-                if(p.getPortInst().getCellInst() == null) {
+                if (p.getPortInst().getCellInst() == null) {
                     // Moving up in hierarchy
                     if (!p.getHierarchicalInst().isTopLevelInst()) {
                         final EDIFHierPortInst upPort = p.getPortInParent();
@@ -213,7 +213,7 @@ public class EDIFHierNet {
                 } else {
                     // Moving down in hierarchy
                     EDIFHierNet otherNet = p.getInternalNet();
-                    if(otherNet == null) {
+                    if (otherNet == null) {
                         // Looks unconnected
                         continue;
                     }

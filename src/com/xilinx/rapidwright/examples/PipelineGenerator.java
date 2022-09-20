@@ -295,15 +295,15 @@ public class PipelineGenerator {
                 rstNet.getLogicalNet().createPortInst("R", ffCell);
                 ceNet.getLogicalNet().createPortInst("CE", ffCell);
 
-                if(ff_si.getSitePinInst(clkPinName) == null) {
+                if (ff_si.getSitePinInst(clkPinName) == null) {
                     clkNet.createPin(false, clkPinName, ff_si);
                     ff_si.addSitePIP(clkPinName + "INV","CLK");
                 }
-                if(ff_si.getSitePinInst(rstPinName) == null) {
+                if (ff_si.getSitePinInst(rstPinName) == null) {
                     rstNet.createPin(false, rstPinName, ff_si);
                     ff_si.addSitePIP("RST_"+(isLowerSlice ? "ABCD" : "EFGH")+"INV","RST");
                 }
-                if(ff_si.getSitePinInst(cePinName) == null) {
+                if (ff_si.getSitePinInst(cePinName) == null) {
                     ceNet.createPin(false, cePinName, ff_si);
                 }
             }
@@ -316,7 +316,7 @@ public class PipelineGenerator {
         // Find rectangular area consumed
         PBlock footprint = new PBlock(d.getDevice(),used);
 
-        if(route) {
+        if (route) {
             Router r = new Router(d); // the Manhattan distance router
             r.setRoutingPblock(footprint);
             r.setSupressWarningsErrors(false);
@@ -378,7 +378,7 @@ public class PipelineGenerator {
         OptionParser p = createOptionParser();
         OptionSet opts = p.parse(args);
         boolean verbose = (boolean) opts.valueOf(VERBOSE_OPT);
-        if(opts.has(HELP_OPT)) {
+        if (opts.has(HELP_OPT)) {
             printHelp(p);
             return;
         }
@@ -401,7 +401,7 @@ public class PipelineGenerator {
 
         // Perform some error checking on inputs
         Part part = PartNameTools.getPart(partName);
-        if(part == null || part.isSeries7()) {
+        if (part == null || part.isSeries7()) {
             throw new RuntimeException("ERROR: Invalid/unsupported part " + partName + ".  This example was coded "+
                               "for UltraScale or UltraScale+ devices.");
         }
@@ -421,6 +421,6 @@ public class PipelineGenerator {
         
         t.stop();
         d.writeCheckpoint(outputDCPFileName, t);
-        if(verbose) System.out.println("Wrote final DCP: " + outputDCPFileName);
+        if (verbose) System.out.println("Wrote final DCP: " + outputDCPFileName);
     }
 }

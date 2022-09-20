@@ -74,7 +74,7 @@ public class BinaryEDIFWriter {
 
     private static void addStringToStringMap(String s, Map<String,Integer> stringMap) {
         stringMap.computeIfAbsent(s, v -> stringMap.size());
-        if(stringMap.size() >= EDIF_PROP_FLAG) {
+        if (stringMap.size() >= EDIF_PROP_FLAG) {
             throw new RuntimeException("ERROR: Too many unique strings for this encoding");
         }
     }
@@ -161,8 +161,8 @@ public class BinaryEDIFWriter {
     private static void writeEDIFObject(EDIFPropertyObject o, Output os, Map<String,Integer> stringMap) {
         boolean hasProperties = o.getPropertiesMap().size() > 0;
         writeEDIFName(o, os, stringMap, hasProperties);
-        if(hasProperties) {
-            if(o.getPropertiesMap().size() > 0x0000ffff) {
+        if (hasProperties) {
+            if (o.getPropertiesMap().size() > 0x0000ffff) {
                 throw new RuntimeException("ERROR: EDIF object exceeded number of encoded "
                         + "properties on object '" + o.getName() + "'");
             }
@@ -208,7 +208,7 @@ public class BinaryEDIFWriter {
                                          EDIFLibrary parentCellLib) {
         int libMask = ref.getLibrary().equals(parentCellLib) ? EDIF_SAME_LIB_FLAG : 0; 
         os.writeInt(libMask | stringMap.get(ref.getName()));
-        if(libMask != EDIF_SAME_LIB_FLAG) {
+        if (libMask != EDIF_SAME_LIB_FLAG) {
             os.writeInt(stringMap.get(ref.getLibrary().getName()));
         }
     }
@@ -224,22 +224,22 @@ public class BinaryEDIFWriter {
         writeEDIFObject(c, os, stringMap);
         boolean hasUniqueView = c.getEDIFView() != EDIFCell.DEFAULT_VIEW;
         os.writeInt((hasUniqueView ? EDIF_UNIQUE_VIEW_FLAG : 0) | c.getPorts().size());
-        if(hasUniqueView) {
+        if (hasUniqueView) {
             writeEDIFName(c.getEDIFView(), os, stringMap);
         }
         for(EDIFPort p : c.getPorts()) {
             writeEDIFObject(p, os, stringMap);
             int dirAndWidth = p.getWidth();
-            if(dirAndWidth >= EDIF_DIR_INOUT_MASK) {
+            if (dirAndWidth >= EDIF_DIR_INOUT_MASK) {
                 throw new RuntimeException("ERROR: Port " + p.getName() + " is too wide ("+
                         dirAndWidth+") to be encoded in this file format.");
             }
             EDIFDirection dir = p.getDirection();
-            if(dir == EDIFDirection.INPUT) {
+            if (dir == EDIFDirection.INPUT) {
                 dirAndWidth |= EDIF_DIR_INPUT_MASK;
-            } else if(dir == EDIFDirection.OUTPUT) {
+            } else if (dir == EDIFDirection.OUTPUT) {
                 dirAndWidth |= EDIF_DIR_OUTPUT_MASK;
-            } else if(dir == EDIFDirection.INOUT) {
+            } else if (dir == EDIFDirection.INOUT) {
                 dirAndWidth |= EDIF_DIR_INOUT_MASK;
             }
             os.writeInt(dirAndWidth);
@@ -273,7 +273,7 @@ public class BinaryEDIFWriter {
     private static String getPortInstKey(EDIFPortInst portInst) {
         EDIFPort port = portInst.getPort();
         String returnValue = null;
-        if(port.isBus()) {
+        if (port.isBus()) {
             EDIFCell cell = portInst.getCellInst() == null ? portInst.getParentCell() : portInst.getCellInst().getCellType();
             EDIFPort portCollision = cell.getPort(portInst.getPort().getName());
             returnValue = portCollision != null ? port.getName() : port.getBusName();

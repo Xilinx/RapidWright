@@ -52,7 +52,7 @@ public class ProbeRouter {
     public static Map<String,String> readProbeRequestFile(String fileName) {
         Map<String,String> map = new TreeMap<>();
         for(String line : FileTools.getLinesFromTextFile(fileName)) {
-            if(line.trim().startsWith("#")) continue;
+            if (line.trim().startsWith("#")) continue;
             String[] parts = line.split(" ");
             map.put(parts[0], parts[1]);
         }
@@ -92,7 +92,7 @@ public class ProbeRouter {
             String hierInstName = cellInstName.contains(EDIFTools.EDIF_HIER_SEP) ? cellInstName.substring(0, cellInstName.lastIndexOf('/')) : ""; 
             EDIFHierPortInst startingPoint = new EDIFHierPortInst(d.getNetlist().getHierCellInstFromName(hierInstName), portInst);
             ArrayList<EDIFHierPortInst> sinks = EDIFTools.findSinks(startingPoint);
-            if(sinks.size() != 1) {
+            if (sinks.size() != 1) {
                 System.err.println("ERROR: Currently we only support a single flip flop "
                         + "sink for probe re-routes, found " + sinks.size() + " on " + e.getKey() + ", skipping...");
                 continue;
@@ -105,7 +105,7 @@ public class ProbeRouter {
             // Disconnect probe from current net
             net.removePortInst(portInst);
             // Unroute the portion of physical route to old probe net
-            if(physProbeInPin != null) 
+            if (physProbeInPin != null) 
                 oldPhysNet.removePin(physProbeInPin,true);
             
             // Connect probe to new net
@@ -135,7 +135,7 @@ public class ProbeRouter {
             BELPin inPin = c.getBEL().getPin(c.getPhysicalPinMapping(sinkFlop.getPortInst().getName()));
             c.getSiteInst().routeIntraSiteNet(destPhysNet, c.getSite().getBELPin(sitePinName), inPin);
             
-            if(physProbeInPin == null) {
+            if (physProbeInPin == null) {
                 // Previous connection was internal to site, need to route out to site pin
                 physProbeInPin = new SitePinInst(false, sitePinName, c.getSiteInst());
             }
@@ -146,7 +146,7 @@ public class ProbeRouter {
         // Attempt route new net to probe
         // TODO - Should we add a flop?
         Router r = new Router(d);
-        if(pblock != null) r.setRoutingPblock(pblock);
+        if (pblock != null) r.setRoutingPblock(pblock);
         r.routePinsReEntrant(pinsToRoute, false);
     }
     
@@ -154,9 +154,9 @@ public class ProbeRouter {
         List<EDIFHierCellInst> candidates = d.getNetlist().getAllDescendants("", "u_ila_*", false);
         ArrayList<EDIFHierCellInst> ilas = new ArrayList<EDIFHierCellInst>();
         nextInst: for(EDIFHierCellInst i : candidates) {
-            if(i.getCellName().contains("u_ila_")) {
+            if (i.getCellName().contains("u_ila_")) {
                 for(EDIFPort p : i.getCellType().getPorts()) {
-                    if(p.getName().contains("SL_IPORT_")) {
+                    if (p.getName().contains("SL_IPORT_")) {
                         ilas.add(i);
                         continue nextInst;
                     }
@@ -174,7 +174,7 @@ public class ProbeRouter {
     }
     
     public static void main(String[] args) {
-        if(args.length < 3 || args.length > 5) {
+        if (args.length < 3 || args.length > 5) {
             printHelp();
             return;
         }
@@ -186,8 +186,8 @@ public class ProbeRouter {
         CodePerfTracker t = new CodePerfTracker("Probe Router");
         Design d = Design.readCheckpoint(inputDCP,t);
         
-        if(args.length == 5) {
-            if(!args[3].equals(PBLOCK_SWITCH)) {
+        if (args.length == 5) {
+            if (!args[3].equals(PBLOCK_SWITCH)) {
                 printHelp();
                 return;
             }

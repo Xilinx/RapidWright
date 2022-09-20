@@ -103,11 +103,11 @@ public class PartTileBrowserView extends QGraphicsView {
         double zoom = this.matrix().m11();
         if (event.delta() > 0) {
             // Zoom in (if not at limit)
-            if(zoom < zoomMax)
+            if (zoom < zoomMax)
                 scale(scaleFactor, scaleFactor);
         } else {
             // Zoom out (if not at limit)
-            if(zoom > zoomMin)
+            if (zoom > zoomMin)
                 scale(1.0 / scaleFactor, 1.0 / scaleFactor);
         }
 
@@ -128,11 +128,11 @@ public class PartTileBrowserView extends QGraphicsView {
         double scaleFactor = 1.15; 
         if (event.key() == Key.Key_Equal.value()) {
             // Zoom in (if not at limit)
-            if(this.matrix().m11() < zoomMax)
+            if (this.matrix().m11() < zoomMax)
                 scale(scaleFactor, scaleFactor);
-        } else if(event.key() == Key.Key_Minus.value()) {
+        } else if (event.key() == Key.Key_Minus.value()) {
             // Zoom out (if not at limit)
-            if(this.matrix().m11() > zoomMin)
+            if (this.matrix().m11() > zoomMin)
                 scale(1.0 / scaleFactor, 1.0 / scaleFactor);
         }        
     }

@@ -99,7 +99,7 @@ public class PBlockGenDebugger extends DeviceBrowser {
             PBlockGenerator.main(pBlockArgs);
             /*for(int x=0; x < 100; x++) {
                 pBlockArgs[5] = Integer.toString(x);
-                if(x==49) {
+                if (x==49) {
                     System.out.println(Arrays.toString(pBlockArgs));
                     //PBlockGenerator.main(pBlockArgs);
                     PBlockGenerator.main(pBlockArgs);

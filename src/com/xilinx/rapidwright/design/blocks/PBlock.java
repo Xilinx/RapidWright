@@ -110,7 +110,7 @@ public class PBlock extends ArrayList<PBlockRange> {
         Map<SiteTypeEnum,ArrayList<Site>> typeSets = new HashMap<>();
         for(Site s : sites) {
             ArrayList<Site> sameTypes = typeSets.get(s.getSiteTypeEnum());
-            if(sameTypes == null) {
+            if (sameTypes == null) {
                 sameTypes = new ArrayList<>();
                 typeSets.put(s.getSiteTypeEnum(), sameTypes);
             }
@@ -120,10 +120,10 @@ public class PBlock extends ArrayList<PBlockRange> {
         // SLICEs are a special case
         List<Site> slices = typeSets.remove(SiteTypeEnum.SLICEL);
         List<Site> slicems = typeSets.remove(SiteTypeEnum.SLICEM);
-        if(slices == null) slices = slicems == null ? Collections.emptyList() : slicems;
+        if (slices == null) slices = slicems == null ? Collections.emptyList() : slicems;
         else slices.addAll(slicems == null ? Collections.emptyList() : slicems);
         PBlockRange sliceRange = createPBlockRange(dev, slices);
-        if(sliceRange != null) add(sliceRange);
+        if (sliceRange != null) add(sliceRange);
         // Rest of site types
         for(Entry<SiteTypeEnum,ArrayList<Site>> e : typeSets.entrySet()) {
             add(createPBlockRange(dev, e.getValue()));
@@ -143,7 +143,7 @@ public class PBlock extends ArrayList<PBlockRange> {
      * or null if no sites were given.
      */
     public static PBlockRange createPBlockRange(Device dev, Collection<Site> sites) {
-        if(sites == null || sites.isEmpty()) return null;
+        if (sites == null || sites.isEmpty()) return null;
         
         int xMin = Integer.MAX_VALUE;
         int xMax = 0;
@@ -151,19 +151,19 @@ public class PBlock extends ArrayList<PBlockRange> {
         int yMax = 0;
         String namespace = null;
         for(Site s : sites) {
-            if(namespace == null) {
+            if (namespace == null) {
                 namespace = s.getNameSpacePrefix();
-            } else if(!namespace.equals(s.getNameSpacePrefix())) {
+            } else if (!namespace.equals(s.getNameSpacePrefix())) {
                 throw new RuntimeException("ERROR: Found multiple types for "
                         + "PBlockRange creation request: " + namespace  + " " 
                         + s.getNameSpacePrefix());
             }
             int x = s.getInstanceX();
             int y = s.getInstanceY();
-            if(x > xMax) xMax = x;
-            if(x < xMin) xMin = x;            
-            if(y > yMax) yMax = y;
-            if(y < yMin) yMin = y;
+            if (x > xMax) xMax = x;
+            if (x < xMin) xMin = x;            
+            if (y > yMax) yMax = y;
+            if (y < yMin) yMin = y;
         }
 
         final String lowerLeftName = namespace + "X" + xMin + "Y" + yMin;
@@ -181,16 +181,16 @@ public class PBlock extends ArrayList<PBlockRange> {
     
     
     public ArrayList<String> getTclConstraints() {
-        if(name == null) 
+        if (name == null) 
             throw new RuntimeException("ERROR: Must give pblock a name!");
-        if(parent != null && parent.getName() == null) 
+        if (parent != null && parent.getName() == null) 
             throw new RuntimeException("ERROR: Parent of pblock " + name + " does not have a name");
         ArrayList<String> tcl = new ArrayList<>();
         tcl.add("create_pblock " + name + (parent != null ? " -parent " + parent.getName() : ""));
         for(PBlockRange p : this) {
             tcl.add("resize_pblock "+ name +" -add " + p.toString());
         }
-        if(containRouting()) {
+        if (containRouting()) {
             tcl.add("set_property CONTAIN_ROUTING 1 [get_pblocks "+name+"]");
         }
         
@@ -201,7 +201,7 @@ public class PBlock extends ArrayList<PBlockRange> {
         StringBuilder sb = new StringBuilder();
         for(int i=0; i < size(); i++) {
             sb.append(get(i).toString());
-            if(i != size() -1) sb.append(" ");
+            if (i != size() -1) sb.append(" ");
         }
         return sb.toString();
     }
@@ -211,8 +211,8 @@ public class PBlock extends ArrayList<PBlockRange> {
         int topMostRow = Integer.MAX_VALUE;
         for(PBlockRange range : this) {
             Tile tl = range.getTopLeftTile();
-            if(leftMostColumn > tl.getColumn()) leftMostColumn = tl.getColumn();
-            if(topMostRow > tl.getRow()) topMostRow = tl.getRow();
+            if (leftMostColumn > tl.getColumn()) leftMostColumn = tl.getColumn();
+            if (topMostRow > tl.getRow()) topMostRow = tl.getRow();
         }
         return getDevice().getTile(topMostRow,leftMostColumn);
     }
@@ -222,8 +222,8 @@ public class PBlock extends ArrayList<PBlockRange> {
         int bottomMostRow = 0;
         for(PBlockRange range : this) {
             Tile tl = range.getBottomLeftTile();
-            if(leftMostColumn > tl.getColumn()) leftMostColumn = tl.getColumn();
-            if(bottomMostRow < tl.getRow()) bottomMostRow = tl.getRow();
+            if (leftMostColumn > tl.getColumn()) leftMostColumn = tl.getColumn();
+            if (bottomMostRow < tl.getRow()) bottomMostRow = tl.getRow();
         }
         return getDevice().getTile(bottomMostRow,leftMostColumn);
     }
@@ -233,8 +233,8 @@ public class PBlock extends ArrayList<PBlockRange> {
         int bottomMostRow = 0;
         for(PBlockRange range : this) {
             Tile br = range.getBottomRightTile();
-            if(rightMostColumn < br.getColumn()) rightMostColumn = br.getColumn();
-            if(bottomMostRow < br.getRow()) bottomMostRow = br.getRow();
+            if (rightMostColumn < br.getColumn()) rightMostColumn = br.getColumn();
+            if (bottomMostRow < br.getRow()) bottomMostRow = br.getRow();
         }
         return getDevice().getTile(bottomMostRow,rightMostColumn);
     }
@@ -244,8 +244,8 @@ public class PBlock extends ArrayList<PBlockRange> {
         int topMostRow = Integer.MAX_VALUE;
         for(PBlockRange range : this) {
             Tile br = range.getTopRightTile();
-            if(rightMostColumn < br.getColumn()) rightMostColumn = br.getColumn();
-            if(topMostRow > br.getRow()) topMostRow = br.getRow();
+            if (rightMostColumn < br.getColumn()) rightMostColumn = br.getColumn();
+            if (topMostRow > br.getRow()) topMostRow = br.getRow();
         }
         return getDevice().getTile(topMostRow,rightMostColumn);
     }
@@ -258,7 +258,7 @@ public class PBlock extends ArrayList<PBlockRange> {
      * @return The set of all tiles in the pblock 
      */
     public Set<Tile> getAllTiles() {
-        if(tileSet == null) {
+        if (tileSet == null) {
             tileSet = new HashSet<>();
             for(PBlockRange range : this) {
                 tileSet.addAll(range.getAllTiles());
@@ -275,10 +275,10 @@ public class PBlock extends ArrayList<PBlockRange> {
     public Set<Site> getAllSites(String prefix) {
         Set<Site> sites = new HashSet<>();
         for(Tile t : getAllTiles()) {
-            if(t.getSites() == null) continue;
+            if (t.getSites() == null) continue;
             for(Site s : t.getSites()) {
-                if(prefix != null) {
-                    if(!s.getName().startsWith(prefix)) continue;
+                if (prefix != null) {
+                    if (!s.getName().startsWith(prefix)) continue;
                 }
                 sites.add(s);
             }
@@ -297,17 +297,17 @@ public class PBlock extends ArrayList<PBlockRange> {
     
     
     public Device getDevice() {
-        if(size() == 0) return null;
+        if (size() == 0) return null;
         return get(0).getDevice();
     }
     
     public void addSubPBlock(SubPBlock subPBlock) {
-        if(subPBlocks == null) subPBlocks = new ArrayList<>();
+        if (subPBlocks == null) subPBlocks = new ArrayList<>();
         subPBlocks.add(subPBlock);
     }
     
     public List<SubPBlock> getSubPBlocks() {
-        if(subPBlocks == null) return Collections.emptyList();
+        if (subPBlocks == null) return Collections.emptyList();
         return subPBlocks;
     }
     
@@ -321,30 +321,30 @@ public class PBlock extends ArrayList<PBlockRange> {
         PBlockRange brams = null;
         
         for(PBlockRange range : this) {
-            if(range.getLowerLeftSite().getName().startsWith("SLICE")) {
+            if (range.getLowerLeftSite().getName().startsWith("SLICE")) {
                 slices = range;
-            } else if(range.getLowerLeftSite().getName().startsWith("DSP")) {
+            } else if (range.getLowerLeftSite().getName().startsWith("DSP")) {
                 dsps = range;
-            } else if(range.getLowerLeftSite().getName().startsWith("RAMB")) {
+            } else if (range.getLowerLeftSite().getName().startsWith("RAMB")) {
                 brams = range;
             }
         }
         
-        if(placement.getName().startsWith("SLICE")) {
+        if (placement.getName().startsWith("SLICE")) {
             int xOffset = slices.getLowerLeftSite().getInstanceX() - placement.getInstanceX();
             int yOffset = slices.getLowerLeftSite().getInstanceY() - placement.getInstanceY();
             int newUpperX = slices.getUpperRightSite().getInstanceX() - xOffset;
             int newUpperY = slices.getUpperRightSite().getInstanceY() - yOffset;
             Site newUpperRight = placement.getTile().getDevice().getSite("SLICE_X" + newUpperX + "Y" + newUpperY);
             slices = new PBlockRange(placement, newUpperRight);            
-        } else if(placement.getName().startsWith("DSP")) {
+        } else if (placement.getName().startsWith("DSP")) {
             int xOffset = dsps.getLowerLeftSite().getInstanceX() - placement.getInstanceX();
             int yOffset = dsps.getLowerLeftSite().getInstanceY() - placement.getInstanceY();
             int newUpperX = dsps.getUpperRightSite().getInstanceX() - xOffset;
             int newUpperY = dsps.getUpperRightSite().getInstanceY() - yOffset;
             Site newUpperRight = placement.getTile().getDevice().getSite("DSP48E2_X" + newUpperX + "Y" + newUpperY);
                         
-            if(slices != null) {
+            if (slices != null) {
                 // SLICE X OFFSET: How many slice columns between old and new DSP columns? 
                 Tile startTile = dsps.getLowerLeftSite().getTile();
                 Tile newDSPTile = placement.getTile();
@@ -353,8 +353,8 @@ public class PBlock extends ArrayList<PBlockRange> {
                 int sliceXOffset = 0;
                 while(incr != 0 && startTile.getColumn() != newDSPTile.getColumn()) {
                     startTile = startTile.getDevice().getTile(newDSPTile.getRow(), startTile.getColumn()+incr);
-                    if(startTile.getSites().length > 0) {
-                        if(startTile.getSites()[0].getName().startsWith("SLICE")) {
+                    if (startTile.getSites().length > 0) {
+                        if (startTile.getSites()[0].getName().startsWith("SLICE")) {
                             sliceXOffset -= incr;
                         }
                     }
@@ -369,14 +369,14 @@ public class PBlock extends ArrayList<PBlockRange> {
             }            
             dsps = new PBlockRange(placement, newUpperRight);
             
-        } else if(placement.getName().startsWith("RAMB")) {
+        } else if (placement.getName().startsWith("RAMB")) {
             int xOffset = brams.getLowerLeftSite().getInstanceX() - placement.getInstanceX();
             int yOffset = brams.getLowerLeftSite().getInstanceY() - placement.getInstanceY();
             int newUpperX = brams.getUpperRightSite().getInstanceX() - xOffset;
             int newUpperY = brams.getUpperRightSite().getInstanceY() - yOffset;
             Site newUpperRight = placement.getTile().getDevice().getSite("RAMB36_X" + newUpperX + "Y" + newUpperY);
                         
-            if(slices != null) {
+            if (slices != null) {
                 // SLICE X OFFSET: How many slice columns between old and new BRAM columns? 
                 Tile startTile = brams.getLowerLeftSite().getTile();
                 Tile newBRAMTile = placement.getTile();
@@ -384,12 +384,12 @@ public class PBlock extends ArrayList<PBlockRange> {
                 int sliceXOffset = 0;
                 while(incr != 0 && startTile != newBRAMTile) {
                     startTile = startTile.getDevice().getTile(newBRAMTile.getRow(), startTile.getColumn()+incr);
-                    if(startTile == null) {
+                    if (startTile == null) {
                         throw new RuntimeException("ERROR: Couldn't create new pblock at placement " + 
                                 placement.getName() + " for pblock " + this.toString());
                     }
-                    if(startTile.getSites() != null && startTile.getSites().length > 0) {
-                        if(startTile.getSites()[0].getName().startsWith("SLICE")) {
+                    if (startTile.getSites() != null && startTile.getSites().length > 0) {
+                        if (startTile.getSites()[0].getName().startsWith("SLICE")) {
                             sliceXOffset -= incr;
                         }
                     }
@@ -406,9 +406,9 @@ public class PBlock extends ArrayList<PBlockRange> {
         }
         
         PBlock newPBlock = new PBlock();
-        if(slices != null) newPBlock.add(slices);
-        if(dsps != null) newPBlock.add(dsps);
-        if(brams != null) newPBlock.add(brams);
+        if (slices != null) newPBlock.add(slices);
+        if (dsps != null) newPBlock.add(dsps);
+        if (brams != null) newPBlock.add(brams);
         
         return newPBlock;
     }
@@ -420,13 +420,13 @@ public class PBlock extends ArrayList<PBlockRange> {
      * @return True if the pblock ranges changed, false if no move was made.
      */
     public boolean movePBlock(int dx, int dy) {
-        if(dx == 0 && dy == 0) return false;
+        if (dx == 0 && dy == 0) return false;
         Tile bl = getBottomLeftTile();
         Tile tr = getTopRightTile();
         Device d = tr.getDevice();
         boolean hasMoved = false;
-        if(dx != 0) {
-            if(dx > 0) {
+        if (dx != 0) {
+            if (dx > 0) {
                 // moving to the right, check the columns to the right most tile
                 for(PBlockRange pbr : this) {
                     int x = 0;
@@ -435,11 +435,11 @@ public class PBlock extends ArrayList<PBlockRange> {
                     while(right.getTile().getColumn() < target) {
                         x++;
                         right = pbr.getUpperRightSite().getNeighborSite(x, 0);
-                        if(right.getTile().getColumn() <= target) {
+                        if (right.getTile().getColumn() <= target) {
                             hasMoved = true;
                         }
                     }
-                    if(hasMoved) {
+                    if (hasMoved) {
                         pbr.setUpperRight(right);
                         Site otherCorner = pbr.getLowerLeftSite().getNeighborSite(x, 0);
                         pbr.setLowerLeft(otherCorner);                        
@@ -454,11 +454,11 @@ public class PBlock extends ArrayList<PBlockRange> {
                     while(left.getTile().getColumn() > target) {
                         x--;
                         left = pbr.getLowerLeftSite().getNeighborSite(x, 0);
-                        if(left.getTile().getColumn() >= target) {
+                        if (left.getTile().getColumn() >= target) {
                             hasMoved = true;
                         }
                     }
-                    if(hasMoved) {
+                    if (hasMoved) {
                         pbr.setLowerLeft(left);
                         Site otherCorner = pbr.getUpperRightSite().getNeighborSite(x, 0);
                         pbr.setUpperRight(otherCorner);                        
@@ -467,8 +467,8 @@ public class PBlock extends ArrayList<PBlockRange> {
 
             }            
         }
-        if(dy != 0) {
-            if(dy > 0) {
+        if (dy != 0) {
+            if (dy > 0) {
                 // moving down, check tiles below
                 for(PBlockRange pbr : this) {
                     int y = 0;
@@ -477,11 +477,11 @@ public class PBlock extends ArrayList<PBlockRange> {
                     while(left.getTile().getRow() < target) {
                         y--;
                         left = pbr.getLowerLeftSite().getNeighborSite(0, y);
-                        if(left.getTile().getRow() <= target) {
+                        if (left.getTile().getRow() <= target) {
                             hasMoved = true;
                         }
                     }
-                    if(hasMoved) {
+                    if (hasMoved) {
                         pbr.setLowerLeft(left);
                         Site otherCorner = pbr.getUpperRightSite().getNeighborSite(0, y);
                         pbr.setUpperRight(otherCorner);                                            
@@ -496,11 +496,11 @@ public class PBlock extends ArrayList<PBlockRange> {
                     while(right.getTile().getRow() > target) {
                         y++;
                         right = pbr.getUpperRightSite().getNeighborSite(0, y);
-                        if(right.getTile().getRow() >= target) {
+                        if (right.getTile().getRow() >= target) {
                             hasMoved = true;
                         }
                     }
-                    if(hasMoved) {
+                    if (hasMoved) {
                         pbr.setUpperRight(right);
                         Site otherCorner = pbr.getLowerLeftSite().getNeighborSite(0, y);
                         pbr.setLowerLeft(otherCorner);                        

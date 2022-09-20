@@ -108,7 +108,7 @@ public class JobQueue {
                 launched = true;
             }
 
-            if(!launched || !printJobStart) {
+            if (!launched || !printJobStart) {
                 System.out.print("Waiting on ");
                 jobsByState.forEach((state, jobs) -> {
                     System.out.print(jobs.size()+" "+state.getName()+", ");
@@ -127,8 +127,8 @@ public class JobQueue {
         boolean success = true;
         for(Job j : finished) {
             boolean curr = j.jobWasSuccessful();
-            if(!curr) {
-                if(failedCount == 0) {
+            if (!curr) {
+                if (failedCount == 0) {
                     // Let's just print the first error output
                     j.getLastLogLines().ifPresent(lastLogLines -> {
                         System.err.println("***************************************************************************");
@@ -145,7 +145,7 @@ public class JobQueue {
             }
             success &= curr;
         }
-        if(failedCount > 0)  {
+        if (failedCount > 0)  {
             System.err.println("Failed Job Count: " + failedCount);
         }
         return success;
@@ -160,13 +160,13 @@ public class JobQueue {
         long watchdog = System.currentTimeMillis(); 
         while(!running.isEmpty() && (System.currentTimeMillis() - watchdog < 5000)) {
             Job j = running.poll();
-            if(j.isFinished()) finished.add(j);
+            if (j.isFinished()) finished.add(j);
             else {
                 running.add(j);
                 try {Thread.sleep(200);} catch (InterruptedException e) {break;}
             }
         }
-        if(!running.isEmpty()) {
+        if (!running.isEmpty()) {
             MessageGenerator.briefError("ERROR: Couldn't kill all running jobs, still running are pid=" + running);
             return false;
         }
@@ -177,7 +177,7 @@ public class JobQueue {
     private static Boolean lsfAvailable = null;
     public static boolean isLSFAvailable() {
         if (lsfAvailable == null) {
-            if(FileTools.isExecutableOnPath("bsub")) {
+            if (FileTools.isExecutableOnPath("bsub")) {
                 lsfAvailable = JobQueue.USE_LSF_IF_AVAILABLE;
             } else {
                 lsfAvailable = false;
@@ -201,7 +201,7 @@ public class JobQueue {
         JobQueue q = new JobQueue();
         
         // Run a test if no arguments
-        if(args.length == 0) {
+        if (args.length == 0) {
             String mainDir = System.getenv("HOME") + File.separator+ "JobQueueTest" + File.separator;
             for(int i=0; i < 10; i++) {
                 Job job = createJob();
@@ -210,13 +210,13 @@ public class JobQueue {
                 q.addJob(job);
             }
         } else {
-            if(args[0].equalsIgnoreCase(LSF_AVAILABLE_OPTION)) {
+            if (args[0].equalsIgnoreCase(LSF_AVAILABLE_OPTION)) {
                 System.out.println(Boolean.toString(isLSFAvailable()));
                 return;
-            } else if(args[0].equalsIgnoreCase(LSF_RESOURCE_OPTION)) {
+            } else if (args[0].equalsIgnoreCase(LSF_RESOURCE_OPTION)) {
                 System.out.println(LSFJob.LSF_RESOURCE);
                 return;
-            } else if(args[0].equalsIgnoreCase(LSF_QUEUE_OPTION)) {
+            } else if (args[0].equalsIgnoreCase(LSF_QUEUE_OPTION)) {
                 System.out.println(LSFJob.LSF_QUEUE);
                 return;
             }
@@ -231,7 +231,7 @@ public class JobQueue {
             }
         }
         boolean success = q.runAllToCompletion();
-        if(success) System.out.println("Runs completed successfully");
+        if (success) System.out.println("Runs completed successfully");
         else System.err.println("One or more runs failed");
     }
 

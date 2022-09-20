@@ -37,7 +37,7 @@ public class UpdateRoutingUsingSATRouter {
 
     public static void main(String[] args) {
         // Check args
-        if(args.length != 3) {
+        if (args.length != 3) {
             System.out.println("USAGE: java " + UpdateRoutingUsingSATRouter.class.getCanonicalName() + " " 
                             + "<failed_routed_dcp> <pblock_area_constraint> <output_dcp>");
             return;
@@ -46,7 +46,7 @@ public class UpdateRoutingUsingSATRouter {
         Design d = Design.readCheckpoint(args[0]);
 
         for(Net n : d.getNets()) {
-            if(n.isClockNet() || n.isStaticNet()) continue;
+            if (n.isClockNet() || n.isStaticNet()) continue;
             n.unroute();
         }
         

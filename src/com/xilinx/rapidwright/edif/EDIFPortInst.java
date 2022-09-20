@@ -86,14 +86,14 @@ public class EDIFPortInst {
      * @param cellInst This instance on which this port ref corresponds.
      */
     public EDIFPortInst(EDIFPort port, EDIFNet parentNet, int index, EDIFCellInst cellInst) {
-        if(index == -1 && port.isBus()) {
+        if (index == -1 && port.isBus()) {
             throw new RuntimeException("ERROR: Use a different constructor, "
                     + "need index for bussed port " + port.getName());
         }
-        if(cellInst != null) {
-            if(!port.equals(cellInst.getPort(port.getBusName()))) {
+        if (cellInst != null) {
+            if (!port.equals(cellInst.getPort(port.getBusName()))) {
                 // check for name collision
-                if(!port.equals(cellInst.getPort(port.getName()))) {
+                if (!port.equals(cellInst.getPort(port.getName()))) {
                     throw new RuntimeException("ERROR: Provided port '"+ 
                             port.getName() + "' does not exist on EDIFCell type '" + 
                             cellInst.getCellType().getName() + "' when adding port "
@@ -105,7 +105,7 @@ public class EDIFPortInst {
         this.port = port;
         this.name = getPortInstNameFromPort();
         setCellInst(cellInst);
-        if(parentNet != null) parentNet.addPortInst(this);
+        if (parentNet != null) parentNet.addPortInst(this);
     }
     
     protected EDIFPortInst() {
@@ -154,11 +154,11 @@ public class EDIFPortInst {
      * @param cellInst the cellInst to set
      */
     public void setCellInst(EDIFCellInst cellInst) {
-        if(this.cellInst != null) {
+        if (this.cellInst != null) {
             this.cellInst.removePortInst(this);
         }
         this.cellInst = cellInst;
-        if(cellInst != null) {
+        if (cellInst != null) {
             cellInst.addPortInst(this);
         }
     }
@@ -172,20 +172,20 @@ public class EDIFPortInst {
      * @return True if the underlying cell is a static output from GND or VCC, false otherwise.
      */
     public boolean isPrimitiveStaticSource() {
-        if(cellInst == null) return false;
+        if (cellInst == null) return false;
         String name = cellInst.getCellType().getName();
-        if(name.equals("GND") || name.equals("VCC")) return true;
+        if (name.equals("GND") || name.equals("VCC")) return true;
         return false;
     }
 
     public String getFullName() {
         String fullName = getName();
-        if(port == null && index != -1) {
+        if (port == null && index != -1) {
             // This is a special case only during parsing that needs to be
             // added to avoid name collisions in the EDIFNet portInsts map.
             fullName = fullName + "[" + index + "]";
         }
-        if(getCellInst() == null) return fullName;
+        if (getCellInst() == null) return fullName;
         return getCellInst().getName() + EDIFTools.EDIF_HIER_SEP + fullName;
     }
 
@@ -221,7 +221,7 @@ public class EDIFPortInst {
     }
 
     public EDIFNet getInternalNet() {
-        if(cellInst == null) return null;
+        if (cellInst == null) return null;
         return cellInst.getCellType().getInternalNet(this);
     }
     
@@ -240,7 +240,7 @@ public class EDIFPortInst {
     public void writeEDIFExport(OutputStream os, byte[] indent, EDIFWriteLegalNameCache<?> cache) throws IOException{
         os.write(indent);
         os.write(EXPORT_CONST_PORTREF);
-        if(index == -1) {
+        if (index == -1) {
              os.write(cache.getLegalEDIFName(getPort().getName()));
         }
         else {
@@ -250,7 +250,7 @@ public class EDIFPortInst {
             os.write(Integer.toString(index).getBytes(StandardCharsets.UTF_8));
             os.write(')');
         }
-        if(getCellInst() != null) {
+        if (getCellInst() != null) {
             os.write(EXPORT_CONST_INSTANCEREF);
             os.write(cache.getLegalEDIFName(getCellInst().getName()));
             os.write(')');
@@ -299,7 +299,7 @@ public class EDIFPortInst {
     }
 
     public String toString() {
-        if(cellInst == null) return name;
+        if (cellInst == null) return name;
         return cellInst.getName() + EDIFTools.EDIF_HIER_SEP + name;
     }
 }

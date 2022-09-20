@@ -161,7 +161,7 @@ public class PinSwap {
      * @return Cell in the overlapping LUT BEL site.
      */
     public Cell checkForCompanionCell() {
-        if(companionCell != null) return companionCell;
+        if (companionCell != null) return companionCell;
         String otherBEL = cell.getBELName().charAt(1) == '5' ? cell.getBELName().replace('5', '6') : cell.getBELName().replace('6', '5');
         return cell.getSiteInst().getCell(otherBEL);
     }

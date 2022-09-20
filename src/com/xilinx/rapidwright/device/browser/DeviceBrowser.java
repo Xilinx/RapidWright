@@ -113,7 +113,7 @@ public class DeviceBrowser extends QMainWindow{
         
         // Gets the available parts in RapidWright and populates the selection tree
         Set<String> parts = WidgetMaker.getSupportedDevices();
-        if(parts.size() < 1) {
+        if (parts.size() < 1) {
             throw new RuntimeException("Error: No available parts. " +
                     "Please generate part database files.");
         }
@@ -121,7 +121,7 @@ public class DeviceBrowser extends QMainWindow{
         if (defaultPart == null) {
             defaultPart = "xcku040";
         }
-        if(parts.contains(defaultPart)) {
+        if (parts.contains(defaultPart)) {
             currPart = defaultPart;
         } else {
             currPart = parts.iterator().next();
@@ -205,10 +205,10 @@ public class DeviceBrowser extends QMainWindow{
      */
     public void wireDoubleClicked(QModelIndex index) {
         scene.clearCurrentLines();
-        if(currTile == null) return;
+        if (currTile == null) return;
         int currWire = currTile.getWireIndex(index.data().toString());
-        if(currWire < 0) return;
-        if(currTile.getWireConnections(index.data().toString()) == null) return;
+        if (currWire < 0) return;
+        if (currTile.getWireConnections(index.data().toString()) == null) return;
         for(Wire wire : currTile.getWireConnections(index.data().toString())) {
             scene.drawWire(currTile, currWire, wire.getTile(), wire.getWireIndex());
         }
@@ -229,7 +229,7 @@ public class DeviceBrowser extends QMainWindow{
      */
     protected void updatePrimitiveList() {
         primitiveList.clear();
-        if(currTile == null) return;
+        if (currTile == null) return;
         for(Site ps : currTile.getSites()) {
             QTreeWidgetItem treeItem = new QTreeWidgetItem();
             treeItem.setText(0, ps.getName());
@@ -244,7 +244,7 @@ public class DeviceBrowser extends QMainWindow{
      */
     protected void updateWireList() {
         wireList.clear();
-        if(currTile == null || currTile.getWireNames() == null) return;
+        if (currTile == null || currTile.getWireNames() == null) return;
         for(String wire : currTile.getWireNames()) {
             QTreeWidgetItem treeItem = new QTreeWidgetItem();
             treeItem.setText(0, wire);
@@ -262,8 +262,8 @@ public class DeviceBrowser extends QMainWindow{
      */
     protected void showPart(QModelIndex qmIndex) {
         Object data = qmIndex.data(ItemDataRole.AccessibleDescriptionRole);
-        if( data != null) {
-            if(currPart.equals(data))
+        if ( data != null) {
+            if (currPart.equals(data))
                 return;
             currPart = (String) data;            
             device = Device.getDevice(currPart);

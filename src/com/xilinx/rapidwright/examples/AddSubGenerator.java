@@ -88,15 +88,15 @@ public class AddSubGenerator extends ArithmeticGenerator {
         String clkPinName = isLowerSlice ? "CLK1" : "CLK2";
         String rstPinName = isLowerSlice ? "SRST1" : "SRST2";
         String cePinName = "CKEN" + (isLowerSlice ? (isFF2 ? "2" : "1") : (isFF2 ? "4" : "3")); 
-        if(ff.getSiteInst().getSitePinInst(clkPinName) == null) {
+        if (ff.getSiteInst().getSitePinInst(clkPinName) == null) {
             clk.createPin(false, clkPinName, ff.getSiteInst());
             ff.getSiteInst().addSitePIP(clkPinName + "INV","CLK");
         }
-        if(ff.getSiteInst().getSitePinInst(rstPinName) == null) {
+        if (ff.getSiteInst().getSitePinInst(rstPinName) == null) {
             rst.createPin(false, rstPinName, ff.getSiteInst());
             ff.getSiteInst().addSitePIP("RST_"+(isLowerSlice ? "ABCD" : "EFGH")+"INV","RST");
         }
-        if(ff.getSiteInst().getSitePinInst(cePinName) == null) {
+        if (ff.getSiteInst().getSitePinInst(cePinName) == null) {
             ce.createPin(false, cePinName, ff.getSiteInst());
         }
     }
@@ -129,7 +129,7 @@ public class AddSubGenerator extends ArithmeticGenerator {
         EDIFNet gnd = EDIFTools.getStaticNet(NetType.GND, top, d.getNetlist());
         EDIFNet vcc = EDIFTools.getStaticNet(NetType.VCC, top, d.getNetlist());
 
-        if(inputFlop || outputFlop) {
+        if (inputFlop || outputFlop) {
             clkPort = top.createPort("clk", EDIFDirection.INPUT, 1);
             cePort = top.createPort("ce", EDIFDirection.INPUT, 1);
             rstPort = top.createPort("rst", EDIFDirection.INPUT, 1);
@@ -159,11 +159,11 @@ public class AddSubGenerator extends ArithmeticGenerator {
             lutCell.addProperty("INIT", isSubtract ? "4'h9" : "4'h6", EDIFValueType.STRING);
             Cell ffCell = outputFlop ? 
                     d.createAndPlaceCell(top, "sum" + i, Unisim.FDRE, currSlice, ff) : null;
-            if(outputFlop) ffCell.addProperty("INIT", "1'b0", EDIFValueType.STRING);
+            if (outputFlop) ffCell.addProperty("INIT", "1'b0", EDIFValueType.STRING);
             SiteInst si = lutCell.getSiteInst();
                         
             
-            if(letter.equals("A")) {
+            if (letter.equals("A")) {
                 BEL carry = currSlice.getBEL("CARRY8");
                 carryCell = d.createAndPlaceCell(top, "carry" + i, Unisim.CARRY8, currSlice, carry);
                 carryCell.addProperty("CARRY_TYPE","SINGLE_CY8", EDIFValueType.STRING);
@@ -174,13 +174,13 @@ public class AddSubGenerator extends ArithmeticGenerator {
                     carryCell.addPinMapping(physName, "DI[" + j +"]");
                 }
 
-                if(i>0) {
+                if (i>0) {
                     EDIFNet c = top.getNet("c" + (i-1));
                     c.createPortInst("CI", carryCell);
                     Net cNet = d.getNet(c.getName());
                     cNet.createPin(false, "CIN",si);
                     
-                    if(si.getSiteTypeEnum() == SiteTypeEnum.SLICEL) {
+                    if (si.getSiteTypeEnum() == SiteTypeEnum.SLICEL) {
                         cNet.addPIP(new PIP(si.getTile(), "CLE_CLE_L_SITE_0_CIN","CLE_CLE_L_SITE_0_CIN_PIN"));
                     } else {
                         cNet.addPIP(new PIP(si.getTile(), "CLE_CLE_M_SITE_0_CIN","CLE_CLE_M_SITE_0_CIN_PIN"));
@@ -211,7 +211,7 @@ public class AddSubGenerator extends ArithmeticGenerator {
             p.createPortInst("O", lutCell);
             p.createPortInst("S", edifIndex, carryCell);
             s.createPortInst("O", edifIndex, carryCell);
-            if(outputFlop) {
+            if (outputFlop) {
                 s.createPortInst("D", ffCell);
                 so.createPortInst("Q", ffCell);
                 connectFDRECtrl(clkNet, rstNet, ceNet, ffCell);
@@ -233,7 +233,7 @@ public class AddSubGenerator extends ArithmeticGenerator {
             BELPin src = lut.getPin("O6");
             BELPin snk = carryCell.getBEL().getPin("S" + cleIndex);
             si.routeIntraSiteNet(pNet, src, snk);
-            if(outputFlop) { 
+            if (outputFlop) { 
                 si.routeIntraSiteNet(sNet, carryCell.getBEL().getPin("O"+cleIndex), ff.getPin("D"));
             } else {
                 BELPin sitePin = si.getSite().getBELPin(letter+"MUX");
@@ -243,10 +243,10 @@ public class AddSubGenerator extends ArithmeticGenerator {
             
             soNet.createPin(true,letter + (outputFlop ? "Q" : "MUX"),si);
             
-            if(inputFlop) {
+            if (inputFlop) {
                 Site inputFFSite = null;
                 // Decided if we pack flop into FF2s of carry-using CLEs or put flops above
-                /*if((i+BITS_PER_CLE-1) / BITS_PER_CLE < carryCLEs) {
+                /*if ((i+BITS_PER_CLE-1) / BITS_PER_CLE < carryCLEs) {
                     int yOffset = i / BITS_PER_CLE;
                     inputFFSite = origin.getNeighborSite(0, yOffset);
                 } else {*/
@@ -275,7 +275,7 @@ public class AddSubGenerator extends ArithmeticGenerator {
             }
             
             
-            if(i%8==7 && width > i+1) {
+            if (i%8==7 && width > i+1) {
                 EDIFNet c = top.createNet("c" + i);
                 c.createPortInst("CO", edifIndex, carryCell);
                 Net cNet = d.createNet(c);
@@ -286,7 +286,7 @@ public class AddSubGenerator extends ArithmeticGenerator {
         // Find rectangular area consumed
         PBlock footprint = new PBlock(d.getDevice(),used);
         
-        if(route) {            
+        if (route) {            
             Router r = new Router(d);
             r.setRoutingPblock(footprint);
             r.setSupressWarningsErrors(true);
@@ -345,7 +345,7 @@ public class AddSubGenerator extends ArithmeticGenerator {
         OptionParser p = createOptionParser();
         OptionSet opts = p.parse(args);
         boolean verbose = (boolean) opts.valueOf(VERBOSE_OPT);
-        if(opts.has(HELP_OPT)) {
+        if (opts.has(HELP_OPT)) {
             printHelp(p);
             return;
         }
@@ -363,7 +363,7 @@ public class AddSubGenerator extends ArithmeticGenerator {
         
         // Perform some error checking on inputs
         Part part = PartNameTools.getPart(partName);
-        if(part == null || part.isSeries7()) {
+        if (part == null || part.isSeries7()) {
             throw new RuntimeException("ERROR: Invalid/unsupport part " + partName + ".");
         }
         
@@ -382,6 +382,6 @@ public class AddSubGenerator extends ArithmeticGenerator {
         
         t.stop();
         d.writeCheckpoint(outputDCPFileName, t);
-        if(verbose) System.out.println("Wrote final DCP: " + outputDCPFileName);
+        if (verbose) System.out.println("Wrote final DCP: " + outputDCPFileName);
     }
 }

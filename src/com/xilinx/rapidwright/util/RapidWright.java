@@ -67,7 +67,7 @@ public class RapidWright {
 
             // Figure proper CLASSPATH based on if this is running from a jar or not 
             CodeSource src = RapidWright.class.getProtectionDomain().getCodeSource();
-            if(src == null) {
+            if (src == null) {
                 MessageGenerator.briefError("Couldn't identify classpath for running RapidWright.  "
                         + "Either set the CLASSPATH correctly, or modify " + f.getAbsolutePath() + " "
                         + "to include classpath information");
@@ -76,22 +76,22 @@ public class RapidWright {
             boolean isWindows = FileTools.isWindows();
             String location = src.getLocation().getPath();
             location = isWindows ? toWindowsPath(location) : location;
-            if(location.toLowerCase().endsWith(".jar")) {
+            if (location.toLowerCase().endsWith(".jar")) {
                 bw.write("          \""+location+"\",\n");
             } else {
                 bw.write("          \""+location+ "");
                 File binFolder = new File(location);
-                if(binFolder.isDirectory() && binFolder.getName().equals("bin")) {
+                if (binFolder.isDirectory() && binFolder.getName().equals("bin")) {
                     location = binFolder.getParentFile().getAbsolutePath();
                 }
                 File jarDir = new File(location + File.separator + FileTools.JARS_FOLDER_NAME);
-                if(jarDir != null && jarDir.isDirectory()) {
+                if (jarDir != null && jarDir.isDirectory()) {
                     for(String jar : jarDir.list()) {
-                        if(isWindows && jar.contains("-linux64-")) continue;
-                        if(!isWindows && jar.contains("-win64-")) continue;
-                        if(jar.contains("javadoc")) continue;
+                        if (isWindows && jar.contains("-linux64-")) continue;
+                        if (!isWindows && jar.contains("-win64-")) continue;
+                        if (jar.contains("javadoc")) continue;
                         String jarPath = jarDir.getAbsolutePath() + File.separator;
-                        if(isWindows) {
+                        if (isWindows) {
                             jarPath = jarPath.replace("\\", "\\\\");
                         }
                         bw.write(File.pathSeparator + jarPath + jar);
@@ -120,7 +120,7 @@ public class RapidWright {
     }
     
     public static void main(String[] args) {
-        if(args.length == 0) {
+        if (args.length == 0) {
             // If no arguments, import all major rapidwright packages for ease of use
             @SuppressWarnings("rawtypes")
             Class[] primerClass = new Class[]{
@@ -191,9 +191,9 @@ public class RapidWright {
             System.err.println(Device.FRAMEWORK_NAME + " " + Device.RAPIDWRIGHT_VERSION + " (Jython "+PySystemState.version+")");
         } else {
             for(String s : args) {
-                if(s.equals(UNPACK_OPTION_NAME)) {
+                if (s.equals(UNPACK_OPTION_NAME)) {
                     boolean success = FileTools.unPackSupportingJarData();
-                    if(success) {
+                    if (success) {
                         System.out.println("Successfully unpacked "
                             + " RapidWright jar data to "+FileTools.getExecJarStoragePath()+". "
                             + "To override, please set the environment variable RAPIDWRIGHT_PATH to"
@@ -205,10 +205,10 @@ public class RapidWright {
                             + "from RapidWright jar.");
                     }
                     
-                } else if(s.equals(CREATE_JUPYTER_KERNEL)) {
+                } else if (s.equals(CREATE_JUPYTER_KERNEL)) {
                     createJupyterKernelFile();
                     return;
-                } else if(s.equals(HELP_OPTION_NAME)) {
+                } else if (s.equals(HELP_OPTION_NAME)) {
                     System.out.println("*** RapidWright specific options: ***");
                     for(String option : RAPIDWRIGHT_OPTIONS) {
                         System.out.println("\t" + option);

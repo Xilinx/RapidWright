@@ -61,7 +61,7 @@ public class ClkRouteTiming {
         this.intTileToBufgInDelay = new HashMap<>();
         this.intTileToBufgInRoute = new ArrayList<>();
         
-        if(fileName != null) {
+        if (fileName != null) {
             this.clkRouteTiming = fileName;
             System.out.println("INFO: Clock route timing file set as: " + clkRouteTiming);
         }
@@ -75,7 +75,7 @@ public class ClkRouteTiming {
     
     private void parseDataFromFile() throws IOException {
         File clkTimingFile = new File(this.clkRouteTiming);
-        if(!clkTimingFile.exists()) {
+        if (!clkTimingFile.exists()) {
             throw new IllegalArgumentException("ERROR: Specified clock route timing file does not exist.");
         }
         BufferedReader reader = new BufferedReader(new FileReader(clkTimingFile));
@@ -101,12 +101,12 @@ public class ClkRouteTiming {
             e.printStackTrace();
         }
         
-        if(!dataFound) {
+        if (!dataFound) {
             throw new IllegalArgumentException("ERROR: No section header found in the file for " + section);
         }
-        if(section.equals("int_bufg")) {
+        if (section.equals("int_bufg")) {
             this.readINTToBufgDelay(reader);
-        } else if(section.equals("bufg_int")) {
+        } else if (section.equals("bufg_int")) {
             this.readRouteAndDelay(reader);
         }
         
@@ -115,7 +115,7 @@ public class ClkRouteTiming {
     private void readINTToBufgDelay(BufferedReader reader) throws NumberFormatException, IOException {
         String line;
         while ((line = reader.readLine()) != null) {
-            if(line.startsWith("#")) continue;
+            if (line.startsWith("#")) continue;
             if (line.length() == 0) {
                 // the end of the current section
                 return;
@@ -123,7 +123,7 @@ public class ClkRouteTiming {
             
             line = line.replace("{", "").replace("}", "");
             String[] dataStrings = line.split("\\s+");
-            if(dataStrings.length < 4) {
+            if (dataStrings.length < 4) {
                 throw new IllegalArgumentException("ERROR: Incomplete data of line " + line);
             }
             this.routeDelaysToSinkINTTiles.put(dataStrings[0], Short.parseShort(dataStrings[2]));
@@ -143,10 +143,10 @@ public class ClkRouteTiming {
                 return;
             }
             
-            if(line.startsWith("#")) continue;
+            if (line.startsWith("#")) continue;
             line = line.replace("{", "").replace("}", "");
             String[] dataStrings = line.split("\\s+");
-            if(dataStrings.length < 3 || dataStrings.length < 4) {
+            if (dataStrings.length < 3 || dataStrings.length < 4) {
                 throw new IllegalArgumentException("ERROR: Incomplete data of line " + line);
             }
             String intTile = dataStrings[1];

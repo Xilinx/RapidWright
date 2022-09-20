@@ -125,7 +125,7 @@ public class RouterHelper {
         while(intNode.getAllDownhillNodes().get(0).getTile().getTileTypeEnum() != TileTypeEnum.INT) {
             List<Node> downhills = intNode.getAllDownhillNodes();
             intNode = downhills.get(0);
-            if(downhills.size() > 1) {
+            if (downhills.size() > 1) {
                 int i = 1;
                 while(intNode.getAllDownhillNodes().size() == 0) {
                     intNode = downhills.get(i);
@@ -133,7 +133,7 @@ public class RouterHelper {
                 }
             }
             watchdog--;
-            if(intNode.getAllDownhillNodes().size() == 0 || watchdog < 0) {
+            if (intNode.getAllDownhillNodes().size() == 0 || watchdog < 0) {
                 intNode = null;
                 break;
             }
@@ -155,7 +155,7 @@ public class RouterHelper {
         int watchdog = 1000;        
         while(!q.isEmpty()) {
             RoutingNode n = q.poll();
-            if(n.getNode().getTile().getTileTypeEnum() == TileTypeEnum.INT) {
+            if (n.getNode().getTile().getTileTypeEnum() == TileTypeEnum.INT) {
                 while(n != null) {
                     sinkToSwitchBoxPath.add(n.getNode());
                     n = n.getPrev();
@@ -163,13 +163,13 @@ public class RouterHelper {
                 return sinkToSwitchBoxPath;
             }
             for(Node uphill : n.getNode().getAllUphillNodes()) {
-                if(uphill.getAllUphillNodes().size() == 0) continue;
+                if (uphill.getAllUphillNodes().size() == 0) continue;
                 RoutingNode prev = new RoutingNode(uphill);
                 prev.setPrev(n);
                 q.add(prev);
             }
             watchdog--;
-            if(watchdog < 0) {
+            if (watchdog < 0) {
                 break;
             }        
         }
@@ -179,7 +179,7 @@ public class RouterHelper {
     
     public static Tile getUpstreamINTTileOfClkIn(SitePinInst clkIn) {
         List<Node> pathToINTTile = projectInputPinToINTNode(clkIn);
-        if(pathToINTTile.isEmpty()) {
+        if (pathToINTTile.isEmpty()) {
             throw new RuntimeException("ERROR: CLK_IN does not connet to INT Tile directly");
         }
         
@@ -202,13 +202,13 @@ public class RouterHelper {
      */
     public static List<PIP> getPIPsFromListOfReversedNodes(List<Node> connectionNodes) {
         List<PIP> connectionPIPs = new ArrayList<>();
-        if(connectionNodes == null) return connectionPIPs;
+        if (connectionNodes == null) return connectionPIPs;
         // Nodes of a connection are added to the list starting from its sink to its source
         for(int i = connectionNodes.size() -1; i > 0; i--) {
             Node driver = connectionNodes.get(i);
             Node load = connectionNodes.get(i-1);        
             PIP pip = findPIPbetweenNodes(driver, load);    
-            if(pip != null) {
+            if (pip != null) {
                 connectionPIPs.add(pip);
             } else {
                 System.err.println("ERROR: Null PIP connecting these two nodes: " + driver.toString() + ", " + load.toString());
@@ -225,7 +225,7 @@ public class RouterHelper {
      */
     public static PIP findPIPbetweenNodes(Node driver, Node load) {
         PIP pip = getPIP(load.getTile(), driver.getAllWiresInNode(), load.getWire());
-        if(pip == null) {
+        if (pip == null) {
             // for other scenarios regarding bidirectional nodes, such as LAG tile nodes, LAG_LAG_X12Y250/LAG_MUX_ATOM_0_TXOUT to node LAG_LAG_X12Y310/UBUMP0 
             pip = getPIP(driver, load);
         }
@@ -243,9 +243,9 @@ public class RouterHelper {
     public static PIP getPIP(Tile loadTile, Wire[] driverWires, int loadWire) {
         PIP pip = null;
         for(Wire wire : driverWires) {
-            if(wire.getTile().equals(loadTile)) {
+            if (wire.getTile().equals(loadTile)) {
                 pip = loadTile.getPIP(wire.getWireIndex(), loadWire);
-                if(pip != null) {
+                if (pip != null) {
                     break;
                 }
             }
@@ -262,11 +262,11 @@ public class RouterHelper {
     public static PIP getPIP(Node driver, Node load) {
         PIP pip = null;
         for(PIP p : driver.getAllDownhillPIPs()) {
-            if(p.getEndNode().equals(load))
+            if (p.getEndNode().equals(load))
                 return p;
         }
         for(PIP p : driver.getAllUphillPIPs()) {
-            if(p.getStartNode().equals(load))
+            if (p.getStartNode().equals(load))
                 return p;
         }
         return pip;
@@ -280,10 +280,10 @@ public class RouterHelper {
      */
     public static List<Node> getNodesOfNet(Net net) {
         List<Node> nodes = new ArrayList<>();
-        if(net.getSource() != null) nodes.add(net.getSource().getConnectedNode());
+        if (net.getSource() != null) nodes.add(net.getSource().getConnectedNode());
         for(SitePinInst pin : net.getSinkPins()) {
             Node pinNode = pin.getConnectedNode();
-            if(pinNode != null) {
+            if (pinNode != null) {
                 nodes.add(pinNode);
             } else {
                 System.err.println("ERROR: No node connects to pin " + pin + ", net " + net);
@@ -293,8 +293,8 @@ public class RouterHelper {
         for(PIP pip : net.getPIPs()) {
             Node end = pip.getEndNode();
             Node start = pip.getStartNode();
-            if(!nodes.contains(end)) nodes.add(end);
-            if(!nodes.contains(start)) nodes.add(start);
+            if (!nodes.contains(end)) nodes.add(end);
+            if (!nodes.contains(start)) nodes.add(start);
         }    
         return nodes;
     }
@@ -306,10 +306,10 @@ public class RouterHelper {
      */
     public static Set<Node> getUsedNodesOfNet(Net net) {
         Set<Node> nodes = new HashSet<>();
-        if(net.getSource() != null) nodes.add(net.getSource().getConnectedNode());
+        if (net.getSource() != null) nodes.add(net.getSource().getConnectedNode());
         for(SitePinInst pin : net.getSinkPins()) {
             Node pinNode = pin.getConnectedNode();
-            if(pinNode != null) {
+            if (pinNode != null) {
                 nodes.add(pinNode);
             } else {
                 System.err.println("ERROR: No node connects to pin " + pin + ", net " + net);
@@ -332,7 +332,7 @@ public class RouterHelper {
      * @return true, if the bel pin is invertible.
      */
     private static boolean isInvertibleDSPBELPin(BELPin belPin) {
-        if(belPin.getBELName().equals("CLKINV")) {
+        if (belPin.getBELName().equals("CLKINV")) {
             //NEED TO BE INVERTED when BEL.canInvert returns false
             return true;
         }
@@ -345,23 +345,23 @@ public class RouterHelper {
      * @param staticNet The static net, should be VCC only.
      */
     public static void invertPossibleGndPinsToVccPins(Design design, Net staticNet) {
-        if(!staticNet.getName().equals(Net.GND_NET)) return;
+        if (!staticNet.getName().equals(Net.GND_NET)) return;
         List<SitePinInst> toInvertPins = new ArrayList<>();
         for(SitePinInst currSitePinInst:staticNet.getPins()) {
             BELPin[] belPins = currSitePinInst.getSiteInst().getSiteWirePins(currSitePinInst.getName());
             // DSP or BRAM
-            if(belPins.length == 2) {
+            if (belPins.length == 2) {
                 for(BELPin belPin : belPins) {
-                    if(belPin.isSitePort())    continue;
+                    if (belPin.isSitePort())    continue;
                     // DO NOT invert CLK_OPTINV_CLKB_L and CLK_OPTINV_CLKB_U
-                    if(belPin.getBEL().getName().contains("CLKB")) continue;
-                    if(currSitePinInst.toString().contains("RAM")) {
-                        if(belPin.getBEL().canInvert()) {
+                    if (belPin.getBEL().getName().contains("CLKB")) continue;
+                    if (currSitePinInst.toString().contains("RAM")) {
+                        if (belPin.getBEL().canInvert()) {
                             // SRST2 of SLICE also has an inverter, but should not be invertible
                             toInvertPins.add(currSitePinInst);
                         }
                     } else if (currSitePinInst.toString().contains("DSP")) {
-                        if(isInvertibleDSPBELPin(belPin)) {
+                        if (isInvertibleDSPBELPin(belPin)) {
                             toInvertPins.add(currSitePinInst);
                         }
                     }
@@ -372,7 +372,7 @@ public class RouterHelper {
         for(SitePinInst toinvert:toInvertPins) {
             boolean success = staticNet.removePin(toinvert, true);
             success |= design.getVccNet().addPin(toinvert);
-            if(!success) {
+            if (!success) {
                   throw new RuntimeException("ERROR: Couldn't invert site pin " +
                           toinvert);
             }
@@ -390,15 +390,15 @@ public class RouterHelper {
         List<Tile> intTiles = new ArrayList<>();
         for(Wire w : node.getAllWiresInNode()) {
             Tile wireTile = w.getTile();
-            if(wireTile.getTileTypeEnum() == TileTypeEnum.INT) {
-                if(!intTiles.contains(wireTile)) {
+            if (wireTile.getTileTypeEnum() == TileTypeEnum.INT) {
+                if (!intTiles.contains(wireTile)) {
                     intTiles.add(wireTile);
                 }
             }
         }    
-        if(intTiles.size() > 1) {
+        if (intTiles.size() > 1) {
             exit = intTiles.get(1);
-        } else if(intTiles.size() == 1) {
+        } else if (intTiles.size() == 1) {
             exit = entry;
         }        
         return Math.abs(entry.getTileXCoordinate()- exit.getTileXCoordinate())
@@ -415,7 +415,7 @@ public class RouterHelper {
     public static void addNodeTypeLengthToMap(Node node, int wlNode, Map<IntentCode, Long> typeUsage, Map<IntentCode, Long> typeLength) {
         IntentCode ic = node.getIntentCode();
         Long counter = typeUsage.get(ic);
-        if(counter == null) {
+        if (counter == null) {
             counter = (long) 1;
         } else {
             counter++;
@@ -423,7 +423,7 @@ public class RouterHelper {
         typeUsage.put(ic, counter);
         
         Long length = typeLength.get(ic);
-        if(length == null) {
+        if (length == null) {
             length = (long) wlNode;
         } else {
             length += wlNode;
@@ -445,7 +445,7 @@ public class RouterHelper {
             Node startNode = pip.getStartNode();
             RoutingNode startrn = createRoutingNode(pip.getStartNode(), nodeRoutingNodeMap);
             
-            if(firstPIP) {
+            if (firstPIP) {
                 startrn.setDelayFromSource(0);
             }
             firstPIP = false;
@@ -454,7 +454,7 @@ public class RouterHelper {
             RoutingNode endrn = createRoutingNode(endNode, nodeRoutingNodeMap);
             endrn.setPrev(startrn);
             int delay = 0;
-            if(endNode.getTile().getTileTypeEnum() == TileTypeEnum.INT) {//device independent?
+            if (endNode.getTile().getTileTypeEnum() == TileTypeEnum.INT) {//device independent?
                 delay = computeNodeDelay(estimator, endNode)
                         + DelayEstimatorBase.getExtraDelay(endNode, DelayEstimatorBase.isLong(startNode));
             }
@@ -465,7 +465,7 @@ public class RouterHelper {
         Map<Pair<SitePinInst, Node>, Short> sinkNodeDelays = new HashMap<>();
         for(SitePinInst sink : net.getSinkPins()) {
             Node sinkNode = sink.getConnectedNode();
-            if(!(sinkNode.getTile().getTileTypeEnum() == TileTypeEnum.INT)) {
+            if (!(sinkNode.getTile().getTileTypeEnum() == TileTypeEnum.INT)) {
                 sinkNode = projectInputPinToINTNode(sink).get(0);
             }
             
@@ -484,7 +484,7 @@ public class RouterHelper {
      */
     public static RoutingNode createRoutingNode(Node node, Map<Node, RoutingNode> createdRoutingNodes) {
         RoutingNode resourceNode = createdRoutingNodes.get(node);
-        if(resourceNode == null) {
+        if (resourceNode == null) {
             resourceNode = new RoutingNode(node);
             createdRoutingNodes.put(node, resourceNode);
         }
@@ -498,7 +498,7 @@ public class RouterHelper {
      * @return The delay of the node.
      */
     public static short computeNodeDelay(DelayEstimatorBase estimator, Node node) {
-        if(RoutableNode.isExitNode(node)) {
+        if (RoutableNode.isExitNode(node)) {
             return estimator.getDelayOf(node);
         }
         return 0;
@@ -523,10 +523,10 @@ public class RouterHelper {
      */
     public static List<Node> findPathBetweenNodes(Node source, Node sink) {
         List<Node> path = new ArrayList<>();        
-        if(source.equals(sink)) {
+        if (source.equals(sink)) {
             return path; // for pins without additional projected int_node    
         }
-        if(source.getAllDownhillNodes().contains(sink)) {
+        if (source.getAllDownhillNodes().contains(sink)) {
             path.add(sink);
             path.add(source);
             return path;
@@ -540,7 +540,7 @@ public class RouterHelper {
         boolean success = false;
         while(!queue.isEmpty()) {
             RoutingNode curr = queue.poll();        
-            if(curr.getNode().equals(sink)) {
+            if (curr.getNode().equals(sink)) {
                 while(curr != null) {
                     path.add(curr.getNode());
                     curr = curr.getPrev();
@@ -554,13 +554,13 @@ public class RouterHelper {
                 queue.add(child);    
             }
             watchdog--;
-            if(watchdog < 0) {
+            if (watchdog < 0) {
                 success = false;
                 break;
             }    
         }
         
-        if(!success) {
+        if (!success) {
             System.err.println("ERROR: Failed to find a path between two nodes: " + source + ", " + sink);
         }
         return path;
@@ -578,7 +578,7 @@ public class RouterHelper {
         // NOTE: remember to change the pin names of DSPs from subblock to top-level block that we use
         verticesOfVivadoPath.add("superSource");    
         File vivadoReport = new File(filePath);    
-        if(!vivadoReport.exists()) {
+        if (!vivadoReport.exists()) {
             System.err.println("ERROR: Target file does not exist for getting the sample path delay");
             return;
         }
@@ -609,7 +609,7 @@ public class RouterHelper {
                 break;
             }
             
-            if(!line.contains(" r  ") && !line.contains(" f  ")) continue;
+            if (!line.contains(" r  ") && !line.contains(" f  ")) continue;
             
             String[] dataStrings = line.split("\\s+");
             path.add(dataStrings[dataStrings.length - 1]);

@@ -67,10 +67,10 @@ public class NetWrapper{
         
         boolean sourceRnodeAdded = false;    
         for(Connection connection : connections) {
-            if(connection.isDirect()) continue;
+            if (connection.isDirect()) continue;
             short x = 0;
             short y = 0;
-            if(!sourceRnodeAdded) {
+            if (!sourceRnodeAdded) {
                 x = connection.getSourceRnode().getEndTileXCoordinate();
                 y = connection.getSourceRnode().getEndTileYCoordinate();
                 xArray.add(x);

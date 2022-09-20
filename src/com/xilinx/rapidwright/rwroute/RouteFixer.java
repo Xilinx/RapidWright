@@ -70,10 +70,10 @@ public class RouteFixer{
                 nodeMap.put(cur, newCur);
                 nodeMap.put(next, newNext);
                 
-                if(i == 1) {
+                if (i == 1) {
                     newNext.setSink(true);
                 }
-                if(i == vertexSize - 1) source = newCur;
+                if (i == vertexSize - 1) source = newCur;
                 newCur.addChildren(newNext);
             }
         }
@@ -108,11 +108,11 @@ public class RouteFixer{
         while(!queue.isEmpty()) {
             NodeWithDelay cur = queue.poll();
             Set<NodeWithDelay> nexts = cur.children;
-            if(nexts == null || nexts.isEmpty()) continue;
+            if (nexts == null || nexts.isEmpty()) continue;
             for(NodeWithDelay next : nexts) {
                 float newCost = cur.cost + next.getDelay()
                         + DelayEstimatorBase.getExtraDelay(next.getNode(), DelayEstimatorBase.isLong(cur.getNode()));
-                if(!next.isVisited() || (next.isVisited() && newCost < next.cost)) {
+                if (!next.isVisited() || (next.isVisited() && newCost < next.cost)) {
                     // The second condition is necessary, 
                     // because a smaller path delay from the source to the current "next" could be achieved later.    
                     next.cost = newCost;
@@ -127,7 +127,7 @@ public class RouteFixer{
     private static Comparator<NodeWithDelay> NodeWithDelayComparator = new Comparator<NodeWithDelay>() {
         @Override
         public int compare(NodeWithDelay a, NodeWithDelay b) {
-            if(a.getDelay() < b.getDelay()) {
+            if (a.getDelay() < b.getDelay()) {
                 return -1;
             } else {
                 return 1;
@@ -173,9 +173,9 @@ public class RouteFixer{
         }
         
         public void setPrev(NodeWithDelay driver) {
-            if(prev == null) {
+            if (prev == null) {
                 prev = driver;
-            } else if(driver.cost < prev.cost) {
+            } else if (driver.cost < prev.cost) {
                 prev = driver;
             }
         }

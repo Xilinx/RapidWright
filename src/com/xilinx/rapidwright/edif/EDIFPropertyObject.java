@@ -111,7 +111,7 @@ public class EDIFPropertyObject extends EDIFName {
      * @return The old property value or null if none existed
      */
     public EDIFPropertyValue removeProperty(String key) {
-        if(properties == null) return null;
+        if (properties == null) return null;
         return properties.remove(key);
     }
     
@@ -133,7 +133,7 @@ public class EDIFPropertyObject extends EDIFName {
      * @return Old property value for the provided key
      */
     public EDIFPropertyValue addProperty(String key, EDIFPropertyValue value) {
-        if(properties == null) properties = getNewMap();
+        if (properties == null) properties = getNewMap();
         return properties.put(key, value);
     }
 
@@ -145,7 +145,7 @@ public class EDIFPropertyObject extends EDIFName {
     }
     
     public EDIFPropertyValue getProperty(String key) {
-        if(properties == null) return null;
+        if (properties == null) return null;
         return properties.get(key);
     }
         
@@ -169,7 +169,7 @@ public class EDIFPropertyObject extends EDIFName {
      * @return
      */
     public Map<String, EDIFPropertyValue> createDuplicatePropertiesMap() {
-        if(properties == null) return null;
+        if (properties == null) return null;
         Map<String, EDIFPropertyValue> newMap = new HashMap<>();
         for(Entry<String, EDIFPropertyValue> e : properties.entrySet()) {
             newMap.put(e.getKey(), new EDIFPropertyValue(e.getValue()));
@@ -213,7 +213,7 @@ public class EDIFPropertyObject extends EDIFName {
     public static final byte[] EXPORT_CONST_PROP_END = ")\n".getBytes(StandardCharsets.UTF_8);
 
     public void exportEDIFProperties(OutputStream os, byte[] indent, EDIFWriteLegalNameCache<?> cache, boolean stable) throws IOException{
-        if(properties == null) return;
+        if (properties == null) return;
         for(Entry<String, EDIFPropertyValue> e : EDIFTools.sortIfStable(properties, stable)) {
             try {
                 os.write(indent);
@@ -221,7 +221,7 @@ public class EDIFPropertyObject extends EDIFName {
                 EDIFName.exportSomeEDIFName(os, e.getKey(), cache.getEDIFRename(e.getKey()));
                 os.write(' ');
                 e.getValue().writeEDIFString(os);
-                if(e.getValue().getOwner() != null) {
+                if (e.getValue().getOwner() != null) {
                     os.write(EXPORT_CONST_OWNER_START);
                     os.write(e.getValue().getOwner().getBytes(StandardCharsets.UTF_8));
                     os.write(EXPORT_CONST_OWNER_END);

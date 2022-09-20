@@ -89,7 +89,7 @@ public class PartTileBrowser extends QMainWindow{
 
         createTreeView();
         List<String> parts = Device.getAvailableDevices();
-        if(parts.size() < 1) {
+        if (parts.size() < 1) {
             throw new RuntimeException("Error: No available parts. Please generate part database files.");
         }
         currPartName = parts.get(0);
@@ -124,8 +124,8 @@ public class PartTileBrowser extends QMainWindow{
     @SuppressWarnings("unused")
     private void showPart(QModelIndex qmIndex) {
         Object data = qmIndex.data(ItemDataRole.AccessibleDescriptionRole);
-        if( data != null) {
-            if(currPartName.equals(data))
+        if ( data != null) {
+            if (currPartName.equals(data))
                 return;
             currPartName = (String) data;
             QProgressDialog progress = new QProgressDialog("Loading "+currPartName.toUpperCase()+"...", "", 0, 100, this);

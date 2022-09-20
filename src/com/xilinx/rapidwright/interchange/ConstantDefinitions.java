@@ -84,9 +84,9 @@ public class ConstantDefinitions {
             String belPin = allStrings.get(source.getBelPin());
 
             ConstantType constant = source.getConstant();
-            if(constant == ConstantType.VCC) {
+            if (constant == ConstantType.VCC) {
                 vccBels.put(new AbstractMap.SimpleEntry<SiteTypeEnum, String>(siteTypeEnum, bel), belPin);
-            } else if(constant == ConstantType.GND) {
+            } else if (constant == ConstantType.GND) {
                 gndBels.put(new AbstractMap.SimpleEntry<SiteTypeEnum, String>(siteTypeEnum, bel), belPin);
             } else {
                 throw new RuntimeException("Unexpected value of constant " + constant.name());
@@ -98,9 +98,9 @@ public class ConstantDefinitions {
             String wire = allStrings.get(source.getWire());
 
             ConstantType constant = source.getConstant();
-            if(constant == ConstantType.VCC) {
+            if (constant == ConstantType.VCC) {
                 exceptionalVccNodes.add(new AbstractMap.SimpleEntry<String, String>(tile, wire));
-            } else if(constant == ConstantType.GND) {
+            } else if (constant == ConstantType.GND) {
                 exceptionalGndNodes.add(new AbstractMap.SimpleEntry<String, String>(tile, wire));
             } else {
                 throw new RuntimeException("Unexpected value of constant " + constant.name());
@@ -117,9 +117,9 @@ public class ConstantDefinitions {
                 for(int i = 0; i < wires.size(); ++i) {
                     Integer wireIndex = wires.get(i);
                     Map.Entry<TileTypeEnum, Integer> key = new AbstractMap.SimpleEntry<TileTypeEnum, Integer>(tileTypeEnum, wireIndex);
-                    if(constant == ConstantType.VCC) {
+                    if (constant == ConstantType.VCC) {
                         vccWires.add(key);
-                    } else if(constant == ConstantType.GND) {
+                    } else if (constant == ConstantType.GND) {
                         gndWires.add(key);
                     } else {
                         throw new RuntimeException("Unexpected value of constant " + constant.name());
@@ -137,12 +137,12 @@ public class ConstantDefinitions {
     public BELPin getConstantSource(BEL bel) {
         Map.Entry<SiteTypeEnum, String> key = getBelKey(bel);
         String pin = vccBels.get(key);
-        if(pin != null) {
+        if (pin != null) {
             return bel.getPin(pin);
         }
 
         pin = gndBels.get(key);
-        if(pin != null) {
+        if (pin != null) {
             return bel.getPin(pin);
         }
 
@@ -170,10 +170,10 @@ public class ConstantDefinitions {
     public boolean isNodeTiedVcc(Node node) {
         Tile tile = node.getTile();
         Map.Entry<String, String> key = new AbstractMap.SimpleEntry<String, String>(tile.getName(), node.getWireName());
-        if(exceptionalVccNodes.contains(key)) {
+        if (exceptionalVccNodes.contains(key)) {
             return true;
         }
-        if(exceptionalGndNodes.contains(key)) {
+        if (exceptionalGndNodes.contains(key)) {
             return false;
         }
         
@@ -181,7 +181,7 @@ public class ConstantDefinitions {
         for(Wire wire : node.getAllWiresInNode()) {
             TileTypeEnum tileType = wire.getTile().getTileTypeEnum();
             boolean found = vccWires.contains(new AbstractMap.SimpleEntry<TileTypeEnum, Integer>(tileType, wire.getWireIndex()));
-            if(found) {
+            if (found) {
                 return true;
             }
         }
@@ -191,17 +191,17 @@ public class ConstantDefinitions {
     public boolean isNodeTiedGnd(Node node) {
         Tile tile = node.getTile();
         Map.Entry<String, String> key = new AbstractMap.SimpleEntry<String, String>(tile.getName(), node.getWireName());
-        if(exceptionalGndNodes.contains(key)) {
+        if (exceptionalGndNodes.contains(key)) {
             return true;
         }
-        if(exceptionalVccNodes.contains(key)) {
+        if (exceptionalVccNodes.contains(key)) {
             return false;
         }
 
         for(Wire wire : node.getAllWiresInNode()) {
             TileTypeEnum tileType = wire.getTile().getTileTypeEnum();
             boolean found = gndWires.contains(new AbstractMap.SimpleEntry<TileTypeEnum, Integer>(tileType, wire.getWireIndex()));
-            if(found) {
+            if (found) {
                 return true;
             }
         }
@@ -213,7 +213,7 @@ public class ConstantDefinitions {
         for(Tile tile : device.getAllTiles()) {
             for(int i=0; i < tile.getWireCount(); i++) {
                 Node node = Node.getNode(tile, i);
-                if(node == null)
+                if (node == null)
                     continue;
                 if (node.getTile() == tile && node.getWire() == i)
                     allNodes.add(makeKey(node.getTile(), node.getWire()));
@@ -227,7 +227,7 @@ public class ConstantDefinitions {
         for(Tile tile : device.getAllTiles()) {
             for(int i=0; i < tile.getWireCount(); i++) {
                 Node node = Node.getNode(tile, i);
-                if(node == null || !node.isTied())
+                if (node == null || !node.isTied())
                     continue;
                 if (node.getTile() == tile && node.getWire() == i)
                     allNodes.add(node);
@@ -238,23 +238,23 @@ public class ConstantDefinitions {
 
     
     public static void verifyConstants(Enumerator<String> allStrings, Device device, Design design, Map<SiteTypeEnum,Site> siteTypes, Constants.Reader reader, Map<TileTypeEnum, TileType.Reader> tileTypes) {
-        if(reader.getDefaultBestConstant() != ConstantType.VCC) {
+        if (reader.getDefaultBestConstant() != ConstantType.VCC) {
             throw new RuntimeException("Expected that default best constant be VCC! Got " + reader.getDefaultBestConstant().name());
         }
 
-        if(!reader.getGndNetName().isName()) {
+        if (!reader.getGndNetName().isName()) {
             throw new RuntimeException("Expected GND net be specified.");
         }
         String gnd_net = allStrings.get(reader.getGndNetName().getName());
-        if(!gnd_net.equals(Net.GND_NET)) {
+        if (!gnd_net.equals(Net.GND_NET)) {
             throw new RuntimeException("GND net should be " + Net.GND_NET + " but got " + gnd_net);
         }
 
-        if(!reader.getVccNetName().isName()) {
+        if (!reader.getVccNetName().isName()) {
             throw new RuntimeException("Expected VCC net be specified.");
         }
         String vcc_net = allStrings.get(reader.getVccNetName().getName());
-        if(!vcc_net.equals(Net.VCC_NET)) {
+        if (!vcc_net.equals(Net.VCC_NET)) {
             throw new RuntimeException("VCC net should be " + Net.VCC_NET + " but got " + vcc_net);
         }
 
@@ -266,13 +266,13 @@ public class ConstantDefinitions {
             Tile tile = device.getTile((int)(nodeKey >>> 32));
             Node node = new Node(tile, (int)(nodeKey & 0xffffffff));
 
-            if(node.isTied() != constants.isNodeTied(node)) {
+            if (node.isTied() != constants.isNodeTied(node)) {
                 throw new RuntimeException(String.format("Node %s tie(gold)=%s =! tie(test)=%s", 
                         node.toString(), node.isTied(), constants.isNodeTied(node)));
             }
 
-            if(node.isTied()) {
-                if(node.isTiedToGnd() != constants.isNodeTiedGnd(node)) {
+            if (node.isTied()) {
+                if (node.isTiedToGnd() != constants.isNodeTiedGnd(node)) {
                     throw new RuntimeException(String.format("Tile %s node %s GND tie mismatch! %b != %b",
                                 tile.getName(),
                                 node.getWireName(),
@@ -281,7 +281,7 @@ public class ConstantDefinitions {
                                 ));
                 }
 
-                if(node.isTiedToVcc() != constants.isNodeTiedVcc(node)) {
+                if (node.isTiedToVcc() != constants.isNodeTiedVcc(node)) {
                     throw new RuntimeException(String.format("Tile %s node %s GND tie mismatch! %b != %b",
                                 tile.getName(),
                                 node.getWireName(),
@@ -298,16 +298,16 @@ public class ConstantDefinitions {
             SiteInst siteInst = design.createSiteInst("site_instance", siteType, site);
             for(int j=0; j < siteInst.getBELs().length; j++) {
                 BEL bel = siteInst.getBELs()[j];
-                if(bel.isGndSource()) {
-                    if(!constants.isBelTiedGnd(bel)) {
+                if (bel.isGndSource()) {
+                    if (!constants.isBelTiedGnd(bel)) {
                         throw new RuntimeException(String.format("Site %s site type %s BEL %s is not tied to GND as expected", site.getName(), siteType, bel.getName()));
                     }
-                } else if(bel.isVccSource()) {
-                    if(!constants.isBelTiedVcc(bel)) {
+                } else if (bel.isVccSource()) {
+                    if (!constants.isBelTiedVcc(bel)) {
                         throw new RuntimeException(String.format("Site %s site type %s BEL %s is not tied to VCC as expected", site.getName(), siteType, bel.getName()));
                     }
                 } else {
-                    if(constants.isBelTied(bel)) {
+                    if (constants.isBelTied(bel)) {
                         throw new RuntimeException(String.format("Site %s site type %s BEL %s is tied, but isn't expected", site.getName(), siteType, bel.getName()));
                     }
                 }
@@ -323,18 +323,18 @@ public class ConstantDefinitions {
             String unisimName = allStrings.get(defaultReader.getCellType());
             Unisim u = Unisim.valueOf(unisimName);
             Map<String, NetType> pinMap = map.get(u);
-            if(pinMap == null) {
+            if (pinMap == null) {
                 throw new RuntimeException("ERROR: " + u + " missing cell pin defaults");
             }
             StructList.Reader<DefaultCellConnection.Reader> pinDefaults = defaultReader.getPins();
-            if(pinDefaults.size() != pinMap.size()) {
+            if (pinDefaults.size() != pinMap.size()) {
                 throw new RuntimeException("ERROR: Mismatch cell pin defaults on " + u);
             }
             for(DefaultCellConnection.Reader r : pinDefaults) {
                 String pinName = allStrings.get(r.getName());
                 CellPinValue value = r.getValue();
                 NetType goldValue = pinMap.get(pinName);
-                if(value != getCellPinValue(goldValue)) {
+                if (value != getCellPinValue(goldValue)) {
                     throw new RuntimeException("ERROR: Mismatch default on " + u + ", pin " 
                             + pinName + ". Expected " + goldValue + ", found " + value);
                 }
@@ -360,18 +360,18 @@ public class ConstantDefinitions {
             TileTypeEnum type = tiedNode.getTile().getTileTypeEnum();
             int wireIdx = tiedNode.getWire();
             Map<Integer,int[]> wireMap = tileTiedWires.get(type);
-            if(wireMap == null) {
+            if (wireMap == null) {
                 wireMap = new HashMap<Integer, int[]>();
                 tileTiedWires.put(type, wireMap);
             }
             int[] tiedCounter = wireMap.get(wireIdx);
-            if(tiedCounter == null) {
+            if (tiedCounter == null) {
                 tiedCounter = new int[3];
                 wireMap.put(wireIdx, tiedCounter);
             }
-            if(tiedNode.isTiedToGnd()) {
+            if (tiedNode.isTiedToGnd()) {
                 tiedCounter[TIED_TO_GND]++;
-            } else if(tiedNode.isTiedToVcc()) {
+            } else if (tiedNode.isTiedToVcc()) {
                 tiedCounter[TIED_TO_VCC]++;
             } else {
                 throw new RuntimeException("ERROR: This node was presumed tied to GND or VCC: " +
@@ -382,13 +382,13 @@ public class ConstantDefinitions {
         for(Tile tile : device.getAllTiles()) {
             TileTypeEnum type = tile.getTileTypeEnum();
             Map<Integer, int[]> wireMap = tileTiedWires.get(type);
-            if(wireMap == null) continue;
+            if (wireMap == null) continue;
             for(int wireIdx=0; wireIdx < tile.getWireCount(); wireIdx++) {
                 int[] tiedCounter = wireMap.get(wireIdx);
-                if(tiedCounter == null) continue;
+                if (tiedCounter == null) continue;
                 Node node = Node.getNode(tile,wireIdx);
-                if(node == null) continue;
-                if(!node.isTied()) {
+                if (node == null) continue;
+                if (!node.isTied()) {
                     tiedCounter[UNTIED]++;
                 }
             }
@@ -411,29 +411,29 @@ public class ConstantDefinitions {
             TileTypeEnum tileType = tiedNode.getTile().getTileTypeEnum();
             Map<Integer, int[]> wireMap = tileTiedWires.get(tileType);
             int[] tiedCounters = wireMap.get(tiedNode.getWire());
-            if(tiedCounters[UNTIED] > 0) {
+            if (tiedCounters[UNTIED] > 0) {
                 tiedNodeExceptions.add(tiedNode);
                 continue;
             }
             boolean tiedToGnd = tiedNode.isTiedToGnd();
-            if(tiedCounters[TIED_TO_GND] > 0 && tiedCounters[TIED_TO_VCC] > 0) {
+            if (tiedCounters[TIED_TO_GND] > 0 && tiedCounters[TIED_TO_VCC] > 0) {
                 // If the node is tied to both GND and VCC, make the less frequent the exceptional
                 // case
-                if(tiedToGnd == (tiedCounters[TIED_TO_GND] < tiedCounters[TIED_TO_VCC])) {
+                if (tiedToGnd == (tiedCounters[TIED_TO_GND] < tiedCounters[TIED_TO_VCC])) {
                     tiedNodeExceptions.add(tiedNode);
                     continue;                    
                 }
             }
-            if(tiedToGnd) {
+            if (tiedToGnd) {
                 Set<Integer> gndWires = gndTiedNodes.get(tileType);
-                if(gndWires == null) {
+                if (gndWires == null) {
                     gndWires = new HashSet<>();
                     gndTiedNodes.put(tileType, gndWires);
                 }
                 gndWires.add(tiedNode.getWire());
             } else {
                 Set<Integer> vccWires = vccTiedNodes.get(tileType);
-                if(vccWires == null) {
+                if (vccWires == null) {
                     vccWires = new HashSet<>();
                     vccTiedNodes.put(tileType, vccWires);
                 }
@@ -463,7 +463,7 @@ public class ConstantDefinitions {
             StructList.Builder<WireConstantSources.Builder> wireConstants = tileType.initConstants(staticSourceCount);
             
             int idx = 0;
-            if(gndWireIdxs != null) {
+            if (gndWireIdxs != null) {
                 WireConstantSources.Builder gndWires = wireConstants.get(idx++);
                 gndWires.setConstant(ConstantType.GND);
                 PrimitiveList.Int.Builder wiresObj = gndWires.initWires(gndWireIdxs.size());
@@ -473,7 +473,7 @@ public class ConstantDefinitions {
                     j++;
                 }
             }
-            if(vccWireIdxs != null) {
+            if (vccWireIdxs != null) {
                 WireConstantSources.Builder vccWires = wireConstants.get(idx++);
                 vccWires.setConstant(ConstantType.VCC);
                 PrimitiveList.Int.Builder wiresObj = vccWires.initWires(vccWireIdxs.size());
@@ -495,7 +495,7 @@ public class ConstantDefinitions {
             SiteInst siteInst = design.createSiteInst("site_instance", e.getKey(), site);
             for(int j=0; j < siteInst.getBELs().length; j++) {
                 BEL bel = siteInst.getBELs()[j];
-                if(bel.isGndSource() || bel.isVccSource()) {
+                if (bel.isGndSource() || bel.isVccSource()) {
 
                     List<String> source = new ArrayList<String>();
 
@@ -503,16 +503,16 @@ public class ConstantDefinitions {
                     source.add(bel.getName());
 
                     BELPin[] pins = bel.getPins();
-                    if(pins.length != 1) {
+                    if (pins.length != 1) {
                         throw new RuntimeException(String.format(
                                     "BEL %s has %d pins, which is not expected",
                                     bel.getName(), pins.length));
                     }
                     source.add(pins[0].getName());
 
-                    if(bel.isGndSource()) {
+                    if (bel.isGndSource()) {
                         siteGndSources.add(source);
-                    } else if(bel.isVccSource()) {
+                    } else if (bel.isVccSource()) {
                         siteVccSources.add(source);
                     } else {
                         throw new RuntimeException("Not reachable!");

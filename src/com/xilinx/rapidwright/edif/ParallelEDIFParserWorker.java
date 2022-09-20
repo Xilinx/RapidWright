@@ -129,18 +129,18 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParserWorker implement
             EDIFToken nextToken = getNextTokenWithOffset(true);
             if (nextToken.text.equalsIgnoreCase(STATUS)) {
                 parseStatus(netlist);
-            } else if(nextToken.text.equalsIgnoreCase(LIBRARY) || nextToken.text.equalsIgnoreCase(EXTERNAL)) {
+            } else if (nextToken.text.equalsIgnoreCase(LIBRARY) || nextToken.text.equalsIgnoreCase(EXTERNAL)) {
                 EDIFLibrary library = parseEdifLibraryHead();
                 librariesAndCells.add(new LibraryResult(nextToken, library));
                 if (parseToNextCellWithinLibrary()) {
                     inLibrary = true;
                     return true;
                 }
-            } else if(nextToken.text.equalsIgnoreCase(COMMENT)) {
+            } else if (nextToken.text.equalsIgnoreCase(COMMENT)) {
                 // Final Comment on Reference To The Cell Of Highest Level
                 String comment = getNextToken(true);
                 expect(RIGHT_PAREN, getNextToken(true));
-            } else if(nextToken.text.equalsIgnoreCase(DESIGN)) {
+            } else if (nextToken.text.equalsIgnoreCase(DESIGN)) {
                 edifDesign = parseEDIFNameObject(new EDIFDesign());
                 expect(LEFT_PAREN, getNextToken(true));
                 expect(CELLREF, getNextToken(true));
@@ -381,7 +381,7 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParserWorker implement
         }
 
         public void add() {
-            if(portInst.getCellInst() != null) {
+            if (portInst.getCellInst() != null) {
                 portInst.getCellInst().addPortInst(portInst);
             }
             net.addPortInst(portInst);

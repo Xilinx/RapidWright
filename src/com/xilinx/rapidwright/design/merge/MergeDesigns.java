@@ -59,7 +59,7 @@ public class MergeDesigns {
         
         for(EDIFPort port1 : new ArrayList<>(topCell1.getPorts())) {
             EDIFPort port0 = topCell0.getPort(port1.getBusName());
-            if(port0 == null) {
+            if (port0 == null) {
                 topCell0.addPort(port1);
             } else {
                 merger.mergePorts(port0, port1);
@@ -68,10 +68,10 @@ public class MergeDesigns {
         
         for(EDIFNet net1 : topCell1.getNets()) {
             EDIFNet net0 = topCell0.getNet(net1);
-            if(net0 == null) {
+            if (net0 == null) {
                 topCell0.addNet(net1);
                 for(EDIFPortInst inst : net1.getPortInsts()) {
-                    if(inst.isTopLevelPort() && inst.getPort().getParentCell() == topCell0) {
+                    if (inst.isTopLevelPort() && inst.getPort().getParentCell() == topCell0) {
                         topCell0.addInternalPortMapEntry(inst.getPortInstNameFromPort(), net1);
                     }
                 }
@@ -82,7 +82,7 @@ public class MergeDesigns {
                 
         for(EDIFCellInst inst1 : topCell1.getCellInsts()) {
             EDIFCellInst inst0 = topCell0.getCellInst(inst1.getName());
-            if(inst0 == null) {
+            if (inst0 == null) {
                 topCell0.addCellInst(inst1);
             } else {
                 merger.mergeCellInsts(inst0, inst1);
@@ -91,7 +91,7 @@ public class MergeDesigns {
         
         for(SiteInst siteInst1 : design1.getSiteInsts()) {
             SiteInst siteInst0 = design0.getSiteInstFromSiteName(siteInst1.getSiteName());
-            if(siteInst0 == null) {
+            if (siteInst0 == null) {
                 design0.addSiteInst(siteInst1);
             } else {
                 merger.mergeSiteInsts(siteInst0, siteInst1);
@@ -100,7 +100,7 @@ public class MergeDesigns {
         
         for(Net net1 : design1.getNets()) {
             Net net0 = design0.getNet(net1.getName());
-            if(net0 == null) {
+            if (net0 == null) {
                 design0.addNet(net1);
             } else {
                 merger.mergePhysicalNets(net0, net1);
@@ -109,7 +109,7 @@ public class MergeDesigns {
 
         // Merge encrypted cells
         List<String> encryptedCells = design1.getNetlist().getEncryptedCells();
-        if(encryptedCells != null && encryptedCells.size() > 0) {
+        if (encryptedCells != null && encryptedCells.size() > 0) {
             design0.getNetlist().addEncryptedCells(encryptedCells);
         }          
 
@@ -136,7 +136,7 @@ public class MergeDesigns {
     public static Design mergeDesigns(Supplier<AbstractDesignMerger> merger, Design...designs) {
         Design result = null;
         for(Design design : designs) {
-            if(result == null) {
+            if (result == null) {
                 result = design;
             } else {
                 result = mergeDesigns(result, design, merger.get());
@@ -157,7 +157,7 @@ public class MergeDesigns {
      * @throws InterruptedException
      */
     public static void main(String[] args) throws InterruptedException {
-        if(args.length != 2 && args.length != 3) {
+        if (args.length != 2 && args.length != 3) {
             System.out.println("Usage: <dir with DCPs> <merged output DCP filename> [dcp filter regex]");
             return;
         }

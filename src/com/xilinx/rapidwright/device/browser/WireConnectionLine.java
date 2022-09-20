@@ -81,7 +81,7 @@ public class WireConnectionLine extends QGraphicsLineItem{
     
     @Override
     public void mousePressEvent(QGraphicsSceneMouseEvent event) {
-        if(scene.getClass().equals(DeviceBrowserScene.class)) {
+        if (scene.getClass().equals(DeviceBrowserScene.class)) {
             ((DeviceBrowserScene)scene).drawConnectingWires(tile, wire);            
         }
     }

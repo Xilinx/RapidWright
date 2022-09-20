@@ -90,7 +90,7 @@ public class CheckAccuracyUsingGnlDesigns {
 
         try {
             String goldenFileName = path + "golden/" + suiteFileName;
-            if(!new File(goldenFileName).exists()) {
+            if (!new File(goldenFileName).exists()) {
                 System.out.print("ERROR: GNL designs could not be found.  Would you like to"
                         + " download them ");
                 MessageGenerator.agreeToContinue();

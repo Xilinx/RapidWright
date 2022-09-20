@@ -268,12 +268,12 @@ public class PerformanceExplorer {
         ArrayList<String> lines = new ArrayList<>();
         lines.add("open_checkpoint " + initialDcp);
         lines.add("set_clock_uncertainty -setup "+clockUncertainty+" [get_clocks "+clkName+"]");
-        if(pblock != null) {
+        if (pblock != null) {
             String pblockName = pblock.getName() == null ? "pe_pblock_1" : pblock.getName();
             lines.add("create_pblock " + pblockName);
             lines.add("resize_pblock "+pblockName+" -add {"+pblock.toString()+"}");
             lines.add("add_cells_to_pblock "+pblockName+" " + (pblockCells == null ? "-top" : "[get_cells {"+ pblockCells +"}]" ));
-            if(containRouting) {
+            if (containRouting) {
                 lines.add("set_property CONTAIN_ROUTING 1 [get_pblocks "+ pblockName+"]");
             }
         }
@@ -284,7 +284,7 @@ public class PerformanceExplorer {
         lines.add("route_design -directive " + r.name());
         lines.add("report_timing -file "+instDirectory + File.separator+ROUTED_TIMING_RESULT);
         lines.add("write_checkpoint -force " + instDirectory + File.separator + "routed.dcp");
-        if(addEDIFAndMetadata) {
+        if (addEDIFAndMetadata) {
             lines.add("write_edif -force " + instDirectory + File.separator + "routed.edf");
             lines.add("source " + FileTools.getRapidWrightPath() + File.separator + "tcl" + File.separator + "rapidwright.tcl");
             lines.add("generate_metadata "+ instDirectory + File.separator + "routed.dcp false 0");
@@ -298,7 +298,7 @@ public class PerformanceExplorer {
     
     public void explorePerformance() {
         
-        if(vivadoPath.equals(DEFAULT_VIVADO) && !FileTools.isVivadoOnPath()) {
+        if (vivadoPath.equals(DEFAULT_VIVADO) && !FileTools.isVivadoOnPath()) {
             throw new RuntimeException("ERROR: Couldn't find \n"
                 + "    vivado on PATH, please update PATH or specify path with option -" + VIVADO_PATH_OPT);
         }
@@ -311,7 +311,7 @@ public class PerformanceExplorer {
             List<String> xdcList = design.getXDCConstraints(g);
             for(int i=0; i < xdcList.size(); i++) {
                 String xdc = xdcList.get(i);
-                if(xdc.contains("create_clock") && xdc.contains("-name " + clkName)) {
+                if (xdc.contains("create_clock") && xdc.contains("-name " + clkName)) {
                     // TODO - For now, user will need to update DCP beforehand
                 }
             }        
@@ -320,7 +320,7 @@ public class PerformanceExplorer {
         design.writeCheckpoint(dcpName); 
         JobQueue jobs = new JobQueue();
         
-        if(pblocks == null) {
+        if (pblocks == null) {
             pblocks = new HashMap<>();
             pblocks.put(null, null);
         }
@@ -333,7 +333,7 @@ public class PerformanceExplorer {
                     for(double c : getClockUncertaintyValues()) {
                         String roundedC = printNS(c);
                         String uniqueID = p.name() + "_" + r.name() + "_" + roundedC;
-                        if(pblock != null) {
+                        if (pblock != null) {
                             uniqueID = uniqueID + "_pblock" + pb;
                         }
                         System.out.println(uniqueID);
@@ -428,7 +428,7 @@ public class PerformanceExplorer {
         OptionParser p = createOptionParser();
         OptionSet opts = p.parse(args);
         
-        if(opts.has(HELP_OPT)) {
+        if (opts.has(HELP_OPT)) {
             printHelp(p);
             return;
         }
@@ -441,11 +441,11 @@ public class PerformanceExplorer {
         Design d = Design.readCheckpoint(dcpInputName);
         PerformanceExplorer pe = new PerformanceExplorer(d, runDir, clkName, targetPeriod);
 
-        if(opts.hasArgument(MAX_CONCURRENT_JOBS_OPT)) {
+        if (opts.hasArgument(MAX_CONCURRENT_JOBS_OPT)) {
             JobQueue.MAX_LOCAL_CONCURRENT_JOBS = (int) opts.valueOf(MAX_CONCURRENT_JOBS_OPT);
         }
         
-        if(opts.hasArgument(CLK_UNCERTAINTY_OPT)) {
+        if (opts.hasArgument(CLK_UNCERTAINTY_OPT)) {
             String clkUncertaintyValues = (String) opts.valueOf(CLK_UNCERTAINTY_OPT);
             pe.setClockUncertaintyValues(clkUncertaintyValues.split("[,]"));            
         } else {
@@ -463,16 +463,16 @@ public class PerformanceExplorer {
         pe.setAddEDIFAndMetadata((boolean)opts.valueOf(ADD_EDIF_METADATA_OPT));
 
         
-        if(opts.hasArgument(PBLOCK_FILE_OPT)) {
+        if (opts.hasArgument(PBLOCK_FILE_OPT)) {
             String fileName = (String) opts.valueOf(PBLOCK_FILE_OPT);
             Map<PBlock,String> pblocks = new HashMap<>();
             for(String line : FileTools.getLinesFromTextFile(fileName)) {
-                if(line.trim().startsWith("#")) continue;
-                if(line.trim().length()==0) continue;
+                if (line.trim().startsWith("#")) continue;
+                if (line.trim().length()==0) continue;
                 String pblockRanges = null;
                 String cellNames = null;
                 int idx = line.indexOf('|');
-                if(idx >= 0) {
+                if (idx >= 0) {
                      pblockRanges = line.substring(0, idx).trim();
                      cellNames = line.substring(idx+1).trim();
                 } else {

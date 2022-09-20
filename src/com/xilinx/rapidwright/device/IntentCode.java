@@ -175,11 +175,11 @@ public enum IntentCode {
      * @return The array of relevant intent codes or null if not available.
      */
     public static IntentCode[] getIntentCodesBySeries(Series s) {
-        if(s == Series.Series7) {
+        if (s == Series.Series7) {
             return Arrays.copyOfRange(IntentCode.values, SERIES7_START_IDX, SERIES7_END_IDX);
-        } else if(s == Series.UltraScale) {
+        } else if (s == Series.UltraScale) {
             return Arrays.copyOfRange(IntentCode.values, ULTRASCALE_START_IDX, ULTRASCALE_END_IDX);
-        } else if(s == Series.UltraScalePlus) {
+        } else if (s == Series.UltraScalePlus) {
             return Arrays.copyOfRange(IntentCode.values, ULTRASCALEPLUS_START_IDX, ULTRASCALEPLUS_END_IDX);
         } 
         return null;

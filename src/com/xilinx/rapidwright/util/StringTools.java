@@ -41,8 +41,8 @@ public class StringTools {
         StringBuilder sb = new StringBuilder();
         for(int i=0; i < name.length(); i++) {
             char c = name.charAt(i);
-            if(c == '_') continue;
-            if(i != 0 && name.charAt(i-1) == '_') {
+            if (c == '_') continue;
+            if (i != 0 && name.charAt(i-1) == '_') {
                 sb.append(Character.toUpperCase(c));
             } else {
                 sb.append(Character.toLowerCase(c));                
@@ -65,11 +65,11 @@ public class StringTools {
      * @return
      */
     public static String removeOuterQuotes(String s) {
-        if(s == null) return s;
+        if (s == null) return s;
         int len = s.length();
-        if(len == 0) return s; 
+        if (len == 0) return s; 
         boolean atFront = s.charAt(0) == '\"';
-        if(len == 1) {
+        if (len == 1) {
             return atFront ? "" : s;
         }
         boolean atBack = s.charAt(len-1) == '\"';
@@ -106,22 +106,22 @@ public class StringTools {
             public int compare(String a, String b) {
                 int ai = 0, bi = 0;
                 while(ai < a.length() && bi < b.length()) {
-                    if(isDigit(a.charAt(ai)) && isDigit(b.charAt(bi))) {
+                    if (isDigit(a.charAt(ai)) && isDigit(b.charAt(bi))) {
                         int aStart = ai, bStart = bi;
                         while(ai < a.length() && isDigit(a.charAt(ai))) ai++;
                         while(bi < b.length() && isDigit(b.charAt(bi))) bi++;
                         String aStr = a.substring(aStart,ai);
                         String bStr = b.substring(bStart,bi);
-                        if(aStr.length() > 9 || bStr.length() > 9) {
-                            if(!aStr.equals(bStr)) {
+                        if (aStr.length() > 9 || bStr.length() > 9) {
+                            if (!aStr.equals(bStr)) {
                                 return aStr.compareTo(bStr);
                             }
                         } else {
                             int aInt = Integer.parseInt(aStr);
                             int bInt = Integer.parseInt(bStr);
-                            if(aInt != bInt) return aInt - bInt;                            
+                            if (aInt != bInt) return aInt - bInt;                            
                         }
-                    } else if(a.charAt(ai) != b.charAt(bi)) 
+                    } else if (a.charAt(ai) != b.charAt(bi)) 
                         return a.charAt(ai) - b.charAt(bi);
                     ai++; bi++;
                 }
@@ -150,7 +150,7 @@ public class StringTools {
      * string if 
      */
     public static String removeLastSeparator(String s) {
-        if(s.endsWith(File.separator)) {
+        if (s.endsWith(File.separator)) {
             return s.substring(0, s.length()-1);
         }
         return s;
@@ -170,7 +170,7 @@ public class StringTools {
     
     public static boolean isInteger(String s) {
         for(int i=0; i < s.length(); i++) {
-            if(!Character.isDigit(s.charAt(i))) return false;
+            if (!Character.isDigit(s.charAt(i))) return false;
         }
         return true;
     }
@@ -187,7 +187,7 @@ public class StringTools {
      */
     public static String addIndexingAngleBrackets(String s) {
         int i = s.length() -1;
-        if(!Character.isDigit(s.charAt(i))) return s;
+        if (!Character.isDigit(s.charAt(i))) return s;
         while(Character.isDigit(s.charAt(i))) {
             i--;
         }
@@ -207,7 +207,7 @@ public class StringTools {
     public static int countOccurrences(String str, char c) {
         int count = 0;
         for(int i=0; i < str.length(); i++) {
-            if(str.charAt(i) == c) count++;
+            if (str.charAt(i) == c) count++;
         }
         return count;
     }
@@ -219,10 +219,10 @@ public class StringTools {
      * @return Longest common prefix string or empty string if none.
      */
     public static String longestCommonPrefix(String s0, String s1) {
-        if(s0 == null || s1 == null) return "";
+        if (s0 == null || s1 == null) return "";
         int min = Math.min(s0.length(), s1.length());
         for(int i=0; i < min; i++) {
-            if(s0.charAt(i) != s1.charAt(i)) {
+            if (s0.charAt(i) != s1.charAt(i)) {
                 return s0.substring(0, i);
             }
         }
@@ -238,7 +238,7 @@ public class StringTools {
      */
     public static String startsWithAny(String str, Collection<String> prefixes) {
         for(String prefix : prefixes) {
-            if(str.startsWith(prefix)) return prefix;
+            if (str.startsWith(prefix)) return prefix;
         }
         return null;
     }

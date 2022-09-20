@@ -68,7 +68,7 @@ public class BlockUpdater {
     }
     
     public static void main(String[] args) {
-        if(args.length != 3 && args.length != 4) {
+        if (args.length != 3 && args.length != 4) {
             System.out.println("USAGE: <path to cache entry> <new DCP> <implementation index> "
                     + "[impl guide file]");
             return;
@@ -88,7 +88,7 @@ public class BlockUpdater {
         }
         int implementationIdx = Integer.parseInt(args[2]);
         
-        if(!FileTools.isVivadoOnPath()) {
+        if (!FileTools.isVivadoOnPath()) {
             throw new RuntimeException("ERROR: Vivado executable could not be found on PATH,"
                     + " please set environment variable accordingly.");
         }
@@ -100,17 +100,17 @@ public class BlockUpdater {
         String doneFileName = null;
         int count = 0;
         for(String fileName : dir.list()) {
-            if(fileName.endsWith("_routed.dcp")) {
+            if (fileName.endsWith("_routed.dcp")) {
                 count++;
             }
-            if(fileName.endsWith(suffix)) {
+            if (fileName.endsWith(suffix)) {
                 existingDCP = fileName;
             }
-            else if(fileName.startsWith(BlockCreator.DONE_FILE_PREFIX)) {
+            else if (fileName.startsWith(BlockCreator.DONE_FILE_PREFIX)) {
                 doneFileName = dir + File.separator + fileName;
             }
         }
-        if(existingDCP == null) {
+        if (existingDCP == null) {
             throw new RuntimeException("ERROR: Couldn't find existing DCP in " + dir.getAbsolutePath());
         }
         
@@ -118,7 +118,7 @@ public class BlockUpdater {
         cacheID = cacheID.substring(cacheID.lastIndexOf(File.separator)+1);
         
         BlockGuide bg =  null;
-        if(args.length == 4) {
+        if (args.length == 4) {
             String implGuideFile = args[3];
             ImplGuide ig = ImplGuide.readImplGuide(implGuideFile);
             bg = ig.getBlock(cacheID);
@@ -133,7 +133,7 @@ public class BlockUpdater {
         }
         FileTools.copyFile(newDCPPath, fullExistingDCPName);
         
-        if(doneFileName == null) {
+        if (doneFileName == null) {
             doneFileName = dir + File.separator + BlockCreator.DONE_FILE_PREFIX + count;
         }
         BlockCreator.createDoneFile(doneFileName, bg);

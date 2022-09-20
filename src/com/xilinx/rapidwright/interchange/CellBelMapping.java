@@ -56,7 +56,7 @@ class CellBelMapping {
                 String belPin = allStrings.get(pin.getBelPin());
                 String cellPin = allStrings.get(pin.getCellPin());
                 String otherCellPin = pinMap.get(belPin);
-                if(otherCellPin != null) {
+                if (otherCellPin != null) {
                     throw new RuntimeException(String.format(
                                 "Duplicate BEL pin entry '%s' for '%s', '%s' <-> '%s'",
                                 otherCellPin, cell, cellPin, belPin));
@@ -70,7 +70,7 @@ class CellBelMapping {
         private void addPlacements(Set<Map.Entry<SiteTypeEnum, String>> placements) {
             for(Map.Entry<SiteTypeEnum, String> placement : placements) {
                 Set<String> placementsForSiteType = compatiblePlacements.get(placement.getKey());
-                if(placementsForSiteType == null) {
+                if (placementsForSiteType == null) {
                     placementsForSiteType = new HashSet<String>();
                     compatiblePlacements.put(placement.getKey(), placementsForSiteType);
                 }
@@ -97,7 +97,7 @@ class CellBelMapping {
                         Map.Entry<SiteTypeEnum, String> key = new AbstractMap.SimpleEntry(siteType, bel);
 
                         Map<String, String> otherPins = commonMaps.get(key);
-                        if(otherPins != null) {
+                        if (otherPins != null) {
                             throw new RuntimeException(String.format(
                                         "Duplicate common pin entry for site type '%s' BEL '%s'",
                                         siteType.name(), bel));
@@ -117,7 +117,7 @@ class CellBelMapping {
                     Map.Entry<SiteTypeEnum, String> key = new AbstractMap.SimpleEntry(siteType, bel);
 
                     Map<String, Map<String, String>> parameterToPins = parameterMaps.get(key);
-                    if(parameterToPins == null) {
+                    if (parameterToPins == null) {
                         parameterToPins = new HashMap<String, Map<String, String>>();
                         parameterMaps.put(key, parameterToPins);
                     }
@@ -127,18 +127,18 @@ class CellBelMapping {
                     String parameterKey = allStrings.get(parameter.getKey());
                     String parameterValue;
 
-                    if(parameter.isTextValue()) {
+                    if (parameter.isTextValue()) {
                         String textValue = allStrings.get(parameter.getTextValue());
-                        if(textValue.contains("\"")) {
+                        if (textValue.contains("\"")) {
                             throw new RuntimeException("ERROR: String '"+textValue+
                                     "'\n\t value contains unescaped '\"' "
                                     + "character. Please replace with EDIF escape value '%34%'.");
                         }
 
                         parameterValue = textValue;
-                    } else if(parameter.isIntValue()) {
+                    } else if (parameter.isIntValue()) {
                         parameterValue = String.format("%d", parameter.getIntValue());
-                    } else if(parameter.isBoolValue()) {
+                    } else if (parameter.isBoolValue()) {
                         parameterValue = String.format("%d", parameter.getBoolValue());
                     } else {
                         throw new RuntimeException("ERROR: Unknown property type for key " + parameterKey);
@@ -147,7 +147,7 @@ class CellBelMapping {
                     String parameterStr = parameterKey + "=" + parameterValue;
 
                     Map<String, String> otherPins = parameterToPins.get(parameterStr);
-                    if(otherPins != null) {
+                    if (otherPins != null) {
                         throw new RuntimeException(String.format(
                                     "Duplicate common pin entry for site type '%s' BEL '%s' parameter '%s'",
                                     siteType.name(), bel, parameterStr));
@@ -177,7 +177,7 @@ class CellBelMapping {
 
             for(String parameter : params) {
                 Map<String, String> parameterPins = allParameterPins.get(parameter);
-                if(parameterPins != null) {
+                if (parameterPins != null) {
                     pins.putAll(parameterPins);
                 }
             }
@@ -194,7 +194,7 @@ class CellBelMapping {
         for(Device.CellBelMapping.Reader cellBelMap : cellBelMaps) {
             String cell = allStrings.get(cellBelMap.getCell());
             CellBelPinMapping obj = map.get(cell);
-            if(obj != null) {
+            if (obj != null) {
                 throw new RuntimeException(String.format(
                             "Duplicate cell '%s' in map data",
                             cell));

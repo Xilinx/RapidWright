@@ -58,10 +58,10 @@ public class EDIFHierCellInst {
         EDIFLibrary library = cellType.getLibrary();
         EDIFNetlist netlist = library.getNetlist();
         EDIFCellInst topCellInst = null;
-        if(netlist != null) {
+        if (netlist != null) {
             topCellInst = netlist.getTopCellInst();
         }
-        if(topCellInst != null) {
+        if (topCellInst != null) {
             return topCellInst==eci;
         } else {
             return false;
@@ -156,10 +156,10 @@ public class EDIFHierCellInst {
      */
     public boolean isDescendantOf(EDIFHierCellInst potentialAncestor) {
         EDIFCellInst[] other = potentialAncestor.cellInsts;
-        if(other.length >= cellInsts.length) return false;
+        if (other.length >= cellInsts.length) return false;
         for(int i=0; i < other.length; i++) {
-            if(cellInsts.length > i) {
-                if(!cellInsts[i].getName().equals(other[i].getName())) {
+            if (cellInsts.length > i) {
+                if (!cellInsts[i].getName().equals(other[i].getName())) {
                     return false;
                 }
             }
@@ -175,7 +175,7 @@ public class EDIFHierCellInst {
      * @return The closest common ancestor between this instance and the provided instance.
      */
     public EDIFHierCellInst getCommonAncestor(EDIFHierCellInst o) {
-        if(!isAbsolute() || !o.isAbsolute()) {
+        if (!isAbsolute() || !o.isAbsolute()) {
             throw new RuntimeException("ERROR: Can only get a common ancestor of absolute "
                     + "EDIFHierCellInsts. this.isAbsolute()=" + this.isAbsolute() 
                     + ", o.isAbsolute()=" + o.isAbsolute());
@@ -184,7 +184,7 @@ public class EDIFHierCellInst {
         int min = Integer.min(cellInsts.length, oCellInsts.length);
         int idx = 0;
         for(int i=0; i< min; i++) { 
-            if(cellInsts[i] == oCellInsts[i]) {
+            if (cellInsts[i] == oCellInsts[i]) {
                 idx++;
             } else {
                 break;

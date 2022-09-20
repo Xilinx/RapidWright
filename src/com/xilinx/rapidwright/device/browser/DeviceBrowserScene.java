@@ -107,7 +107,7 @@ public class DeviceBrowserScene extends TileScene{
 
     public void drawConnectingWires(Tile tile, int wire) {
         clearCurrentLines();
-        if(tile == null) return;
+        if (tile == null) return;
         for(Wire w : tile.getWireConnections(wire)) {
             drawWire(tile, wire, w.getTile(), w.getWireIndex());
         }
@@ -119,7 +119,7 @@ public class DeviceBrowserScene extends TileScene{
         Queue<RouteNode> queue = new LinkedList<RouteNode>();
         for(int wire = 0; wire < t.getWireCount(); wire++) {
             List<Wire> connections = t.getWireConnections(wire);
-            if(connections == null) continue;
+            if (connections == null) continue;
             for(Wire wc : connections) {
                 queue.add(new RouteNode(wc.getTile(),wc.getWireIndex()));
             }
@@ -128,14 +128,14 @@ public class DeviceBrowserScene extends TileScene{
         while(!queue.isEmpty()) {
             RouteNode currNode = queue.poll();
             Integer i = reachabilityMap.get(currNode.getTile());
-            if(i == null) {
+            if (i == null) {
                 i = 1;
                 reachabilityMap.put(currNode.getTile(), i);
             }
             else {
                 reachabilityMap.put(currNode.getTile(), i+1);                        
             }
-            if(currNode.getLevel() < hops-1) {
+            if (currNode.getLevel() < hops-1) {
                 List<Wire> connections = currNode.getConnections();
                 for(Wire wc : connections) {
                     queue.add(new RouteNode(wc.getTile(),wc.getWireIndex()));
@@ -197,8 +197,8 @@ public class DeviceBrowserScene extends TileScene{
     
     @Override
     public void mouseReleaseEvent(QGraphicsSceneMouseEvent event) {
-        if(event.button().equals(MouseButton.RightButton)) {
-            if(browser.view.hasPanned) {
+        if (event.button().equals(MouseButton.RightButton)) {
+            if (browser.view.hasPanned) {
                 browser.view.hasPanned = false;
 
             }

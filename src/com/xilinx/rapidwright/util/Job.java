@@ -148,7 +148,7 @@ public abstract class Job {
 
     public Optional<List<String>> getLastLogLines() {
         String logFileName = getLogFilename();
-        if(new File(logFileName).exists()) {
+        if (new File(logFileName).exists()) {
             ArrayList<String> lines = FileTools.getLinesFromTextFile(logFileName);
             int start = lines.size() >= 8 ? lines.size()-8 : 0;
             return Optional.of(IntStream.range(start, lines.size()).mapToObj(lines::get).collect(Collectors.toList()));

@@ -46,7 +46,7 @@ public class TestCellBELMappings {
         boolean foundIDDRR = false;
         for(int i=0; i < devBuilder.getCellBelMap().size(); i++) {
             CellBelMapping.Builder mapping = devBuilder.getCellBelMap().get(i);
-            if(allStrings.get(mapping.getCell()).equals("IDDR")) {
+            if (allStrings.get(mapping.getCell()).equals("IDDR")) {
                 Assertions.assertTrue(mapping.hasParameterPins());
                for(ParameterCellBelPinMaps.Builder paramPins : mapping.getParameterPins()) {
                     for(CellBelPinEntry.Builder pinObj : paramPins.getPins()) {

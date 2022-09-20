@@ -74,13 +74,13 @@ public class ImplGuide {
         // Check for valid sites
         int colon = pblock.indexOf(':');
         Site start = ig.getDevice().getSite(pblock.substring(0, colon));
-        if(start == null) {
+        if (start == null) {
             throw new RuntimeException("ERROR: Site " + pblock.substring(0, colon) 
                 +" doesn't exist in part " + ig.getPart().getName() 
                 + " found in pblock on line " + lineNumber );
         }
         Site end = ig.getDevice().getSite(pblock.substring(colon+1, pblock.length()));
-        if(end == null) {
+        if (end == null) {
             throw new RuntimeException("ERROR: Site " + pblock.substring(colon+1, pblock.length()) 
                 +" doesn't exist in part " + ig.getPart().getName() 
                 + " found in pblock on line " + lineNumber );
@@ -99,8 +99,8 @@ public class ImplGuide {
         outer: for(String line : FileTools.getLinesFromTextFile(fileName)) {
             lineNumber++;
             line = line.trim();
-            if(line.isEmpty()) continue;
-            if(line.startsWith("#")) continue;
+            if (line.isEmpty()) continue;
+            if (line.startsWith("#")) continue;
             String[] tokens = line.split("\\s+");
             
             switch(tokens[0]) {
@@ -143,7 +143,7 @@ public class ImplGuide {
                     String getCellsParam = line.substring(line.indexOf('\'')+1, line.lastIndexOf('\''));
                     int lastTokenWithQuote = 0;
                     for(int i=0; i < tokens.length; i++) {
-                        if(tokens[i].indexOf('\'') != -1) lastTokenWithQuote = i;
+                        if (tokens[i].indexOf('\'') != -1) lastTokenWithQuote = i;
                     }
                     lastTokenWithQuote++;
                     StringBuilder sb = new StringBuilder(checkPblockValid(ig, lineNumber, tokens[lastTokenWithQuote]));
@@ -160,18 +160,18 @@ public class ImplGuide {
                     BlockInst bi = new BlockInst();
                     bi.setName(tokens[1]);
                     currBlock.addBlockInst(bi);
-                    if(tokens.length > 2) {
+                    if (tokens.length > 2) {
                         bi.setImpl(Integer.parseInt(tokens[2]));
-                        if(currBlock.getImplementations().get(bi.getImplIndex()) == null) {
+                        if (currBlock.getImplementations().get(bi.getImplIndex()) == null) {
                             throw new RuntimeException("ERROR: Inconsistent implement"
                                 + "ation guide for instance " + bi.getName() + ".  The"
                                 + " block " + currBlock.getCacheID() + " doesn't have "
                                 + "an implementation " + bi.getImplIndex() + ".");
                         }
                     }
-                    if(tokens.length > 3) {
+                    if (tokens.length > 3) {
                         Site s = ig.getDevice().getSite(tokens[3]);
-                        if(s == null) {
+                        if (s == null) {
                             throw new RuntimeException("ERROR: " + tokens[3] + " could " 
                                 + "not be found in the device " 
                                 + ig.getDevice().getName() + ".");
@@ -183,12 +183,12 @@ public class ImplGuide {
                 case CLOCK:{
                     String clkPortName = tokens[1];
                     Float period = Float.parseFloat(tokens[2]);
-                    if(period < 0) throw new RuntimeException("ERROR: Parsing clock period constraint '" 
+                    if (period < 0) throw new RuntimeException("ERROR: Parsing clock period constraint '" 
                             + tokens[2] +"' is invalid on line " + lineNumber );
                     currBlock.addClock(clkPortName,period);
-                    if(tokens.length == 4) {
+                    if (tokens.length == 4) {
                         Site clkBuffer = ig.getDevice().getSite(tokens[3]);
-                        if(clkBuffer == null) {
+                        if (clkBuffer == null) {
                             throw new RuntimeException("ERROR: Invalid clk buffer site '" 
                                     + tokens[3] +"' on line " + lineNumber );
                         }
@@ -234,9 +234,9 @@ public class ImplGuide {
                 } 
                 for(BlockInst bi : b.getInsts()) {
                     bw.write(indent + INST + " " + bi.getName());
-                    if(bi.getImplIndex() != null) {
+                    if (bi.getImplIndex() != null) {
                         bw.write(" " + bi.getImplIndex()); 
-                        if(bi.getPlacement() != null) {
+                        if (bi.getPlacement() != null) {
                             bw.write(" " + bi.getPlacement().getName());
                         }
                     }
@@ -247,7 +247,7 @@ public class ImplGuide {
                     float f = b.getClockPeriod(clock);
                     bw.write(" " + f);
                     Site clkBuffer = b.getClockBuffer(clock);
-                    if(clkBuffer != null) {
+                    if (clkBuffer != null) {
                         bw.write(" " + clkBuffer.getName());
                     }
                     bw.write(nl);
@@ -339,9 +339,9 @@ public class ImplGuide {
         for(BlockGuide bg : getBlocks()) {
             boolean isNull = false; 
             for(PBlock pb : bg.getImplementations()) {
-                if(pb == null) isNull = true;
+                if (pb == null) isNull = true;
             }
-            if(isNull) toRemove.add(bg);
+            if (isNull) toRemove.add(bg);
         }
         for(BlockGuide bg : toRemove) {
             removeBlock(bg.getCacheID());
@@ -353,7 +353,7 @@ public class ImplGuide {
     }
     
     public static void main(String[] args) {
-        if(args.length != 2) {
+        if (args.length != 2) {
             System.out.println("USAGE: <input.igf> <output.igf>");
             return;
         }

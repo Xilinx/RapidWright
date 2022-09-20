@@ -113,7 +113,7 @@ public class TimingManager {
          for(NetWrapper netWrapper:illegalNets) {
              for(Connection connection:netWrapper.getConnections()) {
                  float netDelay = 0;
-                 if(connection.isDirect()) continue;
+                 if (connection.isDirect()) continue;
                  for(int i = connection.getNodes().size() - 2; i >= 0; i--) {
                      Node child = connection.getNodes().get(i);
                      Node parent = connection.getNodes().get(i+1);
@@ -132,8 +132,8 @@ public class TimingManager {
      */
     public void patchUpDelayOfConnections(List<Connection> connections) {
         for(Connection connection : connections) {
-            if(connection.isDirect()) continue;
-            if(connection.isDlyPatched()) continue;
+            if (connection.isDirect()) continue;
+            if (connection.isDlyPatched()) continue;
             float netDelay = 0;
             for(int i = connection.getRnodes().size() - 2; i >= 0; i--) {
                 Routable child = connection.getRnodes().get(i);
@@ -163,10 +163,10 @@ public class TimingManager {
      * Sets critical path delay pessimism factors.
      */
     private void setPessimismFactors(float a, short b) {
-        if(a > 1) {
+        if (a > 1) {
             pessimismA = a;
         }
-        if(b > 0) {
+        if (b > 0) {
             pessimismB = b;
         }
     }
@@ -205,7 +205,7 @@ public class TimingManager {
     }
     
     private void printPathDelayBreakDown(short arr, List<TimingEdge> criticalEdges, Map<TimingEdge, Connection> timingEdgeConnctionMap, boolean useRoutable, Map<Node, Routable> rnodesCreated) {
-        if(verbose) {
+        if (verbose) {
             System.out.println("\nTimingEdges:");
             int id = 0;
             for(TimingEdge e : criticalEdges) {
@@ -213,12 +213,12 @@ public class TimingManager {
             }
         }
         this.printTimingPathInTable(criticalEdges, arr);
-        if(rnodesCreated == null) return;
-        if(!verbose) return;
+        if (rnodesCreated == null) return;
+        if (!verbose) return;
         for(TimingEdge edge : criticalEdges) {
-            if(timingEdgeConnctionMap.containsKey(edge)) {
+            if (timingEdgeConnctionMap.containsKey(edge)) {
                 System.out.println(timingEdgeConnctionMap.get(edge));
-                if(useRoutable) {
+                if (useRoutable) {
                     List<Routable> groups = timingEdgeConnctionMap.get(edge).getRnodes();
                     for(int iGroup = groups.size() -1; iGroup >= 0; iGroup--) {
                         System.out.println("\t " + groups.get(iGroup));
@@ -227,7 +227,7 @@ public class TimingManager {
                     List<Node> nodes = timingEdgeConnctionMap.get(edge).getNodes();
                     for(int iGroup = nodes.size() -1; iGroup >= 0; iGroup--) {
                         Routable rnode = rnodesCreated.get(nodes.get(iGroup));
-                        if(rnode != null) {
+                        if (rnode != null) {
                             System.out.println("\t " + rnode.getNode() + ", " + rnode.getNode().getIntentCode() + ", delay = " + (short) rnode.getDelay());
                         } else {
                             System.out.println("\t " + nodes.get(iGroup) + ", " + nodes.get(iGroup).getIntentCode() + ", delay = " + 0);
@@ -257,7 +257,7 @@ public class TimingManager {
                     (short) e.getIntraSiteDelay(),
                     (short) e.getDelay(),
                     e.getSrc());
-            if(e.getNet() != null && e.getNet().getName() != null) {
+            if (e.getNet() != null && e.getNet().getName() != null) {
                 System.out.printf("%50s  %-25s\n", "", "  net: " + e.getNet().getName());
             }
         }
@@ -282,7 +282,7 @@ public class TimingManager {
         for(ConstraintGroup group : constraintGroups) {
             List<String> constraints = design.getXDCConstraints(group);
             for(String constraint : constraints) {
-                if(constraint.contains("-period")) {
+                if (constraint.contains("-period")) {
                     int startIndex = constraint.indexOf("-period");
                     treq = Math.max(treq, Float.valueOf(constraint.substring(startIndex+7, startIndex+13)));
                 }
@@ -306,7 +306,7 @@ public class TimingManager {
         float maxCriti = 0;
         for(Connection connection : connections) {
             connection.calculateCriticality(maxDelay, maxCriticality, criticalityExponent);
-            if(connection.getCriticality() > maxCriti)
+            if (connection.getCriticality() > maxCriti)
                 maxCriti = connection.getCriticality();
         }
     }
@@ -316,23 +316,23 @@ public class TimingManager {
      * @return Indication of successful completion.
      */
     private boolean build(boolean isPartialRouting, Collection<Net> targetNets) {
-        if(this.routerTimer != null) this.routerTimer.createRuntimeTracker("build timing model", "Initialization").start();
+        if (this.routerTimer != null) this.routerTimer.createRuntimeTracker("build timing model", "Initialization").start();
         timingModel.build();
-        if(this.routerTimer != null) this.routerTimer.getRuntimeTracker("build timing model").stop();
+        if (this.routerTimer != null) this.routerTimer.getRuntimeTracker("build timing model").stop();
         
-        if(this.routerTimer != null) this.routerTimer.createRuntimeTracker("build timing graph", "Initialization").start();
+        if (this.routerTimer != null) this.routerTimer.createRuntimeTracker("build timing graph", "Initialization").start();
         timingGraph.build(isPartialRouting, targetNets);
-        if(this.routerTimer != null) this.routerTimer.getRuntimeTracker("build timing graph").stop();
+        if (this.routerTimer != null) this.routerTimer.getRuntimeTracker("build timing graph").stop();
         
         return postBuild();
     }
 
     private boolean postBuild() {
-        if(this.routerTimer != null) this.routerTimer.createRuntimeTracker("post graph build", "Initialization").start();
+        if (this.routerTimer != null) this.routerTimer.createRuntimeTracker("post graph build", "Initialization").start();
         timingGraph.removeClockCrossingPaths();
         timingGraph.buildSuperGraphPaths();
         timingGraph.setOrderedTimingVertexLists();
-        if(this.routerTimer != null) this.routerTimer.getRuntimeTracker("post graph build").stop();
+        if (this.routerTimer != null) this.routerTimer.getRuntimeTracker("post graph build").stop();
         return true;
     }
 

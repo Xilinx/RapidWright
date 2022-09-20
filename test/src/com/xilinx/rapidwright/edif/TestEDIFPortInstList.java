@@ -39,7 +39,7 @@ public class TestEDIFPortInstList {
         portInst.setPort(new EDIFPort());
         String instanceName = portInstName.contains("/") ? 
                 portInstName.substring(0, portInstName.lastIndexOf("/")) : null; 
-        if(instanceName != null) {
+        if (instanceName != null) {
             EDIFCellInst cellInst = new EDIFCellInst();
             cellInst.setName(instanceName);
             portInst.setCellInst(cellInst);

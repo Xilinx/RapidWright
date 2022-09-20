@@ -146,12 +146,12 @@ public class BlockGuide {
     }
     
     public void addXDCCommand(String xdc) {
-        if(xdcCommands == null) xdcCommands = new ArrayList<>();
+        if (xdcCommands == null) xdcCommands = new ArrayList<>();
         xdcCommands.add(xdc);
     }
     
     public List<String> getXDCCommands() {
-        if(xdcCommands == null) return Collections.emptyList();
+        if (xdcCommands == null) return Collections.emptyList();
         return xdcCommands;
     }
     
@@ -163,7 +163,7 @@ public class BlockGuide {
      * @return
      */
     public String getMD5Hash() {
-        if(md5Hash == null) {
+        if (md5Hash == null) {
             MessageDigest md5 = null;
             
             try {
@@ -176,7 +176,7 @@ public class BlockGuide {
             md5.update(cacheID.getBytes());
             for(PBlock pb : implementations) {
                 md5.update(pb.toString().getBytes());
-                if(pb.getSubPBlocks() != null) {
+                if (pb.getSubPBlocks() != null) {
                     for(SubPBlock sub : pb.getSubPBlocks()) {
                         md5.update(sub.getGetCellsArgs().getBytes());
                         md5.update(sub.toString().getBytes());

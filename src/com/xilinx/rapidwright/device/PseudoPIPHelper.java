@@ -71,7 +71,7 @@ public class PseudoPIPHelper {
      * @param pip A prototype pseudo PIP to use.
      */
     private PseudoPIPHelper(PIP pip) {
-        if(pip == null || !pip.isRouteThru()) {
+        if (pip == null || !pip.isRouteThru()) {
             throw new RuntimeException("ERROR: Attempting to initialize "
                     + getClass().getName() + " with non pseudo PIP: " + pip);
         }
@@ -161,19 +161,19 @@ public class PseudoPIPHelper {
      */
     public static Map<TileTypeEnum,HashMap<PIPWires, PseudoPIPHelper>> getPseudoPIPMap(Device device) {
         Map<TileTypeEnum,HashMap<PIPWires, PseudoPIPHelper>> map = deviceMap.get(device.getName());
-        if(map != null) {
+        if (map != null) {
             return map;
         }
         map = new HashMap<TileTypeEnum, HashMap<PIPWires,PseudoPIPHelper>>();
         HashSet<TileTypeEnum> visited = new HashSet<TileTypeEnum>();
         for(Tile tile : device.getAllTiles()) {
             TileTypeEnum type = tile.getTileTypeEnum();
-            if(visited.contains(type)) continue;
+            if (visited.contains(type)) continue;
             HashMap<PIPWires, PseudoPIPHelper> pipMap = new HashMap<PIPWires, PseudoPIPHelper>();
             map.put(type, pipMap);
             visited.add(type);
             for(PIP pip : tile.getPIPs()) {
-                if(!pip.isRouteThru()) continue;
+                if (!pip.isRouteThru()) continue;
                 PIPWires wirePair = new PIPWires(pip.getStartWireIndex(), pip.getEndWireIndex());
                 pipMap.put(wirePair, new PseudoPIPHelper(pip));
             }
@@ -246,7 +246,7 @@ public class PseudoPIPHelper {
                 node.sinkBelPin = newSinkBelPin;
                 node.parent = parentNode;
 
-                if(siteWires.contains(newSinkBelPin.getSiteWireIndex())) {
+                if (siteWires.contains(newSinkBelPin.getSiteWireIndex())) {
                     // We found a path to a site wire that is driven by the
                     // net used by "start", all done!
                     result = node;
@@ -256,12 +256,12 @@ public class PseudoPIPHelper {
                 }
             }
 
-            if(result != null) {
+            if (result != null) {
                 break;
             }
         }
 
-        if(result == null) {
+        if (result == null) {
             throw new RuntimeException(String.format("ERROR: Failed to find path for pseudo pip from %s/%s to %s/%s",
                         start.getSite().getName(), start.getPinName(),
                         end.getSite().getName(), end.getPinName()));
@@ -293,7 +293,7 @@ public class PseudoPIPHelper {
         BELPin endBELPin = end.getBELPin();
 
         // Dual output PIP, search back to common point
-        if(!start.isInput()) {
+        if (!start.isInput()) {
             return findCommonRoute(start, end);
         }
 
@@ -315,12 +315,12 @@ public class PseudoPIPHelper {
      */
     private static LinkedList<BELPin> exploreInput(LinkedList<BELPin> path, BELPin curr, BELPin target) {
         BELPin src = curr.getSourcePin();
-        if(src.equals(target)) {
+        if (src.equals(target)) {
             path.addFirst(src);
             return path;
         }
-        if(curr.getName().equals("PAD")) {
-            if(curr.getSiteWireName().equals(target.getName())) {
+        if (curr.getName().equals("PAD")) {
+            if (curr.getSiteWireName().equals(target.getName())) {
                 path.addFirst(target);
                 return path;
             }
@@ -330,7 +330,7 @@ public class PseudoPIPHelper {
             copy.addFirst(src);
             copy.addFirst(input);
             LinkedList<BELPin> result = exploreInput(copy, input, target);
-            if(result != null) return result;
+            if (result != null) return result;
         }
 
         return null;
@@ -347,9 +347,9 @@ public class PseudoPIPHelper {
         for(SitePIP pip : output.getSitePIPs()) {
             pins.add(pip.getInputPin());
         }
-        if(pins.size() == 0) {
+        if (pins.size() == 0) {
             for(BELPin input : output.getBEL().getPins()) {
-                if(input.isOutput()) continue;
+                if (input.isOutput()) continue;
                 pins.add(input);
             }
         }
@@ -362,7 +362,7 @@ public class PseudoPIPHelper {
     }
 
     public static void main(String[] args) {
-        if(args.length != 1) {
+        if (args.length != 1) {
             System.out.println("USAGE: <device name>");
             System.out.println("   Print pseudo pips from device");
             return;

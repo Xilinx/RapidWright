@@ -95,12 +95,12 @@ public class TimingAndWirelengthReport{
     private void computeNetsWirelengthAndDelay() {
         for(Net net : this.design.getNets()) {
             if (net.getType() != NetType.WIRE) continue;
-            if(!RouterHelper.isRoutableNetWithSourceSinks(net)) continue;
-            if(net.getSource().toString().contains("CLK")) continue;
+            if (!RouterHelper.isRoutableNetWithSourceSinks(net)) continue;
+            if (net.getSource().toString().contains("CLK")) continue;
             NetWrapper netplus = this.createNetWrapper(net);        
             List<Node> netNodes = RouterHelper.getNodesOfNet(net);            
             for(Node node:netNodes) {    
-                if(node.getTile().getTileTypeEnum() != TileTypeEnum.INT) continue;
+                if (node.getTile().getTileTypeEnum() != TileTypeEnum.INT) continue;
                 usedNodes++;    
                 int wl = RouterHelper.getLengthOfNode(node);    
                 this.wirelength += wl;
@@ -121,20 +121,20 @@ public class TimingAndWirelengthReport{
         SitePinInst source = net.getSource();
         Node sourceINTNode = null;
         for(SitePinInst sink:net.getSinkPins()) {
-            if(RouterHelper.isExternalConnectionToCout(source, sink)) {
+            if (RouterHelper.isExternalConnectionToCout(source, sink)) {
                 source = net.getAlternateSource();
-                if(source == null) {
+                if (source == null) {
                     String errMsg = "Null alternate source is for COUT-CIN connection: " + net.toStringFull();
                      throw new IllegalArgumentException(errMsg);
                 }
             }
             Connection connection = new Connection(this.numConnectionsToRoute++, source, sink, netWrapper);    
             List<Node> nodes = RouterHelper.projectInputPinToINTNode(sink);
-            if(nodes.isEmpty()) {    
+            if (nodes.isEmpty()) {    
                 connection.setDirect(true);
             } else {
                 connection.setSinkRnode(new RoutableNode(this.rnodeId++, nodes.get(0), RoutableType.PINFEED_I));
-                if(sourceINTNode == null) {
+                if (sourceINTNode == null) {
                     sourceINTNode = RouterHelper.projectOutputPinToINTNode(source);
                 }
                 connection.setSourceRnode(new RoutableNode(this.rnodeId++, sourceINTNode, RoutableType.PINFEED_O));
@@ -157,14 +157,14 @@ public class TimingAndWirelengthReport{
             // This approach works because we observed that the PIPs are in order
             Node startNode = pip.getStartNode();
             RoutingNode startrn = RouterHelper.createRoutingNode(startNode, nodeRoutingNodeMap);
-            if(firstPIP) startrn.setDelayFromSource(0);
+            if (firstPIP) startrn.setDelayFromSource(0);
             firstPIP = false;
             
             Node endNode = pip.getEndNode();
             RoutingNode endrn = RouterHelper.createRoutingNode(endNode, nodeRoutingNodeMap);
             endrn.setPrev(startrn);
             float delay = 0;
-            if(endNode.getTile().getTileTypeEnum() == TileTypeEnum.INT) {
+            if (endNode.getTile().getTileTypeEnum() == TileTypeEnum.INT) {
                 delay = RouterHelper.computeNodeDelay(this.estimator, endrn.getNode())
                         + DelayEstimatorBase.getExtraDelay(endNode, DelayEstimatorBase.isLong(startNode));
             }
@@ -172,18 +172,18 @@ public class TimingAndWirelengthReport{
         }
         
         for(Connection connection : netWrapper.getConnections()) {
-            if(connection.isDirect()) continue;
+            if (connection.isDirect()) continue;
             Node sinkNode = connection.getSinkRnode().getNode();
             RoutingNode sinkrn = nodeRoutingNodeMap.get(sinkNode);
-            if(sinkrn == null) continue;
+            if (sinkrn == null) continue;
             float connectionDelay = sinkrn.getDelayFromSource();
-            if(connection.getTimingEdges() == null) continue;
+            if (connection.getTimingEdges() == null) continue;
             connection.setTimingEdgesDelay(connectionDelay);    
         }    
     }
     
     public static void main(String[] args) {
-        if(args.length < 1) {
+        if (args.length < 1) {
             System.out.println("USAGE:\n <input.dcp>");
         }
         Design design = Design.readCheckpoint(args[0]);

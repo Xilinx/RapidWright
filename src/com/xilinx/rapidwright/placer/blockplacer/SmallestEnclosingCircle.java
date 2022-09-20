@@ -86,23 +86,23 @@ public class SmallestEnclosingCircle {
             double minAngle = Math.PI;
             minPoint = null;
             for(Point v: convexHull) {
-                if(v.equals(s1) || v.equals(s2)) {
+                if (v.equals(s1) || v.equals(s2)) {
                     continue;
                 }
                 //compute the angle subtended by s;
                 double subtended = angle(s1, v, s2);
-                if(subtended < minAngle) {
+                if (subtended < minAngle) {
                     minAngle = subtended;
                     minPoint = v;
                 }
             }
-            if(minAngle > (Math.PI / 2)) {
+            if (minAngle > (Math.PI / 2)) {
                 //use the side S to determine the circle
                 finished = true;
-            } else if(angle(s1, s2, minPoint) > (Math.PI / 2)) {
+            } else if (angle(s1, s2, minPoint) > (Math.PI / 2)) {
                 //this angle is obtuse, set the side S accordingly
                 s2 = minPoint;
-            } else if(angle(s2, s1, minPoint) > (Math.PI / 2)) {
+            } else if (angle(s2, s1, minPoint) > (Math.PI / 2)) {
                 //this angle is obtuse, set the side S accordingly
                 s1 = minPoint;
             } else {
@@ -112,7 +112,7 @@ public class SmallestEnclosingCircle {
             }
         }
         
-        if(useMinPoint) {
+        if (useMinPoint) {
             //use the side S and the minPoint to determine the circle
             Point circumcenter = getCircumcenter( s1, s2, minPoint);
             center.x = circumcenter.x;

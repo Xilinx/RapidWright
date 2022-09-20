@@ -95,7 +95,7 @@ public class EDIFPropertyValue {
      * parse.
      */
     public Integer getIntValue() {
-        if(type != EDIFValueType.INTEGER) {
+        if (type != EDIFValueType.INTEGER) {
             return null;
         }
         int radix = 10;
@@ -103,7 +103,7 @@ public class EDIFPropertyValue {
         boolean isSigned = value.contains("-");
         for(int i=0; i < value.length(); i++) {
             char c = value.charAt(i);
-            if(lastCharWasTick) {
+            if (lastCharWasTick) {
                 switch (c) {
                     case 'b':
                     case 'B':
@@ -126,17 +126,17 @@ public class EDIFPropertyValue {
                         isSigned = true;
                         continue;
                 }
-                if(isSigned) {
+                if (isSigned) {
                     return Integer.parseInt(value.substring(i+1), radix);
                 }
                 return Integer.parseUnsignedInt(value.substring(i+1), radix);
                 
             }
-            if(c == '\'') {
+            if (c == '\'') {
                 lastCharWasTick = true;
             }
         }
-        if(isSigned) {
+        if (isSigned) {
             return Integer.parseInt(value);
         }
         return Integer.parseUnsignedInt(value);
@@ -149,7 +149,7 @@ public class EDIFPropertyValue {
      * parse.
      */
     public Long getLongValue() {
-        if(type != EDIFValueType.STRING) {
+        if (type != EDIFValueType.STRING) {
             return null;
         }
         int radix = 10;
@@ -157,7 +157,7 @@ public class EDIFPropertyValue {
         boolean isSigned = false;
         for(int i=0; i < value.length(); i++) {
             char c = value.charAt(i);
-            if(lastCharWasTick) {
+            if (lastCharWasTick) {
                 switch (c) {
                     case 'b':
                     case 'B':
@@ -180,13 +180,13 @@ public class EDIFPropertyValue {
                         isSigned = true;
                         continue;
                 }
-                if(isSigned) {
+                if (isSigned) {
                     return Long.parseLong(value.substring(i+1), radix);
                 }
                 return Long.parseUnsignedLong(value.substring(i+1), radix);
                 
             }
-            if(c == '\'') {
+            if (c == '\'') {
                 lastCharWasTick = true;
             }
         }
@@ -207,11 +207,11 @@ public class EDIFPropertyValue {
         os.write('(');
         os.write(type.toString().getBytes(StandardCharsets.UTF_8));
         os.write(' ');
-        if(type == EDIFValueType.STRING) {
+        if (type == EDIFValueType.STRING) {
             os.write('\"');
             os.write(value.getBytes(StandardCharsets.UTF_8));
             os.write('\"');
-        } else if(type == EDIFValueType.BOOLEAN) {
+        } else if (type == EDIFValueType.BOOLEAN) {
             os.write('(');
             os.write(value.getBytes(StandardCharsets.UTF_8));
             os.write(')');
@@ -238,7 +238,7 @@ public class EDIFPropertyValue {
                 int radix = radixValues[i];
                 char radixChar = radixChars[i];
                 for(String signed : new String[] {"s", "S", ""}) {
-                    if(testValue < 0 && signed.length() != 0) continue;
+                    if (testValue < 0 && signed.length() != 0) continue;
                     String value = signed.length() == 0 ? Integer.toUnsignedString(testValue,radix) :
                         Integer.toString(testValue,radix);
                     examples.put("32'" + Character.toString(radixChar) + value, testValue);
@@ -256,7 +256,7 @@ public class EDIFPropertyValue {
             System.out.print(e.getKey() + " " + e.getValue());
             Integer parsedValue = p.getIntValue();
             System.out.println( " " + parsedValue);
-            if(!e.getValue().equals(parsedValue)) {
+            if (!e.getValue().equals(parsedValue)) {
                 throw new RuntimeException("ERROR: Couldn't parse test value " + e.getKey());
             }
         }

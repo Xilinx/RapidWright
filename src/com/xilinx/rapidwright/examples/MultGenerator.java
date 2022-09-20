@@ -215,13 +215,13 @@ public class MultGenerator extends ArithmeticGenerator {
                 EDIFPort p = inst.getCellType().getPort(bus);
                 int stop = p.getWidth();
                 boolean isAorB = bus.equals("A") || bus.equals("B"); 
-                if(isAorB) {
+                if (isAorB) {
                     // Don't gnd the inputs
                     stop = p.getWidth() - width;
                 }
                 for(int i=0; i < stop; i++) {
                     logicSrc.createPortInst(p, i, inst);
-                    if(bus.equals("D")) bus = "DIN";
+                    if (bus.equals("D")) bus = "DIN";
                     physNet.createPin(false, bus + (isAorB ? i+width : i), si);
                 }
             }
@@ -235,13 +235,13 @@ public class MultGenerator extends ArithmeticGenerator {
             EDIFPort p = inst.getCellType().getPort(gndBus);
             int stop = p.getWidth();
             boolean isAorB = gndBus.equals("A") || gndBus.equals("B"); 
-            if(isAorB) {
+            if (isAorB) {
                 // Don't gnd the inputs
                 stop = p.getWidth() - width;
             }
             for(int i=0; i < stop; i++) {
                 gnd.createPortInst(p, i, inst);
-                if(gndBus.equals("D")) gndBus = "DIN";
+                if (gndBus.equals("D")) gndBus = "DIN";
                 logic0.createPin(false, gndBus + (isAorB ? i+width : i), si);
             }
         }
@@ -256,7 +256,7 @@ public class MultGenerator extends ArithmeticGenerator {
         EDIFPort opmode = inst.getPort("OPMODE"); 
         for(int i=0; i < opmode.getWidth(); i++) {
             char c = opmodeValue.charAt(i);
-            if(c == '1') {
+            if (c == '1') {
                 gnd.createPortInst(opmode, i, inst);
                 logic0.createPin(false, opmode.getBusName()+(opmode.getWidth()-i-1), si);
             } else {
@@ -322,9 +322,9 @@ public class MultGenerator extends ArithmeticGenerator {
         for(String element : sitePIPElements) {
             String pinName = element.substring(0, element.length()-3);
             Net net = null;
-            if(element.equals("CLKINV")) {
+            if (element.equals("CLKINV")) {
                 net = physClk;
-            } else if(element.startsWith("OPMODE")) {
+            } else if (element.startsWith("OPMODE")) {
                 int idx = element.charAt(6) - 48;
                 char c = OPMODE_VALUE.charAt(OPMODE_VALUE.length()-idx-1);
                 net = c == 1 ? logic1 : logic0;
@@ -336,8 +336,8 @@ public class MultGenerator extends ArithmeticGenerator {
         }
         
         for(EDIFPort port : inst.getCellType().getPorts()) {
-            if(!port.isOutput()) continue;
-            if(port.getBusName().equals(RESULT_NAME)) continue;
+            if (!port.isOutput()) continue;
+            if (port.getBusName().equals(RESULT_NAME)) continue;
             for(int i=0; i < port.getWidth(); i++) {
                 EDIFNet net = top.createNet(designName + "/" + port.getBusName() + (port.getWidth() > 1 ? "["+i+"]" : ""));
                 net.createPortInst(port.getBusName(), i, inst);
@@ -345,11 +345,11 @@ public class MultGenerator extends ArithmeticGenerator {
                 
                 // Correct differences in physical pin names
                 String busName = port.getBusName();
-                if(busName.equals("ACOUT") || busName.equals("BCOUT")) {
+                if (busName.equals("ACOUT") || busName.equals("BCOUT")) {
                     busName = busName.replace("COUT", "COUT_B");
-                } else if(busName.equals("PATTERNDETECT")) {
+                } else if (busName.equals("PATTERNDETECT")) {
                     busName = "PATTERN_DETECT";
-                } else if(busName.equals("PATTERNBDETECT")) {
+                } else if (busName.equals("PATTERNBDETECT")) {
                     busName = "PATTERN_B_DETECT";
                 }
                 
@@ -365,14 +365,14 @@ public class MultGenerator extends ArithmeticGenerator {
             next_pin : for(int i=elem.getHighestInputIndex()+1; i < elem.getPins().length; i++) {
                 BELPin outpin = elem.getPin(i);
                 for(BELPin conn : outpin.getSiteConns()) {
-                    if(conn.isSitePort()) continue next_pin;
+                    if (conn.isSitePort()) continue next_pin;
                 }
                 String pinName = null;
-                if(specialCases.contains(outpin.getName())) {
+                if (specialCases.contains(outpin.getName())) {
                     pinName = outpin.getName();
-                } else if(outpin.getName().startsWith("A2A1")) {
+                } else if (outpin.getName().startsWith("A2A1")) {
                     pinName = outpin.getName().replace("A2A1", "A2A1<") + ">";
-                } else if(outpin.getName().startsWith("B2B1")) {
+                } else if (outpin.getName().startsWith("B2B1")) {
                     pinName = outpin.getName().replace("B2B1", "B2B1<") + ">";
                 } else {
                     pinName = StringTools.addIndexingAngleBrackets(outpin.getName());
@@ -432,7 +432,7 @@ public class MultGenerator extends ArithmeticGenerator {
         OptionParser p = createOptionParser();
         OptionSet opts = p.parse(args);
         boolean verbose = (boolean) opts.valueOf(VERBOSE_OPT);
-        if(opts.has(HELP_OPT)) {
+        if (opts.has(HELP_OPT)) {
             printHelp(p);
             return;
         }
@@ -448,7 +448,7 @@ public class MultGenerator extends ArithmeticGenerator {
         
         // Perform some error checking on inputs
         Part part = PartNameTools.getPart(partName);
-        if(part == null || part.isSeries7()) {
+        if (part == null || part.isSeries7()) {
             throw new RuntimeException("ERROR: Invalid/unsupport part " + partName + ".");
         }
         
@@ -468,6 +468,6 @@ public class MultGenerator extends ArithmeticGenerator {
         t.stop();
 
         d.writeCheckpoint(outputDCPFileName, t);
-        if(verbose) System.out.println("Wrote final DCP: " + outputDCPFileName);
+        if (verbose) System.out.println("Wrote final DCP: " + outputDCPFileName);
     }
 }

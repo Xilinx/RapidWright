@@ -65,14 +65,14 @@ public class UltraScaleClockRouting {
         while(!q.isEmpty()) {
             RouteNode curr = q.poll();
             IntentCode c = curr.getIntentCode(); 
-            if(c == IntentCode.NODE_GLOBAL_HROUTE) {
+            if (c == IntentCode.NODE_GLOBAL_HROUTE) {
                 clk.getPIPs().addAll(curr.getPIPsBackToSource());
                 return curr;
             }
             for(Wire w : curr.getWireConnections()) {
                 q.add(new RouteNode(w.getTile(), w.getWireIndex(), curr, curr.getLevel()+1));
             }
-            if(watchDog-- == 0) break;
+            if (watchDog-- == 0) break;
         }
         return null;
     }
@@ -114,16 +114,16 @@ public class UltraScaleClockRouting {
 
             for(Wire w : curr.getWireConnections()) {
                 RouteNode parent = curr.getParent();
-                if(parent != null) {
-                    if(w.getIntentCode()      == IntentCode.NODE_GLOBAL_VDISTR &&
+                if (parent != null) {
+                    if (w.getIntentCode()      == IntentCode.NODE_GLOBAL_VDISTR &&
                        curr.getIntentCode()   == IntentCode.NODE_GLOBAL_VROUTE &&
                        parent.getIntentCode() == IntentCode.NODE_GLOBAL_VROUTE &&
                        clockRegion.equals(w.getTile().getClockRegion()) &&
                        clockRegion.equals(curr.getTile().getClockRegion()) &&
                        clockRegion.equals(parent.getTile().getClockRegion()) &&
                        parent.getWireName().contains("BOT")) {
-                        if(adjusted) {
-                            if(findCentroidHroute) {
+                        if (adjusted) {
+                            if (findCentroidHroute) {
                                 centroidHRouteNode = curr.getParent();
                                 while(centroidHRouteNode.getIntentCode() != IntentCode.NODE_GLOBAL_HROUTE) {
                                     centroidHRouteNode = centroidHRouteNode.getParent();
@@ -142,16 +142,16 @@ public class UltraScaleClockRouting {
                 }
                 
                 // Only using routing lines to get to centroid
-                if(!w.getIntentCode().isUltraScaleClockRouting()) continue;
-                if(adjusted && !findCentroidHroute && w.getIntentCode() == IntentCode.NODE_GLOBAL_HROUTE) {
+                if (!w.getIntentCode().isUltraScaleClockRouting()) continue;
+                if (adjusted && !findCentroidHroute && w.getIntentCode() == IntentCode.NODE_GLOBAL_HROUTE) {
                     continue;
                 }
                 RouteNode rn = new RouteNode(w.getTile(), w.getWireIndex(), curr, curr.getLevel()+1);
-                if(visited.contains(rn)) continue;
+                if (visited.contains(rn)) continue;
                 rn.setCost(rn.getTile().getManhattanDistance(approxTarget));
                 q.add(rn);
             }
-            if(watchDog-- == 0) {
+            if (watchDog-- == 0) {
                 throw new RuntimeException("ERROR: Could not route from " + startingRouteNode + " to clock region " + clockRegion);
             }
         }
@@ -181,9 +181,9 @@ public class UltraScaleClockRouting {
 
             for(Wire w : curr.getWireConnections()) {
                 // Only using clk routing network to reach centroid
-                if(!w.getIntentCode().isUltraScaleClocking()) continue;
+                if (!w.getIntentCode().isUltraScaleClocking()) continue;
                 
-                if(w.getWireName().equals(centroid.getWireName()) 
+                if (w.getWireName().equals(centroid.getWireName()) 
                         && w.getTile().equals(centroid.getTile())) {
                     // curr is not the target, build the target
                     RouteNode routeNodeTarget = new RouteNode(w.getTile(), w.getWireIndex(), curr, curr.getLevel()+1);
@@ -192,13 +192,13 @@ public class UltraScaleClockRouting {
                 }
                     
                 RouteNode rn = new RouteNode(w.getTile(), w.getWireIndex(), curr, curr.getLevel()+1);
-                if(visited.contains(rn)) continue;
+                if (visited.contains(rn)) continue;
                 // using column & row based distance is more accurate than tile x/y coordinate based distance
                 int md = Math.abs(rn.getTile().getColumn() - tileTarget.getColumn()) + Math.abs(rn.getTile().getRow() - tileTarget.getRow());
                 rn.setCost(md);
                 q.add(rn);
             }
-            if(watchDog-- == 0) {
+            if (watchDog-- == 0) {
                 throw new RuntimeException("ERROR: Could not route from " + startingRouteNode + "\n       to the given centroid: " + centroid 
                                             + ".\n       Please check if BUFGCE is correctly placed in line with the reference.");
             }
@@ -215,7 +215,7 @@ public class UltraScaleClockRouting {
      */
     public static RouteNode transitionCentroidToDistributionLine(Net clk, RouteNode centroidRouteLine) {
         centroidRouteLine.setParent(null);
-        if(centroidRouteLine.getIntentCode() == IntentCode.NODE_GLOBAL_VDISTR) {
+        if (centroidRouteLine.getIntentCode() == IntentCode.NODE_GLOBAL_VDISTR) {
             return centroidRouteLine;
         }
         ClockRegion currCR = centroidRouteLine.getTile().getClockRegion();
@@ -224,12 +224,12 @@ public class UltraScaleClockRouting {
     
     public static RouteNode transitionCentroidToVerticalDistributionLine(Net clk, RouteNode centroidRouteLine, boolean down) {
         centroidRouteLine.setParent(null);
-        if(centroidRouteLine.getIntentCode() == IntentCode.NODE_GLOBAL_VDISTR) {
+        if (centroidRouteLine.getIntentCode() == IntentCode.NODE_GLOBAL_VDISTR) {
             return centroidRouteLine;
         }
         
         ClockRegion currCR = centroidRouteLine.getTile().getClockRegion();
-        if(down) currCR = currCR.getNeighborClockRegion(-1, 0);
+        if (down) currCR = currCR.getNeighborClockRegion(-1, 0);
         return transitionCentroidToDistributoinLine(clk, centroidRouteLine, currCR);
     }
     
@@ -241,17 +241,17 @@ public class UltraScaleClockRouting {
         while(!q.isEmpty()) {
             RouteNode curr = q.poll();
             IntentCode c = curr.getIntentCode(); 
-            if(curr.getTile().getClockRegion().equals(currCR) && c == IntentCode.NODE_GLOBAL_VDISTR) {
+            if (curr.getTile().getClockRegion().equals(currCR) && c == IntentCode.NODE_GLOBAL_VDISTR) {
                 clk.getPIPs().addAll(curr.getPIPsBackToSource());
                 return curr;
             }
             for(Wire w : curr.getWireConnections()) {
                 // Stay in this clock region to transition from 
-                if(!currCR.equals(w.getTile().getClockRegion())) continue;
-                if(!w.getIntentCode().isUltraScaleClocking()) continue;
+                if (!currCR.equals(w.getTile().getClockRegion())) continue;
+                if (!w.getIntentCode().isUltraScaleClocking()) continue;
                 q.add(new RouteNode(w.getTile(), w.getWireIndex(), curr, curr.getLevel()+1));
             }
-            if(watchDog-- == 0) break;
+            if (watchDog-- == 0) break;
         }
         return null;
     }
@@ -284,7 +284,7 @@ public class UltraScaleClockRouting {
                 visited.add(curr);
                 IntentCode c = curr.getIntentCode();
                 ClockRegion currCR = curr.getTile().getClockRegion();
-                if(currCR != null && cr.getRow() == currCR.getRow() && c == IntentCode.NODE_GLOBAL_VDISTR) {
+                if (currCR != null && cr.getRow() == currCR.getRow() && c == IntentCode.NODE_GLOBAL_VDISTR) {
                     List<PIP> pips = curr.getPIPsBackToSource();
                     allPIPs.addAll(pips);
                     for(PIP p : pips) {
@@ -295,9 +295,9 @@ public class UltraScaleClockRouting {
                     continue nextClockRegion;
                 }
                 for(Wire w : curr.getWireConnections()) {
-                    if(w.getIntentCode() != IntentCode.NODE_GLOBAL_VDISTR) continue;
+                    if (w.getIntentCode() != IntentCode.NODE_GLOBAL_VDISTR) continue;
                     RouteNode rn = new RouteNode(w.getTile(), w.getWireIndex(), curr, curr.getLevel()+1);
-                    if(visited.contains(rn)) continue;
+                    if (visited.contains(rn)) continue;
                     rn.setCost(w.getTile().getManhattanDistance(crTarget));
                     q.add(rn);
                 }
@@ -327,14 +327,14 @@ public class UltraScaleClockRouting {
             while(!q.isEmpty()) {
                 RouteNode curr = q.poll(); 
                 IntentCode c = curr.getIntentCode();
-                if(e.getKey().equals(curr.getTile().getClockRegion()) && c == IntentCode.NODE_GLOBAL_HDISTR) {
+                if (e.getKey().equals(curr.getTile().getClockRegion()) && c == IntentCode.NODE_GLOBAL_HDISTR) {
                     List<PIP> pips = curr.getPIPsBackToSource();
                     allPIPs.addAll(pips);
                     distLines.add(curr);
                     continue nextClockRegion;
                 }
                 for(Wire w : curr.getWireConnections()) { 
-                    if(!w.getIntentCode().isUltraScaleClocking()) continue;
+                    if (!w.getIntentCode().isUltraScaleClocking()) continue;
                     q.add(new RouteNode(w.getTile(), w.getWireIndex(), curr, curr.getLevel()+1));
                 }
             }
@@ -359,7 +359,7 @@ public class UltraScaleClockRouting {
         for(RouteNode rn : distLines) {
             ClockRegion cr = rn.getTile().getClockRegion();
             Set<RouteNode> routeNodes = startingPoints.get(cr);
-            if(routeNodes == null) {
+            if (routeNodes == null) {
                 routeNodes = new HashSet<>();
                 startingPoints.put(cr, routeNodes);
             }
@@ -382,7 +382,7 @@ public class UltraScaleClockRouting {
             while(!q.isEmpty()) {
                 RouteNode curr = q.poll(); 
                 visited.add(curr);
-                if(lcb.equals(curr)) {
+                if (lcb.equals(curr)) {
                     List<PIP> pips = curr.getPIPsBackToSource();
                     allPIPs.addAll(pips);
                     
@@ -395,15 +395,15 @@ public class UltraScaleClockRouting {
                 }
                 for(Wire w : curr.getWireConnections()) {
                     // Stay in this clock region
-                    if(!currCR.equals(w.getTile().getClockRegion())) continue;
-                    if(!w.getIntentCode().isUltraScaleClocking()) {
+                    if (!currCR.equals(w.getTile().getClockRegion())) continue;
+                    if (!w.getIntentCode().isUltraScaleClocking()) {
                         // Final node will not be clocking intent code
                         SitePin p = w.getSitePin(); 
-                        if(p == null) continue;
-                        if(p.getSite().getSiteTypeEnum() != SiteTypeEnum.BUFCE_LEAF) continue;
+                        if (p == null) continue;
+                        if (p.getSite().getSiteTypeEnum() != SiteTypeEnum.BUFCE_LEAF) continue;
                     }
                     RouteNode rn = new RouteNode(w.getTile(), w.getWireIndex(), curr, curr.getLevel()+1);
-                    if(visited.contains(rn)) continue;
+                    if (visited.contains(rn)) continue;
                     rn.setCost(rn.getManhattanDistance(lcb));
                     q.add(rn);
                 }
@@ -431,13 +431,13 @@ public class UltraScaleClockRouting {
             
                 while(!q.isEmpty()) {
                     RouteNode curr = q.poll(); 
-                    if(target.equals(curr)) {
+                    if (target.equals(curr)) {
                         List<PIP> pips = curr.getPIPsBackToSource();
                         currPIPs.addAll(pips);
                         continue nextPin;
                     }
                     for(Wire w : curr.getWireConnections()) {
-                        if(used.contains(w)) continue;
+                        if (used.contains(w)) continue;
                         q.add(new RouteNode(w.getTile(), w.getWireIndex(), curr, curr.getLevel()+1));
                     }
                 }
@@ -464,19 +464,19 @@ public class UltraScaleClockRouting {
     public static List<RouteNode> routeToHorizontalDistributionLines(Net clk, RouteNode vroute, List<ClockRegion> clockRegions, boolean down) {
         boolean verbose = false;
         RouteNode centroidDistNode = UltraScaleClockRouting.transitionCentroidToVerticalDistributionLine(clk, vroute, down);
-        if(verbose) System.out.println(" transition distribution node is \n \t = " + centroidDistNode);
+        if (verbose) System.out.println(" transition distribution node is \n \t = " + centroidDistNode);
         
-        if(centroidDistNode == null) return null;
+        if (centroidDistNode == null) return null;
         
         Map<ClockRegion, RouteNode> vertDistLines = routeCentroidToVerticalDistributionLines(clk, centroidDistNode, clockRegions);
-        if(verbose) {
+        if (verbose) {
             System.out.println(" clock region - vertical distribution node ");
             for(ClockRegion cr : vertDistLines.keySet()) System.out.println(" \t" + cr + " \t " + vertDistLines.get(cr));
         }
         
         List<RouteNode> distLines = new ArrayList<>();
         distLines.addAll(routeCentroidToHorizontalDistributionLines(clk, centroidDistNode, vertDistLines));
-        if(verbose) System.out.println(" dist lines are \n \t" + distLines);
+        if (verbose) System.out.println(" dist lines are \n \t" + distLines);
         
         return distLines;
     }

@@ -52,7 +52,7 @@ public class PartNameTools {
         try (Input his = FileTools.getKryoInputStream(FileTools.getRapidWrightResourceInputStream(FileTools.PART_DB_PATH))) {
         
             int version = his.readInt();
-            if(version != FileTools.PART_DB_FILE_VERSION) {
+            if (version != FileTools.PART_DB_FILE_VERSION) {
                 throw new RuntimeException("ERROR: " + FileTools.PART_DB_PATH
                     + " file version is incorrect.  Expecting version "
                     + FileTools.PART_DB_FILE_VERSION + ", found " + version + ".");
@@ -83,9 +83,9 @@ public class PartNameTools {
                     Series.valueOf(strings[part[17]])
                     );
                 addToPartMap(strings[part[0]], tmpPart);
-                if(!(strings[part[8]].isEmpty())) {
+                if (!(strings[part[8]].isEmpty())) {
                     addToPartMap(strings[part[4]]+"-"+strings[part[8]], tmpPart);
-                    if(!partMap.containsKey(strings[part[4]])) {
+                    if (!partMap.containsKey(strings[part[4]])) {
                         addToPartMap(strings[part[4]], tmpPart);
                         addToPartMap(strings[part[4]]+strings[part[5]], tmpPart);
                         addToPartMap(strings[part[4]]+strings[part[5]]+strings[part[6]], tmpPart);
@@ -105,10 +105,10 @@ public class PartNameTools {
     public static Part getPart(String partName) {
         String normalizedName = partName.toLowerCase();
         Part p = partMap.get(normalizedName);
-        if(p == null && !normalizedName.startsWith("xc")) {
+        if (p == null && !normalizedName.startsWith("xc")) {
             p = partMap.get("xc" + normalizedName);
         }
-        if(p == null) {
+        if (p == null) {
             throw new RuntimeException("\n\n\tERROR: Couldn't identify " + normalizedName + " in RapidWright part database. ");
         }
         return p;
@@ -281,7 +281,7 @@ public class PartNameTools {
      * attempts to handle the case properly.
      */
     public static String getDeviceAndPackage(Part p) {
-        if(p.getArchitectureFullName().contains("UltraScale")) {
+        if (p.getArchitectureFullName().contains("UltraScale")) {
             return p.getDevice()+"-"+p.getPkg();
         }
         return p.getDevice()+p.getPkg();
@@ -295,7 +295,7 @@ public class PartNameTools {
     public static List<Part> getAllParts(Series series) {
         ArrayList<Part> parts = new ArrayList<>();
         for(Part p : getParts()) {
-            if(p.getSeries() == series) parts.add(p);
+            if (p.getSeries() == series) parts.add(p);
         }
         return parts;
     }

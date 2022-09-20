@@ -96,10 +96,10 @@ public class HandPlacer extends QMainWindow {
 
         boolean debugPlacer = false;
         String fileToOpen = null;
-        if(args.length > 0) {
+        if (args.length > 0) {
             fileToOpen = args[0];
         }
-        if(args.length == 2 && args[1].equalsIgnoreCase("-g")) {
+        if (args.length == 2 && args[1].equalsIgnoreCase("-g")) {
             System.out.println("DEBUG MODE");
             debugPlacer = true;
         }
@@ -124,7 +124,7 @@ public class HandPlacer extends QMainWindow {
     }
     
     public static void openDesign(Design d, boolean nonBlocking) {
-        if(nonBlocking) {
+        if (nonBlocking) {
             new Thread(new Runnable() {
                  public void run() {
                       openDesign(d);
@@ -164,8 +164,8 @@ public class HandPlacer extends QMainWindow {
         
         init(debugPlacer);
 
-        if(fileToOpen != null && new File(fileToOpen).exists()) {
-            if(debugPlacer) {
+        if (fileToOpen != null && new File(fileToOpen).exists()) {
+            if (debugPlacer) {
                 //internalOpenWithAutoPlacer(fileToOpen);
             }
             else {
@@ -229,13 +229,13 @@ public class HandPlacer extends QMainWindow {
     
     @SuppressWarnings("unused")
     private void updateListSelection() {
-        if(macroList.hasFocus())
+        if (macroList.hasFocus())
             return;
         macroList.clearSelection();
         for(QGraphicsItemInterface item : scene.selectedItems()) {
             String modInstName = ((GUIModuleInst)item).getModuleInst().getName();
             List<QTreeWidgetItem> itemList = macroList.findItems(modInstName, new MatchFlags(MatchFlag.MatchExactly), 0);
-            if(itemList.size() > 0) {
+            if (itemList.size() > 0) {
                 itemList.get(0).setSelected(true);
             }
         }
@@ -243,13 +243,13 @@ public class HandPlacer extends QMainWindow {
     
     @SuppressWarnings("unused")
     private void updateSceneSelection() {
-        if(scene.hasFocus())
+        if (scene.hasFocus())
             return;
         scene.clearSelection();
         for(QTreeWidgetItem item : macroList.selectedItems()) {
             String modInstName = item.text(0);
             GUIModuleInst gmi = scene.getGMI(modInstName);
-            if(gmi != null) {
+            if (gmi != null) {
                 gmi.setSelected(true);
             }
         }
@@ -297,7 +297,7 @@ public class HandPlacer extends QMainWindow {
 
     public void updateDesign(ArrayList<PartitionLine> lines) {
         scene.openNewDesign(debugDesign);
-        if(lines != null) {
+        if (lines != null) {
             for(PartitionLine line : lines) {
                 line.drawPartitionLine(scene);
             }            
@@ -307,7 +307,7 @@ public class HandPlacer extends QMainWindow {
     protected void openDesign() {
         /*String fileName = QFileDialog.getOpenFileName(this, "Choose a file...",
                 ".", FileFilters.xdlFilter);
-        if(fileName.endsWith(".xdl")) {
+        if (fileName.endsWith(".xdl")) {
             internalOpenDesign(fileName);
         }*/
         System.out.println("TODO: Need modular design open method");
@@ -328,7 +328,7 @@ public class HandPlacer extends QMainWindow {
     }
     
     protected void saveAsDCPDesign() {
-        if(scene.getDesign() == null)
+        if (scene.getDesign() == null)
             return;
         String fileName = QFileDialog.getSaveFileName(this, tr("Save As"),".", FileFilters.dcpFilter);
         if (fileName.length() == 0)
@@ -339,7 +339,7 @@ public class HandPlacer extends QMainWindow {
     }
     
     protected void saveAsPDFDesign() {
-        if(scene.getDesign() == null)
+        if (scene.getDesign() == null)
             return;
         String fileName = QFileDialog.getSaveFileName(this, tr("Save As PDF"),".", FileFilters.pdfFilter);
         if (fileName.length() == 0)
@@ -442,13 +442,13 @@ public class HandPlacer extends QMainWindow {
         for(QGraphicsItemInterface item : scene.selectedItems()) {
             QPointF gmiTL = item.pos();
             QPointF gmiBR = item.pos().add(item.boundingRect().bottomRight());
-            if(top < 0 || gmiTL.y() < top)
+            if (top < 0 || gmiTL.y() < top)
                 top = gmiTL.y();
-            if(left < 0 || gmiTL.x() < left)
+            if (left < 0 || gmiTL.x() < left)
                 left = gmiTL.x();
-            if(bottom < 0 || gmiBR.y() > bottom)
+            if (bottom < 0 || gmiBR.y() > bottom)
                 bottom = gmiBR.y();
-            if(right < 0 || gmiBR.x() > right)
+            if (right < 0 || gmiBR.x() > right)
                 right = gmiBR.x();
         }
         view.fitInView(left, top, right-left, bottom-top, Qt.AspectRatioMode.KeepAspectRatio);    

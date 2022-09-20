@@ -48,9 +48,9 @@ public class NumberedHighlightedTile  extends QGraphicsRectItem{
         int x = scene.getDrawnTileX(t) * scene.tileSize;
         int y = scene.getDrawnTileY(t) * scene.tileSize;
         text.setPos(x-4, y);
-        if(number < 100) {
+        if (number < 100) {
             text.setFont(font8);            
-        } else if(number < 1000) {
+        } else if (number < 1000) {
             text.setFont(font6);
         } else {
             text.setFont(font4);

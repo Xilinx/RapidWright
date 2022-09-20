@@ -219,7 +219,7 @@ public class LogNetlistWriter {
                     } else {
                         piBuilder.setExtPort(Void.VOID);
                     }
-                    if(portInst.getPort().isBus()) {
+                    if (portInst.getPort().isBus()) {
                         piBuilder.initBusIdx().setIdx(portInst.getIndex());
                     }
                     k++;
@@ -291,9 +291,9 @@ public class LogNetlistWriter {
      * @throws IOException
      */
     public static void writeLogNetlist(EDIFNetlist n, String fileName, boolean collapseMacros) throws IOException {
-        if(collapseMacros) {
+        if (collapseMacros) {
             Device device = n.getDevice();
-            if(device != null) {
+            if (device != null) {
                 n.collapseMacroUnisims(device.getSeries());
             } else {
                 System.err.println("WARNING: Could not collapse macros in netlist as part target device"

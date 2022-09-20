@@ -48,7 +48,7 @@ public class TileSources implements Serializable{
     public int hashCode() {
         int hash = 0;
         
-        if(sources == null) {
+        if (sources == null) {
             return hash;
         }
         else {
@@ -72,16 +72,16 @@ public class TileSources implements Serializable{
         if (getClass() != obj.getClass())
             return false;
         TileSources other = (TileSources) obj;
-        if(other.sources == null && sources == null) {
+        if (other.sources == null && sources == null) {
             return true;
         }
-        if(other.sources == null || sources == null) {
+        if (other.sources == null || sources == null) {
             return false;
         }
         Arrays.sort(other.sources);
         Arrays.sort(sources);
         for(int i=0; i< sources.length; i++) {
-            if(sources[i] != other.sources[i]) {
+            if (sources[i] != other.sources[i]) {
                 return false;
             }
         }

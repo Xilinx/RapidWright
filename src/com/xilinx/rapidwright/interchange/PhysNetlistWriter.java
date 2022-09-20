@@ -96,10 +96,10 @@ public class PhysNetlistWriter {
     
     protected static String getUniqueLockedCellName(Cell cell, HashMap<String,PhysCellType> physCells) {
         String cellName = cell.getName();
-        if(cellName.equals(LOCKED)) {
+        if (cellName.equals(LOCKED)) {
             cellName = cell.getSiteName() + "_" + cell.getBELName() + "_" + LOCKED;
             physCells.put(cellName,PhysCellType.LOCKED);
-        } else if(cell.getType().equals(PORT)) {
+        } else if (cell.getType().equals(PORT)) {
             physCells.put(cellName,PhysCellType.PORT);
         }
         return cellName;
@@ -118,15 +118,15 @@ public class PhysNetlistWriter {
         HashMap<String,ArrayList<Cell>> multiBelCells = new HashMap<>();
         int i=0;
         for(SiteInst siteInst : siteInsts) {
-            if(!siteInst.isPlaced()) continue;
+            if (!siteInst.isPlaced()) continue;
             for(Cell cell : siteInst.getCells()) {
                 allCells.add(cell);
-                if(!cell.isPlaced()) continue;
+                if (!cell.isPlaced()) continue;
                 String cellName = cell.getName();
-                if(cellName.equals(PhysNetlistWriter.LOCKED)) continue;
-                if(!design.getCell(cellName).getBELName().equals(cell.getBELName())) {
+                if (cellName.equals(PhysNetlistWriter.LOCKED)) continue;
+                if (!design.getCell(cellName).getBELName().equals(cell.getBELName())) {
                     ArrayList<Cell> cells = multiBelCells.get(cellName);
-                    if(cells == null) {
+                    if (cells == null) {
                         cells = new ArrayList<Cell>();
                     }
                     // Don't add multi-bel cells, store relevant info in pin placements
@@ -145,19 +145,19 @@ public class PhysNetlistWriter {
             physCell.setType(strings.getIndex(cell.getType()));
             physCell.setSite(strings.getIndex(cell.getSiteName()));
             String belName = cell.getBELName();
-            if(belName != null) {
+            if (belName != null) {
                 physCell.setBel(strings.getIndex(belName));
             }
             physCell.setIsBelFixed(cell.isBELFixed());
             physCell.setIsSiteFixed(cell.isSiteFixed());
             ArrayList<Cell> otherBels = multiBelCells.get(cell.getName());
             int additionalPinMappings = 0;
-            if(otherBels != null) {
+            if (otherBels != null) {
                 PrimitiveList.Int.Builder others = physCell.initOtherBels(otherBels.size());
                 int j=0;
                 for(Cell c : otherBels) {
                     additionalPinMappings += c.getPinMappingsP2L().size();
-                    if(c.hasAltPinMappings()) {
+                    if (c.hasAltPinMappings()) {
                         additionalPinMappings += c.getAltPinMappings().size();
                     }
                     others.set(j, strings.getIndex(c.getBELName()));
@@ -168,7 +168,7 @@ public class PhysNetlistWriter {
                  + additionalPinMappings);
             Integer idx = 0;
             idx = addCellPinMappings(cell, strings, pinMap, 0);
-            if(otherBels != null) {
+            if (otherBels != null) {
                 for(Cell c : otherBels) {
                     idx = addCellPinMappings(c, strings, pinMap, idx);
                 }
@@ -200,7 +200,7 @@ public class PhysNetlistWriter {
             pinMapping.setIsFixed(cell.isPinFixed(e.getKey()));
             idx++;
         } 
-        if(cell.hasAltPinMappings()) {
+        if (cell.hasAltPinMappings()) {
             for(Entry<String,AltPinMapping> e : cell.getAltPinMappings().entrySet()) {
                 PinMapping.Builder pinMapping = pinMap.get(idx);
                 pinMapping.setBel(strings.getIndex(cell.getBELName()));
@@ -227,15 +227,15 @@ public class PhysNetlistWriter {
             for(SitePIP sitePIP : siteInst.getUsedSitePIPs()) {
                 String siteWire = sitePIP.getInputPin().getSiteWireName();
                 Net net = siteInst.getNetFromSiteWire(siteWire);
-                if(net == null) {
+                if (net == null) {
                     String sitePinName = sitePIP.getInputPin().getConnectedSitePinName();
                     SitePinInst spi = siteInst.getSitePinInst(sitePinName);
-                    if(spi != null) {
+                    if (spi != null) {
                         net = spi.getNet();
                     }
                 }
                 SitePIPStatus status = siteInst.getSitePIPStatus(sitePIP);
-                if(net == null) {
+                if (net == null) {
                     nullNetStubs.add(new RouteBranchNode(site, sitePIP, status.isFixed()));
                     continue;
                 }
@@ -246,18 +246,18 @@ public class PhysNetlistWriter {
             
             for(Entry<Net,List<String>> e : siteInst.getNetToSiteWiresMap().entrySet()) {
                 List<RouteBranchNode> segments = netSiteRouting.get(e.getKey());
-                if(segments == null) {
+                if (segments == null) {
                     segments = new ArrayList<RouteBranchNode>();
                     netSiteRouting.put(e.getKey(), segments);
                 }
-                if(e.getValue() != null && e.getValue().size() > 0) {
+                if (e.getValue() != null && e.getValue().size() > 0) {
                     for(String siteWire : e.getValue()) {
                         BELPin[] belPins = siteInst.getSiteWirePins(siteWire);
                         for(BELPin belPin : belPins) {
                             BEL bel = belPin.getBEL();
                             Cell cell = siteInst.getCell(bel);
                             boolean routethru = false;
-                            if(belPin.isInput()) {
+                            if (belPin.isInput()) {
                                 // Skip if no BEL placed here
                                 if (cell == null) {
                                     continue;
@@ -303,7 +303,7 @@ public class PhysNetlistWriter {
         int physNetCount = netSiteRouting.size();
         // Check if some routes exists without site routing
         for(Net net : design.getNets()) {
-            if(!netSiteRouting.containsKey(net)) {
+            if (!netSiteRouting.containsKey(net)) {
                 physNetCount++;
             }
         }
@@ -329,7 +329,7 @@ public class PhysNetlistWriter {
             ArrayList<RouteBranchNode> routingSources = new ArrayList<>();
             List<PIP> stubNodes = new ArrayList<>();
             for(PIP p : net.getPIPs()) {
-                if(p.getEndWireName() == null) {
+                if (p.getEndWireName() == null) {
                     stubNodes.add(p);
                 } else {
                     routingSources.add(new RouteBranchNode(p));
@@ -339,9 +339,9 @@ public class PhysNetlistWriter {
                 routingSources.add(new RouteBranchNode(spi));
             }
             List<RouteBranchNode> segments = netSiteRouting.remove(net);
-            if(segments != null) routingSources.addAll(segments);
+            if (segments != null) routingSources.addAll(segments);
             populateRouting(routingSources, physNet, strings);
-            if(stubNodes.size() > 0) {
+            if (stubNodes.size() > 0) {
                 StructList.Builder<PhysNode.Builder> physNodes = physNet.initStubNodes(stubNodes.size());
                 for(int j=0; j < stubNodes.size(); j++) {
                     PhysNode.Builder physNode = physNodes.get(j);
@@ -378,7 +378,7 @@ public class PhysNetlistWriter {
         List<RouteBranchNode> sources = new ArrayList<>();
         List<RouteBranchNode> stubs = new ArrayList<>();
         
-        if(BUILD_ROUTING_GRAPH_ON_EXPORT) {
+        if (BUILD_ROUTING_GRAPH_ON_EXPORT) {
             Map<String, RouteBranchNode> map = new HashMap<>();
             for(RouteBranchNode rb : routingBranches) {
                 map.put(rb.toString(), rb);
@@ -386,19 +386,19 @@ public class PhysNetlistWriter {
             
             // PASS 1: Connect drivers of each branch, put sources on source list
             for(RouteBranchNode rb : routingBranches) {
-                if(rb.isSource()) {
+                if (rb.isSource()) {
                     sources.add(rb);
                 } else {
                     for(String driver : rb.getDrivers()) {
                         RouteBranchNode driverBranch = map.get(driver);
-                        if(driverBranch == null) continue;
-                        if(driverBranch.getType() == RouteSegmentType.PIP) {
+                        if (driverBranch == null) continue;
+                        if (driverBranch.getType() == RouteSegmentType.PIP) {
                             PIP pip = driverBranch.getPIP();
-                            if(pip.isBidirectional() && rb.getType() == RouteSegmentType.PIP) {
+                            if (pip.isBidirectional() && rb.getType() == RouteSegmentType.PIP) {
                                 PIP curr = rb.getPIP();
                                 Node driverNode = pip.isReversed() ? 
                                                   pip.getStartNode() : pip.getEndNode();
-                                if(!curr.getStartNode().equals(driverNode)) {
+                                if (!curr.getStartNode().equals(driverNode)) {
                                     continue;
                                 }
                             }
@@ -412,7 +412,7 @@ public class PhysNetlistWriter {
             Queue<RouteBranchNode> queue = new LinkedList<>(sources);
             while(!queue.isEmpty()) {
                 RouteBranchNode curr = queue.poll();
-                if(curr.hasBeenVisited()) {
+                if (curr.hasBeenVisited()) {
                     continue;
                 }
                 curr.setVisited(true);
@@ -420,7 +420,7 @@ public class PhysNetlistWriter {
                 queue.addAll(curr.getBranches());
             }
             for(RouteBranchNode rb : map.values()) {
-                if(rb.getParent() == null) {
+                if (rb.getParent() == null) {
                     stubs.add(rb);
                 }
             }
@@ -428,7 +428,7 @@ public class PhysNetlistWriter {
             stubs = routingBranches;
         }
         
-        //if(strings.get(physNet.getName()).equals("")) debugPrintRouteBranchNodes(sources, "");
+        //if (strings.get(physNet.getName()).equals("")) debugPrintRouteBranchNodes(sources, "");
         
         // Serialize...
         Builder<RouteBranch.Builder> routeSrcs = physNet.initSources(sources.size());
@@ -456,7 +456,7 @@ public class PhysNetlistWriter {
                 physPIP.setWire0(strings.getIndex(pip.getStartWireName()));
                 physPIP.setWire1(strings.getIndex(pip.getEndWireName()));
                 physPIP.setIsFixed(pip.isPIPFixed());
-                if(pip.isBidirectional()) {
+                if (pip.isBidirectional()) {
                     physPIP.setForward(!pip.isReversed());
                 }
                 break;

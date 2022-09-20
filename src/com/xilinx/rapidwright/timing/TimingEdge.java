@@ -125,7 +125,7 @@ public class TimingEdge extends DefaultEdge {
     }
 
     private String simplifyName(String name) {
-        if(name == null) return null;
+        if (name == null) return null;
         return name.replaceAll("\\[", "_").replaceAll("\\]", "_").replaceAll("\\.", "__")
                    .replaceAll("\\:", "___").replaceAll("\\/", "_");
     }
@@ -137,7 +137,7 @@ public class TimingEdge extends DefaultEdge {
     public String toString() {
         String result = "";
          if (hasEDIFPortInsts) {
-            if(timingGraph.hierCellInstMap == null) {
+            if (timingGraph.hierCellInstMap == null) {
                 timingGraph.populateHierCellInstMap();
             }
             String sCellInst = (srcPort.getCellInst() != null) ? 
@@ -168,7 +168,7 @@ public class TimingEdge extends DefaultEdge {
     }
 
     private String formatVertexName(String name) {
-        if(name == null) return null;
+        if (name == null) return null;
         return name .replaceAll("\\[","_").replaceAll("\\]","").replaceAll("\\(","")
                     .replaceAll("\\)","").replaceAll("\\/","____").replaceAll("\\.","_")
                     .replaceAll(":","->");

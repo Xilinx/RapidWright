@@ -233,7 +233,7 @@ public class Port implements Serializable, Cloneable{
     }
 
     public void addPassThruPortName(String portName) {
-        if(passThruPortNames == null) passThruPortNames = new ArrayList<String>();
+        if (passThruPortNames == null) passThruPortNames = new ArrayList<String>();
         passThruPortNames.add(portName);
     }
 
@@ -280,20 +280,20 @@ public class Port implements Serializable, Cloneable{
      */
     @Override
     public boolean equals(Object obj) {
-        if(this == obj)
+        if (this == obj)
             return true;
-        if(obj == null)
+        if (obj == null)
             return false;
-        if(getClass() != obj.getClass())
+        if (getClass() != obj.getClass())
             return false;
         Port other = (Port) obj;
         if (!sitePinInsts.equals(other.sitePinInsts))
             return false;
-        if(name == null) {
-            if(other.name != null)
+        if (name == null) {
+            if (other.name != null)
                 return false;
         }
-        else if(!name.equals(other.name))
+        else if (!name.equals(other.name))
             return false;
         return true;
     }
@@ -304,7 +304,7 @@ public class Port implements Serializable, Cloneable{
         sb.append("port ");
         sb.append(name);
         sb.append(sitePinInsts);
-        if(passThruPortNames != null && passThruPortNames.size() > 0)
+        if (passThruPortNames != null && passThruPortNames.size() > 0)
             sb.append(" [PASSTHRU: " + passThruPortNames + "]");
         return sb.toString();
         //return "  port \"" + name + "\" \"" + pin.getSiteInstName() + "\" \"" + pin.getName() +"\";";

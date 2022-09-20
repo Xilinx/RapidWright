@@ -53,16 +53,16 @@ public class RuntimeTrackerTree {
      * @return A runtime tracker under the name.
      */
     public RuntimeTracker createRuntimeTracker(String name, String parent) {
-        if(parent == null) {
+        if (parent == null) {
             throw new RuntimeException("ERROR: Null parent name.");
         }
         RuntimeTracker parentTracker = this.runtimeTrackers.get(parent);
-        if(parentTracker == null) {
+        if (parentTracker == null) {
             throw new RuntimeException("ERROR: No parent runtime tracker under name " + parent + 
                     ".\n Please refer to one of the created runtime trackers: " + this.runtimeTrackers.keySet());
         }
         RuntimeTracker newTracker = this.runtimeTrackers.get(name);
-        if(newTracker == null) {
+        if (newTracker == null) {
             newTracker = new RuntimeTracker(name, (short) (parentTracker.getLevel() + 1));
             parentTracker.addChild(newTracker);    
             this.runtimeTrackers.put(name, newTracker);
@@ -77,7 +77,7 @@ public class RuntimeTrackerTree {
      */
     public RuntimeTracker getRuntimeTracker(String name) {
         RuntimeTracker tracker = this.runtimeTrackers.get(name);
-        if(tracker == null) {
+        if (tracker == null) {
             throw new IllegalArgumentException("ERROR: No runtime tracker instance under name " + name + "." 
                         + "\n Please check if the name is correct. Runtime trackers created: " + this.runtimeTrackers.keySet());
         }
@@ -100,7 +100,7 @@ public class RuntimeTrackerTree {
     
     @Override
     public String toString() {
-        if(verbose) {
+        if (verbose) {
             return this.root.trakerWithFullHierarchy();
         }
         return this.root.trackerWithOneLevelChidren();

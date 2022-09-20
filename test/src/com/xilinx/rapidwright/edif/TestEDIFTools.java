@@ -69,7 +69,7 @@ public class TestEDIFTools {
         Assertions.assertEquals(netAliases.size(), 16);
         boolean containsSnkNet = false;
         for(EDIFHierNet net : netAliases) {
-            if(net.getHierarchicalNetName().equals(snkPortInst.getHierarchicalNetName())) {
+            if (net.getHierarchicalNetName().equals(snkPortInst.getHierarchicalNetName())) {
                 containsSnkNet = true;
             }
         }
@@ -80,7 +80,7 @@ public class TestEDIFTools {
         Assertions.assertEquals(portInsts.size(), 6);
         boolean containsSnk = false;
         for(EDIFHierPortInst sink : portInsts) {
-            if(sink.toString().equals(snkPortInst.toString())) {
+            if (sink.toString().equals(snkPortInst.toString())) {
                 containsSnk = true;
             }
         }
@@ -142,7 +142,7 @@ public class TestEDIFTools {
         
         for(Entry<EDIFLibrary, Map<EDIFCell, List<EDIFHierCellInst>>> e : 
                                             EDIFTools.createCellInstanceMap(netlist).entrySet()) {
-            if(e.getKey().isHDIPrimitivesLibrary()) continue;
+            if (e.getKey().isHDIPrimitivesLibrary()) continue;
             for(Entry<EDIFCell, List<EDIFHierCellInst>> e2 : e.getValue().entrySet()) {
                 Assertions.assertEquals(e2.getValue().size(), 1);
             }

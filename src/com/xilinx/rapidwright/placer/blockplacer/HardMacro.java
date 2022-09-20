@@ -174,7 +174,7 @@ public class HardMacro extends ModuleInst implements Comparable<Object> {
 
     @Override
     public Site getPlacement() {
-        if(tempAnchorSite!=null) {
+        if (tempAnchorSite!=null) {
             return tempAnchorSite;
         }
         return super.getPlacement();

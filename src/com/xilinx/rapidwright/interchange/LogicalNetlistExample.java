@@ -37,7 +37,7 @@ import com.xilinx.rapidwright.tests.CodePerfTracker;
 public class LogicalNetlistExample {
 
     public static void main(String[] args) throws IOException {
-        if(args.length != 1) {
+        if (args.length != 1) {
             System.out.println("USAGE: <input>.edf");
             System.out.println("   Example round trip test for a logical netlist to start from EDIF,"
                     + " get converted to a\n   Cap'n Proto serialized file and then read back into "

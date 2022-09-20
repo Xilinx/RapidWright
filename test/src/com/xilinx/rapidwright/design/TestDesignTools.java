@@ -105,7 +105,7 @@ public class TestDesignTools {
             Assertions.assertEquals(srcSiteInst.getNetFromSiteWire(siteWireName).getName(),
                                     dstSiteInst.getNetFromSiteWire(siteWireName).getName());
             
-            if(routeThru.getSecond()) {
+            if (routeThru.getSecond()) {
                 Assertions.assertEquals(dstSiteInst.getNetFromSiteWire(siteWireName), 
                                         dstDesign.getVccNet());
             } else {
@@ -180,13 +180,13 @@ public class TestDesignTools {
         for(EDIFHierCellInst inst : leafCells) {
             String name = inst.getFullHierarchicalInstName();
             Cell cell = design.getCell(name);
-            if(cell != null && cell.isPlaced()) {
+            if (cell != null && cell.isPlaced()) {
                 placedCellsInBlackBox.add(name);
             }
         }
         Set<String> allOtherPlacedCells = new HashSet<>();
         for(Cell cell : design.getCells()) {
-            if(placedCellsInBlackBox.contains(cell.getName())) continue;
+            if (placedCellsInBlackBox.contains(cell.getName())) continue;
             allOtherPlacedCells.add(cell.getName());
         }
         

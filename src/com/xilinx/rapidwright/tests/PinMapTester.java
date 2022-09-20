@@ -53,13 +53,13 @@ import com.xilinx.rapidwright.design.VivadoProp;
 public class PinMapTester {
 
     public static void main(String[] args) {
-        if(args.length < 5) {
+        if (args.length < 5) {
             System.out.println("USAGE: <partname> <cell name> <site> <site type> <bel> <parameters>");
             return;
         }
         String partName = args[0];
         Part part = PartNameTools.getPart(partName);
-        if(part == null) {
+        if (part == null) {
             throw new RuntimeException("The partname " + args[0] + " is invalid or unrecognized, cannot load device.");
         }
 
@@ -85,7 +85,7 @@ public class PinMapTester {
 
         String siteName = args[2];
         Site site = device.getSite(siteName);
-        if(site == null) {
+        if (site == null) {
             throw new RuntimeException("Site " + siteName + " is not found in specified part.");
         }
 
@@ -96,7 +96,7 @@ public class PinMapTester {
         String belName = args[4];
 
         BEL bel = siteInst.getBEL(belName);
-        if(bel == null) {
+        if (bel == null) {
             throw new RuntimeException("BEL " + belName + " is not found in within specified site.");
         }
 
@@ -110,7 +110,7 @@ public class PinMapTester {
 
         for(int i = 5; i < args.length; ++i) {
             String[] parameterSplit = args[i].split("=", 2);
-            if(parameterSplit.length != 2) {
+            if (parameterSplit.length != 2) {
                 throw new RuntimeException("Invalid parameter " + args[i]);
             }
 

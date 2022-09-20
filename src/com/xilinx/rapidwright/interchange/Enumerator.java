@@ -36,7 +36,7 @@ public class Enumerator<T> extends ArrayList<T> {
 
     private String getKey(T obj) {
         String key = null;
-        if(obj instanceof EDIFEnumerable) {
+        if (obj instanceof EDIFEnumerable) {
             key = ((EDIFEnumerable)obj).getUniqueKey();
         } else {
             key = obj.toString();
@@ -78,7 +78,7 @@ public class Enumerator<T> extends ArrayList<T> {
 
     @Override
     public T get(int index) {
-        if(size() -1 < index) return null;
+        if (size() -1 < index) return null;
         return super.get(index);
     }
 

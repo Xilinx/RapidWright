@@ -100,7 +100,7 @@ public class RoutableNode implements Routable{
     
     public static void setTimingDriven(boolean isTimingDriven, DelayEstimatorBase estimator) {
         timingDriven = isTimingDriven;
-        if(timingDriven) {
+        if (timingDriven) {
             delayEstimator = estimator;
         }
     }
@@ -123,7 +123,7 @@ public class RoutableNode implements Routable{
         usersConnectionCounts = null;
         driversCounts = null;
         prev = null;
-        if(timingDriven) {
+        if (timingDriven) {
             setDelay(RouterHelper.computeNodeDelay(delayEstimator, node));
         }
     }
@@ -133,12 +133,12 @@ public class RoutableNode implements Routable{
         List<Node> allDownHillNodes = node.getAllDownhillNodes();
         
         for(Node downhill : allDownHillNodes) {
-            if(reserved.contains(downhill)) continue;
-            if(isExcluded(downhill, timingDriven)) continue;
-            if(routethruHelper.isRouteThru(node, downhill)) continue;
+            if (reserved.contains(downhill)) continue;
+            if (isExcluded(downhill, timingDriven)) continue;
+            if (routethruHelper.isRouteThru(node, downhill)) continue;
             
             Routable child = createdRoutable.get(downhill);
-            if(child == null) {
+            if (child == null) {
                 RoutableType type = RoutableType.WIRE;        
                 child = new RoutableNode(globalIndex++, downhill, type);
                 createdRoutable.put(downhill, child);
@@ -149,7 +149,7 @@ public class RoutableNode implements Routable{
     }
     
     public void setBaseCost() {
-        if(type == RoutableType.WIRE) {
+        if (type == RoutableType.WIRE) {
             baseCost = 0.4f;
             // NOTE: IntentCode is device-dependent
             IntentCode ic = node.getIntentCode();
@@ -162,7 +162,7 @@ public class RoutableNode implements Routable{
                 break;
             
             case NODE_DOUBLE:
-                if(endTileXCoordinate != getNode().getTile().getTileXCoordinate()) {
+                if (endTileXCoordinate != getNode().getTile().getTileXCoordinate()) {
                     baseCost = 0.4f*length;
                 }
                 break;
@@ -179,13 +179,13 @@ public class RoutableNode implements Routable{
                 baseCost = 0.7f;
                 break;    
             default:
-                if(length != 0) baseCost *= length;
+                if (length != 0) baseCost *= length;
                 type = RoutableType.WIRE;
                 break;
             }    
-        } else if(type == RoutableType.PINFEED_I) {
+        } else if (type == RoutableType.PINFEED_I) {
             baseCost = 0.4f;
-        } else if(type == RoutableType.PINFEED_O) {
+        } else if (type == RoutableType.PINFEED_O) {
             baseCost = 1f;
         }
     }
@@ -210,14 +210,14 @@ public class RoutableNode implements Routable{
         Wire[] wires = node.getAllWiresInNode();
         List<Tile> intTiles = new ArrayList<>();
         for(Wire w : wires) {
-            if(w.getTile().getTileTypeEnum() == TileTypeEnum.INT) {
+            if (w.getTile().getTileTypeEnum() == TileTypeEnum.INT) {
                 intTiles.add(w.getTile());
             }
         }
         Tile endTile = null;
-        if(intTiles.size() > 1) {
+        if (intTiles.size() > 1) {
             endTile = intTiles.get(1);
-        } else if(intTiles.size() == 1) {
+        } else if (intTiles.size() == 1) {
             endTile = intTiles.get(0);
         } else {
             endTile = getNode().getTile();
@@ -386,7 +386,7 @@ public class RoutableNode implements Routable{
     
     @Override
     public void incrementUser(NetWrapper source) {
-        if(usersConnectionCounts == null) {
+        if (usersConnectionCounts == null) {
             usersConnectionCounts = new HashMap<>();
         }
         Integer connectionCount = usersConnectionCounts.getOrDefault(source, 0);
@@ -395,7 +395,7 @@ public class RoutableNode implements Routable{
     
     @Override
     public int uniqueUserCount() {
-        if(usersConnectionCounts == null) {
+        if (usersConnectionCounts == null) {
             return 0;
         }
         return usersConnectionCounts.size();
@@ -404,16 +404,16 @@ public class RoutableNode implements Routable{
     @Override
     public void decrementUser(NetWrapper user) {
         Integer count = usersConnectionCounts.getOrDefault(user, 0);
-        if(count == 1) {
+        if (count == 1) {
             usersConnectionCounts.remove(user);
-        } else if(count > 1) {
+        } else if (count > 1) {
             usersConnectionCounts.put(user, count - 1);
         }
     }
     
     @Override
     public int countConnectionsOfUser(NetWrapper user) {
-        if(usersConnectionCounts == null) {
+        if (usersConnectionCounts == null) {
             return 0;
         }
         return usersConnectionCounts.getOrDefault(user, 0);
@@ -421,7 +421,7 @@ public class RoutableNode implements Routable{
     
     @Override
     public int uniqueDriverCount() {
-        if(driversCounts == null) {
+        if (driversCounts == null) {
             return 0;
         }
         return driversCounts.size();
@@ -429,7 +429,7 @@ public class RoutableNode implements Routable{
     
     @Override
     public void incrementDriver(Routable parent) {
-        if(driversCounts == null) {
+        if (driversCounts == null) {
             driversCounts = new HashMap<>();
         }
         Integer count = driversCounts.getOrDefault(parent, 0);
@@ -439,9 +439,9 @@ public class RoutableNode implements Routable{
     @Override
     public void decrementDriver(Routable parent) {
         Integer count = driversCounts.getOrDefault(parent, 0);
-        if(count == 1) {
+        if (count == 1) {
             driversCounts.remove(parent);
-        } else if(count > 1) {
+        } else if (count > 1) {
             driversCounts.put(parent, count - 1);
         }
     }
@@ -508,7 +508,7 @@ public class RoutableNode implements Routable{
             case NODE_PINFEED:
                 return true;
             case NODE_LOCAL:
-                if(node.getWireName().contains("GLOBAL") || node.getWireName().contains("CTRL")) {
+                if (node.getWireName().contains("GLOBAL") || node.getWireName().contains("CTRL")) {
                     return true;
                 }
             default:
@@ -524,8 +524,8 @@ public class RoutableNode implements Routable{
      */
     public static boolean isExcluded(Node node, boolean timingDriven) {
         Tile tile = node.getTile();
-        if(tile.getTileTypeEnum() == TileTypeEnum.INT) {
-            if(timingDriven && maskNodesCrossRCLK) {
+        if (tile.getTileTypeEnum() == TileTypeEnum.INT) {
+            if (timingDriven && maskNodesCrossRCLK) {
                 int y = tile.getTileYCoordinate();
                 if ((y-30)%60 == 0) { // above RCLK
                     return excludeAboveRclk.contains(node.getWireName());
@@ -535,7 +535,7 @@ public class RoutableNode implements Routable{
             }
             return false;
         } else {
-            if(tile.getName().startsWith("LAG")) {
+            if (tile.getName().startsWith("LAG")) {
                 return false;
             }
             return true;

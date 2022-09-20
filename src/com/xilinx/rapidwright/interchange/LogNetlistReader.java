@@ -94,17 +94,17 @@ public class LogNetlistReader {
         for(int i=0; i < count; i++) {
             PropertyMap.Entry.Reader entryReader = entries.get(i);
             String key = allStrings.get(entryReader.getKey());
-            if(entryReader.isTextValue()) {
+            if (entryReader.isTextValue()) {
                 String textValue = allStrings.get(entryReader.getTextValue());
-                if(textValue.contains("\"")) {
+                if (textValue.contains("\"")) {
                     throw new RuntimeException("ERROR: String '"+textValue+
                             "'\n\t value contains unescaped '\"' "
                             + "character. Please replace with EDIF escape value '%34%'.");
                 }
                 obj.addProperty(key, textValue);
-            } else if(entryReader.isIntValue()) {
+            } else if (entryReader.isIntValue()) {
                 obj.addProperty(key, entryReader.getIntValue());
-            } else if(entryReader.isBoolValue()) {
+            } else if (entryReader.isBoolValue()) {
                 obj.addProperty(key, entryReader.getBoolValue());
             } else {
                 throw new RuntimeException("ERROR: Unknown property type for key " + key);
@@ -172,9 +172,9 @@ public class LogNetlistReader {
 
             for(PortInstance.Reader portInstReader : netReader.getPortInsts()) {
                 EDIFCellInst inst = null;
-                if(!portInstReader.isExtPort()) {
+                if (!portInstReader.isExtPort()) {
                     inst = allInsts.get(portInstReader.getInst());
-                    if(inst == null) {
+                    if (inst == null) {
                         throw new RuntimeException("ERROR: EDIFCellInst should already have been read!");
                     }
                 }
@@ -182,7 +182,7 @@ public class LogNetlistReader {
                 EDIFPort port = allPorts.get(portInstReader.getPort());
 
                 BusIdx.Reader portIdxReader = portInstReader.getBusIdx();
-                if(portIdxReader.isSingleBit()) {
+                if (portIdxReader.isSingleBit()) {
                     net.createPortInst(port, inst);
                 } else {
                     net.createPortInst(port, portIdxReader.getIdx(), inst);
@@ -191,10 +191,10 @@ public class LogNetlistReader {
         }
 
         // Check if Unisim definitions match
-        if(edifCell.getLibrary().isHDIPrimitivesLibrary()) {
+        if (edifCell.getLibrary().isHDIPrimitivesLibrary()) {
             Unisim cellType = Unisim.valueOf(edifCell.getName());
             EDIFCell cell = Design.getUnisimCell(cellType);
-            if(cell.getPorts().size() != edifCell.getPorts().size()) {
+            if (cell.getPorts().size() != edifCell.getPorts().size()) {
                 System.err.println("[WARNING]: Unisim mismatch found in EDIF Library: "
                      + EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME  + ", Cell: "
                      + edifCell.getName() + ", port names/widths mismatch, should be: \n\t"
@@ -203,7 +203,7 @@ public class LogNetlistReader {
             for(EDIFPort port : cell.getPorts()) {
                 String portKey = port.getBusName();
                 EDIFPort portMatch = edifCell.getPort(portKey);
-                if(portMatch == null || portMatch.getWidth() != port.getWidth()) {
+                if (portMatch == null || portMatch.getWidth() != port.getWidth()) {
                     System.err.println("[WARNING]: Unisim mismatch found in EDIF Library: "
                             + EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME  + ", Cell: "
                             + edifCell.getName() + ", port names/widths mismatch, should be: \n\t"
@@ -214,7 +214,7 @@ public class LogNetlistReader {
     }
 
     private EDIFCellInst getInst(int instIdx) {
-        if(instIdx >= allInsts.size()) {
+        if (instIdx >= allInsts.size()) {
             return null;
         }
 
@@ -226,7 +226,7 @@ public class LogNetlistReader {
                                                 StructList.Reader<Netlist.Cell.Reader> cellListReader,
                                                 StructList.Reader<Netlist.CellInstance.Reader> instListReader) {
         EDIFCellInst edifCellInst = getInst(instIdx);
-        if(edifCellInst != null) {
+        if (edifCellInst != null) {
             throw new RuntimeException("ERROR: Each EDIFCellInst should only be read once.");
         }
 
@@ -267,13 +267,13 @@ public class LogNetlistReader {
 
     private EDIFPort readEDIFPort(Port.Reader portReader) {
         int width = 1;
-        if(portReader.hasBus()) {
+        if (portReader.hasBus()) {
             int start = portReader.getBus().getBusStart();
             int end = portReader.getBus().getBusEnd();
             width = Math.abs(start-end) + 1;
         }
         String portBusName = allStrings.get(portReader.getName());
-        if(portReader.isBus()) {
+        if (portReader.isBus()) {
             portBusName += "["+ portReader.getBus().getBusStart() +
                     ":" + portReader.getBus().getBusEnd() + "]";
         }
@@ -302,7 +302,7 @@ public class LogNetlistReader {
             libraryName = libraryRename.getOrDefault(libraryName, libraryName);
 
             EDIFLibrary library = n.getLibrary(libraryName);
-            if(library == null) {
+            if (library == null) {
                 library = new EDIFLibrary(libraryName);
                 n.addLibrary(library);
             }
@@ -353,7 +353,7 @@ public class LogNetlistReader {
             readEDIFCell(i, n, netlist, cellListReader, instListReader);
         }
 
-        if(!skipTopStuff) {
+        if (!skipTopStuff) {
             EDIFDesign design = new EDIFDesign(allCells.get(netlist.getTopInst().getCell()).getName());
             design.setTopCell(allCells.get(netlist.getTopInst().getCell()));
             n.setDesign(design);
@@ -367,9 +367,9 @@ public class LogNetlistReader {
             n.addLibrary(lib);
         }
 
-        if(expandMacros) {
+        if (expandMacros) {
             String partName = EDIFTools.getPartName(n);
-            if(partName != null) {
+            if (partName != null) {
                 n.expandMacroUnisims(PartNameTools.getPart(partName).getSeries());
             } else {
                 System.err.println("WARNING: Could not determine target device from netlist.  Macro "

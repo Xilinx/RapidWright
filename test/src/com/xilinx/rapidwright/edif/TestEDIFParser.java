@@ -94,7 +94,7 @@ public class TestEDIFParser {
                 final ParseStart offs = interestingOffsets.get(i);
                 offsets.add(offs);
                 names.add(offs.name);
-                if(offs.success) {
+                if (offs.success) {
                     expectedSuccessfulThreads++;
                 }
             }

@@ -32,7 +32,7 @@ import com.xilinx.rapidwright.tests.CodePerfTracker;
 public class DeviceResourcesExample {
 
     public static void main(String[] args) throws IOException {
-        if(args.length != 1) {
+        if (args.length != 1) {
             System.out.println("USAGE: <device name>");
             System.out.println("   Example dump of device information for interchange format.");
             return;
@@ -43,7 +43,7 @@ public class DeviceResourcesExample {
 
         // Create device resource file if it doesn't exist
         String capnProtoFileName = args[0] + ".device";
-        //if(!new File(capnProtoFileName).exists()) {
+        //if (!new File(capnProtoFileName).exists()) {
             //MessageGenerator.waitOnAnyKey();
             t.start("Load Device");
             Device device = Device.getDevice(args[0]);

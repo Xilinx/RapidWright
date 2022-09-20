@@ -95,7 +95,7 @@ public class TileColumnPattern extends ArrayList<TileTypeEnum> implements Compar
     public static TileColumnPattern createTileColumnPattern(List<TileTypeEnum> filteredTypes, int start, int end) {
         TileColumnPattern p = new TileColumnPattern();
         for(TileTypeEnum t : filteredTypes.subList(start, end)) {
-            if(t == TileTypeEnum.NULL) return null;
+            if (t == TileTypeEnum.NULL) return null;
             p.add(t);
         }
         p.updateFlags();
@@ -105,15 +105,15 @@ public class TileColumnPattern extends ArrayList<TileTypeEnum> implements Compar
     private void updateFlags() {
         flags = EnumSet.noneOf(TypesOfInterest.class);
         for(TileTypeEnum t : this) {
-            if(Utils.isCLBM(t)) {
+            if (Utils.isCLBM(t)) {
                 flags.add(TypesOfInterest.SLICEM);
-            } else if(Utils.isCLB(t)) {
+            } else if (Utils.isCLB(t)) {
                 flags.add(TypesOfInterest.SLICEL);
-            } else if(Utils.isDSP(t)) {
+            } else if (Utils.isDSP(t)) {
                 flags.add(TypesOfInterest.DSP);
-            } else if(Utils.isBRAM(t)) {
+            } else if (Utils.isBRAM(t)) {
                 flags.add(TypesOfInterest.BRAM);
-            } else if(Utils.isURAM(t)) {
+            } else if (Utils.isURAM(t)) {
                 flags.add(TypesOfInterest.URAM);
             } else {
                 throw new RuntimeException("ERROR: Unexpected TileTypeEnum, please re-examine source code to properly handle " + t);
@@ -172,9 +172,9 @@ public class TileColumnPattern extends ArrayList<TileTypeEnum> implements Compar
             for(int col=0; col < dev.getColumns(); col++) {
                 Tile t = dev.getTile(row, col);
                 TileTypeEnum tt = t.getTileTypeEnum();
-                if(Utils.isDSP(tt)) hasDSP = true;
-                if(Utils.isBRAM(tt)) hasBRAM = true;
-                if(Utils.isCLB(tt)) hasCLB = true;
+                if (Utils.isDSP(tt)) hasDSP = true;
+                if (Utils.isBRAM(tt)) hasBRAM = true;
+                if (Utils.isCLB(tt)) hasCLB = true;
                 if (Utils.isURAM(tt)) hasURAM = true;
                 if (tt == TileTypeEnum.LAG_LAG) {
                     hasLaguna = true;
@@ -184,7 +184,7 @@ public class TileColumnPattern extends ArrayList<TileTypeEnum> implements Compar
                 }
             }
             //Cannot test inside loop since we may hit the first laguna tile after having satisfied all other conditions
-            if(hasDSP && hasBRAM && hasCLB && (!devHasUram || hasURAM) && (hasLaguna==wantLaguna)) {
+            if (hasDSP && hasBRAM && hasCLB && (!devHasUram || hasURAM) && (hasLaguna==wantLaguna)) {
                 return row;
             }
         }
@@ -224,17 +224,17 @@ public class TileColumnPattern extends ArrayList<TileTypeEnum> implements Compar
         int currRunWithoutNull = 0;
         for(int col=0; col < dev.getColumns(); col++) {
             Tile tile = dev.getTile(rowIdx, col);
-            if(typesOfInterest.contains(tile.getTileTypeEnum())) {
+            if (typesOfInterest.contains(tile.getTileTypeEnum())) {
                 filteredTypes.add(tile.getTileTypeEnum());
                 columnIdxs.add(tile.getColumn());
                 nullCtr = 0;
                 currRunWithoutNull++;
-            } else if(tile.getTileTypeEnum() == TileTypeEnum.NULL) {
+            } else if (tile.getTileTypeEnum() == TileTypeEnum.NULL) {
                 nullCtr++;
-                if(NULL_COLUMN_BREAK_SIZE == nullCtr) {
+                if (NULL_COLUMN_BREAK_SIZE == nullCtr) {
                     filteredTypes.add(tile.getTileTypeEnum());
                     columnIdxs.add(tile.getColumn());
-                    if(currRunWithoutNull > longestRunWithoutNull) {
+                    if (currRunWithoutNull > longestRunWithoutNull) {
                         longestRunWithoutNull = currRunWithoutNull;
                     }
                     currRunWithoutNull = 0;
@@ -244,18 +244,18 @@ public class TileColumnPattern extends ArrayList<TileTypeEnum> implements Compar
             }
         }
         MAX_PATTERN_LENGTH = longestRunWithoutNull;
-        if(longestRunWithoutNull==1 && (currRunWithoutNull>0)) {
+        if (longestRunWithoutNull==1 && (currRunWithoutNull>0)) {
             MAX_PATTERN_LENGTH = currRunWithoutNull;
         }
         // Generate all possible patterns and store them in the map keeping track of each
         // instance of each pattern
         for(int i=1; i < MAX_PATTERN_LENGTH; i++) {
             for(int j=0; j < filteredTypes.size(); j++) {
-                if(j+i > filteredTypes.size()) continue;
+                if (j+i > filteredTypes.size()) continue;
                 TileColumnPattern curr = createTileColumnPattern(filteredTypes, j, j+i);
-                if(curr == null) continue;
+                if (curr == null) continue;
                 TreeSet<Integer> matches = colPatternMap.get(curr);
-                if(matches == null) {
+                if (matches == null) {
                     matches = new TreeSet<Integer>();
                     colPatternMap.put(curr,matches);
                 }
@@ -306,7 +306,7 @@ public class TileColumnPattern extends ArrayList<TileTypeEnum> implements Compar
      */
     @SuppressWarnings("incomplete-switch")
     public static char getTileCharacter(TileTypeEnum type, FamilyType arch) {
-        if(arch == FamilyType.KINTEXU || arch == FamilyType.VIRTEXU) {
+        if (arch == FamilyType.KINTEXU || arch == FamilyType.VIRTEXU) {
             switch (type) {
                 case INT: return 'I'; 
                 case CLEL_L:return 'L';
@@ -352,7 +352,7 @@ public class TileColumnPattern extends ArrayList<TileTypeEnum> implements Compar
     @Override
     public int compareTo(TileColumnPattern o) {
         int numInstsDiff = o.getNumInstances() - getNumInstances();
-        if(numInstsDiff == 0) {
+        if (numInstsDiff == 0) {
             return size() - o.size();
         }
         return numInstsDiff;

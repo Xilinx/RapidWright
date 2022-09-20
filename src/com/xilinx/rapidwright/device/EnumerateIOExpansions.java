@@ -151,14 +151,14 @@ public class EnumerateIOExpansions {
             String pkgPin = seriesName.equals("Series7") ? "D5" : 
                 (seriesName.equals("UltraScalePlus") ? "B2" : "D14");
             System.out.println(seriesName);
-            if(!FileTools.makeDir(seriesName)) {
+            if (!FileTools.makeDir(seriesName)) {
                 throw new RuntimeException("ERROR: Couldn't create folder " + e.getKey().toString());
             }
             Pair<Unisim[], IOStandard[]> ios = e.getValue();
             for(Unisim u : ios.getFirst()) {
                 String unisimName = u.name();
                 String dirName = seriesName + File.separator + unisimName + File.separator;
-                if(!FileTools.makeDir(dirName)) {
+                if (!FileTools.makeDir(dirName)) {
                     throw new RuntimeException("ERROR: Couldn't create folder " + dirName);
                 }
                 for(IOStandard iostd : ios.getSecond()) {
@@ -166,7 +166,7 @@ public class EnumerateIOExpansions {
 
                     System.out.println("  " + u + " " + iostd);
                     String ioStddirName = dirName + File.separator + iostd + File.separator;
-                    if(!FileTools.makeDir(ioStddirName)) {
+                    if (!FileTools.makeDir(ioStddirName)) {
                         throw new RuntimeException("ERROR: Couldn't create folder " + ioStddirName);
                     }                    
                     
@@ -189,7 +189,7 @@ public class EnumerateIOExpansions {
                     for(int i=0; i < ports.size(); i++) {
                         EDIFPort port = ports.get(i);
                         String lastComma = (i == ports.size()-1) ? "" : ","; 
-                        if(port.isInput()) {
+                        if (port.isInput()) {
                             lines.add("    input " + port.getName() + lastComma);
                         } else {
                             lines.add("    output " + port.getName() + "_" + unisimName + lastComma);
@@ -201,7 +201,7 @@ public class EnumerateIOExpansions {
                     for(int i=0; i < ports.size(); i++) {
                         EDIFPort port = ports.get(i);
                         String lastComma = (i == ports.size()-1) ? "" : ","; 
-                        if(port.isInput()) {
+                        if (port.isInput()) {
                             lines.add("        ." + port.getName() + "(" + port.getName() + ")" + lastComma);
                         } else {
                             lines.add("        ." + port.getName() + "(" + port.getName() +"_"+ unisimName + ")" + lastComma);
@@ -212,7 +212,7 @@ public class EnumerateIOExpansions {
                     FileTools.writeLinesToTextFile(lines, ioStddirName + "top.v");
                     
                     lines.clear();
-                    if(unisimName.startsWith("IBUF")) {
+                    if (unisimName.startsWith("IBUF")) {
                         lines.add("set_property IOSTANDARD "+iostd.name()+" [get_ports I]");
                         lines.add("set_property IOSTANDARD LVCMOS18 [get_ports O_"+unisimName+"]");
                     } else {

@@ -76,13 +76,13 @@ public class PopulateMacroParamRules {
         seriesPartMap.put(Series.Versal, "xcvc1802-viva1596-2LP-e-S");
     }
     private static List<EDIFCellInst> involvesParamRule(EDIFCell cell) {
-        if(cell.getName().startsWith("FD") || cell.getName().startsWith("LD")) {
+        if (cell.getName().startsWith("FD") || cell.getName().startsWith("LD")) {
             return Collections.emptyList();
         }
         List<EDIFCellInst> insts = new ArrayList<>();
         for(EDIFCellInst inst : cell.getCellInsts()) {
             for(EDIFName name : inst.getProperties().keySet()) {
-                if(name.getName().contains(INIT)) {
+                if (name.getName().contains(INIT)) {
                     insts.add(inst);
                 }
             }
@@ -94,7 +94,7 @@ public class PopulateMacroParamRules {
         List<String> lines = new ArrayList<>();
         lines.add("link_design -part " + partName);
         for(EDIFCell c : Design.getMacroPrimitives(series).getCells()) {
-            if(involvesParamRule(c).size() < 2) continue;
+            if (involvesParamRule(c).size() < 2) continue;
             String name = c.getName();
             lines.add("create_cell -reference " + name + " my_"+ name);
             lines.add("set cell [get_cells my_"+name+"]");
@@ -154,7 +154,7 @@ public class PopulateMacroParamRules {
         String val = prop.getValue().getValue();
         val = val.substring(val.indexOf('h')+1);
         for(Entry<String, String> e : primParams.entrySet()) {
-            if(e.getValue().contains(val)) {
+            if (e.getValue().contains(val)) {
                 String primVal = e.getValue().substring(e.getValue().indexOf('h')+1);
                 int primLength = primVal.length() * 4;
                 int count = val.length() * 4;
@@ -183,7 +183,7 @@ public class PopulateMacroParamRules {
             Map<String,List<MacroParamRule>> currMap = new HashMap<>();
             macroRules.put(s, currMap);
             for(File file : dir.listFiles()) {
-                if(file.getName().endsWith(".params")) {
+                if (file.getName().endsWith(".params")) {
                     String macroName = file.getName().replace(".params", "");
                     String edfFileName = file.getParentFile().getAbsolutePath() + File.separator 
                             + macroName + ".edf" + File.separator + macroName + File.separator 
@@ -194,7 +194,7 @@ public class PopulateMacroParamRules {
                     Map<String,String> initValues = new HashMap<>();
                     System.out.println(macroName + ":");
                     for(String line : FileTools.getLinesFromTextFile(file.getAbsolutePath())) {
-                        if(line.contains(INIT)) {
+                        if (line.contains(INIT)) {
                             String[] tokens = line.split("\\s+");
                             initValues.put(tokens[0], tokens[4]);
                             System.out.println("  " + tokens[0] + " -> " + tokens[4]);
@@ -205,14 +205,14 @@ public class PopulateMacroParamRules {
                         boolean printedInst = false;
                         for(Entry<EDIFName,EDIFPropertyValue> e : inst.getProperties().entrySet()) {
                             String paramName = e.getKey().getName(); 
-                            if(paramName.contains(INIT)) {
-                                if(!printedInst) {
+                            if (paramName.contains(INIT)) {
+                                if (!printedInst) {
                                     System.out.println(" " + inst.getName() + ":");
                                     printedInst = true;
                                 }
                                 System.out.println("   " + e.getKey() + " -> " + e.getValue());
                                 MacroParamRule rule = findRule(inst.getName(), e, initValues);
-                                if(rule != null) {
+                                if (rule != null) {
                                     currList.add(rule);
                                 }
                             }

@@ -63,7 +63,7 @@ public class RelocateHierarchy {
 
         Set<SiteTypeEnum> customSet = RelocationTools.defaultSiteTypes;
         
-        if(args.length == 6) {
+        if (args.length == 6) {
             for(String siteTypeEnum : args[5].split(",")) {
                 customSet.add(SiteTypeEnum.valueOf(siteTypeEnum));                
             }

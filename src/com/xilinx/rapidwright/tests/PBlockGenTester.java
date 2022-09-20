@@ -37,25 +37,25 @@ import com.xilinx.rapidwright.util.MessageGenerator;
  */
 public class PBlockGenTester {
     public static void main(String[] args) {
-        if(args.length != 1) {
+        if (args.length != 1) {
             System.out.println("USAGE: <dir_to_project_runs>");
             return;
         }
         
         File dir = new File(args[0]);
-        if(dir.exists() && dir.isDirectory()) {
+        if (dir.exists() && dir.isDirectory()) {
             for(File child : dir.listFiles()) {
-                if(!child.isDirectory()) continue;
+                if (!child.isDirectory()) continue;
                 String shapeFile = null;
                 String utilReportFile = null;
                 for(File file : child.listFiles()) {
-                    if(file.getAbsoluteFile().getName().endsWith("_shapes.txt")) {
+                    if (file.getAbsoluteFile().getName().endsWith("_shapes.txt")) {
                         shapeFile = file.toString();
-                    } else if(file.getAbsoluteFile().getName().endsWith("_utilization.report")) {
+                    } else if (file.getAbsoluteFile().getName().endsWith("_utilization.report")) {
                         utilReportFile = file.toString();
                     }
                 }
-                if(shapeFile != null && utilReportFile != null) {
+                if (shapeFile != null && utilReportFile != null) {
                     System.out.println(child.getName() + " " + utilReportFile + " " + shapeFile);
                     PBlockGenerator.main(new String[]{
                             "-u", utilReportFile, 

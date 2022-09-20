@@ -429,7 +429,7 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
         int size = (tg.orientation() == T.Orientation.HORIZONTAL) ? numCol : numRow;
         short d = 0;
         List<Short> dArray = distArrays.get(tg.orientation()).get(tg.type());
-        if(endLoc >= 0 && endLoc < size) {
+        if (endLoc >= 0 && endLoc < size) {
             short st  = dArray.get(begLoc);
             short sp  = dArray.get(endLoc);
             // Need abs in case the tg is going to the left.
@@ -440,8 +440,8 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
             else {
                 d = (short) (dArray.get(begLoc) - 2 * dArray.get(0) + dArray.get(-endLoc - 1));
             }
-        } else if(endLoc >= size) {
-            if(!useUTurnNodes) {
+        } else if (endLoc >= size) {
+            if (!useUTurnNodes) {
                 return Short.MAX_VALUE / 2;
             } else {
                 int index = Math.min(size - 1, endLoc);

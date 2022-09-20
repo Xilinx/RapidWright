@@ -37,9 +37,9 @@ public class TestPIP {
         for(Tile t : d.getAllTiles()) {
             for(PIP p : t.getPIPs()) {
                 Node start = p.getStartNode();
-                if(start == null) continue;
+                if (start == null) continue;
                 Node end = p.getEndNode();
-                if(end == null) continue;
+                if (end == null) continue;
                 
                 PIP pip = PIP.getArbitraryPIP(start, end);
                 Assertions.assertEquals(start, pip.getStartNode());

@@ -49,16 +49,16 @@ import com.xilinx.rapidwright.device.Site;
  */
 public class BufferTapTool {
     public static void main(String[] args) {
-        if(args.length < 2) {
+        if (args.length < 2) {
             System.out.println("BASIC USAGE:\n <input.dcp> <--read <file directory> or --set <file>> <output directory>\n");
             return;
         }
         boolean read = args[1].equals("--read");
-        if(!read && args.length < 4) {
+        if (!read && args.length < 4) {
             System.out.println("BASIC USAGE:\n <input.dcp> --set <file path> <output directory>\n");
             return;
         }
-        if(read && args.length < 4) {
+        if (read && args.length < 4) {
             System.out.println("BASIC USAGE:\n <input.dcp> --read <input file> <output file path>\n");
             return;
         }
@@ -68,17 +68,17 @@ public class BufferTapTool {
         Device dev = design.getDevice();
         
         Net clock = getClockNet(design);
-        if(clock == null) {
+        if (clock == null) {
             System.err.println("ERROR: No clock net found");
         }
         
         Map<String, Integer> siteTaps = getBufferSiteTapsFromFile(args[2]);
-        if(siteTaps.isEmpty()) {
+        if (siteTaps.isEmpty()) {
             System.err.println("ERROR: No valid content found in " + args[2]);
             return;
         }
         
-        if(read) {
+        if (read) {
             String filePath = args[3].endsWith("/")? args[3] : args[3] + "/";
             readBufferTapsToFile(inputDcpName, clock, siteTaps, dev, filePath);
             return;
@@ -98,7 +98,7 @@ public class BufferTapTool {
      */
     private static Net getClockNet(Design design) {
         for(Net n : design.getNets()) {
-            if(n.isClockNet()) {
+            if (n.isClockNet()) {
                 return n;
             }
         }
@@ -121,7 +121,7 @@ public class BufferTapTool {
                         break;
                     }
                     String[] siteTapLevels = line.split("\\s+");
-                    if(siteTapLevels.length == 1) {
+                    if (siteTapLevels.length == 1) {
                         siteTaps.put(siteTapLevels[0], null);
                     } else {
                         siteTaps.put(siteTapLevels[0], Integer.parseInt(siteTapLevels[1]));
@@ -152,7 +152,7 @@ public class BufferTapTool {
             
             for(String s : siteTaps.keySet()) {
                 Site site = dev.getSite(s);
-                if(site == null) {
+                if (site == null) {
                     System.err.println("ERROR: No site found under name " + s);
                     continue;
                 }
@@ -178,7 +178,7 @@ public class BufferTapTool {
             String siteName = siteTap.getKey();
             Site site = dev.getSite(siteName);
             int tap = siteTap.getValue();
-            if(site == null) {
+            if (site == null) {
                 System.err.println("ERROR: No site found under name " + siteName);
                 continue;
             }

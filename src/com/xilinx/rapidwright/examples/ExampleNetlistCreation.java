@@ -79,7 +79,7 @@ public class ExampleNetlistCreation {
             top2ffNet.createPortInst(port); 
         
             // Clk is a special case
-            if(pinNames[i].equals(clk)) continue;
+            if (pinNames[i].equals(clk)) continue;
             
             // Create an FDRE instance
             EDIFCellInst ffInst = top.createChildCellInst(pinNames[i]+"FF", ff);

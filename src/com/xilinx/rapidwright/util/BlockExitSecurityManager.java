@@ -57,7 +57,7 @@ public class BlockExitSecurityManager extends SecurityManager {
      * @see <a href="https://bugs.openjdk.java.net/browse/JDK-8199704">JDK-8199704</a>
      */
     public static void blockSystemExitCalls() {
-        if(singleton == null) {
+        if (singleton == null) {
             singleton = new BlockExitSecurityManager();
             System.setSecurityManager(singleton);            
         }

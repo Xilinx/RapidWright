@@ -93,7 +93,7 @@ public class PicoBlazeArray {
      */
     public static void updateAnchorToBRAM(Module m) {
         for(SiteInst i : m.getSiteInsts()) {
-            if(i.getSite().getSiteTypeEnum() == SiteTypeEnum.RAMBFIFO36) {
+            if (i.getSite().getSiteTypeEnum() == SiteTypeEnum.RAMBFIFO36) {
                 m.setAnchor(i.getSite());
                 m.calculateAllValidPlacements(m.getDevice());
             }
@@ -164,12 +164,12 @@ public class PicoBlazeArray {
                     Site bram = device.getSite("RAMB36_X" + x + "Y" + y);
                     Module impl = null;
                     for(Module m : picoBlazeImpls) {
-                        if(canCreateModuleAtSite(design, bram, m, instances.values())) {
+                        if (canCreateModuleAtSite(design, bram, m, instances.values())) {
                             impl = m;
                             break;
                         }
                     }
-                    if(impl == null) continue; // Laguna site
+                    if (impl == null) continue; // Laguna site
 
                     T mi = createInstance(design, makeName(x,y), impl, picoBlazeImpls);
 
@@ -199,7 +199,7 @@ public class PicoBlazeArray {
                 // we will skip top and bottom clock region rows to avoid laguna tiles and U-turn routing
                 for(int y=BRAMS_IN_CLOCK_REGION_HEIGHT; y < bramRows-BRAMS_IN_CLOCK_REGION_HEIGHT; y++) {
                     T curr = instances.get(makeName(x, y));
-                    if(curr==null) continue;
+                    if (curr==null) continue;
 
                     clk.createPortInst(CLK, curr.getCellInst());
                     curr.connect(RST, RST);
@@ -207,9 +207,9 @@ public class PicoBlazeArray {
                     for(int i=0; i < PICOBLAZE_BUS_WIDTH; i++) {
                         for(int j=0; j < CONN_ARRAY.length; j++) {
                             T other = instances.get(makeName(x, y + CONN_ARRAY[j]));
-                            if(other == null) {
+                            if (other == null) {
                                 curr.connect(PICOBLAZE_INPUTS [j], TOP_INPUT_PREFIX  + x, i);
-                                if(y == bramRows-BRAMS_IN_CLOCK_REGION_HEIGHT-1 && j==3) {
+                                if (y == bramRows-BRAMS_IN_CLOCK_REGION_HEIGHT-1 && j==3) {
                                     curr.connect(PICOBLAZE_OUTPUTS[j], TOP_OUTPUT_PREFIX + x, i);
                                 }
                             } else {

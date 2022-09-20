@@ -118,10 +118,10 @@ public class GUIPBlock extends QGraphicsPolygonItem {
             int botEdge = ts * pb.getBottomRightTile().getRow();
 
             // Check boundary conditions
-            if(topEdge+dy < 0) dy = -topEdge;
-            if(dy+botEdge > sceneHeight) dy = sceneHeight - botEdge;        
-            if(leftEdge+dx < 0) dx = -leftEdge;
-            if(dx+rightEdge > sceneWidth) dx = sceneWidth - rightEdge;
+            if (topEdge+dy < 0) dy = -topEdge;
+            if (dy+botEdge > sceneHeight) dy = sceneHeight - botEdge;        
+            if (leftEdge+dx < 0) dx = -leftEdge;
+            if (dx+rightEdge > sceneWidth) dx = sceneWidth - rightEdge;
             
             // Check how many tile columns we might be skipping (not drawn)
             Tile bottomLeft = pb.getBottomLeftTile();
@@ -138,7 +138,7 @@ public class GUIPBlock extends QGraphicsPolygonItem {
 //            System.out.println("Moving pblock: " + tileX + " " + tileY);
             System.out.println("****************************");
             System.out.println("* " + pb.toString());
-            if(pb.movePBlock(tileX, tileY)) {
+            if (pb.movePBlock(tileX, tileY)) {
                 Tile newLowerLeft = pb.getBottomLeftTile();
                 lastSnapToDx = (newLowerLeft.getColumn() - lastSnapToBottomLeftTile.getColumn()) * ts;
                 lastSnapToDy = (newLowerLeft.getRow() - lastSnapToBottomLeftTile.getRow()) * ts;

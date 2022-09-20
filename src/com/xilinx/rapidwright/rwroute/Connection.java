@@ -122,8 +122,8 @@ public class Connection implements Comparable<Connection>{
         yMinBB = (short) (yMin - boundingBoxExtensionY);
         
         // allow more space for resource expansion of SLR-crossing connections
-        if(checkSLRCrossing) {        
-            if(crossSLR()) {
+        if (checkSLRCrossing) {        
+            if (crossSLR()) {
                 yMaxBB += 2 * boundingBoxExtensionY;
                 yMinBB -= 2 * boundingBoxExtensionY;
             }
@@ -133,7 +133,7 @@ public class Connection implements Comparable<Connection>{
     }
     
     private boolean crossSLR() {
-        if(getSource().getTile().getSLR().equals(sink.getTile().getSLR())) {
+        if (getSource().getTile().getSLR().equals(sink.getTile().getSLR())) {
             return false;
         }
         crossSLR = true;
@@ -141,9 +141,9 @@ public class Connection implements Comparable<Connection>{
     }
     
     private short maxOfThree(short var1, short var2, short var3) {
-        if(var1 >= var2 && var1 >= var3) {
+        if (var1 >= var2 && var1 >= var3) {
             return var1;
-        } else if(var2 >= var1 && var2 >= var3) {
+        } else if (var2 >= var1 && var2 >= var3) {
             return var2;
         } else {
             return var3;
@@ -151,9 +151,9 @@ public class Connection implements Comparable<Connection>{
     }
     
     private short minOfThree(short var1, short var2, short var3) {
-        if(var1 <= var2 && var1 <= var3) {
+        if (var1 <= var2 && var1 <= var3) {
             return var1;
-        } else if(var2 <= var1 && var2 <= var3) {
+        } else if (var2 <= var1 && var2 <= var3) {
             return var2;
         } else {
             return var3;
@@ -170,7 +170,7 @@ public class Connection implements Comparable<Connection>{
         float slackCon = Float.MAX_VALUE;
         for(TimingEdge e : getTimingEdges()) {
             float tmpslackCon = e.getDst().getRequiredTime() - e.getSrc().getArrivalTime() - e.getDelay();
-            if(tmpslackCon < slackCon)
+            if (tmpslackCon < slackCon)
                 slackCon = tmpslackCon;
         }
         
@@ -178,7 +178,7 @@ public class Connection implements Comparable<Connection>{
         
         tempCriticality = (float) Math.pow(tempCriticality, criticalityExponent) * maxCriticality;
         
-        if(tempCriticality > criticality)
+        if (tempCriticality > criticality)
             setCriticality(tempCriticality);
     }
     
@@ -188,7 +188,7 @@ public class Connection implements Comparable<Connection>{
      */
     public boolean isCongested() {
         for(Routable rn : getRnodes()) {
-            if(rn.isOverUsed()) {
+            if (rn.isOverUsed()) {
                 return true;
             }
         }
@@ -201,7 +201,7 @@ public class Connection implements Comparable<Connection>{
      */
     public boolean useRnodesWithMultiDrivers() {
         for(Routable rn : getRnodes()) {
-            if(rn.hasMultiDrivers()) {
+            if (rn.hasMultiDrivers()) {
                 return true;
             }
         }
@@ -398,13 +398,13 @@ public class Connection implements Comparable<Connection>{
     
     @Override
     public int compareTo(Connection arg0) {
-        if(netWrapper.getConnections().size() > arg0.getNetWrapper().getConnections().size()) {
+        if (netWrapper.getConnections().size() > arg0.getNetWrapper().getConnections().size()) {
             return 1;
-        } else if(netWrapper.getConnections().size() == arg0.getNetWrapper().getConnections().size()) {
-            if(this.getHpwl() > arg0.getHpwl()) {
+        } else if (netWrapper.getConnections().size() == arg0.getNetWrapper().getConnections().size()) {
+            if (this.getHpwl() > arg0.getHpwl()) {
                 return 1;
-            } else if(getHpwl() == arg0.getHpwl()) {
-                if(hashCode() > arg0.hashCode()) {
+            } else if (getHpwl() == arg0.getHpwl()) {
+                if (hashCode() > arg0.hashCode()) {
                     return -1;
                 }
             }

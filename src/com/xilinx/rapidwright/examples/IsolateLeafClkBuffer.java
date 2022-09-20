@@ -82,14 +82,14 @@ public class IsolateLeafClkBuffer {
         q.add(src);
         while(!q.isEmpty()) {
             curr = q.poll();
-            if(curr.equals(snk)) {
+            if (curr.equals(snk)) {
                 return curr.getPIPsBackToSource();
             }
             visited.add(curr);
             for(Wire w : curr.getConnections()) {
                 RouteNode nextNode = new RouteNode(w,curr);
-                if(visited.contains(nextNode)) continue;
-                if(used.contains(nextNode)) continue;
+                if (visited.contains(nextNode)) continue;
+                if (used.contains(nextNode)) continue;
                 nextNode.setCost(nextNode.getManhattanDistance(snk) + curr.getLevel());
                 q.add(nextNode);
             }
@@ -117,7 +117,7 @@ public class IsolateLeafClkBuffer {
         
         
         Net clk = clkPin.getNet();
-        if(!clk.removePin(clkPin, true)) {
+        if (!clk.removePin(clkPin, true)) {
             throw new RuntimeException("ERROR: Couldn't disconnect clk pin " +
                 clkPin + " on site " + clkPin.getSite());
         }
@@ -135,7 +135,7 @@ public class IsolateLeafClkBuffer {
 
         List<PIP> route = findRoute(src, snk, used);
 
-        if(route == null) {
+        if (route == null) {
             throw new RuntimeException("ERROR: Couldn't find new LCB path");
         }
         
@@ -149,7 +149,7 @@ public class IsolateLeafClkBuffer {
     }
     
     public static void main(String[] args) {
-        if(args.length != 3) {
+        if (args.length != 3) {
             System.out.println("USAGE: <input.dcp> <cell_clk_pin_name> <output.dcp>");
         }
         Design d = Design.readCheckpoint(args[0]);

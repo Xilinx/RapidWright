@@ -59,7 +59,7 @@ public class Interchange {
     public static void writeInterchangeFile(String fileName, MessageBuilder message) throws IOException {
         WritableByteChannel wbc = null;
         
-        if(IS_GZIPPED) {
+        if (IS_GZIPPED) {
             GZIPOutputStream go = new GZIPOutputStream(new FileOutputStream(fileName));
             wbc = Channels.newChannel(go);
             
@@ -67,7 +67,7 @@ public class Interchange {
             FileOutputStream fo = new java.io.FileOutputStream(fileName);
             wbc = fo.getChannel();
         }
-        if(IS_PACKED) {
+        if (IS_PACKED) {
             SerializePacked.writeToUnbuffered(wbc, message);
         } else {
             Serialize.write(wbc, message);
@@ -85,7 +85,7 @@ public class Interchange {
      */
     public static MessageReader readInterchangeFile(String fileName, ReaderOptions readOptions) throws IOException {
         ReadableByteChannel channel = null;
-        if(IS_GZIPPED) {
+        if (IS_GZIPPED) {
             GZIPInputStream gis = new GZIPInputStream(new FileInputStream(fileName));
             channel = Channels.newChannel(gis);
         } else {
@@ -93,7 +93,7 @@ public class Interchange {
             channel = fis.getChannel();
         }
         MessageReader readMsg = null;
-        if(IS_PACKED) {
+        if (IS_PACKED) {
             readMsg = SerializePacked.readFromUnbuffered(channel, readOptions);
         } else {
             readMsg = Serialize.read(channel, readOptions);
@@ -163,7 +163,7 @@ public class Interchange {
     }
     
     public static void main(String[] args) throws IOException {
-        if(args.length < 1 || args.length > 2) {
+        if (args.length < 1 || args.length > 2) {
             System.out.println("USAGE: <input DCP> [input EDIF]");
             return;
         }

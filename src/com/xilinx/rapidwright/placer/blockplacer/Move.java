@@ -69,8 +69,8 @@ public class Move<ModuleInstT extends AbstractModuleInst<?,?,?>, PlacementT> {
     }
     
     public void undoMove() {
-        if(getBlock0() != null) placer.setTempAnchorSite(getBlock0(), site0);
-        if(getBlock1() != null) placer.setTempAnchorSite(getBlock1(), site1Previous != null ? site1Previous : site1);
+        if (getBlock0() != null) placer.setTempAnchorSite(getBlock0(), site0);
+        if (getBlock1() != null) placer.setTempAnchorSite(getBlock1(), site1Previous != null ? site1Previous : site1);
     }
 
     /* (non-Javadoc)

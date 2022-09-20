@@ -57,7 +57,7 @@ public class TestSiteInst {
     private void routeLUTRouteThruHelper(Design d, SiteInst si, char letter, boolean lutPrimary, BELPin snk, Unisim cellType) {
         BEL bel = snk.getBEL();
         String cellName = bel.getName() + "_inst";
-        if(d.getCell(cellName) == null) {
+        if (d.getCell(cellName) == null) {
             d.createAndPlaceCell(d.getTopEDIFCell(), cellName, cellType,
                     si.getSiteName() + "/" + bel.getName());            
         }
@@ -71,7 +71,7 @@ public class TestSiteInst {
 
     private void routeLUTRouteThruHelperFF(Design d, SiteInst si, char letter, boolean lutPrimary, boolean ffPrimary) {
         BEL bel;
-        if(d.getDevice().getSeries() == Series.Series7) {
+        if (d.getDevice().getSeries() == Series.Series7) {
             bel = si.getBEL(letter + (ffPrimary ? "" : "5") + "FF");
         } else {
             bel = si.getBEL(letter + "FF" + (ffPrimary ? "" : "2"));
@@ -82,7 +82,7 @@ public class TestSiteInst {
     private void routeLUTRouteThruHelperCarry(Design d, SiteInst si, char letter, boolean primary) {
         BEL bel;
         Unisim cellType;
-        if(d.getDevice().getSeries() == Series.Series7) {
+        if (d.getDevice().getSeries() == Series.Series7) {
             bel = si.getBEL("CARRY4");
             cellType = Unisim.CARRY4;
         } else {
@@ -103,7 +103,7 @@ public class TestSiteInst {
         for(char letter : LUTTools.lutLetters) {
             routeLUTRouteThruHelperFF(d, si, letter, true, true);
             routeLUTRouteThruHelperFF(d, si, letter, false, false);
-            if(d.getDevice().getSeries() == Series.Series7 && letter == 'D') break;
+            if (d.getDevice().getSeries() == Series.Series7 && letter == 'D') break;
         }
     }
 
@@ -118,7 +118,7 @@ public class TestSiteInst {
             routeLUTRouteThruHelperFF(d, si, letter, true, true);
             routeLUTRouteThruHelperFF(d, si, letter, true, false);
             Assertions.assertNull(si.getCell(letter + "5LUT"));
-            if(d.getDevice().getSeries() == Series.Series7 && letter == 'D') break;
+            if (d.getDevice().getSeries() == Series.Series7 && letter == 'D') break;
         }
     }
 
@@ -147,7 +147,7 @@ public class TestSiteInst {
             {
                 BELPin src = si.getSite().getBELPin(letter + "4");
                 BELPin snk;
-                if(d.getDevice().getSeries() == Series.Series7) {
+                if (d.getDevice().getSeries() == Series.Series7) {
                     snk = si.getBEL(letter + "5FF").getPin("D");
                 } else {
                     snk = si.getBEL(letter + "FF2").getPin("D");
@@ -157,7 +157,7 @@ public class TestSiteInst {
                 Assertions.assertNull(lut5);
             }
 
-            if(d.getDevice().getSeries() == Series.Series7 && letter == 'D') break;
+            if (d.getDevice().getSeries() == Series.Series7 && letter == 'D') break;
         }
     }
 
@@ -199,7 +199,7 @@ public class TestSiteInst {
         for(char letter : LUTTools.lutLetters) {
             routeLUTRouteThruHelperCarry(d, si, letter, true);
             routeLUTRouteThruHelperCarry(d, si, letter, false);
-            if(d.getDevice().getSeries() == Series.Series7 && letter == 'D') break;
+            if (d.getDevice().getSeries() == Series.Series7 && letter == 'D') break;
         }
     }
 

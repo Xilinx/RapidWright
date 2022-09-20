@@ -161,11 +161,11 @@ public class TileScene extends QGraphicsScene{
         // Used to avoid a bug in Qt
         System.gc();
 
-        if(device != null) {
+        if (device != null) {
             tileColumnTypesToHide = new HashSet<TileTypeEnum>();
             tileRowTypesToHide = new HashSet<TileTypeEnum>();
 
-            if(hideTiles) {
+            if (hideTiles) {
                 populateTileTypesToHide();
             }
 
@@ -220,10 +220,10 @@ public class TileScene extends QGraphicsScene{
         for(Tile[] tileRow : device.getTiles()) {
             for(Tile tile : tileRow) {
                 TileTypeEnum type = tile.getTileTypeEnum();
-                if(tileColumnTypesToHide.contains(type)) {
+                if (tileColumnTypesToHide.contains(type)) {
                     colsToSkip.add(tile.getColumn());
                 }
-                if(tileRowTypesToHide.contains(type)) {
+                if (tileRowTypesToHide.contains(type)) {
                     rowsToSkip.add(tile.getRow());
                 }
             }
@@ -235,9 +235,9 @@ public class TileScene extends QGraphicsScene{
         tileXMap = new HashMap<Tile, Integer>();
         tileYMap = new HashMap<Tile, Integer>();
         for(int row = 0; row < rows; row++) {
-            if(rowsToSkip.contains(row)) continue;
+            if (rowsToSkip.contains(row)) continue;
             for (int col = 0; col < cols; col++) {
-                if(colsToSkip.contains(col)) continue;
+                if (colsToSkip.contains(col)) continue;
                 Tile tile = device.getTile(row, col);
                 drawnTiles[i][j] = tile;
                 tileXMap.put(tile, j);
@@ -288,14 +288,14 @@ public class TileScene extends QGraphicsScene{
                 int rectY = y * tileSize;
                 int rectSide = tileSize - 2 * offset;
 
-                if(drawPrimitives) {
-                    if(Utils.isCLB(tileTypeEnum)) {
+                if (drawPrimitives) {
+                    if (Utils.isCLB(tileTypeEnum)) {
                         drawCLB(painter, rectX, rectY, rectSide);
-                    } else if(Utils.isSwitchBox(tileTypeEnum)) {
+                    } else if (Utils.isSwitchBox(tileTypeEnum)) {
                         drawSwitchBox(painter, rectX, rectY, rectSide);
-                    } else if(Utils.isBRAM(tileTypeEnum)) {
+                    } else if (Utils.isBRAM(tileTypeEnum)) {
                         drawBRAM(painter, rectX, rectY, rectSide, offset, color);
-                    } else if(Utils.isDSP(tileTypeEnum)) {
+                    } else if (Utils.isDSP(tileTypeEnum)) {
                         drawDSP(painter, rectX, rectY, rectSide, offset, color);
                     } else if (Utils.isURAM(tileTypeEnum)) {
                         drawURAM(painter, rectX, rectY, rectSide, offset, color);
@@ -353,12 +353,12 @@ public class TileScene extends QGraphicsScene{
         QPointF mousePos = event.scenePos();
         if (device != null) {
             Tile tile = getTile(mousePos.x(), mousePos.y());
-            if(tile != null) {
+            if (tile != null) {
                 String siteNames = "";
-                if(tile.getSites().length > 0) {
+                if (tile.getSites().length > 0) {
                     siteNames = " | " + tile.getSites()[0].getName();
                 }
-                if(tile.getSites().length > 1) {
+                if (tile.getSites().length > 1) {
                     siteNames += " ...";
                 }                
                 String tileName = device.getName() + " | " +  tile.getName() +
@@ -385,7 +385,7 @@ public class TileScene extends QGraphicsScene{
     }
     
     public void updateCursor() {
-        if(highlit != null) {
+        if (highlit != null) {
             highlit.dispose();
         }
         highlit = addRect(currX * tileSize, currY * tileSize, tileSize - 2,
@@ -404,14 +404,14 @@ public class TileScene extends QGraphicsScene{
     
     public int getDrawnTileX(Tile tile) {
         Integer tmp = tileXMap.get(tile);
-        if(tmp == null)
+        if (tmp == null)
             return -1;
         return tmp;
     }
     
     public int getDrawnTileY(Tile tile) {
         Integer tmp = tileYMap.get(tile);
-        if(tmp == null)
+        if (tmp == null)
             return -1;
         return tmp;
     }
@@ -423,7 +423,7 @@ public class TileScene extends QGraphicsScene{
 
     public void setDesign(Design design) {
         this.design = design;
-        if(this.design != null) {
+        if (this.design != null) {
             setDevice(design.getDevice());
         }
     }

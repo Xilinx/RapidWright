@@ -45,7 +45,7 @@ import com.xilinx.rapidwright.device.Site;
 public class DesignImplementationDiff {
 
     public static void main(String[] args) {
-        if(args.length != 2) {
+        if (args.length != 2) {
             System.out.println("USAGE: <original.dcp> <superset.dcp>");
             return;
         }
@@ -58,16 +58,16 @@ public class DesignImplementationDiff {
             Site s = c.getSite();
             boolean placementChange = false;
             Cell cc = superset.getCell(c.getName());
-            if(cc == null) {
+            if (cc == null) {
                 System.out.println("Cell " + c.getName() + " is missing");
                 continue;
             }
-            if(!cc.getSite().equals(s)) {
+            if (!cc.getSite().equals(s)) {
                 System.out.println("Cell " + c.getName() + " has moved to " + cc.getSite());
                 placementChange = true;
             }
             
-            if(!cc.getBEL().equals(e)) {
+            if (!cc.getBEL().equals(e)) {
                 System.out.println("Cell " + c.getName() + " has moved to " + cc.getBEL());
                 placementChange = true;
             }
@@ -76,15 +76,15 @@ public class DesignImplementationDiff {
         
         for(Net n : original.getNets()) {
             Net nn = superset.getNet(n.getName());
-            if(nn == null) {
+            if (nn == null) {
                 System.out.println("Net " + nn + " is missing");
                 continue;
             }
-            if(nn.isStaticNet()) continue;
+            if (nn.isStaticNet()) continue;
             boolean netChange = false;
             HashSet<PIP> pips = new HashSet<>(nn.getPIPs());    
             for(PIP p : n.getPIPs()) {
-                if(!pips.contains(p)) {
+                if (!pips.contains(p)) {
                     System.out.println("Missing PIP " + p.toString() + " from net " + n.getName());
                     netChange = true;
                 }

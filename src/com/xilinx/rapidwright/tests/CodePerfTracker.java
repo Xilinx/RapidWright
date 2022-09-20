@@ -82,7 +82,7 @@ public class CodePerfTracker {
     }
     
     public void init(String name, boolean printProgress) {
-        if(!GLOBAL_DEBUG) return; 
+        if (!GLOBAL_DEBUG) return; 
         this.name = name;
         this.printProgress = printProgress;
         runtimes = new ArrayList<Long>();
@@ -90,7 +90,7 @@ public class CodePerfTracker {
         segmentNames = new ArrayList<String>();
         inflightTimes = new HashMap<>();
         rt = Runtime.getRuntime();        
-        if(this.printProgress && isVerbose() && name != null) {
+        if (this.printProgress && isVerbose() && name != null) {
             MessageGenerator.printHeader(name);
         }
     }
@@ -102,7 +102,7 @@ public class CodePerfTracker {
     private int getSegmentIndex(String segmentName) {
         int i=0;
         for(String name : segmentNames) {
-            if(name.equals(segmentName)) {
+            if (name.equals(segmentName)) {
                 return i;
             }
             i++;
@@ -129,8 +129,8 @@ public class CodePerfTracker {
     }
 
     public CodePerfTracker start(String segmentName) {
-        if(!GLOBAL_DEBUG || this == SILENT) return this;
-        if(isUsingGCCallsToTrackMemory()) System.gc();
+        if (!GLOBAL_DEBUG || this == SILENT) return this;
+        if (isUsingGCCallsToTrackMemory()) System.gc();
         long currUsage = rt.totalMemory() - rt.freeMemory();
         segmentNames.add(segmentName);
         memUsages.add(currUsage);
@@ -139,19 +139,19 @@ public class CodePerfTracker {
     }
 
     public CodePerfTracker stop() {
-        if(!GLOBAL_DEBUG || this == SILENT) return this;
+        if (!GLOBAL_DEBUG || this == SILENT) return this;
         long end = System.nanoTime();
         int idx = runtimes.size()-1;
-        if(idx < 0) return null;
+        if (idx < 0) return null;
         long start = runtimes.get(idx);
-        if(isUsingGCCallsToTrackMemory()) System.gc();
+        if (isUsingGCCallsToTrackMemory()) System.gc();
         long currUsage = (rt.totalMemory() - rt.freeMemory());
         long prevUsage = memUsages.get(idx);
         
         runtimes.set(idx, end-start);
         memUsages.set(idx,    currUsage-prevUsage);
         
-        if(printProgress && isVerbose()) {
+        if (printProgress && isVerbose()) {
             print(idx);
         }
         return this;
@@ -184,7 +184,7 @@ public class CodePerfTracker {
     }
 
     private void print(String segmentName, Long runtime, Long memUsage, boolean nested) {
-        if(isUsingGCCallsToTrackMemory()) {
+        if (isUsingGCCallsToTrackMemory()) {
             if (nested) {
                 System.out.printf("%"+maxSegmentNameSize+"s: %"+maxRuntimeSize+"s %" + maxUsageSize + "s      (%" + maxRuntimeSize + ".3fs)\n",
                         segmentName,
@@ -245,13 +245,13 @@ public class CodePerfTracker {
             totalRuntime += runtimes.get(i);
             totalUsage += memUsages.get(i);
             int len = segmentNames.get(i).length() + 1;
-            if(len > maxSegmentNameSize) maxSegmentNameSize = len;
+            if (len > maxSegmentNameSize) maxSegmentNameSize = len;
         }
         runtimes.add(totalRuntime);
         memUsages.add(totalUsage);
         String totalName = isUsingGCCallsToTrackMemory() ? "*Total*" : " [No GC] *Total*";  
         segmentNames.add(totalName);
-        if(maxSegmentNameSize < totalName.length()) maxSegmentNameSize = totalName.length();
+        if (maxSegmentNameSize < totalName.length()) maxSegmentNameSize = totalName.length();
     }
 
     private void removeTotalEntry() {
@@ -262,13 +262,13 @@ public class CodePerfTracker {
     }
     
     public void printSummary() {
-        if(!GLOBAL_DEBUG || this == SILENT) return;
-        if(!isVerbose()) return;
-        if(!printProgress) MessageGenerator.printHeader(name);
+        if (!GLOBAL_DEBUG || this == SILENT) return;
+        if (!isVerbose()) return;
+        if (!printProgress) MessageGenerator.printHeader(name);
         addTotalEntry();
         int start = printProgress ? runtimes.size()-1 : 0;
         for(int i=start; i < runtimes.size(); i++) {
-            if(i == runtimes.size()-1) {
+            if (i == runtimes.size()-1) {
                 System.out.println("------------------------------------------------------------------------------");
             }
             print(i);

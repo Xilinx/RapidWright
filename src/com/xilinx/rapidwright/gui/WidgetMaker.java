@@ -39,7 +39,7 @@ public class WidgetMaker {
     private static Set<String> devices;
 
     public static Set<String> getSupportedDevices() {
-        if(devices == null) {
+        if (devices == null) {
             devices = new HashSet<>();
             for(Part part : PartNameTools.getParts()) {
             devices.add(part.getDevice());
@@ -62,7 +62,7 @@ public class WidgetMaker {
                     //FamilyType type = p.getArchitecture();
                     String type = PartNameTools.getFullArchitectureName(p.getArchitecture());
                     QTreeWidgetItem familyItem = familyItems.get(type);
-                    if(familyItem == null) {
+                    if (familyItem == null) {
                         familyItem = new QTreeWidgetItem(treeWidget);
                         familyItem.setText(0, type);
                         familyItems.put(type, familyItem);

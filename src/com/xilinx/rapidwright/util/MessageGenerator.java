@@ -175,7 +175,7 @@ public class MessageGenerator{
                 System.out.print("Would you like to continue(y/n)? ");
                 ch = System.in.read();
             }
-            if(ch == 'y' || ch == 'Y') {
+            if (ch == 'y' || ch == 'Y') {
                 return;
             }
             else {
@@ -201,7 +201,7 @@ public class MessageGenerator{
                 System.out.print("Would you like to continue(y/n)? ");
                 ch = System.in.read();
             }
-            if(ch == 'y' || ch == 'Y') {
+            if (ch == 'y' || ch == 'Y') {
                 return;
             }
             else {

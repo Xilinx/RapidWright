@@ -42,7 +42,7 @@ public class CellPinStaticDefaults {
     
     @SuppressWarnings("unchecked")
     public static synchronized Map<Series, Map<Unisim, Map<String, NetType>>> getCellPinDefaultsMap() {
-        if(cellPinDefaultsMap == null) {
+        if (cellPinDefaultsMap == null) {
             InputStream is = FileTools.getRapidWrightResourceInputStream(
                     FileTools.CELL_PIN_DEFAULTS_FILE_NAME);
             cellPinDefaultsMap = (Map<Series, Map<Unisim, Map<String, NetType>>>) 
@@ -54,9 +54,9 @@ public class CellPinStaticDefaults {
     public static NetType getCellPinDefault(Series s, Unisim u, String pinName) {
         Map<Series, Map<Unisim, Map<String, NetType>>> map = getCellPinDefaultsMap();
         Map<Unisim, Map<String, NetType>> map2 = map.get(s);
-        if(map2 != null) {
+        if (map2 != null) {
             Map<String, NetType> map3 = map2.get(u);
-            if(map3 != null) {
+            if (map3 != null) {
                 return map3.get(pinName);
             }
         }

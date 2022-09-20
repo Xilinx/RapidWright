@@ -136,14 +136,14 @@ public class RouteStatus implements Comparable<RouteStatus> {
      */
     public void reportDifferences(RouteStatus r2) {
         boolean printedName = false;
-        if(!getStatus().equals(r2.getStatus())) {
-            if(!printedName) {System.out.println("DIFF: " + getName()); printedName = true;}
+        if (!getStatus().equals(r2.getStatus())) {
+            if (!printedName) {System.out.println("DIFF: " + getName()); printedName = true;}
             System.out.println("  Status: " + getStatus() + " " + r2.getStatus());
         }
         ArrayList<ArrayList<String>> myTrees = getSubTrees();
         ArrayList<ArrayList<String>> otherTrees = r2.getSubTrees();
-        if(myTrees.size() != otherTrees.size()) {
-            if(!printedName) {System.out.println("DIFF: " + getName()); printedName = true;}
+        if (myTrees.size() != otherTrees.size()) {
+            if (!printedName) {System.out.println("DIFF: " + getName()); printedName = true;}
             System.out.println("  SubTree Count: " + myTrees.size() + " " + otherTrees.size());
         }
         
@@ -155,33 +155,33 @@ public class RouteStatus implements Comparable<RouteStatus> {
         for(ArrayList<String> list : myTrees) {
             for(String other : list) {
                 boolean success = set.remove(other);
-                if(!success) {
-                    if(!printedName) {System.out.println("DIFF: " + getName()); printedName = true;}
+                if (!success) {
+                    if (!printedName) {System.out.println("DIFF: " + getName()); printedName = true;}
                     System.out.println("  2: " + other);
                 }                
             }
         }
         for(String mine : set) {
-            if(!printedName) {System.out.println("DIFF: " + getName()); printedName = true;}
+            if (!printedName) {System.out.println("DIFF: " + getName()); printedName = true;}
             System.out.println("  1: " + mine);                
         }
         
         
         /*
         for(int i=0; i < myTrees.size(); i++) {
-            if(i >= otherTrees.size()) return;
+            if (i >= otherTrees.size()) return;
             ArrayList<String> myTree = myTrees.get(i);
             ArrayList<String> otherTree = otherTrees.get(i);
             HashSet<String> set = new HashSet<String>(myTree);
             for(String other : otherTree) {
                 boolean success = set.remove(other);
-                if(!success) {
-                    if(!printedName) {System.out.println("DIFF: " + getName()); printedName = true;}
+                if (!success) {
+                    if (!printedName) {System.out.println("DIFF: " + getName()); printedName = true;}
                     System.out.println("  2: " + other);
                 }
             }
             for(String mine : set) {
-                if(!printedName) {System.out.println("DIFF: " + getName()); printedName = true;}
+                if (!printedName) {System.out.println("DIFF: " + getName()); printedName = true;}
                 System.out.println("  1: " + mine);                
             }
         }*/

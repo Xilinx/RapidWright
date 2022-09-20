@@ -37,7 +37,7 @@ public class CopyMMCMCell {
 
     
     public static void main(String[] args) {
-        if(args.length != 3) {
+        if (args.length != 3) {
             System.out.println("USAGE: <source MMCM DCP> <input DCP> <output DCP>");
             return;
         }
@@ -46,12 +46,12 @@ public class CopyMMCMCell {
         
         Cell mmcm = null;
         for(Cell c : clkPath.getCells()) {
-            if(c.getBEL().getName().contains("MMCM")) {
+            if (c.getBEL().getName().contains("MMCM")) {
                 mmcm = c;
                 break;
             }
         }
-        if(mmcm == null) throw new RuntimeException("ERROR: Couldn't find an MMCM instance in source design.");
+        if (mmcm == null) throw new RuntimeException("ERROR: Couldn't find an MMCM instance in source design.");
         
         input.copyCell(mmcm, mmcm.getName().substring(mmcm.getName().lastIndexOf('/')+1));
         

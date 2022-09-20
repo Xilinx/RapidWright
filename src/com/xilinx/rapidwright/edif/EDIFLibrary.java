@@ -69,9 +69,9 @@ public class EDIFLibrary extends EDIFName {
      * @return The cell that has been added.
      */
     public EDIFCell addCell(EDIFCell cell) {
-        if(cells == null) cells = getNewMap(); 
+        if (cells == null) cells = getNewMap(); 
         EDIFCell collision = cells.put(cell.getName(), cell);
-        if(collision != null && cell != collision) {
+        if (collision != null && cell != collision) {
             throw new RuntimeException("ERROR: Failed to add cell " + 
                 cell.getName() + " to library " + getName()+". The library "
                 + "already contains a cell with the same name.");
@@ -98,7 +98,7 @@ public class EDIFLibrary extends EDIFName {
      * @return The cell that has been added.
      */
     public EDIFCell addCellRenameDuplicates(EDIFCell cell, String preferredSuffix) {
-        if(cells == null) cells = getNewMap();
+        if (cells == null) cells = getNewMap();
         cell.setLibrary(this);
 
         EDIFCell collision = cells.put(cell.getName(), cell);
@@ -208,7 +208,7 @@ public class EDIFLibrary extends EDIFName {
         List<EDIFCell> list = new ArrayList<>();
         for(EDIFCell c : getCells()) {
             for(EDIFCellInst i : c.getCellInsts()) {
-                if(!containsCell(i.getCellType())) {
+                if (!containsCell(i.getCellType())) {
                     list.add(i.getCellType());
                 }
             }
@@ -298,7 +298,7 @@ public class EDIFLibrary extends EDIFName {
         }
         for(EDIFCellInst i : cellInsts) {
             EDIFCell childCell = i.getCellType();
-            if(childCell.getLibrary() == this) {
+            if (childCell.getLibrary() == this) {
                 visit(childCell,visitedList,visitedSet, stable);
             }
         }

@@ -45,14 +45,14 @@ public class StampPlacement {
     public static Module[] loadStampDCPs(String stampDCPFilePrefix) {
         String stampFileDir = System.getProperty("user.dir");
         String filePrefix = stampDCPFilePrefix;
-        if(stampDCPFilePrefix.contains(File.separator)) {
+        if (stampDCPFilePrefix.contains(File.separator)) {
             int sep = stampDCPFilePrefix.lastIndexOf(File.separator);
             stampFileDir = stampDCPFilePrefix.substring(0, sep);
             filePrefix = stampDCPFilePrefix.substring(sep+1);
         }
         ArrayList<String> dcpFileNames = new ArrayList<>();
         for(File f : new File(stampFileDir).listFiles(FileTools.getDCPFilenameFilter())) {
-            if(f.getName().startsWith(filePrefix)) {
+            if (f.getName().startsWith(filePrefix)) {
                 dcpFileNames.add(f.getName());
             }
         }
@@ -74,19 +74,19 @@ public class StampPlacement {
         int lineNum = 0;
         for(String line : FileTools.getLinesFromTextFile(placementDirectionFile)) {
             lineNum++;
-            if(line.trim().startsWith("#")) continue;
+            if (line.trim().startsWith("#")) continue;
             String[] tokens = line.split("\\s+");
-            if(line.trim().startsWith("STAMP")) {
+            if (line.trim().startsWith("STAMP")) {
                 int idx = Integer.parseInt(tokens[1]);
                 Site anchor = device.getSite(tokens[2]);
-                if(anchor == null) {
+                if (anchor == null) {
                     throw new RuntimeException("ERROR: invalid anchor site " + anchor + " on line " + lineNum);
                 }
                 String fullDCPFileName = tokens[3];
                 String metadataFileName = tokens[4];
                 stamps.put(idx, new Module(Design.readCheckpoint(fullDCPFileName, CodePerfTracker.SILENT), metadataFileName));
                 stamps.get(idx).setAnchor(anchor);
-                if(stamps.get(idx).getAnchor() == null) {
+                if (stamps.get(idx).getAnchor() == null) {
                     throw new RuntimeException("ERROR: No site used in " + fullDCPFileName + " at proposed anchor " + anchor + " on line " + lineNum);
                 }
                 placementDirectives.put(idx, new HashMap<>());
@@ -94,7 +94,7 @@ public class StampPlacement {
             }
             int stampIdx = Integer.parseInt(tokens[0]);
             Site placement = device.getSite(tokens[1]);
-            if(placement == null) {
+            if (placement == null) {
                 throw new RuntimeException("ERROR: invalid anchor site " + placement + " on line " + lineNum);
             }
             String instName = tokens[2];
@@ -105,7 +105,7 @@ public class StampPlacement {
     }
     
     public static void main(String[] args) {
-        if(args.length != 3) {
+        if (args.length != 3) {
             System.out.println("USAGE: <input.dcp> <stamp_direction_file> <output.dcp>\n");
             System.out.println("  Format for the stamp_direction_file is: ");
             System.out.println("    STAMP <define_stamp_index> <anchor_site> <stamp_dcp_file_name> <dcp_metadata_file_name>");
@@ -121,7 +121,7 @@ public class StampPlacement {
         Device device = design.getDevice();
         
         for(Net net : design.getNets()) {
-            if(net.isClockNet()) net.unroute();
+            if (net.isClockNet()) net.unroute();
         }
         
         t.stop().start("Load stamp DCPs");

@@ -85,21 +85,21 @@ public class HMTile extends QGraphicsRectItem {
         switch (newState) {
             case VALID:
                 this.setPen(new QPen(GREEN));
-                if(isAnchor) 
+                if (isAnchor) 
                     this.setBrush(ANCHOR_GREEN);
                 else
                     this.setBrush(new QBrush(GREEN));
                 break;
             case COLLIDING:
                 this.setPen(new QPen(ORANGE));
-                if(isAnchor) 
+                if (isAnchor) 
                     this.setBrush(ANCHOR_ORANGE);
                 else
                     this.setBrush(new QBrush(ORANGE));
                 break;
             case INVALID:
                 this.setPen(new QPen(RED));
-                if(isAnchor) 
+                if (isAnchor) 
                     this.setBrush(ANCHOR_RED);
                 else
                     this.setBrush(new QBrush(RED));

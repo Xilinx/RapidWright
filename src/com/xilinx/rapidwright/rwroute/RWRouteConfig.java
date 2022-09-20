@@ -124,7 +124,7 @@ public class RWRouteConfig {
         printConnectionSpan = false;
         resolveConflictNets = false;
         anchorNameKeyword = "q0_reg";
-        if(arguments != null) {
+        if (arguments != null) {
             parseArguments(arguments);
         }
     }
@@ -146,14 +146,14 @@ public class RWRouteConfig {
                 setBoundingBoxExtensionY(Short.parseShort(arguments[++i]));
                 break;
             case "--enlargeBoundingBox":
-                if(i+1 < arguments.length && (!arguments[i+1].startsWith("--extensionYIncrement") && !arguments[i+1].startsWith("--extensionXIncrement"))) {
+                if (i+1 < arguments.length && (!arguments[i+1].startsWith("--extensionYIncrement") && !arguments[i+1].startsWith("--extensionXIncrement"))) {
                     System.out.println("INFO: --enlargeBoundingBox option is specified without being followed by --extensionYIncrement <arg> or --extensionXIncrement <arg>.");
                     System.out.println("         Default settings are used: extensionYIncrement = 2, extensionXIncrement = 1.");
                 }
                 setEnlargeBoundingBox(true);
                 break;
             case "--fixBoundingBox":
-                if(i+1 < arguments.length && (!arguments[i+1].startsWith("--boundingBoxExtensionX") && !arguments[i+1].startsWith("--boundingBoxExtensionY"))) {
+                if (i+1 < arguments.length && (!arguments[i+1].startsWith("--boundingBoxExtensionX") && !arguments[i+1].startsWith("--boundingBoxExtensionY"))) {
                     System.out.println("INFO: --fixBoundingBox option is specified without being followed by --boundingBoxExtensionX <arg> or --boundingBoxExtensionY <arg>.");
                     System.out.println("         Default settings are used: boundingBoxExtensionX = 3, boundingBoxExtensionY = 15.");
                 }
@@ -398,7 +398,7 @@ public class RWRouteConfig {
      * @param wirelengthWeight The wirelength-driven weighting factor used in the cost function
      */
     public void setWirelengthWeight(float wirelengthWeight) {
-        if(wirelengthWeight < 0 || wirelengthWeight > 1)
+        if (wirelengthWeight < 0 || wirelengthWeight > 1)
             throw new IllegalArgumentException("ERROR: wirelength-driven weighting factor wirelengthWeight should be within [0, 1].");
         this.wirelengthWeight = wirelengthWeight;
     }
@@ -420,7 +420,7 @@ public class RWRouteConfig {
      * @param timingWeight The timing-driven weighting factor used in the cost function.
      */
     public void setTimingWeight(float timingWeight) {
-        if(timingWeight < 0 || timingWeight > 1)
+        if (timingWeight < 0 || timingWeight > 1)
             throw new IllegalArgumentException("ERROR: timing-driven weighting factor timingWeight cannot be negative or greater than 1.");
         this.timingWeight = timingWeight;
     }
@@ -443,7 +443,7 @@ public class RWRouteConfig {
      * @param timingMultiplier A multiplier greater than 1 to increase timingWeight along routing iterations.
      */
     public void setTimingMultiplier(float timingMultiplier) {
-        if(timingMultiplier < 1)
+        if (timingMultiplier < 1)
             throw new IllegalArgumentException("ERROR: timingMultiplier cannot be less than 1.");
         this.timingMultiplier = timingMultiplier;
     }
@@ -465,7 +465,7 @@ public class RWRouteConfig {
      * @param shareExponent The sharing exponent that discourages resource sharing for timing-driven routing of critical connections.
      */
     public void setShareExponent(float shareExponent) {
-        if(shareExponent < 0)
+        if (shareExponent < 0)
             throw new IllegalArgumentException("ERROR: shareExponent cannot be negative.");
         this.shareExponent = shareExponent;
     }
@@ -489,7 +489,7 @@ public class RWRouteConfig {
      * @param criticalityExponent
      */
     public void setCriticalityExponent(float criticalityExponent) {
-        if(criticalityExponent < 1)
+        if (criticalityExponent < 1)
             throw new IllegalArgumentException("ERROR: criticalityExponent cannot be less than 1.");
         this.criticalityExponent = criticalityExponent;
     }
@@ -511,7 +511,7 @@ public class RWRouteConfig {
      * @param minRerouteCriticality
      */
     public void setMinRerouteCriticality(float minRerouteCriticality) {
-        if(minRerouteCriticality <= 0.5)
+        if (minRerouteCriticality <= 0.5)
             throw new IllegalArgumentException("ERROR: minRerouteCriticality cannot be less than 0.5.");
         this.minRerouteCriticality = minRerouteCriticality;
     }
@@ -533,7 +533,7 @@ public class RWRouteConfig {
      * @param reroutePercentage
      */
     public void setReroutePercentage(short reroutePercentage) {
-        if(reroutePercentage < 0) 
+        if (reroutePercentage < 0) 
             throw new IllegalArgumentException("ERROR: reroutePercentage cannot be negative.");
         this.reroutePercentage = reroutePercentage;
     }
@@ -555,7 +555,7 @@ public class RWRouteConfig {
      * @param initialPresentCongestionFactor The value to set.
      */
     public void setInitialPresentCongestionFactor(float initialPresentCongestionFactor) {
-        if(initialPresentCongestionFactor < 0)
+        if (initialPresentCongestionFactor < 0)
             throw new IllegalArgumentException("ERROR: initialPresentCongesFactor cannot be negative.");
         this.initialPresentCongestionFactor = initialPresentCongestionFactor;
     }
@@ -577,7 +577,7 @@ public class RWRouteConfig {
      * @param presentCongestionMultiplier
      */
     public void setPresentCongestionMultiplier(float presentCongestionMultiplier) {
-        if(presentCongestionMultiplier <= 1)
+        if (presentCongestionMultiplier <= 1)
             throw new IllegalArgumentException("ERROR: the present congestion factor multiplier cannot be less than 1.");
         this.presentCongestionMultiplier = presentCongestionMultiplier;
     }
@@ -599,7 +599,7 @@ public class RWRouteConfig {
      * @param historicalCongestionFactor
      */
     public void setHistoricalCongestionFactor(float historicalCongestionFactor) {
-        if(historicalCongestionFactor <= 0)
+        if (historicalCongestionFactor <= 0)
             throw new IllegalArgumentException("ERROR: historicalCongestionFactor cannot be less than 0.");
         this.historicalCongestionFactor = historicalCongestionFactor;
     }
@@ -642,8 +642,8 @@ public class RWRouteConfig {
      */
     public void setPartialRouting(boolean partialRouting) {
         this.partialRouting = partialRouting;
-        if(this.partialRouting == false) return;
-        if(enlargeBoundingBox == false) {
+        if (this.partialRouting == false) return;
+        if (enlargeBoundingBox == false) {
             // when enlargeBoundingBox is not set, use the default parameters as default
             // can be overridden later if there are corresponding options included in the arguments
             enlargeBoundingBox = true;
@@ -740,7 +740,7 @@ public class RWRouteConfig {
      * @param pessimismA
      */
     public void setPessimismA(float pessimismA) {
-        if(pessimismA < 0.99)
+        if (pessimismA < 0.99)
             throw new IllegalArgumentException("ERROR: pessimismA cannot be less than 0.99");
         this.pessimismA = pessimismA;
     }
@@ -762,7 +762,7 @@ public class RWRouteConfig {
      * @param pessimismB 
      */
     public void setPessimismB(short pessimismB) {
-        if(pessimismB < 0)
+        if (pessimismB < 0)
             throw new IllegalArgumentException("ERROR: pessimismB cannot be negative.");
         this.pessimismB = pessimismB;
     }
@@ -784,10 +784,10 @@ public class RWRouteConfig {
      * @param maskNodesCrossRCLK A flag to indicate if masking nodes cross RCLK.
      */
     public void setMaskNodesCrossRCLK(boolean maskNodesCrossRCLK) {
-        if(this.isPartialRouting() && maskNodesCrossRCLK) {
+        if (this.isPartialRouting() && maskNodesCrossRCLK) {
             System.out.println("WARNING: Masking nodes cross RCLK for partial routing could result in routability problems.");
         }
-        if(!this.isPartialRouting() && !maskNodesCrossRCLK) {
+        if (!this.isPartialRouting() && !maskNodesCrossRCLK) {
             System.out.println("WARNING: Not masking nodes cross RCLK for partial routing could result in delay optimism.");
         }
         this.maskNodesCrossRCLK = maskNodesCrossRCLK;
@@ -898,10 +898,10 @@ public class RWRouteConfig {
         s.append(MessageGenerator.formatString("Timing-driven: ", timingDriven));
         s.append(MessageGenerator.formatString("Partial routing: ", partialRouting));
         s.append(MessageGenerator.formatString("Use bounding boxes: ", isUseBoundingBox()));
-        if(this.isUseBoundingBox()) {
+        if (this.isUseBoundingBox()) {
             s.append(MessageGenerator.formatString("Bounding box extension X: ", boundingBoxExtensionX));
             s.append(MessageGenerator.formatString("Bounding box extension Y: ", boundingBoxExtensionY));
-            if(this.isEnlargeBoundingBox()) {
+            if (this.isEnlargeBoundingBox()) {
                 s.append(MessageGenerator.formatString("Enlarge bounding box: ", isEnlargeBoundingBox()));
                 s.append(MessageGenerator.formatString("Extension X increment: ", extensionXIncrement));
                 s.append(MessageGenerator.formatString("Extension Y increment: ", extensionYIncrement));
@@ -910,7 +910,7 @@ public class RWRouteConfig {
             }
         }
         s.append(MessageGenerator.formatString("Wirelength-driven weight: ", wirelengthWeight));
-        if(timingDriven) {
+        if (timingDriven) {
             s.append(MessageGenerator.formatString("Sharing exponent: ", shareExponent));
             s.append(MessageGenerator.formatString("Timing-driven weight: ", timingWeight));
             s.append(MessageGenerator.formatString("Timing-driven mult fac: ", timingMultiplier));

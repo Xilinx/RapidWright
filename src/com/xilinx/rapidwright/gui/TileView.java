@@ -78,7 +78,7 @@ public class TileView extends QGraphicsView{
             lastPan = event.pos();
             setCursor(new QCursor(CursorShape.ClosedHandCursor));
         }
-        if(addingAPBlock && event.button().equals(Qt.MouseButton.LeftButton)) {
+        if (addingAPBlock && event.button().equals(Qt.MouseButton.LeftButton)) {
             // Start drawing a Pblock
             System.out.println("Begin drawing pblock...");
             
@@ -91,11 +91,11 @@ public class TileView extends QGraphicsView{
      * In this case, this will disallow the user to pan.
      */
     public void mouseReleaseEvent(QMouseEvent event) {
-        if(event.button().equals(Qt.MouseButton.RightButton)) {
+        if (event.button().equals(Qt.MouseButton.RightButton)) {
             rightPressed = false;
             setCursor(new QCursor(CursorShape.ArrowCursor));
         }
-        if(addingAPBlock && event.button().equals(Qt.MouseButton.LeftButton)) {
+        if (addingAPBlock && event.button().equals(Qt.MouseButton.LeftButton)) {
             // Stop drawing a Pblock, save it, return cursor to arrow
             System.out.println("Done drawing pblock!");
             addPBlockMode(false);
@@ -140,11 +140,11 @@ public class TileView extends QGraphicsView{
         double zoom = this.matrix().m11();
         if (event.delta() > 0) {
             // Zoom in (if not at limit)
-            if(zoom < zoomMax)
+            if (zoom < zoomMax)
                 scale(scaleFactor, scaleFactor);
         } else {
             // Zoom out (if not at limit)
-            if(zoom > zoomMin)
+            if (zoom > zoomMin)
                 scale(1.0 / scaleFactor, 1.0 / scaleFactor);
         }
 
@@ -170,24 +170,24 @@ public class TileView extends QGraphicsView{
         double scaleFactor = 1.15; 
         if (event.key() == Key.Key_Equal.value()) {
             // Zoom in (if not at limit)
-            if(this.matrix().m11() < zoomMax)
+            if (this.matrix().m11() < zoomMax)
                 scale(scaleFactor, scaleFactor);
-        } else if(event.key() == Key.Key_Minus.value()) {
+        } else if (event.key() == Key.Key_Minus.value()) {
             // Zoom out (if not at limit)
-            if(this.matrix().m11() > zoomMin)
+            if (this.matrix().m11() > zoomMin)
                 scale(1.0 / scaleFactor, 1.0 / scaleFactor);
         }        
     }
     
     public void zoomIn() { 
         // Zoom in (if not at limit)
-        if(this.matrix().m11() < zoomMax)
+        if (this.matrix().m11() < zoomMax)
             scale(scaleFactor, scaleFactor);
     }
     
     public void zoomOut() {
         // Zoom out (if not at limit)
-        if(this.matrix().m11() > zoomMin)
+        if (this.matrix().m11() > zoomMin)
             scale(1.0 / scaleFactor, 1.0 / scaleFactor);
     }
     
@@ -196,7 +196,7 @@ public class TileView extends QGraphicsView{
      */
     public void addPBlockMode(boolean b) {
         this.addingAPBlock = b;
-        if(this.addingAPBlock == false) {
+        if (this.addingAPBlock == false) {
             setCursor(new QCursor(CursorShape.ArrowCursor));
         }
     }

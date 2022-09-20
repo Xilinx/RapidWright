@@ -110,8 +110,8 @@ public class DeviceResourcesWriter {
     private static HashMap<SiteTypeEnum,Site> siteTypes;
 
     public static void populateSiteEnumerations(SiteInst siteInst, Site site) {
-        if(!siteTypes.containsKey(siteInst.getSiteTypeEnum())) {
-            if(site.getSiteTypeEnum() != siteInst.getSiteTypeEnum()) {
+        if (!siteTypes.containsKey(siteInst.getSiteTypeEnum())) {
+            if (site.getSiteTypeEnum() != siteInst.getSiteTypeEnum()) {
                 return;
             }
             siteTypes.put(siteInst.getSiteTypeEnum(), site);
@@ -144,7 +144,7 @@ public class DeviceResourcesWriter {
         siteTypes = new HashMap<>();
         for(Tile tile : device.getAllTiles()) {
             allStrings.addObject(tile.getName());
-            if(!tileTypes.containsKey(tile.getTileTypeEnum())) {
+            if (!tileTypes.containsKey(tile.getTileTypeEnum())) {
                 allStrings.addObject(tile.getTileTypeEnum().name());
                 for(int i=0; i < tile.getWireCount(); i++) {
                     allStrings.addObject(tile.getWireName(i));
@@ -163,7 +163,7 @@ public class DeviceResourcesWriter {
                     SiteInst altSiteInst = design.createSiteInst("site_instance", altSiteTypes[i], site);
                     populateSiteEnumerations(altSiteInst, site);
                     design.removeSiteInst(altSiteInst);
-                    if(!allAltSiteTypeEnums.containsKey(altSiteTypes[i])) {
+                    if (!allAltSiteTypeEnums.containsKey(altSiteTypes[i])) {
                         allAltSiteTypeEnums.put(altSiteTypes[i], site);                        
                     }
                 }
@@ -194,7 +194,7 @@ public class DeviceResourcesWriter {
                 String cellTypeName = cell.getName();
 
                 Map<String,VivadoProp> defaultCellProperties = Design.getDefaultCellProperties(series, cellTypeName);
-                if(defaultCellProperties != null && defaultCellProperties.size() > 0) {
+                if (defaultCellProperties != null && defaultCellProperties.size() > 0) {
                     cellsWithParameters.add(cellTypeName);
                 }
             }
@@ -226,17 +226,17 @@ public class DeviceResourcesWriter {
                 defaultValue.setKey(nameIdx);
                 defaultValue.setTextValue(allStrings.getIndex(propValue.getValue()));
 
-                if(propValue.getType() == VivadoPropType.BINARY) {
+                if (propValue.getType() == VivadoPropType.BINARY) {
                     paramDef.setFormat(ParameterFormat.VERILOG_BINARY);
-                } else if(propValue.getType() == VivadoPropType.BOOL) {
+                } else if (propValue.getType() == VivadoPropType.BOOL) {
                     paramDef.setFormat(ParameterFormat.BOOLEAN);
-                } else if(propValue.getType() == VivadoPropType.DOUBLE) {
+                } else if (propValue.getType() == VivadoPropType.DOUBLE) {
                     paramDef.setFormat(ParameterFormat.FLOATING_POINT);
-                } else if(propValue.getType() == VivadoPropType.HEX) {
+                } else if (propValue.getType() == VivadoPropType.HEX) {
                     paramDef.setFormat(ParameterFormat.VERILOG_HEX);
-                } else if(propValue.getType() == VivadoPropType.INT) {
+                } else if (propValue.getType() == VivadoPropType.INT) {
                     paramDef.setFormat(ParameterFormat.INTEGER);
-                } else if(propValue.getType() == VivadoPropType.STRING) {
+                } else if (propValue.getType() == VivadoPropType.STRING) {
                     paramDef.setFormat(ParameterFormat.STRING);
                 } else {
                     throw new RuntimeException(String.format("Unknown VivadoPropType %s", propValue.getType().name()));
@@ -253,13 +253,13 @@ public class DeviceResourcesWriter {
         while(!q.isEmpty()) {
             EDIFCell curr = q.poll();
             visited.add(curr);
-            if(unusedMacros.contains(curr)) {
+            if (unusedMacros.contains(curr)) {
                 unusedMacros.add(curr);
                 return true;
             }
             for(EDIFCellInst inst : cell.getCellInsts()) {
                 EDIFCell child = inst.getCellType();
-                if(visited.contains(child)) continue;
+                if (visited.contains(child)) continue;
                 q.add(child);
             }
         }
@@ -306,7 +306,7 @@ public class DeviceResourcesWriter {
         List<EDIFCell> dupsToRemove = new ArrayList<EDIFCell>();
         for(EDIFCell hdiCell : prims.getCells()) {
             EDIFCell cell = macros.getCell(hdiCell.getName());
-            if(cell != null) {
+            if (cell != null) {
                 dupsToRemove.add(hdiCell);
             }
         }
@@ -318,12 +318,12 @@ public class DeviceResourcesWriter {
         for(EDIFCell cell : macros.getCells()) {
             for(EDIFCellInst inst : cell.getCellInsts()) {
                 EDIFCell instCell = inst.getCellType();
-                if(!prims.containsCell(instCell) && !macros.containsCell(instCell)) {
+                if (!prims.containsCell(instCell) && !macros.containsCell(instCell)) {
                     unsupportedMacros.add(cell);
                     continue;
                 }
                 EDIFCell macroCell = macros.getCell(instCell.getName());
-                if(macroCell != null && !unsupportedMacros.contains(macroCell)) {
+                if (macroCell != null && !unsupportedMacros.contains(macroCell)) {
                     // remap cell definition to macro library
                     inst.setCellType(macroCell);
                 }
@@ -333,7 +333,7 @@ public class DeviceResourcesWriter {
         // Not all devices have all the primitives to support all macros, thus we will remove
         // them to avoid stale references
         for(EDIFCell macro : new ArrayList<>(macros.getCells())) {
-            if(containsUnusedMacros(macro, unsupportedMacros)) {
+            if (containsUnusedMacros(macro, unsupportedMacros)) {
                 macros.removeCell(macro);
             }
         }
@@ -344,19 +344,19 @@ public class DeviceResourcesWriter {
         for(EDIFCell cell : macros.getCells()) {
             String cellName = cell.getName();
             Pair<String, EnumSet<IOStandard>> entry = macroCollapseExceptionMap.get(cellName);
-            if(entry != null) {
+            if (entry != null) {
                 cellName = entry.getFirst();
             }
             Unisim unisim = Unisim.valueOf(cellName);
             Map<String,String> invertiblePins = DesignTools.getInvertiblePinMap(series, unisim);
-            if(invertiblePins != null && invertiblePins.size() > 0) {
+            if (invertiblePins != null && invertiblePins.size() > 0) {
                 unisims.add(unisim);
             }
         }
         for(EDIFCell cell : prims.getCells()) {
             Unisim unisim = Unisim.valueOf(cell.getName());
             Map<String,String> invertiblePins = DesignTools.getInvertiblePinMap(series, unisim);
-            if(invertiblePins != null && invertiblePins.size() > 0) {
+            if (invertiblePins != null && invertiblePins.size() > 0) {
                 unisims.add(unisim);
             }
         }
@@ -420,7 +420,7 @@ public class DeviceResourcesWriter {
             entryBuilder.setMacroName(allStrings.getIndex(macroName));
             
             // Check if this macro has an expansion exception
-            if(expandMap.containsKey(macroName)) {
+            if (expandMap.containsKey(macroName)) {
                 Pair<String, EnumSet<IOStandard>> expandException = expandMap.get(macroName);
                 entryBuilder.setMacroName(allStrings.getIndex(expandException.getFirst()));
 
@@ -436,7 +436,7 @@ public class DeviceResourcesWriter {
             }
             
             // Check if this macro has a parameter propagation rule set
-            if(paramRules.containsKey(macroName)) {
+            if (paramRules.containsKey(macroName)) {
                 MacroParamRule[] rules = paramRules.get(macroName);
                 StructList.Builder<ParameterMapRule.Builder> parameterMap = 
                         entryBuilder.initParamMapping(rules.length);
@@ -446,13 +446,13 @@ public class DeviceResourcesWriter {
                     ruleBuilder.setPrimParam(allStrings.getIndex(rule.getPrimParam()));
                     ruleBuilder.setInstName(allStrings.getIndex(rule.getInstName()));
                     ruleBuilder.setInstParam(allStrings.getIndex(rule.getInstParam()));
-                    if(rule.getBitSlice() != null) {
+                    if (rule.getBitSlice() != null) {
                         PrimitiveList.Int.Builder bitsBuilder = 
                                 ruleBuilder.initBitSlice(rule.getBitSlice().length);
                         for(int k = 0; k < rule.getBitSlice().length; k++) {
                             bitsBuilder.set(k, rule.getBitSlice()[k]);
                         }
-                    } else if(rule.getTableLookup() != null) {
+                    } else if (rule.getTableLookup() != null) {
                         // Lookup table
                         StructList.Builder<ParameterMapEntry.Builder> tableBuilder =
                             ruleBuilder.initTableLookup(rule.getTableLookup().length);
@@ -501,22 +501,22 @@ public class DeviceResourcesWriter {
 
     protected static BELCategory getBELCategory(BEL bel) {
         BELClass category = bel.getBELClass();
-        if(category == BELClass.BEL)
+        if (category == BELClass.BEL)
             return BELCategory.LOGIC;
-        if(category == BELClass.RBEL)
+        if (category == BELClass.RBEL)
             return BELCategory.ROUTING;
-        if(category == BELClass.PORT)
+        if (category == BELClass.PORT)
             return BELCategory.SITE_PORT;
         return BELCategory._NOT_IN_SCHEMA;
     }
 
     protected static Direction getBELPinDirection(BELPin belPin) {
         BELPin.Direction dir = belPin.getDir();
-        if(dir == BELPin.Direction.INPUT)
+        if (dir == BELPin.Direction.INPUT)
             return Direction.INPUT;
-        if(dir == BELPin.Direction.OUTPUT)
+        if (dir == BELPin.Direction.OUTPUT)
             return Direction.OUTPUT;
-        if(dir == BELPin.Direction.BIDIRECTIONAL)
+        if (dir == BELPin.Direction.BIDIRECTIONAL)
             return Direction.INOUT;
         return Direction._NOT_IN_SCHEMA;
     }
@@ -549,7 +549,7 @@ public class DeviceResourcesWriter {
                 }
                 belBuilder.setCategory(getBELCategory(bel));
 
-                if(bel.canInvert()) {
+                if (bel.canInvert()) {
                     BELInverter.Builder belInverter = belBuilder.initInverting();
                     belInverter.setNonInvertingPin(allBELPins.getIndex(bel.getNonInvertingPin()));
                     belInverter.setInvertingPin(allBELPins.getIndex(bel.getInvertingPin()));
@@ -570,12 +570,12 @@ public class DeviceResourcesWriter {
             for(int j=0; j < pinNames.size(); j++) {
                 String primarySitePinName = pinNames.get(j);
                 int sitePinIndex = site.getPinIndex(pinNames.get(j));
-                if(sitePinIndex == -1) {
+                if (sitePinIndex == -1) {
                     primarySitePinName = siteInst.getPrimarySitePinName(pinNames.get(j));
                     sitePinIndex = site.getPinIndex(primarySitePinName);
                 }
 
-                if(sitePinIndex == -1) {
+                if (sitePinIndex == -1) {
                     throw new RuntimeException("Failed to find pin index for site " + site.getName() + " site type " + e.getKey().name()+ " site pin " + primarySitePinName + " / " + pinNames.get(j));
                 }
 
@@ -584,7 +584,7 @@ public class DeviceResourcesWriter {
                 pin.setDir(j <= highestIndexInputPin ? Direction.INPUT : Direction.OUTPUT);
                 BEL bel = siteInst.getBEL(pinNames.get(j));
                 BELPin[] belPins = bel.getPins();
-                if(belPins.length != 1) {
+                if (belPins.length != 1) {
                     throw new RuntimeException("Only expected 1 BEL pin on site pin BEL.");
                 }
                 BELPin belPin = belPins[0];
@@ -643,7 +643,7 @@ public class DeviceResourcesWriter {
 
             for(int j=0; j < altSiteTypes.length; ++j) {
                 Integer siteTypeIdx = allSiteTypes.maybeGetIndex(altSiteTypes[j].name());
-                if(siteTypeIdx == null) {
+                if (siteTypeIdx == null) {
                     throw new RuntimeException("Site type " + altSiteTypes[j].name() + " is missing from allSiteTypes Enumerator.");
                 }
                 altSiteTypesBuilder.set(j, siteTypeIdx);
@@ -730,24 +730,24 @@ public class DeviceResourcesWriter {
                 pipBuilder.setWire0(pip.getStartWireIndex());
                 pipBuilder.setWire1(pip.getEndWireIndex());
                 pipBuilder.setDirectional(!pip.isBidirectional());
-                if(pip.getPIPType() == PIPType.BI_DIRECTIONAL_BUFFERED20) {
+                if (pip.getPIPType() == PIPType.BI_DIRECTIONAL_BUFFERED20) {
                     pipBuilder.setBuffered20(true);
-                } else if(pip.getPIPType() == PIPType.BI_DIRECTIONAL_BUFFERED21_BUFFERED20) {
+                } else if (pip.getPIPType() == PIPType.BI_DIRECTIONAL_BUFFERED21_BUFFERED20) {
                     pipBuilder.setBuffered20(true);
                     pipBuilder.setBuffered21(true);
-                } else if(pip.getPIPType() == PIPType.DIRECTIONAL_BUFFERED21) {
+                } else if (pip.getPIPType() == PIPType.DIRECTIONAL_BUFFERED21) {
                     pipBuilder.setBuffered21(true);
                 }
 
-                if(pip.isRouteThru()) {
+                if (pip.isRouteThru()) {
                     PseudoPIPHelper pseudoPIPHelper = PseudoPIPHelper.getPseudoPIPHelper(pip);
                     List<BELPin> belPins = pseudoPIPHelper.getUsedBELPins();
-                    if(belPins == null || belPins.size() < 1) continue;
+                    if (belPins == null || belPins.size() < 1) continue;
                     
                     HashMap<BEL,ArrayList<BELPin>> pins = new HashMap<BEL, ArrayList<BELPin>>();
                     for(BELPin pin : belPins) {
                         ArrayList<BELPin> currBELPins = pins.get(pin.getBEL());
-                        if(currBELPins == null) {
+                        if (currBELPins == null) {
                             currBELPins = new ArrayList<>();
                             pins.put(pin.getBEL(), currBELPins);
                         }
@@ -815,7 +815,7 @@ public class DeviceResourcesWriter {
                 allWires.addObject(makeKey(wire.getTile(), wire.getWireIndex()));
 
                 Node node = wire.getNode();
-                if(node == null)
+                if (node == null)
                     continue;
                 if (node.getTile() == tile && node.getWire() == i)
                     allNodes.add(makeKey(node.getTile(), node.getWire()));
@@ -874,14 +874,14 @@ public class DeviceResourcesWriter {
 
                 packagePinObj.setPackagePin(allStrings.getIndex(packagePin.getName()));
                 Site site = packagePin.getSite();
-                if(site != null) {
+                if (site != null) {
                     packagePinObj.initSite().setSite(allStrings.getIndex(site.getName()));
                 } else {
                     packagePinObj.initSite().setNoSite(Void.VOID);
                 }
 
                 BEL bel = packagePin.getBEL();
-                if(bel != null) {
+                if (bel != null) {
                     packagePinObj.initBel().setBel(allStrings.getIndex(bel.getName()));
                 } else {
                     packagePinObj.initBel().setNoBel(Void.VOID);

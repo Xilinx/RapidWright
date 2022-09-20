@@ -73,7 +73,7 @@ public class EDIFParser extends AbstractEDIFParserWorker implements AutoCloseabl
     private EDIFCell getRefEDIFCell(String edifCellName, String libraryName) {
         Map<String, EDIFCell> lib = edifInstCellMap.computeIfAbsent(libraryName, k -> new HashMap<>());
         EDIFCell cell = lib.get(edifCellName);
-        if(cell == null) {
+        if (cell == null) {
             cell = new EDIFCell();
             lib.put(edifCellName, cell);
         }
@@ -90,13 +90,13 @@ public class EDIFParser extends AbstractEDIFParserWorker implements AutoCloseabl
             String nextToken = getNextToken(true);
             if (nextToken.equalsIgnoreCase(STATUS)) {
                 parseStatus(currNetlist);
-            } else if(nextToken.equalsIgnoreCase(LIBRARY) || nextToken.equalsIgnoreCase(EXTERNAL)) {
+            } else if (nextToken.equalsIgnoreCase(LIBRARY) || nextToken.equalsIgnoreCase(EXTERNAL)) {
                 currNetlist.addLibrary(parseEDIFLibrary());
-            } else if(nextToken.equalsIgnoreCase(COMMENT)) {
+            } else if (nextToken.equalsIgnoreCase(COMMENT)) {
                 // Final Comment on Reference To The Cell Of Highest Level
                 String comment = getNextToken(true);
                 expect(RIGHT_PAREN, getNextToken(true));
-            } else if(nextToken.equalsIgnoreCase(DESIGN)) {
+            } else if (nextToken.equalsIgnoreCase(DESIGN)) {
                 EDIFDesign design = parseEDIFNameObject(new EDIFDesign());
                 currNetlist.setDesign(design);
                 expect(LEFT_PAREN, getNextToken(true));
@@ -157,7 +157,7 @@ public class EDIFParser extends AbstractEDIFParserWorker implements AutoCloseabl
         Map<String, EDIFCell> map = edifInstCellMap.computeIfAbsent(libraryLegalName, k -> new HashMap<>());
         final String legalEDIFName = cache.getLegalEDIFName(cell);
         EDIFCell existingCell = map.get(legalEDIFName);
-        if(existingCell != null) {
+        if (existingCell != null) {
             existingCell.setName(cell.getName());
             return existingCell;
         }
@@ -176,7 +176,7 @@ public class EDIFParser extends AbstractEDIFParserWorker implements AutoCloseabl
         EDIFParser e = new EDIFParser(args[0]);
         EDIFNetlist n = e.parseEDIFNetlist();
         p.stop().start("Write EDIF");
-        if(args.length > 1) n.exportEDIF(args[1]);
+        if (args.length > 1) n.exportEDIF(args[1]);
         p.stop().printSummary();
     }
 

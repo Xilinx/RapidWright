@@ -89,18 +89,18 @@ public abstract class AbstractModuleInst<ModuleT, PlacementT, T extends Abstract
      */
     @Override
     public boolean equals(Object obj) {
-        if(this == obj)
+        if (this == obj)
             return true;
-        if(obj == null)
+        if (obj == null)
             return false;
-        if(getClass() != obj.getClass())
+        if (getClass() != obj.getClass())
             return false;
         AbstractModuleInst<?,?,?> other = (AbstractModuleInst<?,?,?>) obj;
-        if(name == null) {
-            if(other.name != null)
+        if (name == null) {
+            if (other.name != null)
                 return false;
         }
-        else if(!name.equals(other.name))
+        else if (!name.equals(other.name))
             return false;
         return true;
     }
@@ -179,17 +179,17 @@ public abstract class AbstractModuleInst<ModuleT, PlacementT, T extends Abstract
 
     public void connect(String portName, int busIndex0, T other, String otherPortName, int busIndex1) {
         EDIFCell top = cellInst.getParentCell();
-        if(cellInst == null) throw new RuntimeException("ERROR: Couldn't find logical cell instance for " + getName());
-        if(other == null) {
+        if (cellInst == null) throw new RuntimeException("ERROR: Couldn't find logical cell instance for " + getName());
+        if (other == null) {
             // Connect to a top-level port
             EDIFPort port = top.getPort(otherPortName);
 
             String netName = getNewNetName(portName, busIndex0, other, otherPortName, busIndex1); 
             EDIFNet net = top.getNet(netName);
-            if(net == null) {
+            if (net == null) {
                 net = top.createNet(netName);
             }
-            if(net.getPortInst(null, netName) == null) {
+            if (net.getPortInst(null, netName) == null) {
                 net.createPortInst(port, busIndex1);
             }
             net.createPortInst(portName, busIndex0, cellInst);
@@ -197,7 +197,7 @@ public abstract class AbstractModuleInst<ModuleT, PlacementT, T extends Abstract
             return;
         }
         EDIFCellInst eci1 = other.getCellInst();
-        if(eci1 == null) throw new RuntimeException("ERROR: Couldn't find logical cell instance for " + getName());
+        if (eci1 == null) throw new RuntimeException("ERROR: Couldn't find logical cell instance for " + getName());
 
         String netName = getNewNetName(portName, busIndex0, other, otherPortName, busIndex1);
         EDIFNet net = top.createNet(netName);
@@ -206,7 +206,7 @@ public abstract class AbstractModuleInst<ModuleT, PlacementT, T extends Abstract
     }
 
     public String getNewNetName(String portName, int busIndex0, T other, String otherPortName, int busIndex1) {
-        if(other == null) {
+        if (other == null) {
             EDIFPort port = cellInst.getParentCell().getPort(otherPortName);
             return busIndex1 == -1 ? otherPortName : port.getBusName() + "[" + busIndex1 + "]";
         } else {

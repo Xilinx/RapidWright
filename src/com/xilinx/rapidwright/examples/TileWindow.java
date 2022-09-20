@@ -103,7 +103,7 @@ public class TileWindow extends QMainWindow{
         QApplication.exec();
     }
     protected void saveAsPDFDesign() {
-        if(scene.getDesign() == null)
+        if (scene.getDesign() == null)
             return;
         String fileName = QFileDialog.getSaveFileName(this, tr("Save As PDF"),".", FileFilters.pdfFilter);
         if (fileName.length() == 0)

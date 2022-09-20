@@ -98,27 +98,27 @@ public class RouteThruHelper {
     private void init() {
         String serializedFileName = getSerializedFileName(device);
         routeThrus = new HashMap<TileTypeEnum,HashSet<Integer>>();
-        if(new File(serializedFileName).exists()) {
+        if (new File(serializedFileName).exists()) {
             readFile();
             return;
         }
         for(Tile tile : device.getAllTiles()) {
-            if(routeThrus.containsKey(tile.getTileTypeEnum())) continue;
+            if (routeThrus.containsKey(tile.getTileTypeEnum())) continue;
             HashSet<Integer> rtPIPs = new HashSet<Integer>();
             for(PIP p : tile.getPIPs()) {
-                if(p.isRouteThru()) {
+                if (p.isRouteThru()) {
                     int startEndWirePair = (p.getStartWireIndex() << 16) | p.getEndWireIndex();
                     rtPIPs.add(startEndWirePair);
                 }
             }
-            if(rtPIPs.size() > 0) routeThrus.put(tile.getTileTypeEnum(), rtPIPs);
+            if (rtPIPs.size() > 0) routeThrus.put(tile.getTileTypeEnum(), rtPIPs);
         }
         writeFile();
     }
     
     public boolean isRouteThru(Tile tile, int startWire, int endWire) {
         HashSet<Integer> rtPairs = routeThrus.get(tile.getTileTypeEnum());
-        if(rtPairs == null) return false;
+        if (rtPairs == null) return false;
         return rtPairs.contains(startWire << 16 | endWire);
     }
     
@@ -127,10 +127,10 @@ public class RouteThruHelper {
         int endWire = end.getWire();
         Wire[] wiresInStartNode = start.getAllWiresInNode();
         HashSet<Integer> rtPairs = routeThrus.get(tile.getTileTypeEnum());
-        if(rtPairs == null) return false;
+        if (rtPairs == null) return false;
         for(Wire w : wiresInStartNode) {
-            if(w.getTile().equals(tile)) {
-                if(rtPairs.contains((w.getWireIndex() << 16) | endWire)) {
+            if (w.getTile().equals(tile)) {
+                if (rtPairs.contains((w.getWireIndex() << 16) | endWire)) {
                     return true;
                 }
             }
@@ -141,10 +141,10 @@ public class RouteThruHelper {
     private void printRouteThrusByTileType() {
         HashSet<TileTypeEnum> visited = new HashSet<>();
         for(Tile tile : device.getAllTiles()) {
-            if(visited.contains(tile.getTileTypeEnum())) continue;
+            if (visited.contains(tile.getTileTypeEnum())) continue;
             visited.add(tile.getTileTypeEnum());
             HashSet<Integer> rtPairs = routeThrus.get(tile.getTileTypeEnum());
-            if(rtPairs == null) continue; 
+            if (rtPairs == null) continue; 
             System.out.println(tile.getTileTypeEnum() + "(" + tile.getName() + "):");
             for(Integer i : rtPairs) {
                 int startWire = i >>> 16;
@@ -155,25 +155,25 @@ public class RouteThruHelper {
     }
 
     public static boolean isRouteThruPIPAvailable(Design design, PIP routethru) {
-        if(!routethru.isRouteThru()) return false;
+        if (!routethru.isRouteThru()) return false;
         return isRouteThruPIPAvailable(design, routethru.getStartWire(), routethru.getEndWire());
     }
     
     public static boolean isRouteThruPIPAvailable(Design design, Wire start, Wire end) {
         SitePin outPin = end.getSitePin();
-        if(outPin == null) return false;
+        if (outPin == null) return false;
         SiteInst siteInst = design.getSiteInstFromSite(outPin.getSite());
-        if(siteInst == null) return true;
+        if (siteInst == null) return true;
         Net outputNetCollision = siteInst.getNetFromSiteWire(outPin.getBELPin().getSiteWireName());
-        if(outputNetCollision != null) return false;
+        if (outputNetCollision != null) return false;
         SitePin inPin = start.getSitePin();
         BELPin belPin = inPin.getBELPin();
         Net inputNetCollision = siteInst.getNetFromSiteWire(belPin.getSiteWireName());
-        if(inputNetCollision != null) return false;
+        if (inputNetCollision != null) return false;
         
         for(BELPin sink : belPin.getSiteConns()) {
             Cell collision = siteInst.getCell(sink.getBEL());
-            if(collision != null) return false;
+            if (collision != null) return false;
         }
         return true;
     }
@@ -184,11 +184,11 @@ public class RouteThruHelper {
         //rtHelper.printRouteThrusByTileType();
         
         for(Tile tile : rtHelper.device.getAllTiles()) {
-            if(tile.getTileTypeEnum() == TileTypeEnum.INT) {
+            if (tile.getTileTypeEnum() == TileTypeEnum.INT) {
                 for(String wireName : tile.getWireNames()) {
                     Node node = Node.getNode(tile, wireName);
                     for(Node downhill : node.getAllDownhillNodes()) {
-                        if(rtHelper.isRouteThru(node, downhill)) {
+                        if (rtHelper.isRouteThru(node, downhill)) {
                             System.out.println(node + " " + downhill);
                         }
                     }
