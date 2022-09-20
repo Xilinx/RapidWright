@@ -90,10 +90,10 @@ public class PartialRouter extends RWRoute{
 						throw new RuntimeException();
 					}
 					if (net.isClockNet()) {
-						// FIXME: Ignore part pins on clock nets
+						// Ignore part pins on clock net, as in at least one case they pointed to
+						// (many) horizontal distribution lines for use as sources
 						continue;
 					}
-
 					Node node = Node.getNode(ppin.getTile(), ppin.getWireIndex());
 
 					// Find all routed input part pins
