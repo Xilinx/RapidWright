@@ -1,6 +1,7 @@
 /*
  * 
- * Copyright (c) 2018 Xilinx, Inc. 
+ * Copyright (c) 2018-2022, Xilinx, Inc. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -37,78 +38,78 @@ import java.io.IOException;
  */
 public class LocalJob extends Job {
 
-	private Process p;
-	
-	private static int jobCount = 0;
-	
-	/* (non-Javadoc)
-	 * @see com.xilinx.rapidwright.util.Job#launchJob()
-	 */
-	@Override
-	public long launchJob() {
-		Pair<String,String> launchScriptNames = createLaunchScript();
-		
-		try {
-			ProcessBuilder pb = new ProcessBuilder();
-			pb.redirectErrorStream(true);
-			pb.redirectOutput(new File(launchScriptNames.getSecond()));
-			pb.command(launchScriptNames.getFirst());
-			p = pb.start();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-		setJobNumber(getProcessID());
-		return getJobNumber();
-	}
+    private Process p;
+    
+    private static int jobCount = 0;
+    
+    /* (non-Javadoc)
+     * @see com.xilinx.rapidwright.util.Job#launchJob()
+     */
+    @Override
+    public long launchJob() {
+        Pair<String,String> launchScriptNames = createLaunchScript();
+        
+        try {
+            ProcessBuilder pb = new ProcessBuilder();
+            pb.redirectErrorStream(true);
+            pb.redirectOutput(new File(launchScriptNames.getSecond()));
+            pb.command(launchScriptNames.getFirst());
+            p = pb.start();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        setJobNumber(getProcessID());
+        return getJobNumber();
+    }
 
-	/* (non-Javadoc)
-	 * @see com.xilinx.rapidwright.util.Job#getJobState()
-	 */
-	@Override
-	public JobState getJobState() {
-		return p.isAlive() ? JobState.RUNNING : JobState.EXITED;
-	}
+    /* (non-Javadoc)
+     * @see com.xilinx.rapidwright.util.Job#getJobState()
+     */
+    @Override
+    public JobState getJobState() {
+        return p.isAlive() ? JobState.RUNNING : JobState.EXITED;
+    }
 
-	/* (non-Javadoc)
-	 * @see com.xilinx.rapidwright.util.Job#jobWasSuccessful()
-	 */
-	@Override
-	public boolean jobWasSuccessful() {
-		return p.exitValue() == 0;
-	}
+    /* (non-Javadoc)
+     * @see com.xilinx.rapidwright.util.Job#jobWasSuccessful()
+     */
+    @Override
+    public boolean jobWasSuccessful() {
+        return p.exitValue() == 0;
+    }
 
-	
-	public long getProcessID(){
-		/* -- This technique uses reflective access to private members of protected JDK classes
-		 * -- and causes warnings and potentially future errors.  We will just use a running
-		 * -- count for unique IDs.
-		String className = p.getClass().getName();
-		if(className.equals("java.lang.UNIXProcess")){
-			try{
-				Field f = p.getClass().getDeclaredField("pid");
-				f.setAccessible(true);
-				return f.getInt(p);
-			}catch(Exception e){
-				return -1;
-			}
-		}else if(className.equals("java.lang.ProcessImpl") || className.equals("java.lang.Win32Process")){
-			try{
-				Field f = p.getClass().getDeclaredField("handle");
-				f.setAccessible(true);
-				return (int)f.getLong(p);
-			}catch(Exception e){
-				return -1;
-			}
-		}
-		*/
-		return ++jobCount;
-	}
+    
+    public long getProcessID(){
+        /* -- This technique uses reflective access to private members of protected JDK classes
+         * -- and causes warnings and potentially future errors.  We will just use a running
+         * -- count for unique IDs.
+        String className = p.getClass().getName();
+        if(className.equals("java.lang.UNIXProcess")){
+            try{
+                Field f = p.getClass().getDeclaredField("pid");
+                f.setAccessible(true);
+                return f.getInt(p);
+            }catch(Exception e){
+                return -1;
+            }
+        }else if(className.equals("java.lang.ProcessImpl") || className.equals("java.lang.Win32Process")){
+            try{
+                Field f = p.getClass().getDeclaredField("handle");
+                f.setAccessible(true);
+                return (int)f.getLong(p);
+            }catch(Exception e){
+                return -1;
+            }
+        }
+        */
+        return ++jobCount;
+    }
 
-	/* (non-Javadoc)
-	 * @see com.xilinx.rapidwright.util.Job#killJob()
-	 */
-	@Override
-	public void killJob() {
-		p.destroyForcibly();
-	}
+    /* (non-Javadoc)
+     * @see com.xilinx.rapidwright.util.Job#killJob()
+     */
+    @Override
+    public void killJob() {
+        p.destroyForcibly();
+    }
 }

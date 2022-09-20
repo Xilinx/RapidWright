@@ -1,6 +1,7 @@
 /* 
  * Original work: Copyright (c) 2010-2011 Brigham Young University
- * Modified work: Copyright (c) 2017 Xilinx, Inc. 
+ * Modified work: Copyright (c) 2017-2022, Xilinx, Inc. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -42,93 +43,93 @@ import com.trolltech.qt.gui.QWidget;
  */
 public class GUIMultiNetLine extends QGraphicsLineItem {
 
-	private QGraphicsItemInterface srcItem;
-	private QGraphicsItemInterface destItem;
-	private int hue;
-	private int alpha;
-	
-	private static final int CEILING_LINE_WIDTH_SIZE = 128;
+    private QGraphicsItemInterface srcItem;
+    private QGraphicsItemInterface destItem;
+    private int hue;
+    private int alpha;
+    
+    private static final int CEILING_LINE_WIDTH_SIZE = 128;
 
-	public GUIMultiNetLine(QGraphicsItemInterface srcItem, QGraphicsItemInterface destItem) {
-		super();
-		this.srcItem = srcItem;
-		this.destItem = destItem;
-		updateLine();
-		hue = 110;
-		alpha = 128;
-		QColor color = QColor.fromHsv(hue, 240, 255);
-		color.setAlpha(alpha);
-		QPen pen = new QPen(color, 1.0);
-		pen.setCapStyle(PenCapStyle.RoundCap);
-		this.setPen(pen);
-		setZValue(3.0);
-		updateToolTip();
+    public GUIMultiNetLine(QGraphicsItemInterface srcItem, QGraphicsItemInterface destItem) {
+        super();
+        this.srcItem = srcItem;
+        this.destItem = destItem;
+        updateLine();
+        hue = 110;
+        alpha = 128;
+        QColor color = QColor.fromHsv(hue, 240, 255);
+        color.setAlpha(alpha);
+        QPen pen = new QPen(color, 1.0);
+        pen.setCapStyle(PenCapStyle.RoundCap);
+        this.setPen(pen);
+        setZValue(3.0);
+        updateToolTip();
 
-	}
+    }
 
-	private void updateToolTip() {
-		setToolTip(this.pen().width() + " connections");
-	}
+    private void updateToolTip() {
+        setToolTip(this.pen().width() + " connections");
+    }
 
-	public void addNet() {
-		int oldWidth = this.pen().width();
-		QPen pen = this.pen();
-		hue = (hue > 0) ? hue - 2 : 0;
-		QColor color = QColor.fromHsv(hue, 240, 255);
-		color.setAlpha(alpha);
-		pen.setColor(color);
-		pen.setWidth(oldWidth + 1 > CEILING_LINE_WIDTH_SIZE ? oldWidth : oldWidth + 1);
-		this.setPen(pen);
-		updateToolTip();
-	}
+    public void addNet() {
+        int oldWidth = this.pen().width();
+        QPen pen = this.pen();
+        hue = (hue > 0) ? hue - 2 : 0;
+        QColor color = QColor.fromHsv(hue, 240, 255);
+        color.setAlpha(alpha);
+        pen.setColor(color);
+        pen.setWidth(oldWidth + 1 > CEILING_LINE_WIDTH_SIZE ? oldWidth : oldWidth + 1);
+        this.setPen(pen);
+        updateToolTip();
+    }
 
-	public void updateLine() {
-		QPointF src = srcItem.pos().add(srcItem.boundingRect().center());
-		QPointF dest = destItem.pos().add(destItem.boundingRect().center());
-		QLineF line = this.line();
-		line.setPoints(src, dest);
-		this.setLine(line);
-	}
+    public void updateLine() {
+        QPointF src = srcItem.pos().add(srcItem.boundingRect().center());
+        QPointF dest = destItem.pos().add(destItem.boundingRect().center());
+        QLineF line = this.line();
+        line.setPoints(src, dest);
+        this.setLine(line);
+    }
 
-	public void paint(QPainter painter, QStyleOptionGraphicsItem option,
-			QWidget widget) {
-		if (srcItem != null && destItem != null) {
-			updateLine();
-		}
-		super.paint(painter, option, widget);
-	}
+    public void paint(QPainter painter, QStyleOptionGraphicsItem option,
+            QWidget widget) {
+        if (srcItem != null && destItem != null) {
+            updateLine();
+        }
+        super.paint(painter, option, widget);
+    }
 
-	@Override
-	public int hashCode() {
-		final int prime = 31;
-		int result = 1;
-		result = prime * result + ((destItem == null) ? 0 : destItem.hashCode());
-		result = prime * result + ((srcItem == null) ? 0 : srcItem.hashCode());
-		return result;
-	}
+    @Override
+    public int hashCode() {
+        final int prime = 31;
+        int result = 1;
+        result = prime * result + ((destItem == null) ? 0 : destItem.hashCode());
+        result = prime * result + ((srcItem == null) ? 0 : srcItem.hashCode());
+        return result;
+    }
 
-	@Override
-	public boolean equals(Object obj) {
-		if (this == obj)
-			return true;
-		if (!super.equals(obj))
-			return false;
-		if (getClass() != obj.getClass())
-			return false;
-		GUIMultiNetLine other = (GUIMultiNetLine) obj;
-		if (destItem == null) {
-			if (other.destItem != null)
-				return false;
-		} else if (!destItem.equals(other.destItem))
-			return false;
-		if (srcItem == null) {
-			if (other.srcItem != null)
-				return false;
-		} else if (!srcItem.equals(other.srcItem))
-			return false;
-		return true;
-	}
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj)
+            return true;
+        if (!super.equals(obj))
+            return false;
+        if (getClass() != obj.getClass())
+            return false;
+        GUIMultiNetLine other = (GUIMultiNetLine) obj;
+        if (destItem == null) {
+            if (other.destItem != null)
+                return false;
+        } else if (!destItem.equals(other.destItem))
+            return false;
+        if (srcItem == null) {
+            if (other.srcItem != null)
+                return false;
+        } else if (!srcItem.equals(other.srcItem))
+            return false;
+        return true;
+    }
 
-	
+    
 
 }

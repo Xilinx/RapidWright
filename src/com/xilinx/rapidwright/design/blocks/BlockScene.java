@@ -1,6 +1,7 @@
 /*
  * 
- * Copyright (c) 2017 Xilinx, Inc. 
+ * Copyright (c) 2017-2022, Xilinx, Inc. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -36,40 +37,40 @@ import com.xilinx.rapidwright.gui.TileScene;
  * Created on: Apr 26, 2017
  */
 public class BlockScene extends TileScene {
-	
-	private ImplGuide implGuide;
-	
-	private ArrayList<GUIPBlock> guiPBlocks;
-	
-	public BlockScene(){
-		super();
-		guiPBlocks = new ArrayList<>();
-	}
+    
+    private ImplGuide implGuide;
+    
+    private ArrayList<GUIPBlock> guiPBlocks;
+    
+    public BlockScene(){
+        super();
+        guiPBlocks = new ArrayList<>();
+    }
 
-	/**
-	 * @return the implGuide
-	 */
-	public ImplGuide getImplGuide() {
-		return implGuide;
-	}
+    /**
+     * @return the implGuide
+     */
+    public ImplGuide getImplGuide() {
+        return implGuide;
+    }
 
-	/**
-	 * @param implGuide the implGuide to set
-	 */
-	public void setImplGuide(ImplGuide implGuide) {
-		this.implGuide = implGuide;
-		
-		// Update list of PBlocks
-		guiPBlocks.clear();
-		for(BlockGuide b : implGuide.getBlocks()){
-			for(PBlock pb : b.getImplementations()){
-				GUIPBlock guiPb = new GUIPBlock(pb, this);
-				guiPBlocks.add(guiPb);
-				addItem(guiPb);
-				guiPb.show();
-			}
-		}
-		
-	}
-	
+    /**
+     * @param implGuide the implGuide to set
+     */
+    public void setImplGuide(ImplGuide implGuide) {
+        this.implGuide = implGuide;
+        
+        // Update list of PBlocks
+        guiPBlocks.clear();
+        for(BlockGuide b : implGuide.getBlocks()){
+            for(PBlock pb : b.getImplementations()){
+                GUIPBlock guiPb = new GUIPBlock(pb, this);
+                guiPBlocks.add(guiPb);
+                addItem(guiPb);
+                guiPb.show();
+            }
+        }
+        
+    }
+    
 }

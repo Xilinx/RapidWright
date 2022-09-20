@@ -1,6 +1,7 @@
 /*
  * 
- * Copyright (c) 2017 Xilinx, Inc. 
+ * Copyright (c) 2017-2022, Xilinx, Inc. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -36,8 +37,8 @@ import com.xilinx.rapidwright.gui.TileView;
  */
 public class BlockView extends TileView {
 
-	public BlockView(QGraphicsScene scene) {
-		super(scene);
-	}
+    public BlockView(QGraphicsScene scene) {
+        super(scene);
+    }
 
 }

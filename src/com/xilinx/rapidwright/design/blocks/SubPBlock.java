@@ -1,6 +1,7 @@
 /*
  * 
- * Copyright (c) 2017 Xilinx, Inc. 
+ * Copyright (c) 2017-2022, Xilinx, Inc. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -34,33 +35,33 @@ import com.xilinx.rapidwright.device.Device;
  */
 public class SubPBlock extends PBlock {
 
-	/**
-	 * 
-	 */
-	private static final long serialVersionUID = -5272887799353790281L;
-	private String getCellsArgs;
+    /**
+     * 
+     */
+    private static final long serialVersionUID = -5272887799353790281L;
+    private String getCellsArgs;
 
-	/**
-	 * @param device
-	 * @param pblock
-	 */
-	public SubPBlock(Device device, String pblock) {
-		super(device, pblock);
-	}
+    /**
+     * @param device
+     * @param pblock
+     */
+    public SubPBlock(Device device, String pblock) {
+        super(device, pblock);
+    }
 
-	/**
-	 * @return the getCellsArgs
-	 */
-	public String getGetCellsArgs() {
-		return getCellsArgs;
-	}
+    /**
+     * @return the getCellsArgs
+     */
+    public String getGetCellsArgs() {
+        return getCellsArgs;
+    }
 
-	/**
-	 * @param getCellsArgs the getCellsArgs to set
-	 */
-	public void setGetCellsArgs(String getCellsArgs) {
-		this.getCellsArgs = getCellsArgs;
-	}
-	
-	
+    /**
+     * @param getCellsArgs the getCellsArgs to set
+     */
+    public void setGetCellsArgs(String getCellsArgs) {
+        this.getCellsArgs = getCellsArgs;
+    }
+    
+    
 }

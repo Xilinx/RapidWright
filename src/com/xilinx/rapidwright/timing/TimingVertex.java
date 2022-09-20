@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2019 Xilinx, Inc.
+ * Copyright (c) 2019-2022, Xilinx, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * This file is part of RapidWright.
@@ -60,8 +61,8 @@ public class TimingVertex {
      * @param isFlopInput - to indicate if it is an input or output
      */
     public TimingVertex(String name, boolean isFlopInput) {
-    	this.name = name;
-    	this.isFlopInput = isFlopInput;
+        this.name = name;
+        this.isFlopInput = isFlopInput;
         this.isFlopOutput = !isFlopInput;
         this.printed = false;
     }
@@ -129,15 +130,15 @@ public class TimingVertex {
         this.slack = requiredTime - arrivalTime;
     }
     
-	public void setMinRequiredTime(float requiredTime){
-    	if(this.requiredTime == null){
-    		this.requiredTime = requiredTime;
-    	}else{
-    		if(this.requiredTime > requiredTime){
-    			this.requiredTime = requiredTime;
-    		}
-    	}
-    	
+    public void setMinRequiredTime(float requiredTime){
+        if(this.requiredTime == null){
+            this.requiredTime = requiredTime;
+        }else{
+            if(this.requiredTime > requiredTime){
+                this.requiredTime = requiredTime;
+            }
+        }
+        
     }
     
     /**
@@ -146,30 +147,30 @@ public class TimingVertex {
      * this vertex 
      */
     public void setMaxArrivalTime(float arrivalTime){
-    	if(this.arrivalTime == null){
-    		this.arrivalTime = arrivalTime;
-    	}else if(this.arrivalTime < arrivalTime){
-    		this.arrivalTime = arrivalTime;
-    	}
+        if(this.arrivalTime == null){
+            this.arrivalTime = arrivalTime;
+        }else if(this.arrivalTime < arrivalTime){
+            this.arrivalTime = arrivalTime;
+        }
     }
     
     public void setMaxArrivalTime(float arrivalTime, TimingVertex prev){
-    	if(this.arrivalTime == null){
-    		this.arrivalTime = arrivalTime;
-    		this.setPrev(prev);
-    	}else if(this.arrivalTime < arrivalTime){
-    		this.arrivalTime = arrivalTime;
-    		this.setPrev(prev);
-    	}
+        if(this.arrivalTime == null){
+            this.arrivalTime = arrivalTime;
+            this.setPrev(prev);
+        }else if(this.arrivalTime < arrivalTime){
+            this.arrivalTime = arrivalTime;
+            this.setPrev(prev);
+        }
     }
     
     public void resetRequiredTime(){
-    	this.requiredTime = null;
+        this.requiredTime = null;
     }
     
     
     public void resetArrivalTime(){
-    	this.arrivalTime = null;
+        this.arrivalTime = null;
     }
     
     /**
@@ -290,11 +291,11 @@ public class TimingVertex {
         isFlopOutput = true;
     }
 
-	public TimingVertex getPrev() {
-		return prev;
-	}
+    public TimingVertex getPrev() {
+        return prev;
+    }
 
-	public void setPrev(TimingVertex prev) {
-		this.prev = prev;
-	}
+    public void setPrev(TimingVertex prev) {
+        this.prev = prev;
+    }
 }

@@ -1,5 +1,6 @@
 /* 
- * Copyright (c) 2020 Xilinx, Inc. 
+ * Copyright (c) 2020-2022, Xilinx, Inc. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -48,13 +49,13 @@ public class PhysicalNetlistExample {
         String edifFileName = null;
         String outputDCPFileName = args[1];
         if(args.length > 2) {
-        	edifFileName = args[1];
-        	outputDCPFileName = args[2];
+            edifFileName = args[1];
+            outputDCPFileName = args[2];
         }
         // Read DCP into memory using RapidWright
         Design design = edifFileName == null ? 
-        					Design.readCheckpoint(args[0], CodePerfTracker.SILENT) : 
-        					Design.readCheckpoint(args[0], edifFileName, CodePerfTracker.SILENT);
+                            Design.readCheckpoint(args[0], CodePerfTracker.SILENT) : 
+                            Design.readCheckpoint(args[0], edifFileName, CodePerfTracker.SILENT);
         
         t.stop().start("Write Logical Netlist");
         // Write Logical & Physical Netlist to Cap'n Proto Serialization file

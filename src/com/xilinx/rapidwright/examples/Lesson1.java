@@ -1,6 +1,7 @@
 /*
  * 
- * Copyright (c) 2018 Xilinx, Inc. 
+ * Copyright (c) 2018-2022, Xilinx, Inc. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -44,38 +45,38 @@ import com.xilinx.rapidwright.router.Router;
  */
 public class Lesson1 {
 
-	public static void main(String[] args) {
-		// Create a new empty design using the PYNQ-Z1 device part
-		Design d = new Design("HelloWorld",Device.PYNQ_Z1);
-				
-		// Create all the design elements (LUT2, and 3 IOs)
-		Cell and2 = d.createAndPlaceCell("and2", Unisim.AND2, "SLICE_X100Y100/A6LUT");		
-		Cell button0 = d.createAndPlaceIOB("button0", PinType.IN , "D19",  "LVCMOS33");
-		Cell button1 = d.createAndPlaceIOB("button1", PinType.IN , "D20",  "LVCMOS33");
-		Cell led0    = d.createAndPlaceIOB("led0"   , PinType.OUT, "R14",  "LVCMOS33");
-		
-		// Connect Button 0 to the LUT2 input I0
-		Net net0 = d.createNet("button0_IBUF");
-		net0.connect(button0, "O");
-		net0.connect(and2, "I0");
-		
-		// Connect Button 1 to the LUT2 input I1
-		Net net1 = d.createNet("button1_IBUF");
-		net1.connect(button1, "O");
-		net1.connect(and2, "I1");
-		
-		// Connect the LUT2 (AND2) to the LED IO
-		Net net2 = d.createNet("and2");
-		net2.connect(and2, "O");
-		net2.connect(led0, "I");
-		
-		// Route site internal nets
-		d.routeSites();
-		
-		// Route nets between sites
-		new Router(d).routeDesign();
-		
-		// Save our work in a Checkpoint
-		d.writeCheckpoint("HelloWorld.dcp");
-	}
+    public static void main(String[] args) {
+        // Create a new empty design using the PYNQ-Z1 device part
+        Design d = new Design("HelloWorld",Device.PYNQ_Z1);
+                
+        // Create all the design elements (LUT2, and 3 IOs)
+        Cell and2 = d.createAndPlaceCell("and2", Unisim.AND2, "SLICE_X100Y100/A6LUT");        
+        Cell button0 = d.createAndPlaceIOB("button0", PinType.IN , "D19",  "LVCMOS33");
+        Cell button1 = d.createAndPlaceIOB("button1", PinType.IN , "D20",  "LVCMOS33");
+        Cell led0    = d.createAndPlaceIOB("led0"   , PinType.OUT, "R14",  "LVCMOS33");
+        
+        // Connect Button 0 to the LUT2 input I0
+        Net net0 = d.createNet("button0_IBUF");
+        net0.connect(button0, "O");
+        net0.connect(and2, "I0");
+        
+        // Connect Button 1 to the LUT2 input I1
+        Net net1 = d.createNet("button1_IBUF");
+        net1.connect(button1, "O");
+        net1.connect(and2, "I1");
+        
+        // Connect the LUT2 (AND2) to the LED IO
+        Net net2 = d.createNet("and2");
+        net2.connect(and2, "O");
+        net2.connect(led0, "I");
+        
+        // Route site internal nets
+        d.routeSites();
+        
+        // Route nets between sites
+        new Router(d).routeDesign();
+        
+        // Save our work in a Checkpoint
+        d.writeCheckpoint("HelloWorld.dcp");
+    }
 }

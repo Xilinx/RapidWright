@@ -1,5 +1,6 @@
 /* 
- * Copyright (c) 2021 Xilinx, Inc. 
+ * Copyright (c) 2021-2022, Xilinx, Inc. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -32,13 +33,13 @@ package com.xilinx.rapidwright.device;
  * Enumeration of IOBankType type for all valid devices within Vivado.
  */
 public enum IOBankType {
-	BT_ADC,
-	BT_DAC,
-	BT_HIGH_DENSITY,
-	BT_HIGH_PERFORMANCE,
-	BT_HIGH_RANGE,
-	BT_MGT,
-	BT_NO_USER_IO,
-	BT_PSS,
-	BT_XP,
+    BT_ADC,
+    BT_DAC,
+    BT_HIGH_DENSITY,
+    BT_HIGH_PERFORMANCE,
+    BT_HIGH_RANGE,
+    BT_MGT,
+    BT_NO_USER_IO,
+    BT_PSS,
+    BT_XP,
 }

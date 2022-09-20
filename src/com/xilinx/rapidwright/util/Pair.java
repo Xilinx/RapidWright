@@ -1,6 +1,7 @@
 /*
  * 
- * Copyright (c) 2018 Xilinx, Inc. 
+ * Copyright (c) 2018-2022, Xilinx, Inc. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -31,86 +32,86 @@ package com.xilinx.rapidwright.util;
  */
 public class Pair<T,U> {
 
-	private T first;
-	
-	private U second;
-	
-	public Pair(){
-		
-	}
-	
-	public Pair(T first, U second){
-		this.first = first;
-		this.second = second;
-	}
+    private T first;
+    
+    private U second;
+    
+    public Pair(){
+        
+    }
+    
+    public Pair(T first, U second){
+        this.first = first;
+        this.second = second;
+    }
 
-	public T getFirst() {
-		return first;
-	}
+    public T getFirst() {
+        return first;
+    }
 
-	public void setFirst(T first) {
-		this.first = first;
-	}
+    public void setFirst(T first) {
+        this.first = first;
+    }
 
-	public U getSecond() {
-		return second;
-	}
+    public U getSecond() {
+        return second;
+    }
 
-	public void setSecond(U second) {
-		this.second = second;
-	}
+    public void setSecond(U second) {
+        this.second = second;
+    }
 
-	public String toString(){
-		return "<" + first + "," + second + ">";
-	}
-	
-	/**
-	 * Combines two arrays of equal length into an array of Pair
-	 * objects for convenience in loop or parameter passing.
-	 * @param t First array, stored in the first location
-	 * @param u Second array, stored in the second location
-	 * @return An array of populated Pair objects or null if input was invalid.
-	 */
-	public static <V,W> Pair<V,W>[] zip(V[] t, W[] u){
-		if(t==null || u == null) return null;
-		if(t.length != u.length) return null;
-		@SuppressWarnings("unchecked")
-		Pair<V,W>[] arr = new Pair[t.length];
-		for(int i=0; i < t.length; i++){
-			arr[i].first = t[i];
-			arr[i].second = u[i];
-		}
-		return arr;
-	}
-	
-	@Override
-	public int hashCode() {
-		final int prime = 31;
-		int result = 1;
-		result = prime * result + ((first == null) ? 0 : first.hashCode());
-		result = prime * result + ((second == null) ? 0 : second.hashCode());
-		return result;
-	}
+    public String toString(){
+        return "<" + first + "," + second + ">";
+    }
+    
+    /**
+     * Combines two arrays of equal length into an array of Pair
+     * objects for convenience in loop or parameter passing.
+     * @param t First array, stored in the first location
+     * @param u Second array, stored in the second location
+     * @return An array of populated Pair objects or null if input was invalid.
+     */
+    public static <V,W> Pair<V,W>[] zip(V[] t, W[] u){
+        if(t==null || u == null) return null;
+        if(t.length != u.length) return null;
+        @SuppressWarnings("unchecked")
+        Pair<V,W>[] arr = new Pair[t.length];
+        for(int i=0; i < t.length; i++){
+            arr[i].first = t[i];
+            arr[i].second = u[i];
+        }
+        return arr;
+    }
+    
+    @Override
+    public int hashCode() {
+        final int prime = 31;
+        int result = 1;
+        result = prime * result + ((first == null) ? 0 : first.hashCode());
+        result = prime * result + ((second == null) ? 0 : second.hashCode());
+        return result;
+    }
 
-	@Override
-	public boolean equals(Object obj) {
-		if (this == obj)
-			return true;
-		if (obj == null)
-			return false;
-		if (getClass() != obj.getClass())
-			return false;
-		Pair<?,?> other = (Pair<?,?>) obj;
-		if (first == null) {
-			if (other.first != null)
-				return false;
-		} else if (!first.equals(other.first))
-			return false;
-		if (second == null) {
-			if (other.second != null)
-				return false;
-		} else if (!second.equals(other.second))
-			return false;
-		return true;
-	}
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj)
+            return true;
+        if (obj == null)
+            return false;
+        if (getClass() != obj.getClass())
+            return false;
+        Pair<?,?> other = (Pair<?,?>) obj;
+        if (first == null) {
+            if (other.first != null)
+                return false;
+        } else if (!first.equals(other.first))
+            return false;
+        if (second == null) {
+            if (other.second != null)
+                return false;
+        } else if (!second.equals(other.second))
+            return false;
+        return true;
+    }
 }

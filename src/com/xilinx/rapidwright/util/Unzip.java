@@ -1,6 +1,7 @@
 /*
  * 
- * Copyright (c) 2018 Xilinx, Inc. 
+ * Copyright (c) 2018-2022, Xilinx, Inc. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -29,11 +30,11 @@ package com.xilinx.rapidwright.util;
  * Created on: May 4, 2018
  */
 public class Unzip {
-	public static void main(String[] args) {
-		if(args.length != 2){
-			System.out.println("USAGE: <zip file> <dest dir>");
-			return;
-		}
-		FileTools.unzipFile(args[0], args[1]);
-	}
+    public static void main(String[] args) {
+        if(args.length != 2){
+            System.out.println("USAGE: <zip file> <dest dir>");
+            return;
+        }
+        FileTools.unzipFile(args[0], args[1]);
+    }
 }

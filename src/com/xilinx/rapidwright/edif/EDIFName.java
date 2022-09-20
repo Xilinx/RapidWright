@@ -1,6 +1,7 @@
 /*
  * 
- * Copyright (c) 2017 Xilinx, Inc. 
+ * Copyright (c) 2017-2022, Xilinx, Inc. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -39,100 +40,100 @@ import java.util.Objects;
  * Created on: May 11, 2017
  */
 public class EDIFName implements Comparable<EDIFName> {
-	/** Name of the EDIF object */
-	private String name;
-	
-	
-	protected EDIFName(){
-		
-	}
-	
-	public EDIFName(String name){
-		this.name = name;
-	}
-	
-	/**
-	 * Copy constructor
-	 * @param edifName
-	 */
-	public EDIFName(EDIFName edifName) {
-		this.name = edifName.name;
-	}
+    /** Name of the EDIF object */
+    private String name;
+    
+    
+    protected EDIFName(){
+        
+    }
+    
+    public EDIFName(String name){
+        this.name = name;
+    }
+    
+    /**
+     * Copy constructor
+     * @param edifName
+     */
+    public EDIFName(EDIFName edifName) {
+        this.name = edifName.name;
+    }
 
-	public String getName(){
-		return name;
-	}
-	
-	protected void setName(String name){
-		this.name = name;
-	}
+    public String getName(){
+        return name;
+    }
+    
+    protected void setName(String name){
+        this.name = name;
+    }
 
-	public static final byte[] EXPORT_CONST_RENAME_START = "(rename ".getBytes(StandardCharsets.UTF_8);
+    public static final byte[] EXPORT_CONST_RENAME_START = "(rename ".getBytes(StandardCharsets.UTF_8);
 
 
-	public static void exportSomeEDIFName(OutputStream os, String name, byte[] legalName) throws IOException {
-		if (legalName == null) {
-			os.write(name.getBytes(StandardCharsets.UTF_8));
-			return;
-		}
-		os.write(EXPORT_CONST_RENAME_START);
-		os.write(legalName);
-		os.write(' ');
-		os.write('"');
-		os.write(name.getBytes(StandardCharsets.UTF_8));
-		os.write('"');
-		os.write(')');
-	}
+    public static void exportSomeEDIFName(OutputStream os, String name, byte[] legalName) throws IOException {
+        if (legalName == null) {
+            os.write(name.getBytes(StandardCharsets.UTF_8));
+            return;
+        }
+        os.write(EXPORT_CONST_RENAME_START);
+        os.write(legalName);
+        os.write(' ');
+        os.write('"');
+        os.write(name.getBytes(StandardCharsets.UTF_8));
+        os.write('"');
+        os.write(')');
+    }
 
-	/**
-	 * Writes out valid EDIF syntax the name and/or rename of this object to
-	 * the provided output writer.
-	 * @param os The stream to export the EDIF syntax to.
-	 * @throws IOException
-	 */
-	public void exportEDIFName(OutputStream os, EDIFWriteLegalNameCache<?> cache) throws IOException{
-		exportSomeEDIFName(os, getName(), cache.getEDIFRename(getName()));
-	}
+    /**
+     * Writes out valid EDIF syntax the name and/or rename of this object to
+     * the provided output writer.
+     * @param os The stream to export the EDIF syntax to.
+     * @throws IOException
+     */
+    public void exportEDIFName(OutputStream os, EDIFWriteLegalNameCache<?> cache) throws IOException{
+        exportSomeEDIFName(os, getName(), cache.getEDIFRename(getName()));
+    }
 
-	/* (non-Javadoc)
-	 * @see java.lang.Object#hashCode()
-	 */
-	@Override
-	public int hashCode() {
-		return Objects.hashCode(name);
-	}
+    /* (non-Javadoc)
+     * @see java.lang.Object#hashCode()
+     */
+    @Override
+    public int hashCode() {
+        return Objects.hashCode(name);
+    }
 
-	/* (non-Javadoc)
-	 * @see java.lang.Object#equals(java.lang.Object)
-	 */
-	@Override
-	public boolean equals(Object obj) {
-		if (this == obj)
-			return true;
-		if (obj == null)
-			return false;
-		if (getClass() != obj.getClass())
-			return false;
-		EDIFName other = (EDIFName) obj;
-		if (name == null) {
-			if (other.name != null)
-				return false;
-		} else if (!name.equals(other.name))
-			return false;
-		return true;
-	}
-	
-	public String toString(){
-		return name;
-	}
-	
-	public static <K, V> Map<K, V> getNewMap(){
-		//Save some memory for small maps
-		return new HashMap<K,V>(2);
-	}
+    /* (non-Javadoc)
+     * @see java.lang.Object#equals(java.lang.Object)
+     */
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj)
+            return true;
+        if (obj == null)
+            return false;
+        if (getClass() != obj.getClass())
+            return false;
+        EDIFName other = (EDIFName) obj;
+        if (name == null) {
+            if (other.name != null)
+                return false;
+        } else if (!name.equals(other.name))
+            return false;
+        return true;
+    }
+    
+    public String toString(){
+        return name;
+    }
+    
+    public static <K, V> Map<K, V> getNewMap(){
+        //Save some memory for small maps
+        return new HashMap<K,V>(2);
+    }
 
-	public int compareTo(EDIFName o) {
-		return this.getName().compareTo(o.getName());
-	}
+    public int compareTo(EDIFName o) {
+        return this.getName().compareTo(o.getName());
+    }
 
 }

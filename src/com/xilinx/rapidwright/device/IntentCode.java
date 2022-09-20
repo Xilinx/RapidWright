@@ -1,5 +1,6 @@
 /* 
- * Copyright (c) 2017 Xilinx, Inc. 
+ * Copyright (c) 2017-2022, Xilinx, Inc. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -32,10 +33,10 @@ import java.util.Arrays;
  * Created on: Oct 19, 2015
  */
 public enum IntentCode {
-	// DO NOT CHANGE ORDER OF CODES
-	
-	// UltraScale
-	INTENT_DEFAULT,
+    // DO NOT CHANGE ORDER OF CODES
+    
+    // UltraScale
+    INTENT_DEFAULT,
     NODE_OUTPUT,
     NODE_DEDICATED,
     NODE_GLOBAL_VDISTR,
@@ -133,28 +134,28 @@ public enum IntentCode {
 
 
     public static boolean isLongWire(Tile tile, int wire){
-    	return isLongWire(tile.getWireIntentCode(wire).ordinal());
+        return isLongWire(tile.getWireIntentCode(wire).ordinal());
     }
     
     public static boolean isLongWire(int intentCode){
-    	IntentCode ic = values[intentCode];
-    	return NODE_VLONG == ic || NODE_HLONG == ic || VLONG == ic || HLONG == ic || VLONG12 == ic || SVLONG == ic;
+        IntentCode ic = values[intentCode];
+        return NODE_VLONG == ic || NODE_HLONG == ic || VLONG == ic || HLONG == ic || VLONG12 == ic || SVLONG == ic;
     }
     
     public static boolean isUltraScaleClocking(Tile tile, int wire){
-    	return values[tile.getWireIntentCode(wire).ordinal()].isUltraScaleClocking();	
+        return values[tile.getWireIntentCode(wire).ordinal()].isUltraScaleClocking();    
     }
     
     public boolean isUltraScaleClocking(){
-    	return NODE_GLOBAL_HDISTR == this || NODE_GLOBAL_VDISTR == this || NODE_GLOBAL_HROUTE == this || NODE_GLOBAL_LEAF == this || NODE_GLOBAL_VROUTE == this;
+        return NODE_GLOBAL_HDISTR == this || NODE_GLOBAL_VDISTR == this || NODE_GLOBAL_HROUTE == this || NODE_GLOBAL_LEAF == this || NODE_GLOBAL_VROUTE == this;
     }
     
     public boolean isUltraScaleClockRouting(){
-    	return NODE_GLOBAL_HROUTE == this || NODE_GLOBAL_VROUTE == this;
+        return NODE_GLOBAL_HROUTE == this || NODE_GLOBAL_VROUTE == this;
     }
     
     public boolean isUltraScaleClockDistribution(){
-    	return NODE_GLOBAL_HDISTR == this || NODE_GLOBAL_VDISTR == this;
+        return NODE_GLOBAL_HDISTR == this || NODE_GLOBAL_VDISTR == this;
     }
     
     private static final int SERIES7_START_IDX = 23;
@@ -174,26 +175,26 @@ public enum IntentCode {
      * @return The array of relevant intent codes or null if not available.
      */
     public static IntentCode[] getIntentCodesBySeries(Series s){
-    	if(s == Series.Series7){
-    		return Arrays.copyOfRange(IntentCode.values, SERIES7_START_IDX, SERIES7_END_IDX);
-    	}else if(s == Series.UltraScale){
-    		return Arrays.copyOfRange(IntentCode.values, ULTRASCALE_START_IDX, ULTRASCALE_END_IDX);
-    	}else if(s == Series.UltraScalePlus){
-    		return Arrays.copyOfRange(IntentCode.values, ULTRASCALEPLUS_START_IDX, ULTRASCALEPLUS_END_IDX);
-    	} 
-    	return null;
+        if(s == Series.Series7){
+            return Arrays.copyOfRange(IntentCode.values, SERIES7_START_IDX, SERIES7_END_IDX);
+        }else if(s == Series.UltraScale){
+            return Arrays.copyOfRange(IntentCode.values, ULTRASCALE_START_IDX, ULTRASCALE_END_IDX);
+        }else if(s == Series.UltraScalePlus){
+            return Arrays.copyOfRange(IntentCode.values, ULTRASCALEPLUS_START_IDX, ULTRASCALEPLUS_END_IDX);
+        } 
+        return null;
     }
     
     public static void printIntentCodesBySeries(Series s){
-    	System.out.println(s.name() + ":");
-    	for(IntentCode i : getIntentCodesBySeries(s)){
-			System.out.printf("%3d. %s\n", i.ordinal(), i.name());
-		}
+        System.out.println(s.name() + ":");
+        for(IntentCode i : getIntentCodesBySeries(s)){
+            System.out.printf("%3d. %s\n", i.ordinal(), i.name());
+        }
     }
     
     public static void main(String[] args) {
-    	for(Series s : Series.values()){
-    		printIntentCodesBySeries(s);
-    	}
-	}
+        for(Series s : Series.values()){
+            printIntentCodesBySeries(s);
+        }
+    }
 }

@@ -1,6 +1,7 @@
 /*
  * 
- * Copyright (c) 2017 Xilinx, Inc. 
+ * Copyright (c) 2017-2022, Xilinx, Inc. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -34,62 +35,62 @@ import com.xilinx.rapidwright.device.Site;
  * Created on: Apr 25, 2017
  */
 public class BlockInst {
-	/** A reference to the block prototype for this block instance */
-	private BlockGuide parent;
-	/** Name of the block instance */
-	private String name;
-	/** Index of the implementation (pblock) within the block parent */
-	private Integer impl = null;
-	/** The anchor site placement for this instance */
-	private Site placement = null;
-	/**
-	 * @return the parent
-	 */
-	public BlockGuide getParent() {
-		return parent;
-	}
-	/**
-	 * @param parent the parent to set
-	 */
-	public void setParent(BlockGuide parent) {
-		this.parent = parent;
-	}
-	/**
-	 * @return the name
-	 */
-	public String getName() {
-		return name;
-	}
-	/**
-	 * @param name the name to set
-	 */
-	public void setName(String name) {
-		this.name = name;
-	}
-	/**
-	 * @return the impl
-	 */
-	public Integer getImplIndex() {
-		return impl;
-	}
-	/**
-	 * @param impl the impl to set
-	 */
-	public void setImpl(Integer impl) {
-		this.impl = impl;
-	}
-	/**
-	 * @return the placement
-	 */
-	public Site getPlacement() {
-		return placement;
-	}
-	/**
-	 * @param placement the placement to set
-	 */
-	public void setPlacement(Site placement) {
-		this.placement = placement;
-	}
-	
-	
+    /** A reference to the block prototype for this block instance */
+    private BlockGuide parent;
+    /** Name of the block instance */
+    private String name;
+    /** Index of the implementation (pblock) within the block parent */
+    private Integer impl = null;
+    /** The anchor site placement for this instance */
+    private Site placement = null;
+    /**
+     * @return the parent
+     */
+    public BlockGuide getParent() {
+        return parent;
+    }
+    /**
+     * @param parent the parent to set
+     */
+    public void setParent(BlockGuide parent) {
+        this.parent = parent;
+    }
+    /**
+     * @return the name
+     */
+    public String getName() {
+        return name;
+    }
+    /**
+     * @param name the name to set
+     */
+    public void setName(String name) {
+        this.name = name;
+    }
+    /**
+     * @return the impl
+     */
+    public Integer getImplIndex() {
+        return impl;
+    }
+    /**
+     * @param impl the impl to set
+     */
+    public void setImpl(Integer impl) {
+        this.impl = impl;
+    }
+    /**
+     * @return the placement
+     */
+    public Site getPlacement() {
+        return placement;
+    }
+    /**
+     * @param placement the placement to set
+     */
+    public void setPlacement(Site placement) {
+        this.placement = placement;
+    }
+    
+    
 }

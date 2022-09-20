@@ -1,5 +1,6 @@
 /* 
- * Copyright (c) 2019 Xilinx, Inc. 
+ * Copyright (c) 2019-2022, Xilinx, Inc. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -48,12 +49,12 @@ import java.util.Scanner;
 
 public class CheckAccuracyUsingGnlDesigns {
 
-	public static String GNL_DESIGN_PATH = File.separator + "designs"+File.separator+"timing"+
+    public static String GNL_DESIGN_PATH = File.separator + "designs"+File.separator+"timing"+
                                            File.separator+"gnl" + File.separator;
-	
-	private static String DOWNLOAD_PATH = 
-			"https://github.com/Xilinx/RapidWright/releases/download/v2019.2.0-beta/";
-	
+    
+    private static String DOWNLOAD_PATH = 
+            "https://github.com/Xilinx/RapidWright/releases/download/v2019.2.0-beta/";
+    
     public CheckAccuracyUsingGnlDesigns() {
     }
 
@@ -88,15 +89,15 @@ public class CheckAccuracyUsingGnlDesigns {
         List<Double> absErrorList = new ArrayList<Double>();;
 
         try {
-        	String goldenFileName = path + "golden/" + suiteFileName;
-        	if(!new File(goldenFileName).exists()) {
-        		System.out.print("ERROR: GNL designs could not be found.  Would you like to"
-        				+ " download them ");
-        		MessageGenerator.agreeToContinue();
-        		String gnlDesignFileName = "gnl_timing_designs.zip";
-        		Installer.downloadFile(DOWNLOAD_PATH + gnlDesignFileName, gnlDesignFileName);
-        		FileTools.unzipFile(gnlDesignFileName, FileTools.getRapidWrightPath());
-        	}
+            String goldenFileName = path + "golden/" + suiteFileName;
+            if(!new File(goldenFileName).exists()) {
+                System.out.print("ERROR: GNL designs could not be found.  Would you like to"
+                        + " download them ");
+                MessageGenerator.agreeToContinue();
+                String gnlDesignFileName = "gnl_timing_designs.zip";
+                Installer.downloadFile(DOWNLOAD_PATH + gnlDesignFileName, gnlDesignFileName);
+                FileTools.unzipFile(gnlDesignFileName, FileTools.getRapidWrightPath());
+            }
             FileInputStream inputStream = new FileInputStream(goldenFileName);
             printStream.println("#designs                                vivado  model(golden)   "
                                 + "model   error   abs_error");

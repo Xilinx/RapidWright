@@ -1,6 +1,7 @@
 /* 
  * Original work: Copyright (c) 2010-2011 Brigham Young University
- * Modified work: Copyright (c) 2017 Xilinx, Inc. 
+ * Modified work: Copyright (c) 2017-2022, Xilinx, Inc. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -28,42 +29,42 @@ import com.trolltech.qt.gui.QGraphicsTextItem;
 import com.xilinx.rapidwright.device.Tile;
 
 public class NumberedHighlightedTile  extends QGraphicsRectItem{
-	/** */
-	protected QGraphicsTextItem text;
-	/** */
-	protected TileScene scene;
-	/** */
-	protected static QFont font4 = new QFont("Arial", 4);
-	/** */
-	protected static QFont font6 = new QFont("Arial", 6);
-	/** */
-	protected static QFont font8 = new QFont("Arial", 8);
-	
-	
-	public NumberedHighlightedTile(Tile t, TileScene scene, int number){
-		super(0, 0, scene.tileSize - 2, scene.tileSize - 2);
-		this.scene = scene;
-		this.text = new QGraphicsTextItem(Integer.toString(number));
-		int x = scene.getDrawnTileX(t) * scene.tileSize;
-		int y = scene.getDrawnTileY(t) * scene.tileSize;
-		text.setPos(x-4, y);
-		if(number < 100){
-			text.setFont(font8);			
-		}else if(number < 1000){
-			text.setFont(font6);
-		}else {
-			text.setFont(font4);
-		}
+    /** */
+    protected QGraphicsTextItem text;
+    /** */
+    protected TileScene scene;
+    /** */
+    protected static QFont font4 = new QFont("Arial", 4);
+    /** */
+    protected static QFont font6 = new QFont("Arial", 6);
+    /** */
+    protected static QFont font8 = new QFont("Arial", 8);
+    
+    
+    public NumberedHighlightedTile(Tile t, TileScene scene, int number){
+        super(0, 0, scene.tileSize - 2, scene.tileSize - 2);
+        this.scene = scene;
+        this.text = new QGraphicsTextItem(Integer.toString(number));
+        int x = scene.getDrawnTileX(t) * scene.tileSize;
+        int y = scene.getDrawnTileY(t) * scene.tileSize;
+        text.setPos(x-4, y);
+        if(number < 100){
+            text.setFont(font8);            
+        }else if(number < 1000){
+            text.setFont(font6);
+        }else {
+            text.setFont(font4);
+        }
 
-		this.moveBy(x, y);
-		this.scene.addItem(this);
-		this.scene.addItem(text);
+        this.moveBy(x, y);
+        this.scene.addItem(this);
+        this.scene.addItem(text);
 
-		this.text.setZValue(this.zValue() + 1);
-	}
-	
-	public void remove(){
-		scene.removeItem(text);
-		scene.removeItem(this);
-	}
+        this.text.setZValue(this.zValue() + 1);
+    }
+    
+    public void remove(){
+        scene.removeItem(text);
+        scene.removeItem(this);
+    }
 }

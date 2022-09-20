@@ -1,6 +1,7 @@
 /*
  * 
  * Copyright (c) 2021 Ghent University. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Yun Zhou, Ghent University.
@@ -30,60 +31,60 @@ import com.xilinx.rapidwright.device.Node;
  * each {@link RoutingNode} Object is associated to a {@link Node} Object.
  */
 public class RoutingNode{
-	private Node node;
-	private RoutingNode prev;
-	private boolean isTarget;
-	/** Accumulative delay from a source to a {@link RoutingNode} instance */
-	private float delayFromSource;
-	
-	RoutingNode (Node node){
-		this.node = node;
-		prev = null;
-		isTarget = false;
-		delayFromSource = 0;
-	}
-	
-	/**
-	 * Gets the accumulative delay from a source to a RoutingNode instance if it is an used resource of a routing path.
-	 * @return The accumulative delay.
-	 */
-	public float getDelayFromSource() {
-		return delayFromSource;
-	}
+    private Node node;
+    private RoutingNode prev;
+    private boolean isTarget;
+    /** Accumulative delay from a source to a {@link RoutingNode} instance */
+    private float delayFromSource;
+    
+    RoutingNode (Node node){
+        this.node = node;
+        prev = null;
+        isTarget = false;
+        delayFromSource = 0;
+    }
+    
+    /**
+     * Gets the accumulative delay from a source to a RoutingNode instance if it is an used resource of a routing path.
+     * @return The accumulative delay.
+     */
+    public float getDelayFromSource() {
+        return delayFromSource;
+    }
 
-	/**
-	 * Sets the accumulative delay from a source to a RoutingNode instance if it is an used resource of a routing path.
-	 */
-	public void setDelayFromSource(float delayFromSource) {
-		this.delayFromSource = delayFromSource;
-	}
+    /**
+     * Sets the accumulative delay from a source to a RoutingNode instance if it is an used resource of a routing path.
+     */
+    public void setDelayFromSource(float delayFromSource) {
+        this.delayFromSource = delayFromSource;
+    }
 
-	public void setPrev(RoutingNode prev) {
-		this.prev = prev;
-	}
-	
-	public RoutingNode getPrev() {
-		return prev;
-	}
-	
-	public Node getNode() {
-		return node;
-	}
+    public void setPrev(RoutingNode prev) {
+        this.prev = prev;
+    }
+    
+    public RoutingNode getPrev() {
+        return prev;
+    }
+    
+    public Node getNode() {
+        return node;
+    }
 
-	public boolean isTarget() {
-		return isTarget;
-	}
+    public boolean isTarget() {
+        return isTarget;
+    }
 
-	public void setTarget(boolean isTarget) {
-		this.isTarget = isTarget;
-	}
-	
-	public int hashCode() {
-		return node.hashCode();
-	}
-	
-	public String toString() {
-		return node.toString() + ", accDly = " + delayFromSource;
-	}
-	
+    public void setTarget(boolean isTarget) {
+        this.isTarget = isTarget;
+    }
+    
+    public int hashCode() {
+        return node.hashCode();
+    }
+    
+    public String toString() {
+        return node.toString() + ", accDly = " + delayFromSource;
+    }
+    
 }

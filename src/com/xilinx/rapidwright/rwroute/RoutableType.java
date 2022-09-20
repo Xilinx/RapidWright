@@ -1,6 +1,7 @@
 /*
  * 
  * Copyright (c) 2021 Ghent University. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Yun Zhou, Ghent University.
@@ -28,25 +29,25 @@ import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 
 public enum RoutableType {
-	/** 
-	 * Denotes {@link Routable} Objects that correspond to the output pins of {@link Net} Objects, 
-	 * typically the source {@link Routable} Objects of {@link Connection} Objects.
-	 */
-	PINFEED_O,
-	/** 
-	 * Denotes {@link Routable} Objects that correspond to input pins of {@link Net} Objects, 
-	 * typically the sink {@link Routable} Objects of {@link Connection} Objects. 
-	 */
-	PINFEED_I,
-	/** 
-	 * Denotes {@link Routable} Objects that are created based on {@link Node} Objects 
-	 * that have an {@link IntentCode} of NODE_PINBOUNCE.
-	 */
-	PINBOUNCE,
-	/** 
-	 * Denotes other wiring {@link Routable} Objects 
-	 * that are created for routing {@link Connection} Objects.
-	 */
-	WIRE
-	
+    /** 
+     * Denotes {@link Routable} Objects that correspond to the output pins of {@link Net} Objects, 
+     * typically the source {@link Routable} Objects of {@link Connection} Objects.
+     */
+    PINFEED_O,
+    /** 
+     * Denotes {@link Routable} Objects that correspond to input pins of {@link Net} Objects, 
+     * typically the sink {@link Routable} Objects of {@link Connection} Objects. 
+     */
+    PINFEED_I,
+    /** 
+     * Denotes {@link Routable} Objects that are created based on {@link Node} Objects 
+     * that have an {@link IntentCode} of NODE_PINBOUNCE.
+     */
+    PINBOUNCE,
+    /** 
+     * Denotes other wiring {@link Routable} Objects 
+     * that are created for routing {@link Connection} Objects.
+     */
+    WIRE
+    
 }

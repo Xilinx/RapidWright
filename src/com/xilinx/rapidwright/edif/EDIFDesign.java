@@ -1,6 +1,7 @@
 /*
  * 
- * Copyright (c) 2017 Xilinx, Inc. 
+ * Copyright (c) 2017-2022, Xilinx, Inc. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -32,31 +33,31 @@ package com.xilinx.rapidwright.edif;
  * Created on: May 12, 2017
  */
 public class EDIFDesign extends EDIFPropertyObject {
-	
-	private EDIFCell topCell;
+    
+    private EDIFCell topCell;
 
-	public EDIFDesign(String name){
-		super(name);
-	}
-	
-	protected EDIFDesign(){
-		
-	}
-	
-	/**
-	 * @return the topCell
-	 */
-	public EDIFCell getTopCell() {
-		return topCell;
-	}
+    public EDIFDesign(String name){
+        super(name);
+    }
+    
+    protected EDIFDesign(){
+        
+    }
+    
+    /**
+     * @return the topCell
+     */
+    public EDIFCell getTopCell() {
+        return topCell;
+    }
 
-	/**
-	 * @param topCell the topCell to set
-	 */
-	public void setTopCell(EDIFCell topCell) {
-		this.topCell = topCell;
-	}
+    /**
+     * @param topCell the topCell to set
+     */
+    public void setTopCell(EDIFCell topCell) {
+        this.topCell = topCell;
+    }
 
-	
-	
+    
+    
 }

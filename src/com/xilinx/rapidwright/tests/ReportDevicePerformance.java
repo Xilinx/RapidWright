@@ -1,6 +1,7 @@
 /*
  * 
- * Copyright (c) 2017 Xilinx, Inc. 
+ * Copyright (c) 2017-2022, Xilinx, Inc. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -33,30 +34,30 @@ import com.xilinx.rapidwright.device.Device;
  */
 public class ReportDevicePerformance {
 
-	public static void main(String[] args) {
-		String[] partNames = new String[]{
-				"xc7a12t",
-				"xc7s100",
-				"xc7z020",
-				"xc7v2000t",
-				"xcku040",
-				"xcvu440",
-				"xcvu9p",
-				"xczu19eg"
-		};
-		String deviceLoad = "Device Load";
-		for(String partName : partNames){
-			CodePerfTracker p = new CodePerfTracker(partName,false);
-			p.start(deviceLoad);
-			Device d = Device.getDevice(partName);
-			p.stop();
-			
-			System.out.printf("%12s: %2.3fs %7.3fMBs\n", 
-					d.getName(), 
-					(p.getRuntime(deviceLoad))/1000000000.0,
-					(p.getMemUsage(deviceLoad))/(1024.0*1024.0));
-			
-			//System.out.println(d.getName() + " " +  + " " + );
-		}
-	}
+    public static void main(String[] args) {
+        String[] partNames = new String[]{
+                "xc7a12t",
+                "xc7s100",
+                "xc7z020",
+                "xc7v2000t",
+                "xcku040",
+                "xcvu440",
+                "xcvu9p",
+                "xczu19eg"
+        };
+        String deviceLoad = "Device Load";
+        for(String partName : partNames){
+            CodePerfTracker p = new CodePerfTracker(partName,false);
+            p.start(deviceLoad);
+            Device d = Device.getDevice(partName);
+            p.stop();
+            
+            System.out.printf("%12s: %2.3fs %7.3fMBs\n", 
+                    d.getName(), 
+                    (p.getRuntime(deviceLoad))/1000000000.0,
+                    (p.getMemUsage(deviceLoad))/(1024.0*1024.0));
+            
+            //System.out.println(d.getName() + " " +  + " " + );
+        }
+    }
 }

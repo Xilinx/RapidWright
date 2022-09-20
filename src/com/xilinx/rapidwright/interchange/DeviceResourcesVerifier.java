@@ -1,5 +1,6 @@
 /* 
- * Copyright (c) 2020 Xilinx, Inc. 
+ * Copyright (c) 2020-2022, Xilinx, Inc. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -314,7 +315,7 @@ public class DeviceResourcesVerifier {
             expect(sitePIPs.length, sitePipsReader.size());
             Map<String, SitePIP> sitePIPMap = new HashMap<>();
             for(SitePIP sitePIP : sitePIPs) {
-            	sitePIPMap.put(sitePIP.toString(),sitePIP);
+                sitePIPMap.put(sitePIP.toString(),sitePIP);
             }
             
             

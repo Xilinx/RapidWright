@@ -1,6 +1,7 @@
 /*
  * 
- * Copyright (c) 2017 Xilinx, Inc. 
+ * Copyright (c) 2017-2022, Xilinx, Inc. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -30,114 +31,114 @@ package com.xilinx.rapidwright.design;
  */
 public class AltPinMapping {
 
-	private String logicalName;
-	
-	private String altCellName;
-	
-	private String altCellType;
+    private String logicalName;
+    
+    private String altCellName;
+    
+    private String altCellType;
 
-	/**
-	 * @return the logicalName
-	 */
-	public String getLogicalName() {
-		return logicalName;
-	}
+    /**
+     * @return the logicalName
+     */
+    public String getLogicalName() {
+        return logicalName;
+    }
 
-	/**
-	 * @param logicalName the logicalName to set
-	 */
-	public void setLogicalName(String logicalName) {
-		this.logicalName = logicalName;
-	}
+    /**
+     * @param logicalName the logicalName to set
+     */
+    public void setLogicalName(String logicalName) {
+        this.logicalName = logicalName;
+    }
 
-	/**
-	 * @return the altCellName
-	 */
-	public String getAltCellName() {
-		return altCellName;
-	}
+    /**
+     * @return the altCellName
+     */
+    public String getAltCellName() {
+        return altCellName;
+    }
 
-	/**
-	 * @param altCellName the altCellName to set
-	 */
-	public void setAltCellName(String altCellName) {
-		this.altCellName = altCellName;
-	}
+    /**
+     * @param altCellName the altCellName to set
+     */
+    public void setAltCellName(String altCellName) {
+        this.altCellName = altCellName;
+    }
 
-	/**
-	 * @return the altCellType
-	 */
-	public String getAltCellType() {
-		return altCellType;
-	}
+    /**
+     * @return the altCellType
+     */
+    public String getAltCellType() {
+        return altCellType;
+    }
 
-	/**
-	 * @param altCellType the altCellType to set
-	 */
-	public void setAltCellType(String altCellType) {
-		this.altCellType = altCellType;
-	}
+    /**
+     * @param altCellType the altCellType to set
+     */
+    public void setAltCellType(String altCellType) {
+        this.altCellType = altCellType;
+    }
 
-	/* (non-Javadoc)
-	 * @see java.lang.Object#hashCode()
-	 */
-	@Override
-	public int hashCode() {
-		final int prime = 31;
-		int result = 1;
-		result = prime * result + ((altCellName == null) ? 0 : altCellName.hashCode());
-		result = prime * result + ((altCellType == null) ? 0 : altCellType.hashCode());
-		result = prime * result + ((logicalName == null) ? 0 : logicalName.hashCode());
-		return result;
-	}
+    /* (non-Javadoc)
+     * @see java.lang.Object#hashCode()
+     */
+    @Override
+    public int hashCode() {
+        final int prime = 31;
+        int result = 1;
+        result = prime * result + ((altCellName == null) ? 0 : altCellName.hashCode());
+        result = prime * result + ((altCellType == null) ? 0 : altCellType.hashCode());
+        result = prime * result + ((logicalName == null) ? 0 : logicalName.hashCode());
+        return result;
+    }
 
-	/* (non-Javadoc)
-	 * @see java.lang.Object#equals(java.lang.Object)
-	 */
-	@Override
-	public boolean equals(Object obj) {
-		if (this == obj)
-			return true;
-		if (obj == null)
-			return false;
-		if (getClass() != obj.getClass())
-			return false;
-		AltPinMapping other = (AltPinMapping) obj;
-		if (altCellName == null) {
-			if (other.altCellName != null)
-				return false;
-		} else if (!altCellName.equals(other.altCellName))
-			return false;
-		if (altCellType == null) {
-			if (other.altCellType != null)
-				return false;
-		} else if (!altCellType.equals(other.altCellType))
-			return false;
-		if (logicalName == null) {
-			if (other.logicalName != null)
-				return false;
-		} else if (!logicalName.equals(other.logicalName))
-			return false;
-		return true;
-	}
+    /* (non-Javadoc)
+     * @see java.lang.Object#equals(java.lang.Object)
+     */
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj)
+            return true;
+        if (obj == null)
+            return false;
+        if (getClass() != obj.getClass())
+            return false;
+        AltPinMapping other = (AltPinMapping) obj;
+        if (altCellName == null) {
+            if (other.altCellName != null)
+                return false;
+        } else if (!altCellName.equals(other.altCellName))
+            return false;
+        if (altCellType == null) {
+            if (other.altCellType != null)
+                return false;
+        } else if (!altCellType.equals(other.altCellType))
+            return false;
+        if (logicalName == null) {
+            if (other.logicalName != null)
+                return false;
+        } else if (!logicalName.equals(other.logicalName))
+            return false;
+        return true;
+    }
 
-	/**
-	 * @param logicalName
-	 * @param altCellName
-	 * @param altCellType
-	 */
-	public AltPinMapping(String logicalName, String altCellName, String altCellType) {
-		super();
-		this.logicalName = logicalName;
-		this.altCellName = altCellName;
-		this.altCellType = altCellType;
-	}
-	
-	public AltPinMapping(){
-		
-	}
-	
-	public String toString() {
-		return altCellName + "[" + altCellType + "]/" + logicalName;
-	}
+    /**
+     * @param logicalName
+     * @param altCellName
+     * @param altCellType
+     */
+    public AltPinMapping(String logicalName, String altCellName, String altCellType) {
+        super();
+        this.logicalName = logicalName;
+        this.altCellName = altCellName;
+        this.altCellType = altCellType;
+    }
+    
+    public AltPinMapping(){
+        
+    }
+    
+    public String toString() {
+        return altCellName + "[" + altCellType + "]/" + logicalName;
+    }
 }

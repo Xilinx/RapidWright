@@ -1,5 +1,6 @@
 /* 
- * Copyright (c) 2017 Xilinx, Inc. 
+ * Copyright (c) 2017-2022, Xilinx, Inc. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -35,36 +36,36 @@ import com.xilinx.rapidwright.util.MessageGenerator;
  * Created on: Jun 20, 2016
  */
 public class PBlockGenTester {
-	public static void main(String[] args) {
-		if(args.length != 1){
-			System.out.println("USAGE: <dir_to_project_runs>");
-			return;
-		}
-		
-		File dir = new File(args[0]);
-		if(dir.exists() && dir.isDirectory()){
-			for(File child : dir.listFiles()){
-				if(!child.isDirectory()) continue;
-				String shapeFile = null;
-				String utilReportFile = null;
-				for(File file : child.listFiles()){
-					if(file.getAbsoluteFile().getName().endsWith("_shapes.txt")){
-						shapeFile = file.toString();
-					}else if(file.getAbsoluteFile().getName().endsWith("_utilization.report")){
-						utilReportFile = file.toString();
-					}
-				}
-				if(shapeFile != null && utilReportFile != null){
-					System.out.println(child.getName() + " " + utilReportFile + " " + shapeFile);
-					PBlockGenerator.main(new String[]{
-							"-u", utilReportFile, 
-							"-s", shapeFile,
-							"-c", "1",
-						//	"-a", "0.25",
-						//	"-o", "1.5",
-							});
-				}
-			}
-		}
-	}
+    public static void main(String[] args) {
+        if(args.length != 1){
+            System.out.println("USAGE: <dir_to_project_runs>");
+            return;
+        }
+        
+        File dir = new File(args[0]);
+        if(dir.exists() && dir.isDirectory()){
+            for(File child : dir.listFiles()){
+                if(!child.isDirectory()) continue;
+                String shapeFile = null;
+                String utilReportFile = null;
+                for(File file : child.listFiles()){
+                    if(file.getAbsoluteFile().getName().endsWith("_shapes.txt")){
+                        shapeFile = file.toString();
+                    }else if(file.getAbsoluteFile().getName().endsWith("_utilization.report")){
+                        utilReportFile = file.toString();
+                    }
+                }
+                if(shapeFile != null && utilReportFile != null){
+                    System.out.println(child.getName() + " " + utilReportFile + " " + shapeFile);
+                    PBlockGenerator.main(new String[]{
+                            "-u", utilReportFile, 
+                            "-s", shapeFile,
+                            "-c", "1",
+                        //    "-a", "0.25",
+                        //    "-o", "1.5",
+                            });
+                }
+            }
+        }
+    }
 }

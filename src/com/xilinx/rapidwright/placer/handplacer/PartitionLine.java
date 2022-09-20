@@ -1,6 +1,7 @@
 /* 
  * Original work: Copyright (c) 2010-2011 Brigham Young University
- * Modified work: Copyright (c) 2017 Xilinx, Inc. 
+ * Modified work: Copyright (c) 2017-2022, Xilinx, Inc. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -28,23 +29,23 @@ import com.trolltech.qt.gui.QPen;
 import com.xilinx.rapidwright.device.Tile;
 
 public class PartitionLine{
-	
-	public Tile start;
-	
-	public Tile end;
-	
-	public PartitionLine(Tile start, Tile end){
-		this.start = start;
-		this.end = end;
-	}
-	
-	public void drawPartitionLine(FloorPlanScene scene){
-		QPen pen = new QPen(QColor.white, 20);
-		pen.setStyle(PenStyle.DashLine);
-		scene.addLine(start.getColumn()*scene.tileSize,
-				      start.getRow()*scene.tileSize,
-				      end.getColumn()*scene.tileSize,
-				      end.getRow()*scene.tileSize,
-				      pen);
-	}
+    
+    public Tile start;
+    
+    public Tile end;
+    
+    public PartitionLine(Tile start, Tile end){
+        this.start = start;
+        this.end = end;
+    }
+    
+    public void drawPartitionLine(FloorPlanScene scene){
+        QPen pen = new QPen(QColor.white, 20);
+        pen.setStyle(PenStyle.DashLine);
+        scene.addLine(start.getColumn()*scene.tileSize,
+                      start.getRow()*scene.tileSize,
+                      end.getColumn()*scene.tileSize,
+                      end.getRow()*scene.tileSize,
+                      pen);
+    }
 }

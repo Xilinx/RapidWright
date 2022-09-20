@@ -1,5 +1,6 @@
 /* 
- * Copyright (c) 2020 Xilinx, Inc. 
+ * Copyright (c) 2020-2022, Xilinx, Inc. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Keith Rothman, Google, Inc.
@@ -173,7 +174,7 @@ public class ConstantDefinitions {
             return true;
         }
         if(exceptionalGndNodes.contains(key)) {
-        	return false;
+            return false;
         }
         
 
@@ -194,7 +195,7 @@ public class ConstantDefinitions {
             return true;
         }
         if(exceptionalVccNodes.contains(key)) {
-        	return false;
+            return false;
         }
 
         for(Wire wire : node.getAllWiresInNode()) {
@@ -267,7 +268,7 @@ public class ConstantDefinitions {
 
             if(node.isTied() != constants.isNodeTied(node)) {
                 throw new RuntimeException(String.format("Node %s tie(gold)=%s =! tie(test)=%s", 
-                		node.toString(), node.isTied(), constants.isNodeTied(node)));
+                        node.toString(), node.isTied(), constants.isNodeTied(node)));
             }
 
             if(node.isTied()) {
@@ -352,137 +353,137 @@ public class ConstantDefinitions {
     private static final int UNTIED = 2;
     
     private static Map<TileTypeEnum, Map<Integer, int[]>> getTiedWires(Device device, List<Node> allTiedNodes) {
-    	Map<TileTypeEnum, Map<Integer,int[]>> tileTiedWires = 
-    			new HashMap<TileTypeEnum, Map<Integer, int[]>>();
-    	// Count GND and VCC instances
-    	for(Node tiedNode : allTiedNodes) {
-    		TileTypeEnum type = tiedNode.getTile().getTileTypeEnum();
-    		int wireIdx = tiedNode.getWire();
-    		Map<Integer,int[]> wireMap = tileTiedWires.get(type);
-    		if(wireMap == null) {
-    			wireMap = new HashMap<Integer, int[]>();
-    			tileTiedWires.put(type, wireMap);
-    		}
-    		int[] tiedCounter = wireMap.get(wireIdx);
-    		if(tiedCounter == null) {
-    			tiedCounter = new int[3];
-    			wireMap.put(wireIdx, tiedCounter);
-    		}
-    		if(tiedNode.isTiedToGnd()) {
-    			tiedCounter[TIED_TO_GND]++;
-    		}else if(tiedNode.isTiedToVcc()) {
-    			tiedCounter[TIED_TO_VCC]++;
-    		}else {
-    			throw new RuntimeException("ERROR: This node was presumed tied to GND or VCC: " +
-    					tiedNode);
-    		}
-    	}
-    	// For those tile type/wire pairs that have at least one tied instance, check for untied
-    	for(Tile tile : device.getAllTiles()) {
-			TileTypeEnum type = tile.getTileTypeEnum();
-			Map<Integer, int[]> wireMap = tileTiedWires.get(type);
-			if(wireMap == null) continue;
-			for(int wireIdx=0; wireIdx < tile.getWireCount(); wireIdx++) {
-				int[] tiedCounter = wireMap.get(wireIdx);
-				if(tiedCounter == null) continue;
-				Node node = Node.getNode(tile,wireIdx);
-				if(node == null) continue;
-				if(!node.isTied()) {
-					tiedCounter[UNTIED]++;
-				}
-			}
-		}
-    	
-    	return tileTiedWires;
+        Map<TileTypeEnum, Map<Integer,int[]>> tileTiedWires = 
+                new HashMap<TileTypeEnum, Map<Integer, int[]>>();
+        // Count GND and VCC instances
+        for(Node tiedNode : allTiedNodes) {
+            TileTypeEnum type = tiedNode.getTile().getTileTypeEnum();
+            int wireIdx = tiedNode.getWire();
+            Map<Integer,int[]> wireMap = tileTiedWires.get(type);
+            if(wireMap == null) {
+                wireMap = new HashMap<Integer, int[]>();
+                tileTiedWires.put(type, wireMap);
+            }
+            int[] tiedCounter = wireMap.get(wireIdx);
+            if(tiedCounter == null) {
+                tiedCounter = new int[3];
+                wireMap.put(wireIdx, tiedCounter);
+            }
+            if(tiedNode.isTiedToGnd()) {
+                tiedCounter[TIED_TO_GND]++;
+            }else if(tiedNode.isTiedToVcc()) {
+                tiedCounter[TIED_TO_VCC]++;
+            }else {
+                throw new RuntimeException("ERROR: This node was presumed tied to GND or VCC: " +
+                        tiedNode);
+            }
+        }
+        // For those tile type/wire pairs that have at least one tied instance, check for untied
+        for(Tile tile : device.getAllTiles()) {
+            TileTypeEnum type = tile.getTileTypeEnum();
+            Map<Integer, int[]> wireMap = tileTiedWires.get(type);
+            if(wireMap == null) continue;
+            for(int wireIdx=0; wireIdx < tile.getWireCount(); wireIdx++) {
+                int[] tiedCounter = wireMap.get(wireIdx);
+                if(tiedCounter == null) continue;
+                Node node = Node.getNode(tile,wireIdx);
+                if(node == null) continue;
+                if(!node.isTied()) {
+                    tiedCounter[UNTIED]++;
+                }
+            }
+        }
+        
+        return tileTiedWires;
     }
 
     public static void writeTiedWires(Enumerator<String> allStrings, Device device, 
-    		Constants.Builder builder, Map<TileTypeEnum, TileType.Builder> tileTypes) {
-    	
-    	ArrayList<Node> allTiedNodes = getAllTiedNodes(device);
+            Constants.Builder builder, Map<TileTypeEnum, TileType.Builder> tileTypes) {
+        
+        ArrayList<Node> allTiedNodes = getAllTiedNodes(device);
         Map<TileTypeEnum, Map<Integer, int[]>> tileTiedWires = getTiedWires(device, allTiedNodes);
 
         // Find exceptionally tied nodes (inconsistent across tile type / wire)
         ArrayList<Node> tiedNodeExceptions = new ArrayList<Node>();
         Map<TileTypeEnum,Set<Integer>> vccTiedNodes = new HashMap<TileTypeEnum,Set<Integer>>();
         Map<TileTypeEnum,Set<Integer>> gndTiedNodes = new HashMap<TileTypeEnum,Set<Integer>>();
-    	for(Node tiedNode : allTiedNodes) {
-    		TileTypeEnum tileType = tiedNode.getTile().getTileTypeEnum();
-    		Map<Integer, int[]> wireMap = tileTiedWires.get(tileType);
-    		int[] tiedCounters = wireMap.get(tiedNode.getWire());
-    		if(tiedCounters[UNTIED] > 0) {
-    			tiedNodeExceptions.add(tiedNode);
-    			continue;
-    		}
-    		boolean tiedToGnd = tiedNode.isTiedToGnd();
-    		if(tiedCounters[TIED_TO_GND] > 0 && tiedCounters[TIED_TO_VCC] > 0) {
-    			// If the node is tied to both GND and VCC, make the less frequent the exceptional
-    			// case
-    			if(tiedToGnd == (tiedCounters[TIED_TO_GND] < tiedCounters[TIED_TO_VCC])) {
-        			tiedNodeExceptions.add(tiedNode);
-        			continue;    				
-    			}
-    		}
-    		if(tiedToGnd) {
-    			Set<Integer> gndWires = gndTiedNodes.get(tileType);
-    			if(gndWires == null) {
-    				gndWires = new HashSet<>();
-    				gndTiedNodes.put(tileType, gndWires);
-    			}
-    			gndWires.add(tiedNode.getWire());
-    		}else {
-    			Set<Integer> vccWires = vccTiedNodes.get(tileType);
-    			if(vccWires == null) {
-    				vccWires = new HashSet<>();
-    				vccTiedNodes.put(tileType, vccWires);
-    			}
-    			vccWires.add(tiedNode.getWire());
-    		}
-    	}
-    	
-		int i = 0;
-		StructList.Builder<NodeConstantSource.Builder> nodeSourcesObj = 
-				builder.initNodeSources(tiedNodeExceptions.size());
-		for(Node tiedNodeException : tiedNodeExceptions) {
-		    NodeConstantSource.Builder nodeSourceObj = nodeSourcesObj.get(i);
-		    nodeSourceObj.setTile(allStrings.getIndex(tiedNodeException.getTile().getName()));
-		    nodeSourceObj.setWire(allStrings.getIndex(tiedNodeException.getWireName()));
-		    nodeSourceObj.setConstant(ConstantType.valueOf(tiedNodeException.isTiedToGnd() ? "GND" : "VCC"));
-		    i++;
-		}
-		
-		for(Entry<TileTypeEnum,Map<Integer, int[]>> e : tileTiedWires.entrySet()) {
-			TileType.Builder tileType = tileTypes.get(e.getKey());
-			Set<Integer> gndWireIdxs = gndTiedNodes.get(e.getKey());
-			Set<Integer> vccWireIdxs = vccTiedNodes.get(e.getKey());
-			
-			int staticSourceCount = 0; 
-			staticSourceCount += gndWireIdxs != null ? 1 : 0;
-			staticSourceCount += vccWireIdxs != null ? 1 : 0;
-			StructList.Builder<WireConstantSources.Builder> wireConstants = tileType.initConstants(staticSourceCount);
-			
-			int idx = 0;
-			if(gndWireIdxs != null) {
-				WireConstantSources.Builder gndWires = wireConstants.get(idx++);
-				gndWires.setConstant(ConstantType.GND);
-				PrimitiveList.Int.Builder wiresObj = gndWires.initWires(gndWireIdxs.size());
-				int j=0;
-				for(Integer wireIdx : gndWireIdxs) {
-					wiresObj.set(j, wireIdx);
-					j++;
-				}
-			}
-			if(vccWireIdxs != null) {
-				WireConstantSources.Builder vccWires = wireConstants.get(idx++);
-				vccWires.setConstant(ConstantType.VCC);
-				PrimitiveList.Int.Builder wiresObj = vccWires.initWires(vccWireIdxs.size());
-				int j=0;
-				for(Integer wireIdx : vccWireIdxs) {
-					wiresObj.set(j, wireIdx);
-					j++;
-				}
-			}
-		}
+        for(Node tiedNode : allTiedNodes) {
+            TileTypeEnum tileType = tiedNode.getTile().getTileTypeEnum();
+            Map<Integer, int[]> wireMap = tileTiedWires.get(tileType);
+            int[] tiedCounters = wireMap.get(tiedNode.getWire());
+            if(tiedCounters[UNTIED] > 0) {
+                tiedNodeExceptions.add(tiedNode);
+                continue;
+            }
+            boolean tiedToGnd = tiedNode.isTiedToGnd();
+            if(tiedCounters[TIED_TO_GND] > 0 && tiedCounters[TIED_TO_VCC] > 0) {
+                // If the node is tied to both GND and VCC, make the less frequent the exceptional
+                // case
+                if(tiedToGnd == (tiedCounters[TIED_TO_GND] < tiedCounters[TIED_TO_VCC])) {
+                    tiedNodeExceptions.add(tiedNode);
+                    continue;                    
+                }
+            }
+            if(tiedToGnd) {
+                Set<Integer> gndWires = gndTiedNodes.get(tileType);
+                if(gndWires == null) {
+                    gndWires = new HashSet<>();
+                    gndTiedNodes.put(tileType, gndWires);
+                }
+                gndWires.add(tiedNode.getWire());
+            }else {
+                Set<Integer> vccWires = vccTiedNodes.get(tileType);
+                if(vccWires == null) {
+                    vccWires = new HashSet<>();
+                    vccTiedNodes.put(tileType, vccWires);
+                }
+                vccWires.add(tiedNode.getWire());
+            }
+        }
+        
+        int i = 0;
+        StructList.Builder<NodeConstantSource.Builder> nodeSourcesObj = 
+                builder.initNodeSources(tiedNodeExceptions.size());
+        for(Node tiedNodeException : tiedNodeExceptions) {
+            NodeConstantSource.Builder nodeSourceObj = nodeSourcesObj.get(i);
+            nodeSourceObj.setTile(allStrings.getIndex(tiedNodeException.getTile().getName()));
+            nodeSourceObj.setWire(allStrings.getIndex(tiedNodeException.getWireName()));
+            nodeSourceObj.setConstant(ConstantType.valueOf(tiedNodeException.isTiedToGnd() ? "GND" : "VCC"));
+            i++;
+        }
+        
+        for(Entry<TileTypeEnum,Map<Integer, int[]>> e : tileTiedWires.entrySet()) {
+            TileType.Builder tileType = tileTypes.get(e.getKey());
+            Set<Integer> gndWireIdxs = gndTiedNodes.get(e.getKey());
+            Set<Integer> vccWireIdxs = vccTiedNodes.get(e.getKey());
+            
+            int staticSourceCount = 0; 
+            staticSourceCount += gndWireIdxs != null ? 1 : 0;
+            staticSourceCount += vccWireIdxs != null ? 1 : 0;
+            StructList.Builder<WireConstantSources.Builder> wireConstants = tileType.initConstants(staticSourceCount);
+            
+            int idx = 0;
+            if(gndWireIdxs != null) {
+                WireConstantSources.Builder gndWires = wireConstants.get(idx++);
+                gndWires.setConstant(ConstantType.GND);
+                PrimitiveList.Int.Builder wiresObj = gndWires.initWires(gndWireIdxs.size());
+                int j=0;
+                for(Integer wireIdx : gndWireIdxs) {
+                    wiresObj.set(j, wireIdx);
+                    j++;
+                }
+            }
+            if(vccWireIdxs != null) {
+                WireConstantSources.Builder vccWires = wireConstants.get(idx++);
+                vccWires.setConstant(ConstantType.VCC);
+                PrimitiveList.Int.Builder wiresObj = vccWires.initWires(vccWireIdxs.size());
+                int j=0;
+                for(Integer wireIdx : vccWireIdxs) {
+                    wiresObj.set(j, wireIdx);
+                    j++;
+                }
+            }
+        }
     }
 
     private static void writeTiedBels(Enumerator<String> allStrings, Device device, Constants.Builder builder, Design design, Map<SiteTypeEnum,Site> siteTypes) {

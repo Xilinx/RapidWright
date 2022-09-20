@@ -1,6 +1,7 @@
 /*
  * 
- * Copyright (c) 2020 Xilinx, Inc. 
+ * Copyright (c) 2020-2022, Xilinx, Inc. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -28,80 +29,80 @@ package com.xilinx.rapidwright.design;
  */
 public class VivadoProp {
 
-	private VivadoPropType type;
-	
-	private String value;
+    private VivadoPropType type;
+    
+    private String value;
 
-	public VivadoProp(String type, String value) {
-		this.type = VivadoPropType.valueOf(type.toUpperCase());
-		this.value = value;
-	}
-	
-	public VivadoProp(VivadoPropType type, String value) {
-		this.type = type;
-		this.value = value;
-	}
+    public VivadoProp(String type, String value) {
+        this.type = VivadoPropType.valueOf(type.toUpperCase());
+        this.value = value;
+    }
+    
+    public VivadoProp(VivadoPropType type, String value) {
+        this.type = type;
+        this.value = value;
+    }
 
-	/**
-	 * @return the type
-	 */
-	public VivadoPropType getType() {
-		return type;
-	}
+    /**
+     * @return the type
+     */
+    public VivadoPropType getType() {
+        return type;
+    }
 
-	/**
-	 * @param type the type to set
-	 */
-	public void setType(VivadoPropType type) {
-		this.type = type;
-	}
+    /**
+     * @param type the type to set
+     */
+    public void setType(VivadoPropType type) {
+        this.type = type;
+    }
 
-	/**
-	 * @return the value
-	 */
-	public String getValue() {
-		return value;
-	}
+    /**
+     * @return the value
+     */
+    public String getValue() {
+        return value;
+    }
 
-	/**
-	 * @param value the value to set
-	 */
-	public void setValue(String value) {
-		this.value = value;
-	}
+    /**
+     * @param value the value to set
+     */
+    public void setValue(String value) {
+        this.value = value;
+    }
 
-	@Override
-	public String toString() {
-		return value + "("+ type+ ")";
-	}
+    @Override
+    public String toString() {
+        return value + "("+ type+ ")";
+    }
 
-	@Override
-	public int hashCode() {
-		final int prime = 31;
-		int result = 1;
-		result = prime * result + ((type == null) ? 0 : type.hashCode());
-		result = prime * result + ((value == null) ? 0 : value.hashCode());
-		return result;
-	}
+    @Override
+    public int hashCode() {
+        final int prime = 31;
+        int result = 1;
+        result = prime * result + ((type == null) ? 0 : type.hashCode());
+        result = prime * result + ((value == null) ? 0 : value.hashCode());
+        return result;
+    }
 
-	@Override
-	public boolean equals(Object obj) {
-		if (this == obj)
-			return true;
-		if (obj == null)
-			return false;
-		if (getClass() != obj.getClass())
-			return false;
-		VivadoProp other = (VivadoProp) obj;
-		if (type != other.type)
-			return false;
-		if (value == null) {
-			if (other.value != null)
-				return false;
-		} else if (!value.equals(other.value))
-			return false;
-		return true;
-	}
-	
-	
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj)
+            return true;
+        if (obj == null)
+            return false;
+        if (getClass() != obj.getClass())
+            return false;
+        VivadoProp other = (VivadoProp) obj;
+        if (type != other.type)
+            return false;
+        if (value == null) {
+            if (other.value != null)
+                return false;
+        } else if (!value.equals(other.value))
+            return false;
+        return true;
+    }
+    
+    
 }

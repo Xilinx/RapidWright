@@ -1,5 +1,6 @@
 /* 
- * Copyright (c) 2017 Xilinx, Inc. 
+ * Copyright (c) 2017-2022, Xilinx, Inc. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -32,11 +33,11 @@ import com.trolltech.qt.gui.QPolygonF;
  * Created on: Sep 16, 2015
  */
 public class ValidPlacementPolygon extends QGraphicsPolygonItem {
-	
-	private QPointF anchorOffset;
+    
+    private QPointF anchorOffset;
 
-	public ValidPlacementPolygon(QPolygonF polygon, QPointF anchorOffset){
-		setPolygon(polygon);
-		this.anchorOffset = anchorOffset;
-	}
+    public ValidPlacementPolygon(QPolygonF polygon, QPointF anchorOffset){
+        setPolygon(polygon);
+        this.anchorOffset = anchorOffset;
+    }
 }

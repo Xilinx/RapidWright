@@ -1,6 +1,7 @@
 /*
  * 
- * Copyright (c) 2017 Xilinx, Inc. 
+ * Copyright (c) 2017-2022, Xilinx, Inc. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -37,24 +38,24 @@ import java.util.List;
  */
 public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
 
-	private EDIFCell parentCell;
-	
-	private EDIFDirection direction;
-	
-	private int width = 1;
+    private EDIFCell parentCell;
+    
+    private EDIFDirection direction;
+    
+    private int width = 1;
 
-	private boolean isLittleEndian = true;
-	
-	private String busName;
-	
-	public EDIFPort(String name, EDIFDirection direction, int width){
-		super(name);
-		setDirection(direction);
-		setWidth(width);
-		setIsLittleEndian();
-	}
-	
-	/**
+    private boolean isLittleEndian = true;
+    
+    private String busName;
+    
+    public EDIFPort(String name, EDIFDirection direction, int width){
+        super(name);
+        setDirection(direction);
+        setWidth(width);
+        setIsLittleEndian();
+    }
+    
+    /**
      * Copy Constructor
      * @param port
      */
@@ -65,221 +66,221 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
         this.isLittleEndian = port.isLittleEndian;
         this.busName = port.busName;
     }
-	
-	protected EDIFPort(){
-		
-	}
-	
-	/**
-	 * @return the direction
-	 */
-	public EDIFDirection getDirection() {
-		return direction;
-	}
+    
+    protected EDIFPort(){
+        
+    }
+    
+    /**
+     * @return the direction
+     */
+    public EDIFDirection getDirection() {
+        return direction;
+    }
 
-	/**
-	 * If this port is a bus, it describes the endian-ness of
-	 * how the bits in the bus vector are arranged.  If the bus is
-	 * little endian, LSB (least significant bit) is the rightmost bit 
-	 * (bus[7:0]).  If the bus is not little endian (big endian), LSB is the
-	 * left most bit (bus[0:7]).
-	 * @return True if this bus is little endian, false otherwise. Not 
-	 * applicable for single bit ports.   
-	 */
-	public boolean isLittleEndian(){
-		return isLittleEndian;
-	}
-	
-	protected void setIsLittleEndian(){
-		if(width == 1) return;
-		String name = getName();
-		if(name.charAt(name.length()-1) != ']' || !Character.isDigit(name.charAt(name.length()-2))){
-			throw new RuntimeException("ERROR: Port " + getName() + " does not have proper bus suffix");
-		}
-		int colonIdx = -1;
-		int leftBracket = -1;
-		for(int i=name.length()-3; i >= 0; i--){
-			char c = name.charAt(i);
-			if(c == ':') colonIdx = i;
-			else if(c == '[') {
-				leftBracket = i;
-				break;
-			}
-		}
-		if(colonIdx == -1 || leftBracket == -1){
-			throw new RuntimeException("ERROR: Interpreting port " + getName() + ", couldn't identify indicies.");
-		}
-		
-		int left = Integer.parseInt(name.substring(leftBracket+1, colonIdx));
-		int right = Integer.parseInt(name.substring(colonIdx+1, name.length()-1));
-		isLittleEndian = left > right;
-	}
-	
-	public boolean isOutput(){
-		return direction == EDIFDirection.OUTPUT;
-	}
-	
-	public boolean isInput(){
-		return direction == EDIFDirection.INPUT;
-	}
-	
-	/**
-	 * @param direction the direction to set
-	 */
-	public void setDirection(EDIFDirection direction) {
-		this.direction = direction;
-	}
+    /**
+     * If this port is a bus, it describes the endian-ness of
+     * how the bits in the bus vector are arranged.  If the bus is
+     * little endian, LSB (least significant bit) is the rightmost bit 
+     * (bus[7:0]).  If the bus is not little endian (big endian), LSB is the
+     * left most bit (bus[0:7]).
+     * @return True if this bus is little endian, false otherwise. Not 
+     * applicable for single bit ports.   
+     */
+    public boolean isLittleEndian(){
+        return isLittleEndian;
+    }
+    
+    protected void setIsLittleEndian(){
+        if(width == 1) return;
+        String name = getName();
+        if(name.charAt(name.length()-1) != ']' || !Character.isDigit(name.charAt(name.length()-2))){
+            throw new RuntimeException("ERROR: Port " + getName() + " does not have proper bus suffix");
+        }
+        int colonIdx = -1;
+        int leftBracket = -1;
+        for(int i=name.length()-3; i >= 0; i--){
+            char c = name.charAt(i);
+            if(c == ':') colonIdx = i;
+            else if(c == '[') {
+                leftBracket = i;
+                break;
+            }
+        }
+        if(colonIdx == -1 || leftBracket == -1){
+            throw new RuntimeException("ERROR: Interpreting port " + getName() + ", couldn't identify indicies.");
+        }
+        
+        int left = Integer.parseInt(name.substring(leftBracket+1, colonIdx));
+        int right = Integer.parseInt(name.substring(colonIdx+1, name.length()-1));
+        isLittleEndian = left > right;
+    }
+    
+    public boolean isOutput(){
+        return direction == EDIFDirection.OUTPUT;
+    }
+    
+    public boolean isInput(){
+        return direction == EDIFDirection.INPUT;
+    }
+    
+    /**
+     * @param direction the direction to set
+     */
+    public void setDirection(EDIFDirection direction) {
+        this.direction = direction;
+    }
 
-	/**
-	 * @return the width
-	 */
-	public int getWidth() {
-		return width;
-	}
-	
-	/**
-	 * @param width the width to set
-	 */
-	public void setWidth(int width) {
-		this.width = width;
-	}
-	
-	public String getBusName(){
-		if(busName == null){
-			int idx = EDIFTools.lengthOfNameWithoutBus(getName().toCharArray());
-			busName = getName().substring(0, idx);						
-		}
-		return busName;
-	}
-	
-	public String getStemName(){
-		int leftBracket = getName().indexOf('[');
-		return leftBracket == -1 ? getName() : getName().substring(0, leftBracket); 
-	}
-	
-	public Integer getLeft(){
-		if(!isBus()) return null;
-		int leftBracket = getName().lastIndexOf('[');
-		int colon = getName().lastIndexOf(':');
-		int value = Integer.parseInt(getName().substring(leftBracket+1,colon)); 
-		return value;
-	}
-	
+    /**
+     * @return the width
+     */
+    public int getWidth() {
+        return width;
+    }
+    
+    /**
+     * @param width the width to set
+     */
+    public void setWidth(int width) {
+        this.width = width;
+    }
+    
+    public String getBusName(){
+        if(busName == null){
+            int idx = EDIFTools.lengthOfNameWithoutBus(getName().toCharArray());
+            busName = getName().substring(0, idx);                        
+        }
+        return busName;
+    }
+    
+    public String getStemName(){
+        int leftBracket = getName().indexOf('[');
+        return leftBracket == -1 ? getName() : getName().substring(0, leftBracket); 
+    }
+    
+    public Integer getLeft(){
+        if(!isBus()) return null;
+        int leftBracket = getName().lastIndexOf('[');
+        int colon = getName().lastIndexOf(':');
+        int value = Integer.parseInt(getName().substring(leftBracket+1,colon)); 
+        return value;
+    }
+    
 
-	public Integer getRight(){
-		if(!isBus()) return null;
-		int rightBracket = getName().lastIndexOf(']');
-		int colon = getName().lastIndexOf(':');
-		int value = Integer.parseInt(getName().substring(colon+1, rightBracket)); 
-		return value;
-	}
-	
-	/**
-	 * Gets the list of internal nets connected to this port, indexed in the same way as the port.
-	 * A single bit port will only have one entry in the list, for example. 
-	 * @return The list of internal nets connected to this port.  If one or more bits is not 
-	 * connected (such as in a primitive cell), a null entry will be present at the corresponding 
-	 * index.
-	 */
-	public List<EDIFNet> getInternalNets(){
-	    List<EDIFNet> nets = new ArrayList<>(width);
-	    for(int i=0; i < width; i++) {
-	        nets.add(getInternalNet(i));
-	    }
-	    return nets;
-	}
-	
-	/**
-	 * Gets the internal net connected to this port at specified index of the port,
-	 * connected to the inside of the cell.  
-	 * @param index Index of port (0 if it is a single bit) 
-	 * @return The internal net connect to this port or null if not connect (such as a primitive).
-	 */
-	public EDIFNet getInternalNet(int index) {
-	    return parentCell.getInternalNet(getPortInstNameFromPort(index));
-	}
-	
-	/**
-	 * If the port is only one bit wide or the user only needs the 0th indexed net, this is
-	 * a convenience method to getting the internal net (inside the cell) connected to this port.  
-	 * @return The internal net connected to this port (single bit or 0th index only), 
-	 * or null if not connected (such as a primitive).
-	 */
-	public EDIFNet getInternalNet() {
-	    return getInternalNet(0);
-	}
-	
-	/**
-	 * Gets the PortInst name from this port and the specified index
-	 * @param index The index to get from the port 
-	 * @return The name of the PortInst for the specified index
-	 */
-	public String getPortInstNameFromPort(int index) {
-	    if(!isBus()) return getBusName();
-	    if(isLittleEndian()){
-	        index = (getWidth()-1) - index;
-	    }
-	    return getBusName() + "[" + index + "]";     
-	}
+    public Integer getRight(){
+        if(!isBus()) return null;
+        int rightBracket = getName().lastIndexOf(']');
+        int colon = getName().lastIndexOf(':');
+        int value = Integer.parseInt(getName().substring(colon+1, rightBracket)); 
+        return value;
+    }
+    
+    /**
+     * Gets the list of internal nets connected to this port, indexed in the same way as the port.
+     * A single bit port will only have one entry in the list, for example. 
+     * @return The list of internal nets connected to this port.  If one or more bits is not 
+     * connected (such as in a primitive cell), a null entry will be present at the corresponding 
+     * index.
+     */
+    public List<EDIFNet> getInternalNets(){
+        List<EDIFNet> nets = new ArrayList<>(width);
+        for(int i=0; i < width; i++) {
+            nets.add(getInternalNet(i));
+        }
+        return nets;
+    }
+    
+    /**
+     * Gets the internal net connected to this port at specified index of the port,
+     * connected to the inside of the cell.  
+     * @param index Index of port (0 if it is a single bit) 
+     * @return The internal net connect to this port or null if not connect (such as a primitive).
+     */
+    public EDIFNet getInternalNet(int index) {
+        return parentCell.getInternalNet(getPortInstNameFromPort(index));
+    }
+    
+    /**
+     * If the port is only one bit wide or the user only needs the 0th indexed net, this is
+     * a convenience method to getting the internal net (inside the cell) connected to this port.  
+     * @return The internal net connected to this port (single bit or 0th index only), 
+     * or null if not connected (such as a primitive).
+     */
+    public EDIFNet getInternalNet() {
+        return getInternalNet(0);
+    }
+    
+    /**
+     * Gets the PortInst name from this port and the specified index
+     * @param index The index to get from the port 
+     * @return The name of the PortInst for the specified index
+     */
+    public String getPortInstNameFromPort(int index) {
+        if(!isBus()) return getBusName();
+        if(isLittleEndian()){
+            index = (getWidth()-1) - index;
+        }
+        return getBusName() + "[" + index + "]";     
+    }
 
-	public static final byte[] EXPORT_CONST_PORT_BEGIN = "(port ".getBytes(StandardCharsets.UTF_8);
-	public static final byte[] EXPORT_CONST_ARRAY_BEGIN = "(array ".getBytes(StandardCharsets.UTF_8);
-	public static final byte[] EXPORT_CONST_DIRECTION_START = " (direction ".getBytes(StandardCharsets.UTF_8);
-	public static final byte[] EXPORT_CONST_INDENT = "        ".getBytes(StandardCharsets.UTF_8);
-	public static final byte[] EXPORT_CONST_CHILD_INDENT = "           ".getBytes(StandardCharsets.UTF_8);
+    public static final byte[] EXPORT_CONST_PORT_BEGIN = "(port ".getBytes(StandardCharsets.UTF_8);
+    public static final byte[] EXPORT_CONST_ARRAY_BEGIN = "(array ".getBytes(StandardCharsets.UTF_8);
+    public static final byte[] EXPORT_CONST_DIRECTION_START = " (direction ".getBytes(StandardCharsets.UTF_8);
+    public static final byte[] EXPORT_CONST_INDENT = "        ".getBytes(StandardCharsets.UTF_8);
+    public static final byte[] EXPORT_CONST_CHILD_INDENT = "           ".getBytes(StandardCharsets.UTF_8);
 
-	public void exportEDIF(OutputStream os, EDIFWriteLegalNameCache<?> cache, boolean stable) throws IOException{
-		os.write(EXPORT_CONST_INDENT);
-		os.write(EXPORT_CONST_PORT_BEGIN);
-		if(width > 1) os.write(EXPORT_CONST_ARRAY_BEGIN);
-		exportEDIFName(os, cache);
-		if(width > 1) {
-			os.write(' ');
-			os.write(Integer.toString(width).getBytes(StandardCharsets.UTF_8));
-			os.write(')');
-		}
-		os.write(EXPORT_CONST_DIRECTION_START);
-		os.write(direction.toByteArray());
-		os.write(')');
-		if(getPropertiesMap().size() > 0){
-			os.write('\n');
-			exportEDIFProperties(os, EXPORT_CONST_CHILD_INDENT, cache, stable);
-			os.write(EXPORT_CONST_INDENT);
-		}
-		os.write(')');
-		os.write('\n');
-	}
+    public void exportEDIF(OutputStream os, EDIFWriteLegalNameCache<?> cache, boolean stable) throws IOException{
+        os.write(EXPORT_CONST_INDENT);
+        os.write(EXPORT_CONST_PORT_BEGIN);
+        if(width > 1) os.write(EXPORT_CONST_ARRAY_BEGIN);
+        exportEDIFName(os, cache);
+        if(width > 1) {
+            os.write(' ');
+            os.write(Integer.toString(width).getBytes(StandardCharsets.UTF_8));
+            os.write(')');
+        }
+        os.write(EXPORT_CONST_DIRECTION_START);
+        os.write(direction.toByteArray());
+        os.write(')');
+        if(getPropertiesMap().size() > 0){
+            os.write('\n');
+            exportEDIFProperties(os, EXPORT_CONST_CHILD_INDENT, cache, stable);
+            os.write(EXPORT_CONST_INDENT);
+        }
+        os.write(')');
+        os.write('\n');
+    }
 
-	/**
-	 * @return the parentCell
-	 */
-	public EDIFCell getParentCell() {
-		return parentCell;
-	}
+    /**
+     * @return the parentCell
+     */
+    public EDIFCell getParentCell() {
+        return parentCell;
+    }
 
-	/**
-	 * @param parentCell the parentCell to set
-	 */
-	public void setParentCell(EDIFCell parentCell) {
-		this.parentCell = parentCell;
-		parentCell.trackChange(EDIFChangeType.PORT_ADD, getName());
-	}
+    /**
+     * @param parentCell the parentCell to set
+     */
+    public void setParentCell(EDIFCell parentCell) {
+        this.parentCell = parentCell;
+        parentCell.trackChange(EDIFChangeType.PORT_ADD, getName());
+    }
 
-	/**
-	 * @return
-	 */
-	public boolean isBus() {
+    /**
+     * @return
+     */
+    public boolean isBus() {
         return width > 1 || !getName().equals(getBusName());
-	}
-	
-	public int[] getBitBlastedIndicies(){
-		int lastLeftBracket = getName().lastIndexOf('[');
-		if(getName().contains(":")) 
-			return EDIFTools.bitBlastBus(getName().substring(lastLeftBracket));
-		if(getName().contains("["))
-			return new int[] {Integer.parseInt(getName().substring(lastLeftBracket,getName().length()-1))};
-		return null;
-	}
+    }
+    
+    public int[] getBitBlastedIndicies(){
+        int lastLeftBracket = getName().lastIndexOf('[');
+        if(getName().contains(":")) 
+            return EDIFTools.bitBlastBus(getName().substring(lastLeftBracket));
+        if(getName().contains("["))
+            return new int[] {Integer.parseInt(getName().substring(lastLeftBracket,getName().length()-1))};
+        return null;
+    }
 
     @Override
     public String getUniqueKey() {

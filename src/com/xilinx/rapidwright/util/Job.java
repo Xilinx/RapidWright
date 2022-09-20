@@ -1,6 +1,7 @@
 /*
  * 
- * Copyright (c) 2018 Xilinx, Inc. 
+ * Copyright (c) 2018-2022, Xilinx, Inc. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -40,122 +41,122 @@ import java.util.stream.IntStream;
  */
 public abstract class Job {
 
-	private String command;
-	
-	private String runDir;
-	
-	private long jobNumber;
+    private String command;
+    
+    private String runDir;
+    
+    private long jobNumber;
 
-	public static final String DEFAULT_SCRIPT_NAME = "run";
-	
-	public static final String DEFAULT_COMMAND_NAME = "cmd";
-	
-	public static final String DEFAULT_LOG_EXTENSION = ".log";
+    public static final String DEFAULT_SCRIPT_NAME = "run";
+    
+    public static final String DEFAULT_COMMAND_NAME = "cmd";
+    
+    public static final String DEFAULT_LOG_EXTENSION = ".log";
 
-	public static final String DEFAULT_SCRIPT_LOG_FILE = DEFAULT_SCRIPT_NAME + DEFAULT_LOG_EXTENSION;
-	
-	public static final String DEFAULT_COMMAND_LOG_FILE = DEFAULT_COMMAND_NAME + DEFAULT_LOG_EXTENSION;
-	
-	public abstract long launchJob();
+    public static final String DEFAULT_SCRIPT_LOG_FILE = DEFAULT_SCRIPT_NAME + DEFAULT_LOG_EXTENSION;
+    
+    public static final String DEFAULT_COMMAND_LOG_FILE = DEFAULT_COMMAND_NAME + DEFAULT_LOG_EXTENSION;
+    
+    public abstract long launchJob();
 
-	public abstract JobState getJobState();
-	
-	public final boolean isFinished() {
-		return getJobState() == JobState.EXITED;
-	}
+    public abstract JobState getJobState();
+    
+    public final boolean isFinished() {
+        return getJobState() == JobState.EXITED;
+    }
 
-	public abstract boolean jobWasSuccessful();
-	
-	public abstract void killJob();
-	
-	
-	public Pair<String,String> createLaunchScript(){
-		List<String> startupScript = new ArrayList<>();
-		
-		String scriptExt = FileTools.isWindows() ? ".bat" : ".sh";
-		String dir = getRunDir()==null? System.getProperty("user.dir") : getRunDir();
-		FileTools.makeDirs(dir);
-		
-		startupScript.add("cd " + dir);
-		startupScript.add(getCommand() + " > " + DEFAULT_COMMAND_LOG_FILE + " 2>&1");
+    public abstract boolean jobWasSuccessful();
+    
+    public abstract void killJob();
+    
+    
+    public Pair<String,String> createLaunchScript(){
+        List<String> startupScript = new ArrayList<>();
+        
+        String scriptExt = FileTools.isWindows() ? ".bat" : ".sh";
+        String dir = getRunDir()==null? System.getProperty("user.dir") : getRunDir();
+        FileTools.makeDirs(dir);
+        
+        startupScript.add("cd " + dir);
+        startupScript.add(getCommand() + " > " + DEFAULT_COMMAND_LOG_FILE + " 2>&1");
 
-		String startupScriptName = dir + File.separator + DEFAULT_SCRIPT_NAME + scriptExt;
-		FileTools.writeLinesToTextFile(startupScript, startupScriptName);
-		new File(startupScriptName).setExecutable(true);
-		String startupScriptLog = dir + File.separator + DEFAULT_SCRIPT_LOG_FILE;
-		return new Pair<String,String>(startupScriptName,startupScriptLog);
-	}
-	/**
-	 * @return the command
-	 */
-	public String getCommand() {
-		return command;
-	}
+        String startupScriptName = dir + File.separator + DEFAULT_SCRIPT_NAME + scriptExt;
+        FileTools.writeLinesToTextFile(startupScript, startupScriptName);
+        new File(startupScriptName).setExecutable(true);
+        String startupScriptLog = dir + File.separator + DEFAULT_SCRIPT_LOG_FILE;
+        return new Pair<String,String>(startupScriptName,startupScriptLog);
+    }
+    /**
+     * @return the command
+     */
+    public String getCommand() {
+        return command;
+    }
 
 
 
-	/**
-	 * @param command the command to set
-	 */
-	public void setCommand(String command) {
-		this.command = command;
-	}
+    /**
+     * @param command the command to set
+     */
+    public void setCommand(String command) {
+        this.command = command;
+    }
 
-	/**
-	 * Set the command to run a RapidWright main class
-	 * @param mainClass the main class to use
-	 * @param memoryLimitMB maximum memory in MB
-	 * @param arguments command arguments as single string
-	 */
-	public void setRapidWrightCommand(Class<?> mainClass, int memoryLimitMB, String arguments) {
-		command = System.getProperty("java.home")+"/bin/java -cp "
-				+ System.getProperty("java.class.path") + " -Xmx"+memoryLimitMB+"m "
-				+ mainClass.getCanonicalName()+" "+arguments;
-	}
+    /**
+     * Set the command to run a RapidWright main class
+     * @param mainClass the main class to use
+     * @param memoryLimitMB maximum memory in MB
+     * @param arguments command arguments as single string
+     */
+    public void setRapidWrightCommand(Class<?> mainClass, int memoryLimitMB, String arguments) {
+        command = System.getProperty("java.home")+"/bin/java -cp "
+                + System.getProperty("java.class.path") + " -Xmx"+memoryLimitMB+"m "
+                + mainClass.getCanonicalName()+" "+arguments;
+    }
 
-	/**
-	 * @return the jobNumber
-	 */
-	public long getJobNumber() {
-		return jobNumber;
-	}
+    /**
+     * @return the jobNumber
+     */
+    public long getJobNumber() {
+        return jobNumber;
+    }
 
-	/**
-	 * @param jobNumber the jobNumber to set
-	 */
-	public void setJobNumber(long jobNumber) {
-		this.jobNumber = jobNumber;
-	}
+    /**
+     * @param jobNumber the jobNumber to set
+     */
+    public void setJobNumber(long jobNumber) {
+        this.jobNumber = jobNumber;
+    }
 
-	/**
-	 * @return the runDir
-	 */
-	public String getRunDir() {
-		return runDir;
-	}
+    /**
+     * @return the runDir
+     */
+    public String getRunDir() {
+        return runDir;
+    }
 
-	/**
-	 * @param runDir the runDir to set
-	 */
-	public void setRunDir(String runDir) {
-		this.runDir = runDir;
-	}
-	
-	public String toString(){
-		return Long.toString(jobNumber);
-	}
+    /**
+     * @param runDir the runDir to set
+     */
+    public void setRunDir(String runDir) {
+        this.runDir = runDir;
+    }
+    
+    public String toString(){
+        return Long.toString(jobNumber);
+    }
 
-	public Optional<List<String>> getLastLogLines() {
-		String logFileName = getLogFilename();
-		if(new File(logFileName).exists()){
-			ArrayList<String> lines = FileTools.getLinesFromTextFile(logFileName);
-			int start = lines.size() >= 8 ? lines.size()-8 : 0;
-			return Optional.of(IntStream.range(start, lines.size()).mapToObj(lines::get).collect(Collectors.toList()));
-		}
-		return Optional.empty();
-	}
+    public Optional<List<String>> getLastLogLines() {
+        String logFileName = getLogFilename();
+        if(new File(logFileName).exists()){
+            ArrayList<String> lines = FileTools.getLinesFromTextFile(logFileName);
+            int start = lines.size() >= 8 ? lines.size()-8 : 0;
+            return Optional.of(IntStream.range(start, lines.size()).mapToObj(lines::get).collect(Collectors.toList()));
+        }
+        return Optional.empty();
+    }
 
-	public String getLogFilename() {
-		return getRunDir() + File.separator + Job.DEFAULT_COMMAND_LOG_FILE;
-	}
+    public String getLogFilename() {
+        return getRunDir() + File.separator + Job.DEFAULT_COMMAND_LOG_FILE;
+    }
 }

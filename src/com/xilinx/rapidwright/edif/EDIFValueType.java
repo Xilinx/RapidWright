@@ -1,6 +1,7 @@
 /*
  * 
- * Copyright (c) 2017 Xilinx, Inc. 
+ * Copyright (c) 2017-2022, Xilinx, Inc. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -31,14 +32,14 @@ package com.xilinx.rapidwright.edif;
  * Created on: Jun 1, 2017
  */
 public enum EDIFValueType {
-	STRING,
-	INTEGER,
-	BOOLEAN;
-	
-	public static final EDIFValueType[] values = values();
-	
-	@Override
-	public String toString(){
-		return this.name().toLowerCase();
-	}
+    STRING,
+    INTEGER,
+    BOOLEAN;
+    
+    public static final EDIFValueType[] values = values();
+    
+    @Override
+    public String toString(){
+        return this.name().toLowerCase();
+    }
 }

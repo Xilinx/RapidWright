@@ -1,6 +1,7 @@
 /*
  * 
- * Copyright (c) 2018 Xilinx, Inc. 
+ * Copyright (c) 2018-2022, Xilinx, Inc. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -28,33 +29,33 @@ package com.xilinx.rapidwright.design.tools;
  * @author clavin
  */
 class LUTEquationEvaluator {
-	
-	public static final char XOR = '^';
-	public static final char XOR2 = '@';
-	public static final char AND = '&';
-	public static final char AND2 = '*';
-	public static final char AND3 = '.';
-	public static final char OR = '+';
-	public static final char OR2 = '|';
-	public static final char NOT = '~';
-	public static final char NOT2 = '!';
-	
-	private int pos = -1;
-	
-	private char ch;
-	
-	private String equation;
-	
-	private int row;
+    
+    public static final char XOR = '^';
+    public static final char XOR2 = '@';
+    public static final char AND = '&';
+    public static final char AND2 = '*';
+    public static final char AND3 = '.';
+    public static final char OR = '+';
+    public static final char OR2 = '|';
+    public static final char NOT = '~';
+    public static final char NOT2 = '!';
+    
+    private int pos = -1;
+    
+    private char ch;
+    
+    private String equation;
+    
+    private int row;
 
-	public LUTEquationEvaluator(String equation){
-		this.equation = equation;
-	}
-	
-	public void setRow(int row){
-		this.row = row;
-	}
-	
+    public LUTEquationEvaluator(String equation){
+        this.equation = equation;
+    }
+    
+    public void setRow(int row){
+        this.row = row;
+    }
+    
     private void nextChar() {
         ch = (char) ((++pos < equation.length()) ? equation.charAt(pos) : -1);
     }
@@ -69,14 +70,14 @@ class LUTEquationEvaluator {
     }
     
     public boolean eval(int row) {
-    	pos = 0;
-    	setRow(row);
+        pos = 0;
+        setRow(row);
         nextChar();
         boolean x = evalOR();
         nextChar();
         if (pos < equation.length()) 
-        	throw new RuntimeException("Unexpected: '" + (char)ch + 
-        			"' in LUT equation '" + equation + "'");
+            throw new RuntimeException("Unexpected: '" + (char)ch + 
+                    "' in LUT equation '" + equation + "'");
         return x;
     }
 
@@ -92,33 +93,33 @@ class LUTEquationEvaluator {
         boolean x = evalLiteral();
         for (;;) {
             if (checkNextChar(XOR) || checkNextChar(XOR2)) 
-            	x ^= evalLiteral(); // XOR
+                x ^= evalLiteral(); // XOR
             else if (checkNextChar(AND) || checkNextChar(AND2) || checkNextChar(AND3)) 
-            	x &= evalLiteral(); // AND
+                x &= evalLiteral(); // AND
 
             else return x;
         }
     }
 
     boolean evalLiteral() {
-    	boolean invert = false;
-    	if (checkNextChar(NOT) || checkNextChar(NOT2)) invert = true;
+        boolean invert = false;
+        if (checkNextChar(NOT) || checkNextChar(NOT2)) invert = true;
         boolean x = false;
         
         if (checkNextChar('(')) { 
             x = evalOR();
             checkNextChar(')');
         } else if (ch == '0') {
-        	x = false;
+            x = false;
         } else if (ch == '1') {
-        	x = true;
+            x = true;
         } else if (ch == 'I') { 
-        	nextChar();
-        	x = LUTTools.getBit(row, ch - 48) == 0 ? false : true;
-        	nextChar();
+            nextChar();
+            x = LUTTools.getBit(row, ch - 48) == 0 ? false : true;
+            nextChar();
         } else {
             throw new RuntimeException("Unexpected: '" + (char)ch +
-            		"' in LUT equation '" + equation + "'");
+                    "' in LUT equation '" + equation + "'");
         }
 
         return invert ? !x : x;

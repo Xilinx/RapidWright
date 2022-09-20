@@ -1,6 +1,7 @@
 /*
  * 
- * Copyright (c) 2018 Xilinx, Inc. 
+ * Copyright (c) 2018-2022, Xilinx, Inc. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -31,39 +32,39 @@ package com.xilinx.rapidwright.ipi;
  */
 public class PackagePinConstraint {
 
-	private String name;
-	
-	private String ioStandard;
+    private String name;
+    
+    private String ioStandard;
 
-	/**
-	 * @return the name
-	 */
-	public String getName() {
-		return name;
-	}
+    /**
+     * @return the name
+     */
+    public String getName() {
+        return name;
+    }
 
-	/**
-	 * @param name the name to set
-	 */
-	public void setName(String name) {
-		this.name = name;
-	}
+    /**
+     * @param name the name to set
+     */
+    public void setName(String name) {
+        this.name = name;
+    }
 
-	/**
-	 * @return the ioStandard
-	 */
-	public String getIoStandard() {
-		return ioStandard;
-	}
+    /**
+     * @return the ioStandard
+     */
+    public String getIoStandard() {
+        return ioStandard;
+    }
 
-	/**
-	 * @param ioStandard the ioStandard to set
-	 */
-	public void setIOStandard(String ioStandard) {
-		this.ioStandard = ioStandard;
-	}
-	
-	public String toString(){
-		return name + ":" + ioStandard;
-	}
+    /**
+     * @param ioStandard the ioStandard to set
+     */
+    public void setIOStandard(String ioStandard) {
+        this.ioStandard = ioStandard;
+    }
+    
+    public String toString(){
+        return name + ":" + ioStandard;
+    }
 }

@@ -1,6 +1,7 @@
 /*
  *
- * Copyright (c) 2019 Xilinx, Inc.
+ * Copyright (c) 2019-2022, Xilinx, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Pongstorn Maidee, Xilinx Research Labs.
@@ -58,7 +59,7 @@ public class SmallDelayModel implements DelayModel {
     }
 
     public short getBELIndex(String belName) {
-    	return bel2IdxMap.get(belName);
+        return bel2IdxMap.get(belName);
     }
     
     /**
@@ -69,7 +70,7 @@ public class SmallDelayModel implements DelayModel {
         Short delay = null;
         Short idx = site2IdxMap.get(siteTypeName.name());
         if (idx == null) {
-        	return null;
+            return null;
 //            throw new IllegalArgumentException("SmallDelayModel: Unknown site/belName to getIntraSiteDelay."
 //                    + "  site/belName " + siteTypeName + "  frBelPin " + frBelPin + "  toBelPin " + toBelPin);
         } else {

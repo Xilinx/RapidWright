@@ -1,6 +1,7 @@
 /*
  * 
- * Copyright (c) 2018 Xilinx, Inc. 
+ * Copyright (c) 2018-2022, Xilinx, Inc. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -24,21 +25,21 @@ package com.xilinx.rapidwright.design;
 
 public class CellPin {
 
-	private Cell cell;
-	
-	private String logicalPinName;
+    private Cell cell;
+    
+    private String logicalPinName;
 
-	public CellPin(Cell cell, String physicalPinName) {
-		super();
-		this.cell = cell;
-		this.logicalPinName = physicalPinName;
-	}
+    public CellPin(Cell cell, String physicalPinName) {
+        super();
+        this.cell = cell;
+        this.logicalPinName = physicalPinName;
+    }
 
-	public Cell getCell() {
-		return cell;
-	}
+    public Cell getCell() {
+        return cell;
+    }
 
-	public String getLogicalPinName() {
-		return logicalPinName;
-	}
+    public String getLogicalPinName() {
+        return logicalPinName;
+    }
 }

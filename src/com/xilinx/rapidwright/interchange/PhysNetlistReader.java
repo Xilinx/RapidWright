@@ -1,5 +1,6 @@
 /* 
- * Copyright (c) 2020 Xilinx, Inc. 
+ * Copyright (c) 2020-2022, Xilinx, Inc. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -733,41 +734,41 @@ public class PhysNetlistReader {
      * @param design The placed design to be checked
      */
     private static void checkMacros(Design design) {
-    	EDIFNetlist netlist = design.getNetlist();
-    	List<EDIFHierCellInst> leaves = netlist.getTopCell().getAllLeafDescendants();
-    	EDIFLibrary macros = Design.getMacroPrimitives(design.getDevice().getSeries());
-    	for(EDIFHierCellInst leaf : leaves) {
-    		if(macros.containsCell(leaf.getCellType())) {
-    			EDIFCell macro = macros.getCell(leaf.getCellName());
-    			// Check that the macro children instances have the same placement status 
-    			// (all placed or none are placed)
-    			Boolean isPlaced = null;
-    			boolean inconsistentPlacement = false;
-    			String macroName = leaf.getFullHierarchicalInstName() + EDIFTools.EDIF_HIER_SEP;
-    			List<EDIFHierCellInst> macroLeaves = macro.getAllLeafDescendants();
-    			for(EDIFHierCellInst inst : macroLeaves) {
-    				String cellName = macroName + inst.getFullHierarchicalInstName();
-    				Cell cell = design.getCell(cellName);
-    				boolean isCellPlaced = !(cell == null || !cell.isPlaced());
-    				if(isPlaced == null) isPlaced = isCellPlaced;
-    				else if(isPlaced != isCellPlaced) {
-    					inconsistentPlacement = true;
-    				}
-    			}
-    			if(inconsistentPlacement) {
-					System.err.println("ERROR: Inconsistent macro placement for " + macroName 
-							+ ", please ensure all member cell instances are either "
-							+ "unplaced or fully placed: ");
-    				for(EDIFHierCellInst inst : macroLeaves) {
-    					String cellName = macroName + inst.getFullHierarchicalInstName();
-    					Cell cell = design.getCell(cellName);
-    					boolean isCellPlaced = !(cell == null || !cell.isPlaced());
-        				System.err.println("\t" + cellName + " is " + (isCellPlaced ? "placed" : "unplaced"));
-        			}
-    			}
-    			
-    		}
-    	}
-    	
+        EDIFNetlist netlist = design.getNetlist();
+        List<EDIFHierCellInst> leaves = netlist.getTopCell().getAllLeafDescendants();
+        EDIFLibrary macros = Design.getMacroPrimitives(design.getDevice().getSeries());
+        for(EDIFHierCellInst leaf : leaves) {
+            if(macros.containsCell(leaf.getCellType())) {
+                EDIFCell macro = macros.getCell(leaf.getCellName());
+                // Check that the macro children instances have the same placement status 
+                // (all placed or none are placed)
+                Boolean isPlaced = null;
+                boolean inconsistentPlacement = false;
+                String macroName = leaf.getFullHierarchicalInstName() + EDIFTools.EDIF_HIER_SEP;
+                List<EDIFHierCellInst> macroLeaves = macro.getAllLeafDescendants();
+                for(EDIFHierCellInst inst : macroLeaves) {
+                    String cellName = macroName + inst.getFullHierarchicalInstName();
+                    Cell cell = design.getCell(cellName);
+                    boolean isCellPlaced = !(cell == null || !cell.isPlaced());
+                    if(isPlaced == null) isPlaced = isCellPlaced;
+                    else if(isPlaced != isCellPlaced) {
+                        inconsistentPlacement = true;
+                    }
+                }
+                if(inconsistentPlacement) {
+                    System.err.println("ERROR: Inconsistent macro placement for " + macroName 
+                            + ", please ensure all member cell instances are either "
+                            + "unplaced or fully placed: ");
+                    for(EDIFHierCellInst inst : macroLeaves) {
+                        String cellName = macroName + inst.getFullHierarchicalInstName();
+                        Cell cell = design.getCell(cellName);
+                        boolean isCellPlaced = !(cell == null || !cell.isPlaced());
+                        System.err.println("\t" + cellName + " is " + (isCellPlaced ? "placed" : "unplaced"));
+                    }
+                }
+                
+            }
+        }
+        
     }
 }

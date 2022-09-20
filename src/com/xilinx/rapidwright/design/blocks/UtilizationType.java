@@ -1,6 +1,7 @@
 /*
  * 
- * Copyright (c) 2017 Xilinx, Inc. 
+ * Copyright (c) 2017-2022, Xilinx, Inc. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -31,35 +32,35 @@ package com.xilinx.rapidwright.design.blocks;
  * Created on: Apr 21, 2017
  */
 public enum UtilizationType {
-	CLB_LUTS("CLB LUTs"),
-	LUTS_AS_LOGIC("LUTs as Logic"),
-	LUTS_AS_MEMORY("LUTs as Memory"),
-	CLB_REGS("CLB Regs"),
-	REGS_AS_FFS("Regs as FF"),
-	REGS_AS_LATCHES("Regs as Latch"),
-	CARRY8S("CARRY8s"),
-	//F7_MUXES("F7 Muxes"),
-	//F8_MUXES("F8 Muxes"),
-	//F9_MUXES("F9 Muxes"),
-	CLBS("CLBs"),
-	CLBLS("CLBLs"),
-	CLBMS("CLBMs"),
-	//LUT_FF_PAIRS("Lut/FF Pairs"),
-	RAMB36S_FIFOS("RAMB36s/FIFOs"),
-	RAMB18S("RAMB18s"),
-	URAMS("URAMs"),
-	DSPS("DSPs");
+    CLB_LUTS("CLB LUTs"),
+    LUTS_AS_LOGIC("LUTs as Logic"),
+    LUTS_AS_MEMORY("LUTs as Memory"),
+    CLB_REGS("CLB Regs"),
+    REGS_AS_FFS("Regs as FF"),
+    REGS_AS_LATCHES("Regs as Latch"),
+    CARRY8S("CARRY8s"),
+    //F7_MUXES("F7 Muxes"),
+    //F8_MUXES("F8 Muxes"),
+    //F9_MUXES("F9 Muxes"),
+    CLBS("CLBs"),
+    CLBLS("CLBLs"),
+    CLBMS("CLBMs"),
+    //LUT_FF_PAIRS("Lut/FF Pairs"),
+    RAMB36S_FIFOS("RAMB36s/FIFOs"),
+    RAMB18S("RAMB18s"),
+    URAMS("URAMs"),
+    DSPS("DSPs");
 
-	private String name;
-	
-	public static final UtilizationType[] values = values();
-	
-	private UtilizationType(String name){
-		this.name = name;
-	}
-	
-	public String getString(){
-		return name;
-	}
+    private String name;
+    
+    public static final UtilizationType[] values = values();
+    
+    private UtilizationType(String name){
+        this.name = name;
+    }
+    
+    public String getString(){
+        return name;
+    }
 
 }

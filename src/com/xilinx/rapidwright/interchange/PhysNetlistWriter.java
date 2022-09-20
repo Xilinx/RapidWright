@@ -1,5 +1,6 @@
 /* 
- * Copyright (c) 2020 Xilinx, Inc. 
+ * Copyright (c) 2020-2022, Xilinx, Inc. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -96,10 +97,10 @@ public class PhysNetlistWriter {
     protected static String getUniqueLockedCellName(Cell cell, HashMap<String,PhysCellType> physCells) {
         String cellName = cell.getName();
         if(cellName.equals(LOCKED)) {
-        	cellName = cell.getSiteName() + "_" + cell.getBELName() + "_" + LOCKED;
-        	physCells.put(cellName,PhysCellType.LOCKED);
+            cellName = cell.getSiteName() + "_" + cell.getBELName() + "_" + LOCKED;
+            physCells.put(cellName,PhysCellType.LOCKED);
         } else if(cell.getType().equals(PORT)) {
-        	physCells.put(cellName,PhysCellType.PORT);
+            physCells.put(cellName,PhysCellType.PORT);
         }
         return cellName;
     }
@@ -117,60 +118,60 @@ public class PhysNetlistWriter {
         HashMap<String,ArrayList<Cell>> multiBelCells = new HashMap<>();
         int i=0;
         for(SiteInst siteInst : siteInsts) {
-        	if(!siteInst.isPlaced()) continue;
+            if(!siteInst.isPlaced()) continue;
             for(Cell cell : siteInst.getCells()) {
-            	allCells.add(cell);
-            	if(!cell.isPlaced()) continue;
-            	String cellName = cell.getName();
-            	if(cellName.equals(PhysNetlistWriter.LOCKED)) continue;
-            	if(!design.getCell(cellName).getBELName().equals(cell.getBELName())) {
-            		ArrayList<Cell> cells = multiBelCells.get(cellName);
-            		if(cells == null) {
-            			cells = new ArrayList<Cell>();
-            		}
-            		// Don't add multi-bel cells, store relevant info in pin placements
-            		allCells.remove(allCells.size()-1);
-            		cells.add(cell);
-            		multiBelCells.put(cellName, cells);
-            	}
+                allCells.add(cell);
+                if(!cell.isPlaced()) continue;
+                String cellName = cell.getName();
+                if(cellName.equals(PhysNetlistWriter.LOCKED)) continue;
+                if(!design.getCell(cellName).getBELName().equals(cell.getBELName())) {
+                    ArrayList<Cell> cells = multiBelCells.get(cellName);
+                    if(cells == null) {
+                        cells = new ArrayList<Cell>();
+                    }
+                    // Don't add multi-bel cells, store relevant info in pin placements
+                    allCells.remove(allCells.size()-1);
+                    cells.add(cell);
+                    multiBelCells.put(cellName, cells);
+                }
             }
         }
         
         Builder<CellPlacement.Builder> cells = physNetlist.initPlacements(allCells.size());
         for(Cell cell : allCells) {
-        	CellPlacement.Builder physCell = cells.get(i);
+            CellPlacement.Builder physCell = cells.get(i);
             String cellName = getUniqueLockedCellName(cell, physCells);
             physCell.setCellName(strings.getIndex(cellName));
             physCell.setType(strings.getIndex(cell.getType()));
             physCell.setSite(strings.getIndex(cell.getSiteName()));
             String belName = cell.getBELName();
             if(belName != null) {
-            	physCell.setBel(strings.getIndex(belName));
+                physCell.setBel(strings.getIndex(belName));
             }
             physCell.setIsBelFixed(cell.isBELFixed());
             physCell.setIsSiteFixed(cell.isSiteFixed());
             ArrayList<Cell> otherBels = multiBelCells.get(cell.getName());
             int additionalPinMappings = 0;
             if(otherBels != null) {
-            	PrimitiveList.Int.Builder others = physCell.initOtherBels(otherBels.size());
-            	int j=0;
-            	for(Cell c : otherBels) {
-            		additionalPinMappings += c.getPinMappingsP2L().size();
-            		if(c.hasAltPinMappings()) {
-            			additionalPinMappings += c.getAltPinMappings().size();
-            		}
-            		others.set(j, strings.getIndex(c.getBELName()));
-            		j++;
-            	}
+                PrimitiveList.Int.Builder others = physCell.initOtherBels(otherBels.size());
+                int j=0;
+                for(Cell c : otherBels) {
+                    additionalPinMappings += c.getPinMappingsP2L().size();
+                    if(c.hasAltPinMappings()) {
+                        additionalPinMappings += c.getAltPinMappings().size();
+                    }
+                    others.set(j, strings.getIndex(c.getBELName()));
+                    j++;
+                }
             }
             Builder<PinMapping.Builder> pinMap = physCell.initPinMap(cell.getPinMappingsP2L().size()
-            	 + additionalPinMappings);
+                 + additionalPinMappings);
             Integer idx = 0;
             idx = addCellPinMappings(cell, strings, pinMap, 0);
             if(otherBels != null) {
-	            for(Cell c : otherBels) {
-	                idx = addCellPinMappings(c, strings, pinMap, idx);
-	            }
+                for(Cell c : otherBels) {
+                    idx = addCellPinMappings(c, strings, pinMap, idx);
+                }
             }
             
             i++;
@@ -180,17 +181,17 @@ public class PhysNetlistWriter {
         Builder<PhysCell.Builder> physCellBuilders = physNetlist.initPhysCells(physCells.size());
         int j=0;
         for(Entry<String,PhysCellType> e : physCells.entrySet()) {
-        	String physCellName = e.getKey();
-        	PhysCellType type = e.getValue();
-        	PhysCell.Builder physCellBuilder = physCellBuilders.get(j);
-        	physCellBuilder.setCellName(strings.getIndex(physCellName));
-        	physCellBuilder.setPhysType(type);
-        	j++;
+            String physCellName = e.getKey();
+            PhysCellType type = e.getValue();
+            PhysCell.Builder physCellBuilder = physCellBuilders.get(j);
+            physCellBuilder.setCellName(strings.getIndex(physCellName));
+            physCellBuilder.setPhysType(type);
+            j++;
         }
     }
     
     private static int addCellPinMappings(Cell cell, Enumerator<String> strings, 
-    										Builder<PinMapping.Builder> pinMap, Integer idx) { 
+                                            Builder<PinMapping.Builder> pinMap, Integer idx) { 
         for(Entry<String,String> e : cell.getPinMappingsP2L().entrySet()) {
             PinMapping.Builder pinMapping = pinMap.get(idx);
             pinMapping.setBel(strings.getIndex(cell.getBELName()));
@@ -200,8 +201,8 @@ public class PhysNetlistWriter {
             idx++;
         } 
         if(cell.hasAltPinMappings()) {
-        	for(Entry<String,AltPinMapping> e : cell.getAltPinMappings().entrySet()) {
-        		PinMapping.Builder pinMapping = pinMap.get(idx);
+            for(Entry<String,AltPinMapping> e : cell.getAltPinMappings().entrySet()) {
+                PinMapping.Builder pinMapping = pinMap.get(idx);
                 pinMapping.setBel(strings.getIndex(cell.getBELName()));
                 pinMapping.setCellPin(strings.getIndex(e.getValue().getLogicalName()));
                 pinMapping.setBelPin(strings.getIndex(e.getKey()));
@@ -211,9 +212,9 @@ public class PhysNetlistWriter {
                     otherCell.setMultiType(strings.getIndex(e.getValue().getAltCellType()));
                 }
                 idx++;
-        	}
+            }
         }
-    	return idx;
+        return idx;
     }
 
     public static Map<Net, List<RouteBranchNode>> extractSiteRouting(Collection<SiteInst> siteInsts,
@@ -246,8 +247,8 @@ public class PhysNetlistWriter {
             for(Entry<Net,List<String>> e : siteInst.getNetToSiteWiresMap().entrySet()) {
                 List<RouteBranchNode> segments = netSiteRouting.get(e.getKey());
                 if(segments == null) {
-                	segments = new ArrayList<RouteBranchNode>();
-                	netSiteRouting.put(e.getKey(), segments);
+                    segments = new ArrayList<RouteBranchNode>();
+                    netSiteRouting.put(e.getKey(), segments);
                 }
                 if(e.getValue() != null && e.getValue().size() > 0) {
                     for(String siteWire : e.getValue()) {
@@ -285,43 +286,43 @@ public class PhysNetlistWriter {
         List<RouteBranchNode> nullNetStubs = new ArrayList<>();
         Map<Net, List<RouteBranchNode>> netSiteRouting = extractSiteRouting(design.getSiteInsts(), nullNetStubs);
 
-    	PhysNet.Builder nullNet = physNetlist.getNullNet();
-    	Builder<RouteBranch.Builder> stubs = nullNet.initStubs(nullNetStubs.size());
-    	int i=0;
-    	for(RouteBranchNode node : nullNetStubs) {
-    		RouteBranch.Builder stub = stubs.get(i);
-    		PhysSitePIP.Builder physSitePIP = stub.initRouteSegment().initSitePIP();
+        PhysNet.Builder nullNet = physNetlist.getNullNet();
+        Builder<RouteBranch.Builder> stubs = nullNet.initStubs(nullNetStubs.size());
+        int i=0;
+        for(RouteBranchNode node : nullNetStubs) {
+            RouteBranch.Builder stub = stubs.get(i);
+            PhysSitePIP.Builder physSitePIP = stub.initRouteSegment().initSitePIP();
             SiteSitePIP sitePIP = node.getSitePIP();
             physSitePIP.setSite(strings.getIndex(sitePIP.site.getName()));
             physSitePIP.setBel(strings.getIndex(sitePIP.sitePIP.getBELName()));
             physSitePIP.setPin(strings.getIndex(sitePIP.sitePIP.getInputPinName()));
             physSitePIP.setIsFixed(sitePIP.isFixed);
-    		i++;
-    	}
-    	
-    	int physNetCount = netSiteRouting.size();
-    	// Check if some routes exists without site routing
-    	for(Net net : design.getNets()) {
-    		if(!netSiteRouting.containsKey(net)) {
-    			physNetCount++;
-    		}
-    	}
-    	
-    	
+            i++;
+        }
+        
+        int physNetCount = netSiteRouting.size();
+        // Check if some routes exists without site routing
+        for(Net net : design.getNets()) {
+            if(!netSiteRouting.containsKey(net)) {
+                physNetCount++;
+            }
+        }
+        
+        
         Builder<PhysNet.Builder> nets = physNetlist.initPhysNets(physNetCount);
         i=0;
         for(Net net : design.getNets()) {
             PhysNet.Builder physNet = nets.get(i);
             physNet.setName(strings.getIndex(net.getName()));
             switch (net.getType()) {
-            	case GND:
-            		physNet.setType(PhysNetlist.NetType.GND);
-            		break;
-            	case VCC:
-            		physNet.setType(PhysNetlist.NetType.VCC);
-            		break;            		
-            	default:
-            		physNet.setType(PhysNetlist.NetType.SIGNAL);
+                case GND:
+                    physNet.setType(PhysNetlist.NetType.GND);
+                    break;
+                case VCC:
+                    physNet.setType(PhysNetlist.NetType.VCC);
+                    break;                    
+                default:
+                    physNet.setType(PhysNetlist.NetType.SIGNAL);
             }
             
             // We need to traverse the net inside sites to fully populate routing spec
@@ -355,10 +356,10 @@ public class PhysNetlistWriter {
 
         // Clean up any nets not found in design that were stored in site routing
         for(Entry<Net,List<RouteBranchNode>> e : netSiteRouting.entrySet()) {
-        	PhysNet.Builder physNet = nets.get(i);
-        	physNet.setName(strings.getIndex(e.getKey().getName()));
-        	populateRouting(e.getValue(), physNet, strings);
-        	i++;
+            PhysNet.Builder physNet = nets.get(i);
+            physNet.setName(strings.getIndex(e.getKey().getName()));
+            populateRouting(e.getValue(), physNet, strings);
+            i++;
         }
     }
     

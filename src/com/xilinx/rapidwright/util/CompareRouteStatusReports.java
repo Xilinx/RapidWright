@@ -1,5 +1,6 @@
 /* 
- * Copyright (c) 2017 Xilinx, Inc. 
+ * Copyright (c) 2017-2022, Xilinx, Inc. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -33,85 +34,85 @@ import java.util.TreeMap;
  */
 public class CompareRouteStatusReports {
 
-	TreeMap<String,RouteStatus> tree1;
-	
-	TreeMap<String,RouteStatus> tree2;
+    TreeMap<String,RouteStatus> tree1;
+    
+    TreeMap<String,RouteStatus> tree2;
 
-	public TreeMap<String,RouteStatus> loadRouteStatusReport(String fileName){
-		ArrayList<String> lines = FileTools.getLinesFromTextFile(fileName);
-		TreeMap<String,RouteStatus> tree = new TreeMap<String,RouteStatus>();
-		boolean pastHeader = false;
-		String currNetName = null;
-		String currStatus = null;
-		ArrayList<String> currSubTree = null;
-		ArrayList<ArrayList<String>> currSubTrees = null;
-		for(int i=0; i < lines.size(); i++){
-			String curr = lines.get(i);
-			if(pastHeader){
-				if(curr.length() > 0 && Character.isWhitespace(curr.charAt(0))){
-					if(curr.contains("Route Tree:")){
-						continue;
-					}
-					else if(curr.contains("Routing status:")){
-						String[] parts = curr.split(" ");
-						currStatus = parts[4];
-					}else if(curr.contains("-----------") && !lines.get(i-1).contains("Route Tree:")){
-						// create new RouteStatus
-						RouteStatus rs = new RouteStatus();
-						rs.setName(currNetName);
-						rs.setStatus(currStatus);
-						rs.setSubTrees(currSubTrees);
-						tree.put(rs.getName(),rs);
-						currSubTree = null;
-						currSubTrees = null;
-					}else if(curr.contains("/")){
-						String wire = curr.replace("[", " ").replace("{", " ").replace("}", " ").replace("]", " ");
-						wire = wire.trim();
-						currSubTree.add(wire);
-					}else if(curr.contains("Subtree:")){
-						currSubTree = new ArrayList<String>();
-						if(currSubTrees == null){
-							currSubTrees = new ArrayList<ArrayList<String>>();
-						}
-						currSubTrees.add(currSubTree);
-					}
-				}else{
-					currNetName = curr.trim();
-				}
-			}
-			else if(curr.contains("Logical Net Detailed Routing:")){
-				pastHeader = true;
-			}
-		}
-		
-		return tree;
-	}
-	
-	
-	public void compare(String fileName1, String fileName2){
-		tree1 = loadRouteStatusReport(fileName1);
-		tree2 = loadRouteStatusReport(fileName2);
-		if(tree1.keySet().size() != tree2.keySet().size()){
-			System.out.println("Error: Differing number of nets in files!");
-		}
-		
-		for(String net : tree1.keySet()){
-			RouteStatus r1 = tree1.get(net);
-			RouteStatus r2 = tree2.get(net);
-			r1.reportDifferences(r2);
-		}
-	}
-	
-	
-	public static void main(String[] args) {
-		if(args.length != 2){
-			System.out.println("USAGE: report1.txt report2.txt");
-			return;
-		}
-		String file1 = args[0];
-		String file2 = args[1];
-		
-		CompareRouteStatusReports r = new CompareRouteStatusReports();
-		r.compare(file1,file2);
-	}
+    public TreeMap<String,RouteStatus> loadRouteStatusReport(String fileName){
+        ArrayList<String> lines = FileTools.getLinesFromTextFile(fileName);
+        TreeMap<String,RouteStatus> tree = new TreeMap<String,RouteStatus>();
+        boolean pastHeader = false;
+        String currNetName = null;
+        String currStatus = null;
+        ArrayList<String> currSubTree = null;
+        ArrayList<ArrayList<String>> currSubTrees = null;
+        for(int i=0; i < lines.size(); i++){
+            String curr = lines.get(i);
+            if(pastHeader){
+                if(curr.length() > 0 && Character.isWhitespace(curr.charAt(0))){
+                    if(curr.contains("Route Tree:")){
+                        continue;
+                    }
+                    else if(curr.contains("Routing status:")){
+                        String[] parts = curr.split(" ");
+                        currStatus = parts[4];
+                    }else if(curr.contains("-----------") && !lines.get(i-1).contains("Route Tree:")){
+                        // create new RouteStatus
+                        RouteStatus rs = new RouteStatus();
+                        rs.setName(currNetName);
+                        rs.setStatus(currStatus);
+                        rs.setSubTrees(currSubTrees);
+                        tree.put(rs.getName(),rs);
+                        currSubTree = null;
+                        currSubTrees = null;
+                    }else if(curr.contains("/")){
+                        String wire = curr.replace("[", " ").replace("{", " ").replace("}", " ").replace("]", " ");
+                        wire = wire.trim();
+                        currSubTree.add(wire);
+                    }else if(curr.contains("Subtree:")){
+                        currSubTree = new ArrayList<String>();
+                        if(currSubTrees == null){
+                            currSubTrees = new ArrayList<ArrayList<String>>();
+                        }
+                        currSubTrees.add(currSubTree);
+                    }
+                }else{
+                    currNetName = curr.trim();
+                }
+            }
+            else if(curr.contains("Logical Net Detailed Routing:")){
+                pastHeader = true;
+            }
+        }
+        
+        return tree;
+    }
+    
+    
+    public void compare(String fileName1, String fileName2){
+        tree1 = loadRouteStatusReport(fileName1);
+        tree2 = loadRouteStatusReport(fileName2);
+        if(tree1.keySet().size() != tree2.keySet().size()){
+            System.out.println("Error: Differing number of nets in files!");
+        }
+        
+        for(String net : tree1.keySet()){
+            RouteStatus r1 = tree1.get(net);
+            RouteStatus r2 = tree2.get(net);
+            r1.reportDifferences(r2);
+        }
+    }
+    
+    
+    public static void main(String[] args) {
+        if(args.length != 2){
+            System.out.println("USAGE: report1.txt report2.txt");
+            return;
+        }
+        String file1 = args[0];
+        String file2 = args[1];
+        
+        CompareRouteStatusReports r = new CompareRouteStatusReports();
+        r.compare(file1,file2);
+    }
 }

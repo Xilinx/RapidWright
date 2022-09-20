@@ -1,5 +1,6 @@
 /* 
- * Copyright (c) 2017 Xilinx, Inc. 
+ * Copyright (c) 2017-2022, Xilinx, Inc. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -41,36 +42,36 @@ import com.xilinx.rapidwright.edif.EDIFTools;
  */
 public class PrintEDIFInstances {
 
-	
-	public static void printEDIFInstancesToFile(EDIFNetlist ee, String fileName){
-		try {
-			PrintWriter pw = new PrintWriter(fileName);
-			pw.println("DESIGN NAME: " + ee.getName());
-			Queue<EDIFHierCellInst> queue = new LinkedList<EDIFHierCellInst>();
-			queue.add(ee.getTopHierCellInst());
-			while(!queue.isEmpty()){
-				EDIFHierCellInst p = queue.poll();
-				EDIFCellInst i = p.getInst();
-				String curr = p.getFullHierarchicalInstName();
-				pw.println(curr + " (" + i.getCellType() + ") from library " + i.getCellType().getLibrary());
-				for(EDIFCellInst i2 : i.getCellType().getCellInsts()){
-					queue.add(p.getChild(i2));
-				}
-			}
-			
-			
-			pw.close();
-		} catch (FileNotFoundException e) {
-			e.printStackTrace();
-		}
-	}
-	
-	public static void main(String[] args) {
-		if(args.length != 2){
-			System.out.println("USAGE: <input.edf> <instnames.txt>");
-			return;
-		}
-		EDIFNetlist ee = EDIFTools.readEdifFile(args[0]);
-		printEDIFInstancesToFile(ee, args[1]);
-	}
+    
+    public static void printEDIFInstancesToFile(EDIFNetlist ee, String fileName){
+        try {
+            PrintWriter pw = new PrintWriter(fileName);
+            pw.println("DESIGN NAME: " + ee.getName());
+            Queue<EDIFHierCellInst> queue = new LinkedList<EDIFHierCellInst>();
+            queue.add(ee.getTopHierCellInst());
+            while(!queue.isEmpty()){
+                EDIFHierCellInst p = queue.poll();
+                EDIFCellInst i = p.getInst();
+                String curr = p.getFullHierarchicalInstName();
+                pw.println(curr + " (" + i.getCellType() + ") from library " + i.getCellType().getLibrary());
+                for(EDIFCellInst i2 : i.getCellType().getCellInsts()){
+                    queue.add(p.getChild(i2));
+                }
+            }
+            
+            
+            pw.close();
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
+    }
+    
+    public static void main(String[] args) {
+        if(args.length != 2){
+            System.out.println("USAGE: <input.edf> <instnames.txt>");
+            return;
+        }
+        EDIFNetlist ee = EDIFTools.readEdifFile(args[0]);
+        printEDIFInstancesToFile(ee, args[1]);
+    }
 }

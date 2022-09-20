@@ -1,6 +1,7 @@
 /*
  * 
- * Copyright (c) 2018 Xilinx, Inc. 
+ * Copyright (c) 2018-2022, Xilinx, Inc. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -63,135 +64,135 @@ import joptsimple.OptionSet;
  *
  */
 public class MultGenerator extends ArithmeticGenerator {
-	private static final String DSP_SITE_OPT = "s";
-	
-	public static final String RESULT_NAME = "P";
+    private static final String DSP_SITE_OPT = "s";
+    
+    public static final String RESULT_NAME = "P";
 
     private static final String OPMODE_VALUE = "000000101";
-	
-	public static EDIFCellInst createDSP48E2CellInstance(Design d, EDIFCell parent, String name){
-		EDIFCell dsp48e2 = new EDIFCell(d.getNetlist().getHDIPrimitivesLibrary(),"DSP48E2");
-		
-		dsp48e2.createPort("CARRYCASCOUT",EDIFDirection.OUTPUT,1);
-		dsp48e2.createPort("MULTSIGNOUT",EDIFDirection.OUTPUT,1);
-		dsp48e2.createPort("OVERFLOW",EDIFDirection.OUTPUT,1);
-		dsp48e2.createPort("PATTERNBDETECT",EDIFDirection.OUTPUT,1);
-		dsp48e2.createPort("PATTERNDETECT",EDIFDirection.OUTPUT,1);
-		dsp48e2.createPort("UNDERFLOW",EDIFDirection.OUTPUT,1);
-		dsp48e2.createPort("CARRYCASCIN",EDIFDirection.INPUT,1);
-		dsp48e2.createPort("CARRYIN",EDIFDirection.INPUT,1);
-		dsp48e2.createPort("CEA1",EDIFDirection.INPUT,1);
-		dsp48e2.createPort("CEA2",EDIFDirection.INPUT,1);
-		dsp48e2.createPort("CEAD",EDIFDirection.INPUT,1);
-		dsp48e2.createPort("CEALUMODE",EDIFDirection.INPUT,1);
-		dsp48e2.createPort("CEB1",EDIFDirection.INPUT,1);
-		dsp48e2.createPort("CEB2",EDIFDirection.INPUT,1);
-		dsp48e2.createPort("CEC",EDIFDirection.INPUT,1);
-		dsp48e2.createPort("CECARRYIN",EDIFDirection.INPUT,1);
-		dsp48e2.createPort("CECTRL",EDIFDirection.INPUT,1);
-		dsp48e2.createPort("CED",EDIFDirection.INPUT,1);
-		dsp48e2.createPort("CEINMODE",EDIFDirection.INPUT,1);
-		dsp48e2.createPort("CEM",EDIFDirection.INPUT,1);
-		dsp48e2.createPort("CEP",EDIFDirection.INPUT,1);
-		dsp48e2.createPort("CLK",EDIFDirection.INPUT,1);
-		dsp48e2.createPort("MULTSIGNIN",EDIFDirection.INPUT,1);
-		dsp48e2.createPort("RSTA",EDIFDirection.INPUT,1);
-		dsp48e2.createPort("RSTALLCARRYIN",EDIFDirection.INPUT,1);
-		dsp48e2.createPort("RSTALUMODE",EDIFDirection.INPUT,1);
-		dsp48e2.createPort("RSTB",EDIFDirection.INPUT,1);
-		dsp48e2.createPort("RSTC",EDIFDirection.INPUT,1);
-		dsp48e2.createPort("RSTCTRL",EDIFDirection.INPUT,1);
-		dsp48e2.createPort("RSTD",EDIFDirection.INPUT,1);
-		dsp48e2.createPort("RSTINMODE",EDIFDirection.INPUT,1);
-		dsp48e2.createPort("RSTM",EDIFDirection.INPUT,1);
-		dsp48e2.createPort("RSTP",EDIFDirection.INPUT,1);
+    
+    public static EDIFCellInst createDSP48E2CellInstance(Design d, EDIFCell parent, String name){
+        EDIFCell dsp48e2 = new EDIFCell(d.getNetlist().getHDIPrimitivesLibrary(),"DSP48E2");
+        
+        dsp48e2.createPort("CARRYCASCOUT",EDIFDirection.OUTPUT,1);
+        dsp48e2.createPort("MULTSIGNOUT",EDIFDirection.OUTPUT,1);
+        dsp48e2.createPort("OVERFLOW",EDIFDirection.OUTPUT,1);
+        dsp48e2.createPort("PATTERNBDETECT",EDIFDirection.OUTPUT,1);
+        dsp48e2.createPort("PATTERNDETECT",EDIFDirection.OUTPUT,1);
+        dsp48e2.createPort("UNDERFLOW",EDIFDirection.OUTPUT,1);
+        dsp48e2.createPort("CARRYCASCIN",EDIFDirection.INPUT,1);
+        dsp48e2.createPort("CARRYIN",EDIFDirection.INPUT,1);
+        dsp48e2.createPort("CEA1",EDIFDirection.INPUT,1);
+        dsp48e2.createPort("CEA2",EDIFDirection.INPUT,1);
+        dsp48e2.createPort("CEAD",EDIFDirection.INPUT,1);
+        dsp48e2.createPort("CEALUMODE",EDIFDirection.INPUT,1);
+        dsp48e2.createPort("CEB1",EDIFDirection.INPUT,1);
+        dsp48e2.createPort("CEB2",EDIFDirection.INPUT,1);
+        dsp48e2.createPort("CEC",EDIFDirection.INPUT,1);
+        dsp48e2.createPort("CECARRYIN",EDIFDirection.INPUT,1);
+        dsp48e2.createPort("CECTRL",EDIFDirection.INPUT,1);
+        dsp48e2.createPort("CED",EDIFDirection.INPUT,1);
+        dsp48e2.createPort("CEINMODE",EDIFDirection.INPUT,1);
+        dsp48e2.createPort("CEM",EDIFDirection.INPUT,1);
+        dsp48e2.createPort("CEP",EDIFDirection.INPUT,1);
+        dsp48e2.createPort("CLK",EDIFDirection.INPUT,1);
+        dsp48e2.createPort("MULTSIGNIN",EDIFDirection.INPUT,1);
+        dsp48e2.createPort("RSTA",EDIFDirection.INPUT,1);
+        dsp48e2.createPort("RSTALLCARRYIN",EDIFDirection.INPUT,1);
+        dsp48e2.createPort("RSTALUMODE",EDIFDirection.INPUT,1);
+        dsp48e2.createPort("RSTB",EDIFDirection.INPUT,1);
+        dsp48e2.createPort("RSTC",EDIFDirection.INPUT,1);
+        dsp48e2.createPort("RSTCTRL",EDIFDirection.INPUT,1);
+        dsp48e2.createPort("RSTD",EDIFDirection.INPUT,1);
+        dsp48e2.createPort("RSTINMODE",EDIFDirection.INPUT,1);
+        dsp48e2.createPort("RSTM",EDIFDirection.INPUT,1);
+        dsp48e2.createPort("RSTP",EDIFDirection.INPUT,1);
 
-		dsp48e2.createPort("ACOUT[29:0]",EDIFDirection.OUTPUT,30);
-		dsp48e2.createPort("BCOUT[17:0]",EDIFDirection.OUTPUT,18);
-		dsp48e2.createPort("CARRYOUT[3:0]",EDIFDirection.OUTPUT,4);
-		dsp48e2.createPort("PCOUT[47:0]",EDIFDirection.OUTPUT,48);
-		dsp48e2.createPort("P[47:0]",EDIFDirection.OUTPUT,48);
-		dsp48e2.createPort("XOROUT[7:0]",EDIFDirection.OUTPUT,8);
-		dsp48e2.createPort("ACIN[29:0]",EDIFDirection.INPUT,30);
-		dsp48e2.createPort("ALUMODE[3:0]",EDIFDirection.INPUT,4);
-		dsp48e2.createPort("A[29:0]",EDIFDirection.INPUT,30);
-		dsp48e2.createPort("BCIN[17:0]",EDIFDirection.INPUT,18);
-		dsp48e2.createPort("B[17:0]",EDIFDirection.INPUT,18);
-		dsp48e2.createPort("CARRYINSEL[2:0]",EDIFDirection.INPUT,3);
-		dsp48e2.createPort("C[47:0]",EDIFDirection.INPUT,48);
-		dsp48e2.createPort("D[26:0]",EDIFDirection.INPUT,27);
-		dsp48e2.createPort("INMODE[4:0]",EDIFDirection.INPUT,5);
-		dsp48e2.createPort("OPMODE[8:0]",EDIFDirection.INPUT,9);
-		dsp48e2.createPort("PCIN[47:0]",EDIFDirection.INPUT,48);
+        dsp48e2.createPort("ACOUT[29:0]",EDIFDirection.OUTPUT,30);
+        dsp48e2.createPort("BCOUT[17:0]",EDIFDirection.OUTPUT,18);
+        dsp48e2.createPort("CARRYOUT[3:0]",EDIFDirection.OUTPUT,4);
+        dsp48e2.createPort("PCOUT[47:0]",EDIFDirection.OUTPUT,48);
+        dsp48e2.createPort("P[47:0]",EDIFDirection.OUTPUT,48);
+        dsp48e2.createPort("XOROUT[7:0]",EDIFDirection.OUTPUT,8);
+        dsp48e2.createPort("ACIN[29:0]",EDIFDirection.INPUT,30);
+        dsp48e2.createPort("ALUMODE[3:0]",EDIFDirection.INPUT,4);
+        dsp48e2.createPort("A[29:0]",EDIFDirection.INPUT,30);
+        dsp48e2.createPort("BCIN[17:0]",EDIFDirection.INPUT,18);
+        dsp48e2.createPort("B[17:0]",EDIFDirection.INPUT,18);
+        dsp48e2.createPort("CARRYINSEL[2:0]",EDIFDirection.INPUT,3);
+        dsp48e2.createPort("C[47:0]",EDIFDirection.INPUT,48);
+        dsp48e2.createPort("D[26:0]",EDIFDirection.INPUT,27);
+        dsp48e2.createPort("INMODE[4:0]",EDIFDirection.INPUT,5);
+        dsp48e2.createPort("OPMODE[8:0]",EDIFDirection.INPUT,9);
+        dsp48e2.createPort("PCIN[47:0]",EDIFDirection.INPUT,48);
 
-		EDIFCellInst i = dsp48e2.createCellInst(name, parent);
+        EDIFCellInst i = dsp48e2.createCellInst(name, parent);
 
-		i.addProperty("USE_MULT","MULTIPLY");
-		i.addProperty("SEL_PATTERN","PATTERN");
-		i.addProperty("USE_SIMD","ONE48");
-		i.addProperty("USE_PATTERN_DETECT","NO_PATDET");
-		i.addProperty("XORSIMD","XOR24_48_96");
-		i.addProperty("USE_WIDEXOR","FALSE");
-		i.addProperty("ACASCREG",1);
-		i.addProperty("ADREG",1);
-		i.addProperty("ALUMODEREG",0);
-		i.addProperty("AMULTSEL","A");
-		i.addProperty("AREG",1);
-		i.addProperty("AUTORESET_PATDET","NO_RESET");
-		i.addProperty("AUTORESET_PRIORITY","RESET");
-		i.addProperty("A_INPUT","DIRECT");
-		i.addProperty("BCASCREG",1);
-		i.addProperty("BMULTSEL","B");
-		i.addProperty("BREG",1);
-		i.addProperty("B_INPUT","DIRECT");
-		i.addProperty("CARRYINREG",0);
-		i.addProperty("CARRYINSELREG",0);
-		i.addProperty("CREG",0);
-		i.addProperty("DREG",1);
-		i.addProperty("INMODEREG",0);
-		i.addProperty("MASK","48'h3FFFFFFFFFFF");
-		i.addProperty("MREG",1);
-		i.addProperty("OPMODEREG",0);
-		i.addProperty("PATTERN","48'h000000000000");
-		i.addProperty("PREADDINSEL","A");
-		i.addProperty("PREG",1);
-		i.addProperty("RND","48'h000000000000");
-		i.addProperty("SEL_MASK","MASK");
-		
-		return i;
-	}
-	
-	public static PBlock createMult(Design d, Site origin, int width, String designName, String clkName){
-		EDIFCell top = d.getNetlist().getTopCell();
-		
-		EDIFPort clkPort = top.createPort(clkName, EDIFDirection.INPUT, 1);
-		EDIFNet clk = top.createNet(clkName);
-		clk.createPortInst(clkPort);
-		
-		String[] dspCells = new String[]{
-				"DSP_PREADD_DATA", "DSP_A_B_DATA", "DSP_C_DATA", "DSP_MULTIPLIER", 
-				"DSP_ALU", "DSP_M_DATA", "DSP_OUTPUT", "DSP_PREADD",
-				};
-		SiteInst si = null;
-		for(String elem : dspCells){
-			Cell c = d.createAndPlaceCell(null, designName+"/"+elem +"_INST", 
-					Unisim.valueOf(elem), origin,origin.getBEL(elem));
-			si = c.getSiteInst();
-		}
-		EDIFCellInst inst = createDSP48E2CellInstance(d,top,designName);
-		
+        i.addProperty("USE_MULT","MULTIPLY");
+        i.addProperty("SEL_PATTERN","PATTERN");
+        i.addProperty("USE_SIMD","ONE48");
+        i.addProperty("USE_PATTERN_DETECT","NO_PATDET");
+        i.addProperty("XORSIMD","XOR24_48_96");
+        i.addProperty("USE_WIDEXOR","FALSE");
+        i.addProperty("ACASCREG",1);
+        i.addProperty("ADREG",1);
+        i.addProperty("ALUMODEREG",0);
+        i.addProperty("AMULTSEL","A");
+        i.addProperty("AREG",1);
+        i.addProperty("AUTORESET_PATDET","NO_RESET");
+        i.addProperty("AUTORESET_PRIORITY","RESET");
+        i.addProperty("A_INPUT","DIRECT");
+        i.addProperty("BCASCREG",1);
+        i.addProperty("BMULTSEL","B");
+        i.addProperty("BREG",1);
+        i.addProperty("B_INPUT","DIRECT");
+        i.addProperty("CARRYINREG",0);
+        i.addProperty("CARRYINSELREG",0);
+        i.addProperty("CREG",0);
+        i.addProperty("DREG",1);
+        i.addProperty("INMODEREG",0);
+        i.addProperty("MASK","48'h3FFFFFFFFFFF");
+        i.addProperty("MREG",1);
+        i.addProperty("OPMODEREG",0);
+        i.addProperty("PATTERN","48'h000000000000");
+        i.addProperty("PREADDINSEL","A");
+        i.addProperty("PREG",1);
+        i.addProperty("RND","48'h000000000000");
+        i.addProperty("SEL_MASK","MASK");
+        
+        return i;
+    }
+    
+    public static PBlock createMult(Design d, Site origin, int width, String designName, String clkName){
+        EDIFCell top = d.getNetlist().getTopCell();
+        
+        EDIFPort clkPort = top.createPort(clkName, EDIFDirection.INPUT, 1);
+        EDIFNet clk = top.createNet(clkName);
+        clk.createPortInst(clkPort);
+        
+        String[] dspCells = new String[]{
+                "DSP_PREADD_DATA", "DSP_A_B_DATA", "DSP_C_DATA", "DSP_MULTIPLIER", 
+                "DSP_ALU", "DSP_M_DATA", "DSP_OUTPUT", "DSP_PREADD",
+                };
+        SiteInst si = null;
+        for(String elem : dspCells){
+            Cell c = d.createAndPlaceCell(null, designName+"/"+elem +"_INST", 
+                    Unisim.valueOf(elem), origin,origin.getBEL(elem));
+            si = c.getSiteInst();
+        }
+        EDIFCellInst inst = createDSP48E2CellInstance(d,top,designName);
+        
         String[] gndPins = new String[]{
-        		"CEA1","CEAD","CEALUMODE","CEB1","CEC",
-        		"CECARRYIN","CECTRL","CED","CEINMODE",
+                "CEA1","CEAD","CEALUMODE","CEB1","CEC",
+                "CECARRYIN","CECTRL","CED","CEINMODE",
         };
         String[] vccPins = new String[]{"CARRYIN","CEA2","CEB2","CEM","CEP","RSTA",
-        		"RSTALLCARRYIN","RSTALUMODE","RSTB","RSTC","RSTCTRL","RSTD",
-        		"RSTINMODE","RSTM","RSTP"};
+                "RSTALLCARRYIN","RSTALUMODE","RSTB","RSTC","RSTCTRL","RSTD",
+                "RSTINMODE","RSTM","RSTP"};
         String[] gndBusses = new String[]{
-        		"A","B","CARRYINSEL","C","D"
+                "A","B","CARRYINSEL","C","D"
         };
         String[] vccBusses = new String[]{
-        		"ALUMODE","INMODE","OPMODE"
+                "ALUMODE","INMODE","OPMODE"
         };        
         
         // Setup GND/VCC inputs
@@ -201,28 +202,28 @@ public class MultGenerator extends ArithmeticGenerator {
         Net logic1 = d.getStaticNet(NetType.VCC);
         
         for(NetType type : new NetType[]{NetType.GND,NetType.VCC}){
-        	EDIFNet logicSrc = type == NetType.GND ? gnd : vcc;
-        	Net physNet = type == NetType.GND ? logic0 : logic1;
-        	String[] pins = type == NetType.GND ? gndPins : vccPins;
-        	for(String pin : pins){
-            	logicSrc.createPortInst(pin, inst);
-            	physNet.createPin(false, pin, si);
+            EDIFNet logicSrc = type == NetType.GND ? gnd : vcc;
+            Net physNet = type == NetType.GND ? logic0 : logic1;
+            String[] pins = type == NetType.GND ? gndPins : vccPins;
+            for(String pin : pins){
+                logicSrc.createPortInst(pin, inst);
+                physNet.createPin(false, pin, si);
             }
-        	String[] busPins = type == NetType.GND ? gndBusses : vccBusses;
+            String[] busPins = type == NetType.GND ? gndBusses : vccBusses;
         
-        	for(String bus : busPins){
-            	EDIFPort p = inst.getCellType().getPort(bus);
-            	int stop = p.getWidth();
-            	boolean isAorB = bus.equals("A") || bus.equals("B"); 
-            	if(isAorB){
-            		// Don't gnd the inputs
-            		stop = p.getWidth() - width;
-            	}
-            	for(int i=0; i < stop; i++){
-            		logicSrc.createPortInst(p, i, inst);
-            		if(bus.equals("D")) bus = "DIN";
-            		physNet.createPin(false, bus + (isAorB ? i+width : i), si);
-            	}
+            for(String bus : busPins){
+                EDIFPort p = inst.getCellType().getPort(bus);
+                int stop = p.getWidth();
+                boolean isAorB = bus.equals("A") || bus.equals("B"); 
+                if(isAorB){
+                    // Don't gnd the inputs
+                    stop = p.getWidth() - width;
+                }
+                for(int i=0; i < stop; i++){
+                    logicSrc.createPortInst(p, i, inst);
+                    if(bus.equals("D")) bus = "DIN";
+                    physNet.createPin(false, bus + (isAorB ? i+width : i), si);
+                }
             }
         }
 
@@ -231,37 +232,37 @@ public class MultGenerator extends ArithmeticGenerator {
         
         /*
         for(String gndBus : gndBusses){
-        	EDIFPort p = inst.getCellType().getPort(gndBus);
-        	int stop = p.getWidth();
-        	boolean isAorB = gndBus.equals("A") || gndBus.equals("B"); 
-        	if(isAorB){
-        		// Don't gnd the inputs
-        		stop = p.getWidth() - width;
-        	}
-        	for(int i=0; i < stop; i++){
-        		gnd.createPortInst(p, i, inst);
-        		if(gndBus.equals("D")) gndBus = "DIN";
-        		logic0.createPin(false, gndBus + (isAorB ? i+width : i), si);
-        	}
+            EDIFPort p = inst.getCellType().getPort(gndBus);
+            int stop = p.getWidth();
+            boolean isAorB = gndBus.equals("A") || gndBus.equals("B"); 
+            if(isAorB){
+                // Don't gnd the inputs
+                stop = p.getWidth() - width;
+            }
+            for(int i=0; i < stop; i++){
+                gnd.createPortInst(p, i, inst);
+                if(gndBus.equals("D")) gndBus = "DIN";
+                logic0.createPin(false, gndBus + (isAorB ? i+width : i), si);
+            }
         }
 
         for(String pin : vccPins){
-        	vcc.createPortInst(pin, inst);
-        	logic1.createPin(false, pin, si);
+            vcc.createPortInst(pin, inst);
+            logic1.createPin(false, pin, si);
         }
         
         
         String opmodeValue = "000000101";
         EDIFPort opmode = inst.getPort("OPMODE"); 
         for(int i=0; i < opmode.getWidth(); i++){
-        	char c = opmodeValue.charAt(i);
-        	if(c == '1'){
-        		gnd.createPortInst(opmode, i, inst);
-        		logic0.createPin(false, opmode.getBusName()+(opmode.getWidth()-i-1), si);
-        	}else{
-        		vcc.createPortInst(opmode, i, inst);
-        		logic1.createPin(false, opmode.getBusName()+(opmode.getWidth()-i-1), si);
-        	}
+            char c = opmodeValue.charAt(i);
+            if(c == '1'){
+                gnd.createPortInst(opmode, i, inst);
+                logic0.createPin(false, opmode.getBusName()+(opmode.getWidth()-i-1), si);
+            }else{
+                vcc.createPortInst(opmode, i, inst);
+                logic1.createPin(false, opmode.getBusName()+(opmode.getWidth()-i-1), si);
+            }
         }*/
 
         // Connect logical outside connections/ports
@@ -279,194 +280,194 @@ public class MultGenerator extends ArithmeticGenerator {
         EDIFPort r = top.createPort(RESULT_NAME + "["+(pWidth-1)+":0]", EDIFDirection.OUTPUT, pWidth);
         
         for(int i=0; i < width; i++){
-        	suffix = "["+i+"]";
-        	EDIFNet aNet = top.createNet(INPUT_A_NAME + suffix);
-        	EDIFNet bNet = top.createNet(INPUT_B_NAME + suffix);
-        	EDIFNet rNet = top.createNet(designName + "/" + RESULT_NAME + suffix);        	
-        	
-        	aNet.createPortInst(a,width-i-1);
-        	bNet.createPortInst(b,width-i-1);
-        	rNet.createPortInst(r,pWidth-i-1);
-        	
-        	aNet.createPortInst(INPUT_A_NAME, aWidth-i-1, inst);
-        	bNet.createPortInst(INPUT_B_NAME, bWidth-i-1, inst);
-        	rNet.createPortInst(RESULT_NAME, pWidth-i-1, inst);
-        	
-        	Net physA = d.createNet(aNet);
-        	Net physB = d.createNet(bNet);
-        	Net physR = d.createNet(rNet);
+            suffix = "["+i+"]";
+            EDIFNet aNet = top.createNet(INPUT_A_NAME + suffix);
+            EDIFNet bNet = top.createNet(INPUT_B_NAME + suffix);
+            EDIFNet rNet = top.createNet(designName + "/" + RESULT_NAME + suffix);            
+            
+            aNet.createPortInst(a,width-i-1);
+            bNet.createPortInst(b,width-i-1);
+            rNet.createPortInst(r,pWidth-i-1);
+            
+            aNet.createPortInst(INPUT_A_NAME, aWidth-i-1, inst);
+            bNet.createPortInst(INPUT_B_NAME, bWidth-i-1, inst);
+            rNet.createPortInst(RESULT_NAME, pWidth-i-1, inst);
+            
+            Net physA = d.createNet(aNet);
+            Net physB = d.createNet(bNet);
+            Net physR = d.createNet(rNet);
 
-        	physA.createPin(false, INPUT_A_NAME+i, si);
-        	physB.createPin(false, INPUT_B_NAME+i, si);
-        	physR.createPin(true, RESULT_NAME+i, si);
+            physA.createPin(false, INPUT_A_NAME+i, si);
+            physB.createPin(false, INPUT_B_NAME+i, si);
+            physR.createPin(true, RESULT_NAME+i, si);
         }
         for(int i=width; i < pWidth; i++){
-        	suffix = "["+i+"]";
-        	EDIFNet rNet = top.createNet(designName + "/" + RESULT_NAME + suffix);
-        	rNet.createPortInst(r,pWidth-i-1);
-        	rNet.createPortInst(RESULT_NAME, pWidth-i-1, inst);
-        	Net physR = d.createNet(rNet);
-        	physR.createPin(true, RESULT_NAME+i, si);
+            suffix = "["+i+"]";
+            EDIFNet rNet = top.createNet(designName + "/" + RESULT_NAME + suffix);
+            rNet.createPortInst(r,pWidth-i-1);
+            rNet.createPortInst(RESULT_NAME, pWidth-i-1, inst);
+            Net physR = d.createNet(rNet);
+            physR.createPin(true, RESULT_NAME+i, si);
         }
         
         // ADD SitePIPs
         String[] sitePIPElements = new String[]{
-        		"ALUMODE0INV","ALUMODE1INV","ALUMODE2INV","ALUMODE3INV",
-        		"CARRYININV","CLKINV","INMODE0INV","INMODE1INV","INMODE2INV",
-        		"INMODE3INV","INMODE4INV","OPMODE0INV","OPMODE1INV","OPMODE2INV",
-        		"OPMODE3INV","OPMODE4INV","OPMODE5INV","OPMODE6INV","OPMODE7INV",
-        		"OPMODE8INV","RSTAINV","RSTALLCARRYININV","RSTALUMODEINV","RSTBINV",
-        		"RSTCINV","RSTCTRLINV","RSTDINV","RSTINMODEINV","RSTMINV","RSTPINV"
+                "ALUMODE0INV","ALUMODE1INV","ALUMODE2INV","ALUMODE3INV",
+                "CARRYININV","CLKINV","INMODE0INV","INMODE1INV","INMODE2INV",
+                "INMODE3INV","INMODE4INV","OPMODE0INV","OPMODE1INV","OPMODE2INV",
+                "OPMODE3INV","OPMODE4INV","OPMODE5INV","OPMODE6INV","OPMODE7INV",
+                "OPMODE8INV","RSTAINV","RSTALLCARRYININV","RSTALUMODEINV","RSTBINV",
+                "RSTCINV","RSTCTRLINV","RSTDINV","RSTINMODEINV","RSTMINV","RSTPINV"
         };
         for(String element : sitePIPElements){
-        	String pinName = element.substring(0, element.length()-3);
-        	Net net = null;
-        	if(element.equals("CLKINV")){
-        		net = physClk;
-        	}else if(element.startsWith("OPMODE")){
-        		int idx = element.charAt(6) - 48;
-        		char c = OPMODE_VALUE.charAt(OPMODE_VALUE.length()-idx-1);
-        		net = c == 1 ? logic1 : logic0;
-        	}else{
-        		net = logic0;
-        	}
-        	si.routeIntraSiteNet(net, si.getSite().getBELPin(pinName), si.getBEL(element).getPin("D"));
-        	si.addSitePIP(element, "D");
+            String pinName = element.substring(0, element.length()-3);
+            Net net = null;
+            if(element.equals("CLKINV")){
+                net = physClk;
+            }else if(element.startsWith("OPMODE")){
+                int idx = element.charAt(6) - 48;
+                char c = OPMODE_VALUE.charAt(OPMODE_VALUE.length()-idx-1);
+                net = c == 1 ? logic1 : logic0;
+            }else{
+                net = logic0;
+            }
+            si.routeIntraSiteNet(net, si.getSite().getBELPin(pinName), si.getBEL(element).getPin("D"));
+            si.addSitePIP(element, "D");
         }
         
         for(EDIFPort port : inst.getCellType().getPorts()){
-        	if(!port.isOutput()) continue;
-        	if(port.getBusName().equals(RESULT_NAME)) continue;
-        	for(int i=0; i < port.getWidth(); i++){
-        		EDIFNet net = top.createNet(designName + "/" + port.getBusName() + (port.getWidth() > 1 ? "["+i+"]" : ""));
-        		net.createPortInst(port.getBusName(), i, inst);
-        		Net physNet = d.createNet(net);
-        		
-        		// Correct differences in physical pin names
-        		String busName = port.getBusName();
-        		if(busName.equals("ACOUT") || busName.equals("BCOUT")){
-        			busName = busName.replace("COUT", "COUT_B");
-        		}else if(busName.equals("PATTERNDETECT")){
-        			busName = "PATTERN_DETECT";
-        		}else if(busName.equals("PATTERNBDETECT")){
-        			busName = "PATTERN_B_DETECT";
-        		}
-        		
-        		physNet.createPin(true, busName + (port.getWidth() > 1 ? i : ""), si);
-        	}
+            if(!port.isOutput()) continue;
+            if(port.getBusName().equals(RESULT_NAME)) continue;
+            for(int i=0; i < port.getWidth(); i++){
+                EDIFNet net = top.createNet(designName + "/" + port.getBusName() + (port.getWidth() > 1 ? "["+i+"]" : ""));
+                net.createPortInst(port.getBusName(), i, inst);
+                Net physNet = d.createNet(net);
+                
+                // Correct differences in physical pin names
+                String busName = port.getBusName();
+                if(busName.equals("ACOUT") || busName.equals("BCOUT")){
+                    busName = busName.replace("COUT", "COUT_B");
+                }else if(busName.equals("PATTERNDETECT")){
+                    busName = "PATTERN_DETECT";
+                }else if(busName.equals("PATTERNBDETECT")){
+                    busName = "PATTERN_B_DETECT";
+                }
+                
+                physNet.createPin(true, busName + (port.getWidth() > 1 ? i : ""), si);
+            }
         }
         
         Set<String> specialCases = new HashSet<>(Arrays.asList("ALUMODE10","AMULT26","BMULT17","P_FDBK_47","INMODE_2"));
         
         
         for(String dspCell : dspCells){
-        	BEL elem = si.getSite().getBEL(dspCell);
-        	next_pin : for(int i=elem.getHighestInputIndex()+1; i < elem.getPins().length; i++){
-        		BELPin outpin = elem.getPin(i);
-        		for(BELPin conn : outpin.getSiteConns()){
-        			if(conn.isSitePort()) continue next_pin;
-        		}
-        		String pinName = null;
-        		if(specialCases.contains(outpin.getName())){
-        			pinName = outpin.getName();
-        		}else if(outpin.getName().startsWith("A2A1")){
-        			pinName = outpin.getName().replace("A2A1", "A2A1<") + ">";
-        		}else if(outpin.getName().startsWith("B2B1")){
-        			pinName = outpin.getName().replace("B2B1", "B2B1<") + ">";
-        		}else{
-        			pinName = StringTools.addIndexingAngleBrackets(outpin.getName());
-        		}
-        		
-        		Net n = d.createNet(designName + "/" + outpin.getBEL().getName() +"." + pinName, null);
-        		si.routeIntraSiteNet(n, outpin, outpin.getSiteConns().get(0));
-        	}
+            BEL elem = si.getSite().getBEL(dspCell);
+            next_pin : for(int i=elem.getHighestInputIndex()+1; i < elem.getPins().length; i++){
+                BELPin outpin = elem.getPin(i);
+                for(BELPin conn : outpin.getSiteConns()){
+                    if(conn.isSitePort()) continue next_pin;
+                }
+                String pinName = null;
+                if(specialCases.contains(outpin.getName())){
+                    pinName = outpin.getName();
+                }else if(outpin.getName().startsWith("A2A1")){
+                    pinName = outpin.getName().replace("A2A1", "A2A1<") + ">";
+                }else if(outpin.getName().startsWith("B2B1")){
+                    pinName = outpin.getName().replace("B2B1", "B2B1<") + ">";
+                }else{
+                    pinName = StringTools.addIndexingAngleBrackets(outpin.getName());
+                }
+                
+                Net n = d.createNet(designName + "/" + outpin.getBEL().getName() +"." + pinName, null);
+                si.routeIntraSiteNet(n, outpin, outpin.getSiteConns().get(0));
+            }
         }
         
-		return new PBlock(d.getDevice(),origin.getName() +":"+origin.getName());
-	}
-	
-	private static OptionParser createOptionParser(){
-		// Defaults
-		String partName = Device.AWS_F1;
-		String designName = "mult";
-		String outputDCPFileName = System.getProperty("user.dir") + File.separator + designName +".dcp";
-		String clkName = "clk";
-		double clkPeriodConstraint = 1.291; // 775 MHz
-		int width = 16;//*30*5;
-		String dspSite = "DSP48E2_X9Y60";
-		boolean verbose = true;
+        return new PBlock(d.getDevice(),origin.getName() +":"+origin.getName());
+    }
+    
+    private static OptionParser createOptionParser(){
+        // Defaults
+        String partName = Device.AWS_F1;
+        String designName = "mult";
+        String outputDCPFileName = System.getProperty("user.dir") + File.separator + designName +".dcp";
+        String clkName = "clk";
+        double clkPeriodConstraint = 1.291; // 775 MHz
+        int width = 16;//*30*5;
+        String dspSite = "DSP48E2_X9Y60";
+        boolean verbose = true;
 
-		
-		OptionParser p = new OptionParser() {{
-			accepts(PART_OPT).withOptionalArg().defaultsTo(partName).describedAs("UltraScale+ Part Name");
-			accepts(DESIGN_NAME_OPT).withOptionalArg().defaultsTo(designName).describedAs("Design Name");
-			accepts(OUT_DCP_OPT).withOptionalArg().defaultsTo(outputDCPFileName).describedAs("Output DCP File Name");
-			accepts(CLK_NAME_OPT).withOptionalArg().defaultsTo(clkName).describedAs("Clk net name");
-			accepts(CLK_CONSTRAINT_OPT).withOptionalArg().ofType(Double.class).defaultsTo(clkPeriodConstraint).describedAs("Clk period constraint (ns)");
-			accepts(WIDTH_OPT).withOptionalArg().ofType(Integer.class).defaultsTo(width).describedAs("Operand width");
-			accepts(DSP_SITE_OPT).withOptionalArg().defaultsTo(dspSite).describedAs("DSP48 to be used");
-			accepts(VERBOSE_OPT).withOptionalArg().ofType(Boolean.class).defaultsTo(verbose).describedAs("Print verbose output");
-			acceptsAll( Arrays.asList(HELP_OPT, "?"), "Print Help" ).forHelp();
-		}};
-		
-		return p;
-	}
-	
-	private static void printHelp(OptionParser p){
-		MessageGenerator.printHeader("Multiplier Generator");
-		System.out.println("This RapidWright program creates a placed and routed DCP that can be \n"
-			+ "imported into UltraScale+ designs that will perform integer multiplication.  See \n"
-			+ "RapidWright documentation for more information.\n");
-		try {
-			p.accepts(OUT_DCP_OPT).withOptionalArg().defaultsTo("mult.dcp").describedAs("Output DCP File Name");
-			p.printHelpOn(System.out);
-			
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-	}
-	
-	public static void main(String[] args) {
-		// Extract program options
-		OptionParser p = createOptionParser();
-		OptionSet opts = p.parse(args);
-		boolean verbose = (boolean) opts.valueOf(VERBOSE_OPT);
-		if(opts.has(HELP_OPT)){
-			printHelp(p);
-			return;
-		}
-		CodePerfTracker t = verbose ? new CodePerfTracker(MultGenerator.class.getSimpleName(),true).start("Init") : null;
-		
-		String partName = (String) opts.valueOf(PART_OPT);
-		String designName = (String) opts.valueOf(DESIGN_NAME_OPT);
-		String outputDCPFileName = (String) opts.valueOf(OUT_DCP_OPT);
-		String clkName = (String) opts.valueOf(CLK_NAME_OPT);
-		double clkPeriodConstraint = (double) opts.valueOf(CLK_CONSTRAINT_OPT);
-		int width = (int) opts.valueOf(WIDTH_OPT);		
-		String dspName = (String) opts.valueOf(DSP_SITE_OPT);
-		
-		// Perform some error checking on inputs
-		Part part = PartNameTools.getPart(partName);
-		if(part == null || part.isSeries7()){
-			throw new RuntimeException("ERROR: Invalid/unsupport part " + partName + ".");
-		}
-		
-		Design d = new Design(designName,partName);
-		d.setAutoIOBuffers(false);
-		Device dev = d.getDevice();
-		
-		t.stop().start("Create Multiplier");
-		Site dsp = dev.getSite(dspName);
-		createMult(d, dsp, width, designName, clkName);			
-				
-		// Add a clock constraint
-		String tcl = "create_clock -name "+clkName+" -period "+clkPeriodConstraint+" [get_ports "+clkName+"]";
-		d.addXDCConstraint(ConstraintGroup.LATE, tcl);
-		d.setAutoIOBuffers(false);
-		
-		t.stop();
+        
+        OptionParser p = new OptionParser() {{
+            accepts(PART_OPT).withOptionalArg().defaultsTo(partName).describedAs("UltraScale+ Part Name");
+            accepts(DESIGN_NAME_OPT).withOptionalArg().defaultsTo(designName).describedAs("Design Name");
+            accepts(OUT_DCP_OPT).withOptionalArg().defaultsTo(outputDCPFileName).describedAs("Output DCP File Name");
+            accepts(CLK_NAME_OPT).withOptionalArg().defaultsTo(clkName).describedAs("Clk net name");
+            accepts(CLK_CONSTRAINT_OPT).withOptionalArg().ofType(Double.class).defaultsTo(clkPeriodConstraint).describedAs("Clk period constraint (ns)");
+            accepts(WIDTH_OPT).withOptionalArg().ofType(Integer.class).defaultsTo(width).describedAs("Operand width");
+            accepts(DSP_SITE_OPT).withOptionalArg().defaultsTo(dspSite).describedAs("DSP48 to be used");
+            accepts(VERBOSE_OPT).withOptionalArg().ofType(Boolean.class).defaultsTo(verbose).describedAs("Print verbose output");
+            acceptsAll( Arrays.asList(HELP_OPT, "?"), "Print Help" ).forHelp();
+        }};
+        
+        return p;
+    }
+    
+    private static void printHelp(OptionParser p){
+        MessageGenerator.printHeader("Multiplier Generator");
+        System.out.println("This RapidWright program creates a placed and routed DCP that can be \n"
+            + "imported into UltraScale+ designs that will perform integer multiplication.  See \n"
+            + "RapidWright documentation for more information.\n");
+        try {
+            p.accepts(OUT_DCP_OPT).withOptionalArg().defaultsTo("mult.dcp").describedAs("Output DCP File Name");
+            p.printHelpOn(System.out);
+            
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+    
+    public static void main(String[] args) {
+        // Extract program options
+        OptionParser p = createOptionParser();
+        OptionSet opts = p.parse(args);
+        boolean verbose = (boolean) opts.valueOf(VERBOSE_OPT);
+        if(opts.has(HELP_OPT)){
+            printHelp(p);
+            return;
+        }
+        CodePerfTracker t = verbose ? new CodePerfTracker(MultGenerator.class.getSimpleName(),true).start("Init") : null;
+        
+        String partName = (String) opts.valueOf(PART_OPT);
+        String designName = (String) opts.valueOf(DESIGN_NAME_OPT);
+        String outputDCPFileName = (String) opts.valueOf(OUT_DCP_OPT);
+        String clkName = (String) opts.valueOf(CLK_NAME_OPT);
+        double clkPeriodConstraint = (double) opts.valueOf(CLK_CONSTRAINT_OPT);
+        int width = (int) opts.valueOf(WIDTH_OPT);        
+        String dspName = (String) opts.valueOf(DSP_SITE_OPT);
+        
+        // Perform some error checking on inputs
+        Part part = PartNameTools.getPart(partName);
+        if(part == null || part.isSeries7()){
+            throw new RuntimeException("ERROR: Invalid/unsupport part " + partName + ".");
+        }
+        
+        Design d = new Design(designName,partName);
+        d.setAutoIOBuffers(false);
+        Device dev = d.getDevice();
+        
+        t.stop().start("Create Multiplier");
+        Site dsp = dev.getSite(dspName);
+        createMult(d, dsp, width, designName, clkName);            
+                
+        // Add a clock constraint
+        String tcl = "create_clock -name "+clkName+" -period "+clkPeriodConstraint+" [get_ports "+clkName+"]";
+        d.addXDCConstraint(ConstraintGroup.LATE, tcl);
+        d.setAutoIOBuffers(false);
+        
+        t.stop();
 
-		d.writeCheckpoint(outputDCPFileName, t);
-		if(verbose) System.out.println("Wrote final DCP: " + outputDCPFileName);
-	}
+        d.writeCheckpoint(outputDCPFileName, t);
+        if(verbose) System.out.println("Wrote final DCP: " + outputDCPFileName);
+    }
 }

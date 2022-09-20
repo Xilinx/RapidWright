@@ -1,6 +1,7 @@
 /* 
  * Original work: Copyright (c) 2010-2011 Brigham Young University
- * Modified work: Copyright (c) 2017 Xilinx, Inc. 
+ * Modified work: Copyright (c) 2017-2022, Xilinx, Inc. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -46,13 +47,13 @@ public class StreamGobbler extends Thread{
             BufferedReader br = new BufferedReader(isr);
             String str = null;
             while( (str = br.readLine()) != null){
-            	if(verbose){
-            		System.out.println(str);
-            	}
+                if(verbose){
+                    System.out.println(str);
+                }
             }
         } 
         catch (IOException ioe){
-        	ioe.printStackTrace();  
+            ioe.printStackTrace();  
         }
     }
 }

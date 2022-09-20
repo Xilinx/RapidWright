@@ -1,5 +1,6 @@
 /* 
- * Copyright (c) 2017 Xilinx, Inc. 
+ * Copyright (c) 2017-2022, Xilinx, Inc. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -36,19 +37,19 @@ import com.xilinx.rapidwright.util.MessageGenerator;
  */
 public class DeviceLoader {
 
-	public static void main(String[] args) {
-		if(args.length != 1){
-			System.out.println("USAGE: <partname>");
-			return;
-		}
-		Part p = PartNameTools.getPart(args[0]);
-		if(p == null){
-		    throw new RuntimeException("The partname " + args[0] + " is invalid or unrecognized, cannot load device.");
-		}
-		CodePerfTracker track = new CodePerfTracker("Load Device for Part " + p.getName());
-		track.start("Load file");
-		Device d = Device.getDevice(p);
-		track.stop().printSummary();
-		
-	}	
+    public static void main(String[] args) {
+        if(args.length != 1){
+            System.out.println("USAGE: <partname>");
+            return;
+        }
+        Part p = PartNameTools.getPart(args[0]);
+        if(p == null){
+            throw new RuntimeException("The partname " + args[0] + " is invalid or unrecognized, cannot load device.");
+        }
+        CodePerfTracker track = new CodePerfTracker("Load Device for Part " + p.getName());
+        track.start("Load file");
+        Device d = Device.getDevice(p);
+        track.stop().printSummary();
+        
+    }    
 }

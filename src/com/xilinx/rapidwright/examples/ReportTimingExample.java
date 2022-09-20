@@ -1,5 +1,6 @@
 /* 
- * Copyright (c) 2019 Xilinx, Inc. 
+ * Copyright (c) 2019-2022, Xilinx, Inc. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -37,8 +38,8 @@ public class ReportTimingExample {
 
     public static void main(String[] args) {
         if(args.length != 1) {
-        	System.out.println("USAGE: <dcp_file_name>");
-        	return;
+            System.out.println("USAGE: <dcp_file_name>");
+            return;
         }
         CodePerfTracker t = new CodePerfTracker("Report Timing Example");
         t.useGCToTrackMemory(true);

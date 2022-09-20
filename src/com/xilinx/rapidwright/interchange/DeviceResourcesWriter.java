@@ -1,5 +1,6 @@
 /* 
- * Copyright (c) 2020 Xilinx, Inc. 
+ * Copyright (c) 2020-2022, Xilinx, Inc. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -110,9 +111,9 @@ public class DeviceResourcesWriter {
 
     public static void populateSiteEnumerations(SiteInst siteInst, Site site) {
         if(!siteTypes.containsKey(siteInst.getSiteTypeEnum())) {
-        	if(site.getSiteTypeEnum() != siteInst.getSiteTypeEnum()) {
-        		return;
-        	}
+            if(site.getSiteTypeEnum() != siteInst.getSiteTypeEnum()) {
+                return;
+            }
             siteTypes.put(siteInst.getSiteTypeEnum(), site);
             allStrings.addObject(siteInst.getSiteTypeEnum().toString());
 
@@ -163,7 +164,7 @@ public class DeviceResourcesWriter {
                     populateSiteEnumerations(altSiteInst, site);
                     design.removeSiteInst(altSiteInst);
                     if(!allAltSiteTypeEnums.containsKey(altSiteTypes[i])) {
-                        allAltSiteTypeEnums.put(altSiteTypes[i], site);                    	
+                        allAltSiteTypeEnums.put(altSiteTypes[i], site);                        
                     }
                 }
             }
@@ -180,9 +181,9 @@ public class DeviceResourcesWriter {
         }
         
         for(Entry<SiteTypeEnum, Site> altSiteType : allAltSiteTypeEnums.entrySet()) {
-        	if (!siteTypes.containsKey(altSiteType.getKey())) {
-        		siteTypes.put(altSiteType.getKey(), altSiteType.getValue());
-        	}
+            if (!siteTypes.containsKey(altSiteType.getKey())) {
+                siteTypes.put(altSiteType.getKey(), altSiteType.getValue());
+            }
         }
     }
 
@@ -246,23 +247,23 @@ public class DeviceResourcesWriter {
 
 
     private static boolean containsUnusedMacros(EDIFCell cell, Set<EDIFCell> unusedMacros) {
-    	Queue<EDIFCell> q = new LinkedList<>(); 
-    	Set<EDIFCell> visited = new HashSet<>();
-    	q.add(cell);
-    	while(!q.isEmpty()) {
-    		EDIFCell curr = q.poll();
-    		visited.add(curr);
-    		if(unusedMacros.contains(curr)) {
-    			unusedMacros.add(curr);
-    			return true;
-    		}
-    		for(EDIFCellInst inst : cell.getCellInsts()) {
-    			EDIFCell child = inst.getCellType();
-    			if(visited.contains(child)) continue;
-    			q.add(child);
-    		}
-    	}
-    	return false;
+        Queue<EDIFCell> q = new LinkedList<>(); 
+        Set<EDIFCell> visited = new HashSet<>();
+        q.add(cell);
+        while(!q.isEmpty()) {
+            EDIFCell curr = q.poll();
+            visited.add(curr);
+            if(unusedMacros.contains(curr)) {
+                unusedMacros.add(curr);
+                return true;
+            }
+            for(EDIFCellInst inst : cell.getCellInsts()) {
+                EDIFCell child = inst.getCellType();
+                if(visited.contains(child)) continue;
+                q.add(child);
+            }
+        }
+        return false;
     }
     
     public static void writeDeviceResourcesFile(String part, Device device, CodePerfTracker t,
@@ -318,8 +319,8 @@ public class DeviceResourcesWriter {
             for(EDIFCellInst inst : cell.getCellInsts()) {
                 EDIFCell instCell = inst.getCellType();
                 if(!prims.containsCell(instCell) && !macros.containsCell(instCell)) {
-                	unsupportedMacros.add(cell);
-                	continue;
+                    unsupportedMacros.add(cell);
+                    continue;
                 }
                 EDIFCell macroCell = macros.getCell(instCell.getName());
                 if(macroCell != null && !unsupportedMacros.contains(macroCell)) {
@@ -332,9 +333,9 @@ public class DeviceResourcesWriter {
         // Not all devices have all the primitives to support all macros, thus we will remove
         // them to avoid stale references
         for(EDIFCell macro : new ArrayList<>(macros.getCells())) {
-        	if(containsUnusedMacros(macro, unsupportedMacros)) {
-        		macros.removeCell(macro);
-        	}
+            if(containsUnusedMacros(macro, unsupportedMacros)) {
+                macros.removeCell(macro);
+            }
         }
 
         Map<String, Pair<String, EnumSet<IOStandard>>> macroCollapseExceptionMap = 

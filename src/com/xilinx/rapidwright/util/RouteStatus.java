@@ -1,5 +1,6 @@
 /* 
- * Copyright (c) 2017 Xilinx, Inc. 
+ * Copyright (c) 2017-2022, Xilinx, Inc. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -33,157 +34,157 @@ import java.util.HashSet;
  */
 public class RouteStatus implements Comparable<RouteStatus> {
 
-	private String name;
-	
-	private String status;
-	
-	private ArrayList<ArrayList<String>> subTrees;
+    private String name;
+    
+    private String status;
+    
+    private ArrayList<ArrayList<String>> subTrees;
 
-	/**
-	 * @return the name
-	 */
-	public String getName() {
-		return name;
-	}
+    /**
+     * @return the name
+     */
+    public String getName() {
+        return name;
+    }
 
-	/**
-	 * @param name the name to set
-	 */
-	public void setName(String name) {
-		this.name = name;
-	}
+    /**
+     * @param name the name to set
+     */
+    public void setName(String name) {
+        this.name = name;
+    }
 
-	/**
-	 * @return the status
-	 */
-	public String getStatus() {
-		return status;
-	}
+    /**
+     * @return the status
+     */
+    public String getStatus() {
+        return status;
+    }
 
-	/**
-	 * @param status the status to set
-	 */
-	public void setStatus(String status) {
-		this.status = status;
-	}
+    /**
+     * @param status the status to set
+     */
+    public void setStatus(String status) {
+        this.status = status;
+    }
 
-	/**
-	 * @return the subTrees
-	 */
-	public ArrayList<ArrayList<String>> getSubTrees() {
-		return subTrees;
-	}
+    /**
+     * @return the subTrees
+     */
+    public ArrayList<ArrayList<String>> getSubTrees() {
+        return subTrees;
+    }
 
-	/**
-	 * @param subTrees the subTrees to set
-	 */
-	public void setSubTrees(ArrayList<ArrayList<String>> subTrees) {
-		this.subTrees = subTrees;
-	}
+    /**
+     * @param subTrees the subTrees to set
+     */
+    public void setSubTrees(ArrayList<ArrayList<String>> subTrees) {
+        this.subTrees = subTrees;
+    }
 
-	@Override
-	public int compareTo(RouteStatus o) {
-		return this.getName().compareTo(o.getName());
-	}
+    @Override
+    public int compareTo(RouteStatus o) {
+        return this.getName().compareTo(o.getName());
+    }
 
-	/* (non-Javadoc)
-	 * @see java.lang.Object#hashCode()
-	 */
-	@Override
-	public int hashCode() {
-		final int prime = 31;
-		int result = 1;
-		result = prime * result + ((name == null) ? 0 : name.hashCode());
-		result = prime * result + ((status == null) ? 0 : status.hashCode());
-		result = prime * result
-				+ ((subTrees == null) ? 0 : subTrees.hashCode());
-		return result;
-	}
+    /* (non-Javadoc)
+     * @see java.lang.Object#hashCode()
+     */
+    @Override
+    public int hashCode() {
+        final int prime = 31;
+        int result = 1;
+        result = prime * result + ((name == null) ? 0 : name.hashCode());
+        result = prime * result + ((status == null) ? 0 : status.hashCode());
+        result = prime * result
+                + ((subTrees == null) ? 0 : subTrees.hashCode());
+        return result;
+    }
 
-	/* (non-Javadoc)
-	 * @see java.lang.Object#equals(java.lang.Object)
-	 */
-	@Override
-	public boolean equals(Object obj) {
-		if (this == obj)
-			return true;
-		if (obj == null)
-			return false;
-		if (getClass() != obj.getClass())
-			return false;
-		RouteStatus other = (RouteStatus) obj;
-		if (name == null) {
-			if (other.name != null)
-				return false;
-		} else if (!name.equals(other.name))
-			return false;
-		if (status == null) {
-			if (other.status != null)
-				return false;
-		} else if (!status.equals(other.status))
-			return false;
-		if (subTrees == null) {
-			if (other.subTrees != null)
-				return false;
-		} else if (!subTrees.equals(other.subTrees))
-			return false;
-		return true;
-	}
+    /* (non-Javadoc)
+     * @see java.lang.Object#equals(java.lang.Object)
+     */
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj)
+            return true;
+        if (obj == null)
+            return false;
+        if (getClass() != obj.getClass())
+            return false;
+        RouteStatus other = (RouteStatus) obj;
+        if (name == null) {
+            if (other.name != null)
+                return false;
+        } else if (!name.equals(other.name))
+            return false;
+        if (status == null) {
+            if (other.status != null)
+                return false;
+        } else if (!status.equals(other.status))
+            return false;
+        if (subTrees == null) {
+            if (other.subTrees != null)
+                return false;
+        } else if (!subTrees.equals(other.subTrees))
+            return false;
+        return true;
+    }
 
-	/**
-	 * @param r2
-	 */
-	public void reportDifferences(RouteStatus r2) {
-		boolean printedName = false;
-		if(!getStatus().equals(r2.getStatus())){
-			if(!printedName) {System.out.println("DIFF: " + getName()); printedName = true;}
-			System.out.println("  Status: " + getStatus() + " " + r2.getStatus());
-		}
-		ArrayList<ArrayList<String>> myTrees = getSubTrees();
-		ArrayList<ArrayList<String>> otherTrees = r2.getSubTrees();
-		if(myTrees.size() != otherTrees.size()){
-			if(!printedName) {System.out.println("DIFF: " + getName()); printedName = true;}
-			System.out.println("  SubTree Count: " + myTrees.size() + " " + otherTrees.size());
-		}
-		
-		
-		HashSet<String> set = new HashSet<String>();
-		for(ArrayList<String> list : myTrees){
-			set.addAll(list);
-		}
-		for(ArrayList<String> list : myTrees){
-			for(String other : list){
-				boolean success = set.remove(other);
-				if(!success){
-					if(!printedName) {System.out.println("DIFF: " + getName()); printedName = true;}
-					System.out.println("  2: " + other);
-				}				
-			}
-		}
-		for(String mine : set){
-			if(!printedName) {System.out.println("DIFF: " + getName()); printedName = true;}
-			System.out.println("  1: " + mine);				
-		}
-		
-		
-		/*
-		for(int i=0; i < myTrees.size(); i++){
-			if(i >= otherTrees.size()) return;
-			ArrayList<String> myTree = myTrees.get(i);
-			ArrayList<String> otherTree = otherTrees.get(i);
-			HashSet<String> set = new HashSet<String>(myTree);
-			for(String other : otherTree){
-				boolean success = set.remove(other);
-				if(!success){
-					if(!printedName) {System.out.println("DIFF: " + getName()); printedName = true;}
-					System.out.println("  2: " + other);
-				}
-			}
-			for(String mine : set){
-				if(!printedName) {System.out.println("DIFF: " + getName()); printedName = true;}
-				System.out.println("  1: " + mine);				
-			}
-		}*/
-		
-	}
+    /**
+     * @param r2
+     */
+    public void reportDifferences(RouteStatus r2) {
+        boolean printedName = false;
+        if(!getStatus().equals(r2.getStatus())){
+            if(!printedName) {System.out.println("DIFF: " + getName()); printedName = true;}
+            System.out.println("  Status: " + getStatus() + " " + r2.getStatus());
+        }
+        ArrayList<ArrayList<String>> myTrees = getSubTrees();
+        ArrayList<ArrayList<String>> otherTrees = r2.getSubTrees();
+        if(myTrees.size() != otherTrees.size()){
+            if(!printedName) {System.out.println("DIFF: " + getName()); printedName = true;}
+            System.out.println("  SubTree Count: " + myTrees.size() + " " + otherTrees.size());
+        }
+        
+        
+        HashSet<String> set = new HashSet<String>();
+        for(ArrayList<String> list : myTrees){
+            set.addAll(list);
+        }
+        for(ArrayList<String> list : myTrees){
+            for(String other : list){
+                boolean success = set.remove(other);
+                if(!success){
+                    if(!printedName) {System.out.println("DIFF: " + getName()); printedName = true;}
+                    System.out.println("  2: " + other);
+                }                
+            }
+        }
+        for(String mine : set){
+            if(!printedName) {System.out.println("DIFF: " + getName()); printedName = true;}
+            System.out.println("  1: " + mine);                
+        }
+        
+        
+        /*
+        for(int i=0; i < myTrees.size(); i++){
+            if(i >= otherTrees.size()) return;
+            ArrayList<String> myTree = myTrees.get(i);
+            ArrayList<String> otherTree = otherTrees.get(i);
+            HashSet<String> set = new HashSet<String>(myTree);
+            for(String other : otherTree){
+                boolean success = set.remove(other);
+                if(!success){
+                    if(!printedName) {System.out.println("DIFF: " + getName()); printedName = true;}
+                    System.out.println("  2: " + other);
+                }
+            }
+            for(String mine : set){
+                if(!printedName) {System.out.println("DIFF: " + getName()); printedName = true;}
+                System.out.println("  1: " + mine);                
+            }
+        }*/
+        
+    }
 }

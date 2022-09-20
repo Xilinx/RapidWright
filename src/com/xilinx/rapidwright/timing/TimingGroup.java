@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2019 Xilinx, Inc.
+ * Copyright (c) 2019-2022, Xilinx, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * This file is part of RapidWright.
@@ -511,7 +512,7 @@ public class TimingGroup implements Comparable<TimingGroup> {
      * @return The list of nodes in the timing group
      */
     public List<Node> getNodes() {
-    	return nodes;
+        return nodes;
     }
     
     /**
@@ -520,7 +521,7 @@ public class TimingGroup implements Comparable<TimingGroup> {
      * @return Node at the index i of this timing group
      */
     public Node getNode(int i) {
-    	return nodes.get(i);
+        return nodes.get(i);
     }
     
     /**
@@ -528,58 +529,58 @@ public class TimingGroup implements Comparable<TimingGroup> {
      * @return The last node in the timing group
      */
     public Node getLastNode() {
-    	return nodes.get(nodes.size() - 1);
+        return nodes.get(nodes.size() - 1);
     }
     
     public List<PIP> getPIPs() {
-    	return pips;
+        return pips;
     }
     
     public PIP getPIP(int i) {
-    	return pips.get(i);
+        return pips.get(i);
     }
     
     public PIP getLastPIP() {
-    	return pips.get(pips.size()-1);
+        return pips.get(pips.size()-1);
     }
     
     public List<IntentCode> getNodeTypes() {
-    	return nodeTypes; 
+        return nodeTypes; 
     }
     
     public IntentCode getNodeType(int i) {
-    	return nodeTypes.get(i);
+        return nodeTypes.get(i);
     }
     
     public GroupDelayType getDelayType() {
-    	return groupDelayType; 
+        return groupDelayType; 
     }
     
     public GroupWireDirection getWireDirection() {
-    	return groupWireDir;
+        return groupWireDir;
     }
     
     public TimingDirection getDirection() {
-    	return direction;
+        return direction;
     }
     
     public boolean isInitialGroup() {
-    	return isInitialGroup;
+        return isInitialGroup;
     }
     
     public boolean isFinalGroup() {
-    	return isFinalGroup;
+        return isFinalGroup;
     }
     
     public void setInitialGroup(boolean value) {
-    	isInitialGroup = value;
+        isInitialGroup = value;
     }
     
     public void setFinalGroup(boolean value) {
-    	isFinalGroup = value;
+        isFinalGroup = value;
     }
     
     public boolean hasPinFeed() {
-    	return hasPinFeed;
+        return hasPinFeed;
     }  
 }

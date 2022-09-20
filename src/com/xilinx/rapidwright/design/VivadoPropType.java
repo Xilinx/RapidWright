@@ -1,6 +1,7 @@
 /*
  * 
- * Copyright (c) 2020 Xilinx, Inc. 
+ * Copyright (c) 2020-2022, Xilinx, Inc. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -27,10 +28,10 @@ package com.xilinx.rapidwright.design;
  *
  */
 public enum VivadoPropType {
-	BINARY,
-	BOOL,
-	DOUBLE,
-	HEX,
-	INT,
-	STRING,
+    BINARY,
+    BOOL,
+    DOUBLE,
+    HEX,
+    INT,
+    STRING,
 }

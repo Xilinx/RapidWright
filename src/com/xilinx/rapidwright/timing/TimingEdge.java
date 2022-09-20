@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2019 Xilinx, Inc.
+ * Copyright (c) 2019-2022, Xilinx, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * This file is part of RapidWright.
@@ -136,9 +137,9 @@ public class TimingEdge extends DefaultEdge {
     public String toString() {
         String result = "";
          if (hasEDIFPortInsts) {
-        	if(timingGraph.hierCellInstMap == null) {
-        		timingGraph.populateHierCellInstMap();
-        	}
+            if(timingGraph.hierCellInstMap == null) {
+                timingGraph.populateHierCellInstMap();
+            }
             String sCellInst = (srcPort.getCellInst() != null) ? 
                     "" + timingGraph.hierCellInstMap.get(srcPort.getCellInst()) : "top";
             String dCellInst = (dstPort.getCellInst() != null) ? 
@@ -253,31 +254,31 @@ public class TimingEdge extends DefaultEdge {
     }
     
     public float getIntraSiteDelay() {
-		return intraSiteDelay;
-	}
+        return intraSiteDelay;
+    }
 
-	public void setIntraSiteDelay(float intraSiteDelay) {
-		this.intraSiteDelay = intraSiteDelay;
-	}
+    public void setIntraSiteDelay(float intraSiteDelay) {
+        this.intraSiteDelay = intraSiteDelay;
+    }
     
     public String toStringOnSitePinInsts(){
-    	return this.getFirstPin().toString() + " -> " + this.getSecondPin().toString();
+        return this.getFirstPin().toString() + " -> " + this.getSecondPin().toString();
     }
     
     public String delaysInfo(){
-    	return "logic = " + this.logicDelay + ", intrasite = " + this.intraSiteDelay + ", net = " + this.netDelay + ", total = " + this.delay;
+        return "logic = " + this.logicDelay + ", intrasite = " + this.intraSiteDelay + ", net = " + this.netDelay + ", total = " + this.delay;
     }
     
     public void setRouteDelay(float routeDelay){
-    	this.netDelay = this.intraSiteDelay + routeDelay;
-    	this.delay = logicDelay + this.netDelay;
-    	if (timingGraph.containsEdge(this))
+        this.netDelay = this.intraSiteDelay + routeDelay;
+        this.delay = logicDelay + this.netDelay;
+        if (timingGraph.containsEdge(this))
             timingGraph.setEdgeWeight(this, this.delay);
-    	else
-    		System.err.println("timing graph does not contain timing edge");
+        else
+            System.err.println("timing graph does not contain timing edge");
     }
 
-	/**
+    /**
      * Sets the net-related component of the delay in ps for this edge.
      * @param netDelay Net delay in picoseconds.
      */
@@ -300,35 +301,35 @@ public class TimingEdge extends DefaultEdge {
     }
 
     @Override
-	public int hashCode() {
-		final int prime = 31;
-		int result = 1;
-		result = prime * result + ((dst == null) ? 0 : dst.hashCode());
-		result = prime * result + ((src == null) ? 0 : src.hashCode());
-		return result;
-	}
+    public int hashCode() {
+        final int prime = 31;
+        int result = 1;
+        result = prime * result + ((dst == null) ? 0 : dst.hashCode());
+        result = prime * result + ((src == null) ? 0 : src.hashCode());
+        return result;
+    }
 
-	@Override
-	public boolean equals(Object obj) {
-		if (this == obj)
-			return true;
-		if (obj == null)
-			return false;
-		if (getClass() != obj.getClass())
-			return false;
-		TimingEdge other = (TimingEdge) obj;
-		if (dst == null) {
-			if (other.dst != null)
-				return false;
-		} else if (!dst.equals(other.dst))
-			return false;
-		if (src == null) {
-			if (other.src != null)
-				return false;
-		} else if (!src.equals(other.src))
-			return false;
-		return true;
-	}
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj)
+            return true;
+        if (obj == null)
+            return false;
+        if (getClass() != obj.getClass())
+            return false;
+        TimingEdge other = (TimingEdge) obj;
+        if (dst == null) {
+            if (other.dst != null)
+                return false;
+        } else if (!dst.equals(other.dst))
+            return false;
+        if (src == null) {
+            if (other.src != null)
+                return false;
+        } else if (!src.equals(other.src))
+            return false;
+        return true;
+    }
     
     /**
      * Gets the first vertex of this edge.

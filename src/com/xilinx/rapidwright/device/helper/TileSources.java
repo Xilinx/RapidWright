@@ -1,6 +1,7 @@
 /* 
  * Original work: Copyright (c) 2010-2011 Brigham Young University
- * Modified work: Copyright (c) 2017 Xilinx, Inc. 
+ * Modified work: Copyright (c) 2017-2022, Xilinx, Inc. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -32,60 +33,60 @@ import java.util.Arrays;
  */
 public class TileSources implements Serializable{
 
-	private static final long serialVersionUID = -139462627137160891L;
-	/** Sources of the tile */
-	public int[] sources;
-	
-	public TileSources(int[] sources){
-		this.sources = sources;
-	}
+    private static final long serialVersionUID = -139462627137160891L;
+    /** Sources of the tile */
+    public int[] sources;
+    
+    public TileSources(int[] sources){
+        this.sources = sources;
+    }
 
-	/* (non-Javadoc)
-	 * @see java.lang.Object#hashCode()
-	 */
-	@Override
-	public int hashCode() {
-		int hash = 0;
-		
-		if(sources == null){
-			return hash;
-		}
-		else{
-			Arrays.sort(sources);
-			for(Integer i : sources){
-				hash += i * 7;
-			}
-			return hash;
-		}
-	}
+    /* (non-Javadoc)
+     * @see java.lang.Object#hashCode()
+     */
+    @Override
+    public int hashCode() {
+        int hash = 0;
+        
+        if(sources == null){
+            return hash;
+        }
+        else{
+            Arrays.sort(sources);
+            for(Integer i : sources){
+                hash += i * 7;
+            }
+            return hash;
+        }
+    }
 
-	/* (non-Javadoc)
-	 * @see java.lang.Object#equals(java.lang.Object)
-	 */
-	@Override
-	public boolean equals(Object obj) {
-		if (this == obj)
-			return true;
-		if (obj == null)
-			return false;
-		if (getClass() != obj.getClass())
-			return false;
-		TileSources other = (TileSources) obj;
-		if(other.sources == null && sources == null){
-			return true;
-		}
-		if(other.sources == null || sources == null){
-			return false;
-		}
-		Arrays.sort(other.sources);
-		Arrays.sort(sources);
-		for(int i=0; i< sources.length; i++){
-			if(sources[i] != other.sources[i]){
-				return false;
-			}
-		}
-		return true;
-	}
-	
-	
+    /* (non-Javadoc)
+     * @see java.lang.Object#equals(java.lang.Object)
+     */
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj)
+            return true;
+        if (obj == null)
+            return false;
+        if (getClass() != obj.getClass())
+            return false;
+        TileSources other = (TileSources) obj;
+        if(other.sources == null && sources == null){
+            return true;
+        }
+        if(other.sources == null || sources == null){
+            return false;
+        }
+        Arrays.sort(other.sources);
+        Arrays.sort(sources);
+        for(int i=0; i< sources.length; i++){
+            if(sources[i] != other.sources[i]){
+                return false;
+            }
+        }
+        return true;
+    }
+    
+    
 }

@@ -1,6 +1,7 @@
 /* 
  * Original work: Copyright (c) 2010-2011 Brigham Young University
- * Modified work: Copyright (c) 2017 Xilinx, Inc. 
+ * Modified work: Copyright (c) 2017-2022, Xilinx, Inc. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -42,145 +43,145 @@ import com.xilinx.rapidwright.device.Tile;
  *
  */
 public class HardMacro extends ModuleInst implements Comparable<Object> {
-	private final ModuleInst original;
-	
-	private ArrayList<PortWire> connectedPortWires;
-	
-	private HashSet<Path> connectedPaths;
-	
-	private Site tempAnchorSite;
-	private RelocatableTileRectangle tempAnchorBoundingBox;
+    private final ModuleInst original;
+    
+    private ArrayList<PortWire> connectedPortWires;
+    
+    private HashSet<Path> connectedPaths;
+    
+    private Site tempAnchorSite;
+    private RelocatableTileRectangle tempAnchorBoundingBox;
 
-	
-	private int tileSize = 0;
+    
+    private int tileSize = 0;
 
-	public HardMacro(ModuleInst moduleInst) {
-		super(moduleInst);
-		setConnectedPortWires(new ArrayList<PortWire>());
-		connectedPaths = new HashSet<Path>();
-		original = moduleInst;
-	}
+    public HardMacro(ModuleInst moduleInst) {
+        super(moduleInst);
+        setConnectedPortWires(new ArrayList<PortWire>());
+        connectedPaths = new HashSet<Path>();
+        original = moduleInst;
+    }
 
-	/**
-	 * Updates the total number of tiles used in the hard macro.
-	 */
-	public void calculateTileSize(){
-		HashSet<Tile> tileSet = new HashSet<Tile>(); 
-		for(SiteInst i : getSiteInsts()){
-			tileSet.add(i.getTile());
-		}
-		for(Net n : getNets()){
-			for(PIP p : n.getPIPs()){
-				tileSet.add(p.getTile());
-			}
-		}
-		this.setTileSize(tileSet.size());
-	}
-	
-	/**
-	 * @return the validPlacements
-	 */
-	public List<Site> getValidPlacements() {
-		return getModule().getAllValidPlacements();
-	}
-	
-	public void unsetTempAnchorSite(){
-		this.tempAnchorSite = null;
-	}
-	
-	/**
-	 * @return the tempAnchorSite
-	 */
-	public Site getTempAnchorSite() {
-		return tempAnchorSite;
-	}
+    /**
+     * Updates the total number of tiles used in the hard macro.
+     */
+    public void calculateTileSize(){
+        HashSet<Tile> tileSet = new HashSet<Tile>(); 
+        for(SiteInst i : getSiteInsts()){
+            tileSet.add(i.getTile());
+        }
+        for(Net n : getNets()){
+            for(PIP p : n.getPIPs()){
+                tileSet.add(p.getTile());
+            }
+        }
+        this.setTileSize(tileSet.size());
+    }
+    
+    /**
+     * @return the validPlacements
+     */
+    public List<Site> getValidPlacements() {
+        return getModule().getAllValidPlacements();
+    }
+    
+    public void unsetTempAnchorSite(){
+        this.tempAnchorSite = null;
+    }
+    
+    /**
+     * @return the tempAnchorSite
+     */
+    public Site getTempAnchorSite() {
+        return tempAnchorSite;
+    }
 
-	/**
-	 * @param tempAnchorSite the tempAnchorSite to set
-	 */
-	public void setTempAnchorSite(Site tempAnchorSite, HashMap<Site, HardMacro> currentPlacements) {
+    /**
+     * @param tempAnchorSite the tempAnchorSite to set
+     */
+    public void setTempAnchorSite(Site tempAnchorSite, HashMap<Site, HardMacro> currentPlacements) {
 
-		// perform the move
-		if (currentPlacements != null) {
-			currentPlacements.remove(this.tempAnchorSite);
-			currentPlacements.put(tempAnchorSite, this);
-		}
+        // perform the move
+        if (currentPlacements != null) {
+            currentPlacements.remove(this.tempAnchorSite);
+            currentPlacements.put(tempAnchorSite, this);
+        }
 
-		this.tempAnchorSite = tempAnchorSite;
-		this.tempAnchorBoundingBox = getModule().getBoundingBox().getCorresponding(tempAnchorSite.getTile(), getModule().getAnchor().getTile());
-	}
-	
-	/**
-	 * @param connectedPortWires the connectedPortWires to set
-	 */
-	public void setConnectedPortWires(ArrayList<PortWire> connectedPortWires) {
-		this.connectedPortWires = connectedPortWires;
-	}
+        this.tempAnchorSite = tempAnchorSite;
+        this.tempAnchorBoundingBox = getModule().getBoundingBox().getCorresponding(tempAnchorSite.getTile(), getModule().getAnchor().getTile());
+    }
+    
+    /**
+     * @param connectedPortWires the connectedPortWires to set
+     */
+    public void setConnectedPortWires(ArrayList<PortWire> connectedPortWires) {
+        this.connectedPortWires = connectedPortWires;
+    }
 
-	/**
-	 * @return the connectedPortWires
-	 */
-	public ArrayList<PortWire> getConnectedPortWires() {
-		return connectedPortWires;
-	}
+    /**
+     * @return the connectedPortWires
+     */
+    public ArrayList<PortWire> getConnectedPortWires() {
+        return connectedPortWires;
+    }
 
-	public void addConnectedPortWire(PortWire wire){
-		connectedPortWires.add(wire);
-	}
-	
-	public void addConnectedPath(Path path){
-		connectedPaths.add(path);
-	}
-	
-	public HashSet<Path> getConnectedPaths(){
-		return connectedPaths;
-	}
+    public void addConnectedPortWire(PortWire wire){
+        connectedPortWires.add(wire);
+    }
+    
+    public void addConnectedPath(Path path){
+        connectedPaths.add(path);
+    }
+    
+    public HashSet<Path> getConnectedPaths(){
+        return connectedPaths;
+    }
 
-	@Override
-	public int compareTo(Object other){
-		return ((HardMacro)other).getTileSize() - getTileSize();
-	}
+    @Override
+    public int compareTo(Object other){
+        return ((HardMacro)other).getTileSize() - getTileSize();
+    }
 
-	@Override
-	public RelocatableTileRectangle getBoundingBox() {
-		if (getTempAnchorSite()!=null) {
-			return tempAnchorBoundingBox;
-		}
-		return super.getBoundingBox();
-	}
+    @Override
+    public RelocatableTileRectangle getBoundingBox() {
+        if (getTempAnchorSite()!=null) {
+            return tempAnchorBoundingBox;
+        }
+        return super.getBoundingBox();
+    }
 
-	public String toString(){
-		return getName();
-	}
+    public String toString(){
+        return getName();
+    }
 
-	/**
-	 * @return the tileSize
-	 */
-	public int getTileSize() {
-		return tileSize;
-	}
+    /**
+     * @return the tileSize
+     */
+    public int getTileSize() {
+        return tileSize;
+    }
 
-	/**
-	 * @param tileSize the tileSize to set
-	 */
-	public void setTileSize(int tileSize) {
-		this.tileSize = tileSize;
-	}
+    /**
+     * @param tileSize the tileSize to set
+     */
+    public void setTileSize(int tileSize) {
+        this.tileSize = tileSize;
+    }
 
-	public ModuleInst getOriginal() {
-		return original;
-	}
+    public ModuleInst getOriginal() {
+        return original;
+    }
 
-	@Override
-	public Site getPlacement() {
-		if(tempAnchorSite!=null) {
-			return tempAnchorSite;
-		}
-		return super.getPlacement();
-	}
+    @Override
+    public Site getPlacement() {
+        if(tempAnchorSite!=null) {
+            return tempAnchorSite;
+        }
+        return super.getPlacement();
+    }
 
-	@Override
-	public boolean isPlaced() {
-		return super.isPlaced() || tempAnchorSite!=null;
-	}
+    @Override
+    public boolean isPlaced() {
+        return super.isPlaced() || tempAnchorSite!=null;
+    }
 }

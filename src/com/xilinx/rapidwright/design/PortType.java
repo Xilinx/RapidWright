@@ -1,5 +1,6 @@
 /* 
- * Copyright (c) 2017 Xilinx, Inc. 
+ * Copyright (c) 2017-2022, Xilinx, Inc. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -28,13 +29,13 @@ package com.xilinx.rapidwright.design;
  * Created on: May 10, 2016
  */
 public enum PortType {
-	UNKNOWN,
-	LOCAL_CLOCK,
-	GLOBAL_CLOCK,
-	REGIONAL_CLOCK,
-	POWER,
-	GROUND,
-	UNCONNECTED,
-	DONT_CARE,
-	SIGNAL
+    UNKNOWN,
+    LOCAL_CLOCK,
+    GLOBAL_CLOCK,
+    REGIONAL_CLOCK,
+    POWER,
+    GROUND,
+    UNCONNECTED,
+    DONT_CARE,
+    SIGNAL
 }

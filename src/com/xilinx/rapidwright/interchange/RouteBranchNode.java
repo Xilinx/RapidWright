@@ -1,5 +1,6 @@
 /* 
- * Copyright (c) 2020 Xilinx, Inc. 
+ * Copyright (c) 2020-2022, Xilinx, Inc. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -135,9 +136,9 @@ public class RouteBranchNode {
     }
     
     public void addBranch(RouteBranchNode routeBranch) {
-    	if(routeBranch.getParent() != null) {
-    		return;
-    	}
+        if(routeBranch.getParent() != null) {
+            return;
+        }
         branches.add(routeBranch);
         routeBranch.setParent(this);
     }

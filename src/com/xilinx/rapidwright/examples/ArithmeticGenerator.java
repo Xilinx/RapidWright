@@ -1,6 +1,7 @@
 /*
  * 
- * Copyright (c) 2018 Xilinx, Inc. 
+ * Copyright (c) 2018-2022, Xilinx, Inc. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -31,18 +32,18 @@ package com.xilinx.rapidwright.examples;
  */
 public abstract class ArithmeticGenerator {
 
-	protected static final String PART_OPT = "p";
-	protected static final String DESIGN_NAME_OPT = "d";
-	protected static final String OUT_DCP_OPT = "o";
-	protected static final String CLK_NAME_OPT = "c";
-	protected static final String CLK_CONSTRAINT_OPT = "x";
-	protected static final String WIDTH_OPT = "w";
-	protected static final String VERBOSE_OPT = "v";
-	protected static final String HELP_OPT = "h";
+    protected static final String PART_OPT = "p";
+    protected static final String DESIGN_NAME_OPT = "d";
+    protected static final String OUT_DCP_OPT = "o";
+    protected static final String CLK_NAME_OPT = "c";
+    protected static final String CLK_CONSTRAINT_OPT = "x";
+    protected static final String WIDTH_OPT = "w";
+    protected static final String VERBOSE_OPT = "v";
+    protected static final String HELP_OPT = "h";
 
-	
-	public static final int BITS_PER_CLE = 8;
-	public static String INPUT_A_NAME = "A";
-	public static String INPUT_B_NAME = "B";
-	public static String RESULT_NAME = "S";
+    
+    public static final int BITS_PER_CLE = 8;
+    public static String INPUT_A_NAME = "A";
+    public static String INPUT_B_NAME = "B";
+    public static String RESULT_NAME = "S";
 }

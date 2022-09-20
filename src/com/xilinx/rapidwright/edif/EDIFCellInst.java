@@ -1,6 +1,7 @@
 /*
  * 
- * Copyright (c) 2017 Xilinx, Inc. 
+ * Copyright (c) 2017-2022, Xilinx, Inc. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -50,10 +51,10 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
     
     public static final EDIFName DEFAULT_VIEWREF = EDIFCell.DEFAULT_VIEW;
 
-	public static final String BLACK_BOX_PROP = "IS_IMPORTED";
-	public static final String BLACK_BOX_PROP_VERSAL = "black_box";
-	
-	private EDIFPortInstList portInsts;
+    public static final String BLACK_BOX_PROP = "IS_IMPORTED";
+    public static final String BLACK_BOX_PROP_VERSAL = "black_box";
+    
+    private EDIFPortInstList portInsts;
 
     protected EDIFCellInst(){
         
@@ -232,14 +233,14 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
     public void updateCellType(EDIFCell cellType) {
         setCellType(cellType);
     }
-	
-	public boolean isBlackBox(){
-		EDIFPropertyValue val = getProperty(BLACK_BOX_PROP);
-		if(val != null && val.getValue().toLowerCase().equals("true")) 
-			return true;
-		val = getProperty(BLACK_BOX_PROP_VERSAL);
-		if(val != null && val.getValue().toLowerCase().equals("1")) 
-			return true;
+    
+    public boolean isBlackBox(){
+        EDIFPropertyValue val = getProperty(BLACK_BOX_PROP);
+        if(val != null && val.getValue().toLowerCase().equals("true")) 
+            return true;
+        val = getProperty(BLACK_BOX_PROP_VERSAL);
+        if(val != null && val.getValue().toLowerCase().equals("1")) 
+            return true;
         return false;
     }
 

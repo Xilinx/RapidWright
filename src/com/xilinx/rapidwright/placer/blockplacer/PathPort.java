@@ -1,6 +1,7 @@
 /* 
  * Original work: Copyright (c) 2010-2011 Brigham Young University
- * Modified work: Copyright (c) 2017 Xilinx, Inc. 
+ * Modified work: Copyright (c) 2017-2022, Xilinx, Inc. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -32,88 +33,88 @@ import com.xilinx.rapidwright.device.Tile;
  *
  */
 public class PathPort {
-	
-	private final SitePinInst sitePinInst;
-	private final HardMacro block;
-	private final Tile tile;
-	private final Tile[][] nameRootTiles;
+    
+    private final SitePinInst sitePinInst;
+    private final HardMacro block;
+    private final Tile tile;
+    private final Tile[][] nameRootTiles;
 
-	public PathPort(SitePinInst sitePinInst, HardMacro block, Tile tile) {
-		this.sitePinInst = sitePinInst;
-		this.block = block;
-		this.tile = tile;
-		this.nameRootTiles = tile.getDevice().getTilesByNameRoot(tile.getNameRoot());
-	}
+    public PathPort(SitePinInst sitePinInst, HardMacro block, Tile tile) {
+        this.sitePinInst = sitePinInst;
+        this.block = block;
+        this.tile = tile;
+        this.nameRootTiles = tile.getDevice().getTilesByNameRoot(tile.getNameRoot());
+    }
 
-	private Tile cachedAnchor;
-	private Tile cachedRelocate;
+    private Tile cachedAnchor;
+    private Tile cachedRelocate;
 
-	public Tile getPortTile(){
-		if(block == null){
-			return tile;
-		}
-		Tile anchor = block.getTempAnchorSite().getTile();
+    public Tile getPortTile(){
+        if(block == null){
+            return tile;
+        }
+        Tile anchor = block.getTempAnchorSite().getTile();
 
-		if (cachedAnchor == anchor) {
-			return cachedRelocate;
-		}
+        if (cachedAnchor == anchor) {
+            return cachedRelocate;
+        }
 
-		final Tile res = Module.getCorrespondingTile(tile, anchor, block.getModule().getAnchor().getTile(), nameRootTiles);
-		cachedAnchor = anchor;
-		cachedRelocate = res;
-		return res;
-	}
+        final Tile res = Module.getCorrespondingTile(tile, anchor, block.getModule().getAnchor().getTile(), nameRootTiles);
+        cachedAnchor = anchor;
+        cachedRelocate = res;
+        return res;
+    }
 
-	
-	/**
-	 * @return the pin
-	 */
-	public SitePinInst getSitePinInst() {
-		return sitePinInst;
-	}
+    
+    /**
+     * @return the pin
+     */
+    public SitePinInst getSitePinInst() {
+        return sitePinInst;
+    }
 
 
-	/**
-	 * @return the block
-	 */
-	public HardMacro getBlock() {
-		return block;
-	}
+    /**
+     * @return the block
+     */
+    public HardMacro getBlock() {
+        return block;
+    }
 
-	public Tile getTemplateTile() {
-		return tile;
-	}
+    public Tile getTemplateTile() {
+        return tile;
+    }
 
-	/* (non-Javadoc)
-	 * @see java.lang.Object#hashCode()
-	 */
-	@Override
-	public int hashCode() {
-		final int prime = 31;
-		int result = 1;
-		result = prime * result + ((sitePinInst == null) ? 0 : sitePinInst.hashCode());
-		return result;
-	}
+    /* (non-Javadoc)
+     * @see java.lang.Object#hashCode()
+     */
+    @Override
+    public int hashCode() {
+        final int prime = 31;
+        int result = 1;
+        result = prime * result + ((sitePinInst == null) ? 0 : sitePinInst.hashCode());
+        return result;
+    }
 
-	/* (non-Javadoc)
-	 * @see java.lang.Object#equals(java.lang.Object)
-	 */
-	@Override
-	public boolean equals(Object obj) {
-		if (this == obj)
-			return true;
-		if (obj == null)
-			return false;
-		if (getClass() != obj.getClass())
-			return false;
-		PathPort other = (PathPort) obj;
-		if (sitePinInst == null) {
-			if (other.sitePinInst != null)
-				return false;
-		} else if (!sitePinInst.equals(other.sitePinInst))
-			return false;
-		return true;
-	}
-	
-	
+    /* (non-Javadoc)
+     * @see java.lang.Object#equals(java.lang.Object)
+     */
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj)
+            return true;
+        if (obj == null)
+            return false;
+        if (getClass() != obj.getClass())
+            return false;
+        PathPort other = (PathPort) obj;
+        if (sitePinInst == null) {
+            if (other.sitePinInst != null)
+                return false;
+        } else if (!sitePinInst.equals(other.sitePinInst))
+            return false;
+        return true;
+    }
+    
+    
 }

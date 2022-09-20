@@ -1,5 +1,6 @@
 /* 
- * Copyright (c) 2017 Xilinx, Inc. 
+ * Copyright (c) 2017-2022, Xilinx, Inc. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -40,92 +41,92 @@ import com.xilinx.rapidwright.gui.TileView;
  */
 public class PBlockGenDebugger extends DeviceBrowser {
 
-	PBlockGenerator pbGen = null;
-	
-	public PBlockGenDebugger(QWidget parent) {
-		super(parent);
-		
-		// set the title of the window
-		setWindowTitle("PBlock Debugger");
+    PBlockGenerator pbGen = null;
+    
+    public PBlockGenDebugger(QWidget parent) {
+        super(parent);
+        
+        // set the title of the window
+        setWindowTitle("PBlock Debugger");
 
-		// Setup the scene and view for the GUI
-		scene = new PBlockGenScene(device, hideTiles, drawPrimitives, this);
-		view = new TileView(scene);
-		setCentralWidget(view);
+        // Setup the scene and view for the GUI
+        scene = new PBlockGenScene(device, hideTiles, drawPrimitives, this);
+        view = new TileView(scene);
+        setCentralWidget(view);
 
-		// Setup some signals for when the user interacts with the view
-		scene.updateStatus.connect(this, "updateStatus(String, Tile)");
-		scene.updateTile.connect(this, "updateTile(Tile)");
+        // Setup some signals for when the user interacts with the view
+        scene.updateStatus.connect(this, "updateStatus(String, Tile)");
+        scene.updateTile.connect(this, "updateTile(Tile)");
 
-		pbGen = new PBlockGenerator();
-		pbGen.getEmitter().highlightTile.connect(this, "highlightTile(Tile)");
+        pbGen = new PBlockGenerator();
+        pbGen.getEmitter().highlightTile.connect(this, "highlightTile(Tile)");
 
-		QToolBar tb = new QToolBar(this);
-		tb.setWindowTitle(tr("File Actions"));
-		addToolBar(tb);
+        QToolBar tb = new QToolBar(this);
+        tb.setWindowTitle(tr("File Actions"));
+        addToolBar(tb);
 
-		QMenu fileMenu = new QMenu(tr("&File"), this);
-		menuBar().addMenu(fileMenu);
-		
-		QAction a = new QAction("Debug PBlockGenerator", this);
-		fileMenu.addAction(a);
-		a.triggered.connect(this, "debugPBlockGenerator()");
-	}
+        QMenu fileMenu = new QMenu(tr("&File"), this);
+        menuBar().addMenu(fileMenu);
+        
+        QAction a = new QAction("Debug PBlockGenerator", this);
+        fileMenu.addAction(a);
+        a.triggered.connect(this, "debugPBlockGenerator()");
+    }
 
-	private class DebugPBGen extends Thread{
-		PBlockGenerator pbgen; 
-		
-		public DebugPBGen(PBlockGenerator pbgen){
-			this.pbgen = pbgen;
-		}
-		
-		public void run(){
-			PBlockGenerator.debug = true;
-			
-			 
+    private class DebugPBGen extends Thread{
+        PBlockGenerator pbgen; 
+        
+        public DebugPBGen(PBlockGenerator pbgen){
+            this.pbgen = pbgen;
+        }
+        
+        public void run(){
+            PBlockGenerator.debug = true;
+            
+             
 
-			
-			String utilReportFile = "/home/clavin/build_fma/build_fma.runs/design_1_fma_ip_0_0_synth_1/design_1_fma_ip_0_0_utilization.report";
-			String shapeFile = "/home/clavin/build_fma/build_fma.runs/design_1_fma_ip_0_0_synth_1/design_1_fma_ip_0_0_shapes.txt";
-			
-			String[] pBlockArgs = new String[]{
-					"-u", utilReportFile, 
-					"-s", shapeFile,
-					"-c", "4",
-					"-a", "1.0",
-					"-o", "1.5"
-			};
-			PBlockGenerator.main(pBlockArgs);
-			/*for(int x=0; x < 100; x++){
-				pBlockArgs[5] = Integer.toString(x);
-				if(x==49){
-					System.out.println(Arrays.toString(pBlockArgs));
-					//PBlockGenerator.main(pBlockArgs);
-					PBlockGenerator.main(pBlockArgs);
-				}
+            
+            String utilReportFile = "/home/clavin/build_fma/build_fma.runs/design_1_fma_ip_0_0_synth_1/design_1_fma_ip_0_0_utilization.report";
+            String shapeFile = "/home/clavin/build_fma/build_fma.runs/design_1_fma_ip_0_0_synth_1/design_1_fma_ip_0_0_shapes.txt";
+            
+            String[] pBlockArgs = new String[]{
+                    "-u", utilReportFile, 
+                    "-s", shapeFile,
+                    "-c", "4",
+                    "-a", "1.0",
+                    "-o", "1.5"
+            };
+            PBlockGenerator.main(pBlockArgs);
+            /*for(int x=0; x < 100; x++){
+                pBlockArgs[5] = Integer.toString(x);
+                if(x==49){
+                    System.out.println(Arrays.toString(pBlockArgs));
+                    //PBlockGenerator.main(pBlockArgs);
+                    PBlockGenerator.main(pBlockArgs);
+                }
 
-			}*/
-			
-			throw new RuntimeException("To use this debugging feature, you need to modify PBlockGenDebugger.run()");
+            }*/
+            
+            throw new RuntimeException("To use this debugging feature, you need to modify PBlockGenDebugger.run()");
 
-		}
-	}
-	
-	public void debugPBlockGenerator(){
-		DebugPBGen d = new DebugPBGen(pbGen);
-		d.start();
-	}
-	
-	public void highlightTile(Tile t){
-		((PBlockGenScene)scene).highlightTile(t);
-	}
-	
-	
-	public static void main(String[] args){
-		QApplication.setGraphicsSystem("raster");
-		QApplication.initialize(args);
-		PBlockGenDebugger pbDebugger = new PBlockGenDebugger(null);
-		pbDebugger.show();
-		QApplication.exec();
-	}
+        }
+    }
+    
+    public void debugPBlockGenerator(){
+        DebugPBGen d = new DebugPBGen(pbGen);
+        d.start();
+    }
+    
+    public void highlightTile(Tile t){
+        ((PBlockGenScene)scene).highlightTile(t);
+    }
+    
+    
+    public static void main(String[] args){
+        QApplication.setGraphicsSystem("raster");
+        QApplication.initialize(args);
+        PBlockGenDebugger pbDebugger = new PBlockGenDebugger(null);
+        pbDebugger.show();
+        QApplication.exec();
+    }
 }

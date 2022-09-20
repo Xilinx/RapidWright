@@ -1,5 +1,6 @@
 /* 
- * Copyright (c) 2017 Xilinx, Inc. 
+ * Copyright (c) 2017-2022, Xilinx, Inc. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -38,19 +39,19 @@ import com.xilinx.rapidwright.device.Tile;
  */
 public class PBlockGenScene extends DeviceBrowserScene {
 
-	public PBlockGenScene(Device device, boolean hideTiles,
-			boolean drawPrimitives, DeviceBrowser browser) {
-		super(device, hideTiles, drawPrimitives, browser);
-	}
-	
-	
-	private static QColor highlightColor = new QColor(0, 255, 0, 190);
-	private static QPen highlightPen = new QPen(highlightColor);
-	private static QBrush highlightBrush = new QBrush(highlightColor);
-	
-	public void highlightTile(Tile t){		
-		QGraphicsRectItem rect = addRect(tileSize,tileSize, tileSize - 2, tileSize - 2, highlightPen, highlightBrush);
-		rect.setPos(t.getColumn() * tileSize, t.getRow() * tileSize);
-	}
-	
+    public PBlockGenScene(Device device, boolean hideTiles,
+            boolean drawPrimitives, DeviceBrowser browser) {
+        super(device, hideTiles, drawPrimitives, browser);
+    }
+    
+    
+    private static QColor highlightColor = new QColor(0, 255, 0, 190);
+    private static QPen highlightPen = new QPen(highlightColor);
+    private static QBrush highlightBrush = new QBrush(highlightColor);
+    
+    public void highlightTile(Tile t){        
+        QGraphicsRectItem rect = addRect(tileSize,tileSize, tileSize - 2, tileSize - 2, highlightPen, highlightBrush);
+        rect.setPos(t.getColumn() * tileSize, t.getRow() * tileSize);
+    }
+    
 }

@@ -1,6 +1,7 @@
 /* 
  * Original work: Copyright (c) 2010-2011 Brigham Young University
- * Modified work: Copyright (c) 2017 Xilinx, Inc. 
+ * Modified work: Copyright (c) 2017-2022, Xilinx, Inc. 
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -25,22 +26,22 @@ package com.xilinx.rapidwright.gui;
 import com.trolltech.qt.gui.QFileDialog.Filter;
 
 public class FileFilters {
-	/** Xilinx Design Language File Filter */
-	public static Filter xpnFilter = new Filter("Xilinx Physical Netlist Files (*.xpn)");
-	/** Xilinx Design Language File Filter */
-	public static Filter xdlFilter = new Filter("Xilinx Design Language Files (*.xdl)");
-	/** Native Circuit Description File Filter */
-	public static Filter ncdFilter = new Filter("Design Files (*.ncd)");
-	/** Hard Macro File Filter */
-	public static Filter nmcFilter = new Filter("Hard Macro Files (*.nmc)");
-	/** Portable Document Format File Filter */
-	public static Filter pdfFilter = new Filter("Portable Document Format Files (*.pdf)");
-	/** Xilinx Trace Report File Filter */
-	public static Filter twrFilter = new Filter("Xilinx Trace Report Files (*.twr)");
-	/** EDK Microprocessor Hardware Specification File Filter */
-	public static Filter mhsFilter = new Filter("Microprocessor Hardware Specification Files (*.mhs)");
-	/** Design Checkpoint File Filter */ 
-	public static Filter dcpFilter = new Filter("Design Checkpoint Files (*.dcp)");
-	/** Impl Guide File Filter */
-	public static Filter igFilter = new Filter("Implementation Guide Files (*.igf)");
+    /** Xilinx Design Language File Filter */
+    public static Filter xpnFilter = new Filter("Xilinx Physical Netlist Files (*.xpn)");
+    /** Xilinx Design Language File Filter */
+    public static Filter xdlFilter = new Filter("Xilinx Design Language Files (*.xdl)");
+    /** Native Circuit Description File Filter */
+    public static Filter ncdFilter = new Filter("Design Files (*.ncd)");
+    /** Hard Macro File Filter */
+    public static Filter nmcFilter = new Filter("Hard Macro Files (*.nmc)");
+    /** Portable Document Format File Filter */
+    public static Filter pdfFilter = new Filter("Portable Document Format Files (*.pdf)");
+    /** Xilinx Trace Report File Filter */
+    public static Filter twrFilter = new Filter("Xilinx Trace Report Files (*.twr)");
+    /** EDK Microprocessor Hardware Specification File Filter */
+    public static Filter mhsFilter = new Filter("Microprocessor Hardware Specification Files (*.mhs)");
+    /** Design Checkpoint File Filter */ 
+    public static Filter dcpFilter = new Filter("Design Checkpoint Files (*.dcp)");
+    /** Impl Guide File Filter */
+    public static Filter igFilter = new Filter("Implementation Guide Files (*.igf)");
 }
