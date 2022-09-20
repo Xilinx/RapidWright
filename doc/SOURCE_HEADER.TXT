@@ -1,8 +1,8 @@
 /* 
- * Copyright (c) ${year} Xilinx, Inc. 
+ * Copyright (c) ${year}, Advanced Micro Devices, Inc. 
  * All rights reserved.
  *
- * Author: ${user}, Xilinx Research Labs.
+ * Author: ${user}, Advanced Micro Devices, Inc.
  *  
  * This file is part of RapidWright. 
  * 

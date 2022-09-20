@@ -1,6 +1,7 @@
 
 /*
- * Copyright (c) 2022 Xilinx, Inc.
+ * Copyright (c) 2022, Xilinx, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Jakob Wenzel, Xilinx Research Labs.

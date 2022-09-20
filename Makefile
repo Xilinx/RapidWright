@@ -40,8 +40,20 @@ check_headers:
 		exit 1;\
 	fi
 
+check_tabs:
+	@ FILES_CONTAINING_TABS=$$(git grep $$'\t' -- '*.java'); \
+	if [ ! -z "$$FILES_CONTAINING_TABS" ] ;\
+	then \
+		echo "These files contain tab characters, please replace tabs with 4 spaces:" ;\
+		echo ;\
+		echo "$$FILES_CONTAINING_TABS" | sed 's/^/    /' ;\
+		echo ;\
+		echo "Use make check_tabs to automatically detect tab characters." ;\
+		exit 1;\
+	fi
 
-pre_commit: check_headers
+
+pre_commit: check_headers check_tabs
 
 enable_pre_commit_hook:
 	@ hook_file=$$(git rev-parse --git-path hooks/pre-commit) && \
