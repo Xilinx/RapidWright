@@ -41,7 +41,7 @@ check_headers:
 	fi
 
 check_tabs:
-	@ FILES_CONTAINING_TABS=$$(git grep $$'\t' -- '*.java'); \
+	@ FILES_CONTAINING_TABS=$$(git grep --cached $$'\t' -- '*.java'); \
 	if [ ! -z "$$FILES_CONTAINING_TABS" ] ;\
 	then \
 		echo "These files contain tab characters, please replace tabs with 4 spaces:" ;\
