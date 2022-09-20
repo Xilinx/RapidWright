@@ -44,11 +44,11 @@ public class PartialRouter extends RWRoute{
         if(!clk.hasPIPs()) {
             if(RouterHelper.isRoutableNetWithSourceSinks(clk)) {
                 addClkNet(clk);
-            }else {
+            } else {
                 increaseNumNotNeedingRouting();
                 System.err.println("ERROR: Incomplete clk net " + clk.getName());
             }
-        }else {
+        } else {
             preserveNet(clk);
             increaseNumPreservedClks();
         }
@@ -68,12 +68,12 @@ public class PartialRouter extends RWRoute{
                     addReservedNode(sink.getConnectedNode(), staticNet);
                 }
                 addStaticNetRoutingTargets(staticNet, sinks);
-            }else {
+            } else {
                 preserveNet(staticNet);
                 increaseNumPreservedStaticNets();
             }    
             
-        }else {// internally routed (sinks.size = 0)
+        } else {// internally routed (sinks.size = 0)
             preserveNet(staticNet);
             increaseNumNotNeedingRouting();
         }
@@ -83,7 +83,7 @@ public class PartialRouter extends RWRoute{
     protected void addNetConnectionToRoutingTargets(Net net) {
         if(!net.hasPIPs()) {
             createsNetWrapperAndConnections(net, config.getBoundingBoxExtensionX(), config.getBoundingBoxExtensionY(), isMultiSLRDevice());
-        }else{
+        } else {
             // In partial routing mode, a net with PIPs is preserved.
             // This means the routed net is supposed to be fully routed without conflicts.
             // TODO detect partially routed nets.

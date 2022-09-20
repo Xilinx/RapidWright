@@ -126,7 +126,7 @@ public class DesignInstrumentor {
             String[] tokens = line.split("\\s+");
             if(line.startsWith(SAMPLE_DEPTH_KEYWORD)) {
                 sampleDepth = Integer.parseInt(tokens[1]);
-            }else{
+            } else {
                 netNames.put(tokens[0], tokens[1]);
             }
         }
@@ -182,7 +182,7 @@ public class DesignInstrumentor {
             if(n.isStaticNet()) {
                 EDIFNet debugNet = EDIFTools.getStaticNet(n.getType(), topCell, design.getNetlist());
                 EDIFTools.addDebugPort(debugNet, topCell, currDebugPort, debugCore);
-            }else{
+            } else {
                 String debugNetName = portPrefix + "_debug_net_" + probeCount;
                 EDIFNet debugNet = EDIFTools.addDebugPortAndNet(debugNetName, topCell, currDebugPort, debugCore);
                 String debugPortName = portPrefix + "_debug_port_" + probeCount;
@@ -221,7 +221,7 @@ public class DesignInstrumentor {
             Net ilaClockNet = mi.getCorrespondingNet(ilaClockPort);
             design.movePinsToNewNetDeleteOldNet(ilaClockNet, clockNet, true);
             
-        }else{
+        } else {
             throw new RuntimeException("ERROR: Couldn't find any clock nets in design. Exiting...");
         }
     }
@@ -296,7 +296,7 @@ public class DesignInstrumentor {
         String debugHubCoreFileName = "design_1_xsdbm_0_0_opt_routed_routed";
         if(netNames.size() > 32) {
             ilaCoreFileName = "design_1_ila_1_0_opt_routed_routed";
-        }else{
+        } else {
             ilaCoreFileName = "design_1_ila_0_0_opt_routed_routed";
         }
     
@@ -376,7 +376,7 @@ public class DesignInstrumentor {
                 }
             }
             // The rest of the lines can be directly added from the template without modification.
-            else{
+            else {
                 ltx_strings.add(probeLine);
             }
         }        

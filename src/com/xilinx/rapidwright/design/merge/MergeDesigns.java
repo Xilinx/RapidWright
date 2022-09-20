@@ -138,7 +138,7 @@ public class MergeDesigns {
         for(Design design : designs) {
             if(result == null) {
                 result = design;
-            }else {
+            } else {
                 result = mergeDesigns(result, design, merger.get());
             }
         }

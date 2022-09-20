@@ -107,15 +107,15 @@ public class TileColumnPattern extends ArrayList<TileTypeEnum> implements Compar
         for(TileTypeEnum t : this) {
             if(Utils.isCLBM(t)) {
                 flags.add(TypesOfInterest.SLICEM);
-            }else if(Utils.isCLB(t)) {
+            } else if(Utils.isCLB(t)) {
                 flags.add(TypesOfInterest.SLICEL);
-            }else if(Utils.isDSP(t)) {
+            } else if(Utils.isDSP(t)) {
                 flags.add(TypesOfInterest.DSP);
-            }else if(Utils.isBRAM(t)) {
+            } else if(Utils.isBRAM(t)) {
                 flags.add(TypesOfInterest.BRAM);
-            }else if(Utils.isURAM(t)) {
+            } else if(Utils.isURAM(t)) {
                 flags.add(TypesOfInterest.URAM);
-            }else {
+            } else {
                 throw new RuntimeException("ERROR: Unexpected TileTypeEnum, please re-examine source code to properly handle " + t);
             }
         }
@@ -229,7 +229,7 @@ public class TileColumnPattern extends ArrayList<TileTypeEnum> implements Compar
                 columnIdxs.add(tile.getColumn());
                 nullCtr = 0;
                 currRunWithoutNull++;
-            }else if(tile.getTileTypeEnum() == TileTypeEnum.NULL) {
+            } else if(tile.getTileTypeEnum() == TileTypeEnum.NULL) {
                 nullCtr++;
                 if(NULL_COLUMN_BREAK_SIZE == nullCtr) {
                     filteredTypes.add(tile.getTileTypeEnum());
@@ -239,7 +239,7 @@ public class TileColumnPattern extends ArrayList<TileTypeEnum> implements Compar
                     }
                     currRunWithoutNull = 0;
                 }
-            }else{
+            } else {
                 nullCtr = 0;
             }
         }

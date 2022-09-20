@@ -66,10 +66,10 @@ public class DecomposeLUT {
             if(port.isInput() && !port.getName().equals("I5")) {
                 net.createPortInst(port.getName(), lut5_0);
                 net.createPortInst(port.getName(), lut5_1);
-            }else if(port.getName().equals("I5")) {
+            } else if(port.getName().equals("I5")) {
                 // This is our select line
                 net.createPortInst("I2", mux); 
-            }else if(port.isOutput()) {
+            } else if(port.isOutput()) {
                 // Connect output of mux to same top-level output
                 net.createPortInst("O", mux);
             }

@@ -126,7 +126,7 @@ public class BrowseDevice{
                         if(t.getSites().length == 0) {
                             System.out.println(t.getName() + " has no primitive sites.");
                         }
-                        else{
+                        else {
                             for(Site p : t.getSites()) {
                                 System.out.println("  " + p.getName());
                             }

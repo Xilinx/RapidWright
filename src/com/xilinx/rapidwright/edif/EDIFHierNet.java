@@ -210,7 +210,7 @@ public class EDIFHierNet {
                             queue.add(upPort.getHierarchicalNet());
                         }
                     }
-                } else{
+                } else {
                     // Moving down in hierarchy
                     EDIFHierNet otherNet = p.getInternalNet();
                     if(otherNet == null) {

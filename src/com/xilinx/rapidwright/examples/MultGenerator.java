@@ -259,7 +259,7 @@ public class MultGenerator extends ArithmeticGenerator {
             if(c == '1') {
                 gnd.createPortInst(opmode, i, inst);
                 logic0.createPin(false, opmode.getBusName()+(opmode.getWidth()-i-1), si);
-            }else{
+            } else {
                 vcc.createPortInst(opmode, i, inst);
                 logic1.createPin(false, opmode.getBusName()+(opmode.getWidth()-i-1), si);
             }
@@ -324,11 +324,11 @@ public class MultGenerator extends ArithmeticGenerator {
             Net net = null;
             if(element.equals("CLKINV")) {
                 net = physClk;
-            }else if(element.startsWith("OPMODE")) {
+            } else if(element.startsWith("OPMODE")) {
                 int idx = element.charAt(6) - 48;
                 char c = OPMODE_VALUE.charAt(OPMODE_VALUE.length()-idx-1);
                 net = c == 1 ? logic1 : logic0;
-            }else{
+            } else {
                 net = logic0;
             }
             si.routeIntraSiteNet(net, si.getSite().getBELPin(pinName), si.getBEL(element).getPin("D"));
@@ -347,9 +347,9 @@ public class MultGenerator extends ArithmeticGenerator {
                 String busName = port.getBusName();
                 if(busName.equals("ACOUT") || busName.equals("BCOUT")) {
                     busName = busName.replace("COUT", "COUT_B");
-                }else if(busName.equals("PATTERNDETECT")) {
+                } else if(busName.equals("PATTERNDETECT")) {
                     busName = "PATTERN_DETECT";
-                }else if(busName.equals("PATTERNBDETECT")) {
+                } else if(busName.equals("PATTERNBDETECT")) {
                     busName = "PATTERN_B_DETECT";
                 }
                 
@@ -370,11 +370,11 @@ public class MultGenerator extends ArithmeticGenerator {
                 String pinName = null;
                 if(specialCases.contains(outpin.getName())) {
                     pinName = outpin.getName();
-                }else if(outpin.getName().startsWith("A2A1")) {
+                } else if(outpin.getName().startsWith("A2A1")) {
                     pinName = outpin.getName().replace("A2A1", "A2A1<") + ">";
-                }else if(outpin.getName().startsWith("B2B1")) {
+                } else if(outpin.getName().startsWith("B2B1")) {
                     pinName = outpin.getName().replace("B2B1", "B2B1<") + ">";
-                }else{
+                } else {
                     pinName = StringTools.addIndexingAngleBrackets(outpin.getName());
                 }
                 

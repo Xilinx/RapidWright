@@ -130,7 +130,7 @@ public class DesignTools {
                         
                     }
                 }
-            }else{
+            } else {
                 curr = curr.getCellType().getCellInst(tokens[i]);
             }
             
@@ -390,7 +390,7 @@ public class DesignTools {
         int moveIndex = Math.abs(i-newRow);
         if (i > newRow) {
             out = lutValue >> moveIndex;
-        }else {
+        } else {
             out = lutValue << moveIndex;
         }
         return out;
@@ -486,11 +486,11 @@ public class DesignTools {
             boolean pushInverterForward = true;
             if(areAllPinsConnectedToALUT(outputNet)) {
                 pushInverterForward = true;
-            }else if(areAllPinsConnectedToALUT(inputNet)) {
+            } else if(areAllPinsConnectedToALUT(inputNet)) {
                 // We can push the inverter backwards
                 // TODO - I don't think this will happen for now.
                 pushInverterForward = false;
-            }else{
+            } else {
                 // We can't do it
                 continue;
             }            
@@ -498,7 +498,7 @@ public class DesignTools {
             // 2. Modify LUT equation of neighboring LUT TODO TODO TODO
             if(pushInverterForward) {
                 
-            }else{
+            } else {
                 
             }
 
@@ -569,7 +569,7 @@ public class DesignTools {
             SitePinInst oldSource = net.replaceSource(sitePin);
             if(oldSource != null)
                 oldSource.detachSiteInst();
-        }else{
+        } else {
             net.addPin(sitePin);            
         }
         
@@ -613,7 +613,7 @@ public class DesignTools {
                 incrementUtilType(map, UtilizationType.CLBS);
                 if(s == SiteTypeEnum.SLICEL) {
                     incrementUtilType(map, UtilizationType.CLBLS);
-                }else if(s == SiteTypeEnum.SLICEM) {
+                } else if(s == SiteTypeEnum.SLICEM) {
                     incrementUtilType(map, UtilizationType.CLBMS);
                 }
             } else if(Utils.isDSP(si)) {
@@ -621,7 +621,7 @@ public class DesignTools {
             } else if(Utils.isBRAM(si)) {
                 if(s == SiteTypeEnum.RAMBFIFO36) {
                     incrementUtilType(map, UtilizationType.RAMB36S_FIFOS);
-                }else if(s == SiteTypeEnum.RAMB181 || s == SiteTypeEnum.RAMBFIFO18) {
+                } else if(s == SiteTypeEnum.RAMB181 || s == SiteTypeEnum.RAMBFIFO18) {
                     incrementUtilType(map, UtilizationType.RAMB18S);
                 }
             } else if(Utils.isURAM(si)) {
@@ -664,7 +664,7 @@ public class DesignTools {
                     
                     if(isCellLutMemory(c5) || isCellLutMemory(c6)) {
                         incrementUtilType(map, UtilizationType.LUTS_AS_MEMORY);
-                    }else {
+                    } else {
                         incrementUtilType(map, UtilizationType.LUTS_AS_LOGIC);
                     }
                 }
@@ -896,7 +896,7 @@ public class DesignTools {
                 HashSet<PIP> uniquePIPs = new HashSet<PIP>(net.getPIPs());
                 uniquePIPs.addAll(staticNet.getPIPs());
                 staticNet.setPIPs(uniquePIPs);
-            }else{
+            } else {
                 net.updateName(hierarchicalCellName + "/" + net.getName());
                 design.addNet(net);                
             }
@@ -1393,7 +1393,7 @@ public class DesignTools {
             Set<SitePinInst> removals = e.getValue();
             if(preserveOtherRoutes) {
                 DesignTools.unroutePins(net, removals);
-            }else {
+            } else {
                 net.unroute();
             }
             List<SitePinInst> pins = new ArrayList<>();
@@ -1656,7 +1656,7 @@ public class DesignTools {
                 Net newNet = null;
                 if(n.isStaticNet()) {
                     newNet = n.getName().equals(Net.GND_NET) ? design.getGndNet() : design.getVccNet();
-                }else{
+                } else {
                     String newNetName = prefix + n.getName();
                     EDIFNet newEDIFNet = design.getNetlist().getNetFromHierName(newNetName);
                     newNet = design.createNet(newNetName, newEDIFNet);                    
@@ -1707,12 +1707,12 @@ public class DesignTools {
                     Net newNet = null;
                     if(e2.getValue().isStaticNet()) {
                         newNet = netName.equals(Net.GND_NET) ? design.getGndNet() : design.getVccNet(); 
-                    }else if(netName.equals(Net.USED_NET)) {
+                    } else if(netName.equals(Net.USED_NET)) {
                         newNet = design.getNet(Net.USED_NET);
                         if(newNet == null) {
                             newNet = new Net(Net.USED_NET);
                         }
-                    }else{
+                    } else {
                         newNet = design.getNet(prefix + netName);
                     }
                     
@@ -1741,13 +1741,13 @@ public class DesignTools {
                     p = pip.getInputPin().getSiteConns().get(0);
                     Cell c = si.getCell(p.getBELName());
                     if(c != null) cells.add(c);
-                }else{
+                } else {
                     for(BELPin snk : pip.getOutputPin().getSiteConns()) {
                         Cell c = si.getCell(snk.getBELName());
                         if(c != null) cells.add(c);
                     }
                 }
-            }else{
+            } else {
                 Cell c = si.getCell(p.getBELName());
                 if(c != null && c.getLogicalPinMapping(p.getName()) != null) {
                     cells.add(c);                
@@ -1935,7 +1935,7 @@ public class DesignTools {
                 } else {
                     return null;
                 }
-            }else { // output
+            } else { // output
                 for(BELPin sink : curr.getSiteConns()) {
                     if(!siteWires.contains(sink.getSiteWireName())) continue;
                     if(sink.isSitePort()) {
@@ -1946,7 +1946,7 @@ public class DesignTools {
                             if(source != null && source.getName().equals(sink.getName())) {
                                 toCreate = toReturn;
                                 toReturn = sink.getName();
-                            }else {
+                            } else {
                                 toCreate = sink.getName();
                             }
                             if (inst.getSitePinInst(toCreate) == null)
@@ -1954,7 +1954,7 @@ public class DesignTools {
                             // We'll return the first one we found, store the 2nd in the alternate
                             // reference on the net
                             return toReturn;
-                        }else {
+                        } else {
                             toReturn = sink.getName();                            
                         }
                     } else if(sink.getBEL().getBELClass() == BELClass.RBEL) {
@@ -2079,7 +2079,7 @@ public class DesignTools {
                 if(pin.getBEL().getBELClass() == BELClass.RBEL) {
                     SitePIP pip = src.getSiteInst().getSitePIP(pin);
                     q.add(pip.getOutputPin());
-                }else if(pin.isSitePort() && !pin.equals(srcPin)) {
+                } else if(pin.isSitePort() && !pin.equals(srcPin)) {
                     Net currNet2 = siteInst.getNetFromSiteWire(pin.getSiteWireName());
                     if(currNet2 == null || currNet2.equals(net)) {
                         alternateExit = pin;
@@ -2197,7 +2197,7 @@ public class DesignTools {
                             if(portInst != null) portInsts.add(portInst);
                         }                
                     }
-                }else {
+                } else {
                     EDIFHierPortInst portInst = getPortInstFromBELPin(siteInst, belPin);
                     if(portInst != null) portInsts.add(portInst);                    
                 }
@@ -2308,7 +2308,7 @@ public class DesignTools {
         for(String srcPrefix : srcToDestInstNames.keySet()) {
             if(srcPrefix.length()==0) {
                 prefixes.put(srcPrefix, srcPrefix);
-            }else {
+            } else {
                     prefixes.put(srcPrefix + "/", srcPrefix);
             }
         }
@@ -2472,7 +2472,7 @@ public class DesignTools {
             Net net = null;
             if(origNet.isStaticNet()) {
                 net = origNet;
-            }else {
+            } else {
                 String parentNetName = destNetlist.getParentNetName(netName);
                 if(parentNetName == null) {
                     parentNetName = netName;
@@ -2505,7 +2505,7 @@ public class DesignTools {
                             }
                         }
                     }
-                }else {
+                } else {
                     curr = curr.getSourcePin();
                     if(curr.isSitePort()) continue;
                     String belName = curr.getBELName();
@@ -2599,7 +2599,7 @@ public class DesignTools {
             Integer count = fanout.get(startNode);
             if(count == null) {
                 fanout.put(startNode, 1);
-            }else{
+            } else {
                 fanout.put(startNode, count+1);
             }
         }
@@ -2806,14 +2806,14 @@ public class DesignTools {
                         String sitePinName;
                         if(pin.equals("CE")) { // CKEN
                             sitePinName = sitePinNames.getFirst();
-                        }else { //SRST
+                        } else { //SRST
                             sitePinName = sitePinNames.getSecond();
                         }
                         net = design.getVccNet();
                         if(!si.getSitePinInstNames().contains(sitePinName)) net.createPin(sitePinName, si);
                     }
                 }
-            }else if(cell.getType().equals("RAMB36E2") && cell.getAllPhysicalPinMappings("RSTREGB") == null) {
+            } else if(cell.getType().equals("RAMB36E2") && cell.getAllPhysicalPinMappings("RSTREGB") == null) {
                 //cell.getEDIFCellInst().getProperty("DOB_REG")): integer(0)
                 String siteWire = cell.getSiteWireNameFromLogicalPin("RSTREGB");
                 Net net = cell.getSiteInst().getNetFromSiteWire(siteWire);
@@ -2823,7 +2823,7 @@ public class DesignTools {
                     if(!si.getSitePinInstNames().contains("RSTREGBU")) net.createPin("RSTREGBU", si);
                     if(!si.getSitePinInstNames().contains("RSTREGBL")) net.createPin("RSTREGBL", si);
                 }
-            }else if(cell.getType().equals("RAMB18E2") && cell.getAllPhysicalPinMappings("RSTREGB") == null) {
+            } else if(cell.getType().equals("RAMB18E2") && cell.getAllPhysicalPinMappings("RSTREGB") == null) {
                 SiteInst si = cell.getSiteInst();
                 // type RAMB180: L_O, type RAMB181: U_O
                 // TODO Type should be consistent with getPrimarySiteTypeEnum()?
@@ -2840,7 +2840,7 @@ public class DesignTools {
                     String pinName = null;
                     if(siteWire.endsWith("L_O")) {
                         pinName = "RSTREGBL";
-                    }else {
+                    } else {
                         pinName = "RSTREGBU";
                     }
                     if(si.getSitePinInstNames().isEmpty() || !si.getSitePinInstNames().contains(pinName)) {
@@ -3026,7 +3026,7 @@ public class DesignTools {
             if(Files.exists(edfFileName)) {
                 if(currMD5.equals(existingMD5)) {
                     return edfFileName; 
-                }else {
+                } else {
                     try {
                         Files.delete(edfFileName);
                     } catch (IOException e) {

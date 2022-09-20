@@ -51,7 +51,7 @@ public class PBlockGenTester {
                 for(File file : child.listFiles()) {
                     if(file.getAbsoluteFile().getName().endsWith("_shapes.txt")) {
                         shapeFile = file.toString();
-                    }else if(file.getAbsoluteFile().getName().endsWith("_utilization.report")) {
+                    } else if(file.getAbsoluteFile().getName().endsWith("_utilization.report")) {
                         utilReportFile = file.toString();
                     }
                 }

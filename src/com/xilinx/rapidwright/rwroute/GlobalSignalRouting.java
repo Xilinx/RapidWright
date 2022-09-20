@@ -132,7 +132,7 @@ public class GlobalSignalRouting {
             Integer count = crCounts.get(cr.getName());
             if(count == null) {
                 count = 1;
-            }else {
+            } else {
                 count++;
             }
             crCounts.put(cr.getName(), count);
@@ -167,7 +167,7 @@ public class GlobalSignalRouting {
                 Node node = Node.getNode(nodeName, device);
                 if(node != null) {
                     pathNodes.add(node);
-                }else {
+                } else {
                     System.err.println("ERROR: Null Node found under name: " + nodeName);
                 }
             }
@@ -243,7 +243,7 @@ public class GlobalSignalRouting {
         for(ClockRegion cr : clockRegions) {
             if(cr.getInstanceY() > centroid.getInstanceY()) {
                 upClockRegions.add(cr);
-            }else {
+            } else {
                 downClockRegions.add(cr);
             }
         }
@@ -383,7 +383,7 @@ public class GlobalSignalRouting {
             }
             if(!success) {
                 System.err.println("ERROR: Failed to route " + currNet.getName() + " pin " + sink.toString());
-            }else{
+            } else {
                 sink.setRouted(true);
             }
         }
@@ -454,7 +454,7 @@ public class GlobalSignalRouting {
         String pinName = type == NetType.VCC ? Net.VCC_WIRE_NAME : Net.GND_WIRE_NAME;        
         if(node.getWireName().startsWith(pinName)) {
             return true;
-        }else if(lutOutputPinNames.contains(node.getWireName())) {
+        } else if(lutOutputPinNames.contains(node.getWireName())) {
             Site slice = node.getTile().getSites()[0];
             SiteInst i = design.getSiteInstFromSite(slice);            
             if(i == null) return true; // Site is not used

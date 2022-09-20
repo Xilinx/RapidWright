@@ -448,7 +448,7 @@ public class PerformanceExplorer {
         if(opts.hasArgument(CLK_UNCERTAINTY_OPT)) {
             String clkUncertaintyValues = (String) opts.valueOf(CLK_UNCERTAINTY_OPT);
             pe.setClockUncertaintyValues(clkUncertaintyValues.split("[,]"));            
-        } else{
+        } else {
             pe.setMinClockUncertainty((double) opts.valueOf(MIN_CLK_UNCERTAINTY_OPT));
             pe.setMaxClockUncertainty((double) opts.valueOf(MAX_CLK_UNCERTAINTY_OPT));
             pe.setClockUncertaintyStep((double) opts.valueOf(CLK_UNCERTAINTY_STEP_OPT));
@@ -475,7 +475,7 @@ public class PerformanceExplorer {
                 if(idx >= 0) {
                      pblockRanges = line.substring(0, idx).trim();
                      cellNames = line.substring(idx+1).trim();
-                }else {
+                } else {
                     pblockRanges = line.trim();
                 }
                 PBlock pblock = new PBlock(d.getDevice(), pblockRanges);

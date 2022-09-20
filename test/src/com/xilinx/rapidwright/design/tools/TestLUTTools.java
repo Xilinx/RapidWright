@@ -53,7 +53,7 @@ public class TestLUTTools {
                         System.out.println(part + " " + siteType + " " + bel + " " + compLUTName);
                         if(bel.getName().contains("5")) {
                             Assertions.assertTrue(compLUTName.contains("6"));
-                        }else if(bel.getName().contains("6")) {
+                        } else if(bel.getName().contains("6")) {
                             Assertions.assertTrue(compLUTName.contains("5"));
                         }
                         Assertions.assertTrue(site.getBEL(compLUTName).isLUT());

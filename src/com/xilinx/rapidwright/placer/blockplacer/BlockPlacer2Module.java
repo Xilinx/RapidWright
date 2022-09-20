@@ -203,7 +203,7 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
                     System.out.println("could not place "+hm.getName()+" at "+hm.getTempAnchorSite()+". Choosing "+hm.getAnchor().getSite()+" instead");
                 }
             }
-            else{
+            else {
                 usedTiles.addAll(footPrint);
                 if(!hm.place(hm.getTempAnchorSite())) {
                     // Updated code. Goal: if placement fails, unplace that IP and generate .dcp in order to let vivado continue PAR
@@ -325,7 +325,7 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
                         minRow--;
                         column++;
                     }
-                    else{
+                    else {
                         row--;
                     }
                     break;
@@ -335,7 +335,7 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
                         maxRow++;
                         column--;
                     }
-                    else{
+                    else {
                         row++;
                     }
                     break;
@@ -345,7 +345,7 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
                         minColumn--;
                         row--;
                     }
-                    else{
+                    else {
                         column--;
                     }
                     break;
@@ -355,7 +355,7 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
                         maxColumn++;
                         row++;
                     }
-                    else{
+                    else {
                         column++;
                     }
                     break;
@@ -370,7 +370,7 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
                     usedTiles.addAll(tiles);
                     return true;
                 }
-                else{
+                else {
                     tiles = null;
                 }
             }
@@ -453,7 +453,7 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
                             return null;
                         }
                     }
-                    else{
+                    else {
                         return null;
                     }
                 }

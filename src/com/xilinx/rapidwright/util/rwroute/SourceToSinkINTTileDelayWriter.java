@@ -64,7 +64,7 @@ public class SourceToSinkINTTileDelayWriter {
         if(net == null) {
             System.err.println("ERROR: Cannot find net under name " + args[2]);
             return;
-        }else if(!net.hasPIPs()) {
+        } else if(!net.hasPIPs()) {
             System.err.println("ERROR: No PIPs found of net " + net.getName());
             return;
         }
@@ -86,7 +86,7 @@ public class SourceToSinkINTTileDelayWriter {
                     System.out.printf(String.format("      %-50s %5d\n", node, delay));
                 }
                 
-            }else {
+            } else {
                 System.out.println("INFO: Write delay from source to IMUX node of CLK_IN to file \n      " + outputFile);
                 for(Entry<Pair<SitePinInst, Node>, Short> sinkINTNodeDelay : sourceToSinkINTDelays.entrySet()) {
                     Node node = sinkINTNodeDelay.getKey().getSecond();

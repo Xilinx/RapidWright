@@ -99,13 +99,13 @@ public class SmallestEnclosingCircle {
             if(minAngle > (Math.PI / 2)) {
                 //use the side S to determine the circle
                 finished = true;
-            }else if(angle(s1, s2, minPoint) > (Math.PI / 2)) {
+            } else if(angle(s1, s2, minPoint) > (Math.PI / 2)) {
                 //this angle is obtuse, set the side S accordingly
                 s2 = minPoint;
-            }else if(angle(s2, s1, minPoint) > (Math.PI / 2)) {
+            } else if(angle(s2, s1, minPoint) > (Math.PI / 2)) {
                 //this angle is obtuse, set the side S accordingly
                 s1 = minPoint;
-            }else{
+            } else {
                 //use the side S and the minPoint to determine the circle
                 finished = true;
                 useMinPoint = true;
@@ -117,7 +117,7 @@ public class SmallestEnclosingCircle {
             Point circumcenter = getCircumcenter( s1, s2, minPoint);
             center.x = circumcenter.x;
             center.y = circumcenter.y;
-        }else{
+        } else {
             //use the side S to determine the diametric circle
             center.x = (s1.x > s2.x) ? (s1.x - s2.x) / 2 + s2.x : (s2.x - s1.x) / 2 + s1.x;
             center.y = (s1.y > s2.y) ? (s1.y - s2.y) / 2 + s2.y : (s2.y - s1.y) / 2 + s1.y;

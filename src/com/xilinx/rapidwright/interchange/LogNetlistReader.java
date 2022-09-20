@@ -184,7 +184,7 @@ public class LogNetlistReader {
                 BusIdx.Reader portIdxReader = portInstReader.getBusIdx();
                 if(portIdxReader.isSingleBit()) {
                     net.createPortInst(port, inst);
-                }else {
+                } else {
                     net.createPortInst(port, portIdxReader.getIdx(), inst);
                 }
             }

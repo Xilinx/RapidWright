@@ -247,7 +247,7 @@ public class SATRouter {
                 if(output != null && p != output) {
                     if(siteWireName == null) {
                         continue;
-                    }else if(si.getNetFromSiteWire(siteWireName).equals(net) && outputSite.equals(c.getSite())) {
+                    } else if(si.getNetFromSiteWire(siteWireName).equals(net) && outputSite.equals(c.getSite())) {
                         // Input pin is within same site as output
                         continue;
                     }
@@ -302,7 +302,7 @@ public class SATRouter {
                     int siteWireIdx = i.getSite().getSiteWireIndex(e.getKey());
                     parentNetName = DesignTools.resolveNetNameFromSiteWire(i, siteWireIdx);
                     if(parentNetName == null) continue;
-                }else if(!n.getName().equals(parentNetName)) {
+                } else if(!n.getName().equals(parentNetName)) {
                     Net parentNet = design.getNet(parentNetName);
                     if(parentNet == null) {
                         parentNet = new Net(design.getNetlist().getHierNetFromName(parentNetName));
@@ -488,7 +488,7 @@ public class SATRouter {
                     if(p.isLUTInputPin()) {
                         Wire w = new Wire(p.getTile(),p.getConnectedWireIndex());
                         bw.write(" " + w);
-                    }else{
+                    } else {
                         bw.write(" " + p.getConnectedNode());
                     }
                     
@@ -608,7 +608,7 @@ public class SATRouter {
                                         newBELPin = currCxn;
                                         break;                                        
                                     }
-                                }else{
+                                } else {
                                     newBELPin = currCxn;
                                     break;
                                 }
@@ -625,7 +625,7 @@ public class SATRouter {
                         if(match != null) {
                             // Add companion cell mapping
                             match.setCompanionCell(c, logicalPinName);
-                        }else{
+                        } else {
                             // Create new entry
                             String depopulatedLogicalPinName = c.getLogicalPinMapping(newBELPin.getName());
                             ps.put(psKey, new PinSwap(c, logicalPinName,oldPhysicalPinName,newBELPin.getName(), depopulatedLogicalPinName, newPin.getPinName()));                            

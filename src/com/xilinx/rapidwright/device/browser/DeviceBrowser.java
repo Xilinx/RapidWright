@@ -123,7 +123,7 @@ public class DeviceBrowser extends QMainWindow{
         }
         if(parts.contains(defaultPart)) {
             currPart = defaultPart;
-        } else{
+        } else {
             currPart = parts.iterator().next();
             System.out.println(defaultPart+" not available, showing "+currPart);
         }

@@ -144,19 +144,19 @@ public class PBlockGenerator {
                     throw new RuntimeException("ERROR: Couldn't load device for part: " +
                             line.split("\\s+")[3] + " (" +  partName + ")");
                 }
-            }else if(line.startsWith("| CLB LUTs") || line.startsWith("| Slice LUTs")) {
+            } else if(line.startsWith("| CLB LUTs") || line.startsWith("| Slice LUTs")) {
                 lutCount = Integer.parseInt(line.split("\\s+")[4]);
-            }else if(line.startsWith("| CLB Registers") || line.startsWith("| Slice Registers")) {
+            } else if(line.startsWith("| CLB Registers") || line.startsWith("| Slice Registers")) {
                 regCount = Integer.parseInt(line.split("\\s+")[4]);                
-            }else if(line.startsWith("|   LUT as Memory")) {
+            } else if(line.startsWith("|   LUT as Memory")) {
                 lutRAMCount = Integer.parseInt(line.split("\\s+")[5]);
-            }else if(line.startsWith("|   RAMB36/FIFO")) {
+            } else if(line.startsWith("|   RAMB36/FIFO")) {
                 bram36kCount = Integer.parseInt(line.split("\\s+")[3]);
-            }else if(line.startsWith("|   RAMB18")) {
+            } else if(line.startsWith("|   RAMB18")) {
                 bram18kCount = Integer.parseInt(line.split("\\s+")[3]);
-            }else if(line.startsWith("| DSPs")) {
+            } else if(line.startsWith("| DSPs")) {
                 dspCount = Integer.parseInt(line.split("\\s+")[3]);
-            }else if(line.startsWith("| CARRY")) {
+            } else if(line.startsWith("| CARRY")) {
                 carryCount = Integer.parseInt(line.split("\\s+")[3]);
             }
         }
@@ -206,11 +206,11 @@ public class PBlockGenerator {
                     lutCount = 0;
                     ffCount = 0;
                     carryCount = 0;
-                }else if(line.startsWith("(SLICE")) {
+                } else if(line.startsWith("(SLICE")) {
                     if(line.contains("FF")) ffCount++;
                     else if(line.contains("LUT")) lutCount++;
                     else if(line.contains("CARRY")) carryCount++;
-                }else if(line.contains("Shape builder is called from")) {
+                } else if(line.contains("Shape builder is called from")) {
                     // It seems in some shape DB dumps, there is a stack trace followed by another, updated set of shapes.
                     // If we see this, reset and start over
                     tallestShape = 0;
@@ -238,13 +238,13 @@ public class PBlockGenerator {
             if(dspCount > 0 || (bram18kCount > 0 || bram36kCount > 0)) {
                 if(dspCount > 0) {
                     this.startingPoint = dev.getSite("DSP48E2_X5Y55");
-                }else{
+                } else {
                     this.startingPoint = dev.getSite("RAMB36_X6Y32");
                 }
-            }else{
+            } else {
                 this.startingPoint = dev.getSite("SLICE_X39Y149");
             }
-        }else{
+        } else {
             this.startingPoint = dev.getSite("SLICE_X" + STARTING_X + "Y" + STARTING_Y);
         }
     }
@@ -257,7 +257,7 @@ public class PBlockGenerator {
         if(startingPoint == null) {
             throw new RuntimeException("PBlock Generator Error: Could not find a valid "
                     + "starting tile for constraint generation.");
-        }else{
+        } else {
             rStart = startingPoint.getTile().getRow();
             cStart = startingPoint.getTile().getColumn();
         }
@@ -324,7 +324,7 @@ public class PBlockGenerator {
                         }
                     }
                     DSPRequired--;
-                }else if(dev.getTile(r,c).getTileTypeEnum().equals(TileTypeEnum.BRAM)) {
+                } else if(dev.getTile(r,c).getTileTypeEnum().equals(TileTypeEnum.BRAM)) {
                     if(RAMRequired > 0 || RAM36Required > 0) {
                         if(c > RAMmaxC) {
                             RAMmaxC = c;
@@ -341,11 +341,11 @@ public class PBlockGenerator {
                     }
                     if(RAM36Required <= 0) {
                         RAMRequired-=2;
-                    }else if(RAM36Required > 0) {
+                    } else if(RAM36Required > 0) {
                         RAM36Required--;
                     }
                     
-                }else if(dev.getTile(r,c).getTileTypeEnum().equals(TileTypeEnum.CLE_M) || dev.getTile(r,c).getTileTypeEnum().equals(TileTypeEnum.CLEL_R) || dev.getTile(r,c).getTileTypeEnum().equals(TileTypeEnum.CLEL_L)) {
+                } else if(dev.getTile(r,c).getTileTypeEnum().equals(TileTypeEnum.CLE_M) || dev.getTile(r,c).getTileTypeEnum().equals(TileTypeEnum.CLEL_R) || dev.getTile(r,c).getTileTypeEnum().equals(TileTypeEnum.CLEL_L)) {
                     if(firstCLBColumn == -1) {
                         firstCLBColumn = c;
                     }
@@ -362,7 +362,7 @@ public class PBlockGenerator {
                         if(r < CLBminR || CLBminR == -1) {
                             CLBminR = r;
                         }
-                    }else if(carryBlocks > 0) {
+                    } else if(carryBlocks > 0) {
                         // if carryBits are still needed but slices have been satisfied, 
                         // then only increase the bounds in the up or down direction
                         if(r > CLBmaxR) {
@@ -384,7 +384,7 @@ public class PBlockGenerator {
                 }
             
             // check to see if the maximum bounds of the spiral have exceeded the tile dimensions
-            }else if(minR < 0 && minC < 0 && maxR >= totalRows && maxC >=totalColumns) {
+            } else if(minR < 0 && minC < 0 && maxR >= totalRows && maxC >=totalColumns) {
                 throw new RuntimeException("PBlock Generator Error: Design is too large to be "
                         + "constrained on the device " + dev.getName());
             }
@@ -395,13 +395,13 @@ public class PBlockGenerator {
                 if(dev.getTile(r,c).getTileTypeEnum() == TileTypeEnum.NULL) {
                     if(c == maxC) {
                         nullColumnsOnRight++;
-                    }else if(c == minC) {
+                    } else if(c == minC) {
                         nullColumnsOnLeft++;
                     }
-                }else{
+                } else {
                     if(c == maxC) {
                         nullColumnsOnRight = 0;
-                    }else if(c == minC) {
+                    } else if(c == minC) {
                         nullColumnsOnLeft = 0;
                     }
                 }
@@ -432,99 +432,99 @@ public class PBlockGenerator {
                 dir = Direction.left;
                 minR--;
                 r--;
-            }else if(dir == Direction.down) {
+            } else if(dir == Direction.down) {
                 if(r == minR) {
                     if((((double)(maxC - minC))/((double)(maxR - minR))) > ASPECT_RATIO) {
                         //proceed to create a new row
                         dir = Direction.left;
                         minR--;
                         r--;
-                    }else{
+                    } else {
                         if(nullColumnsOnLeft > AVOID_NULL_COLUMN_COUNT) {
                             // Create a column on the other side
                             dir = Direction.down;
                             maxC++;
                             c = maxC;        
                             r = maxR;
-                        }else{
+                        } else {
                             //do not create another row. instead, jump to the other side and make a new column
                             dir = Direction.up;
                             minC--;
                             c = minC;                            
                         }
                     }
-                }else{
+                } else {
                     r--;
                 }
-            }else if(dir == Direction.left) {
+            } else if(dir == Direction.left) {
                 if(c == minC) {
                     if((((double)(maxC - minC))/((double)(maxR - minR))) > ASPECT_RATIO) {
                         //do not create another column.  instead, jump to the other side and make a new row.
                         dir = Direction.right;
                         maxR++;
                         r=maxR;
-                    }else{
+                    } else {
                         if(nullColumnsOnLeft > AVOID_NULL_COLUMN_COUNT) {
                             // Create a column on the other side
                             dir = Direction.down;
                             maxC++;
                             c = maxC;        
                             r = maxR;
-                        }else{
+                        } else {
                             //proceed to create a new column
                             dir = Direction.up;
                             minC--;
                             c--;                            
                         }
                     }
-                }else{
+                } else {
                     c--;
                 }            
-            }else if(dir == Direction.up) {
+            } else if(dir == Direction.up) {
                 if(r == maxR) {
                     if((((double)(maxC - minC))/((double)(maxR - minR))) > ASPECT_RATIO) {
                         //proceed to create a new row
                         dir = Direction.right;
                         maxR++;
                         r++;
-                    }else{
+                    } else {
                         if(nullColumnsOnRight > AVOID_NULL_COLUMN_COUNT) {
                             // We are up against NULL tiles, make another column on this side
                             dir = Direction.up;
                             minC--;
                             c = minC;    
                             r = minR;
-                        }else{
+                        } else {
                             //do not create a new row, instead, jump to the other side and make a new column
                             dir = Direction.down;
                             maxC++;
                             c = maxC;                            
                         }
                     }
-                }else{
+                } else {
                     r++;
                 }    
-            }else if(dir == Direction.right) {
+            } else if(dir == Direction.right) {
                 if(c == maxC) {
                     if((((double)(maxC - minC))/((double)(maxR - minR))) > ASPECT_RATIO) {
                         //do not create another column.  instead, jump to the other side and make a new row.
                         dir = Direction.left;
                         minR--;
                         r=minR;
-                    }else{
+                    } else {
                         if(nullColumnsOnRight > AVOID_NULL_COLUMN_COUNT) {
                             // We are up against NULL tiles, make another column on this side
                             dir = Direction.up;
                             minC--;
                             c = minC;    
                             r = minR;
-                        }else {
+                        } else {
                             dir = Direction.down;
                             maxC++;
                             c = maxC;                            
                         }
                     }
-                }else{
+                } else {
                     c++;
                 }
             }
@@ -734,13 +734,13 @@ public class PBlockGenerator {
                     slicems--;
                     if(SLICES_PER_TILE==2)
                         slices--;
-                }else if(Utils.isCLB(t)) {
+                } else if(Utils.isCLB(t)) {
                     slices--;
                     if(SLICES_PER_TILE==2)
                         slices--;
-                }else if(Utils.isDSP(t)) {
+                } else if(Utils.isDSP(t)) {
                     dsps--;
-                }else if(Utils.isBRAM(t)) {
+                } else if(Utils.isBRAM(t)) {
                     brams--;
                 }
             }
@@ -850,13 +850,13 @@ public class PBlockGenerator {
             // height = sqrt ( AREA / height )
             if(slicesRequired > sliceMsRequired) {
                 pblockCLEHeight = (int) Math.ceil(Math.sqrt(slicesRequired/(SLICES_PER_TILE*ASPECT_RATIO))); // One PBlock must contain tiles. It can not have 3 slices for exp. => compute height using tile nr, not slice nr. (for 7 series, for ultra. tiles=slices anyway)
-            }else{
+            } else {
                 pblockCLEHeight = (int) Math.ceil(Math.sqrt(sliceMsRequired/(ASPECT_RATIO))); // Tile M-type has only one M slice in case of 7 series
             }
             
-        }else if(dspCLECount > bramCLECount) {
+        } else if(dspCLECount > bramCLECount) {
             pblockCLEHeight = dspCLECount;
-        }else {
+        } else {
             pblockCLEHeight = bramCLECount;
         }
 
@@ -906,9 +906,9 @@ public class PBlockGenerator {
             
             if(numSLICEColumns > 0 && numSLICEMColumns == 0) {
                 pblockCLEHeight -= sliceExcessHeight;
-            }else if(numSLICEMColumns > 0 && numSLICEColumns == 0) {
+            } else if(numSLICEMColumns > 0 && numSLICEColumns == 0) {
                 pblockCLEHeight -= sliceMExcessHeight;
-            }else if(numSLICEColumns > 0 && numSLICEMColumns > 0) {
+            } else if(numSLICEColumns > 0 && numSLICEMColumns > 0) {
                 pblockCLEHeight -= Integer.min(sliceExcessHeight, sliceMExcessHeight);
                 // In the case where we have both SLICEL and SLICEM, extra SLICEM spots
                 // can absorb some SLICELs, further reducing height

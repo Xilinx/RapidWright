@@ -331,7 +331,7 @@ public class PhysNetlistWriter {
             for(PIP p : net.getPIPs()) {
                 if(p.getEndWireName() == null) {
                     stubNodes.add(p);
-                }else {
+                } else {
                     routingSources.add(new RouteBranchNode(p));
                 }
             }

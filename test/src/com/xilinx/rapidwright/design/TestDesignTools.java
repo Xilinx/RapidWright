@@ -108,7 +108,7 @@ public class TestDesignTools {
             if(routeThru.getSecond()) {
                 Assertions.assertEquals(dstSiteInst.getNetFromSiteWire(siteWireName), 
                                         dstDesign.getVccNet());
-            }else {
+            } else {
                 Assertions.assertNotEquals(dstSiteInst.getNetFromSiteWire(siteWireName), 
                                         dstDesign.getVccNet());
             }

@@ -94,7 +94,7 @@ public class DefaultDesignMerger extends AbstractDesignMerger {
                 for(EDIFPortInst portInst0 : net0.getPortInsts()) {
                     if(portInst0.isTopLevelPort() && portInst0.getPort() == p0) {
                         toRemove.add(portInst0);
-                    }else if(!p0IsOutput) {
+                    } else if(!p0IsOutput) {
                         toSwitch.add(portInst0);
                         // Update site routing if net is not the same name
                         if(!net0.getName().equals(net1.getName()) && portInst0.isInput()) {
@@ -111,7 +111,7 @@ public class DefaultDesignMerger extends AbstractDesignMerger {
                 for(EDIFPortInst portInst1 : net1.getPortInsts()) {
                     if(portInst1.isTopLevelPort() && portInst1.getPort() == p1) {
                         toRemove.add(portInst1);
-                    }else if(p0IsOutput) {
+                    } else if(p0IsOutput) {
                         toSwitch.add(portInst1);
                     }
                 }
@@ -217,7 +217,7 @@ public class DefaultDesignMerger extends AbstractDesignMerger {
                 // This pin has already been moved over from a duplicate port, it should be removed
                 if(net0.getName().equals(net1.getName())) {
                     net1.removePortInst(portInst1);
-                }else {
+                } else {
                     net0.removePortInst(portInst0);
                 }
                 continue;

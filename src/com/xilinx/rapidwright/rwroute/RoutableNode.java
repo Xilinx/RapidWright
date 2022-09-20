@@ -183,9 +183,9 @@ public class RoutableNode implements Routable{
                 type = RoutableType.WIRE;
                 break;
             }    
-        }else if(type == RoutableType.PINFEED_I) {
+        } else if(type == RoutableType.PINFEED_I) {
             baseCost = 0.4f;
-        }else if(type == RoutableType.PINFEED_O) {
+        } else if(type == RoutableType.PINFEED_O) {
             baseCost = 1f;
         }
     }
@@ -217,9 +217,9 @@ public class RoutableNode implements Routable{
         Tile endTile = null;
         if(intTiles.size() > 1) {
             endTile = intTiles.get(1);
-        }else if(intTiles.size() == 1) {
+        } else if(intTiles.size() == 1) {
             endTile = intTiles.get(0);
-        }else {
+        } else {
             endTile = getNode().getTile();
         }
         endTileXCoordinate = (short) endTile.getTileXCoordinate();
@@ -406,7 +406,7 @@ public class RoutableNode implements Routable{
         Integer count = usersConnectionCounts.getOrDefault(user, 0);
         if(count == 1) {
             usersConnectionCounts.remove(user);
-        }else if(count > 1) {
+        } else if(count > 1) {
             usersConnectionCounts.put(user, count - 1);
         }
     }
@@ -441,7 +441,7 @@ public class RoutableNode implements Routable{
         Integer count = driversCounts.getOrDefault(parent, 0);
         if(count == 1) {
             driversCounts.remove(parent);
-        }else if(count > 1) {
+        } else if(count > 1) {
             driversCounts.put(parent, count - 1);
         }
     }
@@ -534,7 +534,7 @@ public class RoutableNode implements Routable{
                 }
             }
             return false;
-        }else {
+        } else {
             if(tile.getName().startsWith("LAG")) {
                 return false;
             }

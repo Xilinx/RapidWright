@@ -148,7 +148,7 @@ public class MetadataParser {
                     if(originalInstName != null) expect(originalInstName,tokens[2]);
                     if(nextTokens[1].equals(CLOCKS)) {
                         currState = MDParserState.BLOCK_CLOCKS;
-                    }else{
+                    } else {
                         currState = MDParserState.BLOCK_PBLOCKS;                        
                     }
                     break;
@@ -176,9 +176,9 @@ public class MetadataParser {
                     outputCount = Integer.parseInt(tokens[2]);
                     if(nextTokens[2].equals(PBLOCK)) {
                         currState = MDParserState.PBLOCK_BEGIN;
-                    }else if(nextTokens[2].equals(CLOCK)) {
+                    } else if(nextTokens[2].equals(CLOCK)) {
                         currState = MDParserState.CLOCK_BEGIN;
-                    }else{
+                    } else {
                         currState = MDParserState.PORT_BEGIN;
                     }
                     break;
@@ -209,10 +209,10 @@ public class MetadataParser {
                     if(pblockCount == 0) {
                         if(clockCount > 0) {
                             currState = MDParserState.CLOCK_BEGIN;
-                        }else{
+                        } else {
                             currState = MDParserState.PORT_BEGIN;
                         }
-                    }else{
+                    } else {
                         currState = MDParserState.PBLOCK_BEGIN;
                     }
                     break;
@@ -242,7 +242,7 @@ public class MetadataParser {
                     clockCount--;
                     if(clockCount == 0) {
                         currState = MDParserState.PORT_BEGIN;
-                    }else{
+                    } else {
                         currState = MDParserState.CLOCK_BEGIN;
                     }
                     break;
@@ -254,7 +254,7 @@ public class MetadataParser {
                         expect(INPUT, tokens[2]);
                         inputCount--;
                         currPort.setOutputPort(false);
-                    }else if(outputCount > 0) {
+                    } else if(outputCount > 0) {
                         expect(OUTPUT, tokens[2]);
                         currPort.setOutputPort(true);
                         outputCount--;
@@ -269,9 +269,9 @@ public class MetadataParser {
                     currPort.setName(tokens[2]);
                     if(nextTokens[1].equals(TYPE)) {
                         currState = MDParserState.PORT_TYPE;
-                    }else if(nextTokens[1].equals(PPLOCS)) {
+                    } else if(nextTokens[1].equals(PPLOCS)) {
                         currState = MDParserState.PORT_PPLOCS;
-                    }else{
+                    } else {
                         currState = MDParserState.PORT_NET;
                     }
                     break;
@@ -281,7 +281,7 @@ public class MetadataParser {
                     currPort.setPartitionPinLoc(dev.getTile(tokens[2]));
                     if(nextTokens[1].equals(TYPE)) {
                         currState = MDParserState.PORT_TYPE;
-                    }else{
+                    } else {
                         currState = MDParserState.PORT_NET;
                     }
                     break;
@@ -326,7 +326,7 @@ public class MetadataParser {
                     currPort.setWorstCasePortDelay(Float.parseFloat(tokens[2]));
                     if(nextTokens[1].equals(END)) {
                         currState = MDParserState.PORT_END;
-                    }else{
+                    } else {
                         currState = MDParserState.PORT_CONNS_BEGIN;
                     }
                     break;
@@ -381,9 +381,9 @@ public class MetadataParser {
                                 }
                             }
                         }
-                    }else if(tokens[1].equals(PORT)) {
+                    } else if(tokens[1].equals(PORT)) {
                         currPort.addPassThruPortName(tokens[2]);
-                    }else{
+                    } else {
                         expect("<pin|port>",tokens[1]);
                     }
                     if(nextTokens[1].equals(END)) {

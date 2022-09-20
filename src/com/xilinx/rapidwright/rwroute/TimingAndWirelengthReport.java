@@ -132,7 +132,7 @@ public class TimingAndWirelengthReport{
             List<Node> nodes = RouterHelper.projectInputPinToINTNode(sink);
             if(nodes.isEmpty()) {    
                 connection.setDirect(true);
-            }else {
+            } else {
                 connection.setSinkRnode(new RoutableNode(this.rnodeId++, nodes.get(0), RoutableType.PINFEED_I));
                 if(sourceINTNode == null) {
                     sourceINTNode = RouterHelper.projectOutputPinToINTNode(source);

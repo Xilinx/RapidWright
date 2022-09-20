@@ -319,7 +319,7 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
 
                     if(changeInCost > 0) badAcceptedMoveCount++;
                 }
-                else{
+                else {
                     // Undo the move, we are not accepting it
                     currentMove.undoMove();
                     double testCost = currentSystemCost();
@@ -430,7 +430,7 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
                     throw new RuntimeException("ERROR: Placement failed, couldn't find valid site for " + hm.getName());                    
                 }
             }
-            else{
+            else {
                 usedTiles.addAll(footPrint);
                 if(!hm.place(hm.getTempAnchorSite())) {
                     throw new RuntimeException("ERROR: Problem placing " + hm.getName() + " on site: " + hm.getTempAnchorSite());
@@ -482,7 +482,7 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
                         minRow--;
                         column++;
                     }
-                    else{
+                    else {
                         row--;
                     }
                     break;
@@ -492,7 +492,7 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
                         maxRow++;
                         column--;
                     }
-                    else{
+                    else {
                         row++;
                     }
                     break;
@@ -502,7 +502,7 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
                         minColumn--;
                         row--;
                     }
-                    else{
+                    else {
                         column--;
                     }
                     break;
@@ -512,7 +512,7 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
                         maxColumn++;
                         row++;
                     }
-                    else{
+                    else {
                         column++;
                     }
                     break;
@@ -527,7 +527,7 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
                     usedTiles.addAll(tiles);
                     return true;
                 }
-                else{
+                else {
                     tiles = null;
                 }
             }
@@ -608,7 +608,7 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
                             return null;
                         }
                     }
-                    else{
+                    else {
                         return null;
                     }
                 }
@@ -660,7 +660,7 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
                 }
                 break;
             }
-            else{
+            else {
                 hm0.setTempAnchorSite(site1, currentPlacements);
                 if(!checkValidPlacement(hm0)) {
                     hm0.setTempAnchorSite(site0, currentPlacements);

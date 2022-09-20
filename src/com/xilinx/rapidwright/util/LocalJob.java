@@ -92,7 +92,7 @@ public class LocalJob extends Job {
             }catch(Exception e) {
                 return -1;
             }
-        }else if(className.equals("java.lang.ProcessImpl") || className.equals("java.lang.Win32Process")) {
+        } else if(className.equals("java.lang.ProcessImpl") || className.equals("java.lang.Win32Process")) {
             try{
                 Field f = p.getClass().getDeclaredField("handle");
                 f.setAccessible(true);

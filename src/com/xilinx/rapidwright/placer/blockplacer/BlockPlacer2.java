@@ -359,7 +359,7 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
         }
         if(acceptedMoveCount>0) {
             avgCost = avgCost/acceptedMoveCount;
-        }else{
+        } else {
             avgCost = 0;
         }
         for(double c : arrayCosts) {
@@ -650,7 +650,7 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
                     prevSystemCost = currSystemCost;
                     if(changeInCost > 0) badAcceptedMoveCount++;
                 }
-                else{
+                else {
                     // Undo the move, we are not accepting it
 
                     currentMove.undoMove();
@@ -847,12 +847,12 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
         double tmpCurrentTemp = currentTemp;
         if(moveAcceptanceRate>0.96) {
             tmpCurrentTemp = tmpCurrentTemp * 0.5;
-        }else if(moveAcceptanceRate > 0.8) {
+        } else if(moveAcceptanceRate > 0.8) {
             tmpCurrentTemp = tmpCurrentTemp * 0.9;
-        //}else if(moveAcceptanceRate > 0.15 || rangeLimit > 1.0) {
-        }else if(moveAcceptanceRate > 0.15) {
+        //} else if(moveAcceptanceRate > 0.15 || rangeLimit > 1.0) {
+        } else if(moveAcceptanceRate > 0.15) {
             tmpCurrentTemp = tmpCurrentTemp * 0.95;
-        }else {
+        } else {
             tmpCurrentTemp = tmpCurrentTemp * 0.8;
         }
         return tmpCurrentTemp;

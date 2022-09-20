@@ -185,7 +185,7 @@ public class BlockCreator {
         ArrayList<String> routedDCPFileNames = new ArrayList<String>();
         if(blockImplCount == 1) {
             routedDCPFileNames.add(routedDCPFileName);
-        }else{
+        } else {
             File f = new File(routedDCPFileName);
             for(File siblings :  f.getParentFile().listFiles()) {
                 if(siblings.getName().endsWith(ROUTED_DCP_SUFFIX)) {
@@ -277,7 +277,7 @@ public class BlockCreator {
                 if(fileName.startsWith(DONE_FILE_PREFIX)) {
                     doneFileName = fileName;
                     implCount = Integer.parseInt(doneFileName.substring(doneFileName.lastIndexOf('.')+1));
-                }else if(fileName.endsWith("_opt.dcp")) {
+                } else if(fileName.endsWith("_opt.dcp")) {
                     optDcpFileName = cachedIPDir + "/" + fileName;
                 }
             }
@@ -295,7 +295,7 @@ public class BlockCreator {
                             continue;
                         }
                     }
-                }else{
+                } else {
                     continue;                    
                 }
             }
@@ -315,7 +315,7 @@ public class BlockCreator {
                 }
                 
                 implIndex = pblocks.size();
-            }else{
+            } else {
                 // Create a run for each implementation of each module in pblock file
                 String pblockFileName = optDcpFileName.replace("_opt.dcp", "_pblock.txt");
                 if(new File(pblockFileName).exists()) {
@@ -600,7 +600,7 @@ public class BlockCreator {
             // Use the caching mechanism
             System.out.println(getMD5Checksum(args[2]));
             createOrRetrieveBlock(edifFileName, routedDCPFileName, args[2], args[3], blockImplCount);
-        }else{
+        } else {
             // we just want to build a block outside of the cache
             EDIFNetlist e = EDIFTools.readEdifFile(edifFileName);
             //Module m = createBlock(xpnFileName, e);

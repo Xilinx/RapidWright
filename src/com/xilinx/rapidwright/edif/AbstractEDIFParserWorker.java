@@ -215,9 +215,9 @@ public abstract class AbstractEDIFParserWorker {
                     }
                 }
                 expect(RIGHT_PAREN, currToken); // Content end
-            }else if (contentsOrProperty.equals(PROPERTY)) {
+            } else if (contentsOrProperty.equals(PROPERTY)) {
                 parseProperty(cell, contentsOrProperty);
-            }else{
+            } else {
                 expect(CONTENTS + " | " + PROPERTY, contentsOrProperty);
             }
         }
@@ -254,7 +254,7 @@ public abstract class AbstractEDIFParserWorker {
             String commentOrMetax = getNextToken(true);
             if(commentOrMetax.equals(COMMENT)) {
                 currNetlist.addComment(getNextToken(false));
-            }else if(commentOrMetax.equals(METAX)) {
+            } else if(commentOrMetax.equals(METAX)) {
                 String key = getNextToken(false);
                 EDIFPropertyValue value = parsePropertyValue();
                 currNetlist.addMetax(key,value);
@@ -262,7 +262,7 @@ public abstract class AbstractEDIFParserWorker {
                 // Discard this property for now
                 parseProperty(new EDIFPropertyObject(), commentOrMetax);
                 continue;
-            }else{
+            } else {
                 expect(COMMENT + "|" + METAX + "|" + PROPERTY, commentOrMetax);
             }
             expect(RIGHT_PAREN, getNextToken(true));
@@ -279,7 +279,7 @@ public abstract class AbstractEDIFParserWorker {
             expect(LEFT_PAREN, getNextToken(true));
             val.setValue(getNextToken(false));
             expect(RIGHT_PAREN, getNextToken(true));
-        }else {
+        } else {
             val.setValue(getNextToken(false));
         }
         expect(RIGHT_PAREN, getNextToken(true));
@@ -317,7 +317,7 @@ public abstract class AbstractEDIFParserWorker {
             value.setOwner(getNextToken(false));
             expect(RIGHT_PAREN,getNextToken(true));
             expect(RIGHT_PAREN,getNextToken(true));
-        }else{
+        } else {
             expect(RIGHT_PAREN + "|" + LEFT_PAREN, paren);
         }
 
@@ -355,7 +355,7 @@ public abstract class AbstractEDIFParserWorker {
             portInst.setName(getNextToken(false));
             portInst.setIndex(Integer.parseInt(getNextToken(true)));
             expect(RIGHT_PAREN, getNextToken(true));
-        }else{
+        } else {
             portInst.setName(currToken);
         }
 
@@ -367,7 +367,7 @@ public abstract class AbstractEDIFParserWorker {
             portInst.setCellInstRaw(getRefEDIFCellInst(instanceref, instanceLookup));
             expect(RIGHT_PAREN, getNextToken(true));
             expect(RIGHT_PAREN, getNextToken(true));
-        }else{
+        } else {
             // This is a port to higher level
             expect(RIGHT_PAREN,currToken);
         }
@@ -408,7 +408,7 @@ public abstract class AbstractEDIFParserWorker {
             } else {
                 expect(ARRAY + " | " + RENAME, currToken);
             }
-        }else{
+        } else {
             port = new EDIFPort();
             port.setName(currToken);
         }

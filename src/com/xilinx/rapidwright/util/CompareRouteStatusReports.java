@@ -56,7 +56,7 @@ public class CompareRouteStatusReports {
                     else if(curr.contains("Routing status:")) {
                         String[] parts = curr.split(" ");
                         currStatus = parts[4];
-                    }else if(curr.contains("-----------") && !lines.get(i-1).contains("Route Tree:")) {
+                    } else if(curr.contains("-----------") && !lines.get(i-1).contains("Route Tree:")) {
                         // create new RouteStatus
                         RouteStatus rs = new RouteStatus();
                         rs.setName(currNetName);
@@ -65,18 +65,18 @@ public class CompareRouteStatusReports {
                         tree.put(rs.getName(),rs);
                         currSubTree = null;
                         currSubTrees = null;
-                    }else if(curr.contains("/")) {
+                    } else if(curr.contains("/")) {
                         String wire = curr.replace("[", " ").replace("{", " ").replace("}", " ").replace("]", " ");
                         wire = wire.trim();
                         currSubTree.add(wire);
-                    }else if(curr.contains("Subtree:")) {
+                    } else if(curr.contains("Subtree:")) {
                         currSubTree = new ArrayList<String>();
                         if(currSubTrees == null) {
                             currSubTrees = new ArrayList<ArrayList<String>>();
                         }
                         currSubTrees.add(currSubTree);
                     }
-                }else{
+                } else {
                     currNetName = curr.trim();
                 }
             }

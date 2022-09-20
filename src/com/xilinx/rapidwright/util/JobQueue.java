@@ -209,14 +209,14 @@ public class JobQueue {
                 job.setRunDir(mainDir + i);
                 q.addJob(job);
             }
-        }else{
+        } else {
             if(args[0].equalsIgnoreCase(LSF_AVAILABLE_OPTION)) {
                 System.out.println(Boolean.toString(isLSFAvailable()));
                 return;
-            }else if(args[0].equalsIgnoreCase(LSF_RESOURCE_OPTION)) {
+            } else if(args[0].equalsIgnoreCase(LSF_RESOURCE_OPTION)) {
                 System.out.println(LSFJob.LSF_RESOURCE);
                 return;
-            }else if(args[0].equalsIgnoreCase(LSF_QUEUE_OPTION)) {
+            } else if(args[0].equalsIgnoreCase(LSF_QUEUE_OPTION)) {
                 System.out.println(LSFJob.LSF_QUEUE);
                 return;
             }

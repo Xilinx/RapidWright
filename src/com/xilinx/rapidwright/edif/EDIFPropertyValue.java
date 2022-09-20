@@ -211,11 +211,11 @@ public class EDIFPropertyValue {
             os.write('\"');
             os.write(value.getBytes(StandardCharsets.UTF_8));
             os.write('\"');
-        }else if(type == EDIFValueType.BOOLEAN) {
+        } else if(type == EDIFValueType.BOOLEAN) {
             os.write('(');
             os.write(value.getBytes(StandardCharsets.UTF_8));
             os.write(')');
-        }else{
+        } else {
             os.write(value.getBytes(StandardCharsets.UTF_8));
         }
         os.write(')');

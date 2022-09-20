@@ -104,7 +104,7 @@ public class TestMergeDesigns {
             a.setDesignOutOfContext(true);
             if(name.equals("a")) {
                 designs.setFirst(a);
-            }else {
+            } else {
                 designs.setSecond(a);
             }
             

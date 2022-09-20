@@ -231,7 +231,7 @@ public class FileTools {
         String ver = System.getProperty("java.version");
         if(ver.startsWith("1.")) {
             ver = ver.substring(2, 3);
-        }else {
+        } else {
             int dotIdx = ver.indexOf('.');
             if(dotIdx != -1) {
                 ver = ver.substring(0, dotIdx);
@@ -251,7 +251,7 @@ public class FileTools {
         try{
             if(fileName.endsWith(".gz")) {
                 in = new BufferedReader(new InputStreamReader(new GZIPInputStream(new FileInputStream(fileName))));
-            }else{
+            } else {
                 in = new BufferedReader(new FileReader(fileName));
             }
         }
@@ -278,7 +278,7 @@ public class FileTools {
         try{
             if(fileName.endsWith(".gz")) {
                 out = new BufferedWriter(new OutputStreamWriter(new GZIPOutputStream(new FileOutputStream(fileName))));
-            }else{
+            } else {
                 out = new BufferedWriter(new FileWriter(fileName));
             }            
         }
@@ -566,7 +566,7 @@ public class FileTools {
         if(endIndex != -1) {
             return fileName.substring(0, endIndex);
         }
-        else{
+        else {
             return fileName;
         }
     }
@@ -654,7 +654,7 @@ public class FileTools {
                             return false;
                         }
                     }
-                    else{
+                    else {
                         if(!deleteFile(file.getCanonicalPath())) {
                             return false;
                         }
@@ -686,7 +686,7 @@ public class FileTools {
         for(File i: f.listFiles()) {
             if(i.isDirectory()) {
                 deleteFolder(i.getAbsolutePath());
-            }else if(i.isFile()) {
+            } else if(i.isFile()) {
                 if(!i.delete()) {
                     throw new IllegalArgumentException("Delete: deletion failed: " + i.getAbsolutePath());
                 }
@@ -1151,7 +1151,7 @@ public class FileTools {
         if(FileTools.cygwinInstalled()) {
             return "/";
         }
-        else{
+        else {
             return File.separator;
         }
     }
@@ -1608,7 +1608,7 @@ public class FileTools {
                 String destFilePath = destDirectory + File.separator + e.getName();
                 if(e.isDirectory()) {
                     new File(destFilePath).mkdirs();
-                }else{
+                } else {
                     File currFile = new File(destFilePath);
                     String parentName = currFile.getParentFile().getAbsolutePath();
                     makeDirs(parentName);

@@ -283,7 +283,7 @@ public class PhysNetlistReader {
                         c.setSiteInst(siteInst);
                         siteInst.getCellMap().put(belName, c);
                         c.setRoutethru(true);
-                    }else {
+                    } else {
                         throw new RuntimeException("ERROR: Missing BEL location in other BEL list: "
                                 + belName + " on for pin mapping "
                                 + belPinName + " -> " + cellPinName);
@@ -296,7 +296,7 @@ public class PhysNetlistReader {
                     c.addAltPinMapping(belPinName, new AltPinMapping(cellPinName,
                             strings.get(otherCell.getMultiCell()),
                             strings.get(otherCell.getMultiType())));
-                }else {
+                } else {
                     if(c.getBEL().getPin(belPinName) == null) {
                         System.err.println("WARNING: On cell " + c.getName() + ", a logical pin '" +
                                 c.getType() + "." + cellPinName + "' is being mapped on to a BEL pin '" 
@@ -533,7 +533,7 @@ public class PhysNetlistReader {
             if(DISABLE_AUTO_IO_BUFFERS.equals(key)) {
                 boolean setAutoIOBuffers = "0".equals(strings.get(pReader.getValue()));
                 design.setAutoIOBuffers(setAutoIOBuffers);
-            }else if(OUT_OF_CONTEXT.equals(key)) {
+            } else if(OUT_OF_CONTEXT.equals(key)) {
                 boolean isDesignOOC = "1".equals(strings.get(pReader.getValue()));
                 design.setDesignOutOfContext(isDesignOOC);
             }

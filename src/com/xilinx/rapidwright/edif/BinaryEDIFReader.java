@@ -159,11 +159,11 @@ public class BinaryEDIFReader {
             EDIFDirection dir = null;
             if((dirAndWidth & BinaryEDIFWriter.EDIF_DIR_INPUT_MASK) == BinaryEDIFWriter.EDIF_DIR_INPUT_MASK) {
                 dir = EDIFDirection.INPUT;
-            }else if((dirAndWidth & BinaryEDIFWriter.EDIF_DIR_OUTPUT_MASK) == BinaryEDIFWriter.EDIF_DIR_OUTPUT_MASK) {
+            } else if((dirAndWidth & BinaryEDIFWriter.EDIF_DIR_OUTPUT_MASK) == BinaryEDIFWriter.EDIF_DIR_OUTPUT_MASK) {
                 dir = EDIFDirection.OUTPUT;
-            }else if((dirAndWidth & BinaryEDIFWriter.EDIF_DIR_INOUT_MASK) == BinaryEDIFWriter.EDIF_DIR_INOUT_MASK) {
+            } else if((dirAndWidth & BinaryEDIFWriter.EDIF_DIR_INOUT_MASK) == BinaryEDIFWriter.EDIF_DIR_INOUT_MASK) {
                 dir = EDIFDirection.INOUT;
-            }else {
+            } else {
                 throw new RuntimeException("ERROR: Couldn't read port direction in cell " 
                         + c.getName());
             }

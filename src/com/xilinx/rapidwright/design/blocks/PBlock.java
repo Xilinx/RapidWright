@@ -153,7 +153,7 @@ public class PBlock extends ArrayList<PBlockRange> {
         for(Site s : sites) {
             if(namespace == null) {
                 namespace = s.getNameSpacePrefix();
-            }else if(!namespace.equals(s.getNameSpacePrefix())) {
+            } else if(!namespace.equals(s.getNameSpacePrefix())) {
                 throw new RuntimeException("ERROR: Found multiple types for "
                         + "PBlockRange creation request: " + namespace  + " " 
                         + s.getNameSpacePrefix());
@@ -323,9 +323,9 @@ public class PBlock extends ArrayList<PBlockRange> {
         for(PBlockRange range : this) {
             if(range.getLowerLeftSite().getName().startsWith("SLICE")) {
                 slices = range;
-            }else if(range.getLowerLeftSite().getName().startsWith("DSP")) {
+            } else if(range.getLowerLeftSite().getName().startsWith("DSP")) {
                 dsps = range;
-            }else if(range.getLowerLeftSite().getName().startsWith("RAMB")) {
+            } else if(range.getLowerLeftSite().getName().startsWith("RAMB")) {
                 brams = range;
             }
         }
@@ -337,7 +337,7 @@ public class PBlock extends ArrayList<PBlockRange> {
             int newUpperY = slices.getUpperRightSite().getInstanceY() - yOffset;
             Site newUpperRight = placement.getTile().getDevice().getSite("SLICE_X" + newUpperX + "Y" + newUpperY);
             slices = new PBlockRange(placement, newUpperRight);            
-        }else if(placement.getName().startsWith("DSP")) {
+        } else if(placement.getName().startsWith("DSP")) {
             int xOffset = dsps.getLowerLeftSite().getInstanceX() - placement.getInstanceX();
             int yOffset = dsps.getLowerLeftSite().getInstanceY() - placement.getInstanceY();
             int newUpperX = dsps.getUpperRightSite().getInstanceX() - xOffset;
@@ -369,7 +369,7 @@ public class PBlock extends ArrayList<PBlockRange> {
             }            
             dsps = new PBlockRange(placement, newUpperRight);
             
-        }else if(placement.getName().startsWith("RAMB")) {
+        } else if(placement.getName().startsWith("RAMB")) {
             int xOffset = brams.getLowerLeftSite().getInstanceX() - placement.getInstanceX();
             int yOffset = brams.getLowerLeftSite().getInstanceY() - placement.getInstanceY();
             int newUpperX = brams.getUpperRightSite().getInstanceX() - xOffset;
@@ -445,7 +445,7 @@ public class PBlock extends ArrayList<PBlockRange> {
                         pbr.setLowerLeft(otherCorner);                        
                     }
                 }
-            }else{
+            } else {
                 // moving to the left, check the columns to the left most tile
                 for(PBlockRange pbr : this) {
                     int x = 0;
@@ -487,7 +487,7 @@ public class PBlock extends ArrayList<PBlockRange> {
                         pbr.setUpperRight(otherCorner);                                            
                     }
                 }
-            }else{
+            } else {
                 // moving up, check the rows above
                 for(PBlockRange pbr : this) {
                     int y = 0;

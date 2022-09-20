@@ -209,7 +209,7 @@ public class Installer {
                 
                 if(ze.isDirectory()) {
                     newFile.mkdirs();
-                }else{
+                } else {
                     new File(newFile.getParent()).mkdirs();
                      FileOutputStream fos = new FileOutputStream(newFile);
                      int len;
@@ -375,16 +375,16 @@ public class Installer {
         for(String arg : args) {
             if(arg.equals("-v") || arg.equals("--verbose")) {
                 verbose = true;
-            }else if(arg.equals("-k") || arg.equals("--keep-zip-file")) {
+            } else if(arg.equals("-k") || arg.equals("--keep-zip-file")) {
                 KEEP_ZIP_FILES = true;
-            }else if(arg.equals("-s") || arg.equals("--skip-zip-download")) {
+            } else if(arg.equals("-s") || arg.equals("--skip-zip-download")) {
                 SKIP_ZIP_DOWNLOAD = true;
-            }else if(arg.equals("-t") || arg.equals("--skip-test")) {
+            } else if(arg.equals("-t") || arg.equals("--skip-test")) {
                 SKIP_TEST = true;
-            }else if(arg.equals("-u") || arg.equals("--update-jars")) {
+            } else if(arg.equals("-u") || arg.equals("--update-jars")) {
                 updateJars();
                 return;
-            }else if(arg.equals("-h") || arg.equals("--help")) {
+            } else if(arg.equals("-h") || arg.equals("--help")) {
                 System.out.println("================================================================================");
                 System.out.println(" RapidWright Installer");
                 System.out.println("================================================================================");
@@ -451,7 +451,7 @@ public class Installer {
             System.err.println("ERROR: Couldn't find 'git' on PATH, please install or set PATH environment variable accordingly.");
             if(isWindows()) {
                 System.err.println("\tgit can be downloaded from: https://git-scm.com/download/win");
-            }else{
+            } else {
                 System.err.println("\tgit can be installed by:\n");
                 System.err.println("\tDebian/Ubuntu: 'sudo apt-get install git'\n");
                 System.err.println("\tRedHat/Fedora: 'sudo yum install git'\n");
@@ -463,7 +463,7 @@ public class Installer {
             System.err.println("ERROR: Couldn't find 'javac' on PATH, please install or set PATH environment variable accordingly.");
             if(isWindows()) {
                 System.err.println("\tJava JDK can be downloaded from: https://www.oracle.com/technetwork/java/javase/downloads/jdk8-downloads-2133151.html");
-            }else{
+            } else {
                 System.err.println("\tJDK can be installed by:\n");
                 System.err.println("  \tDebian/Ubuntu: 'sudo apt-get install openjdk-8-jdk'\n");
                 System.err.println("  \tRedHat/Fedora: 'sudo yum install java-1.8.0-openjdk-devel'\n");
@@ -511,7 +511,7 @@ public class Installer {
                             + "  current directory.");
                     System.exit(1);
                 }
-            }else{
+            } else {
                 String url = RELEASE+"/"+name;
                 System.out.println("Downloading " + url + " ...");
                 long size = downloadFile(url, name);
@@ -558,7 +558,7 @@ public class Installer {
         String classpath = binDir+File.pathSeparator + jarsClassPath;
         if(SKIP_TEST) {
             System.out.println("Skipping DeviceBrowser test...");
-        }else{
+        } else {
             System.out.println("================================================================================");
             System.out.println("  4. Let's test the DeviceBrowser in RapidWright ...");
             System.out.println("================================================================================");

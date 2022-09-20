@@ -68,7 +68,7 @@ public class DSPTimingData{
         File dspTimingFile = new File(dspTimingDataFolder + fullName.replace("/", "-") + ".txt");
         if(dspTimingFile.exists()) {
             this.valid = true;
-        }else {
+        } else {
             this.valid = false;
         }
         this.setInputOutputDelays(new HashMap<>());
@@ -118,13 +118,13 @@ public class DSPTimingData{
                     if(s.length == 3) {
                         // clk    P[10]            1.62
                         this.addInputOutputPortDelay("CLK", s[1], (short) (Float.parseFloat(s[2])*1000));
-                    }else {
+                    } else {
                         // CEA2     clk       0.00       0.16
                         // introducing virtual clk: VCLK, which is connected to superSink in timing graph
                         this.addInputOutputPortDelay(s[0], "VCLK", (short) (Float.parseFloat(s[2])*1000 + Float.parseFloat(s[3])*1000));
                     }
                     
-                }else if(line.contains(":")) {
+                } else if(line.contains(":")) {
                     String[] s = line.replaceAll(":", " ").split("\\s+");
                     //port index inclusive
                     for(short idin = Short.parseShort(s[1]); idin <= Short.parseShort(s[2]); idin++) {
@@ -136,7 +136,7 @@ public class DSPTimingData{
                         }
                     }
                     
-                }else if(line.contains("[")) {
+                } else if(line.contains("[")) {
                     String[] s = line.split("\\s+");
                     this.addInputOutputPortDelay(s[0], s[1], (short) (Float.parseFloat(s[2])*1000));
                 }

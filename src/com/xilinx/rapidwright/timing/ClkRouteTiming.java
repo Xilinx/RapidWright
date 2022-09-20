@@ -106,7 +106,7 @@ public class ClkRouteTiming {
         }
         if(section.equals("int_bufg")) {
             this.readINTToBufgDelay(reader);
-        }else if(section.equals("bufg_int")) {
+        } else if(section.equals("bufg_int")) {
             this.readRouteAndDelay(reader);
         }
         

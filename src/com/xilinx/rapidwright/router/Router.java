@@ -271,16 +271,16 @@ public class Router extends AbstractRouter {
                 longLineName = "EE12_BEG";
                 range = 8;
             }
-            else{
+            else {
                 longLineName = "WW12_BEG";
                 range = 8;
             }
         }
-        else{
+        else {
             if(y < 0) {
                 longLineName = use16LongLines ? "NN16_BEG" : "NN12_BEG";
             }
-            else{
+            else {
                 longLineName = use16LongLines ? "SS16_BEG" : "SS12_BEG";
             }
         }
@@ -290,20 +290,20 @@ public class Router extends AbstractRouter {
                     longLineNameAlt = "EE12_BEG";
                     rangeAlt = 8;
                 }
-                else{
+                else {
                     longLineNameAlt = "WW12_BEG";
                     rangeAlt = 8;
                 }
             }
-            else{
+            else {
                 if(y < 0) {
                     longLineNameAlt = use16LongLines ? "NN16_BEG" : "NN12_BEG";
                 }
-                else{
+                else {
                     longLineNameAlt = use16LongLines ? "SS16_BEG" : "SS12_BEG";
                 }
             }
-        }else{
+        } else {
             rangeAlt = 0;
         }
         if(design.getDevice().getArchitecture() == FamilyType.VERSAL) {
@@ -515,7 +515,7 @@ public class Router extends AbstractRouter {
                 if(currLongLine.equals(start) && (x > LONG_LINE_THRESHOLD || y > LONG_LINE_THRESHOLD)) {
                     continue;
                 }
-                else{
+                else {
                     //finalLongLine = closestNode;
                     break;                     
                 }
@@ -565,7 +565,7 @@ public class Router extends AbstractRouter {
                     if(currNode.equals(currSink)) {
                         // The currNode itself is the sink
                         currPathNode = currNode;
-                    }else{
+                    } else {
                         // The currNode's child wire is the sink
                         currPathNode = new RouteNode(w.getTile(), w.getWireIndex(), currNode, currNode.getLevel()+1);
                     }
@@ -616,7 +616,7 @@ public class Router extends AbstractRouter {
                     }
                     return;
                 } 
-                else{                        
+                else {                        
                     // This is not the sink, but is this wire one we should look at in the future?
                     Tile currTile = w.getTile();
                     int currWire = w.getWireIndex();
@@ -660,7 +660,7 @@ public class Router extends AbstractRouter {
                                                 if(possibleCell != null) continue nextNode;
                                             }
                                         }
-                                    }else{
+                                    } else {
                                         if(et != null && si.getCell(et.getName()) != null) continue nextNode;
                                     }
                                 }
@@ -722,7 +722,7 @@ public class Router extends AbstractRouter {
             String rBelName = clkSitePIPNames.get(currPin.getName());
             if(rBelName == null) {
                 if(!supressWarningsErrors) MessageGenerator.briefError("Warning unsupported clock pin: " + currPin);
-            }else if(!rBelName.isEmpty()) {
+            } else if(!rBelName.isEmpty()) {
                 SitePIP existingPIP = currPin.getSiteInst().getUsedSitePIP(rBelName);
                 if(existingPIP == null) {
                     //SitePIP p = new SitePIP(dev, currPin.getSiteInst(), rBelName, "CLK", "OUT");
@@ -758,7 +758,7 @@ public class Router extends AbstractRouter {
     public boolean isRoutable(RouteNode rn, int depth) {
         if(usedNodes.contains(rn) || rn.getWireName().contains("LOGIC_OUT")) {
             return false;
-        }else if(rn.getLevel() == depth) {
+        } else if(rn.getLevel() == depth) {
             return true;
         }
         RouteNode base = rn.getBaseWire();
@@ -875,7 +875,7 @@ public class Router extends AbstractRouter {
                 // just add the original source
                 addInitialSourceForRouting(currSource);
             }
-            else{
+            else {
                 // Leverage previous routings to offer additional starting points for this route 
                 getSourcesFromPIPs(pipList, currSources/* TODO - prune this list to make it faster*/);
             }
@@ -908,10 +908,10 @@ public class Router extends AbstractRouter {
                 netPIPs.addAll(pipList);
                 currPin.setRouted(true);
             } 
-            else{
+            else {
                 if(ENABLE_RIPUP) {
                     failedRoutes.add(currPin);                    
-                }else{
+                } else {
                     failedConnections++;
                     String switchMatrixString = switchMatrixSink != null ? switchMatrixSink.getTile().getName() + " " + switchMatrixSink.getWireName() : "null";
                     if(!supressWarningsErrors) { 
@@ -949,7 +949,7 @@ public class Router extends AbstractRouter {
                         sources.add(new RouteNode(pip.getTile(), pip.getEndWireIndex(), null, 0));
                 }
             }
-        }else{
+        } else {
             for(PIP pip : pips) {
                 if(isSwitchBox(pip.getTile())) {
                     if(!allExclusiveIntSinks.contains(pip.getStartWireName()))
@@ -1056,7 +1056,7 @@ public class Router extends AbstractRouter {
                             }
                             currReserved.add(reserveMe);
                             markNodeUsed(reserveMe);
-                        }else{
+                        } else {
                             // Add a new sink to the GLOBAL_LOGIC* net
                             n.addPin(new SitePinInst(false, e.getKey(), i));
                         }
@@ -1095,7 +1095,7 @@ public class Router extends AbstractRouter {
         String pinName = type == NetType.VCC ? Net.VCC_WIRE_NAME : Net.GND_WIRE_NAME;
         if(n.getWireName().startsWith(pinName)) {
             return true;
-        }else if(lutOutputPinNames.contains(n.getWireName())) {
+        } else if(lutOutputPinNames.contains(n.getWireName())) {
             // If lut is unused, we can re-purpose it for a static source
             Site slice = n.getTile().getSites()[0];
             SiteInst i = design.getSiteInstFromSite(slice);            
@@ -1183,7 +1183,7 @@ public class Router extends AbstractRouter {
                                 if(checkSink(test)!=null) {
                                     currSink.setParent(test);
                                     return currSink;
-                                }else
+                                } else
                                     continue;
                             }
                         }
@@ -1258,7 +1258,7 @@ public class Router extends AbstractRouter {
                     }
                 }
             }
-        }else {
+        } else {
             while(!queue.isEmpty()) {    
                 RouteNode currRouteNode = queue.remove();
                 if ((currRouteNode.getIntentCode()==IntentCode.NODE_GLOBAL_HROUTE||currRouteNode.getIntentCode()==IntentCode.NODE_GLOBAL_VROUTE||currRouteNode.getIntentCode()==IntentCode.NODE_GLOBAL_VDISTR)&&!checkClkResource(currRouteNode)) {
@@ -1461,7 +1461,7 @@ public class Router extends AbstractRouter {
                                         if (tmpVR.getIntentCode()==IntentCode.NODE_GLOBAL_HDISTR) {
                                             return tmpVR;
                                         }
-                                    }else if(tmp.getIntentCode()==IntentCode.NODE_GLOBAL_HDISTR) {
+                                    } else if(tmp.getIntentCode()==IntentCode.NODE_GLOBAL_HDISTR) {
                                         return getHDfromBUF(tmp, debug);
                                     }
                                 }
@@ -1489,18 +1489,18 @@ public class Router extends AbstractRouter {
                 avgSink.setWire(currPin.getSiteExternalWireIndex());
                 return currPin.getTile().getClockRegion();
             }
-        } else{
+        } else {
             for(SitePinInst currPin : currNet.getPins()) {
                 if (currPin.isOutPin()) continue; 
                 ClockRegion crTmp = currPin.getTile().getClockRegion();
                 if(crTmp.getColumn()>xEnd) {
                     xEnd = crTmp.getColumn();
-                }else if(crTmp.getColumn()<xStart) {
+                } else if(crTmp.getColumn()<xStart) {
                     xStart = crTmp.getColumn();
                 }
                 if(crTmp.getRow()>yEnd) {
                     yEnd = crTmp.getRow();
-                }else if(crTmp.getRow()<yStart) {
+                } else if(crTmp.getRow()<yStart) {
                     yStart = crTmp.getRow();
                 }
             }
@@ -1579,7 +1579,7 @@ public class Router extends AbstractRouter {
                 }
                 
             }
-            else{// If NOT first sink to route
+            else {// If NOT first sink to route
                 getSourcesFromPIPs(pipList, currSources/* TODO - prune this list to make it faster*/);
             }
             if(clkRegion == null) {
@@ -1652,7 +1652,7 @@ public class Router extends AbstractRouter {
                 successfulRoute = true;
                 netPIPs.addAll(pipList);
                 currPin.setRouted(true);
-            }else {
+            } else {
                 throw new RuntimeException("ERROR: Did not reach the sink: "+currSink.getTile()+"/"+currSink.getWireName());
             }
         }// end of sinks
@@ -1679,7 +1679,7 @@ public class Router extends AbstractRouter {
                 // just add the original source
                 addInitialSourceForRouting(currSource);
             }
-            else{
+            else {
                 // Leverage previous routings to offer additional starting points for this route 
                 getSourcesFromPIPs(pipList, currSources);
             }
@@ -1698,10 +1698,10 @@ public class Router extends AbstractRouter {
                 netPIPs.addAll(pipList);
                 currPin.setRouted(true);
             } 
-            else{
+            else {
                 if(ENABLE_RIPUP) {
                     failedRoutes.add(currPin);                    
-                }else{
+                } else {
                     failedConnections++;
                     String switchMatrixString = switchMatrixSink != null ? switchMatrixSink.getTile().getName() + " " + switchMatrixSink.getWireName() : "null";
                     MessageGenerator.briefError("\tFAILED TO ROUTE: net: " + currNet.getName() + " inpin: " + currSinkPin.getName() +
@@ -1754,7 +1754,7 @@ public class Router extends AbstractRouter {
             }
             if(!success) {
                 System.out.println("FAILED to route " + netType + " pin " + sink.toString());
-            }else{
+            } else {
                 sink.setRouted(true);
             }
             
@@ -1824,14 +1824,14 @@ public class Router extends AbstractRouter {
                 // just add the original source
                 addInitialSourceForRouting(currSource);
             }
-            else{
+            else {
                 // Leverage previous routings to offer additional starting points for this route 
                 getSourcesFromPIPs(currNet.getPIPs(), currSources);
             }
 
             if(switchMatrixSink != null && usedNodes.contains(switchMatrixSink)) {
                 System.err.println("Sink input already used: " +switchMatrixSink);
-            }else{
+            } else {
                 // Route the current sink node
                 totalConnections++;
                 routeConnection();
@@ -1843,10 +1843,10 @@ public class Router extends AbstractRouter {
                 netPIPs.addAll(pipList);
                 currPin.setRouted(true);
             } 
-            else{
+            else {
                 if(ENABLE_RIPUP) {
                     failedRoutes.add(currPin);                    
-                }else{
+                } else {
                     failedConnections++;
                     String switchMatrixString = switchMatrixSink != null ? switchMatrixSink.getTile().getName() + " " + switchMatrixSink.getWireName() : "null";
                     MessageGenerator.briefError("\tFAILED TO ROUTE: net: " + currNet.getName() + " inpin: " + currSinkPin.getName() +
@@ -1883,7 +1883,7 @@ public class Router extends AbstractRouter {
                         }
                         currNet.unroute();
                         routeClockNet();
-                    }else{
+                    } else {
                         routeNet();
                     }
                     System.out.println("Routing unrouted net: " + currNet.getName());
@@ -2011,9 +2011,9 @@ public class Router extends AbstractRouter {
             long start = System.currentTimeMillis();
             if(currNet.isStaticNet()) {
                 routeStaticNet();
-            }else if(currNet.isClockNet()) {
+            } else if(currNet.isClockNet()) {
                 routeClockNet();
-            }else{
+            } else {
                 routeNet();
             }
             
@@ -2040,7 +2040,7 @@ public class Router extends AbstractRouter {
                 // just add the original source
                 addInitialSourceForRouting(currSource);
             }
-            else{
+            else {
                 // Leverage previous routings to offer additional starting points for this route 
                 getSourcesFromPIPs(pipList, currSources/* TODO - prone this list to make it faster pipList*/);
             }
@@ -2079,7 +2079,7 @@ public class Router extends AbstractRouter {
                     ENABLE_RIPUP = true;
                 }
 
-            }else{
+            } else {
                 failedConnections++;
                 String switchMatrixString = switchMatrixSink != null ? switchMatrixSink.getTile().getName() + " " + switchMatrixSink.getWireName() : "null";
                 MessageGenerator.briefError("\tFAILED TO ROUTE: net: " + currNet.getName() + " inpin: " + currSinkPin.getName() +

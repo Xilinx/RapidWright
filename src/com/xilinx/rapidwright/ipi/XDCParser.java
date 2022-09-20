@@ -81,7 +81,7 @@ public class XDCParser {
                     constraints.put(key, pkgPin);
                 }
                 pkgPin.setName(pinLoc);
-            }else if(line.contains("set_property") && line.contains("IOSTANDARD")) {
+            } else if(line.contains("set_property") && line.contains("IOSTANDARD")) {
                 String[] parts = line.split("\\s+");
                 expect("set_property", parts[0], lineNum, line);
                 expect("IOSTANDARD", parts[1], lineNum, line);

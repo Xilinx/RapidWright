@@ -451,7 +451,7 @@ public class EDIFNetlist extends EDIFName {
         if(destLib == null) {
             if(cell.getLibrary().getName().equals(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME)) {
                 destLib = getHDIPrimitivesLibrary();
-            }else{
+            } else {
                 destLib = addLibrary(new EDIFLibrary(cell.getLibrary().getName()));
             }
         }
@@ -494,7 +494,7 @@ public class EDIFNetlist extends EDIFName {
         if(destLibTop == null) {
             if(cell.getLibrary().getName().equals(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME)) {
                 destLibTop = getHDIPrimitivesLibrary();
-            }else{
+            } else {
                 destLibTop = addLibrary(new EDIFLibrary(cell.getLibrary().getName()));
             }
         }
@@ -559,7 +559,7 @@ public class EDIFNetlist extends EDIFName {
         if(destLib == null) {
             if(cell.getLibrary().isHDIPrimitivesLibrary()) {
                 destLib = getHDIPrimitivesLibrary();
-            }else{
+            } else {
                 destLib = addLibrary(new EDIFLibrary(cell.getLibrary().getName()));
             }
         }
@@ -1049,7 +1049,7 @@ public class EDIFNetlist extends EDIFName {
                 String cellTypeName = eprList.get(0).getCellInst().getCellType().getName();
                 if(cellTypeName.equals("GND")) {
                     return d.getGndNet();
-                }else if(cellTypeName.equals("VCC")) {
+                } else if(cellTypeName.equals("VCC")) {
                     return d.getVccNet();
                 }                
             }
@@ -1097,7 +1097,7 @@ public class EDIFNetlist extends EDIFName {
             EDIFHierCellInst curr = toProcess.poll();
             if(curr.getCellType().isPrimitive()) {
                 leafCells.add(curr);
-            }else{
+            } else {
                 curr.addChildren(toProcess);
             }
         }
@@ -1160,7 +1160,7 @@ public class EDIFNetlist extends EDIFName {
                         continue;
                     }
                     children.add(newCell);
-                } else{
+                } else {
                     q.add(newCell);
                     if(!leavesOnly) {
                         if(pat != null && !pat.matcher(newCell.getFullHierarchicalInstName()).matches()) {
@@ -1252,7 +1252,7 @@ public class EDIFNetlist extends EDIFName {
                             queue.add(upPort.getHierarchicalNet());
                         }
                     }
-                } else{
+                } else {
                     // Moving down in hierarchy
                     EDIFHierNet otherNet = p.getInternalNet();
                     if(otherNet == null) {
@@ -1277,7 +1277,7 @@ public class EDIFNetlist extends EDIFName {
             physicalNetPinMap.put(parentNet, leafCellPins);
         } else if(initialNet.getNet().getPortInsts().size() == 0) {
             return aliases;
-        } else{
+        } else {
             throw new RuntimeException("ERROR: Couldn't identify parent net, no output pins (or top level output port) found.");
         }
         
@@ -1384,7 +1384,7 @@ public class EDIFNetlist extends EDIFName {
                             queue.add(new EDIFHierPortInst(currInst, portInst));
                         }
                     }
-                }else{
+                } else {
                     instQueue.add(currInst.getChild(eci));
                 }
             }
@@ -1566,7 +1566,7 @@ public class EDIFNetlist extends EDIFName {
                 for(int idx=0; idx < port.getWidth(); idx++) {
                     map.put(port.getName() + "["+idx+"]",port);
                 }
-            }else{
+            } else {
                 map.put(port.getName(),port);
             }
         }
@@ -1588,7 +1588,7 @@ public class EDIFNetlist extends EDIFName {
             EDIFHierCellInst curr = toProcess.poll();
             if(curr.getInst().getCellType().isPrimitive()) {
                 primitiveInstances.put(curr.getFullHierarchicalInstName(), curr.getInst());
-            }else{
+            } else {
                 curr.addChildren(toProcess);
             }
         }

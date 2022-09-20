@@ -366,7 +366,7 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
                 if(tileColliding) {
                     hmTile.setState(GUIShapeState.COLLIDING);
                     isColliding = true;
-                }else{
+                } else {
                     hmTile.setState(GUIShapeState.VALID);
                 }
             } else {
@@ -384,7 +384,7 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
         if (isPlacementValid) {
             if(isColliding) {
                 this.setState(GUIShapeState.COLLIDING);
-            }else{
+            } else {
                 this.setState(GUIShapeState.VALID);    
             }
         } else {

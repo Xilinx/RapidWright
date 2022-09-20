@@ -191,7 +191,7 @@ public class EnumerateIOExpansions {
                         String lastComma = (i == ports.size()-1) ? "" : ","; 
                         if(port.isInput()) {
                             lines.add("    input " + port.getName() + lastComma);
-                        }else {
+                        } else {
                             lines.add("    output " + port.getName() + "_" + unisimName + lastComma);
                         }
                     }
@@ -203,7 +203,7 @@ public class EnumerateIOExpansions {
                         String lastComma = (i == ports.size()-1) ? "" : ","; 
                         if(port.isInput()) {
                             lines.add("        ." + port.getName() + "(" + port.getName() + ")" + lastComma);
-                        }else {
+                        } else {
                             lines.add("        ." + port.getName() + "(" + port.getName() +"_"+ unisimName + ")" + lastComma);
                         }
                     }
@@ -215,7 +215,7 @@ public class EnumerateIOExpansions {
                     if(unisimName.startsWith("IBUF")) {
                         lines.add("set_property IOSTANDARD "+iostd.name()+" [get_ports I]");
                         lines.add("set_property IOSTANDARD LVCMOS18 [get_ports O_"+unisimName+"]");
-                    }else {
+                    } else {
                         lines.add("set_property IOSTANDARD LVCMOS18 [get_ports I]");
                         lines.add("set_property IOSTANDARD "+iostd.name()+" [get_ports O_"+unisimName+"]");                        
                     }

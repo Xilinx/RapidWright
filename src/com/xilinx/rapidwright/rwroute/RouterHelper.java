@@ -210,7 +210,7 @@ public class RouterHelper {
             PIP pip = findPIPbetweenNodes(driver, load);    
             if(pip != null) {
                 connectionPIPs.add(pip);
-            }else{
+            } else {
                 System.err.println("ERROR: Null PIP connecting these two nodes: " + driver.toString() + ", " + load.toString());
             }
         }
@@ -285,7 +285,7 @@ public class RouterHelper {
             Node pinNode = pin.getConnectedNode();
             if(pinNode != null) {
                 nodes.add(pinNode);
-            }else {
+            } else {
                 System.err.println("ERROR: No node connects to pin " + pin + ", net " + net);
             }
         }
@@ -311,7 +311,7 @@ public class RouterHelper {
             Node pinNode = pin.getConnectedNode();
             if(pinNode != null) {
                 nodes.add(pinNode);
-            }else {
+            } else {
                 System.err.println("ERROR: No node connects to pin " + pin + ", net " + net);
             }
         }
@@ -360,7 +360,7 @@ public class RouterHelper {
                             // SRST2 of SLICE also has an inverter, but should not be invertible
                             toInvertPins.add(currSitePinInst);
                         }
-                    }else if (currSitePinInst.toString().contains("DSP")) {
+                    } else if (currSitePinInst.toString().contains("DSP")) {
                         if(isInvertibleDSPBELPin(belPin)) {
                             toInvertPins.add(currSitePinInst);
                         }
@@ -398,7 +398,7 @@ public class RouterHelper {
         }    
         if(intTiles.size() > 1) {
             exit = intTiles.get(1);
-        }else if(intTiles.size() == 1) {
+        } else if(intTiles.size() == 1) {
             exit = entry;
         }        
         return Math.abs(entry.getTileXCoordinate()- exit.getTileXCoordinate())
@@ -417,7 +417,7 @@ public class RouterHelper {
         Long counter = typeUsage.get(ic);
         if(counter == null) {
             counter = (long) 1;
-        }else {
+        } else {
             counter++;
         }
         typeUsage.put(ic, counter);
@@ -425,7 +425,7 @@ public class RouterHelper {
         Long length = typeLength.get(ic);
         if(length == null) {
             length = (long) wlNode;
-        }else {
+        } else {
             length += wlNode;
         }
         typeLength.put(ic, length);

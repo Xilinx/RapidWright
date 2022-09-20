@@ -63,13 +63,13 @@ public class Interchange {
             GZIPOutputStream go = new GZIPOutputStream(new FileOutputStream(fileName));
             wbc = Channels.newChannel(go);
             
-        }else {
+        } else {
             FileOutputStream fo = new java.io.FileOutputStream(fileName);
             wbc = fo.getChannel();
         }
         if(IS_PACKED) {
             SerializePacked.writeToUnbuffered(wbc, message);
-        }else {
+        } else {
             Serialize.write(wbc, message);
         }
         
@@ -88,7 +88,7 @@ public class Interchange {
         if(IS_GZIPPED) {
             GZIPInputStream gis = new GZIPInputStream(new FileInputStream(fileName));
             channel = Channels.newChannel(gis);
-        }else {
+        } else {
             FileInputStream fis = new java.io.FileInputStream(fileName);
             channel = fis.getChannel();
         }

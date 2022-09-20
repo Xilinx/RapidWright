@@ -239,7 +239,7 @@ public class BlockStitcher {
                 }
                 else if(net.getType() == NetType.VCC) {
                     newNet = validateNet(newNet, design.getVccNet());
-                }else{
+                } else {
                     nets.add(net);
                     if(net.getSource() != null) {
                         newNet = validateNet(newNet, net);
@@ -311,10 +311,10 @@ public class BlockStitcher {
                     if(uniqueMap.containsKey(i.getSite())) {
                         SiteInst duplicate = uniqueMap.get(site);
                         System.out.println("WARNING: Found duplicate site used by instances: " + i.getName() + " " + duplicate.getName() + " " + i.getSiteName());
-                    }else{
+                    } else {
                         uniqueMap.put(i.getSite(),i);
                     }
-                }else{
+                } else {
                     if(i.getModuleInst() == null) {
                         System.out.println("WARNING: Unplaced site outside of module instance: " + i.getName()  + " "+ i.getSiteTypeEnum());
                     }
@@ -357,7 +357,7 @@ public class BlockStitcher {
             if(first) {
                 fullInstName = fullInstName + "_" + i;
                 first = false;
-            }else{
+            } else {
                 fullInstName = fullInstName.substring(0, fullInstName.lastIndexOf('_')+1) + i; 
             }
         }
@@ -455,7 +455,7 @@ public class BlockStitcher {
             if(new File(implGuideFileName).exists()) {
                 implHelper = ImplGuide.readImplGuide(implGuideFileName);
                 unusedImplGuides = new HashSet<String>(implHelper.getBlockNames());
-            }else{
+            } else {
                 System.out.println("INFO: No .igf file found, proceeding with auto block placement and routing.");
                 buildExampleGuideFile = true;
             }
@@ -497,7 +497,7 @@ public class BlockStitcher {
                 if(f.getName().endsWith(BlockCreator.ROUTED_DCP_SUFFIX) && !f.getName().contains("roundtrip")) {
                     routedDCPFileName = dir + File.separator + cacheID + File.separator + f.getName();
                     blockImplCount++;
-                }else if(f.getName().endsWith(BlockCreator.ROUTED_EDIF_SUFFIX)) {
+                } else if(f.getName().endsWith(BlockCreator.ROUTED_EDIF_SUFFIX)) {
                     edifFileName = dir + File.separator + cacheID + File.separator + f.getName();
                 }                    
             }
@@ -564,7 +564,7 @@ public class BlockStitcher {
         HashMap<String,PackagePinConstraint> constraints = null;
         if(new File(xdcFileName).exists()) {
             constraints = XDCParser.parseXDC(xdcFileName,stitched.getDevice());
-        }else{
+        } else {
             MessageGenerator.briefError("WARNING: Could not find XDC file " + xdcFileName);
         }
         t.stop().start("Stitch Design");
@@ -656,7 +656,7 @@ public class BlockStitcher {
             t.printSummary();
             if(OPEN_HAND_PLACER) HandPlacer.openDesign(stitched);
             return;
-        }else{
+        } else {
             BlockPlacer2Module placer = new BlockPlacer2Module(stitched);
             placer.placeDesign(false);
         }
@@ -703,12 +703,12 @@ public class BlockStitcher {
                 //System.out.println("Found match: " + match.toString() + " " + inst.toString());
                 if(match.getNetList().size() == 0) {
                     removeThese.add(match);
-                }else{
+                } else {
                     removeThese.add(inst);
                     duplicateCheck.put(inst.getSiteName(), match);
                 }
                 
-            }else{
+            } else {
                 duplicateCheck.put(inst.getSiteName(), inst);
             }
         }
@@ -734,7 +734,7 @@ public class BlockStitcher {
 
             
             stitched.writeCheckpoint(routedDCPName);
-        }else{
+        } else {
             runtimes[4] = System.currentTimeMillis() - runtimes[4];
         }
         

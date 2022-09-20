@@ -182,10 +182,10 @@ public class AddSubGenerator extends ArithmeticGenerator {
                     
                     if(si.getSiteTypeEnum() == SiteTypeEnum.SLICEL) {
                         cNet.addPIP(new PIP(si.getTile(), "CLE_CLE_L_SITE_0_CIN","CLE_CLE_L_SITE_0_CIN_PIN"));
-                    }else{
+                    } else {
                         cNet.addPIP(new PIP(si.getTile(), "CLE_CLE_M_SITE_0_CIN","CLE_CLE_M_SITE_0_CIN_PIN"));
                     }
-                }else {
+                } else {
                     EDIFNet cinSrc = isSubtract ? vcc : gnd;
                     cinSrc.createPortInst("CI", carryCell);
                     carryCell.removePinMapping("CIN");
@@ -249,7 +249,7 @@ public class AddSubGenerator extends ArithmeticGenerator {
                 /*if((i+BITS_PER_CLE-1) / BITS_PER_CLE < carryCLEs) {
                     int yOffset = i / BITS_PER_CLE;
                     inputFFSite = origin.getNeighborSite(0, yOffset);
-                }else{*/
+                } else {*/
                     inputFFSite = currSlice.getNeighborSite(0, carryCLEs);
                 //}
                 used.add(inputFFSite);

@@ -55,7 +55,7 @@ public class HashPool<E> extends HashMap<Integer,ArrayList<E>> {
             enumerationMatches.add(enumeration);
             enumerationMap.put(obj, enumerationMatches);
         }
-        else{
+        else {
             enumerationMatches.add(enumeration);
         }
     }
@@ -72,7 +72,7 @@ public class HashPool<E> extends HashMap<Integer,ArrayList<E>> {
             throw new IllegalArgumentException();
             //return -1;
         }
-        else{
+        else {
             for(Integer i : enumerationMatches) {
                 if(enumerations.get(i) == null && obj == null) {
                     return i;
@@ -104,7 +104,7 @@ public class HashPool<E> extends HashMap<Integer,ArrayList<E>> {
             enumerations.add(obj);
             return obj;
         }
-        else{
+        else {
             for(E e :hashMatches) {
                 if(e.equals(obj)) {
                     return e;

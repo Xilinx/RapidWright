@@ -129,7 +129,7 @@ public class RouteFixer{
         public int compare(NodeWithDelay a, NodeWithDelay b) {
             if(a.getDelay() < b.getDelay()) {
                 return -1;
-            }else {
+            } else {
                 return 1;
             }
         }
@@ -175,7 +175,7 @@ public class RouteFixer{
         public void setPrev(NodeWithDelay driver) {
             if(prev == null) {
                 prev = driver;
-            }else if(driver.cost < prev.cost) {
+            } else if(driver.cost < prev.cost) {
                 prev = driver;
             }
         }

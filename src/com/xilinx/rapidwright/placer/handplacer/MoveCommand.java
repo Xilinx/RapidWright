@@ -124,7 +124,7 @@ class MoveCommand extends QUndoCommand {
                 Site newAnchorSite = ghm.getModuleInst().getModule().getAnchor().getCorrespondingSite(ghm.getModuleInst().getModule().getAnchor().getSiteTypeEnum(), newAnchorTile);
                 newAnchorSiteList.add(newAnchorSite);
                 ghm.getModuleInst().place(newAnchorSite);
-            }else{
+            } else {
                 newAnchorSiteList.add(null);
                 ghm.getModuleInst().unplace();
             }
@@ -139,7 +139,7 @@ class MoveCommand extends QUndoCommand {
             Site oldAnchorSite = prevAnchorSiteList.get(i);
             if(oldAnchorSite == null) {
                 ghm.getModuleInst().unplace();
-            }else{
+            } else {
                 ghm.getModuleInst().place(oldAnchorSite);
             }
         }
@@ -152,7 +152,7 @@ class MoveCommand extends QUndoCommand {
             Site newAnchorSite = newAnchorSiteList.get(i);
             if(newAnchorSite == null) {
                 ghm.getModuleInst().unplace();
-            }else{
+            } else {
                 ghm.getModuleInst().place(newAnchorSite);
             }
         }

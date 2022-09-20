@@ -131,7 +131,7 @@ public class HandPlacer extends QMainWindow {
                  }
             }).start();            
         }
-        else{
+        else {
             openDesign(d);
         }
     }
@@ -168,7 +168,7 @@ public class HandPlacer extends QMainWindow {
             if(debugPlacer) {
                 //internalOpenWithAutoPlacer(fileToOpen);
             }
-            else{
+            else {
                 //internalOpenDesign(fileToOpen);
                 System.out.println("TODO: Need modular open design method");
             }

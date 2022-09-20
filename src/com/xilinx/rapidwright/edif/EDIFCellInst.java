@@ -267,7 +267,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
             os.write(EXPORT_CONST_CLOSE_WITH_PROPS);
             exportEDIFProperties(os,EXPORT_CONST_PROP_INDENT, cache, stable);
             os.write(EXPORT_CONST_CLOSE);
-        }else{
+        } else {
             os.write(EXPORT_CONST_CLOSE_NO_PROPS);
         }
     }

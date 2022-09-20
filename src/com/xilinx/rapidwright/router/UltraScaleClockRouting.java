@@ -134,7 +134,7 @@ public class UltraScaleClockRouting {
                             // assign PIPs based on which RouteNode returned, instead of curr
                             clk.getPIPs().addAll(parent.getPIPsBackToSource());
                             return parent;
-                        }else {
+                        } else {
                             clk.getPIPs().addAll(curr.getPIPsBackToSource());
                             return curr;
                         }

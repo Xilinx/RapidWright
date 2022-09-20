@@ -60,7 +60,7 @@ public class PBlockRange {
             }
             setLowerLeft(lowerLeftCR);
             setUpperRight(upperRightCR);
-        }else {
+        } else {
             Site ll = dev.getSite(lowerLeftName);
             Site ur = dev.getSite(upperRightName);
             if(ll == null || ur == null) {
@@ -141,7 +141,7 @@ public class PBlockRange {
         if(isClockRegionRange()) {
             col = ((ClockRegion)lowerLeft).getUpperLeft().getColumn();
             row = ((ClockRegion)upperRight).getUpperLeft().getRow();
-        }else{
+        } else {
             col = getLowerLeftSite().getTile().getColumn();
             row = getUpperRightSite().getTile().getRow();            
         }

@@ -54,7 +54,7 @@ public class TestEDIFPort {
                                Assertions.assertNull(net);
                            }
                        }
-                   }else {
+                   } else {
                        EDIFNet net = port.getInternalNet();
                        String portInstName = port.getPortInstNameFromPort(0);
                        Assertions.assertEquals(internalNetMap.get(portInstName), net);

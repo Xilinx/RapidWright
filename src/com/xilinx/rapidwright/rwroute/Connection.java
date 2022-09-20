@@ -143,9 +143,9 @@ public class Connection implements Comparable<Connection>{
     private short maxOfThree(short var1, short var2, short var3) {
         if(var1 >= var2 && var1 >= var3) {
             return var1;
-        }else if(var2 >= var1 && var2 >= var3) {
+        } else if(var2 >= var1 && var2 >= var3) {
             return var2;
-        }else {
+        } else {
             return var3;
         }
     }
@@ -153,9 +153,9 @@ public class Connection implements Comparable<Connection>{
     private short minOfThree(short var1, short var2, short var3) {
         if(var1 <= var2 && var1 <= var3) {
             return var1;
-        }else if(var2 <= var1 && var2 <= var3) {
+        } else if(var2 <= var1 && var2 <= var3) {
             return var2;
-        }else {
+        } else {
             return var3;
         }
     }
@@ -400,15 +400,15 @@ public class Connection implements Comparable<Connection>{
     public int compareTo(Connection arg0) {
         if(netWrapper.getConnections().size() > arg0.getNetWrapper().getConnections().size()) {
             return 1;
-        }else if(netWrapper.getConnections().size() == arg0.getNetWrapper().getConnections().size()) {
+        } else if(netWrapper.getConnections().size() == arg0.getNetWrapper().getConnections().size()) {
             if(this.getHpwl() > arg0.getHpwl()) {
                 return 1;
-            }else if(getHpwl() == arg0.getHpwl()) {
+            } else if(getHpwl() == arg0.getHpwl()) {
                 if(hashCode() > arg0.hashCode()) {
                     return -1;
                 }
             }
-        }else {
+        } else {
             return -1;
         }
         return -1;

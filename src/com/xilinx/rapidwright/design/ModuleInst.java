@@ -377,7 +377,7 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
                 if(newPipTile == null) {
                     if(skipIncompatible) {
                         continue nextnet;
-                    }else {
+                    } else {
                         unplace();
                         MessageGenerator.briefError("Warning: Unable to return module instance "+ getName() +" back to original placement.");
                         return false;
@@ -630,7 +630,7 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
             if(isSiteCompatible) {
                 if(lowerLeftIP == null) {
                     lowerLeftIP = s;
-                }else if(s.getSite().getInstanceY() < lowerLeftIP.getSite().getInstanceY()) {
+                } else if(s.getSite().getInstanceY() < lowerLeftIP.getSite().getInstanceY()) {
                     lowerLeftIP = s;
                 }
                 if(s.getSite().getInstanceX() < x) {

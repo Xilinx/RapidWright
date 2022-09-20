@@ -133,11 +133,11 @@ public class SLRCrosserGenerator {
                 if(n.getType() == NetType.GND) {
                     Net vcc = c.getSiteInst().getDesign().getVccNet();
                     vcc.addPin(new SitePinInst(false,rxOrTx +"_" + name,si));
-                }else{
+                } else {
                     n.addPin(new SitePinInst(false,rxOrTx +"_" + name,si));
                 }
                 si.addSitePIP(rxOrTx + "_OPTINV_" + name, "I");
-            }else if(!existingNet.equals(n)) {
+            } else if(!existingNet.equals(n)) {
                 throw new RuntimeException("ERROR: Incompatible control nets in "
                     + "Laguna site, currently: " + existingNet + ", failed to add " + n);
             }
@@ -147,7 +147,7 @@ public class SLRCrosserGenerator {
         Net existingNet = si.getNetFromSiteWire(pin.getSiteWireName());
         if(existingNet == null) {
             ce.addPin(new SitePinInst(false,rxOrTx +"_CE",si));
-        }else if(!existingNet.equals(ce)) {
+        } else if(!existingNet.equals(ce)) {
             throw new RuntimeException("ERROR: Incompatible control nets in "
                 + "Laguna site, currently: " + existingNet + ", failed to add " + ce);
         }
@@ -356,7 +356,7 @@ public class SLRCrosserGenerator {
         if(useCommonCentroid) {
             // Use a conventional centroid that attempts to minimize global skew
             centroids.add(findCentroid(lagunaStarts, dev));
-        }else{
+        } else {
             // Use each Laguna start CR as a centroid
             for(String laguna : lagunaStarts) {
                 ClockRegion cr = dev.getSite(laguna).getTile().getClockRegion();

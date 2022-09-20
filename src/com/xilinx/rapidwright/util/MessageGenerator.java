@@ -178,7 +178,7 @@ public class MessageGenerator{
             if(ch == 'y' || ch == 'Y') {
                 return;
             }
-            else{
+            else {
                 System.exit(1);
             }
         }
@@ -204,7 +204,7 @@ public class MessageGenerator{
             if(ch == 'y' || ch == 'Y') {
                 return;
             }
-            else{
+            else {
                 System.exit(1);
             }
         }

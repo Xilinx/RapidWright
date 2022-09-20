@@ -296,7 +296,7 @@ public abstract class AbstractRouter{
         if(switchMatrixSink == null || foundSwitchMatrixSink) {
             x = currSink.getTile().getTileXCoordinate() - routeNode.getTile().getTileXCoordinate();
             y = currSink.getTile().getTileYCoordinate() - routeNode.getTile().getTileYCoordinate();
-        }else{
+        } else {
             x = switchMatrixSink.getTile().getTileXCoordinate() - routeNode.getTile().getTileXCoordinate();
             y = switchMatrixSink.getTile().getTileYCoordinate() - routeNode.getTile().getTileYCoordinate();            
         }

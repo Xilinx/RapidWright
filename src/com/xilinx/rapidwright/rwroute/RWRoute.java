@@ -199,7 +199,7 @@ public class RWRoute{
             public int compare(Routable r1, Routable r2) {
                 if(r1.getLowerBoundTotalPathCost() < r2.getLowerBoundTotalPathCost()) {
                     return -1;
-                }else {
+                } else {
                     return 1;
                 }
             }
@@ -271,22 +271,22 @@ public class RWRoute{
             if(net.isClockNet()) {
                 addGlobalClkRoutingTargets(net);
                 
-            }else if(net.isStaticNet()) {
+            } else if(net.isStaticNet()) {
                 addStaticNetRoutingTargets(net);
                 
-            }else if (net.getType().equals(NetType.WIRE)) {
+            } else if (net.getType().equals(NetType.WIRE)) {
                 if(RouterHelper.isRoutableNetWithSourceSinks(net)) {
                     addNetConnectionToRoutingTargets(net);
-                }else if(RouterHelper.isDriverLessOrLoadLessNet(net)) {
+                } else if(RouterHelper.isDriverLessOrLoadLessNet(net)) {
                     preserveNet(net);
                     numNotNeedingRoutingNets++;
-                }else if(RouterHelper.isInternallyRoutedNet(net)) {
+                } else if(RouterHelper.isInternallyRoutedNet(net)) {
                     preserveNet(net);
                     numNotNeedingRoutingNets++;
-                }else {
+                } else {
                     numNotNeedingRoutingNets++;
                 }
-            }else {
+            } else {
                 numUnrecognizedNets++;
                 System.err.println("ERROR: Unknown net " + net.toString());
             }
@@ -332,7 +332,7 @@ public class RWRoute{
         if(RouterHelper.isRoutableNetWithSourceSinks(clk)) {
             clk.unroute();
             clkNets.add(clk);
-        }else {
+        } else {
             numNotNeedingRoutingNets++;
             System.err.println("ERROR: Incomplete clock net " + clk);
         }
@@ -352,7 +352,7 @@ public class RWRoute{
                  // routes clock nets with references of partial routes
                 System.out.println("INFO: Route with clock route and timing data");
                 GlobalSignalRouting.routeClkWithPartialRoutes(clk, routesToSinkINTTiles, design.getDevice());
-             }else {
+             } else {
                  // routes clock nets from scratch
                 System.out.println("INFO: Route with symmetric non-timing-driven clock router");
                  GlobalSignalRouting.symmetricClkRouting(clk, design.getDevice());
@@ -386,7 +386,7 @@ public class RWRoute{
                 addReservedNode(sink.getConnectedNode(), staticNet);
             }
             staticNetAndRoutingTargets.put(staticNet, sinks);
-        }else {
+        } else {
             preserveNet(staticNet);
             numNotNeedingRoutingNets++;    
         }
@@ -498,7 +498,7 @@ public class RWRoute{
             if(nodes.isEmpty()) {
                 directConnections.add(connection);
                 connection.setDirect(true);
-            }else {
+            } else {
                 Node sinkINTNode = nodes.get(0);
                 indirectConnections.add(connection);
                 connection.setSinkRnode(createAddRoutableNode(connection.getSink(), sinkINTNode, RoutableType.PINFEED_I));
@@ -536,7 +536,7 @@ public class RWRoute{
         Integer counter = connectionSpan.get(connection.getHpwl());
         if(counter == null) {
             counter = 1;
-        }else {
+        } else {
             counter += 1;
         }
         connectionSpan.put(connection.getHpwl(), counter);
@@ -557,7 +557,7 @@ public class RWRoute{
         Net reserved = preservedNodes.get(node);
         if(reserved == null) {
             preservedNodes.put(node, netToPreserve);
-        }else if(reserved.getSource() != null && netToPreserve.getSource() != null && !reserved.getName().equals(netToPreserve.getName())) {
+        } else if(reserved.getSource() != null && netToPreserve.getSource() != null && !reserved.getName().equals(netToPreserve.getName())) {
             boolean generateWarning = conflictNets.size() < 5;
             EDIFNet reservedLogical = reserved.getLogicalNet();
             EDIFNet toReserveLogical = netToPreserve.getLogicalNet();
@@ -565,7 +565,7 @@ public class RWRoute{
                 if(!toReserveLogical.equals(reservedLogical)) {
                     if(generateWarning) generateConflictInfo(node, reserved, netToPreserve);
                 }
-            }else {
+            } else {
                 if(generateWarning) generateConflictInfo(node, reserved, netToPreserve);
             }
             conflictNets.add(reserved);
@@ -605,7 +605,7 @@ public class RWRoute{
             // this is for initializing sources and sinks of those to-be-routed nets's connections
             rnode = new RoutableNode(rnodeId++, node, type);
             rnodesCreated.put(rnode.getNode(), rnode);
-        }else{
+        } else {
             // this is for checking preserved routing resource conflicts among routed nets */
             if(rnode.getRoutableType() == type && type == RoutableType.PINFEED_I) {
                 System.out.println("WARNING: Conflicting node: " + node + ", connected to sink " + sitePinInst);
@@ -764,7 +764,7 @@ public class RWRoute{
                 Set<Connection> unroutedConnectionss = getUnroutedConnections();
                 if(unroutedConnectionss.isEmpty()) {
                     break;
-                }else {
+                } else {
                     if(routeIteration == config.getMaxIterations() - 1) {
                         System.err.println("ERROR: Unroutable connections: " + unroutedConnectionss.size());
                     }
@@ -815,7 +815,7 @@ public class RWRoute{
     private boolean shouldRoute(Connection connection) {        
         if(routeIteration == 1) {
             return true;
-        }else {
+        } else {
             if(connection.getCriticality() > minRerouteCriticality) {
                 return true;
             }
@@ -824,7 +824,7 @@ public class RWRoute{
                     connection.enlargeBoundingBox(config.getExtensionXIncrement(), config.getExtensionYIncrement());
                 }    
                 return true;
-            }else {
+            } else {
                 return false;
             }
         }
@@ -916,7 +916,7 @@ public class RWRoute{
                 int comp = connection2.getNetWrapper().getConnections().size() - connection1.getNetWrapper().getConnections().size();
                 if(comp == 0) {
                     return connection1.getHpwl() > connection2.getHpwl()? 1:connection1.getHpwl() < connection2.getHpwl() ? -1 :0;
-                }else {
+                } else {
                     return comp;
                 }
             }
@@ -931,7 +931,7 @@ public class RWRoute{
             System.out.printf("%9s  %12s  %8s   %11s  %10s   %5s  %9s\n",
                     "Iteration", "RRG Nodes", "Time (s)", "Connections", "Overlaps", "(ps)", "Time (s)");
             System.out.printf("---------  ----------------------   -----------  ----------   -----  ---------\n");
-        }else {
+        } else {
             System.out.printf("%9s  %12s  %8s   %11s  %10s   %5s  %9s\n",
                     "         ", "Generated", "  RRG",    "  Routed",   "Nodes With", "    ", "Total Run");
             System.out.printf("%9s  %12s  %8s   %11s  %10s   %5s  %9s\n",
@@ -960,7 +960,7 @@ public class RWRoute{
                     overUsed,
                     (short)(maxDelayAndTimingVertex == null? 0 : maxDelayAndTimingVertex.getFirst()),
                     iterationRuntime * 1e-9);
-        }else {
+        } else {
             System.out.printf("%4d       %12d  %8.2f   %11d  %10d   %5s  %9.2f\n",
                     routeIteration,
                     numRnodes,
@@ -1106,7 +1106,7 @@ public class RWRoute{
                 Routable rnode = connection.getRnodes().get(i);
                 if(driver == null) {
                     driver = rnode;
-                }else{
+                } else {
                     rnode.incrementDriver(driver);
                     driver = rnode;
                 }
@@ -1230,7 +1230,7 @@ public class RWRoute{
                 setChildrenOfRnode(rnode);
                 exploreAndExpand(rnode, connection, shareWeight, rnodeCostWeight,
                         rnodeWLWeight, estWlWeight, dlyWeight, estDlyWeight);
-            }else {
+            } else {
                 successRoute = true;
                 break;
             }
@@ -1240,7 +1240,7 @@ public class RWRoute{
             finishRouteConnection(connection);
             connection.getSink().setRouted(true);
             if(config.isTimingDriven()) connection.updateRouteDelay();    
-        }else {
+        } else {
             connection.getSink().setRouted(false);
             connection.getSinkRnode().setTarget(false);
             resetExpansion();
@@ -1440,7 +1440,7 @@ public class RWRoute{
                 successRoute = true;
                 return;
                 
-            }else if(childRNode.getRoutableType() == RoutableType.WIRE) {
+            } else if(childRNode.getRoutableType() == RoutableType.WIRE) {
                 if(childRNode.getDelay() > 10000) {
                     // To filter out those nodes that are considered to be excluded with the masking resource approach,
                     // such as U-turn shape nodes near the boundary and some node cross RCLK
@@ -1450,14 +1450,14 @@ public class RWRoute{
                     evaluateCostAndPush(rnode, longParent, childRNode, connection, shareWeight, rnodeCostWeight,
                             rnodeLengthWeight, rnodeEstWlWeight, rnodeDelayWeight, rnodeEstDlyWeight);
                 }
-            }else if(childRNode.getRoutableType() == RoutableType.PINBOUNCE) {            
+            } else if(childRNode.getRoutableType() == RoutableType.PINBOUNCE) {            
                 if(isAccessible(childRNode, connection)) {                
                     if(usablePINBounce(childRNode, connection.getSinkRnode())) {
                         evaluateCostAndPush(rnode, longParent, childRNode, connection, shareWeight, rnodeCostWeight,
                                 rnodeLengthWeight, rnodeEstWlWeight, rnodeDelayWeight, rnodeEstDlyWeight);
                     }                    
                 }
-            }else if(childRNode.getRoutableType() == RoutableType.PINFEED_I) {
+            } else if(childRNode.getRoutableType() == RoutableType.PINFEED_I) {
                 if(connection.isCrossSLR()) {
                     evaluateCostAndPush(rnode, longParent, childRNode, connection, shareWeight, rnodeCostWeight,
                             rnodeLengthWeight, rnodeEstWlWeight, rnodeDelayWeight, rnodeEstDlyWeight);
@@ -1542,7 +1542,7 @@ public class RWRoute{
             int overoccupancy = rnode.getOccupancy() - Routable.capacity;
             // make the congestion cost less for the current connection
             presentCongestionCost = 1 + overoccupancy * presentCongestionFactor;
-        }else{
+        } else {
             presentCongestionCost = rnode.getPresentCongestionCost();
         }
         

@@ -257,7 +257,7 @@ public class ILAInserter {
         Design ilaDesign = null;
         if(args.length == 6) {
             ilaDesign = Design.readCheckpoint(args[5]);
-        }else {
+        } else {
             ilaDesign = createILADesign(probeCount, probeDepth, originalDesign.getPart());
         }
         

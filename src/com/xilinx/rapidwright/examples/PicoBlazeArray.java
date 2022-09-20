@@ -212,7 +212,7 @@ public class PicoBlazeArray {
                                 if(y == bramRows-BRAMS_IN_CLOCK_REGION_HEIGHT-1 && j==3) {
                                     curr.connect(PICOBLAZE_OUTPUTS[j], TOP_OUTPUT_PREFIX + x, i);
                                 }
-                            }else{
+                            } else {
                                 curr.connect(PICOBLAZE_INPUTS [j], other, PICOBLAZE_OUTPUTS[CONN_ARRAY.length-j-1], i);
                             }
                         }

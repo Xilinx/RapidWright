@@ -44,7 +44,7 @@ public class StringTools {
             if(c == '_') continue;
             if(i != 0 && name.charAt(i-1) == '_') {
                 sb.append(Character.toUpperCase(c));
-            }else{
+            } else {
                 sb.append(Character.toLowerCase(c));                
             }
         }

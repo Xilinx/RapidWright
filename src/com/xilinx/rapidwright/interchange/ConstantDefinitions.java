@@ -371,9 +371,9 @@ public class ConstantDefinitions {
             }
             if(tiedNode.isTiedToGnd()) {
                 tiedCounter[TIED_TO_GND]++;
-            }else if(tiedNode.isTiedToVcc()) {
+            } else if(tiedNode.isTiedToVcc()) {
                 tiedCounter[TIED_TO_VCC]++;
-            }else {
+            } else {
                 throw new RuntimeException("ERROR: This node was presumed tied to GND or VCC: " +
                         tiedNode);
             }
@@ -431,7 +431,7 @@ public class ConstantDefinitions {
                     gndTiedNodes.put(tileType, gndWires);
                 }
                 gndWires.add(tiedNode.getWire());
-            }else {
+            } else {
                 Set<Integer> vccWires = vccTiedNodes.get(tileType);
                 if(vccWires == null) {
                     vccWires = new HashSet<>();

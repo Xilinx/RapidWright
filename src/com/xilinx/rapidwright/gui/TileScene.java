@@ -176,7 +176,7 @@ public class TileScene extends QGraphicsScene{
             setBackgroundBrush(new QBrush(QColor.black));
             calculateSkippedTiles();
         }
-        else{
+        else {
             setSceneRect(new QRectF(0, 0, tileSize + 1, tileSize + 1));
         }
         //this array is used to determine how many hard macros are
@@ -291,19 +291,19 @@ public class TileScene extends QGraphicsScene{
                 if(drawPrimitives) {
                     if(Utils.isCLB(tileTypeEnum)) {
                         drawCLB(painter, rectX, rectY, rectSide);
-                    }else if(Utils.isSwitchBox(tileTypeEnum)) {
+                    } else if(Utils.isSwitchBox(tileTypeEnum)) {
                         drawSwitchBox(painter, rectX, rectY, rectSide);
-                    }else if(Utils.isBRAM(tileTypeEnum)) {
+                    } else if(Utils.isBRAM(tileTypeEnum)) {
                         drawBRAM(painter, rectX, rectY, rectSide, offset, color);
-                    }else if(Utils.isDSP(tileTypeEnum)) {
+                    } else if(Utils.isDSP(tileTypeEnum)) {
                         drawDSP(painter, rectX, rectY, rectSide, offset, color);
-                    }else if (Utils.isURAM(tileTypeEnum)) {
+                    } else if (Utils.isURAM(tileTypeEnum)) {
                         drawURAM(painter, rectX, rectY, rectSide, offset, color);
-                    }else{ // Just fill the tile in with a color
+                    } else { // Just fill the tile in with a color
                         colorTile(painter, x, y, offset, color);
                     }
                 }
-                else{
+                else {
                     colorTile(painter, x, y, offset, color);
                 }
             }

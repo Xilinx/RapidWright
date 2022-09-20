@@ -237,9 +237,9 @@ public class BinaryEDIFWriter {
             EDIFDirection dir = p.getDirection();
             if(dir == EDIFDirection.INPUT) {
                 dirAndWidth |= EDIF_DIR_INPUT_MASK;
-            }else if(dir == EDIFDirection.OUTPUT) {
+            } else if(dir == EDIFDirection.OUTPUT) {
                 dirAndWidth |= EDIF_DIR_OUTPUT_MASK;
-            }else if(dir == EDIFDirection.INOUT) {
+            } else if(dir == EDIFDirection.INOUT) {
                 dirAndWidth |= EDIF_DIR_INOUT_MASK;
             }
             os.writeInt(dirAndWidth);

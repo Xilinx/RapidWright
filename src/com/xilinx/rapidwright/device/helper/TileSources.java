@@ -51,7 +51,7 @@ public class TileSources implements Serializable{
         if(sources == null) {
             return hash;
         }
-        else{
+        else {
             Arrays.sort(sources);
             for(Integer i : sources) {
                 hash += i * 7;

@@ -123,7 +123,7 @@ public class BufferTapTool {
                     String[] siteTapLevels = line.split("\\s+");
                     if(siteTapLevels.length == 1) {
                         siteTaps.put(siteTapLevels[0], null);
-                    }else {
+                    } else {
                         siteTaps.put(siteTapLevels[0], Integer.parseInt(siteTapLevels[1]));
                     }        
                 }

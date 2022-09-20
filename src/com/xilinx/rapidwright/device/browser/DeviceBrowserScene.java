@@ -132,7 +132,7 @@ public class DeviceBrowserScene extends TileScene{
                 i = 1;
                 reachabilityMap.put(currNode.getTile(), i);
             }
-            else{
+            else {
                 reachabilityMap.put(currNode.getTile(), i+1);                        
             }
             if(currNode.getLevel() < hops-1) {
@@ -202,7 +202,7 @@ public class DeviceBrowserScene extends TileScene{
                 browser.view.hasPanned = false;
 
             }
-            else{
+            else {
                 reachabilityTile = getTile(event);
                 QMenu menu = new QMenu();
                 QAction action1 = new QAction("Draw Reachability (1 Hop)", this);

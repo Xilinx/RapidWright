@@ -78,7 +78,7 @@ public class RapidWright {
             location = isWindows ? toWindowsPath(location) : location;
             if(location.toLowerCase().endsWith(".jar")) {
                 bw.write("          \""+location+"\",\n");
-            }else{
+            } else {
                 bw.write("          \""+location+ "");
                 File binFolder = new File(location);
                 if(binFolder.isDirectory() && binFolder.getName().equals("bin")) {
@@ -96,7 +96,7 @@ public class RapidWright {
                         }
                         bw.write(File.pathSeparator + jarPath + jar);
                     }                    
-                }else{
+                } else {
                     MessageGenerator.briefError("ERROR: Couldn't read "+jarDir.getAbsolutePath()+" directory, please check RapidWright installation.");
                 }
 
@@ -205,10 +205,10 @@ public class RapidWright {
                             + "from RapidWright jar.");
                     }
                     
-                }else if(s.equals(CREATE_JUPYTER_KERNEL)) {
+                } else if(s.equals(CREATE_JUPYTER_KERNEL)) {
                     createJupyterKernelFile();
                     return;
-                }else if(s.equals(HELP_OPTION_NAME)) {
+                } else if(s.equals(HELP_OPTION_NAME)) {
                     System.out.println("*** RapidWright specific options: ***");
                     for(String option : RAPIDWRIGHT_OPTIONS) {
                         System.out.println("\t" + option);

@@ -387,7 +387,7 @@ public class TimingModel {
         float result = 0f;
         if (groups != null) {
             result = calcDelay(startPinInst, endPinInst, sourceBELPin, sinkBELPin, groups);
-        }else {
+        } else {
             
             checkForIntrasiteDelay();
         }
@@ -1347,7 +1347,7 @@ public class TimingModel {
 //        //TODO debug on intra site delay
 //        if(startPinInst.toString().contains("SLICE_X26Y101.BMUX")) {
 //            this.checkIntraSiteDelay = true;
-//        }else {
+//        } else {
 //            this.checkIntraSiteDelay = false;
 //        }
 
@@ -1427,7 +1427,7 @@ public class TimingModel {
                      } else if (pinName.endsWith("WCKEN")) {
                         group.delay += SITEPIN_WCKEN_DELAY;
                         sitepin_delay += SITEPIN_WCKEN_DELAY;
-                    }else if (pinName.endsWith("1")) {
+                    } else if (pinName.endsWith("1")) {
                         group.delay += SITEPIN_A1_DELAY;
                         sitepin_delay += SITEPIN_A1_DELAY;
                     } else if (pinName.endsWith("2")) {
@@ -1829,7 +1829,7 @@ public class TimingModel {
                     intrasiteDelay += INTRASITE_DELAY_SITEPIN_TO_FF_INPUT;
                 }
             }
-        }else if (endPinInst != null && endPinInst.getName().startsWith("CIN")) {
+        } else if (endPinInst != null && endPinInst.getName().startsWith("CIN")) {
             intrasiteDelay += intrasiteAndLogicDelayModel.getIntraSiteDelay(SiteTypeEnum.SLICEL, 
                     endPinInst.getName(), sinkType + "/" + "CIN");
         }

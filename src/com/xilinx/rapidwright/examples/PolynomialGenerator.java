@@ -106,7 +106,7 @@ public class PolynomialGenerator {
         for(int i=0; i < tokens.length; i++) {
             if(tokens[i].equals("+") || tokens[i].equals("-")) {
                 addSubOps.add(i);
-            }else if(tokens[i].equals("*")) {
+            } else if(tokens[i].equals("*")) {
                 multOps.add(i);
             }
         }
@@ -224,7 +224,7 @@ public class PolynomialGenerator {
             }
                 
             sType = SiteTypeEnum.DSP48E2;
-        }else{
+        } else {
             siteName = "SLICE_X" + slicex + "Y" + (type.endsWith("o") ? sliceyOther : slicey);
             if(type.endsWith("o"))
                 sliceyOther +=5;
@@ -243,7 +243,7 @@ public class PolynomialGenerator {
         if(type.equals("*")) {
             oddDSP = !oddDSP;
             type = type + (oddDSP ? "o" : "");
-        }else{
+        } else {
             oddAddSub = !oddAddSub;
             type = type + (oddAddSub ? "o" : "");
         }
@@ -262,7 +262,7 @@ public class PolynomialGenerator {
             EDIFNet vcc = EDIFTools.getStaticNet(NetType.VCC, top, d.getNetlist());
             vcc.createPortInst("rst", ci);
             vcc.createPortInst("ce", ci);
-        }else{
+        } else {
             EDIFCellInst dsp = mi.getCellInst().getCellType().getCellInst(MULT_NAME);
             SiteInst si = mi.getSiteInsts().get(0);
             for(EDIFPortInst p : dsp.getPortInsts()) {
@@ -310,7 +310,7 @@ public class PolynomialGenerator {
                     throw new RuntimeException("ERROR: Only supports variables names of length one");
                 else
                     lastWasAlpha = true;
-            }else{
+            } else {
                 lastWasAlpha = false;
             }
             if(inExponent && !Character.isDigit(ch)) {
@@ -395,7 +395,7 @@ public class PolynomialGenerator {
                 if(parentNet.equals(EDIFTools.LOGICAL_VCC_NET_NAME)) {
                     d.movePinsToNewNetDeleteOldNet(net, d.getVccNet(), true);
                     continue;
-                }else if(parentNet.equals(EDIFTools.LOGICAL_GND_NET_NAME)) {
+                } else if(parentNet.equals(EDIFTools.LOGICAL_GND_NET_NAME)) {
                     d.movePinsToNewNetDeleteOldNet(net, d.getGndNet(), true);
                     continue;
                 }
@@ -435,14 +435,14 @@ public class PolynomialGenerator {
                 upperRight = "SLICE_X" + (xmax+maxoffset[i]) + "Y" + (ymax+maxoffset[i]);
                 if(d.getDevice().getSite(lowerLeft) != null && d.getDevice().getSite(upperRight) != null) {
                     break;
-                }else{
+                } else {
                     lowerLeft = null;
                     upperRight = null;                    
                 }
             }
             if(lowerLeft == null || upperRight == null) {
                 System.err.println("ERROR: Couldn't find appropriate routing containment Pblock ");
-            }else{
+            } else {
                 r.setRoutingPblock(new PBlock(d.getDevice(),lowerLeft+":"+upperRight));
             }*/
             //r.setRoutingPblock(new PBlock(d.getDevice(), "SLICE_X"+(slicex-3)+"Y"+(slicey-25)+":SLICE_X"+(slicex+1)+"Y"+(slicey+29-25)));

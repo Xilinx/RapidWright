@@ -512,7 +512,7 @@ public class EDIFTools {
                         currNet = createUniqueNet(hierParentInst.getCellType(), newName);
                         currNet.addPortInst(outerPortInst);
                     }
-                }else {
+                } else {
                     // no port to the parent cell above exists, create one
                     EDIFCell cellType = hierParentInst.getCellType();
                     String newPortName = newName;
@@ -552,7 +552,7 @@ public class EDIFTools {
                     snkNet.addPortInst(finalSrc.getPortInst());
                 }
                 return;
-            }else {
+            } else {
                 snkNet.removePortInst(finalSnk.getPortInst());                
             }
         }
@@ -611,7 +611,7 @@ public class EDIFTools {
             if(i == parts.length-2) {
                 EDIFNet targetNet = currInst.getCellType().getNet(parts[parts.length-1]);
                 targetNet.createPortInst(newPort);
-            }else{
+            } else {
                 EDIFNet childNet = new EDIFNet(topPortNet.getName(), currInst.getCellType());            
                 childNet.createPortInst(newPort);
                 currNet = childNet;
@@ -1083,7 +1083,7 @@ public class EDIFTools {
                 EDIFHierPortInst newPortInst = new EDIFHierPortInst(cellInst, p);
                 if(p.getCellInst().getCellType().isPrimitive()) {                    
                     sinks.add(newPortInst);
-                }else {
+                } else {
                     q.add(newPortInst);
                 }
             }
@@ -1157,7 +1157,7 @@ public class EDIFTools {
             EDIFHierCellInst inst = q.remove();
             if(inst.getCellType().isPrimitive()) {
                 leafCells.add(inst.getFullHierarchicalInstName());
-            }else {
+            } else {
                 for(EDIFCellInst i : inst.getCellType().getCellInsts()) {
                     q.add(inst.getChild(i));
                 }

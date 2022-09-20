@@ -89,7 +89,7 @@ public class TestPartitionPin {
                     testPortPartitionPin(design, ppin, port, i, node);
                     count++;
                 }
-            }else {
+            } else {
                 Node node = Node.getNode(t, wireIdx++);
                 PartitionPin ppin = design.createPartitionPin(port, node);
                 testPortPartitionPin(design, ppin, port, -1, node);

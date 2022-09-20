@@ -191,7 +191,7 @@ public class RouteBranchNode {
                     for(SitePIP p : belPin.belPin.getSitePIPs()) {
                         drivers.add(site + p.toString());
                     }
-                }else if(belPin.belPin.getBEL().getBELClass() == BELClass.PORT) {
+                } else if(belPin.belPin.getBEL().getBELClass() == BELClass.PORT) {
                     String site = belPin.site.getName() + ".";
                     drivers.add(site + belPin.belPin.getName());
                 } else {
