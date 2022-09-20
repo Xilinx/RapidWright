@@ -1,3 +1,44 @@
+============= RapidWright 2022.1.3-beta released on 2022-09-19 ================
+Notes: 
+ * Adds support for partition pins, several new APIs added as seen below
+ * Fixes site routing for F8MUX inputs and routethrus on CARRY pins
+ * Fix for DCPs created with -binary_only option
+ * Fix for DCPs that don't end with '.dcp' extension
+ * Optimizes EDIF memory usage (see #463)
+ * Improved handling of dual-output nets
+ * Fixes BEL.canInvert()
+ * Preserves BEL attributes DB in Versal DCPs
+ - API Additions:
+   - com.xilinx.rapidwright.design.Cell "public void setPropertiesMap(Map<String, EDIFPropertyValue> properties)"
+   - com.xilinx.rapidwright.design.Cell "public List<String> getAllCorrespondingSitePinNames(String logicalPinName, boolean considerLutRoutethru)"
+   - com.xilinx.rapidwright.design.Design "public boolean addPartitionPin(PartitionPin pin)"
+   - com.xilinx.rapidwright.design.Design "public boolean removePartitionPin(PartitionPin pin)"
+   - com.xilinx.rapidwright.design.Design "public List<PartitionPin> getPartitionPins()"
+   - com.xilinx.rapidwright.design.Design "public PartitionPin createPartitionPin(EDIFHierPortInst pin, Node node)"
+   - com.xilinx.rapidwright.design.Design "public PartitionPin createPartitionPin(EDIFPort port, int index, Node node)"
+   - com.xilinx.rapidwright.design.Design "public PartitionPin createPartitionPin(EDIFPort port, Node node)"
+   - com.xilinx.rapidwright.design.Design "public void unrouteSites()"
+   - com.xilinx.rapidwright.design.Net "public static final String Z_NET = "GLOBAL_DUMMY_ROUTE""
+   - com.xilinx.rapidwright.design.PartitionPin "public Tile getTile()"
+   - com.xilinx.rapidwright.design.PartitionPin "public String getTileName()"
+   - com.xilinx.rapidwright.design.PartitionPin "public void setNode(Node node)"
+   - com.xilinx.rapidwright.design.PartitionPin "public Node getNode()"
+   - com.xilinx.rapidwright.design.PartitionPin "public int getWireIndex()"
+   - com.xilinx.rapidwright.design.PartitionPin "public String getWireName()"
+   - com.xilinx.rapidwright.design.PartitionPin "public void setIsFixed(boolean isFixed)"
+   - com.xilinx.rapidwright.design.PartitionPin "public void setIsWireFixed(boolean isWireFixed)"
+   - com.xilinx.rapidwright.design.PartitionPin "public boolean isFixed()"
+   - com.xilinx.rapidwright.design.PartitionPin "public boolean isWireFixed()"
+   - com.xilinx.rapidwright.design.PartitionPin "public String getInstanceName()"
+   - com.xilinx.rapidwright.design.PartitionPin "public boolean isPort()"
+   - com.xilinx.rapidwright.design.PartitionPin "public String getTerminalName()"
+   - com.xilinx.rapidwright.design.PartitionPin "public String getLibCellName()"
+   - com.xilinx.rapidwright.design.PartitionPin "public String toString()"
+   - com.xilinx.rapidwright.design.SiteInst "public boolean removePin(SitePinInst sitePinInst)"
+
+
+
+
 ============= RapidWright 2022.1.2-beta released on 2022-07-27 ================
 Notes: 
  * Includes some memory usage improvements of 8-14% for a parsed EDIF netlist (#428)
