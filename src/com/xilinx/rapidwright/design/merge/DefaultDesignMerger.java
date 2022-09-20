@@ -41,29 +41,29 @@ import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 
 /**
- * Provides a basic design merging behavior when merging designs.  If no other design merger is 
+ * Provides a basic design merging behavior when merging designs.  If no other design merger is
  * implemented, {@link MergeDesigns#mergeDesigns(com.xilinx.rapidwright.design.Design...)} is used
- * by default. 
+ * by default.
  */
 public class DefaultDesignMerger extends AbstractDesignMerger {
 
     private Map<String, String> replacedNets = new HashMap<>();
-    
+
     private EDIFPortInst getSingleSource(EDIFNet net) {
         List<EDIFPortInst> srcs = net.getSourcePortInsts(true);
         if (srcs.size() == 0) return null;
         if (srcs.size() == 1) return srcs.get(0);
         throw new RuntimeException("ERROR: Net "+ net +" has more than one source!");
     }
-    
+
     private boolean checkIfNetSourcesMergeCompatible(EDIFNet n0, EDIFNet n1) {
         List<EDIFPortInst> srcs0 = n0.getSourcePortInsts(true);
         List<EDIFPortInst> srcs1 = n1.getSourcePortInsts(true);
-        
+
         if (srcs0.size() != 1 || srcs1.size() != 1) {
             return false;
         }
-        
+
         if (!srcs0.get(0).getFullName().equals(srcs1.get(0).getFullName())) {
             if (!srcs0.get(0).isTopLevelPort() && !srcs1.get(0).isTopLevelPort()) {
                 return false;
@@ -75,12 +75,12 @@ public class DefaultDesignMerger extends AbstractDesignMerger {
     @Override
     public void mergePorts(EDIFPort p0, EDIFPort p1) {
         if (!p0.isBusRangeEqual(p1)) {
-            // TODO - Perhaps there are future use cases where disjoint ranges could be 
+            // TODO - Perhaps there are future use cases where disjoint ranges could be
             // merged, but we'll leave that exercise for another day
-            throw new RuntimeException("ERROR: Port range mismatch " + p0.getName() 
+            throw new RuntimeException("ERROR: Port range mismatch " + p0.getName()
                 + " and " + p1.getName());
         }
-        
+
         if (p0.getDirection() != p1.getDirection()) {
             boolean p0IsOutput = p0.isOutput();
             // Two ports with same name but opposite direction, plan to remove both and connect
@@ -121,16 +121,16 @@ public class DefaultDesignMerger extends AbstractDesignMerger {
                 }
                 toSwitch.clear();
             }
-            
+
             for (EDIFPortInst remove : toRemove) {
-                EDIFNet net = remove.getNet(); 
+                EDIFNet net = remove.getNet();
                 net.removePortInst(remove);
                 if (net.getPortInsts().size() == 0) {
                     net.getParentCell().removeNet(net);
                 }
             }
-            
-            
+
+
             p0.getParentCell().removePort(p0);
             p1.getParentCell().removePort(p1);
             return;
@@ -140,19 +140,19 @@ public class DefaultDesignMerger extends AbstractDesignMerger {
             List<EDIFNet> nets1 = p1.getInternalNets();
             for (int i=0; i < nets0.size(); i++) {
                 if (!checkIfNetSourcesMergeCompatible(nets0.get(i), nets1.get(i))) {
-                    throw new RuntimeException("ERROR: Unable to merge output port " + p0 
+                    throw new RuntimeException("ERROR: Unable to merge output port " + p0
                             + " incompatible source on driving nets");
                 }
             }
-            
+
             throw new RuntimeException("ERROR: Unable to merge port " + p0 + ", duplicate output "
                     + "with different direction");
         }
-        
+
         for (EDIFNet net : p1.getInternalNets()) {
             for (EDIFPortInst portInst: net.getPortInsts()) {
                 if (portInst.getPort() == p1) {
-                   portInst.setPort(p0); 
+                   portInst.setPort(p0);
                 }
             }
         }
@@ -166,9 +166,9 @@ public class DefaultDesignMerger extends AbstractDesignMerger {
         // Remove top-level port if one source already got copied
         EDIFPortInst src0 = getSingleSource(n0);
         EDIFPortInst src1 = getSingleSource(n1);
-        EDIFPortInst nonTopLevelPortSrc = (src0 != null && !src0.isTopLevelPort()) ? 
+        EDIFPortInst nonTopLevelPortSrc = (src0 != null && !src0.isTopLevelPort()) ?
                         src0 : ((src1 != null && !src1.isTopLevelPort()) ? src1 : null);
-        EDIFPortInst topLevelPortSrc = (src0 != null && src0.isTopLevelPort()) ? 
+        EDIFPortInst topLevelPortSrc = (src0 != null && src0.isTopLevelPort()) ?
                         src0 : ((src1 != null && src1.isTopLevelPort()) ? src1 : null);
         // We are merging a net where one instance has a top level port source and the other
         // has a real source.  Move all sinks to the real source and discard the top level port
@@ -183,7 +183,7 @@ public class DefaultDesignMerger extends AbstractDesignMerger {
                 n0 = tmp;
             }
         }
-        
+
         for (EDIFPortInst p1 : new ArrayList<>(n1.getPortInsts())) {
             if (p1.isOutput() || (p1.isTopLevelPort() && p1.isInput())) continue;
             if (n0.getPortInst(p1.getCellInst(), p1.getName()) == null) {
@@ -192,7 +192,7 @@ public class DefaultDesignMerger extends AbstractDesignMerger {
             }
         }
     }
-    
+
     @Override
     public void mergeCellInsts(EDIFCellInst i0, EDIFCellInst i1) {
         if (!i0.getCellType().getName().equals(i1.getCellType().getName())) {
@@ -200,15 +200,15 @@ public class DefaultDesignMerger extends AbstractDesignMerger {
         }
         for (EDIFPortInst portInst1 : i1.getPortInsts()) {
             EDIFPortInst portInst0 = i0.getPortInst(portInst1.getName());
-            
+
             // If portInst0 is null, prioritize portInst1
             if (portInst0 == null) {
-                portInst0 = new EDIFPortInst(i0.getPort(portInst1.getPort().getBusName()), 
+                portInst0 = new EDIFPortInst(i0.getPort(portInst1.getPort().getBusName()),
                         portInst1.getNet(), portInst1.getIndex(), i0);
                 continue;
             }
             if (portInst0.getDirection() != portInst1.getDirection()) {
-                throw new RuntimeException("ERROR: Mismatched port directions on cell type " 
+                throw new RuntimeException("ERROR: Mismatched port directions on cell type "
                         + i1.getCellType());
             }
             EDIFNet net0 = portInst0.getNet();
@@ -222,18 +222,18 @@ public class DefaultDesignMerger extends AbstractDesignMerger {
                 }
                 continue;
             }
-            
+
             if (portInst1.isInput()) {
                 boolean unconnected = false;
                 List<EDIFPortInst> srcs = net1.getSourcePortInsts(true);
                 if (srcs.size() > 1) throw new RuntimeException("ERROR: Unhandled multi-driver case");
                 unconnected = srcs.size() == 0 || (srcs.size() == 1 && srcs.get(0).isTopLevelPort());
                 if (unconnected || net0.getName().equals(net1.getName())) {
-                    // Leave net0 intact and don't merge or copy 
+                    // Leave net0 intact and don't merge or copy
                 } else {
                     portInst0.setParentNet(net1);
                 }
-                
+
             } else if (portInst1.isOutput()) {
                 boolean allSinksTopLevel = true;
                 for (EDIFPortInst sink : net1.getPortInsts()) {
@@ -267,7 +267,7 @@ public class DefaultDesignMerger extends AbstractDesignMerger {
                 }
             }
         }
-        
+
         for (Net net : new ArrayList<>(s0.getNetSiteWireMap().values())) {
             String newNetName = replacedNets.get(net.getName());
             if (newNetName != null) {
@@ -280,7 +280,7 @@ public class DefaultDesignMerger extends AbstractDesignMerger {
                 }
             }
         }
-        
+
         if (modifiedSite) {
             s0.routeSite();
         }

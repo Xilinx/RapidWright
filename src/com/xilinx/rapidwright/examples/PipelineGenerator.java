@@ -1,25 +1,25 @@
 /*
- * 
- * Copyright (c) 2018-2022, Xilinx, Inc. 
+ *
+ * Copyright (c) 2018-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Neely, Xilinx Research Labs.
  *
- * This file is part of RapidWright. 
- * 
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 
 package com.xilinx.rapidwright.examples;
@@ -405,20 +405,20 @@ public class PipelineGenerator {
             throw new RuntimeException("ERROR: Invalid/unsupported part " + partName + ".  This example was coded "+
                               "for UltraScale or UltraScale+ devices.");
         }
-        
+
         Design d = new Design(designName,partName);
         d.setAutoIOBuffers(false);
         Device dev = d.getDevice();
-        
+
         t.stop().start("Create Pipeline");
         Site slice = dev.getSite(sliceName);
         createPipeline(d, slice, width, depth, distance, dir,true);
-                
+
         // Add a clock constraint
         String tcl = "create_clock -name "+clkName+" -period "+clkPeriodConstraint+" [get_ports "+clkName+"]";
         d.addXDCConstraint(ConstraintGroup.LATE,tcl);
         d.setAutoIOBuffers(false);
-        
+
         t.stop();
         d.writeCheckpoint(outputDCPFileName, t);
         if (verbose) System.out.println("Wrote final DCP: " + outputDCPFileName);

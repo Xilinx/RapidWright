@@ -1,27 +1,27 @@
-/* 
- * Copyright (c) 2017-2022, Xilinx, Inc. 
+/*
+ * Copyright (c) 2017-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
- *  
- * This file is part of RapidWright. 
- * 
+ *
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 /**
- * 
+ *
  */
 package com.xilinx.rapidwright.design.blocks;
 
@@ -45,8 +45,8 @@ public class PBlockRange {
     private PBlockCorner upperRight;
 
     public static final String CLOCK_REGION_RANGE_STR = "CLOCKREGION";
-    
-    
+
+
     public PBlockRange(Device dev, String range) {
         int colonIndex = range.indexOf(':');
         if (colonIndex < 0) throw new RuntimeException("ERROR: Invalid pblock string '" + range + "'");
@@ -67,15 +67,15 @@ public class PBlockRange {
                 throw new RuntimeException("ERROR: Invalid pblock range: " + range);
             }
             setLowerLeft(ll);
-            setUpperRight(ur);            
+            setUpperRight(ur);
         }
     }
-    
+
     public PBlockRange(Site lowerLeft, Site upperRight) {
         setLowerLeft(lowerLeft);
         setUpperRight(upperRight);
     }
-    
+
     /**
      * @return the lowerLeft
      */
@@ -89,7 +89,7 @@ public class PBlockRange {
     public void setLowerLeft(PBlockCorner lowerLeft) {
         this.lowerLeft = lowerLeft;
     }
-    
+
     /**
      * @return the upperRight
      */
@@ -103,14 +103,14 @@ public class PBlockRange {
     public void setUpperRight(PBlockCorner upperRight) {
         this.upperRight = upperRight;
     }
-    
+
     public String toString() {
         return lowerLeft.getName() + ":" + upperRight.getName();
     }
-    
+
     /**
      * Moves the pblock by the specified offset in units of the pblock range type.
-     * For example, if the pblock is SLICE_X0Y0:SLICE_X2Y2 with an offset of (0,2), 
+     * For example, if the pblock is SLICE_X0Y0:SLICE_X2Y2 with an offset of (0,2),
      * the result would be SLICE_X0Y2:SLICE_X2Y4.  However, if the pblock range
      * is using clock regions, the offset unit would be two clock regions away.
      * @param xOffset Offset of the pblock range type in the X (column) direction
@@ -128,13 +128,13 @@ public class PBlockRange {
         setLowerLeft(newLowerLeft);
         setUpperRight(newUpperRight);
         return true;
-        
+
     }
-    
+
     public static String replaceXY(String name, int x, int y) {
         return name.substring(0, name.lastIndexOf('X')+1) + x + "Y" + y;
     }
-    
+
     public Tile getTopLeftTile() {
         int col = -1;
         int row = -1;
@@ -143,12 +143,12 @@ public class PBlockRange {
             row = ((ClockRegion)upperRight).getUpperLeft().getRow();
         } else {
             col = getLowerLeftSite().getTile().getColumn();
-            row = getUpperRightSite().getTile().getRow();            
+            row = getUpperRightSite().getTile().getRow();
         }
-            
+
         return getDevice().getTile(row, col);
     }
-    
+
     public Tile getBottomRightTile() {
         int col = -1;
         int row = -1;
@@ -159,10 +159,10 @@ public class PBlockRange {
             row = getLowerLeftSite().getTile().getRow();
             col = getUpperRightSite().getTile().getColumn();
         }
-            
-        return getDevice().getTile(row, col);        
+
+        return getDevice().getTile(row, col);
     }
-    
+
     public Tile getBottomLeftTile() {
         int col = -1;
         int row = -1;
@@ -175,7 +175,7 @@ public class PBlockRange {
         }
         return getDevice().getTile(row, col);
     }
-    
+
     public Tile getTopRightTile() {
         int col = -1;
         int row = -1;
@@ -185,14 +185,14 @@ public class PBlockRange {
         } else {
             row = getUpperRightSite().getTile().getRow();
             col = getUpperRightSite().getTile().getColumn();
-        }    
-        return getDevice().getTile(row, col);        
+        }
+        return getDevice().getTile(row, col);
     }
-    
+
     public Device getDevice() {
         return lowerLeft.getDevice();
     }
-    
+
     /**
      * Iterates over rectangular region imposed by pblock and returns the set of all
      * tiles inclusive of those sites.
@@ -200,33 +200,33 @@ public class PBlockRange {
      */
     public Set<Tile> getAllTiles() {
         Set<Tile> tiles = new HashSet<>();
-        
+
         int colMin = getBottomLeftTile().getColumn();
         int rowMin = getTopRightTile().getRow();
         int colMax = getTopRightTile().getColumn();
         int rowMax = getBottomLeftTile().getRow();
-        
+
         // We may need to expand column to include outward facing CLB/DSP/BRAM to INT tiles
         if (isSiteRange()) {
             Tile t = getLowerLeftSite().getIntTile();
             if (t.getColumn() < colMin) colMin = t.getColumn();
             t = getUpperRightSite().getIntTile();
-            if (t.getColumn() > colMax) colMax = t.getColumn();            
+            if (t.getColumn() > colMax) colMax = t.getColumn();
         }
-                    
+
         for (int col=colMin; col <= colMax; col++) {
             for (int row=rowMin; row <= rowMax; row++) {
                 tiles.add(getDevice().getTile(row, col));
             }
         }
-        
+
         return tiles;
     }
-    
+
     public boolean isClockRegionRange() {
         return lowerLeft instanceof ClockRegion;
     }
-    
+
     public boolean isSiteRange() {
         return lowerLeft instanceof Site;
     }

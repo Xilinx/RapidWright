@@ -1,25 +1,25 @@
-/* 
+/*
  * Original work: Copyright (c) 2010-2011 Brigham Young University
- * Modified work: Copyright (c) 2017-2022, Xilinx, Inc. 
+ * Modified work: Copyright (c) 2017-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
- *  
- * This file is part of RapidWright. 
- * 
+ *
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 package com.xilinx.rapidwright.gui;
 
@@ -50,7 +50,7 @@ import java.util.HashSet;
 import java.util.TreeSet;
 
 /**
- * This class is used for the design explorer although, it could 
+ * This class is used for the design explorer although, it could
  * be used for building other applications as well.
  * @author Chris Lavin
  */
@@ -109,29 +109,29 @@ public class TileScene extends QGraphicsScene{
         setDesign(null);
         initializeScene(true, true);
     }
-    
+
     /**
-     * Creates a new tile scene with a design. 
+     * Creates a new tile scene with a design.
      * @param design The design and device to associate with this scene.
      * @param hideTiles A flag to hide/show certain tiles to make the fabric appear more homogeneous.
-     * @param drawPrimitives A flag to draw boxes to represent primitives. 
+     * @param drawPrimitives A flag to draw boxes to represent primitives.
      */
     public TileScene(Design design, boolean hideTiles, boolean drawPrimitives) {
         setDesign(design);
         initializeScene(hideTiles, drawPrimitives);
     }
-    
+
     /**
-     * Creates a new tile scene with a device. 
+     * Creates a new tile scene with a device.
      * @param device The device to associate with this scene.
      * @param hideTiles A flag to hide/show certain tiles to make the fabric appear more homogeneous.
-     * @param drawPrimitives A flag to draw boxes to represent primitives. 
+     * @param drawPrimitives A flag to draw boxes to represent primitives.
      */
     public TileScene(Device device, boolean hideTiles, boolean drawPrimitives) {
         setDevice(device);
         initializeScene(hideTiles, drawPrimitives);
     }
-    
+
     public QSize getSceneSize() {
         return sceneSize;
     }
@@ -338,7 +338,7 @@ public class TileScene extends QGraphicsScene{
         }
         return null;
     }
-    
+
     /**
      * Gets the tile based on the mouse position in the event.
      * @param event The recent mouse event
@@ -347,7 +347,7 @@ public class TileScene extends QGraphicsScene{
     public Tile getTile(QGraphicsSceneMouseEvent event) {
         return getTile(event.scenePos().x(), event.scenePos().y());
     }
-    
+
     @Override
     public void mouseMoveEvent(QGraphicsSceneMouseEvent event) {
         QPointF mousePos = event.scenePos();
@@ -360,7 +360,7 @@ public class TileScene extends QGraphicsScene{
                 }
                 if (tile.getSites().length > 1) {
                     siteNames += " ...";
-                }                
+                }
                 String tileName = device.getName() + " | " +  tile.getName() +
                 " | " + tile.getTileTypeEnum() + " (" + currX + "," + currY + ")" + siteNames;
                 this.updateStatus.emit(tileName, tile);
@@ -370,7 +370,7 @@ public class TileScene extends QGraphicsScene{
         }
         super.mouseMoveEvent(event);
     }
-    
+
     @Override
     public void mouseDoubleClickEvent(QGraphicsSceneMouseEvent event) {
         QPointF mousePos = event.scenePos();
@@ -379,11 +379,11 @@ public class TileScene extends QGraphicsScene{
 
         if (currX >= 0 && currY >= 0 && currX < cols && currY < rows) {
             updateCursor();
-        }            
-    
+        }
+
         super.mousePressEvent(event);
     }
-    
+
     public void updateCursor() {
         if (highlit != null) {
             highlit.dispose();
@@ -392,30 +392,30 @@ public class TileScene extends QGraphicsScene{
                 tileSize - 2, cursorPen);
         highlit.setZValue(10);
     }
-    
+
     public void updateCurrXY(int currX, int currY) {
         this.currX = currX;
         this.currY = currY;
     }
-    
+
     /*
      * Getters and Setters
      */
-    
+
     public int getDrawnTileX(Tile tile) {
         Integer tmp = tileXMap.get(tile);
         if (tmp == null)
             return -1;
         return tmp;
     }
-    
+
     public int getDrawnTileY(Tile tile) {
         Integer tmp = tileYMap.get(tile);
         if (tmp == null)
             return -1;
         return tmp;
     }
-    
+
 
     public Design getDesign() {
         return design;
@@ -427,11 +427,11 @@ public class TileScene extends QGraphicsScene{
             setDevice(design.getDevice());
         }
     }
-    
+
     public Device getDevice() {
         return device;
     }
-    
+
     public void setDevice(Device device) {
         this.device = device;
     }
@@ -443,24 +443,24 @@ public class TileScene extends QGraphicsScene{
     public double getCurrY() {
         return currY;
     }
-    
+
     public int getTileSize() {
         return tileSize;
     }
-    
+
     /*
      * Helper Drawing Methods
      */
 
 
     private void drawCLB(QPainter painter, int rectX, int rectY, int rectSide) {
-        
+
         switch(device.getSeries()) {
             case Series7:
             case Versal:
                 painter.drawRect(rectX, rectY + rectSide / 2, rectSide / 2 - 1, rectSide / 2 - 1);
-                painter.drawRect(rectX + rectSide / 2, rectY, rectSide / 2 - 1, rectSide / 2 - 1);                    
-                break;                
+                painter.drawRect(rectX + rectSide / 2, rectY, rectSide / 2 - 1, rectSide / 2 - 1);
+                break;
             default:
                 painter.drawRect(rectX, rectY, rectSide, rectSide);
         }
@@ -522,17 +522,17 @@ public class TileScene extends QGraphicsScene{
         }
 
     }
-    
+
     private void drawSwitchBox(QPainter painter, int rectX, int rectY, int rectSide) {
         painter.drawRect(rectX+1, rectY+1, rectSide-2, rectSide-2);
     }
-    
+
     private void colorTile(QPainter painter, int x, int y, int offset, QColor color) {
         painter.fillRect(x * tileSize, y * tileSize,
                 tileSize - 2 * offset, tileSize - 2 * offset, new QBrush(color));
     }
-    
-    
+
+
     @SuppressWarnings("incomplete-switch")
     private void populateTileTypesToHide() {
         switch(device.getSeries()) {

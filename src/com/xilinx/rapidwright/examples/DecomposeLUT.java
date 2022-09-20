@@ -1,26 +1,26 @@
-/* 
- * Copyright (c) 2019-2022, Xilinx, Inc. 
+/*
+ * Copyright (c) 2019-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
- *  
- * This file is part of RapidWright. 
- * 
+ *
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
- 
+
 package com.xilinx.rapidwright.examples;
 
 import com.xilinx.rapidwright.design.Cell;
@@ -46,19 +46,19 @@ public class DecomposeLUT {
             net.createPortInst(topPort);
             net.createPortInst(port,lut6.getEDIFCellInst());
         }
-        
+
         d.setAutoIOBuffers(false);
         d.writeCheckpoint("single_LUT_6_connected_to_top_level_ports.dcp");
-        
+
         // Convert LUT6 to two LUT5s and a LUT3 (2:1 mux)
         Cell lut5_0 = d.createAndPlaceCell("myLUT5_0", Unisim.LUT5, "SLICE_X0Y0/B6LUT");
         Cell lut5_1 = d.createAndPlaceCell("myLUT5_1", Unisim.LUT5, "SLICE_X0Y0/C6LUT");
         Cell mux = d.createAndPlaceCell("mux", Unisim.LUT3, "SLICE_X0Y0/D6LUT");
-        
+
         LUTTools.configureLUT(lut5_0, "O=0"); // Evaluate LUT6 equation with I5=0
         LUTTools.configureLUT(lut5_1, "O=I0 & I1 & I2 & I3 & I4"); // Evaluate LUT6 equation with I5=1
         LUTTools.configureLUT(mux, "O=(IO & ~I2) + (I1 & I2) + (I0 & I1)"); // 2:1 Mux truth table
-        
+
         // Disconnect LUT6, connect LUT5 inputs
         for (EDIFPortInst port : lut6.getEDIFCellInst().getPortInsts()) {
             EDIFNet net = port.getNet();
@@ -68,13 +68,13 @@ public class DecomposeLUT {
                 net.createPortInst(port.getName(), lut5_1);
             } else if (port.getName().equals("I5")) {
                 // This is our select line
-                net.createPortInst("I2", mux); 
+                net.createPortInst("I2", mux);
             } else if (port.isOutput()) {
                 // Connect output of mux to same top-level output
                 net.createPortInst("O", mux);
             }
         }
-        
+
         // Connect LUT5 outputs to Mux inputs
         EDIFNet lut5Output0 = top.createNet("lut5_0");
         EDIFNet lut5Output1 = top.createNet("lut5_1");
@@ -82,7 +82,7 @@ public class DecomposeLUT {
         lut5Output0.createPortInst("I0",mux);
         lut5Output1.createPortInst("O",lut5_1);
         lut5Output1.createPortInst("I1",mux);
-        
+
         d.writeCheckpoint("decomposed_6LUT_to_2_5LUTs_and_mux.dcp");
     }
 }

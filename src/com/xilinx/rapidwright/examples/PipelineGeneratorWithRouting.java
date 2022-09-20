@@ -1,25 +1,25 @@
 /*
- * 
- * Copyright (c) 2018-2022, Xilinx, Inc. 
+ *
+ * Copyright (c) 2018-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Neely, Xilinx Research Labs.
  *
- * This file is part of RapidWright. 
- * 
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 
 package com.xilinx.rapidwright.examples;
@@ -113,17 +113,17 @@ public class PipelineGeneratorWithRouting {
      * @param startingPoint Site for placing the first/starting flop.
      * @param width Bit width of the bus signal.
      * @param depth Number of cycles to pipeline the bus.
-     * @param distanceX Change in the absolute tile coordinates in the x dimension for placing the 
+     * @param distanceX Change in the absolute tile coordinates in the x dimension for placing the
      * next flop.
-     * @param distanceY Change in the absolute tile coordinates in the y dimension for placing the 
+     * @param distanceY Change in the absolute tile coordinates in the y dimension for placing the
      * next flop.
-     * @param dir General direction of the pipeline as either horizontal or vertical.  This does not 
+     * @param dir General direction of the pipeline as either horizontal or vertical.  This does not
      * need to be modified for this routing example.
      * @param route Boolean specifying whether to route the design or not.  This does not need to be
      * modified for this routing example.
      * @return
      */
-    public static PBlock createPipeline(Design d, Site startingPoint, int width, int depth, 
+    public static PBlock createPipeline(Design d, Site startingPoint, int width, int depth,
                                         int distanceX, int distanceY, direction dir, boolean route) {
 
         if (dir == direction.vertical && (distanceY < Math.ceil(width/8))) {
@@ -205,8 +205,8 @@ public class PipelineGeneratorWithRouting {
             rst = top.getNet(rstPort.getName());
         }
 
-        // The "Net" objects below are used later for representing the physical connections in the 
-        // implementation of the design. 
+        // The "Net" objects below are used later for representing the physical connections in the
+        // implementation of the design.
         Net clkNet = d.createNet(clk);
         Net rstNet = d.createNet(rst);
         Net ceNet = d.createNet(ce);
@@ -285,13 +285,13 @@ public class PipelineGeneratorWithRouting {
                 EDIFNet inputNet = ic[j][i];
                 EDIFNet outputNet = ic[j + 1][i];
 
-                // Note: as mentioned above, when we get the next "neighbor site", we pass it a dx 
+                // Note: as mentioned above, when we get the next "neighbor site", we pass it a dx
                 // and dy each time.
                 Site currSlice = prevSite.getNeighborSite(0, i / BITS_PER_CLE);
 
                 // Below is a check in case we have reached some site type that doesn't contain flops
                 int v = 0;
-                while (!currSlice.isCompatibleSiteType(SiteTypeEnum.SLICEL) && 
+                while (!currSlice.isCompatibleSiteType(SiteTypeEnum.SLICEL) &&
                        !currSlice.isCompatibleSiteType(SiteTypeEnum.SLICEM)) {
                     v++;
                     int dy = (i+v) / BITS_PER_CLE;
@@ -307,7 +307,7 @@ public class PipelineGeneratorWithRouting {
                 }
                 used.add(currSlice);
 
-                // Below picks the letter site containing pairs of flops.  
+                // Below picks the letter site containing pairs of flops.
                 // The first flop is called "FF".  The second flop is called "FF2".
                 String letter = Character.toString((char) ('A' + i % 8));
                 BEL ff = currSlice.getBEL(letter + "FF");
@@ -356,10 +356,10 @@ public class PipelineGeneratorWithRouting {
         //
         // Below we will route intrasites first, and then intersites
         //
-        
-        // In the case that the design uses "intrasites", for example this design uses the 
-        // "letter sites" inside of a slice, then it becomes necessary to call the routeSites() 
-        // method below.  
+
+        // In the case that the design uses "intrasites", for example this design uses the
+        // "letter sites" inside of a slice, then it becomes necessary to call the routeSites()
+        // method below.
         d.routeSites();
         d.setAutoIOBuffers(false);
         d.setDesignOutOfContext(true);
@@ -441,7 +441,7 @@ public class PipelineGeneratorWithRouting {
             int tileY1 = sink.getTile().getTileYCoordinate();
             int tileX2 = currG.hasPIPs() ? currPIP.getTile().getTileXCoordinate() :
                 currNodeStartWire.getTile().getTileXCoordinate();
-            int tileY2 = currG.hasPIPs() ? currPIP.getTile().getTileYCoordinate() : 
+            int tileY2 = currG.hasPIPs() ? currPIP.getTile().getTileYCoordinate() :
                 currNodeStartWire.getTile().getTileYCoordinate();
             int tileX3 = sink.getSite().getIntTile().getTileXCoordinate();
             int tileY3 = sink.getSite().getIntTile().getTileYCoordinate();
@@ -455,11 +455,11 @@ public class PipelineGeneratorWithRouting {
 
             int siteX1 = sink.getSite().getInstanceX();
             int siteY1 = sink.getSite().getInstanceY();
-            int siteX2 = currNode.getSitePin() != null ? 
-                    currNode.getSitePin().getSite().getInstanceX() : 
+            int siteX2 = currNode.getSitePin() != null ?
+                    currNode.getSitePin().getSite().getInstanceX() :
                     currNodeStartWire.getTile().getTileXCoordinate();
-            int siteY2 = currNode.getSitePin() != null ? 
-                    currNode.getSitePin().getSite().getInstanceY() : 
+            int siteY2 = currNode.getSitePin() != null ?
+                    currNode.getSitePin().getSite().getInstanceY() :
                     currNodeStartWire.getTile().getTileYCoordinate();
             siteDx = siteX1 - siteX2;
             siteDy = siteY1 - siteY2;
@@ -505,7 +505,7 @@ public class PipelineGeneratorWithRouting {
             TimingGroup currG = solutions.poll();
             List<TimingGroup> reverseTGOrder = new LinkedList<>();
             System.out.println("Visited Wire Count:" + visited.size());
-            System.out.println("Selected Delay is: " + delayCostTable.get(currG)+ 
+            System.out.println("Selected Delay is: " + delayCostTable.get(currG)+
                                 ", artificial cost is: "+currG.cost);
 
             // We've found the sink, recover our trail of used PIPs
@@ -536,7 +536,7 @@ public class PipelineGeneratorWithRouting {
 
 
     /**
-     * This helper function checks the timing group and adds a wire length distance to tileX2B and 
+     * This helper function checks the timing group and adds a wire length distance to tileX2B and
      * tileY2B member variables. The side effect is setting these variables.
      * @param tg
      */
@@ -735,16 +735,16 @@ public class PipelineGeneratorWithRouting {
                     if (nextG.dist ==0 && currG.dist == 0)
                         nextG.sameSpotCounter = currG.sameSpotCounter+1;
 
-                    boolean removeLastBounce = currG.getDelayType() == GroupDelayType.PIN_BOUNCE && 
+                    boolean removeLastBounce = currG.getDelayType() == GroupDelayType.PIN_BOUNCE &&
                                                 nextG.getNodeType(0) == IntentCode.NODE_CLE_OUTPUT;
 
-                    float nextCost = currDelayCost + nextG.delay + 
+                    float nextCost = currDelayCost + nextG.delay +
                             (removeLastBounce? -1*model.BOUNCE_DELAY:0)+
                             (mDist > 1 ? DISTANCE_WEIGHT * (mDist-Math.abs(tileX2B)-Math.abs(tileY2B)) : 0) +
                             ((nextG.getDelayType() == GroupDelayType.GLOBAL)? 200 : 0);
                     nextG.cost = nextCost;
 
-                    delayCostTable.put(nextG, currDelayCost + nextG.delay + 
+                    delayCostTable.put(nextG, currDelayCost + nextG.delay +
                                         (removeLastBounce? -1*model.BOUNCE_DELAY:0) );
                     prevG.put(nextG, currG);
 
@@ -856,15 +856,15 @@ public class PipelineGeneratorWithRouting {
         // Perform some error checking on inputs
         Part part = PartNameTools.getPart(partName);
         if (part == null || part.isSeries7()) {
-            throw new RuntimeException("ERROR: Invalid/unsupported part " + partName + 
+            throw new RuntimeException("ERROR: Invalid/unsupported part " + partName +
                                                 ".  This example was coded "+
                                                   "for UltraScale or UltraScale+ devices.");
         }
-        
+
         Design d = new Design(designName,partName);
         d.setAutoIOBuffers(false);
         Device dev = d.getDevice();
-        
+
         t.stop().start("Create Pipeline");
         Site slice = dev.getSite(sliceName);
 
@@ -874,7 +874,7 @@ public class PipelineGeneratorWithRouting {
 
 
         createPipeline(d, slice, width, depth, distanceX, distanceY, dir, true);
-                
+
         // Add a clock constraint
         String tcl = "create_clock -name "+clkName+" -period "+clkPeriodConstraint+
                      " [get_ports "+clkName+"]";

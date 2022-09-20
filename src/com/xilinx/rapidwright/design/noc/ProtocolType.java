@@ -26,7 +26,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Enumerates AXI protocols 
+ * Enumerates AXI protocols
  */
 public enum ProtocolType {
     AXI_MEMORY_MAPPED("AXI_MM"),
@@ -39,7 +39,7 @@ public enum ProtocolType {
         for (ProtocolType e : values()) {
             map.put(e.toString(), e);
         }
-    }    
+    }
 
     private final String p;
 

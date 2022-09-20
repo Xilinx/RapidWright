@@ -24,7 +24,7 @@ package com.xilinx.rapidwright.timing;
 import java.util.Arrays;
 
 /**
- * A TimingVertex represents a node within the TimingGraph.  It encapsulates slack, arrival time, 
+ * A TimingVertex represents a node within the TimingGraph.  It encapsulates slack, arrival time,
  * required time, and whether it represents a pin on a flip flop.
  */
 public class TimingVertex {
@@ -42,10 +42,10 @@ public class TimingVertex {
 
     /**
      * Creates a vertex for insertion into the TimingGraph.
-     * @param name Name is typically the hierarchical logical name of an input or output pin.  In 
-     * some cases this timing library is using the EDIFPortInst name for the name.  This is 
+     * @param name Name is typically the hierarchical logical name of an input or output pin.  In
+     * some cases this timing library is using the EDIFPortInst name for the name.  This is
      * noteworthy because the EDIFPortInst name may contain square brackets on pins that are indexed
-     * slices of a bus (for example some pins on CARRY8 have indices).  The physical name for pins 
+     * slices of a bus (for example some pins on CARRY8 have indices).  The physical name for pins
      * do not contain square brackets.
      */
     public TimingVertex(String name) {
@@ -54,7 +54,7 @@ public class TimingVertex {
         this.isFlopOutput = false;
         this.printed = false;
     }
-    
+
     /**
      * Create a timing vertex for insertion into the timing graph
      * @param name - name is the cell name of an input or output pin
@@ -76,7 +76,7 @@ public class TimingVertex {
     }
 
     /**
-     * Implements the comparable object interface so that Vertices can be compared. This comparison 
+     * Implements the comparable object interface so that Vertices can be compared. This comparison
      * is based on the name.
      * @param o Object to be compared to.
      * @return Result of comparing the name if both objects are of TimingVertex type.
@@ -88,7 +88,7 @@ public class TimingVertex {
     }
 
     /**
-     * Implements the comparable object interface so that vertices can be compared.  This checks 
+     * Implements the comparable object interface so that vertices can be compared.  This checks
      * whether the names of two objects are equal.
      * @param o Object to be compared to.
      * @return Result of comparing the name if both objects are of TimingVertex type for equality.
@@ -100,7 +100,7 @@ public class TimingVertex {
     }
 
     /**
-     * This method is used when storing TimingVertices in HashTables and HashMaps.  This method 
+     * This method is used when storing TimingVertices in HashTables and HashMaps.  This method
      * returns a hashed representation based on the name.
      * @return Returns a hash code based on the name.
      */
@@ -129,7 +129,7 @@ public class TimingVertex {
         }
         this.slack = requiredTime - arrivalTime;
     }
-    
+
     public void setMinRequiredTime(float requiredTime) {
         if (this.requiredTime == null) {
             this.requiredTime = requiredTime;
@@ -138,13 +138,13 @@ public class TimingVertex {
                 this.requiredTime = requiredTime;
             }
         }
-        
+
     }
-    
+
     /**
      * Sets the arrival time stored at this vertex WHEN the new arrival time is larger than the current.
-     * @param arrivalTime Arrival time in picoseconds.  This is the sum of delay edges leading to 
-     * this vertex 
+     * @param arrivalTime Arrival time in picoseconds.  This is the sum of delay edges leading to
+     * this vertex
      */
     public void setMaxArrivalTime(float arrivalTime) {
         if (this.arrivalTime == null) {
@@ -153,7 +153,7 @@ public class TimingVertex {
             this.arrivalTime = arrivalTime;
         }
     }
-    
+
     public void setMaxArrivalTime(float arrivalTime, TimingVertex prev) {
         if (this.arrivalTime == null) {
             this.arrivalTime = arrivalTime;
@@ -163,25 +163,25 @@ public class TimingVertex {
             this.setPrev(prev);
         }
     }
-    
+
     public void resetRequiredTime() {
         this.requiredTime = null;
     }
-    
-    
+
+
     public void resetArrivalTime() {
         this.arrivalTime = null;
     }
-    
+
     /**
      * Sets the arrival time stored at this vertex.
-     * @param arrivalTime Arrival time in picoseconds.  This is the sum of delay edges leading to 
+     * @param arrivalTime Arrival time in picoseconds.  This is the sum of delay edges leading to
      * this vertex.
      */
     public void setArrivalTime(float arrivalTime) {
         this.arrivalTime = arrivalTime;
     }
-        
+
     /**
      * Gets the slack stored at this vertex.
      * @return Slack value in picoseconds.
@@ -205,7 +205,7 @@ public class TimingVertex {
             return arrivalTime;
         }
     }
-    
+
     /**
      * Gets the required time stored at this vertex.
      * @return Required time in picoseconds.

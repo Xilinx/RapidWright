@@ -1,25 +1,25 @@
 /*
- * 
- * Copyright (c) 2018-2022, Xilinx, Inc. 
+ *
+ * Copyright (c) 2018-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
  *
- * This file is part of RapidWright. 
- * 
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 
 package com.xilinx.rapidwright.design.tools;
@@ -41,34 +41,34 @@ import com.xilinx.rapidwright.edif.EDIFPropertyValue;
 
 
 /**
- * A collection of tools to help modify LUTs.  
- * 
+ * A collection of tools to help modify LUTs.
+ *
  * @author clavin
  *
  */
 public class LUTTools {
 
-    public static final String LUT_INIT = "INIT"; 
+    public static final String LUT_INIT = "INIT";
 
     public static final int MAX_LUT_SIZE = 6;
-    
+
     public static final String[][] lutMap;
-    
+
     public static final char[] lutLetters = new char[] {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'};
-    
+
     public static final String[] empty = new String[0];
-    
+
     static {
         lutMap = new String[lutLetters.length][];
         for (char letter : lutLetters) {
             lutMap[letter - 'A'] = new String[] {letter + "6LUT", letter + "5LUT"};
         }
     }
-    
+
     /**
      * Gets the corresponding BEL site names for a given LUT letter.  For example, 'A' will return
      * ["A6LUT", "A5LUT"]
-     * @param lutLetter The letter of the LUT of interest.  Valid values are 'A'..'H', 
+     * @param lutLetter The letter of the LUT of interest.  Valid values are 'A'..'H',
      * case insensitive.
      * @return The list of corresponding BEL site names or an empty list if none were found.
      */
@@ -77,9 +77,9 @@ public class LUTTools {
         if (index < 0 || index >= lutLetters.length) return empty;
         return lutMap[index];
     }
-    
+
     /**
-     * Gets the BEL's companion LUT.  For example the A5LUT bel's companion would be A6LUT and vice 
+     * Gets the BEL's companion LUT.  For example the A5LUT bel's companion would be A6LUT and vice
      * versa.
      * @param lut The LUT bel in question.
      * @return The name of the companion LUT or null if undetermined.
@@ -88,18 +88,18 @@ public class LUTTools {
         if (!lut.isLUT()) return null;
         return getCompanionLUTName(lut.getName());
     }
-    
+
     /**
-     * Get the companion LUT name of the provided LUT name. For example the A5LUT bel's companion 
+     * Get the companion LUT name of the provided LUT name. For example the A5LUT bel's companion
      * would be A6LUT and vice versa.
      * @param lutName Name of the LUT in question.
      * @return The companion LUT name or null if undetermined.
      */
     public static String getCompanionLUTName(String lutName) {
             String[] belNames = getLUTBELNames(lutName.charAt(0));
-            return belNames[(lutName.charAt(1) == '6') ? 1 : 0];        
+            return belNames[(lutName.charAt(1) == '6') ? 1 : 0];
     }
-    
+
     /**
      * Checks if this cell is a LUT (LUT1, LUT2, LUT3,...). A CFGLUT5 will return false.
      * @param c The cell in question
@@ -108,7 +108,7 @@ public class LUTTools {
     public static boolean isCellALUT(Cell c) {
         return isCellALUT(c.getEDIFCellInst());
     }
-    
+
     /**
      * Checks if this cell is a LUT (LUT1, LUT2, LUT3,...). A CFGLUT5 will return false.
      * @param i The cell in question
@@ -123,7 +123,7 @@ public class LUTTools {
         if (isPrimitive && startsWithLUT) return true;
         return false;
     }
-    
+
     /**
      * If the provided cell is a LUT, it will return the LUT input
      * count.  If it is not a LUT, it will return 0.
@@ -133,7 +133,7 @@ public class LUTTools {
     public static int getLUTSize(Cell c) {
         return getLUTSize(c.getEDIFCellInst());
     }
-    
+
     /**
      * If the provided cell instance is a LUT, it will return the LUT input
      * count.  If it is not a LUT, it will return 0.
@@ -144,7 +144,7 @@ public class LUTTools {
         if (!isCellALUT(c)) return 0;
         return Character.getNumericValue(c.getCellType().getName().charAt(3));
     }
-    
+
     /**
      * Extracts the length value from the INIT String (16, in 16'hA8A2)
      * @param init The init string.
@@ -156,7 +156,7 @@ public class LUTTools {
                                 " String \"" + init +"\", missing \'");
         return Integer.parseInt(init.substring(0, idx));
     }
-    
+
     /**
      * Performs essentially a log_2 operation on the init string length
      * to get the LUT size.
@@ -176,21 +176,21 @@ public class LUTTools {
         case 8:
             lutSize = 3;
             break;
-        case 16: 
+        case 16:
             lutSize = 4;
             break;
         case 32:
             lutSize = 5;
             break;
-        case 64: 
+        case 64:
             lutSize = 6;
             break;
         default:
-            throw new RuntimeException("ERROR: Unsupported LUT Size/INIT value " + init);    
+            throw new RuntimeException("ERROR: Unsupported LUT Size/INIT value " + init);
         }
         return lutSize;
     }
-    
+
     /**
      * Prints out the truth table for the given INIT string on the cell. If the
      * cell is not a LUT, it prints nothing.
@@ -211,7 +211,7 @@ public class LUTTools {
         int lutSize = getLUTSize(init);
         int initLength = initLength(init);
         long initValue = getInitValue(init);
-        
+
         for (int i=lutSize-1; i >= 0; i--) {
             System.out.print("I" + i + " ");
         }
@@ -223,7 +223,7 @@ public class LUTTools {
             System.out.println("| " + getBit(initValue,i));
         }
     }
-    
+
     /**
      * Converts the Verilog-syntax number literal for the LUT initialization
      * to a primitive long integer.
@@ -239,49 +239,49 @@ public class LUTTools {
         if (radix.equals("d")) return Long.parseUnsignedLong(init.substring(idx+2), 10);
         if (radix.equals("o")) return Long.parseUnsignedLong(init.substring(idx+2), 8);
         if (radix.equals("b")) return Long.parseUnsignedLong(init.substring(idx+2), 2);
-        
+
         throw new RuntimeException("Unsupported radix '" + radix + "' in " +
                     LUT_INIT + " string \'" + init + "'");
     }
-    
+
     protected static long setBit(long value, int bitIndex) {
         return value | (1L << bitIndex);
     }
-    
+
     protected static int getBit(int value, int bitIndex) {
         return (value >> bitIndex) & 0x1;
     }
-    
+
     protected static int getBit(long value, int bitIndex) {
         return (int)(value >> bitIndex) & 0x1;
     }
-    
+
     /**
      * Evaluates the provided equation in order to create the INIT string
      * of a LUT of the given size. Equation syntax:
-     * {@code 
-     * Operators: 
+     * {@code
+     * Operators:
      *   XOR: @, ^
      *   AND: &, *, .
      *    OR: |, +
      *   NOT: ~, !
-     *   
+     *
      * A Few Examples:
      *   O = 0
      *   O = 1
      *   O = (I0 & I1) + (I2 & I3)
      *   O = I0 & !I1 & !I3
-     * 
+     *
      * }
-     *  
-     * NOTE: XOR and AND have the same precedence and are evaluated from left 
-     * to right. Vivado uses different rules for handling operators of the 
+     *
+     * NOTE: XOR and AND have the same precedence and are evaluated from left
+     * to right. Vivado uses different rules for handling operators of the
      * same precedence, so be sure to use parentheses to avoid any ambiguity!
-     * 
-     *   
+     *
+     *
      * @param equation A Vivado LUT Equation String.  This follows the same
-     * conventions as the Vivado LUT equation string editor. 
-     * @param lutSize LUT size (input count), supported sizes are: 1,2,3,4,5,6 
+     * conventions as the Vivado LUT equation string editor.
+     * @param lutSize LUT size (input count), supported sizes are: 1,2,3,4,5,6
      * @return The INIT string to program the LUT of the provided size
      */
     public static String getLUTInitFromEquation(String equation, int lutSize) {
@@ -296,7 +296,7 @@ public class LUTTools {
     }
 
     /**
-     * Programs a LUT cell's init string from the provided equation.   
+     * Programs a LUT cell's init string from the provided equation.
      * @param c The LUT cell to program.
      * @param equation The desired programming of the LUT using Vivado LUT equation syntax.
      * @return The previous LUT init string or null if none.
@@ -309,7 +309,7 @@ public class LUTTools {
     }
 
     /**
-     * Programs a LUT cell's init string from the provided equation.   
+     * Programs a LUT cell's init string from the provided equation.
      * @param c The LUT cell instance to program.
      * @param equation The desired programming of the LUT using Vivado LUT equation syntax.
      * @return The previous LUT init string or null if none.
@@ -320,19 +320,19 @@ public class LUTTools {
         String init = getLUTInitFromEquation(equation, size);
         return c.addProperty(LUT_INIT, init);
     }
-    
+
     /**
-     * Reads the init string in this LUT and creates an equivalent (non-optimal) equation. 
-     * @param c The LUT instance 
+     * Reads the init string in this LUT and creates an equivalent (non-optimal) equation.
+     * @param c The LUT instance
      * @return The equation following LUT equation syntax or null if cell is not configured.
      */
     public static String getLUTEquation(Cell c) {
         return getLUTEquation(c.getEDIFCellInst());
     }
-    
+
     /**
-     * Reads the init string in this LUT and creates an equivalent (non-optimal) equation. 
-     * @param i The LUT instance 
+     * Reads the init string in this LUT and creates an equivalent (non-optimal) equation.
+     * @param i The LUT instance
      * @return The equation following LUT equation syntax or null if cell is not configured.
      */
     public static String getLUTEquation(EDIFCellInst i) {
@@ -340,14 +340,14 @@ public class LUTTools {
         if (init == null) return null;
         return getLUTEquation(init);
     }
-    
-    
+
+
     /**
      * Creates a (dumb, non-reduced) boolean logic equation compatible
-     * with Vivado's LUT Equation Editor from an INIT string. 
-     * TODO - Enhance with a logic minimization method such as Quine-McCluskey method. 
+     * with Vivado's LUT Equation Editor from an INIT string.
+     * TODO - Enhance with a logic minimization method such as Quine-McCluskey method.
      * @param init The existing INIT string configuring a LUT.
-     * @return A Vivado LUT Equation Editor compatible equation. 
+     * @return A Vivado LUT Equation Editor compatible equation.
      */
     public static String getLUTEquation(String init) {
         long value = getInitValue(init);
@@ -371,22 +371,22 @@ public class LUTTools {
         return sb.toString();
     }
 
-    
+
     private static List<Map<String,String>> tests;
-    
+
     static{
         tests = new ArrayList<>();
         for (int i=0; i < MAX_LUT_SIZE; i++) {
             int lutSize = i+1;
             tests.add(new LinkedHashMap<>());
             Map<String,String> test = tests.get(i);
-            long lutInitLength = 1L << (i+1); 
+            long lutInitLength = 1L << (i+1);
             test.put("O=0", lutInitLength + "'h0");
-            long initValue = lutInitLength == 64 ? -1L : (1L << (lutInitLength))-1; 
+            long initValue = lutInitLength == 64 ? -1L : (1L << (lutInitLength))-1;
             test.put("O=1", lutInitLength + "'h" + Long.toUnsignedString(initValue,16).toUpperCase());
-            
+
             if (lutSize > 1) {
-                char[] repeatTemplate = new char[(int) (lutInitLength >> 2)]; 
+                char[] repeatTemplate = new char[(int) (lutInitLength >> 2)];
                 test.put("O=I0 "+LUTEquationEvaluator.XOR+ " I1", lutInitLength + "'h" + new String(repeatTemplate).replace("\0", "6"));
                 test.put("O=I0 "+LUTEquationEvaluator.XOR2+" I1", lutInitLength + "'h" + new String(repeatTemplate).replace("\0", "6"));
             }
@@ -401,13 +401,13 @@ public class LUTTools {
                 test.put("O=I0 ^ I1 + I2 ^ I3", "64'h6FF66FF66FF66FF6");
                 test.put("O=(I0 & I1) ^ (I2 & I3)", "64'h7888788878887888");
             }
-            
+
         }
     }
-    
+
     public static void main(String[] args) {
         Design d = new Design("test_design",Device.PYNQ_Z1);
-        
+
         for (int k=1; k <= 6; k++) {
             String name = "fred_" + k;
             Cell c = d.createCell(name, Design.getUnisimCell(Unisim.valueOf("LUT" + k)));

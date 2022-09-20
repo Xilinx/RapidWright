@@ -1,25 +1,25 @@
-/* 
+/*
  * Original work: Copyright (c) 2010-2011 Brigham Young University
- * Modified work: Copyright (c) 2017-2022, Xilinx, Inc. 
+ * Modified work: Copyright (c) 2017-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
- *  
- * This file is part of RapidWright. 
- * 
+ *
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 package com.xilinx.rapidwright.util;
 
@@ -32,10 +32,10 @@ import java.io.UncheckedIOException;
  *
  */
 public class MessageGenerator{
-    
+
     /**
      * Used as a general way to create an error message and send it to
-     * std.err. Prints the stack trace from this point and exits the 
+     * std.err. Prints the stack trace from this point and exits the
      * program.
      * @param msg The message to print to standard error
      */
@@ -43,7 +43,7 @@ public class MessageGenerator{
         generalError(msg);
         System.exit(1);
     }
-    
+
     /**
      * Used as a general way to create an error message and send it to
      * std.err. Prints the stack trace from this point.
@@ -52,9 +52,9 @@ public class MessageGenerator{
     public static void generalError(String msg) {
         System.err.println(msg);
         Exception e = new Exception();
-        e.printStackTrace();        
+        e.printStackTrace();
     }
-    
+
     /**
      * Used as a general way to create an error message and send it to
      * std.err. Exits the program.
@@ -65,16 +65,16 @@ public class MessageGenerator{
         briefError(msg);
         System.exit(1);
     }
-    
+
     /**
      * Used as a general way to create an error message and send it to
-     * std.err. 
+     * std.err.
      * @param msg The message to print to standard error
      */
     public static void briefError(String msg) {
         System.err.println(msg);
     }
-    
+
     /**
      * Used as a general way to create a message and send it to
      * std.out. Exits the program with return value of 0.
@@ -85,16 +85,16 @@ public class MessageGenerator{
         briefMessage(msg);
         System.exit(0);
     }
-    
+
     /**
      * Used as a general way to create a message and send it to
-     * std.out. 
+     * std.out.
      * @param msg The message to print to standard out
      */
     public static void briefMessage(String msg) {
         System.out.println(msg);
     }
-    
+
     /**
      * Prompts the user to press any key to continue execution.
      */
@@ -102,7 +102,7 @@ public class MessageGenerator{
         System.out.print("Press Enter to continue...");
         waitOnAnyKeySilent();
     }
-    
+
     /**
      * Pauses execution until a key is pressed.
      */
@@ -114,12 +114,12 @@ public class MessageGenerator{
             e.printStackTrace();
         }
     }
-    
+
     /**
      * Creates a simple string from an array of objects.  This method
      * calls the toString() on each object in the array.
-     * @param objs The object to create a string from. 
-     * @return A string of all the objects toStrings() concatenated 
+     * @param objs The object to create a string from.
+     * @return A string of all the objects toStrings() concatenated
      * with spaces in between.
      */
     public static String createStringFromArray(Object[] objs) {
@@ -160,7 +160,7 @@ public class MessageGenerator{
         }
         return sb.toString();
     }
-    
+
     /**
      * This will prompt the user to type y or n to either continue
      * with a process or to exit.
@@ -186,7 +186,7 @@ public class MessageGenerator{
             throw new UncheckedIOException("Error reading user input", e);
         }
     }
-    
+
     /**
      * This will prompt the user to type y or n to either continue
      * with a process or to exit.
@@ -212,19 +212,19 @@ public class MessageGenerator{
             throw new UncheckedIOException("Error reading user input", e);
         }
     }
-    
+
     public static String formatString(String s1) {
         return String.format("%-35s\n", s1);
     }
-    
+
     public static String formatString(String s, float value) {
         return String.format("%-35s %10.2f\n", s, value);
     }
-    
+
     public static String formatString(String s, short value) {
         return String.format("%-35s %10d\n", s, value);
     }
-    
+
     public static String formatString(String s, boolean value) {
         return String.format("%-35s %10s\n", s, value);
     }
@@ -232,7 +232,7 @@ public class MessageGenerator{
     public static String formatString(String s, int value) {
         return String.format("%-35s %10d\n", s, value);
     }
-    
+
     public static String formatString(String s, long value) {
         return String.format("%-35s %10d\n", s, value);
     }

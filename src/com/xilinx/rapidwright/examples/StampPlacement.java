@@ -1,26 +1,26 @@
-/* 
- * Copyright (c) 2019-2022, Xilinx, Inc. 
+/*
+ * Copyright (c) 2019-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
- *  
- * This file is part of RapidWright. 
- * 
+ *
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
- 
+
 package com.xilinx.rapidwright.examples;
 
 import java.io.File;
@@ -56,7 +56,7 @@ public class StampPlacement {
                 dcpFileNames.add(f.getName());
             }
         }
-        
+
         int i=0;
         Module[] stamps = new Module[dcpFileNames.size()];
         for (String fileName : StringTools.naturalSort(dcpFileNames)) {
@@ -67,7 +67,7 @@ public class StampPlacement {
         }
         return stamps;
     }
-    
+
     public static Map<Integer,HashMap<String,Site>> loadPlacementDirectives(Device device, Map<Integer,Module> stamps, String placementDirectionFile) {
         Map<Integer, HashMap<String,Site>> placementDirectives = new HashMap<Integer,HashMap<String,Site>>();
         // Parse the stamp direction file
@@ -99,11 +99,11 @@ public class StampPlacement {
             }
             String instName = tokens[2];
             placementDirectives.get(stampIdx).put(instName, placement);
-        }        
-        
+        }
+
         return placementDirectives;
     }
-    
+
     public static void main(String[] args) {
         if (args.length != 3) {
             System.out.println("USAGE: <input.dcp> <stamp_direction_file> <output.dcp>\n");
@@ -112,18 +112,18 @@ public class StampPlacement {
             System.out.println("    <stamp_index> <set anchor site> <desired anchor site placement> <hierarchical cell instance name>");
             return;
         }
-        
-        CodePerfTracker t = new CodePerfTracker("Stamp-based Placement", true);        
-        
+
+        CodePerfTracker t = new CodePerfTracker("Stamp-based Placement", true);
+
         t.start("Read starting design");
-        
+
         Design design = Design.readCheckpoint(args[0], CodePerfTracker.SILENT);
         Device device = design.getDevice();
-        
+
         for (Net net : design.getNets()) {
             if (net.isClockNet()) net.unroute();
         }
-        
+
         t.stop().start("Load stamp DCPs");
 
         Map<Integer,Module> stamps = new HashMap<>();
@@ -134,17 +134,17 @@ public class StampPlacement {
         for (Entry<Integer,Module> e : stamps.entrySet()) {
             DesignTools.stampPlacement(design, e.getValue(), placementDirectives.get(e.getKey()));
         }
-        
+
         t.stop().start("Writing stamped design");
-        
+
         // Unlock cells by default
         for (Cell c: design.getCells()) {
             c.setBELFixed(false);
             c.setSiteFixed(false);
         }
-        
+
         design.writeCheckpoint(args[2], CodePerfTracker.SILENT);
-        
+
         t.stop().printSummary();
     }
 }

@@ -1,26 +1,26 @@
-/* 
- * Copyright (c) 2021-2022, Xilinx, Inc. 
+/*
+ * Copyright (c) 2021-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
- *  
- * This file is part of RapidWright. 
- * 
+ *
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
- 
+
 package com.xilinx.rapidwright.design;
 
 import java.nio.file.Path;
@@ -48,13 +48,13 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestDesignTools {
 
-    private Pair<String,String> inputSiteWire1 = new Pair<>("SLICE_X16Y238","A2"); 
-    
+    private Pair<String,String> inputSiteWire1 = new Pair<>("SLICE_X16Y238","A2");
+
     private Pair<String,String> inputSiteWire2 = new Pair<>("SLICE_X13Y237","F5");
-    
+
     private Map<Pair<String,String>,String> mimicInContextInputPortNetSiteRouting(Design design) {
         Map<Pair<String,String>,String> initialState = new HashMap<>();
-        
+
         for (Pair<String,String> siteWire : Arrays.asList(inputSiteWire1, inputSiteWire2)) {
             SiteInst i = design.getSiteInstFromSiteName(siteWire.getFirst());
             Net net = i.getNetFromSiteWire(siteWire.getSecond());
@@ -63,10 +63,10 @@ public class TestDesignTools {
             i.unrouteIntraSiteNet(pin, pin);
             i.routeIntraSiteNet(design.getVccNet(), pin, pin);
         }
-        
+
         return initialState;
     }
-    
+
     @Test
     public void testResolveSiteRoutingFromInContextPorts() {
         String dcpPath = RapidWrightDCP.getString("picoblaze_ooc_X10Y235.dcp");
@@ -74,42 +74,42 @@ public class TestDesignTools {
 
         // Convert DCP to introduce test scenario
         Map<Pair<String,String>,String> initialSiteRoutes = mimicInContextInputPortNetSiteRouting(design);
-        
+
         DesignTools.resolveSiteRoutingFromInContextPorts(design);
-        
+
         for (Entry<Pair<String,String>,String> e : initialSiteRoutes.entrySet()) {
             SiteInst i = design.getSiteInstFromSiteName(e.getKey().getFirst());
             Net net = i.getNetFromSiteWire(e.getKey().getSecond());
             Assertions.assertEquals(net.getName(), e.getValue());
         }
     }
-    
+
     @Test
     public void testCopyImplementationRouteThruVCCPinCheck() {
         String dcpPath = RapidWrightDCP.getString("bnn.dcp");
         Design srcDesign = Design.readCheckpoint(dcpPath);
         Design dstDesign = Design.readCheckpoint(dcpPath, true);
         DesignTools.copyImplementation(srcDesign, dstDesign, "bd_0_i/hls_inst/inst");
-        
+
         SiteInst srcSiteInst = srcDesign.getSiteInstFromSiteName("SLICE_X73Y155");
         SiteInst dstSiteInst = dstDesign.getSiteInstFromSiteName(srcSiteInst.getSiteName());
         List<Pair<String,Boolean>> routeThrus = new ArrayList<>();
         routeThrus.add(new Pair<>("A6LUT", true)); // It has VCC pin
         routeThrus.add(new Pair<>("B6LUT", false)); // It does not have a VCC pin
-        
+
         for (Pair<String, Boolean> routeThru : routeThrus) {
             Cell rtCell = dstSiteInst.getCell(routeThru.getFirst());
             Assertions.assertTrue(rtCell.isRoutethru());
             String siteWireName = rtCell.getBEL().getPin("A6").getSiteWireName();
-            
+
             Assertions.assertEquals(srcSiteInst.getNetFromSiteWire(siteWireName).getName(),
                                     dstSiteInst.getNetFromSiteWire(siteWireName).getName());
-            
+
             if (routeThru.getSecond()) {
-                Assertions.assertEquals(dstSiteInst.getNetFromSiteWire(siteWireName), 
+                Assertions.assertEquals(dstSiteInst.getNetFromSiteWire(siteWireName),
                                         dstDesign.getVccNet());
             } else {
-                Assertions.assertNotEquals(dstSiteInst.getNetFromSiteWire(siteWireName), 
+                Assertions.assertNotEquals(dstSiteInst.getNetFromSiteWire(siteWireName),
                                         dstDesign.getVccNet());
             }
         }
@@ -189,7 +189,7 @@ public class TestDesignTools {
             if (placedCellsInBlackBox.contains(cell.getName())) continue;
             allOtherPlacedCells.add(cell.getName());
         }
-        
+
         DesignTools.makeBlackBox(design, hierCellName);
         Assertions.assertTrue(design.getNetlist().getCellInstFromHierName(hierCellName).isBlackBox());
         for (String cellName : placedCellsInBlackBox) {
@@ -217,7 +217,7 @@ public class TestDesignTools {
                 "INT_X24Y92/INT.BYPASS_E3->>INT_NODE_IMUX_12_INT_OUT1",
                 "INT_X24Y92/INT.INT_NODE_IMUX_12_INT_OUT1->>BYPASS_E7",               // D_I input pin
         });
-        
+
         SiteInst si = design.createSiteInst("SLICE_X38Y92");
         net.createPin("DQ2", si);
         net.createPin("D_I", si);
@@ -312,10 +312,10 @@ public class TestDesignTools {
     @ValueSource(booleans = {true, false})
     public void testRemoveSourcePin(boolean useUnroutePins) {
         Design design = new Design("test", Device.KCU105);
-        
+
         // Net with one source (AQ2) and two sinks (A_I & FX) and a stub (INT_NODE_IMUX_71_INT_OUT)
         Net net1 = createTestNet(design, "net1", new String[]{
-                // Translocated from example in 
+                // Translocated from example in
                 // https://github.com/Xilinx/RapidWright/pull/475#issuecomment-1188337848
                 "INT_X63Y21/INT.LOGIC_OUTS_E12->>INT_NODE_SINGLE_DOUBLE_76_INT_OUT",
                 "INT_X63Y21/INT.INT_NODE_SINGLE_DOUBLE_76_INT_OUT->>SS2_E_BEG3",
@@ -330,7 +330,7 @@ public class TestDesignTools {
                 "INT_X63Y21/INT.INT_NODE_IMUX_16_INT_OUT->>BOUNCE_E_14_FTN",
                 "INT_X63Y21/INT.INT_NODE_IMUX_16_INT_OUT->>BYPASS_E13"
         });
-        
+
         SiteInst si = design.createSiteInst(design.getDevice().getSite("SLICE_X97Y21"));
         net1.createPin("AQ2", si).setRouted(true);
         net1.createPin("A_I", si).setRouted(true);
@@ -342,15 +342,15 @@ public class TestDesignTools {
             Assertions.assertFalse(pin.isRouted());
         }
 
-        
+
         // Net with one output (HMUX) and one input (SRST_B2)
         Net net2 = createTestNet(design, "net2", new String[]{
-            "INT_X42Y158/INT.LOGIC_OUTS_E16->>INT_NODE_SINGLE_DOUBLE_46_INT_OUT", 
-            "INT_X42Y158/INT.INT_NODE_SINGLE_DOUBLE_46_INT_OUT->>INT_INT_SINGLE_51_INT_OUT", 
-            "INT_X42Y158/INT.INT_INT_SINGLE_51_INT_OUT->>INT_NODE_GLOBAL_3_OUT1", 
+            "INT_X42Y158/INT.LOGIC_OUTS_E16->>INT_NODE_SINGLE_DOUBLE_46_INT_OUT",
+            "INT_X42Y158/INT.INT_NODE_SINGLE_DOUBLE_46_INT_OUT->>INT_INT_SINGLE_51_INT_OUT",
+            "INT_X42Y158/INT.INT_INT_SINGLE_51_INT_OUT->>INT_NODE_GLOBAL_3_OUT1",
             "INT_X42Y158/INT.INT_NODE_GLOBAL_3_OUT1->>CTRL_W_B7"
         });
-        
+
         si = design.createSiteInst(design.getDevice().getSite("SLICE_X65Y158"));
         net2.createPin("HMUX", si).setRouted(true);
         si = design.createSiteInst(design.getDevice().getSite("SLICE_X64Y158"));
@@ -366,8 +366,8 @@ public class TestDesignTools {
         net2.removePin(net2.getPins().get(0));
         design.removeSiteInst(design.getSiteInstFromSiteName("SLICE_X65Y158"));
         design.removeSiteInst(design.getSiteInstFromSiteName("SLICE_X64Y158"));
-        
-        
+
+
         // Net with two outputs (HMUX primary and H_O alternate) and two sinks (SRST_B2 & B2)
         Net net3 = createTestNet(design, "net3", new String[]{
             // SLICE_X65Y158/HMUX-> SLICE_X64Y158/SRST_B2

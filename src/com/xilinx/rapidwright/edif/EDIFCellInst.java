@@ -1,28 +1,28 @@
 /*
- * 
- * Copyright (c) 2017-2022, Xilinx, Inc. 
+ *
+ * Copyright (c) 2017-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
  *
- * This file is part of RapidWright. 
- * 
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 /**
- * 
+ *
  */
 package com.xilinx.rapidwright.edif;
 
@@ -38,38 +38,38 @@ import java.util.Objects;
 /**
  * A cell instance in a logical (EDIF) netlist.  Instantiates
  * an {@link EDIFCell}.
- * 
+ *
  * Created on: May 11, 2017
  */
 public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
-    
+
     private EDIFCell parentCell;
-    
+
     private EDIFCell cellType;
-    
+
     private EDIFName viewref;
-    
+
     public static final EDIFName DEFAULT_VIEWREF = EDIFCell.DEFAULT_VIEW;
 
     public static final String BLACK_BOX_PROP = "IS_IMPORTED";
     public static final String BLACK_BOX_PROP_VERSAL = "black_box";
-    
+
     private EDIFPortInstList portInsts;
 
     protected EDIFCellInst() {
-        
+
     }
-    
+
     public EDIFCellInst(String name, EDIFCell cellType, EDIFCell parentCell) {
         super(name);
         setCellType(cellType);
         if (parentCell != null) parentCell.addCellInst(this);
         setViewref(cellType != null ? cellType.getEDIFView() : DEFAULT_VIEWREF);
     }
-    
+
     /**
-     * Copy constructor.  Creates new objects except portInsts. 
-     * @param inst Prototype instance to copy 
+     * Copy constructor.  Creates new objects except portInsts.
+     * @param inst Prototype instance to copy
      */
     public EDIFCellInst(EDIFCellInst inst, EDIFCell parentCell) {
         super((EDIFPropertyObject)inst);
@@ -77,7 +77,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
         this.cellType = inst.cellType;
         setViewref(new EDIFName(inst.viewref));
     }
-    
+
     /**
      * @return the viewref
      */
@@ -91,11 +91,11 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
     public void setViewref(EDIFName viewref) {
         this.viewref = EDIFCell.DEFAULT_VIEW.equals(viewref) ? EDIFCell.DEFAULT_VIEW : viewref;
     }
-    
+
     /**
      * Creates a new map of all the EDIFPortInst objects stored on this EDIFCellInst.  The new map
-     * contains a copy of EDIFPortInsts available at the time of invocation as returned from 
-     * {@link #getPortInstList()}.      
+     * contains a copy of EDIFPortInsts available at the time of invocation as returned from
+     * {@link #getPortInstList()}.
      * @return A map of EDIFPortInst names ({@link EDIFPortInst#getName()} to the corresponding objects.
      * @deprecated
      */
@@ -107,7 +107,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
         }
         return map;
     }
-    
+
     /**
      * Adds a new EDIFPortInst to this cell instance. The port instances
      * are stored in a sorted ArrayList, so worst case is O(n).
@@ -120,7 +120,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
                 epr.getFullName()+"' being added to EDIFCellInst " + toString());
         portInsts.add(epr);
     }
-    
+
     /**
      * Removes the provided port instance from the cell instance, if it exists.  The port instances
      * are stored in a sorted ArrayList, so worst case is O(n).
@@ -131,7 +131,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
         if (portInsts == null) return null;
         return portInsts.remove(epr);
     }
-    
+
     /**
      * Removes the named port instance from the cell instance, if it exists. The port instances
      * are stored in a sorted ArrayList, so worst case is O(n).
@@ -142,20 +142,20 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
         if (portInsts == null) return null;
         return portInsts.remove(this, portName);
     }
-    
+
     /**
-     * Gets the port instance on this cell by pin name ({@link EDIFPortInst#getName()}). The port 
+     * Gets the port instance on this cell by pin name ({@link EDIFPortInst#getName()}). The port
      * instances are stored in a sorted ArrayList, so worst case is O(log n).
-     * @param name Name of the port instance to get. 
-     * @return The named port instance, or null if none found by that name. 
+     * @param name Name of the port instance to get.
+     * @return The named port instance, or null if none found by that name.
      */
     public EDIFPortInst getPortInst(String name) {
         if (portInsts == null) return null;
         return portInsts.get(this, name);
     }
-    
+
     /**
-     * Gets the port on the underlying cell type.  It is the same as 
+     * Gets the port on the underlying cell type.  It is the same as
      * calling getCellType().getPort(name).
      * @param name Name of the port to get.
      * @return The port on the underlying cell type.
@@ -163,7 +163,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
     public EDIFPort getPort(String name) {
         return getCellType().getPort(name);
     }
-    
+
     /**
      * Gets the sorted ArrayList of EDIFPortInsts on this cell instance as a collection.
      * @return The collection of EDIFPortInsts on this cell.
@@ -171,7 +171,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
     public Collection<EDIFPortInst> getPortInsts() {
         return portInsts == null ? Collections.emptyList() : portInsts;
     }
-    
+
     /**
      * @return the parentCell
      */
@@ -197,7 +197,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
     public Collection<EDIFPort> getCellPorts() {
         return cellType.getPorts();
     }
-    
+
     public String getCellName() {
         return cellType.getName();
     }
@@ -233,13 +233,13 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
     public void updateCellType(EDIFCell cellType) {
         setCellType(cellType);
     }
-    
+
     public boolean isBlackBox() {
         EDIFPropertyValue val = getProperty(BLACK_BOX_PROP);
-        if (val != null && val.getValue().toLowerCase().equals("true")) 
+        if (val != null && val.getValue().toLowerCase().equals("true"))
             return true;
         val = getProperty(BLACK_BOX_PROP_VERSAL);
-        if (val != null && val.getValue().toLowerCase().equals("1")) 
+        if (val != null && val.getValue().toLowerCase().equals("1"))
             return true;
         return false;
     }
@@ -285,7 +285,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
             return false;
         EDIFCellInst that = (EDIFCellInst) o;
 
-        
+
         if (!Objects.equals(parentCell,that.parentCell))
             return false;
 

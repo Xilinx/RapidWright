@@ -37,9 +37,9 @@ public class Move<ModuleInstT extends AbstractModuleInst<?,?,?>, PlacementT> {
 
     PlacementT site1;
     PlacementT site1Previous;
-    
+
     private ModuleInstT block0;
-    
+
     private ModuleInstT block1;
     private int deltaCost;
 
@@ -48,7 +48,7 @@ public class Move<ModuleInstT extends AbstractModuleInst<?,?,?>, PlacementT> {
 
         this.placer = placer;
     }
-    
+
     public Move(PlacementT site0, PlacementT site1, ModuleInstT block0, ModuleInstT block1, AbstractBlockPlacer<ModuleInstT, PlacementT> placer) {
         this.placer = placer;
         this.site0 = site0;
@@ -67,7 +67,7 @@ public class Move<ModuleInstT extends AbstractModuleInst<?,?,?>, PlacementT> {
     public void setMove(PlacementT site0, PlacementT site1, ModuleInstT block0, ModuleInstT block1) {
         setMove(site0, site1, block0, block1, site1);
     }
-    
+
     public void undoMove() {
         if (getBlock0() != null) placer.setTempAnchorSite(getBlock0(), site0);
         if (getBlock1() != null) placer.setTempAnchorSite(getBlock1(), site1Previous != null ? site1Previous : site1);

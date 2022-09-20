@@ -41,7 +41,7 @@ public enum ChannelType {
         for (ChannelType e : values()) {
             map.put(e.toString(), e);
         }
-    }    
+    }
 
     private final String nc;
 

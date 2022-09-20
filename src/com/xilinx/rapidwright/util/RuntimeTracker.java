@@ -1,25 +1,25 @@
 /*
- * 
- * Copyright (c) 2021 Ghent University. 
+ *
+ * Copyright (c) 2021 Ghent University.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Yun Zhou, Ghent University.
  *
- * This file is part of RapidWright. 
- * 
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 
 package com.xilinx.rapidwright.util;
@@ -29,8 +29,8 @@ import java.util.Iterator;
 import java.util.List;
 
 /**
- * A customized RuntimeTracker class, providing start and stop methods for recording total elapsed time of a process. 
- * Each {@link RuntimeTracker} Object should be created at least with a name. 
+ * A customized RuntimeTracker class, providing start and stop methods for recording total elapsed time of a process.
+ * Each {@link RuntimeTracker} Object should be created at least with a name.
  * It also supports a user case of {@link RuntimeTrackerTree} instance for runtime analysis of an entire program.
  */
 public class RuntimeTracker {
@@ -39,12 +39,12 @@ public class RuntimeTracker {
     private long start;
     private short level;
     private List<RuntimeTracker> children;
-    
+
     public RuntimeTracker(String name) {
         this.name = name + ":";
         this.time = 0;
     }
-    
+
     public RuntimeTracker(String name, short level) {
         this.name = name + ":";
         this.time = 0;
@@ -91,18 +91,18 @@ public class RuntimeTracker {
             }
         }
     }
-    
+
     public void start() {
         this.start = System.nanoTime();
     }
-    
+
     /**
      * Stops the runtime tracker and stores the total time elapsed in nanoseconds.
      */
     public void stop() {
         this.time += System.nanoTime() - this.start;
     }
-    
+
     /**
      * Sets the total time.
      * @param time
@@ -111,7 +111,7 @@ public class RuntimeTracker {
         if (time < 0) time = 0;
         this.time = time;
     }
-    
+
     /**
      * Gets the total time elapsed in nanoseconds.
      * @return The total time elapsed in nanoseconds.
@@ -119,7 +119,7 @@ public class RuntimeTracker {
     public long getTime() {
         return this.time;
     }
-    
+
     /**
      * Gets the runtime tracker name.
      * @return The runtime tracker name.
@@ -127,12 +127,12 @@ public class RuntimeTracker {
     public String getName() {
         return name;
     }
-    
+
     @Override
     public int hashCode() {
         return name.hashCode();
     }
-    
+
     private String spaces(int length) {
         StringBuilder s = new StringBuilder();
         for (int i = 0; i < length; i++) {
@@ -140,7 +140,7 @@ public class RuntimeTracker {
         }
         return s.toString();
     }
-    
+
     @Override
     public String toString() {
         if (this.getLevel() == 0) {
@@ -152,9 +152,9 @@ public class RuntimeTracker {
         if (length < 0) length = 0;
         return this.name.replace(":", ":" + spaces(length) + String.format("%9.2fs\n", this.getTime()*1e-9));
     }
-    
+
     /**
-     * Returns a string that represents the full hierarchy of a runtime tracker, 
+     * Returns a string that represents the full hierarchy of a runtime tracker,
      * including all the downhill runtime trackers to the leaf runtime trackers.
      * @return
      */
@@ -163,7 +163,7 @@ public class RuntimeTracker {
         appendFullHierarchy(buffer, "", "");
         return buffer.toString();
     }
-    
+
     private void appendFullHierarchy(StringBuilder buffer, String prefix, String childPrefix) {
         buffer.append(prefix);
         buffer.append(this.toString());
@@ -178,7 +178,7 @@ public class RuntimeTracker {
             }
         }
     }
-    
+
     /**
      * Returns a string representing a runtime tracker and its child trackers.
      * @return
@@ -196,5 +196,5 @@ public class RuntimeTracker {
         }
         return buffer.toString();
     }
-    
+
 }

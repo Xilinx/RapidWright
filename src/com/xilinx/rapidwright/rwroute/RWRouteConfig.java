@@ -1,25 +1,25 @@
 /*
- * 
- * Copyright (c) 2021 Ghent University. 
+ *
+ * Copyright (c) 2021 Ghent University.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Yun Zhou, Ghent University.
  *
- * This file is part of RapidWright. 
- * 
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 
 package com.xilinx.rapidwright.rwroute;
@@ -61,9 +61,9 @@ public class RWRouteConfig {
     /** The maximum percentage of critical connections to be rerouted */
     private short reroutePercentage;
     /** Initial present congestion penalty factor */
-    private float initialPresentCongestionFactor; 
+    private float initialPresentCongestionFactor;
     /** The multiplier factor for present congestion update */
-    private float presentCongestionMultiplier; 
+    private float presentCongestionMultiplier;
     /** Historical congestion penalty factor */
     private float historicalCongestionFactor;
     /** true to enable timing-aware routing */
@@ -92,7 +92,7 @@ public class RWRouteConfig {
     private boolean resolveConflictNets;
     /** A keyword to help recognize the target conflict nets */
     private String anchorNameKeyword;
-    
+
     /** Constructs a Configuration Object */
     public RWRouteConfig(String[] arguments) {
         maxIterations = (short) 100;
@@ -246,7 +246,7 @@ public class RWRouteConfig {
             }
         }
     }
-    
+
     /**
      * Gets the allowed maximum number of routing iterations.
      * Default: 100
@@ -255,10 +255,10 @@ public class RWRouteConfig {
     public short getMaxIterations() {
         return maxIterations;
     }
-    
+
     /**
      * Sets the maximum number of routing iterations.
-     * Default: 100. 100 iterations should be enough for most routing cases. 
+     * Default: 100. 100 iterations should be enough for most routing cases.
      * Otherwise, it is not promising that a design can be successfully routed.
      * To modify the value, please use "--maxIterations" option, e.g. "--maxIterations 60".
      * @param maxIterations The maximum number of routing iterations.
@@ -266,8 +266,8 @@ public class RWRouteConfig {
     public void setMaxIterations(short maxIterations) {
         this.maxIterations = maxIterations;
     }
-    
-    /** 
+
+    /**
      * Checks if the routing bounding box constraint is used.
      * Default: true. To disable the bounding box constraint, please add "--noBoundingBox" to the arguments.
      * @return true, if the routing bounding box constraint is used.
@@ -275,7 +275,7 @@ public class RWRouteConfig {
     public boolean isUseBoundingBox() {
         return useBoundingBox;
     }
-    
+
     /**
      * Sets if the router should route connections with the routing bounding box constraint.
      * Default: true. To disable the bounding box constraint, please add "--noBoundingBox" option to the arguments.
@@ -302,7 +302,7 @@ public class RWRouteConfig {
     public void setBoundingBoxExtensionX(short boundingBoxExtensionX) {
         this.boundingBoxExtensionX = boundingBoxExtensionX;
     }
-    
+
     /**
      * Gets the initial bounding box extension range in the vertical direction.
      * Default: 15. Can be modified by using use "--boundingBoxExtensionY" option, e.g. "--boundingBoxExtensionY 5".
@@ -323,8 +323,8 @@ public class RWRouteConfig {
 
     /**
      * Checks if the bounding boxes of connections would be expanded during routing.
-     * Enlarging bounding boxes of connections helps resolve routability problems for some scenarios, 
-     * such as partial routing and very congested placement of designs. 
+     * Enlarging bounding boxes of connections helps resolve routability problems for some scenarios,
+     * such as partial routing and very congested placement of designs.
      * Default: false for full routing, true for partial routing.
      * To enable enlarging bounding boxes, please add "--enlargeBoundingBox" to the arguments.
      * @return true, if enlarging bounding boxes of connections is allowed.
@@ -335,8 +335,8 @@ public class RWRouteConfig {
 
     /**
      * Sets enlargeBoundingBox.
-     * Enlarging bounding boxes of connections helps resolve routability problems for some scenarios, 
-     * such as partial routing and very congested designs. 
+     * Enlarging bounding boxes of connections helps resolve routability problems for some scenarios,
+     * such as partial routing and very congested designs.
      * Default: false for full routing, true for partial routing.
      * To enable enlarging bounding boxes, please add "--enlargeBoundingBox" to the arguments.
      * @param enlargeBoundingBox A flag to indicate if connections' bounding boxes are allowed to be enlarged for routing.
@@ -375,7 +375,7 @@ public class RWRouteConfig {
     /**
      * Sets the extension increment that connections' bounding boxes should be enlarged by horizontally.
      * Default: 1. Can be modified by using "--extensionXIncrement" option, e.g. "--extensionXIncrement 2".
-     * @param extensionXIncrement The number of INT Tiles that connections' bounding boxes should be enlarged by horizontally. 
+     * @param extensionXIncrement The number of INT Tiles that connections' bounding boxes should be enlarged by horizontally.
      */
     public void setExtensionXIncrement(short extensionXIncrement) {
         this.extensionXIncrement = extensionXIncrement;
@@ -471,8 +471,8 @@ public class RWRouteConfig {
     }
 
     /**
-     * Gets the criticality exponent that is used in calculating connections' criticalities to 
-     * spread the criticalities of less critical connections and more critical connections apart. 
+     * Gets the criticality exponent that is used in calculating connections' criticalities to
+     * spread the criticalities of less critical connections and more critical connections apart.
      * It should be greater than 1. Default: 3.
      * Can be modified by using "--criticalityExponent" option, e.g. "--criticalityExponent 5".
      * @return The criticality exponent.
@@ -482,8 +482,8 @@ public class RWRouteConfig {
     }
 
     /**
-     * Sets the criticality exponent that is used in calculating connections' criticalities to 
-     * spread the criticalities of less critical connections and more critical connections apart. 
+     * Sets the criticality exponent that is used in calculating connections' criticalities to
+     * spread the criticalities of less critical connections and more critical connections apart.
      * It should be greater than 1. Default: 3.
      * Can be modified by using "--criticalityExponent" option, e.g. "--criticalityExponent 5".
      * @param criticalityExponent
@@ -495,8 +495,8 @@ public class RWRouteConfig {
     }
 
     /**
-     * Gets the criticality threshold for re-routing critical connections. 
-     * It should be within (0.5, 0.99). A greater value means less critical connections to be ripped up and re-routed. 
+     * Gets the criticality threshold for re-routing critical connections.
+     * It should be within (0.5, 0.99). A greater value means less critical connections to be ripped up and re-routed.
      * Default: 0.85. Can be modified by using "--minRerouteCriticality" option, e.g. "--minRerouteCriticality 0.9".
      * @return
      */
@@ -505,8 +505,8 @@ public class RWRouteConfig {
     }
 
     /**
-     * Sets the criticality threshold for re-routing critical connections. 
-     * It should be within (0.5, 0.99). A greater value means less critical connections to be ripped up and re-routed. 
+     * Sets the criticality threshold for re-routing critical connections.
+     * It should be within (0.5, 0.99). A greater value means less critical connections to be ripped up and re-routed.
      * Default: 0.85. Can be modified by using "--minRerouteCriticality" option, e.g. "--minRerouteCriticality 0.9".
      * @param minRerouteCriticality
      */
@@ -533,7 +533,7 @@ public class RWRouteConfig {
      * @param reroutePercentage
      */
     public void setReroutePercentage(short reroutePercentage) {
-        if (reroutePercentage < 0) 
+        if (reroutePercentage < 0)
             throw new IllegalArgumentException("ERROR: reroutePercentage cannot be negative.");
         this.reroutePercentage = reroutePercentage;
     }
@@ -616,7 +616,7 @@ public class RWRouteConfig {
 
     /**
      * Sets timingDriven.
-     * Default: true. 
+     * Default: true.
      * For wirelength-driven routing only, please use "--nonTimingDriven" option to disable timing-driven routing.
      * @param timingDriven
      */
@@ -638,7 +638,7 @@ public class RWRouteConfig {
      * Sets partial routing.
      * In the partial routing mode, nets that are already routed will be preserved and the router routes unrouted nets only.
      * Default: false. For partial routing, please add "--partialRouting" to the arguments.
-     * @param partialRouting 
+     * @param partialRouting
      */
     public void setPartialRouting(boolean partialRouting) {
         this.partialRouting = partialRouting;
@@ -759,7 +759,7 @@ public class RWRouteConfig {
      * Sets critical path delay pessimism factor b.
      * It should be greater than 0. Default: 100.
      * Can be modified by using "--pessimismB" option, e.g. "--pessimismB 50".
-     * @param pessimismB 
+     * @param pessimismB
      */
     public void setPessimismB(short pessimismB) {
         if (pessimismB < 0)
@@ -769,7 +769,7 @@ public class RWRouteConfig {
 
     /**
      * Checks if nodes cross RCLK are masked.
-     * If should be set to true for full timing-driven routing to avoid delay optimism and false for partial timing-driven routing for routability. 
+     * If should be set to true for full timing-driven routing to avoid delay optimism and false for partial timing-driven routing for routability.
      * Default: false. Can be modified by adding "--maskNodesCrossRCLK" to the arguments.
      * @return true, if nodes cross RCLK are masked
      */
@@ -779,7 +779,7 @@ public class RWRouteConfig {
 
     /**
      * Sets maskNodesCrossRCLK.
-     * If should be set to true for full timing-driven routing to avoid delay optimism and false for partial timing-driven routing for routability. 
+     * If should be set to true for full timing-driven routing to avoid delay optimism and false for partial timing-driven routing for routability.
      * Default: false. Can be modified by adding "--maskNodesCrossRCLK" to the arguments.
      * @param maskNodesCrossRCLK A flag to indicate if masking nodes cross RCLK.
      */
@@ -814,7 +814,7 @@ public class RWRouteConfig {
     }
 
     /**
-     * Checks if verbose is enabled. 
+     * Checks if verbose is enabled.
      * If enabled, there will be more info in the routing log file regarding design netlist, routing statistics, and timing report.
      * Default: false. Can be modified by adding "--verbose" to the arguments.
      * @return true, if verbose is enabled.
@@ -872,7 +872,7 @@ public class RWRouteConfig {
     public void setResolveConflictNets(boolean resolveConflictNets) {
         this.resolveConflictNets = resolveConflictNets;
     }
-    
+
     /**
      * Gets the keyword to help recognize the routing targets.
      * Default: q0_reg, which is customized for the RapidStream flow.
@@ -925,7 +925,7 @@ public class RWRouteConfig {
         s.append(MessageGenerator.formatString("Initial present congestion factor: ", initialPresentCongestionFactor));
         s.append(MessageGenerator.formatString("Present congestion multiplier: ", presentCongestionMultiplier));
         s.append(MessageGenerator.formatString("Historical congestion factor ", historicalCongestionFactor));
-        
+
         return s.toString();
     }
 }

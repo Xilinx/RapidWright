@@ -52,16 +52,16 @@ public class TimingManager {
     private Device device;
 
     public static final int BUILD_GRAPH_PATHS_DEFAULT_PARAM = 1; // use 0 instead for all paths
-    
+
     public RuntimeTrackerTree routerTimer;
     private boolean verbose;
-    
+
     private short timingRequirement;
     private float pessimismA = (float) 1.03;
     private float pessimismB = 100;
-    
+
     /**
-     * Default constructor: creates the TimingManager object, which the user needs to create for 
+     * Default constructor: creates the TimingManager object, which the user needs to create for
      * using our TimingModel, and then it builds the model.
      * @param design RapidWright Design object.
      */
@@ -70,10 +70,10 @@ public class TimingManager {
     }
 
     /**
-     * Alternate constructor for creating the objects for the TimingModel, but with the choice to 
+     * Alternate constructor for creating the objects for the TimingModel, but with the choice to
      * not build the model yet.
      * @param design RapidWright Design object.
-     * @param doBuild Whether to go ahead and build the model now.  For example, a user might not 
+     * @param doBuild Whether to go ahead and build the model now.  For example, a user might not
      * want to build the TimingGraph yet.
      */
     public TimingManager(Design design, boolean doBuild) {
@@ -87,7 +87,7 @@ public class TimingManager {
         if (doBuild)
             build(false, this.design.getNets());
     }
-    
+
     public TimingManager(Design design, boolean doBuild, RuntimeTrackerTree timer, RWRouteConfig config, ClkRouteTiming clkTiming, Collection<Net> targetNets) {
         this.design = design;
         this.setTimingRequirement();
@@ -103,7 +103,7 @@ public class TimingManager {
         if (doBuild)
             build(config.isPartialRouting(), targetNets);
     }
-    
+
     /**
      * Updates the delay of nets after the cycle removal and delay-aware path merging.
      * @param illegalNets {@link NetWrapper} instances in question.
@@ -125,7 +125,7 @@ public class TimingManager {
              }
          }
     }
-    
+
     /**
      * Patches up the delay of consecutive Long nodes for connections.
      * @param connections Connections in question.
@@ -144,21 +144,21 @@ public class TimingManager {
             connection.setDlyPatched(true);
         }
     }
-    
+
     /**
      * Calculates and returns the maximum arrival time and the associated TimingVertex
      */
     public Pair<Float, TimingVertex> calculateArrivalRequireTimes() {
         Pair<Float, TimingVertex> maxs;
-        
+
         this.timingGraph.resetRequiredAndArrivalTime();
         this.timingGraph.computeArrivalTimesTopologicalOrder();
         maxs = this.timingGraph.getMaxDelay();
         this.timingGraph.setTimingRequirementTopologicalOrder(maxs.getFirst());
-        
+
         return maxs;
     }
-    
+
     /**
      * Sets critical path delay pessimism factors.
      */
@@ -170,7 +170,7 @@ public class TimingManager {
             pessimismB = b;
         }
     }
-    
+
     public void getCriticalPathInfo(Pair<Float, TimingVertex> maxDelayTimingVertex, boolean useRoutable, Map<Node, Routable> rnodesCreated) {
         TimingVertex maxV = maxDelayTimingVertex.getSecond();
         float maxDelay = maxDelayTimingVertex.getFirst();
@@ -187,10 +187,10 @@ public class TimingManager {
         short adjusted = (short) (pessimismA * (arr - criticalEdges.get(0).getDelay() - clkskew) + pessimismB);
         System.out.printf(MessageGenerator.formatString("Critical path delay (ps):", (short)adjusted));
         System.out.printf(MessageGenerator.formatString("Slack (ps):", (short) (timingRequirement - adjusted)));
-        
+
         this.printPathDelayBreakDown(arr, criticalEdges, this.timingGraph.getTimingEdgeConnectionMap(), useRoutable, rnodesCreated);
     }
-    
+
     /**
      * Gets and prints the given path from the TimingGraph
      */
@@ -203,7 +203,7 @@ public class TimingManager {
         System.out.println("Total delay: " + totalDelay);
         this.printPathDelayBreakDown(totalDelay, edges, timingEdgeConnctionMap, routableBased, rnodesCreated);
     }
-    
+
     private void printPathDelayBreakDown(short arr, List<TimingEdge> criticalEdges, Map<TimingEdge, Connection> timingEdgeConnctionMap, boolean useRoutable, Map<Node, Routable> rnodesCreated) {
         if (verbose) {
             System.out.println("\nTimingEdges:");
@@ -238,7 +238,7 @@ public class TimingManager {
             System.out.println();
         }
     }
-    
+
     private void printTimingPathInTable(List<TimingEdge> path, short arr) {
         System.out.println("\nDetail delays:");
         System.out.println("------------------------------------------------------------------------------");
@@ -265,18 +265,18 @@ public class TimingManager {
         System.out.printf("%-38s  %10d\n", "Arrival time:", arr);
         System.out.println("------------------------------------------------------------------------------");
     }
-    
-    
+
+
     /**
      * Set the timing requirement of the design
      */
     public void setTimingRequirement() {
         timingRequirement = (short) (getDesignTimingRequirement(this.design) * 1000);
     }
-    
+
     public static float getDesignTimingRequirement(Design design) {
         float treq = 0;
-        
+
         ConstraintGroup[] constraintGroups = {ConstraintGroup.NORMAL, ConstraintGroup.LATE};
         //TODO CHECK which constraint to use. The maximum one as default?
         for (ConstraintGroup group : constraintGroups) {
@@ -288,10 +288,10 @@ public class TimingManager {
                 }
             }
         }
-        
+
         return treq;
     }
-    
+
     /**
      * Calculates criticality for each connection.
      * @param connections Connections in question.
@@ -319,11 +319,11 @@ public class TimingManager {
         if (this.routerTimer != null) this.routerTimer.createRuntimeTracker("build timing model", "Initialization").start();
         timingModel.build();
         if (this.routerTimer != null) this.routerTimer.getRuntimeTracker("build timing model").stop();
-        
+
         if (this.routerTimer != null) this.routerTimer.createRuntimeTracker("build timing graph", "Initialization").start();
         timingGraph.build(isPartialRouting, targetNets);
         if (this.routerTimer != null) this.routerTimer.getRuntimeTracker("build timing graph").stop();
-        
+
         return postBuild();
     }
 
@@ -359,7 +359,7 @@ public class TimingManager {
     public Design getDesign() {
         return design;
     }
-    
+
     /**
      * Gets the corresponding device used in creating this TimingManager.
      * @return Corresponding device used in creating this TimingManager.
@@ -367,10 +367,10 @@ public class TimingManager {
     public Device getDevice() {
         return device;
     }
-    
+
     public void setTimingEdgesOfConnections(List<Connection> connections) {
         this.timingGraph.setTimingEdgesOfConnections(connections);
     }
-    
-    
+
+
 }

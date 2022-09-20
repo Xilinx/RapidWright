@@ -1,25 +1,25 @@
 /*
- * 
- * Copyright (c) 2018-2022, Xilinx, Inc. 
+ *
+ * Copyright (c) 2018-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
  *
- * This file is part of RapidWright. 
- * 
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 
 package com.xilinx.rapidwright.examples;
@@ -63,20 +63,20 @@ import joptsimple.OptionSet;
 
 /**
  * Generates a placed and routed adder or subtractor using
- * CLB LUTs, CARRY8s and flip flops.  
+ * CLB LUTs, CARRY8s and flip flops.
  * @author clavin
  *
  */
 public class AddSubGenerator extends ArithmeticGenerator {
-    
+
     private static final String SLICE_SITES_OPT = "s";
     private static final String VERBOSE_OPT = "v";
     private static final String HELP_OPT = "h";
     private static final String IS_SUBTRACT_OPT = "m";
     private static final String INPUT_PIPE_FLOP_OPT = "f";
-    
 
-    
+
+
     private static void connectFDRECtrl(Net clk, Net rst, Net ce, Cell ff) {
         clk.getLogicalNet().createPortInst("C", ff);
         rst.getLogicalNet().createPortInst("R", ff);
@@ -84,10 +84,10 @@ public class AddSubGenerator extends ArithmeticGenerator {
 
         char letter = ff.getBELName().charAt(0);
         boolean isFF2 = ff.getBELName().endsWith("2");
-        boolean isLowerSlice = 'A' <= letter && letter <= 'D'; 
+        boolean isLowerSlice = 'A' <= letter && letter <= 'D';
         String clkPinName = isLowerSlice ? "CLK1" : "CLK2";
         String rstPinName = isLowerSlice ? "SRST1" : "SRST2";
-        String cePinName = "CKEN" + (isLowerSlice ? (isFF2 ? "2" : "1") : (isFF2 ? "4" : "3")); 
+        String cePinName = "CKEN" + (isLowerSlice ? (isFF2 ? "2" : "1") : (isFF2 ? "4" : "3"));
         if (ff.getSiteInst().getSitePinInst(clkPinName) == null) {
             clk.createPin(false, clkPinName, ff.getSiteInst());
             ff.getSiteInst().addSitePIP(clkPinName + "INV","CLK");
@@ -100,29 +100,29 @@ public class AddSubGenerator extends ArithmeticGenerator {
             ce.createPin(false, cePinName, ff.getSiteInst());
         }
     }
-    
-    public static PBlock createAddSub(Design d, Site origin, int width, boolean isSubtract, 
+
+    public static PBlock createAddSub(Design d, Site origin, int width, boolean isSubtract,
             boolean inputFlop, boolean route) {
         return createAddSub(d, origin, width, isSubtract, inputFlop, true, route);
     }
-    
-    public static PBlock createAddSub(Design d, Site origin, int width, boolean isSubtract, 
+
+    public static PBlock createAddSub(Design d, Site origin, int width, boolean isSubtract,
             boolean inputFlop, boolean outputFlop, boolean route) {
         EDIFCell top = d.getNetlist().getTopCell();
         Set<Site> used = new HashSet<>();
         String bus = "["+(width-1)+":0]";
-        
+
         EDIFPort aPort = top.createPort(INPUT_A_NAME + bus, EDIFDirection.INPUT, width);
         EDIFPort bPort = top.createPort(INPUT_B_NAME + bus, EDIFDirection.INPUT, width);
         EDIFPort outPort = top.createPort(RESULT_NAME + bus, EDIFDirection.OUTPUT, width);
-    
+
         EDIFPort clkPort = null;
         EDIFPort cePort = null;
         EDIFPort rstPort = null;
         EDIFNet clk = null;
         EDIFNet rst = null;
         EDIFNet ce = null;
-        
+
         Net clkNet = null;
         Net rstNet = null;
         Net ceNet = null;
@@ -136,7 +136,7 @@ public class AddSubGenerator extends ArithmeticGenerator {
             clk = top.createNet(clkPort.getName());
             rst = top.createNet(rstPort.getName());
             ce = top.createNet(cePort.getName());
-            
+
             clk.createPortInst(clkPort);
             rst.createPortInst(rstPort);
             ce.createPortInst(cePort);
@@ -144,8 +144,8 @@ public class AddSubGenerator extends ArithmeticGenerator {
             rstNet = d.createNet(rst);
             ceNet = d.createNet(ce);
         }
-        
-        
+
+
         Cell carryCell = null;
         int carryCLEs = ((width+BITS_PER_CLE-1) / BITS_PER_CLE); // Ceiling divide
         // Create LUT2s & FFs
@@ -157,12 +157,12 @@ public class AddSubGenerator extends ArithmeticGenerator {
             BEL ff = outputFlop ? currSlice.getBEL(letter + "FF") : null;
             Cell lutCell = d.createAndPlaceCell(top, "add" + i, Unisim.LUT2, currSlice, lut);
             lutCell.addProperty("INIT", isSubtract ? "4'h9" : "4'h6", EDIFValueType.STRING);
-            Cell ffCell = outputFlop ? 
+            Cell ffCell = outputFlop ?
                     d.createAndPlaceCell(top, "sum" + i, Unisim.FDRE, currSlice, ff) : null;
             if (outputFlop) ffCell.addProperty("INIT", "1'b0", EDIFValueType.STRING);
             SiteInst si = lutCell.getSiteInst();
-                        
-            
+
+
             if (letter.equals("A")) {
                 BEL carry = currSlice.getBEL("CARRY8");
                 carryCell = d.createAndPlaceCell(top, "carry" + i, Unisim.CARRY8, currSlice, carry);
@@ -179,7 +179,7 @@ public class AddSubGenerator extends ArithmeticGenerator {
                     c.createPortInst("CI", carryCell);
                     Net cNet = d.getNet(c.getName());
                     cNet.createPin(false, "CIN",si);
-                    
+
                     if (si.getSiteTypeEnum() == SiteTypeEnum.SLICEL) {
                         cNet.addPIP(new PIP(si.getTile(), "CLE_CLE_L_SITE_0_CIN","CLE_CLE_L_SITE_0_CIN_PIN"));
                     } else {
@@ -217,7 +217,7 @@ public class AddSubGenerator extends ArithmeticGenerator {
                 connectFDRECtrl(clkNet, rstNet, ceNet, ffCell);
             }
             so.createPortInst(outPort, outPort.getWidth()-i-1);
-            
+
             // Physical Nets
             Net aNet = d.createNet(a);
             Net bNet = d.createNet(b);
@@ -229,20 +229,20 @@ public class AddSubGenerator extends ArithmeticGenerator {
             (inputFlop ? aNetInt : aNet).createPin(false,letter +"5",si);
             (inputFlop ? aNetInt : aNet).createPin(false,letter +"X",si);
             (inputFlop ? bNetInt : bNet).createPin(false,letter +"6",si);
-            
+
             BELPin src = lut.getPin("O6");
             BELPin snk = carryCell.getBEL().getPin("S" + cleIndex);
             si.routeIntraSiteNet(pNet, src, snk);
-            if (outputFlop) { 
+            if (outputFlop) {
                 si.routeIntraSiteNet(sNet, carryCell.getBEL().getPin("O"+cleIndex), ff.getPin("D"));
             } else {
                 BELPin sitePin = si.getSite().getBELPin(letter+"MUX");
                 si.routeIntraSiteNet(sNet, carryCell.getBEL().getPin("O"+cleIndex), sitePin);
             }
             si.addSitePIP((outputFlop ? "FFMUX"+letter+"1" : "OUTMUX"+letter), "XORIN");
-            
+
             soNet.createPin(true,letter + (outputFlop ? "Q" : "MUX"),si);
-            
+
             if (inputFlop) {
                 Site inputFFSite = null;
                 // Decided if we pack flop into FF2s of carry-using CLEs or put flops above
@@ -253,18 +253,18 @@ public class AddSubGenerator extends ArithmeticGenerator {
                     inputFFSite = currSlice.getNeighborSite(0, carryCLEs);
                 //}
                 used.add(inputFFSite);
-                
+
                 BEL ff2 = inputFFSite.getBEL(letter + "FF2");
                 Cell aFFCell = d.createAndPlaceCell(top, "inA" + i, Unisim.FDRE, inputFFSite, ff);
-                Cell bFFCell = d.createAndPlaceCell(top, "inB" + i, Unisim.FDRE, inputFFSite, ff2);    
+                Cell bFFCell = d.createAndPlaceCell(top, "inB" + i, Unisim.FDRE, inputFFSite, ff2);
                 connectFDRECtrl(clkNet, rstNet, ceNet, aFFCell);
                 connectFDRECtrl(clkNet, rstNet, ceNet, bFFCell);
-                
+
                 a.createPortInst("D", aFFCell);
                 b.createPortInst("D", bFFCell);
                 aInt.createPortInst("Q", aFFCell);
                 bInt.createPortInst("Q", bFFCell);
-                
+
                 SiteInst siNeighbor = d.getSiteInstFromSite(inputFFSite);
                 aNet.createPin(false, letter +"X", siNeighbor);
                 bNet.createPin(false, letter +"_I", siNeighbor);
@@ -273,8 +273,8 @@ public class AddSubGenerator extends ArithmeticGenerator {
                 siNeighbor.addSitePIP("FFMUX" + letter +"1", "BYP");
                 siNeighbor.addSitePIP("FFMUX" + letter +"2", "BYP");
             }
-            
-            
+
+
             if (i%8==7 && width > i+1) {
                 EDIFNet c = top.createNet("c" + i);
                 c.createPortInst("CO", edifIndex, carryCell);
@@ -282,20 +282,20 @@ public class AddSubGenerator extends ArithmeticGenerator {
                 cNet.createPin(true,"COUT",si);
             }
         }
-        
+
         // Find rectangular area consumed
         PBlock footprint = new PBlock(d.getDevice(),used);
-        
-        if (route) {            
+
+        if (route) {
             Router r = new Router(d);
             r.setRoutingPblock(footprint);
             r.setSupressWarningsErrors(true);
-            r.routeDesign();            
+            r.routeDesign();
         }
-        
+
         return footprint;
     }
-    
+
     private static OptionParser createOptionParser() {
         // Defaults
         String partName = "xcvu9p-flgb2104-2-i";
@@ -308,7 +308,7 @@ public class AddSubGenerator extends ArithmeticGenerator {
         boolean verbose = true;
         boolean isSubtractor = true;
         boolean addInputFlop = true;
-        
+
         OptionParser p = new OptionParser() {{
             accepts(PART_OPT).withOptionalArg().defaultsTo(partName).describedAs("UltraScale+ Part Name");
             accepts(DESIGN_NAME_OPT).withOptionalArg().defaultsTo(designName).describedAs("Design Name");
@@ -322,10 +322,10 @@ public class AddSubGenerator extends ArithmeticGenerator {
             accepts(VERBOSE_OPT).withOptionalArg().ofType(Boolean.class).defaultsTo(verbose).describedAs("Print verbose output");
             acceptsAll( Arrays.asList(HELP_OPT, "?"), "Print Help" ).forHelp();
         }};
-        
+
         return p;
     }
-    
+
     private static void printHelp(OptionParser p) {
         MessageGenerator.printHeader("Adder/Subtractor Generator");
         System.out.println("This RapidWright program creates a placed and routed DCP that can be \n"
@@ -334,12 +334,12 @@ public class AddSubGenerator extends ArithmeticGenerator {
         try {
             p.accepts(OUT_DCP_OPT).withOptionalArg().defaultsTo("slr_crosser.dcp").describedAs("Output DCP File Name");
             p.printHelpOn(System.out);
-            
+
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
-    
+
     public static void main(String[] args) {
         // Extract program options
         OptionParser p = createOptionParser();
@@ -350,36 +350,36 @@ public class AddSubGenerator extends ArithmeticGenerator {
             return;
         }
         CodePerfTracker t = verbose ? new CodePerfTracker(AddSubGenerator.class.getSimpleName(),true).start("Init") : null;
-        
+
         String partName = (String) opts.valueOf(PART_OPT);
         String designName = (String) opts.valueOf(DESIGN_NAME_OPT);
         String outputDCPFileName = (String) opts.valueOf(OUT_DCP_OPT);
         String clkName = (String) opts.valueOf(CLK_NAME_OPT);
         double clkPeriodConstraint = (double) opts.valueOf(CLK_CONSTRAINT_OPT);
-        int width = (int) opts.valueOf(WIDTH_OPT);        
+        int width = (int) opts.valueOf(WIDTH_OPT);
         String sliceName = (String) opts.valueOf(SLICE_SITES_OPT);
         boolean isSubtract = (boolean) opts.valueOf(IS_SUBTRACT_OPT);
         boolean inputFlop = (boolean) opts.valueOf(INPUT_PIPE_FLOP_OPT);
-        
+
         // Perform some error checking on inputs
         Part part = PartNameTools.getPart(partName);
         if (part == null || part.isSeries7()) {
             throw new RuntimeException("ERROR: Invalid/unsupport part " + partName + ".");
         }
-        
+
         Design d = new Design(designName,partName);
         d.setAutoIOBuffers(false);
         Device dev = d.getDevice();
-        
+
         t.stop().start("Create Add/Sub");
         Site slice = dev.getSite(sliceName);
-        createAddSub(d, slice, width, isSubtract, inputFlop, true);            
-                
+        createAddSub(d, slice, width, isSubtract, inputFlop, true);
+
         // Add a clock constraint
         String tcl = "create_clock -name "+clkName+" -period "+clkPeriodConstraint+" [get_ports "+clkName+"]";
         d.addXDCConstraint(ConstraintGroup.LATE,tcl);
         d.setAutoIOBuffers(false);
-        
+
         t.stop();
         d.writeCheckpoint(outputDCPFileName, t);
         if (verbose) System.out.println("Wrote final DCP: " + outputDCPFileName);

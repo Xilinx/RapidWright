@@ -62,13 +62,13 @@ public class RelocateHierarchy {
         int rowOffset = Integer.parseInt(args[3]);
 
         Set<SiteTypeEnum> customSet = RelocationTools.defaultSiteTypes;
-        
+
         if (args.length == 6) {
             for (String siteTypeEnum : args[5].split(",")) {
-                customSet.add(SiteTypeEnum.valueOf(siteTypeEnum));                
+                customSet.add(SiteTypeEnum.valueOf(siteTypeEnum));
             }
         }
-        
+
         if (!RelocationTools.relocate(design, hierarchyPrefix, colOffset, rowOffset, customSet)) {
             throw new RuntimeException("ERROR: Relocation failed");
         }

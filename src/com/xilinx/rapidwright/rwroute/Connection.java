@@ -1,25 +1,25 @@
 /*
- * 
- * Copyright (c) 2021 Ghent University. 
+ *
+ * Copyright (c) 2021 Ghent University.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Yun Zhou, Ghent University.
  *
- * This file is part of RapidWright. 
- * 
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 
 package com.xilinx.rapidwright.rwroute;
@@ -42,22 +42,22 @@ public class Connection implements Comparable<Connection>{
     /** The source and sink {@link SitePinInst} instances of a connection */
     private SitePinInst source;
     private final SitePinInst sink;
-    /** 
+    /**
      * The source and sink {@link RoutableNode} instances (rnodes) of a connection.
      * They are created based on the INT tile nodes the source and sink SitePinInsts connect to, respectively.
      */
     private Routable sourceRnode;
     private Routable sinkRnode;
-    /** 
-     * true to indicate the source and the sink are connected through dedicated resources, 
+    /**
+     * true to indicate the source and the sink are connected through dedicated resources,
      * such as the carry chain connections and connections between cascaded BRAMs.
      * These connections only need to be routed once after the iterative routing of other connections.
      */
     private boolean direct;
     /** The {@link NetWrapper} instance indicating the net a connection belongs to */
     private NetWrapper netWrapper;
-    /** 
-     * The half-perimeter wirelength of a connection based on the source and sink rnodes, 
+    /**
+     * The half-perimeter wirelength of a connection based on the source and sink rnodes,
      * used for sorting connection and statistics of connection span.
      */
     private short hpwl;
@@ -66,7 +66,7 @@ public class Connection implements Comparable<Connection>{
     private short xMaxBB;
     private short yMinBB;
     private short yMaxBB;
-    /** 
+    /**
      * {@link TimingEdge} instances associated to a connection.
      * For LUT_6_2_* pins, there will be two timing edges mapped to the same connection.
      */
@@ -75,14 +75,14 @@ public class Connection implements Comparable<Connection>{
     private float criticality;
     /** List of Routable instances that make up of the route of a connection */
     private List<Routable> rnodes;
-    
+
     /** To indicate if the route delay of a connection has been patched up, when there are consecutive long nodes */
     private boolean dlyPatched;
     /** true to indicate that a connection cross SLRs */
     private boolean crossSLR;
     /** List of nodes assigned to a connection to form the path for generating PIPs */
     private List<Node> nodes;
-    
+
     public Connection(int id, SitePinInst source, SitePinInst sink, NetWrapper netWrapper) {
         this.id = id;
         this.source = source;
@@ -92,15 +92,15 @@ public class Connection implements Comparable<Connection>{
         this.netWrapper = netWrapper;
         this.netWrapper.addConnection(this);
     }
-    
+
     /**
      * Computes the half-perimeter wirelength of connection based on the source and sink rnodes.
      */
     public void computeHpwl() {
-        hpwl = (short) (Math.abs(sourceRnode.getEndTileXCoordinate() - sinkRnode.getEndTileXCoordinate()) + 1 
+        hpwl = (short) (Math.abs(sourceRnode.getEndTileXCoordinate() - sinkRnode.getEndTileXCoordinate()) + 1
                 + Math.abs(sourceRnode.getEndTileYCoordinate() - sinkRnode.getEndTileYCoordinate()) + 1);
     }
-    
+
     /**
      * Computes the connection bounding box based on the geometric center of the net, source and sink rnodes.
      * @param boundingBoxExtensionX To indicate the extension on top of the minimum bounding box in the horizontal direction.
@@ -120,9 +120,9 @@ public class Connection implements Comparable<Connection>{
         xMinBB = (short) (xMin - boundingBoxExtensionX);
         yMaxBB = (short) (yMax + boundingBoxExtensionY);
         yMinBB = (short) (yMin - boundingBoxExtensionY);
-        
+
         // allow more space for resource expansion of SLR-crossing connections
-        if (checkSLRCrossing) {        
+        if (checkSLRCrossing) {
             if (crossSLR()) {
                 yMaxBB += 2 * boundingBoxExtensionY;
                 yMinBB -= 2 * boundingBoxExtensionY;
@@ -131,7 +131,7 @@ public class Connection implements Comparable<Connection>{
         xMinBB = xMinBB < 0? -1:xMinBB;
         yMinBB = yMinBB < 0? -1:yMinBB;
     }
-    
+
     private boolean crossSLR() {
         if (getSource().getTile().getSLR().equals(sink.getTile().getSLR())) {
             return false;
@@ -139,7 +139,7 @@ public class Connection implements Comparable<Connection>{
         crossSLR = true;
         return true;
     }
-    
+
     private short maxOfThree(short var1, short var2, short var3) {
         if (var1 >= var2 && var1 >= var3) {
             return var1;
@@ -149,7 +149,7 @@ public class Connection implements Comparable<Connection>{
             return var3;
         }
     }
-    
+
     private short minOfThree(short var1, short var2, short var3) {
         if (var1 <= var2 && var1 <= var3) {
             return var1;
@@ -159,7 +159,7 @@ public class Connection implements Comparable<Connection>{
             return var3;
         }
     }
-    
+
     /**
      * Computes criticality of a connection.
      * @param maxDelay The maximum delay to normalize the slack of a connection.
@@ -173,15 +173,15 @@ public class Connection implements Comparable<Connection>{
             if (tmpslackCon < slackCon)
                 slackCon = tmpslackCon;
         }
-        
+
         float tempCriticality  = (1 - slackCon / maxDelay);
-        
+
         tempCriticality = (float) Math.pow(tempCriticality, criticalityExponent) * maxCriticality;
-        
+
         if (tempCriticality > criticality)
             setCriticality(tempCriticality);
     }
-    
+
     /**
      * Checks if a connection has any overused rnodes to indicate the congestion status.
      * @return
@@ -194,7 +194,7 @@ public class Connection implements Comparable<Connection>{
         }
         return false;
     }
-    
+
     /**
      * Checks if a connection is routed through any rnodes that have multiple drivers.
      * @return
@@ -207,21 +207,21 @@ public class Connection implements Comparable<Connection>{
         }
         return false;
     }
-    
+
     public void addRnode(Routable rn) {
-        rnodes.add(rn);    
+        rnodes.add(rn);
     }
-    
-    public void updateRouteDelay() {    
+
+    public void updateRouteDelay() {
         setTimingEdgesDelay(getRouteDelay());
     }
-    
+
     public void setTimingEdgesDelay(float routeDelay) {
         for (TimingEdge e : getTimingEdges()) {
             e.setRouteDelay(routeDelay);
         }
     }
-    
+
     private float getRouteDelay() {
         float routeDelay = getRnodes().get(getRnodes().size() - 1).getDelay();
         for (int i = getRnodes().size() - 2; i >= 0; i--) {
@@ -232,24 +232,24 @@ public class Connection implements Comparable<Connection>{
         }
         return routeDelay;
     }
-    
+
     public void setCriticality(float criticality) {
         this.criticality = criticality;
     }
-    
+
     public void resetCriticality() {
         criticality = 0;
     }
-    
+
     public float getCriticality() {
         return criticality;
     }
-    
+
     public void resetRoute() {
         getRnodes().clear();
         sink.setRouted(false);
     }
-    
+
     public Routable getSourceRnode() {
         return sourceRnode;
     }
@@ -265,7 +265,7 @@ public class Connection implements Comparable<Connection>{
     public void setSinkRnode(Routable childRnode) {
         sinkRnode = childRnode;
     }
-    
+
     public short getXMinBB() {
         return xMinBB;
     }
@@ -301,11 +301,11 @@ public class Connection implements Comparable<Connection>{
     public void setNetWrapper(NetWrapper netWrapper) {
         this.netWrapper = netWrapper;
     }
-    
+
     public NetWrapper getNetWrapper() {
         return this.netWrapper;
     }
-    
+
     public SitePinInst getSource() {
         return source;
     }
@@ -365,15 +365,15 @@ public class Connection implements Comparable<Connection>{
     public void setCrossSLR(boolean crossSLR) {
         this.crossSLR = crossSLR;
     }
-    
+
     public void newNodes() {
         setNodes(new ArrayList<>());
     }
-    
+
     public void addNode(Node node) {
         getNodes().add(node);
     }
-    
+
     public List<Node> getNodes() {
         return nodes;
     }
@@ -381,7 +381,7 @@ public class Connection implements Comparable<Connection>{
     public void setNodes(List<Node> nodes) {
         this.nodes = nodes;
     }
-    
+
     public void enlargeBoundingBox(int horizontalIncrement, int verticalIncrement) {
         xMinBB -= horizontalIncrement;
         xMaxBB += horizontalIncrement;
@@ -390,12 +390,12 @@ public class Connection implements Comparable<Connection>{
         xMinBB = xMinBB < 0? -1:xMinBB;
         yMinBB = yMinBB < 0? -1:yMinBB;
     }
-    
+
     @Override
     public int hashCode() {
         return id;
     }
-    
+
     @Override
     public int compareTo(Connection arg0) {
         if (netWrapper.getConnections().size() > arg0.getNetWrapper().getConnections().size()) {
@@ -413,11 +413,11 @@ public class Connection implements Comparable<Connection>{
         }
         return -1;
     }
-    
+
     public String bbRectangleString() {
         return "[( " + xMinBB + ", " + yMinBB + " ), -> ( " + xMaxBB + ", " + yMaxBB + " )]";
     }
-    
+
     @Override
     public String toString() {
         StringBuilder s = new StringBuilder();
@@ -437,8 +437,8 @@ public class Connection implements Comparable<Connection>{
         s.append(String.format("delay = %4d ", (short)(getTimingEdges() == null? 0:getTimingEdges().get(0).getNetDelay())));
         s.append(", ");
         s.append(String.format("criticality = %4.3f ", getCriticality()));
-        
+
         return s.toString();
     }
-    
+
 }

@@ -57,7 +57,7 @@ class DelayModelSourceFromText extends DelayModelSource {
      */
     protected List<String> configNames;
     /**
-     * Contain all config values for this bel. Each entry is the array of possible values of the 
+     * Contain all config values for this bel. Each entry is the array of possible values of the
      * corresponding configName.
      */
     protected List<List<String>>   configValues;
@@ -271,7 +271,7 @@ class DelayModelSourceFromText extends DelayModelSource {
      */
     private void readIntraSiteDelays(String fileName) {
 
-        
+
         Scanner sc = null;
 
         String siteName = null;

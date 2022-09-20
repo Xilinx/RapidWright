@@ -1,25 +1,25 @@
-/* 
+/*
  * Original work: Copyright (c) 2010-2011 Brigham Young University
- * Modified work: Copyright (c) 2017-2022, Xilinx, Inc. 
+ * Modified work: Copyright (c) 2017-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
- *  
- * This file is part of RapidWright. 
- * 
+ *
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 package com.xilinx.rapidwright.examples.tilebrowser;
 
@@ -54,9 +54,9 @@ public class PartTileBrowserView extends QGraphicsView {
         zoomMax = 30;
     }
 
-    
 
-    
+
+
 
     public void mousePressEvent(QMouseEvent event) {
         if (event.button().equals(Qt.MouseButton.RightButton)) {
@@ -123,9 +123,9 @@ public class PartTileBrowserView extends QGraphicsView {
         this.verticalScrollBar().setValue((int) (this.verticalScrollBar().value()+zoom*offset.y()));
     }
 
-    
+
     public void keyPressEvent(QKeyEvent event) {
-        double scaleFactor = 1.15; 
+        double scaleFactor = 1.15;
         if (event.key() == Key.Key_Equal.value()) {
             // Zoom in (if not at limit)
             if (this.matrix().m11() < zoomMax)
@@ -134,7 +134,7 @@ public class PartTileBrowserView extends QGraphicsView {
             // Zoom out (if not at limit)
             if (this.matrix().m11() > zoomMin)
                 scale(1.0 / scaleFactor, 1.0 / scaleFactor);
-        }        
+        }
     }
 }
 

@@ -53,7 +53,7 @@ public class SmallDelayModel implements DelayModel {
      * Mapping between config value of a bel to a one-hot binary.
      */
     private Map<String, Integer> configCodeMap;
-    
+
     public int getEncodedConfigCode(String value) {
         return configCodeMap.getOrDefault(value, 0);
     }
@@ -61,7 +61,7 @@ public class SmallDelayModel implements DelayModel {
     public short getBELIndex(String belName) {
         return bel2IdxMap.get(belName);
     }
-    
+
     /**
      *  Implement the method with the same signature defined in DelayModel interface.
      */

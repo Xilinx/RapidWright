@@ -1,28 +1,28 @@
-/* 
- * Copyright (c) 2022, Xilinx, Inc. 
+/*
+ * Copyright (c) 2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
- *  
- * This file is part of RapidWright. 
- * 
+ *
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
- 
+
 /**
- * 
+ *
  */
 package com.xilinx.rapidwright.device;
 
@@ -33,7 +33,7 @@ import java.util.HashSet;
 /**
  * Generated on: Wed Apr 27 13:18:34 2022
  * by: com.xilinx.rapidwright.release.PartNamePopulator
- * 
+ *
  * Class used to uniquely represent a Xilinx part.
  */
 public class Part {
@@ -216,79 +216,79 @@ public class Part {
     private static FamilyType[] versalTypes;
     static {
         series7Types = new FamilyType[] {
-                FamilyType.AARTIX7, 
-                FamilyType.AKINTEX7, 
-                FamilyType.ARTIX7, 
-                FamilyType.ARTIX7L, 
-                FamilyType.ASPARTAN7, 
-                FamilyType.AZYNQ, 
-                FamilyType.KINTEX7, 
-                FamilyType.KINTEX7L, 
-                FamilyType.QARTIX7, 
-                FamilyType.QKINTEX7, 
-                FamilyType.QKINTEX7L, 
-                FamilyType.QVIRTEX7, 
-                FamilyType.QZYNQ, 
-                FamilyType.SPARTAN7, 
-                FamilyType.VIRTEX7, 
-                FamilyType.ZYNQ, 
+                FamilyType.AARTIX7,
+                FamilyType.AKINTEX7,
+                FamilyType.ARTIX7,
+                FamilyType.ARTIX7L,
+                FamilyType.ASPARTAN7,
+                FamilyType.AZYNQ,
+                FamilyType.KINTEX7,
+                FamilyType.KINTEX7L,
+                FamilyType.QARTIX7,
+                FamilyType.QKINTEX7,
+                FamilyType.QKINTEX7L,
+                FamilyType.QVIRTEX7,
+                FamilyType.QZYNQ,
+                FamilyType.SPARTAN7,
+                FamilyType.VIRTEX7,
+                FamilyType.ZYNQ,
         };
         series7 = new HashSet<FamilyType>(Arrays.asList(series7Types));
         ultraScaleTypes = new FamilyType[] {
-                FamilyType.KINTEXU, 
-                FamilyType.QKINTEXU, 
-                FamilyType.QRKINTEXU, 
-                FamilyType.VIRTEXU, 
+                FamilyType.KINTEXU,
+                FamilyType.QKINTEXU,
+                FamilyType.QRKINTEXU,
+                FamilyType.VIRTEXU,
         };
         ultraScale = new HashSet<FamilyType>(Arrays.asList(ultraScaleTypes));
         ultraScalePlusTypes = new FamilyType[] {
-                FamilyType.ARTIXUPLUS, 
-                FamilyType.AZYNQUPLUS, 
-                FamilyType.KINTEXUPLUS, 
-                FamilyType.QKINTEXUPLUS, 
-                FamilyType.QVIRTEXUPLUS, 
-                FamilyType.QVIRTEXUPLUSHBM, 
-                FamilyType.QZYNQUPLUS, 
-                FamilyType.QZYNQUPLUSRFSOC, 
-                FamilyType.VIRTEXUPLUS, 
-                FamilyType.VIRTEXUPLUS58G, 
-                FamilyType.VIRTEXUPLUSHBM, 
-                FamilyType.VIRTEXUPLUSHBMES1, 
-                FamilyType.ZYNQUPLUS, 
-                FamilyType.ZYNQUPLUSRFSOC, 
+                FamilyType.ARTIXUPLUS,
+                FamilyType.AZYNQUPLUS,
+                FamilyType.KINTEXUPLUS,
+                FamilyType.QKINTEXUPLUS,
+                FamilyType.QVIRTEXUPLUS,
+                FamilyType.QVIRTEXUPLUSHBM,
+                FamilyType.QZYNQUPLUS,
+                FamilyType.QZYNQUPLUSRFSOC,
+                FamilyType.VIRTEXUPLUS,
+                FamilyType.VIRTEXUPLUS58G,
+                FamilyType.VIRTEXUPLUSHBM,
+                FamilyType.VIRTEXUPLUSHBMES1,
+                FamilyType.ZYNQUPLUS,
+                FamilyType.ZYNQUPLUSRFSOC,
         };
         ultraScalePlus = new HashSet<FamilyType>(Arrays.asList(ultraScalePlusTypes));
         versalTypes = new FamilyType[] {
-                FamilyType.QRVERSALAICORE, 
-                FamilyType.QVERSALAICORE, 
-                FamilyType.QVERSALPRIME, 
-                FamilyType.VERSAL, 
-                FamilyType.VERSALAICORE, 
-                FamilyType.VERSALAIEDGE, 
-                FamilyType.VERSALPREMIUM, 
-                FamilyType.VERSALPRIME, 
+                FamilyType.QRVERSALAICORE,
+                FamilyType.QVERSALAICORE,
+                FamilyType.QVERSALPRIME,
+                FamilyType.VERSAL,
+                FamilyType.VERSALAICORE,
+                FamilyType.VERSALAIEDGE,
+                FamilyType.VERSALPREMIUM,
+                FamilyType.VERSALPRIME,
         };
         versal = new HashSet<FamilyType>(Arrays.asList(versalTypes));
     }
-    
+
     public boolean isSeries7() {
         return series7.contains(architecture);
     }
-    
+
     public boolean isUltraScale() {
         return ultraScale.contains(architecture);
     }
-    
+
     public boolean isUltraScalePlus() {
         return ultraScalePlus.contains(architecture);
     }
-    
+
     public boolean isVersal() {
         return versal.contains(architecture);
     }
-    
+
     public String toString() {
         return name;
     }
-    
+
 }

@@ -1,25 +1,25 @@
-/* 
+/*
  * Original work: Copyright (c) 2010-2011 Brigham Young University
- * Modified work: Copyright (c) 2017-2022, Xilinx, Inc. 
+ * Modified work: Copyright (c) 2017-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
- *  
- * This file is part of RapidWright. 
- * 
+ *
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 package com.xilinx.rapidwright.router;
 
@@ -68,7 +68,7 @@ public abstract class AbstractRouter{
 
     /** PIPs that are part of the most recently routed connection */
     protected ArrayList<PIP> pipList;
-    
+
     /** Keeps track of all current sources for a given net (to avoid the RUG CREATION PROBLEM) */
     protected HashSet<RouteNode> currSources;
     /** Current sink node to be routed */
@@ -77,22 +77,22 @@ public abstract class AbstractRouter{
     protected RouteNode avgSink;
     /** Current net to be routed */
     protected Net currNet;
-    /** Current sink pin to be routed */ 
+    /** Current sink pin to be routed */
     protected SitePinInst currSinkPin;
     /** PIPs of the current net being routed */
     protected HashSet<PIP> netPIPs;
-    
+
     protected RouteNode tempNode;
 
     protected boolean foundSwitchMatrixSink = false;
 
     protected RouteNode switchMatrixSink = null;
-    
+
     /** A flag indicating if the current connection was routed successfully */
     protected boolean successfulRoute;
     /** A flag which determines if the current sink is a clock wire */
     protected boolean isCurrSinkAClkWire;
-    
+
     // Statistic variables
     /** Total number of connections in design */
     protected int totalConnections;
@@ -102,7 +102,7 @@ public abstract class AbstractRouter{
     protected int nodesProcessed;
     /** Counts the number of times the router failed to route a connection */
     protected int failedConnections;
-    
+
     public AbstractRouter() {
         // Initialize variables
         tempNode = new RouteNode();
@@ -121,13 +121,13 @@ public abstract class AbstractRouter{
         currSink = new RouteNode();
         avgSink = new RouteNode();
     }
-    
+
     public Design getDesign() {
         return design;
     }
-    
+
     /**
-     * Sets a node (combined tile and wire) as used and maps 
+     * Sets a node (combined tile and wire) as used and maps
      * the usage to the given net.
      * @param t The tile specifier for the node to be marked as used.
      * @param wire The wire specifier for the node to be marked as used.
@@ -137,12 +137,12 @@ public abstract class AbstractRouter{
     protected RouteNode setWireAsUsed(Tile t, int wire, Net net) {
         RouteNode n = new RouteNode(t, wire, null, 0);
         markNodeUsed(n);
-        addUsedWireMapping(net, n);    
+        addUsedWireMapping(net, n);
         return n;
     }
-    
+
     /**
-     * Sets a node (combined tile and wire) as unused and unmaps 
+     * Sets a node (combined tile and wire) as unused and unmaps
      * the usage to the given net.
      * @param t The tile specifier for the node to be marked as unused.
      * @param wire The wire specifier for the node to be marked as unused.
@@ -152,10 +152,10 @@ public abstract class AbstractRouter{
     protected RouteNode setWireAsUnused(Tile t, int wire, Net net) {
         RouteNode n = new RouteNode(t, wire, null, 0);
         usedNodes.remove(n);
-        removeUsedWireMapping(net, n);        
+        removeUsedWireMapping(net, n);
         return n;
     }
-    
+
     /**
      * This method allows a router to keep track of which nets use which
      * nodes.
@@ -164,15 +164,15 @@ public abstract class AbstractRouter{
      */
     protected void addUsedWireMapping(Net net, RouteNode n) {
         LinkedList<Net> list = usedNodesMap.get(n);
-        if (list == null) { 
+        if (list == null) {
             list = new LinkedList<Net>();
             usedNodesMap.put(n, list);
         }
-        if (!list.contains(net)) { 
+        if (!list.contains(net)) {
             list.add(net);
         }
     }
-    
+
     /**
      * This method removes a node usage mapping to a net when it is being
      * marked as unused.
@@ -181,8 +181,8 @@ public abstract class AbstractRouter{
      */
     protected void removeUsedWireMapping(Net net, RouteNode n) {
         LinkedList<Net> list = usedNodesMap.get(n);
-        if (list == null) { 
-            return; 
+        if (list == null) {
+            return;
         }
         if (list.remove(net)) {
             if (list.isEmpty()) {
@@ -190,7 +190,7 @@ public abstract class AbstractRouter{
             }
         }
     }
-    
+
     /**
      * @return the reserved Nodes Map
      */
@@ -201,22 +201,22 @@ public abstract class AbstractRouter{
     /**
      * Gets are returns a list of reserved nodes for the provide net.
      * @param net The net to get reserved nodes for.
-     * @return A list of reserved nodes for the net, or null if no 
+     * @return A list of reserved nodes for the net, or null if no
      * nodes are reserved.
      */
     public ArrayList<RouteNode> getReservedNodesForNet(Net net) {
         return reservedNodes.get(net);
     }
-    
+
     public boolean isNodeUsed(Tile tile, int wire) {
         tempNode.setTileAndWire(tile, wire);
         return usedNodes.contains(tempNode);
     }
-    
+
     public boolean isNodeUsed(RouteNode routeNode) {
         return usedNodes.contains(routeNode);
     }
-    
+
     /**
      * Examines the pips in the list and marks all of the resources
      * as used.
@@ -229,7 +229,7 @@ public abstract class AbstractRouter{
             markIntermediateNodesAsUsed(pip, currNet);
         }
     }
-    
+
     /**
      * Creates sources from a list of PIPs
      * @param pips The pips of the net to examine.
@@ -243,29 +243,29 @@ public abstract class AbstractRouter{
         }
         return sources;
     }
-    
+
     public void markNodeUsed(RouteNode n) {
         usedNodes.add(n);
     }
-    
+
     /**
      * This will add the sole source of the net to the set of sources to be used by the router.
      * It also updates the Router's currSources with the sole source of the net.
      * @param currSource The source pin of the net
      */
     public void addInitialSourceForRouting(SitePinInst currSource) {
-        RouteNode n = new RouteNode(currSource.getSiteInst().getTile(), 
+        RouteNode n = new RouteNode(currSource.getSiteInst().getTile(),
                 currSource.getSiteExternalWireIndex(), null, 0);
         currSources.add(n);
     }
-    
+
     protected void prepareSink(SitePinInst currPin) {
         currSinkPin = currPin;
-        
+
         // Populate the current sink node
-        currSink.setTileAndWire(currSinkPin.getSiteInst().getTile(),currSinkPin.getSiteExternalWireIndex());    
+        currSink.setTileAndWire(currSinkPin.getSiteInst().getTile(),currSinkPin.getSiteExternalWireIndex());
     }
-    
+
     protected void prepareForRoutingConnection() {
         // Reset Variable for a new route
         pipList = new ArrayList<PIP>();
@@ -284,9 +284,9 @@ public abstract class AbstractRouter{
             }
         }
     }
-    
+
     /**
-     * Cost function, used to set each node's cost to be prioritized by the queue 
+     * Cost function, used to set each node's cost to be prioritized by the queue
      * @param routeNode The node to calculate and set its cost based on currSink.
      */
     public void setCost(RouteNode routeNode, boolean isRouteThrough) {
@@ -298,15 +298,15 @@ public abstract class AbstractRouter{
             y = currSink.getTile().getTileYCoordinate() - routeNode.getTile().getTileYCoordinate();
         } else {
             x = switchMatrixSink.getTile().getTileXCoordinate() - routeNode.getTile().getTileXCoordinate();
-            y = switchMatrixSink.getTile().getTileYCoordinate() - routeNode.getTile().getTileYCoordinate();            
+            y = switchMatrixSink.getTile().getTileYCoordinate() - routeNode.getTile().getTileYCoordinate();
         }
-        
+
         // ABS
         if (x < 0) x = -x;
         if (y < 0) y = -y;
 
         routeNode.setCost(((x + y) << 1) + routeNode.getLevel() + routeNode.getHistory());
-        
+
         // Favor clock wires when routing the clock tree
         if (isCurrSinkAClkWire && routeNode.getWireName().contains("CLK") && !isRouteThrough) {
             //if (switchMatrixSink != null && !node.getTile().equals(switchMatrixSink.getTile())) {
@@ -318,7 +318,7 @@ public abstract class AbstractRouter{
                 queue.clear();
             }
         }
-        
+
         if (routeNode.equals(switchMatrixSink)) {
             foundSwitchMatrixSink = true;
             queue.clear();
@@ -327,13 +327,13 @@ public abstract class AbstractRouter{
         }
     }
 
-    
+
     /**
      * Checks each node in a PIP to see if there are other nodes that should be
      * marked as used. These are wires external to a tile such as
      * doubles/pents/hexes/longlines.
      * @param pip The pip to check intermediate used nodes for
-     * @param currentNet The net to associate with the intermediate nodes, null if 
+     * @param currentNet The net to associate with the intermediate nodes, null if
      * the usedNodesMap should not be updated
      */
     protected void markIntermediateNodesAsUsed(PIP pip, Net currentNet) {
@@ -346,7 +346,7 @@ public abstract class AbstractRouter{
                 }
             }
         }
-        
+
         if (IntentCode.isLongWire(pip.getTile(), pip.getStartWireIndex()) && IntentCode.isLongWire(pip.getTile(), pip.getEndWireIndex())) {
             wires = pip.getTile().getWireConnections(pip.getStartWireIndex());
             if (wires != null && wires.size() > 1) {
@@ -363,5 +363,5 @@ public abstract class AbstractRouter{
     public static boolean isClkPin(SitePinInst sinkPin) {
         return sinkPin.getName().contains("CLK");
     }
-    
+
 }

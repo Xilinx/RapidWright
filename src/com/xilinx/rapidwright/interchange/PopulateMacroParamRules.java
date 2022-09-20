@@ -1,24 +1,24 @@
-/* 
- * Copyright (c) 2021-2022, Xilinx, Inc. 
+/*
+ * Copyright (c) 2021-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: clavin, Xilinx Research Labs.
- *  
- * This file is part of RapidWright. 
- * 
+ *
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 package com.xilinx.rapidwright.interchange;
 
@@ -49,9 +49,9 @@ import com.xilinx.rapidwright.util.JobQueue;
 import com.xilinx.rapidwright.util.LSFJob;
 
 /**
- * This class is intended to find and make available macro parameter propagation rules for 
- * the Interchange.  For example, a LUT6_2 has a property INIT=64'hF000111122223333, which value 
- * gets propagated to its children (LUT5.INIT=32'h22223333 and LUT6.INIT=64'hF000111122223333). 
+ * This class is intended to find and make available macro parameter propagation rules for
+ * the Interchange.  For example, a LUT6_2 has a property INIT=64'hF000111122223333, which value
+ * gets propagated to its children (LUT5.INIT=32'h22223333 and LUT6.INIT=64'hF000111122223333).
  * TODO - Still some macros with more complex mappings (RAM32M, for example) are not supported yet.
  */
 public class PopulateMacroParamRules {
@@ -67,7 +67,7 @@ public class PopulateMacroParamRules {
        "E1" , "E2", "E3", "E4", "E5", "E6", "E7" , "E8", "E9", "EA", "EB", "EC", "ED", "E1", "EF",
        "F1" , "F2", "F3", "F4", "F5", "F6", "F7" , "F8", "F9", "FA", "FB", "FC", "FD", "FE", "F1",
     };
-    
+
     static {
         seriesPartMap = new HashMap<>();
         seriesPartMap.put(Series.Series7, Device.PYNQ_Z1);
@@ -89,7 +89,7 @@ public class PopulateMacroParamRules {
         }
         return insts.size() < 2 ? Collections.emptyList() : insts;
     }
-    
+
     private static void createTclScript(Series series, String partName, String tclFileName) {
         List<String> lines = new ArrayList<>();
         lines.add("link_design -part " + partName);
@@ -99,22 +99,22 @@ public class PopulateMacroParamRules {
             lines.add("create_cell -reference " + name + " my_"+ name);
             lines.add("set cell [get_cells my_"+name+"]");
             lines.add("set props [report_property -return_string $cell]");
-            
+
             StringBuilder sb = new StringBuilder();
             for (String s : SENTINEL_STRINGS) {
                 sb.append("\""+s+ "\" ");
             }
             writeTclProgram("", lines, sb.toString(), name);
-            
+
             sb = new StringBuilder();
             for (int i=1; i < SENTINEL_STRINGS.length; i++) {
                 sb.append("\""+SENTINEL_STRINGS[i]+ "\" ");
             }
-            writeTclProgram("2", lines, sb.toString(), name);            
+            writeTclProgram("2", lines, sb.toString(), name);
         }
         FileTools.writeLinesToTextFile(lines, tclFileName);
     }
-    
+
     private static void writeTclProgram(String itr, List<String> lines, String sentinel, String name) {
         lines.add("set sentinelString"+itr+" [list "+sentinel+"] ");
         lines.add("set sentinelIdx 0");
@@ -135,9 +135,9 @@ public class PopulateMacroParamRules {
         lines.add("puts $fp [report_property -quiet -return_string $cell]");
         lines.add("write_edif -cell $cell "+name+itr+".edf");
         lines.add("close $fp");
-        
+
     }
-    
+
     private static Job buildInVivado(Series series, String partName) {
         String runDir = TMP_DIR + series;
         FileTools.makeDirs(runDir);
@@ -149,7 +149,7 @@ public class PopulateMacroParamRules {
         job.launchJob();
         return job;
     }
-    
+
     private static MacroParamRule findRule(String instName, Entry<EDIFName,EDIFPropertyValue> prop, Map<String,String> primParams) {
         String val = prop.getValue().getValue();
         val = val.substring(val.indexOf('h')+1);
@@ -159,22 +159,22 @@ public class PopulateMacroParamRules {
                 int primLength = primVal.length() * 4;
                 int count = val.length() * 4;
                 int start = primLength - ((primVal.indexOf(val) * 4) + count);
-                return MacroParamRule.bitRange(e.getKey(), instName, prop.getKey().getName(), start, count); 
+                return MacroParamRule.bitRange(e.getKey(), instName, prop.getKey().getName(), start, count);
             }
         }
         return null;
     }
-    
+
     public static void runVivadoExtractTests() {
         JobQueue q = new JobQueue();
         for (Series s : Series.values()) {
             Job j = buildInVivado(s,seriesPartMap.get(s));
             q.addRunningJob(j);
         }
-        
-        q.runAllToCompletion();        
+
+        q.runAllToCompletion();
     }
-    
+
     public static Map<Series,Map<String,List<MacroParamRule>>> createMacroParamRules() {
         Map<Series,Map<String,List<MacroParamRule>>> macroRules = new HashMap<>();
         for (Series s : Series.values()) {
@@ -185,8 +185,8 @@ public class PopulateMacroParamRules {
             for (File file : dir.listFiles()) {
                 if (file.getName().endsWith(".params")) {
                     String macroName = file.getName().replace(".params", "");
-                    String edfFileName = file.getParentFile().getAbsolutePath() + File.separator 
-                            + macroName + ".edf" + File.separator + macroName + File.separator 
+                    String edfFileName = file.getParentFile().getAbsolutePath() + File.separator
+                            + macroName + ".edf" + File.separator + macroName + File.separator
                             + macroName + ".edn";
                     List<MacroParamRule> currList = new ArrayList<>();
                     currMap.put(macroName, currList);
@@ -204,7 +204,7 @@ public class PopulateMacroParamRules {
                     for (EDIFCellInst inst : cell.getCellInsts()) {
                         boolean printedInst = false;
                         for (Entry<EDIFName,EDIFPropertyValue> e : inst.getProperties().entrySet()) {
-                            String paramName = e.getKey().getName(); 
+                            String paramName = e.getKey().getName();
                             if (paramName.contains(INIT)) {
                                 if (!printedInst) {
                                     System.out.println(" " + inst.getName() + ":");
@@ -223,7 +223,7 @@ public class PopulateMacroParamRules {
         }
         return macroRules;
     }
-    
+
     public static void genStaticCode(Map<Series,Map<String,List<MacroParamRule>>> macroRules) {
         String className = "MacroParamMappingRules";
         try (BufferedWriter bw = new BufferedWriter(new FileWriter("src/com/xilinx/rapidwright/interchange/"+className+".java"))) {
@@ -244,7 +244,7 @@ public class PopulateMacroParamRules {
             bw.write("    public static Map<Series,Map<String,MacroParamRule[]>> macroRules;\n\n");
             bw.write("    static {\n");
             bw.write("        macroRules = new HashMap<>();\n");
-            bw.write("        Map<String, MacroParamRule[]> currMap = null;\n"); 
+            bw.write("        Map<String, MacroParamRule[]> currMap = null;\n");
             for (Series series : Series.values()) {
                 bw.write("        currMap = new HashMap<>();\n");
                 bw.write("\n        // *** Begin Series."+series+"\n");
@@ -257,8 +257,8 @@ public class PopulateMacroParamRules {
                                 +rule.getPrimParam()+"\", \""
                                 +rule.getInstName()+"\", \""
                                 +rule.getInstParam()+"\", "
-                                +rule.getBitSlice()[0]+", " 
-                                +rule.getBitSlice().length+"),\n");    
+                                +rule.getBitSlice()[0]+", "
+                                +rule.getBitSlice().length+"),\n");
                     }
                     bw.write("        });\n");
                 }
@@ -269,7 +269,7 @@ public class PopulateMacroParamRules {
             e.printStackTrace();
         }
     }
-    
+
     public static void main(String[] args) throws IOException {
         //runVivadoExtractTests();
         Map<Series,Map<String,List<MacroParamRule>>> macroRules = createMacroParamRules();

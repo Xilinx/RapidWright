@@ -1,28 +1,28 @@
-/* 
+/*
  * Original work: Copyright (c) 2010-2011 Brigham Young University
- * Modified work: Copyright (c) 2017-2022, Xilinx, Inc. 
+ * Modified work: Copyright (c) 2017-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
- *  
- * This file is part of RapidWright. 
- * 
+ *
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 /**
- * 
+ *
  */
 package com.xilinx.rapidwright.placer.handplacer;
 
@@ -58,7 +58,7 @@ import com.xilinx.rapidwright.gui.TileScene;
 
 /**
  * @author marc
- * 
+ *
  */
 public class FloorPlanScene extends TileScene {
 
@@ -82,16 +82,16 @@ public class FloorPlanScene extends TileScene {
     private HashMap<String, GUIModuleInst> macroMap;
 
     private ArrayList<ValidPlacementPolygon> validPlacements;
-    
+
     private static final int HIDE_NETS = 0;
     private static final int MODULE_TO_MODULE = 1;
 
     private int netViewState = HIDE_NETS;
-    
+
     public FloorPlanScene() {
         this(null, false);
     }
-    
+
     public FloorPlanScene(Design design, boolean debugPlacer) {
         super(design, true, true);
         this.debugPlacer = debugPlacer;
@@ -99,7 +99,7 @@ public class FloorPlanScene extends TileScene {
         // Let's not use a cursor
         cursorPen = new QPen(QColor.transparent);
     }
-    
+
     public void initializeScene() {
         polyList = new ArrayList<GUIModuleInst>();
         multiNetLineMap = new HashMap<String, GUIMultiNetLine>();
@@ -110,7 +110,7 @@ public class FloorPlanScene extends TileScene {
         validPlacements = new ArrayList<ValidPlacementPolygon>();
         initializeScene(true, true);
     }
-    
+
     @Override
     public void mousePressEvent(QGraphicsSceneMouseEvent event) {
         super.mousePressEvent(event);
@@ -143,7 +143,7 @@ public class FloorPlanScene extends TileScene {
             if (netViewState == HIDE_NETS) {
                 for (GUIModuleInst gmi : movingHMList) {
                     gmi.hideMyLines();
-                }                
+                }
             }
         }
         super.mouseReleaseEvent(event);
@@ -151,13 +151,13 @@ public class FloorPlanScene extends TileScene {
 
     public void highlightValidPlacements(GUIModuleInst ghmpi) {
         QPolygonF shape = new QPolygonF(ghmpi.getShape());
-        
+
         for (Site s : ghmpi.getModuleInst().getAllValidPlacements()) {
             ValidPlacementPolygon item = new ValidPlacementPolygon(shape,ghmpi.getAnchorOffset());
             addItem(item);
         }
     }
-    
+
     public QGraphicsRectItem highlightTile(int x, int y) {
         QColor color = new QColor(0, 255, 0, 190);
         int offset = (int) Math.ceil((lineWidth / 2.0));
@@ -198,8 +198,8 @@ public class FloorPlanScene extends TileScene {
             polyList.add(ghmpi);
             macroMap.put(ghmpi.getModuleInst().getName(), ghmpi);
         }
-        
-        
+
+
         for (String key : modInstances.keySet()) {
             List<SiteInst> instList = modInstances.get(key).getSiteInsts();
             if (instList.size() == 0) continue;
@@ -245,7 +245,7 @@ public class FloorPlanScene extends TileScene {
                     }
                     if (curr != null) modInstName = curr;
                 }
-            }            
+            }
         }
         if (debugPlacer) {
             Collection<SiteInst> insts = getDesign().getSiteInsts();
@@ -257,7 +257,7 @@ public class FloorPlanScene extends TileScene {
                     myTile.moveBy(getDrawnTileX(t) * tileSize, getDrawnTileY(t) * tileSize);
                     addItem(myTile);
                 }
-            }            
+            }
         }
     }
 
@@ -270,15 +270,15 @@ public class FloorPlanScene extends TileScene {
         for (SitePinInst sitePinInst : net.getPins()) {
             SiteInst pinInst = sitePinInst.getSiteInst();
             String pinMIName = pinInst.getModuleInstName();
-            
-            
+
+
             if (pinMIName == null && pinInst.isPlaced()) {
                 if (debugPlacer)
                     pinMIName = "NOMODULE";
                 else
                     pinMIName = pinInst.getName()+"_HMTILE";
             }
-            if (pinMIName != null) {                    
+            if (pinMIName != null) {
                 if (sitePinInst.isOutPin()) {
                     // outpin
                     srcMIName = pinMIName;
@@ -289,7 +289,7 @@ public class FloorPlanScene extends TileScene {
                     destTileList.add((pinInst.isPlaced())? pinInst.getTile() : pinInst.getModuleTemplateInst().getTile());
                 }
             }
-            
+
         }
         if (srcMIName != null) {
             //for (String destKey : destMINameList) {
@@ -299,18 +299,18 @@ public class FloorPlanScene extends TileScene {
                 //Non-module-to-module connections
                 if (debugPlacer) {
                     if (srcMIName.equals("NOMODULE") || destMIName.equals("NOMODULE")) {
-                    
+
                         int srcX = getDrawnTileX(srcTile);
-                        if (srcX < 0) 
+                        if (srcX < 0)
                             srcX = (srcTile.getColumn() >= cols)? (cols-1)*tileSize : srcTile.getColumn()*tileSize;
                         int srcY = getDrawnTileY(srcTile);
-                        if (srcY < 0) 
+                        if (srcY < 0)
                             srcY = (srcTile.getRow() >= rows)? (rows-1)*tileSize : srcTile.getRow()*tileSize;
                         int destX = getDrawnTileX(destTile);
-                        if (destX < 0) 
+                        if (destX < 0)
                             destX = (destTile.getColumn() >= cols)? (cols-1)*tileSize : destTile.getColumn()*tileSize;
                         int destY = getDrawnTileY(destTile);
-                        if (destY < 0) 
+                        if (destY < 0)
                             destY = (destTile.getRow() >= rows)? (rows-1)*tileSize : destTile.getRow()*tileSize;
                         QGraphicsLineItem line = new QGraphicsLineItem(10+srcX, 10+srcY, 10+destX, 10+destY);
                         line.setPen(new QPen(QColor.cyan, 2));
@@ -357,7 +357,7 @@ public class FloorPlanScene extends TileScene {
     public GUIModuleInst getGMI(String name) {
         return macroMap.get(name);
     }
-    
+
     public void changeNetView(int index) {
         netViewState = index;
         switch (index) {

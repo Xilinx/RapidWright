@@ -1,25 +1,25 @@
-/* 
+/*
  * Original work: Copyright (c) 2010-2011 Brigham Young University
- * Modified work: Copyright (c) 2017-2022, Xilinx, Inc. 
+ * Modified work: Copyright (c) 2017-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
- *  
- * This file is part of RapidWright. 
- * 
+ *
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 package com.xilinx.rapidwright.placer.blockplacer;
 
@@ -48,8 +48,8 @@ import com.xilinx.rapidwright.util.MessageGenerator;
 import com.xilinx.rapidwright.util.Utils;
 
 /**
- * Initial attempt at a pre-implemented module placer.  
- * It is more accurate in that it tries to traverse critical 
+ * Initial attempt at a pre-implemented module placer.
+ * It is more accurate in that it tries to traverse critical
  * paths into both ends of the connections made between hard macros.
  * @author Chris Lavin
  */
@@ -83,14 +83,14 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
     /** */
     private double tempReduce = 0.90;
     /** */
-    private double goldenRate = 0.44; 
+    private double goldenRate = 0.44;
     /** */
     private double END_ACCEPTANCE_RATE = 0.01;
     /** */
     private double startTempFactor = 10.5;
     /** */
     private long seed = 2;
-    
+
     // Final Results
     /** */
     public double finalSystemCost;
@@ -106,16 +106,16 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
     public static final int DEBUG_LEVEL = 1;
     // DEBUG
     //private HashMap<HardMacro, Integer> moveCount = new HashMap<HardMacro, Integer>();
-    
-    
-    /** 
+
+
+    /**
      * Empty Constructor
-     * 
+     *
      */
     public BlockPlacer() {
-        
+
     }
-    
+
     /**
      * New Constructor
      * @param movesPerTemperature Number of desired moves per temperature step
@@ -130,7 +130,7 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
         this.tempReduce = tempReduceRate;
         this.startTempFactor = startTempFactor;
     }
-    
+
     /**
      * Sets the random seed to be used in this placer
      * @param seed
@@ -138,7 +138,7 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
     private void setSeed(long seed) {
         this.seed = seed;
     }
-    
+
     /**
      * Performs all of the initialization steps to prepare for placement
      */
@@ -151,7 +151,7 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
         allPaths = new HashSet<Path>();
         hardMacros = new ArrayList<HardMacro>();
         macroMap = new HashMap<ModuleInst, HardMacro>();
-        
+
         // Find all valid placements for each module
         for (ModuleImpls moduleImpls : design.getModules()) {
             for (Module module : moduleImpls) {
@@ -178,7 +178,7 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
                 }
             }
         }
-        
+
         // Create Hard Macro objects from module instances
         for (ModuleInst mi : design.getModuleInsts()) {
             HardMacro hm = new HardMacro(mi);
@@ -187,7 +187,7 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
         }
 
         // Place hard macros for initial placement
-        for (HardMacro hm : hardMacros) {            
+        for (HardMacro hm : hardMacros) {
             for (Site site : hm.getValidPlacements()) {
                 hm.setTempAnchorSite(site, currentPlacements);
                 if (checkValidPlacement(hm)) {
@@ -197,7 +197,7 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
                 }
             }
         }
-        
+
         // Find all port wires
         populateAllPaths();
     }
@@ -223,7 +223,7 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
                     snks.add(p);
                 }
             }
-            
+
             if (snks.size() > 0) {
                 Path newPath = new Path();
                 newPath.addPin(src, macroMap);
@@ -233,7 +233,7 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
                 allPaths.add(newPath);
             }
         }
-        
+
         for (Path pa : allPaths) {
             for (PathPort po : pa) {
                 if (po.getBlock() != null) {
@@ -242,7 +242,7 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
             }
         }
     }
-    
+
     private boolean checkValidPlacement(HardMacro hm) {
         for (HardMacro hardMacro : hardMacros) {
             if (hardMacro.equals(hm)) continue;
@@ -253,8 +253,8 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
         }
         return true;
     }
-    
-    
+
+
     public Design placeDesign(Design design, boolean debugFlow) {
         this.design = design;
         boolean finished = false;
@@ -265,7 +265,7 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
         initializePlacer(debugFlow);
         //design.saveXPN("debug.xpn");
         System.out.println("Initialization Time: " + ((System.currentTimeMillis()-start)/1000.0) + " secs");
-        
+
         start = System.currentTimeMillis();
         for (Path path : allPaths) {
             path.calculateLength();
@@ -275,12 +275,12 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
 
         double currSystemCost = prevSystemCost;
         double bestSoFar = currSystemCost;
-        
+
         // Initialize temperature
-        currentTemp = currSystemCost * startTempFactor;    
-        
+        currentTemp = currSystemCost * startTempFactor;
+
         int extraMoves = 0;
-        
+
         while (!finished) {
             currentAcceptedMoveCount = 0;
             int moveCount = 0;
@@ -298,7 +298,7 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
                 if (currSystemCost < bestSoFar) {
                     bestSoFar = currSystemCost;
                 }
-                
+
                 r = rand.nextDouble();
                 double scaleFactor = 0.0;
                 if (currentMove.getBlock0() != null) {
@@ -307,12 +307,12 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
                 if (currentMove.getBlock1() != null) {
                     scaleFactor += currentMove.getBlock1().getConnectedPaths().size();
                 }
-                
+
                 //System.out.println(changeInCost + " " + scaleFactor + " " + currentTemp + " " + r);
                 boolean acceptMove = (r < Math.exp(-changeInCost/(scaleFactor*currentTemp)));
-                
-                if (changeInCost > 0) badMoveCount++; 
-                
+
+                if (changeInCost > 0) badMoveCount++;
+
                 if (acceptMove) {
                     currentAcceptedMoveCount++;
                     prevSystemCost = currSystemCost;
@@ -331,13 +331,13 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
                 moveAcceptanceRate = ((double)currentAcceptedMoveCount) / moveCount;
             }
             if (DEBUG_LEVEL > 0) System.out.printf("MOVES(ACCEPTED/TOTAL): %7d/%7d SYS COST: % 7.1f AVG COST/MOVE: % 7.1f TEMP: % 7.1f ACCEPTANCE RATE: %5.1f%% BEST: % 7.1f BAD: %4.1f%%\n",currentAcceptedMoveCount,moveCount,prevSystemCost, totalMovesCost/moveCount, currentTemp, moveAcceptanceRate*100, bestSoFar, 100.0*badAcceptedMoveCount/badMoveCount);
-            
-            currentTemp = updateTemperature();        
-            
+
+            currentTemp = updateTemperature();
+
             extraMoves = (int)Math.abs((10.0/(moveAcceptanceRate - goldenRate)));
             if (extraMoves > 2500) extraMoves = 2500;
 
-            
+
             // Determine if we should exit
             //if (currentTemp < END_TEMP) {
             if (moveAcceptanceRate < END_ACCEPTANCE_RATE || currentTemp < 0.01) {
@@ -349,19 +349,19 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
         finalBestCost = bestSoFar;
         placerRuntime  = ((System.currentTimeMillis()-start)/1000.0);
         if (DEBUG_LEVEL > 0) System.out.println(seed + ": " + currSystemCost + " / " + bestSoFar + " Runtime: " + placerRuntime + "secs");
-        if (DEBUG_LEVEL > 0) System.out.printf("  Perturbation Time: %.3f secs (%9.0f moves/sec)\n", placerRuntime,(totalMoves/placerRuntime));    
-        
+        if (DEBUG_LEVEL > 0) System.out.printf("  Perturbation Time: %.3f secs (%9.0f moves/sec)\n", placerRuntime,(totalMoves/placerRuntime));
+
         System.out.println("Final System Cost: " + finalSystemCost);
-        
-        HashSet<HardMacro> fineTunePlacement = new HashSet<HardMacro>(); 
-        
+
+        HashSet<HardMacro> fineTunePlacement = new HashSet<HardMacro>();
+
         for (HardMacro hm : hardMacros) {
             if (hm.getTileSize() < 60) {
                 fineTunePlacement.add(hm);
             }
         }
-        
-        
+
+
         for (HardMacro hm : fineTunePlacement) {
             // Keep the original spot, in the case we suggest a worst spot
             Site original = hm.getTempAnchorSite();
@@ -378,16 +378,16 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
                     }
                 }
             }
-            
-            
-            
+
+
+
             Point center = SmallestEnclosingCircle.getCenterPoint(pointsList);
             Tile centroid = dev.getTile("INT_X" + center.x + "Y" + center.y);
             Site newCandidateSite = null;
             if (centroid != null && centroid.getSites().length > 0) {
                 newCandidateSite = centroid.getSites()[0];
             }
-            
+
 
             if (newCandidateSite != null) {
                 if (DEBUG_LEVEL > 0) System.out.println("Moving " + hm.getName() + " from " + original.getTile() + " to " + newCandidateSite.getTile());
@@ -407,27 +407,27 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
                 }
             }
         }
-        
+
         System.out.println("Final System Cost (after fine tuning): " + this.currentSystemCost());
-        
+
         //MessageGenerator.waitOnAnyKey();
-        
-        
+
+
         // Sort hard macros, largest first to place them first
         HardMacro[] array = new HardMacro[hardMacros.size()];
         array = hardMacros.toArray(array);
         Arrays.sort(array);
-        
+
         HashSet<Tile> usedTiles = new HashSet<Tile>();
         // Perform final placement of all hard macros
-        for (HardMacro hm : array) {    
+        for (HardMacro hm : array) {
             //System.out.println(moveCount.get(hm) + " " + hm.tileSize + " " + hm.getName());
             HashSet<Tile> footPrint = isValidPlacement((ModuleInst)hm, hm.getModule().getAnchor(), hm.getTempAnchorSite().getTile(), usedTiles);
             if (footPrint == null) {
-                
+
                 if (!placeModuleNear((ModuleInst)hm, hm.getTempAnchorSite().getTile(), usedTiles)) {
                     System.out.println("Saving as debug.");
-                    throw new RuntimeException("ERROR: Placement failed, couldn't find valid site for " + hm.getName());                    
+                    throw new RuntimeException("ERROR: Placement failed, couldn't find valid site for " + hm.getName());
                 }
             }
             else {
@@ -437,12 +437,12 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
                 }
             }
         }
-        
+
         design.clearUsedSites();
         for (SiteInst i : design.getSiteInsts()) {
             i.place(i.getSite());
         }
-        
+
         return design;
     }
 
@@ -452,7 +452,7 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
     }
 
     enum Direction{UP, DOWN, LEFT, RIGHT};
-    
+
     public Site getPrimitiveSiteFromTile(Tile tile, SiteTypeEnum type) {
         for (Site p : tile.getSites()) {
             if (p.isCompatibleSiteType(type)) {
@@ -461,7 +461,7 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
         }
         return null;
     }
-    
+
     public boolean placeModuleNear(ModuleInst modInst, Tile tile, HashSet<Tile> usedTiles) {
         Site anchorSite = modInst.getModule().getAnchor();
         Tile proposedAnchorTile = tile;
@@ -521,7 +521,7 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
             if (proposedAnchorTile != null) {
                 triedTiles.add(proposedAnchorTile);
                 tiles = isValidPlacement(modInst, anchorSite, proposedAnchorTile, usedTiles);
-                
+
                 Site newAnchorSite = anchorSite.getCorrespondingSite(modInst.getModule().getAnchor().getSiteTypeEnum(), proposedAnchorTile);
                 if (tiles != null && modInst.place(newAnchorSite)) {
                     usedTiles.addAll(tiles);
@@ -532,7 +532,7 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
                 }
             }
         }
-        
+
         if (proposedAnchorTile == null) {
             Site[] candidateSites = dev.getAllCompatibleSites(modInst.getAnchor().getSiteTypeEnum());
             for (Site site : candidateSites) {
@@ -546,8 +546,8 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
                 }
             }
         }
-        
-        
+
+
         if (tiles == null) {
             if (DEBUG_LEVEL > 0) System.out.println("Placement failed: tiles==null " + modInst.getName());
             return false;
@@ -560,20 +560,20 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
         if (DEBUG_LEVEL > 0) System.out.println("Placement failed: place() " + modInst.getName());
         return false;
     }
-    
-    
+
+
     private HashSet<Tile> isValidPlacement(ModuleInst modInst, Site anchorSite, Tile proposedAnchorTile, HashSet<Tile> usedTiles) {
         if (usedTiles.contains(proposedAnchorTile)) {
             return null;
         }
-        
+
         modInst.getAnchor().getSiteTypeEnum();
         Site newSite2 = modInst.getAnchor().getSite().getCorrespondingSite(modInst.getAnchor().getSiteTypeEnum(), proposedAnchorTile);
-        
+
         if (newSite2 == null) {
             return null;
         }
-        
+
         HashSet<Tile> footPrint = new HashSet<Tile>();
         // Check instances
         for (SiteInst i : modInst.getModule().getSiteInsts()) {
@@ -584,15 +584,15 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
             if (newTile == null || usedTiles.contains(newTile)) {
                 return null;
             }
-            
+
             Site newSite = i.getSite().getCorrespondingSite(i.getSiteTypeEnum(), newTile);
             if (newSite == null) {
                 return null;
             }
-            
+
             footPrint.add(newTile);
         }
-        
+
         // Check nets
         for (Net n : modInst.getModule().getNets()) {
             for (PIP p : n.getPIPs()) {
@@ -614,12 +614,12 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
                 }
                 footPrint.add(newTile);
             }
-        }        
-        
+        }
+
         return footPrint;
     }
-    
-    
+
+
     private void getNextMove() {
         HardMacro selected = hardMacros.get(rand.nextInt(hardMacros.size()));
         List<Site> validSites = selected.getValidPlacements();
@@ -638,17 +638,17 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
                 iterations = 0;
             }
             iterations++;
-            
+
             site1 = validSites.get(rand.nextInt(validSites.size()));
-            
-            
+
+
             if (site0.equals(site1)) {
                 //if (DEBUG_LEVEL > 1) System.out.println("  SAME SITE");
                 continue;
             }
 
             hm1 = currentPlacements.get(site1);
-                
+
             if (hm1 != null) {
                 hm1.setTempAnchorSite(site0, currentPlacements);
                 hm0.setTempAnchorSite(site1, currentPlacements);
@@ -676,12 +676,12 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
     private double updateTemperature() {
         return currentTemp = currentTemp * tempReduce;
     }
-    
+
     private double currentSystemCost() {
         int totalWireLength = 0;
         if (currentMove.getBlock0() != null) {
             for (Path wire : currentMove.getBlock0().getConnectedPaths()) {
-                wire.calculateLength();                
+                wire.calculateLength();
             }
         }
         if (currentMove.getBlock1() != null) {
@@ -714,8 +714,8 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
         allPaths = new HashSet<Path>();
         hardMacros = new ArrayList<HardMacro>();
         macroMap = new HashMap<ModuleInst, HardMacro>();
-        
-        
+
+
         // Create Hard Macro objects from module instances
         for (ModuleInst mi : design.getModuleInsts()) {
             HardMacro hm = new HardMacro(mi);
@@ -727,23 +727,23 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
         for (HardMacro hm : hardMacros) {
             hm.setTempAnchorSite(hm.getAnchor().getSite(), currentPlacements);
         }
-        
+
         // Find all port wires
         populateAllPaths();
-        
+
         for (Path path : allPaths) {
             path.calculateLength();
             System.out.printf("%4d ",path.getLength());
             for (PathPort pp : path) {
-                String name = pp.getBlock() == null ? "null" : pp.getBlock().getModule().getName(); 
+                String name = pp.getBlock() == null ? "null" : pp.getBlock().getModule().getName();
                 System.out.print(name + "("+pp.getPortTile().getName()+")->");
             }
             System.out.println();
         }
-        
+
         System.out.println("System cost for file: " + fileName + " is " + currentSystemCost());
     }
-    
+
     /**
      * This will return a set of all unique TileTypes which are considered
      * to have a switch matrix or routing switch box in them.

@@ -1,27 +1,27 @@
-/* 
- * Copyright (c) 2017-2022, Xilinx, Inc. 
+/*
+ * Copyright (c) 2017-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
- *  
- * This file is part of RapidWright. 
- * 
+ *
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 /**
- * 
+ *
  */
 package com.xilinx.rapidwright.ipi;
 
@@ -68,7 +68,7 @@ import com.xilinx.rapidwright.util.Utils;
 
 /**
  * Manages pre-implemented block creation.
- * 
+ *
  * Created on: Aug 14, 2015
  */
 public class BlockCreator {
@@ -76,32 +76,32 @@ public class BlockCreator {
     public static final String BLOCK_CACHE_PATH = "/home/"+System.getenv("USER")+"/blockCache";
 
     public static final String ROUTED_XPN_SUFFIX = "_routed.xpn";
-    
+
     public static final String ROUTED_DCP_SUFFIX = "_routed.dcp";
-    
+
     public static final String METADATA_FILE_SUFFIX = "_metadata.txt";
-    
+
     public static final String ROUTED_EDIF_SUFFIX = "_routed.edf";
 
     public static final String IMPL_RUN_SCRIPT_NAME = "launch_impl_run.tcl";
 
     public static final String USED_PBLOCK_FILE_SUFFIX = "_routed_pblock.txt";
-    
+
     public static final boolean BC_DEBUG = false;
-    
+
     private static HashMap<String,ModuleImpls> inMemModuleCache = new HashMap<String, ModuleImpls>();
-    
+
     public static final String DONE_FILE_PREFIX = "done.file.";
-    
+
     public static final String DONE_FILE_PATTERN = "IMPLGUIDE";
-    
+
     public static String getUniqueFileName(String xciFileName) {
         return xciFileName.replace(".xci", "");
     }
-    
+
     public static ModuleImpls createBlock(String routedDCPFileName, String metadataFileName, EDIFNetlist e, int blockImplCount, String cellInstName) {
         ArrayList<String> routedDCPFileNames = getRoutedDCPFileNames(routedDCPFileName, blockImplCount);
-        
+
         ModuleImpls modImpls = new ModuleImpls();
         for (String dcpName : routedDCPFileNames) {
             Design d = new Design(e);
@@ -111,7 +111,7 @@ public class BlockCreator {
                 if (i.getName().startsWith("STATIC_SOURCE")) continue;
                 if (Utils.isModuleSiteType(i.getSite().getSiteTypeEnum())) {
                     anchorCandidate = i;
-                    break;                
+                    break;
                 }
             }
             if (anchorCandidate == null) {
@@ -126,7 +126,7 @@ public class BlockCreator {
             fixupModuleOutputs(m);
 
             modImpls.add(m);
-            
+
             // Store PBlock with Module Here
             String guidedPblockFile = dcpName.replace("_routed.dcp", USED_PBLOCK_FILE_SUFFIX);
             List<String> lines = FileTools.getLinesFromTextFile(guidedPblockFile);
@@ -196,7 +196,7 @@ public class BlockCreator {
         StringTools.naturalSort(routedDCPFileNames);
         return routedDCPFileNames;
     }
-    
+
     public static byte[] createChecksum(String filename) {
         InputStream fis;
         MessageDigest complete = null;
@@ -236,7 +236,7 @@ public class BlockCreator {
     }
 
     /**
-     * Read the stored module from disk.  
+     * Read the stored module from disk.
      * @param commonFileName This is the root name of the two files involved that store the module information.
      * @return The populated module.
      */
@@ -246,7 +246,7 @@ public class BlockCreator {
             // For cached blocks, the cell instance name gets lost so we restore it here
             netlist.renameNetlistAndTopCell(cellInstanceName);
         }
-        
+
         ModuleImpls modImpls = ModuleCache.readFromCompactFile(commonFileName+".dat",netlist);
         for (Module m : modImpls) {
             m.setName(cellInstanceName);
@@ -255,11 +255,11 @@ public class BlockCreator {
         return modImpls;
 
     }
-    
+
     public static void implementBlocks(HashMap<String,String> ipNames, String cacheDir, ImplGuide implHelper, Device dev) {
         JobQueue jobs = new JobQueue();
         Map<Long,String> jobLocations = new HashMap<>();
-        
+
         for (Entry<String,String> e : ipNames.entrySet()) {
             String blockName = e.getKey();
             String cacheID = e.getValue();
@@ -268,7 +268,7 @@ public class BlockCreator {
             if (cachedIPDir.list() == null || cachedIPDir.list().length == 0) {
                 throw new RuntimeException("ERROR: Cached entry " + cachedIPDir + " for ip " + blockName +" is empty!");
             }
-            
+
             // Look for done.file.<implCount> to see if implementation has completed
             String doneFileName = null;
             String optDcpFileName = null;
@@ -284,7 +284,7 @@ public class BlockCreator {
             if (optDcpFileName == null) {
                 throw new RuntimeException("ERROR: Expected an _opt.dcp file in " + cachedIPDir.getAbsolutePath());
             }
-            
+
             if (doneFileName != null) {
                 if (implHelper != null && implHelper.hasBlock(cacheID)) {
                     ArrayList<String> lines = FileTools.getLinesFromTextFile(cachedIPDir + "/" + doneFileName);
@@ -296,10 +296,10 @@ public class BlockCreator {
                         }
                     }
                 } else {
-                    continue;                    
+                    continue;
                 }
             }
-            
+
             // implement the blocks
             int implIndex = 0;
             if (implHelper != null && implHelper.hasBlock(cacheID)) {
@@ -313,7 +313,7 @@ public class BlockCreator {
                     jobLocations.put(job.getJobNumber(), optDcpFileName + " " + i);
                     FileTools.writeStringToTextFile(pblock.toString(), optDcpFileName.replace("opt.dcp", +i+USED_PBLOCK_FILE_SUFFIX));
                 }
-                
+
                 implIndex = pblocks.size();
             } else {
                 // Create a run for each implementation of each module in pblock file
@@ -331,7 +331,7 @@ public class BlockCreator {
                         jobs.addJob(job);
                         jobLocations.put(job.getJobNumber(), optDcpFileName + " " + implIndex);
                         implIndex++;
-                    }                    
+                    }
                 }
                 else if (new File(optDcpFileName.replace("_opt.dcp", "_utilization.report")).exists()) {
                     Job job = createImplRun(optDcpFileName, null, implIndex, null);
@@ -345,7 +345,7 @@ public class BlockCreator {
             //FileTools.writeLinesToTextFile(doneFileContents, cachedIPDir+"/"+DONE_FILE_PREFIX+implIndex);
             //FileTools.getCommandOutput(new String[]{"touch", cachedIPDir+"/"+DONE_FILE_SUFFIX+implIndex});
         }
-        
+
         // Returns when all jobs are finished
         boolean success = jobs.runAllToCompletion();
         if (!success)System.out.println("Job failures detected...");
@@ -376,7 +376,7 @@ public class BlockCreator {
                 }
             }
             String wns = null;
-            String timingFile = dir + "/route_timing" + implIndex + ".twr"; 
+            String timingFile = dir + "/route_timing" + implIndex + ".twr";
             if (!noDCP && new File(timingFile).exists() && FileTools.isFileNewer(timingFile, dir + "/" + doneFile)) {
                 for (String line : FileTools.getLinesFromTextFile(timingFile)) {
                     if (line.contains("Slack")) {
@@ -387,7 +387,7 @@ public class BlockCreator {
                 }
             }
             boolean isNegSlack = wns == null ? true : Float.parseFloat(wns.replace("ns", "")) < 0;
-            
+
             if (wns == null || isNegSlack) pass = false;
             String timing = noDCP ? "NO DCP" : (wns == null ? "inf" : wns.toString());
             System.out.println( (pass ? "PASS" : (wns==null ? "N/A" : "FAIL")) + " | " + timing + " | " + routedFileName );
@@ -398,23 +398,23 @@ public class BlockCreator {
                     if (line.contains("ERROR"))
                         System.out.println("  *** " + line + " ***");
                 }
-                
-                // Stop the process if a DCP is missing, but keep going 
+
+                // Stop the process if a DCP is missing, but keep going
                 // even if we miss timing
                 halt = true;
-                
+
                 // Delete the done file
                 if (doneFile != null && new File( dir + "/" + doneFile).exists())
                     FileTools.deleteFile( dir + "/" + doneFile);
             }
         }
-        
+
         if (halt) {
             throw new RuntimeException("ERROR: Failure to generate all necessary OOC DCPs.  "
                 + "Please see error messages and logs above to resolve issues in order to continue.");
         }
     }
-    
+
     public static void createDoneFile(String fileName, BlockGuide bg) {
         ArrayList<String> doneFileContents = new ArrayList<>();
         if (bg != null) {
@@ -446,7 +446,7 @@ public class BlockCreator {
         pw.println("}");
         pw.println("puts \"RAPIDWRIGHT_PATH=$::env(RAPIDWRIGHT_PATH)\"");
 
-        
+
         pw.println("open_checkpoint " + optDcpFileName);
         if (blockGuide != null) {
             // Add Clock Constraints
@@ -462,15 +462,15 @@ public class BlockCreator {
                     pw.print(" -group [get_clocks " + clkPortName +"]");
                 }
                 pw.println();
-            }                
+            }
         }
-        
+
         pw.println("set optDcpFileName " + optDcpFileName);
         pw.println("set pblock \"" + (pblock == null ? "" : pblock.toString()) + "\"");
         pw.println("set implIndex " + implIndex);
         pw.println("set designCells [get_cells -filter {NAME!=VCC && NAME!=GND}]");
         pw.println("if { $designCells != {} } {");
-        pw.println("    if {[string trim $pblock] != {} }  {"); 
+        pw.println("    if {[string trim $pblock] != {} }  {");
         pw.println("        create_pblock pblock_1");
         pw.println("        add_cells_to_pblock pblock_1 -instances $designCells");
         //if (!optDcpFileName.contains("_slr"))
@@ -479,7 +479,7 @@ public class BlockCreator {
         int i = 2;
         if (pblock != null) {
             for (SubPBlock subPBlock : pblock.getSubPBlocks()) {
-                String pblockName = "pblock_" + i; 
+                String pblockName = "pblock_" + i;
                 i++;
                 pw.println("        create_pblock " + pblockName);
                 String[] parts = subPBlock.getGetCellsArgs().split(",");
@@ -491,24 +491,24 @@ public class BlockCreator {
             }
         }
         pw.println("    }");
-        
+
         if (blockGuide != null) {
             for (String xdc : blockGuide.getXDCCommands()) {
                 pw.println("    " + xdc);
-            }                
+            }
         }
-        
+
         pw.println("    place_design");
         pw.println("    route_design -directive Explore");
         pw.println("}");
         pw.println("puts \"PBLOCK: $implIndex Placed and Routed!\"");
         pw.println("set routedDcpFile [string map \"_opt.dcp _${implIndex}_routed.dcp\" $optDcpFileName]");
         pw.println("set dcpFile [string map \"_opt.dcp .dcp\" $optDcpFileName]");
-        pw.println("update_routed_dcp $dcpFile $implIndex");        
+        pw.println("update_routed_dcp $dcpFile $implIndex");
         //pw.println("create_impl_block " + optDcpFileName +" \"" + pblock + "\" " + implIndex);
         pw.close();
     }
-    
+
     /**
      * Launches an independent run of an area constrained place and route job
      * @param optDcpFileName The name of the input DCP to start with
@@ -519,7 +519,7 @@ public class BlockCreator {
     public static Job createImplRun(String optDcpFileName, PBlock pblock, int implIndex, BlockGuide blockGuide) {
         String currDir = optDcpFileName.substring(0, optDcpFileName.lastIndexOf('/')+1) + implIndex;
         String scriptName = currDir + File.separator + IMPL_RUN_SCRIPT_NAME;
-        
+
         Job j = JobQueue.createJob();
         j.setRunDir(currDir);
         j.setCommand(FileTools.getVivadoPath() + " -mode batch -source " + scriptName);
@@ -527,15 +527,15 @@ public class BlockCreator {
         createTclScript(scriptName, optDcpFileName, pblock, implIndex, blockGuide);
         return j;
     }
-    
+
     /**
-     * Relies on the cache to load or create from the prepared design the appropriate module based on the input files. 
+     * Relies on the cache to load or create from the prepared design the appropriate module based on the input files.
      * @param edifFileName The EDIF file name (logical netlist)
-     * @param routedDCPFileName The routed DCP file name 
+     * @param routedDCPFileName The routed DCP file name
      * @param cellInstanceName The name of the cell instance (also the IP name in IPI)
      * @param xciFileName The XCI file name (attributes to the IP block that indicate its uniqueness)
-     * @param blockImplCount The number of implementations provided for this module 
-     * @return The module corresponding 
+     * @param blockImplCount The number of implementations provided for this module
+     * @return The module corresponding
      */
     public static ModuleImpls createOrRetrieveBlock(String edifFileName, String routedDCPFileName, String cellInstanceName, String xciFileName, int blockImplCount) {
         Objects.requireNonNull(edifFileName);
@@ -552,7 +552,7 @@ public class BlockCreator {
         }
         //System.out.println("Cache miss on " + cellInstanceName + " " + cacheID);
         String datFileName = uniqueFileName+".dat";
-        /*boolean storedModuleValid = new File(datFileName).exists() && new File(uniqueFileName+".kryo").exists(); 
+        /*boolean storedModuleValid = new File(datFileName).exists() && new File(uniqueFileName+".kryo").exists();
         if (storedModuleValid) {
             // Check that all *routed.dcp files are older than .dat
             for (String routedDCP : getRoutedDCPFileNames(routedDCPFileName, blockImplCount)) {
@@ -562,7 +562,7 @@ public class BlockCreator {
                 }
             }
         }
-        
+
         if (storedModuleValid) {
             // Module has already been built, load existing file
             //System.out.println("Reading Stored dat/kryo for " + uniqueFileName);
@@ -585,7 +585,7 @@ public class BlockCreator {
         inMemModuleCache.put(cacheID, modules);
         return modules;
     }
-    
+
     public static void main(String[] args) {
         if (args.length != 5) {
             System.out.println("USAGE: <EDIF file name> <routed DCP file name> "

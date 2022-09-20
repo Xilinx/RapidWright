@@ -1,28 +1,28 @@
 /*
- * 
- * Copyright (c) 2017-2022, Xilinx, Inc. 
+ *
+ * Copyright (c) 2017-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
  *
- * This file is part of RapidWright. 
- * 
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 /**
- * 
+ *
  */
 package com.xilinx.rapidwright.edif;
 
@@ -41,20 +41,20 @@ import com.xilinx.rapidwright.design.Cell;
 
 /**
  * Represents a net within an EDIF netlist.
- * 
+ *
  * Created on: May 11, 2017
  */
 public class EDIFNet extends EDIFPropertyObject {
-    
+
     private EDIFCell parentCell;
-    
+
     private EDIFPortInstList portInsts;
 
     public EDIFNet(String name, EDIFCell parentCell) {
         super(name);
         if (parentCell != null) parentCell.addNet(this);
     }
-    
+
     /**
      * Copy constructor, does not copy portInsts
      * @param net
@@ -62,14 +62,14 @@ public class EDIFNet extends EDIFPropertyObject {
     public EDIFNet(EDIFNet net) {
         super((EDIFPropertyObject) net);
     }
-    
+
     protected EDIFNet() {
-        
+
     }
-    
+
     /**
      * Adds the EDIFPortInst to this logical net.  The net stores the port instances using a sorted
-     * ArrayList (@link EDIFPortInstList).  Worst case O(n) to add. 
+     * ArrayList (@link EDIFPortInstList).  Worst case O(n) to add.
      * @param portInst The port instance to add to this net.
      */
     public void addPortInst(EDIFPortInst portInst) {
@@ -86,7 +86,7 @@ public class EDIFNet extends EDIFPropertyObject {
         }
         portInsts.add(portInst);
     }
-    
+
     public void trackChanges(EDIFChangeType type, EDIFCellInst inst, String portInstName) {
         EDIFNetlist netlist = parentCell.getNetlist();
         if (netlist != null && netlist.isTrackingCellChanges()) {
@@ -95,15 +95,15 @@ public class EDIFNet extends EDIFPropertyObject {
             netlist.addTrackingChange(parentCell, change);
         }
     }
-    
+
     public EDIFPortInst createPortInst(EDIFPort port) {
         return new EDIFPortInst(port, this, null);
     }
-    
+
     public EDIFPortInst createPortInst(EDIFPort port, int index) {
         return new EDIFPortInst(port, this, index, null);
     }
-    
+
     public EDIFPortInst createPortInst(String portName, EDIFCellInst cellInst) {
         EDIFPort port = cellInst.getPort(portName);
         if (port == null) {
@@ -121,35 +121,35 @@ public class EDIFNet extends EDIFPropertyObject {
         }
         return new EDIFPortInst(port, this, cellInst);
     }
-    
+
     public EDIFPortInst createPortInst(String portName, int index, EDIFCellInst cellInst) {
         EDIFPort port = cellInst.getPort(portName);
         return new EDIFPortInst(port, this, index, cellInst);
     }
-    
+
     public EDIFPortInst createPortInst(String portName, Cell cell) {
         EDIFCellInst cellInst = cell.getEDIFCellInst();
         return createPortInst(portName,cellInst);
     }
-    
+
     public EDIFPortInst createPortInst(String portName, int index, Cell cell) {
         EDIFCellInst cellInst = cell.getEDIFCellInst();
         return createPortInst(portName,index,cellInst);
     }
 
-    
+
     public EDIFPortInst createPortInst(EDIFPort port, EDIFCellInst cellInst) {
         return new EDIFPortInst(port, this, cellInst);
     }
-        
+
     public EDIFPortInst createPortInst(EDIFPort port, int index, EDIFCellInst cellInst) {
         return new EDIFPortInst(port, this, index, cellInst);
     }
-    
+
     /**
      * Creates a new map of all the EDIFPortInst objects stored on this net.  The new map
-     * contains a copy of EDIFPortInsts available at the time of invocation as returned from 
-     * {@link #getPortInstList()}.      
+     * contains a copy of EDIFPortInsts available at the time of invocation as returned from
+     * {@link #getPortInstList()}.
      * @return A map of EDIFPortInst names ({@link EDIFPortInst#getName()} to the corresponding objects.
      * @deprecated
      */
@@ -161,7 +161,7 @@ public class EDIFNet extends EDIFPropertyObject {
         }
         return map;
     }
-    
+
     /**
      * Gets the sorted ArrayList of EDIFPortInsts on this net as a collection.
      * @return The collection of EDIFPortInsts on this net.
@@ -169,17 +169,17 @@ public class EDIFNet extends EDIFPropertyObject {
     public Collection<EDIFPortInst> getPortInsts() {
         return portInsts == null ? Collections.emptyList() : portInsts;
     }
-    
+
     public void rename(String newName) {
         this.parentCell.removeNet(this);
         setName(newName);
         this.parentCell.addNet(this);
     }
-    
+
     /**
-     * This returns all sources on the net, either output ports of the 
+     * This returns all sources on the net, either output ports of the
      * cell instances in the cell or the top level input ports.
-     * @return A list of port ref sources. 
+     * @return A list of port ref sources.
      */
     public List<EDIFPortInst> getSourcePortInsts(boolean includeTopLevelPorts) {
         List<EDIFPortInst> srcs = new ArrayList<>();
@@ -191,21 +191,21 @@ public class EDIFNet extends EDIFPropertyObject {
         }
         return srcs;
     }
-    
+
     /**
      * @deprecated
      * Poor performance, please use {@link #getPortInst(EDIFCellInst, String)}.
      * @param fullName Full name of the port instance {@link EDIFPortInst#getFullName()}
-     * @return The port instance connected to this net, or null if none exists. 
+     * @return The port instance connected to this net, or null if none exists.
      */
     public EDIFPortInst getPortInst(String fullName) {
         return getPortInstMap().get(fullName);
     }
-    
+
     /**
      * Gets the port instance specified by the cell instance and name of the port instance.  If the
      * specified cell instance is null, this looks for a top level port instance on the parent cell.
-     * The net stores the port instances using a sorted ArrayList (@link EDIFPortInstList).  Worst 
+     * The net stores the port instances using a sorted ArrayList (@link EDIFPortInstList).  Worst
      * case O(log n) to get.
      * @param inst The cell instance where the EDIFPortInst resides.  If this is null, it gets the
      * top level port instance connected to the parent cell port.
@@ -231,9 +231,9 @@ public class EDIFNet extends EDIFPropertyObject {
         }
         return null;
     }
-    
+
     /**
-     * Gets all top level port instances connected to this net.  
+     * Gets all top level port instances connected to this net.
      * @return A list of all top level port instances connected to this net.
      */
     public List<EDIFPortInst> getAllTopLevelPortInsts() {
@@ -245,20 +245,20 @@ public class EDIFNet extends EDIFPropertyObject {
         }
         return topPortInsts;
     }
-    
+
     /**
-     * Removes the port instance provided from the net. The net stores the port instances using a 
+     * Removes the port instance provided from the net. The net stores the port instances using a
      * sorted ArrayList (@link EDIFPortInstList).  Worst case O(n) to remove.
      * @param portInst The port instance to remove from the net.
      * @return The port instance object that was removed or null if no changes were made.
      */
     public EDIFPortInst removePortInst(EDIFPortInst portInst) {
-        return removePortInst(portInst.getCellInst(), portInst.getName()); 
+        return removePortInst(portInst.getCellInst(), portInst.getName());
     }
-    
+
     /**
-     * Removes the port instance by full name.  
-     * @param portInstName Full name of the port instance (if its on a cell instance, it includes 
+     * Removes the port instance by full name.
+     * @param portInstName Full name of the port instance (if its on a cell instance, it includes
      * the instance name suffixed with '/' followed by bit-wise port name.
      * @return The removed port instance, or null if none removed.
      * @deprecated
@@ -273,11 +273,11 @@ public class EDIFNet extends EDIFPropertyObject {
         String pinName = portInstName.substring(hierIdx+1);
         return removePortInst(inst,pinName);
     }
-    
+
     /**
      * Removes the port instance specified from the net. The net stores the port instances using a
-     * sorted ArrayList (@link EDIFPortInstList).  Worst case O(n) to remove. 
-     * @param inst The cell instance where the EDIFPortInst resides.  If this is null, it removes 
+     * sorted ArrayList (@link EDIFPortInstList).  Worst case O(n) to remove.
+     * @param inst The cell instance where the EDIFPortInst resides.  If this is null, it removes
      * the top level port instance connected to the parent cell port.
      * @param portInstName Name of the port instance ({@link EDIFPortInst#getName()} to remove
      * @return The port instance object that was removed or null if no changes were made.
@@ -292,7 +292,7 @@ public class EDIFNet extends EDIFPropertyObject {
         if (tmp != null) tmp.setParentNet(null);
         return tmp;
     }
-    
+
     /**
      * @return the parentCell
      */

@@ -1,27 +1,27 @@
-/* 
- * Copyright (c) 2017-2022, Xilinx, Inc. 
+/*
+ * Copyright (c) 2017-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
- *  
- * This file is part of RapidWright. 
- * 
+ *
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 /**
- * 
+ *
  */
 package com.xilinx.rapidwright.edif;
 
@@ -59,59 +59,59 @@ import com.xilinx.rapidwright.util.Pair;
 
 
 /**
- * A collection of utility methods for extracting information from BYU EDIF tool 
+ * A collection of utility methods for extracting information from BYU EDIF tool
  * netlists.
  * Created on: Dec 2, 2015
  */
 public class EDIFTools {
 
     public static String EDIF_HIER_SEP = "/";
-    
+
     public static final String EDIF_LIBRARY_HDI_PRIMITIVES_NAME = "hdi_primitives";
 
     public static final String MACRO_PRIMITIVES_LIB = "macro_primitives";
-    
+
     public static final String EDIF_LIBRARY_WORK_NAME = "work";
 
     public static final String EDIF_PART_PROP = "PART";
-    
-    public static final Set<String> edifKeywordSet = 
+
+    public static final Set<String> edifKeywordSet =
         new HashSet<>(Arrays.asList(
-            "abs", "acload", "actual", "after", "and", "annotate", "apply", 
+            "abs", "acload", "actual", "after", "and", "annotate", "apply",
             "arc", "array", "arraymacro", "arrayrelatedinfo", "arraysite",
             "assign", "atleast", "atmost", "author", "basearray", "becomes",
-            "between", "block", "boolean", "booleandisplay", "booleanmap", 
+            "between", "block", "boolean", "booleandisplay", "booleanmap",
             "borderpattern", "borderwidth", "boundingbox","build", "ceiling",
             "cell", "cellref", "celltype", "change", "circle","collector",
             "color", "comment", "commentgraphics", "compound", "concat",
             "connectlocation", "constant", "constraint", "contents",
-            "cornertype","criticality", "currentmap", "curve", "cycle", 
-            "dataorigin", "dcfaninload", "dcfanoutload", "dcmaxfanin", 
-            "dcmaxfanout", "delay", "delta", "derivation", "design", 
-            "designator", "difference", "direction", "display", "divide", 
+            "cornertype","criticality", "currentmap", "curve", "cycle",
+            "dataorigin", "dcfaninload", "dcfanoutload", "dcmaxfanin",
+            "dcmaxfanout", "delay", "delta", "derivation", "design",
+            "designator", "difference", "direction", "display", "divide",
             "dominates", "dot", "duration", "e", "edif", "ediflevel",
-            "edifversion", "else", "enclosuredistance", "endtype", "entry", 
-            "equal", "escape", "event", "exactly", "external", "fabricate", 
-            "false", "figure", "figurearea", "figuregroup", 
-            "figuregroupobject", "figuregroupoverride", "figuregroupref", 
+            "edifversion", "else", "enclosuredistance", "endtype", "entry",
+            "equal", "escape", "event", "exactly", "external", "fabricate",
+            "false", "figure", "figurearea", "figuregroup",
+            "figuregroupobject", "figuregroupoverride", "figuregroupref",
             "figureperimeter", "figurewidth", "fillpattern", "fix", "floor",
-            "follow", "forbiddenevent", "foreach", "formal", "formallist", 
-            "generate", "globalportref", "greaterthan", "gridmap", "if", 
+            "follow", "forbiddenevent", "foreach", "formal", "formallist",
+            "generate", "globalportref", "greaterthan", "gridmap", "if",
             "ignore", "includefiguregroup", "increasing", "initial",
             "instance", "instancebackannotate", "instancegroup", "instancemap",
             "instanceref", "integer", "integerdisplay", "interface",
-            "interfiguregroupspacing", "intersection", 
-            "intrafiguregroupspacing", "inverse", "isolated", "iterate", 
-            "joined", "justify", "keywordalias", "keyworddefine", 
-            "keyworddisplay", "keywordlevel", "keywordmap", 
-            "keywordparameters", "lessthan", "library", "libraryref", 
+            "interfiguregroupspacing", "intersection",
+            "intrafiguregroupspacing", "inverse", "isolated", "iterate",
+            "joined", "justify", "keywordalias", "keyworddefine",
+            "keyworddisplay", "keywordlevel", "keywordmap",
+            "keywordparameters", "lessthan", "library", "libraryref",
             "listofnets", "listofports", "literal", "loaddelay", "logicassign",
             "logicinput", "logiclist", "logicmapinput", "logicmapoutput",
             "logiconeof", "logicoutput", "logicport", "logicref", "logicvalue",
             "logicwaveform", "maintain", "match", "max", "member", "min",
-            "minomax", "minomaxdisplay", "mnm", "mod", "multiplevalueset", 
-            "mustjoin", "name", "negate", "net", "netbackannotate", 
-            "netbundle", "netdelay", "netgroup", "netmap", "netref", 
+            "minomax", "minomaxdisplay", "mnm", "mod", "multiplevalueset",
+            "mustjoin", "name", "negate", "net", "netbackannotate",
+            "netbundle", "netdelay", "netgroup", "netmap", "netref",
             "nochange", "nonpermutable", "not", "notallowed", "notchspacing",
             "number", "numberdefinition", "numberdisplay", "offpageconnector",
             "offsetevent", "openshape", "optional", "or", "orientation",
@@ -122,7 +122,7 @@ public class EDIFTools {
             "pointsubtract", "pointsum", "polygon", "port", "portbackannotate",
             "portbundle", "portdelay", "portgroup", "portimplementation",
             "portinstance", "portlist", "portlistalias", "portmap", "portref",
-            "product", "program", "property", "propertydisplay", 
+            "product", "program", "property", "propertydisplay",
             "protectionframe", "pt", "rangevector", "rectangle",
             "rectanglesize", "rename", "resolves", "scale", "scalex", "scaley",
             "section", "shape", "simulate", "simulationinfo", "singlevalueset",
@@ -135,29 +135,29 @@ public class EDIFTools {
             "userdata", "variable", "version", "view", "viewlist", "viewmap",
             "viewref", "viewtype", "visible", "voltagemap", "wavevalue",
             "weak", "weakjoined", "when", "while", "written", "xcoord", "xor",
-            "ycoord"            
-        )); 
+            "ycoord"
+        ));
 
     public static final String LOGICAL_VCC_NET_NAME = "<const1>";
     public static final String LOGICAL_GND_NET_NAME = "<const0>";
 
     public static final String LOAD_TCL_SUFFIX = "_load.tcl";
-    
+
     public static int UNIQUE_COUNT = 0;
 
     /**
      * Flag to set a feature where any .edf file that is attempted to be loaded will check if an
-     * existing binary EDIF has already been generated and will load that instead (faster).  This 
+     * existing binary EDIF has already been generated and will load that instead (faster).  This
      * will also enable generation of binary EDIF files after a successful EDIF file loading to be
      * used on the next load.
      */
-    public static final boolean RW_ENABLE_EDIF_BINARY_CACHING = 
+    public static final boolean RW_ENABLE_EDIF_BINARY_CACHING =
             System.getenv("RW_ENABLE_EDIF_BINARY_CACHING") != null;
-    
+
     private static String getUniqueSuffix() {
         return "_rw_created" + UNIQUE_COUNT++;
     }
-    
+
     /**
      * Helper method to get the part name from an EDIF netlist.
      * @param edif The EDIF netlist from which to extract the part name.
@@ -171,7 +171,7 @@ public class EDIFTools {
         }
         return p.getValue();
     }
-    
+
     public static boolean ensureCellInLibraries(EDIFNetlist e, EDIFCell c) {
         EDIFCell libCell = e.getCell(c.getName());
         if (libCell == null) {
@@ -180,7 +180,7 @@ public class EDIFTools {
         }
         return true;
     }
-    
+
     private static EDIFLibrary matchCellToEDIFLibrary(EDIFNetlist n, EDIFCell c) {
         String libName = c.isPrimitive() ? EDIF_LIBRARY_HDI_PRIMITIVES_NAME : EDIF_LIBRARY_WORK_NAME;
         EDIFLibrary lib = n.getLibrary(libName);
@@ -195,7 +195,7 @@ public class EDIFTools {
         // Not sure which one to use, so we'll just choose the first
         return libs.iterator().next();
     }
-    
+
     public static void consolidateLibraries(EDIFNetlist edif) {
         HashMap<String,EDIFCell> moveToWork = new HashMap<String,EDIFCell>();
         EDIFLibrary workLib = edif.getLibrary(EDIF_LIBRARY_WORK_NAME);
@@ -228,32 +228,32 @@ public class EDIFTools {
             if (c.getLibrary().getName().equals(hdiPrims.getName())) {
                 if (!hdiPrims.containsCell(c.getName())) {
                     c.moveToLibrary(hdiPrims);
-                    hdiPrims.addCell(c);                    
+                    hdiPrims.addCell(c);
                 }
             }
         }
     }
-    
-    public static void connectPortBus(EDIFCell topCell, EDIFCellInst src, EDIFCellInst snk, 
+
+    public static void connectPortBus(EDIFCell topCell, EDIFCellInst src, EDIFCellInst snk,
                                       String srcPrefix, String snkPrefix, int width) {
         for (int i=0; i < width; i++) {
             String suffix = "["+i+"]";
             String outputPortName = srcPrefix + suffix;
-            String inputPortName = snkPrefix + suffix; 
-            
+            String inputPortName = snkPrefix + suffix;
+
             EDIFNet net = null;
             net = new EDIFNet("conn_net_" + EDIFTools.makeNameEDIFCompatible(outputPortName), topCell);
 
             EDIFPortInst outputPortInst = src.getPortInst(outputPortName);
             EDIFPortInst inputPortInst = snk.getPortInst(inputPortName);
-            
+
             @SuppressWarnings("unused")
             EDIFPortInst outputPort = new EDIFPortInst(outputPortInst.getPort(),net,outputPortInst.getIndex(),src);
             @SuppressWarnings("unused")
             EDIFPortInst inputPort = new EDIFPortInst(inputPortInst.getPort(),net,inputPortInst.getIndex(),snk);
         }
     }
-    
+
     /**
      * Creates a map for each EDIF cell type to all its instances, starting with the top cell instance.
      * @param topCellInst The top cell instance from which to start the search.
@@ -261,10 +261,10 @@ public class EDIFTools {
      */
     public static HashMap<EDIFCell, ArrayList<EDIFCellInst>> generateCellInstMap(EDIFCellInst topCellInst) {
         HashMap<EDIFCell, ArrayList<EDIFCellInst>> instanceMap = new HashMap<EDIFCell, ArrayList<EDIFCellInst>>();
-        
+
         Queue<EDIFCellInst> q = new LinkedList<EDIFCellInst>();
         q.add(topCellInst);
-        
+
         while (!q.isEmpty()) {
             EDIFCellInst eci = q.poll();
 
@@ -279,22 +279,22 @@ public class EDIFTools {
                 q.add(child);
             }
         }
-        
+
         return instanceMap;
     }
-    
+
     /**
      * Same as EDIFNetlist.getCellInstFromHierName()
      * @param netlist The netlist to search
      * @param hierarchicalName The full hierarchical name of the instance
      * @return The cell instance named, or null if it could not be found
-     * @deprecated 
+     * @deprecated
      * To be removed in 2022.2.0
      */
     public static EDIFCellInst getEDIFCellInst(EDIFNetlist netlist, String hierarchicalName) {
         return netlist.getCellInstFromHierName(hierarchicalName);
     }
-    
+
     /**
      * Gets the EDIFNet corresponding to the hierarchical name of a net.
      * @param hierarchicalName The full path name to the het
@@ -302,7 +302,7 @@ public class EDIFTools {
      */
     public static EDIFNet getNet(EDIFNetlist e, String hierarchicalName) {
         String[] parts = hierarchicalName.split(EDIF_HIER_SEP);
-        
+
         EDIFCellInst currInst = e.getTopCellInst();
         for (int i=0; i < parts.length-1; i++) {
             currInst = currInst.getCellType().getCellInst(EDIFTools.makeNameEDIFCompatible(parts[i]));
@@ -310,7 +310,7 @@ public class EDIFTools {
         String netName = makeNameEDIFCompatible(parts[parts.length-1]);
         return currInst.getCellType().getNet(netName);
     }
-    
+
     public static EDIFNet addNet(EDIFNetlist e, String hierarchicalName) {
         String[] parts = hierarchicalName.split(EDIF_HIER_SEP);
         EDIFCellInst currInst = e.getTopCellInst();
@@ -325,12 +325,12 @@ public class EDIFTools {
 
         return newEDIFNet;
     }
-    
+
     /**
-     * Tries to make a string EDIF compatible by replacing invalid characters 
-     * with an underscore.  
+     * Tries to make a string EDIF compatible by replacing invalid characters
+     * with an underscore.
      * @param currName Existing name to be made legal
-     * @return A new string that has been legalized to EDIF standards. 
+     * @return A new string that has been legalized to EDIF standards.
      */
     public static String makeNameEDIFCompatible(String currName) {
         char[] newName = currName.toCharArray();
@@ -377,7 +377,7 @@ public class EDIFTools {
                 newName[i] = '_';
             }
         }
-        if (newName[0] == '_' || Character.isDigit(newName[0])) return "&" + new String(newName,0,len); 
+        if (newName[0] == '_' || Character.isDigit(newName[0])) return "&" + new String(newName,0,len);
         return new String(newName,0,len);
     }
 
@@ -403,14 +403,14 @@ public class EDIFTools {
         if (idx < 0) return "";
         return s.substring(0, idx);
     }
-    
+
     /**
      * Determines if the char[] ends with the pattern [#:#] where # are positive
      * bus values (e.g., [7:0]) and then returns the length of the string without
-     * the bus suffix (if it exists).  If the name does not end with the bus 
+     * the bus suffix (if it exists).  If the name does not end with the bus
      * pattern, it returns the original length of the char[].
      * @param name
-     * @return The length of the string 
+     * @return The length of the string
      */
     public static int lengthOfNameWithoutBus(char[] name) {
         int len = name.length;
@@ -426,15 +426,15 @@ public class EDIFTools {
         if (name[i] != '[') return len;
         return i;
     }
-    
+
     public static int getPortIndexFromName(String name) {
         int lengthRootName = name.lastIndexOf('[');
         String tmp = name.substring(lengthRootName+1, name.length()-1);
         return Integer.parseInt(tmp);
     }
-    
+
     /**
-     * 
+     *
      * @param name
      * @return
      */
@@ -454,7 +454,7 @@ public class EDIFTools {
         if (colonIdx == -1 || leftBracket == -1) {
             throw new RuntimeException("ERROR: Interpreting port " + name + ", couldn't identify indicies.");
         }
-        
+
         int left = Integer.parseInt(name.substring(leftBracket+1, colonIdx));
         int right = Integer.parseInt(name.substring(colonIdx+1, name.length()-1));
         return Math.abs(left - right) + 1;
@@ -466,27 +466,27 @@ public class EDIFTools {
         }
         return new EDIFNet(netName, parentCell);
     }
-    
+
     /**
      * Connects two existing logical port insts together by creating new ports and nets on all cells
      * instantiated between their levels of hierarchy.  It assumes the netlist cells involved only
-     * have one instance (does not differentiate cells when creating the ports).  This assumption 
+     * have one instance (does not differentiate cells when creating the ports).  This assumption
      * can be enforced by calling {@link #uniqueifyNetlist(Design)}. If the src or snk
      * port insts do net have nets connected, it will create them and connect them in their parent
      * cell definition.
-     * @param src The logical port inst driver or source  
+     * @param src The logical port inst driver or source
      * @param snk The logical port inst sink
      * @param newName A unique name to be used in creating the ports and nets
      */
-    public static void connectPortInstsThruHier(EDIFHierPortInst src, EDIFHierPortInst snk, 
+    public static void connectPortInstsThruHier(EDIFHierPortInst src, EDIFHierPortInst snk,
             String newName) {
-        EDIFHierCellInst commonAncestor = 
+        EDIFHierCellInst commonAncestor =
                 src.getHierarchicalInst().getCommonAncestor(snk.getHierarchicalInst());
         EDIFHierPortInst finalSrc = src;
         EDIFHierPortInst finalSnk = snk;
         boolean createdSrcNet = false;
-        // Trace existing connections or make new connections between src and snk to the common 
-        // ancestor.   
+        // Trace existing connections or make new connections between src and snk to the common
+        // ancestor.
         for (EDIFHierPortInst hierPortInst : new EDIFHierPortInst[] {src, snk}) {
             EDIFHierCellInst hierParentInst = hierPortInst.getHierarchicalInst();
             EDIFNet currNet = hierPortInst.getNet();
@@ -517,9 +517,9 @@ public class EDIFTools {
                     EDIFCell cellType = hierParentInst.getCellType();
                     String newPortName = newName;
                     if (cellType.getPort(newPortName) != null) {
-                        newPortName += getUniqueSuffix(); 
+                        newPortName += getUniqueSuffix();
                     }
-                    EDIFPort port = cellType.createPort(newPortName, 
+                    EDIFPort port = cellType.createPort(newPortName,
                             hierPortInst == src ? EDIFDirection.OUTPUT : EDIFDirection.INPUT, 1);
 
                     currNet.createPortInst(port);
@@ -553,23 +553,23 @@ public class EDIFTools {
                 }
                 return;
             } else {
-                snkNet.removePortInst(finalSnk.getPortInst());                
+                snkNet.removePortInst(finalSnk.getPortInst());
             }
         }
         // Make final connection in the common ancestor instance
-        finalSrc.getNet().addPortInst(finalSnk.getPortInst());   
+        finalSrc.getNet().addPortInst(finalSnk.getPortInst());
     }
 
     /**
-     * Specialized function to connect a debug port within an EDIF netlist.  
+     * Specialized function to connect a debug port within an EDIF netlist.
      * @param topPortNet The top-level net that connects to the debug core's input port.
      * @param routedNetName The name of the routed net who's source is the net we need to connect to
      * @param newPortName The name of the port to be added at each level of hierarchy
      * @param parentInst The instance where topPortNet resides
-     * @param netlist The current netlist 
-     * @param instMap The map of the design created by {@link EDIFTools#generateCellInstMap(EDIFCellInst)} 
+     * @param netlist The current netlist
+     * @param instMap The map of the design created by {@link EDIFTools#generateCellInstMap(EDIFCellInst)}
      */
-    public static void connectDebugProbe(EDIFNet topPortNet, String routedNetName, String newPortName, 
+    public static void connectDebugProbe(EDIFNet topPortNet, String routedNetName, String newPortName,
             EDIFHierCellInst parentInst, EDIFNetlist netlist, HashMap<EDIFCell, ArrayList<EDIFCellInst>> instMap) {
         EDIFNet currNet = topPortNet;
         String currParentName = parentInst.getParent().getFullHierarchicalInstName();
@@ -584,7 +584,7 @@ public class EDIFTools {
             currNet = new EDIFNet(newPortName, currInst.getCellType());
             currNet.createPortInst(newPortName, prevInst);
         }
-        
+
         String[] parts = routedNetName.split(EDIFTools.EDIF_HIER_SEP);
         int idx = 0;
         if (!netlist.getTopCell().equals(currInst.getCellType())) {
@@ -598,7 +598,7 @@ public class EDIFTools {
                     currInst.getName() + " from routed net name " + routedNetName);
             }
         }
-        
+
         for (int i=idx; i <= parts.length-2; i++) {
             currInst = currInst.getCellType().getCellInst(parts[i]);
             EDIFCell type = currInst.getCellType();
@@ -612,17 +612,17 @@ public class EDIFTools {
                 EDIFNet targetNet = currInst.getCellType().getNet(parts[parts.length-1]);
                 targetNet.createPortInst(newPort);
             } else {
-                EDIFNet childNet = new EDIFNet(topPortNet.getName(), currInst.getCellType());            
+                EDIFNet childNet = new EDIFNet(topPortNet.getName(), currInst.getCellType());
                 childNet.createPortInst(newPort);
                 currNet = childNet;
             }
         }
     }
-    
+
     /**
-     * Specialized function to add enable a debug probe connection.  Adds the external port on the debug core and 
+     * Specialized function to add enable a debug probe connection.  Adds the external port on the debug core and
      * a new net at the top level that can be used to as a sink to probe a user signal.  Used in conjunction with
-     * EDIFTools.connectDebugProbe(...) 
+     * EDIFTools.connectDebugProbe(...)
      * @param newDebugNetName Name of the debug net to add at the top level
      * @param topCell Name of the cell where the net and port should exists
      * @param currPort The existing port on the debug core
@@ -635,11 +635,11 @@ public class EDIFTools {
         addDebugPort(net,topCell,currPort,debugCore);
         return net;
     }
-    
+
     /**
      * Adds the debug port to the debug core in the EDIF netlist
      * @param net The net to which the port should connect
-     * @param topCell The top cell which has the debug core as a subcell 
+     * @param topCell The top cell which has the debug core as a subcell
      * @param currPort The current port to add
      * @param debugCore The debug core
      * @return The newly created {@link EDIFPortInst}
@@ -649,9 +649,9 @@ public class EDIFTools {
         EDIFPortInst probeInput = new EDIFPortInst(currPort.getPort(), net, debugCore);
         net.addPortInst(probeInput);
 
-        
+
         if (topCell.getNet(net) == null) {
-            topCell.addNet(net);                
+            topCell.addNet(net);
         }
         return probeInput;
     }
@@ -669,18 +669,18 @@ public class EDIFTools {
     }
 
     /**
-     * Creates and/or gets the static net (GND/VCC) in the specified cell.  
+     * Creates and/or gets the static net (GND/VCC) in the specified cell.
      * @param type The type of net to get or create
      * @param cell The cell that should have a static net
      * @param netlist The netlist of interest
      * @return An existing or newly created static net for the cell provided.
      */
     public static EDIFNet getStaticNet(NetType type, EDIFCell cell, EDIFNetlist netlist) {
-        return getStaticNet(type, cell, netlist, type == NetType.GND ? LOGICAL_GND_NET_NAME : LOGICAL_VCC_NET_NAME);        
+        return getStaticNet(type, cell, netlist, type == NetType.GND ? LOGICAL_GND_NET_NAME : LOGICAL_VCC_NET_NAME);
     }
-    
+
     /**
-     * Creates and/or gets the static net (GND/VCC) in the specified cell.  
+     * Creates and/or gets the static net (GND/VCC) in the specified cell.
      * @param type The type of net to get or create
      * @param cell The cell that should have a static net
      * @param netlist The netlist of interest
@@ -705,7 +705,7 @@ public class EDIFTools {
             outputPortInst = new EDIFPortInst(staticInst.getPort(portName),null,staticInst);
         }
         EDIFNet staticNet = outputPortInst.getNet();
-        
+
         if (staticNet == null) {
             String debugNetName = netName;
             staticNet = cell.getNet(debugNetName);
@@ -716,15 +716,15 @@ public class EDIFTools {
         }
         return staticNet;
     }
-    
+
     public static void main(String[] args) {
         CodePerfTracker t = new CodePerfTracker("EDIF Read", true);
         String edifFileName = args[0];
         EDIFNetlist edif;
-        
+
         t.start("Read EDIF from ASCII EDIF file");
         edif = EDIFTools.loadEDIFFile(edifFileName);
-        t.stop(); 
+        t.stop();
         t.start("Write EDIF file");
         EDIFTools.writeEDIFFile(edifFileName.replace(".edf", "_out.edf"), edif, "partname");
         t.stop().printSummary();
@@ -748,12 +748,12 @@ public class EDIFTools {
             if (ParallelEDIFParser.calcThreads(size) > 1) {
                 try (ParallelEDIFParser p = new ParallelEDIFParser(fileName)) {
                     return p.parseEDIFNetlist();
-                }           
+                }
             } else {
                 try (EDIFParser p = new EDIFParser(fileName)) {
                     return p.parseEDIFNetlist();
-                }                       
-            }            
+                }
+            }
         } catch (IOException e) {
             throw new UncheckedIOException("ERROR: Couldn't read file : " + fileName, e);
         }
@@ -821,7 +821,7 @@ public class EDIFTools {
                     edifDirectoryName = canEdifFile.getParent();
                 }
             } catch (IOException e) {
-                // Unable to determine EDIF source directory - not sure if 
+                // Unable to determine EDIF source directory - not sure if
                 // this is worth throwing an error as we are only checking for EDN files
                 System.err.println("WARNING: Could not determine source directory for EDIF. "
                     + "If it contained encrypted cells \n(present as .edn files), they will not "
@@ -832,13 +832,13 @@ public class EDIFTools {
         if (edifDirectoryName != null) {
             File origDir = new File(edifDirectoryName);
             edif.setOrigDirectory(edifDirectoryName);
-            String[] ednFiles = origDir.list(FileTools.getEDNFilenameFilter()); 
+            String[] ednFiles = origDir.list(FileTools.getEDNFilenameFilter());
             if (ednFiles != null && ednFiles.length > 0) {
                 edifDirectoryName = edifDirectoryName + File.separator;
                 for (int i=0; i < ednFiles.length; i++) {
                     ednFiles[i] = edifDirectoryName + ednFiles[i];
                 }
-                
+
             }
             edif.setEncryptedCells(new ArrayList<>(Arrays.asList(ednFiles)));
         }
@@ -872,13 +872,13 @@ public class EDIFTools {
         writeEDIFFile(out, (Path) null, edif, partName);
     }
 
-    
+
     /**
-     * Write out EDIF to a stream.  Also checks if netlist has potential encrypted cells and 
+     * Write out EDIF to a stream.  Also checks if netlist has potential encrypted cells and
      * creates a Tcl script to help re-import design into Vivado intact.
      * @param out The output stream
      * @param dcpFileName The name of the DCP file associated with this netlist
-     * @param edif The netlist of the design 
+     * @param edif The netlist of the design
      * @param partName The target part for this design
      */
     public static void writeEDIFFile(OutputStream out, Path dcpFileName, EDIFNetlist edif,
@@ -889,7 +889,7 @@ public class EDIFTools {
             if (dcpFileName != null && edif.getEncryptedCells() != null) {
                 if (edif.getEncryptedCells().size() > 0) {
                     writeTclLoadScriptForPartialEncryptedDesigns(edif, dcpFileName, partName);
-                }                
+                }
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -912,15 +912,15 @@ public class EDIFTools {
             writeEDIFFile(out, Paths.get(dcpFileName), edif, partName);
         }
     }
-    
-    public static void writeTclLoadScriptForPartialEncryptedDesigns(EDIFNetlist edif, 
+
+    public static void writeTclLoadScriptForPartialEncryptedDesigns(EDIFNetlist edif,
                                                             Path dcpFileName, String partName) {
         ArrayList<String> lines = new ArrayList<String>();
         for (String cellName : edif.getEncryptedCells()) {
             lines.add("read_edif " + cellName);
         }
         Path pathDCPFileName = dcpFileName.toAbsolutePath();
-        
+
         lines.add("read_checkpoint " + pathDCPFileName);
         lines.add("set_property top "+edif.getName()+" [current_fileset]");
         lines.add("link_design -part " + partName);
@@ -930,7 +930,7 @@ public class EDIFTools {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
-        System.out.println("INFO: Design Checkpoint \'"+ pathDCPFileName + "\'" 
+        System.out.println("INFO: Design Checkpoint \'"+ pathDCPFileName + "\'"
                 + "\n      may contain encrypted cells. To correctly load the design into Vivado, "
                 + "\n      please source this Tcl script to open the checkpoint: "
                 + "\n\n      source " + tclFileName + "\n");
@@ -946,7 +946,7 @@ public class EDIFTools {
     public static EDIFNetlist createNewNetlist(String topName) {
         return createNewNetlist(topName, true);
     }
-    
+
     public static EDIFNetlist createNewNetlist(String topName, boolean addINV) {
         EDIFNetlist n = new EDIFNetlist(topName);
         n.generateBuildComments();
@@ -961,8 +961,8 @@ public class EDIFTools {
     }
 
     /**
-     * Creates a new netlist from an existing EDIFCellInst in a netlist.  This operation does not 
-     * modify the source netlist.   
+     * Creates a new netlist from an existing EDIFCellInst in a netlist.  This operation does not
+     * modify the source netlist.
      * @param cellInst The new top cell/top cell inst in the netlist.
      * @return The newly created netlist from the provided cell inst.
      */
@@ -974,7 +974,7 @@ public class EDIFTools {
         EDIFCell topCell = cellInst.getCellType();
         n.copyCellAndSubCells(topCell);
         eDesign.setTopCell(n.getLibrary(topCell.getLibrary().getName()).getCell(topCell.getName()));
-        // If we have more than the primitives and work library, lets order the libraries in the same way 
+        // If we have more than the primitives and work library, lets order the libraries in the same way
         // from the source netlist
         if (n.getLibraries().size() > 2) {
             // Put libraries in the same order as source netlist
@@ -986,13 +986,13 @@ public class EDIFTools {
             for (String libName : cellInst.getCellType().getNetlist().getLibrariesMap().keySet()) {
                 EDIFLibrary lib = libs.get(libName);
                 if (lib != null) {
-                    n.getLibrariesMap().put(libName, lib);                    
+                    n.getLibrariesMap().put(libName, lib);
                 }
             }
         }
         return n;
     }
-    
+
     public static int[] bitBlastBus(String busSuffix) {
         int colon = busSuffix.indexOf(':');
         int left = Integer.parseInt(busSuffix.substring(1,colon));
@@ -1006,7 +1006,7 @@ public class EDIFTools {
         }
         return idxs;
     }
-    
+
     /**
      * Bit blasts the shorthand bus name (ex: {@code "data[0:2]" --> ["data0", "data1", "data2"]})
      * @param bussedSignal The bussed name with bracketed indices
@@ -1026,10 +1026,10 @@ public class EDIFTools {
     }
 
     /**
-     * Creates a top level port (if it doesn't already exist) and an array of corresponding {@link EDIFPortInst}s 
+     * Creates a top level port (if it doesn't already exist) and an array of corresponding {@link EDIFPortInst}s
      * to be used to connect to an array of EDIFNets
      * @param parent Top level cell to which the port should be created
-     * @param name Root name of the port to create and corresponding {@link EDIFPortInst}s (no brackets) 
+     * @param name Root name of the port to create and corresponding {@link EDIFPortInst}s (no brackets)
      * @param dir Direction of the port.
      * @param width Width of the port
      * @return An array [0:width-1] of port refs.
@@ -1046,7 +1046,7 @@ public class EDIFTools {
 
     /**
      * Creates an array of {@link EDIFPortInst}s from an existing port on an {@link EDIFCellInst}.
-     * @param name Root name of the port (no brackets) 
+     * @param name Root name of the port (no brackets)
      * @param dir Direction of the port
      * @param width Width of the port
      * @param eci The existing cell instance with the port to create the {@link EDIFPortInst}s.
@@ -1060,10 +1060,10 @@ public class EDIFTools {
         }
         return resultPortInsts;
     }
-    
-    
+
+
     /**
-     * Traverse all connected EDIFNets to find all leaf sink portrefs as part of the physical net. 
+     * Traverse all connected EDIFNets to find all leaf sink portrefs as part of the physical net.
      * @param startingInput Search begins at this portref and searches below in inner levels of hierarchy.  Doesn't search backwards.
      * @return The list of all leaf cell pin (portrefs) found below the provided starting input pin. Or null if the portref provided is not an input.
      */
@@ -1081,14 +1081,14 @@ public class EDIFTools {
                 if (!p.isInput()) continue;
                 if (p.getCellInst() == null) continue;
                 EDIFHierPortInst newPortInst = new EDIFHierPortInst(cellInst, p);
-                if (p.getCellInst().getCellType().isPrimitive()) {                    
+                if (p.getCellInst().getCellType().isPrimitive()) {
                     sinks.add(newPortInst);
                 } else {
                     q.add(newPortInst);
                 }
             }
         }
-        
+
         return sinks;
     }
 
@@ -1123,12 +1123,12 @@ public class EDIFTools {
 
     /**
      * Creates (or gets) a top level port by the specified name.  It will
-     * also ensure that the port is connected to the specified {@link EDIFCellInst} 
+     * also ensure that the port is connected to the specified {@link EDIFCellInst}
      * which should be part of an IBUF or OBUF.
      * @param d Current design with netlist
      * @param name Name of the port (and net if none exists)
      * @param i IBUF (or INBUF in UltraScale devices) or OBUF instances
-     * @param dir Direction of the pin on the IBUF/INBUF/OBUF instance to connect. 
+     * @param dir Direction of the pin on the IBUF/INBUF/OBUF instance to connect.
      */
     public static void addTopLevelPort(Design d, String name, EDIFCellInst i, PinType dir) {
         EDIFPortInst pr = createTopLevelPortInst(d, name, dir);
@@ -1143,7 +1143,7 @@ public class EDIFTools {
         EDIFPortInst bufPortInst = portNet.getPortInst(i, portName);
         if (bufPortInst == null)
             portNet.createPortInst(portName, i);
-        if (pr.getNet() == null) 
+        if (pr.getNet() == null)
             portNet.addPortInst(pr);
     }
 
@@ -1165,24 +1165,24 @@ public class EDIFTools {
         }
         return leafCells;
     }
-    
+
     /**
-     * Creates a map of all cells in the netlist and a mapping to a list of all the hierarchical 
+     * Creates a map of all cells in the netlist and a mapping to a list of all the hierarchical
      * instances of that cell.  Helpful in finding multiple instances of the same cell.
      * @param netlist The netlist to build the map from.
      * @return The populated map of cells to list of hierarchical instances.
      */
-    public static Map<EDIFLibrary, Map<EDIFCell, List<EDIFHierCellInst>>> 
+    public static Map<EDIFLibrary, Map<EDIFCell, List<EDIFHierCellInst>>>
                             createCellInstanceMap(EDIFNetlist netlist) {
-        Map<EDIFLibrary, Map<EDIFCell, List<EDIFHierCellInst>>> cellInstMap = 
+        Map<EDIFLibrary, Map<EDIFCell, List<EDIFHierCellInst>>> cellInstMap =
                 new HashMap<EDIFLibrary, Map<EDIFCell, List<EDIFHierCellInst>>>();
-        
+
         Queue<EDIFHierCellInst> toProcess = new LinkedList<EDIFHierCellInst>();
         netlist.getTopHierCellInst().addChildren(toProcess);
-        
+
         while (!toProcess.isEmpty()) {
             EDIFHierCellInst curr = toProcess.poll();
-            
+
             EDIFLibrary lib = curr.getCellType().getLibrary();
             Map<EDIFCell, List<EDIFHierCellInst>> cellMap = cellInstMap.computeIfAbsent(lib, k -> new HashMap<>());
 
@@ -1197,26 +1197,26 @@ public class EDIFTools {
                 toProcess.add(curr.getChild(i));
             }
         }
-    
+
         return cellInstMap;
     }
 
     /**
-     * Duplicates EDIFCells such that each EDIFCellInst only instantiates an EDIFCell once 
+     * Duplicates EDIFCells such that each EDIFCellInst only instantiates an EDIFCell once
      * (except primitives and macros).
      * @param design The design containing the netlist to uniqueify.
-     * @deprecated 
+     * @deprecated
      * Please use {@link #uniqueifyNetlist(Design)} instead
      * To be removed in 2022.2.0
      */
     public static void flattenNetlist(Design design) {
         uniqueifyNetlist(design);
     }
-    
+
     /**
-     * Duplicates EDIFCells such that each EDIFCellInst only instantiates an EDIFCell once 
-     * (except primitives and macros).  It also updates references throughout the logical and 
-     * physical netlist so all references are self-consistent.  This transformation is useful when 
+     * Duplicates EDIFCells such that each EDIFCellInst only instantiates an EDIFCell once
+     * (except primitives and macros).  It also updates references throughout the logical and
+     * physical netlist so all references are self-consistent.  This transformation is useful when
      * performing netlist manipulations such as adding/removing cells, ports or nets within a design.
      * @param design The design containing the netlist to uniqueify.
      * @return True if uniqueification necessary and netlist was modified, False if not necessary and netlist was not modified. Null if indeterminable.
@@ -1232,39 +1232,39 @@ public class EDIFTools {
         Map<EDIFLibrary, Map<EDIFCell, List<EDIFHierCellInst>>> instMap = createCellInstanceMap(netlist);
         // Don't uniqueify primitive cell instances
         instMap.remove(netlist.getHDIPrimitivesLibrary());
-        
-        Map<EDIFCell, List<EDIFHierCellInst>> toUniqueify 
+
+        Map<EDIFCell, List<EDIFHierCellInst>> toUniqueify
                                             = new HashMap<EDIFCell, List<EDIFHierCellInst>>();
-        
+
         for (Entry<EDIFLibrary, Map<EDIFCell, List<EDIFHierCellInst>>> libEntry : instMap.entrySet()) {
             for (Entry<EDIFCell,List<EDIFHierCellInst>> e : libEntry.getValue().entrySet()) {
                 // Also skip macros
                 if (macros.containsCell(e.getKey())) continue;
                 // Identify multiple instantiated cells
                 if (e.getValue().size() > 1) {
-                    toUniqueify.put(e.getKey(),e.getValue());                    
+                    toUniqueify.put(e.getKey(),e.getValue());
                 }
             }
         }
 
         if (toUniqueify.isEmpty())
             return false;
-        
+
         for (EDIFCell curr : new ArrayList<>(toUniqueify.keySet())) {
             duplicateMultiInstCell(design, curr, toUniqueify);
         }
 
         return true;
     }
-    
-    
+
+
     private static int unique = 1;
-    
-    private static void duplicateMultiInstCell(Design design, EDIFCell cell, 
+
+    private static void duplicateMultiInstCell(Design design, EDIFCell cell,
                                     Map<EDIFCell, List<EDIFHierCellInst>> toUniqueify) {
         EDIFNetlist netlist = design.getNetlist();
         // Check that all higher level cells don't have multiple shared cell definitions, before
-        // duplicating this one        
+        // duplicating this one
         List<EDIFHierCellInst> insts = toUniqueify.get(cell);
         if (insts == null) {
             // Already processed, or no duplicates
@@ -1279,7 +1279,7 @@ public class EDIFTools {
                     List<EDIFHierCellInst> parentDuplicates = toUniqueify.get(parent.getCellType());
                     if (parentDuplicates != null) {
                         duplicateMultiInstCell(design, parent.getCellType(), toUniqueify);
-                    }                    
+                    }
                 }
                 sb.append(EDIF_HIER_SEP + instParents[i]);
             }
@@ -1294,33 +1294,33 @@ public class EDIFTools {
             }
             // Perform cell duplication
             EDIFCell origCell = cellInst.getCellType();
-            EDIFCell newCell = new EDIFCell(origCell.getLibrary(), origCell, origCell.getName() 
+            EDIFCell newCell = new EDIFCell(origCell.getLibrary(), origCell, origCell.getName()
                     + "_RW" + unique++);
             cellInst.getInst().setCellType(newCell);
             for (EDIFCellInst newInstCopy : newCell.getCellInsts()) {
                 List<EDIFHierCellInst> instsToUniqueify = toUniqueify.get(newInstCopy.getCellType());
-                if (instsToUniqueify == null) continue; 
+                if (instsToUniqueify == null) continue;
                 for (int i=0; i < instsToUniqueify.size(); i++) {
                     EDIFHierCellInst hierInst = instsToUniqueify.get(i);
-                    if (newInstCopy.getName().equals(hierInst.getInst().getName()) 
+                    if (newInstCopy.getName().equals(hierInst.getInst().getName())
                             && hierInst.isDescendantOf(cellInst)) {
-                        instsToUniqueify.set(i, hierInst.getSibling(newInstCopy));                            
+                        instsToUniqueify.set(i, hierInst.getSibling(newInstCopy));
                     }
                 }
             }
             // Update any physical cell references
             for (EDIFCellInst inst : newCell.getCellInsts()) {
-                String potentialLeafCell = cellInst.getFullHierarchicalInstName() 
+                String potentialLeafCell = cellInst.getFullHierarchicalInstName()
                         + EDIF_HIER_SEP + inst.getName();
                 Cell physCell = design.getCell(potentialLeafCell);
                 if (physCell != null) {
                     physCell.setEDIFCellInst(inst);
                 }
             }
-            
+
             // Update any physical net references
             for (EDIFNet net : newCell.getNets()) {
-                String potentialLeafCell = cellInst.getFullHierarchicalInstName() 
+                String potentialLeafCell = cellInst.getFullHierarchicalInstName()
                         + EDIF_HIER_SEP + net.getName();
                 Net physNet = design.getNet(potentialLeafCell);
                 if (physNet != null) {
@@ -1330,7 +1330,7 @@ public class EDIFTools {
         }
         toUniqueify.remove(cell);
     }
-    
+
     /**
      * Connects an existing logical net to another instances by creating intermediate logical
      * nets and ports.  Design must be fully flattened (see {@link EDIFTools#uniqueifyNetlist(Design)}.
@@ -1338,19 +1338,19 @@ public class EDIFTools {
      * Note: EDIF cell instances and nets can contain '/' within their name. This function currently does not support
      * designs containing these constructs.
      *
-     * @param sinkParentInstName Hierarchical name of destination parent instance for net 
+     * @param sinkParentInstName Hierarchical name of destination parent instance for net
      * @param srcParentInstName Hierarchical name of source parent instance of net
      * @param parentInstNameToLogNet A map from hierarchical instance name to equivalent logical net
      * in that corresponding cell instance.  Needs to be populated with the source parent instance
-     * name to work.  
+     * name to work.
      * @param netlist Current working netlist.
-     * @return The final logical net in the destination cell instance.  Note also that the 
-     * parentInstNameToLogNet map is fully populated with each intermediate logical net created 
+     * @return The final logical net in the destination cell instance.  Note also that the
+     * parentInstNameToLogNet map is fully populated with each intermediate logical net created
      * through the process.  Thus it can be used for multiple fan out paths.
      */
-    public static EDIFNet connectLogicalNetAcrossHierarchy(String sinkParentInstName, 
+    public static EDIFNet connectLogicalNetAcrossHierarchy(String sinkParentInstName,
             String srcParentInstName,
-            Map<String, EDIFNet> parentInstNameToLogNet, 
+            Map<String, EDIFNet> parentInstNameToLogNet,
             EDIFNetlist netlist) {
         String currParentInstName = srcParentInstName;
         String srcDupNetName = parentInstNameToLogNet.get(srcParentInstName).getName();
@@ -1385,18 +1385,18 @@ public class EDIFTools {
                     // We need to go up in hierarchy, create output port out of parent
                     EDIFCellInst currInst = netlist.getCellInstFromHierName(currParentInstName);
                     EDIFCell currCell = currInst.getCellType();
-                    int j=0; 
+                    int j=0;
                     while (currCell.getPort(portName + "_" + j) != null) {
                         j++;
                     }
                     EDIFPort port = currInst.getCellType().createPort(portName + "_" + j, EDIFDirection.OUTPUT, 1);
-                    prevNet.createPortInst(port);                 
+                    prevNet.createPortInst(port);
                     currNet.createPortInst(port, currInst);
                 } else {
-                    // We are going down in hierarchy, create input port towards target 
+                    // We are going down in hierarchy, create input port towards target
                     EDIFCellInst nextInst = netlist.getCellInstFromHierName(nextInstName);
                     EDIFCell nextCell = nextInst.getCellType();
-                    int j=0; 
+                    int j=0;
                     while (nextCell.getPort(portName + "_" + j) != null) {
                         j++;
                     }
@@ -1408,7 +1408,7 @@ public class EDIFTools {
             }
             currParentInstName = nextInstName;
         }
-        
+
         // Update Parent Net Map after creating new nets
         Map<EDIFHierNet,EDIFHierNet> parentNetMap = netlist.getParentNetMap();
         EDIFHierNet srcNetName = netlist.getHierCellInstFromName(srcParentInstName).getNet(srcDupNetName);
@@ -1423,38 +1423,38 @@ public class EDIFTools {
 
         return currNet;
     }
-    
+
     public static void printHierSepNames(EDIFNetlist netlist) {
         for (EDIFLibrary lib : netlist.getLibraries()) {
             for (EDIFCell cell : lib.getCells()) {
                 if (cell.getName().contains(EDIF_HIER_SEP)) {
                     System.out.println("CELL: " + lib.getName() + "," + cell.getName());
                 }
-                
+
                 for (EDIFPort port : cell.getPorts()) {
                     if (port.getName().contains(EDIF_HIER_SEP)) {
-                        System.out.println("PORT: " + lib.getName() + "," + cell.getName() 
+                        System.out.println("PORT: " + lib.getName() + "," + cell.getName()
                         +"," + port.getName());
                     }
                 }
-                
+
                 for (EDIFNet net : cell.getNets()) {
                     if (net.getName().contains(EDIF_HIER_SEP)) {
-                        System.out.println("NET: " + lib.getName() + "," + cell.getName() 
+                        System.out.println("NET: " + lib.getName() + "," + cell.getName()
                         +"," + net.getName());
                     }
                 }
-                
+
                 for (EDIFCellInst inst : cell.getCellInsts()) {
                     if (inst.getName().contains(EDIF_HIER_SEP)) {
-                        System.out.println("INST: " + lib.getName() + "," + cell.getName() 
+                        System.out.println("INST: " + lib.getName() + "," + cell.getName()
                         + "," + inst.getName());
                     }
                 }
             }
         }
     }
-    
+
     public static void printLibraries(EDIFNetlist netlist) {
         for (EDIFLibrary lib : netlist.getLibraries()) {
             System.out.println("LIBRARY: " + lib.getName());

@@ -1,27 +1,27 @@
-/* 
- * Copyright (c) 2017-2022, Xilinx, Inc. 
+/*
+ * Copyright (c) 2017-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
- *  
- * This file is part of RapidWright. 
- * 
+ *
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 /**
- * 
+ *
  */
 package com.xilinx.rapidwright.util;
 
@@ -36,7 +36,7 @@ import java.util.List;
  * Created on: May 25, 2016
  */
 public class StringTools {
-    
+
     public static String makeCamelCase(String name) {
         StringBuilder sb = new StringBuilder();
         for (int i=0; i < name.length(); i++) {
@@ -45,20 +45,20 @@ public class StringTools {
             if (i != 0 && name.charAt(i-1) == '_') {
                 sb.append(Character.toUpperCase(c));
             } else {
-                sb.append(Character.toLowerCase(c));                
+                sb.append(Character.toLowerCase(c));
             }
         }
         return sb.toString();
     }
-    
+
     public static String lowerCaseFirstLetter(String name) {
         return name.substring(0, 1).toLowerCase() + name.substring(1);
     }
-    
+
     public static String makeUpperCamelCase(String name) {
         return Character.toUpperCase(name.charAt(0)) + makeCamelCase(name).substring(1);
     }
-    
+
     /**
      * Removes any double quote characters from the ends of the string.
      * @param s
@@ -67,7 +67,7 @@ public class StringTools {
     public static String removeOuterQuotes(String s) {
         if (s == null) return s;
         int len = s.length();
-        if (len == 0) return s; 
+        if (len == 0) return s;
         boolean atFront = s.charAt(0) == '\"';
         if (len == 1) {
             return atFront ? "" : s;
@@ -75,7 +75,7 @@ public class StringTools {
         boolean atBack = s.charAt(len-1) == '\"';
         return s.substring(atFront ? 1 : 0, atBack ? len-1 : len);
     }
-    
+
     @SuppressWarnings("unused")
     private void _test_removeOuterQuotes() {
         String[] tests = new String[] {
@@ -87,21 +87,21 @@ public class StringTools {
                 ,""
                 ,null
                 };
-        
+
         for (String s : tests) {
             String result = removeOuterQuotes(s);
             System.out.println("<<" + s + ">>  <<" + result + ">>");
         }
     }
-    
+
     private static Comparator<String> naturalComparator;
-    
+
     static {
         naturalComparator = new Comparator<String>() {
             private boolean isDigit(char c) {
                 return 0x30 <= c && c <= 0x39;
             }
-            
+
             @Override
             public int compare(String a, String b) {
                 int ai = 0, bi = 0;
@@ -119,9 +119,9 @@ public class StringTools {
                         } else {
                             int aInt = Integer.parseInt(aStr);
                             int bInt = Integer.parseInt(bStr);
-                            if (aInt != bInt) return aInt - bInt;                            
+                            if (aInt != bInt) return aInt - bInt;
                         }
-                    } else if (a.charAt(ai) != b.charAt(bi)) 
+                    } else if (a.charAt(ai) != b.charAt(bi))
                         return a.charAt(ai) - b.charAt(bi);
                     ai++; bi++;
                 }
@@ -129,9 +129,9 @@ public class StringTools {
             }
         };
     }
-    
+
     /**
-     * Sorts strings using the 'natural' sort approach where numbers are sorted by 
+     * Sorts strings using the 'natural' sort approach where numbers are sorted by
      * their magnitudes, i.e. {1,2,3,4,5,6,7,8,9,10,...} as opposed to strict ASCII
      * sorting {1,10,11,12,13, ...}
      * @param strings The list of strings to sort
@@ -141,13 +141,13 @@ public class StringTools {
         strings.sort(naturalComparator);
         return strings;
     }
-    
+
     /**
      * Removes any trailing '/' (File.separator) characters from file paths.
      * If none are present, the original string is returned.
      * @param s File path
-     * @return The file path with File.separator removed or the original 
-     * string if 
+     * @return The file path with File.separator removed or the original
+     * string if
      */
     public static String removeLastSeparator(String s) {
         if (s.endsWith(File.separator)) {
@@ -155,9 +155,9 @@ public class StringTools {
         }
         return s;
     }
-    
+
     /**
-     * Sorts strings using the 'natural' sort approach where numbers are sorted by 
+     * Sorts strings using the 'natural' sort approach where numbers are sorted by
      * their magnitudes, i.e. {1,2,3,4,5,6,7,8,9,10,...} as opposed to strict ASCII
      * sorting {1,10,11,12,13, ...}
      * @param strings The array of strings to sort
@@ -167,14 +167,14 @@ public class StringTools {
         Arrays.sort(strings, naturalComparator);
         return strings;
     }
-    
+
     public static boolean isInteger(String s) {
         for (int i=0; i < s.length(); i++) {
             if (!Character.isDigit(s.charAt(i))) return false;
         }
         return true;
     }
-    
+
     /**
      * Will insert angle brackets around indexing value
      * at the end of a String.  For example:
@@ -197,7 +197,7 @@ public class StringTools {
         sb.append('>');
         return sb.toString();
     }
-    
+
     /**
      * Counts occurrences of a character in a string.
      * @param str String to check
@@ -211,7 +211,7 @@ public class StringTools {
         }
         return count;
     }
-    
+
     /**
      * Get the longest common prefix between two strings starting at the beginning.
      * @param s0 First string to check
@@ -228,12 +228,12 @@ public class StringTools {
         }
         return s0.substring(0,min);
     }
-    
+
     /**
      * Checks if given string starts with any of the provided prefix strings
      * @param str The string to check
      * @param prefixes The set of possible prefixes to match against str
-     * @return A prefix that matches, although there could exist other matches that have a longer 
+     * @return A prefix that matches, although there could exist other matches that have a longer
      * match.  Returns null if no prefix match is found.
      */
     public static String startsWithAny(String str, Collection<String> prefixes) {
@@ -242,7 +242,7 @@ public class StringTools {
         }
         return null;
     }
-    
+
     public static void main(String[] args) {
         String[] tests = new String[] {
             "ARCHITECTURE",
@@ -288,7 +288,7 @@ public class StringTools {
             "TEMAC_NETWORK_CONTROLLERS",
             "TEMPERATURE_GRADE_LETTER",
         };
-        
+
         for (String s : tests) {
             System.out.println(s + " = " + makeCamelCase(s) + " " + makeUpperCamelCase(s));
         }

@@ -1,25 +1,25 @@
-/* 
+/*
  * Original work: Copyright (c) 2010-2011 Brigham Young University
- * Modified work: Copyright (c) 2017-2022, Xilinx, Inc. 
+ * Modified work: Copyright (c) 2017-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
- *  
- * This file is part of RapidWright. 
- * 
+ *
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 package com.xilinx.rapidwright.device.helper;
 
@@ -39,15 +39,15 @@ public class HashPool<E> extends HashMap<Integer,ArrayList<E>> {
     private static final long serialVersionUID = -7643508400771696765L;
 
     private ArrayList<E> enumerations;
-    
+
     private HashMap<E,ArrayList<Integer>> enumerationMap;
-    
+
     public HashPool() {
         super();
         enumerations = new ArrayList<E>();
         enumerationMap = new HashMap<E,ArrayList<Integer>>();
     }
-    
+
     private void addToEnumerationMap(E obj, Integer enumeration) {
         ArrayList<Integer> enumerationMatches = enumerationMap.get(obj);
         if (enumerationMatches == null) {
@@ -59,7 +59,7 @@ public class HashPool<E> extends HashMap<Integer,ArrayList<E>> {
             enumerationMatches.add(enumeration);
         }
     }
-    
+
     /**
      * Gets the Integer enumeration of the object based on the HashPool.
      * @param obj The object to get an enumeration value for.
@@ -77,7 +77,7 @@ public class HashPool<E> extends HashMap<Integer,ArrayList<E>> {
                 if (enumerations.get(i) == null && obj == null) {
                     return i;
                 }
-                    
+
                 if (enumerations.get(i).equals(obj)) {
                     return i;
                 }
@@ -87,7 +87,7 @@ public class HashPool<E> extends HashMap<Integer,ArrayList<E>> {
         throw new IllegalArgumentException();
         //return -1;
     }
-    
+
     /**
      * Adds the object to the pool if an identical copy doesn't already exist.
      * @param obj The object to be added
@@ -117,7 +117,7 @@ public class HashPool<E> extends HashMap<Integer,ArrayList<E>> {
             return obj;
         }
     }
-    
+
     /**
      * Checks the HashPool if it contains an equal object to obj as defined by the equals() method.
      * @param obj The object to check for.
@@ -135,7 +135,7 @@ public class HashPool<E> extends HashMap<Integer,ArrayList<E>> {
         }
         return false;
     }
-    
+
     /**
      * Gets the identical object in the HashPool that is equal by definition of the equals()
      * method.  Returns null if no equivalent object exists in pool
@@ -182,5 +182,5 @@ public class HashPool<E> extends HashMap<Integer,ArrayList<E>> {
     public void setEnumerationMap(HashMap<E, ArrayList<Integer>> enumerationMap) {
         this.enumerationMap = enumerationMap;
     }
-    
+
 }

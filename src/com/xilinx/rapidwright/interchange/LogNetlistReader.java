@@ -1,26 +1,26 @@
-/* 
- * Copyright (c) 2020-2022, Xilinx, Inc. 
+/*
+ * Copyright (c) 2020-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
- *  
- * This file is part of RapidWright. 
- * 
+ *
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
- 
+
 package com.xilinx.rapidwright.interchange;
 
 import java.io.IOException;
@@ -323,7 +323,7 @@ public class LogNetlistReader {
     }
 
     /**
-     * Reads an Interchange netlist from Cap'n Proto reader.  Will expand macros by default. 
+     * Reads an Interchange netlist from Cap'n Proto reader.  Will expand macros by default.
      * @param netlist The Cap'n Proto netlist reader
      * @param skipTopStuff If true, skips netlist design object
      * @return The logical netlist.
@@ -331,9 +331,9 @@ public class LogNetlistReader {
     public EDIFNetlist readLogNetlist(Netlist.Reader netlist, boolean skipTopStuff) {
         return readLogNetlist(netlist, skipTopStuff, true);
     }
-    
+
     /**
-     * Reads an Interchange netlist from Cap'n Proto reader.  
+     * Reads an Interchange netlist from Cap'n Proto reader.
      * @param netlist The Cap'n Proto netlist reader
      * @param skipTopStuff If true, skips netlist design object
      * @param expandMacros If true, expands the macros in the netlist before returning it to the caller.
@@ -374,11 +374,11 @@ public class LogNetlistReader {
             } else {
                 System.err.println("WARNING: Could not determine target device from netlist.  Macro "
                     + "unisims are not expanded.  Please add a top netlist property to indicate the "
-                    + "target part such as [part=xcvu095-ffva2104-2-e].  Macro expansion can also be" 
+                    + "target part such as [part=xcvu095-ffva2104-2-e].  Macro expansion can also be"
                     + " run manually with EDIFNetlist.expandMacroUnisims(Series)");
-            }            
+            }
         }
-        
+
         return n;
     }
 

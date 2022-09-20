@@ -1,26 +1,26 @@
-/* 
- * Copyright (c) 2020-2022, Xilinx, Inc. 
+/*
+ * Copyright (c) 2020-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Keith Rothman, Google, Inc.
- *  
- * This file is part of RapidWright. 
- * 
+ *
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
- 
+
 package com.xilinx.rapidwright.interchange;
 
 import java.util.AbstractMap;
@@ -176,7 +176,7 @@ public class ConstantDefinitions {
         if (exceptionalGndNodes.contains(key)) {
             return false;
         }
-        
+
 
         for (Wire wire : node.getAllWiresInNode()) {
             TileTypeEnum tileType = wire.getTile().getTileTypeEnum();
@@ -236,7 +236,7 @@ public class ConstantDefinitions {
         return allNodes;
     }
 
-    
+
     public static void verifyConstants(Enumerator<String> allStrings, Device device, Design design, Map<SiteTypeEnum,Site> siteTypes, Constants.Reader reader, Map<TileTypeEnum, TileType.Reader> tileTypes) {
         if (reader.getDefaultBestConstant() != ConstantType.VCC) {
             throw new RuntimeException("Expected that default best constant be VCC! Got " + reader.getDefaultBestConstant().name());
@@ -267,7 +267,7 @@ public class ConstantDefinitions {
             Node node = new Node(tile, (int)(nodeKey & 0xffffffff));
 
             if (node.isTied() != constants.isNodeTied(node)) {
-                throw new RuntimeException(String.format("Node %s tie(gold)=%s =! tie(test)=%s", 
+                throw new RuntimeException(String.format("Node %s tie(gold)=%s =! tie(test)=%s",
                         node.toString(), node.isTied(), constants.isNodeTied(node)));
             }
 
@@ -315,7 +315,7 @@ public class ConstantDefinitions {
 
             design.removeSiteInst(siteInst);
         }
-        
+
         Map<Unisim, Map<String, NetType>> map = CellPinStaticDefaults.getCellPinDefaultsMap().get(device.getSeries());
         StructList.Reader<DefaultCellConnections.Reader> defaultsReader = reader.getDefaultCellConns();
         for (int i=0; i < defaultsReader.size(); i++) {
@@ -335,7 +335,7 @@ public class ConstantDefinitions {
                 CellPinValue value = r.getValue();
                 NetType goldValue = pinMap.get(pinName);
                 if (value != getCellPinValue(goldValue)) {
-                    throw new RuntimeException("ERROR: Mismatch default on " + u + ", pin " 
+                    throw new RuntimeException("ERROR: Mismatch default on " + u + ", pin "
                             + pinName + ". Expected " + goldValue + ", found " + value);
                 }
             }
@@ -347,13 +347,13 @@ public class ConstantDefinitions {
         key = (((long)tile.getUniqueAddress()) << 32) | key;
         return key;
     }
-    
+
     private static final int TIED_TO_GND = 0;
     private static final int TIED_TO_VCC = 1;
     private static final int UNTIED = 2;
-    
+
     private static Map<TileTypeEnum, Map<Integer, int[]>> getTiedWires(Device device, List<Node> allTiedNodes) {
-        Map<TileTypeEnum, Map<Integer,int[]>> tileTiedWires = 
+        Map<TileTypeEnum, Map<Integer,int[]>> tileTiedWires =
                 new HashMap<TileTypeEnum, Map<Integer, int[]>>();
         // Count GND and VCC instances
         for (Node tiedNode : allTiedNodes) {
@@ -393,13 +393,13 @@ public class ConstantDefinitions {
                 }
             }
         }
-        
+
         return tileTiedWires;
     }
 
-    public static void writeTiedWires(Enumerator<String> allStrings, Device device, 
+    public static void writeTiedWires(Enumerator<String> allStrings, Device device,
             Constants.Builder builder, Map<TileTypeEnum, TileType.Builder> tileTypes) {
-        
+
         ArrayList<Node> allTiedNodes = getAllTiedNodes(device);
         Map<TileTypeEnum, Map<Integer, int[]>> tileTiedWires = getTiedWires(device, allTiedNodes);
 
@@ -421,7 +421,7 @@ public class ConstantDefinitions {
                 // case
                 if (tiedToGnd == (tiedCounters[TIED_TO_GND] < tiedCounters[TIED_TO_VCC])) {
                     tiedNodeExceptions.add(tiedNode);
-                    continue;                    
+                    continue;
                 }
             }
             if (tiedToGnd) {
@@ -440,9 +440,9 @@ public class ConstantDefinitions {
                 vccWires.add(tiedNode.getWire());
             }
         }
-        
+
         int i = 0;
-        StructList.Builder<NodeConstantSource.Builder> nodeSourcesObj = 
+        StructList.Builder<NodeConstantSource.Builder> nodeSourcesObj =
                 builder.initNodeSources(tiedNodeExceptions.size());
         for (Node tiedNodeException : tiedNodeExceptions) {
             NodeConstantSource.Builder nodeSourceObj = nodeSourcesObj.get(i);
@@ -451,17 +451,17 @@ public class ConstantDefinitions {
             nodeSourceObj.setConstant(ConstantType.valueOf(tiedNodeException.isTiedToGnd() ? "GND" : "VCC"));
             i++;
         }
-        
+
         for (Entry<TileTypeEnum,Map<Integer, int[]>> e : tileTiedWires.entrySet()) {
             TileType.Builder tileType = tileTypes.get(e.getKey());
             Set<Integer> gndWireIdxs = gndTiedNodes.get(e.getKey());
             Set<Integer> vccWireIdxs = vccTiedNodes.get(e.getKey());
-            
-            int staticSourceCount = 0; 
+
+            int staticSourceCount = 0;
             staticSourceCount += gndWireIdxs != null ? 1 : 0;
             staticSourceCount += vccWireIdxs != null ? 1 : 0;
             StructList.Builder<WireConstantSources.Builder> wireConstants = tileType.initConstants(staticSourceCount);
-            
+
             int idx = 0;
             if (gndWireIdxs != null) {
                 WireConstantSources.Builder gndWires = wireConstants.get(idx++);
@@ -557,11 +557,11 @@ public class ConstantDefinitions {
                 return CellPinValue.FLOAT;
         }
     }
-    
+
     private static void writeCellPinDefaults(Enumerator<String> allStrings, Device device, Constants.Builder builder) {
         Map<Unisim,Map<String,NetType>> map = CellPinStaticDefaults.getCellPinDefaultsMap().get(device.getSeries());
         Builder<DefaultCellConnections.Builder> defaultCellConnsBuilder = builder.initDefaultCellConns(map.keySet().size());
-        int i=0; 
+        int i=0;
         for (Entry<Unisim,Map<String,NetType>> e : map.entrySet()) {
             DefaultCellConnections.Builder defaultConnBuilder = defaultCellConnsBuilder.get(i);
             defaultConnBuilder.setCellType(allStrings.getIndex(e.getKey().name()));
@@ -574,9 +574,9 @@ public class ConstantDefinitions {
                 j++;
             }
             i++;
-        }        
+        }
     }
-    
+
     public static void writeConstants(Enumerator<String> allStrings, Device device, Constants.Builder builder, Design design, Map<SiteTypeEnum,Site> siteTypes, Map<TileTypeEnum, TileType.Builder> tileTypes) {
         builder.setDefaultBestConstant(ConstantType.VCC);
 

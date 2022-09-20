@@ -1,25 +1,25 @@
 /*
- * 
- * Copyright (c) 2018-2022, Xilinx, Inc. 
+ *
+ * Copyright (c) 2018-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
  *
- * This file is part of RapidWright. 
- * 
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 
 package com.xilinx.rapidwright.examples;
@@ -59,20 +59,20 @@ import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 
 /**
- * 
+ *
  * @author clavin
  *
  */
 public class MultGenerator extends ArithmeticGenerator {
     private static final String DSP_SITE_OPT = "s";
-    
+
     public static final String RESULT_NAME = "P";
 
     private static final String OPMODE_VALUE = "000000101";
-    
+
     public static EDIFCellInst createDSP48E2CellInstance(Design d, EDIFCell parent, String name) {
         EDIFCell dsp48e2 = new EDIFCell(d.getNetlist().getHDIPrimitivesLibrary(),"DSP48E2");
-        
+
         dsp48e2.createPort("CARRYCASCOUT",EDIFDirection.OUTPUT,1);
         dsp48e2.createPort("MULTSIGNOUT",EDIFDirection.OUTPUT,1);
         dsp48e2.createPort("OVERFLOW",EDIFDirection.OUTPUT,1);
@@ -158,29 +158,29 @@ public class MultGenerator extends ArithmeticGenerator {
         i.addProperty("PREG",1);
         i.addProperty("RND","48'h000000000000");
         i.addProperty("SEL_MASK","MASK");
-        
+
         return i;
     }
-    
+
     public static PBlock createMult(Design d, Site origin, int width, String designName, String clkName) {
         EDIFCell top = d.getNetlist().getTopCell();
-        
+
         EDIFPort clkPort = top.createPort(clkName, EDIFDirection.INPUT, 1);
         EDIFNet clk = top.createNet(clkName);
         clk.createPortInst(clkPort);
-        
+
         String[] dspCells = new String[]{
-                "DSP_PREADD_DATA", "DSP_A_B_DATA", "DSP_C_DATA", "DSP_MULTIPLIER", 
+                "DSP_PREADD_DATA", "DSP_A_B_DATA", "DSP_C_DATA", "DSP_MULTIPLIER",
                 "DSP_ALU", "DSP_M_DATA", "DSP_OUTPUT", "DSP_PREADD",
                 };
         SiteInst si = null;
         for (String elem : dspCells) {
-            Cell c = d.createAndPlaceCell(null, designName+"/"+elem +"_INST", 
+            Cell c = d.createAndPlaceCell(null, designName+"/"+elem +"_INST",
                     Unisim.valueOf(elem), origin,origin.getBEL(elem));
             si = c.getSiteInst();
         }
         EDIFCellInst inst = createDSP48E2CellInstance(d,top,designName);
-        
+
         String[] gndPins = new String[]{
                 "CEA1","CEAD","CEALUMODE","CEB1","CEC",
                 "CECARRYIN","CECTRL","CED","CEINMODE",
@@ -193,14 +193,14 @@ public class MultGenerator extends ArithmeticGenerator {
         };
         String[] vccBusses = new String[]{
                 "ALUMODE","INMODE","OPMODE"
-        };        
-        
+        };
+
         // Setup GND/VCC inputs
         EDIFNet gnd = EDIFTools.getStaticNet(NetType.GND, top, d.getNetlist());
         EDIFNet vcc = EDIFTools.getStaticNet(NetType.VCC, top, d.getNetlist());
         Net logic0 = d.getStaticNet(NetType.GND);
         Net logic1 = d.getStaticNet(NetType.VCC);
-        
+
         for (NetType type : new NetType[]{NetType.GND,NetType.VCC}) {
             EDIFNet logicSrc = type == NetType.GND ? gnd : vcc;
             Net physNet = type == NetType.GND ? logic0 : logic1;
@@ -210,11 +210,11 @@ public class MultGenerator extends ArithmeticGenerator {
                 physNet.createPin(false, pin, si);
             }
             String[] busPins = type == NetType.GND ? gndBusses : vccBusses;
-        
+
             for (String bus : busPins) {
                 EDIFPort p = inst.getCellType().getPort(bus);
                 int stop = p.getWidth();
-                boolean isAorB = bus.equals("A") || bus.equals("B"); 
+                boolean isAorB = bus.equals("A") || bus.equals("B");
                 if (isAorB) {
                     // Don't gnd the inputs
                     stop = p.getWidth() - width;
@@ -227,14 +227,14 @@ public class MultGenerator extends ArithmeticGenerator {
             }
         }
 
-        
-        
-        
+
+
+
         /*
         for (String gndBus : gndBusses) {
             EDIFPort p = inst.getCellType().getPort(gndBus);
             int stop = p.getWidth();
-            boolean isAorB = gndBus.equals("A") || gndBus.equals("B"); 
+            boolean isAorB = gndBus.equals("A") || gndBus.equals("B");
             if (isAorB) {
                 // Don't gnd the inputs
                 stop = p.getWidth() - width;
@@ -250,10 +250,10 @@ public class MultGenerator extends ArithmeticGenerator {
             vcc.createPortInst(pin, inst);
             logic1.createPin(false, pin, si);
         }
-        
-        
+
+
         String opmodeValue = "000000101";
-        EDIFPort opmode = inst.getPort("OPMODE"); 
+        EDIFPort opmode = inst.getPort("OPMODE");
         for (int i=0; i < opmode.getWidth(); i++) {
             char c = opmodeValue.charAt(i);
             if (c == '1') {
@@ -269,30 +269,30 @@ public class MultGenerator extends ArithmeticGenerator {
         clk.createPortInst("CLK",inst);
         Net physClk = d.createNet(clk);
         physClk.createPin(false, "CLK", si);
-        
+
         int aWidth = inst.getPort(INPUT_A_NAME).getWidth();
         int bWidth = inst.getPort(INPUT_B_NAME).getWidth();
         int pWidth = inst.getPort(RESULT_NAME).getWidth();
-                
+
         String suffix = "["+(width-1)+":0]";
         EDIFPort a = top.createPort(INPUT_A_NAME + suffix, EDIFDirection.INPUT, width);
         EDIFPort b = top.createPort(INPUT_B_NAME + suffix, EDIFDirection.INPUT, width);
         EDIFPort r = top.createPort(RESULT_NAME + "["+(pWidth-1)+":0]", EDIFDirection.OUTPUT, pWidth);
-        
+
         for (int i=0; i < width; i++) {
             suffix = "["+i+"]";
             EDIFNet aNet = top.createNet(INPUT_A_NAME + suffix);
             EDIFNet bNet = top.createNet(INPUT_B_NAME + suffix);
-            EDIFNet rNet = top.createNet(designName + "/" + RESULT_NAME + suffix);            
-            
+            EDIFNet rNet = top.createNet(designName + "/" + RESULT_NAME + suffix);
+
             aNet.createPortInst(a,width-i-1);
             bNet.createPortInst(b,width-i-1);
             rNet.createPortInst(r,pWidth-i-1);
-            
+
             aNet.createPortInst(INPUT_A_NAME, aWidth-i-1, inst);
             bNet.createPortInst(INPUT_B_NAME, bWidth-i-1, inst);
             rNet.createPortInst(RESULT_NAME, pWidth-i-1, inst);
-            
+
             Net physA = d.createNet(aNet);
             Net physB = d.createNet(bNet);
             Net physR = d.createNet(rNet);
@@ -309,7 +309,7 @@ public class MultGenerator extends ArithmeticGenerator {
             Net physR = d.createNet(rNet);
             physR.createPin(true, RESULT_NAME+i, si);
         }
-        
+
         // ADD SitePIPs
         String[] sitePIPElements = new String[]{
                 "ALUMODE0INV","ALUMODE1INV","ALUMODE2INV","ALUMODE3INV",
@@ -334,7 +334,7 @@ public class MultGenerator extends ArithmeticGenerator {
             si.routeIntraSiteNet(net, si.getSite().getBELPin(pinName), si.getBEL(element).getPin("D"));
             si.addSitePIP(element, "D");
         }
-        
+
         for (EDIFPort port : inst.getCellType().getPorts()) {
             if (!port.isOutput()) continue;
             if (port.getBusName().equals(RESULT_NAME)) continue;
@@ -342,7 +342,7 @@ public class MultGenerator extends ArithmeticGenerator {
                 EDIFNet net = top.createNet(designName + "/" + port.getBusName() + (port.getWidth() > 1 ? "["+i+"]" : ""));
                 net.createPortInst(port.getBusName(), i, inst);
                 Net physNet = d.createNet(net);
-                
+
                 // Correct differences in physical pin names
                 String busName = port.getBusName();
                 if (busName.equals("ACOUT") || busName.equals("BCOUT")) {
@@ -352,14 +352,14 @@ public class MultGenerator extends ArithmeticGenerator {
                 } else if (busName.equals("PATTERNBDETECT")) {
                     busName = "PATTERN_B_DETECT";
                 }
-                
+
                 physNet.createPin(true, busName + (port.getWidth() > 1 ? i : ""), si);
             }
         }
-        
+
         Set<String> specialCases = new HashSet<>(Arrays.asList("ALUMODE10","AMULT26","BMULT17","P_FDBK_47","INMODE_2"));
-        
-        
+
+
         for (String dspCell : dspCells) {
             BEL elem = si.getSite().getBEL(dspCell);
             next_pin : for (int i=elem.getHighestInputIndex()+1; i < elem.getPins().length; i++) {
@@ -377,15 +377,15 @@ public class MultGenerator extends ArithmeticGenerator {
                 } else {
                     pinName = StringTools.addIndexingAngleBrackets(outpin.getName());
                 }
-                
+
                 Net n = d.createNet(designName + "/" + outpin.getBEL().getName() +"." + pinName, null);
                 si.routeIntraSiteNet(n, outpin, outpin.getSiteConns().get(0));
             }
         }
-        
+
         return new PBlock(d.getDevice(),origin.getName() +":"+origin.getName());
     }
-    
+
     private static OptionParser createOptionParser() {
         // Defaults
         String partName = Device.AWS_F1;
@@ -397,7 +397,7 @@ public class MultGenerator extends ArithmeticGenerator {
         String dspSite = "DSP48E2_X9Y60";
         boolean verbose = true;
 
-        
+
         OptionParser p = new OptionParser() {{
             accepts(PART_OPT).withOptionalArg().defaultsTo(partName).describedAs("UltraScale+ Part Name");
             accepts(DESIGN_NAME_OPT).withOptionalArg().defaultsTo(designName).describedAs("Design Name");
@@ -409,10 +409,10 @@ public class MultGenerator extends ArithmeticGenerator {
             accepts(VERBOSE_OPT).withOptionalArg().ofType(Boolean.class).defaultsTo(verbose).describedAs("Print verbose output");
             acceptsAll( Arrays.asList(HELP_OPT, "?"), "Print Help" ).forHelp();
         }};
-        
+
         return p;
     }
-    
+
     private static void printHelp(OptionParser p) {
         MessageGenerator.printHeader("Multiplier Generator");
         System.out.println("This RapidWright program creates a placed and routed DCP that can be \n"
@@ -421,12 +421,12 @@ public class MultGenerator extends ArithmeticGenerator {
         try {
             p.accepts(OUT_DCP_OPT).withOptionalArg().defaultsTo("mult.dcp").describedAs("Output DCP File Name");
             p.printHelpOn(System.out);
-            
+
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
-    
+
     public static void main(String[] args) {
         // Extract program options
         OptionParser p = createOptionParser();
@@ -437,34 +437,34 @@ public class MultGenerator extends ArithmeticGenerator {
             return;
         }
         CodePerfTracker t = verbose ? new CodePerfTracker(MultGenerator.class.getSimpleName(),true).start("Init") : null;
-        
+
         String partName = (String) opts.valueOf(PART_OPT);
         String designName = (String) opts.valueOf(DESIGN_NAME_OPT);
         String outputDCPFileName = (String) opts.valueOf(OUT_DCP_OPT);
         String clkName = (String) opts.valueOf(CLK_NAME_OPT);
         double clkPeriodConstraint = (double) opts.valueOf(CLK_CONSTRAINT_OPT);
-        int width = (int) opts.valueOf(WIDTH_OPT);        
+        int width = (int) opts.valueOf(WIDTH_OPT);
         String dspName = (String) opts.valueOf(DSP_SITE_OPT);
-        
+
         // Perform some error checking on inputs
         Part part = PartNameTools.getPart(partName);
         if (part == null || part.isSeries7()) {
             throw new RuntimeException("ERROR: Invalid/unsupport part " + partName + ".");
         }
-        
+
         Design d = new Design(designName,partName);
         d.setAutoIOBuffers(false);
         Device dev = d.getDevice();
-        
+
         t.stop().start("Create Multiplier");
         Site dsp = dev.getSite(dspName);
-        createMult(d, dsp, width, designName, clkName);            
-                
+        createMult(d, dsp, width, designName, clkName);
+
         // Add a clock constraint
         String tcl = "create_clock -name "+clkName+" -period "+clkPeriodConstraint+" [get_ports "+clkName+"]";
         d.addXDCConstraint(ConstraintGroup.LATE, tcl);
         d.setAutoIOBuffers(false);
-        
+
         t.stop();
 
         d.writeCheckpoint(outputDCPFileName, t);

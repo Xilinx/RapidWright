@@ -1,28 +1,28 @@
 /*
- * 
- * Copyright (c) 2018-2022, Xilinx, Inc. 
+ *
+ * Copyright (c) 2018-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
  *
- * This file is part of RapidWright. 
- * 
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 /**
- * 
+ *
  */
 package com.xilinx.rapidwright.util;
 
@@ -37,31 +37,31 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.stream.Collectors;
 
 /**
- * Used to manage a batch of task jobs to run in parallel. 
- * 
+ * Used to manage a batch of task jobs to run in parallel.
+ *
  * Created on: Jan 26, 2018
  */
 public class JobQueue {
 
     public static int MAX_LOCAL_CONCURRENT_JOBS = Math.max(1, Runtime.getRuntime().availableProcessors() / 2);
-    
+
     public static int MAX_LSF_CONCURRENT_JOBS = 120;
-    
+
     public static boolean USE_LSF_IF_AVAILABLE = true;
 
     private final boolean printJobStart;
 
     private Queue<Job> waitingToRun;
-    
+
     private ConcurrentLinkedQueue<Job> running;
-    
+
     private Queue<Job> finished;
 
     public static final String LSF_AVAILABLE_OPTION = "-lsf_available";
     public static final String LSF_RESOURCE_OPTION = "-lsf_resource";
     public static final String LSF_QUEUE_OPTION = "-lsf_queue";
-    
-    
+
+
     public JobQueue(boolean printJobStart) {
         waitingToRun = new LinkedList<>();
         running = new ConcurrentLinkedQueue<>();
@@ -71,11 +71,11 @@ public class JobQueue {
     public JobQueue() {
         this(true);
     }
-    
+
     public boolean addJob(Job j) {
         return waitingToRun.add(Objects.requireNonNull(j));
     }
-    
+
     public boolean addRunningJob(Job j) {
         return running.add(j);
     }
@@ -83,7 +83,7 @@ public class JobQueue {
     public boolean runAllToCompletion() {
         return runAllToCompletion(isLSFAvailable() ? JobQueue.MAX_LSF_CONCURRENT_JOBS : JobQueue.MAX_LOCAL_CONCURRENT_JOBS);
     }
-    
+
     public boolean runAllToCompletion(int maxNumRunningJobs) {
         while (!waitingToRun.isEmpty() || !running.isEmpty()) {
 
@@ -150,14 +150,14 @@ public class JobQueue {
         }
         return success;
     }
-    
-    
+
+
     public boolean killAllRunningJobs() {
         for (Job j : running) {
             j.killJob();
         }
         MessageGenerator.briefError("Killing all running jobs...");
-        long watchdog = System.currentTimeMillis(); 
+        long watchdog = System.currentTimeMillis();
         while (!running.isEmpty() && (System.currentTimeMillis() - watchdog < 5000)) {
             Job j = running.poll();
             if (j.isFinished()) finished.add(j);
@@ -196,10 +196,10 @@ public class JobQueue {
         }
         return new LocalJob();
     }
-    
+
     public static void main(String[] args) throws InterruptedException {
         JobQueue q = new JobQueue();
-        
+
         // Run a test if no arguments
         if (args.length == 0) {
             String mainDir = System.getenv("HOME") + File.separator+ "JobQueueTest" + File.separator;

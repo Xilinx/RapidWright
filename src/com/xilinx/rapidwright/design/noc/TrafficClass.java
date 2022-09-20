@@ -41,7 +41,7 @@ public enum TrafficClass {
         for (TrafficClass e : values()) {
             map.put(e.toString(), e);
         }
-    }    
+    }
 
     private final String tc;
 

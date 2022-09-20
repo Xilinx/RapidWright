@@ -1,27 +1,27 @@
-/* 
- * Copyright (c) 2017-2022, Xilinx, Inc. 
+/*
+ * Copyright (c) 2017-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
- *  
- * This file is part of RapidWright. 
- * 
+ *
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 /**
- * 
+ *
  */
 package com.xilinx.rapidwright.device.helper;
 
@@ -65,7 +65,7 @@ public class TileColumnPattern extends ArrayList<TileTypeEnum> implements Compar
     /** Place holder for the number of occurrences of this tile column pattern in a particular device */
     private int numInstances = 0;
 
-    
+
     /** Contains the tile types to create patterns from (all other tile types are ignored) */
     private static HashSet<TileTypeEnum> typesOfInterest;
     static{
@@ -75,17 +75,17 @@ public class TileColumnPattern extends ArrayList<TileTypeEnum> implements Compar
         typesOfInterest.addAll(Utils.getBRAMTileTypes());
         typesOfInterest.addAll(Utils.getURAMTileTypes());
     }
-    
+
     public TileColumnPattern() {
         updateFlags();
     }
-    
+
     public static TileColumnPattern createTileColumnPattern(List<TileTypeEnum> types) {
         return createTileColumnPattern(types,0, types.size());
     }
-    
+
     /**
-     * Creates a TileColumnPattern from an existing list of tile types and uses the start and end 
+     * Creates a TileColumnPattern from an existing list of tile types and uses the start and end
      * as indicies to get a sublist of filteredTypes.
      * @param filteredTypes The list of tile types to turn into a pattern
      * @param start The start index to use to build a subList of filteredTypes
@@ -120,26 +120,26 @@ public class TileColumnPattern extends ArrayList<TileTypeEnum> implements Compar
             }
         }
     }
-    
+
     public boolean hasSLICEL() {
         return flags.contains(TypesOfInterest.SLICEL);
     }
-    
+
     public boolean hasSLICEM() {
         return flags.contains(TypesOfInterest.SLICEM);
     }
-    
+
     public boolean hasBRAM() {
         return flags.contains(TypesOfInterest.BRAM);
     }
-    
+
     public boolean hasDSP() {
         return flags.contains(TypesOfInterest.DSP);
     }
     public boolean hasURAM() {
         return flags.contains(TypesOfInterest.URAM);
     }
-    
+
     /**
      * @return the numInstances
      */
@@ -201,11 +201,11 @@ public class TileColumnPattern extends ArrayList<TileTypeEnum> implements Compar
     public static int getCommonRow(Device dev) {
         return getCommonRow(dev, false);
     }
-    
+
     /**
-     * Creates a map where the keys are all tile column patterns for the given device and 
+     * Creates a map where the keys are all tile column patterns for the given device and
      * the values are sets of occurrences/instances of those tile column patterns (represented
-     * by the the column index of the start of the pattern).  
+     * by the the column index of the start of the pattern).
      * @param dev The device of interest
      * @param wantLaguna true if we are interested in a row with laguna tiles, false if interested in one without
      * @return The map between tile column patterns and their respective instances.
@@ -215,7 +215,7 @@ public class TileColumnPattern extends ArrayList<TileTypeEnum> implements Compar
 
         // We need to know what row index to start from to avoid missing DSP/BRAM tiles with nulls
         int rowIdx = getCommonRow(dev, wantLaguna);
-        
+
         // First create a filtered list of columns of only the CLB/BRAM/DSP types of interest
         ArrayList<TileTypeEnum> filteredTypes = new ArrayList<TileTypeEnum>();
         ArrayList<Integer> columnIdxs = new ArrayList<Integer>();
@@ -262,8 +262,8 @@ public class TileColumnPattern extends ArrayList<TileTypeEnum> implements Compar
                 matches.add(columnIdxs.get(j));
             }
         }
-        
-        
+
+
         return colPatternMap;
     }
 
@@ -278,7 +278,7 @@ public class TileColumnPattern extends ArrayList<TileTypeEnum> implements Compar
     public static HashMap<TileColumnPattern,TreeSet<Integer>> genColumnPatternMap(Device dev) {
         return genColumnPatternMap(dev, false);
     }
-    
+
     /**
      * Gets an array of all tile column pattersn sorted by those with the most number of instances.
      * @param map A tile column pattern map such as one generated in genColumnPatternMap().
@@ -287,16 +287,16 @@ public class TileColumnPattern extends ArrayList<TileTypeEnum> implements Compar
     public static TileColumnPattern[] getSortedMostCommonPatterns(HashMap<TileColumnPattern,TreeSet<Integer>> map) {
         int size = map.size();
         TileColumnPattern[] sorted = new TileColumnPattern[size];
-        int i = 0; 
+        int i = 0;
         for (Entry<TileColumnPattern,TreeSet<Integer>> e : map.entrySet()) {
             e.getKey().setNumInstances(e.getValue().size());
             sorted[i++] = e.getKey();
         }
-        
+
         Arrays.sort(sorted);
         return sorted;
     }
-    
+
     /**
      * Helper function to help visualize tile column patterns by assigning an ASCII charcter
      * to certain tile types.
@@ -308,7 +308,7 @@ public class TileColumnPattern extends ArrayList<TileTypeEnum> implements Compar
     public static char getTileCharacter(TileTypeEnum type, FamilyType arch) {
         if (arch == FamilyType.KINTEXU || arch == FamilyType.VIRTEXU) {
             switch (type) {
-                case INT: return 'I'; 
+                case INT: return 'I';
                 case CLEL_L:return 'L';
                 case CLEL_R: return 'l';
                 case CLE_M: return 'M';
@@ -319,10 +319,10 @@ public class TileColumnPattern extends ArrayList<TileTypeEnum> implements Compar
         }
         return '0';
     }
-    
+
     /**
      * Gets the short-hand ASCII tile column pattern.
-     * @param arch Family of the device of interest. 
+     * @param arch Family of the device of interest.
      * @return A string of the short-hand ASCII tile column type representation.
      */
     public String getTilePatternString(FamilyType arch) {
@@ -332,10 +332,10 @@ public class TileColumnPattern extends ArrayList<TileTypeEnum> implements Compar
         }
         return sb.toString();
     }
-    
+
     public static void main(String[] args) {
         String part = "xcku040-ffva1156-2-e";
-        
+
         Device dev = Device.getDevice(part);
         FamilyType arch = dev.getArchitecture();
         HashMap<TileColumnPattern,TreeSet<Integer>> map = genColumnPatternMap(dev);

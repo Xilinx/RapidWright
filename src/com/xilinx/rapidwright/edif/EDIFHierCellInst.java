@@ -146,12 +146,12 @@ public class EDIFHierCellInst {
     }
 
     /**
-     * Checks if the provided instance is an ancestor (hierarchical parent) of this instance. For 
-     * example, if this="disneyland/tomorrow_land/space_mountain" and 
-     * potentialAncestor="disneyland/tomorrow_land", this method would return true.  however, if 
-     * potentialAncestor="disneyland/adventure_land", it would return false. 
-     *  
-     * @param potentialAncestor The hierarchical instance in question to check if it is  
+     * Checks if the provided instance is an ancestor (hierarchical parent) of this instance. For
+     * example, if this="disneyland/tomorrow_land/space_mountain" and
+     * potentialAncestor="disneyland/tomorrow_land", this method would return true.  however, if
+     * potentialAncestor="disneyland/adventure_land", it would return false.
+     *
+     * @param potentialAncestor The hierarchical instance in question to check if it is
      * @return True if the provided instance is a hierarchical ancestor of this instance.
      */
     public boolean isDescendantOf(EDIFHierCellInst potentialAncestor) {
@@ -166,24 +166,24 @@ public class EDIFHierCellInst {
         }
         return true;
     }
-    
+
     /**
      * Given this instance and the provided instance o, it determines the closest common ancestor
      * between the two instances.  In some cases, this can default to the top cell design instance.
-     * For example, if this instance = "a/b/c/d" and o = "a/b/e/f", the method would return "a/b".  
+     * For example, if this instance = "a/b/c/d" and o = "a/b/e/f", the method would return "a/b".
      * @param o The other instance to check for a common ancestor.
      * @return The closest common ancestor between this instance and the provided instance.
      */
     public EDIFHierCellInst getCommonAncestor(EDIFHierCellInst o) {
         if (!isAbsolute() || !o.isAbsolute()) {
             throw new RuntimeException("ERROR: Can only get a common ancestor of absolute "
-                    + "EDIFHierCellInsts. this.isAbsolute()=" + this.isAbsolute() 
+                    + "EDIFHierCellInsts. this.isAbsolute()=" + this.isAbsolute()
                     + ", o.isAbsolute()=" + o.isAbsolute());
         }
         EDIFCellInst[] oCellInsts = o.cellInsts;
         int min = Integer.min(cellInsts.length, oCellInsts.length);
         int idx = 0;
-        for (int i=0; i< min; i++) { 
+        for (int i=0; i< min; i++) {
             if (cellInsts[i] == oCellInsts[i]) {
                 idx++;
             } else {
@@ -192,7 +192,7 @@ public class EDIFHierCellInst {
         }
         return new EDIFHierCellInst(oCellInsts, idx, null);
     }
-    
+
     public boolean isAbsolute() {
         return isToplevelInst(cellInsts[0]);
     }
@@ -281,7 +281,7 @@ public class EDIFHierCellInst {
         }
         return new EDIFHierPortInst(getParent(), port);
     }
-    
+
     /**
      * Gets the hierarchical port insts on this cell instance
      * @return The list of hierarchical port insts corresponding to this cell inst
@@ -289,7 +289,7 @@ public class EDIFHierCellInst {
     public List<EDIFHierPortInst> getHierPortInsts() {
         List<EDIFHierPortInst> hierPortInsts = new ArrayList<>();
         for (EDIFPortInst portInst : getInst().getPortInsts()) {
-            hierPortInsts.add(new EDIFHierPortInst(this.getParent(), portInst));   
+            hierPortInsts.add(new EDIFHierPortInst(this.getParent(), portInst));
         }
         return hierPortInsts;
     }

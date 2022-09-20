@@ -1,25 +1,25 @@
 /*
- * 
- * Copyright (c) 2018-2022, Xilinx, Inc. 
+ *
+ * Copyright (c) 2018-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
  *
- * This file is part of RapidWright. 
- * 
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 
 package com.xilinx.rapidwright.util;
@@ -37,7 +37,7 @@ import org.python.util.jython;
 import com.xilinx.rapidwright.device.Device;
 
 /**
- * Main entry point for the RapidWright executable stand-alone jar and 
+ * Main entry point for the RapidWright executable stand-alone jar and
  * Python (Jython) interactive shell.
  * @author clavin
  *
@@ -51,12 +51,12 @@ public class RapidWright {
     public static final String JUPYTER_KERNEL_FILENAME = "kernel.json";
     public static final String JUPYTER_JYTHON_KERNEL_NAME = "jython27";
     public static final String[] RAPIDWRIGHT_OPTIONS = new String[]{CREATE_JUPYTER_KERNEL, HELP_OPTION_NAME, UNPACK_OPTION_NAME};
-    
+
     private static String toWindowsPath(String linuxPath) {
         linuxPath = linuxPath.startsWith("/") ? linuxPath.substring(1) : linuxPath;
         return linuxPath.replace("/", "\\\\");
     }
-    
+
     public static void createJupyterKernelFile() {
         try {
             FileTools.makeDirs(JUPYTER_JYTHON_KERNEL_NAME);
@@ -65,7 +65,7 @@ public class RapidWright {
             bw.write("{\n");
             bw.write(" \"argv\": [\"java\",\n");
 
-            // Figure proper CLASSPATH based on if this is running from a jar or not 
+            // Figure proper CLASSPATH based on if this is running from a jar or not
             CodeSource src = RapidWright.class.getProtectionDomain().getCodeSource();
             if (src == null) {
                 MessageGenerator.briefError("Couldn't identify classpath for running RapidWright.  "
@@ -95,7 +95,7 @@ public class RapidWright {
                             jarPath = jarPath.replace("\\", "\\\\");
                         }
                         bw.write(File.pathSeparator + jarPath + jar);
-                    }                    
+                    }
                 } else {
                     MessageGenerator.briefError("ERROR: Couldn't read "+jarDir.getAbsolutePath()+" directory, please check RapidWright installation.");
                 }
@@ -118,7 +118,7 @@ public class RapidWright {
             e.printStackTrace();
         }
     }
-    
+
     public static void main(String[] args) {
         if (args.length == 0) {
             // If no arguments, import all major rapidwright packages for ease of use
@@ -178,7 +178,7 @@ public class RapidWright {
                     com.xilinx.rapidwright.design.tools.LUTTools.class,
                     com.xilinx.rapidwright.device.helper.TileColumnPattern.class,
             };
-            
+
             args = new String[3];
             args[0] = "-i";
             args[1] = "-c";
@@ -204,7 +204,7 @@ public class RapidWright {
                         throw new RuntimeException("ERROR: Couldn't unpack ./data directory "
                             + "from RapidWright jar.");
                     }
-                    
+
                 } else if (s.equals(CREATE_JUPYTER_KERNEL)) {
                     createJupyterKernelFile();
                     return;
@@ -217,7 +217,7 @@ public class RapidWright {
                 }
             }
         }
-        
+
         FileTools.blockSystemExitCalls();
         jython.main(args);
     }

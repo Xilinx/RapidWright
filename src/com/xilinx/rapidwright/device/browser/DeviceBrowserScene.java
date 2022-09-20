@@ -1,25 +1,25 @@
-/* 
+/*
  * Original work: Copyright (c) 2010-2011 Brigham Young University
- * Modified work: Copyright (c) 2017-2022, Xilinx, Inc. 
+ * Modified work: Copyright (c) 2017-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
- *  
- * This file is part of RapidWright. 
- * 
+ *
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 package com.xilinx.rapidwright.device.browser;
 
@@ -63,15 +63,15 @@ public class DeviceBrowserScene extends TileScene{
     private Tile reachabilityTile;
     /**     */
     private ArrayList<NumberedHighlightedTile> currentTiles = new ArrayList<NumberedHighlightedTile>();
-    
-    
+
+
     public DeviceBrowserScene(Device device, boolean hideTiles, boolean drawPrimitives, DeviceBrowser browser) {
         super(device, hideTiles, drawPrimitives);
         currLines = new ArrayList<QGraphicsLineItem>();
         wirePen = new QPen(QColor.yellow, 0.25, PenStyle.SolidLine);
         this.browser = browser;
     }
-    
+
     public void drawWire(Tile src, Tile dst) {
         QGraphicsLineItem line = new QGraphicsLineItem(
                 src.getColumn()*tileSize  + tileSize/2,
@@ -89,7 +89,7 @@ public class DeviceBrowserScene extends TileScene{
         }
         currLines.clear();
     }
-    
+
     public void drawWire(Tile src, int wireSrc, Tile dst, int wireDst) {
         double enumSize = src.getWireCount();
         double x1 = (double) tileXMap.get(src)*tileSize  + (wireSrc%tileSize);
@@ -115,7 +115,7 @@ public class DeviceBrowserScene extends TileScene{
 
     private HashMap<Tile, Integer> findReachability(Tile t, Integer hops) {
         HashMap<Tile, Integer> reachabilityMap = new HashMap<Tile, Integer>();
-        
+
         Queue<RouteNode> queue = new LinkedList<RouteNode>();
         for (int wire = 0; wire < t.getWireCount(); wire++) {
             List<Wire> connections = t.getWireConnections(wire);
@@ -124,7 +124,7 @@ public class DeviceBrowserScene extends TileScene{
                 queue.add(new RouteNode(wc.getTile(),wc.getWireIndex()));
             }
         }
-        
+
         while (!queue.isEmpty()) {
             RouteNode currNode = queue.poll();
             Integer i = reachabilityMap.get(currNode.getTile());
@@ -133,7 +133,7 @@ public class DeviceBrowserScene extends TileScene{
                 reachabilityMap.put(currNode.getTile(), i);
             }
             else {
-                reachabilityMap.put(currNode.getTile(), i+1);                        
+                reachabilityMap.put(currNode.getTile(), i+1);
             }
             if (currNode.getLevel() < hops-1) {
                 List<Wire> connections = currNode.getConnections();
@@ -144,7 +144,7 @@ public class DeviceBrowserScene extends TileScene{
         }
         return reachabilityMap;
     }
-    
+
     private void drawReachability(HashMap<Tile, Integer> map) {
         menuReachabilityClear();
         for (Tile t : map.keySet()) {
@@ -154,7 +154,7 @@ public class DeviceBrowserScene extends TileScene{
             currentTiles.add(tile);
         }
     }
-    
+
     @SuppressWarnings("unused")
     private void menuReachability1() {
         drawReachability(findReachability(reachabilityTile, 1));
@@ -164,7 +164,7 @@ public class DeviceBrowserScene extends TileScene{
     private void menuReachability2() {
         drawReachability(findReachability(reachabilityTile, 2));
     }
-    
+
     @SuppressWarnings("unused")
     private void menuReachability3() {
         drawReachability(findReachability(reachabilityTile, 3));
@@ -179,7 +179,7 @@ public class DeviceBrowserScene extends TileScene{
     private void menuReachability5() {
         drawReachability(findReachability(reachabilityTile, 5));
     }
-    
+
     private void menuReachabilityClear() {
         for (NumberedHighlightedTile rect : currentTiles) {
             rect.remove();
@@ -187,14 +187,14 @@ public class DeviceBrowserScene extends TileScene{
         currentTiles.clear();
     }
 
-    
+
     @Override
     public void mouseDoubleClickEvent(QGraphicsSceneMouseEvent event) {
         Tile t = getTile(event);
         this.updateTile.emit(t);
         super.mouseDoubleClickEvent(event);
     }
-    
+
     @Override
     public void mouseReleaseEvent(QGraphicsSceneMouseEvent event) {
         if (event.button().equals(MouseButton.RightButton)) {
@@ -223,11 +223,11 @@ public class DeviceBrowserScene extends TileScene{
                 menu.addAction(action4);
                 menu.addAction(action5);
                 menu.addAction(actionClear);
-                menu.exec(event.screenPos());            
+                menu.exec(event.screenPos());
             }
         }
-        
-        
+
+
         super.mouseReleaseEvent(event);
     }
 }

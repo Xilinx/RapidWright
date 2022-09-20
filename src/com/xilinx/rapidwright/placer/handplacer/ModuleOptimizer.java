@@ -1,25 +1,25 @@
-/* 
+/*
  * Original work: Copyright (c) 2010-2011 Brigham Young University
- * Modified work: Copyright (c) 2017-2022, Xilinx, Inc. 
+ * Modified work: Copyright (c) 2017-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
- *  
- * This file is part of RapidWright. 
- * 
+ *
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 package com.xilinx.rapidwright.placer.handplacer;
 
@@ -91,12 +91,12 @@ public class ModuleOptimizer extends QMainWindow {
     private QTableWidget utilTable;
     Device device;
     private QComboBox netViewCombo;
-    
+
     private static String title = "Module Optimizer";
-    
+
     private String currOpenFileName = null;
-        
-    
+
+
     public static void main(String[] args) {
         QApplication.setGraphicsSystem("raster");
         QApplication.initialize(args);
@@ -110,27 +110,27 @@ public class ModuleOptimizer extends QMainWindow {
             System.out.println("DEBUG MODE");
             debugPlacer = true;
         }
-        
+
         ModuleOptimizer ModuleOptimizer = new ModuleOptimizer(null, fileToOpen, debugPlacer);
 
         ModuleOptimizer.show();
 
         QApplication.exec();
     }
-    
+
     public ModuleOptimizer(QWidget parent, String fileToOpen, boolean debugPlacer) {
         super(parent);
-        
+
         undoStack = new QUndoStack();
         scene = new FloorPlanScene(null, debugPlacer);
         view = new TileView(scene);
         setCentralWidget(view);
-        
+
         setupFileActions();
         setupEditActions();
         setupViewActions();
         setWindowTitle(title);
-        
+
         undoStack.canRedoChanged.connect(actionRedo, "setEnabled(boolean)");
         undoStack.canUndoChanged.connect(actionUndo, "setEnabled(boolean)");
 
@@ -140,11 +140,11 @@ public class ModuleOptimizer extends QMainWindow {
         macroList.itemSelectionChanged.connect(this,"updateSceneSelection()");
         statusLabel = new QLabel("Status Bar");
         statusLabel.setText("Status Bar");
-        
+
         scene.updateStatus.connect(this, "setStatusText(String, Tile)");
         scene.hmMoved.connect(this, "hmMoved(java.util.List, java.util.List)");
 
-        
+
         QStatusBar statusBar = new QStatusBar();
         statusBar.addWidget(statusLabel);
         setStatusBar(statusBar);
@@ -156,12 +156,12 @@ public class ModuleOptimizer extends QMainWindow {
         // Set the opening default window size to 1024x768 pixels
         resize(1024, 768);
     }
-    
+
     @SuppressWarnings("unused")
     private void setStatusText(String text, Tile tile) {
         statusLabel.setText(text);
     }
-    
+
     private void populateMacroList() {
         macroList.clear();
         for (GUIModuleInst macro : scene.getMacroList()) {
@@ -173,7 +173,7 @@ public class ModuleOptimizer extends QMainWindow {
             macroList.addTopLevelItem(treeItem);
         }
     }
-    
+
     @SuppressWarnings("unused")
     private void updateListSelection() {
         if (macroList.hasFocus())
@@ -187,7 +187,7 @@ public class ModuleOptimizer extends QMainWindow {
             }
         }
     }
-    
+
     @SuppressWarnings("unused")
     private void updateSceneSelection() {
         if (scene.hasFocus())
@@ -201,7 +201,7 @@ public class ModuleOptimizer extends QMainWindow {
             }
         }
     }
-    
+
     private void updateWireEstimate() {
         ArrayList<GUINetLine> netLineList = scene.getNetLineList();
         double estimate = 0;
@@ -209,21 +209,21 @@ public class ModuleOptimizer extends QMainWindow {
             estimate += netLine.line().length();
         }
     }
-    
+
     public void hmMoved(List<GUIModuleInst> movedHMList, List<QPointF> oldPosList) {
         undoStack.push(new MoveCommand(movedHMList, oldPosList, scene));
         updateWireEstimate();
     }
 
     private void createUtilizationTable() {
-        
+
         List<String> headerList = Arrays.asList("Used", "Avail", "%Util");
         List<String> vHeaderList = new ArrayList<String>(UtilizationType.values().length);
         for (UtilizationType type : UtilizationType.values()) {
             vHeaderList.add(type.getString());
         }
         utilTable = new QTableWidget(vHeaderList.size(), headerList.size());
-        
+
         utilTable.setHorizontalHeaderLabels(headerList);
         utilTable.setVerticalHeaderLabels(vHeaderList);
         for (int i=0; i < vHeaderList.size(); i++) {
@@ -232,27 +232,27 @@ public class ModuleOptimizer extends QMainWindow {
         for (int i=0; i < headerList.size(); i++) {
             utilTable.setColumnWidth(i, 50);
         }
-        
+
         QDockWidget dockWidget = new QDockWidget(tr("PBlock Utilization"), this);
         dockWidget.setAllowedAreas(DockWidgetArea.RightDockWidgetArea,
                 DockWidgetArea.LeftDockWidgetArea);
         dockWidget.setWidget(utilTable);
         addDockWidget(DockWidgetArea.RightDockWidgetArea, dockWidget);
     }
-    
+
     private void updateUtilizationTable(Design d) {
         HashMap<UtilizationType,Integer> map = DesignTools.calculateUtilization(d);
-        
+
         for (int i=0; i < UtilizationType.values.length; i++) {
             Integer count = map.get(UtilizationType.values[i]);
             utilTable.setItem(i, 0, new QTableWidgetItem(count.toString()));
         }
-        
-        
+
+
     }
-    
+
     private void createModuleList() {
-        
+
         macroList = new QTreeWidget();
         macroList.setSelectionMode(SelectionMode.ExtendedSelection);
         macroList.setColumnCount(2);
@@ -261,15 +261,15 @@ public class ModuleOptimizer extends QMainWindow {
         headerList.add("Size(occupied tiles)");
         macroList.setHeaderLabels(headerList);
         macroList.setSortingEnabled(true);
-        
-        
+
+
         QDockWidget dockWidget = new QDockWidget(tr("Module List"), this);
         dockWidget.setAllowedAreas(DockWidgetArea.RightDockWidgetArea,
                 DockWidgetArea.LeftDockWidgetArea);
         dockWidget.setWidget(macroList);
         addDockWidget(DockWidgetArea.RightDockWidgetArea, dockWidget);
     }
-    
+
     protected void about() {
         QMessageBox.information(this, "Info",
                 "Interactive Module Optimization Tool\n built on RapidWright.");
@@ -282,7 +282,7 @@ public class ModuleOptimizer extends QMainWindow {
             internalOpenDesign(fileName);
         }
     }
-    
+
     private void internalOpenDesign(String fileName) {
         currOpenFileName = fileName;
         String shortFileName = fileName.substring(fileName.lastIndexOf('/')+1);
@@ -291,7 +291,7 @@ public class ModuleOptimizer extends QMainWindow {
         progress.setWindowModality(WindowModality.WindowModal);
         progress.setCancelButton(null);
         progress.show();
-        progress.setValue(0);    
+        progress.setValue(0);
         undoStack.clear();
         progress.setValue(10);
         Design design = Design.readCheckpoint(fileName);
@@ -313,14 +313,14 @@ public class ModuleOptimizer extends QMainWindow {
         scene.changeNetView(0);
         progress.setValue(100);
     }
-    
+
     protected void saveDesign() {
         if (scene.getDesign() == null || currOpenFileName == null)
             return;
         scene.getDesign().writeCheckpoint(currOpenFileName);
         statusBar().showMessage(currOpenFileName + " saved.", 2000);
     }
-    
+
     protected void saveAsDesign() {
         if (scene.getDesign() == null)
             return;
@@ -331,7 +331,7 @@ public class ModuleOptimizer extends QMainWindow {
         scene.getDesign().writeCheckpoint(fileName);
         statusBar().showMessage(fileName + " saved.", 2000);
     }
-    
+
     protected void saveAsPDFDesign() {
         if (scene.getDesign() == null)
             return;
@@ -347,7 +347,7 @@ public class ModuleOptimizer extends QMainWindow {
         pdfPainter.end();
         statusBar().showMessage(fileName + " saved.", 2000);
     }
-    
+
     private QAction action(String name, String image, Object shortcut,
             String slot, QMenu menu, QToolBar toolBar) {
         QAction a = new QAction(name, this);
@@ -383,7 +383,7 @@ public class ModuleOptimizer extends QMainWindow {
         action(tr("&Save As"), "filesaveas", StandardKey.SaveAs, "saveAsDesign()", fileMenu, tb);
         action(tr("&Save As PDF"), "exportpdf", null, "saveAsPDFDesign()", fileMenu, tb);
         fileMenu.addSeparator();
-        action(tr("&Print"), "fileprint", StandardKey.Print, null, fileMenu, tb);        
+        action(tr("&Print"), "fileprint", StandardKey.Print, null, fileMenu, tb);
         fileMenu.addSeparator();
         action(tr("&Quit"), null, "Ctrl+Q", "close()", fileMenu, null);
     }
@@ -404,18 +404,18 @@ public class ModuleOptimizer extends QMainWindow {
                 b);
         actionRedo.setEnabled(false);
         actionRedo.triggered.connect(undoStack, "redo()");
-        
+
         actionAddPBlock = action(tr("Add PBlock"), "addPblock", "Ctrl+b", "addPblock()", m, b);
         actionAddPBlock.setEnabled(true);
     }
-    
+
     private void setupViewActions() {
         QToolBar tb = new QToolBar(this);
         tb.setWindowTitle(tr("View Actions"));
         addToolBar(tb);
         QMenu m = new QMenu(tr("&View"), this);
         menuBar().addMenu(m);
-        
+
         netViewCombo = new QComboBox();
         netViewCombo.addItem(tr("Nets hidden"));
         netViewCombo.addItem(tr("Module-to-module"));
@@ -423,7 +423,7 @@ public class ModuleOptimizer extends QMainWindow {
         netViewCombo.setEnabled(false);
         netViewCombo.currentIndexChanged.connect(scene,"changeNetView(int)");
         tb.addWidget(netViewCombo);
-        
+
         actionZoomIn = action(tr("&Zoom Out"), "zoomout", StandardKey.ZoomOut, "zoomout()", m, tb);
         actionZoomOut = action(tr("&Zoom In"), "zoomin", "Ctrl+=", "zoomin()", m, tb);
         actionZoomSelection = action(tr("&Zoom Selection"), "zoomselection", null, "zoomselection()", m, tb);
@@ -455,7 +455,7 @@ public class ModuleOptimizer extends QMainWindow {
             if (right < 0 || gmiBR.x() > right)
                 right = gmiBR.x();
         }
-        view.fitInView(left, top, right-left, bottom-top, Qt.AspectRatioMode.KeepAspectRatio);    
+        view.fitInView(left, top, right-left, bottom-top, Qt.AspectRatioMode.KeepAspectRatio);
     }
     @SuppressWarnings("unused")
     private void addPblock() {

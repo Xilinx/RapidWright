@@ -1,26 +1,26 @@
-/* 
- * Copyright (c) 2020-2022, Xilinx, Inc. 
+/*
+ * Copyright (c) 2020-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
- *  
- * This file is part of RapidWright. 
- * 
+ *
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
- 
+
 package com.xilinx.rapidwright.interchange;
 
 import java.io.FileInputStream;
@@ -317,8 +317,8 @@ public class DeviceResourcesVerifier {
             for (SitePIP sitePIP : sitePIPs) {
                 sitePIPMap.put(sitePIP.toString(),sitePIP);
             }
-            
-            
+
+
             for (DeviceResources.Device.SitePIP.Reader spReader : sitePipsReader) {
                 DeviceResources.Device.BELPin.Reader bpReader = belPinsReader.get(spReader.getInpin());
                 DeviceResources.Device.BELPin.Reader bpOutReader = belPinsReader.get(spReader.getOutpin());
@@ -503,7 +503,7 @@ public class DeviceResourcesVerifier {
                     (size > 1 ? "ies" : "y")+": " + libsFound);
         }
 
-        Map<String, Pair<String, EnumSet<IOStandard>>> macroCollapseExceptionMap = 
+        Map<String, Pair<String, EnumSet<IOStandard>>> macroCollapseExceptionMap =
                 EDIFNetlist.macroCollapseExceptionMap.getOrDefault(series, Collections.emptyMap());
         Set<Unisim> unisimsExpected = new HashSet<Unisim>();
         for (EDIFLibrary lib : primsAndMacros.getLibraries()) {
@@ -555,7 +555,7 @@ public class DeviceResourcesVerifier {
 
         StructList.Reader<PrimToMacroExpansion.Reader> exceptionMap = dReader.getExceptionMap();
         Map<String,MacroParamRule[]> rulesMap = MacroParamMappingRules.macroRules.get(series);
-        Map<String, Pair<String, EnumSet<IOStandard>>> macroExpandExceptionMap = 
+        Map<String, Pair<String, EnumSet<IOStandard>>> macroExpandExceptionMap =
                 EDIFNetlist.macroExpandExceptionMap.getOrDefault(series, Collections.emptyMap());
         int mapSize = exceptionMap.size();
         for (int i=0; i < mapSize; i++) {
@@ -570,21 +570,21 @@ public class DeviceResourcesVerifier {
                             "("+ primName+"-->" +macroName+") does not match expected mapping ("+
                             primName+"-->"+EDIFNetlist.macroExpandExceptionMap.get(primName)+")");
                 }
-                
+
                 Reader<PropertyMap.Entry.Reader> parameterReader = entry.getParameters();
                 if (ioStdSet.size() != parameterReader.size()) {
                     throw new RuntimeException("Exception map parameter set mismatch: differing number "
-                        + "of IOStandard property values, found " + parameterReader.size() 
+                        + "of IOStandard property values, found " + parameterReader.size()
                         + ", expected " + mapping.getSecond().size() );
                 }
                 for (PropertyMap.Entry.Reader paramReader : entry.getParameters()) {
                     expect(EDIFNetlist.IOSTANDARD_PROP, allStrings.get(paramReader.getKey()));
                     IOStandard ioStandardValue = IOStandard.valueOf(allStrings.get(paramReader.getTextValue()));
                     if (!ioStdSet.contains(ioStandardValue)) {
-                        throw new RuntimeException("ERROR: IOStandard " + ioStandardValue 
+                        throw new RuntimeException("ERROR: IOStandard " + ioStandardValue
                                 + " not found in exception map." );
                     }
-                }                
+                }
             }
             MacroParamRule[] rules = rulesMap.get(macroName);
             if (entry.hasParamMapping() && rules != null) {

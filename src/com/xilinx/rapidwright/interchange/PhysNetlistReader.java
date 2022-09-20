@@ -1,26 +1,26 @@
-/* 
- * Copyright (c) 2020-2022, Xilinx, Inc. 
+/*
+ * Copyright (c) 2020-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
- *  
- * This file is part of RapidWright. 
- * 
+ *
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
- 
+
 package com.xilinx.rapidwright.interchange;
 
 import java.io.IOException;
@@ -112,7 +112,7 @@ public class PhysNetlistReader {
         readPlacement(physNetlist, design, allStrings);
 
         checkMacros(design);
-        
+
         readRouting(physNetlist, design, allStrings);
 
         readDesignProperties(physNetlist, design, allStrings);
@@ -139,7 +139,7 @@ public class PhysNetlistReader {
         if (siteInstCount == 0 && physNetlist.getPlacements().size() > 0) {
             System.out.println("WARNING: Missing SiteInst information in *.phys file.  RapidWright "
 
-                    + "will attempt to infer the proper SiteInst, however, it is recommended that " 
+                    + "will attempt to infer the proper SiteInst, however, it is recommended that "
                     + "SiteInst information be specified to avoid SiteTypeEnum mismatch problems.");
         }
         for (int i=0; i < siteInstCount; i++) {
@@ -239,7 +239,7 @@ public class PhysNetlistReader {
                 cell.setBELFixed(placement.getIsBelFixed());
                 cell.setSiteFixed(placement.getIsSiteFixed());
                 if (cellInst != null) {
-                    cell.setType(cellInst.getCellType().getName());                    
+                    cell.setType(cellInst.getCellType().getName());
                 }
 
                 PrimitiveList.Int.Reader otherBELs = placement.getOtherBels();
@@ -299,8 +299,8 @@ public class PhysNetlistReader {
                 } else {
                     if (c.getBEL().getPin(belPinName) == null) {
                         System.err.println("WARNING: On cell " + c.getName() + ", a logical pin '" +
-                                c.getType() + "." + cellPinName + "' is being mapped on to a BEL pin '" 
-                                + c.getBELName() + "." + belPinName + "' that does not exist. " 
+                                c.getType() + "." + cellPinName + "' is being mapped on to a BEL pin '"
+                                + c.getBELName() + "." + belPinName + "' that does not exist. "
                                 + "This may result in an invalid design.");
                     }
 
@@ -727,9 +727,9 @@ public class PhysNetlistReader {
             }
         }
     }
-    
+
     /**
-     * Examines a design to ensure that the provided macro placement is consistent with the 
+     * Examines a design to ensure that the provided macro placement is consistent with the
      * macro definition in the library.
      * @param design The placed design to be checked
      */
@@ -740,7 +740,7 @@ public class PhysNetlistReader {
         for (EDIFHierCellInst leaf : leaves) {
             if (macros.containsCell(leaf.getCellType())) {
                 EDIFCell macro = macros.getCell(leaf.getCellName());
-                // Check that the macro children instances have the same placement status 
+                // Check that the macro children instances have the same placement status
                 // (all placed or none are placed)
                 Boolean isPlaced = null;
                 boolean inconsistentPlacement = false;
@@ -756,7 +756,7 @@ public class PhysNetlistReader {
                     }
                 }
                 if (inconsistentPlacement) {
-                    System.err.println("ERROR: Inconsistent macro placement for " + macroName 
+                    System.err.println("ERROR: Inconsistent macro placement for " + macroName
                             + ", please ensure all member cell instances are either "
                             + "unplaced or fully placed: ");
                     for (EDIFHierCellInst inst : macroLeaves) {
@@ -766,9 +766,9 @@ public class PhysNetlistReader {
                         System.err.println("\t" + cellName + " is " + (isCellPlaced ? "placed" : "unplaced"));
                     }
                 }
-                
+
             }
         }
-        
+
     }
 }

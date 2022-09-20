@@ -1,27 +1,27 @@
-/* 
- * Copyright (c) 2017-2022, Xilinx, Inc. 
+/*
+ * Copyright (c) 2017-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
- *  
- * This file is part of RapidWright. 
- * 
+ *
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 /**
- * 
+ *
  */
 package com.xilinx.rapidwright.debug;
 
@@ -57,40 +57,40 @@ import com.xilinx.rapidwright.util.MessageGenerator;
 
 /**
  * This class serves as the main entry point for the BYU/Xilinx debug
- * instrumentation flow within RapidWright.  
- * 
+ * instrumentation flow within RapidWright.
+ *
  * Created on: Nov 30, 2015
  */
 public class DesignInstrumentor {
-    
+
     public static final String SAMPLE_DEPTH_KEYWORD = "SAMPLE_DEPTH";
-    
+
     @SuppressWarnings("unused")
     private int sampleDepth = -1;
-    
-    private TreeMap<String,String> netNames = new TreeMap<String, String>(); 
-    
-    private Design design = null; 
-    
+
+    private TreeMap<String,String> netNames = new TreeMap<String, String>();
+
+    private Design design = null;
+
     private Net clockNet = null;
-    
+
     private EDIFNet edifClockNet = null;
-    
+
     private ArrayList<SitePinInst> pinsToRoute = null;
-    
+
     public static final String DEBUG_CORE_PATH = FileTools.getRapidWrightPath() + "/debug";
-    
+
     private static List<String> header;
-    
+
     private static List<String> probe;
-    
+
     private static List<String> footer;
-    
+
     static {
         header = new ArrayList<>();
         probe = new ArrayList<>();
         footer = new ArrayList<>();
-        
+
         header.add("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
         header.add("<probeData version=\"1\" minor=\"2\">");
         header.add("  <probeset name=\"EDA_PROBESET\" active=\"true\">");
@@ -109,11 +109,11 @@ public class DesignInstrumentor {
         footer.add("  </probeset>");
         footer.add("</probeData>");
     }
-    
+
     /**
      * This should load the instrumentation file details into
      * class members.  The file will likely be small, so the function
-     * is written for ease of implementation, not speed.  
+     * is written for ease of implementation, not speed.
      * @param fileName Name of the instrumentation details file.
      */
     public void loadInstrumentationDetailsFile(String fileName) {
@@ -121,7 +121,7 @@ public class DesignInstrumentor {
             // Skip comments and empty lines
             if (line.startsWith("#")) continue;
             if (line.trim().isEmpty()) continue;
-            
+
             // Every line should be a key value pair
             String[] tokens = line.split("\\s+");
             if (line.startsWith(SAMPLE_DEPTH_KEYWORD)) {
@@ -131,7 +131,7 @@ public class DesignInstrumentor {
             }
         }
     }
-    
+
     /**
      * Stitches in the debug unit probes and clock into the user design.
      * Specifically, it add the input pin ports of the debug block onto
@@ -140,7 +140,7 @@ public class DesignInstrumentor {
     public void stitchProbesOnILA(ModuleInst mi, EDIFCellInst debugCore) {
         EDIFCell topCell = design.getNetlist().getTopCell();
         HashMap<EDIFCell, ArrayList<EDIFCellInst>> instMap = EDIFTools.generateCellInstMap(design.getNetlist().getTopCellInst());
-        
+
         pinsToRoute = new ArrayList<SitePinInst>();
         // For each net, add the probe input pin as a sink on the net
         HashSet<String> alreadyConnected = new HashSet<String>();
@@ -153,30 +153,30 @@ public class DesignInstrumentor {
             String routedNetName = netNamePair.getValue();
             // Watch out for two nets with equivalent physical routed nets
             if (alreadyConnected.contains(routedNetName)) continue;
-            
+
             Net n = design.getNet(routedNetName);
             if (n.getPins().size() < 2) {
                 MessageGenerator.briefError("WARNING: Net "+ netName +" has no source, routing probe to GND.  (" +
                         routedNetName + " is the routing net alias)");
                 n = design.getNet(Net.GND_NET);
             }
-            
+
             // Identify clock net
             if (clockPin == null && n.getSource() != null) {
                 clockPin = DesignTools.identifyClockSource(n.getSource());
             }
-            
+
             String portName = portPrefix + "[" + probeCount + "]";
             Port p = m.getPort(portName);
             Net portNet = mi.getCorrespondingNet(p);
             if (portNet == null || portNet.getPins().size() != 1) {
                 MessageGenerator.briefError("WARNING: Couldn't get probe net for port " + portName);
             }
-            
-            // Move pin over 
+
+            // Move pin over
             pinsToRoute.addAll(portNet.getPins());
             design.movePinsToNewNetDeleteOldNet(portNet, n, true);
-            
+
             // Connect EDIF in same way
             EDIFPortInst currDebugPort = debugCore.getPortInst(portName);
             if (n.isStaticNet()) {
@@ -187,13 +187,13 @@ public class DesignInstrumentor {
                 EDIFNet debugNet = EDIFTools.addDebugPortAndNet(debugNetName, topCell, currDebugPort, debugCore);
                 String debugPortName = portPrefix + "_debug_port_" + probeCount;
                 EDIFHierCellInst topInst = design.getNetlist().getTopHierCellInst();
-                EDIFTools.connectDebugProbe(debugNet, routedNetName, debugPortName, topInst, design.getNetlist(), instMap);                
+                EDIFTools.connectDebugProbe(debugNet, routedNetName, debugPortName, topInst, design.getNetlist(), instMap);
             }
 
             alreadyConnected.add(routedNetName);
             probeCount++;
         }
-        
+
         // TODO ASSUMPTION: All probed signals are on the same clock
         if (clockPin == null) {
             MessageGenerator.briefError("WARNING: Couldn't definitely identify clock net for probe signals! Choosing clock with largest fanout...");
@@ -202,10 +202,10 @@ public class DesignInstrumentor {
                 if (clkNet.isClockNet() && clkNet.getFanOut() > largestFanout) {
                     clockPin = clkNet.getSource();
                     largestFanout = clkNet.getFanOut();
-                }                
+                }
             }
         }
-        
+
         if (clockPin != null) {
             String clkDebugNet = "clk_probe_net";
             String clkDebugPort = "clk_probe_port";
@@ -215,18 +215,18 @@ public class DesignInstrumentor {
             String routedClkNetName = clockNet.getName();
             EDIFHierCellInst topInst = design.getNetlist().getTopHierCellInst();
             EDIFTools.connectDebugProbe(edifClockNet, routedClkNetName, clkDebugPort, topInst, design.getNetlist(), instMap);
-            
+
             // Connect clock
             Port ilaClockPort = mi.getModule().getPort("clk");
             Net ilaClockNet = mi.getCorrespondingNet(ilaClockPort);
             design.movePinsToNewNetDeleteOldNet(ilaClockNet, clockNet, true);
-            
+
         } else {
             throw new RuntimeException("ERROR: Couldn't find any clock nets in design. Exiting...");
         }
     }
-    
-    public void stitchDebugHubToILA(ModuleInst ilaCorePhysical, EDIFCellInst ilaCoreLogical, 
+
+    public void stitchDebugHubToILA(ModuleInst ilaCorePhysical, EDIFCellInst ilaCoreLogical,
                                     ModuleInst dhCorePhysical, EDIFCellInst dhCoreLogical) {
         String dhInput = "sl_oport0_i";
         String dhOutput = "sl_iport0_o";
@@ -234,17 +234,17 @@ public class DesignInstrumentor {
         String ilaOutput = "sl_oport0";
         int iportWidth = 17;
         int oportWidth = 37;
-        
+
         EDIFCell topCell = design.getNetlist().getTopCell();
-        
+
         for (int i=0; i < oportWidth; i++) {
             String suffix = "["+i+"]";
             String dhPortName = dhOutput + suffix;
-            String ilaPortName = ilaInput + suffix; 
+            String ilaPortName = ilaInput + suffix;
             // Physical stitching
             Port ilaPort = ilaCorePhysical.getModule().getPort(ilaPortName);
             Net ilaNet = ilaCorePhysical.getCorrespondingNet(ilaPort);
-            Port dhPort = dhCorePhysical.getModule().getPort(dhPortName); 
+            Port dhPort = dhCorePhysical.getModule().getPort(dhPortName);
             Net dhNet = dhCorePhysical.getCorrespondingNet(dhPort);
             design.movePinsToNewNetDeleteOldNet(ilaNet, dhNet, false);
             for (SitePinInst p : dhNet.getPins()) {
@@ -253,15 +253,15 @@ public class DesignInstrumentor {
             }
         }
         EDIFTools.connectPortBus(topCell, dhCoreLogical, ilaCoreLogical, dhOutput, ilaInput, oportWidth);
-        
+
         for (int i=0; i < iportWidth; i++) {
             String suffix = "["+i+"]";
             String dhPortName = dhInput + suffix;
-            String ilaPortName = ilaOutput + suffix; 
+            String ilaPortName = ilaOutput + suffix;
             // Physical stitching
             Port ilaPort = ilaCorePhysical.getModule().getPort(ilaPortName);
             Net ilaNet = ilaCorePhysical.getCorrespondingNet(ilaPort);
-            Port dhPort = dhCorePhysical.getModule().getPort(dhPortName); 
+            Port dhPort = dhCorePhysical.getModule().getPort(dhPortName);
             Net dhNet = dhCorePhysical.getCorrespondingNet(dhPort);
             design.movePinsToNewNetDeleteOldNet(dhNet, ilaNet, false);
             for (SitePinInst p : ilaNet.getPins()) {
@@ -275,12 +275,12 @@ public class DesignInstrumentor {
         Port dhClockPort = dhCorePhysical.getModule().getPort("clk");
         Net dhClockNet = dhCorePhysical.getCorrespondingNet(dhClockPort);
         design.movePinsToNewNetDeleteOldNet(dhClockNet, clockNet, true);
-        
+
         EDIFPortInst clkPortInst = dhCoreLogical.getPortInst("clk");
         EDIFPortInst clkPort = new EDIFPortInst(clkPortInst.getPort(), edifClockNet,dhCoreLogical);
         edifClockNet.addPortInst(clkPort);
     }
-    
+
     /**
      * Meat of the instrumentation process.  This function will:
      *   (1) Choose which pre-compiled block to load based on requested parameters
@@ -299,22 +299,22 @@ public class DesignInstrumentor {
         } else {
             ilaCoreFileName = "design_1_ila_0_0_opt_routed_routed";
         }
-    
+
         // Step 2 - Load block(s)
         ModuleImpls ilaModuleImpls = BlockCreator.readStoredModule(DEBUG_CORE_PATH + "/" + ilaCoreFileName, null);
         ModuleImpls dhModuleImpls = BlockCreator.readStoredModule(DEBUG_CORE_PATH + "/" + debugHubCoreFileName, null);
-        
+
         // Step 3 - Stitch blocks into user design (both physical and logical netlists)
         ModuleInst ilaCorePhysical = design.createModuleInst(ilaModuleImpls.getNetlist().getTopCellInst().getName(), ilaModuleImpls.get(0));
         EDIFCellInst ilaCoreLogical = design.addModuleInstNetlist(ilaCorePhysical, ilaModuleImpls.getNetlist());
         stitchProbesOnILA(ilaCorePhysical, ilaCoreLogical);
-        
+
         ModuleInst dhCorePhysical = design.createModuleInst(dhModuleImpls.getNetlist().getTopCellInst().getName(), dhModuleImpls.get(0));
         EDIFCellInst dhCoreLogical = design.addModuleInstNetlist(dhCorePhysical, dhModuleImpls.getNetlist());
         stitchDebugHubToILA(ilaCorePhysical, ilaCoreLogical, dhCorePhysical, dhCoreLogical);
-        
+
         EDIFTools.consolidateLibraries(design.getNetlist());
-        
+
         // Step 4 - Place blocks in empty locations within the user design
         BlockPlacer placer = new BlockPlacer();
         placer.placeDesign(design,true);
@@ -327,12 +327,12 @@ public class DesignInstrumentor {
         if (unplacedInsts > 0) {
             throw new RuntimeException("ERROR: " + unplacedInsts + "Unplaced instances!");
         }
-        
+
         // Step 5 - Route updated nets
         Router router = new Router(design);
         router.routePinsReEntrant(pinsToRoute, true);
     }
-    
+
     /**
     * Uses list of signals marked for debug to produce debug netlist (.ltx) file for debugging.
     */
@@ -342,8 +342,8 @@ public class DesignInstrumentor {
 
         // 2. Pull in and modify the probe template with list of signals marked for debug.
         ArrayList<String> probe_template = new ArrayList<>(probe);
-        
-        /** 
+
+        /**
         * Most lines will just be added right to the ltx; some need modding;
         * some need adding (additional nets). See assumptions...may need to add more special cases.
         *
@@ -379,23 +379,23 @@ public class DesignInstrumentor {
             else {
                 ltx_strings.add(probeLine);
             }
-        }        
-        
+        }
+
         // 3. Pull in and add the footer.
         ltx_strings.addAll(footer);
 
         // 4. Write it out. I'm hoping this will end up in the same location as the xpn and edf.
         FileTools.writeLinesToTextFile(ltx_strings, name);
     }
-    
-    
+
+
     /**
      * This is the main entry point for Vivado design debug instrumentation.
-     * @param args There are 3 arguments to this function: 
+     * @param args There are 3 arguments to this function:
      *   (0) Name of the file containing instrumentation details
      *   (1) Name of the XPN file for the design
      *   (2) Name of the EDIF file for the design
-     * 
+     *
      *  The program, under normal operation will output two file names separated by a space
      *  These are the instrumented XPN and EDIF files respectively.
      */
@@ -404,46 +404,46 @@ public class DesignInstrumentor {
             System.out.println("USAGE: <instrumentation file name> <XPN file name> <EDIF file name>");
             return;
         }
-        
+
         long[] runtimes = new long[6];
         runtimes[0] = runtimes[1] = System.currentTimeMillis();
-        
+
         String insFileName = args[0];
         String xpnFileName = args[1];
         String edfFileName = args[2];
         String xpnOutFileName = xpnFileName.replace(".xpn", "_ins.xpn");
         String edfOutFileName = edfFileName.replace(".edf", "_ins.edf");
         String ltxOutFileName = xpnOutFileName.replace(".xpn", "_debug_netlist.ltx");
-        
+
         // Check that files exist
         FileTools.errorIfFileDoesNotExist(insFileName);
         FileTools.errorIfFileDoesNotExist(xpnFileName);
         FileTools.errorIfFileDoesNotExist(edfFileName);
-        
+
         // Load files
         DesignInstrumentor d = new DesignInstrumentor();
         d.loadInstrumentationDetailsFile(insFileName);
-        
+
         runtimes[1] = System.currentTimeMillis() - runtimes[1];
         runtimes[2] = System.currentTimeMillis();
-        
+
         //d.design = Design.loadDesign(edfFileName, xpnFileName);
-        
+
         runtimes[2] = System.currentTimeMillis() - runtimes[2];
         runtimes[3] = System.currentTimeMillis();
-        
+
         d.instrumentDesign();
-        d.createLTX(ltxOutFileName);    
-        
+        d.createLTX(ltxOutFileName);
+
         runtimes[3] = System.currentTimeMillis() - runtimes[3];
         runtimes[4] = System.currentTimeMillis();
-        
+
         // Write instrumented design out
         //d.design.saveDesign(edfOutFileName, xpnOutFileName);
-        
+
         // Print out names to communicate back to the Tcl script
         System.out.println("OUTPUT_DESIGN: " + edfOutFileName + " " + xpnOutFileName);
-        
+
         runtimes[4] = System.currentTimeMillis() - runtimes[4];
         runtimes[0] = System.currentTimeMillis() - runtimes[0];
 
@@ -455,6 +455,6 @@ public class DesignInstrumentor {
         System.out.printf("             Saving Design Time : %8.3fs \n", runtimes[4]/1000.0);
         System.out.println("-----------------------------------------------------------------");
         System.out.printf("                  Total Runtime : %8.3fs \n", runtimes[0]/1000.0);
-        
+
     }
 }

@@ -1,25 +1,25 @@
 /*
- * 
- * Copyright (c) 2021 Ghent University. 
+ *
+ * Copyright (c) 2021 Ghent University.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Yun Zhou, Ghent University.
  *
- * This file is part of RapidWright. 
- * 
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 
 package com.xilinx.rapidwright.rwroute;
@@ -63,7 +63,7 @@ public class RoutableNode implements Routable{
     private boolean target;
     /** The children (downhill rnodes) of this rnode */
     private List<Routable> children;
-    
+
     /** Present congestion cost */
     private float presentCongestionCost;
     /** Historical congestion cost */
@@ -90,25 +90,25 @@ public class RoutableNode implements Routable{
      * We count the drivers of a rnode to facilitate the route fixer at the end of routing.
      */
     private Map<Routable, Integer> driversCounts;
-    
+
     /** Static variable to indicate if the routing is timing-driven */
     static boolean timingDriven;
     /** The instantiated delayEstimator to compute delays */
     static DelayEstimatorBase delayEstimator;
     /** A flag to indicate if the routing resource exclusion should disable exclusion of nodes cross RCLK */
     static boolean maskNodesCrossRCLK;
-    
+
     public static void setTimingDriven(boolean isTimingDriven, DelayEstimatorBase estimator) {
         timingDriven = isTimingDriven;
         if (timingDriven) {
             delayEstimator = estimator;
         }
     }
-    
+
     public static void setMaskNodesCrossRCLK(boolean mask) {
         maskNodesCrossRCLK = mask;
     }
-    
+
     public RoutableNode(int index, Node node, RoutableType type) {
         this.index = index;
         this.type = type;
@@ -127,19 +127,19 @@ public class RoutableNode implements Routable{
             setDelay(RouterHelper.computeNodeDelay(delayEstimator, node));
         }
     }
-    
+
     public int setChildren(int globalIndex, Map<Node, Routable> createdRoutable, Set<Node> reserved, RouteThruHelper routethruHelper) {
         children = new ArrayList<>();
         List<Node> allDownHillNodes = node.getAllDownhillNodes();
-        
+
         for (Node downhill : allDownHillNodes) {
             if (reserved.contains(downhill)) continue;
             if (isExcluded(downhill, timingDriven)) continue;
             if (routethruHelper.isRouteThru(node, downhill)) continue;
-            
+
             Routable child = createdRoutable.get(downhill);
             if (child == null) {
-                RoutableType type = RoutableType.WIRE;        
+                RoutableType type = RoutableType.WIRE;
                 child = new RoutableNode(globalIndex++, downhill, type);
                 createdRoutable.put(downhill, child);
             }
@@ -147,7 +147,7 @@ public class RoutableNode implements Routable{
         }
         return globalIndex;
     }
-    
+
     public void setBaseCost() {
         if (type == RoutableType.WIRE) {
             baseCost = 0.4f;
@@ -160,7 +160,7 @@ public class RoutableNode implements Routable{
             case NODE_PINFEED:
                 type = RoutableType.PINFEED_I;
                 break;
-            
+
             case NODE_DOUBLE:
                 if (endTileXCoordinate != getNode().getTile().getTileXCoordinate()) {
                     baseCost = 0.4f*length;
@@ -177,12 +177,12 @@ public class RoutableNode implements Routable{
                 break;
             case NODE_VLONG:
                 baseCost = 0.7f;
-                break;    
+                break;
             default:
                 if (length != 0) baseCost *= length;
                 type = RoutableType.WIRE;
                 break;
-            }    
+            }
         } else if (type == RoutableType.PINFEED_I) {
             baseCost = 0.4f;
         } else if (type == RoutableType.PINFEED_O) {
@@ -194,12 +194,12 @@ public class RoutableNode implements Routable{
     public boolean isOverUsed() {
         return Routable.capacity < getOccupancy();
     }
-    
+
     @Override
     public boolean isUsed() {
         return getOccupancy() > 0;
     }
-    
+
     @Override
     public boolean hasMultiDrivers() {
         return Routable.capacity < uniqueDriverCount();
@@ -225,25 +225,25 @@ public class RoutableNode implements Routable{
         endTileXCoordinate = (short) endTile.getTileXCoordinate();
         endTileYCoordinate = (short) endTile.getTileYCoordinate();
         Tile base = getNode().getTile();
-        length = (short) (Math.abs(endTileXCoordinate - base.getTileXCoordinate()) 
+        length = (short) (Math.abs(endTileXCoordinate - base.getTileXCoordinate())
                 + Math.abs(endTileYCoordinate - base.getTileYCoordinate()));
     }
-    
+
     @Override
     public void updatePresentCongestionCost(float pres_fac) {
         int occ = getOccupancy();
         int cap = Routable.capacity;
-        
+
         if (occ < cap) {
             setPresentCongestionCost(1);
         } else {
             setPresentCongestionCost(1 + (occ - cap + 1) * pres_fac);
         }
     }
-    
+
     @Override
     public String toString() {
-        String coordinate = "";    
+        String coordinate = "";
         coordinate = "(" + endTileXCoordinate + "," + endTileYCoordinate + ")";
         StringBuilder s = new StringBuilder();
         s.append("id = " + index);
@@ -261,25 +261,25 @@ public class RoutableNode implements Routable{
         s.append(String.format("user = %s", getOccupancy()));
         s.append(", ");
         s.append(getUsersConnectionCounts());
-        
+
         return s.toString();
     }
-    
+
     @Override
     public int hashCode() {
         return node.hashCode();
     }
-    
+
     @Override
     public int getIndex() {
         return index;
     }
-    
+
     @Override
-    public boolean isInConnectionBoundingBox(Connection connection) {        
+    public boolean isInConnectionBoundingBox(Connection connection) {
         return endTileXCoordinate > connection.getXMinBB() && endTileXCoordinate < connection.getXMaxBB() && endTileYCoordinate > connection.getYMinBB() && endTileYCoordinate < connection.getYMaxBB();
     }
-    
+
     @Override
     public Node getNode() {
         return node;
@@ -292,7 +292,7 @@ public class RoutableNode implements Routable{
 
     @Override
     public void setTarget(boolean isTarget) {
-        this.target = isTarget;    
+        this.target = isTarget;
     }
 
     @Override
@@ -323,7 +323,7 @@ public class RoutableNode implements Routable{
     public short getEndTileYCoordinate() {
         return endTileYCoordinate;
     }
-    
+
     @Override
     public float getBaseCost() {
         return baseCost;
@@ -357,23 +357,23 @@ public class RoutableNode implements Routable{
     public short getLength() {
         return length;
     }
-    
+
     @Override
     public void setLowerBoundTotalPathCost(float totalPathCost) {
         lowerBoundTotalPathCost = totalPathCost;
         setVisited(true);
     }
-    
+
     @Override
     public void setUpstreamPathCost(float newPartialPathCost) {
         this.upstreamPathCost = newPartialPathCost;
     }
-    
+
     @Override
     public float getLowerBoundTotalPathCost() {
         return lowerBoundTotalPathCost;
     }
-    
+
     @Override
     public float getUpstreamPathCost() {
         return upstreamPathCost;
@@ -383,7 +383,7 @@ public class RoutableNode implements Routable{
     public Map<NetWrapper, Integer> getUsersConnectionCounts() {
         return usersConnectionCounts;
     }
-    
+
     @Override
     public void incrementUser(NetWrapper source) {
         if (usersConnectionCounts == null) {
@@ -392,7 +392,7 @@ public class RoutableNode implements Routable{
         Integer connectionCount = usersConnectionCounts.getOrDefault(source, 0);
         usersConnectionCounts.put(source, connectionCount + 1);
     }
-    
+
     @Override
     public int uniqueUserCount() {
         if (usersConnectionCounts == null) {
@@ -400,7 +400,7 @@ public class RoutableNode implements Routable{
         }
         return usersConnectionCounts.size();
     }
-    
+
     @Override
     public void decrementUser(NetWrapper user) {
         Integer count = usersConnectionCounts.getOrDefault(user, 0);
@@ -410,7 +410,7 @@ public class RoutableNode implements Routable{
             usersConnectionCounts.put(user, count - 1);
         }
     }
-    
+
     @Override
     public int countConnectionsOfUser(NetWrapper user) {
         if (usersConnectionCounts == null) {
@@ -418,7 +418,7 @@ public class RoutableNode implements Routable{
         }
         return usersConnectionCounts.getOrDefault(user, 0);
     }
-    
+
     @Override
     public int uniqueDriverCount() {
         if (driversCounts == null) {
@@ -426,7 +426,7 @@ public class RoutableNode implements Routable{
         }
         return driversCounts.size();
     }
-    
+
     @Override
     public void incrementDriver(Routable parent) {
         if (driversCounts == null) {
@@ -435,7 +435,7 @@ public class RoutableNode implements Routable{
         Integer count = driversCounts.getOrDefault(parent, 0);
         driversCounts.put(parent, count + 1);
     }
-    
+
     @Override
     public void decrementDriver(Routable parent) {
         Integer count = driversCounts.getOrDefault(parent, 0);
@@ -445,12 +445,12 @@ public class RoutableNode implements Routable{
             driversCounts.put(parent, count - 1);
         }
     }
-    
+
     @Override
     public int getOccupancy() {
         return this.uniqueUserCount();
     }
-    
+
     @Override
     public Routable getPrev() {
         return prev;
@@ -460,7 +460,7 @@ public class RoutableNode implements Routable{
     public void setPrev(Routable prev) {
         this.prev = prev;
     }
-    
+
     @Override
     public float getPresentCongestionCost() {
         return presentCongestionCost;
@@ -490,11 +490,11 @@ public class RoutableNode implements Routable{
     public void setVisited(boolean visited) {
         this.visited = visited;
     }
-    
+
     /**
      * Checks if a node is an exit node of a NodeGroup
      * @param node The node in question
-     * @return true, if the node is a S/D/Q/L node or a local node with a GLOBA and CTRL wire 
+     * @return true, if the node is a S/D/Q/L node or a local node with a GLOBA and CTRL wire
      */
     public static boolean isExitNode(Node node) {
         switch(node.getIntentCode()) {
@@ -515,7 +515,7 @@ public class RoutableNode implements Routable{
         }
         return false;
     }
-    
+
     /**
      * Checks if some routing resources are prevented from being used.
      * @param node The routing resource in question.
@@ -541,7 +541,7 @@ public class RoutableNode implements Routable{
             return true;
         }
     }
-     
+
     private static Set<String> excludeAboveRclk;
     private static Set<String> excludeBelowRclk;
     static {
@@ -567,5 +567,5 @@ public class RoutableNode implements Routable{
              add("WW1_W_BEG7");
          }};
     }
-    
+
 }

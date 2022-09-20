@@ -1,28 +1,28 @@
-/* 
- * Copyright (c) 2022, Xilinx, Inc. 
+/*
+ * Copyright (c) 2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
- *  
- * This file is part of RapidWright. 
- * 
+ *
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
- 
+
 /**
- * 
+ *
  */
 package com.xilinx.rapidwright.design;
 
@@ -36,7 +36,7 @@ import com.xilinx.rapidwright.edif.EDIFLibrary;
 /**
  * Generated on: Mon Apr 25 23:31:34 2022
  * by: com.xilinx.rapidwright.release.UnisimParser
- * 
+ *
  * Enumerates supported Unisim primitives that map to Xilinx devices.
  */
 public enum Unisim {
@@ -1298,10 +1298,10 @@ public enum Unisim {
     XPLL,
     ZHOLD_DELAY,
 ;
-    
+
     /**
      * Determines if on given series, if the unisim is transformed to
-     * different unisim type(s).  
+     * different unisim type(s).
      * @param s The architectural series in question.
      * @return True if unisim is transformed for the given architecture, false otherwise.
      */
@@ -1309,9 +1309,9 @@ public enum Unisim {
         final EDIFLibrary macroPrimitives = Design.getMacroPrimitives(s);
         return macroPrimitives.containsCell(this.name());
     }
-    
+
     private static final Unisim[] EMPTY_ARRAY = {};
-    
+
     /**
      * Gets the set of unisims the provided unisim transforms to in a
      * given series.

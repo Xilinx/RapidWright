@@ -1,28 +1,28 @@
 /*
- * 
- * Copyright (c) 2022, Xilinx, Inc. 
+ *
+ * Copyright (c) 2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
  *
- * This file is part of RapidWright. 
- * 
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 /**
- * 
+ *
  */
 package com.xilinx.rapidwright.edif;
 
@@ -38,7 +38,7 @@ import static com.xilinx.rapidwright.edif.BinaryEDIFWriter.EDIF_HAS_OWNER;
 
 /**
  * A Reader for the RapidWright Binary EDIF Format
- *  
+ *
  * Provides a binary alternative to textual EDIF that is ~10-15X smaller and loads 5-10X faster.
  * This is intended as a RapidWright-only cache (with the extension *.bedf) of this text-based
  * EDIF and cannot be read by Vivado.  One additional tradeoff is that it takes about 2.5-3X
@@ -46,7 +46,7 @@ import static com.xilinx.rapidwright.edif.BinaryEDIFWriter.EDIF_HAS_OWNER;
  * be written once and read many times.
  */
 public class BinaryEDIFReader {
-    
+
     /**
      * Reads an EDIFName object from Kryo-based input stream.
      * @param o The object to populate
@@ -86,7 +86,7 @@ public class BinaryEDIFReader {
 
     /**
      * Reads an EDIFDesign object
-     * @param is The Kryo-based input stream 
+     * @param is The Kryo-based input stream
      * @param strings Indexed string lookup
      * @param netlist The current netlist being populated
      * @return A new EDIFDesign object, populated with data from the input stream
@@ -109,7 +109,7 @@ public class BinaryEDIFReader {
      * @return The existing EDIFCell contained in the specified library of the netlist.
      * @see BinaryEDIFWriter#writeEDIFCellRef(EDIFCell, Output, Map, EDIFLibrary)
      */
-    static EDIFCell readEDIFCellRef(Input is, String[] strings, EDIFNetlist netlist, 
+    static EDIFCell readEDIFCellRef(Input is, String[] strings, EDIFNetlist netlist,
                                             EDIFLibrary parentCellLib) {
         int cellNameIdx = is.readInt();
         EDIFLibrary lib = null;
@@ -125,7 +125,7 @@ public class BinaryEDIFReader {
         }
         EDIFCell cell = lib.getCell(cellName);
         if (cell == null) {
-            throw new RuntimeException("ERROR: Couldn't find cell '" 
+            throw new RuntimeException("ERROR: Couldn't find cell '"
                     + cellName + "' in Library '" + cellName + "'");
         }
         return cell;
@@ -164,7 +164,7 @@ public class BinaryEDIFReader {
             } else if ((dirAndWidth & BinaryEDIFWriter.EDIF_DIR_INOUT_MASK) == BinaryEDIFWriter.EDIF_DIR_INOUT_MASK) {
                 dir = EDIFDirection.INOUT;
             } else {
-                throw new RuntimeException("ERROR: Couldn't read port direction in cell " 
+                throw new RuntimeException("ERROR: Couldn't read port direction in cell "
                         + c.getName());
             }
             port.setWidth(width);
@@ -190,7 +190,7 @@ public class BinaryEDIFReader {
                 int index = is.readInt();
                 int instRef = is.readInt();
                 if (instRef == BinaryEDIFWriter.EDIF_NULL_INST) {
-                    net.createPortInst(c.getPort(name), index); 
+                    net.createPortInst(c.getPort(name), index);
                 } else {
                     EDIFCellInst inst = c.getCellInst(strings[instRef]);
                     EDIFPort port = inst.getPort(name);
@@ -202,7 +202,7 @@ public class BinaryEDIFReader {
     }
 
     /**
-     * Reads a binary EDIF (.bedf) file and creates a new EDIFNetlist object.  
+     * Reads a binary EDIF (.bedf) file and creates a new EDIFNetlist object.
      * @param fileName Name of the file to read
      * @return The newly created netlist populated from the binary EDIF file
      * @see BinaryEDIFWriter#writeBinaryEDIF(String, EDIFNetlist)
@@ -212,7 +212,7 @@ public class BinaryEDIFReader {
     }
 
     /**
-     * Reads a binary EDIF (.bedf) file and creates a new EDIFNetlist object.  
+     * Reads a binary EDIF (.bedf) file and creates a new EDIFNetlist object.
      * @param path Name of the file to read
      * @return The newly created netlist populated from the binary EDIF file
      * @see BinaryEDIFWriter#writeBinaryEDIF(Path, EDIFNetlist)

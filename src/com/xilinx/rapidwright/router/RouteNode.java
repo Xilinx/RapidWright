@@ -1,25 +1,25 @@
-/* 
+/*
  * Original work: Copyright (c) 2010-2011 Brigham Young University
- * Modified work: Copyright (c) 2017-2022, Xilinx, Inc. 
+ * Modified work: Copyright (c) 2017-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
- *  
- * This file is part of RapidWright. 
- * 
+ *
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 package com.xilinx.rapidwright.router;
 
@@ -39,14 +39,14 @@ import com.xilinx.rapidwright.device.Wire;
 
 
 /**
- * This class represents the basic routing element, a node or wire.  A node is described as a 
+ * This class represents the basic routing element, a node or wire.  A node is described as a
  * wire with a particular name in a particular tile.  When routing, it keeps track of the source node
  * by setting the parent variable.
  * @author Chris Lavin
  *
  */
 public class RouteNode{
-    
+
     /** This is the tile where the node/wire resides */
     public Tile tile;
     /** This is the enumerated int that represents the name of the wire specified */
@@ -59,7 +59,7 @@ public class RouteNode{
     public int level;
     /** This is the combined cost of a node when it is used, and used multiple times */
     public int history;
-    
+
     /**
      * Empty constructor, sets tile and wires to null. Sets wire and cost to -1.
      * level and history are set to 0 and isPIP is set to false.
@@ -71,7 +71,7 @@ public class RouteNode{
         level = 0;
         history = 0;
     }
-    
+
     /**
      * A quick population constructor, parent is set to null, and the level is 0.
      * @param tile The tile of the new node.
@@ -83,7 +83,7 @@ public class RouteNode{
         setParent(null);
         setLevel(0);
     }
-    
+
     /**
      * Constructor common for routing expansion
      * @param wire Wire object to construct route node from
@@ -95,7 +95,7 @@ public class RouteNode{
         setParent(parent);
         setLevel(parent.getLevel() + 1);
     }
-    
+
     /**
      * A quick population constructor.
      * @param tile The tile of the new node.
@@ -109,19 +109,19 @@ public class RouteNode{
         setParent(parent);
         setLevel(level);
     }
-    
+
     public RouteNode(SitePinInst p) {
         setTile(p.getTile());
         setWire(p.getConnectedTileWire());
     }
-    
+
     public RouteNode(Node n) {
         setTile(n.getTile());
         setWire(n.getWire());
     }
-    
+
     /**
-     * Convenience constructor that takes the Node name {@code "<Tile>/<Wire>"} and 
+     * Convenience constructor that takes the Node name {@code "<Tile>/<Wire>"} and
      * creates the node.
      * @param nodeName Name of the node
      * @param dev Device to which the node belongs
@@ -134,7 +134,7 @@ public class RouteNode{
         setParent(null);
         setLevel(0);
     }
-    
+
     /**
      * A quick setter method for the tile and wire.
      * @param tile The new tile of the node.
@@ -144,20 +144,20 @@ public class RouteNode{
         setTile(tile);
         setWire(wire);
     }
-    
+
     public void setTileAndWire(Wire wire) {
         setTile(wire.getTile());
         setWire(wire.getWireIndex());
     }
-    
+
     /**
      * Gets all the possible connections to leaving this node
-     * @return The list of all possible connections leaving this node 
+     * @return The list of all possible connections leaving this node
      */
     public List<Wire> getConnections() {
         return tile.getWireConnections(wire);
     }
-    
+
     /**
      * Returns the current cost of this node
      * @return The cost of this node
@@ -165,7 +165,7 @@ public class RouteNode{
     public int getCost() {
         return this.cost;
     }
-    
+
     /**
      * @return the number of hops from the source this node is
      */
@@ -193,7 +193,7 @@ public class RouteNode{
     public void setTile(Tile tile) {
         this.tile = tile;
     }
-    
+
     public void setCost(int cost) {
         this.cost = cost;
     }
@@ -239,25 +239,25 @@ public class RouteNode{
     public void setHistory(int history) {
         this.history = history;
     }
-    
+
     public int getManhattanDistance(RouteNode snk) {
         return tile.getManhattanDistance(snk.getTile());
     }
-    
+
     /**
      * The priority queue will use strictly the cost to evaluate priority
      */
     //public int compareTo(RouteNode node) {
     //    return this.cost - node.cost;
     //}
-    
+
     /**
-     * Quick check to see if the tile/wire combination match this node. 
+     * Quick check to see if the tile/wire combination match this node.
      */
     public boolean matches(String tileName, String wireName) {
          return getTile().getName().equals(tileName) && (getWireName().equals(wireName));
     }
-    
+
     /* (non-Javadoc)
      * @see java.lang.Object#hashCode()
      */
@@ -295,31 +295,31 @@ public class RouteNode{
     public String toString() {
         return this.tile + "/" + getWireName() + " " + this.cost + " " + this.level + " " + getIntentCode();
     }
-    
+
     public String getName() {
         return this.tile + "/" + getWireName();
     }
-    
+
     public String getWireName() {
         return tile.getWireName(wire);
     }
-    
+
     public int getWireIndex(String wireName) {
         return getTile().getWireIndex(wireName);
     }
-    
+
     public List<Wire> getWireConnections() {
         return tile.getWireConnections(wire);
     }
-    
+
     public List<PIP> getBackwardPIPs() {
         return getTile().getBackwardPIPs(getWire());
     }
-    
+
     public List<PIP> getForwardPIPs() {
         return getTile().getPIPs(getWire());
     }
-    
+
     public IntentCode getIntentCode() {
         return tile.getWireIntentCode(getWire());
     }
@@ -330,12 +330,12 @@ public class RouteNode{
     public ArrayList<Wire> getBackwardConnections() {
         return tile.getBackwardConnections(wire);
     }
-    
+
     public RouteNode getBaseWire() {
         Node n = Node.getNode(tile,wire);
         return new RouteNode(n);
     }
-    
+
     public ArrayList<PIP> getPIPsForwardToSink() {
         ArrayList<PIP> pips = new ArrayList<>();
         RouteNode curr = this;
@@ -356,7 +356,7 @@ public class RouteNode{
         }
         return pips;
     }
-    
+
     public ArrayList<PIP> getPIPsBackToSource() {
         ArrayList<PIP> pips = new ArrayList<>();
         RouteNode curr = this;
@@ -377,11 +377,11 @@ public class RouteNode{
         }
         return pips;
     }
-    
+
     public Wire[] getWiresInNode() {
         return Node.getWiresInNode(getTile(),getWire());
     }
-    
+
     /**
      * Creates a new node representing the start wire of this PIP
      * @return
@@ -389,7 +389,7 @@ public class RouteNode{
     public RouteNode getStartNode(PIP p) {
         return new RouteNode(p.getTile(), p.getStartWireIndex());
     }
-    
+
     /**
      * Creates a new node representing the end wire of this PIP
      * @return
@@ -397,21 +397,21 @@ public class RouteNode{
     public RouteNode getEndNode(PIP p) {
         return new RouteNode(p.getTile(), p.getEndWireIndex());
     }
-    
+
     public RouteNode createNode(Wire w) {
         return new RouteNode(w.getTile(), w.getWireIndex());
     }
-    
+
     public RouteNode createNode(Wire w, RouteNode parent) {
         RouteNode n = new RouteNode(w.getTile(), w.getWireIndex());
         n.setParent(parent);
         return n;
     }
-    
-    
+
+
     /**
      * Creates a new priority queue that sorts route nodes based on
-     * their lowest cost (see {@link RouteNode#getCost()}).  
+     * their lowest cost (see {@link RouteNode#getCost()}).
      * @return The newly created priority queue.
      */
     public static PriorityQueue<RouteNode> getPriorityQueue() {

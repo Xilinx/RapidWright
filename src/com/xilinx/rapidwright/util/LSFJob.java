@@ -1,28 +1,28 @@
 /*
- * 
- * Copyright (c) 2018-2022, Xilinx, Inc. 
+ *
+ * Copyright (c) 2018-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
  *
- * This file is part of RapidWright. 
- * 
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 /**
- * 
+ *
  */
 package com.xilinx.rapidwright.util;
 
@@ -34,15 +34,15 @@ import org.json.JSONObject;
 
 /**
  * A batch job to be run on an LSF cluster.
- * 
+ *
  * Created on: Jan 26, 2018
  */
 public class LSFJob extends Job {
-    
+
     public static final String LSF_RESOURCE = "select[osver=ws7]";//"select[type=X86_64 && osdistro=rhel && (osver=ws6 || osver=sv6)] rusage[mem=6000]";
-    
+
     public static final String LSF_PROJECT = "RapidWright";
-    
+
     public static final String LSF_QUEUE = "medium";
 
     private String lsfResource = LSF_RESOURCE;
@@ -96,7 +96,7 @@ public class LSFJob extends Job {
                 launchScriptNames.getSecond().replace(DEFAULT_LOG_EXTENSION, "_lsf_%J" + DEFAULT_LOG_EXTENSION),
                 "-P",
                 lsfProject +"-"+ System.getenv("USER"),
-                "-q", 
+                "-q",
                 lsfQueue,
                 FileTools.isWindows() ? "cmd.exe" : "/bin/bash",
                 launchScriptNames.getFirst()};

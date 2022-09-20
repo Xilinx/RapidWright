@@ -26,7 +26,7 @@ import java.util.Collection;
 import java.util.List;
 
 /**
- * Manages possible placements of a single module. This does not take overlaps with other modules into account. 
+ * Manages possible placements of a single module. This does not take overlaps with other modules into account.
  */
 public abstract class AbstractValidPlacementCache<PlacementT> {
 

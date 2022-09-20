@@ -1,25 +1,25 @@
 /*
- * 
- * Copyright (c) 2021 Ghent University. 
+ *
+ * Copyright (c) 2021 Ghent University.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Yun Zhou, Ghent University.
  *
- * This file is part of RapidWright. 
- * 
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 
 package com.xilinx.rapidwright.rwroute;
@@ -42,7 +42,7 @@ import com.xilinx.rapidwright.router.RouteThruHelper;
 public interface Routable {
     /** Each Routable Object can be legally used by one net only */
     public static final short capacity = 1;
-    /** 
+    /**
      * Checks if a Routable Object has been used.
      * @return true, if a Routable Object has been used.
      */
@@ -203,25 +203,25 @@ public interface Routable {
      * @return A list of Routable Objects.
      */
     public List<Routable> getChildren();
-    
+
     /**
      * Sets the lower bound total path cost.
      * @param totalPathCost The cost value to be set.
      */
     public void setLowerBoundTotalPathCost(float totalPathCost);
-    
+
     /**
      * Sets the upstream path cost.
      * @param newPartialPathCost The new value to be set.
      */
     public void setUpstreamPathCost(float newPartialPathCost);
-    
+
     /**
      * Gets the lower bound total path cost.
      * @return The lower bound total path cost.
      */
     public float getLowerBoundTotalPathCost();
-    
+
     /**
      * Gets the upstream path cost.
      * @return The upstream path cost.
@@ -242,17 +242,17 @@ public interface Routable {
      * Adds an user {@link NetWrapper} instance to the user map, of which a key is a {@link NetWrapper} instance and
      * the value is the number of connections that are using a rnode.
      * If the user is already stored in the map, increment the connection count of the user by 1. Otherwise, put the user
-     * into the map and initialize the connection count as 1. 
+     * into the map and initialize the connection count as 1.
      * @param user The user in question.
      */
     public void incrementUser(NetWrapper user);
-    
+
     /**
      * Gets the number of unique users.
      * @return The number of unique {@link NetWrapper} instances in the user map, i.e, the key set size of the user map.
      */
     public int uniqueUserCount();
-    
+
     /**
      * Decrements the connection count of a user that is represented by a
      * {@link NetWrapper} instance corresponding to a {@link Net} instance.
@@ -268,25 +268,25 @@ public interface Routable {
      * @return The total number of connections of the user.
      */
     public int countConnectionsOfUser(NetWrapper user);
-    
+
     /**
      * Gets the number of unique drivers.
      * @return The number of unique drivers of a rnode, i.e., the key set size of the driver map
      */
     public int uniqueDriverCount();
-    
+
     /**
      * Adds a driver to the driver map.
      * @param parent The driver to be added.
      */
     public void incrementDriver(Routable parent);
-    
+
     /**
      * Decrements the driver count of a Routable instance.
      * @param parent The driver that should have its count reduced by 1.
      */
     public void decrementDriver(Routable parent);
-    
+
     /**
      * Gets the parent Routable instance for routing a connection.
      * @return The driving Routable instance.
@@ -310,11 +310,11 @@ public interface Routable {
      * @param visited boolean value to set.
      */
     public void setVisited(boolean visited);
-    
+
     /**
      * Gets the unique index of a rnode.
      * @return
      */
     public int getIndex();
-    
+
 }

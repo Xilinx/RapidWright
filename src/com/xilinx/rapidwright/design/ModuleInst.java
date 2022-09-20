@@ -1,25 +1,25 @@
-/* 
+/*
  * Original work: Copyright (c) 2010-2011 Brigham Young University
- * Modified work: Copyright (c) 2017-2022, Xilinx, Inc. 
+ * Modified work: Copyright (c) 2017-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
- *  
- * This file is part of RapidWright. 
- * 
+ *
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 package com.xilinx.rapidwright.design;
 
@@ -48,7 +48,7 @@ import com.xilinx.rapidwright.util.Utils;
  * a module instance is referenced in a particular way back to the module
  * instance. This class attempts to collect all the module instance information
  * into a single class.
- * 
+ *
  * @author Chris Lavin Created on: Jun 22, 2010
  */
 public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
@@ -100,7 +100,7 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
         nets = moduleInst.nets;
         setCellInst(getCellInst());
     }
-    
+
     /**
      * Adds the instance inst to the instances list that are members of the
      * module instance.
@@ -113,7 +113,7 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
     public void removeInst(SiteInst inst) {
         instances.remove(inst);
     }
-    
+
     /**
      * Adds the net to the net list that are members of the module instance.
      * @param net The net to add.
@@ -157,7 +157,7 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
     public ArrayList<SiteInst> getInsts() {
         return instances;
     }
-    
+
     /**
      * Gets the site instance that belong to this module instance.
      * @return The list of site instances that belong to this module instance.
@@ -196,22 +196,22 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
     public SiteInst getAnchor() {
         return anchor;
     }
-    
+
     public boolean isPlaced() {
         return anchor != null && anchor.isPlaced();
     }
-    
+
     public void addNOCClient(NOCClient nc) {
         getNOCClients().add(nc);
     }
-    
+
     public List<NOCClient> getNOCClients() {
         if (nocClients == null) {
             nocClients = new ArrayList<NOCClient>();
         }
         return nocClients;
     }
-    
+
     /**
      * Does a brute force search to find all valid locations of where this module
      * instance can be placed.  It returns the module instance to its original
@@ -230,29 +230,29 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
                 unplace();
             }
         }
-        
+
         // Put hard macro back
         if (originalSite != null) place(originalSite);
-        
+
         return validSites;
     }
 
     /**
-     * Places the module instance anchor at the newAnchorSite as well as all other 
+     * Places the module instance anchor at the newAnchorSite as well as all other
      * instances and nets within the module instance at their relative offsets of the new site. Note
-     * that this method allows placement overlap by default.  See 
+     * that this method allows placement overlap by default.  See
      * {@link #place(Site, boolean, boolean)} to disallow module overlap.
      * @param newAnchorSite The new site for the anchor of the module instance.
      * @return True if placement was successful, false otherwise.
      */
-    public boolean place(Site newAnchorSite) {    
+    public boolean place(Site newAnchorSite) {
         return place(newAnchorSite, false);
     }
 
     /**
-     * Places the module instance on the module's anchor site (original location of the module).  
+     * Places the module instance on the module's anchor site (original location of the module).
      * This is the same as place(getModule().getAnchor().getSite()). Note
-     * that this method allows placement overlap by default.  See 
+     * that this method allows placement overlap by default.  See
      * {@link #place(Site, boolean, boolean)} to disallow module overlap.
      * @return True if the placement was successful, false otherwise.
      */
@@ -261,15 +261,15 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
     }
 
     /**
-     * Places the module instance anchor at the newAnchorSite as well as all other 
+     * Places the module instance anchor at the newAnchorSite as well as all other
      * instances and nets within the module instance at their relative offsets of the new site.  Note
-     * that this method allows placement overlap by default.  See 
+     * that this method allows placement overlap by default.  See
      * {@link #place(Site, boolean, boolean)} to disallow module overlap.
      * @param newAnchorSite The new site for the anchor of the module instance.
      * @param skipIncompatible Flag telling the placement checks to skip any incompatible site that
-     * does not match the floorplan according to the original module and simply leave it unplaced.  
-     * Setting to false will cause placement to fail on first mismatch of floorplan placement 
-     * attempt.  
+     * does not match the floorplan according to the original module and simply leave it unplaced.
+     * Setting to false will cause placement to fail on first mismatch of floorplan placement
+     * attempt.
      * @return True if placement was successful, false otherwise.
      */
     public boolean place(Site newAnchorSite, boolean skipIncompatible) {
@@ -277,23 +277,23 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
     }
 
     /**
-     * Places the module instance anchor at the newAnchorSite as well as all other 
+     * Places the module instance anchor at the newAnchorSite as well as all other
      * instances and nets within the module instance at their relative offsets of the new site.
      * @param newAnchorSite The new site for the anchor of the module instance.
      * @param skipIncompatible Flag telling the placement checks to skip any incompatible site that
-     * does not match the floorplan according to the original module and simply leave it unplaced.  
-     * Setting to false will cause placement to fail on first mismatch of floorplan placement 
+     * does not match the floorplan according to the original module and simply leave it unplaced.
+     * Setting to false will cause placement to fail on first mismatch of floorplan placement
      * attempt.
      * @param allowOverlap True if the module instance is allowed to overlap with existing placed logic.
      * @return True if placement was successful, false otherwise.
      */
-    public boolean place(Site newAnchorSite, boolean skipIncompatible, boolean allowOverlap) {    
+    public boolean place(Site newAnchorSite, boolean skipIncompatible, boolean allowOverlap) {
         // Check if parameters are null
         if (newAnchorSite == null) {
             return false;
         }
         Device dev = newAnchorSite.getDevice();
-        
+
         // Do some error checking on the newAnchorSite
         if (module.getAnchor() == null) return false;
         Site p = module.getAnchor();
@@ -305,7 +305,7 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
             //this.unplace();
             return false;
         }
-        
+
         // save original placement in case new placement is invalid
         HashMap<SiteInst, Site> originalSites;
         originalSites = isPlaced() ? new HashMap<SiteInst, Site>() : null;
@@ -319,26 +319,26 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
                 inst.place(inst.getModuleTemplateInst().getSite());
                 continue;
             }
-            
+
             Site templateSite = inst.getModuleTemplateInst().getSite();
             Tile newTile = module.getCorrespondingTile(templateSite.getTile(), newAnchorSite.getTile());
             Site newSite = templateSite.getCorrespondingSite(inst.getSiteTypeEnum(), newTile);
 
             SiteInst existingSiteInst = allowOverlap ? null : design.getSiteInstFromSite(newSite);
-            
+
             if (newSite == null || existingSiteInst != null) {
                 //MessageGenerator.briefError("ERROR: No matching site found." +
-                //    " (Template Site:"    + templateSite.getName() + 
+                //    " (Template Site:"    + templateSite.getName() +
                 //    ", Template Tile:" + templateSite.getTile() +
                 //    " => New Site:" + newSite + ", New Tile:" + newTile+")");
-                
+
                 // revert placement to original placement before method call
                 if (originalSites == null) {
                     if (skipIncompatible) {
-                        continue;                        
+                        continue;
                     } else {
                         unplace();
-                        return false;    
+                        return false;
                     }
                 }
                 for (SiteInst i : originalSites.keySet()) {
@@ -358,13 +358,13 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
                     throw new RuntimeException("ERROR: BlockGuide ("+ getName() +") contains a BUFGCE that is already fully occupied in the tile specified.");
                 }
             }
-            
-            if (originalSites != null) { 
+
+            if (originalSites != null) {
                 originalSites.put(inst, inst.getSite());
             }
             inst.place(newSite);
         }
-        
+
         //=======================================================//
         /* Place net at new location                             */
         //=======================================================//
@@ -381,7 +381,7 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
                         unplace();
                         MessageGenerator.briefError("Warning: Unable to return module instance "+ getName() +" back to original placement.");
                         return false;
-                    }                    
+                    }
                 }
                 PIP newPip = new PIP(pip);///new PIP(newPipTile, pip.getStartWire(), pip.getEndWire(), pip.getPIPType());
                 newPip.setTile(newPipTile);
@@ -403,16 +403,16 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
         //Update location of NOCClients
         for (NOCClient nc : getNOCClients()) {
             Site templateSite = dev.getSite(nc.getLocation());
-            if (templateSite == null) 
+            if (templateSite == null)
                 continue;
             Tile newTile = module.getCorrespondingTile(templateSite.getTile(), newAnchorSite.getTile());
             Site newSite = templateSite.getCorrespondingSite(templateSite.getSiteTypeEnum(), newTile);
             nc.setLocation(newSite != null ? newSite.getName() : null);
         }
-        
+
         return true;
     }
-    
+
     /**
      * Removes all placement information and unroutes all nets of the module instance.
      */
@@ -542,7 +542,7 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
         return null;
     }
 
-    
+
     /**
      * Get's the corresponding port on the module by name.
      * @param name
@@ -552,9 +552,9 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
         return module.getPort(name);
     }
 
-    
+
     /**
-     * Get's the current lower left site as used for a placement directive 
+     * Get's the current lower left site as used for a placement directive
      * for an implementation guide.  If a pblock was used and is presently annotated
      * on the Module, it will use the lower left most corner of the pblock.
      * @return The current lower left site used for placement.
@@ -562,31 +562,31 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
     public Site getLowerLeftPlacement() {
         return getLowerLeftPlacement(null);
     }
-    
+
     /**
-     * Get's the current lower left site as used for a placement directive 
+     * Get's the current lower left site as used for a placement directive
      * for an implementation guide.  If a pblock was used and is presently annotated
      * on the Module, it will use the lower left most corner of the pblock.
-     * @param type If a desired type is requested for the corner, otherwise it will search 
-     * for the most lower left corner site 
+     * @param type If a desired type is requested for the corner, otherwise it will search
+     * for the most lower left corner site
      * @return The current lower left site used for placement.
      */
     public Site getLowerLeftPlacement(SiteTypeEnum type) {
         // Calculate anchor offset
         Site anchor = getModule().getAnchor();
         if (anchor == null) return null;
-        
+
         Tile origAnchor = anchor.getTile();
         Tile currAnchor = getAnchor().getSite().getTile();
         int dx = currAnchor.getTileXCoordinate() - origAnchor.getTileXCoordinate();
         int dy = currAnchor.getTileYCoordinate() - origAnchor.getTileYCoordinate();
-        
-        // Get original lower left placement 
+
+        // Get original lower left placement
         Tile origLowerLeft = getLowerLeftTile(type);
 
         String origTilePrefix = origLowerLeft.getNameRoot();
         String newSuffix = "_X" + (origLowerLeft.getTileXCoordinate() + dx) + "Y" + (origLowerLeft.getTileYCoordinate() + dy);
-        
+
         Tile newTile = origLowerLeft.getDevice().getTile(origTilePrefix + newSuffix);
         if (type == null) {
             if (newTile.getSites().length == 0) {
@@ -599,10 +599,10 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
         }
         return null;
     }
-    
+
     /**
      * Chooses a lower left reference tile in a module instance for the purpose
-     * of placement. The tile chosen is from the context of the original module, not 
+     * of placement. The tile chosen is from the context of the original module, not
      * the module instance's current location.
      * @param type The site type space in which to reference.
      * @return A lower left tile from the module's original footprint.
@@ -610,23 +610,23 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
     public Tile getLowerLeftTile(SiteTypeEnum type) {
         PBlock pb = getModule().getPBlock();
         if (pb != null) {
-            if (type == null) 
+            if (type == null)
                 return pb.getBottomLeftTile();
-            
+
             for (PBlockRange range : pb) {
                 if (range.getLowerLeftSite().getSiteTypeEnum() == type) {
                     return range.getLowerLeftSite().getTile();
                 }
             }
         }
-        
-        
+
+
         SiteInst lowerLeftIP = null;
         int x = Integer.MAX_VALUE;
         int y = Integer.MAX_VALUE;
         for (SiteInst s : getModule().getSiteInsts()) {
-            boolean isSiteCompatible = type == null ? PBlock.isPBlockCornerSiteType(s.getSiteTypeEnum()) : 
-                (s.getSite().isCompatibleSiteType(type) || (Utils.isSLICE(s) && Utils.isSLICE(type))); 
+            boolean isSiteCompatible = type == null ? PBlock.isPBlockCornerSiteType(s.getSiteTypeEnum()) :
+                (s.getSite().isCompatibleSiteType(type) || (Utils.isSLICE(s) && Utils.isSLICE(type)));
             if (isSiteCompatible) {
                 if (lowerLeftIP == null) {
                     lowerLeftIP = s;
@@ -641,14 +641,14 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
                 }
             }
         }
-        
+
         Device dev = getDesign().getDevice();
         String prefix = lowerLeftIP.getSite().getName().substring(0, lowerLeftIP.getSite().getName().lastIndexOf('_')+1);
         Site target = dev.getSite(prefix + "X" + x + "Y" + y);
-        
+
         return target.getTile();
     }
-    
+
     /**
      * Attempts to place the module instance such that it's lower left tile falls
      * on the specified IP tile (CLB,DSP,BRAM,...)
@@ -659,30 +659,30 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
     public boolean placeMINearTile(Tile ipTile, SiteTypeEnum type) {
         Tile targetTile = getLowerLeftTile(type);
         Device dev = targetTile.getDevice();
-        
+
         Tile newAnchorTile = getModule().getCorrespondingAnchorTile(targetTile, ipTile, dev);
         if (newAnchorTile == null) return false;
-        
+
         Site anchor = getModule().getAnchor();
         if (anchor == null) return false;
         Site moduleAnchor = anchor;
         boolean success = place(newAnchorTile.getSites()[moduleAnchor.getTile().getSiteIndex(moduleAnchor)]);
-        
+
         if (!success) System.out.println("Failed placement attempt, TargetTile="+targetTile.getName()+" ipTile="+ipTile.getName());
-        return success;  
+        return success;
     }
 
     /**
      * Connects two signals by port name between this module instance and another.
      * This method will create a new net for the connection handling adding both
-     * a logical net (EDIFNet) and physical net (Net).  In the case of a top level connection, the 
+     * a logical net (EDIFNet) and physical net (Net).  In the case of a top level connection, the
      * physical net will not be created.
      * @param portName This module instance's port name to connect.
      * @param busIndex0 If the assigned port of this module instance is multi-bit,
      * specify the index to connect or -1 if single bit bus.
      * @param other The other module instance to connect to. If this is null, it will
      * connect it to an existing parent cell port named otherPortName. When null, this is presumed
-     * an out of context design where there might not be a source/sink.  
+     * an out of context design where there might not be a source/sink.
      * @param otherPortName The port name on the other module instance to connect to or
      * the top-level port of the the cell instance.
      * @param busIndex1 If the port (of the other module instance or the existing parent cell) is multi-bit,

@@ -1,28 +1,28 @@
 /*
- * 
- * Copyright (c) 2017-2022, Xilinx, Inc. 
+ *
+ * Copyright (c) 2017-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
  *
- * This file is part of RapidWright. 
- * 
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 /**
- * 
+ *
  */
 package com.xilinx.rapidwright.debug;
 
@@ -53,21 +53,21 @@ import com.xilinx.rapidwright.util.FileTools;
 
 
 /**
- * Example application in RapidWright for adding an ILA core within 
+ * Example application in RapidWright for adding an ILA core within
  * an implemented (placed and routed) design.
  * Created on: May 3, 2017
  */
 public class ILAInserter {
-    
+
     private static final String ETV_true = "true";
     private static final String ETV_TRUE = "TRUE";
     private static final String EDIF_MARK_DEBUG = "mark_debug";
-    private static final String XDC_MARK_DEBUG = "MARK_DEBUG"; 
+    private static final String XDC_MARK_DEBUG = "MARK_DEBUG";
     private static final String XDC_SET_PROPERTY = "set_property";
-    
+
     /**
      * This method will examine a design for any nets marked for debug
-     * and return the list of names of those nets. 
+     * and return the list of names of those nets.
      * @param design The design to examine
      * @return A list of net names marked for debug.
      */
@@ -84,7 +84,7 @@ public class ILAInserter {
         }
 
         // Nets can also be marked for debug in XDC
-        
+
         List<List<String>> xdcLines = new ArrayList<List<String>>();
         for (ConstraintGroup cg : ConstraintGroup.values()) {
             List<String> lines = design.getXDCConstraints(cg);
@@ -104,15 +104,15 @@ public class ILAInserter {
                 }
             }
         }
-        
-        
-        
+
+
+
         return debugNets;
     }
-    
+
     /**
-     * This method will go outside and invoke Vivado to create a 
-     * stand-alone project with an ILA and Debug Hub and created a 
+     * This method will go outside and invoke Vivado to create a
+     * stand-alone project with an ILA and Debug Hub and created a
      * synthesized DCP that can be imported to RapidWright.
      * @param probeCount The number of probes desired on the ILA
      * @param probeDepth The depth of capture for the ILA
@@ -123,21 +123,21 @@ public class ILAInserter {
         List<String> tclCommands = new ArrayList<>();
         String projFolder = ".ila";
         String tclFileName = projFolder + "/create_ila_" + FileTools.getUniqueProcessAndHostID() + ".tcl";
-        
+
         FileTools.makeDir(projFolder);
         String dcpFileName = projFolder+"/ila.dcp";
         tclCommands.add("source " + FileTools.getRapidWrightPath() + File.separator + FileTools.TCL_FOLDER_NAME + File.separator + "rapidwright.tcl");
         tclCommands.add("create_preimplemented_ila_dcp "+part+" "+probeCount+" "+probeDepth+" " +dcpFileName +"\n");
-        
+
         FileTools.writeLinesToTextFile(tclCommands, tclFileName);
         FileTools.runCommand("vivado -mode batch -log "+projFolder+"/vivado.log -journal "+
                 projFolder+"/vivado.jou -source " + tclFileName, true);
-        
+
         Design ilaDesign = Design.readCheckpoint(dcpFileName);
-        
+
         return ilaDesign;
     }
-    
+
     /**
      * This inserts the ILA design into the original design such that it can
      * be placed and routed on top of the original design inside Vivado.
@@ -152,13 +152,13 @@ public class ILAInserter {
         if (m.getAnchor() != null) {
             mi.place(m.getAnchor());
         }
-        
+
 
         // Logical netlist
         EDIFNetlist netlist = original.getNetlist();
         EDIFCell top = netlist.getTopCell();
 
-        
+
         String ilaClkPort = "ila_clk_out";
         EDIFHierNet clkNet = netlist.getHierNetFromName(clkName);
         // Find clock net closest to the top level cell
@@ -186,20 +186,20 @@ public class ILAInserter {
         EDIFNet clk = clkNet.getNet();
         // Connect the clock (assumes all probed signals are synchronous)
         clk.createPortInst("clk", mi.getCellInst());
-        
+
         for (String c : ila.getXDCConstraints(ConstraintGroup.NORMAL)) {
             if (c.contains("current_instance ")) {
                 if (!c.contains("-quiet")) {
                     c = c.replace("current_instance ", "current_instance " + ila.getNetlist().getTopCellInst().getName() + "/");
                 }
-                
+
             }
             original.addXDCConstraint(c);
         }
-        
+
         return true;
     }
-    
+
     public static void main(String[] args) {
         if (args.length < 4) {
             System.out.println("USAGE: <input.dcp> <output.dcp> probe_count probe_depth clk_net [ila dcp]");
@@ -212,7 +212,7 @@ public class ILAInserter {
         String clkNet = args[4];
         boolean lockPlacement = false;
         boolean lockRouting = false;
-        
+
         if (probeCount < 0 || probeCount > 1024) {
             throw new RuntimeException("ERROR: Unsupported probe count of " + probeCount + ", must be between 1 and 1024.");
         }
@@ -224,43 +224,43 @@ public class ILAInserter {
         if (!isDepthValid) {
             throw new RuntimeException("ERROR: Unsupported probe depth of " + probeDepth +", must be one of " + Arrays.toString(allowedDepths));
         }
-        
+
         Design originalDesign = Design.readCheckpoint(inputDcpFileName);
-        
+
         EDIFNet clk = originalDesign.getNetlistNetMap().get(clkNet);
         if (clk == null) {
             throw new RuntimeException("ERROR: Couldn't find the clk net named " + clkNet + " in the original design provided");
         }
-        
+
         // TODO - Auto identify clock from probed signals
         /*List<String> netsToDebug = getNetsMarkedForDebug(originalDesign);
         Net clk = null;
         for (String net : netsToDebug) {
             clk = DesignTools.getClockDomain(originalDesign, net);
             if (clk != null) break;
-        }*/ 
-        
+        }*/
+
         if (lockPlacement) {
             for (Cell c : originalDesign.getCells()) {
                 c.setBELFixed(true);
                 c.setSiteFixed(true);
-            }            
+            }
         }
         if (lockRouting) {
             for (Net n : originalDesign.getNets()) {
                 for (PIP p : n.getPIPs()) {
                     p.setIsPIPFixed(true);
                 }
-            }            
+            }
         }
-        
+
         Design ilaDesign = null;
         if (args.length == 6) {
             ilaDesign = Design.readCheckpoint(args[5]);
         } else {
             ilaDesign = createILADesign(probeCount, probeDepth, originalDesign.getPart());
         }
-        
+
         applyILAToDesign(originalDesign, ilaDesign, clkNet);
         originalDesign.writeCheckpoint(outputDcpFileName);
     }

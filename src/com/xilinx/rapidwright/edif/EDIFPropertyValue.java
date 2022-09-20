@@ -1,28 +1,28 @@
 /*
- * 
- * Copyright (c) 2017-2022, Xilinx, Inc. 
+ *
+ * Copyright (c) 2017-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
  *
- * This file is part of RapidWright. 
- * 
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 /**
- * 
+ *
  */
 package com.xilinx.rapidwright.edif;
 
@@ -34,14 +34,14 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 /**
- * Represents the EDIF property value construct.  Currently supports: 
+ * Represents the EDIF property value construct.  Currently supports:
  * string, integer and boolean.
  * Created on: May 11, 2017
  */
 public class EDIFPropertyValue {
 
     private EDIFValueType type;
-    
+
     private String value;
 
     private String owner;
@@ -60,13 +60,13 @@ public class EDIFPropertyValue {
         this.value = value;
         this.type = type;
     }
-    
+
     public EDIFPropertyValue(EDIFPropertyValue propValue) {
         this.value = propValue.value;
         this.type = propValue.type;
         this.owner = propValue.owner;
     }
-    
+
     /**
      * @return the type
      */
@@ -130,7 +130,7 @@ public class EDIFPropertyValue {
                     return Integer.parseInt(value.substring(i+1), radix);
                 }
                 return Integer.parseUnsignedInt(value.substring(i+1), radix);
-                
+
             }
             if (c == '\'') {
                 lastCharWasTick = true;
@@ -184,7 +184,7 @@ public class EDIFPropertyValue {
                     return Long.parseLong(value.substring(i+1), radix);
                 }
                 return Long.parseUnsignedLong(value.substring(i+1), radix);
-                
+
             }
             if (c == '\'') {
                 lastCharWasTick = true;
@@ -194,15 +194,15 @@ public class EDIFPropertyValue {
         return Long.parseUnsignedLong(value);
     }
 
-    
-    
+
+
     /**
      * @param value the value to set
      */
     public void setValue(String value) {
         this.value = value;
     }
-    
+
     public void writeEDIFString(OutputStream os) throws IOException{
         os.write('(');
         os.write(type.toString().getBytes(StandardCharsets.UTF_8));
@@ -220,18 +220,18 @@ public class EDIFPropertyValue {
         }
         os.write(')');
     }
-    
+
     @Override
     public String toString() {
         return type + "("+value+")";
     }
 
     public static void main(String[] args) {
-        int[] testValues = new int[] {0, 1, -1, 4, 15, -15, 16, 
+        int[] testValues = new int[] {0, 1, -1, 4, 15, -15, 16,
                 Integer.MAX_VALUE, Integer.MIN_VALUE};
         int[] radixValues = new int[] { 2,   8,  10,  16};
         char[] radixChars = new char[] {'b', 'o', 'd', 'h'};
-        
+
         Map<String,Integer> examples = new HashMap<>();
         for (int testValue : testValues) {
             for (int i=0; i < radixValues.length; i++) {
@@ -248,7 +248,7 @@ public class EDIFPropertyValue {
                 }
             }
         }
-        
+
         for (Entry<String,Integer> e : examples.entrySet()) {
             EDIFPropertyValue p = new EDIFPropertyValue();
             p.setType(EDIFValueType.INTEGER);
@@ -260,7 +260,7 @@ public class EDIFPropertyValue {
                 throw new RuntimeException("ERROR: Couldn't parse test value " + e.getKey());
             }
         }
-        
+
     }
 
     public String getOwner() {

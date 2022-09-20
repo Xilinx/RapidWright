@@ -1,25 +1,25 @@
 /*
- * 
- * Copyright (c) 2021 Ghent University. 
+ *
+ * Copyright (c) 2021 Ghent University.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Yun Zhou, Ghent University.
  *
- * This file is part of RapidWright. 
- * 
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 
 package com.xilinx.rapidwright.util.rwroute;
@@ -40,7 +40,7 @@ import com.xilinx.rapidwright.device.Site;
 
 /**
  * A helper class to read and set clock buffer tap levels.
- * To read: input.dcp --read input_file output_file_directory 
+ * To read: input.dcp --read input_file output_file_directory
  * "input_file" is the file that contains buffers sites.
  * "output_file_directory" is the path to store the output file that contains the buffer sites and tap levels.
  * To set: input.dcp --set input_file output_file_directory
@@ -62,35 +62,35 @@ public class BufferTapTool {
             System.out.println("BASIC USAGE:\n <input.dcp> --read <input file> <output file path>\n");
             return;
         }
-        
+
         String inputDcpName = args[0].substring(args[0].lastIndexOf("/")+1);
         Design design = Design.readCheckpoint(args[0]);
         Device dev = design.getDevice();
-        
+
         Net clock = getClockNet(design);
         if (clock == null) {
             System.err.println("ERROR: No clock net found");
         }
-        
+
         Map<String, Integer> siteTaps = getBufferSiteTapsFromFile(args[2]);
         if (siteTaps.isEmpty()) {
             System.err.println("ERROR: No valid content found in " + args[2]);
             return;
         }
-        
+
         if (read) {
             String filePath = args[3].endsWith("/")? args[3] : args[3] + "/";
             readBufferTapsToFile(inputDcpName, clock, siteTaps, dev, filePath);
             return;
         }
-        
-        // set    
+
+        // set
         setBufferTaps(siteTaps, clock, dev);
         String outputDCP = args[3].endsWith("/")? args[3] : args[3] + "/";
         outputDCP += inputDcpName.replace(".dcp", "_buffer_set.dcp");
         design.writeCheckpoint(outputDCP);
     }
-    
+
     /**
      * Gets the clock net of a design.
      * @param design The design in question.
@@ -104,14 +104,14 @@ public class BufferTapTool {
         }
         return null;
     }
-    
+
     /**
      * Gets buffer sites info from the input file.
      * @param file The file to use that contains buffer sites (and buffer taps in the set mode).
      * @return A map contains buffer site names and corresponding taps when taps provided.
      */
     private static Map<String, Integer> getBufferSiteTapsFromFile(String file) {
-        Map<String, Integer> siteTaps = new HashMap<>();    
+        Map<String, Integer> siteTaps = new HashMap<>();
         try {
             BufferedReader myReader = new BufferedReader(new FileReader(file));
             String line;
@@ -125,7 +125,7 @@ public class BufferTapTool {
                         siteTaps.put(siteTapLevels[0], null);
                     } else {
                         siteTaps.put(siteTapLevels[0], Integer.parseInt(siteTapLevels[1]));
-                    }        
+                    }
                 }
             } catch (IOException e) {
                 e.printStackTrace();
@@ -133,10 +133,10 @@ public class BufferTapTool {
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         }
-        
+
         return siteTaps;
     }
-    
+
     /**
      * Reads buffer taps of a clock net from the design checkpoint and write taps to a file.
      * @param inputDCPName The input design checkpoint file name.
@@ -149,7 +149,7 @@ public class BufferTapTool {
         String readToFile = inputDCPName.replace(".dcp", "_buffer_tap.txt");
         try {
             FileWriter myWriter = new FileWriter(filePath + readToFile);
-            
+
             for (String s : siteTaps.keySet()) {
                 Site site = dev.getSite(s);
                 if (site == null) {
@@ -161,12 +161,12 @@ public class BufferTapTool {
                 System.out.println(site + " \t\t" + tap);
             }
             myWriter.close();
-            
+
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
-    
+
     /**
      * Sets buffer taps of the clock net.
      * @param siteTaps A map contains buffer site names and buffer taps.

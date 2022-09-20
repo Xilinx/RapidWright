@@ -1,24 +1,24 @@
-/* 
- * Copyright (c) 2021-2022, Xilinx, Inc. 
+/*
+ * Copyright (c) 2021-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
- *  
- * This file is part of RapidWright. 
- * 
+ *
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 package com.xilinx.rapidwright.design;
 
@@ -39,18 +39,18 @@ import com.xilinx.rapidwright.util.FileTools;
 public class CellPinStaticDefaults {
 
     private static Map<Series, Map<Unisim, Map<String, NetType>>> cellPinDefaultsMap;
-    
+
     @SuppressWarnings("unchecked")
     public static synchronized Map<Series, Map<Unisim, Map<String, NetType>>> getCellPinDefaultsMap() {
         if (cellPinDefaultsMap == null) {
             InputStream is = FileTools.getRapidWrightResourceInputStream(
                     FileTools.CELL_PIN_DEFAULTS_FILE_NAME);
-            cellPinDefaultsMap = (Map<Series, Map<Unisim, Map<String, NetType>>>) 
+            cellPinDefaultsMap = (Map<Series, Map<Unisim, Map<String, NetType>>>)
                     FileTools.readObjectFromKryoFile(is);
         }
         return cellPinDefaultsMap;
     }
-    
+
     public static NetType getCellPinDefault(Series s, Unisim u, String pinName) {
         Map<Series, Map<Unisim, Map<String, NetType>>> map = getCellPinDefaultsMap();
         Map<Unisim, Map<String, NetType>> map2 = map.get(s);
@@ -62,9 +62,9 @@ public class CellPinStaticDefaults {
         }
         return null;
     }
-    
+
     private static void writeToFileDefaultsMap(
-            Map<Series, Map<Unisim, Map<String,NetType>>> pinDefaults, 
+            Map<Series, Map<Unisim, Map<String,NetType>>> pinDefaults,
             String fileName) throws IOException {
         BufferedWriter bw = new BufferedWriter(new FileWriter(fileName));
         for (Entry<Series, Map<Unisim, Map<String,NetType>>> e : pinDefaults.entrySet()) {
@@ -78,7 +78,7 @@ public class CellPinStaticDefaults {
         }
         bw.close();
     }
-    
+
     public static void main(String[] args) throws IOException {
         Map<Series, Map<Unisim, Map<String, NetType>>> map = getCellPinDefaultsMap();
         writeToFileDefaultsMap(map, "map.txt");

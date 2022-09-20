@@ -1,25 +1,25 @@
-/* 
+/*
  * Original work: Copyright (c) 2010-2011 Brigham Young University
- * Modified work: Copyright (c) 2017-2022, Xilinx, Inc. 
+ * Modified work: Copyright (c) 2017-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
- *  
- * This file is part of RapidWright. 
- * 
+ *
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 package com.xilinx.rapidwright.placer.blockplacer;
 
@@ -48,7 +48,7 @@ public class SmallestEnclosingCircle {
         ArrayList<Point> points = new ArrayList<Point>(pointsSet);
         Point center = new Point(-1,-1);
         ArrayList<Point> convexHull = null;
-        
+
         switch(points.size()) {
         case 0:
             //returns a bogus point when there are no points in the set.
@@ -73,15 +73,15 @@ public class SmallestEnclosingCircle {
             convexHull = convexHull(points);
             break;
         }
-        
+
         boolean finished = false;
         boolean useMinPoint = false;
-        
+
         //describes side S of the convex hull
         Point s1 = convexHull.get(0);
         Point s2 = convexHull.get(1);
         Point minPoint = null;
-        
+
         while (!finished) {
             double minAngle = Math.PI;
             minPoint = null;
@@ -111,7 +111,7 @@ public class SmallestEnclosingCircle {
                 useMinPoint = true;
             }
         }
-        
+
         if (useMinPoint) {
             //use the side S and the minPoint to determine the circle
             Point circumcenter = getCircumcenter( s1, s2, minPoint);
@@ -122,10 +122,10 @@ public class SmallestEnclosingCircle {
             center.x = (s1.x > s2.x) ? (s1.x - s2.x) / 2 + s2.x : (s2.x - s1.x) / 2 + s1.x;
             center.y = (s1.y > s2.y) ? (s1.y - s2.y) / 2 + s2.y : (s2.y - s1.y) / 2 + s1.y;
         }
-        
+
         return center;
     }
-    
+
     /**
      * Given a set of points, returns the set of points in the convex hull in
      * counterclockwise order.
@@ -135,16 +135,16 @@ public class SmallestEnclosingCircle {
      */
     public static ArrayList<Point> convexHull(ArrayList<Point> points) {
         ArrayList<Point> convexHull = new ArrayList<Point>();
-        
+
         int n = points.size();
         int k = 0;
-        
+
         Point[] hull = new Point[2*n];
-        
+
         Point[] sortedPoints = new Point[points.size()];
         sortedPoints = points.toArray(sortedPoints);
         Arrays.sort(sortedPoints);
-        
+
         for (int i = 0; i < n; i++) {
             while (k >= 2 && crossProduct(hull[k-2], hull[k-1], sortedPoints[i]) <= 0) {
                 k--;
@@ -157,15 +157,15 @@ public class SmallestEnclosingCircle {
             }
             hull[k++] = sortedPoints[i];
         }
-        
+
         //only k-1 distinct points.  the kth point is the same as the 1st point
         for (int i = 0; i < k-1; i++) {
             convexHull.add(hull[i]);
         }
-        
+
         return convexHull;
     }
-    
+
     /**
      * Determines the circumcenter of a circle that circumscribes triangle abc.
      * http://en.wikipedia.org/wiki/Circumscribed_circle
@@ -184,7 +184,7 @@ public class SmallestEnclosingCircle {
                         ( Math.pow(c.y, 2) + Math.pow(c.x, 2) ) * ( b.x - a.x ) ) / d;
         return new Point( (int) x, (int) y);
     }
-    
+
     /**
      * Performs a 2D cross product of OA and OB vectors.  Returns a positive value if
      * OAB makes a counter-clockwise turn, negative for a clockwise turn, and zero if
@@ -196,15 +196,15 @@ public class SmallestEnclosingCircle {
      * @return int, the cross product
      */
     public static int crossProduct(Point o, Point a, Point b) {
-        return (a.x - o.x) * (b.y - o.y) - (a.y - o.y)* (b.x - o.x); 
+        return (a.x - o.x) * (b.y - o.y) - (a.y - o.y)* (b.x - o.x);
     }
-    
+
     public static void printPoints(HashSet<Point> points) {
         for (Point p : points) {
             System.out.println("\tX: " + p.x + "\tY: " + p.y);
         }
     }
-    
+
     /**
      * Computes the angle ABC from the points a, b, c.
      * http://forums.devx.com/archive/index.php/t-154064.html
@@ -216,7 +216,7 @@ public class SmallestEnclosingCircle {
     public static double angle(Point a, Point b, Point c) {
         return Math.acos(dotProduct(a, b, c));
     }
-    
+
     /**
      * Computes the dot product of the vectors ba, bc from the points a, b, c.
      * http://forums.devx.com/archive/index.php/t-154064.html
@@ -232,7 +232,7 @@ public class SmallestEnclosingCircle {
         double v2y = c.y - b.y;
         return ( (v1x * v2x) + (v1y * v2y) ) / ( Math.sqrt( Math.pow(v1x, 2) + Math.pow(v1y, 2) ) * Math.sqrt( Math.pow(v2x, 2) + Math.pow(v2y, 2) ) );
     }
-    
+
     /**
      * Command line interface for debug.
      * @param args No args defined for this main()
@@ -249,5 +249,5 @@ public class SmallestEnclosingCircle {
         Point center = getCenterPoint(testPoints);
         System.out.println("\n\n\nCENTER POINT: X: " + center.x + " Y: " + center.y);
     }
-    
+
 }

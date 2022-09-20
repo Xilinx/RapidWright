@@ -1,26 +1,26 @@
-/* 
- * Copyright (c) 2020-2022, Xilinx, Inc. 
+/*
+ * Copyright (c) 2020-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
- *  
- * This file is part of RapidWright. 
- * 
+ *
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
- 
+
 package com.xilinx.rapidwright.router;
 
 import java.io.File;
@@ -50,22 +50,22 @@ import com.xilinx.rapidwright.util.FileTools;
 public class RouteThruHelper {
 
     private HashMap<TileTypeEnum,HashSet<Integer>> routeThrus;
-    
-    private Device device; 
-    
+
+    private Device device;
+
     private static final String rtName = "routeThrus";
-    
+
     private static String getSerializedFileName(Device device) {
         String folderName = FileTools.getRapidWrightPath() + File.separator + rtName;
         FileTools.makeDirs(folderName);
         return folderName + File.separator + device.getName() + ".rt";
     }
-    
+
     public RouteThruHelper(Device device) {
         this.device = device;
         init();
     }
-    
+
     private void writeFile() {
         try (Output out = FileTools.getKryoOutputStream(getSerializedFileName(device))) {
             out.writeInt(routeThrus.size());
@@ -78,7 +78,7 @@ public class RouteThruHelper {
             }
         }
     }
-    
+
     private void readFile() {
         routeThrus = new HashMap<TileTypeEnum, HashSet<Integer>>();
         try (Input in = FileTools.getKryoInputStream(getSerializedFileName(device))) {
@@ -94,7 +94,7 @@ public class RouteThruHelper {
             }
         }
     }
-    
+
     private void init() {
         String serializedFileName = getSerializedFileName(device);
         routeThrus = new HashMap<TileTypeEnum,HashSet<Integer>>();
@@ -115,13 +115,13 @@ public class RouteThruHelper {
         }
         writeFile();
     }
-    
+
     public boolean isRouteThru(Tile tile, int startWire, int endWire) {
         HashSet<Integer> rtPairs = routeThrus.get(tile.getTileTypeEnum());
         if (rtPairs == null) return false;
         return rtPairs.contains(startWire << 16 | endWire);
     }
-    
+
     public boolean isRouteThru(Node start, Node end) {
         Tile tile = end.getTile();
         int endWire = end.getWire();
@@ -137,28 +137,28 @@ public class RouteThruHelper {
         }
         return false;
     }
-    
+
     private void printRouteThrusByTileType() {
         HashSet<TileTypeEnum> visited = new HashSet<>();
         for (Tile tile : device.getAllTiles()) {
             if (visited.contains(tile.getTileTypeEnum())) continue;
             visited.add(tile.getTileTypeEnum());
             HashSet<Integer> rtPairs = routeThrus.get(tile.getTileTypeEnum());
-            if (rtPairs == null) continue; 
+            if (rtPairs == null) continue;
             System.out.println(tile.getTileTypeEnum() + "(" + tile.getName() + "):");
             for (Integer i : rtPairs) {
                 int startWire = i >>> 16;
                 int endWire = i & 0xffff;
                 System.out.println("  " + tile.getWireName(startWire) + " -> " + tile.getWireName(endWire));
             }
-        }        
+        }
     }
 
     public static boolean isRouteThruPIPAvailable(Design design, PIP routethru) {
         if (!routethru.isRouteThru()) return false;
         return isRouteThruPIPAvailable(design, routethru.getStartWire(), routethru.getEndWire());
     }
-    
+
     public static boolean isRouteThruPIPAvailable(Design design, Wire start, Wire end) {
         SitePin outPin = end.getSitePin();
         if (outPin == null) return false;
@@ -170,19 +170,19 @@ public class RouteThruHelper {
         BELPin belPin = inPin.getBELPin();
         Net inputNetCollision = siteInst.getNetFromSiteWire(belPin.getSiteWireName());
         if (inputNetCollision != null) return false;
-        
+
         for (BELPin sink : belPin.getSiteConns()) {
             Cell collision = siteInst.getCell(sink.getBEL());
             if (collision != null) return false;
         }
         return true;
     }
-    
+
     public static void main(String[] args) {
         RouteThruHelper rtHelper = new RouteThruHelper(Device.getDevice(Device.AWS_F1));
-        
+
         //rtHelper.printRouteThrusByTileType();
-        
+
         for (Tile tile : rtHelper.device.getAllTiles()) {
             if (tile.getTileTypeEnum() == TileTypeEnum.INT) {
                 for (String wireName : tile.getWireNames()) {
@@ -196,6 +196,6 @@ public class RouteThruHelper {
                 break;
             }
         }
-        
+
     }
 }

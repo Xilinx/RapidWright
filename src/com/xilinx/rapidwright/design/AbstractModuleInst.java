@@ -184,7 +184,7 @@ public abstract class AbstractModuleInst<ModuleT, PlacementT, T extends Abstract
             // Connect to a top-level port
             EDIFPort port = top.getPort(otherPortName);
 
-            String netName = getNewNetName(portName, busIndex0, other, otherPortName, busIndex1); 
+            String netName = getNewNetName(portName, busIndex0, other, otherPortName, busIndex1);
             EDIFNet net = top.getNet(netName);
             if (net == null) {
                 net = top.createNet(netName);
@@ -213,7 +213,7 @@ public abstract class AbstractModuleInst<ModuleT, PlacementT, T extends Abstract
             return busIndex0 == -1 ? getName() + "_" + portName : getName() + "_" + portName + "["+busIndex0+"]";
         }
     }
-    
+
     public abstract RelocatableTileRectangle getBoundingBox();
 
 

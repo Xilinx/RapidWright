@@ -1,28 +1,28 @@
 /*
- * 
- * Copyright (c) 2017-2022, Xilinx, Inc. 
+ *
+ * Copyright (c) 2017-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
  *
- * This file is part of RapidWright. 
- * 
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 /**
- * 
+ *
  */
 package com.xilinx.rapidwright.edif;
 
@@ -37,13 +37,13 @@ import java.nio.charset.StandardCharsets;
 public class EDIFPortInst {
 
     private String name;
-    
+
     private EDIFPort port;
-    
+
     private EDIFNet parentNet;
-    
+
     private int index = -1;
-    
+
     private EDIFCellInst cellInst;
 
     public EDIFPortInst(EDIFPort port, EDIFNet parentNet) {
@@ -61,7 +61,7 @@ public class EDIFPortInst {
         this.index = portInst.index;
         this.cellInst = null;
     }
-    
+
     public EDIFPortInst(EDIFPort port, EDIFNet parentNet, int index) {
         this(port,parentNet,index,null);
     }
@@ -73,9 +73,9 @@ public class EDIFPortInst {
      * @param cellInst The instance this port ref belongs to
      */
     public EDIFPortInst(EDIFPort port, EDIFNet parentNet, EDIFCellInst cellInst) {
-        this(port, parentNet, -1, cellInst);        
+        this(port, parentNet, -1, cellInst);
     }
-    
+
     /**
      * Constructor to create a new port ref on the provided instance and connect
      * it to the provided net
@@ -94,10 +94,10 @@ public class EDIFPortInst {
             if (!port.equals(cellInst.getPort(port.getBusName()))) {
                 // check for name collision
                 if (!port.equals(cellInst.getPort(port.getName()))) {
-                    throw new RuntimeException("ERROR: Provided port '"+ 
-                            port.getName() + "' does not exist on EDIFCell type '" + 
+                    throw new RuntimeException("ERROR: Provided port '"+
+                            port.getName() + "' does not exist on EDIFCell type '" +
                             cellInst.getCellType().getName() + "' when adding port "
-                            + "ref to instance '" + cellInst.getName() + "'.");                    
+                            + "ref to instance '" + cellInst.getName() + "'.");
                 }
             }
         }
@@ -107,23 +107,23 @@ public class EDIFPortInst {
         setCellInst(cellInst);
         if (parentNet != null) parentNet.addPortInst(this);
     }
-    
+
     protected EDIFPortInst() {
-        
+
     }
-    
+
     public String getPortInstNameFromPort() {
         return port.getPortInstNameFromPort(index);
     }
-    
+
     public String getName() {
         return name;
     }
-    
+
     protected void setName(String name) {
         this.name = name;
     }
-    
+
     /**
      * @return the index
      */
@@ -141,8 +141,8 @@ public class EDIFPortInst {
     public EDIFCell getParentCell() {
         return parentNet.getParentCell();
     }
-    
-    
+
+
     /**
      * @return the cellInst
      */
@@ -162,11 +162,11 @@ public class EDIFPortInst {
             cellInst.addPortInst(this);
         }
     }
-    
+
     protected void setCellInstRaw(EDIFCellInst cellInst) {
         this.cellInst = cellInst;
     }
-    
+
     /**
      * Checks if this is an output of a GND or VCC primitive cell.
      * @return True if the underlying cell is a static output from GND or VCC, false otherwise.
@@ -192,27 +192,27 @@ public class EDIFPortInst {
     public EDIFPort getPort() {
         return port;
     }
-    
+
     public void setPort(EDIFPort port) {
         this.port = port;
     }
-    
+
     public EDIFDirection getDirection() {
         return getPort().getDirection();
     }
-    
+
     public boolean isOutput() {
         return getDirection() == EDIFDirection.OUTPUT;
     }
-    
+
     public boolean isInput() {
         return getDirection() == EDIFDirection.INPUT;
     }
-    
+
     public boolean isTopLevelPort() {
         return getCellInst() == null;
     }
-    
+
     /**
      * @return the parentNet
      */
@@ -224,7 +224,7 @@ public class EDIFPortInst {
         if (cellInst == null) return null;
         return cellInst.getCellType().getInternalNet(this);
     }
-    
+
     /**
      * @param parentNet the parentNet to set
      */
@@ -236,7 +236,7 @@ public class EDIFPortInst {
     public static final byte[] EXPORT_CONST_MEMBER = "(member ".getBytes(StandardCharsets.UTF_8);
     public static final byte[] EXPORT_CONST_INSTANCEREF = " (instanceref ".getBytes(StandardCharsets.UTF_8);
     public static final byte[] EXPORT_CONST_CLOSE_PORT_INST = ")\n".getBytes(StandardCharsets.UTF_8);
-    
+
     public void writeEDIFExport(OutputStream os, byte[] indent, EDIFWriteLegalNameCache<?> cache) throws IOException{
         os.write(indent);
         os.write(EXPORT_CONST_PORTREF);

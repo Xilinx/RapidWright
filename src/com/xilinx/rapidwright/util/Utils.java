@@ -1,25 +1,25 @@
-/* 
+/*
  * Original work: Copyright (c) 2010-2011 Brigham Young University
- * Modified work: Copyright (c) 2017-2022, Xilinx, Inc. 
+ * Modified work: Copyright (c) 2017-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
- *  
- * This file is part of RapidWright. 
- * 
+ *
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 package com.xilinx.rapidwright.util;
 
@@ -32,36 +32,36 @@ import java.util.Set;
 
 /**
  * This is a helper class for creating PrimitiveTypes and TileTypes
- * as well as helping to categorize TileTypes. 
+ * as well as helping to categorize TileTypes.
  */
 public class Utils{
 
     private static Set<TileTypeEnum> clbs;
-    
+
     private static Set<TileTypeEnum> clbms;
-    
+
     private static Set<TileTypeEnum> dsps;
-    
+
     private static Set<TileTypeEnum> brams;
-    
+
     private static Set<TileTypeEnum> ints;
-    
+
     private static Set<TileTypeEnum> gts;
-    
+
     private static Set<TileTypeEnum> interconnects;
 
     private static Set<TileTypeEnum> urams;
-    
+
     private static Set<SiteTypeEnum> lockedSiteTypes;
 
     private static Set<SiteTypeEnum> moduleSiteTypes;
 
     private static Set<SiteTypeEnum> sliceTypes;
-    
+
     public static Set<SiteTypeEnum> dspTypes;
 
     public static Set<SiteTypeEnum> bramTypes;
-    
+
     public static Set<SiteTypeEnum> iobTypes;
 
     public static Set<SiteTypeEnum> uramTypes;
@@ -87,7 +87,7 @@ public class Utils{
     public static TileTypeEnum createTileType(String s) {
         return TileTypeEnum.valueOf(s.toUpperCase());
     }
-    
+
     /**
      * Determines if the provided tile type contains SLICE primitive sites
      * of any type.
@@ -97,7 +97,7 @@ public class Utils{
     public static boolean isCLB(TileTypeEnum type) {
         return clbs.contains(type);
     }
-    
+
     /**
      * Determines if the tile type has a SLICEM site type.
      * @param type
@@ -106,7 +106,7 @@ public class Utils{
     public static boolean isCLBM(TileTypeEnum type) {
         return clbms.contains(type);
     }
-    
+
     /**
      * Determines if the provided tile type contains DSP primitive sites
      * of any type.
@@ -116,7 +116,7 @@ public class Utils{
     public static boolean isDSP(TileTypeEnum type) {
         return dsps.contains(type);
     }
-    
+
     /**
      * Determines if the provided tile type contains BRAM primitive sites
      * of any type.
@@ -126,7 +126,7 @@ public class Utils{
     public static boolean isBRAM(TileTypeEnum type) {
         return brams.contains(type);
     }
-    
+
     /**
      * Determines if the provided tile type contains BRAM primitive sites
      * of any type.
@@ -136,7 +136,7 @@ public class Utils{
     public static boolean isSwitchBox(TileTypeEnum type) {
         return ints.contains(type);
     }
-    
+
     /**
      * Determines if the provided tile type contains GTs primitive sites
      * of any type.
@@ -146,7 +146,7 @@ public class Utils{
     public static boolean isGt(TileTypeEnum type) {
         return gts.contains(type);
     }
-    
+
     /**
      * Determines if the provided tile type contains INTERCONNECTs primitive sites
      * of any type.
@@ -160,19 +160,19 @@ public class Utils{
     public static boolean isURAM(TileTypeEnum type) {
         return urams.contains(type);
     }
-    
+
     public static boolean isLockedSiteType(SiteTypeEnum type) {
         return lockedSiteTypes.contains(type);
     }
-    
+
     public static boolean isModuleSiteType(SiteTypeEnum type) {
         return moduleSiteTypes.contains(type);
     }
-    
+
     public static Set<TileTypeEnum> getIntTileTypes() {
         return interconnects;
     }
-    
+
     public static Set<TileTypeEnum> getCLBTileTypes() {
         return clbs;
     }
@@ -180,7 +180,7 @@ public class Utils{
     public static Set<TileTypeEnum> getCLBMTileTypes() {
         return clbms;
     }
-    
+
     public static Set<TileTypeEnum> getDSPTileTypes() {
         return dsps;
     }
@@ -192,7 +192,7 @@ public class Utils{
     public static Set<TileTypeEnum> getURAMTileTypes() {
         return urams;
     }
-    
+
     public static Set<SiteTypeEnum> getLockedSiteTypes() {
         return lockedSiteTypes;
     }
@@ -200,7 +200,7 @@ public class Utils{
     public static Set<SiteTypeEnum> getModuleSiteTypes() {
         return moduleSiteTypes;
     }
-    
+
     public static boolean isSLICE(SiteInst s) {
         return sliceTypes.contains(s.getSiteTypeEnum());
     }
@@ -216,21 +216,21 @@ public class Utils{
     public static boolean isBRAM(SiteInst s) {
         return bramTypes.contains(s.getSiteTypeEnum());
     }
-    
+
     public static boolean isURAM(SiteInst s) {
         return uramTypes.contains(s.getSiteTypeEnum());
     }
-    
+
     public static boolean isIOB(SiteInst s) {
         return iobTypes.contains(s.getSiteTypeEnum());
     }
-    
+
     public static boolean isIOB(SiteTypeEnum s) {
         return iobTypes.contains(s);
     }
 
 
-    
+
     static{
         clbs = EnumSet.of(
             TileTypeEnum.CLBLL_L,
@@ -246,7 +246,7 @@ public class Utils{
             TileTypeEnum.CLE_E_CORE,
             TileTypeEnum.CLE_W_CORE
         );
-        
+
         clbms = EnumSet.of(
             TileTypeEnum.CLBLM_L,
             TileTypeEnum.CLBLM_R,
@@ -255,7 +255,7 @@ public class Utils{
             TileTypeEnum.CLEM,
             TileTypeEnum.CLEM_R
         );
-        
+
         dsps = EnumSet.of(
             TileTypeEnum.DSP,
             TileTypeEnum.DSP_L,
@@ -263,7 +263,7 @@ public class Utils{
             TileTypeEnum.DSP_ROCF_B_TILE,
             TileTypeEnum.DSP_ROCF_T_TILE
         );
-        
+
         brams = EnumSet.of(
             TileTypeEnum.BRAM,
             TileTypeEnum.BRAM_L,
@@ -285,7 +285,7 @@ public class Utils{
             TileTypeEnum.INT_INTF_R,
             TileTypeEnum.INT_INTF_L
         );
-        
+
         gts = EnumSet.of(
             TileTypeEnum.GTZ_TOP,
             TileTypeEnum.GTZ_BOT,
@@ -300,7 +300,7 @@ public class Utils{
             TileTypeEnum.GTH_CHANNEL_3,
             TileTypeEnum.GTH_COMMON
         );
-       
+
         interconnects = EnumSet.of(
             TileTypeEnum.INT,
             TileTypeEnum.INT_L,
@@ -321,7 +321,7 @@ public class Utils{
             TileTypeEnum.URAM_DELAY_LOCF_TL_TILE,
             TileTypeEnum.URAM_DELAY_ROCF_TL_TILE
         );
-        
+
         lockedSiteTypes = EnumSet.of(
             SiteTypeEnum.CONFIG_SITE,
             SiteTypeEnum.BUFG
@@ -331,7 +331,7 @@ public class Utils{
             SiteTypeEnum.SLICEL,
             SiteTypeEnum.SLICEM
         );
-        
+
         dspTypes = EnumSet.of(
             SiteTypeEnum.DSP48E1,
             SiteTypeEnum.DSP48E2,
@@ -339,7 +339,7 @@ public class Utils{
             SiteTypeEnum.DSP58_CPLX,
             SiteTypeEnum.DSPFP
         );
-        
+
         bramTypes = EnumSet.of(
             SiteTypeEnum.FIFO18_0,
             SiteTypeEnum.FIFO18E1,
@@ -356,7 +356,7 @@ public class Utils{
             SiteTypeEnum.RAMB18_L,
             SiteTypeEnum.RAMB18_U
         );
-        
+
         iobTypes = EnumSet.of(
             SiteTypeEnum.IOB18,
             SiteTypeEnum.IOB18M,
@@ -366,7 +366,7 @@ public class Utils{
             SiteTypeEnum.IOB33S,
             SiteTypeEnum.IOB,
             SiteTypeEnum.IOBM,
-            SiteTypeEnum.IOBS, 
+            SiteTypeEnum.IOBS,
             SiteTypeEnum.HPIOB,
             SiteTypeEnum.HPIOB_M,
             SiteTypeEnum.HPIOB_S,
@@ -379,7 +379,7 @@ public class Utils{
             SiteTypeEnum.HRIODIFFINBUF,
             SiteTypeEnum.HRIODIFFOUTBUF
         );
-        
+
         uramTypes = EnumSet.of(
             SiteTypeEnum.URAM288
         );

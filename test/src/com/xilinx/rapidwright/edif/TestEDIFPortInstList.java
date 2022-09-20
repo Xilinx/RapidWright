@@ -1,26 +1,26 @@
-/* 
- * Copyright (c) 2022, Xilinx, Inc. 
+/*
+ * Copyright (c) 2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
- *  
- * This file is part of RapidWright. 
- * 
+ *
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
- 
+
 package com.xilinx.rapidwright.edif;
 
 import java.util.ArrayList;
@@ -37,8 +37,8 @@ public class TestEDIFPortInstList {
         EDIFPortInst portInst = new EDIFPortInst();
         portInst.setName(portInstName);
         portInst.setPort(new EDIFPort());
-        String instanceName = portInstName.contains("/") ? 
-                portInstName.substring(0, portInstName.lastIndexOf("/")) : null; 
+        String instanceName = portInstName.contains("/") ?
+                portInstName.substring(0, portInstName.lastIndexOf("/")) : null;
         if (instanceName != null) {
             EDIFCellInst cellInst = new EDIFCellInst();
             cellInst.setName(instanceName);
@@ -49,11 +49,11 @@ public class TestEDIFPortInstList {
         portInst.setIndex(index);
         return portInst;
     }
-    
+
     @Test
     public void testEDIFPortInstListSorting() {
         EDIFPortInstList list = new EDIFPortInstList();
- 
+
         ArrayList<String> allNames = new ArrayList<>();
         String[] names = new String[] {
             "processor/DOADO[0]",
@@ -175,19 +175,19 @@ public class TestEDIFPortInstList {
             "processor/write_strobe_flop_0[0]",
             "processor/write_strobe_flop_1[0]",
             "processor/write_strobe_flop_2[0]",
-            "port_name", 
+            "port_name",
             "port_name/Q"
         };
-        
-        
-        
+
+
+
         for (String name : names) {
             allNames.add(name);
         }
         for (String name : EDIFTools.bitBlast("x[12:0]")) {
             allNames.add(name);
         }
-        
+
         HashSet<String> uniqueSet = new HashSet<>();
         for (String name : allNames) {
             // Test to ensure duplicates are not allowed
@@ -199,16 +199,16 @@ public class TestEDIFPortInstList {
         Assertions.assertEquals(uniqueSet.size(), list.size());
         allNames.clear();
         allNames.addAll(uniqueSet);
-        
+
         Collections.sort(allNames);
-        
+
         ArrayList<String> listSorted = new ArrayList<>();
         for (int i=0; i < allNames.size(); i++) {
             listSorted.add(list.get(i).getFullName());
         }
 
         Assertions.assertTrue(listSorted.containsAll(allNames) && allNames.containsAll(listSorted));
-        
+
         for (EDIFPortInst portInst : new ArrayList<>(list)) {
             EDIFPortInst portInstGet = list.get(portInst.getCellInst(), portInst.getName());
             Assertions.assertEquals(portInst, portInstGet);

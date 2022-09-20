@@ -1,28 +1,28 @@
 /*
- * 
- * Copyright (c) 2017-2022, Xilinx, Inc. 
+ *
+ * Copyright (c) 2017-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
  *
- * This file is part of RapidWright. 
- * 
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 /**
- * 
+ *
  */
 package com.xilinx.rapidwright.design.blocks;
 
@@ -44,7 +44,7 @@ import com.xilinx.rapidwright.util.MessageGenerator;
 
 /**
  * Parser for impl guide files.
- * 
+ *
  * Created on: Apr 25, 2017
  */
 public class ImplGuide {
@@ -58,39 +58,39 @@ public class ImplGuide {
     public static final String TCL = "TCL";
     public static final String END_BLOCK = "END_BLOCK";
     public static final String END_BLOCKS = "END_BLOCKS";
-    
+
     /** The target part for this design */
     private Part part;
     /** The device corresponding to the part */
     private Device device;
     /** A map to keep track of all the blockGuides */
     private Map<String, BlockGuide> blockGuides;
-    
+
     public ImplGuide() {
         blockGuides = new LinkedHashMap<String,BlockGuide>();
     }
-    
+
     private static String checkPblockValid(ImplGuide ig, int lineNumber, String pblock) {
         // Check for valid sites
         int colon = pblock.indexOf(':');
         Site start = ig.getDevice().getSite(pblock.substring(0, colon));
         if (start == null) {
-            throw new RuntimeException("ERROR: Site " + pblock.substring(0, colon) 
-                +" doesn't exist in part " + ig.getPart().getName() 
+            throw new RuntimeException("ERROR: Site " + pblock.substring(0, colon)
+                +" doesn't exist in part " + ig.getPart().getName()
                 + " found in pblock on line " + lineNumber );
         }
         Site end = ig.getDevice().getSite(pblock.substring(colon+1, pblock.length()));
         if (end == null) {
-            throw new RuntimeException("ERROR: Site " + pblock.substring(colon+1, pblock.length()) 
-                +" doesn't exist in part " + ig.getPart().getName() 
+            throw new RuntimeException("ERROR: Site " + pblock.substring(colon+1, pblock.length())
+                +" doesn't exist in part " + ig.getPart().getName()
                 + " found in pblock on line " + lineNumber );
         }
         return pblock;
     }
-    
+
     public static ImplGuide readImplGuide(String fileName) {
         ImplGuide ig = new ImplGuide();
-        
+
         int lineNumber = 0;
         BlockGuide currBlock = null;
         PBlock currImpl = null;
@@ -102,7 +102,7 @@ public class ImplGuide {
             if (line.isEmpty()) continue;
             if (line.startsWith("#")) continue;
             String[] tokens = line.split("\\s+");
-            
+
             switch(tokens[0]) {
                 case PART:{
                     ig.setPart(PartNameTools.getPart(tokens[1]));
@@ -127,9 +127,9 @@ public class ImplGuide {
                         subImplCount = 0;
                         tokenIdx = -1;
                     }
-                    
+
                     StringBuilder sb = new StringBuilder(checkPblockValid(ig, lineNumber, tokens[3+tokenIdx]));
-                    
+
                     for (int i=4+tokenIdx; i < tokens.length; i++) {
                         sb.append(" ");
                         sb.append(checkPblockValid(ig, lineNumber, tokens[i]));
@@ -172,8 +172,8 @@ public class ImplGuide {
                     if (tokens.length > 3) {
                         Site s = ig.getDevice().getSite(tokens[3]);
                         if (s == null) {
-                            throw new RuntimeException("ERROR: " + tokens[3] + " could " 
-                                + "not be found in the device " 
+                            throw new RuntimeException("ERROR: " + tokens[3] + " could "
+                                + "not be found in the device "
                                 + ig.getDevice().getName() + ".");
                         }
                         bi.setPlacement(s);
@@ -183,13 +183,13 @@ public class ImplGuide {
                 case CLOCK:{
                     String clkPortName = tokens[1];
                     Float period = Float.parseFloat(tokens[2]);
-                    if (period < 0) throw new RuntimeException("ERROR: Parsing clock period constraint '" 
+                    if (period < 0) throw new RuntimeException("ERROR: Parsing clock period constraint '"
                             + tokens[2] +"' is invalid on line " + lineNumber );
                     currBlock.addClock(clkPortName,period);
                     if (tokens.length == 4) {
                         Site clkBuffer = ig.getDevice().getSite(tokens[3]);
                         if (clkBuffer == null) {
-                            throw new RuntimeException("ERROR: Invalid clk buffer site '" 
+                            throw new RuntimeException("ERROR: Invalid clk buffer site '"
                                     + tokens[3] +"' on line " + lineNumber );
                         }
                         currBlock.addClockBuffer(clkPortName,clkBuffer);
@@ -209,13 +209,13 @@ public class ImplGuide {
                     break outer;
                 }
                 default:
-                    throw new RuntimeException("ERROR while parsing " + 
+                    throw new RuntimeException("ERROR while parsing " +
                     fileName + " unexpected token " + tokens[0] +
                     " on line " + lineNumber);
             }
-            
+
         }
-        
+
         return ig;
     }
 
@@ -231,11 +231,11 @@ public class ImplGuide {
                 for (PBlock pb : b.getImplementations()) {
                     bw.write(indent + IMPL + " " + i +  " "+ pb.toString() + nl);
                     i++;
-                } 
+                }
                 for (BlockInst bi : b.getInsts()) {
                     bw.write(indent + INST + " " + bi.getName());
                     if (bi.getImplIndex() != null) {
-                        bw.write(" " + bi.getImplIndex()); 
+                        bw.write(" " + bi.getImplIndex());
                         if (bi.getPlacement() != null) {
                             bw.write(" " + bi.getPlacement().getName());
                         }
@@ -299,7 +299,7 @@ public class ImplGuide {
     public Collection<BlockGuide> getBlocks() {
         return blockGuides.values();
     }
-    
+
     /**
      * Adds a block to this implementation guide
      * @param blockGuide The block to add.
@@ -308,7 +308,7 @@ public class ImplGuide {
     public BlockGuide addBlock(BlockGuide blockGuide) {
         return blockGuides.put(blockGuide.getCacheID(), blockGuide);
     }
-    
+
     /**
      * Creates a new block guide with the associated cache ID and
      * adds it to the impl guide.
@@ -321,23 +321,23 @@ public class ImplGuide {
         addBlock(bg);
         return bg;
     }
-    
+
     public Set<String> getBlockNames() {
         return blockGuides.keySet();
     }
-    
+
     public BlockGuide getBlock(String id) {
         return blockGuides.get(id);
     }
-    
+
     public BlockGuide removeBlock(String id) {
         return blockGuides.remove(id);
     }
-    
+
     public void removeBlocksWithoutPBlocks() {
         ArrayList<BlockGuide> toRemove = new ArrayList<>();
         for (BlockGuide bg : getBlocks()) {
-            boolean isNull = false; 
+            boolean isNull = false;
             for (PBlock pb : bg.getImplementations()) {
                 if (pb == null) isNull = true;
             }
@@ -347,11 +347,11 @@ public class ImplGuide {
             removeBlock(bg.getCacheID());
         }
     }
-    
+
     public boolean hasBlock(String id) {
         return blockGuides.containsKey(id);
     }
-    
+
     public static void main(String[] args) {
         if (args.length != 2) {
             System.out.println("USAGE: <input.igf> <output.igf>");

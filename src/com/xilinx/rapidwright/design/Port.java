@@ -1,25 +1,25 @@
-/* 
+/*
  * Original work: Copyright (c) 2010-2011 Brigham Young University
- * Modified work: Copyright (c) 2017-2022, Xilinx, Inc. 
+ * Modified work: Copyright (c) 2017-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
- *  
- * This file is part of RapidWright. 
- * 
+ *
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 package com.xilinx.rapidwright.design;
 
@@ -35,7 +35,7 @@ import java.util.Set;
 import com.xilinx.rapidwright.device.Tile;
 
 /**
- * This class represents the ports used to define the interfaces of modules.  
+ * This class represents the ports used to define the interfaces of modules.
  * They consist of a unique name and the {@link SitePinInst} to which they are
  * connected.
  * @author Chris Lavin
@@ -58,14 +58,14 @@ public class Port implements Serializable, Cloneable{
     private boolean isOutputPort = false;
     /** Worst case delay in or out of the port in nanoseconds */
     private float worstCasePortDelay = 0.0f;
-    
+
     /**
      * Default constructor, everything is null.
      */
     public Port() {
         name = null;
     }
-    
+
 
     /**
      * @param name Name of the port.
@@ -114,7 +114,7 @@ public class Port implements Serializable, Cloneable{
     public String getName() {
         return name;
     }
-    
+
     /**
      * Sets the name of the port.
      * @param name The new name of the port.
@@ -122,7 +122,7 @@ public class Port implements Serializable, Cloneable{
     public void setName(String name) {
         this.name = name;
     }
-    
+
     /**
      * Gets and returns the instance name.
      * @return The name of the instance where this port resides.
@@ -131,7 +131,7 @@ public class Port implements Serializable, Cloneable{
         SitePinInst singleSitePinInst = getSingleSitePinInst();
         return singleSitePinInst == null ? "null" : (singleSitePinInst.getSiteInst() == null ? "null" : singleSitePinInst.getSiteInstName());
     }
-    
+
     /**
      *  Gets the pin name of the instance where the port resides.
      * @return The pin name of the port.
@@ -159,7 +159,7 @@ public class Port implements Serializable, Cloneable{
         }
         isOutputPort = hasOutputPin;
     }
-    
+
 
     /**
      * @param sitePinInst the pin to add
@@ -297,7 +297,7 @@ public class Port implements Serializable, Cloneable{
             return false;
         return true;
     }
-    
+
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();

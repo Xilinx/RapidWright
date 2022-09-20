@@ -1,25 +1,25 @@
-/* 
+/*
  * Original work: Copyright (c) 2010-2011 Brigham Young University
- * Modified work: Copyright (c) 2017-2022, Xilinx, Inc. 
+ * Modified work: Copyright (c) 2017-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
- *  
- * This file is part of RapidWright. 
- * 
+ *
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 package com.xilinx.rapidwright.examples.tilebrowser;
 
@@ -46,7 +46,7 @@ import com.xilinx.rapidwright.util.MessageGenerator;
 /**
  * This class is an example of how RapidWright could be used to build
  * interactive tools using Qt or other GUI packages.  This class
- * creates a zoom-able 2D array of the tiles found in the devices installed 
+ * creates a zoom-able 2D array of the tiles found in the devices installed
  * with RapidWright.  This example requires the Qt Jambi (Qt for Java)
  * jars to run.
  * @author marc
@@ -72,7 +72,7 @@ public class PartTileBrowser extends QMainWindow{
     public static void main(String[] args) {
         // This line fixes slow performance under Linux
         QApplication.setGraphicsSystem("raster");
-        
+
         QApplication.initialize(args);
         PartTileBrowser testPTB = new PartTileBrowser(null);
         testPTB.show();
@@ -94,13 +94,13 @@ public class PartTileBrowser extends QMainWindow{
         }
         currPartName = parts.get(0);
         device = Device.getDevice(currPartName);
-        
+
         scene = new PartTileBrowserScene(device);
 
         view = new PartTileBrowserView(scene);
 
         setCentralWidget(view);
-        
+
         scene.updateStatus.connect(this, "updateStatus()");
         statusLabel = new QLabel("Status Bar");
         statusLabel.setText("Status Bar");
@@ -111,9 +111,9 @@ public class PartTileBrowser extends QMainWindow{
     }
 
     private void createTreeView() {
-        treeWidget = WidgetMaker.createAvailablePartTreeWidget("Select a part...");    
+        treeWidget = WidgetMaker.createAvailablePartTreeWidget("Select a part...");
         treeWidget.doubleClicked.connect(this,"showPart(QModelIndex)");
-        
+
         QDockWidget dockWidget = new QDockWidget(tr("Part Browser"), this);
         dockWidget.setAllowedAreas(DockWidgetArea.LeftDockWidgetArea);
         dockWidget.setWidget(treeWidget);
@@ -134,13 +134,13 @@ public class PartTileBrowser extends QMainWindow{
             progress.setCancelButton(null);
             progress.show();
             progress.setValue(10);
-            
+
             device = Device.getDevice(currPartName);
             progress.setValue(100);
             scene.setDevice(device);
             statusLabel.setText("Loaded: "+currPartName.toUpperCase());
 
-            
+
         }
     }
     void updateStatus() {

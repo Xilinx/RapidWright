@@ -1,25 +1,25 @@
-/* 
+/*
  * Original work: Copyright (c) 2010-2011 Brigham Young University
- * Modified work: Copyright (c) 2017-2022, Xilinx, Inc. 
+ * Modified work: Copyright (c) 2017-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
- *  
- * This file is part of RapidWright. 
- * 
+ *
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 package com.xilinx.rapidwright.examples.tilebrowser;
 
@@ -41,10 +41,10 @@ import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Tile;
 
 /**
- * 
- * 
+ *
+ *
  * @author marc
- * 
+ *
  */
 public class PartTileBrowserScene extends QGraphicsScene {
     double currX, currY, prevX, prevY;
@@ -95,7 +95,7 @@ public class PartTileBrowserScene extends QGraphicsScene {
     private void drawSliceBackground() {
 
         setBackgroundBrush(new QBrush(QColor.black));
-        //Create transparent QPixmap that accepts hovers 
+        //Create transparent QPixmap that accepts hovers
         //  so that moveMouseEvent is triggered
         QPixmap qpm = new QPixmap(new QSize((numCols + 1) * (tileSize + 1),
                 (numRows + 1) * (tileSize + 1)));
@@ -103,7 +103,7 @@ public class PartTileBrowserScene extends QGraphicsScene {
         QGraphicsPixmapItem background = addPixmap(qpm);
         background.setAcceptsHoverEvents(true);
         background.setZValue(-1);
-        // Draw colored tiles onto QImage        
+        // Draw colored tiles onto QImage
         qImage = new QImage(new QSize((numCols + 1) * (tileSize + 1),
                 (numRows + 1) * (tileSize + 1)), Format.Format_RGB16);
         QPainter painter = new QPainter(qImage);
@@ -156,9 +156,9 @@ public class PartTileBrowserScene extends QGraphicsScene {
         }
 
         painter.end();
-        
+
     }
-    
+
     public void drawBackground(QPainter painter, QRectF rect) {
         super.drawBackground(painter, rect);
         painter.drawImage(0, 0, qImage);

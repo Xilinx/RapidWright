@@ -1,37 +1,37 @@
-/* 
- * Copyright (c) 2019-2022, Xilinx, Inc. 
+/*
+ * Copyright (c) 2019-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
- *  
- * This file is part of RapidWright. 
- * 
+ *
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
- 
+
 /*
- * 
- * Copyright (c) 2019-2022, Xilinx, Inc. 
+ *
+ * Copyright (c) 2019-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
- * 
+ *
  */
 /**
- * 
+ *
  */
 package com.xilinx.rapidwright.examples;
 
@@ -65,7 +65,7 @@ public class IsolateLeafClkBuffer {
         topLCBIndices = new HashSet<>(Arrays.asList(topIndices));
         botLCBIndices = new HashSet<>(Arrays.asList(botIndices));
     }
-    
+
     private static boolean isLCBPIPInTop(PIP pip) {
         int lcbIndex = Integer.parseInt(pip.getEndWireName()
                 .replace("CLK_LEAF_SITES_", "")
@@ -73,11 +73,11 @@ public class IsolateLeafClkBuffer {
                 .replace("_CLK_IN", ""));
         return topLCBIndices.contains(lcbIndex);
     }
-    
+
     private static List<PIP> findRoute(RouteNode src, RouteNode snk, Set<RouteNode> used) {
         Set<RouteNode> visited = new HashSet<>();
         Queue<RouteNode> q = RouteNode.getPriorityQueue();
-        
+
         RouteNode curr = null;
         q.add(src);
         while (!q.isEmpty()) {
@@ -94,11 +94,11 @@ public class IsolateLeafClkBuffer {
                 q.add(nextNode);
             }
         }
-        
+
         return null;
     }
-    
-    public static List<PIP> routeNewLCB(SitePinInst clkPin) {        
+
+    public static List<PIP> routeNewLCB(SitePinInst clkPin) {
         Node sink = clkPin.getConnectedNode();
         Net net = clkPin.getNet();
         Map<Node, PIP> reversePaths = new HashMap<Node, PIP>();
@@ -112,17 +112,17 @@ public class IsolateLeafClkBuffer {
         }
         PIP currLCB = reversePaths.get(curr);
         boolean isTopLCB = isLCBPIPInTop(currLCB);
-        
+
         PIP drivingPIP = reversePaths.get(currLCB.getStartNode());
-        
-        
+
+
         Net clk = clkPin.getNet();
         if (!clk.removePin(clkPin, true)) {
             throw new RuntimeException("ERROR: Couldn't disconnect clk pin " +
                 clkPin + " on site " + clkPin.getSite());
         }
-        
-        
+
+
         RouteNode src = drivingPIP.getStartRouteNode();
         RouteNode snk = new RouteNode(sink);
         Set<RouteNode> used = new HashSet<>();
@@ -138,16 +138,16 @@ public class IsolateLeafClkBuffer {
         if (route == null) {
             throw new RuntimeException("ERROR: Couldn't find new LCB path");
         }
-        
+
         System.out.println("New Clock Path PIPs:");
         for (PIP p : route) {
             System.out.println("\t" + p);
         }
-        
+
         net.getPIPs().addAll(route);
         return route;
     }
-    
+
     public static void main(String[] args) {
         if (args.length != 3) {
             System.out.println("USAGE: <input.dcp> <cell_clk_pin_name> <output.dcp>");
@@ -158,15 +158,15 @@ public class IsolateLeafClkBuffer {
         String cellName = args[1].substring(0, idx);
         String logPinName = args[1].substring(idx+1);
         Cell c = d.getCell(cellName);
-        
+
         SitePinInst clkPin = c.getSitePinFromLogicalPin(logPinName, null);
         Net clk = clkPin.getNet();
 
         routeNewLCB(clkPin);
-        
+
         clk.addPin(clkPin);
-        
+
         d.writeCheckpoint(args[2]);
-        
+
     }
 }

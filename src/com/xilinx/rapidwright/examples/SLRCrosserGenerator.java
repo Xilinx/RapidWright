@@ -1,25 +1,25 @@
 /*
- * 
- * Copyright (c) 2018-2022, Xilinx, Inc. 
+ *
+ * Copyright (c) 2018-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
  *
- * This file is part of RapidWright. 
- * 
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 
 package com.xilinx.rapidwright.examples;
@@ -79,7 +79,7 @@ import joptsimple.OptionSet;
  * Highly parameterizable SLR bridge crossing circuit generator for
  * UltraScale+ devices.  Will write out a placed and routed DCP with
  * SLR crossings already realized.
- * 
+ *
  * Created on: Jan 31, 2018
  */
 public class SLRCrosserGenerator {
@@ -91,7 +91,7 @@ public class SLRCrosserGenerator {
     /**
      * Routes the current incomplete net to its corresponding RX site.  It
      * will add the necessary PIPs to the net to route it, but will not add
-     * the site pin. 
+     * the site pin.
      * @param n The net with a Laguna TX pin source.
      * @return The RX site pin.
      */
@@ -114,7 +114,7 @@ public class SLRCrosserGenerator {
         }
         return null;
     }
-    
+
     /**
      * Routes the control signals (CLK,CE,RST) for a laguna flop within its site.
      * @param c The laguna flop cell to route signals to
@@ -124,7 +124,7 @@ public class SLRCrosserGenerator {
      */
     public static void routeControlSignalsInLagunaSite(Cell c, Net clk, Net rst, Net ce) {
         String rxOrTx = (c.getBELName().startsWith("RX") ? "RX" : "TX");
-        SiteInst si = c.getSiteInst();        
+        SiteInst si = c.getSiteInst();
         for (Net n : new Net[]{clk,rst}) {
             String name = n.equals(clk) ? "CLK" : "SR";
             BELPin pin = c.getBEL().getPin(name);
@@ -142,7 +142,7 @@ public class SLRCrosserGenerator {
                     + "Laguna site, currently: " + existingNet + ", failed to add " + n);
             }
         }
-        
+
         BELPin pin = c.getBEL().getPin("CE");
         Net existingNet = si.getNetFromSiteWire(pin.getSiteWireName());
         if (existingNet == null) {
@@ -152,23 +152,23 @@ public class SLRCrosserGenerator {
                 + "Laguna site, currently: " + existingNet + ", failed to add " + ce);
         }
     }
-    
-    /** 
-     * Given a logical net and site/bel site, this method will perform the placement and routing 
+
+    /**
+     * Given a logical net and site/bel site, this method will perform the placement and routing
      * of two laguna flops and their inter-site super-long-line routing.
      * @param d The current design.
      * @param path The logical net to implement as an SLR crossing signal
      * @param txSite The laguna site onto which to place the TX flop
-     * @param txElementName The element/bel site to place the TX flop 
+     * @param txElementName The element/bel site to place the TX flop
      * @return The physical net routed across the super long line
      */
     public static Net placeAndRouteLagunaFlopPair(Design d, EDIFHierNet path, Site txSite, String txElementName) {
-        if (path.getNet().getPortInsts().size() != 2) 
+        if (path.getNet().getPortInsts().size() != 2)
             throw new RuntimeException("ERROR: Bad net for SLR crossing: " + path);
-        Cell txCell = null;        
+        Cell txCell = null;
         Cell rxCell = null;
         EDIFNetlist n = d.getNetlist();
-        
+
         // Get/Create cells
         for (EDIFPortInst p : path.getNet().getPortInsts()) {
             String cellName = path.getHierarchicalInstName(p);
@@ -180,13 +180,13 @@ public class SLRCrosserGenerator {
             else rxCell = cell;
         }
         d.placeCell(txCell, txSite, txSite.getBEL(txElementName));
-        
+
         EDIFCellInst i = txCell.getEDIFCellInst();
         Net clk = n.getPhysicalNetFromPin(path.getHierarchicalInstName(), i.getPortInst("C"), d);
         Net rst = n.getPhysicalNetFromPin(path.getHierarchicalInstName(), i.getPortInst("R"), d);
         Net ce = n.getPhysicalNetFromPin(path.getHierarchicalInstName(), i.getPortInst("CE"), d);
         routeControlSignalsInLagunaSite(txCell, clk, rst, ce);
-        
+
         // Add the TX output pin
         String sitePinName = txCell.getBEL().getPin("Q").getConnectedSitePinName();
         Net physNet = d.getNet(path.getHierarchicalNetName());
@@ -194,37 +194,37 @@ public class SLRCrosserGenerator {
              physNet = d.createNet(path.getHierarchicalNetName());
         }
         physNet.addPin(new SitePinInst(true,sitePinName,txCell.getSiteInst()));
-        
+
         EDIFNet logicalNetIn = txCell.getEDIFCellInst().getPortInst("D").getNet();
         Net physNetIn = d.getNet(logicalNetIn.getName());
         if (physNetIn == null) {
             physNetIn = d.createNet(logicalNetIn);
         }
         physNetIn.addPin(new SitePinInst(false, txCell.getBELName().replace("_REG", "D"), txCell.getSiteInst()));
-        
+
         // Route TX output to RX site
         SitePin snk = routeToLagunaRx(physNet);
         String pinName = snk.getPinName();
         d.placeCell(rxCell, snk.getSite(), snk.getSite().getBEL("RX_REG" + pinName.substring(pinName.length()-1)));
         physNet.addPin(new SitePinInst(false,pinName,rxCell.getSiteInst()));
-        
+
         EDIFNet logicalNetOut = rxCell.getEDIFCellInst().getPortInst("Q").getNet();
         Net physNetOut = d.getNet(logicalNetOut.getName());
         if (physNetOut == null) {
             physNetOut = d.createNet(logicalNetOut);
         }
         physNetOut.addPin(new SitePinInst(true, rxCell.getBELName().replace("_REG", "Q"), rxCell.getSiteInst()));
-        
+
         routeControlSignalsInLagunaSite(rxCell, clk, rst, ce);
-        
+
         return physNet;
     }
-    
+
     /**
      * Places a BUFGCE present in the netlist.
      * @param d Design containing BUFGCE
      * @param s Site onto which to place the BUFGCE
-     * @param bufName Full hierarchical instance name of the BUFGCE 
+     * @param bufName Full hierarchical instance name of the BUFGCE
      */
     public static Cell placeBUFGCE(Design d, Site s, String bufName) {
         EDIFNetlist n = d.getNetlist();
@@ -233,13 +233,13 @@ public class SLRCrosserGenerator {
             c = d.createCell(bufName, d.getNetlist().getCellInstFromHierName(bufName));
         }
         d.placeCell(c, s, s.getBEL("BUFCE"));
-        
+
         Net ce = n.getPhysicalNetFromPin("", c.getEDIFCellInst().getPortInst("CE"), d);
         ce.addPin(new SitePinInst(false,"CE_PRE_OPTINV",c.getSiteInst()));
         c.getSiteInst().addSitePIP("IINV", "I_PREINV");
         Net clkIn = n.getPhysicalNetFromPin("", c.getEDIFCellInst().getPortInst("I"), d);
         Net clk = n.getPhysicalNetFromPin("", c.getEDIFCellInst().getPortInst("O"), d);
-        
+
         SiteInst si = c.getSiteInst();
         String src0 = "CE_PRE_OPTINV";
         String src1 = "CLK_IN";
@@ -256,20 +256,20 @@ public class SLRCrosserGenerator {
 
         return c;
     }
-    
+
     /**
-     * Places and routes an SLR crossing given a north and south bus of size width.  
+     * Places and routes an SLR crossing given a north and south bus of size width.
      * @param d The current design
-     * @param northStart The starting Laguna site to start placement (placement moves north) 
+     * @param northStart The starting Laguna site to start placement (placement moves north)
      *     for the north traveling bus
-     * @param northBusName Full hierarchical net name of the bus to cross SLR in north direction 
+     * @param northBusName Full hierarchical net name of the bus to cross SLR in north direction
      * @param southBusName Full hierarchical net name of the bus to cross SLR in south direction
      * @param width Width of both north and south buses crossing SLR
      */
     public static void placeAndRouteSLRCrossing(Design d, Site northStart, String northBusName, String southBusName, int width) {
         int yStart = northStart.getInstanceY() + ((LAGUNA_SITES_PER_TILE * LAGUNA_TILES_PER_FSR * 3) / 4);
         Site southStart = d.getDevice().getSite("LAGUNA_X"+northStart.getInstanceX()+"Y" + yStart);
-        
+
         for (String busName : new String[]{northBusName,southBusName}) {
             Site start = busName.equals(northBusName) ? northStart : southStart;
             int lagunaStartX = start.getInstanceX();
@@ -277,7 +277,7 @@ public class SLRCrosserGenerator {
             for (int i=0; i < width; i++) {
                 EDIFHierNet net = d.getNetlist().getHierNetFromName(busName + "[" + i + "]");
                 int x = ((i / 12) % 2) + lagunaStartX;
-                int y = lagunaStartY + ((i/(LAGUNA_FLOPS_PER_SITE*LAGUNA_SITES_PER_TILE))*2) 
+                int y = lagunaStartY + ((i/(LAGUNA_FLOPS_PER_SITE*LAGUNA_SITES_PER_TILE))*2)
                                      + ((i/LAGUNA_FLOPS_PER_SITE % 2) == 1 ? 1 : 0);
 
                 Site txSite = d.getDevice().getSite("LAGUNA_X" + x + "Y" + y);
@@ -285,13 +285,13 @@ public class SLRCrosserGenerator {
                 placeAndRouteLagunaFlopPair(d, net, txSite, txElementName);
             }
         }
-        
+
     }
-    
+
     /**
      * Separates clock sinks by direction in a half clock region so
-     * they can be driven by independent leaf clock buffers (LCBs). 
-     * @param clk The physical clock net 
+     * they can be driven by independent leaf clock buffers (LCBs).
+     * @param clk The physical clock net
      * @param txClkWire The INT tile wire name to use for TX-based clocks
      * @param rxClkWire The INT tile wire name to use for RX-based clocks
      * @return A map from LCB node to a list of all clk sinks to be driven by the LCB.
@@ -312,8 +312,8 @@ public class SLRCrosserGenerator {
         }
         return lcbMappings;
     }
-    
-    
+
+
     public static ClockRegion findCentroid(String[] lagunaStarts, Device dev) {
         HashSet<Point> lagunaPoints = new HashSet<>();
         for (String laguna : lagunaStarts) {
@@ -325,32 +325,32 @@ public class SLRCrosserGenerator {
         int i=1;
         int dir = -1;
         int count = 0;
-        // Some tiles don't belong to a clock region, we need to wiggle around 
+        // Some tiles don't belong to a clock region, we need to wiggle around
         // until we find one that is
         while (c.getClockRegion() == null) {
-            int neighborOffset = (count % 2 == 0) ? dir*i : i; 
+            int neighborOffset = (count % 2 == 0) ? dir*i : i;
             c = c.getTileNeighbor(neighborOffset, 0);
             count++;
             if (count % 2 == 0) i++;
         }
         return c.getClockRegion().getNeighborClockRegion(0, 1);
     }
-    
-    
+
+
     public static void customRouteSLRCrossingClock(Design d, String clkName, String[] lagunaStarts, String txClkWire, String rxClkWire, boolean useCommonCentroid) {
         Net clk = d.getNet(clkName);
         Device dev = d.getDevice();
-        
+
         List<ClockRegion> clockRegions = new ArrayList<>();
         for (String laguna : lagunaStarts) {
             ClockRegion cr = dev.getSite(laguna).getTile().getClockRegion();
             clockRegions.add(cr);
-            clockRegions.add(dev.getClockRegion(cr.getRow()+1, cr.getColumn()));                
+            clockRegions.add(dev.getClockRegion(cr.getRow()+1, cr.getColumn()));
         }
-        
+
         // Route from BUFG to Clock Routing Tracks
         RouteNode clkRoutingLine = UltraScaleClockRouting.routeBUFGToNearestRoutingTrack(clk);
-        
+
         // Route from Routing track to Centroid
         Set<ClockRegion> centroids = new HashSet<>();
         if (useCommonCentroid) {
@@ -367,35 +367,35 @@ public class SLRCrosserGenerator {
         List<RouteNode> distLines = new ArrayList<>();
         for (ClockRegion centroid : centroids) {
             RouteNode centroidRouteNode = UltraScaleClockRouting.routeToCentroid(clk, clkRoutingLine, centroid);
-            
+
             // Transition centroid from routing track to vertical distribution track
             RouteNode centroidDistNode = UltraScaleClockRouting.transitionCentroidToDistributionLine(clk,centroidRouteNode);
 
-            // Route from Centroid to Clock distribution 
+            // Route from Centroid to Clock distribution
             if (!useCommonCentroid) {
                 clockRegions.clear();
                 clockRegions.add(centroid);
                 clockRegions.add(centroid.getNeighborClockRegion(1, 0));
             }
             Map<ClockRegion, RouteNode> vertDistLines = UltraScaleClockRouting.routeCentroidToVerticalDistributionLines(clk,centroidDistNode, clockRegions);
-            
-            distLines.addAll(UltraScaleClockRouting.routeCentroidToHorizontalDistributionLines(clk, centroidDistNode, vertDistLines));             
+
+            distLines.addAll(UltraScaleClockRouting.routeCentroidToHorizontalDistributionLines(clk, centroidDistNode, vertDistLines));
         }
-        
-        
+
+
         // Separate sinks by RX/TX LCBs
         Map<RouteNode, ArrayList<SitePinInst>> lcbMappings = getLCBPinMappings(clk, txClkWire, rxClkWire);
-        
+
         // Route from clock distribution to all 4 LCBs
-        UltraScaleClockRouting.routeDistributionToLCBs(clk, distLines, lcbMappings.keySet());        
-        
+        UltraScaleClockRouting.routeDistributionToLCBs(clk, distLines, lcbMappings.keySet());
+
         // Route from each LCB to laguna sites
         UltraScaleClockRouting.routeLCBsToSinks(clk, lcbMappings);
 
         // Update clocking delays to improve SLR crossing hold issues
         clk.improveSLRClockingDelay(txClkWire, rxClkWire);
     }
-    
+
     /**
      * Creates/instantiates a BUFGCE in the design
      * @param d The current design
@@ -407,12 +407,12 @@ public class SLRCrosserGenerator {
     public static void createBUFGCE(Design d, String clkName, String clkInName, String clkOutName, String bufgceInstName) {
         EDIFNetlist n = d.getNetlist();
         EDIFCell parent = n.getTopCell();
-        
+
         // Create BUFGCE in netlist and connect it
         EDIFCellInst bufgce = Design.createUnisimInst(parent, bufgceInstName, Unisim.BUFGCE);
         EDIFNet clkInNet = parent.createNet(clkInName);
         clkInNet.createPortInst(parent.createPort(clkInName, EDIFDirection.INPUT, 1));
-        
+
         clkInNet.createPortInst("I", bufgce);
         EDIFNet clkNet = parent.createNet(clkName);
         clkNet.createPortInst("O", bufgce);
@@ -422,10 +422,10 @@ public class SLRCrosserGenerator {
         EDIFNet vccNet = EDIFTools.getStaticNet(NetType.VCC, parent, n);
         vccNet.createPortInst("CE", bufgce);
     }
-    
+
     /**
      * Creates the logical netlist of the SLR crosser design.
-     * @param d Current design 
+     * @param d Current design
      * @param busWidth Width of the buses to create
      * @param busPrefixes Prefixes to use for bus names
      * @param clkName Name of the clock net
@@ -436,14 +436,14 @@ public class SLRCrosserGenerator {
     public static void createBUFGCEAndFlops(Design d, int busWidth, List<String> busPrefixes, String clkName, String clkInName, String clkOutName, String bufgceInstName) {
         EDIFNetlist n = d.getNetlist();
         EDIFCell parent = n.getTopCell();
-        
+
         // Create BUFGCE in netlist and connect it
         createBUFGCE(d, clkName, clkInName, clkOutName, bufgceInstName);
 
         EDIFNet clkNet = parent.getNet(clkName);
         EDIFNet vccNet = EDIFTools.getStaticNet(NetType.VCC, parent, n);
         EDIFNet gndNet = EDIFTools.getStaticNet(NetType.GND, parent, n);
-        
+
         // Create register pairs
         for (String busPrefix : busPrefixes) {
             String busSuffix = "[" + (busWidth-1) + ":0]";
@@ -454,31 +454,31 @@ public class SLRCrosserGenerator {
                 String suffix = "[" + i + "]";
                 EDIFCellInst reg0 = Design.createUnisimInst(parent, parts[0] + "_reg0" + suffix, Unisim.FDRE);
                 EDIFCellInst reg1 = Design.createUnisimInst(parent, parts[1] + "_reg1" + suffix, Unisim.FDRE);
-                
+
                 EDIFNet inputNet = parent.createNet(parts[0] + suffix);
                 inputNet.createPortInst(input, i);
                 inputNet.createPortInst("D", reg0);
-                
+
                 EDIFNet outputNet = parent.createNet(parts[1] + suffix);
                 outputNet.createPortInst(output, i);
                 outputNet.createPortInst("Q", reg1);
-                
+
                 clkNet.createPortInst("C", reg0);
                 clkNet.createPortInst("C", reg1);
-                
+
                 vccNet.createPortInst("CE", reg0);
                 vccNet.createPortInst("CE", reg1);
-                
+
                 gndNet.createPortInst("R", reg0);
                 gndNet.createPortInst("R", reg1);
-                
+
                 EDIFNet connNet = parent.createNet(parts[0] + "_" + parts[1] + suffix);
                 connNet.createPortInst("Q",reg0);
                 connNet.createPortInst("D",reg1);
-            }            
+            }
         }
     }
-    
+
     private static final String PART_OPT = "p";
     private static final String DESIGN_NAME_OPT = "d";
     private static final String TX_CLK_WIRE_OPT = "t";
@@ -499,7 +499,7 @@ public class SLRCrosserGenerator {
     private static final String VERBOSE_OPT = "v";
     private static final String HELP_OPT = "h";
     private static final String COMMON_CENTROID_OPT = "z";
-    
+
     private static OptionParser createOptionParser() {
         // Defaults
         String partName = "xcvu9p-flgb2104-2-i";
@@ -521,7 +521,7 @@ public class SLRCrosserGenerator {
         String lagunaSites = "LAGUNA_X2Y120";
         boolean verbose = true;
         boolean useCommonCentroid = false;
-        
+
         OptionParser p = new OptionParser() {{
             accepts(PART_OPT).withOptionalArg().defaultsTo(partName).describedAs("UltraScale+ Part Name");
             accepts(DESIGN_NAME_OPT).withOptionalArg().defaultsTo(designName).describedAs("Design Name");
@@ -544,10 +544,10 @@ public class SLRCrosserGenerator {
             accepts(COMMON_CENTROID_OPT).withOptionalArg().ofType(Boolean.class).defaultsTo(useCommonCentroid).describedAs("Use common centroid");
             acceptsAll( Arrays.asList(HELP_OPT, "?"), "Print Help" ).forHelp();
         }};
-        
+
         return p;
     }
-    
+
     private static void printHelp(OptionParser p) {
         MessageGenerator.printHeader("SLR Crossing DCP Generator");
         System.out.println("This RapidWright program creates a placed and routed DCP that can be \n"
@@ -556,12 +556,12 @@ public class SLRCrosserGenerator {
         try {
             p.accepts(OUT_DCP_OPT).withOptionalArg().defaultsTo("slr_crosser.dcp").describedAs("Output DCP File Name");
             p.printHelpOn(System.out);
-            
+
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
-    
+
     public static void main(String[] args) {
         // Extract program options
         OptionParser p = createOptionParser();
@@ -572,7 +572,7 @@ public class SLRCrosserGenerator {
             return;
         }
         CodePerfTracker t = verbose ? new CodePerfTracker(SLRCrosserGenerator.class.getSimpleName(),true).start("Init") : null;
-        
+
         String partName = (String) opts.valueOf(PART_OPT);
         String designName = (String) opts.valueOf(DESIGN_NAME_OPT);
         String txClkWire = (String) opts.valueOf(TX_CLK_WIRE_OPT);
@@ -583,14 +583,14 @@ public class SLRCrosserGenerator {
         String clkName = (String) opts.valueOf(CLK_NAME_OPT);
         String clkInName = (String) opts.valueOf(CLK_IN_NAME_OPT);
         String clkOutName = (String) opts.valueOf(CLK_OUT_NAME_OPT);
-        int busWidth = (int) opts.valueOf(BUS_WIDTH_OPT);        
+        int busWidth = (int) opts.valueOf(BUS_WIDTH_OPT);
         String inputPrefix = (String) opts.valueOf(INPUT_PREFIX_OPT);
         String outputPrefix= (String) opts.valueOf(OUTPUT_PREFIX_OPT);
         String northSuffix = (String) opts.valueOf(NORTH_SUFFIX_OPT);
         String southSuffix = (String) opts.valueOf(SOUTH_SUFFIX_OPT);
         String[] lagunaNames = ((String) opts.valueOf(LAGUNA_SITES_OPT)).split(",");
         boolean commonCentroid = (boolean) opts.valueOf(COMMON_CENTROID_OPT);
-        
+
         Double clkPeriodConstraint = null;
         if (opts.hasArgument(CLK_CONSTRAINT_OPT)) {
             clkPeriodConstraint = (double) opts.valueOf(CLK_CONSTRAINT_OPT);
@@ -600,11 +600,11 @@ public class SLRCrosserGenerator {
         if (part == null || !part.isUltraScalePlus()) {
             throw new RuntimeException("ERROR: Invalid/unsupport part " + partName + ".");
         }
-        
+
         Design d = new Design(designName,partName);
         d.setAutoIOBuffers(false);
         Device dev = d.getDevice();
-        
+
         if (dev.getSite(bufgceSiteName) == null) {
             throw new RuntimeException("ERROR: BUFGCE site '" +
                     bufgceSiteName + "' not found on part " + partName);
@@ -612,7 +612,7 @@ public class SLRCrosserGenerator {
         for (String lagunaSite : lagunaNames) {
             Site s = dev.getSite(lagunaSite);
             if (s == null) {
-                throw new RuntimeException("ERROR: LAGUNA site '" + 
+                throw new RuntimeException("ERROR: LAGUNA site '" +
                     lagunaSite + "' not found on part " + partName);
             }
             ClockRegion curr = s.getTile().getClockRegion();
@@ -623,18 +623,18 @@ public class SLRCrosserGenerator {
                     throw new RuntimeException("ERROR: Laguna site '" + s + "' is not a bottom row LAGUNA site.");
             }
         }
-        
+
         List<String> busNames = new ArrayList<>();
         for (int i=0; i < lagunaNames.length; i++) {
             busNames.add(inputPrefix + i + northSuffix + "," + outputPrefix + i + northSuffix);
             busNames.add(inputPrefix + i + southSuffix + "," + outputPrefix + i + southSuffix);
         }
-        
 
-        if (verbose) t.stop().start("Create Netlist");        
+
+        if (verbose) t.stop().start("Create Netlist");
         createBUFGCEAndFlops(d, busWidth, busNames, clkName, clkInName, clkOutName, bufgceInstName);
-        placeBUFGCE(d,dev.getSite(bufgceSiteName),bufgceInstName);        
-        
+        placeBUFGCE(d,dev.getSite(bufgceSiteName),bufgceInstName);
+
         if (verbose) t.stop().start("Place SLR Crossings");
         int j = 0;
         for (String lagunaStart : lagunaNames) {
@@ -647,18 +647,18 @@ public class SLRCrosserGenerator {
         if (verbose) t.stop().start("Custom Clock Route");
         customRouteSLRCrossingClock(d, clkName, lagunaNames, txClkWire, rxClkWire, commonCentroid);
 
-        if (verbose) t.stop().start("Route VCC/GND");        
+        if (verbose) t.stop().start("Route VCC/GND");
         Router r = new Router(d);
         r.routeStaticNets();
         t.stop();
-        
+
         // Add a clock constraint
         if (clkPeriodConstraint != null) {
             d.addXDCConstraint(ConstraintGroup.LATE, "create_clock -name "+clkName+" -period "+clkPeriodConstraint+" [get_nets "+clkName+"]");
-            d.addXDCConstraint(ConstraintGroup.LATE, "create_property MAX_PROG_DELAY net"); 
-            d.addXDCConstraint(ConstraintGroup.LATE, "set_property MAX_PROG_DELAY 0 [get_nets "+clkName+"]");            
+            d.addXDCConstraint(ConstraintGroup.LATE, "create_property MAX_PROG_DELAY net");
+            d.addXDCConstraint(ConstraintGroup.LATE, "set_property MAX_PROG_DELAY 0 [get_nets "+clkName+"]");
         }
-        
+
         d.writeCheckpoint(outputDCPFileName, t);
         if (verbose) System.out.println("Wrote final DCP: " + outputDCPFileName);
     }

@@ -1,25 +1,25 @@
-/* 
+/*
  * Original work: Copyright (c) 2010-2011 Brigham Young University
- * Modified work: Copyright (c) 2017-2022, Xilinx, Inc. 
+ * Modified work: Copyright (c) 2017-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
- *  
- * This file is part of RapidWright. 
- * 
+ *
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 package com.xilinx.rapidwright.placer.handplacer;
 
@@ -78,18 +78,18 @@ public class HandPlacer extends QMainWindow {
     private QTreeWidget macroList;
     Device device;
     private QComboBox netViewCombo;
-    
+
     private static String title = "Hand HMPlacer";
-    
+
     private String currOpenFileName = null;
-    
+
     private Design debugDesign;
 
     @SuppressWarnings("unused")
     private boolean debugPlacer;
 
     public QToolBar toolbar;
-    
+
     public static void main(String[] args) {
         QApplication.setGraphicsSystem("raster");
         QApplication.initialize(args);
@@ -103,42 +103,42 @@ public class HandPlacer extends QMainWindow {
             System.out.println("DEBUG MODE");
             debugPlacer = true;
         }
-        
+
         HandPlacer handPlacer = new HandPlacer(null, fileToOpen, debugPlacer);
 
         handPlacer.show();
 
         QApplication.exec();
     }
-    
+
     public static void openDesign(Design d) {
         QApplication.setGraphicsSystem("raster");
         QApplication.initialize(new String[]{});
-        
+
         HandPlacer handPlacer = new HandPlacer(null, d);
 
         handPlacer.show();
 
         QApplication.exec();
-        
+
     }
-    
+
     public static void openDesign(Design d, boolean nonBlocking) {
         if (nonBlocking) {
             new Thread(new Runnable() {
                  public void run() {
                       openDesign(d);
                  }
-            }).start();            
+            }).start();
         }
         else {
             openDesign(d);
         }
     }
-    
+
     public HandPlacer(QWidget parent, Design design) {
         super(parent);
-        
+
         init(false);
 
 
@@ -152,16 +152,16 @@ public class HandPlacer extends QMainWindow {
         setWindowTitle(design.getName() + " - " + title);
         populateMacroList();
         scene.changeNetView(0);
-        
+
         resize(1024, 768);
-        
+
         // Zoom out to full view
         view.fitInView(new QRectF(new QPointF(0, 0), new QSizeF(scene.getSceneSize())), Qt.AspectRatioMode.KeepAspectRatio);
     }
-    
+
     public HandPlacer(QWidget parent, String fileToOpen, boolean debugPlacer) {
         super(parent);
-        
+
         init(debugPlacer);
 
         if (fileToOpen != null && new File(fileToOpen).exists()) {
@@ -176,19 +176,19 @@ public class HandPlacer extends QMainWindow {
         // Set the opening default window size to 1024x768 pixels
         resize(1024, 768);
     }
-    
+
     private void init(boolean debugPlacer) {
         undoStack = new QUndoStack();
         scene = new FloorPlanScene(null, debugPlacer);
         view = new TileView(scene);
         setCentralWidget(view);
-        
+
         toolbar = new QToolBar(this);
         setupFileActions();
         setupEditActions();
         setupViewActions();
         setWindowTitle(title);
-        
+
         undoStack.canRedoChanged.connect(actionRedo, "setEnabled(boolean)");
         undoStack.canUndoChanged.connect(actionUndo, "setEnabled(boolean)");
 
@@ -197,24 +197,24 @@ public class HandPlacer extends QMainWindow {
         macroList.itemSelectionChanged.connect(this,"updateSceneSelection()");
         statusLabel = new QLabel("Status Bar");
         statusLabel.setText("Status Bar");
-        
+
         scene.updateStatus.connect(this, "setStatusText(String, Tile)");
         scene.hmMoved.connect(this, "hmMoved(java.util.List, java.util.List)");
 
-        
+
         QStatusBar statusBar = new QStatusBar();
         statusBar.addWidget(statusLabel);
         setStatusBar(statusBar);
 
 
-        this.debugPlacer = debugPlacer;        
+        this.debugPlacer = debugPlacer;
     }
-    
+
     @SuppressWarnings("unused")
     private void setStatusText(String text, Tile tile) {
         statusLabel.setText(text);
     }
-    
+
     private void populateMacroList() {
         macroList.clear();
         for (GUIModuleInst macro : scene.getMacroList()) {
@@ -226,7 +226,7 @@ public class HandPlacer extends QMainWindow {
             macroList.addTopLevelItem(treeItem);
         }
     }
-    
+
     @SuppressWarnings("unused")
     private void updateListSelection() {
         if (macroList.hasFocus())
@@ -240,7 +240,7 @@ public class HandPlacer extends QMainWindow {
             }
         }
     }
-    
+
     @SuppressWarnings("unused")
     private void updateSceneSelection() {
         if (scene.hasFocus())
@@ -254,7 +254,7 @@ public class HandPlacer extends QMainWindow {
             }
         }
     }
-    
+
     private void updateWireEstimate() {
         ArrayList<GUINetLine> netLineList = scene.getNetLineList();
         double estimate = 0;
@@ -263,16 +263,16 @@ public class HandPlacer extends QMainWindow {
         }
         statusBar().showMessage("Wiring cost: "+estimate, 2000);
     }
-    
+
     public void hmMoved(List<GUIModuleInst> movedHMList, List<QPointF> oldPosList) {
         undoStack.push(new MoveCommand(movedHMList, oldPosList, scene));
         updateWireEstimate();
     }
 
-    public QDockWidget macroListDockWidget; 
-    
+    public QDockWidget macroListDockWidget;
+
     private void createModuleList() {
-        
+
         macroList = new QTreeWidget();
         macroList.setSelectionMode(SelectionMode.ExtendedSelection);
         macroList.setColumnCount(2);
@@ -281,15 +281,15 @@ public class HandPlacer extends QMainWindow {
         headerList.add("Size(occupied tiles)");
         macroList.setHeaderLabels(headerList);
         macroList.setSortingEnabled(true);
-        
-        
+
+
         macroListDockWidget = new QDockWidget(tr("Module List"), this);
         macroListDockWidget.setAllowedAreas(DockWidgetArea.RightDockWidgetArea,
                 DockWidgetArea.LeftDockWidgetArea);
         macroListDockWidget.setWidget(macroList);
         addDockWidget(DockWidgetArea.RightDockWidgetArea, macroListDockWidget);
     }
-    
+
     protected void about() {
         QMessageBox.information(this, "Info",
                 "This is the first try \nat a manual Block Placer.");
@@ -300,10 +300,10 @@ public class HandPlacer extends QMainWindow {
         if (lines != null) {
             for (PartitionLine line : lines) {
                 line.drawPartitionLine(scene);
-            }            
+            }
         }
     }
-    
+
     protected void openDesign() {
         /*String fileName = QFileDialog.getOpenFileName(this, "Choose a file...",
                 ".", FileFilters.xdlFilter);
@@ -312,7 +312,7 @@ public class HandPlacer extends QMainWindow {
         }*/
         System.out.println("TODO: Need modular design open method");
     }
-    
+
     protected void openWithAutoPlacer() {
         String fileName = QFileDialog.getOpenFileName(this, "Choose a file...",
                 ".", FileFilters.xdlFilter);
@@ -320,13 +320,13 @@ public class HandPlacer extends QMainWindow {
             debugPlacer = true;
             scene.debugPlacer = true;
             //internalOpenWithAutoPlacer(fileName);
-        }        
+        }
     }
-        
+
     protected void openRecentFile() {
-        
+
     }
-    
+
     protected void saveAsDCPDesign() {
         if (scene.getDesign() == null)
             return;
@@ -337,7 +337,7 @@ public class HandPlacer extends QMainWindow {
         scene.getDesign().writeCheckpoint(fileName);
         statusBar().showMessage(fileName + " saved.", 2000);
     }
-    
+
     protected void saveAsPDFDesign() {
         if (scene.getDesign() == null)
             return;
@@ -347,7 +347,7 @@ public class HandPlacer extends QMainWindow {
         UiTools.saveAsPdf(scene, new File(fileName));
         statusBar().showMessage(fileName + " saved.", 2000);
     }
-    
+
     private QAction action(String name, String image, Object shortcut,
             String slot, QMenu menu, QToolBar toolBar) {
         QAction a = new QAction(name, this);
@@ -384,7 +384,7 @@ public class HandPlacer extends QMainWindow {
         action(tr("&Save As DCP"), "filesaveas", StandardKey.SaveAs, "saveAsDCPDesign()", fileMenu, toolbar);
         action(tr("&Save As PDF"), "exportpdf", null, "saveAsPDFDesign()", fileMenu, toolbar);
         fileMenu.addSeparator();
-        action(tr("&Print"), "fileprint", StandardKey.Print, null, fileMenu, toolbar);        
+        action(tr("&Print"), "fileprint", StandardKey.Print, null, fileMenu, toolbar);
         fileMenu.addSeparator();
         action(tr("&Quit"), null, "Ctrl+Q", "close()", fileMenu, null);
     }
@@ -406,13 +406,13 @@ public class HandPlacer extends QMainWindow {
         actionRedo.triggered.connect(undoStack, "redo()");
 
     }
-    
+
     private void setupViewActions() {
         toolbar.setWindowTitle(tr("View Actions"));
         addToolBar(toolbar);
         QMenu m = new QMenu(tr("&View"), this);
         menuBar().addMenu(m);
-        
+
         netViewCombo = new QComboBox();
         netViewCombo.addItem(tr("Nets hidden"));
         netViewCombo.addItem(tr("Module-to-module"));
@@ -420,7 +420,7 @@ public class HandPlacer extends QMainWindow {
         netViewCombo.setEnabled(false);
         netViewCombo.currentIndexChanged.connect(scene,"changeNetView(int)");
         toolbar.addWidget(netViewCombo);
-        
+
         actionZoomIn = action(tr("&Zoom Out"), "zoomout", StandardKey.ZoomOut, "zoomout()", m, toolbar);
         actionZoomOut = action(tr("&Zoom In"), "zoomin", "Ctrl+=", "zoomin()", m, toolbar);
         actionZoomSelection = action(tr("&Zoom Selection"), "zoomselection", null, "zoomselection()", m, toolbar);
@@ -451,6 +451,6 @@ public class HandPlacer extends QMainWindow {
             if (right < 0 || gmiBR.x() > right)
                 right = gmiBR.x();
         }
-        view.fitInView(left, top, right-left, bottom-top, Qt.AspectRatioMode.KeepAspectRatio);    
+        view.fitInView(left, top, right-left, bottom-top, Qt.AspectRatioMode.KeepAspectRatio);
     }
 }

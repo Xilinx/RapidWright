@@ -1,25 +1,25 @@
 /*
- * 
- * Copyright (c) 2021 Ghent University. 
+ *
+ * Copyright (c) 2021 Ghent University.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Yun Zhou, Ghent University.
  *
- * This file is part of RapidWright. 
- * 
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 
 package com.xilinx.rapidwright.rwroute;
@@ -43,16 +43,16 @@ public class RapidStreamRoute extends PartialRouter{
     /**
      * Classifies {@link Net} Objects into different categories: clocks, static nets,
      * and regular signal nets (i.e. {@link NetType}.WIRE) and determines routing targets.
-     * Overrides to enable routing of conflict nets in the partial routing mode. 
+     * Overrides to enable routing of conflict nets in the partial routing mode.
      */
     @Override
     protected void determineRoutingTargets() {
         categorizeNets();
         if (config.isResolveConflictNets()) handleConflictNets();
     }
-    
+
     /**
-     * Deals with nets that are routed but with conflicting nodes. 
+     * Deals with nets that are routed but with conflicting nodes.
      */
     private void handleConflictNets() {
         List<Net> toPreserveNets = new ArrayList<>();
@@ -61,7 +61,7 @@ public class RapidStreamRoute extends PartialRouter{
                 toPreserveNets.add(net);
                 continue;
             }
-            
+
             removeNetNodesFromPreservedNodes(net); // remove preserved nodes of a net from the map
             createsNetWrapperAndConnections(net, config.getBoundingBoxExtensionX(), config.getBoundingBoxExtensionY(), this.isMultiSLRDevice());
             net.unroute();//NOTE: no need to unroute if routing tree is reused, then toPreserveNets should be detected before createNetWrapperAndConnections
@@ -70,9 +70,9 @@ public class RapidStreamRoute extends PartialRouter{
             preserveNet(net);
         }
     }
-    
+
     /**
-     * Checks if a net is the target conflict net to be routed. 
+     * Checks if a net is the target conflict net to be routed.
      * Note: this method provides an example of customizing the partial router for application-specific tool flows.
      * It is specifically for the RapidStream use case, where the targets are nets connecting anchor FFs of CLB tiles.
      * @param net The net in question.
@@ -105,7 +105,7 @@ public class RapidStreamRoute extends PartialRouter{
         // Note: if laguna anchor nets are never conflicted, there will be no need to check tile names.
         return anchorNet && anchorTile.getName().startsWith("CLE");
     }
-    
+
     /**
      * Routes a design for the RapidStream flow.
      * Note: Added to indicate the parameters for the use case.

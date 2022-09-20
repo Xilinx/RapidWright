@@ -1,28 +1,28 @@
 /*
- * 
- * Copyright (c) 2017-2022, Xilinx, Inc. 
+ *
+ * Copyright (c) 2017-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
  *
- * This file is part of RapidWright. 
- * 
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 /**
- * 
+ *
  */
 package com.xilinx.rapidwright.util;
 
@@ -66,14 +66,14 @@ public class DesignImplementationDiff {
                 System.out.println("Cell " + c.getName() + " has moved to " + cc.getSite());
                 placementChange = true;
             }
-            
+
             if (!cc.getBEL().equals(e)) {
                 System.out.println("Cell " + c.getName() + " has moved to " + cc.getBEL());
                 placementChange = true;
             }
             cellMovements += placementChange ? 1 : 0;
         }
-        
+
         for (Net n : original.getNets()) {
             Net nn = superset.getNet(n.getName());
             if (nn == null) {
@@ -82,7 +82,7 @@ public class DesignImplementationDiff {
             }
             if (nn.isStaticNet()) continue;
             boolean netChange = false;
-            HashSet<PIP> pips = new HashSet<>(nn.getPIPs());    
+            HashSet<PIP> pips = new HashSet<>(nn.getPIPs());
             for (PIP p : n.getPIPs()) {
                 if (!pips.contains(p)) {
                     System.out.println("Missing PIP " + p.toString() + " from net " + n.getName());
@@ -91,14 +91,14 @@ public class DesignImplementationDiff {
             }
             netRoutingChanges += netChange ? 1 : 0;
         }
-        
+
         int cellCount = original.getCells().size();
         int netCount = original.getNets().size();
-        
+
         float placementPercent = ((float)cellMovements/(float)cellCount) * 100.0f;
         float routingPercent = ((float)netRoutingChanges/(float)netCount) * 100.0f;
         System.out.printf("Placement changes: %d/%d %3.2f%%\n", cellMovements, cellCount, placementPercent);
         System.out.printf("Net routing changes: %d/%d %3.2f%%\n", netRoutingChanges, netCount, routingPercent);
-        
+
     }
 }

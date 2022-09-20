@@ -1,25 +1,25 @@
-/* 
+/*
  * Original work: Copyright (c) 2010-2011 Brigham Young University
- * Modified work: Copyright (c) 2017-2022, Xilinx, Inc. 
+ * Modified work: Copyright (c) 2017-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
- *  
- * This file is part of RapidWright. 
- * 
+ *
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 package com.xilinx.rapidwright.device.browser;
 
@@ -54,7 +54,7 @@ import com.xilinx.rapidwright.gui.WidgetMaker;
  * and populate the site and wire lists.  Wire connections can also be drawn
  * by selecting a specific wire in the tile (from the list) and the program will draw
  * all connections that can be made from that wire.  The wire positions on the tile
- * are determined by a hash and are not related to FPGA Editor positions.   
+ * are determined by a hash and are not related to FPGA Editor positions.
  * @author Chris Lavin and Marc Padilla
  * Created on: Nov 26, 2010
  */
@@ -77,10 +77,10 @@ public class DeviceBrowser extends QMainWindow{
     private QTreeWidget wireList;
     /** This is the current tile that has been selected */
     private Tile currTile = null;
-    
+
     protected boolean hideTiles = false;
-    
-    protected boolean drawPrimitives = true; 
+
+    protected boolean drawPrimitives = true;
     /**
      * Main method setting up the Qt environment for the program to run.
      * @param args
@@ -105,12 +105,12 @@ public class DeviceBrowser extends QMainWindow{
      */
     public DeviceBrowser(QWidget parent, String defaultPart) {
         super(parent);
-        
+
         // set the title of the window
         setWindowTitle("Device Browser");
-        
+
         initializeSideBar();
-        
+
         // Gets the available parts in RapidWright and populates the selection tree
         Set<String> parts = WidgetMaker.getSupportedDevices();
         if (parts.size() < 1) {
@@ -127,9 +127,9 @@ public class DeviceBrowser extends QMainWindow{
             currPart = parts.iterator().next();
             System.out.println(defaultPart+" not available, showing "+currPart);
         }
-        
+
         device = Device.getDevice(currPart);
-        
+
         // Setup the scene and view for the GUI
         scene = new DeviceBrowserScene(device, hideTiles, drawPrimitives, this);
         view = new TileView(scene);
@@ -138,14 +138,14 @@ public class DeviceBrowser extends QMainWindow{
         // Setup some signals for when the user interacts with the view
         scene.updateStatus.connect(this, "updateStatus(String, Tile)");
         scene.updateTile.connect(this, "updateTile(Tile)");
-        
+
         // Initialize the status bar at the bottom
         statusLabel = new QLabel("Status Bar");
         statusLabel.setText("Status Bar");
         QStatusBar statusBar = new QStatusBar();
         statusBar.addWidget(statusLabel);
         setStatusBar(statusBar);
-        
+
         // Set the opening default window size to 1024x768 pixels
         resize(1024, 768);
     }
@@ -162,12 +162,12 @@ public class DeviceBrowser extends QMainWindow{
     private void initializeSideBar() {
         treeWidget = WidgetMaker.createAvailablePartTreeWidget("Select a part...");
         treeWidget.doubleClicked.connect(this,"showPart(QModelIndex)");
-        
+
         QDockWidget dockWidget = new QDockWidget(tr("Part Browser"), this);
         dockWidget.setWidget(treeWidget);
         dockWidget.setFeatures(DockWidgetFeature.DockWidgetMovable);
         addDockWidget(DockWidgetArea.LeftDockWidgetArea, dockWidget);
-        
+
         // Create the primitive site list window
         primitiveList = new QTreeWidget();
         primitiveList.setColumnCount(2);
@@ -176,12 +176,12 @@ public class DeviceBrowser extends QMainWindow{
         headerList.add("Type");
         primitiveList.setHeaderLabels(headerList);
         primitiveList.setSortingEnabled(true);
-        
+
         QDockWidget dockWidget2 = new QDockWidget(tr("Primitive List"), this);
         dockWidget2.setWidget(primitiveList);
         dockWidget2.setFeatures(DockWidgetFeature.DockWidgetMovable);
         addDockWidget(DockWidgetArea.LeftDockWidgetArea, dockWidget2);
-        
+
         // Create the wire list window
         wireList = new QTreeWidget();
         wireList.setColumnCount(2);
@@ -198,7 +198,7 @@ public class DeviceBrowser extends QMainWindow{
         // Draw wire connections when the wire name is double clicked
         wireList.doubleClicked.connect(this, "wireDoubleClicked(QModelIndex)");
     }
-    
+
     /**
      * This method will draw all of the wire connections based on the wire given.
      * @param index The index of the wire in the wire list.
@@ -213,7 +213,7 @@ public class DeviceBrowser extends QMainWindow{
             scene.drawWire(currTile, currWire, wire.getTile(), wire.getWireIndex());
         }
     }
-    
+
     /**
      * This method gets called each time a user double clicks on a tile.
      */
@@ -222,7 +222,7 @@ public class DeviceBrowser extends QMainWindow{
         updatePrimitiveList();
         updateWireList();
     }
-    
+
     /**
      * This will update the primitive list window based on the current
      * selected tile.
@@ -256,7 +256,7 @@ public class DeviceBrowser extends QMainWindow{
     }
 
     /**
-     * This method loads a new device based on the part name selected in the 
+     * This method loads a new device based on the part name selected in the
      * treeWidget.
      * @param qmIndex The index of the part to load.
      */
@@ -265,16 +265,16 @@ public class DeviceBrowser extends QMainWindow{
         if ( data != null) {
             if (currPart.equals(data))
                 return;
-            currPart = (String) data;            
+            currPart = (String) data;
             device = Device.getDevice(currPart);
             scene.setDevice(device);
             scene.initializeScene(hideTiles, drawPrimitives);
             statusLabel.setText("Loaded: "+currPart.toUpperCase());
         }
     }
-    
+
     /**
-     * This method updates the status bar each time the mouse moves from a 
+     * This method updates the status bar each time the mouse moves from a
      * different tile.
      */
     protected void updateStatus(String text, Tile tile) {

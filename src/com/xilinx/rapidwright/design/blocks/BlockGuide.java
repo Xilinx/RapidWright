@@ -1,28 +1,28 @@
 /*
- * 
- * Copyright (c) 2017-2022, Xilinx, Inc. 
+ *
+ * Copyright (c) 2017-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
  *
- * This file is part of RapidWright. 
- * 
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 /**
- * 
+ *
  */
 package com.xilinx.rapidwright.design.blocks;
 
@@ -43,7 +43,7 @@ import com.xilinx.rapidwright.device.Site;
 /**
  * An object that captures pre-implemented block creation guidance
  * from an implementation guide file.
- * 
+ *
  * Created on: Apr 25, 2017
  */
 public class BlockGuide {
@@ -61,14 +61,14 @@ public class BlockGuide {
     private List<String> xdcCommands;
     /** Cached copy of MD5 hash representing collection of settings */
     private String md5Hash;
-    
+
     public BlockGuide() {
         implementations = new ArrayList<>();
         insts = new LinkedHashMap<>();
         clocks = new LinkedHashMap<>();
         clockBuffers = new LinkedHashMap<>();
     }
-    
+
     /**
      * @return the cacheID
      */
@@ -105,67 +105,67 @@ public class BlockGuide {
     public void setInsts(TreeMap<String, BlockInst> insts) {
         this.insts = insts;
     }
-    
+
     public void addImplementation(int index, PBlock pblock) {
         implementations.add(index, pblock);
     }
-    
+
     public BlockInst getInst(String name) {
         return insts.get(name);
     }
-    
+
     /**
      * @param bi
      */
     public void addBlockInst(BlockInst bi) {
         insts.put(bi.getName(), bi);
     }
-    
+
     public void addClock(String clockName, Float constraint) {
         clocks.put(clockName, constraint);
     }
-    
+
     public void addClockBuffer(String clockName, Site clkBuffer) {
         clockBuffers.put(clockName, clkBuffer);
     }
-    
+
     public Set<String> getClocks() {
         return clocks.keySet();
     }
-    
+
     public Float getClockPeriod(String clkPortName) {
         return clocks.get(clkPortName);
     }
-    
+
     public Site getClockBuffer(String clkPortName) {
         return clockBuffers.get(clkPortName);
     }
-    
+
     public Set<String> getClocksWithBuffers() {
         return clockBuffers.keySet();
     }
-    
+
     public void addXDCCommand(String xdc) {
         if (xdcCommands == null) xdcCommands = new ArrayList<>();
         xdcCommands.add(xdc);
     }
-    
+
     public List<String> getXDCCommands() {
         if (xdcCommands == null) return Collections.emptyList();
         return xdcCommands;
     }
-    
+
     /**
-     * The MD5 hash intends to include anything that can affect any of the 
+     * The MD5 hash intends to include anything that can affect any of the
      * implementations from the Impl Guide.  Therefore, if the user changes
-     * anything about the impl guide that affects the implementation build, 
-     * it should restart.  
+     * anything about the impl guide that affects the implementation build,
+     * it should restart.
      * @return
      */
     public String getMD5Hash() {
         if (md5Hash == null) {
             MessageDigest md5 = null;
-            
+
             try {
                 md5 = MessageDigest.getInstance("MD5");
             } catch (NoSuchAlgorithmException e1) {
@@ -194,7 +194,7 @@ public class BlockGuide {
             for (String xdc : getXDCCommands()) {
                 md5.update(xdc.getBytes());
             }
-            
+
             // Convert bytes to alpha-numeric string
             byte[] b = md5.digest();
             StringBuilder result = new StringBuilder(32);

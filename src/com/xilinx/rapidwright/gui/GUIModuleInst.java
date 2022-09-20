@@ -1,25 +1,25 @@
-/* 
+/*
  * Original work: Copyright (c) 2010-2011 Brigham Young University
- * Modified work: Copyright (c) 2017-2022, Xilinx, Inc. 
+ * Modified work: Copyright (c) 2017-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
- *  
- * This file is part of RapidWright. 
- * 
+ *
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 package com.xilinx.rapidwright.gui;
 
@@ -72,7 +72,7 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
         this.hmTiles = new ArrayList<HMTile>();
         this.gutsHidden = true;
         this.isValidlyPlaced = true;
-        
+
         this.occupiedTilesX = new ArrayList<Integer>();
         this.occupiedTilesY = new ArrayList<Integer>();
         init();
@@ -178,7 +178,7 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
                     && tileY < heightInTiles) {
                 hmTileMap[tileY][tileX] = true;
             }
-            
+
             addHMTile(tile, tileX, tileY, tilesWithSLICEM.contains(tile), tile.equals(anchorTile));
         }
 
@@ -203,7 +203,7 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
         int height = hmTileMap.length;
         int width = hmTileMap[0].length;
         boolean changed;
-        do {    
+        do {
             changed = false;
             // fill in holes in tile rows
             for (int i = 0; i < height; i++) {
@@ -230,8 +230,8 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
                     }
                 }
             }
-            
-    
+
+
             // fill in holes in tile cols
             for (int j = 0; j < width; j++) {
                 int bottomI = -1;
@@ -256,9 +256,9 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
                         changed = true;
                     }
             }
-        } while (changed);        
-        
-        
+        } while (changed);
+
+
         int tileSize = scene.tileSize;
         QPolygonF hmPolygon = new QPolygonF();
         // Go down right side, adding profile points
@@ -310,7 +310,7 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
      * TODO - This method is overly optimistic and needs to be updated - 3/8/16 - CL
      */
     public void checkPlacement() {
-    
+
         HashSet<GUIModuleInst> prevCollidingGMIs = new HashSet<GUIModuleInst>();
         HashSet<GUIModuleInst> newCollidingGMIs = new HashSet<GUIModuleInst>();
         for (int i=0; i<occupiedTilesX.size(); i++) {
@@ -320,7 +320,7 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
         }
         occupiedTilesX.clear();
         occupiedTilesY.clear();
-        
+
         boolean isPlacementValid = true;
         boolean isColliding = false;
 
@@ -329,13 +329,13 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
             final Tile tile = scene.getTile(scenePos().x() + anchorOffset.x(), scenePos().y() + anchorOffset.y());
             isValidAnchor = moduleInst.getModule().getAllValidPlacements().stream().anyMatch(p->p.getTile()==tile);
         }
-        
+
         for (HMTile hmTile : this.hmTiles) {
             //Check to see if this HMTile collides with any other GMIs (other than parent)
 
 
             boolean tileColliding = false;
-            
+
             int x = (int) Math.floor(hmTile.scenePos().x()
                     / scene.tileSize);
             int y = (int) Math.floor(hmTile.scenePos().y()
@@ -350,7 +350,7 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
             //    y += 3;
             //}
             //TileTypeEnum devType = fpScene.device.getTile(y, x).getType();
-            
+
             occupiedTilesX.add(x);
             occupiedTilesY.add(y);
             HashSet<GUIModuleInst> gmiSet = scene.tileOccupantCount[y][x];
@@ -359,9 +359,9 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
             int tileOccupation = gmiSet.size();
             if (tileOccupation > 1)
                 tileColliding = true;
-            
+
             TileTypeEnum devType = scene.drawnTiles[y][x].getTileTypeEnum();
-            if (myType.equals(devType) 
+            if (myType.equals(devType)
                     || Utils.isInterConnect(myType) && Utils.isInterConnect(devType)) {
                 if (tileColliding) {
                     hmTile.setState(GUIShapeState.COLLIDING);
@@ -385,13 +385,13 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
             if (isColliding) {
                 this.setState(GUIShapeState.COLLIDING);
             } else {
-                this.setState(GUIShapeState.VALID);    
+                this.setState(GUIShapeState.VALID);
             }
         } else {
             this.setState(GUIShapeState.INVALID);
         }
-        
-        
+
+
         StackTraceElement aParentStack = new Throwable().fillInStackTrace().getStackTrace()[1];
         //This is here to prevent infinite recursion.  It makes sure
         // that checkPlacement is only called on the colliding GMIs iff
@@ -509,7 +509,7 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
         grabOffset = this.pos().subtract(event.pos());
         super.mousePressEvent(event);
     }
-    
+
     public void mouseReleaseEvent(QGraphicsSceneMouseEvent event) {
         grabbed = false;
         super.mouseReleaseEvent(event);
@@ -518,12 +518,12 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
     public ModuleInst getModuleInst() {
         return moduleInst;
     }
-    
+
     public boolean isValidlyPlaced() {
         return isValidlyPlaced;
     }
 
-    
+
     public void setAnchorOffset() {
         Site anchorInst = null;
         if (moduleInst.isPlaced()) {
@@ -541,7 +541,7 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
     public QPointF getAnchorOffset() {
         return anchorOffset;
     }
-    
+
     public HMTile getHMTile(Tile tile) {
         if (tile == null)
             return null;
@@ -551,11 +551,11 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
         }
         return null;
     }
-    
+
     public int getSizeInTiles() {
         return hmTiles.size();
     }
-    
+
     public void setState(GUIShapeState newState) {
         switch (newState) {
             case VALID:
@@ -597,14 +597,14 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
     public void setShape(QPolygonF shape) {
         this.shape = shape;
     }
-    
+
     public void addLine(GUIMultiNetLine line) {
         if (myLines == null) {
             myLines = new ArrayList<GUIMultiNetLine>();
         }
         myLines.add(line);
     }
-    
+
     public void showMyLines() {
         if (myLines != null) {
             for (GUIMultiNetLine line : myLines) {
@@ -612,7 +612,7 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
             }
         }
     }
-    
+
     public void hideMyLines() {
         if (myLines != null) {
             for (GUIMultiNetLine line : myLines) {

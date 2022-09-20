@@ -1,28 +1,28 @@
 /*
- * 
- * Copyright (c) 2017-2022, Xilinx, Inc. 
+ *
+ * Copyright (c) 2017-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
  *
- * This file is part of RapidWright. 
- * 
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 /**
- * 
+ *
  */
 package com.xilinx.rapidwright.util;
 
@@ -61,7 +61,7 @@ import java.util.zip.ZipInputStream;
 
 /**
  * Installer for RapidWright for development setup.
- * 
+ *
  * Created on: Sep 1, 2017
  */
 public class Installer {
@@ -74,7 +74,7 @@ public class Installer {
     private static String rwPathVarName = "RAPIDWRIGHT_PATH";
     private static String classpathVarName = "CLASSPATH";
     public static String MD5_FILE_NAME = "MD5SUM.TXT";
-    
+
     /**
      * Convert bytes of an MD5 checksum into common alpha-numeric String representation.
      * @param checksum The digested result from an MD5 instance.
@@ -85,9 +85,9 @@ public class Installer {
         for (int i=0; i < checksum.length; i++) {
             result.append(Integer.toString( ( checksum[i] & 0xff ) + 0x100, 16).substring( 1 ));
         }
-        return result.toString();        
+        return result.toString();
     }
-    
+
     /**
      * Performs an MD5 checksum on the provided file and returns the result.
      * @param fileName Name of the file on which to perform the checksum
@@ -133,8 +133,8 @@ public class Installer {
 
     /**
      * Validates an already downloaded RapidWright release file using the MD5 hash
-     * @param releaseDir The URL of the release directory 
-     * @param downloadedFileName The name of the local file 
+     * @param releaseDir The URL of the release directory
+     * @param downloadedFileName The name of the local file
      * @return True if the file is correct, false otherwise
      */
     public static boolean validateMD5OfDownloadedFile(String releaseDir, String downloadedFileName) {
@@ -143,11 +143,11 @@ public class Installer {
         boolean matches = md5sum.equals(calcMD5Sum);
         if (!matches) {
             System.out.println(downloadedFileName + " md5sum is invalid: " +
-                    calcMD5Sum + ", should be: " + md5sum);            
+                    calcMD5Sum + ", should be: " + md5sum);
         }
         return matches;
     }
-    
+
     /**
      * Downloads a file specified by the URL to the local file dstFileName.
      * @param url The target URL to download
@@ -162,29 +162,29 @@ public class Installer {
                 parentDir.mkdirs();
             } else if (!parentDir.isDirectory()) {
                 throw new RuntimeException("ERROR: Existing file conflicts with RapidWright "
-                        + "directory structure: " + parentDir.getAbsolutePath() 
+                        + "directory structure: " + parentDir.getAbsolutePath()
                         + " please relocate or remove file and try again.");
-            }            
+            }
         }
 
         long transferred = -1;
-         
+
         try (FileOutputStream fos = new FileOutputStream(newFile);
             ReadableByteChannel rbc = Channels.newChannel(new URL(url).openStream()) ) {
             transferred = fos.getChannel().transferFrom(rbc, 0, Long.MAX_VALUE);
         } catch (MalformedURLException e) {
-            throw new RuntimeException("ERROR: Couldn't download file from url: " 
+            throw new RuntimeException("ERROR: Couldn't download file from url: "
                     + url + ", URL is not valid.");
         } catch (FileNotFoundException e) {
-            throw new UncheckedIOException("ERROR: Problem creating local file: " + dstFileName 
+            throw new UncheckedIOException("ERROR: Problem creating local file: " + dstFileName
                 + ", please check permissions and/or that adequate disk space is available.", e);
         } catch (IOException e) {
-            throw new UncheckedIOException("ERROR: Problem downloading file: " + dstFileName 
+            throw new UncheckedIOException("ERROR: Problem downloading file: " + dstFileName
                     + ", ensure a stable Internet connection.", e);
         }
         return transferred;
     }
-    
+
     /**
      * Unzips a file into a specified directory
      * @param zipFile Name of the zip file to unzip
@@ -194,7 +194,7 @@ public class Installer {
         File dir = new File(destDir);
         // create output directory if it doesn't exist
         if (!dir.exists()) dir.mkdirs();
-        
+
         //buffer for read and write data to file
         byte[] buffer = new byte[1024];
         try (ZipInputStream zis = new ZipInputStream(new FileInputStream(zipFile))) {
@@ -206,7 +206,7 @@ public class Installer {
                     throw new RuntimeException("Bad zip entry");
                 }
                 System.out.println("Unzipping to "+newFile.getAbsolutePath());
-                
+
                 if (ze.isDirectory()) {
                     newFile.mkdirs();
                 } else {
@@ -226,7 +226,7 @@ public class Installer {
             e.printStackTrace();
         }
     }
-    
+
     public static Integer runCommand(List<String> command) {
         if (verbose) System.out.println("External Command: " + command);
         ProcessBuilder pb = new ProcessBuilder(command);
@@ -245,14 +245,14 @@ public class Installer {
         }
         return returnVal;
     }
-    
+
     public static boolean isWindows() {
         return System.getProperty("os.name").startsWith("Windows");
     }
-    
+
     /**
      * Identifies all necessary jar files in /jars directory and creates a CLASSPATH string.
-     * @return The dependent jar files 
+     * @return The dependent jar files
      */
     public static String getJarsClasspath() {
         String cwd = System.getProperty("user.dir");
@@ -272,9 +272,9 @@ public class Installer {
         }
         return sb.toString();
     }
-    
+
     /**
-     * Gets all Java (.java) source files recursively under the 
+     * Gets all Java (.java) source files recursively under the
      * provided directory
      * @param dir The directory to look under for Java source files
      * @return A list of all Java source files with absolute path names.
@@ -282,19 +282,19 @@ public class Installer {
     public static List<String> getAllJavaSources(String dir) {
         Path root = FileSystems.getDefault().getPath(dir);
         List<String> javaSrcs = null;
-        
+
         try (final Stream<Path> walk = Files.walk(root)) {
             javaSrcs = walk
                     .filter(foundPath -> foundPath.toString().endsWith(".java"))
                     .map(javaPath -> javaPath.toAbsolutePath().toString())
-                    .collect(Collectors.toList());            
+                    .collect(Collectors.toList());
         } catch (IOException e) {
             e.printStackTrace();
         }
-        
+
         return javaSrcs;
     }
-    
+
     public static String getExpectedMD5(String releaseName, String fileName) {
         long downloaded = downloadFile(releaseName+"/"+MD5_FILE_NAME, MD5_FILE_NAME);
         if (downloaded < 1) {
@@ -304,7 +304,7 @@ public class Installer {
         String md5sum = null;
         try {
             for (String line : Files.readAllLines(Paths.get(MD5_FILE_NAME), Charset.forName("US-ASCII"))) {
-                String[] parts = line.split("\\s+"); 
+                String[] parts = line.split("\\s+");
                 if (parts[1].trim().equals(fileName)) {
                     md5sum = parts[0].trim();
                     break;
@@ -315,7 +315,7 @@ public class Installer {
         }
         return md5sum;
     }
-    
+
     public static void updateJars() {
         URL url = null;
         try {
@@ -341,7 +341,7 @@ public class Installer {
         }
         String localFile = jarsZipUrl.substring(jarsZipUrl.lastIndexOf('/')+1);
         downloadFile(jarsZipUrl, localFile);
-        String releaseDirUrl = jarsZipUrl.replace("/"+localFile, ""); 
+        String releaseDirUrl = jarsZipUrl.replace("/"+localFile, "");
         if (!validateMD5OfDownloadedFile(releaseDirUrl, localFile)) {
             throw new RuntimeException("ERROR: Download of " + JARS_ZIP + " was corrupted, "
                     + "please try again.");
@@ -355,22 +355,22 @@ public class Installer {
                 throw new UncheckedIOException("ERROR: Failed to delete 'jars' directory", e);
             }
         }
-        
+
         unzipFile(localFile, System.getProperty("user.dir"));
         if (!KEEP_ZIP_FILES) {
             System.out.print("Cleaning up files ...");
             boolean success = new File(JARS_ZIP).delete();
             success &= new File(MD5_FILE_NAME).delete();
             if (success) System.out.println("Done.");
-            else System.out.println("Problem cleaning up files.");         
+            else System.out.println("Problem cleaning up files.");
         }
     }
-    
+
     public static final String REPO = "https://github.com/Xilinx/RapidWright.git";
     public static final String RELEASE = "https://github.com/Xilinx/RapidWright/releases/latest/download";
     public static final String DATA_ZIP = "rapidwright_data.zip";
     public static final String JARS_ZIP = "rapidwright_jars.zip";
-       
+
     public static void main(String[] args) throws IOException {
         for (String arg : args) {
             if (arg.equals("-v") || arg.equals("--verbose")) {
@@ -398,24 +398,24 @@ public class Installer {
                                  + "  -s, --skip-zip-download : Uses local copies of the data and jar zip  in the\n"
                                  + "                            same directory instead of downloading them.\n"
                                  + "  -t, --skip-test         : Skips the attempt to test RapidWright by opening\n"
-                                 + "                            the DeviceBrowser (scripted installs).\n" 
+                                 + "                            the DeviceBrowser (scripted installs).\n"
                                  + "  -u, --update-jars       : (Existing installs only) Gets the latest set of \n"
                                  + "                            RapidWright jar dependencies from GitHub.\n"
                                  + "  -h, --help              : Prints this help message.");
                 return;
             }
         }
-        
+
         System.out.println("================================================================================");
         System.out.println(" Setting up RapidWright ...");
         System.out.println("================================================================================");
 
-        
+
         String value = System.getenv("HTTPS_PROXY");
         if (value != null && !value.isEmpty()) {
             int idx = value.lastIndexOf(':');
             String host = value.substring(0, idx).replace("http://", "").replace("https://", "");
-            
+
             // If host name is not an ip address, get the IP address
             boolean isIP4 = host.matches("^.[0-9]{1,3}/..[0-9]{1,3}/..[0-9]{1,3}/..[0-9]{1,3}");
             if (!isIP4) {
@@ -439,12 +439,12 @@ public class Installer {
                             +value +", please use syntax: 'proxyname.com:8080'");
                 System.exit(1);
             }
-            System.setProperty("https.proxyHost",host);            
+            System.setProperty("https.proxyHost",host);
             System.setProperty("https.proxyPort",port);
-            System.setProperty("https.proxySet","true");            
+            System.setProperty("https.proxySet","true");
             System.out.println("  Using proxy settings from HTTPS_PROXY="+value+", host=" + host + ", port=" + port);
         }
-        
+
         boolean missingDep = false;
         Integer returnVal = runCommand(Arrays.asList("git","--version"));
         if (returnVal != 0) {
@@ -474,8 +474,8 @@ public class Installer {
             System.out.println("Missing pre-requisite(s), please address issues above to continue install.");
             return;
         }
-        
-        
+
+
         System.out.println("================================================================================");
         System.out.println("  1. Checking out code from "+REPO+" ...");
         System.out.println("================================================================================");
@@ -489,12 +489,12 @@ public class Installer {
                              + "      variables HTTP_PROXY and HTTPS_PROXY to your proxy server");
             System.exit(1);
         }
-        
+
         System.out.println("================================================================================");
         System.out.println("  2. Download and unzip "+DATA_ZIP+" and "+JARS_ZIP+"");
         System.out.println("================================================================================");
         System.out.println("  Please be patient, download may take several minutes...");
-        
+
         for (String name : new String[]{DATA_ZIP,JARS_ZIP}) {
             boolean alreadyDownloaded = false;
             if (new File(name).exists()) {
@@ -515,7 +515,7 @@ public class Installer {
                 String url = RELEASE+"/"+name;
                 System.out.println("Downloading " + url + " ...");
                 long size = downloadFile(url, name);
-                if (size == 0) {                
+                if (size == 0) {
                     System.err.println("ERROR: Problem downloading file:" + name);
                     System.err.println("  You may have a connectivity problem, or you are using a proxy. \n "
                                      + "  Try setting the environment variable HTTPS_PROXY=<proxyhost>:<proxyport>\n"
@@ -526,18 +526,18 @@ public class Installer {
                 String md5sum = getExpectedMD5(RELEASE, name);
                 String calcMD5Sum = calculateMD5OfFile(name);
                 if (!md5sum.equals(calcMD5Sum)) {
-                    System.err.println("ERROR: md5sum of " + name + " invalid: " 
+                    System.err.println("ERROR: md5sum of " + name + " invalid: "
                             + calcMD5Sum + ", should be: " + md5sum);
                     System.err.println("Possible download failure. Please try again, or try "
                             + "downloading separately with \n\t'wget " + url +"'");
                     return;
                 }
-                
+
             }
             System.out.println("Unzipping " + name + " ...");
             unzipFile(name, "RapidWright");
         }
-        
+
         System.out.println("================================================================================");
         System.out.println("  3. Compile all Java source code ...");
         System.out.println("================================================================================");
@@ -554,7 +554,7 @@ public class Installer {
             System.err.println("ERROR: Problem compiling java code. See output above for cause.");
             System.exit(1);
         }
-        
+
         String classpath = binDir+File.pathSeparator + jarsClassPath;
         if (SKIP_TEST) {
             System.out.println("Skipping DeviceBrowser test...");
@@ -569,35 +569,35 @@ public class Installer {
             if (existingPath != null && !existingPath.isEmpty()) {
                 System.out.println("  NOTE: You already have the " + rwPathVarName + " set, be sure to update it. ");
             }
-            
+
             returnVal = runCommand(cmd);
             if (returnVal != 0) {
                 System.err.println("  ERROR: Looks like the DeviceBrowser did not run or crashed. Please examine\n"
                         + "  the output for clues as to what went wrong.  If you are stumped, please request help\n"
                         + "  on the RapidWright GitHub Discussions: https://github.com/Xilinx/RapidWright/discussions.");
                 if (!isWindows()) {
-                    System.err.println("\n*** If you are running Linux ***"); 
+                    System.err.println("\n*** If you are running Linux ***");
                     System.err.println("If you are running Linux, a common problem is to be missing libpng12.so.0.\n" +
-                                       "If you are running a CentOS/RedHat/Fedora distro, try the following:\n" + 
-                                       "    sudo yum install libpng12\n\n" + 
-                                       "If you are running a Debian/Ubuntu distro, try the following:\n" + 
+                                       "If you are running a CentOS/RedHat/Fedora distro, try the following:\n" +
+                                       "    sudo yum install libpng12\n\n" +
+                                       "If you are running a Debian/Ubuntu distro, try the following:\n" +
                                        "    wget -q -O /tmp/libpng12.deb https://snapshot.debian.org/archive/debian/20160413T160058Z/pool/main/libp/libpng/libpng12-0_1.2.54-6_amd64.deb && sudo dpkg -i /tmp/libpng12.deb && rm /tmp/libpng12.deb");
                 }
                 System.exit(1);
-            }        
+            }
         }
-        
+
         System.out.println("================================================================================");
         System.out.println("  Install Finished!");
         System.out.println("================================================================================");
         System.out.println("  To run RapidWright, just set these two environment variables:\n");
         System.out.println("  "+rwPathVarName+" = "+rwDir);
         System.out.println("  "+classpathVarName+" = "+classpath+"\n");
-        
+
         // BASH
         ArrayList<String> lines = new ArrayList<>();
         String bash = "rapidwright.sh";
-        lines.add("export " + rwPathVarName +"=" + rwDir);    
+        lines.add("export " + rwPathVarName +"=" + rwDir);
         lines.add("if [ -n \"${"+classpathVarName+"}\" ]; then");
         lines.add("  export " + classpathVarName +"=" + classpath);
         lines.add("else");
@@ -605,11 +605,11 @@ public class Installer {
         lines.add("fi");
         Files.write(Paths.get(bash), lines);
         new File(bash).setExecutable(true);
-        
+
         // CSH
         lines = new ArrayList<>();
         String csh = "rapidwright.csh";
-        lines.add("setenv " + rwPathVarName + " " + rwDir);        
+        lines.add("setenv " + rwPathVarName + " " + rwDir);
         lines.add("if $?"+classpathVarName+" then");
         lines.add("  setenv "+classpathVarName+" "+classpath+":$" + classpathVarName);
         lines.add("else");
@@ -617,21 +617,21 @@ public class Installer {
         lines.add("endif");
         Files.write(Paths.get(csh), lines);
         new File(csh).setExecutable(true);
-        
+
         // BAT
         lines = new ArrayList<>();
         String bat = "rapidwright.bat";
-        lines.add("SETX " + rwPathVarName + " \"" + rwDir + "\"");        
+        lines.add("SETX " + rwPathVarName + " \"" + rwDir + "\"");
         lines.add("SETX "+classpathVarName+" "+classpath+";%" + classpathVarName + "%");
         Files.write(Paths.get(bat), lines);
         new File(bat).setExecutable(true);
-        
+
         System.out.println("  As a convenience, here are some scripts that can be sourced/run to set those");
         System.out.println("  variables in various shells:");
         System.out.println("    BASH (Linux): "+bash);
         System.out.println("    CSH (Linux): "+csh);
         System.out.println("    BAT (Windows): "+bat + "\n");
-        
+
         String cwd = System.getProperty("user.dir") + File.separator;
         if (returnVal == 0 && (!SKIP_ZIP_DOWNLOAD && !KEEP_ZIP_FILES)) {
             System.out.print("Cleaning up zip files ...");
@@ -639,7 +639,7 @@ public class Installer {
             success &= new File(cwd + JARS_ZIP).delete();
             success &= new File(cwd + MD5_FILE_NAME).delete();
             if (success) System.out.println("Done.");
-            else System.out.println("Problem deleting zip files.");            
+            else System.out.println("Problem deleting zip files.");
         }
     }
 }

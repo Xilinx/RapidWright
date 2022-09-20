@@ -1,26 +1,26 @@
-/* 
- * Copyright (c) 2020-2022, Xilinx, Inc. 
+/*
+ * Copyright (c) 2020-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
- *  
- * This file is part of RapidWright. 
- * 
+ *
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
- 
+
 package com.xilinx.rapidwright.interchange;
 
 import java.io.IOException;
@@ -139,7 +139,7 @@ public class DeviceResourcesWriter {
         allSiteTypes = new Enumerator<>();
 
         HashMap<SiteTypeEnum,Site> allAltSiteTypeEnums = new HashMap<>();
-        
+
         tileTypes = new HashMap<>();
         siteTypes = new HashMap<>();
         for (Tile tile : device.getAllTiles()) {
@@ -164,14 +164,14 @@ public class DeviceResourcesWriter {
                     populateSiteEnumerations(altSiteInst, site);
                     design.removeSiteInst(altSiteInst);
                     if (!allAltSiteTypeEnums.containsKey(altSiteTypes[i])) {
-                        allAltSiteTypeEnums.put(altSiteTypes[i], site);                        
+                        allAltSiteTypeEnums.put(altSiteTypes[i], site);
                     }
                 }
             }
 
         }
-        Map<String, Pair<String, EnumSet<IOStandard>>> macroExpandExceptionMap = 
-                EDIFNetlist.macroExpandExceptionMap.getOrDefault(device.getSeries(), Collections.emptyMap()); 
+        Map<String, Pair<String, EnumSet<IOStandard>>> macroExpandExceptionMap =
+                EDIFNetlist.macroExpandExceptionMap.getOrDefault(device.getSeries(), Collections.emptyMap());
         for (Entry<String,Pair<String, EnumSet<IOStandard>>> e : macroExpandExceptionMap.entrySet()) {
             allStrings.addObject(e.getKey());
             allStrings.addObject(e.getValue().getFirst());
@@ -179,7 +179,7 @@ public class DeviceResourcesWriter {
                 allStrings.addObject(ioStd.name());
             }
         }
-        
+
         for (Entry<SiteTypeEnum, Site> altSiteType : allAltSiteTypeEnums.entrySet()) {
             if (!siteTypes.containsKey(altSiteType.getKey())) {
                 siteTypes.put(altSiteType.getKey(), altSiteType.getValue());
@@ -247,7 +247,7 @@ public class DeviceResourcesWriter {
 
 
     private static boolean containsUnusedMacros(EDIFCell cell, Set<EDIFCell> unusedMacros) {
-        Queue<EDIFCell> q = new LinkedList<>(); 
+        Queue<EDIFCell> q = new LinkedList<>();
         Set<EDIFCell> visited = new HashSet<>();
         q.add(cell);
         while (!q.isEmpty()) {
@@ -265,7 +265,7 @@ public class DeviceResourcesWriter {
         }
         return false;
     }
-    
+
     public static void writeDeviceResourcesFile(String part, Device device, CodePerfTracker t,
                                                                 String fileName) throws IOException {
         Design design = new Design();
@@ -338,7 +338,7 @@ public class DeviceResourcesWriter {
             }
         }
 
-        Map<String, Pair<String, EnumSet<IOStandard>>> macroCollapseExceptionMap = 
+        Map<String, Pair<String, EnumSet<IOStandard>>> macroCollapseExceptionMap =
                 EDIFNetlist.macroCollapseExceptionMap.getOrDefault(series, Collections.emptyMap());
         List<Unisim> unisims = new ArrayList<Unisim>();
         for (EDIFCell cell : macros.getCells()) {
@@ -404,7 +404,7 @@ public class DeviceResourcesWriter {
         writeCellParameterDefinitions(series, netlist, devBuilder.getParameterDefs());
 
         // Write macro exception map
-        Map<String, Pair<String, EnumSet<IOStandard>>> expandMap = 
+        Map<String, Pair<String, EnumSet<IOStandard>>> expandMap =
                 EDIFNetlist.macroExpandExceptionMap.getOrDefault(series, Collections.emptyMap());
         Map<String, MacroParamRule[]> paramRules = MacroParamMappingRules.macroRules.get(series);
         Set<String> exceptionMacros = new TreeSet<>(expandMap.keySet());
@@ -418,7 +418,7 @@ public class DeviceResourcesWriter {
             PrimToMacroExpansion.Builder entryBuilder = exceptionMap.get(i);
             entryBuilder.setPrimName(allStrings.getIndex(macroName));
             entryBuilder.setMacroName(allStrings.getIndex(macroName));
-            
+
             // Check if this macro has an expansion exception
             if (expandMap.containsKey(macroName)) {
                 Pair<String, EnumSet<IOStandard>> expandException = expandMap.get(macroName);
@@ -432,13 +432,13 @@ public class DeviceResourcesWriter {
                     ioStdEntry.setKey(ioStdPropIdx);
                     ioStdEntry.setTextValue(allStrings.getIndex(ioStd.name()));
                     j++;
-                }                
+                }
             }
-            
+
             // Check if this macro has a parameter propagation rule set
             if (paramRules.containsKey(macroName)) {
                 MacroParamRule[] rules = paramRules.get(macroName);
-                StructList.Builder<ParameterMapRule.Builder> parameterMap = 
+                StructList.Builder<ParameterMapRule.Builder> parameterMap =
                         entryBuilder.initParamMapping(rules.length);
                 int j=0;
                 for (MacroParamRule rule : rules) {
@@ -447,7 +447,7 @@ public class DeviceResourcesWriter {
                     ruleBuilder.setInstName(allStrings.getIndex(rule.getInstName()));
                     ruleBuilder.setInstParam(allStrings.getIndex(rule.getInstParam()));
                     if (rule.getBitSlice() != null) {
-                        PrimitiveList.Int.Builder bitsBuilder = 
+                        PrimitiveList.Int.Builder bitsBuilder =
                                 ruleBuilder.initBitSlice(rule.getBitSlice().length);
                         for (int k = 0; k < rule.getBitSlice().length; k++) {
                             bitsBuilder.set(k, rule.getBitSlice()[k]);
@@ -743,7 +743,7 @@ public class DeviceResourcesWriter {
                     PseudoPIPHelper pseudoPIPHelper = PseudoPIPHelper.getPseudoPIPHelper(pip);
                     List<BELPin> belPins = pseudoPIPHelper.getUsedBELPins();
                     if (belPins == null || belPins.size() < 1) continue;
-                    
+
                     HashMap<BEL,ArrayList<BELPin>> pins = new HashMap<BEL, ArrayList<BELPin>>();
                     for (BELPin pin : belPins) {
                         ArrayList<BELPin> currBELPins = pins.get(pin.getBEL());
@@ -899,7 +899,7 @@ public class DeviceResourcesWriter {
         }
     }
     public static void writeWireTypes(Enumerator<String> allStrings, DeviceResources.Device.Builder devBuilder) {
-        StructList.Builder<DeviceResources.Device.WireType.Builder> wireTypesObj = 
+        StructList.Builder<DeviceResources.Device.WireType.Builder> wireTypesObj =
                 devBuilder.initWireTypes(IntentCode.values.length);
         for (IntentCode intent : IntentCode.values) {
             DeviceResources.Device.WireType.Builder wireType = wireTypesObj.get(intent.ordinal());

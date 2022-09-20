@@ -1,28 +1,28 @@
 /*
- * 
- * Copyright (c) 2017-2022, Xilinx, Inc. 
+ *
+ * Copyright (c) 2017-2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
  *
- * This file is part of RapidWright. 
- * 
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 /**
- * 
+ *
  */
 package com.xilinx.rapidwright.design;
 
@@ -33,30 +33,30 @@ package com.xilinx.rapidwright.design;
 public class PinSwap {
 
     private Cell cell;
-    
-    private Cell companionCell; 
-    
+
+    private Cell companionCell;
+
     private String companionLogicalName;
-    
+
     private String logicalName;
-    
+
     private String oldPhysicalName;
-    
+
     private String newPhysicalName;
-    
+
     private String depopulatedLogicalName;
 
     private String newNetPinName;
 
     /**
      * PinSwap constructor
-     * 
+     *
      * @param c The cell where the pin resides
      * @param logicalName The logical name of the pin
      * @param oldPhysicalName The previous physical pin mapping
      * @param newPhysicalName The new physical pin mapping
      * @param depopulatedLogicalName The previous logical pin name that occupied the new physical pin
-     * @param newNetPinName The new SitePinInst name 
+     * @param newNetPinName The new SitePinInst name
      */
     public PinSwap(Cell c, String logicalName, String oldPhysicalName, String newPhysicalName, String depopulatedLogicalName,
             String newNetPinName) {
@@ -126,7 +126,7 @@ public class PinSwap {
     }
 
     /**
-     * This gets the previous logical pin mapping of the new physical pin name being moved. 
+     * This gets the previous logical pin mapping of the new physical pin name being moved.
      * @return the depopulatedLogicalName
      */
     public String getDepopulatedLogicalName() {
@@ -153,11 +153,11 @@ public class PinSwap {
     public Cell getCompanionCell() {
         return companionCell;
     }
-    
+
     /**
      * If this pin swap does not directly involve two cells, it may
      * involve another indirectly.  If this pin swap is a LUT6 it will
-     * check for a LUT5 and vice versa.  
+     * check for a LUT5 and vice versa.
      * @return Cell in the overlapping LUT BEL site.
      */
     public Cell checkForCompanionCell() {
@@ -177,7 +177,7 @@ public class PinSwap {
     public String getCompanionLogicalName() {
         return this.companionLogicalName;
     }
-    
+
     /* (non-Javadoc)
      * @see java.lang.Object#hashCode()
      */
@@ -220,8 +220,8 @@ public class PinSwap {
             return false;
         return true;
     }
-    
+
     public String toString() {
-        return cell.getBELName().charAt(1) + "LUT/" + logicalName + ":" + oldPhysicalName +"->" + newPhysicalName; 
+        return cell.getBELName().charAt(1) + "LUT/" + logicalName + ":" + oldPhysicalName +"->" + newPhysicalName;
     }
 }
