@@ -96,7 +96,7 @@ public class ImplGuide {
         PBlock currImpl = null;
         int implCount = 0;
         int instCount = 0;
-        outer: for(String line : FileTools.getLinesFromTextFile(fileName)) {
+        outer: for (String line : FileTools.getLinesFromTextFile(fileName)) {
             lineNumber++;
             line = line.trim();
             if (line.isEmpty()) continue;
@@ -130,7 +130,7 @@ public class ImplGuide {
                     
                     StringBuilder sb = new StringBuilder(checkPblockValid(ig, lineNumber, tokens[3+tokenIdx]));
                     
-                    for(int i=4+tokenIdx; i < tokens.length; i++) {
+                    for (int i=4+tokenIdx; i < tokens.length; i++) {
                         sb.append(" ");
                         sb.append(checkPblockValid(ig, lineNumber, tokens[i]));
                     }
@@ -142,12 +142,12 @@ public class ImplGuide {
                     int index = Integer.parseInt(tokens[1]);
                     String getCellsParam = line.substring(line.indexOf('\'')+1, line.lastIndexOf('\''));
                     int lastTokenWithQuote = 0;
-                    for(int i=0; i < tokens.length; i++) {
+                    for (int i=0; i < tokens.length; i++) {
                         if (tokens[i].indexOf('\'') != -1) lastTokenWithQuote = i;
                     }
                     lastTokenWithQuote++;
                     StringBuilder sb = new StringBuilder(checkPblockValid(ig, lineNumber, tokens[lastTokenWithQuote]));
-                    for(int i=lastTokenWithQuote+1; i < tokens.length; i++) {
+                    for (int i=lastTokenWithQuote+1; i < tokens.length; i++) {
                         sb.append(" ");
                         sb.append(checkPblockValid(ig, lineNumber, tokens[i]));
                     }
@@ -225,14 +225,14 @@ public class ImplGuide {
         try {
             BufferedWriter bw = new BufferedWriter(new FileWriter(fileName));
             bw.write(PART + " " + getPart().toString() + nl);
-            for(BlockGuide b : getBlocks()) {
+            for (BlockGuide b : getBlocks()) {
                 bw.write(BLOCK + " " + b.getCacheID() + " " + b.getImplementations().size() + " " + b.getInsts().size() + nl);
                 int i = 0;
-                for(PBlock pb : b.getImplementations()) {
+                for (PBlock pb : b.getImplementations()) {
                     bw.write(indent + IMPL + " " + i +  " "+ pb.toString() + nl);
                     i++;
                 } 
-                for(BlockInst bi : b.getInsts()) {
+                for (BlockInst bi : b.getInsts()) {
                     bw.write(indent + INST + " " + bi.getName());
                     if (bi.getImplIndex() != null) {
                         bw.write(" " + bi.getImplIndex()); 
@@ -242,7 +242,7 @@ public class ImplGuide {
                     }
                     bw.write(nl);
                 }
-                for(String clock : b.getClocks()) {
+                for (String clock : b.getClocks()) {
                     bw.write(indent + CLOCK + " " + clock);
                     float f = b.getClockPeriod(clock);
                     bw.write(" " + f);
@@ -336,14 +336,14 @@ public class ImplGuide {
     
     public void removeBlocksWithoutPBlocks() {
         ArrayList<BlockGuide> toRemove = new ArrayList<>();
-        for(BlockGuide bg : getBlocks()) {
+        for (BlockGuide bg : getBlocks()) {
             boolean isNull = false; 
-            for(PBlock pb : bg.getImplementations()) {
+            for (PBlock pb : bg.getImplementations()) {
                 if (pb == null) isNull = true;
             }
             if (isNull) toRemove.add(bg);
         }
-        for(BlockGuide bg : toRemove) {
+        for (BlockGuide bg : toRemove) {
             removeBlock(bg.getCacheID());
         }
     }

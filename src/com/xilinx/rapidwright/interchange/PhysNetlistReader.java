@@ -124,7 +124,7 @@ public class PhysNetlistReader {
         Enumerator<String> allStrings = new Enumerator<>();
         TextList.Reader strListReader = physNetlist.getStrList();
         int strCount = strListReader.size();
-        for(int i=0; i < strCount; i++) {
+        for (int i=0; i < strCount; i++) {
             String str = strListReader.get(i).toString();
             allStrings.addObject(str);
         }
@@ -142,7 +142,7 @@ public class PhysNetlistReader {
                     + "will attempt to infer the proper SiteInst, however, it is recommended that " 
                     + "SiteInst information be specified to avoid SiteTypeEnum mismatch problems.");
         }
-        for(int i=0; i < siteInstCount; i++) {
+        for (int i=0; i < siteInstCount; i++) {
             SiteInstance.Reader si = siteInsts.get(i);
             String siteName = strings.get(si.getSite());
             SiteTypeEnum type = SiteTypeEnum.valueOf(strings.get(si.getType()));
@@ -155,7 +155,7 @@ public class PhysNetlistReader {
         HashMap<String, PhysCellType> physCells = new HashMap<>();
         StructList.Reader<PhysCell.Reader> physCellReaders = physNetlist.getPhysCells();
         int physCellCount = physCellReaders.size();
-        for(int i=0; i < physCellCount; i++) {
+        for (int i=0; i < physCellCount; i++) {
             PhysCell.Reader reader = physCellReaders.get(i);
             physCells.put(strings.get(reader.getCellName()), reader.getPhysType());
         }
@@ -167,7 +167,7 @@ public class PhysNetlistReader {
         EDIFNetlist netlist = design.getNetlist();
         EDIFLibrary macroPrims = Design.getMacroPrimitives(device.getSeries());
         Map<String, List<String>> macroLeafChildren = new HashMap<>();
-        for(int i=0; i < placementCount; i++) {
+        for (int i=0; i < placementCount; i++) {
             CellPlacement.Reader placement = placements.get(i);
             String cellName = strings.get(placement.getCellName());
             EDIFCellInst cellInst = null;
@@ -245,7 +245,7 @@ public class PhysNetlistReader {
                 PrimitiveList.Int.Reader otherBELs = placement.getOtherBels();
                 int otherBELCount = otherBELs.size();
                 if (otherBELCount > 0) otherBELLocs = new HashSet<String>();
-                for(int j=0; j < otherBELCount; j++) {
+                for (int j=0; j < otherBELCount; j++) {
                     String belLoc = strings.get(otherBELs.get(j));
                     otherBELLocs.add(belLoc);
                 }
@@ -254,7 +254,7 @@ public class PhysNetlistReader {
             PhysNet.Reader nullNet = physNetlist.getNullNet();
             StructList.Reader<RouteBranch.Reader> stubs = nullNet.getStubs();
             int stubCount = stubs.size();
-            for(int k=0; k < stubCount; k++) {
+            for (int k=0; k < stubCount; k++) {
                 RouteSegment.Reader segment = stubs.get(k).getRouteSegment();
                 PhysSitePIP.Reader spReader = segment.getSitePIP();
                 SiteInst sitePIPSiteInst = getSiteInst(spReader.getSite(), design, strings);
@@ -265,7 +265,7 @@ public class PhysNetlistReader {
 
             StructList.Reader<PinMapping.Reader> pinMap = placement.getPinMap();
             int pinMapCount = pinMap.size();
-            for(int j=0; j < pinMapCount; j++) {
+            for (int j=0; j < pinMapCount; j++) {
                 PinMapping.Reader pinMapping = pinMap.get(j);
                 belName = strings.get(pinMapping.getBel());
                 String belPinName = strings.get(pinMapping.getBelPin());
@@ -314,7 +314,7 @@ public class PhysNetlistReader {
 
         // Validate macro primitives are placed fully
         HashSet<String> checked = new HashSet<>();
-        for(Cell c : design.getCells()) {
+        for (Cell c : design.getCells()) {
             EDIFCell cellType = c.getParentCell();
             if (cellType != null && macroPrims.containsCell(cellType)) {
                 String parentHierName = c.getParentHierarchicalInstName();
@@ -325,8 +325,8 @@ public class PhysNetlistReader {
                     childrenNames = EDIFTools.getMacroLeafCellNames(cellType);
                     macroLeafChildren.put(cellType.getName(), childrenNames);
                 }
-                //for(EDIFCellInst inst : cellType.getCellInsts()) { // TODO - Fix up loop list
-                for(String childName : childrenNames) {
+                //for (EDIFCellInst inst : cellType.getCellInsts()) { // TODO - Fix up loop list
+                for (String childName : childrenNames) {
                     String childCellName = parentHierName + EDIFTools.EDIF_HIER_SEP + childName;
                     Cell child = design.getCell(childCellName);
                     if (child == null) {
@@ -370,7 +370,7 @@ public class PhysNetlistReader {
         StructList.Reader<PhysNet.Reader> nets = physNetlist.getPhysNets();
         EDIFNetlist netlist = design.getNetlist();
         int netCount = nets.size();
-        for(int i=0; i < netCount; i++) {
+        for (int i=0; i < netCount; i++) {
             PhysNet.Reader netReader = nets.get(i);
             String netName = strings.get(netReader.getName());
             EDIFHierNet edifNet = netlist.getHierNetFromName(netName);
@@ -381,14 +381,14 @@ public class PhysNetlistReader {
             // Sources
             StructList.Reader<RouteBranch.Reader> routeSrcs = netReader.getSources();
             int routeSrcsCount = routeSrcs.size();
-            for(int j=0; j < routeSrcsCount; j++) {
+            for (int j=0; j < routeSrcsCount; j++) {
                 RouteBranch.Reader branchReader = routeSrcs.get(j);
                 readRouteBranch(branchReader, net, design, strings, null);
             }
             // Stubs
             StructList.Reader<RouteBranch.Reader> routeStubs = netReader.getStubs();
             int routeStubsCount = routeStubs.size();
-            for(int j=0; j < routeStubsCount; j++) {
+            for (int j=0; j < routeStubsCount; j++) {
                 RouteBranch.Reader branchReader = routeStubs.get(j);
                 readRouteBranch(branchReader, net, design, strings, null);
             }
@@ -397,7 +397,7 @@ public class PhysNetlistReader {
             StructList.Reader<PhysNode.Reader> stubNodes = netReader.getStubNodes();
             int stubNodeCount = stubNodes.size();
             Device device = design.getDevice();
-            for(int j=0; j < stubNodeCount; j++) {
+            for (int j=0; j < stubNodeCount; j++) {
                 PhysNode.Reader stubNodeReader = stubNodes.get(j);
                 Tile tile = device.getTile(strings.get(stubNodeReader.getTile()));
                 PIP pip = new PIP(tile, stubNodeReader.getWire(), PIP.NULL_END_WIRE_IDX);
@@ -516,7 +516,7 @@ public class PhysNetlistReader {
             }
         }
 
-        for(int j=0; j < branchesCount; j++) {
+        for (int j=0; j < branchesCount; j++) {
             RouteBranch.Reader bReader = branches.get(j);
             readRouteBranch(bReader, net, design, strings, routeThruLutInput);
         }
@@ -527,7 +527,7 @@ public class PhysNetlistReader {
                                                 Enumerator<String> strings) {
         StructList.Reader<Property.Reader> props = physNetlist.getProperties();
         int propCount = props.size();
-        for(int i=0; i < propCount; i++) {
+        for (int i=0; i < propCount; i++) {
             Property.Reader pReader = props.get(i);
             String key = strings.get(pReader.getKey());
             if (DISABLE_AUTO_IO_BUFFERS.equals(key)) {
@@ -572,7 +572,7 @@ public class PhysNetlistReader {
 
         while(!netsToExpand.isEmpty()) {
             net = netsToExpand.remove();
-            for(EDIFPortInst portInst : net.getPortInsts()) {
+            for (EDIFPortInst portInst : net.getPortInsts()) {
                 if (portInst.isOutput() && !portInst.isTopLevelPort()) {
                     // Only following downstream connections.
                     continue;
@@ -621,7 +621,7 @@ public class PhysNetlistReader {
             belPinToPhysicalNet.put(strings.get(bpReader.getSite()) + "/" + strings.get(bpReader.getBel()) + "/" + strings.get(bpReader.getPin()), netReader);
         }
 
-        for(PhysNetlist.RouteBranch.Reader childBranch : routeBranch.getBranches()) {
+        for (PhysNetlist.RouteBranch.Reader childBranch : routeBranch.getBranches()) {
             mapBelPinsToPhysicalNets(belPinToPhysicalNet, netReader, childBranch, strings);
         }
     }
@@ -646,12 +646,12 @@ public class PhysNetlistReader {
         boolean foundVccNet = false;
         Map<String, PhysNet.Reader> belPinToPhysicalNet = new HashMap<String, PhysNet.Reader>();
         Set<Integer> netNames = new HashSet<Integer>();
-        for(PhysNet.Reader physNet : PhysicalNetlist.getPhysNets()) {
-            for(PhysNetlist.RouteBranch.Reader routeBranch : physNet.getSources()) {
+        for (PhysNet.Reader physNet : PhysicalNetlist.getPhysNets()) {
+            for (PhysNetlist.RouteBranch.Reader routeBranch : physNet.getSources()) {
                 mapBelPinsToPhysicalNets(belPinToPhysicalNet, physNet, routeBranch, strings);
             }
 
-            for(PhysNetlist.RouteBranch.Reader routeBranch : physNet.getStubs()) {
+            for (PhysNetlist.RouteBranch.Reader routeBranch : physNet.getStubs()) {
                 mapBelPinsToPhysicalNets(belPinToPhysicalNet, physNet, routeBranch, strings);
             }
 
@@ -688,8 +688,8 @@ public class PhysNetlistReader {
 
         // Iterate over placements and map cell pins to physical nets.
         Map<String, PhysNet.Reader> cellPinToPhysicalNet = new HashMap<String, PhysNet.Reader>();
-        for(CellPlacement.Reader placement : PhysicalNetlist.getPlacements()) {
-            for(PinMapping.Reader pinMap : placement.getPinMap()) {
+        for (CellPlacement.Reader placement : PhysicalNetlist.getPlacements()) {
+            for (PinMapping.Reader pinMap : placement.getPinMap()) {
                 String key = strings.get(placement.getSite()) + "/" + strings.get(pinMap.getBel()) + "/" + strings.get(pinMap.getBelPin());
                 PhysNet.Reader net = belPinToPhysicalNet.get(key);
                 if (net != null) {
@@ -737,7 +737,7 @@ public class PhysNetlistReader {
         EDIFNetlist netlist = design.getNetlist();
         List<EDIFHierCellInst> leaves = netlist.getTopCell().getAllLeafDescendants();
         EDIFLibrary macros = Design.getMacroPrimitives(design.getDevice().getSeries());
-        for(EDIFHierCellInst leaf : leaves) {
+        for (EDIFHierCellInst leaf : leaves) {
             if (macros.containsCell(leaf.getCellType())) {
                 EDIFCell macro = macros.getCell(leaf.getCellName());
                 // Check that the macro children instances have the same placement status 
@@ -746,7 +746,7 @@ public class PhysNetlistReader {
                 boolean inconsistentPlacement = false;
                 String macroName = leaf.getFullHierarchicalInstName() + EDIFTools.EDIF_HIER_SEP;
                 List<EDIFHierCellInst> macroLeaves = macro.getAllLeafDescendants();
-                for(EDIFHierCellInst inst : macroLeaves) {
+                for (EDIFHierCellInst inst : macroLeaves) {
                     String cellName = macroName + inst.getFullHierarchicalInstName();
                     Cell cell = design.getCell(cellName);
                     boolean isCellPlaced = !(cell == null || !cell.isPlaced());
@@ -759,7 +759,7 @@ public class PhysNetlistReader {
                     System.err.println("ERROR: Inconsistent macro placement for " + macroName 
                             + ", please ensure all member cell instances are either "
                             + "unplaced or fully placed: ");
-                    for(EDIFHierCellInst inst : macroLeaves) {
+                    for (EDIFHierCellInst inst : macroLeaves) {
                         String cellName = macroName + inst.getFullHierarchicalInstName();
                         Cell cell = design.getCell(cellName);
                         boolean isCellPlaced = !(cell == null || !cell.isPlaced());

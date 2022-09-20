@@ -127,7 +127,7 @@ public class EnumerateCellBelMapping {
         Map<List<Object>, Set<Site>> sitesforBels = new HashMap<List<Object>, Set<Site>>();
         Map<SiteTypeEnum, Set<Site>> sitesForSiteTypes = new HashMap<SiteTypeEnum, Set<Site>>();
 
-        for(int i = 0; i < siteTypes.size(); ++i) {
+        for (int i = 0; i < siteTypes.size(); ++i) {
             List<Object> key = new ArrayList<Object>();
             key.add(siteTypes.get(i));
             key.add(bels.get(i));
@@ -151,7 +151,7 @@ public class EnumerateCellBelMapping {
 
         Set<List<Object>> sitesTested = new HashSet<List<Object>>();
 
-        for(int i = 0; i < siteTypes.size(); ++i) {
+        for (int i = 0; i < siteTypes.size(); ++i) {
             List<Object> key = new ArrayList<Object>();
             key.add(siteTypes.get(i));
             key.add(bels.get(i));
@@ -179,7 +179,7 @@ public class EnumerateCellBelMapping {
         bels = new ArrayList<String>();
         pinMappings = new ArrayList<Set<Map.Entry<String, String>>>();
         parameterSets = new ArrayList<List<String>>();
-        for(List<Object> key : sitesTested) {
+        for (List<Object> key : sitesTested) {
             siteTypes.add((SiteTypeEnum)key.get(0));
             bels.add((String)key.get(1));
             pinMappings.add((Set<Map.Entry<String, String>>)key.get(2));
@@ -191,8 +191,8 @@ public class EnumerateCellBelMapping {
         checkSizeInvariance();
 
         Set<Map.Entry<String, String>> allPins = new HashSet<Map.Entry<String, String>>();
-        for(Set<Map.Entry<String, String>> pins : pinMappings) {
-            for(Map.Entry<String, String> pin : pins) {
+        for (Set<Map.Entry<String, String>> pins : pinMappings) {
+            for (Map.Entry<String, String> pin : pins) {
                 allPins.add(pin);
             }
         }
@@ -203,7 +203,7 @@ public class EnumerateCellBelMapping {
     private Map<Map.Entry<SiteTypeEnum, String>, Set<Map.Entry<String, String>>> createCommonPins(Set<Map.Entry<String, String>> allPins) {
 
         Map<Map.Entry<SiteTypeEnum, String>, Set<Map.Entry<String, String>>> commonPins = new HashMap<Map.Entry<SiteTypeEnum, String>, Set<Map.Entry<String, String>>>();
-        for(int i = 0; i < siteTypes.size(); ++i) {
+        for (int i = 0; i < siteTypes.size(); ++i) {
             Map.Entry<SiteTypeEnum, String> key = new AbstractMap.SimpleEntry<SiteTypeEnum, String>(siteTypes.get(i), bels.get(i));
             Set<Map.Entry<String, String>> pins = commonPins.get(key);
             if (pins == null) {
@@ -224,9 +224,9 @@ public class EnumerateCellBelMapping {
         checkSizeInvariance();
 
         Map<Map.Entry<SiteTypeEnum, Map.Entry<String, String>>, Set<Map.Entry<String, String>>> parameterToPins = new HashMap<Map.Entry<SiteTypeEnum, Map.Entry<String, String>>, Set<Map.Entry<String, String>>>();
-        for(int i = 0; i < siteTypes.size(); ++i) {
+        for (int i = 0; i < siteTypes.size(); ++i) {
             Map.Entry<SiteTypeEnum, String> commonPinsKey = new AbstractMap.SimpleEntry<SiteTypeEnum, String>(siteTypes.get(i), bels.get(i));
-            for(String parameter : parameterSets.get(i)) {
+            for (String parameter : parameterSets.get(i)) {
                 Map.Entry<SiteTypeEnum, Map.Entry<String, String>> key = new AbstractMap.SimpleEntry<SiteTypeEnum, Map.Entry<String, String>>(
                         siteTypes.get(i), new AbstractMap.SimpleEntry<String, String>(
                             bels.get(i),
@@ -251,14 +251,14 @@ public class EnumerateCellBelMapping {
     public void verifyCellBelPinMaps(
         Map<Map.Entry<SiteTypeEnum, String>, Set<Map.Entry<String, String>>> commonPins,
         Map<Map.Entry<SiteTypeEnum, Map.Entry<String, String>>, Set<Map.Entry<String, String>>> parameterToPins) {
-        for(int i = 0; i < siteTypes.size(); ++i) {
+        for (int i = 0; i < siteTypes.size(); ++i) {
             Set<Map.Entry<String, String>> assembledPins = new HashSet<Map.Entry<String, String>>();
 
             Map.Entry<SiteTypeEnum, String> commonPinsKey = new AbstractMap.SimpleEntry<SiteTypeEnum, String>(siteTypes.get(i), bels.get(i));
             assembledPins.addAll(commonPins.get(commonPinsKey));
 
             String parametersJoined = new String();
-            for(String parameter : parameterSets.get(i)) {
+            for (String parameter : parameterSets.get(i)) {
                 parametersJoined += " " + parameter;
                 Map.Entry<SiteTypeEnum, Map.Entry<String, String>> key = new AbstractMap.SimpleEntry<SiteTypeEnum, Map.Entry<String, String>>(
                         siteTypes.get(i), new AbstractMap.SimpleEntry<String, String>(
@@ -273,7 +273,7 @@ public class EnumerateCellBelMapping {
                 diff.addAll(pinMappings.get(i));
                 diff.removeAll(assembledPins);
                 System.out.printf("pinMappings - assembledPins:\n");
-                for(Map.Entry<String, String> entry : diff) {
+                for (Map.Entry<String, String> entry : diff) {
                     System.out.printf(" - %s => %s\n", entry.getKey(), entry.getValue());
                 }
 
@@ -281,7 +281,7 @@ public class EnumerateCellBelMapping {
                 diff.addAll(assembledPins);
                 diff.removeAll(pinMappings.get(i));
                 System.out.printf("assembledPins - pinMappings:\n");
-                for(Map.Entry<String, String> entry : diff) {
+                for (Map.Entry<String, String> entry : diff) {
                     System.out.printf(" - %s => %s\n", entry.getKey(), entry.getValue());
                 }
 
@@ -300,7 +300,7 @@ public class EnumerateCellBelMapping {
         pinsToSort.sort(new StringPairCompare());
 
         int i = 0;
-        for(Map.Entry<String, String> pin : pinsToSort) {
+        for (Map.Entry<String, String> pin : pinsToSort) {
             CellBelPinEntry.Builder pinObj = pinsObj.get(i);
             pinObj.setCellPin(allStrings.getIndex(pin.getKey()));
             pinObj.setBelPin(allStrings.getIndex(pin.getValue()));
@@ -311,7 +311,7 @@ public class EnumerateCellBelMapping {
     private void writeCommonSiteTypeBels(Enumerator<String> allStrings, CommonCellBelPinMaps.Builder builder, Set<Map.Entry<SiteTypeEnum, String>> siteTypesAndBels) {
         Map<SiteTypeEnum, Set<String>> siteTypesToBels = new HashMap<SiteTypeEnum, Set<String>>();
 
-        for(Map.Entry<SiteTypeEnum, String> siteTypeAndBel : siteTypesAndBels) {
+        for (Map.Entry<SiteTypeEnum, String> siteTypeAndBel : siteTypesAndBels) {
             SiteTypeEnum siteType = siteTypeAndBel.getKey();
             Set<String> bels = siteTypesToBels.get(siteType);
             if (bels == null) {
@@ -328,7 +328,7 @@ public class EnumerateCellBelMapping {
 
         StructList.Builder<SiteTypeBelEntry.Builder> siteTypesObj = builder.initSiteTypes(siteTypesToBels.size());
         int i = 0;
-        for(SiteTypeEnum siteType : siteTypes) {
+        for (SiteTypeEnum siteType : siteTypes) {
             Set<String> bels = siteTypesToBels.get(siteType);
             List<String> belsSorted = new ArrayList<String>();
             belsSorted.addAll(bels);
@@ -339,7 +339,7 @@ public class EnumerateCellBelMapping {
             siteTypeObj.setSiteType(allStrings.getIndex(siteType.name()));
             siteTypeObj.initBels(belsSorted.size());
 
-            for(int j = 0; j < belsSorted.size(); ++j) {
+            for (int j = 0; j < belsSorted.size(); ++j) {
                 siteTypeObj.getBels().set(j, allStrings.getIndex(belsSorted.get(j)));
             }
 
@@ -355,7 +355,7 @@ public class EnumerateCellBelMapping {
         StructList.Builder<ParameterSiteTypeBelEntry.Builder> entriesObj = builder.initParametersSiteTypes(siteTypesBelsAndParametersSorted.size());
 
         int i = 0;
-        for(Map.Entry<SiteTypeEnum, Map.Entry<String, String>> entry : siteTypesBelsAndParametersSorted) {
+        for (Map.Entry<SiteTypeEnum, Map.Entry<String, String>> entry : siteTypesBelsAndParametersSorted) {
             ParameterSiteTypeBelEntry.Builder entryObj = entriesObj.get(i);
 
             SiteTypeEnum siteType = entry.getKey();
@@ -396,7 +396,7 @@ public class EnumerateCellBelMapping {
 
         // Build reverse maps to remove duplication.
         Map<Set<Map.Entry<String, String>>, Set<Map.Entry<SiteTypeEnum, String>>> commonPinsRev = new HashMap<Set<Map.Entry<String, String>>, Set<Map.Entry<SiteTypeEnum, String>>>();
-        for(Map.Entry<Map.Entry<SiteTypeEnum, String>, Set<Map.Entry<String, String>>> commonPin : commonPins.entrySet()) {
+        for (Map.Entry<Map.Entry<SiteTypeEnum, String>, Set<Map.Entry<String, String>>> commonPin : commonPins.entrySet()) {
             Set<Map.Entry<String, String>> key = commonPin.getValue();
 
             Set<Map.Entry<SiteTypeEnum, String>> siteTypesAndBels = commonPinsRev.get(key);
@@ -410,7 +410,7 @@ public class EnumerateCellBelMapping {
 
         StructList.Builder<CommonCellBelPinMaps.Builder> commonPinsObj = builder.initCommonPins(commonPinsRev.size());
         int i = 0;
-        for(Map.Entry<Set<Map.Entry<String, String>>, Set<Map.Entry<SiteTypeEnum, String>>> entry : commonPinsRev.entrySet()) {
+        for (Map.Entry<Set<Map.Entry<String, String>>, Set<Map.Entry<SiteTypeEnum, String>>> entry : commonPinsRev.entrySet()) {
             CommonCellBelPinMaps.Builder entryObj = commonPinsObj.get(i);
 
             Set<Map.Entry<String, String>> pins = entry.getKey();
@@ -422,7 +422,7 @@ public class EnumerateCellBelMapping {
         }
 
         Map<Set<Map.Entry<String, String>>, Set<Map.Entry<SiteTypeEnum, Map.Entry<String, String>>>> parameterToPinsRev = new HashMap<Set<Map.Entry<String, String>>, Set<Map.Entry<SiteTypeEnum, Map.Entry<String, String>>>>();
-        for(Map.Entry<Map.Entry<SiteTypeEnum, Map.Entry<String, String>>, Set<Map.Entry<String, String>>> parameterPin : parameterToPins.entrySet()) {
+        for (Map.Entry<Map.Entry<SiteTypeEnum, Map.Entry<String, String>>, Set<Map.Entry<String, String>>> parameterPin : parameterToPins.entrySet()) {
             Set<Map.Entry<String, String>> key = parameterPin.getValue();
 
             Set<Map.Entry<SiteTypeEnum, Map.Entry<String, String>>> siteTypeBelAndParameters = parameterToPinsRev.get(key);
@@ -436,7 +436,7 @@ public class EnumerateCellBelMapping {
 
         StructList.Builder<ParameterCellBelPinMaps.Builder> parameterPinsObj = builder.initParameterPins(parameterToPinsRev.size());
         i = 0;
-        for(Map.Entry<Set<Map.Entry<String, String>>, Set<Map.Entry<SiteTypeEnum, Map.Entry<String, String>>>> entry : parameterToPinsRev.entrySet()) {
+        for (Map.Entry<Set<Map.Entry<String, String>>, Set<Map.Entry<SiteTypeEnum, Map.Entry<String, String>>>> entry : parameterToPinsRev.entrySet()) {
             ParameterCellBelPinMaps.Builder entryObj = parameterPinsObj.get(i);
 
             Set<Map.Entry<String, String>> pins = entry.getKey();
@@ -507,9 +507,9 @@ public class EnumerateCellBelMapping {
             if (cellName.equals("URAM288E5_BASE") || cellName.equals("URAM288E5")) {
                 int[] portWidths = {18, 36, 72};
                 String[] ports = {"A", "B"};
-                for(int portWidth : portWidths) {
+                for (int portWidth : portWidths) {
                     List<String> parameters = new ArrayList<String>();
-                    for(String port : ports) {
+                    for (String port : ports) {
                         parameters.add("EN_ECC_RD_"+port+"=FALSE");
                         parameters.add("EN_ECC_WR_"+port+"=FALSE");
                         parameters.add("WRITE_WIDTH_" + port + "=" + portWidth);
@@ -517,7 +517,7 @@ public class EnumerateCellBelMapping {
                     parameterSets.add(parameters);
                 }
             } else if (cellName.equals("DSP_PREADD_DATA58") || cellName.equals("DSP_SRCMX_OPTINV")) {
-                for(String mode : new String[] {"INT24", "INT8", "FP32", "CINT18"}) {
+                for (String mode : new String[] {"INT24", "INT8", "FP32", "CINT18"}) {
                     List<String> parameters = new ArrayList<String>();
                     parameters.add("DSP_MODE=" + mode);
                     parameterSets.add(parameters);
@@ -525,7 +525,7 @@ public class EnumerateCellBelMapping {
             } else if (cellName.equals("IBUF") || cellName.equals("IBUFE3") || 
                      cellName.equals("IBUF_IBUFDISABLE") || cellName.equals("IOBUF") || 
                      cellName.equals("IOBUFE3") || cellName.equals("IOBUF_DCIEN")) {
-                for(String mode : new String[] {"LVCMOS15", "LVCMOS12", "LVDCI_15"}) {
+                for (String mode : new String[] {"LVCMOS15", "LVCMOS12", "LVDCI_15"}) {
                     List<String> parameters = new ArrayList<String>();
                     parameters.add("IOSTANDARD=" + mode);
                     parameterSets.add(parameters);
@@ -536,8 +536,8 @@ public class EnumerateCellBelMapping {
         } else {
             if (cellName.equals("RAMB18E1") || cellName.equals("RAMB18E2")) {
                 int[] portWidths = {0, 1, 2, 4, 9, 18};
-                for(int writeWidthA : portWidths) {
-                    for(int writeWidthB : portWidths) {
+                for (int writeWidthA : portWidths) {
+                    for (int writeWidthB : portWidths) {
                         List<String> parameters = new ArrayList<String>();
                         parameters.add(String.format("WRITE_WIDTH_A=%d", writeWidthA));
                         parameters.add(String.format("WRITE_WIDTH_B=%d", writeWidthB));
@@ -601,8 +601,8 @@ public class EnumerateCellBelMapping {
             else if (cellName.equals("RAMB36E1") || cellName.equals("RAMB36E2")) {
                 int[] portWidths = {0, 1, 2, 4, 9, 18, 36};
                 int[] portWidthsNoZero = {1, 2, 4, 9, 18, 36};
-                for(int writeWidthA : portWidthsNoZero) {
-                    for(int writeWidthB : portWidths) {
+                for (int writeWidthA : portWidthsNoZero) {
+                    for (int writeWidthB : portWidths) {
                         List<String> parameters = new ArrayList<String>();
                         parameters.add(String.format("WRITE_WIDTH_A=%d", writeWidthA));
                         parameters.add(String.format("WRITE_WIDTH_B=%d", writeWidthB));
@@ -709,11 +709,11 @@ public class EnumerateCellBelMapping {
 
     public static Map<SiteTypeEnum, List<Site>> createSiteMap(Device device) {
         Map<SiteTypeEnum, List<Site>> siteMap = new HashMap<SiteTypeEnum, List<Site>>();
-        for(Tile[] tiles : device.getTiles()) {
-            for(Tile tile : tiles) {
-                for(Site site : tile.getSites()) {
+        for (Tile[] tiles : device.getTiles()) {
+            for (Tile tile : tiles) {
+                for (Site site : tile.getSites()) {
                     addSite(siteMap, site, site.getSiteTypeEnum());
-                    for(SiteTypeEnum site_type : site.getAlternateSiteTypeEnums()) {
+                    for (SiteTypeEnum site_type : site.getAlternateSiteTypeEnums()) {
                         addSite(siteMap, site, site_type);
                     }
                 }
@@ -733,7 +733,7 @@ public class EnumerateCellBelMapping {
 
         Map<SiteTypeEnum,Set<String>> sites = physCell.getCompatiblePlacements();
         for (Map.Entry<SiteTypeEnum,Set<String>> site : sites.entrySet()) {
-            for(String bel : site.getValue()) {
+            for (String bel : site.getValue()) {
                 entries.add(new AbstractMap.SimpleEntry<SiteTypeEnum, String>(site.getKey(), bel));
             }
         }
@@ -746,15 +746,15 @@ public class EnumerateCellBelMapping {
 
         EnumerateCellBelMapping data = new EnumerateCellBelMapping();
 
-        for(Map.Entry<SiteTypeEnum, String> possibleSite : entries) {
+        for (Map.Entry<SiteTypeEnum, String> possibleSite : entries) {
             SiteTypeEnum siteType = possibleSite.getKey();
             String bel = possibleSite.getValue();
             if (!siteMap.containsKey(siteType)) {
                 continue;
             }
 
-            for(List<String> parameters : getParametersFor(series, cell.getName())) {
-                for(Site site : siteMap.get(siteType)) {
+            for (List<String> parameters : getParametersFor(series, cell.getName())) {
+                for (Site site : siteMap.get(siteType)) {
                     SiteInst siteInst = design.createSiteInst("test_site", siteType, site);
 
                     String[] parameterArray = parameters.toArray(new String[parameters.size()]);
@@ -763,8 +763,8 @@ public class EnumerateCellBelMapping {
                     // Build complete P2L map.
                     Map<String, String> pinMap = new HashMap<String, String>();
 
-                    for(Map.Entry<String, Set<String>> pinPair : physCell.getPinMappingsL2P().entrySet()) {
-                        for(String physPin : pinPair.getValue()) {
+                    for (Map.Entry<String, Set<String>> pinPair : physCell.getPinMappingsL2P().entrySet()) {
+                        for (String physPin : pinPair.getValue()) {
                             pinMap.put(physPin, pinPair.getKey());
                         }
                     }
@@ -772,7 +772,7 @@ public class EnumerateCellBelMapping {
                     pinMap.putAll(physCell.getPinMappingsP2L());
 
                     HashSet<Map.Entry<String, String>> pinMapping = new HashSet<Map.Entry<String, String>>();
-                    for(Map.Entry<String, String> pinPair : pinMap.entrySet()) {
+                    for (Map.Entry<String, String> pinPair : pinMap.entrySet()) {
                         pinMapping.add(new AbstractMap.SimpleEntry<String, String>(pinPair.getValue(), pinPair.getKey()));
                     }
 
@@ -810,12 +810,12 @@ public class EnumerateCellBelMapping {
         // Count how many cells need mapping.
         EDIFLibrary macros = Design.getMacroPrimitives(device.getSeries());
         Set<String> macroCells = new HashSet<String>();
-        for(EDIFCell cell : macros.getCells()) {
+        for (EDIFCell cell : macros.getCells()) {
             macroCells.add(cell.getName());
         }
 
         int count = 0;
-        for(EDIFCell cell : prims.getCells()) {
+        for (EDIFCell cell : prims.getCells()) {
             if (!macroCells.contains(cell.getName())) {
                 count += 1;
             }
@@ -823,7 +823,7 @@ public class EnumerateCellBelMapping {
 
         int i = 0;
         StructList.Builder<CellBelMapping.Builder> cellMapping = devBuilder.initCellBelMap(count);
-        for(EDIFCell cell : prims.getCells()) {
+        for (EDIFCell cell : prims.getCells()) {
             if (!macroCells.contains(cell.getName())) {
                 populateCellBelPin(allStrings, siteMap, cellMapping.get(i), topLevelCell, cell, design);
                 i += 1;

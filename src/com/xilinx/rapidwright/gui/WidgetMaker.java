@@ -41,7 +41,7 @@ public class WidgetMaker {
     public static Set<String> getSupportedDevices() {
         if (devices == null) {
             devices = new HashSet<>();
-            for(Part part : PartNameTools.getParts()) {
+            for (Part part : PartNameTools.getParts()) {
             devices.add(part.getDevice());
             }
         }

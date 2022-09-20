@@ -83,7 +83,7 @@ public class DeviceBrowserScene extends TileScene{
     }
 
     public void clearCurrentLines() {
-        for(QGraphicsLineItem line : currLines) {
+        for (QGraphicsLineItem line : currLines) {
             this.removeItem(line);
             line.dispose();
         }
@@ -108,7 +108,7 @@ public class DeviceBrowserScene extends TileScene{
     public void drawConnectingWires(Tile tile, int wire) {
         clearCurrentLines();
         if (tile == null) return;
-        for(Wire w : tile.getWireConnections(wire)) {
+        for (Wire w : tile.getWireConnections(wire)) {
             drawWire(tile, wire, w.getTile(), w.getWireIndex());
         }
     }
@@ -117,10 +117,10 @@ public class DeviceBrowserScene extends TileScene{
         HashMap<Tile, Integer> reachabilityMap = new HashMap<Tile, Integer>();
         
         Queue<RouteNode> queue = new LinkedList<RouteNode>();
-        for(int wire = 0; wire < t.getWireCount(); wire++) {
+        for (int wire = 0; wire < t.getWireCount(); wire++) {
             List<Wire> connections = t.getWireConnections(wire);
             if (connections == null) continue;
-            for(Wire wc : connections) {
+            for (Wire wc : connections) {
                 queue.add(new RouteNode(wc.getTile(),wc.getWireIndex()));
             }
         }
@@ -137,7 +137,7 @@ public class DeviceBrowserScene extends TileScene{
             }
             if (currNode.getLevel() < hops-1) {
                 List<Wire> connections = currNode.getConnections();
-                for(Wire wc : connections) {
+                for (Wire wc : connections) {
                     queue.add(new RouteNode(wc.getTile(),wc.getWireIndex()));
                 }
             }
@@ -147,7 +147,7 @@ public class DeviceBrowserScene extends TileScene{
     
     private void drawReachability(HashMap<Tile, Integer> map) {
         menuReachabilityClear();
-        for(Tile t : map.keySet()) {
+        for (Tile t : map.keySet()) {
             int color = map.get(t)*16 > 255 ? 255 : map.get(t)*16;
             NumberedHighlightedTile tile = new NumberedHighlightedTile(t, this, map.get(t));
             tile.setBrush(new QBrush(new QColor(0, color, 0)));
@@ -181,7 +181,7 @@ public class DeviceBrowserScene extends TileScene{
     }
     
     private void menuReachabilityClear() {
-        for(NumberedHighlightedTile rect : currentTiles) {
+        for (NumberedHighlightedTile rect : currentTiles) {
             rect.remove();
         }
         currentTiles.clear();

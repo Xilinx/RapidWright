@@ -61,7 +61,7 @@ public class XDCParser {
     public static HashMap<String,PackagePinConstraint> parseXDC(String fileName, Device dev) {
         HashMap<String,PackagePinConstraint> constraints = new HashMap<>();
         int lineNum = 1;
-        for(String line : FileTools.getLinesFromTextFile(fileName)) {
+        for (String line : FileTools.getLinesFromTextFile(fileName)) {
             if (line.trim().startsWith("#")) continue;
             if (line.contains("set_property") && line.contains("PACKAGE_PIN")) {
                 String[] parts = line.split("\\s+");
@@ -107,7 +107,7 @@ public class XDCParser {
     public static void writeXDC(List<String> constraints, OutputStream out) {
         if (constraints == null) return;
         try {
-            for(String s : constraints) {
+            for (String s : constraints) {
                 out.write(s.getBytes());
                 out.write('\n');
             }

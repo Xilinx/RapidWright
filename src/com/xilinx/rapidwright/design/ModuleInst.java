@@ -224,7 +224,7 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
         Site originalSite = getAnchor().getSite();
         Design design = getDesign();
         Site[] sites = design.getDevice().getAllCompatibleSites(getAnchor().getSiteTypeEnum());
-        for(Site newAnchorSite : sites) {
+        for (Site newAnchorSite : sites) {
             if (place(newAnchorSite)) {
                 validSites.add(newAnchorSite);
                 unplace();
@@ -313,7 +313,7 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
         //=======================================================//
         /* Place instances at new location                       */
         //=======================================================//
-        for(SiteInst inst : instances) {
+        for (SiteInst inst : instances) {
             // Certain site types cannot move, and will have to remain
             if (Utils.isLockedSiteType(inst.getSiteTypeEnum())) {
                 inst.place(inst.getModuleTemplateInst().getSite());
@@ -341,14 +341,14 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
                         return false;    
                     }
                 }
-                for(SiteInst i : originalSites.keySet()) {
+                for (SiteInst i : originalSites.keySet()) {
                     design.getSiteInst(i.getName()).place(originalSites.get(i));
                 }
                 return false;
             }
             if (newSite.getSiteTypeEnum() == SiteTypeEnum.BUFGCE && design.isSiteUsed(newSite)) {
                 // Choose a different buffer if the specific one in the block is already used
-                for(Site s : newSite.getTile().getSites()) {
+                for (Site s : newSite.getTile().getSites()) {
                     if (s.isCompatibleSiteType(newSite.getSiteTypeEnum()) && !design.isSiteUsed(s)) {
                         newSite = s;
                         break;
@@ -368,10 +368,10 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
         //=======================================================//
         /* Place net at new location                             */
         //=======================================================//
-        nextnet: for(Net net : nets) {
+        nextnet: for (Net net : nets) {
             net.getPIPs().clear();
             Net templateNet = net.getModuleTemplateNet();
-            for(PIP pip : templateNet.getPIPs()) {
+            for (PIP pip : templateNet.getPIPs()) {
                 Tile templatePipTile = pip.getTile();
                 Tile newPipTile = module.getCorrespondingTile(templatePipTile, newAnchorSite.getTile());
                 if (newPipTile == null) {
@@ -401,7 +401,7 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
             }
         }
         //Update location of NOCClients
-        for(NOCClient nc : getNOCClients()) {
+        for (NOCClient nc : getNOCClients()) {
             Site templateSite = dev.getSite(nc.getLocation());
             if (templateSite == null) 
                 continue;
@@ -418,11 +418,11 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
      */
     public void unplace() {
         //unplace instances
-        for(SiteInst inst : instances) {
+        for (SiteInst inst : instances) {
             inst.unPlace();
         }
         //unplace nets (remove pips)
-        for(Net net : nets) {
+        for (Net net : nets) {
             // Because only one VCC/GND net is allowed for each Design,
             // this net is just a placeholder for any module-specific PIPs
             // that would have been inserted into Design's static net, so
@@ -594,7 +594,7 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
             }
             return newTile.getSites()[0];
         }
-        for(Site s : newTile.getSites()) {
+        for (Site s : newTile.getSites()) {
             if (s.getSiteTypeEnum() == type) return s;
         }
         return null;
@@ -613,7 +613,7 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
             if (type == null) 
                 return pb.getBottomLeftTile();
             
-            for(PBlockRange range : pb) {
+            for (PBlockRange range : pb) {
                 if (range.getLowerLeftSite().getSiteTypeEnum() == type) {
                     return range.getLowerLeftSite().getTile();
                 }
@@ -624,7 +624,7 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
         SiteInst lowerLeftIP = null;
         int x = Integer.MAX_VALUE;
         int y = Integer.MAX_VALUE;
-        for(SiteInst s : getModule().getSiteInsts()) {
+        for (SiteInst s : getModule().getSiteInsts()) {
             boolean isSiteCompatible = type == null ? PBlock.isPBlockCornerSiteType(s.getSiteTypeEnum()) : 
                 (s.getSite().isCompatibleSiteType(type) || (Utils.isSLICE(s) && Utils.isSLICE(type))); 
             if (isSiteCompatible) {

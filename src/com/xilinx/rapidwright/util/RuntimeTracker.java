@@ -135,7 +135,7 @@ public class RuntimeTracker {
     
     private String spaces(int length) {
         StringBuilder s = new StringBuilder();
-        for(int i = 0; i < length; i++) {
+        for (int i = 0; i < length; i++) {
             s.append(" ");
         }
         return s.toString();
@@ -144,7 +144,7 @@ public class RuntimeTracker {
     @Override
     public String toString() {
         if (this.getLevel() == 0) {
-            for(RuntimeTracker child : this.children) {
+            for (RuntimeTracker child : this.children) {
                 this.time += child.getTime();
             }
         }
@@ -188,7 +188,7 @@ public class RuntimeTracker {
         buffer.append(this.toString());
         if (this.children != null) {
             int id = 0;
-            for(RuntimeTracker child : this.children) {
+            for (RuntimeTracker child : this.children) {
                 if (id < this.children.size() - 1) buffer.append("\u251c\u2500 " + child);
                 else buffer.append("\u2514\u2500 " + child);
                 id++;

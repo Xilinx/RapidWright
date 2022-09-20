@@ -41,12 +41,12 @@ public class TestEDIFHierNet {
         
         EDIFNetlist netlist = design.getNetlist();
         
-        for(EDIFHierNet parentNet : netlist.getParentNetMap().values()) {
+        for (EDIFHierNet parentNet : netlist.getParentNetMap().values()) {
             Set<EDIFHierPortInst> goldSet = new HashSet<>(netlist.getPhysicalPins(parentNet)); 
             Set<EDIFHierPortInst> testSet = new HashSet<>(parentNet.getLeafHierPortInsts());
             Assertions.assertEquals(goldSet.size(), testSet.size());
             
-            for(EDIFHierPortInst portInst : goldSet) {
+            for (EDIFHierPortInst portInst : goldSet) {
                 Assertions.assertTrue(testSet.remove(portInst));
             }
             Assertions.assertTrue(testSet.isEmpty());

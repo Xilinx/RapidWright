@@ -51,7 +51,7 @@ public class ProbeRouter {
 
     public static Map<String,String> readProbeRequestFile(String fileName) {
         Map<String,String> map = new TreeMap<>();
-        for(String line : FileTools.getLinesFromTextFile(fileName)) {
+        for (String line : FileTools.getLinesFromTextFile(fileName)) {
             if (line.trim().startsWith("#")) continue;
             String[] parts = line.split(" ");
             map.put(parts[0], parts[1]);
@@ -78,7 +78,7 @@ public class ProbeRouter {
      */
     public static void updateProbeConnections(Design d, Map<String,String> probeToTargetNets, PBlock pblock) {
         ArrayList<SitePinInst> pinsToRoute = new ArrayList<>(); 
-        for(Entry<String,String> e : probeToTargetNets.entrySet()) {
+        for (Entry<String,String> e : probeToTargetNets.entrySet()) {
             String hierPinName = e.getKey();
             String cellInstName = EDIFTools.getHierarchicalRootFromPinName(hierPinName);
             EDIFCellInst i = d.getNetlist().getCellInstFromHierName(cellInstName);
@@ -153,9 +153,9 @@ public class ProbeRouter {
     public static List<EDIFHierCellInst> findILAs(Design d) {
         List<EDIFHierCellInst> candidates = d.getNetlist().getAllDescendants("", "u_ila_*", false);
         ArrayList<EDIFHierCellInst> ilas = new ArrayList<EDIFHierCellInst>();
-        nextInst: for(EDIFHierCellInst i : candidates) {
+        nextInst: for (EDIFHierCellInst i : candidates) {
             if (i.getCellName().contains("u_ila_")) {
-                for(EDIFPort p : i.getCellType().getPorts()) {
+                for (EDIFPort p : i.getCellType().getPorts()) {
                     if (p.getName().contains("SL_IPORT_")) {
                         ilas.add(i);
                         continue nextInst;

@@ -130,7 +130,7 @@ public class RWRouteConfig {
     }
 
     private void parseArguments(String[] arguments) {
-        for(int i = 0; i < arguments.length; i++) {
+        for (int i = 0; i < arguments.length; i++) {
             String arg = arguments[i];
             switch(arg) {
             case "--maxIterations":

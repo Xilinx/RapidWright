@@ -228,7 +228,7 @@ public class TimingGroup implements Comparable<TimingGroup> {
         boolean moreNodesThanPips = nodes.size() > pips.size();
         String result = "<";
         if (moreNodesThanPips) {
-            for(int i=0; i<nodes.size(); i++) {
+            for (int i=0; i<nodes.size(); i++) {
                 result += "n";
                 if (i < pips.size())
                     result += "p";

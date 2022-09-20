@@ -85,7 +85,7 @@ public class SmallestEnclosingCircle {
         while(!finished) {
             double minAngle = Math.PI;
             minPoint = null;
-            for(Point v: convexHull) {
+            for (Point v: convexHull) {
                 if (v.equals(s1) || v.equals(s2)) {
                     continue;
                 }
@@ -145,13 +145,13 @@ public class SmallestEnclosingCircle {
         sortedPoints = points.toArray(sortedPoints);
         Arrays.sort(sortedPoints);
         
-        for(int i = 0; i < n; i++) {
+        for (int i = 0; i < n; i++) {
             while(k >= 2 && crossProduct(hull[k-2], hull[k-1], sortedPoints[i]) <= 0) {
                 k--;
             }
             hull[k++] = sortedPoints[i];
         }
-        for(int i = n-2, t = k+1; i >= 0; i--) {
+        for (int i = n-2, t = k+1; i >= 0; i--) {
             while(k >= t && crossProduct(hull[k-2], hull[k-1], sortedPoints[i]) <= 0) {
                 k--;
             }
@@ -159,7 +159,7 @@ public class SmallestEnclosingCircle {
         }
         
         //only k-1 distinct points.  the kth point is the same as the 1st point
-        for(int i = 0; i < k-1; i++) {
+        for (int i = 0; i < k-1; i++) {
             convexHull.add(hull[i]);
         }
         
@@ -200,7 +200,7 @@ public class SmallestEnclosingCircle {
     }
     
     public static void printPoints(HashSet<Point> points) {
-        for(Point p : points) {
+        for (Point p : points) {
             System.out.println("\tX: " + p.x + "\tY: " + p.y);
         }
     }

@@ -41,8 +41,8 @@ public class TestNOCDesign {
     public void sanityChecks(Design d) {
         Device dev = d.getDevice();
         NOCDesign nocDesign = d.getNOCDesign();
-        for(NOCConnection conn : nocDesign.getAllConnections()) {
-            for(Entry<ChannelType,NOCChannel> e : conn.getChannels().entrySet()) {
+        for (NOCConnection conn : nocDesign.getAllConnections()) {
+            for (Entry<ChannelType,NOCChannel> e : conn.getChannels().entrySet()) {
                 NOCChannel ch = e.getValue();
                 Assertions.assertNotNull(ch);
                 Assertions.assertEquals(ch.getRequiredLatency(), 300);
@@ -51,7 +51,7 @@ public class TestNOCDesign {
             }
         }
         
-        for(Entry<String,NOCClient> e : nocDesign.getClients().entrySet()) {
+        for (Entry<String,NOCClient> e : nocDesign.getClients().entrySet()) {
             Assertions.assertEquals(e.getKey(), e.getValue().getName());
             NOCClient client = e.getValue();
             Assertions.assertNotNull(client);
@@ -88,7 +88,7 @@ public class TestNOCDesign {
         List<NOCConnection> goldConns = nocGold.getAllConnections();
         List<NOCConnection> testConns = nocTest.getAllConnections();
         Assertions.assertEquals(goldConns.size(), testConns.size());
-        for(int i=0; i < goldConns.size(); i++) {
+        for (int i=0; i < goldConns.size(); i++) {
             NOCConnection goldConn = goldConns.get(i);
             NOCConnection testConn = testConns.get(i);
             
@@ -117,7 +117,7 @@ public class TestNOCDesign {
             Map<ChannelType, NOCChannel> goldMap = goldConn.getChannels();
             Map<ChannelType, NOCChannel> testMap = goldConn.getChannels();
             Assertions.assertEquals(goldMap.size(), testMap.size());
-            for(Entry<ChannelType, NOCChannel> e : goldMap.entrySet()) {
+            for (Entry<ChannelType, NOCChannel> e : goldMap.entrySet()) {
                 Assertions.assertTrue(testMap.containsKey(e.getKey()));
                 NOCChannel goldCh = e.getValue();
                 NOCChannel testCh = testMap.get(e.getKey());

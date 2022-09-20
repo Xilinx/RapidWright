@@ -150,7 +150,7 @@ public class FileTools {
         // can be made verbose by specifying the JVM option "--illegal-access=warn"
         boolean allowWarnings = false;
         RuntimeMXBean rmxBean = ManagementFactory.getRuntimeMXBean();
-        for(String input : rmxBean.getInputArguments()) {
+        for (String input : rmxBean.getInputArguments()) {
             if (input.startsWith("--illegal-access")) {
                 allowWarnings = true;
             }
@@ -300,10 +300,10 @@ public class FileTools {
         count = dis.readInt();
         tileMap = new HashMap<String,Integer>(count);
         keys = new String[count];
-        for(int i = 0; i < keys.length; i++) {
+        for (int i = 0; i < keys.length; i++) {
             keys[i] = dis.readString();
         }
-        for(int i=0; i < count; i++) {
+        for (int i=0; i < count; i++) {
             tileMap.put(keys[i], allInts[dis.readInt()]);
         }
         return tileMap;
@@ -313,11 +313,11 @@ public class FileTools {
         int size = map.size();
         dos.writeInt(size);
         ArrayList<Integer> values = new ArrayList<Integer>(map.size());
-        for(String s : map.keySet()) {
+        for (String s : map.keySet()) {
             values.add(map.get(s));
             dos.writeString(s);
         }
-        for(Integer i : values) {
+        for (Integer i : values) {
             dos.writeInt(i.intValue());
         }
         return true;
@@ -325,7 +325,7 @@ public class FileTools {
     
     public static boolean writeStringArray(Output dos, String[] stringArray) {
         dos.writeInt(stringArray.length);
-        for(int i=0; i<stringArray.length; i++) {
+        for (int i=0; i<stringArray.length; i++) {
             dos.writeString(stringArray[i]);
         }
         return true;
@@ -339,7 +339,7 @@ public class FileTools {
             return emptyStringArray;
         }
         wireArray = new String[size];
-        for(int i = 0; i < wireArray.length; i++) {
+        for (int i = 0; i < wireArray.length; i++) {
             wireArray[i] = dis.readString();
         }
         return wireArray;
@@ -463,7 +463,7 @@ public class FileTools {
         String nl = System.getProperty("line.separator");
         try (FileWriter fw = new FileWriter(fileName);
             BufferedWriter bw = new BufferedWriter(fw)) {
-            for(String line : lines) {
+            for (String line : lines) {
                 bw.write(line + nl);
             }
         }
@@ -531,7 +531,7 @@ public class FileTools {
             return lines;
         }
         ArrayList<String> toReturn = new ArrayList<>();
-        for(int i=(lines.size()-(n+1)); i < lines.size(); i++) {
+        for (int i=(lines.size()-(n+1)); i < lines.size(); i++) {
             toReturn.add(lines.get(i));
         }
         return toReturn;
@@ -648,7 +648,7 @@ public class FileTools {
         File currDirectory = new File(path);
         if (currDirectory.exists()) {
             try {
-                for(File file : currDirectory.listFiles()) {
+                for (File file : currDirectory.listFiles()) {
                     if (file.isDirectory()) {
                         if (!deleteFolder(file.getCanonicalPath())) {
                             return false;
@@ -683,7 +683,7 @@ public class FileTools {
             return false;
         }
         
-        for(File i: f.listFiles()) {
+        for (File i: f.listFiles()) {
             if (i.isDirectory()) {
                 deleteFolder(i.getAbsolutePath());
             } else if (i.isFile()) {
@@ -747,7 +747,7 @@ public class FileTools {
             if (!dstDirectory.exists()) {
                 dstDirectory.mkdirs();
             }
-            for(File file : srcDirectory.listFiles()) {
+            for (File file : srcDirectory.listFiles()) {
                 if (!file.isDirectory()) {
                     if (!copyFile(file.getAbsolutePath(), dstDirectory.getAbsolutePath() + File.separator + file.getName())) {
                         return false;
@@ -783,7 +783,7 @@ public class FileTools {
             if (!dstDirectory.exists()) {
                 MessageGenerator.briefError("ERROR: Could find destination directory " + dstDirectory.getAbsolutePath());
             }
-            for(File file : srcDirectory.listFiles()) {
+            for (File file : srcDirectory.listFiles()) {
                 if (!file.isDirectory()) {
                     if (!copyFile(file.getAbsolutePath(), dstDirectory.getAbsolutePath() + File.separator + file.getName())) {
                         return false;
@@ -865,7 +865,7 @@ public class FileTools {
     
     public static void updateAllDataFiles() {
         System.out.println("Updating all RapidWright data files (this may take several minutes)...");
-        for(String fileName : DataVersions.dataVersionMap.keySet()) {
+        for (String fileName : DataVersions.dataVersionMap.keySet()) {
             if (ensureCorrectDataFile(fileName) != null) {
                 System.out.println("  Downloaded " + fileName);
             }
@@ -883,7 +883,7 @@ public class FileTools {
                 + "(this may take several minutes)...");
         int size = DataVersions.dataVersionMap.keySet().size();
         int i=0; 
-        for(String fileName : DataVersions.dataVersionMap.keySet()) {
+        for (String fileName : DataVersions.dataVersionMap.keySet()) {
             downloadDataFile(fileName);
             System.out.println("  Downloaded ["+i+"/"+size+"] " + fileName);
             i++;
@@ -1103,7 +1103,7 @@ public class FileTools {
                     + "see RapidWright installation instructions for help.");
             return Collections.emptyList();
         }
-        for(String part : dir.list()) {
+        for (String part : dir.list()) {
             if (part.endsWith(pattern)) {
                 allParts.add(part.replace(pattern, ""));
             }
@@ -1123,7 +1123,7 @@ public class FileTools {
                     + "see RapidWright installation instructions for help.");
             return Collections.emptyList();
         }
-        for(String partFamily : dir.list()) {
+        for (String partFamily : dir.list()) {
             if (PART_DB_PATH.endsWith(partFamily)) continue;
             FamilyType type = FamilyType.valueOf(partFamily.toUpperCase());
             if (type != null) allFamilies.add(type);
@@ -1441,7 +1441,7 @@ public class FileTools {
         try {
             is.mark(BINARY_CHECK_LENGTH+1);
             int count = is.read(binaryCheckData);
-            for(int i=0; i < count; i++) {
+            for (int i=0; i < count; i++) {
                 if (binaryCheckData[i] == 0x00) {
                     isBinary = true;
                     break;
@@ -1509,7 +1509,7 @@ public class FileTools {
      */
     public static boolean isExecutableOnPath(String execName) {
         List<String> lines = execCommandGetOutput(true, isWindows() ? "where" : "which",execName);
-        for(String line : lines) {
+        for (String line : lines) {
             if (line.startsWith("which:")) return false;
             if (line.contains("INFO: Could not find files")) return false;
             if (line.contains(File.separator + execName)) return true;
@@ -1533,7 +1533,7 @@ public class FileTools {
     public static boolean isVivadoCompatible() {
         if (isVivadoOnPath()) {
             List<String> lines = execCommandGetOutput(true, "vivado", "-version");
-            for(String line : lines) {
+            for (String line : lines) {
                 if (line.startsWith("Vivado ")) {
                     int dot = line.indexOf('.');
                     int year = Integer.parseInt(line.substring(line.indexOf(" v")+2,dot));
@@ -1558,7 +1558,7 @@ public class FileTools {
     public static String getVivadoVersion() {
         if (isVivadoOnPath()) {
             List<String> lines = execCommandGetOutput(true, "vivado", "-version");
-            for(String line : lines) {
+            for (String line : lines) {
                 if (line.startsWith("Vivado ")) {
                     String[] tokens = line.split("\\s+");
                     return tokens[1];
@@ -1680,7 +1680,7 @@ public class FileTools {
      */
     public static boolean unPackSupportingJarData() {
         String outputPath = getExecJarStoragePath();
-        for(String folderName : FileTools.UNPACK_FOLDERS) {
+        for (String folderName : FileTools.UNPACK_FOLDERS) {
             if (new File(outputPath + File.separator + folderName).exists()) continue;
             try {
                 CodeSource src = Device.class.getProtectionDomain().getCodeSource();

@@ -52,7 +52,7 @@ class CellBelMapping {
         private Map<String, String> readPins(String cell, Enumerator<String> allStrings, StructList.Reader<CellBelPinEntry.Reader> pins) {
             Map<String, String> pinMap = new HashMap<String, String>();
 
-            for(CellBelPinEntry.Reader pin : pins) {
+            for (CellBelPinEntry.Reader pin : pins) {
                 String belPin = allStrings.get(pin.getBelPin());
                 String cellPin = allStrings.get(pin.getCellPin());
                 String otherCellPin = pinMap.get(belPin);
@@ -68,7 +68,7 @@ class CellBelMapping {
         }
 
         private void addPlacements(Set<Map.Entry<SiteTypeEnum, String>> placements) {
-            for(Map.Entry<SiteTypeEnum, String> placement : placements) {
+            for (Map.Entry<SiteTypeEnum, String> placement : placements) {
                 Set<String> placementsForSiteType = compatiblePlacements.get(placement.getKey());
                 if (placementsForSiteType == null) {
                     placementsForSiteType = new HashSet<String>();
@@ -84,14 +84,14 @@ class CellBelMapping {
             commonMaps = new HashMap<Map.Entry<SiteTypeEnum, String>, Map<String, String>>();
             parameterMaps = new HashMap<Map.Entry<SiteTypeEnum, String>, Map<String, Map<String, String>>>();
 
-            for(CommonCellBelPinMaps.Reader commonPin : cellBelMap.getCommonPins()) {
+            for (CommonCellBelPinMaps.Reader commonPin : cellBelMap.getCommonPins()) {
                 Map<String, String> pins = readPins(cell, allStrings, commonPin.getPins());
 
-                for(SiteTypeBelEntry.Reader entry : commonPin.getSiteTypes()) {
+                for (SiteTypeBelEntry.Reader entry : commonPin.getSiteTypes()) {
                     SiteTypeEnum siteType = SiteTypeEnum.valueOf(allStrings.get(entry.getSiteType()));
 
                     PrimitiveList.Int.Reader belStrings = entry.getBels();
-                    for(int i = 0; i < belStrings.size(); ++i) {
+                    for (int i = 0; i < belStrings.size(); ++i) {
                         int belStringIdx = belStrings.get(i);
                         String bel = allStrings.get(belStringIdx);
                         Map.Entry<SiteTypeEnum, String> key = new AbstractMap.SimpleEntry(siteType, bel);
@@ -108,10 +108,10 @@ class CellBelMapping {
                 }
             }
 
-            for(ParameterCellBelPinMaps.Reader parameterPin : cellBelMap.getParameterPins()) {
+            for (ParameterCellBelPinMaps.Reader parameterPin : cellBelMap.getParameterPins()) {
                 Map<String, String> pins = readPins(cell, allStrings, parameterPin.getPins());
 
-                for(ParameterSiteTypeBelEntry.Reader entry : parameterPin.getParametersSiteTypes()) {
+                for (ParameterSiteTypeBelEntry.Reader entry : parameterPin.getParametersSiteTypes()) {
                     SiteTypeEnum siteType = SiteTypeEnum.valueOf(allStrings.get(entry.getSiteType()));
                     String bel = allStrings.get(entry.getBel());
                     Map.Entry<SiteTypeEnum, String> key = new AbstractMap.SimpleEntry(siteType, bel);
@@ -175,7 +175,7 @@ class CellBelMapping {
 
             Map<String, Map<String, String>> allParameterPins = parameterMaps.get(key);
 
-            for(String parameter : params) {
+            for (String parameter : params) {
                 Map<String, String> parameterPins = allParameterPins.get(parameter);
                 if (parameterPins != null) {
                     pins.putAll(parameterPins);
@@ -191,7 +191,7 @@ class CellBelMapping {
     public CellBelMapping(Enumerator<String> allStrings, StructList.Reader<Device.CellBelMapping.Reader> cellBelMaps) {
         map = new HashMap<String, CellBelPinMapping>();
 
-        for(Device.CellBelMapping.Reader cellBelMap : cellBelMaps) {
+        for (Device.CellBelMapping.Reader cellBelMap : cellBelMaps) {
             String cell = allStrings.get(cellBelMap.getCell());
             CellBelPinMapping obj = map.get(cell);
             if (obj != null) {

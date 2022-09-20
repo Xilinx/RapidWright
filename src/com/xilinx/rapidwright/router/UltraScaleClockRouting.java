@@ -69,7 +69,7 @@ public class UltraScaleClockRouting {
                 clk.getPIPs().addAll(curr.getPIPsBackToSource());
                 return curr;
             }
-            for(Wire w : curr.getWireConnections()) {
+            for (Wire w : curr.getWireConnections()) {
                 q.add(new RouteNode(w.getTile(), w.getWireIndex(), curr, curr.getLevel()+1));
             }
             if (watchDog-- == 0) break;
@@ -112,7 +112,7 @@ public class UltraScaleClockRouting {
             RouteNode curr = q.poll();
             visited.add(curr);
 
-            for(Wire w : curr.getWireConnections()) {
+            for (Wire w : curr.getWireConnections()) {
                 RouteNode parent = curr.getParent();
                 if (parent != null) {
                     if (w.getIntentCode()      == IntentCode.NODE_GLOBAL_VDISTR &&
@@ -179,7 +179,7 @@ public class UltraScaleClockRouting {
             RouteNode curr = q.poll();
             visited.add(curr);
 
-            for(Wire w : curr.getWireConnections()) {
+            for (Wire w : curr.getWireConnections()) {
                 // Only using clk routing network to reach centroid
                 if (!w.getIntentCode().isUltraScaleClocking()) continue;
                 
@@ -245,7 +245,7 @@ public class UltraScaleClockRouting {
                 clk.getPIPs().addAll(curr.getPIPsBackToSource());
                 return curr;
             }
-            for(Wire w : curr.getWireConnections()) {
+            for (Wire w : curr.getWireConnections()) {
                 // Stay in this clock region to transition from 
                 if (!currCR.equals(w.getTile().getClockRegion())) continue;
                 if (!w.getIntentCode().isUltraScaleClocking()) continue;
@@ -273,7 +273,7 @@ public class UltraScaleClockRouting {
         Set<PIP> allPIPs = new HashSet<>();
         Set<RouteNode> startingPoints = new HashSet<>();
         startingPoints.add(centroidDistNode);
-        nextClockRegion: for(ClockRegion cr : clockRegions) {
+        nextClockRegion: for (ClockRegion cr : clockRegions) {
             q.clear();
             visited.clear();
             q.addAll(startingPoints);
@@ -287,14 +287,14 @@ public class UltraScaleClockRouting {
                 if (currCR != null && cr.getRow() == currCR.getRow() && c == IntentCode.NODE_GLOBAL_VDISTR) {
                     List<PIP> pips = curr.getPIPsBackToSource();
                     allPIPs.addAll(pips);
-                    for(PIP p : pips) {
+                    for (PIP p : pips) {
                         startingPoints.add(new RouteNode(p.getTile(),p.getStartWireIndex()));
                         startingPoints.add(new RouteNode(p.getTile(),p.getEndWireIndex()));
                     }
                     crToVdist.put(cr, curr);
                     continue nextClockRegion;
                 }
-                for(Wire w : curr.getWireConnections()) {
+                for (Wire w : curr.getWireConnections()) {
                     if (w.getIntentCode() != IntentCode.NODE_GLOBAL_VDISTR) continue;
                     RouteNode rn = new RouteNode(w.getTile(), w.getWireIndex(), curr, curr.getLevel()+1);
                     if (visited.contains(rn)) continue;
@@ -321,7 +321,7 @@ public class UltraScaleClockRouting {
         centroidDistLine.setParent(null);
         Queue<RouteNode> q = new LinkedList<RouteNode>();
         Set<PIP> allPIPs = new HashSet<>();
-        nextClockRegion: for(Entry<ClockRegion,RouteNode> e : crMap.entrySet()) {
+        nextClockRegion: for (Entry<ClockRegion,RouteNode> e : crMap.entrySet()) {
             q.clear();
             q.add(e.getValue());
             while(!q.isEmpty()) {
@@ -333,7 +333,7 @@ public class UltraScaleClockRouting {
                     distLines.add(curr);
                     continue nextClockRegion;
                 }
-                for(Wire w : curr.getWireConnections()) { 
+                for (Wire w : curr.getWireConnections()) { 
                     if (!w.getIntentCode().isUltraScaleClocking()) continue;
                     q.add(new RouteNode(w.getTile(), w.getWireIndex(), curr, curr.getLevel()+1));
                 }
@@ -356,7 +356,7 @@ public class UltraScaleClockRouting {
     
     public static Map<ClockRegion, Set<RouteNode>> getStartingPoints(List<RouteNode> distLines) {
         Map<ClockRegion, Set<RouteNode>> startingPoints = new HashMap<>();
-        for(RouteNode rn : distLines) {
+        for (RouteNode rn : distLines) {
             ClockRegion cr = rn.getTile().getClockRegion();
             Set<RouteNode> routeNodes = startingPoints.get(cr);
             if (routeNodes == null) {
@@ -374,7 +374,7 @@ public class UltraScaleClockRouting {
         Set<PIP> allPIPs = new HashSet<>();
         HashSet<RouteNode> visited = new HashSet<>();
         
-        nextLCB: for(RouteNode lcb : lcbTargets) {
+        nextLCB: for (RouteNode lcb : lcbTargets) {
             q.clear();
             visited.clear();
             ClockRegion currCR = lcb.getTile().getClockRegion();
@@ -387,13 +387,13 @@ public class UltraScaleClockRouting {
                     allPIPs.addAll(pips);
                     
                     Set<RouteNode> s = startingPoints.get(currCR);
-                    for(PIP p : pips) {
+                    for (PIP p : pips) {
                         s.add(new RouteNode(p.getTile(),p.getStartWireIndex()));
                         s.add(new RouteNode(p.getTile(),p.getEndWireIndex()));
                     }
                     continue nextLCB;
                 }
-                for(Wire w : curr.getWireConnections()) {
+                for (Wire w : curr.getWireConnections()) {
                     // Stay in this clock region
                     if (!currCR.equals(w.getTile().getClockRegion())) continue;
                     if (!w.getIntentCode().isUltraScaleClocking()) {
@@ -421,10 +421,10 @@ public class UltraScaleClockRouting {
         Set<Wire> used = new HashSet<>();
         Queue<RouteNode> q = new LinkedList<RouteNode>();
         
-        for(Entry<RouteNode,ArrayList<SitePinInst>> e : lcbMappings.entrySet()) {
+        for (Entry<RouteNode,ArrayList<SitePinInst>> e : lcbMappings.entrySet()) {
             Set<PIP> currPIPs = new HashSet<>();
             
-            nextPin: for(SitePinInst sink : e.getValue()) {
+            nextPin: for (SitePinInst sink : e.getValue()) {
                 RouteNode target = sink.getRouteNode();
                 q.clear();
                 q.add(e.getKey());
@@ -436,7 +436,7 @@ public class UltraScaleClockRouting {
                         currPIPs.addAll(pips);
                         continue nextPin;
                     }
-                    for(Wire w : curr.getWireConnections()) {
+                    for (Wire w : curr.getWireConnections()) {
                         if (used.contains(w)) continue;
                         q.add(new RouteNode(w.getTile(), w.getWireIndex(), curr, curr.getLevel()+1));
                     }
@@ -445,7 +445,7 @@ public class UltraScaleClockRouting {
             }
 
             List<PIP> clkPIPs = clk.getPIPs();
-            for(PIP p : currPIPs) {
+            for (PIP p : currPIPs) {
                 used.add(new Wire(p.getTile(),p.getStartWireIndex()));
                 used.add(new Wire(p.getTile(),p.getEndWireIndex()));
                 clkPIPs.add(p);
@@ -471,7 +471,7 @@ public class UltraScaleClockRouting {
         Map<ClockRegion, RouteNode> vertDistLines = routeCentroidToVerticalDistributionLines(clk, centroidDistNode, clockRegions);
         if (verbose) {
             System.out.println(" clock region - vertical distribution node ");
-            for(ClockRegion cr : vertDistLines.keySet()) System.out.println(" \t" + cr + " \t " + vertDistLines.get(cr));
+            for (ClockRegion cr : vertDistLines.keySet()) System.out.println(" \t" + cr + " \t " + vertDistLines.get(cr));
         }
         
         List<RouteNode> distLines = new ArrayList<>();

@@ -153,8 +153,8 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
         macroMap = new HashMap<ModuleInst, HardMacro>();
         
         // Find all valid placements for each module
-        for(ModuleImpls moduleImpls : design.getModules()) {
-            for(Module module : moduleImpls) {
+        for (ModuleImpls moduleImpls : design.getModules()) {
+            for (Module module : moduleImpls) {
                 ArrayList<Site> sites = module.getAllValidPlacements();
                 if (sites.size() == 0) {
                     //throw new RuntimeException("ERROR: Cached macros not implemented yet.");
@@ -166,7 +166,7 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
                 if (debugFlow) {
                     // Need to check if placements will work with existing implementation
                     ArrayList<Site> openSites = new ArrayList<Site>();
-                    for(Site s : sites) {
+                    for (Site s : sites) {
                         if (module.isValidPlacement(s, dev, design)) {
                             openSites.add(s);
                         }
@@ -180,15 +180,15 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
         }
         
         // Create Hard Macro objects from module instances
-        for(ModuleInst mi : design.getModuleInsts()) {
+        for (ModuleInst mi : design.getModuleInsts()) {
             HardMacro hm = new HardMacro(mi);
             hardMacros.add(hm);
             macroMap.put(mi, hm);
         }
 
         // Place hard macros for initial placement
-        for(HardMacro hm : hardMacros) {            
-            for(Site site : hm.getValidPlacements()) {
+        for (HardMacro hm : hardMacros) {            
+            for (Site site : hm.getValidPlacements()) {
                 hm.setTempAnchorSite(site, currentPlacements);
                 if (checkValidPlacement(hm)) {
                     hm.place(site);
@@ -206,7 +206,7 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
      * Finds all paths between unplaced components.
      */
     private void populateAllPaths() {
-        for(Net net : design.getNets()) {
+        for (Net net : design.getNets()) {
             if (net.isStaticNet() || net.isClockNet()) continue;
             SitePinInst src = net.getSource();
             ArrayList<SitePinInst> snks = new ArrayList<SitePinInst>();
@@ -216,7 +216,7 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
                 continue;
             }
             String srcModInstName = src.getSiteInst().getModuleInst() == null ? "null" : src.getModuleInstName();
-            for(SitePinInst p : net.getPins()) {
+            for (SitePinInst p : net.getPins()) {
                 if (p.equals(src)) continue;
                 String snkModInstName = p.getSiteInst().getModuleInst() == null ? "null" : p.getModuleInstName();
                 if (!snkModInstName.equals(srcModInstName)) {
@@ -227,15 +227,15 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
             if (snks.size() > 0) {
                 Path newPath = new Path();
                 newPath.addPin(src, macroMap);
-                for(SitePinInst snk : snks) {
+                for (SitePinInst snk : snks) {
                     newPath.addPin(snk, macroMap);
                 }
                 allPaths.add(newPath);
             }
         }
         
-        for(Path pa : allPaths) {
-            for(PathPort po : pa) {
+        for (Path pa : allPaths) {
+            for (PathPort po : pa) {
                 if (po.getBlock() != null) {
                     po.getBlock().addConnectedPath(pa);
                 }
@@ -244,7 +244,7 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
     }
     
     private boolean checkValidPlacement(HardMacro hm) {
-        for(HardMacro hardMacro : hardMacros) {
+        for (HardMacro hardMacro : hardMacros) {
             if (hardMacro.equals(hm)) continue;
             if (hm.getTempAnchorSite().equals(hardMacro.getTempAnchorSite())) return false;
             if (hm.overlaps(hardMacro)) {
@@ -267,7 +267,7 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
         System.out.println("Initialization Time: " + ((System.currentTimeMillis()-start)/1000.0) + " secs");
         
         start = System.currentTimeMillis();
-        for(Path path : allPaths) {
+        for (Path path : allPaths) {
             path.calculateLength();
         }
         double prevSystemCost = currentSystemCost();
@@ -355,24 +355,24 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
         
         HashSet<HardMacro> fineTunePlacement = new HashSet<HardMacro>(); 
         
-        for(HardMacro hm : hardMacros) {
+        for (HardMacro hm : hardMacros) {
             if (hm.getTileSize() < 60) {
                 fineTunePlacement.add(hm);
             }
         }
         
         
-        for(HardMacro hm : fineTunePlacement) {
+        for (HardMacro hm : fineTunePlacement) {
             // Keep the original spot, in the case we suggest a worst spot
             Site original = hm.getTempAnchorSite();
             int originalMaxLength = 0;
             // Determine all of the connecting points to this hard macro
             HashSet<Point> pointsList = new HashSet<Point>();
-            for(Path path : hm.getConnectedPaths()) {
+            for (Path path : hm.getConnectedPaths()) {
                 if (path.getLength() > originalMaxLength) {
                     originalMaxLength = path.getLength();
                 }
-                for(PathPort pp : path) {
+                for (PathPort pp : path) {
                     if (pp.getBlock()== null || !pp.getBlock().equals(hm)) {
                         pointsList.add(new Point(pp.getPortTile()));
                     }
@@ -395,7 +395,7 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
                 hm.setTempAnchorSite(newCandidateSite, currentPlacements);
                 currentSystemCost();
                 int longestPath = 0;
-                for(Path path : hm.getConnectedPaths()) {
+                for (Path path : hm.getConnectedPaths()) {
                     if (path.getLength() > longestPath) {
                         longestPath = path.getLength();
                     }
@@ -420,7 +420,7 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
         
         HashSet<Tile> usedTiles = new HashSet<Tile>();
         // Perform final placement of all hard macros
-        for(HardMacro hm : array) {    
+        for (HardMacro hm : array) {    
             //System.out.println(moveCount.get(hm) + " " + hm.tileSize + " " + hm.getName());
             HashSet<Tile> footPrint = isValidPlacement((ModuleInst)hm, hm.getModule().getAnchor(), hm.getTempAnchorSite().getTile(), usedTiles);
             if (footPrint == null) {
@@ -439,7 +439,7 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
         }
         
         design.clearUsedSites();
-        for(SiteInst i : design.getSiteInsts()) {
+        for (SiteInst i : design.getSiteInsts()) {
             i.place(i.getSite());
         }
         
@@ -454,7 +454,7 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
     enum Direction{UP, DOWN, LEFT, RIGHT};
     
     public Site getPrimitiveSiteFromTile(Tile tile, SiteTypeEnum type) {
-        for(Site p : tile.getSites()) {
+        for (Site p : tile.getSites()) {
             if (p.isCompatibleSiteType(type)) {
                 return p;
             }
@@ -535,7 +535,7 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
         
         if (proposedAnchorTile == null) {
             Site[] candidateSites = dev.getAllCompatibleSites(modInst.getAnchor().getSiteTypeEnum());
-            for(Site site : candidateSites) {
+            for (Site site : candidateSites) {
                 proposedAnchorTile = site.getTile();
                 if (!triedTiles.contains(proposedAnchorTile)) {
                     tiles = isValidPlacement(modInst, anchorSite, proposedAnchorTile, usedTiles);
@@ -576,7 +576,7 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
         
         HashSet<Tile> footPrint = new HashSet<Tile>();
         // Check instances
-        for(SiteInst i : modInst.getModule().getSiteInsts()) {
+        for (SiteInst i : modInst.getModule().getSiteInsts()) {
             if (Utils.getLockedSiteTypes().contains(i.getSiteTypeEnum())) {
                 continue;
             }
@@ -594,8 +594,8 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
         }
         
         // Check nets
-        for(Net n : modInst.getModule().getNets()) {
-            for(PIP p : n.getPIPs()) {
+        for (Net n : modInst.getModule().getNets()) {
+            for (PIP p : n.getPIPs()) {
                 Tile newTile = modInst.getCorrespondingTile(p.getTile(), proposedAnchorTile, dev);
                 if (newTile == null || usedTiles.contains(newTile)) {
                     return null;
@@ -680,17 +680,17 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
     private double currentSystemCost() {
         int totalWireLength = 0;
         if (currentMove.getBlock0() != null) {
-            for(Path wire : currentMove.getBlock0().getConnectedPaths()) {
+            for (Path wire : currentMove.getBlock0().getConnectedPaths()) {
                 wire.calculateLength();                
             }
         }
         if (currentMove.getBlock1() != null) {
-            for(Path wire : currentMove.getBlock1().getConnectedPaths()) {
+            for (Path wire : currentMove.getBlock1().getConnectedPaths()) {
                 wire.calculateLength();
             }
         }
         int maxPathLength = 0;
-        for(Path path : allPaths) {
+        for (Path path : allPaths) {
             totalWireLength += path.getLength();
             if (path.getLength() > maxPathLength) {
                 maxPathLength = path.getLength();
@@ -717,24 +717,24 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
         
         
         // Create Hard Macro objects from module instances
-        for(ModuleInst mi : design.getModuleInsts()) {
+        for (ModuleInst mi : design.getModuleInsts()) {
             HardMacro hm = new HardMacro(mi);
             hardMacros.add(hm);
             macroMap.put(mi, hm);
         }
 
         // Place hard macros for initial placement
-        for(HardMacro hm : hardMacros) {
+        for (HardMacro hm : hardMacros) {
             hm.setTempAnchorSite(hm.getAnchor().getSite(), currentPlacements);
         }
         
         // Find all port wires
         populateAllPaths();
         
-        for(Path path : allPaths) {
+        for (Path path : allPaths) {
             path.calculateLength();
             System.out.printf("%4d ",path.getLength());
-            for(PathPort pp : path) {
+            for (PathPort pp : path) {
                 String name = pp.getBlock() == null ? "null" : pp.getBlock().getModule().getName(); 
                 System.out.print(name + "("+pp.getPortTile().getName()+")->");
             }

@@ -38,14 +38,14 @@ public class TestEDIFPort {
     public void testEDIFPortInternalNets() {
         Design design = Design.readCheckpoint(RapidWrightDCP.getPath("picoblaze_ooc_X10Y235.dcp"));
         
-        for(EDIFLibrary lib : design.getNetlist().getLibraries()) {
-            for(EDIFCell cell : lib.getCells()) {
+        for (EDIFLibrary lib : design.getNetlist().getLibraries()) {
+            for (EDIFCell cell : lib.getCells()) {
                 boolean isLeaf = cell.isLeafCellOrBlackBox();
                 Map<String,EDIFNet> internalNetMap = cell.getInternalNetMap();
-                for(EDIFPort port : cell.getPorts()) {
+                for (EDIFPort port : cell.getPorts()) {
                    if (port.isBus()) {
                        List<EDIFNet> nets = port.getInternalNets();                      
-                       for(int i=0; i < port.getWidth(); i ++) {
+                       for (int i=0; i < port.getWidth(); i ++) {
                            EDIFNet net = nets.get(i);
                            Assertions.assertEquals(port.getInternalNet(i), nets.get(i));
                            String portInstName = port.getPortInstNameFromPort(i);

@@ -57,7 +57,7 @@ public class MergeDesigns {
         
         design0.getNetlist().migrateCellAndSubCells(topCell1, true);
         
-        for(EDIFPort port1 : new ArrayList<>(topCell1.getPorts())) {
+        for (EDIFPort port1 : new ArrayList<>(topCell1.getPorts())) {
             EDIFPort port0 = topCell0.getPort(port1.getBusName());
             if (port0 == null) {
                 topCell0.addPort(port1);
@@ -66,11 +66,11 @@ public class MergeDesigns {
             }
         }
         
-        for(EDIFNet net1 : topCell1.getNets()) {
+        for (EDIFNet net1 : topCell1.getNets()) {
             EDIFNet net0 = topCell0.getNet(net1);
             if (net0 == null) {
                 topCell0.addNet(net1);
-                for(EDIFPortInst inst : net1.getPortInsts()) {
+                for (EDIFPortInst inst : net1.getPortInsts()) {
                     if (inst.isTopLevelPort() && inst.getPort().getParentCell() == topCell0) {
                         topCell0.addInternalPortMapEntry(inst.getPortInstNameFromPort(), net1);
                     }
@@ -80,7 +80,7 @@ public class MergeDesigns {
             }
         }
                 
-        for(EDIFCellInst inst1 : topCell1.getCellInsts()) {
+        for (EDIFCellInst inst1 : topCell1.getCellInsts()) {
             EDIFCellInst inst0 = topCell0.getCellInst(inst1.getName());
             if (inst0 == null) {
                 topCell0.addCellInst(inst1);
@@ -89,7 +89,7 @@ public class MergeDesigns {
             }
         }
         
-        for(SiteInst siteInst1 : design1.getSiteInsts()) {
+        for (SiteInst siteInst1 : design1.getSiteInsts()) {
             SiteInst siteInst0 = design0.getSiteInstFromSiteName(siteInst1.getSiteName());
             if (siteInst0 == null) {
                 design0.addSiteInst(siteInst1);
@@ -98,7 +98,7 @@ public class MergeDesigns {
             }
         }
         
-        for(Net net1 : design1.getNets()) {
+        for (Net net1 : design1.getNets()) {
             Net net0 = design0.getNet(net1.getName());
             if (net0 == null) {
                 design0.addNet(net1);
@@ -135,7 +135,7 @@ public class MergeDesigns {
      */
     public static Design mergeDesigns(Supplier<AbstractDesignMerger> merger, Design...designs) {
         Design result = null;
-        for(Design design : designs) {
+        for (Design design : designs) {
             if (result == null) {
                 result = design;
             } else {
@@ -175,12 +175,12 @@ public class MergeDesigns {
             e.printStackTrace();
         }
         System.out.println("Merging DCPs:");
-        for(File f : dcps) {
+        for (File f : dcps) {
             System.out.println("  " + f.getAbsolutePath());
         }
         
         Design[] designs = new Design[dcps.size()];
-        for(int i=0; i < designs.length; i++) {
+        for (int i=0; i < designs.length; i++) {
             t.start("Read DCP " + i);
             designs[i] = Design.readCheckpoint(dcps.get(i).toPath(), CodePerfTracker.SILENT);
             t.stop();

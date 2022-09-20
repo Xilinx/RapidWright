@@ -181,15 +181,15 @@ public class TestEDIFPortInstList {
         
         
         
-        for(String name : names) {
+        for (String name : names) {
             allNames.add(name);
         }
-        for(String name : EDIFTools.bitBlast("x[12:0]")) {
+        for (String name : EDIFTools.bitBlast("x[12:0]")) {
             allNames.add(name);
         }
         
         HashSet<String> uniqueSet = new HashSet<>();
-        for(String name : allNames) {
+        for (String name : allNames) {
             // Test to ensure duplicates are not allowed
             boolean success = list.add(makeEDIFPortInst(name));
             boolean isDuplicate = uniqueSet.add(name);
@@ -203,13 +203,13 @@ public class TestEDIFPortInstList {
         Collections.sort(allNames);
         
         ArrayList<String> listSorted = new ArrayList<>();
-        for(int i=0; i < allNames.size(); i++) {
+        for (int i=0; i < allNames.size(); i++) {
             listSorted.add(list.get(i).getFullName());
         }
 
         Assertions.assertTrue(listSorted.containsAll(allNames) && allNames.containsAll(listSorted));
         
-        for(EDIFPortInst portInst : new ArrayList<>(list)) {
+        for (EDIFPortInst portInst : new ArrayList<>(list)) {
             EDIFPortInst portInstGet = list.get(portInst.getCellInst(), portInst.getName());
             Assertions.assertEquals(portInst, portInstGet);
             list.remove(portInst);

@@ -486,7 +486,7 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
         Map<String,EDIFPort> portMap = new HashMap<>(ports);
         if (portMap.size() != cell.getPortMap().size()) return false;
 
-        for(EDIFPort port : cell.getPorts()) {
+        for (EDIFPort port : cell.getPorts()) {
             EDIFPort match = portMap.remove(port.getBusName());
             if (match == null) {
                 match = portMap.remove(port.getName());
@@ -536,16 +536,16 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
         os.write(EXPORT_CONST_CELLTYPE);
         view.exportEDIFName(os, cache);
         os.write(EXPORT_CONST_VIEWTYPE);
-        for(EDIFPort port : EDIFTools.sortIfStable(getPorts(), stable)) {
+        for (EDIFPort port : EDIFTools.sortIfStable(getPorts(), stable)) {
             port.exportEDIF(os, cache, stable);
         }
         os.write(EXPORT_CONST_INTERFACE_END); // Interface end
         if (hasContents()) {
             os.write(EXPORT_CONST_CONTENTS);
-            for(EDIFCellInst i : EDIFTools.sortIfStable(getCellInsts(), stable)) {
+            for (EDIFCellInst i : EDIFTools.sortIfStable(getCellInsts(), stable)) {
                 i.exportEDIF(os, cache, stable);
             }
-            for(EDIFNet n : EDIFTools.sortIfStable(getNets(), stable)) {
+            for (EDIFNet n : EDIFTools.sortIfStable(getNets(), stable)) {
                 n.exportEDIF(os, cache, stable);
             }
             os.write(EXPORT_CONST_CONTENTS_END); // Contents end
@@ -628,7 +628,7 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
         }
         // Finding by EDIFName is O(n), but n is generally small and alternative to building
         // a map for this single search ends up taking longer
-        for(Map.Entry<String,EDIFPort> e : getPortMap().entrySet()) {
+        for (Map.Entry<String,EDIFPort> e : getPortMap().entrySet()) {
             if (cache.getLegalEDIFName(e.getValue()).equals(name)) {
                 return e.getValue();
             }

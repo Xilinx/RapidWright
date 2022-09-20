@@ -187,13 +187,13 @@ public enum IntentCode {
     
     public static void printIntentCodesBySeries(Series s) {
         System.out.println(s.name() + ":");
-        for(IntentCode i : getIntentCodesBySeries(s)) {
+        for (IntentCode i : getIntentCodesBySeries(s)) {
             System.out.printf("%3d. %s\n", i.ordinal(), i.name());
         }
     }
     
     public static void main(String[] args) {
-        for(Series s : Series.values()) {
+        for (Series s : Series.values()) {
             printIntentCodesBySeries(s);
         }
     }

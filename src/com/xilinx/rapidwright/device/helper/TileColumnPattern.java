@@ -94,7 +94,7 @@ public class TileColumnPattern extends ArrayList<TileTypeEnum> implements Compar
      */
     public static TileColumnPattern createTileColumnPattern(List<TileTypeEnum> filteredTypes, int start, int end) {
         TileColumnPattern p = new TileColumnPattern();
-        for(TileTypeEnum t : filteredTypes.subList(start, end)) {
+        for (TileTypeEnum t : filteredTypes.subList(start, end)) {
             if (t == TileTypeEnum.NULL) return null;
             p.add(t);
         }
@@ -104,7 +104,7 @@ public class TileColumnPattern extends ArrayList<TileTypeEnum> implements Compar
 
     private void updateFlags() {
         flags = EnumSet.noneOf(TypesOfInterest.class);
-        for(TileTypeEnum t : this) {
+        for (TileTypeEnum t : this) {
             if (Utils.isCLBM(t)) {
                 flags.add(TypesOfInterest.SLICEM);
             } else if (Utils.isCLB(t)) {
@@ -163,13 +163,13 @@ public class TileColumnPattern extends ArrayList<TileTypeEnum> implements Compar
      */
     public static int getCommonRow(Device dev, boolean wantLaguna) {
         boolean devHasUram = (PartNameTools.getPart(dev.getName()).getUltraRams() != 0);
-        for(int row=0; row < dev.getRows(); row++) {
+        for (int row=0; row < dev.getRows(); row++) {
             boolean hasDSP = false;
             boolean hasBRAM = false;
             boolean hasCLB = false;
             boolean hasURAM = false;
             boolean hasLaguna = false;
-            for(int col=0; col < dev.getColumns(); col++) {
+            for (int col=0; col < dev.getColumns(); col++) {
                 Tile t = dev.getTile(row, col);
                 TileTypeEnum tt = t.getTileTypeEnum();
                 if (Utils.isDSP(tt)) hasDSP = true;
@@ -222,7 +222,7 @@ public class TileColumnPattern extends ArrayList<TileTypeEnum> implements Compar
         int nullCtr = 0;
         int longestRunWithoutNull = 1;
         int currRunWithoutNull = 0;
-        for(int col=0; col < dev.getColumns(); col++) {
+        for (int col=0; col < dev.getColumns(); col++) {
             Tile tile = dev.getTile(rowIdx, col);
             if (typesOfInterest.contains(tile.getTileTypeEnum())) {
                 filteredTypes.add(tile.getTileTypeEnum());
@@ -249,8 +249,8 @@ public class TileColumnPattern extends ArrayList<TileTypeEnum> implements Compar
         }
         // Generate all possible patterns and store them in the map keeping track of each
         // instance of each pattern
-        for(int i=1; i < MAX_PATTERN_LENGTH; i++) {
-            for(int j=0; j < filteredTypes.size(); j++) {
+        for (int i=1; i < MAX_PATTERN_LENGTH; i++) {
+            for (int j=0; j < filteredTypes.size(); j++) {
                 if (j+i > filteredTypes.size()) continue;
                 TileColumnPattern curr = createTileColumnPattern(filteredTypes, j, j+i);
                 if (curr == null) continue;
@@ -288,7 +288,7 @@ public class TileColumnPattern extends ArrayList<TileTypeEnum> implements Compar
         int size = map.size();
         TileColumnPattern[] sorted = new TileColumnPattern[size];
         int i = 0; 
-        for(Entry<TileColumnPattern,TreeSet<Integer>> e : map.entrySet()) {
+        for (Entry<TileColumnPattern,TreeSet<Integer>> e : map.entrySet()) {
             e.getKey().setNumInstances(e.getValue().size());
             sorted[i++] = e.getKey();
         }
@@ -327,7 +327,7 @@ public class TileColumnPattern extends ArrayList<TileTypeEnum> implements Compar
      */
     public String getTilePatternString(FamilyType arch) {
         StringBuilder sb = new StringBuilder();
-        for(TileTypeEnum t : this) {
+        for (TileTypeEnum t : this) {
             sb.append(getTileCharacter(t, arch));
         }
         return sb.toString();
@@ -339,10 +339,10 @@ public class TileColumnPattern extends ArrayList<TileTypeEnum> implements Compar
         Device dev = Device.getDevice(part);
         FamilyType arch = dev.getArchitecture();
         HashMap<TileColumnPattern,TreeSet<Integer>> map = genColumnPatternMap(dev);
-        for(TileColumnPattern p : getSortedMostCommonPatterns(map)) {
+        for (TileColumnPattern p : getSortedMostCommonPatterns(map)) {
             TreeSet<Integer> set = map.get(p);
             System.out.print(p.getTilePatternString(arch) + " " + p.getNumInstances() + " {");
-            for(Integer i : set) {
+            for (Integer i : set) {
                 System.out.print(i + ",");
             }
             System.out.println("}");

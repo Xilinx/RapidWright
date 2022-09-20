@@ -130,7 +130,7 @@ public class FloorPlanScene extends TileScene {
     @Override
     public void mouseReleaseEvent(QGraphicsSceneMouseEvent event) {
         if (validPlacements.size() > 0) {
-            for(ValidPlacementPolygon p : validPlacements) {
+            for (ValidPlacementPolygon p : validPlacements) {
                 removeItem(p);
             }
         }
@@ -141,7 +141,7 @@ public class FloorPlanScene extends TileScene {
                 hmMoved.emit(movingHMList, movingPosList);
             }
             if (netViewState == HIDE_NETS) {
-                for(GUIModuleInst gmi : movingHMList) {
+                for (GUIModuleInst gmi : movingHMList) {
                     gmi.hideMyLines();
                 }                
             }
@@ -152,7 +152,7 @@ public class FloorPlanScene extends TileScene {
     public void highlightValidPlacements(GUIModuleInst ghmpi) {
         QPolygonF shape = new QPolygonF(ghmpi.getShape());
         
-        for(Site s : ghmpi.getModuleInst().getAllValidPlacements()) {
+        for (Site s : ghmpi.getModuleInst().getAllValidPlacements()) {
             ValidPlacementPolygon item = new ValidPlacementPolygon(shape,ghmpi.getAnchorOffset());
             addItem(item);
         }
@@ -232,11 +232,11 @@ public class FloorPlanScene extends TileScene {
             }
         }
         if (netsFound.size() < 2) {
-            nextNet: for(Net n : getDesign().getNets()) {
+            nextNet: for (Net n : getDesign().getNets()) {
                 if (n.isClockNet()) continue;
                 if (n.isStaticNet()) continue;
                 String modInstName = null;
-                for(SitePinInst p : n.getPins()) {
+                for (SitePinInst p : n.getPins()) {
                     String curr = p.getModuleInstName();
                     if (modInstName != null && curr != null && !modInstName.equals(curr)) {
                         netsFound.add(n);
@@ -249,7 +249,7 @@ public class FloorPlanScene extends TileScene {
         }
         if (debugPlacer) {
             Collection<SiteInst> insts = getDesign().getSiteInsts();
-            for(SiteInst inst : insts) {
+            for (SiteInst inst : insts) {
                 if (inst.getModuleTemplate() == null && inst.isPlaced()) {
                     Tile t = inst.getTile();
                     HMTile myTile = new HMTile(t, this, null);
@@ -293,7 +293,7 @@ public class FloorPlanScene extends TileScene {
         }
         if (srcMIName != null) {
             //for (String destKey : destMINameList) {
-            for(int i=0;i<destMINameList.size();i++) {
+            for (int i=0;i<destMINameList.size();i++) {
                 String destMIName = destMINameList.get(i);
                 Tile destTile = destTileList.get(i);
                 //Non-module-to-module connections
@@ -362,27 +362,27 @@ public class FloorPlanScene extends TileScene {
         netViewState = index;
         switch (index) {
         case HIDE_NETS://Nets hidden
-            for(String key : multiNetLineMap.keySet()) {
+            for (String key : multiNetLineMap.keySet()) {
                 GUIMultiNetLine line = multiNetLineMap.get(key);
                 line.hide();
             }
-            for(GUINetLine line : netLineList)
+            for (GUINetLine line : netLineList)
                 line.hide();
             break;
         case MODULE_TO_MODULE://Module-to-module
-            for(String key : multiNetLineMap.keySet()) {
+            for (String key : multiNetLineMap.keySet()) {
                 GUIMultiNetLine line = multiNetLineMap.get(key);
                 line.show();
             }
-            for(GUINetLine line : netLineList)
+            for (GUINetLine line : netLineList)
                 line.hide();
             break;
         case 2://All nets(not clk/rst)
-            for(String key : multiNetLineMap.keySet()) {
+            for (String key : multiNetLineMap.keySet()) {
                 GUIMultiNetLine line = multiNetLineMap.get(key);
                 line.hide();
             }
-            for(GUINetLine line : netLineList)
+            for (GUINetLine line : netLineList)
                 line.show();
             break;
         default:

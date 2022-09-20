@@ -156,7 +156,7 @@ public class EDIFNet extends EDIFPropertyObject {
     public Map<String, EDIFPortInst> getPortInstMap() {
         if (portInsts == null) return Collections.emptyMap();
         HashMap<String, EDIFPortInst> map = new HashMap<>();
-        for(EDIFPortInst e : getPortInsts()) {
+        for (EDIFPortInst e : getPortInsts()) {
             map.put(e.getFullName(), e);
         }
         return map;
@@ -183,7 +183,7 @@ public class EDIFNet extends EDIFPropertyObject {
      */
     public List<EDIFPortInst> getSourcePortInsts(boolean includeTopLevelPorts) {
         List<EDIFPortInst> srcs = new ArrayList<>();
-        for(EDIFPortInst portInst : getPortInsts()) {
+        for (EDIFPortInst portInst : getPortInsts()) {
             boolean includePort =
                 (portInst.isOutput() && !portInst.isTopLevelPort()) ||
                 (portInst.isInput() && portInst.isTopLevelPort() && includeTopLevelPorts);
@@ -224,7 +224,7 @@ public class EDIFNet extends EDIFPropertyObject {
      * @return The first top level port instance found in the net, or null if none exists.
      */
     public EDIFPortInst getTopLevelPortInst() {
-        for(EDIFPortInst portInst : getPortInsts()) {
+        for (EDIFPortInst portInst : getPortInsts()) {
             if (portInst.isTopLevelPort()) {
                 return portInst;
             }
@@ -238,7 +238,7 @@ public class EDIFNet extends EDIFPropertyObject {
      */
     public List<EDIFPortInst> getAllTopLevelPortInsts() {
         List<EDIFPortInst> topPortInsts = new ArrayList<>();
-        for(EDIFPortInst portInst : getPortInsts()) {
+        for (EDIFPortInst portInst : getPortInsts()) {
             if (portInst.isTopLevelPort()) {
                 topPortInsts.add(portInst);
             }
@@ -323,7 +323,7 @@ public class EDIFNet extends EDIFPropertyObject {
         os.write(EXPORT_CONST_NET_START);
         exportEDIFName(os, cache);
         os.write(EXPORT_CONST_JOINED);
-        for(EDIFPortInst p : EDIFTools.sortIfStable(getPortInsts(), edifPortInstComparator, stable)) {
+        for (EDIFPortInst p : EDIFTools.sortIfStable(getPortInsts(), edifPortInstComparator, stable)) {
             p.writeEDIFExport(os, EXPORT_CONST_PORT_INDENT, cache);
         }
         os.write(EXPORT_CONST_JOINED_END); // joined end

@@ -100,7 +100,7 @@ public class TestSiteInst {
         
         SiteInst si = d.createSiteInst(d.getDevice().getSite("SLICE_X32Y73"));
         
-        for(char letter : LUTTools.lutLetters) {
+        for (char letter : LUTTools.lutLetters) {
             routeLUTRouteThruHelperFF(d, si, letter, true, true);
             routeLUTRouteThruHelperFF(d, si, letter, false, false);
             if (d.getDevice().getSeries() == Series.Series7 && letter == 'D') break;
@@ -114,7 +114,7 @@ public class TestSiteInst {
 
         SiteInst si = d.createSiteInst(d.getDevice().getSite("SLICE_X32Y73"));
 
-        for(char letter : LUTTools.lutLetters) {
+        for (char letter : LUTTools.lutLetters) {
             routeLUTRouteThruHelperFF(d, si, letter, true, true);
             routeLUTRouteThruHelperFF(d, si, letter, true, false);
             Assertions.assertNull(si.getCell(letter + "5LUT"));
@@ -129,7 +129,7 @@ public class TestSiteInst {
 
         SiteInst si = d.createSiteInst(d.getDevice().getSite("SLICE_X32Y73"));
 
-        for(char letter : LUTTools.lutLetters) {
+        for (char letter : LUTTools.lutLetters) {
             routeLUTRouteThruHelperFF(d, si, letter, true, true);
             routeLUTRouteThruHelperFF(d, si, letter, false, false);
 
@@ -168,8 +168,8 @@ public class TestSiteInst {
         SiteInst si = design.getSiteInstFromSiteName("SLICE_X78Y212");
 
         // Test cross product of {LUT opin, SitePIP ipin} x {FF ipin, SitePIP opin}
-        for(BELPin src : new BELPin[] {si.getBELPin("D5LUT","O5"), si.getBELPin("FFMUXD2","D5")} ) {
-            for(BELPin snk : new BELPin[] {si.getBELPin("DFF2","D"), si.getBELPin("FFMUXD2","OUT2")} ) {
+        for (BELPin src : new BELPin[] {si.getBELPin("D5LUT","O5"), si.getBELPin("FFMUXD2","D5")} ) {
+            for (BELPin snk : new BELPin[] {si.getBELPin("DFF2","D"), si.getBELPin("FFMUXD2","OUT2")} ) {
                 Net net = si.getNetFromSiteWire("D5LUT_O5");
                 Assertions.assertNotNull(net);
                 Assertions.assertEquals(si.getUsedSitePIP("FFMUXD2").getInputPinName(), "D5");
@@ -196,7 +196,7 @@ public class TestSiteInst {
 
         SiteInst si = d.createSiteInst(d.getDevice().getSite("SLICE_X32Y73"));
 
-        for(char letter : LUTTools.lutLetters) {
+        for (char letter : LUTTools.lutLetters) {
             routeLUTRouteThruHelperCarry(d, si, letter, true);
             routeLUTRouteThruHelperCarry(d, si, letter, false);
             if (d.getDevice().getSeries() == Series.Series7 && letter == 'D') break;
@@ -270,7 +270,7 @@ public class TestSiteInst {
 
         String[] siteWires = new String[] {inputPin, inputPin.charAt(0)+ "_O"};
 
-        for(String siteWire : siteWires) {
+        for (String siteWire : siteWires) {
             Assertions.assertEquals(n, si.getNetFromSiteWire(siteWire));
         }
 
@@ -313,7 +313,7 @@ public class TestSiteInst {
 
         String[] siteWires = new String[] {inputPin, "F7MUX_EF_OUT", inputPin.charAt(0)+ "_O"};
         
-        for(String siteWire : siteWires) {
+        for (String siteWire : siteWires) {
             Assertions.assertEquals(n, si.getNetFromSiteWire(siteWire));
         }
         Net staticSelectNet = inputPin.equals("F6") ? d.getGndNet() : d.getVccNet(); 
@@ -329,7 +329,7 @@ public class TestSiteInst {
         f7mux = si.getCell(si.getBEL("F7MUX_EF"));
         Assertions.assertNull(f7mux);
 
-        for(String siteWire : siteWires) {
+        for (String siteWire : siteWires) {
             Assertions.assertNull(si.getNetFromSiteWire(siteWire));
         }
         Assertions.assertNull(si.getNetFromSiteWire("EX"));

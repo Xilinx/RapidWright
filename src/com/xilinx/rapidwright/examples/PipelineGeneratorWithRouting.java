@@ -214,7 +214,7 @@ public class PipelineGeneratorWithRouting {
         Net[][] icNet = new Net[depth+1][width];
         Cell[][] ffs = new Cell[depth][width];
 
-        for(int j=0; j <= depth; j++) {
+        for (int j=0; j <= depth; j++) {
             for (int i = width - 1; i >= 0; i--) {
                 String index = "[" + i + "]";
                 String ic_name;
@@ -234,7 +234,7 @@ public class PipelineGeneratorWithRouting {
         Site newSite = startingPoint;
 
         // Note: the outer loop replicates flops for having multiple cycles
-        for(int j=0; j < depth; j++) {
+        for (int j=0; j < depth; j++) {
 
             int newSiteRow = newSite.getTile().getRow();
             int newSiteCol = newSite.getTile().getColumn();

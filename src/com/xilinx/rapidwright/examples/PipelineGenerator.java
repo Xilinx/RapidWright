@@ -177,7 +177,7 @@ public class PipelineGenerator {
         EDIFNet[][] ic = new EDIFNet[depth+1][width];
         boolean[][] ic_net_created = new boolean[depth+1][width];
 
-        for(int j=0; j <= depth; j++) {
+        for (int j=0; j <= depth; j++) {
             for (int i = width - 1; i >= 0; i--) {
                 String index = "[" + i + "]";
                 String ic_name;
@@ -198,7 +198,7 @@ public class PipelineGenerator {
 
 
         // Note: the outer loop replicates flops for having multiple cycles
-        for(int j=0; j < depth; j++) {
+        for (int j=0; j < depth; j++) {
 
             int newSiteRow = newSite.getTile().getRow();
             int newSiteCol = newSite.getTile().getColumn();

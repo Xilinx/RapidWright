@@ -53,7 +53,7 @@ public class TileSources implements Serializable{
         }
         else {
             Arrays.sort(sources);
-            for(Integer i : sources) {
+            for (Integer i : sources) {
                 hash += i * 7;
             }
             return hash;
@@ -80,7 +80,7 @@ public class TileSources implements Serializable{
         }
         Arrays.sort(other.sources);
         Arrays.sort(sources);
-        for(int i=0; i< sources.length; i++) {
+        for (int i=0; i< sources.length; i++) {
             if (sources[i] != other.sources[i]) {
                 return false;
             }

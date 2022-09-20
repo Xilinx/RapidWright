@@ -53,7 +53,7 @@ public class TestMergeDesigns {
     
     public static Pair<Design, Design> createDesignsToMerge(boolean reverse) {
         Pair<Design, Design> designs = new Pair<>();
-        for(String name : new String[] {"a", "b"}) {
+        for (String name : new String[] {"a", "b"}) {
             Design a = new Design(name, partName);
             int i = name.equals("a") ? 0 : 1;
             Cell ff0 = a.createAndPlaceCell("ff" + i, Unisim.FDRE, "SLICE_X"+i+"Y0/AFF");
@@ -120,8 +120,8 @@ public class TestMergeDesigns {
 
     private static int countMergedNets(EDIFCell ... topCells) {
         HashSet<String> nets = new HashSet<>();
-        for(EDIFCell top : topCells) {
-            for(EDIFNet net : top.getNets()) {
+        for (EDIFCell top : topCells) {
+            for (EDIFNet net : top.getNets()) {
                 nets.add(net.getName());
             }
         }
@@ -130,8 +130,8 @@ public class TestMergeDesigns {
     
     private static int countMergedInsts(EDIFCell ... topCells) {
         HashSet<String> insts = new HashSet<>();
-        for(EDIFCell top : topCells) {
-            for(EDIFCellInst inst : top.getCellInsts()) {
+        for (EDIFCell top : topCells) {
+            for (EDIFCellInst inst : top.getCellInsts()) {
                 insts.add(inst.getName());
             }
         }
@@ -140,8 +140,8 @@ public class TestMergeDesigns {
     
     private static int countMergedPorts(EDIFCell ... topCells) {
         HashSet<String> ports = new HashSet<>();
-        for(EDIFCell top : topCells) {
-            for(EDIFPort port : top.getPorts()) {
+        for (EDIFCell top : topCells) {
+            for (EDIFPort port : top.getPorts()) {
                 ports.add(port.getName());
             }
         }
@@ -150,8 +150,8 @@ public class TestMergeDesigns {
     
     private static int countMergedSiteInsts(Design ... designs) {
         HashSet<String> sites = new HashSet<>();
-        for(Design design : designs) {
-            for(SiteInst siteInst : design.getSiteInsts()) {
+        for (Design design : designs) {
+            for (SiteInst siteInst : design.getSiteInsts()) {
                 if (siteInst.isPlaced()) {
                     sites.add(siteInst.getSiteName());
                 }

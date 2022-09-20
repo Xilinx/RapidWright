@@ -78,7 +78,7 @@ public class PolynomialGenerator {
                 int value = Integer.parseInt(name);
                 EDIFNet gnd = EDIFTools.getStaticNet(NetType.GND, top, d.getNetlist());
                 EDIFNet vcc = EDIFTools.getStaticNet(NetType.VCC, top, d.getNetlist());
-                for(int i=0; i < width; i++) {
+                for (int i=0; i < width; i++) {
                     int bit = (value >> i) & 0x1;
                     EDIFNet src = bit == 1 ? vcc : gnd;
                     src.addPortInst(resultPortInsts[i]);
@@ -89,7 +89,7 @@ public class PolynomialGenerator {
             if (top.getPort(name) == null) {
                 srcs = EDIFTools.createPortInsts(top, name, EDIFDirection.INPUT, resultPortInsts.length);
             }
-            for(int i=0; i < width; i++) {
+            for (int i=0; i < width; i++) {
                 String netName = name + "[" + i + "]"; 
                 EDIFNet net = top.getNet(netName);
                 if (net == null) {
@@ -103,7 +103,7 @@ public class PolynomialGenerator {
         
         ArrayList<Integer> addSubOps = new ArrayList<>();
         ArrayList<Integer> multOps = new ArrayList<>();
-        for(int i=0; i < tokens.length; i++) {
+        for (int i=0; i < tokens.length; i++) {
             if (tokens[i].equals("+") || tokens[i].equals("-")) {
                 addSubOps.add(i);
             } else if (tokens[i].equals("*")) {
@@ -123,7 +123,7 @@ public class PolynomialGenerator {
         EDIFCell top = d.getNetlist().getTopCell();
         EDIFPortInst[] inputA = EDIFTools.createPortInsts(inA, EDIFDirection.INPUT, width, mi.getCellInst());
         EDIFPortInst[] inputB = EDIFTools.createPortInsts(inB, EDIFDirection.INPUT, width, mi.getCellInst());
-        for(int i=0; i < width; i++) {
+        for (int i=0; i < width; i++) {
             String netName = RESULT_NAME + "_" + (instanceCount++) + "[" + i + "]";
             EDIFNet net = top.createNet(netName);
             net.addPortInst(resultPortInsts[i]);
@@ -190,12 +190,12 @@ public class PolynomialGenerator {
         sub.setNetlist(subDesign2.getNetlist());
         operators.put("-o", sub2);
         
-        for(Design design : new Design[]{multDesign,multDesign2,adderDesign,adderDesign2,subDesign,subDesign2}) {
-            for(EDIFCell cell : design.getNetlist().getWorkLibrary().getCells()) {
+        for (Design design : new Design[]{multDesign,multDesign2,adderDesign,adderDesign2,subDesign,subDesign2}) {
+            for (EDIFCell cell : design.getNetlist().getWorkLibrary().getCells()) {
                 d.getNetlist().getWorkLibrary().addCell(cell);
             }
             EDIFLibrary hdi = d.getNetlist().getHDIPrimitivesLibrary(); 
-            for(EDIFCell cell : design.getNetlist().getHDIPrimitivesLibrary().getCells()) {
+            for (EDIFCell cell : design.getNetlist().getHDIPrimitivesLibrary().getCells()) {
                 if (!hdi.containsCell(cell)) hdi.addCell(cell);
             }            
         }
@@ -265,7 +265,7 @@ public class PolynomialGenerator {
         } else {
             EDIFCellInst dsp = mi.getCellInst().getCellType().getCellInst(MULT_NAME);
             SiteInst si = mi.getSiteInsts().get(0);
-            for(EDIFPortInst p : dsp.getPortInsts()) {
+            for (EDIFPortInst p : dsp.getPortInsts()) {
                 if (p.getName().startsWith("ACIN") || p.getName().startsWith("BCIN") || p.getName().startsWith("PCIN")) continue;
                 if (p.getName().startsWith("CARRYCASCIN") || p.getName().startsWith("MULTSIGNIN") ) continue;
                 if (p.getNet().getName().equals(EDIFTools.LOGICAL_VCC_NET_NAME)) {
@@ -286,7 +286,7 @@ public class PolynomialGenerator {
         int power = Integer.parseInt(parts[1]);
         if (power == 0) return "";
         StringBuilder sb = new StringBuilder(var);
-        for(int i=1; i < power; i++) {
+        for (int i=1; i < power; i++) {
             sb.append("*");
             sb.append(var);
         }
@@ -303,7 +303,7 @@ public class PolynomialGenerator {
         boolean inExponent = false;
         int startExponent = 0;
         boolean lastWasAlpha = false;
-        for(int i=0; i < p.length(); i++) {
+        for (int i=0; i < p.length(); i++) {
             char ch = p.charAt(i);
             if (Character.isLetter(ch)) {
                 if (lastWasAlpha)
@@ -322,7 +322,7 @@ public class PolynomialGenerator {
                 startExponent = i-1;
             }
         }
-        for(String power : powers) {
+        for (String power : powers) {
             p = p.replace(power, convPowerToMultiply(power));
         }
         
@@ -388,7 +388,7 @@ public class PolynomialGenerator {
         
         
         Map<String,String> parentNetMap = n.getParentNetMapNames();
-        for(Net net : new ArrayList<>(d.getNets())) {
+        for (Net net : new ArrayList<>(d.getNets())) {
             if (net.getPins().size() > 0 && net.getSource() == null) {
                 if (net.isStaticNet()) continue;
                 String parentNet = parentNetMap.get(net.getName());
@@ -417,7 +417,7 @@ public class PolynomialGenerator {
             int xmax = 0;
             int ymin = Integer.MAX_VALUE;
             int ymax = 0;
-            for(SiteInstance si : d.getSiteInstances()) {
+            for (SiteInstance si : d.getSiteInstances()) {
                 if (si.getSiteName().startsWith("SLICE")) {
                     if (si.getSite().getInstanceX() < xmin) xmin = si.getSite().getInstanceX();
                     if (si.getSite().getInstanceX() > xmax) xmax = si.getSite().getInstanceX();
@@ -430,7 +430,7 @@ public class PolynomialGenerator {
             int[] maxoffset = new int[] { 1, 2,  0};
             String lowerLeft = null;
             String upperRight = null;
-            for(int i=0; i < 3; i++) {
+            for (int i=0; i < 3; i++) {
                 lowerLeft = "SLICE_X" + (xmin+minoffset[i]) + "Y" + (ymin+minoffset[i]);
                 upperRight = "SLICE_X" + (xmax+maxoffset[i]) + "Y" + (ymax+maxoffset[i]);
                 if (d.getDevice().getSite(lowerLeft) != null && d.getDevice().getSite(upperRight) != null) {

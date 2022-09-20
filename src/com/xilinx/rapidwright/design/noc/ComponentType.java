@@ -51,7 +51,7 @@ public enum ComponentType {
 
     static {
         map = new HashMap<>();
-        for(ComponentType e : values()) {
+        for (ComponentType e : values()) {
             map.put(e.toString(), e);
         }
     }

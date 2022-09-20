@@ -157,7 +157,7 @@ public class EDIFHierCellInst {
     public boolean isDescendantOf(EDIFHierCellInst potentialAncestor) {
         EDIFCellInst[] other = potentialAncestor.cellInsts;
         if (other.length >= cellInsts.length) return false;
-        for(int i=0; i < other.length; i++) {
+        for (int i=0; i < other.length; i++) {
             if (cellInsts.length > i) {
                 if (!cellInsts[i].getName().equals(other[i].getName())) {
                     return false;
@@ -183,7 +183,7 @@ public class EDIFHierCellInst {
         EDIFCellInst[] oCellInsts = o.cellInsts;
         int min = Integer.min(cellInsts.length, oCellInsts.length);
         int idx = 0;
-        for(int i=0; i< min; i++) { 
+        for (int i=0; i< min; i++) { 
             if (cellInsts[i] == oCellInsts[i]) {
                 idx++;
             } else {
@@ -288,7 +288,7 @@ public class EDIFHierCellInst {
      */
     public List<EDIFHierPortInst> getHierPortInsts() {
         List<EDIFHierPortInst> hierPortInsts = new ArrayList<>();
-        for(EDIFPortInst portInst : getInst().getPortInsts()) {
+        for (EDIFPortInst portInst : getInst().getPortInsts()) {
             hierPortInsts.add(new EDIFHierPortInst(this.getParent(), portInst));   
         }
         return hierPortInsts;

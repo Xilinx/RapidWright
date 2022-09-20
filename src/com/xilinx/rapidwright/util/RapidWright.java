@@ -86,7 +86,7 @@ public class RapidWright {
                 }
                 File jarDir = new File(location + File.separator + FileTools.JARS_FOLDER_NAME);
                 if (jarDir != null && jarDir.isDirectory()) {
-                    for(String jar : jarDir.list()) {
+                    for (String jar : jarDir.list()) {
                         if (isWindows && jar.contains("-linux64-")) continue;
                         if (!isWindows && jar.contains("-win64-")) continue;
                         if (jar.contains("javadoc")) continue;
@@ -183,14 +183,14 @@ public class RapidWright {
             args[0] = "-i";
             args[1] = "-c";
             StringBuilder importCmd = new StringBuilder();
-            for(@SuppressWarnings("rawtypes") Class c : primerClass) {
+            for (@SuppressWarnings("rawtypes") Class c : primerClass) {
                 String pkg = c.getPackage().getName();
                 importCmd.append("from " + pkg + " import " + c.getSimpleName() + ";");
             }
             args[2] = importCmd.toString();
             System.err.println(Device.FRAMEWORK_NAME + " " + Device.RAPIDWRIGHT_VERSION + " (Jython "+PySystemState.version+")");
         } else {
-            for(String s : args) {
+            for (String s : args) {
                 if (s.equals(UNPACK_OPTION_NAME)) {
                     boolean success = FileTools.unPackSupportingJarData();
                     if (success) {
@@ -210,7 +210,7 @@ public class RapidWright {
                     return;
                 } else if (s.equals(HELP_OPTION_NAME)) {
                     System.out.println("*** RapidWright specific options: ***");
-                    for(String option : RAPIDWRIGHT_OPTIONS) {
+                    for (String option : RAPIDWRIGHT_OPTIONS) {
                         System.out.println("\t" + option);
                     }
                     System.out.println("*** Jython --help output: ***");

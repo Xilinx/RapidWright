@@ -91,7 +91,7 @@ public class LogNetlistReader {
     private void extractPropertyMap(PropertyMap.Reader reader, EDIFPropertyObject obj) {
         StructList.Reader<PropertyMap.Entry.Reader> entries = reader.getEntries();
         int count = entries.size();
-        for(int i=0; i < count; i++) {
+        for (int i=0; i < count; i++) {
             PropertyMap.Entry.Reader entryReader = entries.get(i);
             String key = allStrings.get(entryReader.getKey());
             if (entryReader.isTextValue()) {
@@ -160,17 +160,17 @@ public class LogNetlistReader {
         // Instances
         PrimitiveList.Int.Reader cellInstsReader = cellReader.getInsts();
         int instCount = cellInstsReader.size();
-        for(int j=0; j < instCount; j++) {
+        for (int j=0; j < instCount; j++) {
             readEDIFCellInst(cellInstsReader.get(j), n, netlist, edifCell, cellListReader,
                              instListReader);
         }
 
         // Nets
-        for(Net.Reader netReader : cellReader.getNets()) {
+        for (Net.Reader netReader : cellReader.getNets()) {
             EDIFNet net = new EDIFNet(allStrings.get(netReader.getName()), edifCell);
             extractPropertyMap(netReader.getPropMap(), net);
 
-            for(PortInstance.Reader portInstReader : netReader.getPortInsts()) {
+            for (PortInstance.Reader portInstReader : netReader.getPortInsts()) {
                 EDIFCellInst inst = null;
                 if (!portInstReader.isExtPort()) {
                     inst = allInsts.get(portInstReader.getInst());
@@ -200,7 +200,7 @@ public class LogNetlistReader {
                      + edifCell.getName() + ", port names/widths mismatch, should be: \n\t"
                      + cell.getPorts() + ",\n\tbut found: \n\t\t" + edifCell.getPorts());
             }
-            for(EDIFPort port : cell.getPorts()) {
+            for (EDIFPort port : cell.getPorts()) {
                 String portKey = port.getBusName();
                 EDIFPort portMatch = edifCell.getPort(portKey);
                 if (portMatch == null || portMatch.getWidth() != port.getWidth()) {
@@ -259,7 +259,7 @@ public class LogNetlistReader {
     private void readStrings(Netlist.Reader netlist) {
         TextList.Reader strListReader = netlist.getStrList();
         int strCount = strListReader.size();
-        for(int i=0; i < strCount; i++) {
+        for (int i=0; i < strCount; i++) {
             String str = strListReader.get(i).toString();
             allStrings.add(str);
         }
@@ -286,7 +286,7 @@ public class LogNetlistReader {
     private void readPorts(Netlist.Reader netlist) {
         StructList.Reader<Port.Reader> portReaderList = netlist.getPortList();
         allPorts = new ArrayList<EDIFPort>(portReaderList.size());
-        for(int i = 0; i < portReaderList.size(); ++i) {
+        for (int i = 0; i < portReaderList.size(); ++i) {
             Port.Reader portReader = portReaderList.get(i);
             allPorts.add(i, readEDIFPort(portReader));
         }
@@ -296,7 +296,7 @@ public class LogNetlistReader {
         StructList.Reader<Netlist.CellDeclaration.Reader> cellDeclsReader = netlist.getCellDecls();
 
         allCells = new ArrayList<EDIFCell>(cellDeclsReader.size());
-        for(int i = 0; i < cellDeclsReader.size(); ++i) {
+        for (int i = 0; i < cellDeclsReader.size(); ++i) {
             Netlist.CellDeclaration.Reader cellReader = cellDeclsReader.get(i);
             String libraryName = allStrings.get(cellReader.getLib());
             libraryName = libraryRename.getOrDefault(libraryName, libraryName);
@@ -316,7 +316,7 @@ public class LogNetlistReader {
 
             PrimitiveList.Int.Reader ports = cellReader.getPorts();
             int portCount = ports.size();
-            for(int j=0; j < portCount; j++) {
+            for (int j=0; j < portCount; j++) {
                 cell.addPort(allPorts.get(ports.get(j)));
             }
         }
@@ -349,7 +349,7 @@ public class LogNetlistReader {
         StructList.Reader<Netlist.Cell.Reader> cellListReader = netlist.getCellList();
         StructList.Reader<Netlist.CellInstance.Reader> instListReader = netlist.getInstList();
         allInsts = new ArrayList<EDIFCellInst>(Collections.nCopies(instListReader.size(), null));
-        for(int i=0; i < cellCount; i++) {
+        for (int i=0; i < cellCount; i++) {
             readEDIFCell(i, n, netlist, cellListReader, instListReader);
         }
 
@@ -363,7 +363,7 @@ public class LogNetlistReader {
         // Put libraries in proper export order
         List<EDIFLibrary> libs = n.getLibrariesInExportOrder();
         n.getLibrariesMap().clear();
-        for(EDIFLibrary lib : libs) {
+        for (EDIFLibrary lib : libs) {
             n.addLibrary(lib);
         }
 

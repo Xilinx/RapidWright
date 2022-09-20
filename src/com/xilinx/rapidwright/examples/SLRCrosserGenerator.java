@@ -107,7 +107,7 @@ public class SLRCrosserGenerator {
                 n.setPIPs(curr.getPIPsBackToSource());
                 return check;
             }
-            for(Wire w : curr.getWireConnections()) {
+            for (Wire w : curr.getWireConnections()) {
                 q.add(new RouteNode(w.getTile(), w.getWireIndex(), curr, curr.getLevel()+1));
             }
             if (watchDog-- == 0) return null;
@@ -125,7 +125,7 @@ public class SLRCrosserGenerator {
     public static void routeControlSignalsInLagunaSite(Cell c, Net clk, Net rst, Net ce) {
         String rxOrTx = (c.getBELName().startsWith("RX") ? "RX" : "TX");
         SiteInst si = c.getSiteInst();        
-        for(Net n : new Net[]{clk,rst}) {
+        for (Net n : new Net[]{clk,rst}) {
             String name = n.equals(clk) ? "CLK" : "SR";
             BELPin pin = c.getBEL().getPin(name);
             Net existingNet = si.getNetFromSiteWire(pin.getSiteWireName());
@@ -170,7 +170,7 @@ public class SLRCrosserGenerator {
         EDIFNetlist n = d.getNetlist();
         
         // Get/Create cells
-        for(EDIFPortInst p : path.getNet().getPortInsts()) {
+        for (EDIFPortInst p : path.getNet().getPortInsts()) {
             String cellName = path.getHierarchicalInstName(p);
             Cell cell = d.getCell(cellName);
             if (cell == null) {
@@ -270,11 +270,11 @@ public class SLRCrosserGenerator {
         int yStart = northStart.getInstanceY() + ((LAGUNA_SITES_PER_TILE * LAGUNA_TILES_PER_FSR * 3) / 4);
         Site southStart = d.getDevice().getSite("LAGUNA_X"+northStart.getInstanceX()+"Y" + yStart);
         
-        for(String busName : new String[]{northBusName,southBusName}) {
+        for (String busName : new String[]{northBusName,southBusName}) {
             Site start = busName.equals(northBusName) ? northStart : southStart;
             int lagunaStartX = start.getInstanceX();
             int lagunaStartY = start.getInstanceY();
-            for(int i=0; i < width; i++) {
+            for (int i=0; i < width; i++) {
                 EDIFHierNet net = d.getNetlist().getHierNetFromName(busName + "[" + i + "]");
                 int x = ((i / 12) % 2) + lagunaStartX;
                 int y = lagunaStartY + ((i/(LAGUNA_FLOPS_PER_SITE*LAGUNA_SITES_PER_TILE))*2) 
@@ -298,7 +298,7 @@ public class SLRCrosserGenerator {
      */
     public static Map<RouteNode,ArrayList<SitePinInst>> getLCBPinMappings(Net clk, String txClkWire, String rxClkWire) {
         Map<RouteNode, ArrayList<SitePinInst>> lcbMappings = new HashMap<>();
-        for(SitePinInst p : clk.getPins()) {
+        for (SitePinInst p : clk.getPins()) {
             if (p.isOutPin()) continue;
             String wireName = p.getName().startsWith("TX") ? txClkWire : rxClkWire;
             Node n = Node.getNode(p.getSite().getIntTile(), p.getSite().getIntTile().getWireIndex(wireName));
@@ -316,7 +316,7 @@ public class SLRCrosserGenerator {
     
     public static ClockRegion findCentroid(String[] lagunaStarts, Device dev) {
         HashSet<Point> lagunaPoints = new HashSet<>();
-        for(String laguna : lagunaStarts) {
+        for (String laguna : lagunaStarts) {
             Tile t = dev.getSite(laguna).getTile();
             lagunaPoints.add(new Point(t.getColumn(),t.getRow()));
         }
@@ -342,7 +342,7 @@ public class SLRCrosserGenerator {
         Device dev = d.getDevice();
         
         List<ClockRegion> clockRegions = new ArrayList<>();
-        for(String laguna : lagunaStarts) {
+        for (String laguna : lagunaStarts) {
             ClockRegion cr = dev.getSite(laguna).getTile().getClockRegion();
             clockRegions.add(cr);
             clockRegions.add(dev.getClockRegion(cr.getRow()+1, cr.getColumn()));                
@@ -358,14 +358,14 @@ public class SLRCrosserGenerator {
             centroids.add(findCentroid(lagunaStarts, dev));
         } else {
             // Use each Laguna start CR as a centroid
-            for(String laguna : lagunaStarts) {
+            for (String laguna : lagunaStarts) {
                 ClockRegion cr = dev.getSite(laguna).getTile().getClockRegion();
                 centroids.add(cr);
             }
         }
 
         List<RouteNode> distLines = new ArrayList<>();
-        for(ClockRegion centroid : centroids) {
+        for (ClockRegion centroid : centroids) {
             RouteNode centroidRouteNode = UltraScaleClockRouting.routeToCentroid(clk, clkRoutingLine, centroid);
             
             // Transition centroid from routing track to vertical distribution track
@@ -445,12 +445,12 @@ public class SLRCrosserGenerator {
         EDIFNet gndNet = EDIFTools.getStaticNet(NetType.GND, parent, n);
         
         // Create register pairs
-        for(String busPrefix : busPrefixes) {
+        for (String busPrefix : busPrefixes) {
             String busSuffix = "[" + (busWidth-1) + ":0]";
             String[] parts = busPrefix.split(",");
             EDIFPort input = parent.createPort(parts[0]+busSuffix, EDIFDirection.INPUT, busWidth);
             EDIFPort output = parent.createPort(parts[1]+busSuffix, EDIFDirection.OUTPUT, busWidth);
-            for(int i=0; i < busWidth; i++) {
+            for (int i=0; i < busWidth; i++) {
                 String suffix = "[" + i + "]";
                 EDIFCellInst reg0 = Design.createUnisimInst(parent, parts[0] + "_reg0" + suffix, Unisim.FDRE);
                 EDIFCellInst reg1 = Design.createUnisimInst(parent, parts[1] + "_reg1" + suffix, Unisim.FDRE);
@@ -609,7 +609,7 @@ public class SLRCrosserGenerator {
             throw new RuntimeException("ERROR: BUFGCE site '" +
                     bufgceSiteName + "' not found on part " + partName);
         }
-        for(String lagunaSite : lagunaNames) {
+        for (String lagunaSite : lagunaNames) {
             Site s = dev.getSite(lagunaSite);
             if (s == null) {
                 throw new RuntimeException("ERROR: LAGUNA site '" + 
@@ -625,7 +625,7 @@ public class SLRCrosserGenerator {
         }
         
         List<String> busNames = new ArrayList<>();
-        for(int i=0; i < lagunaNames.length; i++) {
+        for (int i=0; i < lagunaNames.length; i++) {
             busNames.add(inputPrefix + i + northSuffix + "," + outputPrefix + i + northSuffix);
             busNames.add(inputPrefix + i + southSuffix + "," + outputPrefix + i + southSuffix);
         }
@@ -637,7 +637,7 @@ public class SLRCrosserGenerator {
         
         if (verbose) t.stop().start("Place SLR Crossings");
         int j = 0;
-        for(String lagunaStart : lagunaNames) {
+        for (String lagunaStart : lagunaNames) {
             Site northLagunaStart = dev.getSite(lagunaStart);
             String northBusName = busNames.get(j+0).replace(",", "_");
             String southBusName = busNames.get(j+1).replace(",", "_");

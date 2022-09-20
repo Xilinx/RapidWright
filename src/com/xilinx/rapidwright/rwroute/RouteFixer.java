@@ -53,10 +53,10 @@ public class RouteFixer{
     }
     
     private void buildGraph(NetWrapper netWrapper, Map<Node, Routable> rnodesCreated) {
-        for(Connection connection:netWrapper.getConnections()) {
+        for (Connection connection:netWrapper.getConnections()) {
             // nodes of connections are in the order from sink to source
             int vertexSize = connection.getNodes().size();
-            for(int i = vertexSize - 1; i > 0; i--) {
+            for (int i = vertexSize - 1; i > 0; i--) {
                 Node cur = connection.getNodes().get(i);
                 Node next = connection.getNodes().get(i - 1);
                 
@@ -85,7 +85,7 @@ public class RouteFixer{
     public void finalizeRoutesOfConnections() {
         setShortestPathToEachVertex();
         
-        for(Connection connection : netp.getConnections()) {
+        for (Connection connection : netp.getConnections()) {
             NodeWithDelay csink = nodeMap.get(connection.getNodes().get(0));
             connection.getNodes().clear();
             connection.getNodes().add(csink.getNode());
@@ -109,7 +109,7 @@ public class RouteFixer{
             NodeWithDelay cur = queue.poll();
             Set<NodeWithDelay> nexts = cur.children;
             if (nexts == null || nexts.isEmpty()) continue;
-            for(NodeWithDelay next : nexts) {
+            for (NodeWithDelay next : nexts) {
                 float newCost = cur.cost + next.getDelay()
                         + DelayEstimatorBase.getExtraDelay(next.getNode(), DelayEstimatorBase.isLong(cur.getNode()));
                 if (!next.isVisited() || (next.isVisited() && newCost < next.cost)) {

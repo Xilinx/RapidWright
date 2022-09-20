@@ -139,7 +139,7 @@ public class EDIFPropertyObject extends EDIFName {
 
     @Deprecated
     public void addProperties(Map<EDIFName,EDIFPropertyValue> properties) {
-        for(Entry<EDIFName,EDIFPropertyValue> p : properties.entrySet()) {
+        for (Entry<EDIFName,EDIFPropertyValue> p : properties.entrySet()) {
             addProperty(p.getKey(),p.getValue());
         }
     }
@@ -171,7 +171,7 @@ public class EDIFPropertyObject extends EDIFName {
     public Map<String, EDIFPropertyValue> createDuplicatePropertiesMap() {
         if (properties == null) return null;
         Map<String, EDIFPropertyValue> newMap = new HashMap<>();
-        for(Entry<String, EDIFPropertyValue> e : properties.entrySet()) {
+        for (Entry<String, EDIFPropertyValue> e : properties.entrySet()) {
             newMap.put(e.getKey(), new EDIFPropertyValue(e.getValue()));
         }
         return newMap;
@@ -214,7 +214,7 @@ public class EDIFPropertyObject extends EDIFName {
 
     public void exportEDIFProperties(OutputStream os, byte[] indent, EDIFWriteLegalNameCache<?> cache, boolean stable) throws IOException{
         if (properties == null) return;
-        for(Entry<String, EDIFPropertyValue> e : EDIFTools.sortIfStable(properties, stable)) {
+        for (Entry<String, EDIFPropertyValue> e : EDIFTools.sortIfStable(properties, stable)) {
             try {
                 os.write(indent);
                 os.write(EXPORT_CONST_PROP_START);

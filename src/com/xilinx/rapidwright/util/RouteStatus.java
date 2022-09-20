@@ -149,11 +149,11 @@ public class RouteStatus implements Comparable<RouteStatus> {
         
         
         HashSet<String> set = new HashSet<String>();
-        for(ArrayList<String> list : myTrees) {
+        for (ArrayList<String> list : myTrees) {
             set.addAll(list);
         }
-        for(ArrayList<String> list : myTrees) {
-            for(String other : list) {
+        for (ArrayList<String> list : myTrees) {
+            for (String other : list) {
                 boolean success = set.remove(other);
                 if (!success) {
                     if (!printedName) {System.out.println("DIFF: " + getName()); printedName = true;}
@@ -161,26 +161,26 @@ public class RouteStatus implements Comparable<RouteStatus> {
                 }                
             }
         }
-        for(String mine : set) {
+        for (String mine : set) {
             if (!printedName) {System.out.println("DIFF: " + getName()); printedName = true;}
             System.out.println("  1: " + mine);                
         }
         
         
         /*
-        for(int i=0; i < myTrees.size(); i++) {
+        for (int i=0; i < myTrees.size(); i++) {
             if (i >= otherTrees.size()) return;
             ArrayList<String> myTree = myTrees.get(i);
             ArrayList<String> otherTree = otherTrees.get(i);
             HashSet<String> set = new HashSet<String>(myTree);
-            for(String other : otherTree) {
+            for (String other : otherTree) {
                 boolean success = set.remove(other);
                 if (!success) {
                     if (!printedName) {System.out.println("DIFF: " + getName()); printedName = true;}
                     System.out.println("  2: " + other);
                 }
             }
-            for(String mine : set) {
+            for (String mine : set) {
                 if (!printedName) {System.out.println("DIFF: " + getName()); printedName = true;}
                 System.out.println("  1: " + mine);                
             }

@@ -73,7 +73,7 @@ public class HashPool<E> extends HashMap<Integer,ArrayList<E>> {
             //return -1;
         }
         else {
-            for(Integer i : enumerationMatches) {
+            for (Integer i : enumerationMatches) {
                 if (enumerations.get(i) == null && obj == null) {
                     return i;
                 }
@@ -105,7 +105,7 @@ public class HashPool<E> extends HashMap<Integer,ArrayList<E>> {
             return obj;
         }
         else {
-            for(E e :hashMatches) {
+            for (E e :hashMatches) {
                 if (e.equals(obj)) {
                     return e;
                 }
@@ -128,7 +128,7 @@ public class HashPool<E> extends HashMap<Integer,ArrayList<E>> {
         if (hashMatches == null) {
             return false;
         }
-        for(E e :hashMatches) {
+        for (E e :hashMatches) {
             if (e.equals(obj)) {
                 return true;
             }
@@ -147,7 +147,7 @@ public class HashPool<E> extends HashMap<Integer,ArrayList<E>> {
         if (hashMatches == null) {
             return null;
         }
-        for(E e :hashMatches) {
+        for (E e :hashMatches) {
             if (e.equals(obj)) {
                 return e;
             }

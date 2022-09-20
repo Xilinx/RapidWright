@@ -34,8 +34,8 @@ public class TestPIP {
     public void testGetArbitraryPIP(String deviceName) {
         Device d = Device.getDevice(deviceName);
         
-        for(Tile t : d.getAllTiles()) {
-            for(PIP p : t.getPIPs()) {
+        for (Tile t : d.getAllTiles()) {
+            for (PIP p : t.getPIPs()) {
                 Node start = p.getStartNode();
                 if (start == null) continue;
                 Node end = p.getEndNode();

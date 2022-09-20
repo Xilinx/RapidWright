@@ -125,7 +125,7 @@ public class JobQueue {
         }
         int failedCount = 0;
         boolean success = true;
-        for(Job j : finished) {
+        for (Job j : finished) {
             boolean curr = j.jobWasSuccessful();
             if (!curr) {
                 if (failedCount == 0) {
@@ -153,7 +153,7 @@ public class JobQueue {
     
     
     public boolean killAllRunningJobs() {
-        for(Job j : running) {
+        for (Job j : running) {
             j.killJob();
         }
         MessageGenerator.briefError("Killing all running jobs...");
@@ -203,7 +203,7 @@ public class JobQueue {
         // Run a test if no arguments
         if (args.length == 0) {
             String mainDir = System.getenv("HOME") + File.separator+ "JobQueueTest" + File.separator;
-            for(int i=0; i < 10; i++) {
+            for (int i=0; i < 10; i++) {
                 Job job = createJob();
                 job.setCommand("vivado -version");
                 job.setRunDir(mainDir + i);
@@ -222,7 +222,7 @@ public class JobQueue {
             }
             // Read a file in where each line is a job, command is first token, run directory is second
             // separated by '#'
-            for(String line : FileTools.getLinesFromTextFile(args[0])) {
+            for (String line : FileTools.getLinesFromTextFile(args[0])) {
                 String[] parts = line.split("#");
                 Job j = createJob();
                 j.setCommand(parts[0].trim());

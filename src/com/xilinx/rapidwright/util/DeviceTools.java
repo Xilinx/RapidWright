@@ -52,7 +52,7 @@ public class DeviceTools {
             RouteNode curr = q.poll();
             if (curr.getLevel() > depth) continue;
             System.out.println(MessageGenerator.makeWhiteSpace(curr.getLevel()) + curr);
-            for(Wire w : curr.getConnections()) {
+            for (Wire w : curr.getConnections()) {
                 RouteNode next = new RouteNode(w.getTile(),w.getWireIndex(),curr,curr.getLevel()+1);
                 if (next.getConnections().isEmpty()) continue;
                 next.setLevel(curr.getLevel()+1);
@@ -69,8 +69,8 @@ public class DeviceTools {
      */
     public static List<Tile> getAllTilesInRectangle(Tile lowerLeft, Tile upperRight) {
         ArrayList<Tile> tiles = new ArrayList<>();
-        for(int col = lowerLeft.getColumn(); col <= upperRight.getColumn(); col++) {
-            for(int row = upperRight.getRow(); row <= lowerLeft.getRow(); row++) {
+        for (int col = lowerLeft.getColumn(); col <= upperRight.getColumn(); col++) {
+            for (int row = upperRight.getRow(); row <= lowerLeft.getRow(); row++) {
                 tiles.add(lowerLeft.getDevice().getTile(row,col));
             }
         }

@@ -99,7 +99,7 @@ public class BlockUpdater {
         String suffix = "_"+implementationIdx +"_routed.dcp";
         String doneFileName = null;
         int count = 0;
-        for(String fileName : dir.list()) {
+        for (String fileName : dir.list()) {
             if (fileName.endsWith("_routed.dcp")) {
                 count++;
             }

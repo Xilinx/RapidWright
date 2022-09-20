@@ -68,7 +68,7 @@ public class ExampleNetlistCreation {
         EDIFNet gnd = EDIFTools.getStaticNet(NetType.GND, top, netlist);
         EDIFNet vcc = EDIFTools.getStaticNet(NetType.VCC, top, netlist);
         
-        for(int i=0; i < pinNames.length; i++) {
+        for (int i=0; i < pinNames.length; i++) {
             // Create net to connect top-level pin to FF
             EDIFNet top2ffNet = top.createNet(pinNames[i]);
             

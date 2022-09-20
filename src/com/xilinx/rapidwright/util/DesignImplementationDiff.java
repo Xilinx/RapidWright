@@ -53,7 +53,7 @@ public class DesignImplementationDiff {
         Design superset = Design.readCheckpoint(args[1]);
         int cellMovements = 0;
         int netRoutingChanges = 0;
-        for(Cell c : original.getCells()) {
+        for (Cell c : original.getCells()) {
             BEL e = c.getBEL();
             Site s = c.getSite();
             boolean placementChange = false;
@@ -74,7 +74,7 @@ public class DesignImplementationDiff {
             cellMovements += placementChange ? 1 : 0;
         }
         
-        for(Net n : original.getNets()) {
+        for (Net n : original.getNets()) {
             Net nn = superset.getNet(n.getName());
             if (nn == null) {
                 System.out.println("Net " + nn + " is missing");
@@ -83,7 +83,7 @@ public class DesignImplementationDiff {
             if (nn.isStaticNet()) continue;
             boolean netChange = false;
             HashSet<PIP> pips = new HashSet<>(nn.getPIPs());    
-            for(PIP p : n.getPIPs()) {
+            for (PIP p : n.getPIPs()) {
                 if (!pips.contains(p)) {
                     System.out.println("Missing PIP " + p.toString() + " from net " + n.getName());
                     netChange = true;

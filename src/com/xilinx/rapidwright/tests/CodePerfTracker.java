@@ -101,7 +101,7 @@ public class CodePerfTracker {
     
     private int getSegmentIndex(String segmentName) {
         int i=0;
-        for(String name : segmentNames) {
+        for (String name : segmentNames) {
             if (name.equals(segmentName)) {
                 return i;
             }
@@ -241,7 +241,7 @@ public class CodePerfTracker {
         long totalRuntime = 0L;
         long totalUsage = 0L;
 //        maxSegmentNameSize = 0;
-        for(int i=0; i < runtimes.size(); i++) {
+        for (int i=0; i < runtimes.size(); i++) {
             totalRuntime += runtimes.get(i);
             totalUsage += memUsages.get(i);
             int len = segmentNames.get(i).length() + 1;
@@ -267,7 +267,7 @@ public class CodePerfTracker {
         if (!printProgress) MessageGenerator.printHeader(name);
         addTotalEntry();
         int start = printProgress ? runtimes.size()-1 : 0;
-        for(int i=start; i < runtimes.size(); i++) {
+        for (int i=start; i < runtimes.size(); i++) {
             if (i == runtimes.size()-1) {
                 System.out.println("------------------------------------------------------------------------------");
             }

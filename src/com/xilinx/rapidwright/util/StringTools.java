@@ -39,7 +39,7 @@ public class StringTools {
     
     public static String makeCamelCase(String name) {
         StringBuilder sb = new StringBuilder();
-        for(int i=0; i < name.length(); i++) {
+        for (int i=0; i < name.length(); i++) {
             char c = name.charAt(i);
             if (c == '_') continue;
             if (i != 0 && name.charAt(i-1) == '_') {
@@ -88,7 +88,7 @@ public class StringTools {
                 ,null
                 };
         
-        for(String s : tests) {
+        for (String s : tests) {
             String result = removeOuterQuotes(s);
             System.out.println("<<" + s + ">>  <<" + result + ">>");
         }
@@ -169,7 +169,7 @@ public class StringTools {
     }
     
     public static boolean isInteger(String s) {
-        for(int i=0; i < s.length(); i++) {
+        for (int i=0; i < s.length(); i++) {
             if (!Character.isDigit(s.charAt(i))) return false;
         }
         return true;
@@ -206,7 +206,7 @@ public class StringTools {
      */
     public static int countOccurrences(String str, char c) {
         int count = 0;
-        for(int i=0; i < str.length(); i++) {
+        for (int i=0; i < str.length(); i++) {
             if (str.charAt(i) == c) count++;
         }
         return count;
@@ -221,7 +221,7 @@ public class StringTools {
     public static String longestCommonPrefix(String s0, String s1) {
         if (s0 == null || s1 == null) return "";
         int min = Math.min(s0.length(), s1.length());
-        for(int i=0; i < min; i++) {
+        for (int i=0; i < min; i++) {
             if (s0.charAt(i) != s1.charAt(i)) {
                 return s0.substring(0, i);
             }
@@ -237,7 +237,7 @@ public class StringTools {
      * match.  Returns null if no prefix match is found.
      */
     public static String startsWithAny(String str, Collection<String> prefixes) {
-        for(String prefix : prefixes) {
+        for (String prefix : prefixes) {
             if (str.startsWith(prefix)) return prefix;
         }
         return null;
@@ -289,7 +289,7 @@ public class StringTools {
             "TEMPERATURE_GRADE_LETTER",
         };
         
-        for(String s : tests) {
+        for (String s : tests) {
             System.out.println(s + " = " + makeCamelCase(s) + " " + makeUpperCamelCase(s));
         }
     }

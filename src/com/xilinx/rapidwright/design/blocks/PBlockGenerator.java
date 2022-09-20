@@ -135,7 +135,7 @@ public class PBlockGenerator {
     private void getResourceUsages(String reportFileName) {
         ArrayList<String> lines = FileTools.getLinesFromTextFile(reportFileName);
         
-        for(String line : lines) {
+        for (String line : lines) {
             if (line.startsWith("| Device")) {
                 String partName = line.split("\\s+")[3];
                 Part part = PartNameTools.getPart(partName);
@@ -565,8 +565,8 @@ public class PBlockGenerator {
             yMax = slice.getInstanceY();
                         
             //add the tiles to the bounded set
-            for(int i = CLBminR; i <= CLBmaxR; i++) {
-                for(int j = CLBminC; j <= CLBmaxC; j++) {
+            for (int i = CLBminR; i <= CLBmaxR; i++) {
+                for (int j = CLBminC; j <= CLBmaxC; j++) {
                     bounded.add(dev.getTile(i, j).getName());
                 }
             }
@@ -588,7 +588,7 @@ public class PBlockGenerator {
             yMax = 0;
             // get the lower left corner
             Site[] dsps = dev.getTile(DSPmaxR,DSPminC).getSites();
-            for(Site dsp : dsps) {
+            for (Site dsp : dsps) {
                 if (!dsp.getSiteTypeEnum().equals(SiteTypeEnum.DSP48E2)) continue;
                 if (xMin > dsp.getInstanceX()) xMin = dsp.getInstanceX();
                 if (yMin > dsp.getInstanceY()) yMin = dsp.getInstanceY();
@@ -596,15 +596,15 @@ public class PBlockGenerator {
 
             // get the upper right corner
             dsps = dev.getTile(DSPminR,DSPmaxC).getSites();
-            for(Site dsp : dsps) {
+            for (Site dsp : dsps) {
                 if (!dsp.getSiteTypeEnum().equals(SiteTypeEnum.DSP48E2)) continue;
                 if (xMax < dsp.getInstanceX()) xMax = dsp.getInstanceX();
                 if (yMax < dsp.getInstanceY()) yMax = dsp.getInstanceY();
             }
                         
             //add the tiles to the bounded set
-            for(int i = DSPminR; i <= DSPmaxR; i++) {
-                for(int j = DSPminC; j <= DSPmaxC; j++) {
+            for (int i = DSPminR; i <= DSPmaxR; i++) {
+                for (int j = DSPminC; j <= DSPmaxC; j++) {
                     bounded.add(dev.getTile(i, j).getName());
                 }
             }
@@ -624,22 +624,22 @@ public class PBlockGenerator {
             xMax = 0;
             yMax = 0;
             // get the lower left corner
-            for(Site s: dev.getTile(RAMmaxR,RAMminC).getSites()) {
+            for (Site s: dev.getTile(RAMmaxR,RAMminC).getSites()) {
                 if (!s.getSiteTypeEnum().equals(SiteTypeEnum.RAMBFIFO36)) continue;
                 if (xMin > s.getInstanceX()) xMin = s.getInstanceX();
                 if (yMin > s.getInstanceY()) yMin = s.getInstanceY();
             }
             
             // get the upper right corner
-            for(Site s: dev.getTile(RAMminR,RAMmaxC).getSites()) {
+            for (Site s: dev.getTile(RAMminR,RAMmaxC).getSites()) {
                 if (!s.getSiteTypeEnum().equals(SiteTypeEnum.RAMBFIFO36)) continue;
                 if (xMax < s.getInstanceX()) xMax = s.getInstanceX();
                 if (yMax < s.getInstanceY()) yMax = s.getInstanceY();
             }
             
             //add the tiles to the bounded set
-            for(int i = RAMminR; i <= RAMmaxR; i++) {
-                for(int j = RAMminC; j <= RAMmaxC; j++) {
+            for (int i = RAMminR; i <= RAMmaxR; i++) {
+                for (int j = RAMminC; j <= RAMmaxC; j++) {
                     bounded.add(dev.getTile(i, j).getName());
                 }
             }
@@ -654,7 +654,7 @@ public class PBlockGenerator {
         int commonRow = TileColumnPattern.getCommonRow(dev);
         int numSLICEMColumns = 0;
         if (sliceMRequired > 0) {
-            for(int x= CLBminC; x <= CLBmaxC; x++) {
+            for (int x= CLBminC; x <= CLBmaxC; x++) {
                 TileTypeEnum t = dev.getTile(commonRow, x).getTileTypeEnum();
                 if (Utils.isCLBM(t)) {
                     numSLICEMColumns++;
@@ -667,14 +667,14 @@ public class PBlockGenerator {
         
         boolean trivial = (matches.size() > 0) && matches.get(0).size() < 2;;
         ArrayList<String> pBlocks = new ArrayList<String>(PBLOCK_COUNT);
-        for(TileColumnPattern p : matches) {
+        for (TileColumnPattern p : matches) {
             int col = patMap.get(p).iterator().next();
             int row = TileColumnPattern.getCommonRow(dev);
             Site upperLeft = null;
             StringBuilder sb = new StringBuilder();
             if (numSLICEColumns > 0) {
                 int pIdx = 0;
-                for(int i=0; pIdx < p.size(); i++) {
+                for (int i=0; pIdx < p.size(); i++) {
                     TileTypeEnum t = dev.getTile(row, col+i).getTileTypeEnum();
                     if (Utils.isCLB(t)) {
                         upperLeft = dev.getTile(row - 4 /* TODO - Make Data Driven*/, col+i).getSites()[0];
@@ -687,10 +687,10 @@ public class PBlockGenerator {
             }
             if (numBRAMColumns > 0) {
                 int pIdx = 0;
-                for(int i=0; pIdx < p.size(); i++) {
+                for (int i=0; pIdx < p.size(); i++) {
                     TileTypeEnum t = dev.getTile(row, col+i).getTileTypeEnum();
                     if (Utils.isBRAM(t)) {
-                        for(Site s : dev.getTile(row, col+i).getSites()) {
+                        for (Site s : dev.getTile(row, col+i).getSites()) {
                             if (s.getSiteTypeEnum() == SiteTypeEnum.RAMBFIFO36) upperLeft = s;
                         }
                         break;
@@ -702,7 +702,7 @@ public class PBlockGenerator {
             }
             if (numDSPColumns > 0) {
                 int pIdx = 0;
-                for(int i=0; pIdx < p.size(); i++) {
+                for (int i=0; pIdx < p.size(); i++) {
                     TileTypeEnum t = dev.getTile(row, col+i).getTileTypeEnum();
                     if (Utils.isDSP(t)) {
                         upperLeft = dev.getTile(row, col+i).getSites()[0];
@@ -723,13 +723,13 @@ public class PBlockGenerator {
     private ArrayList<TileColumnPattern> getCompatiblePatterns(int sliceColumns, int slicemColumns, int dspColumns, int bramColumns, HashMap<TileColumnPattern, TreeSet<Integer>> patMap) {
         TileColumnPattern[] sortedPatterns = TileColumnPattern.getSortedMostCommonPatterns(patMap);
         ArrayList<TileColumnPattern> matches = new ArrayList<TileColumnPattern>();
-        for(TileColumnPattern p : sortedPatterns) {
+        for (TileColumnPattern p : sortedPatterns) {
             int slices = sliceColumns;
             int slicems = slicemColumns;
             int dsps = dspColumns;
             int brams = bramColumns; 
             
-            for(TileTypeEnum t : p) {
+            for (TileTypeEnum t : p) {
                 if (slicems > 0 && Utils.isCLBM(t)) {
                     slicems--;
                     if (SLICES_PER_TILE==2)
@@ -780,9 +780,9 @@ public class PBlockGenerator {
         int[] brams = {0, 1, 2, 4, 7, 13, 20};
         int[] dsps = {0, 1, 2, 3, 4, 8, 20};
         
-        for(int lut : luts) {
-            for(int lutRAM : lutRAMs) {
-                for(int ff : ffs) {
+        for (int lut : luts) {
+            for (int lutRAM : lutRAMs) {
+                for (int ff : ffs) {
                     pb.lutCount = lut;
                     pb.regCount = ff;
                     pb.lutRAMCount = lutRAM;
@@ -793,7 +793,7 @@ public class PBlockGenerator {
             }
         }
         
-        for(int bram : brams) {
+        for (int bram : brams) {
             pb.lutCount = 0;
             pb.regCount = 0;
             pb.lutRAMCount = 0;
@@ -801,7 +801,7 @@ public class PBlockGenerator {
             pb.dspCount = 0;
             pb.generatePBlockFromReport2("", "");
         }
-        for(int dsp : dsps) {
+        for (int dsp : dsps) {
             pb.lutCount = 0;
             pb.regCount = 0;
             pb.lutRAMCount = 0;
@@ -964,7 +964,7 @@ public class PBlockGenerator {
             HashMap<Integer, Integer> nrInst = new HashMap<Integer, Integer>();
             getAlreadyGenPBlocks(xl,xr,yd,yu,nrInst);
             // Order the patterns according to the available resources             
-            for(TileColumnPattern p : matches) {
+            for (TileColumnPattern p : matches) {
                 if (trivial) {
                     storeBestPattern.put((double) 0, p);
                     break;
@@ -983,7 +983,7 @@ public class PBlockGenerator {
             }
             // Select the patterns with most available resources and only the amount requested by the user
             int nrAddedPatterns = 1;
-            for(double key : storeBestPattern.descendingKeySet()) { // descending order = start with the ones with most free resources
+            for (double key : storeBestPattern.descendingKeySet()) { // descending order = start with the ones with most free resources
                 TileColumnPattern p = storeBestPattern.get(key);
                 Iterator<Integer> patternInstancesItr = patMap.get(p).iterator();
                 int col = patternInstancesItr.next();
@@ -1027,7 +1027,7 @@ public class PBlockGenerator {
                                 BufferedWriter bw = new BufferedWriter(fw);
                                 PrintWriter out = new PrintWriter(bw)) {
                                 int nrInstances = (int) Math.ceil((double)IP_NR_INSTANCES / WritePBlocks.size()); // distribute instances over number of pblocks of this pattern
-                                for(int stringNr = 0; stringNr<WritePBlocks.size();stringNr++)
+                                for (int stringNr = 0; stringNr<WritePBlocks.size();stringNr++)
                                     out.println(WritePBlocks.get(stringNr)+" "+nrInstances);
                                 } catch (IOException e) {
                                     throw new UncheckedIOException("Problem appending all the "
@@ -1042,10 +1042,10 @@ public class PBlockGenerator {
                 } 
                 if (numBRAMColumns > 0) {
                     int pIdx = 0;
-                    for(int i=0; pIdx < p.size(); i++) {
+                    for (int i=0; pIdx < p.size(); i++) {
                         TileTypeEnum t = dev.getTile(row, col+i).getTileTypeEnum();
                         if (Utils.isBRAM(t)) {
-                            for(Site s : dev.getTile(row, col+i).getSites()) {
+                            for (Site s : dev.getTile(row, col+i).getSites()) {
                                 if ((s.getSiteTypeEnum() == SiteTypeEnum.RAMBFIFO36)||(s.getSiteTypeEnum() == SiteTypeEnum.RAMBFIFO36E1)) upperLeft = s; // Update. Goal: support for 7 series
                             }
                             break;
@@ -1056,7 +1056,7 @@ public class PBlockGenerator {
                 }
                 if (numDSPColumns > 0) {
                     int pIdx = 0;
-                    for(int i=0; pIdx < p.size(); i++) {
+                    for (int i=0; pIdx < p.size(); i++) {
                         TileTypeEnum t = dev.getTile(row, col+i).getTileTypeEnum();
                         if (Utils.isDSP(t)) {
                             upperLeft = dev.getTile(row, col+i).getSites()[1];
@@ -1074,7 +1074,7 @@ public class PBlockGenerator {
         }
         
         // Code in case horizontal density algorithm not desired
-        for(TileColumnPattern p : matches) {
+        for (TileColumnPattern p : matches) {
             Iterator<Integer> patternInstancesItr = patMap.get(p).iterator();
             int col = patternInstancesItr.next();
             if (patternInstancesItr.hasNext()) {
@@ -1088,7 +1088,7 @@ public class PBlockGenerator {
             StringBuilder sb = new StringBuilder();
             if (numSLICEColumns > 0 || numSLICEMColumns > 0) {
                 int pIdx = 0;
-                for(int i=0; pIdx < p.size(); i++) {
+                for (int i=0; pIdx < p.size(); i++) {
                     TileTypeEnum t = dev.getTile(row, col+i).getTileTypeEnum();
                     if (Utils.isCLB(t)) {
                         upperLeft = dev.getTile(row - 4 /* TODO - Make Data Driven*/, col+i).getSites()[0];
@@ -1100,10 +1100,10 @@ public class PBlockGenerator {
             }
             if (numBRAMColumns > 0) {
                 int pIdx = 0;
-                for(int i=0; pIdx < p.size(); i++) {
+                for (int i=0; pIdx < p.size(); i++) {
                     TileTypeEnum t = dev.getTile(row, col+i).getTileTypeEnum();
                     if (Utils.isBRAM(t)) {
-                        for(Site s : dev.getTile(row, col+i).getSites()) {
+                        for (Site s : dev.getTile(row, col+i).getSites()) {
                             if ((s.getSiteTypeEnum() == SiteTypeEnum.RAMBFIFO36)||(s.getSiteTypeEnum() == SiteTypeEnum.RAMBFIFO36E1)) upperLeft = s; // Update. Goal: support for 7 series
                         }
                         break;
@@ -1114,7 +1114,7 @@ public class PBlockGenerator {
             }
             if (numDSPColumns > 0) {
                 int pIdx = 0;
-                for(int i=0; pIdx < p.size(); i++) {
+                for (int i=0; pIdx < p.size(); i++) {
                     TileTypeEnum t = dev.getTile(row, col+i).getTileTypeEnum();
                     if (Utils.isDSP(t)) {
                         upperLeft = dev.getTile(row, col+i).getSites()[1];
@@ -1133,7 +1133,7 @@ public class PBlockGenerator {
     
     private int getTileRowInRegionBelow(int col, int row) {
         Tile tmp = dev.getTile(row, col);
-        for(int c = 0; c < dev.getColumns(); c++) {
+        for (int c = 0; c < dev.getColumns(); c++) {
             if (Utils.isCLB(dev.getTile(row, c).getTileTypeEnum())) {
                 tmp = dev.getTile(row, c);
             }
@@ -1147,7 +1147,7 @@ public class PBlockGenerator {
         
         if (dev.getNumOfSLRs() > 1) {
             SLR master = null;
-            for(int i=0; i < dev.getNumOfSLRs(); i++) {
+            for (int i=0; i < dev.getNumOfSLRs(); i++) {
                 if (dev.getSLR(i).isMasterSLR()) {
                     master = dev.getSLR(i);
                     break;
@@ -1196,7 +1196,7 @@ public class PBlockGenerator {
         int colAllFulfilled;
         // Go through Pattern components and check at which column all required resources are fulfilled
         int pIdx = 0;
-        for(colAllFulfilled=0; pIdx < p.size(); colAllFulfilled++) {
+        for (colAllFulfilled=0; pIdx < p.size(); colAllFulfilled++) {
             TileTypeEnum t = dev.getTile(row, col+colAllFulfilled).getTileTypeEnum();
             
             if (Utils.isCLBM(t) && (reqNumSLICEMColumns>0)) {
@@ -1227,7 +1227,7 @@ public class PBlockGenerator {
         reqNumBRAMColumns   = numBRAMColumns;
         reqNumDSPColumns    = numDSPColumns;
         int colOffset;
-        for(colOffset=0; pIdx >= 0; colOffset++) {
+        for (colOffset=0; pIdx >= 0; colOffset++) {
             TileTypeEnum t = dev.getTile(row, col+colAllFulfilled-colOffset).getTileTypeEnum();
             if (Utils.isCLBM(t) && (reqNumSLICEMColumns>0)) {
                 reqNumSLICEMColumns--;
@@ -1319,7 +1319,7 @@ public class PBlockGenerator {
                 int req_numSLICEMColumns = numSLICEMColumns;
                 int req_numSLICEColumns = numSLICEColumns;            
                 int i;
-                for(i=mainPBlockCol+offsetCol; i<dev.getColumns(); i++) { // i<dev.getColumns() was introduced, as we don't know anymore at this step the value of xl in the original pattern.
+                for (i=mainPBlockCol+offsetCol; i<dev.getColumns(); i++) { // i<dev.getColumns() was introduced, as we don't know anymore at this step the value of xl in the original pattern.
                     TileTypeEnum t = dev.getTile(row, i).getTileTypeEnum();
                     if (Utils.isCLBM(t) && (req_numSLICEMColumns>0)) {
                         req_numSLICEMColumns--;
@@ -1358,7 +1358,7 @@ public class PBlockGenerator {
             }
                     
             if (!(clbPBlock.containsKey(0))) {            // if the next element was not a real one...copy value of key 1 into key 0
-                for(int key : clbPBlock.keySet() ) {    // contains only 1 elem, probably key = 1. But to avoid special cases error, this 'for' was attached
+                for (int key : clbPBlock.keySet() ) {    // contains only 1 elem, probably key = 1. But to avoid special cases error, this 'for' was attached
                     Integer[] val = clbPBlock.get(key);
                     clbPBlock.remove(key);
                     clbPBlock.put(0, val);
@@ -1422,7 +1422,7 @@ public class PBlockGenerator {
         boolean overlap = false;
         
         for (int i : xl.keySet()) {                         // Go through all the pblocks in the global pblock file
-            for(int myPatternCol : clbPBlock.keySet()) {     // Go through all my  pblocks. clb_pblock value:  Integer[] {x_l,x_r,y_d,y_u}
+            for (int myPatternCol : clbPBlock.keySet()) {     // Go through all my  pblocks. clb_pblock value:  Integer[] {x_l,x_r,y_d,y_u}
                 overlap = false;
                 if (  ((clbPBlock.get(myPatternCol)[0]<=xl.get(i)) && (clbPBlock.get(myPatternCol)[1]>=xl.get(i))) ||
                      ((clbPBlock.get(myPatternCol)[0]<=xr.get(i)) && (clbPBlock.get(myPatternCol)[1]>=xr.get(i))) ||
@@ -1459,7 +1459,7 @@ public class PBlockGenerator {
         ArrayList<String> lines = new ArrayList<String>();
         lines = FileTools.getLinesFromTextFile(GLOBAL_PBLOCK);
         int lineNr = 0;
-        for(String line : lines) {
+        for (String line : lines) {
             if (line.contains("Failed")) {
                 continue;
             }
@@ -1569,7 +1569,7 @@ public class PBlockGenerator {
         }
         HashSet<String> alreadySeen = new HashSet<String>();
         int requested = pbGen.PBLOCK_COUNT;
-        for(String s : pbGen.generatePBlockFromReport(fileName, shapesReportFileName)) {
+        for (String s : pbGen.generatePBlockFromReport(fileName, shapesReportFileName)) {
             if (alreadySeen.contains(s)) continue;
             System.out.println(s);
             alreadySeen.add(s);

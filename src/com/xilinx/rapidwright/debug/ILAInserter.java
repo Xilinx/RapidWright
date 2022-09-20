@@ -74,7 +74,7 @@ public class ILAInserter {
     public static List<String> getNetsMarkedForDebug(Design design) {
         // Nets can be marked for debug as a netlist property
         ArrayList<String> debugNets = new ArrayList<>();
-        for(Entry<String,EDIFNet> e : design.getNetlistNetMap().entrySet()) {
+        for (Entry<String,EDIFNet> e : design.getNetlistNetMap().entrySet()) {
             EDIFPropertyValue p = e.getValue().getProperty(EDIF_MARK_DEBUG);
             if (p == null) continue;
             String etv = p.getValue();
@@ -86,14 +86,14 @@ public class ILAInserter {
         // Nets can also be marked for debug in XDC
         
         List<List<String>> xdcLines = new ArrayList<List<String>>();
-        for(ConstraintGroup cg : ConstraintGroup.values()) {
+        for (ConstraintGroup cg : ConstraintGroup.values()) {
             List<String> lines = design.getXDCConstraints(cg);
             if (!lines.isEmpty()) {
                 xdcLines.add(lines);
             }
         }
-        for(List<String> file : xdcLines) {
-            for(String line : file) {
+        for (List<String> file : xdcLines) {
+            for (String line : file) {
                 if (line.isEmpty() || line.startsWith("#")) continue;
                 if (line.contains(XDC_MARK_DEBUG) && line.contains(XDC_SET_PROPERTY)) {
                     String[] tokens = line.split("\\s+");
@@ -187,7 +187,7 @@ public class ILAInserter {
         // Connect the clock (assumes all probed signals are synchronous)
         clk.createPortInst("clk", mi.getCellInst());
         
-        for(String c : ila.getXDCConstraints(ConstraintGroup.NORMAL)) {
+        for (String c : ila.getXDCConstraints(ConstraintGroup.NORMAL)) {
             if (c.contains("current_instance ")) {
                 if (!c.contains("-quiet")) {
                     c = c.replace("current_instance ", "current_instance " + ila.getNetlist().getTopCellInst().getName() + "/");
@@ -218,7 +218,7 @@ public class ILAInserter {
         }
         int[] allowedDepths = new int[] {1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072};
         boolean isDepthValid = false;
-        for(int depth : allowedDepths) {
+        for (int depth : allowedDepths) {
             if (depth == probeDepth) isDepthValid = true;
         }
         if (!isDepthValid) {
@@ -235,20 +235,20 @@ public class ILAInserter {
         // TODO - Auto identify clock from probed signals
         /*List<String> netsToDebug = getNetsMarkedForDebug(originalDesign);
         Net clk = null;
-        for(String net : netsToDebug) {
+        for (String net : netsToDebug) {
             clk = DesignTools.getClockDomain(originalDesign, net);
             if (clk != null) break;
         }*/ 
         
         if (lockPlacement) {
-            for(Cell c : originalDesign.getCells()) {
+            for (Cell c : originalDesign.getCells()) {
                 c.setBELFixed(true);
                 c.setSiteFixed(true);
             }            
         }
         if (lockRouting) {
-            for(Net n : originalDesign.getNets()) {
-                for(PIP p : n.getPIPs()) {
+            for (Net n : originalDesign.getNets()) {
+                for (PIP p : n.getPIPs()) {
                     p.setIsPIPFixed(true);
                 }
             }            

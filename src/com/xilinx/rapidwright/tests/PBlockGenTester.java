@@ -44,11 +44,11 @@ public class PBlockGenTester {
         
         File dir = new File(args[0]);
         if (dir.exists() && dir.isDirectory()) {
-            for(File child : dir.listFiles()) {
+            for (File child : dir.listFiles()) {
                 if (!child.isDirectory()) continue;
                 String shapeFile = null;
                 String utilReportFile = null;
-                for(File file : child.listFiles()) {
+                for (File file : child.listFiles()) {
                     if (file.getAbsoluteFile().getName().endsWith("_shapes.txt")) {
                         shapeFile = file.toString();
                     } else if (file.getAbsoluteFile().getName().endsWith("_utilization.report")) {

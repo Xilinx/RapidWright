@@ -64,8 +64,8 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
         macroMap = new HashMap<ModuleInst, HardMacro>();
 
         // Find all valid placements for each module
-        for(ModuleImpls moduleImpls : design.getModules()) {
-            for(Module module : moduleImpls) {
+        for (ModuleImpls moduleImpls : design.getModules()) {
+            for (Module module : moduleImpls) {
                 ArrayList<Site> sites = module.getAllValidPlacements();
                 if (sites.size() == 0) {
                     sites = module.calculateAllValidPlacements(dev);
@@ -73,7 +73,7 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
                 if (debugFlow) {
                     // Need to check if placements will work with existing implementation
                     ArrayList<Site> openSites = new ArrayList<Site>();
-                    for(Site s : sites) {
+                    for (Site s : sites) {
                         if (module.isValidPlacement(s, design)) {
                             openSites.add(s);
                         }
@@ -87,7 +87,7 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
         }
 
         // Create Hard Macro objects from module instances;
-        for(ModuleInst mi : design.getModuleInsts()) {
+        for (ModuleInst mi : design.getModuleInsts()) {
             HardMacro hm = new HardMacro(mi);
             hardMacros.add(hm);
             if (mi.isPlaced()) {
@@ -134,7 +134,7 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
     }
 
     private boolean checkValidPlacementLegacy(HardMacro hm) {
-        for(HardMacro hardMacro : hardMacros) {
+        for (HardMacro hardMacro : hardMacros) {
             if (hardMacro.equals(hm)) continue;
             if (hm.getTempAnchorSite().equals(hardMacro.getTempAnchorSite())) return false;
             if (hm.overlaps(hardMacro)) {
@@ -183,7 +183,7 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
         // Added variable for genreating partial dcp
         boolean save_and_exit = false;
         // Perform final placement of all hard macros
-        for(HardMacro hm : array) {
+        for (HardMacro hm : array) {
             hm.place(hm.getTempAnchorSite());
             //System.out.println(moveCount.get(hm) + " " + hm.tileSize + " " + hm.getName());
             /*HashSet<Tile> footPrint = isValidPlacement((ModuleInst)hm, hm.getModule().getAnchor(), hm.getTempAnchorSite().getTile(), usedTiles);
@@ -220,7 +220,7 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
         System.out.println("Cost = " + currentSystemCost());
 
         design.clearUsedSites();
-        for(SiteInst i : design.getSiteInsts()) {
+        for (SiteInst i : design.getSiteInsts()) {
             i.place(i.getSite());
         }
 
@@ -263,7 +263,7 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
 
     @Override
     protected void populateAllPaths() {
-        for(Net net : design.getNets()) {
+        for (Net net : design.getNets()) {
             if (net.isStaticNet() || net.isClockNet()) continue;
             SitePinInst src = net.getSource();
             ArrayList<SitePinInst> snks = new ArrayList<SitePinInst>();
@@ -273,7 +273,7 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
                 continue;
             }
             ModuleInst srcModInst = src.getSiteInst().getModuleInst();
-            for(SitePinInst p : net.getPins()) {
+            for (SitePinInst p : net.getPins()) {
                 if (p == src) continue;
                 if (srcModInst != p.getSiteInst().getModuleInst()) {
                     snks.add(p);
@@ -283,7 +283,7 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
             if (snks.size() > 0) {
                 Path newPath = new Path(net.getName());
                 newPath.addPin(src, macroMap);
-                for(SitePinInst snk : snks) {
+                for (SitePinInst snk : snks) {
                     newPath.addPin(snk, macroMap);
                 }
                 allPaths.add(newPath);
@@ -296,8 +296,8 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
 
         pruneSameConnectionPaths();
 
-        for(Path pa : allPaths) {
-            for(PathPort po : pa) {
+        for (Path pa : allPaths) {
+            for (PathPort po : pa) {
                 if (po.getBlock() != null) {
                     po.getBlock().addConnectedPath(pa);
                 }
@@ -378,7 +378,7 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
 
         if (proposedAnchorTile == null) {
             Site[] candidateSites = dev.getAllCompatibleSites(modInst .getAnchor().getSiteTypeEnum());
-            for(Site site : candidateSites) {
+            for (Site site : candidateSites) {
                 proposedAnchorTile = site.getTile();
                 if (!triedTiles.contains(proposedAnchorTile)) {
                     tiles = isValidPlacement(modInst, anchorSite, proposedAnchorTile, usedTiles);
@@ -421,7 +421,7 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
 
         HashSet<Tile> footPrint = new HashSet<Tile>();
         // Check instances
-        for(SiteInst i : modInst.getModule().getSiteInsts()) {
+        for (SiteInst i : modInst.getModule().getSiteInsts()) {
             if (Utils.getLockedSiteTypes().contains(i.getSiteTypeEnum())) {
                 continue;
             }
@@ -439,8 +439,8 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
         }
 
         // Check nets
-        for(Net n : modInst.getModule().getNets()) {
-            for(PIP p : n.getPIPs()) {
+        for (Net n : modInst.getModule().getNets()) {
+            for (PIP p : n.getPIPs()) {
                 Tile newTile = modInst.getCorrespondingTile(p.getTile(), proposedAnchorTile, dev);
                 if (newTile == null || usedTiles.contains(newTile)) {
                     return null;

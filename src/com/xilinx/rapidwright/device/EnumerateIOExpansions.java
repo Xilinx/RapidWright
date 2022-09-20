@@ -146,7 +146,7 @@ public class EnumerateIOExpansions {
     public static void main(String[] args) {
 
         JobQueue q = new JobQueue();
-        for(Entry<Part, Pair<Unisim[], IOStandard[]>> e : diffIOMap.entrySet()) {
+        for (Entry<Part, Pair<Unisim[], IOStandard[]>> e : diffIOMap.entrySet()) {
             String seriesName = e.getKey().getSeries().toString();
             String pkgPin = seriesName.equals("Series7") ? "D5" : 
                 (seriesName.equals("UltraScalePlus") ? "B2" : "D14");
@@ -155,13 +155,13 @@ public class EnumerateIOExpansions {
                 throw new RuntimeException("ERROR: Couldn't create folder " + e.getKey().toString());
             }
             Pair<Unisim[], IOStandard[]> ios = e.getValue();
-            for(Unisim u : ios.getFirst()) {
+            for (Unisim u : ios.getFirst()) {
                 String unisimName = u.name();
                 String dirName = seriesName + File.separator + unisimName + File.separator;
                 if (!FileTools.makeDir(dirName)) {
                     throw new RuntimeException("ERROR: Couldn't create folder " + dirName);
                 }
-                for(IOStandard iostd : ios.getSecond()) {
+                for (IOStandard iostd : ios.getSecond()) {
                     EDIFCell cell = Design.getUnisimCell(u);
 
                     System.out.println("  " + u + " " + iostd);
@@ -186,7 +186,7 @@ public class EnumerateIOExpansions {
                     lines.clear();
                     lines.add("module top(\n");
                     List<EDIFPort> ports = new ArrayList<>(cell.getPorts());
-                    for(int i=0; i < ports.size(); i++) {
+                    for (int i=0; i < ports.size(); i++) {
                         EDIFPort port = ports.get(i);
                         String lastComma = (i == ports.size()-1) ? "" : ","; 
                         if (port.isInput()) {
@@ -198,7 +198,7 @@ public class EnumerateIOExpansions {
 
                     lines.add(");\n");
                     lines.add("    " + u.name() + " inst (");
-                    for(int i=0; i < ports.size(); i++) {
+                    for (int i=0; i < ports.size(); i++) {
                         EDIFPort port = ports.get(i);
                         String lastComma = (i == ports.size()-1) ? "" : ","; 
                         if (port.isInput()) {

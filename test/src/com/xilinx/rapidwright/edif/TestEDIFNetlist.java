@@ -123,11 +123,11 @@ class TestEDIFNetlist {
         Assertions.assertEquals(modifiedCells.size(), 8);
 
         Set<EDIFCell> potentiallyModifiedCells = new HashSet<>();
-        for(EDIFHierNet logNets : netlist.getNetAliases(srcPortInst.getHierarchicalNet())) {
+        for (EDIFHierNet logNets : netlist.getNetAliases(srcPortInst.getHierarchicalNet())) {
             potentiallyModifiedCells.add(logNets.getParentInst().getCellType());
         }
 
-        for(EDIFCell modifiedCell : modifiedCells.keySet()) {
+        for (EDIFCell modifiedCell : modifiedCells.keySet()) {
             Assertions.assertTrue(potentiallyModifiedCells.contains(modifiedCell));
         }
     }

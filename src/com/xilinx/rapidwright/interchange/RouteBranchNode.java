@@ -150,8 +150,8 @@ public class RouteBranchNode {
             case PIP:{
                 PIP pip = getPIP();
                 Node node = pip.isReversed() ? pip.getEndNode() : pip.getStartNode();
-                for(Wire w : node.getAllWiresInNode()) {
-                    for(PIP p : w.getBackwardPIPs()) {
+                for (Wire w : node.getAllWiresInNode()) {
+                    for (PIP p : w.getBackwardPIPs()) {
                         if (!p.equals(getPIP())) {
                             drivers.add(p.toString());   
                         }
@@ -176,8 +176,8 @@ public class RouteBranchNode {
                     drivers.add(spi.getSite().getName() + "/" + belPin.toString());
                 } else {
                     Node node = getSitePin().getConnectedNode();
-                    for(Wire w : node.getAllWiresInNode()) {
-                        for(PIP p : w.getBackwardPIPs()) {
+                    for (Wire w : node.getAllWiresInNode()) {
+                        for (PIP p : w.getBackwardPIPs()) {
                             drivers.add(p.toString());
                         }
                     }                    
@@ -188,7 +188,7 @@ public class RouteBranchNode {
                 if (belPin.belPin.isOutput() && belPin.belPin.getBEL().getBELClass() == BELClass.RBEL
                                                                                 && !isSource()) {
                     String site = belPin.site.getName() + "/";
-                    for(SitePIP p : belPin.belPin.getSitePIPs()) {
+                    for (SitePIP p : belPin.belPin.getSitePIPs()) {
                         drivers.add(site + p.toString());
                     }
                 } else if (belPin.belPin.getBEL().getBELClass() == BELClass.PORT) {

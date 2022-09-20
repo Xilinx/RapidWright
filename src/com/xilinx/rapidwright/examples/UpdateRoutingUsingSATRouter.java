@@ -45,7 +45,7 @@ public class UpdateRoutingUsingSATRouter {
         
         Design d = Design.readCheckpoint(args[0]);
 
-        for(Net n : d.getNets()) {
+        for (Net n : d.getNets()) {
             if (n.isClockNet() || n.isStaticNet()) continue;
             n.unroute();
         }

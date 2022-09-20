@@ -120,7 +120,7 @@ public class PerformanceExplorer {
     
     public void updateClockUncertaintyValues() {
         this.clockUncertaintyValues = new ArrayList<>();
-        for(double i=minClockUncertainty; i < maxClockUncertainty; i+=clockUncertaintyStep) {
+        for (double i=minClockUncertainty; i < maxClockUncertainty; i+=clockUncertaintyStep) {
             clockUncertaintyValues.add(i);
         }
     }
@@ -176,7 +176,7 @@ public class PerformanceExplorer {
     
     public void setPlacerDirectives(String[] directives) {
         this.placerDirectives = new ArrayList<>();
-        for(String directive : directives) {
+        for (String directive : directives) {
             directive = directive.trim();
             placerDirectives.add(PlacerDirective.valueOf(directive));
         }
@@ -192,7 +192,7 @@ public class PerformanceExplorer {
 
     public void setRouterDirectives(String[] directives) {
         this.routerDirectives = new ArrayList<>();
-        for(String directive : directives) {
+        for (String directive : directives) {
             directive = directive.trim();
             routerDirectives.add(RouterDirective.valueOf(directive));
         }
@@ -208,7 +208,7 @@ public class PerformanceExplorer {
     
     public void setClockUncertaintyValues(String[] values) {
         this.clockUncertaintyValues = new ArrayList<Double>();
-        for(String val : values) {
+        for (String val : values) {
             clockUncertaintyValues.add(Double.parseDouble(val));
         }
     }
@@ -307,9 +307,9 @@ public class PerformanceExplorer {
         runDirectory = new File(runDirectory).getAbsolutePath();        
         String dcpName = runDirectory + File.separator + INITIAL_DCP_NAME;
         // Update clock period constraint
-        for(ConstraintGroup g : ConstraintGroup.values()) {
+        for (ConstraintGroup g : ConstraintGroup.values()) {
             List<String> xdcList = design.getXDCConstraints(g);
-            for(int i=0; i < xdcList.size(); i++) {
+            for (int i=0; i < xdcList.size(); i++) {
                 String xdc = xdcList.get(i);
                 if (xdc.contains("create_clock") && xdc.contains("-name " + clkName)) {
                     // TODO - For now, user will need to update DCP beforehand
@@ -326,11 +326,11 @@ public class PerformanceExplorer {
         }
         
         int pb = 0;
-        for(Entry<PBlock, String> e : pblocks.entrySet()) {
+        for (Entry<PBlock, String> e : pblocks.entrySet()) {
             PBlock pblock = e.getKey();
-            for(PlacerDirective p : getPlacerDirectives()) {
-                for(RouterDirective r : getRouterDirectives()) {
-                    for(double c : getClockUncertaintyValues()) {
+            for (PlacerDirective p : getPlacerDirectives()) {
+                for (RouterDirective r : getRouterDirectives()) {
+                    for (double c : getClockUncertaintyValues()) {
                         String roundedC = printNS(c);
                         String uniqueID = p.name() + "_" + r.name() + "_" + roundedC;
                         if (pblock != null) {
@@ -466,7 +466,7 @@ public class PerformanceExplorer {
         if (opts.hasArgument(PBLOCK_FILE_OPT)) {
             String fileName = (String) opts.valueOf(PBLOCK_FILE_OPT);
             Map<PBlock,String> pblocks = new HashMap<>();
-            for(String line : FileTools.getLinesFromTextFile(fileName)) {
+            for (String line : FileTools.getLinesFromTextFile(fileName)) {
                 if (line.trim().startsWith("#")) continue;
                 if (line.trim().length()==0) continue;
                 String pblockRanges = null;

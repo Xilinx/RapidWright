@@ -266,7 +266,7 @@ public class LogNetlistWriter {
     private void writeAllStringsToNetlistBuilder(Netlist.Builder netlist) {
         int stringCount = allStrings.size();
         TextList.Builder strList = netlist.initStrList(stringCount);
-        for(int i=0; i < stringCount; i++) {
+        for (int i=0; i < stringCount; i++) {
             strList.set(i, new Text.Reader(allStrings.get(i)));
         }
     }

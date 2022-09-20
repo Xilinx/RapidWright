@@ -55,7 +55,7 @@ public class TestDesignTools {
     private Map<Pair<String,String>,String> mimicInContextInputPortNetSiteRouting(Design design) {
         Map<Pair<String,String>,String> initialState = new HashMap<>();
         
-        for(Pair<String,String> siteWire : Arrays.asList(inputSiteWire1, inputSiteWire2)) {
+        for (Pair<String,String> siteWire : Arrays.asList(inputSiteWire1, inputSiteWire2)) {
             SiteInst i = design.getSiteInstFromSiteName(siteWire.getFirst());
             Net net = i.getNetFromSiteWire(siteWire.getSecond());
             initialState.put(siteWire, net.getName());
@@ -77,7 +77,7 @@ public class TestDesignTools {
         
         DesignTools.resolveSiteRoutingFromInContextPorts(design);
         
-        for(Entry<Pair<String,String>,String> e : initialSiteRoutes.entrySet()) {
+        for (Entry<Pair<String,String>,String> e : initialSiteRoutes.entrySet()) {
             SiteInst i = design.getSiteInstFromSiteName(e.getKey().getFirst());
             Net net = i.getNetFromSiteWire(e.getKey().getSecond());
             Assertions.assertEquals(net.getName(), e.getValue());
@@ -97,7 +97,7 @@ public class TestDesignTools {
         routeThrus.add(new Pair<>("A6LUT", true)); // It has VCC pin
         routeThrus.add(new Pair<>("B6LUT", false)); // It does not have a VCC pin
         
-        for(Pair<String, Boolean> routeThru : routeThrus) {
+        for (Pair<String, Boolean> routeThru : routeThrus) {
             Cell rtCell = dstSiteInst.getCell(routeThru.getFirst());
             Assertions.assertTrue(rtCell.isRoutethru());
             String siteWireName = rtCell.getBEL().getPin("A6").getSiteWireName();
@@ -177,7 +177,7 @@ public class TestDesignTools {
         String hierCellName = "bd_0_i/hls_inst/inst/dmem_V_U";
         List<EDIFHierCellInst> leafCells = design.getNetlist().getAllLeafDescendants(hierCellName);
         Set<String> placedCellsInBlackBox = new HashSet<>();
-        for(EDIFHierCellInst inst : leafCells) {
+        for (EDIFHierCellInst inst : leafCells) {
             String name = inst.getFullHierarchicalInstName();
             Cell cell = design.getCell(name);
             if (cell != null && cell.isPlaced()) {
@@ -185,17 +185,17 @@ public class TestDesignTools {
             }
         }
         Set<String> allOtherPlacedCells = new HashSet<>();
-        for(Cell cell : design.getCells()) {
+        for (Cell cell : design.getCells()) {
             if (placedCellsInBlackBox.contains(cell.getName())) continue;
             allOtherPlacedCells.add(cell.getName());
         }
         
         DesignTools.makeBlackBox(design, hierCellName);
         Assertions.assertTrue(design.getNetlist().getCellInstFromHierName(hierCellName).isBlackBox());
-        for(String cellName : placedCellsInBlackBox) {
+        for (String cellName : placedCellsInBlackBox) {
             Assertions.assertNull(design.getCell(cellName));
         }
-        for(String cellName : allOtherPlacedCells) {
+        for (String cellName : allOtherPlacedCells) {
             Assertions.assertNotNull(design.getCell(cellName));
         }
     }
@@ -338,7 +338,7 @@ public class TestDesignTools {
 
         removeSourcePinHelper(useUnroutePins, net1.getSource(), 12);
         Assertions.assertEquals(0, net1.getPIPs().size());
-        for(SitePinInst pin : net1.getPins()) {
+        for (SitePinInst pin : net1.getPins()) {
             Assertions.assertFalse(pin.isRouted());
         }
 
@@ -358,7 +358,7 @@ public class TestDesignTools {
 
         removeSourcePinHelper(useUnroutePins, net2.getSource(), 4);
         Assertions.assertEquals(0, net2.getPIPs().size());
-        for(SitePinInst pin : net2.getPins()) {
+        for (SitePinInst pin : net2.getPins()) {
             Assertions.assertFalse(pin.isRouted());
         }
 

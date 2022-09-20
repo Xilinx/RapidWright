@@ -259,7 +259,7 @@ public class Installer {
         String jarsDir = cwd + File.separator + "RapidWright" + File.separator +"jars";
         boolean isWindows = isWindows();
         StringBuilder sb = new StringBuilder();
-        for(String jar : new File(jarsDir).list()) {
+        for (String jar : new File(jarsDir).list()) {
             if (jar.contains("javadoc")) continue;
             if (jar.contains("macosx") || jar.contains("linux32") || jar.contains("win32")) continue;
             if (isWindows && jar.contains("linux64")) continue;
@@ -303,7 +303,7 @@ public class Installer {
         }
         String md5sum = null;
         try {
-            for(String line : Files.readAllLines(Paths.get(MD5_FILE_NAME), Charset.forName("US-ASCII"))) {
+            for (String line : Files.readAllLines(Paths.get(MD5_FILE_NAME), Charset.forName("US-ASCII"))) {
                 String[] parts = line.split("\\s+"); 
                 if (parts[1].trim().equals(fileName)) {
                     md5sum = parts[0].trim();
@@ -327,7 +327,7 @@ public class Installer {
         try(BufferedReader reader = new BufferedReader(new InputStreamReader(url.openStream()))) {
             String line = null;
             while((line = reader.readLine()) != null) {
-                for(String s : line.split(",")) {
+                for (String s : line.split(",")) {
                     if (s.contains("browser_download_url") && s.contains(JARS_ZIP)) {
                         String suffix = "_jars.zip";
                         jarsZipUrl = s.substring(s.indexOf("http"), s.indexOf(suffix)+ suffix.length());
@@ -372,7 +372,7 @@ public class Installer {
     public static final String JARS_ZIP = "rapidwright_jars.zip";
        
     public static void main(String[] args) throws IOException {
-        for(String arg : args) {
+        for (String arg : args) {
             if (arg.equals("-v") || arg.equals("--verbose")) {
                 verbose = true;
             } else if (arg.equals("-k") || arg.equals("--keep-zip-file")) {
@@ -495,7 +495,7 @@ public class Installer {
         System.out.println("================================================================================");
         System.out.println("  Please be patient, download may take several minutes...");
         
-        for(String name : new String[]{DATA_ZIP,JARS_ZIP}) {
+        for (String name : new String[]{DATA_ZIP,JARS_ZIP}) {
             boolean alreadyDownloaded = false;
             if (new File(name).exists()) {
                 System.out.println("Checking if existing "+name+" can be used...");

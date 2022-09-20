@@ -54,7 +54,7 @@ public class PrintEDIFInstances {
                 EDIFCellInst i = p.getInst();
                 String curr = p.getFullHierarchicalInstName();
                 pw.println(curr + " (" + i.getCellType() + ") from library " + i.getCellType().getLibrary());
-                for(EDIFCellInst i2 : i.getCellType().getCellInsts()) {
+                for (EDIFCellInst i2 : i.getCellType().getCellInsts()) {
                     queue.add(p.getChild(i2));
                 }
             }

@@ -35,7 +35,7 @@ import com.xilinx.rapidwright.device.PartNameTools;
  */
 public class PartPrinter {
     public static void main(String[] args) {
-        for(Part p : PartNameTools.getParts()) {
+        for (Part p : PartNameTools.getParts()) {
             System.out.println(p);
         }
     }

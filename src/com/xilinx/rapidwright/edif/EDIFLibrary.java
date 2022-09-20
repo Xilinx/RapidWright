@@ -206,8 +206,8 @@ public class EDIFLibrary extends EDIFName {
      */
     public List<EDIFCell> getExternallyReferencedCells() {
         List<EDIFCell> list = new ArrayList<>();
-        for(EDIFCell c : getCells()) {
-            for(EDIFCellInst i : c.getCellInsts()) {
+        for (EDIFCell c : getCells()) {
+            for (EDIFCellInst i : c.getCellInsts()) {
                 if (!containsCell(i.getCellType())) {
                     list.add(i.getCellType());
                 }
@@ -224,7 +224,7 @@ public class EDIFLibrary extends EDIFName {
      */
     public Collection<EDIFLibrary> getExternallyReferencedLibraries() {
         Set<EDIFLibrary> set = new HashSet<>();
-        for(EDIFCell c : getExternallyReferencedCells()) {
+        for (EDIFCell c : getExternallyReferencedCells()) {
             set.add(c.getLibrary());
         }
         return set;
@@ -239,7 +239,7 @@ public class EDIFLibrary extends EDIFName {
     public void uniqueifyCellsWithPrefix(String prefix) {
         ArrayList<EDIFCell> renamedCells = new ArrayList<>(getCells());
         cells.clear();
-        for(EDIFCell c : renamedCells) {
+        for (EDIFCell c : renamedCells) {
             c.setName(prefix + c.getName());
             addCell(c);
         }
@@ -296,7 +296,7 @@ public class EDIFLibrary extends EDIFName {
         } else {
             cellInsts = cell.getCellInsts();
         }
-        for(EDIFCellInst i : cellInsts) {
+        for (EDIFCellInst i : cellInsts) {
             EDIFCell childCell = i.getCellType();
             if (childCell.getLibrary() == this) {
                 visit(childCell,visitedList,visitedSet, stable);

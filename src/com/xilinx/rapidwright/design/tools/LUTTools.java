@@ -60,7 +60,7 @@ public class LUTTools {
     
     static {
         lutMap = new String[lutLetters.length][];
-        for(char letter : lutLetters) {
+        for (char letter : lutLetters) {
             lutMap[letter - 'A'] = new String[] {letter + "6LUT", letter + "5LUT"};
         }
     }
@@ -212,12 +212,12 @@ public class LUTTools {
         int initLength = initLength(init);
         long initValue = getInitValue(init);
         
-        for(int i=lutSize-1; i >= 0; i--) {
+        for (int i=lutSize-1; i >= 0; i--) {
             System.out.print("I" + i + " ");
         }
         System.out.println("| " + getLUTEquation(init));
-        for(int i=0; i < initLength; i++) {
-            for(int j=lutSize-1; j >= 0; j--) {
+        for (int i=0; i < initLength; i++) {
+            for (int j=lutSize-1; j >= 0; j--) {
                 System.out.print(" " + getBit(i,j) + " ");
             }
             System.out.println("| " + getBit(initValue,i));
@@ -288,7 +288,7 @@ public class LUTTools {
         int length = 1 << lutSize;
         long init = 0;
         LUTEquationEvaluator b = new LUTEquationEvaluator(equation);
-        for(int i=0; i < length; i++) {
+        for (int i=0; i < length; i++) {
             boolean result = b.eval(i);
             if (result) init = setBit(init,i);
         }
@@ -355,10 +355,10 @@ public class LUTTools {
         int lutSize = getLUTSize(init);
         StringBuilder sb = new StringBuilder("O=");
         int termCount = 0;
-        for(int i=0; i < length; i++) {
+        for (int i=0; i < length; i++) {
             if (getBit(value,i) == 1) {
                 if (termCount > 0) sb.append(" + ");
-                for(int j=lutSize-1; j >= 0; j--) {
+                for (int j=lutSize-1; j >= 0; j--) {
                     sb.append(getBit(i,j) == 1 ? "" : "!");
                     sb.append("I" + j);
                     if (j > 0) sb.append(" & ");
@@ -376,7 +376,7 @@ public class LUTTools {
     
     static{
         tests = new ArrayList<>();
-        for(int i=0; i < MAX_LUT_SIZE; i++) {
+        for (int i=0; i < MAX_LUT_SIZE; i++) {
             int lutSize = i+1;
             tests.add(new LinkedHashMap<>());
             Map<String,String> test = tests.get(i);
@@ -408,13 +408,13 @@ public class LUTTools {
     public static void main(String[] args) {
         Design d = new Design("test_design",Device.PYNQ_Z1);
         
-        for(int k=1; k <= 6; k++) {
+        for (int k=1; k <= 6; k++) {
             String name = "fred_" + k;
             Cell c = d.createCell(name, Design.getUnisimCell(Unisim.valueOf("LUT" + k)));
             EDIFCellInst i = c.getEDIFCellInst();
             System.out.println("==== LUT" + k + " TESTS ====");
             Map<String,String> lutTests = tests.get(k-1);
-            for(Entry<String,String> e : lutTests.entrySet()) {
+            for (Entry<String,String> e : lutTests.entrySet()) {
                 String equation = e.getKey();
                 String init = e.getValue();
                 i.addProperty(LUT_INIT, init);

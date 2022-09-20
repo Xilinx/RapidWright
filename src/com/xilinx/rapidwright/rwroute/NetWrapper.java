@@ -66,7 +66,7 @@ public class NetWrapper{
         List<Short> yArray = new ArrayList<>();
         
         boolean sourceRnodeAdded = false;    
-        for(Connection connection : connections) {
+        for (Connection connection : connections) {
             if (connection.isDirect()) continue;
             short x = 0;
             short y = 0;

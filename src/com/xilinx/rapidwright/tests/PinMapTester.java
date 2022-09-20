@@ -104,11 +104,11 @@ public class PinMapTester {
         Map<String, String> parameterMap = new HashMap<String, String>();
 
         Map<String,VivadoProp> defaultParameters = design.getDefaultCellProperties(device.getSeries(), cellTypeName);
-        for(Map.Entry<String, VivadoProp> defaultParameter : defaultParameters.entrySet()) {
+        for (Map.Entry<String, VivadoProp> defaultParameter : defaultParameters.entrySet()) {
             parameterMap.put(defaultParameter.getKey(), defaultParameter.getValue().getValue());
         }
 
-        for(int i = 5; i < args.length; ++i) {
+        for (int i = 5; i < args.length; ++i) {
             String[] parameterSplit = args[i].split("=", 2);
             if (parameterSplit.length != 2) {
                 throw new RuntimeException("Invalid parameter " + args[i]);
@@ -118,7 +118,7 @@ public class PinMapTester {
         }
 
         List<String> parameters = new ArrayList<String>();
-        for(Map.Entry<String, String> pair : parameterMap.entrySet()) {
+        for (Map.Entry<String, String> pair : parameterMap.entrySet()) {
             parameters.add(pair.getKey() + "=" + pair.getValue());
         }
         String[] parameterArray = parameters.toArray(new String[parameters.size()]);
@@ -127,11 +127,11 @@ public class PinMapTester {
 
         System.out.printf("Cell type %s at %s/%s in part %s, pin map:\n",
                 cellTypeName, site.getName(), belName, partName);
-        for(Map.Entry<String, String> pinMap : physCell.getPinMappingsP2L().entrySet()) {
+        for (Map.Entry<String, String> pinMap : physCell.getPinMappingsP2L().entrySet()) {
             System.out.printf(" - %s <= %s\n", pinMap.getKey(), pinMap.getValue());
         }
 
-        //for(Map.Entry<String, Set<String>> pinMap : physCell.getPinMappingsL2P().entrySet()) {
+        //for (Map.Entry<String, Set<String>> pinMap : physCell.getPinMappingsL2P().entrySet()) {
         //    System.out.printf("
         //}
     }

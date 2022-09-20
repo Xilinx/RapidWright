@@ -46,7 +46,7 @@ public class CompareRouteStatusReports {
         String currStatus = null;
         ArrayList<String> currSubTree = null;
         ArrayList<ArrayList<String>> currSubTrees = null;
-        for(int i=0; i < lines.size(); i++) {
+        for (int i=0; i < lines.size(); i++) {
             String curr = lines.get(i);
             if (pastHeader) {
                 if (curr.length() > 0 && Character.isWhitespace(curr.charAt(0))) {
@@ -96,7 +96,7 @@ public class CompareRouteStatusReports {
             System.out.println("Error: Differing number of nets in files!");
         }
         
-        for(String net : tree1.keySet()) {
+        for (String net : tree1.keySet()) {
             RouteStatus r1 = tree1.get(net);
             RouteStatus r2 = tree2.get(net);
             r1.reportDifferences(r2);

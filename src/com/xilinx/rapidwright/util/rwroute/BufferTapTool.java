@@ -97,7 +97,7 @@ public class BufferTapTool {
      * @return The clock net of the design.
      */
     private static Net getClockNet(Design design) {
-        for(Net n : design.getNets()) {
+        for (Net n : design.getNets()) {
             if (n.isClockNet()) {
                 return n;
             }
@@ -150,7 +150,7 @@ public class BufferTapTool {
         try {
             FileWriter myWriter = new FileWriter(filePath + readToFile);
             
-            for(String s : siteTaps.keySet()) {
+            for (String s : siteTaps.keySet()) {
                 Site site = dev.getSite(s);
                 if (site == null) {
                     System.err.println("ERROR: No site found under name " + s);
@@ -174,7 +174,7 @@ public class BufferTapTool {
      * @param dev The device instance to use.
      */
     private static void setBufferTaps(Map<String, Integer> siteTaps, Net clock, Device dev) {
-        for(Entry<String, Integer> siteTap : siteTaps.entrySet()) {
+        for (Entry<String, Integer> siteTap : siteTaps.entrySet()) {
             String siteName = siteTap.getKey();
             Site site = dev.getSite(siteName);
             int tap = siteTap.getValue();

@@ -103,11 +103,11 @@ public class BlockCreator {
         ArrayList<String> routedDCPFileNames = getRoutedDCPFileNames(routedDCPFileName, blockImplCount);
         
         ModuleImpls modImpls = new ModuleImpls();
-        for(String dcpName : routedDCPFileNames) {
+        for (String dcpName : routedDCPFileNames) {
             Design d = new Design(e);
             d.updateDesignWithCheckpointPlaceAndRoute(dcpName);
             SiteInst anchorCandidate = null;
-            for(SiteInst i : d.getSiteInsts()) {
+            for (SiteInst i : d.getSiteInsts()) {
                 if (i.getName().startsWith("STATIC_SOURCE")) continue;
                 if (Utils.isModuleSiteType(i.getSite().getSiteTypeEnum())) {
                     anchorCandidate = i;
@@ -187,7 +187,7 @@ public class BlockCreator {
             routedDCPFileNames.add(routedDCPFileName);
         } else {
             File f = new File(routedDCPFileName);
-            for(File siblings :  f.getParentFile().listFiles()) {
+            for (File siblings :  f.getParentFile().listFiles()) {
                 if (siblings.getName().endsWith(ROUTED_DCP_SUFFIX)) {
                     routedDCPFileNames.add(siblings.toString());
                 }
@@ -248,7 +248,7 @@ public class BlockCreator {
         }
         
         ModuleImpls modImpls = ModuleCache.readFromCompactFile(commonFileName+".dat",netlist);
-        for(Module m : modImpls) {
+        for (Module m : modImpls) {
             m.setName(cellInstanceName);
             m.setSrcDatFile(commonFileName+".dat");
         }
@@ -260,7 +260,7 @@ public class BlockCreator {
         JobQueue jobs = new JobQueue();
         Map<Long,String> jobLocations = new HashMap<>();
         
-        for(Entry<String,String> e : ipNames.entrySet()) {
+        for (Entry<String,String> e : ipNames.entrySet()) {
             String blockName = e.getKey();
             String cacheID = e.getValue();
 
@@ -273,7 +273,7 @@ public class BlockCreator {
             String doneFileName = null;
             String optDcpFileName = null;
             int implCount = -1;
-            for(String fileName : cachedIPDir.list()) {
+            for (String fileName : cachedIPDir.list()) {
                 if (fileName.startsWith(DONE_FILE_PREFIX)) {
                     doneFileName = fileName;
                     implCount = Integer.parseInt(doneFileName.substring(doneFileName.lastIndexOf('.')+1));
@@ -306,7 +306,7 @@ public class BlockCreator {
                 // A helper entry exists for this block, we'll use the guides provided
                 BlockGuide blockHelper = implHelper.getBlock(cacheID);
                 ArrayList<PBlock> pblocks = blockHelper.getImplementations();
-                for(int i=0; i < pblocks.size(); i++) {
+                for (int i=0; i < pblocks.size(); i++) {
                     PBlock pblock = pblocks.get(i);
                     Job job = createImplRun(optDcpFileName, pblock, i, blockHelper);
                     jobs.addJob(job);
@@ -323,7 +323,7 @@ public class BlockCreator {
                     if (pBlockLines.get(0).startsWith("PBlockGenerator Failed!")) {
                         throw new RuntimeException("in " + cacheID+" "+String.join("\n", pBlockLines) +"\n for "+pblockFileName);
                     }
-                    for(String pblock : pBlockLines) {
+                    for (String pblock : pBlockLines) {
                         if (pblock.startsWith("#")) continue;
                         PBlock pblock2 = (pblock.trim().isEmpty() || pblock.contains("Failed!")) ? null : new PBlock(dev, pblock);
                         FileTools.writeStringToTextFile(pblock, optDcpFileName.replace("opt.dcp", +implIndex + USED_PBLOCK_FILE_SUFFIX));
@@ -352,7 +352,7 @@ public class BlockCreator {
         // When all jobs are done, check outputs to see if any failed
         if (jobLocations.size() > 0) MessageGenerator.printHeader("OOC Implementation Runs Summary");
         boolean halt = false;
-        for(Entry<Long, String> e : jobLocations.entrySet()) {
+        for (Entry<Long, String> e : jobLocations.entrySet()) {
             int lastSlash = e.getValue().lastIndexOf('/');
             int lastSpace = e.getValue().lastIndexOf(' ');
             String dir = e.getValue().substring(0, lastSlash);
@@ -364,7 +364,7 @@ public class BlockCreator {
             boolean noDCP = true;
             String doneFile = null;
             if (routedFileExists) {
-                for(String file : new File(dir).list()) {
+                for (String file : new File(dir).list()) {
                     if (file.startsWith(DONE_FILE_PREFIX)) {
                         doneFile = file;
                         break;
@@ -378,7 +378,7 @@ public class BlockCreator {
             String wns = null;
             String timingFile = dir + "/route_timing" + implIndex + ".twr"; 
             if (!noDCP && new File(timingFile).exists() && FileTools.isFileNewer(timingFile, dir + "/" + doneFile)) {
-                for(String line : FileTools.getLinesFromTextFile(timingFile)) {
+                for (String line : FileTools.getLinesFromTextFile(timingFile)) {
                     if (line.contains("Slack")) {
                         String[] tokens = line.split("\\s+");
                         if (tokens.length > 2) wns = tokens[3];
@@ -394,7 +394,7 @@ public class BlockCreator {
             if (noDCP) {
                 String logFile = dir + "/" + implIndex +"/vivado.log";
                 System.out.println("  VIVADO LOG: " + logFile);
-                for(String line : FileTools.getLinesFromTextFile(logFile)) {
+                for (String line : FileTools.getLinesFromTextFile(logFile)) {
                     if (line.contains("ERROR"))
                         System.out.println("  *** " + line + " ***");
                 }
@@ -450,15 +450,15 @@ public class BlockCreator {
         pw.println("open_checkpoint " + optDcpFileName);
         if (blockGuide != null) {
             // Add Clock Constraints
-            for(String clkPortName : blockGuide.getClocks()) {
+            for (String clkPortName : blockGuide.getClocks()) {
                 pw.println("create_clock -name " + clkPortName + " -period " + Float.toString(blockGuide.getClockPeriod(clkPortName)) + " [get_ports " + clkPortName + "]");
             }
-            for(String clkPortName : blockGuide.getClocksWithBuffers()) {
+            for (String clkPortName : blockGuide.getClocksWithBuffers()) {
                 pw.println("set_property HD.CLK_SRC " + blockGuide.getClockBuffer(clkPortName) + " [get_ports " + clkPortName + "]");
             }
             if (blockGuide.getClocks().size() > 1) {
                 pw.print("set_clock_groups -asynchronous");
-                for(String clkPortName : blockGuide.getClocks()) {
+                for (String clkPortName : blockGuide.getClocks()) {
                     pw.print(" -group [get_clocks " + clkPortName +"]");
                 }
                 pw.println();
@@ -478,12 +478,12 @@ public class BlockCreator {
         pw.println("        resize_pblock pblock_1 -add $pblock");
         int i = 2;
         if (pblock != null) {
-            for(SubPBlock subPBlock : pblock.getSubPBlocks()) {
+            for (SubPBlock subPBlock : pblock.getSubPBlocks()) {
                 String pblockName = "pblock_" + i; 
                 i++;
                 pw.println("        create_pblock " + pblockName);
                 String[] parts = subPBlock.getGetCellsArgs().split(",");
-                for(String p : parts) {
+                for (String p : parts) {
                     pw.println("        add_cells_to_pblock " + pblockName + " -instances [get_cells "+ p + "]");
                 }
                 pw.println("        resize_pblock " + pblockName + " -add {"+ subPBlock.toString() + "}");
@@ -493,7 +493,7 @@ public class BlockCreator {
         pw.println("    }");
         
         if (blockGuide != null) {
-            for(String xdc : blockGuide.getXDCCommands()) {
+            for (String xdc : blockGuide.getXDCCommands()) {
                 pw.println("    " + xdc);
             }                
         }
@@ -555,7 +555,7 @@ public class BlockCreator {
         /*boolean storedModuleValid = new File(datFileName).exists() && new File(uniqueFileName+".kryo").exists(); 
         if (storedModuleValid) {
             // Check that all *routed.dcp files are older than .dat
-            for(String routedDCP : getRoutedDCPFileNames(routedDCPFileName, blockImplCount)) {
+            for (String routedDCP : getRoutedDCPFileNames(routedDCPFileName, blockImplCount)) {
                 if (FileTools.isFileNewer(routedDCP, datFileName)) {
                     storedModuleValid = false;
                     break;
@@ -574,7 +574,7 @@ public class BlockCreator {
         EDIFNetlist e = EDIFTools.readEdifFile(edifFileName);
         String metadataFileName = routedDCPFileName == null ? null : routedDCPFileName.replace(ROUTED_DCP_SUFFIX, METADATA_FILE_SUFFIX);
         ModuleImpls modules = createBlock(routedDCPFileName, metadataFileName, e, blockImplCount, cellInstanceName);
-        for(Module m : modules) {
+        for (Module m : modules) {
             m.setSrcDatFile(uniqueFileName+".dat");
             m.setNetlist(e);
             e.setDevice(m.getDevice());

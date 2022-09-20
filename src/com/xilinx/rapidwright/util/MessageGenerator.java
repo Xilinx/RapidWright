@@ -124,7 +124,7 @@ public class MessageGenerator{
      */
     public static String createStringFromArray(Object[] objs) {
         StringBuilder sb = new StringBuilder();
-        for(Object o : objs) {
+        for (Object o : objs) {
             sb.append(o.toString() + " ");
         }
         return sb.toString();
@@ -155,7 +155,7 @@ public class MessageGenerator{
         if (length < 1)
             return "";
         StringBuilder sb = new StringBuilder(length);
-        for(int i=0; i<length; i++) {
+        for (int i=0; i<length; i++) {
             sb.append(" ");
         }
         return sb.toString();

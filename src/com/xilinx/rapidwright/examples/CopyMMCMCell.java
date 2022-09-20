@@ -45,7 +45,7 @@ public class CopyMMCMCell {
         Design input = Design.readCheckpoint(args[1], args[1].replace(".dcp", ".edf"));
         
         Cell mmcm = null;
-        for(Cell c : clkPath.getCells()) {
+        for (Cell c : clkPath.getCells()) {
             if (c.getBEL().getName().contains("MMCM")) {
                 mmcm = c;
                 break;

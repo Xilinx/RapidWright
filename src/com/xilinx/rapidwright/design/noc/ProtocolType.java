@@ -36,7 +36,7 @@ public enum ProtocolType {
 
     static {
         map = new HashMap<>();
-        for(ProtocolType e : values()) {
+        for (ProtocolType e : values()) {
             map.put(e.toString(), e);
         }
     }    

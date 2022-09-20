@@ -174,24 +174,24 @@ public class BlockGuide {
 
             // Add all data to md5sum
             md5.update(cacheID.getBytes());
-            for(PBlock pb : implementations) {
+            for (PBlock pb : implementations) {
                 md5.update(pb.toString().getBytes());
                 if (pb.getSubPBlocks() != null) {
-                    for(SubPBlock sub : pb.getSubPBlocks()) {
+                    for (SubPBlock sub : pb.getSubPBlocks()) {
                         md5.update(sub.getGetCellsArgs().getBytes());
                         md5.update(sub.toString().getBytes());
                     }
                 }
             }
-            for(Entry<String,Float> e : clocks.entrySet()) {
+            for (Entry<String,Float> e : clocks.entrySet()) {
                 md5.update(e.getKey().getBytes());
                 md5.update(e.getValue().toString().getBytes());
             }
-            for(Entry<String,Site> e : clockBuffers.entrySet()) {
+            for (Entry<String,Site> e : clockBuffers.entrySet()) {
                 md5.update(e.getKey().getBytes());
                 md5.update(e.getValue().toString().getBytes());
             }
-            for(String xdc : getXDCCommands()) {
+            for (String xdc : getXDCCommands()) {
                 md5.update(xdc.getBytes());
             }
             

@@ -62,8 +62,8 @@ public class GlobalSignalRouting {
     private static HashSet<String> lutOutputPinNames;
     static {
         lutOutputPinNames = new HashSet<String>();
-        for(String cle : new String[]{"L", "M"}) {
-            for(String pin : new String[]{"A", "B", "C", "D", "E", "F", "G", "H"}) {
+        for (String cle : new String[]{"L", "M"}) {
+            for (String pin : new String[]{"A", "B", "C", "D", "E", "F", "G", "H"}) {
                 lutOutputPinNames.add("CLE_CLE_" + cle + "_SITE_0_" + pin + "_O");
             }
         }
@@ -82,7 +82,7 @@ public class GlobalSignalRouting {
         Set<PIP> clkPIPs = new HashSet<>();
         Map<String, RouteNode> horDistributionLines = new HashMap<>();
         
-        for(List<Node> nodes : dstINTtilePaths.values()) {
+        for (List<Node> nodes : dstINTtilePaths.values()) {
             Collections.reverse(nodes); // HDISTR to CLK_OUT
             Node hDistr = nodes.get(0);
             RouteNode hdistr = new RouteNode(hDistr.getTile(), hDistr.getWire());
@@ -107,7 +107,7 @@ public class GlobalSignalRouting {
     
     private static Map<ClockRegion, Set<RouteNode>> getStartingPoint(Map<String, RouteNode> crDistLines, Device dev) {
         Map<ClockRegion, Set<RouteNode>> startingPoints = new HashMap<>();
-        for(Entry<String, RouteNode> crRouteNode : crDistLines.entrySet()) {
+        for (Entry<String, RouteNode> crRouteNode : crDistLines.entrySet()) {
             String crName = crRouteNode.getKey();
             ClockRegion cr = dev.getClockRegion(crName);
             Set<RouteNode> routeNodes = startingPoints.get(cr);
@@ -124,7 +124,7 @@ public class GlobalSignalRouting {
         // This is needed because a HDISTR for clock region X3Y2 can have a base tile in clock region X2Y2, 
         // observed with clock routing of the optical-flow design.
         Map<String, Integer> crCounts = new HashMap<>();
-        for(Wire wire : node.getAllWiresInNode()) {
+        for (Wire wire : node.getAllWiresInNode()) {
             ClockRegion cr = wire.getTile().getClockRegion();
             if (cr == null) {
                 continue;
@@ -140,7 +140,7 @@ public class GlobalSignalRouting {
         
         String dominate = null;
         int max = 0;
-        for(Entry<String, Integer> crCount : crCounts.entrySet()) {
+        for (Entry<String, Integer> crCount : crCounts.entrySet()) {
             String cr = crCount.getKey();
             Integer count = crCount.getValue();
             if (count > max) {
@@ -160,10 +160,10 @@ public class GlobalSignalRouting {
      */
     private static Map<String, List<Node>> getListOfNodesFromRoutes(Device device, Map<String, List<String>> routes) {
         Map<String, List<Node>> dstPaths = new HashMap<>();
-        for(Entry<String, List<String>> dstRoute : routes.entrySet()) {
+        for (Entry<String, List<String>> dstRoute : routes.entrySet()) {
             String dst = dstRoute.getKey();
             List<Node> pathNodes = new ArrayList<>();
-            for(String nodeName : dstRoute.getValue()) {
+            for (String nodeName : dstRoute.getValue()) {
                 Node node = Node.getNode(nodeName, device);
                 if (node != null) {
                     pathNodes.add(node);
@@ -229,7 +229,7 @@ public class GlobalSignalRouting {
      */
     private static List<ClockRegion> getClockRegionsOfNet(Net clk) {
         List<ClockRegion> clockRegions = new ArrayList<>();
-        for(SitePinInst pin : clk.getPins()) {
+        for (SitePinInst pin : clk.getPins()) {
             if (pin.isOutPin()) continue;
             Tile t = pin.getTile();
             ClockRegion cr = t.getClockRegion();
@@ -240,7 +240,7 @@ public class GlobalSignalRouting {
     
     private static void divideClockRegions(List<ClockRegion> clockRegions, ClockRegion centroid, List<ClockRegion> upClockRegions,
             List<ClockRegion> downClockRegions) {
-        for(ClockRegion cr : clockRegions) {
+        for (ClockRegion cr : clockRegions) {
             if (cr.getInstanceY() > centroid.getInstanceY()) {
                 upClockRegions.add(cr);
             } else {
@@ -256,12 +256,12 @@ public class GlobalSignalRouting {
      */
     private static Map<RouteNode, ArrayList<SitePinInst>> getLCBPinMappings(Net clk) {
         Map<RouteNode, ArrayList<SitePinInst>> lcbMappings = new HashMap<>();
-        for(SitePinInst p : clk.getPins()) {
+        for (SitePinInst p : clk.getPins()) {
             if (p.isOutPin()) continue;
             Node n = null;// n should be a node whose name ends with "CLK_LEAF"
-            for(Node prev : p.getConnectedNode().getAllUphillNodes()) {
+            for (Node prev : p.getConnectedNode().getAllUphillNodes()) {
                 if (prev.getTile().equals(p.getSite().getIntTile())) {
-                    for(Node prevPrev : prev.getAllUphillNodes()) {
+                    for (Node prevPrev : prev.getAllUphillNodes()) {
                         if (prevPrev.getIntentCode() == IntentCode.NODE_GLOBAL_LEAF) {
                             n = prevPrev;
                             break;
@@ -291,7 +291,7 @@ public class GlobalSignalRouting {
      */
     private static ClockRegion findCentroid(Net clk, Device device) {
         HashSet<Point> sitePinInstTilePoints = new HashSet<>();    
-        for(SitePinInst spi : clk.getPins()) {
+        for (SitePinInst spi : clk.getPins()) {
             if (spi.isOutPin()) continue;
             ClockRegion c = spi.getTile().getClockRegion();
             sitePinInstTilePoints.add(new Point(c.getColumn(),c.getRow()));
@@ -322,7 +322,7 @@ public class GlobalSignalRouting {
             System.out.println("Net: " + currNet.getName());
         }
         
-        for(SitePinInst sink : currNet.getPins()) {
+        for (SitePinInst sink : currNet.getPins()) {
             if (sink.isOutPin()) continue;
             int watchdog = 10000;    
             if (debug) {
@@ -358,7 +358,7 @@ public class GlobalSignalRouting {
                     Collections.reverse(pathNodes);
                     sinkPathNodes.put(sink, pathNodes);
                     if (debug) {
-                        for(Node pathNode:pathNodes) {
+                        for (Node pathNode:pathNodes) {
                             System.out.println(pathNode.toString());
                         }
                     }
@@ -367,7 +367,7 @@ public class GlobalSignalRouting {
                 if (debug) {
                     System.out.println("KEEP LOOKING FOR A SOURCE...");
                 }
-                for(Node uphillNode : routingNode.getNode().getAllUphillNodes()) {
+                for (Node uphillNode : routingNode.getNode().getAllUphillNodes()) {
                     if (routeThruHelper.isRouteThru(uphillNode, routingNode.getNode())) continue;
                     RoutingNode nParent = RouterHelper.createRoutingNode(uphillNode, createdRoutingNodes);
                     if (nParent == null) continue;
@@ -388,7 +388,7 @@ public class GlobalSignalRouting {
             }
         }
         
-        for(List<Node> nodes:sinkPathNodes.values()) {
+        for (List<Node> nodes:sinkPathNodes.values()) {
             netPIPs.addAll(RouterHelper.getPIPsFromListOfReversedNodes(nodes));
         }
         

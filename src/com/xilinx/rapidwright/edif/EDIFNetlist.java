@@ -164,7 +164,7 @@ public class EDIFNetlist extends EDIFName {
 
         macroExpandExceptionMap = new HashMap<>();
         macroCollapseExceptionMap = new HashMap<>();
-        for(Series s : Series.values()) {
+        for (Series s : Series.values()) {
             Map<String,Pair<String,EnumSet<IOStandard>>> seriesMacroExpandExceptionMap = new HashMap<>();
             Map<String,Pair<String,EnumSet<IOStandard>>> seriesMacroCollapseExceptionMap = new HashMap<>();
             
@@ -174,7 +174,7 @@ public class EDIFNetlist extends EDIFName {
             seriesMacroExpandExceptionMap.put("OBUFTDS", new Pair<>("OBUFTDS_DUAL_BUF", obufExpansion));
             macroExpandExceptionMap.put(s, seriesMacroExpandExceptionMap);
             
-            for(Entry<String,Pair<String,EnumSet<IOStandard>>> e : seriesMacroExpandExceptionMap.entrySet()) {
+            for (Entry<String,Pair<String,EnumSet<IOStandard>>> e : seriesMacroExpandExceptionMap.entrySet()) {
                 Pair<String,EnumSet<IOStandard>> newPair = new Pair<>(e.getKey(), e.getValue().getSecond());
                 seriesMacroCollapseExceptionMap.put(e.getValue().getFirst(), newPair);
             }
@@ -298,20 +298,20 @@ public class EDIFNetlist extends EDIFName {
      */
     public void removeUnusedCellsFromAllWorkLibraries() {
         HashMap<String,HashMap<String,EDIFCell>> cellsToRemove = new HashMap<>();
-        for(EDIFLibrary lib : getLibraries()) {
+        for (EDIFLibrary lib : getLibraries()) {
             if (lib.isHDIPrimitivesLibrary()) continue;
             cellsToRemove.put(lib.getName(), new HashMap<>(lib.getCellMap()));
         }
         
         _keepCell(cellsToRemove, getTopCell());
-        for(EDIFHierCellInst i : getAllDescendants("", null, false)) {
+        for (EDIFHierCellInst i : getAllDescendants("", null, false)) {
             _keepCell(cellsToRemove, i.getCellType());
         }
         
-        for(Entry<String, HashMap<String,EDIFCell>> e : cellsToRemove.entrySet()) {
+        for (Entry<String, HashMap<String,EDIFCell>> e : cellsToRemove.entrySet()) {
             String libName = e.getKey();
             EDIFLibrary lib = getLibrary(libName);
-            for(EDIFCell cell : e.getValue().values()) {
+            for (EDIFCell cell : e.getValue().values()) {
                 lib.removeCell(cell);
             }
         }
@@ -321,13 +321,13 @@ public class EDIFNetlist extends EDIFName {
         HashMap<String,EDIFCell> cellsToRemove = new HashMap<>(getWorkLibrary().getCellMap());
         
         cellsToRemove.remove(getTopCell().getName());
-        for(EDIFHierCellInst i : getAllDescendants("", null, false)) {
+        for (EDIFHierCellInst i : getAllDescendants("", null, false)) {
             if (i.getCellType().getLibrary().getName().equals(EDIFTools.EDIF_LIBRARY_WORK_NAME)) {
                 cellsToRemove.remove(i.getCellType().getName());
             }
         }
         
-        for(String name : cellsToRemove.keySet()) {
+        for (String name : cellsToRemove.keySet()) {
             getWorkLibrary().removeCell(name);
         }
     }
@@ -339,7 +339,7 @@ public class EDIFNetlist extends EDIFName {
      * @return The first occurring cell with the provided name. 
      */
     public EDIFCell getCell(String legalEdifName) {
-        for(EDIFLibrary lib : getLibraries()) {
+        for (EDIFLibrary lib : getLibraries()) {
             EDIFCell c = lib.getCell(legalEdifName);
             if (c != null) return c;
         }
@@ -459,7 +459,7 @@ public class EDIFNetlist extends EDIFName {
         EDIFCell existingCell = destLib.getCell(cell.getName());
         if (existingCell == null) {
             destLib.addCell(cell);
-            for(EDIFCellInst inst : cell.getCellInsts()) {
+            for (EDIFCellInst inst : cell.getCellInsts()) {
                 inst.setCellType(migrateCellAndSubCellsWorker(inst.getCellType()));
                 //The view might have changed
                 inst.getViewref().setName(inst.getCellType().getView());
@@ -514,7 +514,7 @@ public class EDIFNetlist extends EDIFName {
         //Do it like before, but updating the celltype of each cellInst should be noticed.
         while(!cells.isEmpty()) {
             EDIFCell pollFromCells = cells.poll();
-            for(EDIFCellInst inst : pollFromCells.getCellInsts()) {
+            for (EDIFCellInst inst : pollFromCells.getCellInsts()) {
                 EDIFCell instCellType = inst.getCellType();
                 EDIFLibrary destLibSub = getLibrary(instCellType.getLibrary().getName());
                 if (destLibSub == null) {
@@ -568,7 +568,7 @@ public class EDIFNetlist extends EDIFName {
         if (existingCell == null) {
             EDIFCell newCell = new EDIFCell(destLib, cell, cell.getName());
             copiedCells.add(newCell);
-            for(EDIFCellInst inst : newCell.getCellInsts()) {
+            for (EDIFCellInst inst : newCell.getCellInsts()) {
                 inst.setCellType(copyCellAndSubCellsWorker(inst.getCellType(), copiedCells));
                 //The view might have changed
                 inst.getViewref().setName(inst.getCellType().getView());
@@ -629,7 +629,7 @@ public class EDIFNetlist extends EDIFName {
         toExport.add(getHDIPrimitivesLibrary());
         
         Map<String, HashSet<EDIFLibrary>> deps = new HashMap<String, HashSet<EDIFLibrary>>();
-        for(EDIFLibrary lib : getLibraries()) {
+        for (EDIFLibrary lib : getLibraries()) {
             if (lib.isHDIPrimitivesLibrary()) continue;
             HashSet<EDIFLibrary> externalRefs = 
                     new HashSet<EDIFLibrary>(lib.getExternallyReferencedLibraries());
@@ -720,7 +720,7 @@ public class EDIFNetlist extends EDIFName {
 
             List<EDIFLibrary> librariesToWrite = new ArrayList<>();
             librariesToWrite.add(getHDIPrimitivesLibrary());
-            for(EDIFLibrary lib : EDIFTools.sortIfStable(getLibrariesMap().values(), stable)) {
+            for (EDIFLibrary lib : EDIFTools.sortIfStable(getLibrariesMap().values(), stable)) {
                 if (lib.getName().equals(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME)) continue;
                 librariesToWrite.add(lib);
             }
@@ -897,7 +897,7 @@ public class EDIFNetlist extends EDIFName {
         EDIFCellInst currInst = getTopCellInst();
         cells.add(currInst);
 
-        for(int i=0; i < parts.length; i++) {
+        for (int i=0; i < parts.length; i++) {
             EDIFCellInst checkInst = currInst.getCellType().getCellInst(parts[i]);
             // Someone named their instance with hierarchy separators, joy!
             if (checkInst == null) {
@@ -912,14 +912,14 @@ public class EDIFNetlist extends EDIFName {
                 if (checkInst == null) {
                     // Try searching other direction
                     String prefixHierName = ""; 
-                    for(int j=0; j < cells.size(); j++) {
+                    for (int j=0; j < cells.size(); j++) {
                         EDIFCellInst curr = cells.get(j);
                         prefixHierName += curr == getTopCellInst() ? "" : (curr.getName() + "/");
                         int index = name.indexOf(prefixHierName);
                         String suffixHierName = name.substring(index + prefixHierName.length()); 
                         EDIFCellInst match = curr.getCellType().getCellInst(suffixHierName);
                         if (match != null) {
-                                    for(int k=cells.size()-1; k > j; k--) {
+                                    for (int k=cells.size()-1; k > j; k--) {
                                         cells.remove(k);
                                     }
                                     cells.add(match);
@@ -1107,7 +1107,7 @@ public class EDIFNetlist extends EDIFName {
     private String convertWildcardToRegex(String wildcardPattern) {
         if (wildcardPattern == null) return null;
         StringBuilder sb = new StringBuilder();
-        for(int i=0; i < wildcardPattern.length(); i++) {
+        for (int i=0; i < wildcardPattern.length(); i++) {
             char c = wildcardPattern.charAt(i);
             switch (c) {
                 case '*':
@@ -1153,7 +1153,7 @@ public class EDIFNetlist extends EDIFName {
         
         while(!q.isEmpty()) {
             EDIFHierCellInst i = q.poll();
-            for(EDIFCellInst child : i.getInst().getCellType().getCellInsts()) {
+            for (EDIFCellInst child : i.getInst().getCellType().getCellInsts()) {
                 EDIFHierCellInst newCell = i.getChild(child);
                 if (newCell.getInst().getCellType().isPrimitive()) {
                     if (pat != null && !pat.matcher(newCell.getFullHierarchicalInstName()).matches()) {
@@ -1225,7 +1225,7 @@ public class EDIFNetlist extends EDIFName {
                 continue;
             }
             aliases.add(net);
-            for(EDIFPortInst relP : net.getNet().getPortInsts()) {
+            for (EDIFPortInst relP : net.getNet().getPortInsts()) {
                 EDIFHierPortInst p = new EDIFHierPortInst(net.getHierarchicalInst(), relP);
 
                 boolean isCellPin = relP.getCellInst() != null && relP.getCellInst().getCellType().isLeafCellOrBlackBox();
@@ -1364,8 +1364,8 @@ public class EDIFNetlist extends EDIFName {
         Queue<EDIFHierPortInst> queue = new LinkedList<>();
         // All parent nets are either top-level inputs or outputs of leaf cells
         // Here we gather all top-level inputs
-        for(EDIFNet n : c.getNets()) {
-            for(EDIFPortInst p : n.getPortInsts()) {
+        for (EDIFNet n : c.getNets()) {
+            for (EDIFPortInst p : n.getPortInsts()) {
                 if (p.isTopLevelPort() && p.isInput()) {
                     queue.add(new EDIFHierPortInst(topCellInst, p));
                 }
@@ -1376,10 +1376,10 @@ public class EDIFNetlist extends EDIFName {
         instQueue.add(getTopHierCellInst());
         while(!instQueue.isEmpty()) {
             EDIFHierCellInst currInst = instQueue.poll(); 
-            for(EDIFCellInst eci : currInst.getInst().getCellType().getCellInsts()) {
+            for (EDIFCellInst eci : currInst.getInst().getCellType().getCellInsts()) {
                 // Checks if cell is primitive or black box
                 if (eci.getCellType().getCellInsts().size() == 0 && eci.getCellType().getNets().size() == 0) {
-                    for(EDIFPortInst portInst : eci.getPortInsts()) {
+                    for (EDIFPortInst portInst : eci.getPortInsts()) {
                         if (portInst.isOutput()) {
                             queue.add(new EDIFHierPortInst(currInst, portInst));
                         }
@@ -1390,9 +1390,9 @@ public class EDIFNetlist extends EDIFName {
             }
         }
 
-        for(EDIFHierPortInst pr : queue) {
+        for (EDIFHierPortInst pr : queue) {
             EDIFHierNet parentNetName = pr.getHierarchicalNet();
-            for(EDIFHierNet alias : getNetAliases(parentNetName)) {
+            for (EDIFHierNet alias : getNetAliases(parentNetName)) {
                 parentNetMap.put(alias, parentNetName);
             }
         }
@@ -1412,7 +1412,7 @@ public class EDIFNetlist extends EDIFName {
         q.add(getTopCellInst());
         while(!q.isEmpty()) {
             EDIFCellInst curr = q.poll();
-            for(EDIFCellInst eci : curr.getCellType().getCellInsts()) {
+            for (EDIFCellInst eci : curr.getCellType().getCellInsts()) {
                 if (eci.getCellType().isPrimitive())
                     insts.add(eci);
                 else
@@ -1534,7 +1534,7 @@ public class EDIFNetlist extends EDIFName {
         Queue<EDIFHierCellInst> toProcess = new LinkedList<EDIFHierCellInst>();
     
         // Add nets at the very top level to start
-        for(EDIFNet net : getTopCell().getNets()) {
+        for (EDIFNet net : getTopCell().getNets()) {
             map.put(net.getName(), net);
         }
 
@@ -1543,7 +1543,7 @@ public class EDIFNetlist extends EDIFName {
         while(!toProcess.isEmpty()) {
             EDIFHierCellInst curr = toProcess.poll();
             if (curr.getInst().getCellType().getNets() == null) continue;
-            for(EDIFNet net : curr.getInst().getCellType().getNets()) {
+            for (EDIFNet net : curr.getInst().getCellType().getNets()) {
                 map.put(new EDIFHierNet(curr, net).getHierarchicalNetName(), net);
                 //System.out.println("NET: " + name + "/" + net.getOldName());
             }
@@ -1561,9 +1561,9 @@ public class EDIFNetlist extends EDIFName {
      */
     public HashMap<String,EDIFPort> generateEDIFPortMap() {
         HashMap<String,EDIFPort> map = new HashMap<String, EDIFPort>(); 
-        for(EDIFPort port : getTopCellInst().getCellType().getPorts()) {
+        for (EDIFPort port : getTopCellInst().getCellType().getPorts()) {
             if (port.isBus()) {
-                for(int idx=0; idx < port.getWidth(); idx++) {
+                for (int idx=0; idx < port.getWidth(); idx++) {
                     map.put(port.getName() + "["+idx+"]",port);
                 }
             } else {
@@ -1604,7 +1604,7 @@ public class EDIFNetlist extends EDIFName {
         while(!q.isEmpty()) {
             EDIFCell curr = q.poll();
             types.add(curr.getName());
-            for(EDIFCellInst i : curr.getCellInsts()) {
+            for (EDIFCellInst i : curr.getCellInsts()) {
                 q.add(i.getCellType());
             }
         }
@@ -1637,7 +1637,7 @@ public class EDIFNetlist extends EDIFName {
         Set<String> toReplace = new HashSet<String>();
         Set<String> possibleExceptions = seriesMacroExpandExceptionMap == null ? 
                 Collections.emptySet() : seriesMacroExpandExceptionMap.keySet();
-        for(EDIFCell c : netlistPrims.getCells()) {
+        for (EDIFCell c : netlistPrims.getCells()) {
             if (macros.containsCell(c.getName())) {
                 toReplace.addAll(getAllDecendantCellTypes(macros.getCell(c.getName())));
             }
@@ -1647,7 +1647,7 @@ public class EDIFNetlist extends EDIFName {
         }
         
         // Replace macro primitives in library and import pre-requisite cells if needed
-        for(String cellName : toReplace) {
+        for (String cellName : toReplace) {
             EDIFCell removed = netlistPrims.removeCell(cellName);
             if (removed == null) {
                 primsToRemoveOnCollapse.add(cellName);
@@ -1661,10 +1661,10 @@ public class EDIFNetlist extends EDIFName {
         }
         
         // Update all cell references to macro versions
-        for(EDIFLibrary lib : getLibraries()) {
+        for (EDIFLibrary lib : getLibraries()) {
             boolean isHDILib = lib.isHDIPrimitivesLibrary(); 
-            for(EDIFCell cell : new ArrayList<>(lib.getCells())) { 
-                for(EDIFCellInst inst : cell.getCellInsts()) {
+            for (EDIFCell cell : new ArrayList<>(lib.getCells())) { 
+                for (EDIFCellInst inst : cell.getCellInsts()) {
                     String cellName = inst.getCellType().getName();
                     if (toReplace.contains(cellName)) {
                         if (!isHDILib) {
@@ -1693,7 +1693,7 @@ public class EDIFNetlist extends EDIFName {
                             primsToRemoveOnCollapse.add(cellName);
                             EDIFCell copy = new EDIFCell(netlistPrims, macro);
                             if (copy.getCellInsts().size() > 0) {
-                                for(EDIFCellInst copyInst : copy.getCellInsts()) {
+                                for (EDIFCellInst copyInst : copy.getCellInsts()) {
                                     EDIFCell primCell = netlistPrims.getCell(copyInst.getCellType().getName());
                                     if (primCell == null) {
                                         primCell = new EDIFCell(netlistPrims, copyInst.getCellType());
@@ -1705,7 +1705,7 @@ public class EDIFNetlist extends EDIFName {
                             newCell = copy;
                         }
                         inst.setCellType(newCell);
-                        for(EDIFCellInst childInst : newCell.getCellInsts()) {
+                        for (EDIFCellInst childInst : newCell.getCellInsts()) {
                             // Check if we already have a copy
                             EDIFCell existingCellType = netlistPrims.getCell(childInst.getCellName()); 
                             if (existingCellType == null) {
@@ -1731,7 +1731,7 @@ public class EDIFNetlist extends EDIFName {
         ArrayList<EDIFCell> reinsert = new ArrayList<EDIFCell>();
         Map<String, Pair<String, EnumSet<IOStandard>>> seriesMacroCollapseExceptionMap = 
                 macroCollapseExceptionMap.getOrDefault(series, Collections.emptyMap());
-        for(EDIFCell cell : prims.getCells()) {
+        for (EDIFCell cell : prims.getCells()) {
             if (macros.containsCell(cell.getName())) {
                 cell.makePrimitive();
                 if (seriesMacroCollapseExceptionMap.containsKey(cell.getName())) {
@@ -1740,12 +1740,12 @@ public class EDIFNetlist extends EDIFName {
                 }
             }
         }
-        for(EDIFCell cell : reinsert) {
+        for (EDIFCell cell : reinsert) {
             prims.removeCell(cell);
             prims.addCell(cell);
         }
         
-        for(String name : primsToRemoveOnCollapse) {
+        for (String name : primsToRemoveOnCollapse) {
             prims.removeCell(name);
         }
     }
@@ -1794,7 +1794,7 @@ public class EDIFNetlist extends EDIFName {
     public void addTclLoadEncryptedCells(Path tclPath) {
 
         List<String> encryptedCells = new ArrayList<>();
-        for(String line : FileTools.getLinesFromTextFile(tclPath.toFile().getAbsolutePath())) {
+        for (String line : FileTools.getLinesFromTextFile(tclPath.toFile().getAbsolutePath())) {
             if (line.startsWith(READ_EDIF_CMD) && line.endsWith(".edn")) {
                 String ednFileName = line.trim().substring(READ_EDIF_CMD.length());
                 encryptedCells.add(ednFileName.trim());

@@ -87,11 +87,11 @@ public class DefaultDesignMerger extends AbstractDesignMerger {
             List<EDIFNet> nets0 = p0.getInternalNets();
             List<EDIFNet> nets1 = p1.getInternalNets();
             ArrayList<EDIFPortInst> toRemove = new ArrayList<>();
-            for(int i=0; i < nets0.size(); i++) {
+            for (int i=0; i < nets0.size(); i++) {
                 EDIFNet net0 = nets0.get(i);
                 EDIFNet net1 = nets1.get(i);
                 List<EDIFPortInst> toSwitch = new ArrayList<>();
-                for(EDIFPortInst portInst0 : net0.getPortInsts()) {
+                for (EDIFPortInst portInst0 : net0.getPortInsts()) {
                     if (portInst0.isTopLevelPort() && portInst0.getPort() == p0) {
                         toRemove.add(portInst0);
                     } else if (!p0IsOutput) {
@@ -102,27 +102,27 @@ public class DefaultDesignMerger extends AbstractDesignMerger {
                         }
                     }
                 }
-                for(EDIFPortInst pi : toSwitch) {
+                for (EDIFPortInst pi : toSwitch) {
                     net0.removePortInst(pi);
                     net1.addPortInst(pi);
                 }
                 toSwitch.clear();
 
-                for(EDIFPortInst portInst1 : net1.getPortInsts()) {
+                for (EDIFPortInst portInst1 : net1.getPortInsts()) {
                     if (portInst1.isTopLevelPort() && portInst1.getPort() == p1) {
                         toRemove.add(portInst1);
                     } else if (p0IsOutput) {
                         toSwitch.add(portInst1);
                     }
                 }
-                for(EDIFPortInst pi : toSwitch) {
+                for (EDIFPortInst pi : toSwitch) {
                     net1.removePortInst(pi);
                     net0.addPortInst(pi);
                 }
                 toSwitch.clear();
             }
             
-            for(EDIFPortInst remove : toRemove) {
+            for (EDIFPortInst remove : toRemove) {
                 EDIFNet net = remove.getNet(); 
                 net.removePortInst(remove);
                 if (net.getPortInsts().size() == 0) {
@@ -138,7 +138,7 @@ public class DefaultDesignMerger extends AbstractDesignMerger {
         if (p0.isOutput() && p1.isOutput()) {
             List<EDIFNet> nets0 = p0.getInternalNets();
             List<EDIFNet> nets1 = p1.getInternalNets();
-            for(int i=0; i < nets0.size(); i++) {
+            for (int i=0; i < nets0.size(); i++) {
                 if (!checkIfNetSourcesMergeCompatible(nets0.get(i), nets1.get(i))) {
                     throw new RuntimeException("ERROR: Unable to merge output port " + p0 
                             + " incompatible source on driving nets");
@@ -149,8 +149,8 @@ public class DefaultDesignMerger extends AbstractDesignMerger {
                     + "with different direction");
         }
         
-        for(EDIFNet net : p1.getInternalNets()) {
-            for(EDIFPortInst portInst: net.getPortInsts()) {
+        for (EDIFNet net : p1.getInternalNets()) {
+            for (EDIFPortInst portInst: net.getPortInsts()) {
                 if (portInst.getPort() == p1) {
                    portInst.setPort(p0); 
                 }
@@ -184,7 +184,7 @@ public class DefaultDesignMerger extends AbstractDesignMerger {
             }
         }
         
-        for(EDIFPortInst p1 : new ArrayList<>(n1.getPortInsts())) {
+        for (EDIFPortInst p1 : new ArrayList<>(n1.getPortInsts())) {
             if (p1.isOutput() || (p1.isTopLevelPort() && p1.isInput())) continue;
             if (n0.getPortInst(p1.getCellInst(), p1.getName()) == null) {
                 n1.removePortInst(p1);
@@ -198,7 +198,7 @@ public class DefaultDesignMerger extends AbstractDesignMerger {
         if (!i0.getCellType().getName().equals(i1.getCellType().getName())) {
             throw new RuntimeException("ERROR: Cell type mismatch for instance " + i0.getName());
         }
-        for(EDIFPortInst portInst1 : i1.getPortInsts()) {
+        for (EDIFPortInst portInst1 : i1.getPortInsts()) {
             EDIFPortInst portInst0 = i0.getPortInst(portInst1.getName());
             
             // If portInst0 is null, prioritize portInst1
@@ -236,7 +236,7 @@ public class DefaultDesignMerger extends AbstractDesignMerger {
                 
             } else if (portInst1.isOutput()) {
                 boolean allSinksTopLevel = true;
-                for(EDIFPortInst sink : net1.getPortInsts()) {
+                for (EDIFPortInst sink : net1.getPortInsts()) {
                     if (portInst1 == sink) continue;
                     if (!sink.isTopLevelPort()) {
                         allSinksTopLevel = false;
@@ -256,7 +256,7 @@ public class DefaultDesignMerger extends AbstractDesignMerger {
     @Override
     public void mergeSiteInsts(SiteInst s0, SiteInst s1) {
         boolean modifiedSite = false;
-        for(Cell c : s1.getCells()) {
+        for (Cell c : s1.getCells()) {
             Cell dstCell = s0.getDesign().getCell(c.getName());
             if (dstCell == null) {
                 EDIFHierCellInst cellInst = s0.getDesign().getNetlist().getHierCellInstFromName(c.getName());
@@ -268,11 +268,11 @@ public class DefaultDesignMerger extends AbstractDesignMerger {
             }
         }
         
-        for(Net net : new ArrayList<>(s0.getNetSiteWireMap().values())) {
+        for (Net net : new ArrayList<>(s0.getNetSiteWireMap().values())) {
             String newNetName = replacedNets.get(net.getName());
             if (newNetName != null) {
                 Net newNet = s0.getDesign().getNet(newNetName);
-                for(String siteWire : new ArrayList<>(s0.getSiteWiresFromNet(net))) {
+                for (String siteWire : new ArrayList<>(s0.getSiteWiresFromNet(net))) {
                     BELPin[] pins = s0.getSiteWirePins(siteWire);
                     BELPin siteWirePin = pins[0];
                     s0.unrouteIntraSiteNet(siteWirePin, siteWirePin);

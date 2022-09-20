@@ -313,7 +313,7 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
     
         HashSet<GUIModuleInst> prevCollidingGMIs = new HashSet<GUIModuleInst>();
         HashSet<GUIModuleInst> newCollidingGMIs = new HashSet<GUIModuleInst>();
-        for(int i=0; i<occupiedTilesX.size(); i++) {
+        for (int i=0; i<occupiedTilesX.size(); i++) {
             HashSet<GUIModuleInst> prevGMISet = scene.tileOccupantCount[occupiedTilesY.get(i)][occupiedTilesX.get(i)];
             prevGMISet.remove(this);
             prevCollidingGMIs.addAll(prevGMISet);
@@ -397,10 +397,10 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
         // that checkPlacement is only called on the colliding GMIs iff
         // this function was called by something other than itself
         if (!aParentStack.getMethodName().equals("checkPlacement")) {
-            for(GUIModuleInst gmi : prevCollidingGMIs) {
+            for (GUIModuleInst gmi : prevCollidingGMIs) {
                 gmi.checkPlacement();
             }
-            for(GUIModuleInst gmi : newCollidingGMIs) {
+            for (GUIModuleInst gmi : newCollidingGMIs) {
                 gmi.checkPlacement();
             }
         }
@@ -545,7 +545,7 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
     public HMTile getHMTile(Tile tile) {
         if (tile == null)
             return null;
-        for(HMTile hmTile : hmTiles) {
+        for (HMTile hmTile : hmTiles) {
             if (hmTile.getTile().equals(tile))
                 return hmTile;
         }
@@ -607,7 +607,7 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
     
     public void showMyLines() {
         if (myLines != null) {
-            for(GUIMultiNetLine line : myLines) {
+            for (GUIMultiNetLine line : myLines) {
                 line.show();
             }
         }
@@ -615,7 +615,7 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
     
     public void hideMyLines() {
         if (myLines != null) {
-            for(GUIMultiNetLine line : myLines) {
+            for (GUIMultiNetLine line : myLines) {
                 line.hide();
             }
         }

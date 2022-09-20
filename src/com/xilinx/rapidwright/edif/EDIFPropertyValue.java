@@ -101,7 +101,7 @@ public class EDIFPropertyValue {
         int radix = 10;
         boolean lastCharWasTick = false;
         boolean isSigned = value.contains("-");
-        for(int i=0; i < value.length(); i++) {
+        for (int i=0; i < value.length(); i++) {
             char c = value.charAt(i);
             if (lastCharWasTick) {
                 switch (c) {
@@ -155,7 +155,7 @@ public class EDIFPropertyValue {
         int radix = 10;
         boolean lastCharWasTick = false;
         boolean isSigned = false;
-        for(int i=0; i < value.length(); i++) {
+        for (int i=0; i < value.length(); i++) {
             char c = value.charAt(i);
             if (lastCharWasTick) {
                 switch (c) {
@@ -233,11 +233,11 @@ public class EDIFPropertyValue {
         char[] radixChars = new char[] {'b', 'o', 'd', 'h'};
         
         Map<String,Integer> examples = new HashMap<>();
-        for(int testValue : testValues) {
-            for(int i=0; i < radixValues.length; i++) {
+        for (int testValue : testValues) {
+            for (int i=0; i < radixValues.length; i++) {
                 int radix = radixValues[i];
                 char radixChar = radixChars[i];
-                for(String signed : new String[] {"s", "S", ""}) {
+                for (String signed : new String[] {"s", "S", ""}) {
                     if (testValue < 0 && signed.length() != 0) continue;
                     String value = signed.length() == 0 ? Integer.toUnsignedString(testValue,radix) :
                         Integer.toString(testValue,radix);
@@ -249,7 +249,7 @@ public class EDIFPropertyValue {
             }
         }
         
-        for(Entry<String,Integer> e : examples.entrySet()) {
+        for (Entry<String,Integer> e : examples.entrySet()) {
             EDIFPropertyValue p = new EDIFPropertyValue();
             p.setType(EDIFValueType.INTEGER);
             p.setValue(e.getKey());

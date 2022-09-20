@@ -132,7 +132,7 @@ public class RoutableNode implements Routable{
         children = new ArrayList<>();
         List<Node> allDownHillNodes = node.getAllDownhillNodes();
         
-        for(Node downhill : allDownHillNodes) {
+        for (Node downhill : allDownHillNodes) {
             if (reserved.contains(downhill)) continue;
             if (isExcluded(downhill, timingDriven)) continue;
             if (routethruHelper.isRouteThru(node, downhill)) continue;
@@ -209,7 +209,7 @@ public class RoutableNode implements Routable{
     public void setEndTileXYCoordinates() {
         Wire[] wires = node.getAllWiresInNode();
         List<Tile> intTiles = new ArrayList<>();
-        for(Wire w : wires) {
+        for (Wire w : wires) {
             if (w.getTile().getTileTypeEnum() == TileTypeEnum.INT) {
                 intTiles.add(w.getTile());
             }

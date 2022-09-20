@@ -149,7 +149,7 @@ public class AddSubGenerator extends ArithmeticGenerator {
         Cell carryCell = null;
         int carryCLEs = ((width+BITS_PER_CLE-1) / BITS_PER_CLE); // Ceiling divide
         // Create LUT2s & FFs
-        for(int i=0; i < width; i++) {
+        for (int i=0; i < width; i++) {
             Site currSlice = origin.getNeighborSite(0, i / BITS_PER_CLE);
             used.add(currSlice);
             String letter = Character.toString((char)('A'+i%8));
@@ -168,7 +168,7 @@ public class AddSubGenerator extends ArithmeticGenerator {
                 carryCell = d.createAndPlaceCell(top, "carry" + i, Unisim.CARRY8, currSlice, carry);
                 carryCell.addProperty("CARRY_TYPE","SINGLE_CY8", EDIFValueType.STRING);
                 gnd.createPortInst("CI_TOP", carryCell);
-                for(int j=0; j < BITS_PER_CLE; j++) {
+                for (int j=0; j < BITS_PER_CLE; j++) {
                     carryCell.removePinMapping("DI" + j);
                     String physName = Character.toString((char)('A' + j)) +"X";
                     carryCell.addPinMapping(physName, "DI[" + j +"]");

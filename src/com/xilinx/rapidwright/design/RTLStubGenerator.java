@@ -48,12 +48,12 @@ public class RTLStubGenerator {
     public static EDIFPort[] getSortedPortList(EDIFCell c) {
         String[] portNames = new String[c.getPorts().size()];
         int idx = 0;
-        for(EDIFPort p : c.getPorts()) {
+        for (EDIFPort p : c.getPorts()) {
             portNames[idx++] = p.getBusName();
         }
         Arrays.sort(portNames);
         EDIFPort[] ports = new EDIFPort[portNames.length];
-        for(int i=0; i < portNames.length; i++) {
+        for (int i=0; i < portNames.length; i++) {
             ports[i] = c.getPort(portNames[i]);
         }
         return ports;
@@ -71,12 +71,12 @@ public class RTLStubGenerator {
             out.write((VERILOG_COMMENT + " This empty module with port declaration file causes synthesis tools to infer a black box for IP.\n").getBytes());
             out.write((VERILOG_COMMENT + " Please paste the declaration into a Verilog source file or add the file as an additional source.\n").getBytes());
             out.write(("module " + d.getName() +"(").getBytes());
-            for(int i=0; i < ports.length; i++) {
+            for (int i=0; i < ports.length; i++) {
                 if (i>0) out.write(", ".getBytes());
                 out.write(ports[i].getBusName().getBytes());
             }
             out.write(");\n".getBytes());
-            for(int i=0; i < ports.length; i++) {
+            for (int i=0; i < ports.length; i++) {
                 EDIFPort p = ports[i];
                 String dir = p.getDirection().name().toLowerCase();
                 String range = p.getWidth() == 1 ? "" : "[" + p.getLeft() + ":" + p.getRight() +"]";
@@ -97,7 +97,7 @@ public class RTLStubGenerator {
             out.write("use IEEE.STD_LOGIC_1164.ALL;\n\n".getBytes());
             out.write(("entity " + topCellName + " is\n").getBytes());
             out.write("  Port (\n".getBytes());
-            for(int i=0; i < ports.length; i++) {
+            for (int i=0; i < ports.length; i++) {
                 EDIFPort p = ports[i];
                 String dir = p.getDirection().name().toLowerCase().replace("put", "");
                 String type = " STD_LOGIC";

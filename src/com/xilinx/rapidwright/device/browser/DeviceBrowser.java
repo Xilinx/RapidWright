@@ -209,7 +209,7 @@ public class DeviceBrowser extends QMainWindow{
         int currWire = currTile.getWireIndex(index.data().toString());
         if (currWire < 0) return;
         if (currTile.getWireConnections(index.data().toString()) == null) return;
-        for(Wire wire : currTile.getWireConnections(index.data().toString())) {
+        for (Wire wire : currTile.getWireConnections(index.data().toString())) {
             scene.drawWire(currTile, currWire, wire.getTile(), wire.getWireIndex());
         }
     }
@@ -230,7 +230,7 @@ public class DeviceBrowser extends QMainWindow{
     protected void updatePrimitiveList() {
         primitiveList.clear();
         if (currTile == null) return;
-        for(Site ps : currTile.getSites()) {
+        for (Site ps : currTile.getSites()) {
             QTreeWidgetItem treeItem = new QTreeWidgetItem();
             treeItem.setText(0, ps.getName());
             treeItem.setText(1, ps.getSiteTypeEnum().toString());
@@ -245,7 +245,7 @@ public class DeviceBrowser extends QMainWindow{
     protected void updateWireList() {
         wireList.clear();
         if (currTile == null || currTile.getWireNames() == null) return;
-        for(String wire : currTile.getWireNames()) {
+        for (String wire : currTile.getWireNames()) {
             QTreeWidgetItem treeItem = new QTreeWidgetItem();
             treeItem.setText(0, wire);
             List<Wire> connections = currTile.getWireConnections(wire);

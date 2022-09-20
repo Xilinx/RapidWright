@@ -184,7 +184,7 @@ public class EDIFHierNet {
             if (!visited.add(net)) {
                 continue;
             }
-            for(EDIFPortInst relP : net.getNet().getPortInsts()) {
+            for (EDIFPortInst relP : net.getNet().getPortInsts()) {
                 EDIFHierPortInst p = new EDIFHierPortInst(net.getHierarchicalInst(), relP);
 
                 boolean isCellPin = relP.getCellInst() != null && relP.getCellInst().getCellType().isLeafCellOrBlackBox();

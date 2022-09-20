@@ -38,7 +38,7 @@ public enum TrafficClass {
 
     static {
         map = new HashMap<>();
-        for(TrafficClass e : values()) {
+        for (TrafficClass e : values()) {
             map.put(e.toString(), e);
         }
     }    

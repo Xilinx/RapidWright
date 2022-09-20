@@ -158,7 +158,7 @@ public class DeviceResourcesVerifier {
 
         int strCount = dReader.getStrList().size();
         TextList.Reader reader = dReader.getStrList();
-        for(int i=0; i < strCount; i++) {
+        for (int i=0; i < strCount; i++) {
             String str = reader.get(i).toString();
             allStrings.addObject(str);
         }
@@ -167,7 +167,7 @@ public class DeviceResourcesVerifier {
         Map<String,TileType.Reader> tileTypeMap = new HashMap<String, TileType.Reader>();
         Map<TileTypeEnum, TileType.Reader> tileTypeEnumMap = new HashMap<TileTypeEnum, TileType.Reader>();
         HashMap<String, StructList.Reader<DeviceResources.Device.PIP.Reader>> ttPIPMap = new HashMap<>();
-        for(int i=0; i < dReader.getTileTypeList().size(); i++) {
+        for (int i=0; i < dReader.getTileTypeList().size(); i++) {
             TileType.Reader ttReader = dReader.getTileTypeList().get(i);
             String name = allStrings.get(ttReader.getName());
             tileTypeMap.put(name, ttReader);
@@ -183,18 +183,18 @@ public class DeviceResourcesVerifier {
 
         // Get examples for each site type to a site.
         Map<SiteTypeEnum, Site> siteTypes = new HashMap<SiteTypeEnum, Site>();
-        for(Tile tile : device.getAllTiles()) {
-            for(Site site : tile.getSites()) {
+        for (Tile tile : device.getAllTiles()) {
+            for (Site site : tile.getSites()) {
                 siteTypes.put(site.getSiteTypeEnum(), site);
                 SiteTypeEnum[] altSiteTypes = site.getAlternateSiteTypeEnums();
-                for(SiteTypeEnum altSiteType : altSiteTypes) {
+                for (SiteTypeEnum altSiteType : altSiteTypes) {
                     siteTypes.put(altSiteType, site);
                 }
             }
         }
 
         Reader<SiteType.Reader> stReaders = dReader.getSiteTypeList();
-        for(SiteType.Reader stReader : stReaders) {
+        for (SiteType.Reader stReader : stReaders) {
             Set<Integer> belPinIndicies = new HashSet<Integer>();
             SiteTypeEnum siteTypeEnum = SiteTypeEnum.valueOf(allStrings.get(stReader.getName()));
 
@@ -205,7 +205,7 @@ public class DeviceResourcesVerifier {
             StructList.Reader<DeviceResources.Device.BEL.Reader> belsReader = stReader.getBels();
             BEL[] bels = siteInst.getBELs();
             expect(bels.length, belsReader.size());
-            for(int i=0; i < bels.length; i++) {
+            for (int i=0; i < bels.length; i++) {
                 BEL bel = bels[i];
                 DeviceResources.Device.BEL.Reader belReader = belsReader.get(i);
 
@@ -215,7 +215,7 @@ public class DeviceResourcesVerifier {
                 BELPin[] belPins = bel.getPins();
                 PrimitiveList.Int.Reader pinsReader = belReader.getPins();
                 expect(belPins.length, pinsReader.size());
-                for(int j=0; j < belPins.length; j++) {
+                for (int j=0; j < belPins.length; j++) {
                     BELPin pin = belPins[j];
                     int belPinIndex = pinsReader.get(j);
                     belPinIndicies.add(belPinIndex);
@@ -248,10 +248,10 @@ public class DeviceResourcesVerifier {
             expect(highestIndexInputPin, stReader.getLastInput());
 
             Set<String> pinNameSet = new HashSet<String>();
-            for(String pin : pinNames) {
+            for (String pin : pinNames) {
                 pinNameSet.add(pin);
             }
-            for(int i=0; i < pinNames.length; i++) {
+            for (int i=0; i < pinNames.length; i++) {
                 DeviceResources.Device.SitePin.Reader pinReader = pinsReader.get(i);
                 String pinName = allStrings.get(pinReader.getName());
                 if (!pinNameSet.contains(pinName)) {
@@ -285,14 +285,14 @@ public class DeviceResourcesVerifier {
             }
 
             Set<String> siteWires = new HashSet<String>();
-            for(String siteWire : siteInst.getSiteWires()) {
+            for (String siteWire : siteInst.getSiteWires()) {
                 siteWires.add(siteWire);
             }
 
             StructList.Reader<DeviceResources.Device.SiteWire.Reader> siteWiresReader = stReader.getSiteWires();
             expect(siteWires.size(), siteWiresReader.size());
 
-            for(DeviceResources.Device.SiteWire.Reader siteWireReader : siteWiresReader) {
+            for (DeviceResources.Device.SiteWire.Reader siteWireReader : siteWiresReader) {
                 String siteWireName = allStrings.get(siteWireReader.getName());
                 if (!siteWires.contains(siteWireName)) {
                     throw new RuntimeException("Site wire " + siteWireName + " not found in site.");
@@ -302,7 +302,7 @@ public class DeviceResourcesVerifier {
                 PrimitiveList.Int.Reader wiresReader = siteWireReader.getPins();
                 expect(belPins.length, wiresReader.size());
 
-                for(int i=0; i < belPins.length; i++) {
+                for (int i=0; i < belPins.length; i++) {
                     belPinIndicies.add(wiresReader.get(i));
                     verifyBelPin(belPinsReader, belPins[i], wiresReader.get(i));
                 }
@@ -314,12 +314,12 @@ public class DeviceResourcesVerifier {
             SitePIP[] sitePIPs = siteInst.getSitePIPs();
             expect(sitePIPs.length, sitePipsReader.size());
             Map<String, SitePIP> sitePIPMap = new HashMap<>();
-            for(SitePIP sitePIP : sitePIPs) {
+            for (SitePIP sitePIP : sitePIPs) {
                 sitePIPMap.put(sitePIP.toString(),sitePIP);
             }
             
             
-            for(DeviceResources.Device.SitePIP.Reader spReader : sitePipsReader) {
+            for (DeviceResources.Device.SitePIP.Reader spReader : sitePipsReader) {
                 DeviceResources.Device.BELPin.Reader bpReader = belPinsReader.get(spReader.getInpin());
                 DeviceResources.Device.BELPin.Reader bpOutReader = belPinsReader.get(spReader.getOutpin());
                 String inputBel = allStrings.get(bpReader.getBel());
@@ -335,7 +335,7 @@ public class DeviceResourcesVerifier {
         }
 
         int tileCount = tilesReader.size();
-        for(int i=0; i < tileCount; i++) {
+        for (int i=0; i < tileCount; i++) {
             DeviceResources.Device.Tile.Reader tileReader = tilesReader.get(i);
             String tileName = allStrings.get(tileReader.getName());
             Tile tile = device.getTile(tileName);
@@ -351,13 +351,13 @@ public class DeviceResourcesVerifier {
             expect(tile.getTileTypeEnum().name(), allStrings.get(tileType.getName()));
             expect(tile.getWireCount(), tileType.getWires().size());
             PrimitiveList.Int.Reader wiresReader = tileType.getWires();
-            for(int j=0; j < tile.getWireCount(); j++) {
+            for (int j=0; j < tile.getWireCount(); j++) {
                 expect(tile.getWireName(j), allStrings.get(wiresReader.get(j)));
             }
 
             // Verify Sites
             expect(tile.getSites().length, tileReader.getSites().size());
-            for(int j=0; j < tile.getSites().length; j++) {
+            for (int j=0; j < tile.getSites().length; j++) {
                 DeviceResources.Device.Site.Reader siteReader = tileReader.getSites().get(j);
                 expect(tile.getSites()[j].getName(), allStrings.get(siteReader.getName()));
                 int tileTypeSiteTypeIdx = siteReader.getType();
@@ -370,7 +370,7 @@ public class DeviceResourcesVerifier {
             Reader<DeviceResources.Device.SiteTypeInTileType.Reader> siteTypesReader = tileType.getSiteTypes();
 
             expect(tile.getSites().length, siteTypesReader.size());
-            for(int j=0; j < tile.getSites().length; j++) {
+            for (int j=0; j < tile.getSites().length; j++) {
                 DeviceResources.Device.SiteTypeInTileType.Reader siteTypeReader = siteTypesReader.get(j);
                 SiteType.Reader stReader = stReaders.get(siteTypeReader.getPrimaryType());
                 int siteTypeName = stReader.getName();
@@ -380,7 +380,7 @@ public class DeviceResourcesVerifier {
 
                 PrimitiveList.Int.Reader pinToWires = siteTypeReader.getPrimaryPinsToTileWires();
                 expect(site.getSitePinCount(), pinToWires.size());
-                for(int k=0; k < site.getSitePinCount(); k++) {
+                for (int k=0; k < site.getSitePinCount(); k++) {
                     String pinName = site.getPinName(k);
                     expect(allStrings.getIndex(pinName),
                            stReader.getPins().get(k).getName());
@@ -390,7 +390,7 @@ public class DeviceResourcesVerifier {
 
                 SiteTypeEnum[] altSiteTypes = site.getAlternateSiteTypeEnums();
                 expect(altSiteTypes.length, siteTypeReader.getAltPinsToPrimaryPins().size());
-                for(int k=0; k < altSiteTypes.length; k++) {
+                for (int k=0; k < altSiteTypes.length; k++) {
                     SiteInst siteInst = design.createSiteInst("site_instance", altSiteTypes[k], site);
                     SiteType.Reader altStReader = stReaders.get(stReader.getAltSiteTypes().get(k));
                     expect(allStrings.getIndex(altSiteTypes[k].name()), altStReader.getName());
@@ -399,13 +399,13 @@ public class DeviceResourcesVerifier {
 
                     String[] altSitePins = siteInst.getSitePinNames();
                     Set<String> altSitePinSet = new HashSet<String>();
-                    for(int l=0; l < altSitePins.length; ++l) {
+                    for (int l=0; l < altSitePins.length; ++l) {
                         altSitePinSet.add(altSitePins[l]);
                     }
                     expect(parentPins.getPins().size(), altSitePins.length);
                     expect(parentPins.getPins().size(), altStReader.getPins().size());
 
-                    for(int l=0; l < parentPins.getPins().size(); l++) {
+                    for (int l=0; l < parentPins.getPins().size(); l++) {
                         String sitePin = allStrings.get(altStReader.getPins().get(l).getName());
                         if (!altSitePinSet.contains(sitePin)) {
                             throw new RuntimeException("Site pin " + sitePin + " not found in site.");
@@ -423,7 +423,7 @@ public class DeviceResourcesVerifier {
             Reader<DeviceResources.Device.PIP.Reader> pipsReader = ttPIPMap.get(tileTypeName);
             expect(pips.size(), pipsReader.size());
 
-            for(int j=0; j < pips.size(); j++) {
+            for (int j=0; j < pips.size(); j++) {
                 DeviceResources.Device.PIP.Reader pipReader = pipsReader.get(j);
                 PIP pip = pips.get(j);
                 expect(pip.getStartWireIndex(), pipReader.getWire0());
@@ -452,12 +452,12 @@ public class DeviceResourcesVerifier {
                     HashSet<BELPin> foundBELPins = new HashSet<BELPin>();
                     Site site = pipHelper.getTilePrototype().getSitePinFromWire(pipHelper.getStartWire()).getSite();
                     StructList.Reader<PseudoCell.Reader> pseudoCells = pipReader.getPseudoCells();
-                    for(int k=0; k < pseudoCells.size(); k++) {
+                    for (int k=0; k < pseudoCells.size(); k++) {
                         PseudoCell.Reader pseudoCell = pseudoCells.get(k);
                         String belName = allStrings.get(pseudoCell.getBel());
                         BEL bel = site.getBEL(belName);
                         Int.Reader pinNamesReader = pseudoCell.getPins();
-                        for(int l=0; l < pinNamesReader.size(); l++) {
+                        for (int l=0; l < pinNamesReader.size(); l++) {
                             String pinName = allStrings.get(pinNamesReader.get(l));
                             BELPin testPin = bel.getPin(pinName);
                             foundBELPins.add(testPin);
@@ -465,7 +465,7 @@ public class DeviceResourcesVerifier {
 
                     }
 
-                    for(BELPin goldBELPin : goldBELPins) {
+                    for (BELPin goldBELPin : goldBELPins) {
                         if (!foundBELPins.remove(goldBELPin)) {
                             throw new RuntimeException("ERROR: BELPin " + goldBELPin.toString()
                                 + " not found for pseudo PIP " + pipHelper.getTileTypeEnum() +"."
@@ -491,7 +491,7 @@ public class DeviceResourcesVerifier {
 
         Set<String> libsFound = new HashSet<String>();
         libsFound.addAll(primsAndMacros.getLibrariesMap().keySet());
-        for(String libExpected : new String[] {EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME,
+        for (String libExpected : new String[] {EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME,
             LogNetlistWriter.DEVICE_MACROS_LIB}) {
             if (!libsFound.remove(libExpected)) {
                 throw new RuntimeException("Missing expected library: " + libExpected);
@@ -506,7 +506,7 @@ public class DeviceResourcesVerifier {
         Map<String, Pair<String, EnumSet<IOStandard>>> macroCollapseExceptionMap = 
                 EDIFNetlist.macroCollapseExceptionMap.getOrDefault(series, Collections.emptyMap());
         Set<Unisim> unisimsExpected = new HashSet<Unisim>();
-        for(EDIFLibrary lib : primsAndMacros.getLibraries()) {
+        for (EDIFLibrary lib : primsAndMacros.getLibraries()) {
             EDIFLibrary reference = lib.isHDIPrimitivesLibrary() ? Design.getPrimitivesLibrary(design.getDevice().getName()) :
                                                     Design.getMacroPrimitives(series);
 
@@ -516,7 +516,7 @@ public class DeviceResourcesVerifier {
             Set<String> cellsExpected = new HashSet<String>();
             cellsExpected.addAll(reference.getCellMap().keySet());
 
-            for(String cellName : reference.getCellMap().keySet()) {
+            for (String cellName : reference.getCellMap().keySet()) {
                 if (!lib.isHDIPrimitivesLibrary()) {
                     Pair<String,EnumSet<IOStandard>> entry = macroCollapseExceptionMap.get(cellName);
                     if (entry != null) {
@@ -530,7 +530,7 @@ public class DeviceResourcesVerifier {
             if (lib.isHDIPrimitivesLibrary()) {
                 EDIFLibrary macros = Design.getMacroPrimitives(device.getSeries());
                 Set<String> dupCells = new HashSet<String>();
-                for(String cell : cellsExpected) {
+                for (String cell : cellsExpected) {
                     if (macros.getCell(cell) != null) {
                         dupCells.add(cell);
                     }
@@ -558,7 +558,7 @@ public class DeviceResourcesVerifier {
         Map<String, Pair<String, EnumSet<IOStandard>>> macroExpandExceptionMap = 
                 EDIFNetlist.macroExpandExceptionMap.getOrDefault(series, Collections.emptyMap());
         int mapSize = exceptionMap.size();
-        for(int i=0; i < mapSize; i++) {
+        for (int i=0; i < mapSize; i++) {
             PrimToMacroExpansion.Reader entry = exceptionMap.get(i);
             String macroName = allStrings.get(entry.getMacroName());
             if (entry.hasParameters()) {
@@ -577,7 +577,7 @@ public class DeviceResourcesVerifier {
                         + "of IOStandard property values, found " + parameterReader.size() 
                         + ", expected " + mapping.getSecond().size() );
                 }
-                for(PropertyMap.Entry.Reader paramReader : entry.getParameters()) {
+                for (PropertyMap.Entry.Reader paramReader : entry.getParameters()) {
                     expect(EDIFNetlist.IOSTANDARD_PROP, allStrings.get(paramReader.getKey()));
                     IOStandard ioStandardValue = IOStandard.valueOf(allStrings.get(paramReader.getTextValue()));
                     if (!ioStdSet.contains(ioStandardValue)) {
@@ -590,7 +590,7 @@ public class DeviceResourcesVerifier {
             if (entry.hasParamMapping() && rules != null) {
                 Reader<ParameterMapRule.Reader> rulesReader = entry.getParamMapping();
                 expect(rules.length, rulesReader.size());
-                for(int j=0; j < rules.length; j++) {
+                for (int j=0; j < rules.length; j++) {
                     MacroParamRule rule = rules[j];
                     ParameterMapRule.Reader ruleReader = rulesReader.get(j);
                     expect(rule.getInstParam(), allStrings.get(ruleReader.getInstParam()));
@@ -599,13 +599,13 @@ public class DeviceResourcesVerifier {
                     if (rule.getBitSlice() != null) {
                         PrimitiveList.Int.Reader bitSliceReader = ruleReader.getBitSlice();
                         expect(rule.getBitSlice().length, bitSliceReader.size());
-                        for(int k=0; k < rule.getBitSlice().length; k++) {
+                        for (int k=0; k < rule.getBitSlice().length; k++) {
                             expect(rule.getBitSlice()[k], bitSliceReader.get(k));
                         }
                     } else if (rule.getTableLookup() != null) {
                         Reader<ParameterMapEntry.Reader> tableReader = ruleReader.getTableLookup();
                         expect(rule.getTableLookup().length, tableReader.size());
-                        for(int k=0; k < rule.getTableLookup().length; k++) {
+                        for (int k=0; k < rule.getTableLookup().length; k++) {
                             ParameterMapEntry.Reader tableEntry = tableReader.get(k);
                             expect(rule.getTableLookup()[k].from, allStrings.get(tableEntry.getFrom()));
                             expect(rule.getTableLookup()[k].to, allStrings.get(tableEntry.getTo()));
@@ -635,7 +635,7 @@ public class DeviceResourcesVerifier {
         Reader<SitePin.Reader> sitePinsReader = stReader.getPins();
         int pinCount = sitePinsReader.size();
         int highestIndexInputPin = site.getHighestInputPinIndex();
-        for(int i=0; i < pinCount; i++) {
+        for (int i=0; i < pinCount; i++) {
             String pinName = site.getPinName(i);
             SitePin.Reader spReader = sitePinsReader.get(i);
             expect(pinName, allStrings.get(spReader.getName()));
@@ -651,7 +651,7 @@ public class DeviceResourcesVerifier {
         Reader<DeviceResources.Device.BELPin.Reader> stBPReader = stReader.getBelPins();
         Reader<DeviceResources.Device.BEL.Reader> stBELReader = stReader.getBels();
         expect(site.getBELs().length, stBELReader.size());
-        for(int i=0; i < site.getBELs().length; i++) {
+        for (int i=0; i < site.getBELs().length; i++) {
             BEL bel = site.getBELs()[i];
             DeviceResources.Device.BEL.Reader belReader = stBELReader.get(i);
             expect(bel.getName(),allStrings.get(belReader.getName()));
@@ -659,7 +659,7 @@ public class DeviceResourcesVerifier {
             expect(DeviceResourcesWriter.getBELCategory(bel).name(), belReader.getCategory().name());
             PrimitiveList.Int.Reader belPinsReader = belReader.getPins();
             expect(bel.getPins().length, belPinsReader.size());
-            for(int j=0; j < bel.getPins().length; j++) {
+            for (int j=0; j < bel.getPins().length; j++) {
                 BELPin belPin = bel.getPin(j);
                 DeviceResources.Device.BELPin.Reader bpReader =
                         stBPReader.get(belPinsReader.get(j));
@@ -688,7 +688,7 @@ public class DeviceResourcesVerifier {
 
         // Check SitePIPs
         expect(site.getSitePIPCount(), stReader.getSitePIPs().size());
-        for(int i=0; i < site.getSitePIPCount(); i++) {
+        for (int i=0; i < site.getSitePIPCount(); i++) {
             SitePIP sitePIP = site.getSitePIP(i);
             DeviceResources.Device.SitePIP.Reader spReader = stReader.getSitePIPs().get(i);
             DeviceResources.Device.BELPin.Reader in = stReader.getBelPins().get(spReader.getInpin());
@@ -700,17 +700,17 @@ public class DeviceResourcesVerifier {
         // SiteWires
         Reader<DeviceResources.Device.SiteWire.Reader> siteWiresReader = stReader.getSiteWires();
         expect(site.getSiteWireCount(), siteWiresReader.size());
-        for(int i=0; i < site.getSiteWireCount(); i++) {
+        for (int i=0; i < site.getSiteWireCount(); i++) {
             String siteWireName = site.getSiteWireName(i);
             DeviceResources.Device.SiteWire.Reader siteWire = siteWiresReader.get(i);
             expect(siteWireName, allStrings.get(siteWire.getName()));
             BELPin[] belPins = site.getBELPins(i);
             HashSet<String> belPinStrings = new HashSet<String>();
-            for(BELPin belPin : belPins) {
+            for (BELPin belPin : belPins) {
                 belPinStrings.add(belPin.getBEL().getName() + "/" + belPin.getName() +
                         "/" + DeviceResourcesWriter.getBELPinDirection(belPin));
             }
-            for(int j=0; j < siteWire.getPins().size(); j++) {
+            for (int j=0; j < siteWire.getPins().size(); j++) {
                 DeviceResources.Device.BELPin.Reader bp =
                         stBPReader.get(siteWire.getPins().get(j));
                 String belName = allStrings.get(bp.getBel());
@@ -751,7 +751,7 @@ public class DeviceResourcesVerifier {
                         cell.getName()));
         }
 
-        for(SiteTypeEnum siteType : siteTypes) {
+        for (SiteTypeEnum siteType : siteTypes) {
             Set<String> bels = sites.get(siteType);
             Set<String> belsFromDev = sitesFromDev.get(siteType);
             if (!bels.equals(belsFromDev)) {
@@ -762,7 +762,7 @@ public class DeviceResourcesVerifier {
         }
 
         for (Map.Entry<SiteTypeEnum,Set<String>> site : sites.entrySet()) {
-            for(String bel : site.getValue()) {
+            for (String bel : site.getValue()) {
                 entries.add(new AbstractMap.SimpleEntry<SiteTypeEnum, String>(site.getKey(), bel));
             }
         }
@@ -773,14 +773,14 @@ public class DeviceResourcesVerifier {
         physCell = null;
         cellInst = null;
 
-        for(Map.Entry<SiteTypeEnum, String> possibleSite : entries) {
+        for (Map.Entry<SiteTypeEnum, String> possibleSite : entries) {
             SiteTypeEnum siteType = possibleSite.getKey();
             String bel = possibleSite.getValue();
             if (!siteMap.containsKey(siteType)) {
                 continue;
             }
 
-            for(List<String> parameters : EnumerateCellBelMapping.getParametersFor(series, cell.getName())) {
+            for (List<String> parameters : EnumerateCellBelMapping.getParametersFor(series, cell.getName())) {
                 String[] parameterArray = parameters.toArray(new String[parameters.size()]);
                 Map<String, String> pinMappingFromDev = cellBelMap.getPinMappingsP2L(
                         cell.getName(),
@@ -789,18 +789,18 @@ public class DeviceResourcesVerifier {
                         parameterArray);
 
                 String parametersStr = new String();
-                for(String parameter : parameters) {
+                for (String parameter : parameters) {
                     parametersStr = parametersStr + " " + parameter;
                 }
 
-                for(Site site : siteMap.get(siteType)) {
+                for (Site site : siteMap.get(siteType)) {
                     SiteInst siteInst = design.createSiteInst("test_site", siteType, site);
                     physCell = design.createAndPlaceCell("test", Unisim.valueOf(cell.getName()), site.getName() + "/" + bel, parameterArray);
 
                     Map<String, String> pinMapping = new HashMap<String, String>();
 
-                    for(Map.Entry<String, Set<String>> pinMap : physCell.getPinMappingsL2P().entrySet()) {
-                        for(String physPin : pinMap.getValue()) {
+                    for (Map.Entry<String, Set<String>> pinMap : physCell.getPinMappingsL2P().entrySet()) {
+                        for (String physPin : pinMap.getValue()) {
                             pinMapping.put(physPin, pinMap.getKey());
                         }
                     }
@@ -808,18 +808,18 @@ public class DeviceResourcesVerifier {
                     pinMapping.putAll(physCell.getPinMappingsP2L());
 
                     if (!pinMapping.equals(pinMappingFromDev)) {
-                        for(String belPin : pinMappingFromDev.keySet()) {
+                        for (String belPin : pinMappingFromDev.keySet()) {
                             if (!pinMapping.containsKey(belPin)) {
                                 System.out.printf(" - %s in DeviceResources, not in RapidWright\n", belPin);
                             }
                         }
-                        for(String belPin : pinMapping.keySet()) {
+                        for (String belPin : pinMapping.keySet()) {
                             if (!pinMappingFromDev.containsKey(belPin)) {
                                 System.out.printf(" - %s in RapidWright, not in DeviceResources\n", belPin);
                             }
                         }
 
-                        for(String belPin : pinMapping.keySet()) {
+                        for (String belPin : pinMapping.keySet()) {
                             if (!pinMappingFromDev.containsKey(belPin)) {
                                 continue;
                             }
@@ -846,7 +846,7 @@ public class DeviceResourcesVerifier {
         EDIFLibrary prims = Design.getPrimitivesLibrary(design.getDevice().getName());
 
         Set<String> cellsWithParameters = new HashSet<String>();
-        for(EDIFCell cell : prims.getCells()) {
+        for (EDIFCell cell : prims.getCells()) {
             String cellTypeName = cell.getName();
 
             Map<String,VivadoProp> defaultCellProperties = Design.getDefaultCellProperties(design.getDevice().getSeries(), cellTypeName);
@@ -858,7 +858,7 @@ public class DeviceResourcesVerifier {
         ParameterDefinitions.Reader paramDefs = dReader.getParameterDefs();
         expect(paramDefs.getCells().size(), cellsWithParameters.size());
 
-        for(CellParameterDefinition.Reader cellParamDef : paramDefs.getCells()) {
+        for (CellParameterDefinition.Reader cellParamDef : paramDefs.getCells()) {
             String cellType = allStrings.get(cellParamDef.getCellType());
 
             if (!cellsWithParameters.contains(cellType)) {
@@ -870,7 +870,7 @@ public class DeviceResourcesVerifier {
             Map<String,VivadoProp> defaultCellProperties = Design.getDefaultCellProperties(design.getDevice().getSeries(), cellType);
             expect(cellParamDef.getParameters().size(), defaultCellProperties.size());
 
-            for(ParameterDefinition.Reader paramDef : cellParamDef.getParameters()) {
+            for (ParameterDefinition.Reader paramDef : cellParamDef.getParameters()) {
                 String paramName = allStrings.get(paramDef.getName());
 
                 // default.key and name should be the same.
@@ -935,12 +935,12 @@ public class DeviceResourcesVerifier {
 
         EDIFLibrary macros = Design.getMacroPrimitives(design.getDevice().getSeries());
         Set<String> macroCells = new HashSet<String>();
-        for(EDIFCell cell : macros.getCells()) {
+        for (EDIFCell cell : macros.getCells()) {
             macroCells.add(cell.getName());
         }
 
         CellBelMapping cellBelMap = new CellBelMapping(allStrings, dReader.getCellBelMap());
-        for(EDIFCell cell : prims.getCells()) {
+        for (EDIFCell cell : prims.getCells()) {
             if (!macroCells.contains(cell.getName())) {
                 verifyCellBelPinMap(siteMap, cellBelMap, topLevelCell, cell, design);
             }
@@ -953,7 +953,7 @@ public class DeviceResourcesVerifier {
         expect(packages.size(), packagesObj.size());
 
         Set<String> packagesFromReader = new HashSet<String>();
-        for(DeviceResources.Device.Package.Reader packageObj : packagesObj) {
+        for (DeviceResources.Device.Package.Reader packageObj : packagesObj) {
             String packageName = allStrings.get(packageObj.getName());
             packagesFromReader.add(packageName);
         }
@@ -962,14 +962,14 @@ public class DeviceResourcesVerifier {
             throw new RuntimeException("Packages doesn't match");
         }
 
-        for(DeviceResources.Device.Package.Reader packageObj : packagesObj) {
+        for (DeviceResources.Device.Package.Reader packageObj : packagesObj) {
             String packageName = allStrings.get(packageObj.getName());
             Package pack = device.getPackage(packageName);
 
             expect(pack.getName(), packageName);
 
             Set<String> packagePinsFromReader = new HashSet<String>();
-            for(DeviceResources.Device.Package.PackagePin.Reader packagePinObj : packageObj.getPackagePins()) {
+            for (DeviceResources.Device.Package.PackagePin.Reader packagePinObj : packageObj.getPackagePins()) {
                 packagePinsFromReader.add(allStrings.get(packagePinObj.getPackagePin()));
             }
 
@@ -981,7 +981,7 @@ public class DeviceResourcesVerifier {
                 throw new RuntimeException("Package pins doesn't match");
             }
 
-            for(DeviceResources.Device.Package.PackagePin.Reader packagePinObj : packageObj.getPackagePins()) {
+            for (DeviceResources.Device.Package.PackagePin.Reader packagePinObj : packageObj.getPackagePins()) {
                 String packagePinName = allStrings.get(packagePinObj.getPackagePin());
                 PackagePin packagePin = pack.getPackagePinMap().get(packagePinName);
 
@@ -1015,7 +1015,7 @@ public class DeviceResourcesVerifier {
 
             Map<String, Integer> gradesMap = new HashMap<String, Integer>();
             int i = 0;
-            for(Grade grade : pack.getGrades()) {
+            for (Grade grade : pack.getGrades()) {
                 gradesMap.put(grade.getName(), i);
                 i += 1;
             }
@@ -1023,7 +1023,7 @@ public class DeviceResourcesVerifier {
             expect(pack.getGrades().length, gradesMap.size());
             expect(pack.getGrades().length, packageObj.getGrades().size());
 
-            for(DeviceResources.Device.Package.Grade.Reader gradeObj : packageObj.getGrades()) {
+            for (DeviceResources.Device.Package.Grade.Reader gradeObj : packageObj.getGrades()) {
                 String gradeName = allStrings.get(gradeObj.getName());
                 int gradeIndex = gradesMap.get(gradeName);
                 Grade grade = pack.getGrades()[gradeIndex];
@@ -1039,7 +1039,7 @@ public class DeviceResourcesVerifier {
         Set<Unisim> unisimsWithInversions = new HashSet<Unisim>();
         Set<Unisim> unisimsInReader = new HashSet<Unisim>();
 
-        for(Unisim unisim : unisimsExpected) {
+        for (Unisim unisim : unisimsExpected) {
             Map<String, String> invertiblePinMap = DesignTools.getInvertiblePinMap(device.getSeries(), unisim);
             if (invertiblePinMap != null && invertiblePinMap.size() > 0) {
                 unisimsWithInversions.add(unisim);
@@ -1047,13 +1047,13 @@ public class DeviceResourcesVerifier {
         }
 
         Map<String, String> macroToPrims = new HashMap<String, String>();
-        for(PrimToMacroExpansion.Reader entry : dReader.getExceptionMap()) {
+        for (PrimToMacroExpansion.Reader entry : dReader.getExceptionMap()) {
             String primName = allStrings.get(entry.getPrimName());
             String macroName = allStrings.get(entry.getMacroName());
             macroToPrims.put(macroName, primName);
         }
 
-        for(CellInversion.Reader cellInversion : dReader.getCellInversions()) {
+        for (CellInversion.Reader cellInversion : dReader.getCellInversions()) {
             String cellName = allStrings.get(cellInversion.getCell());
 
             String primName = macroToPrims.get(cellName);
@@ -1070,7 +1070,7 @@ public class DeviceResourcesVerifier {
             StructList.Reader<CellPinInversion.Reader> pins = cellInversion.getCellPins();
             expect(invertiblePinMap.size(), pins.size());
 
-            for(CellPinInversion.Reader pin : pins) {
+            for (CellPinInversion.Reader pin : pins) {
                 String cellPin = allStrings.get(pin.getCellPin());
                 String expectedParameter = invertiblePinMap.get(cellPin);
                 expect(true, pin.getNotInverting().isParameter());

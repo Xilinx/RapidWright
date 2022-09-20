@@ -42,12 +42,12 @@ public class TestLUTTools {
     @Test
     public void testGetCompanionLUTName() {
         Set<Series> tested = new HashSet<>();
-        for(Part part : PartNameTools.getParts()) {
+        for (Part part : PartNameTools.getParts()) {
             if (tested.contains(part.getSeries())) continue;
             Device device = Device.getDevice(part);
-            for(SiteTypeEnum siteType : new SiteTypeEnum[]{SiteTypeEnum.SLICEL, SiteTypeEnum.SLICEM}) {
+            for (SiteTypeEnum siteType : new SiteTypeEnum[]{SiteTypeEnum.SLICEL, SiteTypeEnum.SLICEM}) {
                 Site site = device.getAllCompatibleSites(siteType)[0];
-                for(BEL bel : site.getBELs()) {
+                for (BEL bel : site.getBELs()) {
                     if (bel.isLUT()) {
                         String compLUTName = LUTTools.getCompanionLUTName(bel);
                         System.out.println(part + " " + siteType + " " + bel + " " + compLUTName);

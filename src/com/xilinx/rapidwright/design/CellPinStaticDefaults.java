@@ -67,11 +67,11 @@ public class CellPinStaticDefaults {
             Map<Series, Map<Unisim, Map<String,NetType>>> pinDefaults, 
             String fileName) throws IOException {
         BufferedWriter bw = new BufferedWriter(new FileWriter(fileName));
-        for(Entry<Series, Map<Unisim, Map<String,NetType>>> e : pinDefaults.entrySet()) {
+        for (Entry<Series, Map<Unisim, Map<String,NetType>>> e : pinDefaults.entrySet()) {
             bw.write(e.getKey() + ":\n");
-            for(Entry<Unisim, Map<String,NetType>> e2 : e.getValue().entrySet()) {
+            for (Entry<Unisim, Map<String,NetType>> e2 : e.getValue().entrySet()) {
                 bw.write("  " + e2.getKey() + ":\n");
-                for(Entry<String,NetType> e3 : e2.getValue().entrySet()) {
+                for (Entry<String,NetType> e3 : e2.getValue().entrySet()) {
                     bw.write("    " + e3.getKey() +"=" + e3.getValue() + "\n");
                 }
             }

@@ -40,7 +40,7 @@ public class DecomposeLUT {
         EDIFCell top = d.getTopEDIFCell();
         Cell lut6 = d.createAndPlaceCell("myLUT6", Unisim.LUT6, "SLICE_X0Y0/A6LUT");
         LUTTools.configureLUT(lut6, "O=I0 & I1 & I2 & I3 & I4 & I5");
-        for(EDIFPort port : lut6.getEDIFCellInst().getCellPorts()) {
+        for (EDIFPort port : lut6.getEDIFCellInst().getCellPorts()) {
             EDIFPort topPort = top.createPort(port.getName(), port.getDirection(), 1);
             EDIFNet net = top.createNet(port.getName());
             net.createPortInst(topPort);
@@ -60,7 +60,7 @@ public class DecomposeLUT {
         LUTTools.configureLUT(mux, "O=(IO & ~I2) + (I1 & I2) + (I0 & I1)"); // 2:1 Mux truth table
         
         // Disconnect LUT6, connect LUT5 inputs
-        for(EDIFPortInst port : lut6.getEDIFCellInst().getPortInsts()) {
+        for (EDIFPortInst port : lut6.getEDIFCellInst().getPortInsts()) {
             EDIFNet net = port.getNet();
             net.removePortInst(port);
             if (port.isInput() && !port.getName().equals("I5")) {

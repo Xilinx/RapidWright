@@ -166,13 +166,13 @@ public class PseudoPIPHelper {
         }
         map = new HashMap<TileTypeEnum, HashMap<PIPWires,PseudoPIPHelper>>();
         HashSet<TileTypeEnum> visited = new HashSet<TileTypeEnum>();
-        for(Tile tile : device.getAllTiles()) {
+        for (Tile tile : device.getAllTiles()) {
             TileTypeEnum type = tile.getTileTypeEnum();
             if (visited.contains(type)) continue;
             HashMap<PIPWires, PseudoPIPHelper> pipMap = new HashMap<PIPWires, PseudoPIPHelper>();
             map.put(type, pipMap);
             visited.add(type);
-            for(PIP pip : tile.getPIPs()) {
+            for (PIP pip : tile.getPIPs()) {
                 if (!pip.isRouteThru()) continue;
                 PIPWires wirePair = new PIPWires(pip.getStartWireIndex(), pip.getEndWireIndex());
                 pipMap.put(wirePair, new PseudoPIPHelper(pip));
@@ -214,7 +214,7 @@ public class PseudoPIPHelper {
             siteWires.add(belPin.getSiteWireIndex());
 
             BELPin sourceBelPin = belPin.getSourcePin();
-            for(SitePIP pip : sourceBelPin.getSitePIPs()) {
+            for (SitePIP pip : sourceBelPin.getSitePIPs()) {
                 sinkBelPinsToExplore.addLast(pip.getInputPin());
             }
         }
@@ -239,7 +239,7 @@ public class PseudoPIPHelper {
 
             BELPin sourceBelPin = parentNode.sinkBelPin.getSourcePin();
 
-            for(SitePIP pip : sourceBelPin.getSitePIPs()) {
+            for (SitePIP pip : sourceBelPin.getSitePIPs()) {
                 BELPin newSinkBelPin = pip.getInputPin();
 
                 SiteNode node = new SiteNode();
@@ -325,7 +325,7 @@ public class PseudoPIPHelper {
                 return path;
             }
         }
-        for(BELPin input : getRoutableInputs(src)) {
+        for (BELPin input : getRoutableInputs(src)) {
             LinkedList<BELPin> copy = new LinkedList<>(path);
             copy.addFirst(src);
             copy.addFirst(input);
@@ -344,11 +344,11 @@ public class PseudoPIPHelper {
      */
     private static List<BELPin> getRoutableInputs(BELPin output) {
         List<BELPin> pins = new ArrayList<BELPin>();
-        for(SitePIP pip : output.getSitePIPs()) {
+        for (SitePIP pip : output.getSitePIPs()) {
             pins.add(pip.getInputPin());
         }
         if (pins.size() == 0) {
-            for(BELPin input : output.getBEL().getPins()) {
+            for (BELPin input : output.getBEL().getPins()) {
                 if (input.isOutput()) continue;
                 pins.add(input);
             }
@@ -370,9 +370,9 @@ public class PseudoPIPHelper {
 
         Device device = Device.getDevice(args[0]);
         Map<TileTypeEnum,HashMap<PIPWires, PseudoPIPHelper>> map = getPseudoPIPMap(device);
-        for(Entry<TileTypeEnum, HashMap<PIPWires, PseudoPIPHelper>> e : map.entrySet()) {
+        for (Entry<TileTypeEnum, HashMap<PIPWires, PseudoPIPHelper>> e : map.entrySet()) {
             System.out.println(e.getKey() + ": ");
-            for(Entry<PIPWires, PseudoPIPHelper> e2 : e.getValue().entrySet()) {
+            for (Entry<PIPWires, PseudoPIPHelper> e2 : e.getValue().entrySet()) {
                 Tile t = e2.getValue().getTilePrototype();
                 System.out.println("  " + t.getWireName(e2.getKey().getStartWire())
                                 +  "->" + t.getWireName(e2.getKey().getEndWire())

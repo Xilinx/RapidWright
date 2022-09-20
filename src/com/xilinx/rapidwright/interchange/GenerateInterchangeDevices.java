@@ -44,7 +44,7 @@ public class GenerateInterchangeDevices {
         String rootRunDir = args[0];
         JobQueue q = new JobQueue();
         int concurrentJobLimit = JobQueue.isLSFAvailable() ? 1000 : 1;
-        for(String deviceName : Device.getAvailableDevices()) {
+        for (String deviceName : Device.getAvailableDevices()) {
             Job job = JobQueue.isLSFAvailable() ? new LSFJob() : new LocalJob();
             job.setCommand("java " + DeviceResourcesExample.class.getCanonicalName() + " " + deviceName);
             job.setRunDir(rootRunDir + File.separator + deviceName);

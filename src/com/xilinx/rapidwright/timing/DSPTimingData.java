@@ -127,9 +127,9 @@ public class DSPTimingData{
                 } else if (line.contains(":")) {
                     String[] s = line.replaceAll(":", " ").split("\\s+");
                     //port index inclusive
-                    for(short idin = Short.parseShort(s[1]); idin <= Short.parseShort(s[2]); idin++) {
+                    for (short idin = Short.parseShort(s[1]); idin <= Short.parseShort(s[2]); idin++) {
                         //input pins 
-                        for(short ido = idin; ido <= Short.parseShort(s[5]); ido++) {
+                        for (short ido = idin; ido <= Short.parseShort(s[5]); ido++) {
                             String in = s[0]+"[" + idin + "]";
                             String out = s[3]+"[" + ido + "]";
                             this.addInputOutputPortDelay(in, out, (short) (Float.parseFloat(s[6])*1000));

@@ -217,7 +217,7 @@ public class HandPlacer extends QMainWindow {
     
     private void populateMacroList() {
         macroList.clear();
-        for(GUIModuleInst macro : scene.getMacroList()) {
+        for (GUIModuleInst macro : scene.getMacroList()) {
             QTreeWidgetItem treeItem = new QTreeWidgetItem();
             treeItem.setText(0, macro.getModuleInst().getName());
             String sizeFMT = String.format("%5d", macro.getSizeInTiles());
@@ -232,7 +232,7 @@ public class HandPlacer extends QMainWindow {
         if (macroList.hasFocus())
             return;
         macroList.clearSelection();
-        for(QGraphicsItemInterface item : scene.selectedItems()) {
+        for (QGraphicsItemInterface item : scene.selectedItems()) {
             String modInstName = ((GUIModuleInst)item).getModuleInst().getName();
             List<QTreeWidgetItem> itemList = macroList.findItems(modInstName, new MatchFlags(MatchFlag.MatchExactly), 0);
             if (itemList.size() > 0) {
@@ -246,7 +246,7 @@ public class HandPlacer extends QMainWindow {
         if (scene.hasFocus())
             return;
         scene.clearSelection();
-        for(QTreeWidgetItem item : macroList.selectedItems()) {
+        for (QTreeWidgetItem item : macroList.selectedItems()) {
             String modInstName = item.text(0);
             GUIModuleInst gmi = scene.getGMI(modInstName);
             if (gmi != null) {
@@ -258,7 +258,7 @@ public class HandPlacer extends QMainWindow {
     private void updateWireEstimate() {
         ArrayList<GUINetLine> netLineList = scene.getNetLineList();
         double estimate = 0;
-        for(GUINetLine netLine : netLineList) {
+        for (GUINetLine netLine : netLineList) {
             estimate += netLine.line().length();
         }
         statusBar().showMessage("Wiring cost: "+estimate, 2000);
@@ -298,7 +298,7 @@ public class HandPlacer extends QMainWindow {
     public void updateDesign(ArrayList<PartitionLine> lines) {
         scene.openNewDesign(debugDesign);
         if (lines != null) {
-            for(PartitionLine line : lines) {
+            for (PartitionLine line : lines) {
                 line.drawPartitionLine(scene);
             }            
         }
@@ -439,7 +439,7 @@ public class HandPlacer extends QMainWindow {
     @SuppressWarnings("unused")
     private void zoomselection() {
         double top=-1,left=-1,right=-1,bottom=-1;
-        for(QGraphicsItemInterface item : scene.selectedItems()) {
+        for (QGraphicsItemInterface item : scene.selectedItems()) {
             QPointF gmiTL = item.pos();
             QPointF gmiBR = item.pos().add(item.boundingRect().bottomRight());
             if (top < 0 || gmiTL.y() < top)

@@ -162,7 +162,7 @@ public class RouterHelper {
                 }
                 return sinkToSwitchBoxPath;
             }
-            for(Node uphill : n.getNode().getAllUphillNodes()) {
+            for (Node uphill : n.getNode().getAllUphillNodes()) {
                 if (uphill.getAllUphillNodes().size() == 0) continue;
                 RoutingNode prev = new RoutingNode(uphill);
                 prev.setPrev(n);
@@ -204,7 +204,7 @@ public class RouterHelper {
         List<PIP> connectionPIPs = new ArrayList<>();
         if (connectionNodes == null) return connectionPIPs;
         // Nodes of a connection are added to the list starting from its sink to its source
-        for(int i = connectionNodes.size() -1; i > 0; i--) {
+        for (int i = connectionNodes.size() -1; i > 0; i--) {
             Node driver = connectionNodes.get(i);
             Node load = connectionNodes.get(i-1);        
             PIP pip = findPIPbetweenNodes(driver, load);    
@@ -242,7 +242,7 @@ public class RouterHelper {
      */
     public static PIP getPIP(Tile loadTile, Wire[] driverWires, int loadWire) {
         PIP pip = null;
-        for(Wire wire : driverWires) {
+        for (Wire wire : driverWires) {
             if (wire.getTile().equals(loadTile)) {
                 pip = loadTile.getPIP(wire.getWireIndex(), loadWire);
                 if (pip != null) {
@@ -261,11 +261,11 @@ public class RouterHelper {
      */
     public static PIP getPIP(Node driver, Node load) {
         PIP pip = null;
-        for(PIP p : driver.getAllDownhillPIPs()) {
+        for (PIP p : driver.getAllDownhillPIPs()) {
             if (p.getEndNode().equals(load))
                 return p;
         }
-        for(PIP p : driver.getAllUphillPIPs()) {
+        for (PIP p : driver.getAllUphillPIPs()) {
             if (p.getStartNode().equals(load))
                 return p;
         }
@@ -281,7 +281,7 @@ public class RouterHelper {
     public static List<Node> getNodesOfNet(Net net) {
         List<Node> nodes = new ArrayList<>();
         if (net.getSource() != null) nodes.add(net.getSource().getConnectedNode());
-        for(SitePinInst pin : net.getSinkPins()) {
+        for (SitePinInst pin : net.getSinkPins()) {
             Node pinNode = pin.getConnectedNode();
             if (pinNode != null) {
                 nodes.add(pinNode);
@@ -290,7 +290,7 @@ public class RouterHelper {
             }
         }
         
-        for(PIP pip : net.getPIPs()) {
+        for (PIP pip : net.getPIPs()) {
             Node end = pip.getEndNode();
             Node start = pip.getStartNode();
             if (!nodes.contains(end)) nodes.add(end);
@@ -307,7 +307,7 @@ public class RouterHelper {
     public static Set<Node> getUsedNodesOfNet(Net net) {
         Set<Node> nodes = new HashSet<>();
         if (net.getSource() != null) nodes.add(net.getSource().getConnectedNode());
-        for(SitePinInst pin : net.getSinkPins()) {
+        for (SitePinInst pin : net.getSinkPins()) {
             Node pinNode = pin.getConnectedNode();
             if (pinNode != null) {
                 nodes.add(pinNode);
@@ -316,7 +316,7 @@ public class RouterHelper {
             }
         }
         
-        for(PIP pip : net.getPIPs()) {
+        for (PIP pip : net.getPIPs()) {
             Node end = pip.getEndNode();
             Node start = pip.getStartNode();
             nodes.add(end);
@@ -347,11 +347,11 @@ public class RouterHelper {
     public static void invertPossibleGndPinsToVccPins(Design design, Net staticNet) {
         if (!staticNet.getName().equals(Net.GND_NET)) return;
         List<SitePinInst> toInvertPins = new ArrayList<>();
-        for(SitePinInst currSitePinInst:staticNet.getPins()) {
+        for (SitePinInst currSitePinInst:staticNet.getPins()) {
             BELPin[] belPins = currSitePinInst.getSiteInst().getSiteWirePins(currSitePinInst.getName());
             // DSP or BRAM
             if (belPins.length == 2) {
-                for(BELPin belPin : belPins) {
+                for (BELPin belPin : belPins) {
                     if (belPin.isSitePort())    continue;
                     // DO NOT invert CLK_OPTINV_CLKB_L and CLK_OPTINV_CLKB_U
                     if (belPin.getBEL().getName().contains("CLKB")) continue;
@@ -369,7 +369,7 @@ public class RouterHelper {
             }
         }
         
-        for(SitePinInst toinvert:toInvertPins) {
+        for (SitePinInst toinvert:toInvertPins) {
             boolean success = staticNet.removePin(toinvert, true);
             success |= design.getVccNet().addPin(toinvert);
             if (!success) {
@@ -388,7 +388,7 @@ public class RouterHelper {
         Tile entry = node.getTile();    
         Tile exit = null;
         List<Tile> intTiles = new ArrayList<>();
-        for(Wire w : node.getAllWiresInNode()) {
+        for (Wire w : node.getAllWiresInNode()) {
             Tile wireTile = w.getTile();
             if (wireTile.getTileTypeEnum() == TileTypeEnum.INT) {
                 if (!intTiles.contains(wireTile)) {
@@ -441,7 +441,7 @@ public class RouterHelper {
         List<PIP> pips = net.getPIPs();
         Map<Node, RoutingNode> nodeRoutingNodeMap = new HashMap<>();
         boolean firstPIP = true;
-        for(PIP pip : pips) {
+        for (PIP pip : pips) {
             Node startNode = pip.getStartNode();
             RoutingNode startrn = createRoutingNode(pip.getStartNode(), nodeRoutingNodeMap);
             
@@ -463,7 +463,7 @@ public class RouterHelper {
         }
         
         Map<Pair<SitePinInst, Node>, Short> sinkNodeDelays = new HashMap<>();
-        for(SitePinInst sink : net.getSinkPins()) {
+        for (SitePinInst sink : net.getSinkPins()) {
             Node sinkNode = sink.getConnectedNode();
             if (!(sinkNode.getTile().getTileTypeEnum() == TileTypeEnum.INT)) {
                 sinkNode = projectInputPinToINTNode(sink).get(0);
@@ -548,7 +548,7 @@ public class RouterHelper {
                 success = true;
                 break;
             }    
-            for(Node n : curr.getNode().getAllDownhillNodes()) {
+            for (Node n : curr.getNode().getAllDownhillNodes()) {
                 RoutingNode child = new RoutingNode(n);
                 child.setPrev(curr);
                 queue.add(child);    

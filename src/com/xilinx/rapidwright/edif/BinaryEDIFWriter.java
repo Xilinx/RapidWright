@@ -85,7 +85,7 @@ public class BinaryEDIFWriter {
     
     private static void addObjectToStringMap(EDIFPropertyObject o, Map<String,Integer> stringMap) {
         addNameToStringMap(o, stringMap);
-        for(Entry<String, EDIFPropertyValue> e : o.getPropertiesMap().entrySet()) {
+        for (Entry<String, EDIFPropertyValue> e : o.getPropertiesMap().entrySet()) {
             addStringToStringMap(e.getKey(), stringMap);
             addStringToStringMap(e.getValue().getValue(), stringMap);
             addStringToStringMap(e.getValue().getOwner(), stringMap);
@@ -100,22 +100,22 @@ public class BinaryEDIFWriter {
      */
     public static Map<String, Integer> createStringMap(EDIFNetlist netlist) {
         Map<String, Integer> stringMap = new HashMap<>();
-        for(EDIFLibrary lib : netlist.getLibraries()) {
+        for (EDIFLibrary lib : netlist.getLibraries()) {
             addNameToStringMap(lib, stringMap);
-            for(EDIFCell cell : lib.getCells()) {
+            for (EDIFCell cell : lib.getCells()) {
                 addObjectToStringMap(cell, stringMap);
                 addNameToStringMap(cell.getEDIFView(), stringMap);
-                for(EDIFCellInst inst : cell.getCellInsts()) {
+                for (EDIFCellInst inst : cell.getCellInsts()) {
                     addObjectToStringMap(inst, stringMap);
                 }
-                for(EDIFNet net : cell.getNets()) {
+                for (EDIFNet net : cell.getNets()) {
                     addObjectToStringMap(net, stringMap);
-                    for(EDIFPortInst pi : net.getPortInsts()) {
+                    for (EDIFPortInst pi : net.getPortInsts()) {
                         String name = pi.getPort().isBus() ? pi.getPort().getBusName() : pi.getName();
                         addStringToStringMap(name, stringMap);
                     }
                 }
-                for(EDIFPort port : cell.getPorts()) {
+                for (EDIFPort port : cell.getPorts()) {
                     addObjectToStringMap(port, stringMap);
                 }
             }
@@ -169,7 +169,7 @@ public class BinaryEDIFWriter {
 
             os.writeInt(o.getPropertiesMap().size());
 
-            for(Entry<String, EDIFPropertyValue> e : o.getPropertiesMap().entrySet()) {
+            for (Entry<String, EDIFPropertyValue> e : o.getPropertiesMap().entrySet()) {
                 int ownerFlag = e.getValue().getOwner() != null ? EDIF_HAS_OWNER : 0;
                 os.writeInt(ownerFlag | stringMap.get(e.getKey()));
                 int propType = e.getValue().getType().ordinal();
@@ -227,7 +227,7 @@ public class BinaryEDIFWriter {
         if (hasUniqueView) {
             writeEDIFName(c.getEDIFView(), os, stringMap);
         }
-        for(EDIFPort p : c.getPorts()) {
+        for (EDIFPort p : c.getPorts()) {
             writeEDIFObject(p, os, stringMap);
             int dirAndWidth = p.getWidth();
             if (dirAndWidth >= EDIF_DIR_INOUT_MASK) {
@@ -246,15 +246,15 @@ public class BinaryEDIFWriter {
         }
 
         os.writeInt(c.getCellInsts().size());
-        for(EDIFCellInst i : c.getCellInsts()) {
+        for (EDIFCellInst i : c.getCellInsts()) {
             writeEDIFObject(i, os, stringMap);
             writeEDIFCellRef(i.getCellType(), os, stringMap, c.getLibrary());
         }
         os.writeInt(c.getNets().size());
-        for(EDIFNet n : c.getNets()) {
+        for (EDIFNet n : c.getNets()) {
             writeEDIFObject(n, os, stringMap);
             os.writeInt(n.getPortInsts().size());
-            for(EDIFPortInst pi : n.getPortInsts()) {
+            for (EDIFPortInst pi : n.getPortInsts()) {
                 String name = getPortInstKey(pi);
                 os.writeInt(stringMap.get(name));
                 os.writeInt(pi.getIndex());
@@ -315,22 +315,22 @@ public class BinaryEDIFWriter {
             os.writeString(EDIF_BINARY_FILE_TAG);
             os.writeString(EDIF_BINARY_FILE_VERSION);
             String[] strings = new String[stringMap.size()];
-            for(Entry<String,Integer> e : stringMap.entrySet()) {
+            for (Entry<String,Integer> e : stringMap.entrySet()) {
                 strings[e.getValue()] = e.getKey();
             }
             FileTools.writeStringArray(os, strings);
             os.writeInt(netlist.getLibraries().size());
-            for(EDIFLibrary lib : netlist.getLibrariesInExportOrder()) {
+            for (EDIFLibrary lib : netlist.getLibrariesInExportOrder()) {
                 writeEDIFName(lib, os, stringMap);
                 os.writeInt(lib.getCells().size());
-                for(EDIFCell cell : lib.getValidCellExportOrder(false)) {
+                for (EDIFCell cell : lib.getValidCellExportOrder(false)) {
                     writeEDIFCell(cell, os, stringMap);
                 }
             }
             writeEDIFName(netlist, os, stringMap);
             // Comments are likely to be unique
             os.writeInt(netlist.getComments().size());
-            for(String comment : netlist.getComments()) {
+            for (String comment : netlist.getComments()) {
                 os.writeString(comment);
             }
             writeEDIFDesign(netlist.getDesign(), os, stringMap);

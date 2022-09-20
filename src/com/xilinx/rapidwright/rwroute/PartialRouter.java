@@ -57,14 +57,14 @@ public class PartialRouter extends RWRoute{
     @Override
     protected void addStaticNetRoutingTargets(Net staticNet) {
         List<SitePinInst> sinks = new ArrayList<>();
-        for(SitePinInst sink : staticNet.getPins()) {
+        for (SitePinInst sink : staticNet.getPins()) {
             if (sink.isOutPin()) continue;
             sinks.add(sink);
         }
         
         if (sinks.size() > 0 ) {
             if (!staticNet.hasPIPs()) {
-                for(SitePinInst sink : sinks) {
+                for (SitePinInst sink : sinks) {
                     addReservedNode(sink.getConnectedNode(), staticNet);
                 }
                 addStaticNetRoutingTargets(staticNet, sinks);

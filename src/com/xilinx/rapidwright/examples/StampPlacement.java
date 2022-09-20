@@ -51,7 +51,7 @@ public class StampPlacement {
             filePrefix = stampDCPFilePrefix.substring(sep+1);
         }
         ArrayList<String> dcpFileNames = new ArrayList<>();
-        for(File f : new File(stampFileDir).listFiles(FileTools.getDCPFilenameFilter())) {
+        for (File f : new File(stampFileDir).listFiles(FileTools.getDCPFilenameFilter())) {
             if (f.getName().startsWith(filePrefix)) {
                 dcpFileNames.add(f.getName());
             }
@@ -59,7 +59,7 @@ public class StampPlacement {
         
         int i=0;
         Module[] stamps = new Module[dcpFileNames.size()];
-        for(String fileName : StringTools.naturalSort(dcpFileNames)) {
+        for (String fileName : StringTools.naturalSort(dcpFileNames)) {
             String fullDCPFileName = stampFileDir + File.separator + fileName;
             String metadataFileName = stampFileDir + File.separator + fileName.replace(".dcp", "_metadata.txt");
             stamps[i] = new Module(Design.readCheckpoint(fullDCPFileName, CodePerfTracker.SILENT), metadataFileName);
@@ -72,7 +72,7 @@ public class StampPlacement {
         Map<Integer, HashMap<String,Site>> placementDirectives = new HashMap<Integer,HashMap<String,Site>>();
         // Parse the stamp direction file
         int lineNum = 0;
-        for(String line : FileTools.getLinesFromTextFile(placementDirectionFile)) {
+        for (String line : FileTools.getLinesFromTextFile(placementDirectionFile)) {
             lineNum++;
             if (line.trim().startsWith("#")) continue;
             String[] tokens = line.split("\\s+");
@@ -120,7 +120,7 @@ public class StampPlacement {
         Design design = Design.readCheckpoint(args[0], CodePerfTracker.SILENT);
         Device device = design.getDevice();
         
-        for(Net net : design.getNets()) {
+        for (Net net : design.getNets()) {
             if (net.isClockNet()) net.unroute();
         }
         
@@ -131,14 +131,14 @@ public class StampPlacement {
         t.stop().start("Stamp placement");
 
         // Perform the actual placements for each stamp type
-        for(Entry<Integer,Module> e : stamps.entrySet()) {
+        for (Entry<Integer,Module> e : stamps.entrySet()) {
             DesignTools.stampPlacement(design, e.getValue(), placementDirectives.get(e.getKey()));
         }
         
         t.stop().start("Writing stamped design");
         
         // Unlock cells by default
-        for(Cell c: design.getCells()) {
+        for (Cell c: design.getCells()) {
             c.setBELFixed(false);
             c.setSiteFixed(false);
         }

@@ -168,7 +168,7 @@ public class Connection implements Comparable<Connection>{
      */
     public void calculateCriticality(float maxDelay, float maxCriticality, float criticalityExponent) {
         float slackCon = Float.MAX_VALUE;
-        for(TimingEdge e : getTimingEdges()) {
+        for (TimingEdge e : getTimingEdges()) {
             float tmpslackCon = e.getDst().getRequiredTime() - e.getSrc().getArrivalTime() - e.getDelay();
             if (tmpslackCon < slackCon)
                 slackCon = tmpslackCon;
@@ -187,7 +187,7 @@ public class Connection implements Comparable<Connection>{
      * @return
      */
     public boolean isCongested() {
-        for(Routable rn : getRnodes()) {
+        for (Routable rn : getRnodes()) {
             if (rn.isOverUsed()) {
                 return true;
             }
@@ -200,7 +200,7 @@ public class Connection implements Comparable<Connection>{
      * @return
      */
     public boolean useRnodesWithMultiDrivers() {
-        for(Routable rn : getRnodes()) {
+        for (Routable rn : getRnodes()) {
             if (rn.hasMultiDrivers()) {
                 return true;
             }
@@ -217,14 +217,14 @@ public class Connection implements Comparable<Connection>{
     }
     
     public void setTimingEdgesDelay(float routeDelay) {
-        for(TimingEdge e : getTimingEdges()) {
+        for (TimingEdge e : getTimingEdges()) {
             e.setRouteDelay(routeDelay);
         }
     }
     
     private float getRouteDelay() {
         float routeDelay = getRnodes().get(getRnodes().size() - 1).getDelay();
-        for(int i = getRnodes().size() - 2; i >= 0; i--) {
+        for (int i = getRnodes().size() - 2; i >= 0; i--) {
             Routable rnode = getRnodes().get(i);
             Routable parent = getRnodes().get(i+1);
             routeDelay += rnode.getDelay() +

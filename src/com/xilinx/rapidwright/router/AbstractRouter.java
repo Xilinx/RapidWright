@@ -237,7 +237,7 @@ public abstract class AbstractRouter{
      */
     public ArrayList<RouteNode> getSourcesFromPIPs(ArrayList<PIP> pips) {
         ArrayList<RouteNode> sources = new ArrayList<RouteNode>(pips.size()*2);
-        for(PIP pip : pips) {
+        for (PIP pip : pips) {
             sources.add(new RouteNode(pip.getTile(), pip.getStartWireIndex(), null, 0));
             sources.add(new RouteNode(pip.getTile(), pip.getEndWireIndex(), null, 0));
         }
@@ -275,7 +275,7 @@ public abstract class AbstractRouter{
         successfulRoute = false;
         foundSwitchMatrixSink = false;
         // Setup the source nodes for starting the routing process
-        for(RouteNode src : currSources) {
+        for (RouteNode src : currSources) {
             // Add the source nodes to the queue
             if (src.getConnections() != null) {
                 // Set the cost of the source
@@ -339,7 +339,7 @@ public abstract class AbstractRouter{
     protected void markIntermediateNodesAsUsed(PIP pip, Net currentNet) {
         List<Wire> wires = pip.getTile().getWireConnections(pip.getEndWireIndex());
         if (wires != null && wires.size() > 1) {
-            for(Wire w : wires) {
+            for (Wire w : wires) {
                 if (!w.getTile().equals(pip.getTile())) {
                     RouteNode tmp = setWireAsUsed(w.getTile(), w.getWireIndex(), currentNet);
                     if (currentNet != null) addUsedWireMapping(currentNet, tmp);
@@ -350,7 +350,7 @@ public abstract class AbstractRouter{
         if (IntentCode.isLongWire(pip.getTile(), pip.getStartWireIndex()) && IntentCode.isLongWire(pip.getTile(), pip.getEndWireIndex())) {
             wires = pip.getTile().getWireConnections(pip.getStartWireIndex());
             if (wires != null && wires.size() > 1) {
-                for(Wire w : wires) {
+                for (Wire w : wires) {
                     if (!w.getTile().equals(pip.getTile())) {
                         RouteNode tmp = setWireAsUsed(w.getTile(), w.getWireIndex(), currentNet);
                         if (currentNet != null) addUsedWireMapping(currentNet, tmp);

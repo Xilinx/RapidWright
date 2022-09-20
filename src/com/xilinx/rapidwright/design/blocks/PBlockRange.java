@@ -214,8 +214,8 @@ public class PBlockRange {
             if (t.getColumn() > colMax) colMax = t.getColumn();            
         }
                     
-        for(int col=colMin; col <= colMax; col++) {
-            for(int row=rowMin; row <= rowMax; row++) {
+        for (int col=colMin; col <= colMax; col++) {
+            for (int row=rowMin; row <= rowMax; row++) {
                 tiles.add(getDevice().getTile(row, col));
             }
         }

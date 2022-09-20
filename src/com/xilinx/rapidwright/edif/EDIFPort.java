@@ -99,7 +99,7 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
         }
         int colonIdx = -1;
         int leftBracket = -1;
-        for(int i=name.length()-3; i >= 0; i--) {
+        for (int i=name.length()-3; i >= 0; i--) {
             char c = name.charAt(i);
             if (c == ':') colonIdx = i;
             else if (c == '[') {
@@ -184,7 +184,7 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
      */
     public List<EDIFNet> getInternalNets() {
         List<EDIFNet> nets = new ArrayList<>(width);
-        for(int i=0; i < width; i++) {
+        for (int i=0; i < width; i++) {
             nets.add(getInternalNet(i));
         }
         return nets;

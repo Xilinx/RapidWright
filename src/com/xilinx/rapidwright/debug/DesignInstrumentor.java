@@ -117,7 +117,7 @@ public class DesignInstrumentor {
      * @param fileName Name of the instrumentation details file.
      */
     public void loadInstrumentationDetailsFile(String fileName) {
-        for(String line : FileTools.getLinesFromTextFile(fileName)) {
+        for (String line : FileTools.getLinesFromTextFile(fileName)) {
             // Skip comments and empty lines
             if (line.startsWith("#")) continue;
             if (line.trim().isEmpty()) continue;
@@ -148,7 +148,7 @@ public class DesignInstrumentor {
         Module m = mi.getModule();
         SitePinInst clockPin = null;
         String portPrefix = "probe0"; // TODO - This should be data driven
-        for(Entry<String,String> netNamePair : netNames.entrySet()) {
+        for (Entry<String,String> netNamePair : netNames.entrySet()) {
             String netName = netNamePair.getKey();
             String routedNetName = netNamePair.getValue();
             // Watch out for two nets with equivalent physical routed nets
@@ -198,7 +198,7 @@ public class DesignInstrumentor {
         if (clockPin == null) {
             MessageGenerator.briefError("WARNING: Couldn't definitely identify clock net for probe signals! Choosing clock with largest fanout...");
             int largestFanout = 0;
-            for(Net clkNet : design.getNets()) {
+            for (Net clkNet : design.getNets()) {
                 if (clkNet.isClockNet() && clkNet.getFanOut() > largestFanout) {
                     clockPin = clkNet.getSource();
                     largestFanout = clkNet.getFanOut();
@@ -237,7 +237,7 @@ public class DesignInstrumentor {
         
         EDIFCell topCell = design.getNetlist().getTopCell();
         
-        for(int i=0; i < oportWidth; i++) {
+        for (int i=0; i < oportWidth; i++) {
             String suffix = "["+i+"]";
             String dhPortName = dhOutput + suffix;
             String ilaPortName = ilaInput + suffix; 
@@ -247,14 +247,14 @@ public class DesignInstrumentor {
             Port dhPort = dhCorePhysical.getModule().getPort(dhPortName); 
             Net dhNet = dhCorePhysical.getCorrespondingNet(dhPort);
             design.movePinsToNewNetDeleteOldNet(ilaNet, dhNet, false);
-            for(SitePinInst p : dhNet.getPins()) {
+            for (SitePinInst p : dhNet.getPins()) {
                 if (p.isOutPin()) continue;
                 pinsToRoute.add(p);
             }
         }
         EDIFTools.connectPortBus(topCell, dhCoreLogical, ilaCoreLogical, dhOutput, ilaInput, oportWidth);
         
-        for(int i=0; i < iportWidth; i++) {
+        for (int i=0; i < iportWidth; i++) {
             String suffix = "["+i+"]";
             String dhPortName = dhInput + suffix;
             String ilaPortName = ilaOutput + suffix; 
@@ -264,7 +264,7 @@ public class DesignInstrumentor {
             Port dhPort = dhCorePhysical.getModule().getPort(dhPortName); 
             Net dhNet = dhCorePhysical.getCorrespondingNet(dhPort);
             design.movePinsToNewNetDeleteOldNet(dhNet, ilaNet, false);
-            for(SitePinInst p : ilaNet.getPins()) {
+            for (SitePinInst p : ilaNet.getPins()) {
                 if (p.isOutPin()) continue;
                 pinsToRoute.add(p);
             }
@@ -319,7 +319,7 @@ public class DesignInstrumentor {
         BlockPlacer placer = new BlockPlacer();
         placer.placeDesign(design,true);
         int unplacedInsts = 0;
-        for(SiteInst si : design.getSiteInsts()) {
+        for (SiteInst si : design.getSiteInsts()) {
             if (!si.isPlaced()) {
                 unplacedInsts++;
             }
@@ -353,7 +353,7 @@ public class DesignInstrumentor {
         *    base_microblaze example design used
         *    We want the actual net name probed for debug, not the "parent" name. --> This assumption looks correct.
         **/
-        for(String probeLine : probe_template) {
+        for (String probeLine : probe_template) {
             // Ensure "busType" is "net" if there's only one net, "bus" for >1 net.
             if (probeLine.trim().startsWith("<probe t")) {
                 if (netNames.size() > 1)
@@ -369,7 +369,7 @@ public class DesignInstrumentor {
             else if (probeLine.trim().startsWith("<net n")) {
                 //System.out.println("Adding nets marked for debug to .ltx!");
                 int count = netNames.size()-1;
-                for(Entry<String,String> netNamePair : netNames.entrySet()) {
+                for (Entry<String,String> netNamePair : netNames.entrySet()) {
                     String netName = netNamePair.getKey().split("\\[")[0];
                     ltx_strings.add("        <net name=\"" + netName + "[" + count + "]\"/>");
                     count--;

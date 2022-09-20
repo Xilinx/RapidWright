@@ -71,7 +71,7 @@ public class BinaryEDIFReader {
     static void readEDIFObject(EDIFPropertyObject o, Input is, String[] strings) {
         if (readEDIFName(o, is, strings)) {
             int numProps = is.readInt();
-            for(int i=0; i < numProps; i++) {
+            for (int i=0; i < numProps; i++) {
                 int ownerAndKeyIdx = is.readInt();
                 boolean hasOwner = (ownerAndKeyIdx & EDIF_HAS_OWNER) == EDIF_HAS_OWNER;
                 String key = strings[ownerAndKeyIdx & ~EDIF_HAS_OWNER];
@@ -151,7 +151,7 @@ public class BinaryEDIFReader {
             readEDIFName(view, is, strings);
             c.setView(view);
         }
-        for(int i=0; i < portCount; i++) {
+        for (int i=0; i < portCount; i++) {
             EDIFPort port = new EDIFPort();
             readEDIFObject(port, is, strings);
             int dirAndWidth = is.readInt();
@@ -173,19 +173,19 @@ public class BinaryEDIFReader {
             c.addPort(port);
         }
         int instCount = is.readInt();
-        for(int i=0; i < instCount; i++) {
+        for (int i=0; i < instCount; i++) {
             EDIFCellInst inst = new EDIFCellInst();
             readEDIFObject(inst, is, strings);
             inst.setCellType(readEDIFCellRef(is, strings, netlist, lib));
             c.addCellInst(inst);
         }
         int netCount = is.readInt();
-        for(int i=0; i < netCount; i++) {
+        for (int i=0; i < netCount; i++) {
             EDIFNet net = new EDIFNet();
             readEDIFObject(net, is, strings);
             c.addNet(net);
             int portRefCount = is.readInt();
-            for(int j=0; j < portRefCount; j++) {
+            for (int j=0; j < portRefCount; j++) {
                 String name = strings[is.readInt()];
                 int index = is.readInt();
                 int instRef = is.readInt();
@@ -228,18 +228,18 @@ public class BinaryEDIFReader {
             EDIFNetlist netlist = new EDIFNetlist();
             String[] strings = FileTools.readStringArray(is);
             int numLibraries = is.readInt();
-            for(int i=0; i < numLibraries; i++) {
+            for (int i=0; i < numLibraries; i++) {
                 EDIFLibrary lib = new EDIFLibrary();
                 readEDIFName(lib, is, strings);
                 netlist.addLibrary(lib);
                 int numCells = is.readInt();
-                for(int j=0; j < numCells; j++) {
+                for (int j=0; j < numCells; j++) {
                     readEDIFCell(is, strings, lib, netlist);
                 }
             }
             readEDIFName(netlist, is, strings);
             int numComments = is.readInt();
-            for(int i=0; i < numComments; i++) {
+            for (int i=0; i < numComments; i++) {
                 netlist.addComment(is.readString());
             }
             readEDIFDesign(is, strings, netlist);

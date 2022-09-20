@@ -86,7 +86,7 @@ public class IsolateLeafClkBuffer {
                 return curr.getPIPsBackToSource();
             }
             visited.add(curr);
-            for(Wire w : curr.getConnections()) {
+            for (Wire w : curr.getConnections()) {
                 RouteNode nextNode = new RouteNode(w,curr);
                 if (visited.contains(nextNode)) continue;
                 if (used.contains(nextNode)) continue;
@@ -102,7 +102,7 @@ public class IsolateLeafClkBuffer {
         Node sink = clkPin.getConnectedNode();
         Net net = clkPin.getNet();
         Map<Node, PIP> reversePaths = new HashMap<Node, PIP>();
-        for(PIP p : net.getPIPs()) {
+        for (PIP p : net.getPIPs()) {
             reversePaths.put(p.getEndNode(), p);
         }
         Node curr = sink;
@@ -126,8 +126,8 @@ public class IsolateLeafClkBuffer {
         RouteNode src = drivingPIP.getStartRouteNode();
         RouteNode snk = new RouteNode(sink);
         Set<RouteNode> used = new HashSet<>();
-        for(Net n : net.getSource().getSiteInst().getDesign().getNets()) {
-            for(PIP p : n.getPIPs()) {
+        for (Net n : net.getSource().getSiteInst().getDesign().getNets()) {
+            for (PIP p : n.getPIPs()) {
                 used.add(p.getStartRouteNode());
                 used.add(p.getEndRouteNode());
             }
@@ -140,7 +140,7 @@ public class IsolateLeafClkBuffer {
         }
         
         System.out.println("New Clock Path PIPs:");
-        for(PIP p : route) {
+        for (PIP p : route) {
             System.out.println("\t" + p);
         }
         

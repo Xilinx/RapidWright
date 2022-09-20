@@ -38,7 +38,7 @@ public enum ChannelType {
 
     static {
         map = new HashMap<>();
-        for(ChannelType e : values()) {
+        for (ChannelType e : values()) {
             map.put(e.toString(), e);
         }
     }    

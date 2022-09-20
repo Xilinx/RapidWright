@@ -44,12 +44,12 @@ public class TestCellBELMappings {
         
         boolean foundIDDRS = false;
         boolean foundIDDRR = false;
-        for(int i=0; i < devBuilder.getCellBelMap().size(); i++) {
+        for (int i=0; i < devBuilder.getCellBelMap().size(); i++) {
             CellBelMapping.Builder mapping = devBuilder.getCellBelMap().get(i);
             if (allStrings.get(mapping.getCell()).equals("IDDR")) {
                 Assertions.assertTrue(mapping.hasParameterPins());
-               for(ParameterCellBelPinMaps.Builder paramPins : mapping.getParameterPins()) {
-                    for(CellBelPinEntry.Builder pinObj : paramPins.getPins()) {
+               for (ParameterCellBelPinMaps.Builder paramPins : mapping.getParameterPins()) {
+                    for (CellBelPinEntry.Builder pinObj : paramPins.getPins()) {
                         Assertions.assertEquals(allStrings.get(pinObj.getBelPin()), "SR");
                         String cellPinName = allStrings.get(pinObj.getCellPin());
                         foundIDDRS = foundIDDRS || cellPinName.equals("S");

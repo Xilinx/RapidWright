@@ -129,7 +129,7 @@ public class ClkRouteTiming {
             this.routeDelaysToSinkINTTiles.put(dataStrings[0], Short.parseShort(dataStrings[2]));
             this.intTileToBufgInDelay.put(dataStrings[0], Short.parseShort(dataStrings[2]));// check the index of INT tile and delay
             
-            for(int id = 3; id < dataStrings.length; id++) {
+            for (int id = 3; id < dataStrings.length; id++) {
                 this.intTileToBufgInRoute.add(dataStrings[id]);
             }
             
@@ -153,7 +153,7 @@ public class ClkRouteTiming {
             this.routeDelaysToSinkINTTiles.put(intTile, Short.parseShort(dataStrings[2]));
             
             List<String> nodes = new ArrayList<>();
-            for(int i = 3; i < dataStrings.length; i++) {
+            for (int i = 3; i < dataStrings.length; i++) {
                 nodes.add(dataStrings[i]);
             }
             

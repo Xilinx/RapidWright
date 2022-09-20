@@ -60,7 +60,7 @@ public class PartNameTools {
             String[] strings = FileTools.readStringArray(his);
             int partCount = 0;
             partCount = his.readInt();
-            for(int i=0; i < partCount; i++) {
+            for (int i=0; i < partCount; i++) {
                 int[] part = FileTools.readIntArray(his);
                 Part tmpPart = new Part(
                     strings[part[0]],
@@ -294,7 +294,7 @@ public class PartNameTools {
      */
     public static List<Part> getAllParts(Series series) {
         ArrayList<Part> parts = new ArrayList<>();
-        for(Part p : getParts()) {
+        for (Part p : getParts()) {
             if (p.getSeries() == series) parts.add(p);
         }
         return parts;

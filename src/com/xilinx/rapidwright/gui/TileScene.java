@@ -182,8 +182,8 @@ public class TileScene extends QGraphicsScene{
         //this array is used to determine how many hard macros are
         // attempting to use each tile.
         tileOccupantCount = new HashSet[rows][cols];
-        for(int y=0;y<rows;y++) {
-            for(int x=0;x<cols;x++) {
+        for (int y=0;y<rows;y++) {
+            for (int x=0;x<cols;x++) {
                 tileOccupantCount[y][x] = new HashSet<GUIModuleInst>();
             }
         }
@@ -217,8 +217,8 @@ public class TileScene extends QGraphicsScene{
         // Determine which columns and rows to not draw
         colsToSkip = new TreeSet<Integer>();
         rowsToSkip = new TreeSet<Integer>();
-        for(Tile[] tileRow : device.getTiles()) {
-            for(Tile tile : tileRow) {
+        for (Tile[] tileRow : device.getTiles()) {
+            for (Tile tile : tileRow) {
                 TileTypeEnum type = tile.getTileTypeEnum();
                 if (tileColumnTypesToHide.contains(type)) {
                     colsToSkip.add(tile.getColumn());
@@ -234,7 +234,7 @@ public class TileScene extends QGraphicsScene{
         drawnTiles = new Tile[rows-rowsToSkip.size()][cols-colsToSkip.size()];
         tileXMap = new HashMap<Tile, Integer>();
         tileYMap = new HashMap<Tile, Integer>();
-        for(int row = 0; row < rows; row++) {
+        for (int row = 0; row < rows; row++) {
             if (rowsToSkip.contains(row)) continue;
             for (int col = 0; col < cols; col++) {
                 if (colsToSkip.contains(col)) continue;
@@ -260,13 +260,13 @@ public class TileScene extends QGraphicsScene{
         QPen missingTileLinePen = new QPen(QColor.lightGray, 2, PenStyle.DashLine);
         painter.setPen(missingTileLinePen);
         i = 0;
-        for(int col : colsToSkip) {
+        for (int col : colsToSkip) {
             int realCol = col - i;
             painter.drawLine(tileSize*realCol-1, 0, tileSize*realCol-1, rows*tileSize-3);
             i++;
         }
         i=0;
-        for(int row : rowsToSkip) {
+        for (int row : rowsToSkip) {
             int realRow = row - i;
             painter.drawLine(0,tileSize*realRow-1, cols*tileSize-3,tileSize*realRow-1);
             i++;
@@ -275,8 +275,8 @@ public class TileScene extends QGraphicsScene{
         // Draw the tile layout
         int offset = (int) Math.ceil((lineWidth / 2.0));
 
-        for(int y = 0; y < rows; y++) {
-            for(int x = 0; x < cols; x++) {
+        for (int y = 0; y < rows; y++) {
+            for (int x = 0; x < cols; x++) {
                 Tile tile = drawnTiles[y][x];
                 TileTypeEnum tileTypeEnum = tile.getTileTypeEnum();
 

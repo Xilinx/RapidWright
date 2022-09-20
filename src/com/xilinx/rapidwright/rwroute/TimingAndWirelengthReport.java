@@ -93,13 +93,13 @@ public class TimingAndWirelengthReport{
      * Computes the wirelength and delay for each net.
      */
     private void computeNetsWirelengthAndDelay() {
-        for(Net net : this.design.getNets()) {
+        for (Net net : this.design.getNets()) {
             if (net.getType() != NetType.WIRE) continue;
             if (!RouterHelper.isRoutableNetWithSourceSinks(net)) continue;
             if (net.getSource().toString().contains("CLK")) continue;
             NetWrapper netplus = this.createNetWrapper(net);        
             List<Node> netNodes = RouterHelper.getNodesOfNet(net);            
-            for(Node node:netNodes) {    
+            for (Node node:netNodes) {    
                 if (node.getTile().getTileTypeEnum() != TileTypeEnum.INT) continue;
                 usedNodes++;    
                 int wl = RouterHelper.getLengthOfNode(node);    
@@ -120,7 +120,7 @@ public class TimingAndWirelengthReport{
         NetWrapper netWrapper = new NetWrapper(this.numWireNetsToRoute++, net);            
         SitePinInst source = net.getSource();
         Node sourceINTNode = null;
-        for(SitePinInst sink:net.getSinkPins()) {
+        for (SitePinInst sink:net.getSinkPins()) {
             if (RouterHelper.isExternalConnectionToCout(source, sink)) {
                 source = net.getAlternateSource();
                 if (source == null) {
@@ -153,7 +153,7 @@ public class TimingAndWirelengthReport{
         List<PIP> pips = netWrapper.getNet().getPIPs();    
         Map<Node, RoutingNode> nodeRoutingNodeMap = new HashMap<>();
         boolean firstPIP = true;
-        for(PIP pip : pips) {
+        for (PIP pip : pips) {
             // This approach works because we observed that the PIPs are in order
             Node startNode = pip.getStartNode();
             RoutingNode startrn = RouterHelper.createRoutingNode(startNode, nodeRoutingNodeMap);
@@ -171,7 +171,7 @@ public class TimingAndWirelengthReport{
             endrn.setDelayFromSource(startrn.getDelayFromSource() + delay);
         }
         
-        for(Connection connection : netWrapper.getConnections()) {
+        for (Connection connection : netWrapper.getConnections()) {
             if (connection.isDirect()) continue;
             Node sinkNode = connection.getSinkRnode().getNode();
             RoutingNode sinkrn = nodeRoutingNodeMap.get(sinkNode);

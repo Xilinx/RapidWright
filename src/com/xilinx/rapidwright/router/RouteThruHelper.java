@@ -83,11 +83,11 @@ public class RouteThruHelper {
         routeThrus = new HashMap<TileTypeEnum, HashSet<Integer>>();
         try (Input in = FileTools.getKryoInputStream(getSerializedFileName(device))) {
             int count = in.readInt();
-            for(int i=0; i < count; i++) {
+            for (int i=0; i < count; i++) {
                 TileTypeEnum type = TileTypeEnum.valueOf(in.readString());
                 int count2 = in.readInt();
                 HashSet<Integer> pips = new HashSet<Integer>(count2);
-                for(int j=0; j < count2; j++) {
+                for (int j=0; j < count2; j++) {
                     pips.add(in.readInt());
                 }
                 routeThrus.put(type, pips);
@@ -102,10 +102,10 @@ public class RouteThruHelper {
             readFile();
             return;
         }
-        for(Tile tile : device.getAllTiles()) {
+        for (Tile tile : device.getAllTiles()) {
             if (routeThrus.containsKey(tile.getTileTypeEnum())) continue;
             HashSet<Integer> rtPIPs = new HashSet<Integer>();
-            for(PIP p : tile.getPIPs()) {
+            for (PIP p : tile.getPIPs()) {
                 if (p.isRouteThru()) {
                     int startEndWirePair = (p.getStartWireIndex() << 16) | p.getEndWireIndex();
                     rtPIPs.add(startEndWirePair);
@@ -128,7 +128,7 @@ public class RouteThruHelper {
         Wire[] wiresInStartNode = start.getAllWiresInNode();
         HashSet<Integer> rtPairs = routeThrus.get(tile.getTileTypeEnum());
         if (rtPairs == null) return false;
-        for(Wire w : wiresInStartNode) {
+        for (Wire w : wiresInStartNode) {
             if (w.getTile().equals(tile)) {
                 if (rtPairs.contains((w.getWireIndex() << 16) | endWire)) {
                     return true;
@@ -140,13 +140,13 @@ public class RouteThruHelper {
     
     private void printRouteThrusByTileType() {
         HashSet<TileTypeEnum> visited = new HashSet<>();
-        for(Tile tile : device.getAllTiles()) {
+        for (Tile tile : device.getAllTiles()) {
             if (visited.contains(tile.getTileTypeEnum())) continue;
             visited.add(tile.getTileTypeEnum());
             HashSet<Integer> rtPairs = routeThrus.get(tile.getTileTypeEnum());
             if (rtPairs == null) continue; 
             System.out.println(tile.getTileTypeEnum() + "(" + tile.getName() + "):");
-            for(Integer i : rtPairs) {
+            for (Integer i : rtPairs) {
                 int startWire = i >>> 16;
                 int endWire = i & 0xffff;
                 System.out.println("  " + tile.getWireName(startWire) + " -> " + tile.getWireName(endWire));
@@ -171,7 +171,7 @@ public class RouteThruHelper {
         Net inputNetCollision = siteInst.getNetFromSiteWire(belPin.getSiteWireName());
         if (inputNetCollision != null) return false;
         
-        for(BELPin sink : belPin.getSiteConns()) {
+        for (BELPin sink : belPin.getSiteConns()) {
             Cell collision = siteInst.getCell(sink.getBEL());
             if (collision != null) return false;
         }
@@ -183,11 +183,11 @@ public class RouteThruHelper {
         
         //rtHelper.printRouteThrusByTileType();
         
-        for(Tile tile : rtHelper.device.getAllTiles()) {
+        for (Tile tile : rtHelper.device.getAllTiles()) {
             if (tile.getTileTypeEnum() == TileTypeEnum.INT) {
-                for(String wireName : tile.getWireNames()) {
+                for (String wireName : tile.getWireNames()) {
                     Node node = Node.getNode(tile, wireName);
-                    for(Node downhill : node.getAllDownhillNodes()) {
+                    for (Node downhill : node.getAllDownhillNodes()) {
                         if (rtHelper.isRouteThru(node, downhill)) {
                             System.out.println(node + " " + downhill);
                         }

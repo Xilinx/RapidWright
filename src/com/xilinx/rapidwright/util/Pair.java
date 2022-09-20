@@ -77,7 +77,7 @@ public class Pair<T,U> {
         if (t.length != u.length) return null;
         @SuppressWarnings("unchecked")
         Pair<V,W>[] arr = new Pair[t.length];
-        for(int i=0; i < t.length; i++) {
+        for (int i=0; i < t.length; i++) {
             arr[i].first = t[i];
             arr[i].second = u[i];
         }

@@ -81,9 +81,9 @@ public class TestPartitionPin {
         Tile t = design.getDevice().getTile("INT_X8Y239");
         int wireIdx = 10;
         int count = 0;
-        for(EDIFPort port : design.getTopEDIFCell().getPorts()) {
+        for (EDIFPort port : design.getTopEDIFCell().getPorts()) {
             if (port.isBus()) {
-                for(int i : port.getBitBlastedIndicies()) {
+                for (int i : port.getBitBlastedIndicies()) {
                     Node node = Node.getNode(t, wireIdx++);
                     PartitionPin ppin = design.createPartitionPin(port, i, node);
                     testPortPartitionPin(design, ppin, port, i, node);
@@ -100,7 +100,7 @@ public class TestPartitionPin {
         
         
         EDIFHierCellInst memory = design.getNetlist().getHierCellInstFromName("your_program");
-        for(EDIFHierPortInst hierPortInst : memory.getHierPortInsts()) {
+        for (EDIFHierPortInst hierPortInst : memory.getHierPortInsts()) {
             Node node = Node.getNode(t, wireIdx);
             PartitionPin ppin = design.createPartitionPin(hierPortInst, node);
             testHierPinPartitionPin(design, ppin, hierPortInst, node);

@@ -62,7 +62,7 @@ public class BrowseDevice{
                         System.out.println("Enter wire name: ");
                         String wire = br.readLine().trim();
                         List<Wire> wires = t.getWireConnections(t.getWireIndex(wire));
-                        for(Wire w : wires) {
+                        for (Wire w : wires) {
                             System.out.println("  " + w.toString());
                         }
                         break;
@@ -74,7 +74,7 @@ public class BrowseDevice{
                         break;
                     case 3:
                         System.out.println("PIPRouteThroughs");
-                        /*for(WireConnection w : dev.getRouteThroughMap().keySet()) {
+                        /*for (WireConnection w : dev.getRouteThroughMap().keySet()) {
                             System.out.println("  " + w.toString(we) + " " + dev.getRouteThroughMap().get(w).toString(we));
                         }*/
                         break;
@@ -99,7 +99,7 @@ public class BrowseDevice{
                                     // print next hop
                                     Tile tmpTile = wireConnections.get(i).getTile();
                                     String tmpWire = tmpTile.getWireName(wireConnections.get(i).getWireIndex());
-                                    for(Wire w : tmpTile.getWireConnections(t.getWireIndex(tmpWire))) {
+                                    for (Wire w : tmpTile.getWireConnections(t.getWireIndex(tmpWire))) {
                                         System.out.println("     ->  " + w.getTile() +" " + w.getWireName() + " ("+w.getIntentCode()+")");
                                     }
                                 }
@@ -127,7 +127,7 @@ public class BrowseDevice{
                             System.out.println(t.getName() + " has no primitive sites.");
                         }
                         else {
-                            for(Site p : t.getSites()) {
+                            for (Site p : t.getSites()) {
                                 System.out.println("  " + p.getName());
                             }
                         }

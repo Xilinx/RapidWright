@@ -79,7 +79,7 @@ public class SourceToSinkINTTileDelayWriter {
             
             if (writeAllSinkDelay) {
                 System.out.println("INFO: Write delay from source to all sink to file \n      " + outputFile);
-                for(Entry<Pair<SitePinInst, Node>, Short> sinkINTNodeDelay : sourceToSinkINTDelays.entrySet()) {
+                for (Entry<Pair<SitePinInst, Node>, Short> sinkINTNodeDelay : sourceToSinkINTDelays.entrySet()) {
                     Node node = sinkINTNodeDelay.getKey().getSecond();
                     Short delay = sinkINTNodeDelay.getValue();
                     myWriter.write(node + " \t\t" + delay + "\n");
@@ -88,7 +88,7 @@ public class SourceToSinkINTTileDelayWriter {
                 
             } else {
                 System.out.println("INFO: Write delay from source to IMUX node of CLK_IN to file \n      " + outputFile);
-                for(Entry<Pair<SitePinInst, Node>, Short> sinkINTNodeDelay : sourceToSinkINTDelays.entrySet()) {
+                for (Entry<Pair<SitePinInst, Node>, Short> sinkINTNodeDelay : sourceToSinkINTDelays.entrySet()) {
                     Node node = sinkINTNodeDelay.getKey().getSecond();
                     Short delay = sinkINTNodeDelay.getValue();
                     if (sinkINTNodeDelay.getKey().getFirst().toString().contains("CLK_IN")) {

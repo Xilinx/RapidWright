@@ -239,7 +239,7 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 
     protected void initialPlacement() {
         if (hardMacros.stream().allMatch(hm->getCurrentPlacement(hm) != null)) {
-            for(PathT path : allPaths) {
+            for (PathT path : allPaths) {
                 path.calculateLength();
             }
 
@@ -250,7 +250,7 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
         possiblePlacements = new HashMap<>();
 
         // Place hard macros for initial placement
-        for(ModuleInstT hm : hardMacros) {
+        for (ModuleInstT hm : hardMacros) {
             PriorityQueue<PlacementT> sites = new PriorityQueue<>(1024, getInitialPlacementComparator(placementArea));
 
             final AbstractValidPlacementCache<PlacementT> placementCache = possiblePlacements.computeIfAbsent(hm.getModule(), module -> {
@@ -281,12 +281,12 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
             }
         }
 
-        for(PathT path : allPaths) {
+        for (PathT path : allPaths) {
             path.calculateLength();
         }
 
         ArrayList<ModuleInstT> prunedList = new ArrayList<>();
-        for(ModuleInstT hm : new ArrayList<>(hardMacros)) {
+        for (ModuleInstT hm : new ArrayList<>(hardMacros)) {
             if (getAllPlacements(hm).size() > 2) prunedList.add(hm);
             else {
                 System.err.println("Not adding HM since it only has one placement: "+hm.getName());
@@ -299,7 +299,7 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
         // Place hard macros for initial placement
         currentMove = new Move2<>(this);
         totalMoves = 0;
-        for(ModuleInstT hm : hardMacros) {
+        for (ModuleInstT hm : hardMacros) {
             unplaceHm(hm);
             unsetTempAnchorSite(hm);
         }
@@ -325,7 +325,7 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
         int acceptedMoveCount = 0;
         previousCost = currentSystemCost();
         final int iter = maxInnerIteration / hardMacros.size();
-        for(ModuleInstT selectedHD : hardMacros) {
+        for (ModuleInstT selectedHD : hardMacros) {
             for (int i = 0; i< iter; i++) {
                 if (getNextMove(selectedHD)) {
                     currentCost = currentSystemCost();
@@ -362,7 +362,7 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
         } else {
             avgCost = 0;
         }
-        for(double c : arrayCosts) {
+        for (double c : arrayCosts) {
             double tmp = c - avgCost;
             stdDev = stdDev + (tmp*tmp);
         }
@@ -416,7 +416,7 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
         initialPlacement();
         //HandPlacer.openDesign(design);
         int totalFootprint = 0;
-        for(ModuleInstT hm : hardMacros) {
+        for (ModuleInstT hm : hardMacros) {
             totalFootprint += getTileSize(hm);
         }
         int squareWidth = (int) (Math.sqrt(totalFootprint) * 1.5);
@@ -478,23 +478,23 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
         /*
         HashSet<HardMacro> fineTunePlacement = new HashSet<HardMacro>();
 
-        for(HardMacro hm : hardMacros) {
+        for (HardMacro hm : hardMacros) {
             if (hm.tileSize < 60) {
                 fineTunePlacement.add(hm);
             }
         }
 
-        for(HardMacro hm : fineTunePlacement) {
+        for (HardMacro hm : fineTunePlacement) {
             // Keep the original spot, in the case we suggest a worst spot
             Site original = hm.getTempAnchorSite();
             int originalMaxLength = 0;
             // Determine all of the connecting points to this hard macro
             HashSet<Point> pointsList = new HashSet<Point>();
-            for(Path path : hm.getConnectedPaths()) {
+            for (Path path : hm.getConnectedPaths()) {
                 if (path.getLength() > originalMaxLength) {
                     originalMaxLength = path.getLength();
                 }
-                for(PathPort pp : path) {
+                for (PathPort pp : path) {
                     if (pp.getBlock()== null || !pp.getBlock().equals(hm)) {
                         pointsList.add(new Point(pp.getPortTile()));
                     }
@@ -515,7 +515,7 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
                 hm.setTempAnchorSite(newCandidateSite, currentPlacements);
                 currentSystemCost();
                 int longestPath = 0;
-                for(Path path : hm.getConnectedPaths()) {
+                for (Path path : hm.getConnectedPaths()) {
                     if (path.getLength() > longestPath) {
                         longestPath = path.getLength();
                     }
@@ -563,9 +563,9 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
         int badMoveCount = 0;
         int badAcceptedMoveCount = 0;
         double totalMovesCost = 0.0;
-        for(int inner_iterate = 0; inner_iterate< maxInnerIteration; inner_iterate++) {
-        //for(int inner_iterate = 0; inner_iterate< (10*rangeLimit); inner_iterate++) {
-        //for(int inner_iterate = 0; inner_iterate< (dev.getColumns()*dev.getRows()); inner_iterate++) {
+        for (int inner_iterate = 0; inner_iterate< maxInnerIteration; inner_iterate++) {
+        //for (int inner_iterate = 0; inner_iterate< (10*rangeLimit); inner_iterate++) {
+        //for (int inner_iterate = 0; inner_iterate< (dev.getColumns()*dev.getRows()); inner_iterate++) {
             //ModuleInstT selectedHD = hardMacros.get(rand.nextInt(hardMacros.size()-1));
             ModuleInstT selectedHD = weighted.get(rand.nextInt(weighted.size()-1));
 
@@ -610,7 +610,7 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
                 double tmp =0.0;
                 double AvgChange = 0.0;
                 /*if (currentMove.getBlock0() != null) {
-                    for(PathT wire : getConnectedPaths(currentMove.getBlock0())) {
+                    for (PathT wire : getConnectedPaths(currentMove.getBlock0())) {
                         wire.calculateLength();
                         tmp = tmp + wire.getLength();
                     }
@@ -619,7 +619,7 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
                 }
                 tmp =0.0;
                 if (currentMove.getBlock1() != null) {
-                    for(PathT wire : getConnectedPaths(currentMove.getBlock1())) {
+                    for (PathT wire : getConnectedPaths(currentMove.getBlock1())) {
                         wire.calculateLength();
                         tmp = tmp + wire.getLength();
                     }
@@ -716,7 +716,7 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
 
 
     public Site getPrimitiveSiteFromTile(Tile tile, SiteTypeEnum type) {
-        for(Site p : tile.getSites()) {
+        for (Site p : tile.getSites()) {
             if (p.isCompatibleSiteType(type)) {
                 return p;
             }
@@ -864,7 +864,7 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
         int totalWireLength = 0;
         /*int tmp = 0;
         if (currentMove.getBlock0() != null) {
-            for(PathT wire : getConnectedPaths(currentMove.getBlock0())) {
+            for (PathT wire : getConnectedPaths(currentMove.getBlock0())) {
                 wire.calculateLength();
                 tmp = tmp + wire.getLength();
             }
@@ -872,14 +872,14 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
         }
         tmp = 0;
         if (currentMove.getBlock1() != null) {
-            for(PathT wire : getConnectedPaths(currentMove.getBlock1())) {
+            for (PathT wire : getConnectedPaths(currentMove.getBlock1())) {
                 wire.calculateLength();
                 tmp = tmp + wire.getLength();
             }
             //System.out.println(currentMove.block1.getName()+":"+currentMove.block1.getConnectedPaths().size());
         }*/
         int maxPathLength = 0;
-        for(PathT path : allPaths) {
+        for (PathT path : allPaths) {
             if (PARANOID) {
                 int prevLength = path.getLength();
                 path.calculateLength();

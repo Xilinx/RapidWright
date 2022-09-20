@@ -56,7 +56,7 @@ public class RapidStreamRoute extends PartialRouter{
      */
     private void handleConflictNets() {
         List<Net> toPreserveNets = new ArrayList<>();
-        for(Net net : conflictNets) {
+        for (Net net : conflictNets) {
             if (!isTargetConflictNetToRoute(net)) {
                 toPreserveNets.add(net);
                 continue;
@@ -66,7 +66,7 @@ public class RapidStreamRoute extends PartialRouter{
             createsNetWrapperAndConnections(net, config.getBoundingBoxExtensionX(), config.getBoundingBoxExtensionY(), this.isMultiSLRDevice());
             net.unroute();//NOTE: no need to unroute if routing tree is reused, then toPreserveNets should be detected before createNetWrapperAndConnections
         }
-        for(Net net : toPreserveNets) {
+        for (Net net : toPreserveNets) {
             preserveNet(net);
         }
     }
@@ -88,7 +88,7 @@ public class RapidStreamRoute extends PartialRouter{
         if (ehportInsts == null) { // e.g. encrypted DSP related nets
             return false;
         }
-        for(EDIFHierPortInst eport : ehportInsts) {
+        for (EDIFHierPortInst eport : ehportInsts) {
             if (eport.getFullHierarchicalInstName().contains(config.getAnchorNameKeyword())) {
                 //use the key word to identify target anchor nets
                 anchorNet = true;

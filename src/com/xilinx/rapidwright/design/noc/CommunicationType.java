@@ -38,7 +38,7 @@ public enum CommunicationType {
 
     static {
         map = new HashMap<>();
-        for(CommunicationType e : values()) {
+        for (CommunicationType e : values()) {
             map.put(e.toString(), e);
         }
     }
