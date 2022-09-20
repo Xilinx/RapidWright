@@ -253,10 +253,11 @@ public class GlobalSignalRouting {
 	 * @param clk The clock net in question.
 	 * @return A map between leaf clock buffer nodes and sink SitePinInsts.
 	 */
-	private static Map<RouteNode, ArrayList<SitePinInst>> getLCBPinMappings(Net clk){
+	public static Map<RouteNode, ArrayList<SitePinInst>> getLCBPinMappings(Net clk){
 		Map<RouteNode, ArrayList<SitePinInst>> lcbMappings = new HashMap<>();
 		for(SitePinInst p : clk.getPins()){
 			if(p.isOutPin()) continue;
+			if(p.isRouted()) continue;
 			Node n = null;// n should be a node whose name ends with "CLK_LEAF"
 			for(Node prev : p.getConnectedNode().getAllUphillNodes()) {
 				if(prev.getTile().equals(p.getSite().getIntTile())) {

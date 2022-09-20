@@ -37,6 +37,8 @@ import java.util.Map.Entry;
 import java.util.Queue;
 import java.util.Set;
 
+import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.ClockRegion;
@@ -48,6 +50,7 @@ import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.router.RouteNode;
+import com.xilinx.rapidwright.rwroute.GlobalSignalRouting;
 
 /**
  * A collection of utility methods for routing clocks on
@@ -403,6 +406,7 @@ public class UltraScaleClockRouting {
 					}
 					RouteNode rn = new RouteNode(w.getTile(), w.getWireIndex(), curr, curr.getLevel()+1);
 					if(visited.contains(rn)) continue;
+					if(rn.getWireName().endsWith("_CLK_CASC_OUT")) continue;
 					rn.setCost(rn.getManhattanDistance(lcb));
 					q.add(rn);
 				}
@@ -479,5 +483,32 @@ public class UltraScaleClockRouting {
 		
 		return distLines;
 	}
-	
+
+	public static void incrementalClockRouter(Design design, Net clkNet) {
+        for(SitePinInst pin : clkNet.getSinkPins()) {
+            pin.setRouted(true);
+        }
+        DesignTools.createMissingSitePinInsts(design, clkNet);
+        
+        Map<ClockRegion,Set<RouteNode>> startingPoints = new HashMap<>();
+        for(PIP p : clkNet.getPIPs()) {
+            for(Node node : new Node[] {p.getStartNode(), p.getEndNode()}) {
+                if(node == null) continue;
+                if(node.getIntentCode() != IntentCode.NODE_GLOBAL_HDISTR) continue;
+                for(Wire w : node.getAllWiresInNode()) {
+                    RouteNode rn = new RouteNode(w.getTile(), w.getWireIndex());
+                    Set<RouteNode> crNodes = startingPoints.computeIfAbsent(w.getTile().getClockRegion(), n -> new HashSet<>());
+                    crNodes.add(rn);                    
+                }
+            }
+        }
+        
+        Map<RouteNode, ArrayList<SitePinInst>> lcbMappings = GlobalSignalRouting.getLCBPinMappings(clkNet);
+        UltraScaleClockRouting.routeToLCBs(clkNet, startingPoints, lcbMappings.keySet());
+        UltraScaleClockRouting.routeLCBsToSinks(clkNet, lcbMappings);
+        
+        Set<PIP> uniquePIPs = new HashSet<>();
+        uniquePIPs.addAll(clkNet.getPIPs());
+        clkNet.setPIPs(uniquePIPs);
+	}
 }
