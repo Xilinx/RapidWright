@@ -1,4 +1,4 @@
-name: Check License Header
+name: Check For Tab Characters
 
 on:
   push:
