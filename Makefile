@@ -41,7 +41,7 @@ check_headers:
 	fi
 
 check_tabs:
-	@ FILES_CONTAINING_TABS=$$(git grep  $$'\t' -- '*.java'); \
+	@ FILES_CONTAINING_TABS=$$(git grep "	" -- '*.java'); \
 	if [ ! -z "$$FILES_CONTAINING_TABS" ] ;\
 	then \
 		echo "These files contain tab characters, please replace tabs with 4 spaces:" ;\
@@ -50,12 +50,6 @@ check_tabs:
 		echo ;\
 		echo "Use make check_tabs to automatically detect tab characters." ;\
 		exit 1;\
-	else \
-		echo "Passed!";\
-		echo "$$FILES_CONTAINING_TABS" | sed 's/^/    /' ;\
-		echo "pwd=`pwd`" ;\
-		OTHER_RESULT=$$(find . -name '*.java' -exec grep -H $$'\t' {} \;); \
-		echo "$$OTHER_RESULT";\
 	fi
 
 
