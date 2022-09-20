@@ -171,7 +171,7 @@ public class MergeDesigns {
                     .map(p -> p.toFile())
                     .filter(p -> p.isFile() && p.getAbsolutePath().matches(dcpRegex))
                     .collect(Collectors.toList());
-        } catch(IOException e) {
+        } catch (IOException e) {
             e.printStackTrace();
         }
         System.out.println("Merging DCPs:");

@@ -805,7 +805,7 @@ public class EDIFTools {
                 try {
                     netlist = BinaryEDIFReader.readBinaryEDIF(bedif);
                     return netlist;
-                } catch(Exception e) {
+                } catch (Exception e) {
                     System.out.println("WARNING: Unable to read Binary EDIF: " + bedif.toString()
                             + ", falling back to reading EDIF: " + edifFileName.toString());
                 }

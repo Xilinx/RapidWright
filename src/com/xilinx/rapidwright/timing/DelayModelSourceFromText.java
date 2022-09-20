@@ -122,7 +122,7 @@ class DelayModelSourceFromText extends DelayModelSource {
         try {
             Integer.parseInt(str);
             return true;
-        } catch(NumberFormatException e) {
+        } catch (NumberFormatException e) {
             return false;
         }
     }

@@ -77,7 +77,7 @@ public class DSPTimingData{
         
         try {
             if (this.valid) this.parse(dspTimingFile);
-        } catch(Exception e) {
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }

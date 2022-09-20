@@ -111,7 +111,7 @@ public class BrowseDevice{
                                 t = wireConnections.get(ndx).getTile();
                                 startWire = t.getWireName(wireConnections.get(ndx).getWireIndex());
                             }
-                            catch(Exception e) {
+                            catch (Exception e) {
                                 System.out.println("Did not understand, try again.");
                                 continue;
                             }

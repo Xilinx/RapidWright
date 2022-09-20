@@ -255,10 +255,10 @@ public class FileTools {
                 in = new BufferedReader(new FileReader(fileName));
             }
         }
-        catch(FileNotFoundException e) {
+        catch (FileNotFoundException e) {
             throw new UncheckedIOException("ERROR: Could not find file: " + fileName, e);
         }
-        catch(IOException e) {
+        catch (IOException e) {
             throw new UncheckedIOException("ERROR: Problem reading file: " + fileName, e);
         }
 
@@ -282,7 +282,7 @@ public class FileTools {
                 out = new BufferedWriter(new FileWriter(fileName));
             }            
         }
-        catch(IOException e) {
+        catch (IOException e) {
             e.printStackTrace();
         }
 
@@ -467,7 +467,7 @@ public class FileTools {
                 bw.write(line + nl);
             }
         }
-        catch(IOException e) {
+        catch (IOException e) {
             throw new UncheckedIOException("Error writing file: " +
                 fileName + File.separator + e.getMessage(), e);
         }
@@ -484,7 +484,7 @@ public class FileTools {
             BufferedWriter bw = new BufferedWriter(fw)) {
             bw.write(text + nl);
         }
-        catch(IOException e) {
+        catch (IOException e) {
             throw new UncheckedIOException("Error writing file: " +
                 fileName + File.separator + e.getMessage(), e);
         }
@@ -507,10 +507,10 @@ public class FileTools {
                 lines.add(line);
             }
         }
-        catch(FileNotFoundException e) {
+        catch (FileNotFoundException e) {
             throw new UncheckedIOException("ERROR: Could not find file: " + fileName, e);
         } 
-        catch(IOException e) {
+        catch (IOException e) {
             throw new UncheckedIOException("ERROR: Could not read from file: " + fileName, e);
         }
         
@@ -661,7 +661,7 @@ public class FileTools {
                     }
                 }                
             }
-            catch(IOException e) {
+            catch (IOException e) {
                 return false;
             }
             return true;
@@ -1711,7 +1711,7 @@ public class FileTools {
                         }
                     }
                 }
-            } catch(IOException e) {
+            } catch (IOException e) {
                 e.printStackTrace();
                 return false;
             }

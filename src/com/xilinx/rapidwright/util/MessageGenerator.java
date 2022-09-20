@@ -110,7 +110,7 @@ public class MessageGenerator{
         try {
             System.in.read();
         }
-        catch(IOException e) {
+        catch (IOException e) {
             e.printStackTrace();
         }
     }
@@ -182,7 +182,7 @@ public class MessageGenerator{
                 System.exit(1);
             }
         }
-        catch(IOException e) {
+        catch (IOException e) {
             throw new UncheckedIOException("Error reading user input", e);
         }
     }
@@ -208,7 +208,7 @@ public class MessageGenerator{
                 System.exit(1);
             }
         }
-        catch(IOException e) {
+        catch (IOException e) {
             throw new UncheckedIOException("Error reading user input", e);
         }
     }
