@@ -50,6 +50,12 @@ check_tabs:
 		echo ;\
 		echo "Use make check_tabs to automatically detect tab characters." ;\
 		exit 1;\
+	else \
+		echo "Passed!";\
+		echo "$$FILES_CONTAINING_TABS" | sed 's/^/    /' ;\
+		echo "pwd=`pwd`" ;\
+		OTHER_RESULT=$$(find . -name '*.java' -exec grep -H $$'\t' {} \;); \
+		echo "$$OTHER_RESULT";\
 	fi
 
 
