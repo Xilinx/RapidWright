@@ -203,7 +203,7 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
         int height = hmTileMap.length;
         int width = hmTileMap[0].length;
         boolean changed;
-        do{    
+        do {    
             changed = false;
             // fill in holes in tile rows
             for (int i = 0; i < height; i++) {
@@ -256,7 +256,7 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
                         changed = true;
                     }
             }
-        }while (changed);        
+        } while (changed);        
         
         
         int tileSize = scene.tileSize;
