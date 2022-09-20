@@ -169,7 +169,7 @@ public class Installer {
 
         long transferred = -1;
          
-        try(FileOutputStream fos = new FileOutputStream(newFile);
+        try (FileOutputStream fos = new FileOutputStream(newFile);
             ReadableByteChannel rbc = Channels.newChannel(new URL(url).openStream()) ) {
             transferred = fos.getChannel().transferFrom(rbc, 0, Long.MAX_VALUE);
         } catch (MalformedURLException e) {
@@ -324,7 +324,7 @@ public class Installer {
             throw new UncheckedIOException(e);
         }
         String jarsZipUrl = null;
-        try(BufferedReader reader = new BufferedReader(new InputStreamReader(url.openStream()))) {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(url.openStream()))) {
             String line = null;
             while ((line = reader.readLine()) != null) {
                 for (String s : line.split(",")) {

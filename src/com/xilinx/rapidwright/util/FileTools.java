@@ -480,7 +480,7 @@ public class FileTools {
      */
     public static void writeStringToTextFile(String text, String fileName) {
         String nl = System.getProperty("line.separator");
-        try(FileWriter fw = new FileWriter(fileName);
+        try (FileWriter fw = new FileWriter(fileName);
             BufferedWriter bw = new BufferedWriter(fw)) {
             bw.write(text + nl);
         }
@@ -1701,7 +1701,7 @@ public class FileTools {
                                 System.out.println("Unpacking " + fileName);
                                 File newFile = new File(fileName);
                                 new File(newFile.getParent()).mkdirs();
-                                try(FileOutputStream fos = new FileOutputStream(newFile)) {
+                                try (FileOutputStream fos = new FileOutputStream(newFile)) {
                                     int len;
                                     while ((len = zip.read(buffer)) > 0) {
                                         fos.write(buffer, 0, len);

@@ -226,7 +226,7 @@ public class PopulateMacroParamRules {
     
     public static void genStaticCode(Map<Series,Map<String,List<MacroParamRule>>> macroRules) {
         String className = "MacroParamMappingRules";
-        try(BufferedWriter bw = new BufferedWriter(new FileWriter("src/com/xilinx/rapidwright/interchange/"+className+".java"))) {
+        try (BufferedWriter bw = new BufferedWriter(new FileWriter("src/com/xilinx/rapidwright/interchange/"+className+".java"))) {
             ArrayList<String> lines = FileTools.getLinesFromTextFile(FileTools.getRapidWrightPath()+"/doc/SOURCE_HEADER.TXT");
             for (String line : lines) {
                 bw.write(line.replace("${year}", Year.now().toString()) + "\n");

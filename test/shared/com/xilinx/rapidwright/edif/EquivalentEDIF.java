@@ -135,7 +135,7 @@ public class EquivalentEDIF {
 
     private static List<String> readEDIFLines(Path path) {
         List<String> lines = new ArrayList<>();
-        try(BufferedReader br = new BufferedReader(new FileReader(path.toFile()))) {
+        try (BufferedReader br = new BufferedReader(new FileReader(path.toFile()))) {
             String line = null;
             while ((line = br.readLine()) != null) {
                 if (line.contains("(metax")) continue;
