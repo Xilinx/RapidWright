@@ -92,7 +92,7 @@ public class GlobalSignalRouting {
 		}
 		clk.setPIPs(clkPIPs);
 		
-		Map<RouteNode, ArrayList<SitePinInst>> lcbMappings = getLCBPinMappings(clk);
+		Map<RouteNode, ArrayList<SitePinInst>> lcbMappings = getLCBPinMappings(clk, clk.getPins());
 		
 		UltraScaleClockRouting.routeToLCBs(clk, getStartingPoint(horDistributionLines, device), lcbMappings.keySet());
 		
@@ -210,7 +210,7 @@ public class GlobalSignalRouting {
 		List<RouteNode> downLines = UltraScaleClockRouting.routeToHorizontalDistributionLines(clk, vrouteDown, downClockRegions, true);//TODO this is where the antenna node shows up
 		if(downLines != null) upDownDistLines.addAll(downLines);
 		
-		Map<RouteNode, ArrayList<SitePinInst>> lcbMappings = getLCBPinMappings(clk);
+		Map<RouteNode, ArrayList<SitePinInst>> lcbMappings = getLCBPinMappings(clk, clk.getPins());
 		UltraScaleClockRouting.routeDistributionToLCBs(clk, upDownDistLines, lcbMappings.keySet());
 		
 		UltraScaleClockRouting.routeLCBsToSinks(clk, lcbMappings);
@@ -253,11 +253,10 @@ public class GlobalSignalRouting {
 	 * @param clk The clock net in question.
 	 * @return A map between leaf clock buffer nodes and sink SitePinInsts.
 	 */
-	public static Map<RouteNode, ArrayList<SitePinInst>> getLCBPinMappings(Net clk){
+	public static Map<RouteNode, ArrayList<SitePinInst>> getLCBPinMappings(Net clk, List<SitePinInst> pins){
 		Map<RouteNode, ArrayList<SitePinInst>> lcbMappings = new HashMap<>();
-		for(SitePinInst p : clk.getPins()){
+		for(SitePinInst p : pins){
 			if(p.isOutPin()) continue;
-			if(p.isRouted()) continue;
 			Node n = null;// n should be a node whose name ends with "CLK_LEAF"
 			for(Node prev : p.getConnectedNode().getAllUphillNodes()) {
 				if(prev.getTile().equals(p.getSite().getIntTile())) {
