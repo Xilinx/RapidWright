@@ -132,7 +132,7 @@ public class Connection implements Comparable<Connection>{
 	}
 	
 	private boolean crossSLR() {
-		if(getSource().getTile().getSLR().equals(sink.getTile().getSLR())) {
+		if(sourceRnode.getNode().getTile().getSLR().equals(sinkRnode.getNode().getTile().getSLR())) {
 			return false;
 		}
 		crossSLR = true;
@@ -431,7 +431,11 @@ public class Connection implements Comparable<Connection>{
 		s.append(", ");
 		s.append(String.format("source = %s", getSource().getName()));
 		s.append(", ");
-		s.append("sink = " + getSink().getName());
+		if (sink != null) {
+			s.append("sink = " + getSink().getName());
+		} else {
+			s.append("sink = " + getSinkRnode().getNode());
+		}
 		s.append(", ");
 		s.append(String.format("delay = %4d ", (short)(getTimingEdges() == null? 0:getTimingEdges().get(0).getNetDelay())));
 		s.append(", ");

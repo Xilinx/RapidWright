@@ -25,22 +25,98 @@ package com.xilinx.rapidwright.rwroute;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.PartitionPin;
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.edif.EDIFHierNet;
+import com.xilinx.rapidwright.edif.EDIFHierPortInst;
+import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.edif.EDIFTools;
 
 /**
  * A class extends {@link RWRoute} for partial routing.
  */
 public class PartialRouter extends RWRoute{
-	public PartialRouter(Design design, RWRouteConfig config){
+	Map<Net, List<SitePinInst>> netToUnroutedPins;
+	Map<Net, SitePinInst> netToSourcePartPin;
+
+	public PartialRouter(Design design, RWRouteConfig config) {
+		this(design, config, null);
+	}
+
+	public PartialRouter(Design design, RWRouteConfig config, Map<Net, List<SitePinInst>> netToUnroutedPins) {
 		super(design, config);
+
+		if (netToUnroutedPins == null) {
+			netToUnroutedPins = new HashMap<>();
+			for (Net net : design.getNets()) {
+				if (net.hasPIPs())
+					continue;
+				List<SitePinInst> unroutedPins = net.getSinkPins();
+				if (unroutedPins.isEmpty())
+					continue;
+				netToUnroutedPins.put(net, unroutedPins);
+			}
+		}
+		this.netToUnroutedPins = netToUnroutedPins;
+
+		netToSourcePartPin = new HashMap<>();
+		Map<Net,Set<Node>> netToNodes = new HashMap<>();
+		EDIFNetlist netlist = design.getNetlist();
+		for (PartitionPin ppin : design.getPartitionPins()) {
+			if(ppin.getInstanceName() == null || ppin.getInstanceName().length() == 0) {
+				// Part pin is on the top level cell
+				throw new RuntimeException();
+			} else {
+				// Part pin is inside design hierarchy
+				EDIFHierPortInst ehpi = netlist.getHierPortInstFromName(ppin.getInstanceName()
+						+ EDIFTools.EDIF_HIER_SEP + ppin.getTerminalName());
+
+				if (ehpi.isInput()) {
+					EDIFHierNet ehn = ehpi.getHierarchicalNet();
+					EDIFHierNet parentEhn = netlist.getParentNet(ehn);
+					Net net = design.getNet((parentEhn != null ? parentEhn : ehn).getHierarchicalNetName());
+					if (net == null) {
+						throw new RuntimeException();
+					}
+					if (net.isClockNet()) {
+						// FIXME: Ignore part pins on clock nets
+						continue;
+					}
+
+					Node node = Node.getNode(ppin.getTile(), ppin.getWireIndex());
+
+					// Find all routed input part pins
+					Set<Node> nodes = netToNodes.computeIfAbsent(net, (n) -> new HashSet<>(RouterHelper.getNodesOfNet(n)));
+					boolean sourceFound = false;
+					for (Node uphill : node.getAllUphillNodes()) {
+						if (nodes.contains(uphill)) {
+							SitePinInst source = new SitePinInst();
+							source.setNet(net);
+							source.setPinName(node.toString());
+							if (netToSourcePartPin.put(net, source) != null) {
+								// Expect only one source part pin
+								throw new RuntimeException(net.getName());
+							}
+							sourceFound = true;
+						}
+					}
+					if (sourceFound) {
+						continue;
+					}
+				}
+			}
+		}
 	}
 	
 	@Override
@@ -60,48 +136,18 @@ public class PartialRouter extends RWRoute{
 	
 	@Override
 	protected void addStaticNetRoutingTargets(Net staticNet){
-		List<SitePinInst> sinks = new ArrayList<>();
-		for(SitePinInst sink : staticNet.getPins()){
-			if(sink.isOutPin()) continue;
-			sinks.add(sink);
-		}
-		
-		if(sinks.size() > 0 ) {
-			if(!staticNet.hasPIPs()) {
-				for(SitePinInst sink : sinks) {
-					addReservedNode(sink.getConnectedNode(), staticNet);
-				}
-				addStaticNetRoutingTargets(staticNet, sinks);
-			}else {
-				List<SitePinInst> unroutedSinks = findUnroutedSinks(staticNet, sinks);
-				addStaticNetRoutingTargets(staticNet, unroutedSinks);
-				preserveNet(staticNet);
-				increaseNumPreservedStaticNets();
-			}	
-			
-		}else {// internally routed (sinks.size = 0)
-			preserveNet(staticNet);
+		preserveNet(staticNet);
+
+		List<SitePinInst> unroutedPins = netToUnroutedPins.get(staticNet);
+		if (unroutedPins == null) {
 			increaseNumNotNeedingRouting();
+			return;
 		}
+
+		addStaticNetRoutingTargets(staticNet, unroutedPins);
+		increaseNumPreservedStaticNets();
 	}
 	
-	private List<SitePinInst> findUnroutedSinks(Net net, List<SitePinInst> sinks) {
-	    Set<Node> usedNodes = new HashSet<>();
-	    List<SitePinInst> unroutedSinks = new ArrayList<>();
-	    for(PIP p : net.getPIPs()) {
-	        usedNodes.add(p.getStartNode());
-	        usedNodes.add(p.getEndNode());
-	    }
-	    for(SitePinInst sink : sinks) {
-	        if(!usedNodes.contains(sink.getConnectedNode())) {
-	            unroutedSinks.add(sink);
-	        }else {
-	            sink.setRouted(true);
-	        }
-	    }
-	    return unroutedSinks;
-	}
-
 	@Override
 	protected void routeStaticNets() {
 		if (staticNetAndRoutingTargets.isEmpty())
@@ -110,7 +156,7 @@ public class PartialRouter extends RWRoute{
 		Net gnd = design.getGndNet();
 		Net vcc = design.getVccNet();
 
-		// Copy existing PIPs
+		// Move existing PIPs
 		List<PIP> gndPips = (staticNetAndRoutingTargets.containsKey(gnd)) ? gnd.getPIPs() : Collections.emptyList();
 		List<PIP> vccPips = (staticNetAndRoutingTargets.containsKey(vcc)) ? vcc.getPIPs() : Collections.emptyList();
 		if (!gndPips.isEmpty()) gnd.setPIPs(new ArrayList<>());
@@ -124,18 +170,41 @@ public class PartialRouter extends RWRoute{
 		gnd.getPIPs().addAll(gndPips);
 		vcc.getPIPs().addAll(vccPips);
 	}
+
+	@Override
+	protected SitePinInst getNetSource(Net net) {
+		return netToSourcePartPin.getOrDefault(net, super.getNetSource(net));
+	}
 	
 	@Override
 	protected void addNetConnectionToRoutingTargets(Net net) {
-		if(!net.hasPIPs()) {
-			createsNetWrapperAndConnections(net, config.getBoundingBoxExtensionX(), config.getBoundingBoxExtensionY(), isMultiSLRDevice());
-		}else{
+		if (net.hasPIPs()) {
 			// In partial routing mode, a net with PIPs is preserved.
 			// This means the routed net is supposed to be fully routed without conflicts.
-			// TODO detect partially routed nets.
 			preserveNet(net);
 			increaseNumPreservedWireNets();
 		}
+
+		Device device = design.getDevice();
+		List<SitePinInst> sinkPins = netToUnroutedPins.get(net);
+		if (sinkPins != null) {
+			if (sinkPins.isEmpty()) {
+				throw new RuntimeException(net.getName());
+			}
+			for (SitePinInst spi : sinkPins) {
+				// preserveNet() above will also preserve all site/part pin nodes, undo that here
+				Node node;
+				if (spi.getSiteInst() != null) {
+					node = spi.getConnectedNode();
+				} else {
+					node = device.getNode(spi.getName());
+					if (node == null) {
+						throw new RuntimeException(spi.getName());
+					}
+				}
+				preservedNodes.remove(node);
+			}
+			createsNetWrapperAndConnections(net, sinkPins);
+		}
 	}
-	
 }

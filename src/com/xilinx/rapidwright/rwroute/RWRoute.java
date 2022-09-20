@@ -40,6 +40,7 @@ import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
@@ -121,7 +122,7 @@ public class RWRoute{
 	/** A set of indices of overused rondes */
 	private Set<Integer> overUsedRnodes;
 	/** A map of preserved nodes to their nets */
-	private Map<Node, Net> preservedNodes;
+	protected Map<Node, Net> preservedNodes;
 	/** A map of nodes to created rnodes */
 	private Map<Node, Routable> rnodesCreated;
 	/** Visited rnodes data during connection routing */
@@ -207,7 +208,16 @@ public class RWRoute{
 		preservedNodes = new HashMap<>();
 		rnodesCreated = new HashMap<>();		
 		rnodeId = 0;
-		
+		sortedIndirectConnections = new ArrayList<>();
+		routethruHelper = new RouteThruHelper(design.getDevice());
+		connectionsRouted = 0;
+		connectionsRoutedIteration = 0;
+		nodesPushed = 0;
+		nodesPopped = 0;
+		overUsedRnodes = new HashSet<>();
+	}
+
+	private void init() {
 		routerTimer.createRuntimeTracker("determine route targets", "Initialization").start();
 		determineRoutingTargets();
 		routerTimer.getRuntimeTracker("determine route targets").stop();
@@ -219,15 +229,7 @@ public class RWRoute{
 				config.isResolveConflictNets() ? conflictNets : design.getNets());
 			timingManager.setTimingEdgesOfConnections(indirectConnections);
 		}
-		
-		sortedIndirectConnections = new ArrayList<>();		
-		routethruHelper = new RouteThruHelper(design.getDevice());		
-		connectionsRouted = 0;
-		connectionsRoutedIteration = 0;
-		nodesPushed = 0;
-		nodesPopped = 0;
-		overUsedRnodes = new HashSet<>();
-		
+
 		routerTimer.getRuntimeTracker("Initialization").stop();
 	}
 	
@@ -366,7 +368,7 @@ public class RWRoute{
 	 */
 	protected void addNetConnectionToRoutingTargets(Net net) {
 		net.unroute();
-		createsNetWrapperAndConnections(net, config.getBoundingBoxExtensionX(), config.getBoundingBoxExtensionY(), multiSLRDevice);
+		createsNetWrapperAndConnections(net, net.getSinkPins());
 	}
 	
 	/**
@@ -481,52 +483,119 @@ public class RWRoute{
 	}
 	
 	private Map<Short, Integer> connectionSpan = new HashMap<>();
+
+	/**
+	 * Gets any and all nodes that do not have a driver.  This is useful for partial routing when
+	 * a net has all its sinks routed but now needs to connect a source.
+	 * @param net The partially routed net
+	 * @return The list of all nodes without a driver
+	 */
+	public static Set<Node>[] getAntennaRootsAndLeaves(Net net) {
+		Set<Node> roots = new HashSet<>();
+		Set<Node> leaves = new HashSet<>();
+		for(PIP p : net.getPIPs()) {
+			if (p.isBidirectional()) {
+				// Don't bother tracking bidirectional PIPs
+				continue;
+			}
+			Node start = p.getStartNode();
+			if(start != null) {
+				roots.add(start);
+			}
+			Node end = p.getEndNode();
+			if(end != null) {
+				leaves.add(end);
+			}
+		}
+		for (SitePinInst spi : net.getPins()) {
+			Node node = spi.getConnectedNode();
+			if (spi.isOutPin()) {
+				roots.remove(node);
+			} else {
+				leaves.remove(node);
+			}
+		}
+		Set<Node> rootsCopy = new HashSet<>(roots);
+		roots.removeAll(leaves);
+		leaves.removeAll(rootsCopy);
+		return new Set[]{roots,leaves};
+	}
+
+	protected SitePinInst getNetSource(Net net) {
+		return net.getSource();
+	}
+
 	/**
 	 * Creates a unique {@link NetWrapper} instance and {@link Connection} instances based on a {@link Net} instance.
 	 * @param net The net to be initialized.
-	 * @param boundingBoxExtensionX The bounding box extension factor for restricting accessible routing resource of a connection in the horizontal direction.
-	 * @param boundingBoxExtensionY The bounding box extension factor for restricting accessible routing resource of a connection in the vertical direction.
-	 * @param multiSLR The flag to indicate if the device has multiple SLRs.
 	 * @return A {@link NetWrapper} instance.
 	 */
-	protected NetWrapper createsNetWrapperAndConnections(Net net, short boundingBoxExtensionX, short boundingBoxExtensionY, boolean multiSLR) {
+	protected NetWrapper createsNetWrapperAndConnections(Net net, List<SitePinInst> sinkPins) {
 		NetWrapper netWrapper = new NetWrapper(numWireNetsToRoute++, net);
 		nets.add(netWrapper);
-		
-		SitePinInst source = net.getSource();
+
+		Device device = design.getDevice();
+		SitePinInst source = getNetSource(net);
 		int indirect = 0;
 		Node sourceINTNode = null;
-		
-		for(SitePinInst sink : net.getSinkPins()){
-			if(RouterHelper.isExternalConnectionToCout(source, sink)){
+
+		for(SitePinInst sink : sinkPins){
+			if(source.getSiteInst() != null && RouterHelper.isExternalConnectionToCout(source, sink)){
 				source = net.getAlternateSource();
 				if(source == null){
 					String errMsg = "Null alternate source is for COUT-CIN connection: " + net.toStringFull();
-					 throw new IllegalArgumentException(errMsg);
+					throw new IllegalArgumentException(errMsg);
 				}
 			}
-			Connection connection = new Connection(numConnectionsToRoute++, source, sink, netWrapper);
-			
-			List<Node> nodes = RouterHelper.projectInputPinToINTNode(sink);
-			if(nodes.isEmpty()) {
-				directConnections.add(connection);
-				connection.setDirect(true);
-			}else {
-				Node sinkINTNode = nodes.get(0);
-				indirectConnections.add(connection);
-				connection.setSinkRnode(createAddRoutableNode(connection.getSink(), sinkINTNode, RoutableType.PINFEED_I));
-				if(sourceINTNode == null) {
+
+			Connection connection;
+			Node sinkINTNode;
+			if (sink.getSiteInst() != null) {
+				connection = new Connection(numConnectionsToRoute++, source, sink, netWrapper);
+				List<Node> nodes = RouterHelper.projectInputPinToINTNode(sink);
+				if (nodes.isEmpty()) {
+					directConnections.add(connection);
+					connection.setDirect(true);
+					continue;
+				}
+
+				sinkINTNode = nodes.get(0);
+			} else {
+				// Part pin
+				sinkINTNode = device.getNode(sink.getName());
+				if (sinkINTNode == null || sinkINTNode.getTile().getTileTypeEnum() != TileTypeEnum.INT) {
+					throw new RuntimeException(sink.getName());
+				}
+
+				if (sinkINTNode.equals(sourceINTNode)) {
+					// (Input) part pins could be sources or sinks of a net, since input is used to indicate
+					// a leaf node of an antenna (the source from which new routing continues from) as well as
+					// to mark nodes that need to be routed to (net sinks)
+					continue;
+				}
+
+				connection = new Connection(numConnectionsToRoute++, source, sink, netWrapper);
+			}
+			indirectConnections.add(connection);
+			connection.setSinkRnode(createAddRoutableNode(connection.getSink(), sinkINTNode, RoutableType.PINFEED_I));
+			if(sourceINTNode == null) {
+				if (source.getSiteInst() != null) {
 					sourceINTNode = RouterHelper.projectOutputPinToINTNode(source);
-					if(sourceINTNode == null) {
+					if (sourceINTNode == null) {
 						throw new RuntimeException("ERROR: Null projected INT node for the source of net " + net.toStringFull());
 					}
+				} else {
+					sourceINTNode = device.getNode(source.getName());
+					if (sourceINTNode == null || sourceINTNode.getTile().getTileTypeEnum() != TileTypeEnum.INT) {
+						throw new RuntimeException(source.getName());
+					}
 				}
-				connection.setSourceRnode(createAddRoutableNode(connection.getSource(), sourceINTNode, RoutableType.PINFEED_O));
-				connection.setDirect(false);
-				indirect++;
-				connection.computeHpwl();
-				addConnectionSpanInfo(connection);
 			}
+			connection.setSourceRnode(createAddRoutableNode(connection.getSource(), sourceINTNode, RoutableType.PINFEED_O));
+			connection.setDirect(false);
+			indirect++;
+			connection.computeHpwl();
+			addConnectionSpanInfo(connection);
 		}
 		
 		if(indirect > 0) {
@@ -534,7 +603,7 @@ public class RWRoute{
 			if(config.isUseBoundingBox()) {
 				for(Connection connection : netWrapper.getConnections()) {
 					if(connection.isDirect()) continue;
-					connection.computeConnectionBoundingBox(boundingBoxExtensionX, boundingBoxExtensionY,multiSLR);
+					connection.computeConnectionBoundingBox(config.getBoundingBoxExtensionX(), config.getBoundingBoxExtensionY(), isMultiSLRDevice());
 				}
 			}
 		}
@@ -897,21 +966,27 @@ public class RWRoute{
 	private void assignNodesToConnections() {
 		for(Connection connection : sortedIndirectConnections){
 			connection.newNodes();
-			List<Node> switchBoxToSink = RouterHelper.findPathBetweenNodes(connection.getSinkRnode().getNode(), connection.getSink().getConnectedNode());
-			if(switchBoxToSink.size() >= 2) {			
-				for(int i = 0; i < switchBoxToSink.size() -1; i++) {
-					connection.addNode(switchBoxToSink.get(i));
+			SitePinInst sink = connection.getSink();
+			if (sink.getSiteInst() != null) {
+				List<Node> switchBoxToSink = RouterHelper.findPathBetweenNodes(connection.getSinkRnode().getNode(), sink.getConnectedNode());
+				if(switchBoxToSink.size() >= 2) {
+					for(int i = 0; i < switchBoxToSink.size() -1; i++) {
+						connection.addNode(switchBoxToSink.get(i));
+					}
 				}
 			}
 			
 			for(Routable rnode:connection.getRnodes()){
 				connection.addNode(rnode.getNode());
 			}
-			
-			List<Node> sourceToSwitchBox = RouterHelper.findPathBetweenNodes(connection.getSource().getConnectedNode(), connection.getSourceRnode().getNode());
-			if(sourceToSwitchBox.size() >= 2) {
-				for(int i = 1; i <= sourceToSwitchBox.size() - 1; i++) {
-					connection.addNode(sourceToSwitchBox.get(i));
+
+			SitePinInst source = connection.getSource();
+			if (source.getSiteInst() != null) {
+				List<Node> sourceToSwitchBox = RouterHelper.findPathBetweenNodes(source.getConnectedNode(), connection.getSourceRnode().getNode());
+				if(sourceToSwitchBox.size() >= 2) {
+					for(int i = 1; i <= sourceToSwitchBox.size() - 1; i++) {
+						connection.addNode(sourceToSwitchBox.get(i));
+					}
 				}
 			}
 		}
@@ -1175,7 +1250,13 @@ public class RWRoute{
 	 */
 	private void setPIPsOfNets(){
 		for(NetWrapper netWrapper : nets){
+			Net net = netWrapper.getNet();
 			Set<PIP> netPIPs = new HashSet<>();
+			for(PIP pip : net.getPIPs()) {
+				if (pip.isPIPFixed()) {
+					netPIPs.add(pip);
+				}
+			}
 			for(Connection connection:netWrapper.getConnections()){
 				netPIPs.addAll(RouterHelper.getConnectionPIPs(connection));
 			}
@@ -1344,7 +1425,7 @@ public class RWRoute{
 		for(Net n : toRouteNets) {
 			List<Node> reservedNetNodes = RouterHelper.getNodesOfNet(n);
 			
-			NetWrapper netnew = createsNetWrapperAndConnections(n, config.getBoundingBoxExtensionX(), config.getBoundingBoxExtensionY(), multiSLRDevice);
+			NetWrapper netnew = createsNetWrapperAndConnections(n, n.getSinkPins());
 			
 			for(Node toBuild : reservedNetNodes) {
 				// remove the node from the preserved nodes
@@ -1740,7 +1821,12 @@ public class RWRoute{
 	public static Design routeDesignPartialNonTimingDriven(Design design) {
 		return routeDesign(design, new RWRouteConfig(new String[] {"--partialRouting", "--fixBoundingBox", "--nonTimingDriven", "--verbose"}));
 	}
-	
+
+	public static Design routeDesignPartialNonTimingDriven(Design design, Map<Net,List<SitePinInst>> netToUnroutedPins) {
+		return routeDesign(design, new RWRouteConfig(new String[] {"--partialRouting", "--fixBoundingBox", "--nonTimingDriven", "--verbose"}),
+				netToUnroutedPins);
+	}
+
 	/**
 	 * Routes a {@link Design} instance.
 	 * @param design The {@link Design} instance to be routed.
@@ -1768,7 +1854,17 @@ public class RWRoute{
 			return new RWRoute(design, config);
 		});
 	}
-	
+
+	private static Design routeDesign(Design design, RWRouteConfig config, Map<Net,List<SitePinInst>> netToUnroutedPins) {
+		return routeDesign(design, config, () -> {
+			if(config.isPartialRouting()) {
+				return new PartialRouter(design, config, netToUnroutedPins);
+			}
+			assert(netToUnroutedPins == null);
+			return new RWRoute(design, config);
+		});
+	}
+
 	/**
 	 * Routes a design after pre-processing.
 	 * @param design The {@link Design} instance to be routed.
@@ -1783,6 +1879,7 @@ public class RWRoute{
 		
 		// Instantiates router object
 		RWRoute router = newRouter.get();
+		router.init();
 		
 		// Routes the design
 		router.route();
