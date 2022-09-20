@@ -41,6 +41,7 @@ check_headers:
 	fi
 
 check_tabs:
+# Yes, that is an actual tab character in quotes, otherwise git grep doesn't work
 	@ FILES_CONTAINING_TABS=$$(git grep "	" -- '*.java'); \
 	if [ ! -z "$$FILES_CONTAINING_TABS" ] ;\
 	then \
