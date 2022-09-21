@@ -349,19 +349,23 @@ public class RWRoute{
 	private void routeGlobalClkNets() {
  		if(clkNets.size() > 0) System.out.println("INFO: Route clock nets");
  		for(Net clk : clkNets) {
- 			if(routesToSinkINTTiles != null) {
- 				// routes clock nets with references of partial routes
-				System.out.println("INFO: Route with clock route and timing data");
-				GlobalSignalRouting.routeClkWithPartialRoutes(clk, routesToSinkINTTiles, design.getDevice());
- 			}else {
- 				// routes clock nets from scratch
-				System.out.println("INFO: Route with symmetric non-timing-driven clock router");
- 				GlobalSignalRouting.symmetricClkRouting(clk, design.getDevice());
- 			}
-			preserveNet(clk);
- 		}
+			routeGlobalClkNet(clk);
+		}
 	}
-	
+
+	protected void routeGlobalClkNet(Net clk) {
+		if(routesToSinkINTTiles != null) {
+			// routes clock nets with references of partial routes
+		   System.out.println("INFO: Route with clock route and timing data");
+		   GlobalSignalRouting.routeClkWithPartialRoutes(clk, routesToSinkINTTiles, design.getDevice());
+		}else {
+			// routes clock nets from scratch
+		   System.out.println("INFO: Route with symmetric non-timing-driven clock router");
+			GlobalSignalRouting.symmetricClkRouting(clk, design.getDevice());
+		}
+		preserveNet(clk);
+	}
+
 	/**
 	 * Adds and initialize a regular signal net to the list of routing targets.
 	 * @param net The net to be added for routing.

@@ -42,6 +42,7 @@ import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFTools;
+import com.xilinx.rapidwright.router.UltraScaleClockRouting;
 
 /**
  * A class extends {@link RWRoute} for partial routing.
@@ -118,18 +119,29 @@ public class PartialRouter extends RWRoute{
 			}
 		}
 	}
+
+	@Override
+	protected void routeGlobalClkNet(Net clk) {
+		if (!clk.hasPIPs()) {
+			super.routeGlobalClkNet(clk);
+		} else {
+			List<SitePinInst> pins = netToUnroutedPins.get(clk);
+			UltraScaleClockRouting.incrementalClockRouter(clk, pins);
+		}
+	}
 	
 	@Override
 	protected void addGlobalClkRoutingTargets(Net clk) {
-		if(!clk.hasPIPs()) {
-			if(RouterHelper.isRoutableNetWithSourceSinks(clk)) {
-				addClkNet(clk);
-			}else {
-				increaseNumNotNeedingRouting();
-				System.err.println("ERROR: Incomplete clk net " + clk.getName());
-			}
-		}else {
-			preserveNet(clk);
+		preserveNet(clk);
+
+		List<SitePinInst> unroutedPins = netToUnroutedPins.get(clk);
+		if (unroutedPins == null) {
+			increaseNumNotNeedingRouting();
+			return;
+		}
+
+		addClkNet(clk);
+		if (clk.hasPIPs()) {
 			increaseNumPreservedClks();
 		}
 	}
@@ -145,7 +157,9 @@ public class PartialRouter extends RWRoute{
 		}
 
 		addStaticNetRoutingTargets(staticNet, unroutedPins);
-		increaseNumPreservedStaticNets();
+		if (staticNet.hasPIPs()) {
+			increaseNumPreservedStaticNets();
+		}
 	}
 	
 	@Override
