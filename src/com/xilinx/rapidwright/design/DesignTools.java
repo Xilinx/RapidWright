@@ -1450,6 +1450,13 @@ public class DesignTools {
 		EDIFCellInst futureBlackBox = hierarchicalCell.getInst();
 		if(futureBlackBox == null) throw new RuntimeException("ERROR: Couldn't find cell " + hierarchicalCell + " in source design " + d.getName());
 		
+		if(hierarchicalCell.getCellType() == d.getTopEDIFCell()) {
+		    d.unplaceDesign();
+		    d.getTopEDIFCell().makePrimitive();
+		    d.getTopEDIFCell().addProperty(EDIFCellInst.BLACK_BOX_PROP, true);
+		    return;
+		}
+		
 		Set<SiteInst> touched = new HashSet<>();
 		Map<String,String> boundaryNets = new HashMap<>();
 		
@@ -2295,7 +2302,11 @@ public class DesignTools {
 			}
 			destNetlist.migrateCellAndSubCells(cellInst.getCellType());
 			EDIFHierCellInst bbInst = destNetlist.getHierCellInstFromName(e.getValue());
-			bbInst.getInst().setCellType(cellInst.getCellType());
+			EDIFCell destCell = destNetlist.getCell(cellInst.getCellType().getName());
+			if(destNetlist.getTopCell() == bbInst.getCellType()) {
+			    destNetlist.getDesign().setTopCell(destCell);
+			}
+			bbInst.getInst().setCellType(destCell);
 			instsWithSeparator.add(e.getKey() + EDIFTools.EDIF_HIER_SEP);
 		}
 		destNetlist.resetParentNetMap();
