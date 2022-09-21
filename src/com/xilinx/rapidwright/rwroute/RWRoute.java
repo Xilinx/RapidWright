@@ -350,6 +350,7 @@ public class RWRoute{
  		if(clkNets.size() > 0) System.out.println("INFO: Route clock nets");
  		for(Net clk : clkNets) {
 			routeGlobalClkNet(clk);
+			preserveNet(clk);
 		}
 	}
 
@@ -363,7 +364,6 @@ public class RWRoute{
 		   System.out.println("INFO: Route with symmetric non-timing-driven clock router");
 			GlobalSignalRouting.symmetricClkRouting(clk, design.getDevice());
 		}
-		preserveNet(clk);
 	}
 
 	/**
