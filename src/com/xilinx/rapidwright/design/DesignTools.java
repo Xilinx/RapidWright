@@ -2532,7 +2532,6 @@ public class DesignTools {
         }
 
         // When we copy the static nets, we must preserve their sources so that nothing should be placed on it.
-        // TODO: need to annotate so that RapidWright placer avoids placing on these bels.
         for (String bel : prohibitBels) {
             dest.addXDCConstraint(ConstraintGroup.LATE, "set_property PROHIBIT true [get_bels " + bel + "]");
         }
