@@ -2348,7 +2348,7 @@ public class DesignTools {
         for (String srcPrefix : srcToDestInstNames.keySet()) {
             if (srcPrefix.length()==0) {
                 prefixes.put(srcPrefix, srcPrefix);
-            }else {
+            } else {
                     prefixes.put(srcPrefix + "/", srcPrefix);
             }
         }
@@ -2628,7 +2628,7 @@ public class DesignTools {
             Net net = null;
             if (origNet.isStaticNet()) {
                 net = origNet;
-            }else {
+            } else {
                 String parentNetName = destNetlist.getParentNetName(netName);
                 if (parentNetName == null) {
                     parentNetName = netName;
@@ -2661,7 +2661,7 @@ public class DesignTools {
                             }
                         }
                     }
-                }else {
+                } else {
                     curr = curr.getSourcePin();
                     if (curr.isSitePort()) continue;
                     String belName = curr.getBELName();
@@ -2755,7 +2755,7 @@ public class DesignTools {
             Integer count = fanout.get(startNode);
             if (count == null) {
                 fanout.put(startNode, 1);
-            }else{
+            } else {
                 fanout.put(startNode, count+1);
             }
         }
