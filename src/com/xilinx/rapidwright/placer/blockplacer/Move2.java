@@ -1,6 +1,7 @@
 /*
  * Original work: Copyright (c) 2010-2011 Brigham Young University
- * Modified work: Copyright (c) 2017 Xilinx, Inc.
+ * Modified work: Copyright (c) 2017-2022, Xilinx, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -38,106 +39,106 @@ import com.xilinx.rapidwright.design.AbstractModuleInst;
  */
 public class Move2<ModuleInstT extends AbstractModuleInst<?,?,?>, PlacementT, PathT extends AbstractPath<?, ModuleInstT>> {
 
-	private final BlockPlacer2<?, ModuleInstT, PlacementT, PathT> placer;
+    private final BlockPlacer2<?, ModuleInstT, PlacementT, PathT> placer;
 
 
-	List<ModuleInstT> blocks = new ArrayList<>();
-	Set<ModuleInstT> blocksSet = new HashSet<>();
-	List<PlacementT> placements = new ArrayList<>();
+    List<ModuleInstT> blocks = new ArrayList<>();
+    Set<ModuleInstT> blocksSet = new HashSet<>();
+    List<PlacementT> placements = new ArrayList<>();
 
-	List<PathT> paths = null;
+    List<PathT> paths = null;
 
-	private int deltaCost;
+    private int deltaCost;
 
 
-	public Move2(BlockPlacer2<?, ModuleInstT, PlacementT, PathT> placer){
+    public Move2(BlockPlacer2<?, ModuleInstT, PlacementT, PathT> placer) {
 
-		this.placer = placer;
-	}
+        this.placer = placer;
+    }
 
-	public void undoMove(){
-		for (int i = 0; i < placements.size(); i++) {
-			placer.setTempAnchorSite(blocks.get(i), placements.get(i));
-		}
+    public void undoMove() {
+        for (int i = 0; i < placements.size(); i++) {
+            placer.setTempAnchorSite(blocks.get(i), placements.get(i));
+        }
 
-		//Have we even changed the paths?
-		if (paths != null) {
-			for (PathT path : paths) {
-				path.restoreUndo();
-				if (BlockPlacer2.PARANOID) {
-					final int length = path.getLength();
-					path.calculateLength();
-					if (path.getLength() != length) {
-						throw new RuntimeException("Improper cost change.");
-					}
-				}
-			}
-			paths = null;
-		}
+        //Have we even changed the paths?
+        if (paths != null) {
+            for (PathT path : paths) {
+                path.restoreUndo();
+                if (BlockPlacer2.PARANOID) {
+                    final int length = path.getLength();
+                    path.calculateLength();
+                    if (path.getLength() != length) {
+                        throw new RuntimeException("Improper cost change.");
+                    }
+                }
+            }
+            paths = null;
+        }
 
-	}
+    }
 
-	public void clear() {
-		blocks.clear();
-		placements.clear();
-		blocksSet.clear();
-	}
+    public void clear() {
+        blocks.clear();
+        placements.clear();
+        blocksSet.clear();
+    }
 
-	public int getDeltaCost() {
-		return deltaCost;
-	}
+    public int getDeltaCost() {
+        return deltaCost;
+    }
 
-	public boolean addBlock(ModuleInstT block, PlacementT placement) {
-		if (!blocksSet.add(block)) {
-			return false;
-		}
-		blocks.add(block);
-		placements.add(placement);
-		return true;
-	}
+    public boolean addBlock(ModuleInstT block, PlacementT placement) {
+        if (!blocksSet.add(block)) {
+            return false;
+        }
+        blocks.add(block);
+        placements.add(placement);
+        return true;
+    }
 
-	public void calcDeltaCost() {
-		paths = new ArrayList<>();
+    public void calcDeltaCost() {
+        paths = new ArrayList<>();
 
-		deltaCost = 0;
-		int undoCount = placer.incUndoCount();
-		for (ModuleInstT block : blocks) {
-			for (PathT path : placer.getConnectedPaths(block)) {
-				if (path.undoCount==undoCount) {
-					continue;
-				}
-				path.undoCount = undoCount;
+        deltaCost = 0;
+        int undoCount = placer.incUndoCount();
+        for (ModuleInstT block : blocks) {
+            for (PathT path : placer.getConnectedPaths(block)) {
+                if (path.undoCount==undoCount) {
+                    continue;
+                }
+                path.undoCount = undoCount;
 
-				path.saveUndo();
-				deltaCost -= path.getLength();
-				path.calculateLength();
-				deltaCost += path.getLength();
-				paths.add(path);
-			}
+                path.saveUndo();
+                deltaCost -= path.getLength();
+                path.calculateLength();
+                deltaCost += path.getLength();
+                paths.add(path);
+            }
 
-		}
-	}
+        }
+    }
 
-	public boolean addBlock(ModuleInstT block) {
-		return addBlock(block, placer.getCurrentPlacement(block));
-	}
+    public boolean addBlock(ModuleInstT block) {
+        return addBlock(block, placer.getCurrentPlacement(block));
+    }
 
-	public void removeLastBlock() {
-		placer.setTempAnchorSite(blocks.remove(blocks.size()-1), placements.remove(placements.size()-1));
-	}
+    public void removeLastBlock() {
+        placer.setTempAnchorSite(blocks.remove(blocks.size()-1), placements.remove(placements.size()-1));
+    }
 
-	@Override
-	public String toString() {
-		return IntStream.range(0, blocks.size())
-				.mapToObj(i-> {
-					final ModuleInstT block = blocks.get(i);
-					final PlacementT from = placements.get(i);
-					final PlacementT to = placer.getCurrentPlacement(block);
-					return block.getName()+": "+from+"->"+to;
-				}).collect(Collectors.joining(", ", "[","]"));
-	}
+    @Override
+    public String toString() {
+        return IntStream.range(0, blocks.size())
+                .mapToObj(i-> {
+                    final ModuleInstT block = blocks.get(i);
+                    final PlacementT from = placements.get(i);
+                    final PlacementT to = placer.getCurrentPlacement(block);
+                    return block.getName()+": "+from+"->"+to;
+                }).collect(Collectors.joining(", ", "[","]"));
+    }
 
-	public int countBlocks() {
-		return blocks.size();
-	}
+    public int countBlocks() {
+        return blocks.size();
+    }
 }

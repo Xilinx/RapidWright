@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2021 Xilinx, Inc.
+ * Copyright (c) 2021-2022, Xilinx, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Jakob Wenzel, Xilinx Research Labs.
@@ -362,7 +363,7 @@ public abstract class DotGraphDumper<InstanceT, PortT, PortTemplateT, NetT, Desi
      * @param filter A function that filters the instances that are shown. Pass null to show everything
      */
     public void doDump(DesignT design, Path output, BiPredicate<InstanceT, DesignT> filter) {
-        try(PrintWriter pw = new PrintWriter(Files.newBufferedWriter(output))) {
+        try (PrintWriter pw = new PrintWriter(Files.newBufferedWriter(output))) {
             doDump(design, pw, filter);
         } catch (IOException e) {
             throw new UncheckedIOException(e);

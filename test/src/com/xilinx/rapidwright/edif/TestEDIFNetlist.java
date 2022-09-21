@@ -1,25 +1,26 @@
-/* 
- * Copyright (c) 2021 Xilinx, Inc. 
+/*
+ * Copyright (c) 2021-2022, Xilinx, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
- *  
- * This file is part of RapidWright. 
- * 
+ *
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
- 
+
 package com.xilinx.rapidwright.edif;
 
 import java.nio.file.Path;
@@ -44,49 +45,49 @@ import org.junit.jupiter.params.provider.ValueSource;
 class TestEDIFNetlist {
 
     private static final String PART_NAME = Device.KCU105;
-    
+
     private static final String TEST_MACRO = "IOBUFDS_INTERMDISABLE";
-    
+
     private Design createSampleMacroDesign(String macro, Part part) {
         String designName = TEST_MACRO +"_design";
         final EDIFNetlist netlist = EDIFTools.createNewNetlist(designName);
         final Design design = new Design(designName, part.getName());
         design.setNetlist(netlist);
-        
-        final EDIFCell prototypeMacro = Design.getMacroPrimitives(part.getSeries()).getCell(macro); 
-        
+
+        final EDIFCell prototypeMacro = Design.getMacroPrimitives(part.getSeries()).getCell(macro);
+
         EDIFCell macroCell = new EDIFCell(netlist.getHDIPrimitivesLibrary(), prototypeMacro);
-        
+
         macroCell.createCellInst("test" + macro, netlist.getTopCell());
 
         return design;
     }
-    
+
     private Design createSamplePrimitiveDesign(String prim, Part part) {
         String designName = prim +"_design";
         final EDIFNetlist netlist = EDIFTools.createNewNetlist(designName);
         final Design design = new Design(designName, part.getName());
         design.setNetlist(netlist);
-        
-        final EDIFCell prototypePrim = Design.getPrimitivesLibrary().getCell(prim); 
-        
+
+        final EDIFCell prototypePrim = Design.getPrimitivesLibrary().getCell(prim);
+
         EDIFCell primCell = new EDIFCell(netlist.getHDIPrimitivesLibrary(), prototypePrim);
-        
+
         primCell.createCellInst("test" + prim, netlist.getTopCell());
 
         return design;
-    }    
-    
+    }
+
     @Test
     void testMacroExpansionException(@TempDir Path tempDir) {
         final Part part = PartNameTools.getPart(PART_NAME);
         Design testDesign = createSampleMacroDesign(TEST_MACRO, part);
         final Path outputDCP = tempDir.resolve(testDesign.getName() + ".dcp");
         testDesign.writeCheckpoint(outputDCP);
-        
+
         Design loadAgain = Design.readCheckpoint(outputDCP);
         Assertions.assertTrue(loadAgain.getNetlist().getHDIPrimitivesLibrary().containsCell("OBUFTDS"));
-        
+
         final Part part2 = PartNameTools.getPart(Device.KCU105);
         Design testDesign2 = createSamplePrimitiveDesign("OBUFDS", part2);
         testDesign2.getNetlist().expandMacroUnisims(part.getSeries());
@@ -97,7 +98,7 @@ class TestEDIFNetlist {
         testDesign2.getTopEDIFCell().getCellInst("testOBUFDS").addProperty("IOStandard", IOStandard.LVCMOS12.name());
         testDesign2.getNetlist().expandMacroUnisims(part.getSeries());
         Assertions.assertTrue(testDesign2.getNetlist().getHDIPrimitivesLibrary().containsCell("OBUFDS"));
-        Assertions.assertFalse(testDesign2.getNetlist().getHDIPrimitivesLibrary().containsCell("OBUFDS_DUAL_BUF"));        
+        Assertions.assertFalse(testDesign2.getNetlist().getHDIPrimitivesLibrary().containsCell("OBUFDS_DUAL_BUF"));
     }
 
     @Test
@@ -122,32 +123,32 @@ class TestEDIFNetlist {
         Assertions.assertEquals(modifiedCells.size(), 8);
 
         Set<EDIFCell> potentiallyModifiedCells = new HashSet<>();
-        for(EDIFHierNet logNets : netlist.getNetAliases(srcPortInst.getHierarchicalNet())) {
+        for (EDIFHierNet logNets : netlist.getNetAliases(srcPortInst.getHierarchicalNet())) {
             potentiallyModifiedCells.add(logNets.getParentInst().getCellType());
         }
 
-        for(EDIFCell modifiedCell : modifiedCells.keySet()) {
+        for (EDIFCell modifiedCell : modifiedCells.keySet()) {
             Assertions.assertTrue(potentiallyModifiedCells.contains(modifiedCell));
         }
     }
-    
+
     @Test
     public void testGetHier() {
         final EDIFNetlist netlist = EDIFTools.createNewNetlist("test");
-        
+
         EDIFCell top = netlist.getTopCell();
         EDIFCell lut2 = Design.getPrimitivesLibrary().getCell("LUT2");
         top.createChildCellInst("fred", lut2);
         top.createChildCellInst("fred/barney", lut2);
-        
+
         Assertions.assertNotNull(netlist.getHierCellInstFromName("fred"));
         Assertions.assertNotNull(netlist.getHierCellInstFromName("fred/barney"));
-        
+
         EDIFCell hierCell = new EDIFCell(netlist.getWorkLibrary(), "flintstones");
         top.createChildCellInst("flintstones", hierCell);
         hierCell.createChildCellInst("wilma", lut2);
         hierCell.createChildCellInst("wilma/betty", lut2);
-        
+
         Assertions.assertNotNull(netlist.getHierCellInstFromName("flintstones/wilma"));
         Assertions.assertNotNull(netlist.getHierCellInstFromName("flintstones/wilma/betty"));
     }

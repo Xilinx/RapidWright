@@ -1,25 +1,26 @@
-/* 
- * Copyright (c) 2020 Xilinx, Inc. 
+/*
+ * Copyright (c) 2020-2022, Xilinx, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Keith Rothman, Google, Inc.
- *  
- * This file is part of RapidWright. 
- * 
+ *
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
- 
+
 package com.xilinx.rapidwright.interchange;
 
 import java.util.AbstractMap;
@@ -51,11 +52,11 @@ class CellBelMapping {
         private Map<String, String> readPins(String cell, Enumerator<String> allStrings, StructList.Reader<CellBelPinEntry.Reader> pins) {
             Map<String, String> pinMap = new HashMap<String, String>();
 
-            for(CellBelPinEntry.Reader pin : pins) {
+            for (CellBelPinEntry.Reader pin : pins) {
                 String belPin = allStrings.get(pin.getBelPin());
                 String cellPin = allStrings.get(pin.getCellPin());
                 String otherCellPin = pinMap.get(belPin);
-                if(otherCellPin != null) {
+                if (otherCellPin != null) {
                     throw new RuntimeException(String.format(
                                 "Duplicate BEL pin entry '%s' for '%s', '%s' <-> '%s'",
                                 otherCellPin, cell, cellPin, belPin));
@@ -67,9 +68,9 @@ class CellBelMapping {
         }
 
         private void addPlacements(Set<Map.Entry<SiteTypeEnum, String>> placements) {
-            for(Map.Entry<SiteTypeEnum, String> placement : placements) {
+            for (Map.Entry<SiteTypeEnum, String> placement : placements) {
                 Set<String> placementsForSiteType = compatiblePlacements.get(placement.getKey());
-                if(placementsForSiteType == null) {
+                if (placementsForSiteType == null) {
                     placementsForSiteType = new HashSet<String>();
                     compatiblePlacements.put(placement.getKey(), placementsForSiteType);
                 }
@@ -83,20 +84,20 @@ class CellBelMapping {
             commonMaps = new HashMap<Map.Entry<SiteTypeEnum, String>, Map<String, String>>();
             parameterMaps = new HashMap<Map.Entry<SiteTypeEnum, String>, Map<String, Map<String, String>>>();
 
-            for(CommonCellBelPinMaps.Reader commonPin : cellBelMap.getCommonPins()) {
+            for (CommonCellBelPinMaps.Reader commonPin : cellBelMap.getCommonPins()) {
                 Map<String, String> pins = readPins(cell, allStrings, commonPin.getPins());
 
-                for(SiteTypeBelEntry.Reader entry : commonPin.getSiteTypes()) {
+                for (SiteTypeBelEntry.Reader entry : commonPin.getSiteTypes()) {
                     SiteTypeEnum siteType = SiteTypeEnum.valueOf(allStrings.get(entry.getSiteType()));
 
                     PrimitiveList.Int.Reader belStrings = entry.getBels();
-                    for(int i = 0; i < belStrings.size(); ++i) {
+                    for (int i = 0; i < belStrings.size(); ++i) {
                         int belStringIdx = belStrings.get(i);
                         String bel = allStrings.get(belStringIdx);
                         Map.Entry<SiteTypeEnum, String> key = new AbstractMap.SimpleEntry(siteType, bel);
 
                         Map<String, String> otherPins = commonMaps.get(key);
-                        if(otherPins != null) {
+                        if (otherPins != null) {
                             throw new RuntimeException(String.format(
                                         "Duplicate common pin entry for site type '%s' BEL '%s'",
                                         siteType.name(), bel));
@@ -107,16 +108,16 @@ class CellBelMapping {
                 }
             }
 
-            for(ParameterCellBelPinMaps.Reader parameterPin : cellBelMap.getParameterPins()) {
+            for (ParameterCellBelPinMaps.Reader parameterPin : cellBelMap.getParameterPins()) {
                 Map<String, String> pins = readPins(cell, allStrings, parameterPin.getPins());
 
-                for(ParameterSiteTypeBelEntry.Reader entry : parameterPin.getParametersSiteTypes()) {
+                for (ParameterSiteTypeBelEntry.Reader entry : parameterPin.getParametersSiteTypes()) {
                     SiteTypeEnum siteType = SiteTypeEnum.valueOf(allStrings.get(entry.getSiteType()));
                     String bel = allStrings.get(entry.getBel());
                     Map.Entry<SiteTypeEnum, String> key = new AbstractMap.SimpleEntry(siteType, bel);
 
                     Map<String, Map<String, String>> parameterToPins = parameterMaps.get(key);
-                    if(parameterToPins == null) {
+                    if (parameterToPins == null) {
                         parameterToPins = new HashMap<String, Map<String, String>>();
                         parameterMaps.put(key, parameterToPins);
                     }
@@ -126,18 +127,18 @@ class CellBelMapping {
                     String parameterKey = allStrings.get(parameter.getKey());
                     String parameterValue;
 
-                    if(parameter.isTextValue()) {
+                    if (parameter.isTextValue()) {
                         String textValue = allStrings.get(parameter.getTextValue());
-                        if(textValue.contains("\"")) {
+                        if (textValue.contains("\"")) {
                             throw new RuntimeException("ERROR: String '"+textValue+
                                     "'\n\t value contains unescaped '\"' "
                                     + "character. Please replace with EDIF escape value '%34%'.");
                         }
 
                         parameterValue = textValue;
-                    } else if(parameter.isIntValue()) {
+                    } else if (parameter.isIntValue()) {
                         parameterValue = String.format("%d", parameter.getIntValue());
-                    } else if(parameter.isBoolValue()) {
+                    } else if (parameter.isBoolValue()) {
                         parameterValue = String.format("%d", parameter.getBoolValue());
                     } else {
                         throw new RuntimeException("ERROR: Unknown property type for key " + parameterKey);
@@ -146,7 +147,7 @@ class CellBelMapping {
                     String parameterStr = parameterKey + "=" + parameterValue;
 
                     Map<String, String> otherPins = parameterToPins.get(parameterStr);
-                    if(otherPins != null) {
+                    if (otherPins != null) {
                         throw new RuntimeException(String.format(
                                     "Duplicate common pin entry for site type '%s' BEL '%s' parameter '%s'",
                                     siteType.name(), bel, parameterStr));
@@ -174,9 +175,9 @@ class CellBelMapping {
 
             Map<String, Map<String, String>> allParameterPins = parameterMaps.get(key);
 
-            for(String parameter : params) {
+            for (String parameter : params) {
                 Map<String, String> parameterPins = allParameterPins.get(parameter);
-                if(parameterPins != null) {
+                if (parameterPins != null) {
                     pins.putAll(parameterPins);
                 }
             }
@@ -190,10 +191,10 @@ class CellBelMapping {
     public CellBelMapping(Enumerator<String> allStrings, StructList.Reader<Device.CellBelMapping.Reader> cellBelMaps) {
         map = new HashMap<String, CellBelPinMapping>();
 
-        for(Device.CellBelMapping.Reader cellBelMap : cellBelMaps) {
+        for (Device.CellBelMapping.Reader cellBelMap : cellBelMaps) {
             String cell = allStrings.get(cellBelMap.getCell());
             CellBelPinMapping obj = map.get(cell);
-            if(obj != null) {
+            if (obj != null) {
                 throw new RuntimeException(String.format(
                             "Duplicate cell '%s' in map data",
                             cell));
