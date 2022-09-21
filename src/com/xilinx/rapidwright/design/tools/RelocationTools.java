@@ -255,8 +255,10 @@ public class RelocationTools {
             }
 
             Collection<SitePinInst> pins = n.getPins();
-            Collection<SitePinInst> nonMatchingPins = pins.stream().filter(
-                    (spi) -> !oldSite.containsKey(spi.getSiteInst()))
+            Collection<SitePinInst> nonMatchingPins = pins.stream()
+                    .filter((spi) -> !oldSite.containsKey(spi.getSiteInst()))
+                    // Filter out SPIs on a "STATIC_SOURCE" SiteInst that would have been unplaced above
+                    .filter((spi) -> spi.getSiteInst().isPlaced())
                     .collect(Collectors.toList());
             if (nonMatchingPins.size() == pins.size()) {
                 continue;

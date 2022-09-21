@@ -79,20 +79,23 @@ public abstract class AbstractEDIFParserWorker {
 
     protected final EDIFTokenizer tokenizer;
     protected final InputStream in;
+    protected final EDIFReadLegalNameCache cache;
 
-    public AbstractEDIFParserWorker(Path fileName, InputStream in, StringPool uniquifier, int maxTokenLength) {
+    public AbstractEDIFParserWorker(Path fileName, InputStream in, StringPool uniquifier, int maxTokenLength, EDIFReadLegalNameCache cache) {
         this.in = in;
+        this.cache = cache;
         this.tokenizer = new EDIFTokenizer(fileName, in, uniquifier, maxTokenLength);
     }
 
-    public AbstractEDIFParserWorker(Path fileName, InputStream in, StringPool uniquifier) {
-        this(fileName, in, uniquifier, EDIFTokenizer.DEFAULT_MAX_TOKEN_LENGTH);
+    public AbstractEDIFParserWorker(Path fileName, InputStream in, StringPool uniquifier, EDIFReadLegalNameCache cache) {
+        this(fileName, in, uniquifier, EDIFTokenizer.DEFAULT_MAX_TOKEN_LENGTH, cache);
     }
 
-    public AbstractEDIFParserWorker(Path fileName, StringPool uniquifier) throws FileNotFoundException {
+    public AbstractEDIFParserWorker(Path fileName, StringPool uniquifier, EDIFReadLegalNameCache cache) throws FileNotFoundException {
         try {
             in = Files.newInputStream(fileName);
             tokenizer = new EDIFTokenizer(fileName, in, uniquifier);
+            this.cache = cache;
         } catch (FileNotFoundException e) {
             throw e;
         } catch (IOException e) {
@@ -120,7 +123,7 @@ public abstract class AbstractEDIFParserWorker {
         String currToken = getNextToken(false);
         if(currToken.equals(EDIFParser.LEFT_PAREN)){
             expect(EDIFParser.RENAME, getNextToken(true));
-            o.setEDIFRename(getNextToken(false));
+            String rename = getNextToken(false);
             // Handle issue with names beginning with '[]'
             String name = getNextToken(false);
             if(name.charAt(0) == '[' && name.length() >= 2 &&  name.charAt(1) == ']'){
@@ -128,6 +131,7 @@ public abstract class AbstractEDIFParserWorker {
                 name = tokenizer.getUniquifier().uniquifyName(tmpName);
             }
             o.setName(name);
+            cache.setRename(o, rename);
             expect(EDIFParser.RIGHT_PAREN, getNextToken(true));
         } else {
             o.setName(currToken);
@@ -204,7 +208,7 @@ public abstract class AbstractEDIFParserWorker {
                     if(nextToken.equals(INSTANCE)){
                         cell.addCellInst(parseEDIFCellInst(libraryLegalName, instanceLookup, cell, nextToken));
                     } else if(nextToken.equals(NET)){
-                        parseEDIFNet(cell, instanceLookup, nextToken);
+                        parseEDIFNet(cell, instanceLookup, nextToken, cache);
                     } else {
                         expect(INSTANCE + " | " + NET, nextToken);
                     }
@@ -302,14 +306,14 @@ public abstract class AbstractEDIFParserWorker {
         expect(PROPERTY, nextToken);
         EDIFName key = parseEDIFNameObject(new EDIFName());
         EDIFPropertyValue value = parsePropertyValue();
-        o.addProperty(key,value);
+        o.addProperty(key.getName(),value);
         String paren = getNextToken(true);
         if(paren.equals(RIGHT_PAREN)) {
             // pass - nothing more to do here
         }
         else if(paren.equals(LEFT_PAREN)){
             expect(OWNER, getNextToken(true));
-            o.setOwner(getNextToken(false));
+            value.setOwner(getNextToken(false));
             expect(RIGHT_PAREN,getNextToken(true));
             expect(RIGHT_PAREN,getNextToken(true));
         }else{
@@ -319,7 +323,7 @@ public abstract class AbstractEDIFParserWorker {
         return o;
     }
 
-    protected EDIFNet parseEDIFNet(EDIFCell cell, Map<String, EDIFCellInst> instanceLookup, String netToken){
+    protected EDIFNet parseEDIFNet(EDIFCell cell, Map<String, EDIFCellInst> instanceLookup, String netToken, EDIFReadLegalNameCache cache){
         expect(NET, netToken);
         EDIFNet net = parseEDIFNameObject(new EDIFNet());
         expect(LEFT_PAREN, getNextToken(true));
@@ -396,8 +400,9 @@ public abstract class AbstractEDIFParserWorker {
                 expect(RIGHT_PAREN, getNextToken(true));
             } else if(currToken.equals(RENAME)){
                 port = new EDIFPort();
-                port.setEDIFRename(getNextToken(false));
+                final String rename = getNextToken(false);
                 port.setName(getNextToken(false));
+                cache.setRename(port, rename);
                 expect(RIGHT_PAREN, getNextToken(true));
             } else {
                 expect(ARRAY + " | " + RENAME, currToken);
@@ -464,13 +469,14 @@ public abstract class AbstractEDIFParserWorker {
      * @return The {@link EDIFCellInst} to be used going forward
      */
     private EDIFCellInst updateEDIFRefCellInstMap(EDIFCellInst inst, Map<String, EDIFCellInst> instanceLookup){
-        EDIFCellInst existingInst = instanceLookup.get(inst.getLegalEDIFName());
+        final String rename = cache.getEDIFRename(inst);
+        EDIFCellInst existingInst = instanceLookup.get(rename);
         if(existingInst != null){
             existingInst.setName(inst.getName());
-            existingInst.setEDIFRename(inst.getEDIFName());
+            cache.setRename(existingInst, rename);
             return existingInst;
         }
-        instanceLookup.put(inst.getLegalEDIFName(), inst);
+        instanceLookup.put(rename != null ? rename : inst.getName(), inst);
         return inst;
     }
 
@@ -487,7 +493,7 @@ public abstract class AbstractEDIFParserWorker {
 
     protected void doLinkPortInstToCellInst(EDIFCell parentCell, EDIFPortInst portInst, EDIFNet net) {
         EDIFCell portCell = lookupPortCell(parentCell, portInst);
-        EDIFPort port = portCell.getPortByLegalName(portInst.getName());
+        EDIFPort port = portCell.getPortByLegalName(portInst.getName(), cache);
 
         if(port == null) {
             throw new EDIFParseException("ERROR: Couldn't find EDIFPort for "

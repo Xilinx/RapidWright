@@ -138,7 +138,7 @@ public class LogNetlistWriter {
         // Enumerate all cells, ports and instances to break cyclic reference dependency
         // in netlist description
         for (EDIFLibrary lib : n.getLibrariesInExportOrder()) {
-            for (EDIFCell cell : lib.getValidCellExportOrder()) {
+            for (EDIFCell cell : lib.getValidCellExportOrder(false)) {
                 allCells.addObject(cell);
                 for (EDIFPort port : cell.getPorts()) {
                     allPorts.addObject(port);

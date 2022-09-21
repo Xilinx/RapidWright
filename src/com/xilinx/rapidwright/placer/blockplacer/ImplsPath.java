@@ -23,6 +23,7 @@ package com.xilinx.rapidwright.placer.blockplacer;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.design.ModuleImplsInst;
@@ -33,6 +34,10 @@ import com.xilinx.rapidwright.design.SimpleTileRectangle;
  */
 public class ImplsPath extends AbstractPath<ImplsInstancePort, ModuleImplsInst>{
     int length;
+    int undoLength;
+
+    SimpleTileRectangle current;
+    SimpleTileRectangle undoCache;
 
     public ImplsPath(String name) {
         this.name = Objects.requireNonNull(name);
@@ -57,12 +62,12 @@ public class ImplsPath extends AbstractPath<ImplsInstancePort, ModuleImplsInst>{
 
     public void calculateLength(){
 
-        SimpleTileRectangle rect = new SimpleTileRectangle();
+        current = new SimpleTileRectangle();
         for (ImplsInstancePort port : ports) {
-            port.enterToRect(rect);
+            port.enterToRect(current);
         }
 
-        if (rect.isEmpty()) {
+        if (current.isEmpty()) {
             length = 0;
             return;
         }
@@ -72,13 +77,19 @@ public class ImplsPath extends AbstractPath<ImplsInstancePort, ModuleImplsInst>{
             fanOutPenalty = 3;
         }
 
-        length = rect.hpwl() * fanOutPenalty;
+        length = current.hpwl() * fanOutPenalty * weight;
     }
 
     public String getName() {
         return name;
     }
 
+    @Override
+    public Set<?> getPathConnections() {
+        return ports.stream()
+                .map(ImplsInstancePort::getAllTiles)
+                .collect(Collectors.toSet());
+    }
 
     public ImplsInstancePort findSource() {
         final List<ImplsInstancePort> sources = ports.stream().filter(ImplsInstancePort::isOutputPort).collect(Collectors.toList());
@@ -88,5 +99,23 @@ public class ImplsPath extends AbstractPath<ImplsInstancePort, ModuleImplsInst>{
             return null;
         }
         return sources.get(0);
+    }
+
+    @Override
+    public void saveUndo() {
+        undoCache = current;
+        undoLength = length;
+    }
+
+    @Override
+    public void restoreUndo() {
+        if (undoCache == null) {
+            throw new RuntimeException("No cached undo value present in "+getName());
+        }
+
+        current = undoCache;
+        length = undoLength;
+
+        undoCache = null;
     }
 }

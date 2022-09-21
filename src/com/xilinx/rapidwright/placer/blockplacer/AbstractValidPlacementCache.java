@@ -21,6 +21,7 @@
  */
 package com.xilinx.rapidwright.placer.blockplacer;
 
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -31,4 +32,6 @@ public abstract class AbstractValidPlacementCache<PlacementT> {
     public abstract List<PlacementT> getByRangeAround(int rangeLimit, PlacementT placement);
 
     public abstract boolean contains(PlacementT site0);
+
+    public abstract Collection<PlacementT> getAll();
 }
