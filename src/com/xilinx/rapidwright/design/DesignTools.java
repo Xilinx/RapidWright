@@ -2513,12 +2513,12 @@ public class DesignTools {
                         } else {
                             node = pip.getStartNode();
                         }
-                        if (node.getWireName().contains("VCC_WIRE"))
+                        if (node.getWireName().contains(Net.VCC_WIRE_NAME))
                             break;
 
                         sitePin = node.getSitePin();
                     }
-                    if ((sitePin != null) && !node.getWireName().contains("VCC_WIRE"))  { // GND source
+                    if ((sitePin != null) && !node.getWireName().contains(Net.VCC_WIRE_NAME))  { // GND source
                         String  pinName = sitePin.getPinName();
                         String  siteName = sitePin.getSite().getName();
                         List<String> bels = sitePin2Bels.get(pinName);
