@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2017 Xilinx, Inc.
+ * Copyright (c) 2017-2022, Xilinx, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -52,13 +53,13 @@ import com.xilinx.rapidwright.design.VivadoProp;
 public class PinMapTester {
 
     public static void main(String[] args) {
-        if(args.length < 5){
+        if (args.length < 5) {
             System.out.println("USAGE: <partname> <cell name> <site> <site type> <bel> <parameters>");
             return;
         }
         String partName = args[0];
         Part part = PartNameTools.getPart(partName);
-        if(part == null){
+        if (part == null) {
             throw new RuntimeException("The partname " + args[0] + " is invalid or unrecognized, cannot load device.");
         }
 
@@ -84,7 +85,7 @@ public class PinMapTester {
 
         String siteName = args[2];
         Site site = device.getSite(siteName);
-        if(site == null) {
+        if (site == null) {
             throw new RuntimeException("Site " + siteName + " is not found in specified part.");
         }
 
@@ -95,7 +96,7 @@ public class PinMapTester {
         String belName = args[4];
 
         BEL bel = siteInst.getBEL(belName);
-        if(bel == null) {
+        if (bel == null) {
             throw new RuntimeException("BEL " + belName + " is not found in within specified site.");
         }
 
@@ -103,13 +104,13 @@ public class PinMapTester {
         Map<String, String> parameterMap = new HashMap<String, String>();
 
         Map<String,VivadoProp> defaultParameters = design.getDefaultCellProperties(device.getSeries(), cellTypeName);
-        for(Map.Entry<String, VivadoProp> defaultParameter : defaultParameters.entrySet()) {
+        for (Map.Entry<String, VivadoProp> defaultParameter : defaultParameters.entrySet()) {
             parameterMap.put(defaultParameter.getKey(), defaultParameter.getValue().getValue());
         }
 
-        for(int i = 5; i < args.length; ++i) {
+        for (int i = 5; i < args.length; ++i) {
             String[] parameterSplit = args[i].split("=", 2);
-            if(parameterSplit.length != 2) {
+            if (parameterSplit.length != 2) {
                 throw new RuntimeException("Invalid parameter " + args[i]);
             }
 
@@ -117,7 +118,7 @@ public class PinMapTester {
         }
 
         List<String> parameters = new ArrayList<String>();
-        for(Map.Entry<String, String> pair : parameterMap.entrySet()) {
+        for (Map.Entry<String, String> pair : parameterMap.entrySet()) {
             parameters.add(pair.getKey() + "=" + pair.getValue());
         }
         String[] parameterArray = parameters.toArray(new String[parameters.size()]);
@@ -126,11 +127,11 @@ public class PinMapTester {
 
         System.out.printf("Cell type %s at %s/%s in part %s, pin map:\n",
                 cellTypeName, site.getName(), belName, partName);
-        for(Map.Entry<String, String> pinMap : physCell.getPinMappingsP2L().entrySet()) {
+        for (Map.Entry<String, String> pinMap : physCell.getPinMappingsP2L().entrySet()) {
             System.out.printf(" - %s <= %s\n", pinMap.getKey(), pinMap.getValue());
         }
 
-        //for(Map.Entry<String, Set<String>> pinMap : physCell.getPinMappingsL2P().entrySet()) {
+        //for (Map.Entry<String, Set<String>> pinMap : physCell.getPinMappingsL2P().entrySet()) {
         //    System.out.printf("
         //}
     }

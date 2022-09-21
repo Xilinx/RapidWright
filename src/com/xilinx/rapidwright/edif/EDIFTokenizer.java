@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2022 Xilinx, Inc.
+ * Copyright (c) 2022, Xilinx, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Jakob Wenzel, Xilinx Research Labs.
@@ -448,7 +449,7 @@ public class EDIFTokenizer implements AutoCloseable {
     }
 
     /**
-     * Skip ahead by some offset. 
+     * Skip ahead by some offset.
      * After skipping, this method tries to advance to the next token boundary. This is an educated guess that needs
      * to be verified once the thread that reads the preceding part of the file catches up to this one.
      * @param i offset to advance by
