@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2022 Xilinx, Inc.
+ * Copyright (c) 2022, Xilinx, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author Zac Blair, Xilinx Research Labs.
@@ -25,7 +26,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Enumerates AXI protocols 
+ * Enumerates AXI protocols
  */
 public enum ProtocolType {
     AXI_MEMORY_MAPPED("AXI_MM"),
@@ -35,14 +36,14 @@ public enum ProtocolType {
 
     static {
         map = new HashMap<>();
-        for(ProtocolType e : values()) {
+        for (ProtocolType e : values()) {
             map.put(e.toString(), e);
         }
-    }    
+    }
 
     private final String p;
 
-    ProtocolType(String p){
+    ProtocolType(String p) {
         this.p = p;
     }
 

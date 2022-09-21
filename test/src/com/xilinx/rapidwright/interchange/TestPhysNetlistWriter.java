@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2021 Xilinx, Inc.
+ * Copyright (c) 2021-2022, Xilinx, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Eddie Hung, Xilinx Research Labs.
@@ -90,12 +91,12 @@ public class TestPhysNetlistWriter {
 
         Enumerator<String> allStrings = PhysNetlistReader.readAllStrings(physNetlist);
 
-        for(PhysNet.Reader physNet : physNetlist.getPhysNets()) {
+        for (PhysNet.Reader physNet : physNetlist.getPhysNets()) {
             if (physNet.getType() == NetType.GND || physNet.getType() == NetType.VCC) {
                 continue;
             }
             for (StructList.Reader<RouteBranch.Reader> i : Arrays.asList(physNet.getSources(), physNet.getStubs())) {
-                for(PhysNetlist.RouteBranch.Reader routeBranch : i) {
+                for (PhysNetlist.RouteBranch.Reader routeBranch : i) {
                     StructList.Reader<RouteBranch.Reader> branches = routeBranch.getBranches();
                     // Necessary for nets having just one source
                     if (branches.size() > 0) {

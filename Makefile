@@ -29,7 +29,7 @@ ensure_headers:
 	@rm $(TMP_HEADER)
 
 check_headers:
-	@ NO_LICENSE_FILES=$$(git grep --files-without-match --cached 'Apache' -- '*.java'); \
+	@ NO_LICENSE_FILES=$$(git grep --files-without-match 'Apache' -- '*.java'); \
 	if [ ! -z "$$NO_LICENSE_FILES" ] ;\
 	then \
 		echo "These files are missing a license header:" ;\
@@ -40,8 +40,21 @@ check_headers:
 		exit 1;\
 	fi
 
+check_tabs:
+# Yes, that is an actual tab character in quotes, otherwise git grep doesn't work
+	@ FILES_CONTAINING_TABS=$$(git grep "	" -- '*.java'); \
+	if [ ! -z "$$FILES_CONTAINING_TABS" ] ;\
+	then \
+		echo "These files contain tab characters, please replace tabs with 4 spaces:" ;\
+		echo ;\
+		echo "$$FILES_CONTAINING_TABS" | sed 's/^/    /' ;\
+		echo ;\
+		echo "Use make check_tabs to automatically detect tab characters." ;\
+		exit 1;\
+	fi
 
-pre_commit: check_headers
+
+pre_commit: check_headers check_tabs
 
 enable_pre_commit_hook:
 	@ hook_file=$$(git rev-parse --git-path hooks/pre-commit) && \

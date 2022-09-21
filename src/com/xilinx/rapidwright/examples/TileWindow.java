@@ -2,7 +2,8 @@ package com.xilinx.rapidwright.examples;
 
 /*
  * Original work: Copyright (c) 2010-2011 Brigham Young University
- * Modified work: Copyright (c) 2017 Xilinx, Inc.
+ * Modified work: Copyright (c) 2017-2022, Xilinx, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -87,7 +88,7 @@ public class TileWindow extends QMainWindow{
     void updateStatus() {
         int x = (int) scene.getCurrX();
         int y = (int) scene.getCurrY();
-        if (x >= 0 && x < scene.getDevice().getColumns() && y >= 0 && y < scene.getDevice().getRows()){
+        if (x >= 0 && x < scene.getDevice().getColumns() && y >= 0 && y < scene.getDevice().getRows()) {
             final Tile tile = scene.getDevice().getTile(y, x);
             String tileName = tile.getName();
             final String sites = tile.getSites() ==null ? "" : tile.getSites().length>5 ? "too may too show" : Arrays.stream(tile.getSites()).map(Site::getName).sorted().collect(Collectors.joining(", "));
@@ -101,8 +102,8 @@ public class TileWindow extends QMainWindow{
         tileWindow.show();
         QApplication.exec();
     }
-    protected void saveAsPDFDesign(){
-        if(scene.getDesign() == null)
+    protected void saveAsPDFDesign() {
+        if (scene.getDesign() == null)
             return;
         String fileName = QFileDialog.getSaveFileName(this, tr("Save As PDF"),".", FileFilters.pdfFilter);
         if (fileName.length() == 0)
