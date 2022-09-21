@@ -39,8 +39,8 @@ public class Connection implements Comparable<Connection>{
 	/** A unique index of a connection */
 	private final int id;
 	/** The source and sink {@link SitePinInst} instances of a connection */
-	private SitePinInst source;
-	private final SitePinInst sink;
+	private RouteTerm source;
+	private final RouteTerm sink;
 	/** 
 	 * The source and sink {@link RoutableNode} instances (rnodes) of a connection.
 	 * They are created based on the INT tile nodes the source and sink SitePinInsts connect to, respectively.
@@ -82,7 +82,7 @@ public class Connection implements Comparable<Connection>{
 	/** List of nodes assigned to a connection to form the path for generating PIPs */
 	private List<Node> nodes;
 	
-	public Connection(int id, SitePinInst source, SitePinInst sink, NetWrapper netWrapper){
+	public Connection(int id, RouteTerm source, RouteTerm sink, NetWrapper netWrapper){
 		this.id = id;
 		this.source = source;
 		this.sink = sink;
@@ -305,11 +305,11 @@ public class Connection implements Comparable<Connection>{
 		return this.netWrapper;
 	}
 	
-	public SitePinInst getSource() {
+	public RouteTerm getSource() {
 		return source;
 	}
 
-	public void setSource(SitePinInst source) {
+	public void setSource(RouteTerm source) {
 		this.source = source;
 	}
 
@@ -321,7 +321,7 @@ public class Connection implements Comparable<Connection>{
 		this.direct = direct;
 	}
 
-	public SitePinInst getSink() {
+	public RouteTerm getSink() {
 		return sink;
 	}
 

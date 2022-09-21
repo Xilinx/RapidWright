@@ -40,7 +40,6 @@ import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SitePinInst;
-import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
@@ -79,7 +78,7 @@ public class RWRoute{
 	/** A list of global clock nets */
 	private List<Net> clkNets;
 	/** Static nets */
-	protected Map<Net, List<SitePinInst>> staticNetAndRoutingTargets;
+	protected Map<Net, List<RouteTerm>> staticNetAndRoutingTargets;
 	/** Nets with conflicting nodes that should be added to the routing targets */
 	protected Set<Net> conflictNets;
 	/** Several integers to indicate the netlist info */
@@ -372,7 +371,7 @@ public class RWRoute{
 	 */
 	protected void addNetConnectionToRoutingTargets(Net net) {
 		net.unroute();
-		createsNetWrapperAndConnections(net, net.getSinkPins());
+		createsNetWrapperAndConnections(net, RouteTermSitePin.asList(net.getSinkPins()));
 	}
 	
 	/**
@@ -380,24 +379,24 @@ public class RWRoute{
 	 * @param staticNet The static net in question, i.e. VCC or GND.
 	 */
 	protected void addStaticNetRoutingTargets(Net staticNet){
-		List<SitePinInst> sinks = new ArrayList<>();
+		List<RouteTerm> terms = new ArrayList<>();
 		for(SitePinInst sink : staticNet.getPins()){
 			if(sink.isOutPin()) continue;
-			sinks.add(sink);
+			terms.add(new RouteTermSitePin(sink));
 		}
 		
-		if(sinks.size() > 0 ) {
-			for(SitePinInst sink : sinks) {
-				addReservedNode(sink.getConnectedNode(), staticNet);
+		if(terms.size() > 0 ) {
+			for(RouteTerm term : terms) {
+				addReservedNode(term.getConnectedNode(), staticNet);
 			}
-			staticNetAndRoutingTargets.put(staticNet, sinks);
+			staticNetAndRoutingTargets.put(staticNet, terms);
 		}else {
 			preserveNet(staticNet);
 			numNotNeedingRoutingNets++;	
 		}
 	}
 	
-	protected void addStaticNetRoutingTargets(Net staticNet, List<SitePinInst> sinks) {
+	protected void addStaticNetRoutingTargets(Net staticNet, List<RouteTerm> sinks) {
 		staticNetAndRoutingTargets.put(staticNet, sinks);
 	}
 	
@@ -405,21 +404,21 @@ public class RWRoute{
 	 * Routes static nets with preserved resources list supplied to avoid conflicting nodes.
 	 */
 	protected void routeStaticNets(){
-		for(List<SitePinInst> netRouteTargetPins : staticNetAndRoutingTargets.values()) {
-			for(SitePinInst sink : netRouteTargetPins) {
-				preservedNodes.remove(sink.getConnectedNode());
+		for(List<RouteTerm> terms : staticNetAndRoutingTargets.values()) {
+			for(RouteTerm term : terms) {
+				preservedNodes.remove(term.getConnectedNode());
 			}
 		}
 
 		Net gndNet = design.getGndNet();
-		List<SitePinInst> gndPins = staticNetAndRoutingTargets.get(gndNet);
-		if (gndPins != null) {
-			List<SitePinInst> vccPins = new ArrayList<>();
-			RouterHelper.invertPossibleGndPinsToVccPins(design, gndPins, vccPins);
-			if (!vccPins.isEmpty()) {
+		List<RouteTerm> gndTerms = staticNetAndRoutingTargets.get(gndNet);
+		if (gndTerms != null) {
+			List<RouteTerm> vccTerms = new ArrayList<>();
+			RouterHelper.invertPossibleGndPinsToVccPins(design, gndTerms, vccTerms);
+			if (!vccTerms.isEmpty()) {
 				staticNetAndRoutingTargets.compute(design.getVccNet(), (k,v) -> {
-					if (v == null) return vccPins;
-					v.addAll(vccPins);
+					if (v == null) return vccTerms;
+					v.addAll(vccTerms);
 					return v;
 				});
 			}
@@ -432,10 +431,10 @@ public class RWRoute{
 		// the nodes connected to pins of other nets must be preserved.
 		unavailableNodes.addAll(rnodesCreated.keySet());
 		
-		for(Map.Entry<Net,List<SitePinInst>> e : staticNetAndRoutingTargets.entrySet()){
+		for(Map.Entry<Net,List<RouteTerm>> e : staticNetAndRoutingTargets.entrySet()){
 			Net net = e.getKey();
-			List<SitePinInst> pins = e.getValue();
-			System.out.println("INFO: Route " + pins.size() + " pins of " + net);
+			List<RouteTerm> terms = e.getValue();
+			System.out.println("INFO: Route " + terms.size() + " terminals of " + net);
 			Map<SitePinInst, List<Node>> sinksRoutingPaths = GlobalSignalRouting.routeStaticNet(net, unavailableNodes, design, routethruHelper);
 			
 			for(Entry<SitePinInst, List<Node>> sinkPath : sinksRoutingPaths.entrySet()) {
@@ -488,8 +487,8 @@ public class RWRoute{
 	
 	private Map<Short, Integer> connectionSpan = new HashMap<>();
 
-	protected SitePinInst getNetSource(Net net) {
-		return net.getSource();
+	protected RouteTerm getNetSource(Net net) {
+		return new RouteTermSitePin(net.getSource());
 	}
 
 	/**
@@ -497,72 +496,45 @@ public class RWRoute{
 	 * @param net The net to be initialized.
 	 * @return A {@link NetWrapper} instance.
 	 */
-	protected NetWrapper createsNetWrapperAndConnections(Net net, List<SitePinInst> sinkPins) {
+	protected NetWrapper createsNetWrapperAndConnections(Net net, List<RouteTerm> sinkTerms) {
 		NetWrapper netWrapper = new NetWrapper(numWireNetsToRoute++, net);
 		nets.add(netWrapper);
 
-		Device device = design.getDevice();
-		SitePinInst source = getNetSource(net);
+		RouteTerm source = getNetSource(net);
 		int indirect = 0;
 		Node sourceINTNode = null;
 
-		for(SitePinInst sink : sinkPins){
-			if(source.getSiteInst() != null && RouterHelper.isExternalConnectionToCout(source, sink)){
-				source = net.getAlternateSource();
+		for(RouteTerm sink : sinkTerms){
+			if(RouterHelper.isExternalConnectionToCout(source, sink)){
+				source = new RouteTermSitePin(net.getAlternateSource());
 				if(source == null){
 					String errMsg = "Null alternate source is for COUT-CIN connection: " + net.toStringFull();
 					throw new IllegalArgumentException(errMsg);
 				}
 			}
+			Connection connection = new Connection(numConnectionsToRoute++, source, sink, netWrapper);;
 
-			Connection connection;
-			Node sinkINTNode;
-			if (sink.getSiteInst() != null) {
-				connection = new Connection(numConnectionsToRoute++, source, sink, netWrapper);
-				List<Node> nodes = RouterHelper.projectInputPinToINTNode(sink);
-				if (nodes.isEmpty()) {
-					directConnections.add(connection);
-					connection.setDirect(true);
-					continue;
-				}
-
-				sinkINTNode = nodes.get(0);
-			} else {
-				// Part pin
-				sinkINTNode = device.getNode(sink.getName());
-				if (sinkINTNode == null || sinkINTNode.getTile().getTileTypeEnum() != TileTypeEnum.INT) {
-					throw new RuntimeException(sink.getName());
-				}
-
-				if (sinkINTNode.equals(sourceINTNode)) {
-					// (Input) part pins could be sources or sinks of a net, since input is used to indicate
-					// a leaf node of an antenna (the source from which new routing continues from) as well as
-					// to mark nodes that need to be routed to (net sinks)
-					continue;
-				}
-
-				connection = new Connection(numConnectionsToRoute++, source, sink, netWrapper);
+			List<Node> nodes = RouterHelper.projectInputPinToINTNode(sink);
+			if (nodes.isEmpty()) {
+				directConnections.add(connection);
+				connection.setDirect(true);
 			}
-			indirectConnections.add(connection);
-			connection.setSinkRnode(createAddRoutableNode(connection.getSink(), sinkINTNode, RoutableType.PINFEED_I));
-			if(sourceINTNode == null) {
-				if (source.getSiteInst() != null) {
-					sourceINTNode = RouterHelper.projectOutputPinToINTNode(source);
+			else {
+				Node sinkINTNode = nodes.get(0);
+				indirectConnections.add(connection);
+				connection.setSinkRnode(createAddRoutableNode(connection.getSink(), sinkINTNode, RoutableType.PINFEED_I));
+				if(sourceINTNode == null) {
+					sourceINTNode = RouterHelper.projectOutputTermToINTNode(source);
 					if (sourceINTNode == null) {
 						throw new RuntimeException("ERROR: Null projected INT node for the source of net " + net.toStringFull());
 					}
-				} else {
-					sourceINTNode = device.getNode(source.getName());
-					if (sourceINTNode == null || sourceINTNode.getTile().getTileTypeEnum() != TileTypeEnum.INT) {
-						throw new RuntimeException(source.getName());
-					}
 				}
+				connection.setSourceRnode(createAddRoutableNode(connection.getSource(), sourceINTNode, RoutableType.PINFEED_O));
+				connection.setDirect(false);
+				indirect++;
+				connection.computeHpwl();
+				addConnectionSpanInfo(connection);
 			}
-			connection.setSourceRnode(createAddRoutableNode(connection.getSource(), sourceINTNode, RoutableType.PINFEED_O));
-			connection.setDirect(false);
-			indirect++;
-			connection.computeHpwl();
-			addConnectionSpanInfo(connection);
 		}
 		
 		if(indirect > 0) {
@@ -643,12 +615,12 @@ public class RWRoute{
 	 * Creates a {@link RoutableNode} Object based on a {@link Node} instance and avoids duplicates,
 	 * used for creating the source and sink rnodes of {@link Connection} instances.
 	 * NOTE: This method does not consider the preserved nodes.
-	 * @param sitePinInst The source or sink {@link SitePinInst} instance.
-	 * @param node The node associated to the {@link SitePinInst} instance.
+	 * @param term The source or sink {@link RouteTerm} instance.
+	 * @param node The node associated to the {@link RouteTerm} instance.
 	 * @param type The {@link RoutableType} of the {@link RoutableNode} Object.
 	 * @return The created {@link RoutableNode} instance.
 	 */
-	private Routable createAddRoutableNode(SitePinInst sitePinInst, Node node, RoutableType type){
+	private Routable createAddRoutableNode(RouteTerm term, Node node, RoutableType type){
 		Routable rnode = rnodesCreated.get(node);
 		if(rnode == null){
 			// this is for initializing sources and sinks of those to-be-routed nets's connections
@@ -657,7 +629,7 @@ public class RWRoute{
 		}else{
 			// this is for checking preserved routing resource conflicts among routed nets */
 			if(rnode.getRoutableType() == type && type == RoutableType.PINFEED_I) {
-				System.out.println("WARNING: Conflicting node: " + node + ", connected to sink " + sitePinInst);
+				System.out.println("WARNING: Conflicting node: " + node + ", connected to sink " + term);
 			}
 		}
 		return rnode;
@@ -933,27 +905,23 @@ public class RWRoute{
 	private void assignNodesToConnections() {
 		for(Connection connection : sortedIndirectConnections){
 			connection.newNodes();
-			SitePinInst sink = connection.getSink();
-			if (sink.getSiteInst() != null) {
-				List<Node> switchBoxToSink = RouterHelper.findPathBetweenNodes(connection.getSinkRnode().getNode(), sink.getConnectedNode());
-				if(switchBoxToSink.size() >= 2) {
-					for(int i = 0; i < switchBoxToSink.size() -1; i++) {
-						connection.addNode(switchBoxToSink.get(i));
-					}
+			RouteTerm sink = connection.getSink();
+			List<Node> switchBoxToSink = RouterHelper.findPathBetweenNodes(connection.getSinkRnode().getNode(), sink.getConnectedNode());
+			if(switchBoxToSink.size() >= 2) {
+				for(int i = 0; i < switchBoxToSink.size() -1; i++) {
+					connection.addNode(switchBoxToSink.get(i));
 				}
 			}
-			
+
 			for(Routable rnode:connection.getRnodes()){
 				connection.addNode(rnode.getNode());
 			}
 
-			SitePinInst source = connection.getSource();
-			if (source.getSiteInst() != null) {
-				List<Node> sourceToSwitchBox = RouterHelper.findPathBetweenNodes(source.getConnectedNode(), connection.getSourceRnode().getNode());
-				if(sourceToSwitchBox.size() >= 2) {
-					for(int i = 1; i <= sourceToSwitchBox.size() - 1; i++) {
-						connection.addNode(sourceToSwitchBox.get(i));
-					}
+			RouteTerm source = connection.getSource();
+			List<Node> sourceToSwitchBox = RouterHelper.findPathBetweenNodes(source.getConnectedNode(), connection.getSourceRnode().getNode());
+			if(sourceToSwitchBox.size() >= 2) {
+				for(int i = 1; i <= sourceToSwitchBox.size() - 1; i++) {
+					connection.addNode(sourceToSwitchBox.get(i));
 				}
 			}
 		}
@@ -1345,14 +1313,15 @@ public class RWRoute{
 		
 		net.replaceSource(altSource);
 		net.setSource(altSource);
-		net.setAlternateSource(connection.getSource());
+		net.setAlternateSource(connection.getSource().getSitePinInst());
 		DesignTools.routeAlternativeOutputSitePin(net, altSource);
 		netWrapper.setSourceChanged(true);
-		
-		Node sourceINTNode = RouterHelper.projectOutputPinToINTNode(altSource);
-		Routable sourceR = createAddRoutableNode(altSource, sourceINTNode, RoutableType.PINFEED_O);;
+
+		RouteTerm altSourceTerm = new RouteTermSitePin(altSource);
+		Node sourceINTNode = RouterHelper.projectOutputTermToINTNode(altSourceTerm);
+		Routable sourceR = createAddRoutableNode(altSourceTerm, sourceINTNode, RoutableType.PINFEED_O);;
 		for(Connection otherConnectionOfNet : netWrapper.getConnections()) {
-			otherConnectionOfNet.setSource(altSource);
+			otherConnectionOfNet.setSource(altSourceTerm);
 			otherConnectionOfNet.setSourceRnode(sourceR);
 		}
 			
@@ -1392,7 +1361,7 @@ public class RWRoute{
 		for(Net n : toRouteNets) {
 			List<Node> reservedNetNodes = RouterHelper.getNodesOfNet(n);
 			
-			NetWrapper netnew = createsNetWrapperAndConnections(n, n.getSinkPins());
+			NetWrapper netnew = createsNetWrapperAndConnections(n, RouteTermSitePin.asList(n.getSinkPins()));
 			
 			for(Node toBuild : reservedNetNodes) {
 				// remove the node from the preserved nodes
@@ -1666,10 +1635,10 @@ public class RWRoute{
 		return design;
 	}
 	
-	private int getNumSitePinOfStaticNets() {
+	private int getNumTerminalsOfStaticNets() {
 		int totalSitePins = 0;
-		for(List<SitePinInst> pins : staticNetAndRoutingTargets.values()) {
-			totalSitePins += pins.size();
+		for(List<RouteTerm> terms : staticNetAndRoutingTargets.values()) {
+			totalSitePins += terms.size();
 		}
 		return totalSitePins;
 	}
@@ -1720,10 +1689,10 @@ public class RWRoute{
 		for(Net clk : clkNets) {
 			clkPins += clk.getSinkPins().size();
 		}
-		printFormattedString("  All site pins to be routed: ", (indirectConnections.size() + getNumSitePinOfStaticNets() + clkPins));	
+		printFormattedString("  All terminals to be routed: ", (indirectConnections.size() + getNumTerminalsOfStaticNets() + clkPins));
 		printFormattedString("    Connections to be routed: ", indirectConnections.size());
-		printFormattedString("    Static net pins: ", getNumSitePinOfStaticNets());
-		printFormattedString("    Clock pins: ", clkPins);
+		printFormattedString("    Static net terms: ", getNumTerminalsOfStaticNets());
+		printFormattedString("    Clock terms: ", clkPins);
 		printFormattedString("Nets not needing routing: ", numNotNeedingRoutingNets);
 		if(numUnrecognizedNets != 0)
 			printFormattedString("Nets unrecognized: ", numUnrecognizedNets);
@@ -1789,9 +1758,9 @@ public class RWRoute{
 		return routeDesign(design, new RWRouteConfig(new String[] {"--partialRouting", "--fixBoundingBox", "--nonTimingDriven", "--verbose"}));
 	}
 
-	public static Design routeDesignPartialNonTimingDriven(Design design, Map<Net,List<SitePinInst>> netToUnroutedPins) {
+	public static Design routeDesignPartialNonTimingDriven(Design design, Map<Net,List<RouteTerm>> netToUnroutedTerms) {
 		return routeDesign(design, new RWRouteConfig(new String[] {"--partialRouting", "--fixBoundingBox", "--nonTimingDriven", "--verbose"}),
-				netToUnroutedPins);
+				netToUnroutedTerms);
 	}
 
 	/**
@@ -1822,12 +1791,12 @@ public class RWRoute{
 		});
 	}
 
-	private static Design routeDesign(Design design, RWRouteConfig config, Map<Net,List<SitePinInst>> netToUnroutedPins) {
+	private static Design routeDesign(Design design, RWRouteConfig config, Map<Net,List<RouteTerm>> netToUnroutedTerms) {
 		return routeDesign(design, config, () -> {
 			if(config.isPartialRouting()) {
-				return new PartialRouter(design, config, netToUnroutedPins);
+				return new PartialRouter(design, config, netToUnroutedTerms);
 			}
-			assert(netToUnroutedPins == null);
+			assert(netToUnroutedTerms == null);
 			return new RWRoute(design, config);
 		});
 	}

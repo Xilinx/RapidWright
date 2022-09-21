@@ -127,14 +127,17 @@ public class TimingAndWirelengthReport{
 					 throw new IllegalArgumentException(errMsg);
 				}
 			}
-			Connection connection = new Connection(this.numConnectionsToRoute++, source, sink, netWrapper);	
+			Connection connection = new Connection(this.numConnectionsToRoute++,
+					new RouteTermSitePin(source),
+					new RouteTermSitePin(sink),
+					netWrapper);
 			List<Node> nodes = RouterHelper.projectInputPinToINTNode(sink);
 			if(nodes.isEmpty()) {	
 				connection.setDirect(true);
 			}else {
 				connection.setSinkRnode(new RoutableNode(this.rnodeId++, nodes.get(0), RoutableType.PINFEED_I));
 				if(sourceINTNode == null) {
-					sourceINTNode = RouterHelper.projectOutputPinToINTNode(source);
+					sourceINTNode = RouterHelper.projectOutputTermToINTNode(source);
 				}
 				connection.setSourceRnode(new RoutableNode(this.rnodeId++, sourceINTNode, RoutableType.PINFEED_O));
 				connection.setDirect(false);

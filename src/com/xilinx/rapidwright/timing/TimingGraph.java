@@ -1975,7 +1975,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
 	public void setTimingEdgesOfConnections(List<Connection> connections) {
 		for(Connection connection : connections) {
 			if(connection.isDirect()) continue;
-			List<EDIFHierPortInst> hportsFromSitePinInsts = DesignTools.getPortInstsFromSitePinInst(connection.getSink());
+			List<EDIFHierPortInst> hportsFromSitePinInsts = DesignTools.getPortInstsFromSitePinInst(connection.getSink().getSitePinInst());
 			if(hportsFromSitePinInsts.isEmpty()) {
 				throw new RuntimeException("ERROR: Unable to find hierarchical logical cell pins from: " + connection.getSink());
 			}
