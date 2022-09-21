@@ -1,25 +1,26 @@
-/* 
- * Copyright (c) 2020 Xilinx, Inc. 
+/*
+ * Copyright (c) 2020-2022, Xilinx, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
- *  
- * This file is part of RapidWright. 
- * 
+ *
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
- 
+
 package com.xilinx.rapidwright.interchange;
 
 import java.io.IOException;
@@ -74,25 +75,25 @@ import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.SiteInstan
 import com.xilinx.rapidwright.interchange.RouteBranchNode.RouteSegmentType;
 
 public class PhysNetlistWriter {
-        
+
     public static final boolean BUILD_ROUTING_GRAPH_ON_EXPORT = true;
-    
-    private static void writeSiteInsts(PhysNetlist.Builder physNetlist, Design design, 
+
+    private static void writeSiteInsts(PhysNetlist.Builder physNetlist, Design design,
             Enumerator<String> strings) {
         Builder<SiteInstance.Builder> siteInsts = physNetlist.initSiteInsts(design.getSiteInsts().size());
-        int i=0; 
+        int i=0;
         for (SiteInst si : design.getSiteInsts()) {
             SiteInstance.Builder siBuilder = siteInsts.get(i);
             siBuilder.setSite(strings.getIndex(si.getSiteName()));
             siBuilder.setType(strings.getIndex(si.getSiteTypeEnum().name()));
             i++;
         }
-        
+
     }
-    
+
     public static final String LOCKED = "<LOCKED>";
     public static final String PORT = "<PORT>";
-    
+
     protected static String getUniqueLockedCellName(Cell cell, HashMap<String,PhysCellType> physCells) {
         String cellName = cell.getName();
         if (cellName.equals(LOCKED)) {
@@ -135,7 +136,7 @@ public class PhysNetlistWriter {
                 }
             }
         }
-        
+
         Builder<CellPlacement.Builder> cells = physNetlist.initPlacements(allCells.size());
         for (Cell cell : allCells) {
             CellPlacement.Builder physCell = cells.get(i);
@@ -172,10 +173,10 @@ public class PhysNetlistWriter {
                     idx = addCellPinMappings(c, strings, pinMap, idx);
                 }
             }
-            
+
             i++;
-        }        
-        
+        }
+
         // Add PhysCells
         Builder<PhysCell.Builder> physCellBuilders = physNetlist.initPhysCells(physCells.size());
         int j=0;
@@ -188,9 +189,9 @@ public class PhysNetlistWriter {
             j++;
         }
     }
-    
-    private static int addCellPinMappings(Cell cell, Enumerator<String> strings, 
-                                            Builder<PinMapping.Builder> pinMap, Integer idx) { 
+
+    private static int addCellPinMappings(Cell cell, Enumerator<String> strings,
+                                            Builder<PinMapping.Builder> pinMap, Integer idx) {
         for (Entry<String,String> e : cell.getPinMappingsP2L().entrySet()) {
             PinMapping.Builder pinMapping = pinMap.get(idx);
             pinMapping.setBel(strings.getIndex(cell.getBELName()));
@@ -198,7 +199,7 @@ public class PhysNetlistWriter {
             pinMapping.setBelPin(strings.getIndex(e.getKey()));
             pinMapping.setIsFixed(cell.isPinFixed(e.getKey()));
             idx++;
-        } 
+        }
         if (cell.hasAltPinMappings()) {
             for (Entry<String,AltPinMapping> e : cell.getAltPinMappings().entrySet()) {
                 PinMapping.Builder pinMapping = pinMap.get(idx);
@@ -242,7 +243,7 @@ public class PhysNetlistWriter {
                 List<RouteBranchNode> segments = netSiteRouting.computeIfAbsent(net, (n) -> new ArrayList<>());
                 segments.add(new RouteBranchNode(site, sitePIP, status.isFixed()));
             }
-            
+
             for (Entry<Net,List<String>> e : siteInst.getNetToSiteWiresMap().entrySet()) {
                 List<RouteBranchNode> segments = netSiteRouting.get(e.getKey());
                 if (segments == null) {
@@ -279,7 +280,7 @@ public class PhysNetlistWriter {
         return netSiteRouting;
     }
 
-    private static void writePhysNets(PhysNetlist.Builder physNetlist, Design design, 
+    private static void writePhysNets(PhysNetlist.Builder physNetlist, Design design,
                                         Enumerator<String> strings) {
 
         List<RouteBranchNode> nullNetStubs = new ArrayList<>();
@@ -298,7 +299,7 @@ public class PhysNetlistWriter {
             physSitePIP.setIsFixed(sitePIP.isFixed);
             i++;
         }
-        
+
         int physNetCount = netSiteRouting.size();
         // Check if some routes exists without site routing
         for (Net net : design.getNets()) {
@@ -306,7 +307,8 @@ public class PhysNetlistWriter {
                 physNetCount++;
             }
         }
-        
+
+
         Builder<PhysNet.Builder> nets = physNetlist.initPhysNets(physNetCount);
         i=0;
         for (Net net : design.getNets()) {
@@ -318,18 +320,18 @@ public class PhysNetlistWriter {
                     break;
                 case VCC:
                     physNet.setType(PhysNetlist.NetType.VCC);
-                    break;                    
+                    break;
                 default:
                     physNet.setType(PhysNetlist.NetType.SIGNAL);
             }
-            
+
             // We need to traverse the net inside sites to fully populate routing spec
             ArrayList<RouteBranchNode> routingSources = new ArrayList<>();
             List<PIP> stubNodes = new ArrayList<>();
             for (PIP p : net.getPIPs()) {
                 if (p.getEndWireName() == null) {
                     stubNodes.add(p);
-                }else {
+                } else {
                     routingSources.add(new RouteBranchNode(p));
                 }
             }
@@ -360,8 +362,8 @@ public class PhysNetlistWriter {
             i++;
         }
     }
-    
-    
+
+
     @SuppressWarnings("unused")
     private static void debugPrintRouteBranchNodes(List<RouteBranchNode> nodes, String prefix) {
         for (RouteBranchNode n : nodes) {
@@ -369,19 +371,19 @@ public class PhysNetlistWriter {
             debugPrintRouteBranchNodes(n.getBranches(), prefix + "  ");
         }
     }
-    
+
     private static void populateRouting(List<RouteBranchNode> routingBranches,
                                         PhysNet.Builder physNet, Enumerator<String> strings) {
 
         List<RouteBranchNode> sources = new ArrayList<>();
         List<RouteBranchNode> stubs = new ArrayList<>();
-        
+
         if (BUILD_ROUTING_GRAPH_ON_EXPORT) {
             Map<String, RouteBranchNode> map = new HashMap<>();
             for (RouteBranchNode rb : routingBranches) {
                 map.put(rb.toString(), rb);
             }
-            
+
             // PASS 1: Connect drivers of each branch, put sources on source list
             for (RouteBranchNode rb : routingBranches) {
                 if (rb.isSource()) {
@@ -394,7 +396,7 @@ public class PhysNetlistWriter {
                             PIP pip = driverBranch.getPIP();
                             if (pip.isBidirectional() && rb.getType() == RouteSegmentType.PIP) {
                                 PIP curr = rb.getPIP();
-                                Node driverNode = pip.isReversed() ? 
+                                Node driverNode = pip.isReversed() ?
                                                   pip.getStartNode() : pip.getEndNode();
                                 if (!curr.getStartNode().equals(driverNode)) {
                                     continue;
@@ -405,7 +407,7 @@ public class PhysNetlistWriter {
                     }
                 }
             }
-            
+
             // PASS 2: Any nodes not reachable by sources, go onto stubs list
             Queue<RouteBranchNode> queue = new LinkedList<>(sources);
             while (!queue.isEmpty()) {
@@ -425,9 +427,9 @@ public class PhysNetlistWriter {
         } else {
             stubs = routingBranches;
         }
-        
+
         //if (strings.get(physNet.getName()).equals("")) debugPrintRouteBranchNodes(sources, "");
-        
+
         // Serialize...
         Builder<RouteBranch.Builder> routeSrcs = physNet.initSources(sources.size());
         for (int i=0; i < sources.size(); i++) {
@@ -493,44 +495,44 @@ public class PhysNetlistWriter {
             writeRouteBranch(branches.get(i), src.getBranch(i), strings);
         }
     }
-    
-    private static void writeDesignProperties(PhysNetlist.Builder physNetlist, Design design, 
+
+    private static void writeDesignProperties(PhysNetlist.Builder physNetlist, Design design,
                                                 Enumerator<String> strings) {
         StructList.Builder<Property.Builder> props = physNetlist.initProperties(2);
         Property.Builder autoIOs = props.get(0);
         autoIOs.setKey(strings.getIndex(PhysNetlistReader.DISABLE_AUTO_IO_BUFFERS));
         autoIOs.setValue(strings.getIndex(design.isAutoIOBuffersSet() ? "0" : "1"));
-        
+
         Property.Builder ooc = props.get(1);
         ooc.setKey(strings.getIndex(PhysNetlistReader.OUT_OF_CONTEXT));
-        ooc.setValue(strings.getIndex(design.isDesignOutOfContext() ? "1" : "0"));        
+        ooc.setValue(strings.getIndex(design.isDesignOutOfContext() ? "1" : "0"));
     }
-    
+
     public static void writeStrings(PhysNetlist.Builder physNetlist, Enumerator<String> strings) {
         TextList.Builder strList = physNetlist.initStrList(strings.size());
         int stringCount = strList.size();
         for (int i=0; i < stringCount; i++) {
             strList.set(i, new Text.Reader(strings.get(i)));
-        }              
+        }
     }
-    
+
     public static void writePhysNetlist(Design design, String fileName) throws IOException {
         MessageBuilder message = new MessageBuilder();
         PhysNetlist.Builder physNetlist = message.initRoot(PhysNetlist.factory);
         Enumerator<String> strings = new Enumerator<>();
 
         physNetlist.setPart(design.getPartName());
-        
+
         writeSiteInsts(physNetlist, design, strings);
-        
+
         writePlacement(physNetlist, design, strings);
-        
+
         writePhysNets(physNetlist, design, strings);
-        
+
         writeDesignProperties(physNetlist, design, strings);
-        
+
         writeStrings(physNetlist, strings);
-        
+
         Interchange.writeInterchangeFile(fileName, message);
     }
 }
