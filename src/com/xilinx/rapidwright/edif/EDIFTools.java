@@ -25,7 +25,6 @@
 package com.xilinx.rapidwright.edif;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -37,6 +36,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -55,7 +55,6 @@ import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.Pair;
-import com.xilinx.rapidwright.util.ParallelismTools;
 
 
 /**
@@ -164,11 +163,9 @@ public class EDIFTools {
 	 * @return The part name or null if none was found.
 	 */
 	public static String getPartName(EDIFNetlist edif){
-		EDIFName key = new EDIFName(EDIF_PART_PROP);
-		EDIFPropertyValue p = edif.getDesign().getProperties().get(key);
+		EDIFPropertyValue p = edif.getDesign().getPropertiesMap().get(EDIF_PART_PROP);
 		if(p == null) {
-			key.setName(EDIF_PART_PROP.toLowerCase());
-			p = edif.getDesign().getProperties().get(key);
+			p = edif.getDesign().getPropertiesMap().get(EDIF_PART_PROP.toLowerCase());
 			if(p == null) return null;
 		}
 		return p.getValue();
@@ -738,21 +735,9 @@ public class EDIFTools {
 	}
 
 	public static EDIFNetlist loadEDIFStream(InputStream is, long size) throws IOException {
-		if (ParallelEDIFParser.calcThreads(size) > 1) {
-			// Copy input stream to a temporary file so that it can be parsed in parallel
-			Path fileName = getTempEDIFFile();
-			try {
-				Files.copy(is, fileName);
-				try (ParallelEDIFParser p = new ParallelEDIFParser(fileName, size)) {
-					return p.parseEDIFNetlist();
-				}
-			} finally {
-				Files.deleteIfExists(fileName);
-			}
-		} else {
-			try (EDIFParser p = new EDIFParser(is)) {
-				return p.parseEDIFNetlist();
-			}
+
+		try (EDIFParser p = new EDIFParser(is)) {
+			return p.parseEDIFNetlist();
 		}
 	}
 
@@ -783,13 +768,13 @@ public class EDIFTools {
 		    design = new EDIFDesign(edif.getName());
 		    edif.setDesign(design);
 		}
-		Map<EDIFName, EDIFPropertyValue> propMap = design.getProperties();
+		Map<String, EDIFPropertyValue> propMap = design.getPropertiesMap();
 		if(propMap == null || propMap.size() == 0){
 			edif.getDesign().addProperty(EDIF_PART_PROP, partName);
 			return;
 		}
 		boolean modified = false;
-		for(Entry<EDIFName,EDIFPropertyValue> p : propMap.entrySet()){
+		for(Entry<String,EDIFPropertyValue> p : propMap.entrySet()){
 			String val = p.getValue().toString();
 			if(val.contains("intex") || val.contains("irtex")){
 				EDIFPropertyValue v = new EDIFPropertyValue();
@@ -801,6 +786,7 @@ public class EDIFTools {
 			}
 		}
 		if(!modified){
+			edif.getDesign().removeProperty(EDIF_PART_PROP.toLowerCase());
 			edif.getDesign().addProperty(EDIF_PART_PROP, partName);
 		}
 	}
@@ -974,13 +960,12 @@ public class EDIFTools {
 	}
 
 	/**
-	 * Creates a new netlist from an existing EDIFCellInst in a netlist.  This operation is 
-	 * destructive to the source netlist.   
+	 * Creates a new netlist from an existing EDIFCellInst in a netlist.  This operation does not 
+	 * modify the source netlist.   
 	 * @param cellInst The new top cell/top cell inst in the netlist.
 	 * @return The newly created netlist from the provided cell inst.
 	 */
 	public static EDIFNetlist createNewNetlist(EDIFCellInst cellInst){
-	    List<String> librariesOrder = new ArrayList<>(cellInst.getCellType().getNetlist().getLibrariesMap().keySet());
 	    EDIFNetlist n = new EDIFNetlist(cellInst.getName());
 	    n.generateBuildComments();
 	    EDIFDesign eDesign = new EDIFDesign(cellInst.getName());
@@ -989,6 +974,8 @@ public class EDIFTools {
 	    n.copyCellAndSubCells(topCell);
 
 	    eDesign.setTopCell(n.getLibrary(topCell.getLibrary().getName()).getCell(topCell.getName()));
+	    // If we have more than the primitives and work library, lets order the libraries in the same way 
+	    // from the source netlist
 	    if(n.getLibraries().size() > 2) {
 	        // Put libraries in the same order as source netlist
 	        Map<String, EDIFLibrary> libs = new HashMap<>();
@@ -996,7 +983,7 @@ public class EDIFTools {
 	            libs.put(lib.getName(), lib);
 	        }
 	        n.getLibrariesMap().clear();
-	        for(String libName : librariesOrder) {
+	        for(String libName : cellInst.getCellType().getNetlist().getLibrariesMap().keySet()) {
 	            EDIFLibrary lib = libs.get(libName);
 	            if(lib != null) {
 	                n.getLibrariesMap().put(libName, lib);	                
@@ -1472,11 +1459,35 @@ public class EDIFTools {
 	    for(EDIFLibrary lib : netlist.getLibraries()) {
 	        System.out.println("LIBRARY: " + lib.getName());
 	        for(Entry<String,EDIFCell> entry : lib.getCellMap().entrySet()) {
-	            System.out.println("  CELL: " + entry.getValue().getLegalEDIFName() + " /// " + entry.getKey());
+	            System.out.println("  CELL: " + entry.getValue().getName() + " /// " + entry.getKey());
 	            for(EDIFCellInst inst : entry.getValue().getCellInsts()) {
-	                System.out.println("    INST: " + inst.getCellType().getLegalEDIFName() + "("+inst.getLegalEDIFName()+")");
+	                System.out.println("    INST: " + inst.getCellType().getName() + "("+inst.getName() +")");
 	            }
 	        }
 	    }
 	}
+
+	public static <T>
+	Iterable<T> sortIfStable(Collection<T> collection, Comparator<T> comparator, boolean stable) {
+		if (!stable) {
+			return collection;
+		}
+		return collection.stream().sorted(comparator)::iterator;
+	}
+
+    public static <T extends EDIFName>
+    Iterable<T> sortIfStable(Collection<T> collection, boolean stable) {
+        if (!stable) {
+            return collection;
+        }
+        return collection.stream().sorted(Comparator.comparing(EDIFName::getName))::iterator;
+    }
+
+    public static <T extends Comparable<T>, U>
+    Iterable<Entry<T,U>> sortIfStable(Map<T,U> collection, boolean stable) {
+        if (!stable) {
+            return collection.entrySet();
+        }
+        return collection.entrySet().stream().sorted(Entry.comparingByKey())::iterator;
+    }
 }

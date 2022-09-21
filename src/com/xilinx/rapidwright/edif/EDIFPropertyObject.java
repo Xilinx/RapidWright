@@ -26,11 +26,13 @@
 package com.xilinx.rapidwright.edif;
 
 import java.io.IOException;
-import java.io.Writer;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.stream.Collectors;
 
 /**
  * All EDIF netlist objects that can possess properties inherit from this 
@@ -39,18 +41,14 @@ import java.util.Map.Entry;
  */
 public class EDIFPropertyObject extends EDIFName {
 
-	private Map<EDIFName,EDIFPropertyValue> properties;
-	
-	private String owner;
-	
-	private static EDIFName tmp = new EDIFName();
-	
+	private Map<String,EDIFPropertyValue> properties;
+
 	public EDIFPropertyObject(String name){
 		super(name);
 	}
 	
 	public EDIFPropertyObject(EDIFPropertyObject obj) {
-		super((EDIFName)obj);
+		super(obj);
 		properties = obj.createDuplicatePropertiesMap();
 	}
 	
@@ -78,9 +76,8 @@ public class EDIFPropertyObject extends EDIFName {
 	 * @return The previous property value stored under the provided key
 	 */
 	public EDIFPropertyValue addProperty(String key, String value){
-		EDIFName k = new EDIFName(key);
 		EDIFPropertyValue p = new EDIFPropertyValue(value, EDIFValueType.STRING);
-		return addProperty(k,p);
+		return addProperty(key,p);
 	}
 	
 	/**
@@ -114,8 +111,7 @@ public class EDIFPropertyObject extends EDIFName {
 	 */
 	public EDIFPropertyValue removeProperty(String key) {
 		if(properties == null) return null;
-		EDIFName k = new EDIFName(key);
-		return properties.remove(k);
+		return properties.remove(key);
 	}
 	
 	/**
@@ -124,11 +120,23 @@ public class EDIFPropertyObject extends EDIFName {
 	 * @param value Value entry for the property
 	 * @return Old property value for the provided key
 	 */
+	@Deprecated
 	public EDIFPropertyValue addProperty(EDIFName key, EDIFPropertyValue value){
+		return addProperty(key.getName(), value);
+	}
+
+	/**
+	 * Adds the property entry mapping for this object.
+	 * @param key Key entry for the property
+	 * @param value Value entry for the property
+	 * @return Old property value for the provided key
+	 */
+	public EDIFPropertyValue addProperty(String key, EDIFPropertyValue value){
 		if(properties == null) properties = getNewMap();
 		return properties.put(key, value);
 	}
-	
+
+	@Deprecated
 	public void addProperties(Map<EDIFName,EDIFPropertyValue> properties){
 		for(Entry<EDIFName,EDIFPropertyValue> p : properties.entrySet()){
 			addProperty(p.getKey(),p.getValue());
@@ -137,70 +145,90 @@ public class EDIFPropertyObject extends EDIFName {
 	
 	public EDIFPropertyValue getProperty(String key){
 		if(properties == null) return null;
-		String edifName = EDIFTools.makeNameEDIFCompatible(key);
-		tmp.setName(key);
-		if(!edifName.equals(key)) tmp.setEDIFRename(edifName);
-		EDIFPropertyValue val = properties.get(tmp);
-		tmp.setEDIFRename(null);
-		return val;
+		return properties.get(key);
 	}
 		
 	/**
+	 * Get all properties. Because the internal representation has changed, this is read-only and
+	 * includes a conversion step.
+	 * Replaced by {@link #getPropertiesMap()}
 	 * @return the properties
 	 */
+	@Deprecated
 	public Map<EDIFName, EDIFPropertyValue> getProperties() {
-		if(properties == null) return Collections.emptyMap();
-		return properties;
+		if (properties == null) {
+			return Collections.emptyMap();
+		}
+		return Collections.unmodifiableMap(properties.entrySet().stream()
+				.collect(Collectors.toMap(e->new EDIFName(e.getKey()), Entry::getValue)));
 	}
 
 	/**
 	 * Creates a completely new copy of the map
 	 * @return
 	 */
-	public Map<EDIFName, EDIFPropertyValue> createDuplicatePropertiesMap(){
+	public Map<String, EDIFPropertyValue> createDuplicatePropertiesMap(){
 		if(properties == null) return null;
-		Map<EDIFName, EDIFPropertyValue> newMap = new HashMap<EDIFName, EDIFPropertyValue>();
-		for(Entry<EDIFName, EDIFPropertyValue> e : properties.entrySet()) {
-			newMap.put(new EDIFName(e.getKey()), new EDIFPropertyValue(e.getValue()));
+		Map<String, EDIFPropertyValue> newMap = new HashMap<>();
+		for(Entry<String, EDIFPropertyValue> e : properties.entrySet()) {
+			newMap.put(e.getKey(), new EDIFPropertyValue(e.getValue()));
 		}
 		return newMap;
 	}
-	
+
 	/**
+	 * Get all properties in native format
+	 */
+	public Map<String, EDIFPropertyValue> getPropertiesMap() {
+		if (properties == null) {
+			return Collections.emptyMap();
+		}
+		return properties;
+	}
+
+	/**
+	 * This function does not work anymore and is only kept around to give users a hint on how to change their code.
+	 * Please use {@link #setPropertiesMap(Map)} instead.
+	 */
+	@Deprecated
+	public void setProperties(Map<EDIFName, EDIFPropertyValue> properties) {
+		// We can't just copy the values from the user-supplied map into a Map<String, EDIFPropertyValue>. The user might
+		// update the supplied map after calling this method. Those changes would not be reflected in the copied map.
+		// In order to not silently change behaviour, let's just throw an exception.
+		throw new RuntimeException("The internal representation of Properties has changed. Please use setPropertiesMap instead of this function.");
+	}
+
+	/**
+	 * Set all properties
 	 * @param properties the properties to set
 	 */
-	public void setProperties(Map<EDIFName, EDIFPropertyValue> properties) {
+	public void setPropertiesMap(Map<String, EDIFPropertyValue> properties) {
 		this.properties = properties;
 	}
 
-	public void exportEDIFProperties(Writer wr, String indent) throws IOException{
+	public static final byte[] EXPORT_CONST_PROP_START = "(property ".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_OWNER_START = " (owner \"".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_OWNER_END = "\")".getBytes(StandardCharsets.UTF_8);
+	public static final byte[] EXPORT_CONST_PROP_END = ")\n".getBytes(StandardCharsets.UTF_8);
+
+	public void exportEDIFProperties(OutputStream os, byte[] indent, EDIFWriteLegalNameCache<?> cache, boolean stable) throws IOException{
 		if(properties == null) return;
-		for(Entry<EDIFName, EDIFPropertyValue> e : properties.entrySet()){
-			wr.write(indent);
-			wr.write("(property ");
-			e.getKey().exportEDIFName(wr);
-			wr.write(" ");
-			e.getValue().writeEDIFString(wr);
-			if(owner != null){
-				wr.write(" (owner \"");
-				wr.write(owner);
-				wr.write("\")");
+		for(Entry<String, EDIFPropertyValue> e : EDIFTools.sortIfStable(properties, stable)) {
+			try {
+				os.write(indent);
+				os.write(EXPORT_CONST_PROP_START);
+				EDIFName.exportSomeEDIFName(os, e.getKey(), cache.getEDIFRename(e.getKey()));
+				os.write(' ');
+				e.getValue().writeEDIFString(os);
+				if(e.getValue().getOwner() != null){
+					os.write(EXPORT_CONST_OWNER_START);
+					os.write(e.getValue().getOwner().getBytes(StandardCharsets.UTF_8));
+					os.write(EXPORT_CONST_OWNER_END);
+				}
+				os.write(EXPORT_CONST_PROP_END);
+			} catch (IOException ex) {
+				throw new RuntimeException(ex);
 			}
-			wr.write(")\n");
 		}
-	}
-
-	/**
-	 * @return the owner
-	 */
-	public String getOwner() {
-		return owner;
-	}
-
-	/**
-	 * @param owner the owner to set
-	 */
-	public void setOwner(String owner) {
-		this.owner = owner;
 	}
 }
