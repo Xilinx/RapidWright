@@ -158,8 +158,8 @@ public class TestDesignTools {
         boolean keepStaticRouting = false;
         HashMap<String, Integer> numPIPs = new HashMap<String, Integer>()
         {{
-            put("GLOBAL_LOGIC0",  0);
-            put("GLOBAL_LOGIC1",  0);
+            put(Net.GND_NET,  0);
+            put(Net.VCC_NET,  0);
         }};
 
         testCopyImplementationHelper(keepStaticRouting, numPIPs);
