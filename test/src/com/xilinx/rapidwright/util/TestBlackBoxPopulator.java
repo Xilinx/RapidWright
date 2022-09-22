@@ -31,7 +31,7 @@ import org.junit.jupiter.api.Test;
 import java.util.ArrayList;
 import java.util.List;
 
-public class TestBlackBoxesPopulator {
+public class TestBlackBoxPopulator {
 
     private static String topDCPName = RapidWrightDCP.getString("hwct.dcp");
     private static String cellDCPName = RapidWrightDCP.getString("hwct_pr1.dcp");
@@ -57,7 +57,7 @@ public class TestBlackBoxesPopulator {
         int numSignalNetTemplate = template.getNets().size() - numVccNetTemplate - numGndNetTemplate;
 
         Module mod = new Module(template, false);
-        BlackboxesPopulator.relocateModuleInsts(top, mod, cellAnchor, targets);
+        BlackboxPopulator.relocateModuleInsts(top, mod, cellAnchor, targets);
 
         Assertions.assertEquals(targets.size()*template.getCells().size()+numCellTop, top.getCells().size()
                 ,"Wrong number of cells!");

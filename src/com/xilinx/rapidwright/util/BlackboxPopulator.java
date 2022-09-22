@@ -50,7 +50,7 @@ import com.xilinx.rapidwright.tests.CodePerfTracker;
 /**
  * Fill some black boxes of a given design with a specific {@link Module} (DCP) implementation.
  */
-public class BlackboxesPopulator {
+public class BlackboxPopulator {
 
     /**
      * Fill some black boxes of the given design with the given implementation.
