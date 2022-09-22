@@ -2449,6 +2449,7 @@ public class DesignTools {
 
     /**
      * Copy the route of static nets feeding the sinks within the given SiteInst.
+     * The route of static nets connecting to every site pin of the given site instances will be copied.
      * @param dest The destination design
      * @param staticNets The list of static nets to copy
      * @param siteInstsOfCells The set of SiteInst containing the sinks of the static nets
@@ -2470,7 +2471,6 @@ public class DesignTools {
             netToPIPs.put(net, new HashSet<>());
             Map<Node,PIP> nodeToDriverPIP = new HashMap<>();
             List<PIP> biPIPs = new ArrayList<>();
-            // TODO: This goes through the whole design. Try to limit it to the target cell, if possible.
             for (PIP pip : net.getPIPs()) {
                 if (pip.isBidirectional()) {
                     biPIPs.add(pip);
