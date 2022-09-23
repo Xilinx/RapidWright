@@ -62,6 +62,9 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
     /** A list of all primitive instances which make up this module instance */
     private ArrayList<SiteInst> instances;
     /** A list of all nets internal to this module instance */
+    // Note that these are references to nets inside 'design' that this ModuleInst
+    // inserted and is exclusively responsible for. As such, any static nets present in
+    // this list must be handled with care.
     private ArrayList<Net> nets;
     /** A list of all NOCClients belonging to this instance **/
     private ArrayList<NOCClient> nocClients;
@@ -373,8 +376,10 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
         //=======================================================//
         nextnet: for (Net net : nets) {
             if (net.isStaticNet()) {
+                // Any static nets that appear in 'nets' is not the exclusive responsibility
+                // of this ModuleInst, instead it is shared with everything in 'design'.
                 if (isPlaced()) {
-                    // We need to remove the old GND/VCC PIPs out of the main design nets
+                    // We need to remove the GND/VCC PIPs inserted by this ModuleInst out of the global design net
                     Net designNet = design.getNet(net.getName());
                     List<PIP> newList = new ArrayList<>();
                     Set<PIP> prevUsed = getUsedStaticPIPs(designNet);
@@ -408,9 +413,8 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
                 newPip.setTile(newPipTile);
                 if (pipSet != null) {
                     pipSet.add(newPip);
-                } else {
-                    net.addPIP(newPip);
                 }
+                net.addPIP(newPip);
             }
 
             // Because only one VCC/GND net is allowed for each Design,
@@ -419,9 +423,6 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
             // singleton net here
             if (templateNet.isStaticNet()) {
                 Net designNet = design.getNet(templateNet.getName());
-                Set<PIP> newPipSet = new HashSet<>(designNet.getPIPs());
-                newPipSet.addAll(pipSet);
-                designNet.setPIPs(newPipSet);
             }
         }
         //Update location of NOCClients
