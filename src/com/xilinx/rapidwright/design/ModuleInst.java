@@ -61,10 +61,11 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
     private SiteInst anchor;
     /** A list of all primitive instances which make up this module instance */
     private ArrayList<SiteInst> instances;
-    /** A list of all nets internal to this module instance */
-    // Note that these are references to nets inside 'design' that this ModuleInst
-    // inserted and is exclusively responsible for. As such, any static nets present in
-    // this list must be handled with care.
+    /** A list of all nets internal to this module instance 
+     * Note: These are references to nets inside 'design' that this ModuleInst
+     * inserted and is exclusively responsible for. As such, any static nets present in
+     * this list must be handled with care.
+     */
     private ArrayList<Net> nets;
     /** A list of all NOCClients belonging to this instance **/
     private ArrayList<NOCClient> nocClients;
@@ -375,25 +376,7 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
         /* Place net at new location                             */
         //=======================================================//
         nextnet: for (Net net : nets) {
-            if (net.isStaticNet()) {
-                // Any static nets that appear in 'nets' is not the exclusive responsibility
-                // of this ModuleInst, instead it is shared with everything in 'design'.
-                if (isPlaced()) {
-                    // We need to remove the GND/VCC PIPs inserted by this ModuleInst out of the global design net
-                    Net designNet = design.getNet(net.getName());
-                    List<PIP> newList = new ArrayList<>();
-                    Set<PIP> prevUsed = getUsedStaticPIPs(designNet);
-                    for (PIP pip : designNet.getPIPs()) {
-                        if (!prevUsed.contains(pip)) {
-                            newList.add(pip);
-                        }
-                    }
-                    designNet.setPIPs(newList);
-                    prevUsed.clear();
-                }
-            } else {
-                net.getPIPs().clear();
-            }
+            unrouteNet(net);
 
             Net templateNet = net.getModuleTemplateNet();
             Set<PIP> pipSet = getUsedStaticPIPs(templateNet);
@@ -416,16 +399,8 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
                 }
                 net.addPIP(newPip);
             }
-
-            // Because only one VCC/GND net is allowed for each Design,
-            // this net is just a placeholder for module-specific PIPs
-            // (that were relocated above) -- add those to Design's
-            // singleton net here
-            if (templateNet.isStaticNet()) {
-                Net designNet = design.getNet(templateNet.getName());
-            }
         }
-        //Update location of NOCClients
+        // Update location of NOCClients
         for (NOCClient nc : getNOCClients()) {
             Site templateSite = dev.getSite(nc.getLocation());
             if (templateSite == null)
@@ -442,25 +417,28 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
      * Removes all placement information and unroutes all nets of the module instance.
      */
     public void unplace() {
-        //unplace instances
+        // unplace instances
         for (SiteInst inst : instances) {
             inst.unPlace();
         }
-        //unplace nets (remove pips)
+        // unplace nets (remove pips)
         for (Net net : nets) {
-            // Because only one VCC/GND net is allowed for each Design,
-            // this net is just a placeholder for any module-specific PIPs
-            // that would have been inserted into Design's static net, so
-            // surgically remove those here
-            if (net.isStaticNet()) {
-                Net templateNet = net.getModuleTemplateNet();
-                Net designNet = design.getNet(templateNet.getName());
+            unrouteNet(net);
+        }
+    }
 
-                HashSet<PIP> pips = new HashSet<>(net.getPIPs());
-                designNet.getPIPs().removeIf((p) -> pips.remove(p));
-                assert(pips.isEmpty());
+    private void unrouteNet(Net net) {
+        if (net.isStaticNet()) {
+            // Any static nets that appear in 'nets' is not the exclusive responsibility
+            // of this ModuleInst, instead it is shared with everything in 'design'.
+            if (isPlaced()) {
+                // We need to remove the GND/VCC PIPs inserted by this ModuleInst out of the global design net
+                Net designNet = design.getNet(net.getName());
+                Set<PIP> prevUsed = getUsedStaticPIPs(designNet);
+                designNet.getPIPs().removeIf(p -> prevUsed.remove(p));
+                assert(prevUsed.isEmpty());
             }
-
+        } else {
             net.getPIPs().clear();
         }
     }
