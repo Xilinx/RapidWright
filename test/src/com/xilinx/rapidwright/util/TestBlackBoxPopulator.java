@@ -24,6 +24,8 @@ package com.xilinx.rapidwright.util;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Module;
+import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.interchange.DeviceResources;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -43,6 +45,14 @@ public class TestBlackBoxPopulator {
         add(new Pair<>("hw_contract_pr2", "INT_X0Y0"));
     }};
 
+    private int numPIPs(Design d) {
+        int PIPCount = 0;
+        for (Net n : d.getNets()) {
+            PIPCount += n.getPIPs().size();
+        }
+        return PIPCount;
+    }
+
     @Test
     void testRelocateModuleInsts() {
         Design top = Design.readCheckpoint(topDCPName);
@@ -50,11 +60,13 @@ public class TestBlackBoxPopulator {
         int numVccNetTop = (top.getVccNet() == null) ? 0 : 1;
         int numGndNetTop = (top.getGndNet() == null) ? 0 : 1;
         int numSignalNetTop = top.getNets().size() - numVccNetTop - numGndNetTop;
+        int numPIPTop = numPIPs(top);
 
         Design template = Design.readCheckpoint(cellDCPName);
         int numVccNetTemplate = (template.getVccNet() == null) ? 0 : 1;
         int numGndNetTemplate = (template.getGndNet() == null) ? 0 : 1;
         int numSignalNetTemplate = template.getNets().size() - numVccNetTemplate - numGndNetTemplate;
+        int numPIPTemplate = numPIPs(template);
 
         Module mod = new Module(template, false);
         BlackboxPopulator.relocateModuleInsts(top, mod, cellAnchor, targets);
@@ -65,6 +77,8 @@ public class TestBlackBoxPopulator {
         int numExpectedNets = targets.size()*numSignalNetTemplate + numSignalNetTop
                               + Math.max(numVccNetTop, numVccNetTemplate) + Math.max(numGndNetTop, numGndNetTemplate);
         Assertions.assertEquals(numExpectedNets, top.getNets().size(),"Wrong number of nets!");
+
+        Assertions.assertEquals(targets.size()*numPIPTemplate + numPIPTop, numPIPs(top),"Wrong number of PIPs!");
     }
     @Test
     void testOutputDCP() {
