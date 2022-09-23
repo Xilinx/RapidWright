@@ -315,7 +315,8 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
 
         // save original placement in case new placement is invalid
         HashMap<SiteInst, Site> originalSites;
-        originalSites = isPlaced() ? new HashMap<SiteInst, Site>() : null;
+        boolean placedPreviously = isPlaced();
+        originalSites = placedPreviously ? new HashMap<SiteInst, Site>() : null;
 
         //=======================================================//
         /* Place instances at new location                       */
@@ -376,7 +377,7 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
         /* Place net at new location                             */
         //=======================================================//
         nextnet: for (Net net : nets) {
-            unrouteNet(net);
+            unrouteNet(net, placedPreviously);
 
             Net templateNet = net.getModuleTemplateNet();
             Set<PIP> pipSet = getUsedStaticPIPs(templateNet);
@@ -417,21 +418,22 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
      * Removes all placement information and unroutes all nets of the module instance.
      */
     public void unplace() {
+        boolean placedPreviously = isPlaced();
         // unplace instances
         for (SiteInst inst : instances) {
             inst.unPlace();
         }
         // unplace nets (remove pips)
         for (Net net : nets) {
-            unrouteNet(net);
+            unrouteNet(net, placedPreviously);
         }
     }
 
-    private void unrouteNet(Net net) {
+    private void unrouteNet(Net net, boolean placedPreviously) {
         if (net.isStaticNet()) {
             // Any static nets that appear in 'nets' is not the exclusive responsibility
             // of this ModuleInst, instead it is shared with everything in 'design'.
-            if (isPlaced()) {
+            if (placedPreviously) {
                 // We need to remove the GND/VCC PIPs inserted by this ModuleInst out of the global design net
                 Net designNet = design.getNet(net.getName());
                 Set<PIP> prevUsed = getUsedStaticPIPs(designNet);
