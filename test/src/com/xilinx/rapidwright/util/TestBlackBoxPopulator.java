@@ -66,5 +66,14 @@ public class TestBlackBoxPopulator {
                               + Math.max(numVccNetTop, numVccNetTemplate) + Math.max(numGndNetTop, numGndNetTemplate);
         Assertions.assertEquals(numExpectedNets, top.getNets().size(),"Wrong number of nets!");
     }
+    @Test
+    void testOutputDCP() {
+        Design top = Design.readCheckpoint(topDCPName);
+        Design template = Design.readCheckpoint(cellDCPName);
+        Module mod = new Module(template, false);
+        BlackboxPopulator.relocateModuleInsts(top, mod, cellAnchor, targets);
 
+        top.writeCheckpoint("output.dcp");
+        Design.readCheckpoint("output.dcp");
+    }
 }
