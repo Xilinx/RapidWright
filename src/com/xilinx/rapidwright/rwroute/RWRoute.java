@@ -158,6 +158,13 @@ public class RWRoute{
         this.config = config;
     }
 
+    protected void preprocess() {
+        // Pre-processing of the design regarding physical net names pins
+        DesignTools.makePhysNetNamesConsistent(design);
+        DesignTools.createPossiblePinsToStaticNets(design);
+        DesignTools.createMissingSitePinInsts(design);
+    }
+
     protected void initialize() {
         routerTimer = new RuntimeTrackerTree("Route design", config.isVerbose());
         rnodesTimer = routerTimer.createStandAloneRuntimeTracker("rnodes creation");
@@ -1635,9 +1642,6 @@ public class RWRoute{
     }
 
     private static Design routeDesign(Design design, RWRouteConfig config) {
-        DesignTools.createMissingSitePinInsts(design);
-        DesignTools.createPossiblePinsToStaticNets(design);
-
         if (!config.isMaskNodesCrossRCLK()) {
             System.out.println("WARNING: Not masking nodes across RCLK could result in delay optimism.");
         }
@@ -1651,8 +1655,7 @@ public class RWRoute{
      * @param router A {@link RWRoute} object to be used to route the design.
      */
     protected static Design routeDesign(Design design, RWRoute router) {
-        // Pre-processing of the design regarding physical net names pins
-        DesignTools.makePhysNetNamesConsistent(design);
+        router.preprocess();
 
         // Initialize router object
         router.initialize();
