@@ -65,7 +65,10 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
     private ArrayList<Net> nets;
     /** A list of all NOCClients belonging to this instance **/
     private ArrayList<NOCClient> nocClients;
-
+    /** Keeps track of currently placed GND PIPs */
+    private Set<PIP> gndPIPs;
+    /** Keeps track of currently placed VCC PIPs */
+    private Set<PIP> vccPIPs;
     /**
      * Constructor initializing instance module name
      * @param name Name of the module instance
@@ -369,8 +372,26 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
         /* Place net at new location                             */
         //=======================================================//
         nextnet: for (Net net : nets) {
-            net.getPIPs().clear();
+            if (net.isStaticNet()) {
+                if (isPlaced()) {
+                    // We need to remove the old GND/VCC PIPs out of the main design nets
+                    Net designNet = design.getNet(net.getName());
+                    List<PIP> newList = new ArrayList<>();
+                    Set<PIP> prevUsed = getUsedStaticPIPs(designNet);
+                    for (PIP pip : designNet.getPIPs()) {
+                        if (!prevUsed.contains(pip)) {
+                            newList.add(pip);
+                        }
+                    }
+                    designNet.setPIPs(newList);
+                    prevUsed.clear();
+                }
+            } else {
+                net.getPIPs().clear();
+            }
+
             Net templateNet = net.getModuleTemplateNet();
+            Set<PIP> pipSet = getUsedStaticPIPs(templateNet);
             for (PIP pip : templateNet.getPIPs()) {
                 Tile templatePipTile = pip.getTile();
                 Tile newPipTile = module.getCorrespondingTile(templatePipTile, newAnchorSite.getTile());
@@ -383,12 +404,13 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
                         return false;
                     }
                 }
-                PIP newPip = new PIP(pip);///new PIP(newPipTile, pip.getStartWire(), pip.getEndWire(), pip.getPIPType());
+                PIP newPip = new PIP(pip);
                 newPip.setTile(newPipTile);
-                //if (!newPipTile.hasPIP(newPip)) {
-                //    return false;
-                //}
-                net.addPIP(newPip);
+                if (pipSet != null) {
+                    pipSet.add(newPip);
+                } else {
+                    net.addPIP(newPip);
+                }
             }
 
             // Because only one VCC/GND net is allowed for each Design,
@@ -397,7 +419,9 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
             // singleton net here
             if (templateNet.isStaticNet()) {
                 Net designNet = design.getNet(templateNet.getName());
-                designNet.getPIPs().addAll(net.getPIPs());
+                Set<PIP> newPipSet = new HashSet<>(designNet.getPIPs());
+                newPipSet.addAll(pipSet);
+                designNet.setPIPs(newPipSet);
             }
         }
         //Update location of NOCClients
@@ -739,5 +763,27 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
             return false;
         }
         return getBoundingBox().overlaps(hm.getBoundingBox());
+    }
+
+    /**
+     * Gets the current set of used GND/VCC PIPs by this ModuleInst.  If the module instance 
+     * is not placed, the set will be empty.  
+     * @param staticNet A static net of the type to get.
+     * @return The set of PIPs used by this module instance if placed, null if the net provided is
+     * not a static net.
+     */
+    public Set<PIP> getUsedStaticPIPs(Net staticNet) {
+        if (staticNet.getName().equals(Net.GND_NET)) {
+            if (gndPIPs == null) {
+                gndPIPs = new HashSet<>();
+            }
+            return gndPIPs;
+        } else if (staticNet.getName().equals(Net.VCC_NET)) {
+            if (vccPIPs == null) {
+                vccPIPs = new HashSet<>();
+            }
+            return vccPIPs;
+        }
+        return null;
     }
 }
