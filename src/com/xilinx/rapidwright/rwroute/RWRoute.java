@@ -1148,8 +1148,9 @@ public class RWRoute{
         float estDlyWeight = connection.getCriticality() * timingWeight;
 
         boolean successRoute = false;
+        RouteNode rnode = null;
         while (!queue.isEmpty()) {
-            RouteNode rnode = queue.poll();
+            rnode = queue.poll();
             if (rnode.isTarget()) {
                 successRoute = true;
                 break;
@@ -1160,7 +1161,7 @@ public class RWRoute{
         }
 
         if (successRoute) {
-            finishRouteConnection(connection);
+            finishRouteConnection(connection, rnode);
             connection.getSink().setRouted(true);
             if (config.isTimingDriven()) connection.updateRouteDelay();
         }else {
@@ -1235,9 +1236,10 @@ public class RWRoute{
     /**
      * Completes the routing process of a connection.
      * @param connection The routed target connection.
+     * @param targetRnode Target RouteNode reached to start backtracking from.
      */
-    protected void finishRouteConnection(Connection connection) {
-        saveRouting(connection);
+    protected void finishRouteConnection(Connection connection, RouteNode targetRnode) {
+        saveRouting(connection, targetRnode);
         connection.setTarget(false);
         routingGraph.resetExpansion();
         updateUsersAndPresentCongestionCost(connection);
@@ -1246,12 +1248,9 @@ public class RWRoute{
     /**
      * Traces back for a connection from its sink rnode to its source, in order to build and store the routing path.
      * @param connection: The connection that is being routed.
+     * @param rnode RouteNode to start backtracking from.
      */
-    private void saveRouting(Connection connection) {
-        RouteNode rnode = connection.getSinkRnode();
-        if (rnode.getPrev() == null) {
-            rnode = connection.getAltSinkRnode();
-        }
+    private void saveRouting(Connection connection, RouteNode rnode) {
         assert(rnode.getPrev() != null);
         while (rnode != null) {
             connection.addRnode(rnode);

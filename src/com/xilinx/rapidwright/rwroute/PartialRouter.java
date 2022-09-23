@@ -230,7 +230,7 @@ public class PartialRouter extends RWRoute{
             // Use the prev pointers to update the routing for each connection
             for (Connection connection : netWrapper.getConnections()) {
                 if (connection.getSink().isRouted()) {
-                    finishRouteConnection(connection);
+                    finishRouteConnection(connection, connection.getSinkRnode());
                 }
             }
         }
@@ -447,7 +447,7 @@ public class PartialRouter extends RWRoute{
             // Use the prev pointers to update the routing for each connection
             for (Connection netnewConnection : netWrapper.getConnections()) {
                 if (netnewConnection.getSink().isRouted()) {
-                    finishRouteConnection(netnewConnection);
+                    finishRouteConnection(netnewConnection, netnewConnection.getSinkRnode());
                 }
             }
 
