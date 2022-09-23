@@ -105,6 +105,7 @@ public class BlackboxPopulator {
             mi.place(toSite);
         }
         System.out.println("\n");
+        top.getNetlist().consolidateAllToWorkLibrary();
         return true;
     }
 
