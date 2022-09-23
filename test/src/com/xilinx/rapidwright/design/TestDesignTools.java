@@ -119,7 +119,7 @@ public class TestDesignTools {
     }
 
     private void testCopyImplementationHelper(boolean keepStaticRouting, HashMap<String, Integer> numPIPs) {
-        String dcpPath = RapidWrightDCP.getString("hwct_pr1.dcp");
+        String dcpPath = RapidWrightDCP.getString("testCopyImplementation.dcp");
         String srcCellName = "clock_isolation";
 
         Design src = Design.readCheckpoint(dcpPath);
