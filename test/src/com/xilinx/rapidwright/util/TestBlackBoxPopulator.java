@@ -26,7 +26,6 @@ import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Module;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.edif.EDIFLibrary;
-import com.xilinx.rapidwright.interchange.DeviceResources;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
