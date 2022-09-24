@@ -82,23 +82,16 @@ public class TestBlackBoxPopulator {
         Assertions.assertEquals(numExpectedNets, top.getNets().size(),"Wrong number of nets!");
 
         Assertions.assertEquals(targets.size()*numPIPTemplate + numPIPTop, numPIPs(top),"Wrong number of PIPs!");
-    }
-    @Test
-    /**
-     * To catch a problem where the work library appears before its dependencies.
-     *
-     * The current workaround is to put every library into work library,
-     * ie., using consolidateAllToWorkLibrary() at the end of relocateModuleInsts.
-     * This test is specific to that workaround to be fast.
-     * Later when a better solution is adopted, this test will need to adjust to check the solution.
-     */
-    void testOutputDCP() {
-        Design top = Design.readCheckpoint(topDCPName);
-        Design template = Design.readCheckpoint(cellDCPName);
-        Module mod = new Module(template, false);
-        BlackboxPopulator.relocateModuleInsts(top, mod, cellAnchor, targets);
 
 
+        /**
+         * To catch a problem where the work library appears before its dependencies.
+         *
+         * The current workaround is to put every library into work library,
+         * ie., using consolidateAllToWorkLibrary() at the end of relocateModuleInsts.
+         * This test is specific to that workaround to be fast.
+         * Later when a better solution is adopted, this test will need to adjust to check the solution.
+         */
         Collection<EDIFLibrary> libs = top.getNetlist().getLibraries();
         Assertions.assertEquals(2, libs.size(),"Expect two libraries!");
 
