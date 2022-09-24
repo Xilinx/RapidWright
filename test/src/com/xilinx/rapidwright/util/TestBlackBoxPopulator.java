@@ -25,13 +25,17 @@ package com.xilinx.rapidwright.util;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Module;
 import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.edif.EDIFLibrary;
 import com.xilinx.rapidwright.interchange.DeviceResources;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class TestBlackBoxPopulator {
 
@@ -81,13 +85,30 @@ public class TestBlackBoxPopulator {
         Assertions.assertEquals(targets.size()*numPIPTemplate + numPIPTop, numPIPs(top),"Wrong number of PIPs!");
     }
     @Test
+    /**
+     * To catch a problem where the work library appears before its dependencies.
+     *
+     * The current workaround is to put every library into work library,
+     * ie., using consolidateAllToWorkLibrary() at the end of relocateModuleInsts.
+     * This test is specific to that workaround to be fast.
+     * Later when a better solution is adopted, this test will need to adjust to check the solution.
+     */
     void testOutputDCP() {
         Design top = Design.readCheckpoint(topDCPName);
         Design template = Design.readCheckpoint(cellDCPName);
         Module mod = new Module(template, false);
         BlackboxPopulator.relocateModuleInsts(top, mod, cellAnchor, targets);
 
-        top.writeCheckpoint("output.dcp");
-        Design.readCheckpoint("output.dcp");
+
+        Collection<EDIFLibrary> libs = top.getNetlist().getLibraries();
+        Assertions.assertEquals(2, libs.size(),"Expect two libraries!");
+
+        Set<String> libNames = new HashSet<>();
+        for (EDIFLibrary l : libs) {
+            libNames.add(l.getName());
+        }
+
+        Assertions.assertTrue(libNames.contains("hdi_primitives"),"Expect to have hdi_primitives library!");
+        Assertions.assertTrue(libNames.contains("work"),"Expect to have work library!");
     }
 }
