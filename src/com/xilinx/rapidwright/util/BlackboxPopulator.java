@@ -211,36 +211,6 @@ public class BlackboxPopulator {
         }
     }
 
-
-    /**
-     * If the property of the design exists, set it to the given value.
-     * @param top  The design to set its property
-     * @param prop The full property name to set
-     * @param val  The value to set to
-     */
-    private static void setPropertyValueInLateXDC(Design top, String prop, String val) {
-        ArrayList<String> xdcList = new ArrayList<String>(top.getXDCConstraints(ConstraintGroup.LATE));
-        int lineNum = 0;
-        for (; lineNum < xdcList.size(); lineNum++) {
-            String line = xdcList.get(lineNum);
-            if (line.contains(prop)) {
-                String[] words = line.split("\\s+");
-                int idx = Arrays.asList(words).indexOf(prop);
-                if (++idx < words.length) {
-                    words[idx] = val;
-                    String newLine = String.join(" ", words);
-                    xdcList.set(lineNum, newLine);
-                    break;
-                }
-            }
-        }
-
-        if (lineNum < xdcList.size()) {
-            top.setXDCConstraints(xdcList, ConstraintGroup.LATE);
-            System.out.println("\nINFO: property " + prop + " is found for the top design. It will be set to false.");
-        }
-    }
-
 // Example arguments
 /*
    -in    hwct.dcp
