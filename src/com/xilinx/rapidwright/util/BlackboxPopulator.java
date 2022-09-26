@@ -145,7 +145,7 @@ public class BlackboxPopulator {
 
     /**
      * Determine if the given net is a clock net.
-     * Net.isClockNet() need the source of a net. This method checks the sink instead.
+     * Net.isClockNet() examines the source, this method looks for at least one clock pin sink.
      * @param net The net to check
      * @return True if the net is a clock net
      */
