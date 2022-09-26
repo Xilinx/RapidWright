@@ -64,12 +64,6 @@ public class BlackboxPopulator {
     public static boolean relocateModuleInsts(Design top, Module mod, String cellAnchor, List<Pair<String, String>> blackboxes) {
         System.out.println("\n\nRelocate " + mod.getName());
 
-        // Make the blackbox whose reference INT tile the same as the implementation as the last to be copied.
-        // Otherwise some nets become unrouted!
-        Collections.sort(blackboxes, (Pair<String, String> a,Pair<String, String> b)
-                -> {return (a.getSecond() == cellAnchor ? 1 : b.getSecond() == cellAnchor ? -1 : a.getSecond().compareTo(b.getSecond()));}
-        );
-
         top.setAutoIOBuffers(false);
 
         Site frSite = mod.getAnchor();
@@ -121,8 +115,6 @@ public class BlackboxPopulator {
         for (Pair<String, String> toCellLoc : blackboxes) {
             combinePIPonClockNets(top, toCellLoc.getFirst());
         }
-
-        setPropertyValueInLateXDC(top, "HD.RECONFIGURABLE", "false");
     }
 
     /**
@@ -153,11 +145,11 @@ public class BlackboxPopulator {
 
     /**
      * Determine if the given net is a clock net.
-     *
+     * Net.isClockNet() need the source of a net. This method checks the sink instead.
      * @param net The net to check
      * @return True if the net is a clock net
      */
-    private static boolean isClockNet(Net net) {
+    private static boolean driveClockPin(Net net) {
         // TODO: rely on attribute instead of name
         for (SitePinInst sink : net.getSinkPins()) {
             if (sink.getName().contains("CLK")) return true;
@@ -190,7 +182,7 @@ public class BlackboxPopulator {
                 Net physNet = top.getNet(physNetName);
 
                 if (physNet != null) {
-                    if (isClockNet(physNet)) {
+                    if (driveClockPin(physNet)) {
                         clockNets.add(hierNetName_outside);
                         break;
                     }
