@@ -109,7 +109,6 @@ public class BlackboxPopulator {
      * @param blackboxes The black boxes that was filled
      */
     public static void postProcessing(Design top, List<Pair<String, String>> blackboxes) {
-
         top.getNetlist().resetParentNetMap();
 
         for (Pair<String, String> toCellLoc : blackboxes) {
