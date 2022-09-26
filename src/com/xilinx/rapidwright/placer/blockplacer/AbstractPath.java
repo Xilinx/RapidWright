@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2021 Xilinx, Inc.
+ * Copyright (c) 2021-2022, Xilinx, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Jakob Wenzel, Xilinx Research Labs.
@@ -34,10 +35,14 @@ import com.xilinx.rapidwright.design.AbstractModuleInst;
  * @param <PortT> Port Type
  * @param <ModuleInstT> Module Instance Type
  */
-public abstract class AbstractPath<PortT, ModuleInstT extends AbstractModuleInst<?,?>> implements Iterable<PortT> {
+public abstract class AbstractPath<PortT, ModuleInstT extends AbstractModuleInst<?,?,?>> implements Iterable<PortT> {
 
     protected List<PortT> ports = new ArrayList<>();
     protected Set<ModuleInstT> moduleInsts = new HashSet<>();
+
+    protected int weight = 1;
+
+    public int undoCount = 0;
 
     /**
      *
@@ -47,7 +52,7 @@ public abstract class AbstractPath<PortT, ModuleInstT extends AbstractModuleInst
 
     public abstract int getLength();
 
-    public int getSize(){
+    public int getSize() {
         return ports.size();
     }
 
@@ -67,5 +72,23 @@ public abstract class AbstractPath<PortT, ModuleInstT extends AbstractModuleInst
 
     public int countConnectedModules() {
         return moduleInsts.size();
+    }
+
+    public void saveUndo() {
+
+    }
+
+    public void restoreUndo() {
+        calculateLength();
+    }
+
+    public abstract Set<?> getPathConnections();
+
+    public void increaseWeight() {
+        weight++;
+    }
+
+    public int getWeight() {
+        return weight;
     }
 }

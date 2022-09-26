@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2021 Xilinx, Inc.
+ * Copyright (c) 2021-2022, Xilinx, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Jakob Wenzel, Xilinx Research Labs.
@@ -38,7 +39,7 @@ import com.xilinx.rapidwright.placer.blockplacer.ImplsInstancePort;
  * This is achieved by calling {@link DesignTools#createModuleInstsFromModuleImplsInsts(Design, Collection, Collection)}
  *
  */
-public class ModuleImplsInst extends AbstractModuleInst<ModuleImpls, ModuleImplsInst> {
+public class ModuleImplsInst extends AbstractModuleInst<ModuleImpls, ModulePlacement, ModuleImplsInst> {
     final ModuleImpls module;
     private ModulePlacement placement;
 
@@ -71,6 +72,9 @@ public class ModuleImplsInst extends AbstractModuleInst<ModuleImpls, ModuleImpls
 
     public void place(ModulePlacement placement) {
         unplace();
+        if (placement.implementationIndex < 0 || placement.implementationIndex>=module.size()) {
+            throw new IllegalStateException("illegal implementation index in new placement "+placement+" for "+this);
+        }
         this.placement = placement;
     }
 

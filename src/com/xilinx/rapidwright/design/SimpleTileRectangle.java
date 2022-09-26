@@ -1,32 +1,33 @@
-/* 
- * Copyright (c) 2021 Xilinx, Inc. 
+/*
+ * Copyright (c) 2021-2022, Xilinx, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Jakob Wenzel, Xilinx Research Labs.
- *  
- * This file is part of RapidWright. 
- * 
+ *
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
- 
-package com.xilinx.rapidwright.design;
 
-import com.xilinx.rapidwright.device.Site;
-import com.xilinx.rapidwright.device.Tile;
+package com.xilinx.rapidwright.design;
 
 import java.util.Objects;
 import java.util.stream.Collector;
+
+import com.xilinx.rapidwright.device.Site;
+import com.xilinx.rapidwright.device.Tile;
 
 /**
  * A {@link TileRectangle} that uses Row/Column indices for storage. Fast, but not relocatable.
@@ -72,18 +73,10 @@ public class SimpleTileRectangle extends TileRectangle {
             return;
         }
 
-        if (otherMinColumn < minColumn) {
-            minColumn = otherMinColumn;
-        }
-        if (otherMaxColumn > maxColumn) {
-            maxColumn = otherMaxColumn;
-        }
-        if (otherMinRow < minRow) {
-            minRow = otherMinRow;
-        }
-        if (otherMaxRow > maxRow) {
-            maxRow = otherMaxRow;
-        }
+        minColumn = Math.min(minColumn, otherMinColumn);
+        maxColumn = Math.max(maxColumn, otherMaxColumn);
+        minRow = Math.min(minRow, otherMinRow);
+        maxRow = Math.max(maxRow, otherMaxRow);
     }
 
     /**
@@ -92,7 +85,9 @@ public class SimpleTileRectangle extends TileRectangle {
      */
     @Override
     public void extendTo(Tile tile) {
-        extendToRect(tile.getColumn(), tile.getColumn(), tile.getRow(), tile.getRow());
+        final int column = tile.getColumn();
+        final int row = tile.getRow();
+        extendToRect(column, column, row, row);
     }
 
     /**

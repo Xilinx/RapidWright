@@ -47,6 +47,7 @@ dependencies {
   testFixturesApi 'org.junit.jupiter:junit-jupiter-api:5.7.1'
   testFixturesApi 'org.junit.jupiter:junit-jupiter-engine:5.7.1'
   testFixturesApi 'org.junit.jupiter:junit-jupiter-params:5.7.1'
+  testFixturesImplementation group: 'org.junit.platform', name: 'junit-platform-console', version: '1.7.1'
 }
 //Kryo needs to access sun.nio.ch.DirectBuffer. This is forbidden by default in Java 16 and up. Check if we need to add a jvm arg.
 if (org.gradle.api.JavaVersion.current().isJava10Compatible()) {
@@ -126,3 +127,22 @@ tasks.withType(Test) {
   finalizedBy remindSubmodules
 }
 
+task testJar(type: Jar) {
+    classifier = 'tests'
+    from sourceSets.test.output
+    dependsOn project.tasks.findByName('testFixturesJar')
+    dependsOn project.tasks.findByName('jar')
+}
+
+task testLsf(type: JavaExec) {
+  group = "verification"
+  description = "Run the tests on lsf"
+  //Using a closure here, otherwise the test classpath gets messed up and compileTestClasses fails.
+  classpath = files( { -> project.configurations.testRuntimeClasspath.getFiles() + project.tasks.findByName('testJar').getArchiveFile().get() })
+  mainClass = "com.xilinx.rapidwright.util.lsf.LaunchTestsOnLsf"
+  workingDir = file("build/test-lsf")
+  args project.tasks.findByName('testJar').getArchiveFile().get()
+  doFirst {
+    project.mkdir(workingDir)
+  }
+}

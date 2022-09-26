@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2022 Xilinx, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Pongstorn Maidee, Xilinx Research Labs.
@@ -24,14 +25,19 @@ package com.xilinx.rapidwright.util;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Module;
+import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.edif.EDIFLibrary;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
-public class TestBlackBoxesPopulator {
+public class TestBlackBoxPopulator {
 
     private static String topDCPName = RapidWrightDCP.getString("hwct.dcp");
     private static String cellDCPName = RapidWrightDCP.getString("hwct_pr1.dcp");
@@ -43,6 +49,14 @@ public class TestBlackBoxesPopulator {
         add(new Pair<>("hw_contract_pr2", "INT_X0Y0"));
     }};
 
+    private int numPIPs(Design d) {
+        int PIPCount = 0;
+        for (Net n : d.getNets()) {
+            PIPCount += n.getPIPs().size();
+        }
+        return PIPCount;
+    }
+
     @Test
     void testRelocateModuleInsts() {
         Design top = Design.readCheckpoint(topDCPName);
@@ -50,14 +64,16 @@ public class TestBlackBoxesPopulator {
         int numVccNetTop = (top.getVccNet() == null) ? 0 : 1;
         int numGndNetTop = (top.getGndNet() == null) ? 0 : 1;
         int numSignalNetTop = top.getNets().size() - numVccNetTop - numGndNetTop;
+        int numPIPTop = numPIPs(top);
 
         Design template = Design.readCheckpoint(cellDCPName);
         int numVccNetTemplate = (template.getVccNet() == null) ? 0 : 1;
         int numGndNetTemplate = (template.getGndNet() == null) ? 0 : 1;
         int numSignalNetTemplate = template.getNets().size() - numVccNetTemplate - numGndNetTemplate;
+        int numPIPTemplate = numPIPs(template);
 
         Module mod = new Module(template, false);
-        BlackboxesPopulator.relocateModuleInsts(top, mod, cellAnchor, targets);
+        BlackboxPopulator.relocateModuleInsts(top, mod, cellAnchor, targets);
 
         Assertions.assertEquals(targets.size()*template.getCells().size()+numCellTop, top.getCells().size()
                 ,"Wrong number of cells!");
@@ -65,6 +81,27 @@ public class TestBlackBoxesPopulator {
         int numExpectedNets = targets.size()*numSignalNetTemplate + numSignalNetTop
                               + Math.max(numVccNetTop, numVccNetTemplate) + Math.max(numGndNetTop, numGndNetTemplate);
         Assertions.assertEquals(numExpectedNets, top.getNets().size(),"Wrong number of nets!");
-    }
 
+        Assertions.assertEquals(targets.size()*numPIPTemplate + numPIPTop, numPIPs(top),"Wrong number of PIPs!");
+
+
+        /**
+         * To catch a problem where the work library appears before its dependencies.
+         *
+         * The current workaround is to put every library into work library,
+         * ie., using consolidateAllToWorkLibrary() at the end of relocateModuleInsts.
+         * This test is specific to that workaround to be fast.
+         * Later when a better solution is adopted, this test will need to adjust to check the solution.
+         */
+        Collection<EDIFLibrary> libs = top.getNetlist().getLibraries();
+        Assertions.assertEquals(2, libs.size(),"Expect two libraries!");
+
+        Set<String> libNames = new HashSet<>();
+        for (EDIFLibrary l : libs) {
+            libNames.add(l.getName());
+        }
+
+        Assertions.assertTrue(libNames.contains("hdi_primitives"),"Expect to have hdi_primitives library!");
+        Assertions.assertTrue(libNames.contains("work"),"Expect to have work library!");
+    }
 }

@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2021 Xilinx, Inc.
+ * Copyright (c) 2021-2022, Xilinx, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Jakob Wenzel, Xilinx Research Labs.
@@ -22,19 +23,19 @@
 
 package com.xilinx.rapidwright.debug;
 
-import com.xilinx.rapidwright.edif.EDIFCell;
-import com.xilinx.rapidwright.edif.EDIFCellInst;
-import com.xilinx.rapidwright.edif.EDIFNet;
-import com.xilinx.rapidwright.edif.EDIFPort;
-import com.xilinx.rapidwright.edif.EDIFPortInst;
-import com.xilinx.rapidwright.util.Pair;
-
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.function.BiPredicate;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
+
+import com.xilinx.rapidwright.edif.EDIFCell;
+import com.xilinx.rapidwright.edif.EDIFCellInst;
+import com.xilinx.rapidwright.edif.EDIFNet;
+import com.xilinx.rapidwright.edif.EDIFPort;
+import com.xilinx.rapidwright.edif.EDIFPortInst;
+import com.xilinx.rapidwright.util.Pair;
 
 /**
  * Dump an EDIF cell's contents to a Graphviz Dot Graph
@@ -119,7 +120,7 @@ public class DotEdifDumper extends DotGraphDumper<EDIFCellInst, EDIFPortInst, Pa
 
     @Override
     protected Map<?, ?> getInstanceProperties(EDIFCellInst edifCellInst, EDIFCell top) {
-        return edifCellInst.getProperties();
+        return edifCellInst.getPropertiesMap();
     }
 
 

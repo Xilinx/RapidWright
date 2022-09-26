@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2022 Xilinx, Inc.
+ * Copyright (c) 2022, Xilinx, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Eddie Hung, Xilinx Research Labs.
@@ -137,7 +138,7 @@ public class TestModuleInst {
         EDIFNetlist netlist = module.getNetlist();
         EDIFNetlist emptyDesignNetlist = emptyDesign.getNetlist();
         EDIFCell moduleTopCell = netlist.getTopCell();
-        String moduleTopCellName = moduleTopCell.getLegalEDIFName();
+        String moduleTopCellName = moduleTopCell.getName();
         EDIFCell copiedModuleTopCell = emptyDesignNetlist.getCell(moduleTopCellName);
         Assertions.assertNotNull(copiedModuleTopCell);
         Assertions.assertEquals(copiedModuleTopCell, mi.getCellInst().getCellType());

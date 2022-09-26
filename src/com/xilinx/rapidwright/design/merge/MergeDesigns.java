@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2022 Xilinx, Inc.
+ * Copyright (c) 2022, Xilinx, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -49,28 +50,28 @@ import com.xilinx.rapidwright.tests.CodePerfTracker;
  * use of the {@link MergeOptions} class.
  */
 public class MergeDesigns {
-    
-    private static Design mergeDesigns(Design design0, Design design1, AbstractDesignMerger merger) {       
+
+    private static Design mergeDesigns(Design design0, Design design1, AbstractDesignMerger merger) {
         EDIFCell topCell0 = design0.getTopEDIFCell();
         EDIFCell topCell1 = design1.getTopEDIFCell();
-        
+
         design0.getNetlist().migrateCellAndSubCells(topCell1, true);
-        
-        for(EDIFPort port1 : new ArrayList<>(topCell1.getPorts())) {
+
+        for (EDIFPort port1 : new ArrayList<>(topCell1.getPorts())) {
             EDIFPort port0 = topCell0.getPort(port1.getBusName());
-            if(port0 == null) {
+            if (port0 == null) {
                 topCell0.addPort(port1);
             } else {
                 merger.mergePorts(port0, port1);
             }
         }
-        
-        for(EDIFNet net1 : topCell1.getNets()) {
+
+        for (EDIFNet net1 : topCell1.getNets()) {
             EDIFNet net0 = topCell0.getNet(net1);
-            if(net0 == null) {
+            if (net0 == null) {
                 topCell0.addNet(net1);
-                for(EDIFPortInst inst : net1.getPortInsts()) {
-                    if(inst.isTopLevelPort() && inst.getPort().getParentCell() == topCell0) {
+                for (EDIFPortInst inst : net1.getPortInsts()) {
+                    if (inst.isTopLevelPort() && inst.getPort().getParentCell() == topCell0) {
                         topCell0.addInternalPortMapEntry(inst.getPortInstNameFromPort(), net1);
                     }
                 }
@@ -78,28 +79,28 @@ public class MergeDesigns {
                 merger.mergeLogicalNets(net0, net1);
             }
         }
-                
-        for(EDIFCellInst inst1 : topCell1.getCellInsts()) {
+
+        for (EDIFCellInst inst1 : topCell1.getCellInsts()) {
             EDIFCellInst inst0 = topCell0.getCellInst(inst1.getName());
-            if(inst0 == null) {
+            if (inst0 == null) {
                 topCell0.addCellInst(inst1);
             } else {
                 merger.mergeCellInsts(inst0, inst1);
             }
         }
-        
-        for(SiteInst siteInst1 : design1.getSiteInsts()) {
+
+        for (SiteInst siteInst1 : design1.getSiteInsts()) {
             SiteInst siteInst0 = design0.getSiteInstFromSiteName(siteInst1.getSiteName());
-            if(siteInst0 == null) {
+            if (siteInst0 == null) {
                 design0.addSiteInst(siteInst1);
             } else {
                 merger.mergeSiteInsts(siteInst0, siteInst1);
             }
         }
-        
-        for(Net net1 : design1.getNets()) {
+
+        for (Net net1 : design1.getNets()) {
             Net net0 = design0.getNet(net1.getName());
-            if(net0 == null) {
+            if (net0 == null) {
                 design0.addNet(net1);
             } else {
                 merger.mergePhysicalNets(net0, net1);
@@ -108,12 +109,12 @@ public class MergeDesigns {
 
         // Merge encrypted cells
         List<String> encryptedCells = design1.getNetlist().getEncryptedCells();
-        if(encryptedCells != null && encryptedCells.size() > 0) {
+        if (encryptedCells != null && encryptedCells.size() > 0) {
             design0.getNetlist().addEncryptedCells(encryptedCells);
-        }          
+        }
 
         design0.getNetlist().removeUnusedCellsFromAllWorkLibraries();
-        
+
         return design0;
     }
 
@@ -122,47 +123,47 @@ public class MergeDesigns {
     }
 
     /**
-     * Merges two or more designs together into a single design.  Merges both logical and physical 
+     * Merges two or more designs together into a single design.  Merges both logical and physical
      * netlist.  Assumes that designs are compatible for merging. Assumes that if there are duplicate
      * cells in the set of designs to be merged that they are flip-flops and that they are always
-     * connected to a top-level port.   
-     * @param options The set of options to customize the merge process based on netlist-specific 
+     * connected to a top-level port.
+     * @param options The set of options to customize the merge process based on netlist-specific
      * names
      * @param designs The set of designs to be merged into a single design.
      * @return The merged design that contains the superset of all logic, placement and routing of
-     * the input designs.  
+     * the input designs.
      */
     public static Design mergeDesigns(Supplier<AbstractDesignMerger> merger, Design...designs) {
         Design result = null;
-        for(Design design : designs) {
-            if(result == null) {
+        for (Design design : designs) {
+            if (result == null) {
                 result = design;
-            }else {
+            } else {
                 result = mergeDesigns(result, design, merger.get());
             }
         }
-        
+
         result.getNetlist().resetParentNetMap();
         DesignTools.makePhysNetNamesConsistent(result);
         return result;
     }
-    
+
     /**
      * Searches recursively in the given input directory for DCPs and presents the set of those
-     * DCPs to MergeDesigns.mergeDesigns() with the default set of options.  
-     * @param args [0]=Input directory of source DCPs to search recursively, 
-     * [1]=Merged DCP output filename and an optional 
-     * [2]=An optional regular expression string to apply to DCPs found in [0]. 
+     * DCPs to MergeDesigns.mergeDesigns() with the default set of options.
+     * @param args [0]=Input directory of source DCPs to search recursively,
+     * [1]=Merged DCP output filename and an optional
+     * [2]=An optional regular expression string to apply to DCPs found in [0].
      * @throws InterruptedException
      */
     public static void main(String[] args) throws InterruptedException {
-        if(args.length != 2 && args.length != 3) {
+        if (args.length != 2 && args.length != 3) {
             System.out.println("Usage: <dir with DCPs> <merged output DCP filename> [dcp filter regex]");
             return;
         }
         String dcpRegex = args.length == 3 ? args[2] : ".*\\.dcp";
         CodePerfTracker t = new CodePerfTracker("Merge Designs");
-  
+
         Path start = Paths.get(args[0]);
         List<File> dcps = null;
         try (Stream<Path> stream = Files.walk(start, Integer.MAX_VALUE)) {
@@ -170,21 +171,21 @@ public class MergeDesigns {
                     .map(p -> p.toFile())
                     .filter(p -> p.isFile() && p.getAbsolutePath().matches(dcpRegex))
                     .collect(Collectors.toList());
-        } catch(IOException e) {
+        } catch (IOException e) {
             e.printStackTrace();
         }
         System.out.println("Merging DCPs:");
-        for(File f : dcps) {
+        for (File f : dcps) {
             System.out.println("  " + f.getAbsolutePath());
         }
-        
+
         Design[] designs = new Design[dcps.size()];
-        for(int i=0; i < designs.length; i++) {
+        for (int i=0; i < designs.length; i++) {
             t.start("Read DCP " + i);
             designs[i] = Design.readCheckpoint(dcps.get(i).toPath(), CodePerfTracker.SILENT);
             t.stop();
         }
-        
+
         t.start("Merge DCPs");
         Design merged = mergeDesigns(designs);
         t.stop().start("Write DCP");

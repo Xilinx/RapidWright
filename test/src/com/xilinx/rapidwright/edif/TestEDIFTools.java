@@ -1,6 +1,7 @@
 
 /*
- * Copyright (c) 2022 Xilinx, Inc.
+ * Copyright (c) 2022, Xilinx, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Jakob Wenzel, Xilinx Research Labs.
@@ -41,12 +42,12 @@ import com.xilinx.rapidwright.support.RapidWrightDCP;
 public class TestEDIFTools {
 
     public static final String UNIQUE_SUFFIX = "TestEDIFToolsWasHere";
-    
+
     public static final String TEST_SRC = "base_mb_i/microblaze_0/U0/"
             + "MicroBlaze_Core_I/Performance.Core/Data_Flow_I/Data_Flow_Logic_I/Gen_Bits[22]."
-            + "MEM_EX_Result_Inst/Using_FPGA.Native/Q"; 
+            + "MEM_EX_Result_Inst/Using_FPGA.Native/Q";
     public static final String TEST_SNK = "u_ila_0/inst/PROBE_PIPE."
-            + "shift_probes_reg[0][7]/D"; 
+            + "shift_probes_reg[0][7]/D";
 
     @Test
     public void testConnectPortInstsThruHier() {
@@ -67,8 +68,8 @@ public class TestEDIFTools {
         List<EDIFHierNet> netAliases = netlist.getNetAliases(srcPortInst.getHierarchicalNet());
         Assertions.assertEquals(netAliases.size(), 16);
         boolean containsSnkNet = false;
-        for(EDIFHierNet net : netAliases) {
-            if(net.getHierarchicalNetName().equals(snkPortInst.getHierarchicalNetName())) {
+        for (EDIFHierNet net : netAliases) {
+            if (net.getHierarchicalNetName().equals(snkPortInst.getHierarchicalNetName())) {
                 containsSnkNet = true;
             }
         }
@@ -78,8 +79,8 @@ public class TestEDIFTools {
         List<EDIFHierPortInst> portInsts = netlist.getPhysicalPins(srcPortInst.getHierarchicalNet());
         Assertions.assertEquals(portInsts.size(), 6);
         boolean containsSnk = false;
-        for(EDIFHierPortInst sink : portInsts) {
-            if(sink.toString().equals(snkPortInst.toString())) {
+        for (EDIFHierPortInst sink : portInsts) {
+            if (sink.toString().equals(snkPortInst.toString())) {
                 containsSnk = true;
             }
         }
@@ -116,33 +117,33 @@ public class TestEDIFTools {
         Assertions.assertEquals("emoji______", EDIFTools.makeNameEDIFCompatible(unicodeStr));
         Assertions.assertEquals("&_", EDIFTools.makeNameEDIFCompatible(" "));
     }
-    
+
     @Test
     public void testUniqueifyNetlist() {
         final EDIFNetlist netlist = EDIFTools.createNewNetlist("test");
         Design design = new Design("test", Device.PYNQ_Z1);
         design.setNetlist(netlist);
-        
+
         EDIFCell top = netlist.getTopCell();
         EDIFCell foo = new EDIFCell(netlist.getWorkLibrary(), "foo");
         EDIFCell bar = new EDIFCell(netlist.getWorkLibrary(), "bar");
         EDIFCell baz = new EDIFCell(netlist.getWorkLibrary(), "baz");
-        
+
         bar.createChildCellInst("baz1", baz);
         bar.createChildCellInst("baz2", baz);
-        
+
         foo.createChildCellInst("bar1", bar);
         foo.createChildCellInst("bar2", bar);
-        
+
         top.createChildCellInst("foo1", foo);
         top.createChildCellInst("foo2", foo);
 
         Assertions.assertTrue(EDIFTools.uniqueifyNetlist(design));
-        
-        for(Entry<EDIFLibrary, Map<EDIFCell, List<EDIFHierCellInst>>> e : 
+
+        for (Entry<EDIFLibrary, Map<EDIFCell, List<EDIFHierCellInst>>> e :
                                             EDIFTools.createCellInstanceMap(netlist).entrySet()) {
-            if(e.getKey().isHDIPrimitivesLibrary()) continue;
-            for(Entry<EDIFCell, List<EDIFHierCellInst>> e2 : e.getValue().entrySet()) {
+            if (e.getKey().isHDIPrimitivesLibrary()) continue;
+            for (Entry<EDIFCell, List<EDIFHierCellInst>> e2 : e.getValue().entrySet()) {
                 Assertions.assertEquals(e2.getValue().size(), 1);
             }
         }

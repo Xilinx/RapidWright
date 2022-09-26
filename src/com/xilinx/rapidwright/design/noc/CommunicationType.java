@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2022 Xilinx, Inc.
+ * Copyright (c) 2022, Xilinx, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author Zac Blair, Xilinx Research Labs.
@@ -37,14 +38,14 @@ public enum CommunicationType {
 
     static {
         map = new HashMap<>();
-        for(CommunicationType e : values()) {
+        for (CommunicationType e : values()) {
             map.put(e.toString(), e);
         }
     }
 
     private final String ct;
 
-    CommunicationType(String ct){
+    CommunicationType(String ct) {
         this.ct = ct;
     }
 

@@ -1,25 +1,26 @@
-/* 
- * Copyright (c) 2022 Xilinx, Inc. 
+/*
+ * Copyright (c) 2022, Xilinx, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
- *  
- * This file is part of RapidWright. 
- * 
+ *
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
- 
+
 package com.xilinx.rapidwright.edif;
 
 import java.io.BufferedReader;
@@ -46,9 +47,8 @@ public class EquivalentEDIF {
      * @return True if the two objects are equivalent
      */
     private static boolean equivalentEDIFPropObject(EDIFPropertyObject golden, EDIFPropertyObject test) {
-        Assertions.assertEquals(golden.getEDIFName(), test.getEDIFName());
         Assertions.assertEquals(golden.getProperties().size(), test.getProperties().size());
-        for(Map.Entry<EDIFName, EDIFPropertyValue> e : golden.getProperties().entrySet()) {
+        for (Map.Entry<EDIFName, EDIFPropertyValue> e : golden.getProperties().entrySet()) {
             EDIFPropertyValue testValue = test.getProperty(e.getKey().getName());
             Assertions.assertNotNull(testValue);
             Assertions.assertEquals(e.getValue().getType(), testValue.getType());
@@ -66,14 +66,15 @@ public class EquivalentEDIF {
      * @return True if the two cells are equivalent, false otherwise.
      */
     private static boolean equivalentEDIFCells(EDIFCell golden, EDIFCell test) {
+        Assertions.assertEquals(golden.getName(), test.getName());
         Assertions.assertTrue(equivalentEDIFPropObject(golden, test));
         Assertions.assertEquals(golden.getEDIFView(), test.getEDIFView());
         Assertions.assertEquals(golden.getPorts().size(), test.getPorts().size());
-        for(EDIFPort port : golden.getPorts()) {
+        for (EDIFPort port : golden.getPorts()) {
             EDIFPort testPort = test.getPort(port.getBusName());
-            if(port.isBus()) {
+            if (port.isBus()) {
                 EDIFPort portCollision = test.getPort(port.getName());
-                if(portCollision != null) {
+                if (portCollision != null) {
                     testPort = portCollision;
                 }
             }
@@ -83,22 +84,22 @@ public class EquivalentEDIF {
             Assertions.assertEquals(port.getRight(), testPort.getRight());
         }
         Assertions.assertEquals(golden.getCellInsts().size(), test.getCellInsts().size());
-        for(EDIFCellInst inst : golden.getCellInsts()) {
+        for (EDIFCellInst inst : golden.getCellInsts()) {
             EDIFCellInst testInst = test.getCellInst(inst.getName());
             Assertions.assertNotNull(testInst);
             Assertions.assertTrue(equivalentEDIFPropObject(inst, testInst));
             Assertions.assertEquals(inst.getViewref(), testInst.getViewref());
             Assertions.assertEquals(inst.getCellName(), testInst.getCellName());
-            Assertions.assertEquals(inst.getCellType().getLibrary().getEDIFName(),
-                                    testInst.getCellType().getLibrary().getEDIFName());
+            Assertions.assertEquals(inst.getCellType().getLibrary().getName(),
+                                    testInst.getCellType().getLibrary().getName());
         }
         Assertions.assertEquals(golden.getNets().size(), test.getNets().size());
-        for(EDIFNet net : golden.getNets()) {
+        for (EDIFNet net : golden.getNets()) {
             EDIFNet testNet = test.getNet(net.getName());
             Assertions.assertNotNull(testNet);
             Assertions.assertTrue(equivalentEDIFPropObject(net, testNet));
             Assertions.assertEquals(net.getPortInsts().size(), testNet.getPortInsts().size());
-            for(EDIFPortInst pInst : net.getPortInsts()) {
+            for (EDIFPortInst pInst : net.getPortInsts()) {
                 EDIFPortInst testPortInst = testNet.getPortInst(pInst.getCellInst(), pInst.getName());
                 Assertions.assertNotNull(testPortInst);
                 Assertions.assertEquals(pInst.getIndex(), testPortInst.getIndex());
@@ -115,16 +116,16 @@ public class EquivalentEDIF {
      * instances and port instances, false otherwise
      */
     public static boolean equivalentEDIFNetlists(EDIFNetlist golden, EDIFNetlist test) {
-        Assertions.assertEquals(golden.getEDIFName(), test.getEDIFName());
+        Assertions.assertEquals(golden.getName(), test.getName());
         Assertions.assertTrue(equivalentEDIFPropObject(golden.getDesign(), test.getDesign()));
         Assertions.assertTrue(equivalentEDIFCells(golden.getDesign().getTopCell(),
                                                   test.getDesign().getTopCell()));
         Assertions.assertEquals(golden.getLibraries().size(), test.getLibraries().size());
-        for(EDIFLibrary lib : golden.getLibraries()) {
+        for (EDIFLibrary lib : golden.getLibraries()) {
             EDIFLibrary testLib = test.getLibrary(lib.getName());
             Assertions.assertNotNull(testLib);
-            for(EDIFCell cell : lib.getCells()) {
-                EDIFCell testCell = testLib.getCell(cell.getLegalEDIFName());
+            for (EDIFCell cell : lib.getCells()) {
+                EDIFCell testCell = testLib.getCell(cell.getName());
                 Assertions.assertNotNull(testCell);
                 Assertions.assertTrue(equivalentEDIFCells(cell, testCell));
             }
@@ -132,13 +133,13 @@ public class EquivalentEDIF {
         return true;
     }
 
-    private static List<String> readEDIFLines(Path path){
+    private static List<String> readEDIFLines(Path path) {
         List<String> lines = new ArrayList<>();
-        try(BufferedReader br = new BufferedReader(new FileReader(path.toFile()))){
+        try (BufferedReader br = new BufferedReader(new FileReader(path.toFile()))) {
             String line = null;
-            while((line = br.readLine()) != null) {
-                if(line.contains("(metax")) continue;
-                if(line.contains("(timeStamp")) continue;
+            while ((line = br.readLine()) != null) {
+                if (line.contains("(metax")) continue;
+                if (line.contains("(timeStamp")) continue;
                 lines.add(line);
             }
         } catch (IOException e) {
@@ -159,10 +160,10 @@ public class EquivalentEDIF {
         List<String> testLines = readEDIFLines(test);
         Collections.sort(goldenLines);
         Collections.sort(testLines);
-        if(goldenLines.size() != testLines.size()) return false;
+        if (goldenLines.size() != testLines.size()) return false;
         int length = goldenLines.size();
-        for(int i=0 ; i < length; i++) {
-            if(!goldenLines.get(i).equals(testLines.get(i))) {
+        for (int i=0 ; i < length; i++) {
+            if (!goldenLines.get(i).equals(testLines.get(i))) {
                 System.err.println("EDIF mismatch on line " + i + ": >>"
                         + goldenLines.get(i) +"<<  >>" + testLines.get(i) + "<<");
                 return false;

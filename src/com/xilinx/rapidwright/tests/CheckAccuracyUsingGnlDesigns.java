@@ -1,25 +1,26 @@
-/* 
- * Copyright (c) 2019 Xilinx, Inc. 
+/*
+ * Copyright (c) 2019-2022, Xilinx, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
- *  
- * This file is part of RapidWright. 
- * 
+ *
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
- 
+
 package com.xilinx.rapidwright.tests;
 
 import com.xilinx.rapidwright.design.Design;
@@ -48,12 +49,12 @@ import java.util.Scanner;
 
 public class CheckAccuracyUsingGnlDesigns {
 
-	public static String GNL_DESIGN_PATH = File.separator + "designs"+File.separator+"timing"+
+    public static String GNL_DESIGN_PATH = File.separator + "designs"+File.separator+"timing"+
                                            File.separator+"gnl" + File.separator;
-	
-	private static String DOWNLOAD_PATH = 
-			"https://github.com/Xilinx/RapidWright/releases/download/v2019.2.0-beta/";
-	
+
+    private static String DOWNLOAD_PATH =
+            "https://github.com/Xilinx/RapidWright/releases/download/v2019.2.0-beta/";
+
     public CheckAccuracyUsingGnlDesigns() {
     }
 
@@ -88,15 +89,15 @@ public class CheckAccuracyUsingGnlDesigns {
         List<Double> absErrorList = new ArrayList<Double>();;
 
         try {
-        	String goldenFileName = path + "golden/" + suiteFileName;
-        	if(!new File(goldenFileName).exists()) {
-        		System.out.print("ERROR: GNL designs could not be found.  Would you like to"
-        				+ " download them ");
-        		MessageGenerator.agreeToContinue();
-        		String gnlDesignFileName = "gnl_timing_designs.zip";
-        		Installer.downloadFile(DOWNLOAD_PATH + gnlDesignFileName, gnlDesignFileName);
-        		FileTools.unzipFile(gnlDesignFileName, FileTools.getRapidWrightPath());
-        	}
+            String goldenFileName = path + "golden/" + suiteFileName;
+            if (!new File(goldenFileName).exists()) {
+                System.out.print("ERROR: GNL designs could not be found.  Would you like to"
+                        + " download them ");
+                MessageGenerator.agreeToContinue();
+                String gnlDesignFileName = "gnl_timing_designs.zip";
+                Installer.downloadFile(DOWNLOAD_PATH + gnlDesignFileName, gnlDesignFileName);
+                FileTools.unzipFile(gnlDesignFileName, FileTools.getRapidWrightPath());
+            }
             FileInputStream inputStream = new FileInputStream(goldenFileName);
             printStream.println("#designs                                vivado  model(golden)   "
                                 + "model   error   abs_error");
@@ -131,7 +132,7 @@ public class CheckAccuracyUsingGnlDesigns {
                     }
 
                     printStream.println(desName +"\t"+ refDelayString + "\t" + goldenEstString
-                                        + "\t\t" + delayString + "\t" + errorString + "\t" 
+                                        + "\t\t" + delayString + "\t" + errorString + "\t"
                                         + absErrorString);
                 }
             }
