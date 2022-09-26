@@ -110,7 +110,7 @@ public class BlackboxPopulator {
     }
 
     /**
-     * Process the design after filing black boxes to match what Vivado expectation.
+     * Process the design after filling black boxes to match what Vivado expects.
      * @param top The design to process
      * @param blackboxes The black boxes that was filled
      */
