@@ -24,13 +24,10 @@
 package com.xilinx.rapidwright.util;
 
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import com.xilinx.rapidwright.design.ConstraintGroup;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Module;
 import com.xilinx.rapidwright.design.ModuleInst;
@@ -112,7 +109,7 @@ public class BlackboxPopulator {
         top.getNetlist().resetParentNetMap();
 
         for (Pair<String, String> toCellLoc : blackboxes) {
-            combinePIPonClockNets(top, toCellLoc.getFirst());
+            combinePIPsOnClockNets(top, toCellLoc.getFirst());
         }
     }
 
@@ -148,7 +145,7 @@ public class BlackboxPopulator {
      * @param net The net to check
      * @return True if the net is a clock net
      */
-    private static boolean driveClockPin(Net net) {
+    private static boolean hasClockPinSink(Net net) {
         // TODO: rely on attribute instead of name
         for (SitePinInst sink : net.getSinkPins()) {
             if (sink.getName().contains("CLK")) return true;
@@ -164,7 +161,7 @@ public class BlackboxPopulator {
      * @param top      The design with black boxes to fill
      * @param cellName A black box name
      */
-    private static void combinePIPonClockNets(Design top, String cellName) {
+    private static void combinePIPsOnClockNets(Design top, String cellName) {
         System.out.println("Combine PIPs on clock nets of " + cellName);
 
         List<String> clockNets = new ArrayList<>();
@@ -181,7 +178,7 @@ public class BlackboxPopulator {
                 Net physNet = top.getNet(physNetName);
 
                 if (physNet != null) {
-                    if (driveClockPin(physNet)) {
+                    if (hasClockPinSink(physNet)) {
                         clockNets.add(hierNetName_outside);
                         break;
                     }
