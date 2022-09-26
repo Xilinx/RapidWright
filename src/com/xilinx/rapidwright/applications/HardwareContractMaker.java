@@ -1,6 +1,6 @@
 /*
  *
- * Copyright (c) 2022 Xilinx, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Pongstorn Maidee, Xilinx Research Labs.
@@ -32,7 +32,7 @@ import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFTools;
-import com.xilinx.rapidwright.util.BlackboxesPopulator;
+import com.xilinx.rapidwright.util.BlackboxPopulator;
 import com.xilinx.rapidwright.util.Pair;
 
 import java.io.IOException;
@@ -40,6 +40,7 @@ import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -124,6 +125,35 @@ public class HardwareContractMaker {
         Map<String, String> cellMap = Collections.singletonMap(cellName, "");
         DesignTools.copyImplementation(src, d2,  keepStaticRouting, true, true, true, cellMap);
         return d2;
+    }
+
+    /**
+     * If the property of the design exists, set it to the given value.
+     * @param top  The design to set its property
+     * @param prop The full property name to set
+     * @param val  The value to set to
+     */
+    private static void setPropertyValueInLateXDC(Design top, String prop, String val) {
+        ArrayList<String> xdcList = new ArrayList<String>(top.getXDCConstraints(ConstraintGroup.LATE));
+        int lineNum = 0;
+        for (; lineNum < xdcList.size(); lineNum++) {
+            String line = xdcList.get(lineNum);
+            if (line.contains(prop)) {
+                String[] words = line.split("\\s+");
+                int idx = Arrays.asList(words).indexOf(prop);
+                if (++idx < words.length) {
+                    words[idx] = val;
+                    String newLine = String.join(" ", words);
+                    xdcList.set(lineNum, newLine);
+                    break;
+                }
+            }
+        }
+
+        if (lineNum < xdcList.size()) {
+            top.setXDCConstraints(xdcList, ConstraintGroup.LATE);
+            System.out.println("\nINFO: property " + prop + " is found for the top design. It will be set to false.");
+        }
     }
 
     public static void main(String[] args) {
@@ -257,11 +287,12 @@ public class HardwareContractMaker {
 
 
         Module mod = new Module(hwct_component, false);
-        if (BlackboxesPopulator.relocateModuleInsts(hwct, mod, cellAnchor, targets)
+        if (BlackboxPopulator.relocateModuleInsts(hwct, mod, cellAnchor, targets)
            && relocateConstraints(hwct, constraints, cellAnchor, targets)) {
             // TODO: remove the use of relocateConstraints, once RapidWright can carry xdc through module creation and relocation
 
-            BlackboxesPopulator.postProcessing(hwct, targets);
+            BlackboxPopulator.postProcessing(hwct, targets);
+            setPropertyValueInLateXDC(hwct, "HD.RECONFIGURABLE", "false");
 
             System.out.println("\n");
             hwct.writeCheckpoint(outDCPName );
