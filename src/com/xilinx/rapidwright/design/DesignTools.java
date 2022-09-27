@@ -1161,6 +1161,7 @@ public class DesignTools {
             }
             rPips.add(pip);
 
+            int endNodeFanout = 0;
             if (pip.isBidirectional()) {
                 rPips = reverseConnsStart.get(startNode);
                 if (rPips == null) {
@@ -1169,14 +1170,18 @@ public class DesignTools {
                 }
                 rPips.add(pip);
 
-                int fanoutCount = nodeSinkPins.contains(endNode) ? 2 : 1;
-                fanout.merge(endNode, fanoutCount, Integer::sum);
+                endNodeFanout = 1;
+            } else if (nodeSinkPins.contains(endNode)) {
+                endNodeFanout = 1;
+            }
+            if (endNodeFanout > 0) {
+                fanout.merge(endNode, endNodeFanout, Integer::sum);
             }
 
             // If a site pin was found and it belongs to this net, add an extra fanout to
             // reflect that it was both used for downstream connection as well as this site pin
-            int fanoutCount = nodeSinkPins.contains(startNode) ? 2 : 1;
-            fanout.merge(startNode, fanoutCount, Integer::sum);
+            int startNodeFanout = nodeSinkPins.contains(startNode) ? 2 : 1;
+            fanout.merge(startNode, startNodeFanout, Integer::sum);
         }
 
         HashSet<PIP> toRemove = new HashSet<>();
