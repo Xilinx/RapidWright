@@ -97,7 +97,7 @@ public class TestNet {
         SitePinInst src = net.createPin("HMUX", si);
         SitePinInst altSrc = net.createPin("H_O", si);
         Assertions.assertNotNull(net.getAlternateSource());
-        Assertions.assertTrue(net.getAlternateSource().getName().equals("H_O"));
+        Assertions.assertTrue(net.getAlternateSource().equals(altSrc));
 
         si = design.createSiteInst(design.getDevice().getSite("SLICE_X64Y158"));
         SitePinInst snk = net.createPin("SRST_B2", si);
@@ -118,5 +118,19 @@ public class TestNet {
             Assertions.assertEquals(0, net.getPIPs().size());
             Assertions.assertFalse(altSnk.isRouted());
         }
+    }
+
+    @Test
+    public void testRemoveAlternateSourcePin() {
+        Design design = new Design("test", Device.KCU105);
+        SiteInst si = design.createSiteInst(design.getDevice().getSite("SLICE_X65Y158"));
+        Net net = design.createNet("net");
+        net.createPin("HMUX", si);
+        SitePinInst altSrc = net.createPin("H_O", si);
+        Assertions.assertNotNull(net.getAlternateSource());
+        Assertions.assertTrue(net.getAlternateSource().equals(altSrc));
+
+        net.removePin(altSrc);
+        Assertions.assertNull(net.getAlternateSource());
     }
 }
