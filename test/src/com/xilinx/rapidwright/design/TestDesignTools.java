@@ -341,6 +341,46 @@ public class TestDesignTools {
         }
     }
 
+    @Test
+    public void testGetTrimmablePIPsFromPinsBidirEndNode() {
+        Design design = new Design("test", "xcvu19p-fsva3824-1-e");
+        Device device = design.getDevice();
+
+        Net net = createTestNet(design, "net", new String[]{
+                "INT_X126Y235/INT.LOGIC_OUTS_W27->INT_NODE_SDQ_87_INT_OUT0",    // DQ2 output
+                "INT_X126Y235/INT.INT_NODE_SDQ_87_INT_OUT0->>EE4_W_BEG6",
+                "INT_X128Y235/INT.EE4_W_END6->INT_NODE_SDQ_84_INT_OUT1",
+                "INT_X128Y235/INT.INT_NODE_SDQ_84_INT_OUT1->>SS2_W_BEG6",
+                "INT_X128Y233/INT.SS2_W_END6->INT_NODE_SDQ_85_INT_OUT0",
+                "INT_X128Y233/INT.INT_NODE_SDQ_85_INT_OUT0->>WW2_W_BEG6",
+                "INT_X127Y233/INT.WW2_W_END6->INT_NODE_SDQ_82_INT_OUT0",
+                "INT_X127Y233/INT.INT_NODE_SDQ_82_INT_OUT0->>NN2_W_BEG5",
+                "INT_X127Y235/INT.NN2_W_END5->INT_NODE_SDQ_78_INT_OUT0",
+                "INT_X127Y235/INT.INT_NODE_SDQ_78_INT_OUT0->>WW2_W_BEG5",
+                "INT_X126Y235/INT.WW2_W_END5->>INT_NODE_IMUX_49_INT_OUT1",
+                "INT_X126Y235/INT.INT_NODE_IMUX_49_INT_OUT1->>BYPASS_W8",       // EX input
+                "INT_X126Y235/INT.INT_NODE_IMUX_37_INT_OUT0<<->>BYPASS_W8",
+                "INT_X126Y235/INT.INT_NODE_IMUX_37_INT_OUT0->>BYPASS_W7"        // D_I input
+        });
+
+        SiteInst si = design.createSiteInst(design.getDevice().getSite("SLICE_X242Y235"));
+        SitePinInst DQ2 = net.createPin("DQ2", si);
+        DQ2.setRouted(true);
+        SitePinInst EX = net.createPin("EX", si);
+        EX.setRouted(true);
+        SitePinInst D_I = net.createPin("D_I", si);
+        D_I.setRouted(true);
+
+        List<SitePinInst> pinsToUnroute = new ArrayList<>(3);
+        pinsToUnroute.add(D_I);
+        Set<PIP> trimmable = DesignTools.getTrimmablePIPsFromPins(net, pinsToUnroute);
+        Assertions.assertEquals(2, trimmable.size());
+        Assertions.assertTrue(trimmable.containsAll(Arrays.asList(
+                device.getPIP("INT_X126Y235/INT.INT_NODE_IMUX_37_INT_OUT0<<->>BYPASS_W8"),
+                device.getPIP("INT_X126Y235/INT.INT_NODE_IMUX_37_INT_OUT0->>BYPASS_W7")
+        )));
+    }
+
     public static Net createTestNet(Design design, String netName, String[] pips) {
         Net net = design.createNet(netName);
         Device device = design.getDevice();

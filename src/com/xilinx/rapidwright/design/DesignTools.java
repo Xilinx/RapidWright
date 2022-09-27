@@ -1169,7 +1169,8 @@ public class DesignTools {
                 }
                 rPips.add(pip);
 
-                fanout.merge(endNode, 1, Integer::sum);
+                int fanoutCount = nodeSinkPins.contains(endNode) ? 2 : 1;
+                fanout.merge(endNode, fanoutCount, Integer::sum);
             }
 
             // If a site pin was found and it belongs to this net, add an extra fanout to
