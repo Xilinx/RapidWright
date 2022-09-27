@@ -157,7 +157,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         myCellMap = design.getNetlist().generateCellInstMap();
         if (!isPartialRouting) {
             determineLogicDelaysFromEDIFCellInsts(myCellMap);
-        }else {
+        } else {
             determineLogicDelaysFromEDIFCellInsts(generateCellMapOfNets(targetNets));
         }
         if (routerTimer != null) routerTimer.getRuntimeTracker("determine logic dly").stop();
@@ -319,7 +319,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
             if (outDegreeOf(v) == 0) {
                 if (v.equals(superSink)) {
                     v.setMinRequiredTime(requirement);
-                }else {
+                } else {
                     v.setMinRequiredTime(Short.MAX_VALUE);//NOTE: there are dangling timing vertices not connected to super sink
                 }
             }
@@ -404,7 +404,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
             TimingVertex v = safeVertexCheck.get(str);
             if (v != null) {
                 vertices.add(v);
-            }else{
+            } else {
                 System.err.println("graph does not contain: " + str);
             }
         }
@@ -752,10 +752,10 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         
         if (bramPinsToSuperSink.contains(portString)) {
             shouldConnect = true;
-        }else if (pinName.startsWith("CASDINA") || pinName.startsWith("CASDINPA")) {
+        } else if (pinName.startsWith("CASDINA") || pinName.startsWith("CASDINPA")) {
             // check CASOREGIMUXA and CASDOMUXA
             shouldConnect = shouldCASCADINConnectToSuperSink(cell, "CASOREGIMUXA", "CASDOMUXA");
-        }else if (pinName.startsWith("CASDINB") || pinName.startsWith("CASDINPB")) {
+        } else if (pinName.startsWith("CASDINB") || pinName.startsWith("CASDINPB")) {
             // check CASOREGIMUXB and CASDOMUXB
             shouldConnect = shouldCASCADINConnectToSuperSink(cell, "CASOREGIMUXB", "CASDOMUXB");
         }
@@ -804,9 +804,9 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                 sources.add(s1);
             } else if (s1.getFlopInput() && outDegreeOf(s1) == 0 && inDegreeOf(s1) > 0) {
                 sinks.add(s1);
-            }else if (s1.getName().endsWith("VCLK")) {// for DSP
+            } else if (s1.getName().endsWith("VCLK")) {// for DSP
                 sinks.add(s1);
-            }else {
+            } else {
                 // All pins to "D" of BRAM must go to super sink, if it goes somewhere else, something is wrong
                 String cellPinName = s1.getName();
                 int indexOfLastSlash = cellPinName.lastIndexOf("/");
@@ -1156,7 +1156,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                                     delay = (short) getCLKtoOutputDelay(s2, encodedConfig);
                                 }
                             }
-                        }else if (s1.startsWith("CLKB")) {
+                        } else if (s1.startsWith("CLKB")) {
                                 if (isBramOutPortB(s2)) {
                                     String property = mycellInst.getProperty("CASCADE_ORDER_B").getValue();
                                     int DOB_REG = Integer.parseInt(mycellInst.getProperty("DOB_REG").getValue());
@@ -1165,7 +1165,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                                     }
                                     
                                 }
-                        }else {
+                        } else {
                             delay = intrasiteAndLogicDelayModel.getLogicDelay(belIdx, s1, s2, encodedConfig);
                         }
                         
@@ -1519,7 +1519,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                         }
                     }
                 }
-            }else if (mycellInst.getCellType().toString().contains("DSP_")) {//contains DSP_, and FD, VCC
+            } else if (mycellInst.getCellType().toString().contains("DSP_")) {//contains DSP_, and FD, VCC
                 dspTimingDataPathCheck();
                 String dspBlockFullHierName = c.getParentHierarchicalInstName();
                 DSPTimingData dspTimingData = dspNameDataMapping.get(dspBlockFullHierName);
@@ -1527,7 +1527,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                     dspTimingData = new DSPTimingData(dspBlockFullHierName, dspTimingDataFolder);//check if data processed previously
                     if (dspTimingData.isValid()) {
                         dspNameDataMapping.put(dspBlockFullHierName, dspTimingData);
-                    }else {
+                    } else {
                         dspTimingFileExistenceWarning(dspBlockFullHierName);
                     }
                 }
@@ -1584,7 +1584,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
             System.out.println("CRITICAL WARNING: The design contains DSP blocks, but the DSP logic delay file path has not been set.");
             DSPTimingData.generateWarningInfo();
             dspTimingDataFolderWarning = true;
-        }else if (dspTimingDataFolder != null) {
+        } else if (dspTimingDataFolder != null) {
             if (!dspTimingDataFolder.endsWith("/")) dspTimingDataFolder += "/";
             if (!dspTimingDataFolderWarning) {
                 System.out.println("INFO: DSP timing data folder set as: " + dspTimingDataFolder);
@@ -1659,10 +1659,10 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         
         if (clkRouteTiming == null) {
             overwriteBUGCEDelay = false;
-        }else {
+        } else {
             if (spi_source != null && spi_source.getName().equals("CLK_OUT") && spi_source.toString().contains(clkRouteTiming.getBufgce())) {
                 overwriteBUGCEDelay = true;
-            }else {
+            } else {
                 overwriteBUGCEDelay = false;
             }
         }
@@ -1731,7 +1731,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                    testSourceCell = cell;
                    if (isUnisimFlipFlopType(cell.getType())) {
                        logicDelay = timingModel.LOGIC_FF_DELAY;
-                   }else if (isRamType(cell.getType())) {
+                   } else if (isRamType(cell.getType())) {
                        updateLogicDelay = false;
                    }
                    source = cell.getBEL().getPin(physPinName);
@@ -1750,7 +1750,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                 source = cell.getBEL().getPin(physPinName);
                 if (isUnisimFlipFlopType(cell.getType())) {
                     logicDelay = timingModel.LOGIC_FF_DELAY;
-                }else if (isRamType(cell.getType())) {
+                } else if (isRamType(cell.getType())) {
                     updateLogicDelay = false;
                 }
             } else {
@@ -1843,21 +1843,21 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                         netDelay = tmpNetDelay;
                         intraSiteDelay = tmpNetDelay;
                         forceUpdateEdge = true;
-                    }else {
+                    } else {
                         netDelay = timingModel.calcDelay(local_spi_source, spi_sink, source, sink, net); 
                         intraSiteDelay = timingModel.getIntraSiteDelay();
                         forceUpdateEdge = true;
                     }
-                }else {                    
+                } else {                    
                     netDelay = timingModel.calcDelay(local_spi_source, spi_sink, source, sink, net);
                     intraSiteDelay = timingModel.getIntraSiteDelay();
                     forceUpdateEdge = true;
                     if (clkRouteTiming == null) {
                         overwriteBUGCEDelay = false;
-                    }else {
+                    } else {
                         if (spi_sink.getName().equals("CLK_IN") && spi_sink.toString().contains(clkRouteTiming.getBufgce())) {
                             overwriteBUGCEDelay = true;
-                        }else {
+                        } else {
                             overwriteBUGCEDelay = false;
                         }
                     }
@@ -1868,7 +1868,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                  if (overwriteBUGCEDelay) {
                      if (spi_sink.getName().equals("CLK_IN")) {
                          logicDelay += getRouteDelayToSinkINTTile(RouterHelper.getUpstreamINTTileOfClkIn(spi_sink).getName());
-                     }else {
+                     } else {
                          netDelay = getRouteDelayToSinkINTTile(spi_sink.getConnectedNode().getTile().getName());
                          logicDelay = 0;
                          intraSiteDelay = 0;

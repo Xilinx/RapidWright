@@ -390,15 +390,15 @@ public class Connection implements Comparable<Connection>{
     public int compareTo(Connection arg0) {
         if (netWrapper.getConnections().size() > arg0.getNetWrapper().getConnections().size()) {
             return 1;
-        }else if (netWrapper.getConnections().size() == arg0.getNetWrapper().getConnections().size()) {
+        } else if (netWrapper.getConnections().size() == arg0.getNetWrapper().getConnections().size()) {
             if (this.getHpwl() > arg0.getHpwl()) {
                 return 1;
-            }else if (getHpwl() == arg0.getHpwl()) {
+            } else if (getHpwl() == arg0.getHpwl()) {
                 if (hashCode() > arg0.hashCode()) {
                     return -1;
                 }
             }
-        }else {
+        } else {
             return -1;
         }
         return -1;

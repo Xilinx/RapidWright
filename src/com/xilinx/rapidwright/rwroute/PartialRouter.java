@@ -259,7 +259,7 @@ public class PartialRouter extends RWRoute{
     protected void addGlobalClkRoutingTargets(Net clk) {
         if (!clk.hasPIPs()) {
             super.addGlobalClkRoutingTargets(clk);
-        }else {
+        } else {
             preserveNet(clk);
             increaseNumPreservedClks();
         }
@@ -278,7 +278,7 @@ public class PartialRouter extends RWRoute{
                 addStaticNetRoutingTargets(staticNet, sinks);
             }
 
-        }else {// internally routed (sinks.size = 0)
+        } else {// internally routed (sinks.size = 0)
             increaseNumNotNeedingRouting();
         }
     }

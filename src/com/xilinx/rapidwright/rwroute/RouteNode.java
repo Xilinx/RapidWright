@@ -169,9 +169,9 @@ abstract public class RouteNode {
                 if (length != 0) baseCost *= length;
                 break;
             }
-        }else if (type == RouteNodeType.PINFEED_I) {
+        } else if (type == RouteNodeType.PINFEED_I) {
             baseCost = 0.4f;
-        }else if (type == RouteNodeType.PINFEED_O) {
+        } else if (type == RouteNodeType.PINFEED_O) {
             baseCost = 1f;
         }
 

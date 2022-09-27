@@ -97,7 +97,7 @@ public class RapidStreamRoute extends PartialRouter{
                     if (!toReserveLogical.equals(reservedLogical)) {
                         if (generateWarning) generateConflictInfo(node, reserved, netToPreserve);
                     }
-                }else {
+                } else {
                     if (generateWarning) generateConflictInfo(node, reserved, netToPreserve);
                 }
                 conflictNets.add(reserved);
@@ -156,7 +156,7 @@ public class RapidStreamRoute extends PartialRouter{
         Tile anchorTile;
         if (input) {
             anchorTile = net.getSinkPins().get(0).getTile();
-        }else {
+        } else {
             anchorTile = net.getSource().getTile();
         }
         // Note: if laguna anchor nets are never conflicted, there will be no need to check tile names.

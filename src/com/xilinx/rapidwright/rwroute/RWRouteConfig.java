@@ -775,7 +775,7 @@ public class RWRouteConfig {
                 s.append(MessageGenerator.formatString("Enlarge bounding box: ", isEnlargeBoundingBox()));
                 s.append(MessageGenerator.formatString("Extension X increment: ", extensionXIncrement));
                 s.append(MessageGenerator.formatString("Extension Y increment: ", extensionYIncrement));
-            }else {
+            } else {
                 s.append(MessageGenerator.formatString("Fixed bounding box: ", !isEnlargeBoundingBox()));
             }
         }

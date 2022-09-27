@@ -173,7 +173,7 @@ public class RouteFixer{
         public void setPrev(NodeWithDelay driver) {
             if (prev == null) {
                 prev = driver;
-            }else if (driver.cost < prev.cost) {
+            } else if (driver.cost < prev.cost) {
                 prev = driver;
             }
         }

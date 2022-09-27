@@ -232,13 +232,13 @@ public class TimingManager {
                     for (int iGroup = groups.size() -1; iGroup >= 0; iGroup--) {
                         System.out.println("\t " + groups.get(iGroup));
                     }
-                }else {
+                } else {
                     List<Node> nodes = timingEdgeConnctionMap.get(edge).getNodes();
                     for (int iGroup = nodes.size() -1; iGroup >= 0; iGroup--) {
                         RouteNode rnode = routingGraph.getNode(nodes.get(iGroup));
                         if (rnode != null) {
                             System.out.println("\t " + rnode.getNode() + ", " + rnode.getNode().getIntentCode() + ", delay = " + (short) rnode.getDelay());
-                        }else {
+                        } else {
                             System.out.println("\t " + nodes.get(iGroup) + ", " + nodes.get(iGroup).getIntentCode() + ", delay = " + 0);
                         }
                     }

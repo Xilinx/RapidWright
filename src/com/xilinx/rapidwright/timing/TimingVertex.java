@@ -156,7 +156,7 @@ public class TimingVertex {
         if (this.arrivalTime == null) {
             this.arrivalTime = arrivalTime;
             setPrev(prev);
-        }else if (this.arrivalTime < arrivalTime) {
+        } else if (this.arrivalTime < arrivalTime) {
             this.arrivalTime = arrivalTime;
             setPrev(prev);
         }

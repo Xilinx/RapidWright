@@ -213,7 +213,7 @@ public class RouterHelper {
             PIP pip = findPIPbetweenNodes(driver, load);
             if (pip != null) {
                 connectionPIPs.add(pip);
-            }else{
+            } else {
                 System.err.println("ERROR: Null PIP connecting these two nodes: " + driver+ ", " + load);
             }
         }
@@ -296,7 +296,7 @@ public class RouterHelper {
             Node pinNode = pin.getConnectedNode();
             if (pinNode != null) {
                 nodes.add(pinNode);
-            }else {
+            } else {
                 System.err.println("ERROR: No node connects to pin " + pin + ", net " + net);
             }
         }
@@ -347,7 +347,7 @@ public class RouterHelper {
                             // SRST2 of SLICE also has an inverter, but should not be invertible
                             toInvertPins.add(currSitePinInst);
                         }
-                    }else if (currSitePinInst.toString().contains("DSP")) {
+                    } else if (currSitePinInst.toString().contains("DSP")) {
                         if (isInvertibleDSPBELPin(belPin)) {
                             toInvertPins.add(currSitePinInst);
                         }

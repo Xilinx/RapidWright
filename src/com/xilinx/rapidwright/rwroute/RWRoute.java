@@ -264,22 +264,22 @@ public class RWRoute{
             if (net.isClockNet()) {
                 addGlobalClkRoutingTargets(net);
 
-            }else if (net.isStaticNet()) {
+            } else if (net.isStaticNet()) {
                 addStaticNetRoutingTargets(net);
 
-            }else if (net.getType().equals(NetType.WIRE)) {
+            } else if (net.getType().equals(NetType.WIRE)) {
                 if (RouterHelper.isRoutableNetWithSourceSinks(net)) {
                     addNetConnectionToRoutingTargets(net);
-                }else if (RouterHelper.isDriverLessOrLoadLessNet(net)) {
+                } else if (RouterHelper.isDriverLessOrLoadLessNet(net)) {
                     preserveNet(net);
                     numNotNeedingRoutingNets++;
-                }else if (RouterHelper.isInternallyRoutedNet(net)) {
+                } else if (RouterHelper.isInternallyRoutedNet(net)) {
                     preserveNet(net);
                     numNotNeedingRoutingNets++;
-                }else {
+                } else {
                     numNotNeedingRoutingNets++;
                 }
-            }else {
+            } else {
                 numUnrecognizedNets++;
                 System.err.println("ERROR: Unknown net " + net);
             }
@@ -327,7 +327,7 @@ public class RWRoute{
         if (RouterHelper.isRoutableNetWithSourceSinks(clk)) {
             clk.unroute();
             clkNets.add(clk);
-        }else {
+        } else {
             numNotNeedingRoutingNets++;
             System.err.println("ERROR: Incomplete clock net " + clk);
         }
@@ -347,7 +347,7 @@ public class RWRoute{
                  // routes clock nets with references of partial routes
                 System.out.println("INFO: Route with clock route and timing data");
                 GlobalSignalRouting.routeClkWithPartialRoutes(clk, routesToSinkINTTiles, design.getDevice());
-             }else {
+             } else {
                  // routes clock nets from scratch
                 System.out.println("INFO: Route with symmetric non-timing-driven clock router");
                  GlobalSignalRouting.symmetricClkRouting(clk, design.getDevice());
@@ -376,7 +376,7 @@ public class RWRoute{
             sinks.forEach((p) -> sinkNodes.add(p.getConnectedNode()));
             addPreservedNodes(sinkNodes, staticNet);
             addStaticNetRoutingTargets(staticNet, sinks);
-        }else {
+        } else {
             preserveNet(staticNet);
             numNotNeedingRoutingNets++;
         }
@@ -492,7 +492,7 @@ public class RWRoute{
             if (nodes.isEmpty()) {
                 directConnections.add(connection);
                 connection.setDirect(true);
-            }else {
+            } else {
                 Node sinkINTNode = nodes.get(0);
                 indirectConnections.add(connection);
                 connection.setSinkRnode(getOrCreateRouteNode(sinkINTNode, RouteNodeType.PINFEED_I));
@@ -717,7 +717,7 @@ public class RWRoute{
             if (overUsedRnodes.size() == 0) {
                 if (unroutableConnections.isEmpty()) {
                     break;
-                }else {
+                } else {
                     if (routeIteration == config.getMaxIterations() - 1) {
                         System.err.println("ERROR: Unroutable connections: " + unroutableConnections.size());
                     }
@@ -872,7 +872,7 @@ public class RWRoute{
             int comp = connection2.getNetWrapper().getConnections().size() - connection1.getNetWrapper().getConnections().size();
             if (comp == 0) {
                 return Short.compare(connection1.getHpwl(), connection2.getHpwl());
-            }else {
+            } else {
                 return comp;
             }
         });
@@ -912,7 +912,7 @@ public class RWRoute{
                     overUsed,
                     (short)(maxDelayAndTimingVertex == null? 0 : maxDelayAndTimingVertex.getFirst()),
                     iterationRuntime * 1e-9);
-        }else {
+        } else {
             System.out.printf("%4d       %12d  %8.2f   %11d  %10d   %5s  %9.2f\n",
                     routeIteration,
                     rnodesCreatedThisIteration,
@@ -1171,7 +1171,7 @@ public class RWRoute{
             finishRouteConnection(connection, rnode);
             connection.getSink().setRouted(true);
             if (config.isTimingDriven()) connection.updateRouteDelay();
-        }else {
+        } else {
             connection.getSink().setRouted(false);
             connection.setTarget(false);
             routingGraph.resetExpansion();
@@ -1433,7 +1433,7 @@ public class RWRoute{
             int overoccupancy = rnode.getOccupancy() - RouteNode.capacity;
             // make the congestion cost less for the current connection
             presentCongestionCost = 1 + overoccupancy * presentCongestionFactor;
-        }else{
+        } else {
             presentCongestionCost = rnode.getPresentCongestionCost();
         }
 
