@@ -46,7 +46,6 @@ import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
-import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.util.MessageGenerator;
@@ -60,7 +59,6 @@ import com.xilinx.rapidwright.timing.TimingManager;
 import com.xilinx.rapidwright.timing.TimingVertex;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
-import org.python.google.common.collect.Lists;
 
 /**
  * RWRoute class provides the main methods for routing a design.
@@ -1209,20 +1207,18 @@ public class RWRoute{
         queueBack.clear();
         nodesPopped += nodesPoppedThisConnection;
 
-        connection.getSink().setRouted(successRoute);
-        connection.setTarget(false);
-
         if (successRoute) {
             finishRouteConnection(connection, rnode);
+            connection.getSink().setRouted(true);
             if (config.isTimingDriven()) connection.updateRouteDelay();
         } else {
+            connection.getSink().setRouted(false);
+            connection.setTarget(false);
+            routingGraph.resetExpansion();
             System.out.printf("CRITICAL WARNING: Unroutable connection in iteration #%d\n", routeIteration);
             System.out.println("                 " + connection);
             System.out.println("                  Nodes popped: " + nodesPoppedThisConnection);
         }
-
-        routingGraph.resetExpansion();
-        assert(!connection.getSinkRnode().isVisited());
     }
 
     /**
@@ -1294,6 +1290,8 @@ public class RWRoute{
      */
     protected void finishRouteConnection(Connection connection, RouteNode targetRnode) {
         saveRouting(connection, targetRnode);
+        connection.setTarget(false);
+        routingGraph.resetExpansion();
         updateUsersAndPresentCongestionCost(connection);
     }
 
@@ -1642,7 +1640,7 @@ public class RWRoute{
         // Adds the source rnode to the queue
         push(connectionToRoute.getSourceRnode(), null, 0, 0);
 
-        // Add sink rnodes to the queue
+        // Add sink rnodes to the backward queue
         for (RouteNode sinkRnode : Arrays.asList(connectionToRoute.getSinkRnode(),
                 connectionToRoute.getAltSinkRnode())) {
             if (sinkRnode != null) {
@@ -1651,102 +1649,6 @@ public class RWRoute{
                 float newPartialPathCost = rnodeCostWeight * getNodeCost(sinkRnode, connectionToRoute, countSourceUses, sharingFactor);
                 pushBack(sinkRnode, null, newPartialPathCost, newPartialPathCost);
             }
-        }
-
-        // Push all nodes from all net's routed connections onto the queue
-        NetWrapper netWrapper = connectionToRoute.getNetWrapper();
-        for (Connection connection : netWrapper.getConnections()) {
-            if (!connection.getSink().isRouted())
-                continue;
-
-            RouteNode parentRnode = null;
-            boolean overUsed = false;
-
-            // Go forwards from source
-            for (RouteNode childRnode : Lists.reverse(connection.getRnodes())) {
-                if (parentRnode != null) {
-                    if (connection != connectionToRoute) {
-                        // Skip all downstream nodes as soon as it leaves the current bounding box
-                        if (!isAccessible(childRnode, connectionToRoute)) {
-                            break;
-                        }
-                    }
-
-                    if (!childRnode.isVisited() &&
-                            // For the case where the target node is the one that is congested,
-                            // disallow targets to leave room to find other paths to reach it
-                            !childRnode.isTarget()) {
-                        // Same as exploreAndExpand()
-                        boolean longParent = config.isTimingDriven() && DelayEstimatorBase.isLong(parentRnode.getNode());
-                        evaluateCostAndPush(parentRnode, longParent, childRnode, connection, shareWeight, rnodeCostWeight,
-                                rnodeLengthWeight, rnodeEstWlWeight, rnodeDelayWeight, rnodeEstDlyWeight);
-                    }
-                }
-
-                // Skip all nodes downstream of over used (or to-be-overused if we were to use it) nodes
-                int occ = childRnode.getOccupancy();
-                overUsed = occ > RouteNode.capacity ||
-                        (occ == RouteNode.capacity && childRnode.countConnectionsOfUser(netWrapper) == 0);
-                if (overUsed) {
-                    break;
-                }
-
-                parentRnode = childRnode;
-            }
-
-            // If non-timing driven, there must be at least one over-used node on the
-            // connection-to-be-routed (otherwise we wouldn't expect it to need
-            // re-routing)
-            assert(config.isTimingDriven() ||
-                    connection != connectionToRoute ||
-                    overUsed);
-        }
-
-        RouteNode childRnode = null;
-
-        // For the connectionToRoute only, go backwards from sink
-        for (RouteNode parentRnode : connectionToRoute.getRnodes()) {
-            // Skip all nodes upstream of first over used node
-            // (or would-be-overused if we were to use it again)
-            int occ = parentRnode.getOccupancy();
-            boolean parentOverUsed = occ > RouteNode.capacity ||
-                    (occ == RouteNode.capacity && parentRnode.countConnectionsOfUser(netWrapper) == 0);
-            if (parentOverUsed) {
-                break;
-            }
-
-            if (!parentRnode.isVisited()) {
-                // Mark nodes upstream of the sink as targets also, unless it has been
-                // placed on the queue already (i.e. this must be the same first congested
-                // node reached from downstream as well as upstream)
-                if (childRnode != null) {
-                    boolean longParent = config.isTimingDriven() && DelayEstimatorBase.isLong(parentRnode.getNode());
-                    evaluateCostAndPushBack(childRnode, longParent, parentRnode, connectionToRoute, shareWeight, rnodeCostWeight,
-                            rnodeLengthWeight, rnodeEstWlWeight, rnodeDelayWeight, rnodeEstDlyWeight);
-                }
-            } else {
-                // During non timing driven, at this point parentRnode has been visited
-                // but is not congested, so it must have been visited by another connection
-                // from the same net (since connectionToRoute has been ripped up already)
-                assert(config.isTimingDriven() ||
-                        parentRnode.countConnectionsOfUser(netWrapper) > 0/* ||
-                        parentRnode == connectionToRoute.getSinkRnode()*/);
-                if (!parentRnode.isTarget()) {
-                    // We've accidentally stumbled upon an uncongested path back to the source!
-                    // Mark this as a target and make it the only node in the queue, so that it
-                    // can be immediately popped and terminate routing
-                    parentRnode.setTarget(true);
-                    childRnode.setPrev(parentRnode);
-                    routingGraph.visit(parentRnode);
-                    routingGraph.visit(childRnode);
-                    queue.clear();
-                    queue.add(parentRnode);
-                }
-                // If so, no point in going further upstream
-                break;
-            }
-
-            childRnode = parentRnode;
         }
 
         // Clears previous route of the connection

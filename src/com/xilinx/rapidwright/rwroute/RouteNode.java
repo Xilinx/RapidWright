@@ -389,9 +389,7 @@ abstract public class RouteNode {
     }
 
     /**
-     * Gets whether the given RouteNode Object is already a child.
-     * @param rnode Child node to search for.
-     * @return True if child already present.
+     * Clears the children of this node so that it can be regenerated.
      */
     public void resetChildren() {
         children = null;
