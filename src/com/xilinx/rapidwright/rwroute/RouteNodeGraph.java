@@ -37,6 +37,7 @@ import com.xilinx.rapidwright.util.ParallelismTools;
 import com.xilinx.rapidwright.util.RuntimeTracker;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -82,9 +83,8 @@ public class RouteNodeGraph {
 
     /** Array mapping an INT tile's Y coordinate, to its SLR index */
     final int[] intYToSLRIndex;
-
-    /** Maximum X distance between any two Laguna tiles */
-    final int maxXBetweenLaguna;
+    public final int[] nextLagunaColumn;
+    public final int[] prevLagunaColumn;
 
     protected class RouteNodeImpl extends RouteNode {
 
@@ -155,24 +155,41 @@ public class RouteNodeGraph {
             lagunaTiles = null;
         }
 
-        int currentMaxXBetweenLaguna = 0;
         if (lagunaTiles != null) {
+            final int maxTileColumns = device.getColumns(); // An over-approximation since this isn't in tiles
+            nextLagunaColumn = new int[maxTileColumns];
+            prevLagunaColumn = new int[maxTileColumns];
+            Arrays.fill(nextLagunaColumn, Integer.MAX_VALUE);
+            Arrays.fill(prevLagunaColumn, Integer.MIN_VALUE);
             for (int y = 0; y < lagunaTiles.length; y++) {
                 Tile[] lagunaTilesAtY = lagunaTiles[y];
-                Tile lastTile = null;
                 for (int x = 0; x < lagunaTilesAtY.length; x++) {
                     Tile tile = lagunaTilesAtY[x];
                     if (tile != null) {
-                        if (lastTile != null) {
-                            int distFromLastTile = tile.getTileXCoordinate() - lastTile.getTileXCoordinate();
-                            currentMaxXBetweenLaguna = Math.max(currentMaxXBetweenLaguna, distFromLastTile);
+                        if (y == 0) {
+                            assert(x == tile.getTileXCoordinate());
+                            // Looks like (on US+) LAGUNA tiles are always on the left side of an INT tile,
+                            // with tile X coordinate one smaller
+                            final int intTileXCoordinate = x + 1;
+
+                            // Go backwards til beginning
+                            for (int i = intTileXCoordinate; i >= 0; i--) {
+                                if (nextLagunaColumn[i] != Integer.MAX_VALUE)
+                                    break;
+                                nextLagunaColumn[i] = intTileXCoordinate;
+                            }
+                            // Go forwards til end
+                            for (int i = intTileXCoordinate; i < prevLagunaColumn.length; i++) {
+                                prevLagunaColumn[i] = intTileXCoordinate;
+                            }
                         }
-                        lastTile = tile;
                     }
                 }
             }
+        } else {
+            nextLagunaColumn = null;
+            prevLagunaColumn = null;
         }
-        maxXBetweenLaguna = currentMaxXBetweenLaguna;
     }
 
     public void initialize() {
@@ -313,9 +330,5 @@ public class RouteNodeGraph {
             sum += rnode.everExpanded() ? rnode.getChildren().length : 0;
         }
         return Math.round((float) sum / numNodes());
-    }
-
-    public int getMaxXBetweenLaguna() {
-        return maxXBetweenLaguna;
     }
 }

@@ -26,8 +26,6 @@ package com.xilinx.rapidwright.rwroute;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -511,13 +509,14 @@ public class RWRoute{
         }
 
         if (indirect > 0) {
-            netWrapper.computeHPWLAndCenterCoordinates();
+            netWrapper.computeHPWLAndCenterCoordinates(routingGraph.nextLagunaColumn, routingGraph.prevLagunaColumn);
             if (config.isUseBoundingBox()) {
                 for (Connection connection : netWrapper.getConnections()) {
                     if (connection.isDirect()) continue;
                     connection.computeConnectionBoundingBox(config.getBoundingBoxExtensionX(),
                             config.getBoundingBoxExtensionY(),
-                            routingGraph.getMaxXBetweenLaguna());
+                            routingGraph.nextLagunaColumn,
+                            routingGraph.prevLagunaColumn);
                 }
             }
         }
@@ -973,9 +972,12 @@ public class RWRoute{
                 netNodes.addAll(connection.getNodes());
             }
             for (Node node:netNodes) {
-                if (node.getTile().getTileTypeEnum() != TileTypeEnum.INT) continue;
+                TileTypeEnum tileType = node.getTile().getTileTypeEnum();
+                if (tileType != TileTypeEnum.INT && !RouteNode.lagunaTileTypes.contains(tileType)) {
+                    continue;
+                }
                 totalINTNodes++;
-                int wl = RouterHelper.getLengthOfNode(node);
+                int wl = RouteNode.getLength(node, null);
                 totalWL += wl;
 
                 RouterHelper.addNodeTypeLengthToMap(node, wl, nodeTypeUsage, nodeTypeLength);
@@ -995,6 +997,7 @@ public class RWRoute{
         nodeTypes.add(IntentCode.NODE_LOCAL);
         nodeTypes.add(IntentCode.NODE_PINBOUNCE);
         nodeTypes.add(IntentCode.NODE_PINFEED);
+        nodeTypes.add(IntentCode.NODE_LAGUNA_DATA); // UltraScale+ only
     }
 
     /**
@@ -1340,6 +1343,17 @@ public class RWRoute{
                         break;
                     case PINFEED_I:
                         break;
+                    case LAGUNA_I:
+                        if (!connection.isCrossSLR() ||
+                            connection.getSinkRnode().getSLRIndex() == childRNode.getSLRIndex()) {
+                            // Do not consider approaching a SLL if not needing to cross
+                            continue;
+                        }
+                        break;
+                    case SUPER_LONG_LINE:
+                        assert(connection.isCrossSLR() &&
+                                connection.getSinkRnode().getSLRIndex() != rnode.getSLRIndex());
+                        break;
                     default:
                         throw new RuntimeException();
                 }
@@ -1359,9 +1373,6 @@ public class RWRoute{
      * @return true, if no bounding box constraints, or if the routing resource is within the connection's bounding box when use the bounding box constraint.
      */
     protected boolean isAccessible(RouteNode child, Connection connection) {
-        if (child.getType() == RouteNodeType.PINFEED_I) {
-            return connection.isCrossSLR();
-        }
         return !config.isUseBoundingBox() || child.isInConnectionBoundingBox(connection);
     }
 
@@ -1389,6 +1400,10 @@ public class RWRoute{
             newPartialPathCost += rnodeDelayWeight * (childRnode.getDelay() + DelayEstimatorBase.getExtraDelay(childRnode.getNode(), longParent));
         }
 
+        // Set the prev pointer, as RouteNode.getEndTileYCoordinate() and
+        // RouteNode.getSLRIndex() require this
+        childRnode.setPrev(rnode);
+
         int childX = childRnode.getEndTileXCoordinate();
         int childY = childRnode.getEndTileYCoordinate();
         RouteNode sinkRnode = connection.getSinkRnode();
@@ -1398,13 +1413,39 @@ public class RWRoute{
         int deltaY = Math.abs(childY - sinkY);
         if (connection.isCrossSLR()) {
             int deltaSLR = Math.abs(sinkRnode.getSLRIndex() - childRnode.getSLRIndex());
-            // Check for overshooting which occurs when child and sink node are in
-            // adjacent SLRs and less than a SLL wire's length apart in the Y axis.
-            if (deltaSLR == 1) {
-                int overshootBy = deltaY - RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES;
-                if (overshootBy < 0) {
-                    deltaY = RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES - overshootBy;
+            if (deltaSLR != 0) {
+                // Check for overshooting which occurs when child and sink node are in
+                // adjacent SLRs and less than a SLL wire's length apart in the Y axis.
+                if (deltaSLR == 1) {
+                    int overshootByY = deltaY - RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES;
+                    if (overshootByY < 0) {
+                        assert(deltaY < RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES);
+                        deltaY = RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES - overshootByY;
+                    }
                 }
+
+                // Account for any detours that must be taken to get to and back from the closest Laguna column
+                int nextLagunaColumn = routingGraph.nextLagunaColumn[childX];
+                int prevLagunaColumn = routingGraph.prevLagunaColumn[childX];
+                int nextLagunaColumnDist = Math.abs(nextLagunaColumn - childX);
+                int prevLagunaColumnDist = Math.abs(prevLagunaColumn - childX);
+                if (sinkX >= childX) {
+                    if (nextLagunaColumnDist <= prevLagunaColumnDist || prevLagunaColumn == Integer.MIN_VALUE) {
+                        assert (nextLagunaColumn != Integer.MAX_VALUE);
+                        deltaX = Math.abs(nextLagunaColumn - childX) + Math.abs(nextLagunaColumn - sinkX);
+                    } else {
+                        deltaX = Math.abs(childX - prevLagunaColumn) + Math.abs(sinkX - prevLagunaColumn);
+                    }
+                } else { // childX > sinkX
+                    if (prevLagunaColumnDist <= nextLagunaColumnDist) {
+                        assert (prevLagunaColumn != Integer.MIN_VALUE);
+                        deltaX = Math.abs(childX - prevLagunaColumn) + Math.abs(sinkX - prevLagunaColumn);
+                    } else {
+                        deltaX = Math.abs(nextLagunaColumn - childX) + Math.abs(nextLagunaColumn - sinkX);
+                    }
+                }
+
+                assert(deltaX >= 0);
             }
         }
 
@@ -1413,7 +1454,7 @@ public class RWRoute{
         if (config.isTimingDriven()) {
             newTotalPathCost += rnodeEstDlyWeight * (deltaX * 0.32 + deltaY * 0.16);
         }
-        push(childRnode, rnode, newPartialPathCost, newTotalPathCost);
+        push(childRnode, newPartialPathCost, newTotalPathCost);
     }
 
     /**
@@ -1450,14 +1491,13 @@ public class RWRoute{
     /**
      * Sets the costs of a rnode and pushes it to the queue.
      * @param childRnode A child rnode.
-     * @param rnode The parent rnode of the childRnode.
      * @param newPartialPathCost The upstream path cost from childRnode to the source.
      * @param newTotalPathCost Total path cost of childRnode.
      */
-    private void push(RouteNode childRnode, RouteNode rnode, float newPartialPathCost, float newTotalPathCost) {
+    private void push(RouteNode childRnode, float newPartialPathCost, float newTotalPathCost) {
+        assert(childRnode.getPrev() != null || childRnode.getType() == RouteNodeType.PINFEED_O);
         childRnode.setLowerBoundTotalPathCost(newTotalPathCost);
         childRnode.setUpstreamPathCost(newPartialPathCost);
-        childRnode.setPrev(rnode);
         routingGraph.visit(childRnode);
         queue.add(childRnode);
     }
@@ -1480,7 +1520,7 @@ public class RWRoute{
         connection.setTarget(true);
 
         // Adds the source rnode to the queue
-        push(connection.getSourceRnode(), null, 0, 0);
+        push(connection.getSourceRnode(), 0, 0);
     }
 
     /**
@@ -1534,12 +1574,12 @@ public class RWRoute{
 
     public static void printNodeTypeUsageAndWirelength(boolean verbose, Map<IntentCode, Long> nodeTypeUsage, Map<IntentCode, Long> nodeTypeLength) {
         if (verbose) {
-            System.out.println("Node Usage Per Type\n");
-            System.out.printf(" %-15s  %14s  %12s\n", "Node Type", "Usage", "Length");
+            System.out.println("Node Usage Per Type");
+            System.out.printf(" %-16s  %13s  %12s\n", "Node Type", "Usage", "Length");
             for (IntentCode ic : nodeTypes) {
                 long usage = nodeTypeUsage.getOrDefault(ic, 0L);
                 long length = nodeTypeLength.getOrDefault(ic, 0L);
-                System.out.printf(" %-15s  %14d  %12d\n", ic, usage, length);
+                System.out.printf(" %-16s  %13d  %12d\n", ic, usage, length);
             }
             System.out.println();
         }

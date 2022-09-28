@@ -107,9 +107,8 @@ public class Connection implements Comparable<Connection>{
      * Computes the connection bounding box based on the geometric center of the net, source and sink rnodes.
      * @param boundingBoxExtensionX To indicate the extension on top of the minimum bounding box in the horizontal direction.
      * @param boundingBoxExtensionY To indicate the extension on top of the minimum bounding box in the vertical direction.
-     * @param maxXBetweenLaguna Maximum X distance between any two Laguna tiles.
      */
-    public void computeConnectionBoundingBox(short boundingBoxExtensionX, short boundingBoxExtensionY, int maxXBetweenLaguna) {
+    public void computeConnectionBoundingBox(short boundingBoxExtensionX, short boundingBoxExtensionY, int[] nextLagunaColumn, int[] prevLagunaColumn) {
         short xMin, xMax, yMin, yMax;
         short xNetCenter = (short) Math.ceil(netWrapper.getXCenter());
         short yNetCenter = (short) Math.ceil(netWrapper.getYCenter());
@@ -117,29 +116,40 @@ public class Connection implements Comparable<Connection>{
         xMin = minOfThree(sourceRnode.getEndTileXCoordinate(), sinkRnode.getEndTileXCoordinate(), xNetCenter);
         yMax = maxOfThree(sourceRnode.getEndTileYCoordinate(), sinkRnode.getEndTileYCoordinate(), yNetCenter);
         yMin = minOfThree(sourceRnode.getEndTileYCoordinate(), sinkRnode.getEndTileYCoordinate(), yNetCenter);
+
+        if (isCrossSLR()) {
+            // For SLR-crossing connections, ensure the bounding box width contains at least one Laguna column
+            // before bounding box extension
+            int nextLaguna = nextLagunaColumn[xMin];
+            int prevLaguna = prevLagunaColumn[xMax];
+            if (nextLaguna != Integer.MAX_VALUE) {
+                xMax = (short) Math.max(xMax, nextLaguna);
+            }
+            if (prevLaguna != Integer.MIN_VALUE) {
+                xMin = (short) Math.min(xMin, prevLaguna);
+            }
+        }
+
         xMaxBB = (short) (xMax + boundingBoxExtensionX);
         xMinBB = (short) (xMin - boundingBoxExtensionX);
         yMaxBB = (short) (yMax + boundingBoxExtensionY);
         yMinBB = (short) (yMin - boundingBoxExtensionY);
 
         if (isCrossSLR()) {
-            // For SLR-crossing connections, ensure the bounding box width is no less than the
-            // maximum distance between Laguna columns to guarantee routability.
-            // Note: by blanket growing the bounding box to the worst-case maximum distance,
-            // this is likely to be more than is necessary to just reach the closest Laguna
-            // column, thus potentially imposing a runtime overhead.
-            short widthMinusMaxLagunaDist = (short) ((xMaxBB - xMinBB - 1) - maxXBetweenLaguna);
-            if (widthMinusMaxLagunaDist < 0) {
-                xMinBB -= -widthMinusMaxLagunaDist / 2;
-                xMaxBB += (-widthMinusMaxLagunaDist + 1) / 2;
-            }
-
-            // Equivalently, ensure that the bounding box height is no less than a SLL's length
-            // to guarantee that at least one SLL is accessible.
+            // Equivalently, ensure that source and sink can both access a SLL without moving
             short heightMinusSLL = (short) ((yMaxBB - yMinBB - 1) - RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES);
             if (heightMinusSLL < 0) {
-                yMinBB -= -heightMinusSLL / 2 + boundingBoxExtensionY;
-                yMaxBB += (-heightMinusSLL + 1) / 2 + boundingBoxExtensionY;
+                if (sourceRnode.getEndTileYCoordinate() <= sinkRnode.getEndTileYCoordinate()) {
+                    // Upwards
+                    short newYMaxBB = (short) (yMin + RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES + 1);
+                    assert(newYMaxBB > yMaxBB);
+                    yMaxBB = newYMaxBB;
+                } else {
+                    // Downwards
+                    short newYMinBB = (short) (yMax - RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES - 1);
+                    assert(newYMinBB < yMinBB);
+                    yMinBB = newYMinBB;
+                }
             }
         }
 

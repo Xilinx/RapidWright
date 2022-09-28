@@ -368,32 +368,6 @@ public class RouterHelper {
     }
 
     /**
-     * Gets the wirelength of a node.
-     * @param node The target node.
-     * @return The wirelength of the node.
-     */
-    public static int getLengthOfNode(Node node) {
-        Tile entry = node.getTile();
-        Tile exit = null;
-        List<Tile> intTiles = new ArrayList<>();
-        for (Wire w : node.getAllWiresInNode()) {
-            Tile wireTile = w.getTile();
-            if (wireTile.getTileTypeEnum() == TileTypeEnum.INT) {
-                if (!intTiles.contains(wireTile)) {
-                    intTiles.add(wireTile);
-                }
-            }
-        }
-        if (intTiles.size() > 1) {
-            exit = intTiles.get(1);
-        } else if (intTiles.size() == 1) {
-            exit = entry;
-        }
-        return Math.abs(entry.getTileXCoordinate()- exit.getTileXCoordinate())
-                + Math.abs(entry.getTileYCoordinate() - exit.getTileYCoordinate());
-    }
-
-    /**
      * Adds the {@link IntentCode} and wirelength of an used node to the map.
      * @param node The target node.
      * @param wlNode The wirelength of the node.
@@ -402,6 +376,13 @@ public class RouterHelper {
      */
     public static void addNodeTypeLengthToMap(Node node, long wlNode, Map<IntentCode, Long> typeUsage, Map<IntentCode, Long> typeLength) {
         IntentCode ic = node.getIntentCode();
+        if (node.getTile().getTileTypeEnum() == TileTypeEnum.LAGUNA_TILE) {
+            // UltraScale only
+            if (node.getWireName().startsWith("UBUMP")) {
+                // Use the intent code from US+
+                ic = IntentCode.NODE_LAGUNA_DATA;
+            }
+        }
         typeUsage.merge(ic, 1L, Long::sum);
         typeLength.merge(ic, wlNode, Long::sum);
     }

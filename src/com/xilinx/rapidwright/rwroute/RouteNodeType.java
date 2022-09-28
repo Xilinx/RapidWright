@@ -44,6 +44,10 @@ public enum RouteNodeType {
      * that have an {@link IntentCode} of NODE_PINBOUNCE.
      */
     PINBOUNCE,
+
+    SUPER_LONG_LINE,
+    LAGUNA_I,
+
     /**
      * Denotes other wiring {@link RouteNode} Objects
      * that are created for routing {@link Connection} Objects.

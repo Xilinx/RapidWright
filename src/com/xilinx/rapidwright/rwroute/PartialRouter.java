@@ -127,7 +127,10 @@ public class PartialRouter extends RWRoute{
         // is if it came from prev
         if (prev != null) {
             assert((prev.getNode() == start) == prev.getNode().equals(start));
-            if (prev.getNode() == start) {
+            if (prev.getNode().equals(start)) {
+                // Now that we're allowing this node to be created, and only be
+                // reachable from prev, remove its 'visited' status so it can be
+                // added to the routing queue
                 endRnode.setVisited(false);
                 return true;
             }
@@ -216,7 +219,7 @@ public class PartialRouter extends RWRoute{
             }
 
             // Erase the prev pointer for all RouteNode-s upstream of projected
-            // INT node, otherwise finishRouteConnection() will complain that
+            // output INT node, otherwise finishRouteConnection() will complain that
             // backtracking doesn't terminate at Net's source
             for (SitePinInst spi : Arrays.asList(net.getSource(), net.getAlternateSource())) {
                 if (spi == null) continue;
@@ -467,7 +470,7 @@ public class PartialRouter extends RWRoute{
             assert(!routingGraph.isPreserved(toBuild));
 
             // Each rnode should be added as a child to all of its parents
-            // that already exist, unless it was already present
+            // that already exist
             for (Node uphill : toBuild.getAllUphillNodes()) {
                 RouteNode parent = routingGraph.getNode(uphill);
                 if (parent == null)
