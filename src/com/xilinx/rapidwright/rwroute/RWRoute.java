@@ -1175,7 +1175,7 @@ public class RWRoute{
         boolean successRoute = false;
         boolean forward = true;
         RouteNode rnode = null;
-        while (!queue.isEmpty()) {
+        while (!queue.isEmpty() && !queueBack.isEmpty()) {
             if (forward) {
                 rnode = queue.poll();
             } else {
@@ -1191,7 +1191,7 @@ public class RWRoute{
 
                 exploreAndExpand(rnode, connection, shareWeight, rnodeCostWeight,
                         rnodeWLWeight, estWlWeight, dlyWeight, estDlyWeight);
-                forward = queueBack.isEmpty();
+                forward = false;
             } else {
                 if (rnode.isVisited()) {
                     successRoute = true;
@@ -1357,24 +1357,23 @@ public class RWRoute{
                                   float rnodeLengthWeight, float rnodeEstWlWeight,
                                   float rnodeDelayWeight, float rnodeEstDlyWeight) {
         boolean longParent = config.isTimingDriven() && DelayEstimatorBase.isLong(rnode.getNode());
+        boolean targetFound = false;
         for (RouteNode childRNode:rnode.getChildren()) {
-            if (childRNode.isTarget()) {
-                // On encountering a target do not terminate immediately by clearing the queue,
-                // as this target could be expensive (due to overuse) and there could be an
-                // alternate target that ends up being cheaper
-                // queue.clear();
-
-                // if (childRNode.isVisited() && childRNode.getUpstreamPathCost() > 0) {
-                //     // Since this node has a `prev` pointer (thus "visited") and
-                //     // it has an upstream cost > 0 (i.e. not prior routing) this
-                //     // means that it must already be present in the queue
-                //     continue;
-                // }
-            } else if (childRNode.isVisited()) {
+            if (childRNode.isVisited()) {
                 // Note: it is possible that another (cheaper) path to a rnode is found here
                 // However, because the PriorityQueue class does not support reducing the cost
                 // of nodes already in the queue, this opportunity is discarded
                 continue;
+            }
+            if (childRNode.isTarget()) {
+                // Despite the limitation above, on encountering a target only terminate
+                // immediately by clearing the queue if this target is not overused since
+                // there could be an alternate target that would be less congested
+                int occ = childRNode.getOccupancy();
+                if (occ == 0 || (occ == 1 && childRNode.countConnectionsOfUser(connection.getNetWrapper()) != 0)) {
+                    queue.clear();
+                    targetFound = true;
+                }
             } else {
                 if (!isAccessible(childRNode, connection)) {
                     continue;
@@ -1401,22 +1400,28 @@ public class RWRoute{
 
             evaluateCostAndPush(rnode, longParent, childRNode, connection, shareWeight, rnodeCostWeight,
                     rnodeLengthWeight, rnodeEstWlWeight, rnodeDelayWeight, rnodeEstDlyWeight);
+            if (targetFound) {
+                break;
+            }
         }
     }
 
     private void exploreAndExpandBack(RouteNode rnode, Connection connection, float shareWeight, float rnodeCostWeight,
                                   float rnodeLengthWeight, float rnodeEstWlWeight,
                                   float rnodeDelayWeight, float rnodeEstDlyWeight) {
+        boolean targetFound = false;
         for (RouteNode parentRnode:rnode.getParents()) {
+            if (parentRnode.isTarget()) {
+                // Already visited by backward router
+                continue;
+            }
             if (parentRnode.isVisited()) {
                 // Already visited by forward router
-            } else if (parentRnode.isTarget()) {
-                // Already visited by backward router
-
-                // Note: it is possible that another (cheaper) path to a rnode is found here
-                // However, because the PriorityQueue class does not support reducing the cost
-                // of nodes already in the queue, this opportunity is discarded
-                continue;
+                int occ = parentRnode.getOccupancy();
+                if (occ == 0 || (occ == 1 && parentRnode.countConnectionsOfUser(connection.getNetWrapper()) != 0)) {
+                    queueBack.clear();
+                    targetFound = true;
+                }
             } else {
                 if (!isAccessibleBack(parentRnode, connection)) {
                     continue;
@@ -1444,6 +1449,9 @@ public class RWRoute{
             boolean longParent = config.isTimingDriven() && DelayEstimatorBase.isLong(parentRnode.getNode());
             evaluateCostAndPushBack(rnode, longParent, parentRnode, connection, shareWeight, rnodeCostWeight,
                     rnodeLengthWeight, rnodeEstWlWeight, rnodeDelayWeight, rnodeEstDlyWeight);
+            if (targetFound) {
+                break;
+            }
         }
     }
 
@@ -1644,6 +1652,7 @@ public class RWRoute{
         for (RouteNode sinkRnode : Arrays.asList(connectionToRoute.getSinkRnode(),
                 connectionToRoute.getAltSinkRnode())) {
             if (sinkRnode != null) {
+                // Unlike source nodes, sink nodes must be costed since they could be overused
                 int countSourceUses = sinkRnode.countConnectionsOfUser(connectionToRoute.getNetWrapper());
                 float sharingFactor = 1 + shareWeight* countSourceUses;
                 float newPartialPathCost = rnodeCostWeight * getNodeCost(sinkRnode, connectionToRoute, countSourceUses, sharingFactor);
