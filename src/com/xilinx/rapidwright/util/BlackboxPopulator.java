@@ -24,13 +24,10 @@
 package com.xilinx.rapidwright.util;
 
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import com.xilinx.rapidwright.design.ConstraintGroup;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Module;
 import com.xilinx.rapidwright.design.ModuleInst;
@@ -50,8 +47,7 @@ import com.xilinx.rapidwright.tests.CodePerfTracker;
 /**
  * Fill some black boxes of a given design with a specific {@link Module} (DCP) implementation.
  */
-public class RelocateModulesIntoBlackboxes {
-
+public class BlackboxPopulator {
 
     /**
      * Fill some black boxes of the given design with the given implementation.
@@ -100,9 +96,22 @@ public class RelocateModulesIntoBlackboxes {
             mi.place(toSite);
         }
         System.out.println("\n");
+        top.getNetlist().consolidateAllToWorkLibrary();
         return true;
     }
 
+    /**
+     * Process the design after filling black boxes to match what Vivado expects.
+     * @param top The design to process
+     * @param blackboxes The black boxes that was filled
+     */
+    public static void postProcessing(Design top, List<Pair<String, String>> blackboxes) {
+        top.getNetlist().resetParentNetMap();
+
+        for (Pair<String, String> toCellLoc : blackboxes) {
+            combinePIPsOnClockNets(top, toCellLoc.getFirst());
+        }
+    }
 
     /**
      * Unplace all cells placed at the proposed existing SiteInts.
@@ -132,11 +141,11 @@ public class RelocateModulesIntoBlackboxes {
 
     /**
      * Determine if the given net is a clock net.
-     *
+     * Net.isClockNet() examines the source, this method looks for at least one clock pin sink.
      * @param net The net to check
      * @return True if the net is a clock net
      */
-    public static boolean isClockNet(Net net) {
+    private static boolean hasClockPinSink(Net net) {
         // TODO: rely on attribute instead of name
         for (SitePinInst sink : net.getSinkPins()) {
             if (sink.getName().contains("CLK")) return true;
@@ -152,7 +161,7 @@ public class RelocateModulesIntoBlackboxes {
      * @param top      The design with black boxes to fill
      * @param cellName A black box name
      */
-    public static void combinePIPonClockNets(Design top, String cellName) {
+    private static void combinePIPsOnClockNets(Design top, String cellName) {
         System.out.println("Combine PIPs on clock nets of " + cellName);
 
         List<String> clockNets = new ArrayList<>();
@@ -169,7 +178,7 @@ public class RelocateModulesIntoBlackboxes {
                 Net physNet = top.getNet(physNetName);
 
                 if (physNet != null) {
-                    if (isClockNet(physNet)) {
+                    if (hasClockPinSink(physNet)) {
                         clockNets.add(hierNetName_outside);
                         break;
                     }
@@ -196,45 +205,6 @@ public class RelocateModulesIntoBlackboxes {
             }
 
         }
-    }
-
-
-    /**
-     * If the property of the design exists, set it to the given value.
-     * @param top  The design to set its property
-     * @param prop The full property name to set
-     * @param val  The value to set to
-     */
-    public static void setPropertyValueInLateXDC(Design top, String prop, String val) {
-        ArrayList<String> xdcList = new ArrayList<String>(top.getXDCConstraints(ConstraintGroup.LATE));
-        int lineNum = 0;
-        for (; lineNum < xdcList.size(); lineNum++) {
-            String line = xdcList.get(lineNum);
-            if (line.contains(prop)) {
-                String[] words = line.split("\\s+");
-                int idx = Arrays.asList(words).indexOf(prop);
-                if (++idx < words.length) {
-                    words[idx] = val;
-                    String newLine = String.join(" ", words);
-                    xdcList.set(lineNum, newLine);
-                    break;
-                }
-            }
-        }
-
-        if (lineNum < xdcList.size()) {
-            top.setXDCConstraints(xdcList, ConstraintGroup.LATE);
-            System.out.println("\nINFO: property " + prop + " is found for the top design. It will be set to false.");
-        }
-    }
-
-
-    // TODO: replace this with a more concise version
-    public static int indexOf(ArrayList<Pair<String,String>> targets, String word) {
-        for (int i = 0; i < targets.size(); i++)
-            if (targets.get(i).getSecond().equals(word))
-                return i;
-        return -1;
     }
 
 // Example arguments
@@ -273,10 +243,8 @@ public class RelocateModulesIntoBlackboxes {
         String cellDCPName = null;
         String cellAnchor = null;
         // Need random access to the list
-        ArrayList<Pair<String, String>> targets = new ArrayList<>();
+        List<Pair<String, String>> targets = new ArrayList<>();
 
-        String toCell = null;
-        String toLoc = null;
 
         // Collect command line arguments
         int i = 0;
@@ -303,9 +271,9 @@ public class RelocateModulesIntoBlackboxes {
                     }
                     break;
                 case "-to":
-                    toCell = args[++i];
+                    String toCell = args[++i];
                     if (i < args.length) {
-                        toLoc = args[++i];
+                        String toLoc = args[++i];
                         targets.add(new Pair<>(toCell, toLoc));
                     } else {
                         System.out.println("Missing value for option -to");
@@ -320,14 +288,6 @@ public class RelocateModulesIntoBlackboxes {
                     break;
             }
             i++;
-        }
-
-
-        int idx = indexOf(targets, cellAnchor);
-        if (idx >= 0) {
-            // Make the blackbox whose reference INT tile the same as the implementation as the last to be copied.
-            // Otherwise some nets become unrouted!
-            Collections.swap(targets, idx, targets.size()-1);
         }
 
 
@@ -354,13 +314,7 @@ public class RelocateModulesIntoBlackboxes {
         t.stop().start("Relocate module instances");
         if (relocateModuleInsts(top, mod, cellAnchor, targets)) {
 
-            top.getNetlist().resetParentNetMap();
-
-            for (Pair<String,String> toCellLoc : targets) {
-                combinePIPonClockNets(top, toCellLoc.getFirst());
-            }
-
-            setPropertyValueInLateXDC (top, "HD.RECONFIGURABLE", "false");
+            postProcessing(top, targets);
 
             System.out.println("\n");
             t.stop().start("Write output dcp");
