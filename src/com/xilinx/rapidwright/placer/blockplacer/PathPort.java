@@ -1,27 +1,29 @@
-/* 
+/*
  * Original work: Copyright (c) 2010-2011 Brigham Young University
- * Modified work: Copyright (c) 2017 Xilinx, Inc. 
+ * Modified work: Copyright (c) 2017-2022, Xilinx, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
- *  
- * This file is part of RapidWright. 
- * 
+ *
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
 package com.xilinx.rapidwright.placer.blockplacer;
 
+import com.xilinx.rapidwright.design.Module;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Tile;
 
@@ -31,124 +33,88 @@ import com.xilinx.rapidwright.device.Tile;
  *
  */
 public class PathPort {
-	
-	private SitePinInst sitePinInst;
-	private HardMacro block;
-	private int rowOffset;
-	private int columnOffset;
-	
-	public Tile getPortTile(){
-		if(block == null){
-			return sitePinInst.getTile();
-		}
-		Tile anchor = block.getTempAnchorSite().getTile();
-		return anchor.getDevice().getTile(anchor.getRow()-rowOffset, anchor.getColumn()-columnOffset);
-	}
-	
-	public Tile getMovedTile(){
-		if(block == null){
-			return sitePinInst.getTile();
-		}
-		Tile pinTile = sitePinInst.getTile();
-		Tile anchor = block.getAnchor().getTile();
-		Tile newAnchorTile = block.getTempAnchorSite().getTile();
-		int tileXOffset = pinTile.getTileXCoordinate() - anchor.getTileXCoordinate();
-		int tileYOffset = pinTile.getTileYCoordinate() - anchor.getTileYCoordinate();
-		int newTileX = newAnchorTile.getTileXCoordinate() + tileXOffset;
-		int newTileY = newAnchorTile.getTileYCoordinate() + tileYOffset;
-		String oldName = pinTile.getName();
-		String newName = oldName.substring(0, oldName.lastIndexOf('X')+1) + newTileX + "Y" + newTileY;
-		Tile correspondingTile = block.getDesign().getDevice().getTile(newName); 
-		return correspondingTile;
-		//return anchor.getDevice().getTile(anchor.getRow()-rowOffset, anchor.getColumn()-columnOffset);
-	}
-	
-	/**
-	 * @return the pin
-	 */
-	public SitePinInst getSitePinInst() {
-		return sitePinInst;
-	}
 
-	/**
-	 * @param sitePinInst the pin to set
-	 */
-	public void setSitePinInst(SitePinInst sitePinInst) {
-		this.sitePinInst = sitePinInst;
-	}
+    private final SitePinInst sitePinInst;
+    private final HardMacro block;
+    private final Tile tile;
+    private final Tile[][] nameRootTiles;
 
-	/**
-	 * @return the block
-	 */
-	public HardMacro getBlock() {
-		return block;
-	}
+    public PathPort(SitePinInst sitePinInst, HardMacro block, Tile tile) {
+        this.sitePinInst = sitePinInst;
+        this.block = block;
+        this.tile = tile;
+        this.nameRootTiles = tile.getDevice().getTilesByNameRoot(tile.getNameRoot());
+    }
 
-	/**
-	 * @param block the block to set
-	 */
-	public void setBlock(HardMacro block) {
-		this.block = block;
-	}
-	
-	/**
-	 * @return the rowOffset
-	 */
-	public int getRowOffset() {
-		return rowOffset;
-	}
+    private Tile cachedAnchor;
+    private Tile cachedRelocate;
 
-	/**
-	 * @param rowOffset the rowOffset to set
-	 */
-	public void setRowOffset(int rowOffset) {
-		this.rowOffset = rowOffset;
-	}
+    public Tile getPortTile() {
+        if (block == null) {
+            return tile;
+        }
+        Tile anchor = block.getTempAnchorSite().getTile();
 
-	/**
-	 * @return the columnOffset
-	 */
-	public int getColumnOffset() {
-		return columnOffset;
-	}
+        if (cachedAnchor == anchor) {
+            return cachedRelocate;
+        }
 
-	/**
-	 * @param columnOffset the columnOffset to set
-	 */
-	public void setColumnOffset(int columnOffset) {
-		this.columnOffset = columnOffset;
-	}
+        final Tile res = Module.getCorrespondingTile(tile, anchor, block.getModule().getAnchor().getTile(), nameRootTiles);
+        cachedAnchor = anchor;
+        cachedRelocate = res;
+        return res;
+    }
 
-	/* (non-Javadoc)
-	 * @see java.lang.Object#hashCode()
-	 */
-	@Override
-	public int hashCode() {
-		final int prime = 31;
-		int result = 1;
-		result = prime * result + ((sitePinInst == null) ? 0 : sitePinInst.hashCode());
-		return result;
-	}
 
-	/* (non-Javadoc)
-	 * @see java.lang.Object#equals(java.lang.Object)
-	 */
-	@Override
-	public boolean equals(Object obj) {
-		if (this == obj)
-			return true;
-		if (obj == null)
-			return false;
-		if (getClass() != obj.getClass())
-			return false;
-		PathPort other = (PathPort) obj;
-		if (sitePinInst == null) {
-			if (other.sitePinInst != null)
-				return false;
-		} else if (!sitePinInst.equals(other.sitePinInst))
-			return false;
-		return true;
-	}
-	
-	
+    /**
+     * @return the pin
+     */
+    public SitePinInst getSitePinInst() {
+        return sitePinInst;
+    }
+
+
+    /**
+     * @return the block
+     */
+    public HardMacro getBlock() {
+        return block;
+    }
+
+    public Tile getTemplateTile() {
+        return tile;
+    }
+
+    /* (non-Javadoc)
+     * @see java.lang.Object#hashCode()
+     */
+    @Override
+    public int hashCode() {
+        final int prime = 31;
+        int result = 1;
+        result = prime * result + ((sitePinInst == null) ? 0 : sitePinInst.hashCode());
+        return result;
+    }
+
+    /* (non-Javadoc)
+     * @see java.lang.Object#equals(java.lang.Object)
+     */
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj)
+            return true;
+        if (obj == null)
+            return false;
+        if (getClass() != obj.getClass())
+            return false;
+        PathPort other = (PathPort) obj;
+        if (sitePinInst == null) {
+            if (other.sitePinInst != null)
+                return false;
+        } else if (!sitePinInst.equals(other.sitePinInst))
+            return false;
+        return true;
+    }
+
+
 }

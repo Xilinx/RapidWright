@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2022 Xilinx, Inc.
+ * Copyright (c) 2022, Xilinx, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Eddie Hung, Xilinx Research Labs.
@@ -32,8 +33,10 @@ import java.util.List;
 public class TestCell {
     @ParameterizedTest
     @CsvSource({
-            "xcvu3p,SLICE_X0Y0,CARRY8,S[4],S4,'[E1, E2, E3, E4, E5, E6]'",
+            "xcvu3p,SLICE_X0Y0,CARRY8,S[4],S4,'[E1, E2, E3, E4, E5, E6]'",  // SLICEL
             "xcvu3p,SLICE_X0Y0,CARRY8,DI[2],DI2,'[C1, C2, C3, C4, C5]'",
+            "xcvu3p,SLICE_X1Y0,CARRY8,S[7],S7,'[H1, H2, H3, H4, H5, H6]'",  // SLICEM
+            "xcvu3p,SLICE_X1Y0,CARRY8,DI[3],DI3,'[D1, D2, D3, D4, D5]'",
     })
     public void testGetAllCorrespondingSitePinNames(String deviceName,
                                                     String siteName,
@@ -44,7 +47,8 @@ public class TestCell {
         Device device = Device.getDevice(deviceName);
         Cell cell = new Cell("cell", device.getSite(siteName).getBEL(belName));
         cell.addPinMapping(physicalPinName, logicalPinName);
-        List<String> sitePinNames = cell.getAllCorrespondingSitePinNames(logicalPinName);
+        final boolean considerLutRoutethru = true;
+        List<String> sitePinNames = cell.getAllCorrespondingSitePinNames(logicalPinName, considerLutRoutethru);
         Assertions.assertEquals(expectedSitePins, sitePinNames.toString());
     }
 }

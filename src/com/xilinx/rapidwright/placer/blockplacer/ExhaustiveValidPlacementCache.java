@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2021 Xilinx, Inc.
+ * Copyright (c) 2021-2022, Xilinx, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Jakob Wenzel, Xilinx Research Labs.
@@ -22,6 +23,7 @@
 package com.xilinx.rapidwright.placer.blockplacer;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
@@ -31,8 +33,8 @@ import java.util.stream.Collectors;
  * @param <PlacementT> The placement class
  */
 public class ExhaustiveValidPlacementCache<PlacementT> extends AbstractValidPlacementCache<PlacementT> {
-    private final List<PlacementT> placements;
-    private final BlockPlacer2<?,?,PlacementT, ?> placer;
+    protected final List<PlacementT> placements;
+    protected final BlockPlacer2<?,?,PlacementT, ?> placer;
 
     public ExhaustiveValidPlacementCache(List<PlacementT> placements, BlockPlacer2<?, ?, PlacementT, ?> placer) {
         this.placements = placements;
@@ -46,7 +48,7 @@ public class ExhaustiveValidPlacementCache<PlacementT> extends AbstractValidPlac
     @Override
     public List<PlacementT> getByRangeAround(int rangeLimit, PlacementT placement) {
         List<PlacementT> result = new ArrayList<>();
-        for(PlacementT s : placements){
+        for (PlacementT s : placements) {
             if (placer.isInRange(placement, s)) {
                 result.add(s);
             }
@@ -57,5 +59,10 @@ public class ExhaustiveValidPlacementCache<PlacementT> extends AbstractValidPlac
     @Override
     public boolean contains(PlacementT site0) {
         return placements.contains(site0);
+    }
+
+    @Override
+    public Collection<PlacementT> getAll() {
+        return placements;
     }
 }

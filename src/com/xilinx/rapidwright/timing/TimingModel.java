@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2019 Xilinx, Inc.
+ * Copyright (c) 2019-2022, Xilinx, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * This file is part of RapidWright.
@@ -385,9 +386,9 @@ public class TimingModel {
         float result = 0f;
         if (groups != null) {
             result = calcDelay(startPinInst, endPinInst, sourceBELPin, sinkBELPin, groups);
-        }else {
-        	
-        	checkForIntrasiteDelay();
+        } else {
+            
+            checkForIntrasiteDelay();
         }
 
         return result;
@@ -426,7 +427,7 @@ public class TimingModel {
      * representing a basic grouping that the delay can be calculated by our model.
      */
     protected List<TimingGroup> determineGroups(List<Node> nodes, List<IntentCode> nodeTypes, 
-    		List<PIP> pips) {
+            List<PIP> pips) {
         // Check the inputs
         if (nodes.size() != nodeTypes.size()) {
             throw new RuntimeException("node size and node types size do not match");
@@ -651,7 +652,7 @@ public class TimingModel {
                 else if (split[0].equalsIgnoreCase("FAR_MIN"))        FAR_MIN =(int) Math.floor(value);
                 else if (split[0].equalsIgnoreCase("FAR_MAX"))        FAR_MAX =(int) Math.floor(value);
                 else {
-                	String errMessage;
+                    String errMessage;
                     if (split.length == 2) {
                         errMessage = "Bad formatted line:"+lineCntr+": \""+split[0]+"\"";
                     } else {
@@ -1167,8 +1168,8 @@ public class TimingModel {
     }
 
     //TODO check
-    public float getIntraSiteDelay(){
-    	return intrasiteDelay;
+    public float getIntraSiteDelay() {
+        return intrasiteDelay;
     }
 
     public DelayModel getDelayModel() { return intrasiteAndLogicDelayModel; }
@@ -1311,7 +1312,7 @@ public class TimingModel {
                 group.delay = GroupDelayCalc;
             }
             if ((!group.isInitialGroup() || (group.isInitialGroup() && group.getDelayType() != null)) 
-            		&& !group.isFinalGroup()) {
+                    && !group.isFinalGroup()) {
                 netDelayCalc += GroupDelayCalc;
             }                
 
@@ -1325,10 +1326,10 @@ public class TimingModel {
         netDelayCalc += checkForSitePinDelay(groups);
         
 //        //TODO debug on intra site delay
-//        if(startPinInst.toString().contains("SLICE_X26Y101.BMUX")) {
-//        	checkIntraSiteDelay = true;
-//        }else {
-//        	checkIntraSiteDelay = false;
+//        if (startPinInst.toString().contains("SLICE_X26Y101.BMUX")) {
+//            checkIntraSiteDelay = true;
+//        } else {
+//            checkIntraSiteDelay = false;
 //        }
 
         checkForIntrasiteDelay();  // implementation refactored into a helper method below
@@ -1337,11 +1338,11 @@ public class TimingModel {
             TimingGroup gprev = groups.get(i-1);
             TimingGroup gcur = groups.get(i);
             if (adjustDoubleConnectedToDoubleDelays && gprev.getDelayType() == GroupDelayType.DOUBLE 
-            		&& gcur.getDelayType() == GroupDelayType.DOUBLE) {
+                    && gcur.getDelayType() == GroupDelayType.DOUBLE) {
                 netDelayCalc -= 6;
             }
             if (adjustQuadConnectedToQuadDelays && gprev.getDelayType() == GroupDelayType.QUAD 
-            		&& gcur.getDelayType() == GroupDelayType.QUAD) {
+                    && gcur.getDelayType() == GroupDelayType.QUAD) {
                 netDelayCalc += 9;
             }
         }
@@ -1349,7 +1350,7 @@ public class TimingModel {
         if (debugFile)
             printStream.println();
 
-        if(verbose) {
+        if (verbose) {
             for (TimingGroup group : groups) {
                 System.out.println("\t" + group.getDelayType() + ":\t" + group.delay + "\t, d:" +
                                    group.d);
@@ -1367,7 +1368,7 @@ public class TimingModel {
                         System.out.println("\t\t\tw:" + w);
                     }
                 }
-            }        	
+            }            
         }
         
         return netDelayCalc + intrasiteDelay; // returning sum of net delay and intrasite delay
@@ -1407,7 +1408,7 @@ public class TimingModel {
                      } else if (pinName.endsWith("WCKEN")) {
                         group.delay += SITEPIN_WCKEN_DELAY;
                         sitepin_delay += SITEPIN_WCKEN_DELAY;
-                    }else if (pinName.endsWith("1")) {
+                    } else if (pinName.endsWith("1")) {
                         group.delay += SITEPIN_A1_DELAY;
                         sitepin_delay += SITEPIN_A1_DELAY;
                     } else if (pinName.endsWith("2")) {
@@ -1510,13 +1511,13 @@ public class TimingModel {
         switch (groupDistance) {
             case SAME:
                 for (TimingGroup ts : unfiltered) {
-                    if ((ts.dist == 0 && ts.getDelayType() != GroupDelayType.PINFEED)// && (ts.dist == 0 && ts.getDelayType() != TimingGroup.GroupDelayType.GLOBAL) //(ts.dist == 0) || (ts.dist == 1 && ts.getDirection() == null)//){// && (ts.getDirection() == targetDirection || ts.getDirection() == null)) {
+                    if ((ts.dist == 0 && ts.getDelayType() != GroupDelayType.PINFEED)// && (ts.dist == 0 && ts.getDelayType() != TimingGroup.GroupDelayType.GLOBAL) //(ts.dist == 0) || (ts.dist == 1 && ts.getDirection() == null)//) {// && (ts.getDirection() == targetDirection || ts.getDirection() == null)) {
                     ) {
                         result.add(ts);
                     }
                 }
                 for (TimingGroup ts : unfiltered) {
-                    if ((ts.dist == 0 && ts.getDelayType() == GroupDelayType.PINFEED) //(ts.dist == 0) || (ts.dist == 1 && ts.getDirection() == null)//){// && (ts.getDirection() == targetDirection || ts.getDirection() == null)) {
+                    if ((ts.dist == 0 && ts.getDelayType() == GroupDelayType.PINFEED) //(ts.dist == 0) || (ts.dist == 1 && ts.getDirection() == null)//) {// && (ts.getDirection() == targetDirection || ts.getDirection() == null)) {
                     ) {
                         result.add(ts);
                     }
@@ -1565,7 +1566,7 @@ public class TimingModel {
     private void determineNodeListInitHelper(Net net) {
         pipEndNodeHashMap = new HashMap<>();
         for (PIP p : net.getPIPs()) {
-            if(p.getEndNode() != null) pipEndNodeHashMap.put(p.getEndNode().toString(), p);
+            if (p.getEndNode() != null) pipEndNodeHashMap.put(p.getEndNode().toString(), p);
         }
     }
 
@@ -1727,7 +1728,7 @@ public class TimingModel {
         Integer startPinSiteWireIdx = null;
 
         if (startPinInst != null) {
-        	Site site = pin.getSiteInst().getSite();
+            Site site = pin.getSiteInst().getSite();
             startPinSiteWireIdx = site.getSiteWireIndex(startPinInst.getName());
         }
         
@@ -1737,7 +1738,7 @@ public class TimingModel {
         if (startPinInst != null) {
             String muxletter = startPinInst.getName().contains("MUX") ? 
                                startPinInst.getName().substring(0, 1) : "";
-        	
+            
             Set<Cell> cells = DesignTools.getConnectedCells(startPinInst);
 
             for (Cell c : cells) {
@@ -1782,9 +1783,9 @@ public class TimingModel {
                     intrasiteDelay += INTRASITE_DELAY_SITEPIN_TO_FF_INPUT;
                 }
             }
-        }else if (endPinInst != null && endPinInst.getName().startsWith("CIN")) {
+        } else if (endPinInst != null && endPinInst.getName().startsWith("CIN")) {
             intrasiteDelay += intrasiteAndLogicDelayModel.getIntraSiteDelay(SiteTypeEnum.SLICEL, 
-            		endPinInst.getName(), sinkType + "/" + "CIN");
+                    endPinInst.getName(), sinkType + "/" + "CIN");
         }
 
         /**
@@ -1805,7 +1806,7 @@ public class TimingModel {
                 fromPinName += sourceBELPin.getName();
             }
             short tmpIntrasiteDelay = intrasiteAndLogicDelayModel.getIntraSiteDelay(
-            		SiteTypeEnum.SLICEL, fromPinName, startPinInst.getName());
+                    SiteTypeEnum.SLICEL, fromPinName, startPinInst.getName());
             intrasiteDelay += tmpIntrasiteDelay;
            
         } else if (startPinInst.getName().endsWith("_O")) {

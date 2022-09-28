@@ -1,6 +1,7 @@
 /*
  * Original work: Copyright (c) 2010-2011 Brigham Young University
- * Modified work: Copyright (c) 2017 Xilinx, Inc.
+ * Modified work: Copyright (c) 2017-2022, Xilinx, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -29,91 +30,91 @@ import com.xilinx.rapidwright.design.AbstractModuleInst;
  * @author clavin
  *
  */
-public class Move<ModuleInstT extends AbstractModuleInst<?,?>, PlacementT> {
+public class Move<ModuleInstT extends AbstractModuleInst<?,?,?>, PlacementT> {
 
-	private final AbstractBlockPlacer<ModuleInstT, PlacementT> placer;
-	PlacementT site0;
+    private final AbstractBlockPlacer<ModuleInstT, PlacementT> placer;
+    PlacementT site0;
 
-	PlacementT site1;
-	PlacementT site1Previous;
-	
-	private ModuleInstT block0;
-	
-	private ModuleInstT block1;
-	private int deltaCost;
+    PlacementT site1;
+    PlacementT site1Previous;
 
+    private ModuleInstT block0;
 
-	public Move(AbstractBlockPlacer<ModuleInstT, PlacementT> placer){
-
-		this.placer = placer;
-	}
-	
-	public Move(PlacementT site0, PlacementT site1, ModuleInstT block0, ModuleInstT block1, AbstractBlockPlacer<ModuleInstT, PlacementT> placer) {
-		this.placer = placer;
-		this.site0 = site0;
-		this.site1 = site1;
-		this.setBlock0(block0);
-		this.setBlock1(block1);
-	}
-	public void setMove(PlacementT site0, PlacementT site1, ModuleInstT block0, ModuleInstT block1, PlacementT site1Previous) {
-		this.site0 = site0;
-		this.site1 = site1;
-		this.site1Previous = site1Previous;
-		this.setBlock0(block0);
-		this.setBlock1(block1);
-	}
-
-	public void setMove(PlacementT site0, PlacementT site1, ModuleInstT block0, ModuleInstT block1) {
-		setMove(site0, site1, block0, block1, site1);
-	}
-	
-	public void undoMove(){
-		if(getBlock0() != null) placer.setTempAnchorSite(getBlock0(), site0);
-		if(getBlock1() != null) placer.setTempAnchorSite(getBlock1(), site1Previous != null ? site1Previous : site1);
-	}
-
-	/* (non-Javadoc)
-	 * @see java.lang.Object#toString()
-	 */
-	@Override
-	public String toString() {
-		return "Move " + (getBlock0() == null ? "null" : getBlock0().getName()) + " -> " + site1 + ", " + (getBlock1() == null ? "null" : getBlock1().getName()) + " -> " + site0;
-	}
-
-	/**
-	 * @return the block0
-	 */
-	public ModuleInstT getBlock0() {
-		return block0;
-	}
-
-	/**
-	 * @param block0 the block0 to set
-	 */
-	public void setBlock0(ModuleInstT block0) {
-		this.block0 = block0;
-	}
-
-	/**
-	 * @return the block1
-	 */
-	public ModuleInstT getBlock1() {
-		return block1;
-	}
-
-	/**
-	 * @param block1 the block1 to set
-	 */
-	public void setBlock1(ModuleInstT block1) {
-		this.block1 = block1;
-	}
+    private ModuleInstT block1;
+    private int deltaCost;
 
 
-	public void setDeltaCost(int deltaCost) {
-		this.deltaCost = deltaCost;
-	}
+    public Move(AbstractBlockPlacer<ModuleInstT, PlacementT> placer) {
 
-	public int getDeltaCost() {
-		return deltaCost;
-	}
+        this.placer = placer;
+    }
+
+    public Move(PlacementT site0, PlacementT site1, ModuleInstT block0, ModuleInstT block1, AbstractBlockPlacer<ModuleInstT, PlacementT> placer) {
+        this.placer = placer;
+        this.site0 = site0;
+        this.site1 = site1;
+        this.setBlock0(block0);
+        this.setBlock1(block1);
+    }
+    public void setMove(PlacementT site0, PlacementT site1, ModuleInstT block0, ModuleInstT block1, PlacementT site1Previous) {
+        this.site0 = site0;
+        this.site1 = site1;
+        this.site1Previous = site1Previous;
+        this.setBlock0(block0);
+        this.setBlock1(block1);
+    }
+
+    public void setMove(PlacementT site0, PlacementT site1, ModuleInstT block0, ModuleInstT block1) {
+        setMove(site0, site1, block0, block1, site1);
+    }
+
+    public void undoMove() {
+        if (getBlock0() != null) placer.setTempAnchorSite(getBlock0(), site0);
+        if (getBlock1() != null) placer.setTempAnchorSite(getBlock1(), site1Previous != null ? site1Previous : site1);
+    }
+
+    /* (non-Javadoc)
+     * @see java.lang.Object#toString()
+     */
+    @Override
+    public String toString() {
+        return "Move " + (getBlock0() == null ? "null" : getBlock0().getName()) + " -> " + site1 + ", " + (getBlock1() == null ? "null" : getBlock1().getName()) + " -> " + site0+" cost: "+deltaCost;
+    }
+
+    /**
+     * @return the block0
+     */
+    public ModuleInstT getBlock0() {
+        return block0;
+    }
+
+    /**
+     * @param block0 the block0 to set
+     */
+    public void setBlock0(ModuleInstT block0) {
+        this.block0 = block0;
+    }
+
+    /**
+     * @return the block1
+     */
+    public ModuleInstT getBlock1() {
+        return block1;
+    }
+
+    /**
+     * @param block1 the block1 to set
+     */
+    public void setBlock1(ModuleInstT block1) {
+        this.block1 = block1;
+    }
+
+
+    public void setDeltaCost(int deltaCost) {
+        this.deltaCost = deltaCost;
+    }
+
+    public int getDeltaCost() {
+        return deltaCost;
+    }
 }

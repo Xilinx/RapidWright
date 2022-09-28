@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2021 Xilinx, Inc.
+ * Copyright (c) 2021-2022, Xilinx, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Jakob Wenzel, Xilinx Research Labs.
@@ -21,13 +22,18 @@
  */
 package com.xilinx.rapidwright.placer.blockplacer;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 import com.xilinx.rapidwright.design.ModuleImplsInst;
 import com.xilinx.rapidwright.design.Port;
 import com.xilinx.rapidwright.design.SimpleTileRectangle;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.TileRectangle;
+import com.xilinx.rapidwright.device.Tile;
+import com.xilinx.rapidwright.util.Pair;
 
 
 /**
@@ -50,6 +56,8 @@ public abstract class ImplsInstancePort {
     public void setPath(ImplsPath path) {
         this.path = path;
     }
+
+    public abstract Pair<String, List<Set<Tile>>> getAllTiles();
 
     /**
      * A port that represents a connection to something that is not contained in a module, like IO.
@@ -75,6 +83,11 @@ public abstract class ImplsInstancePort {
         @Override
         public void enterToRect(SimpleTileRectangle rect) {
             rect.extendTo(sitePinInst.getTile());
+        }
+
+        @Override
+        public Pair<String, List<Set<Tile>>> getAllTiles() {
+            return new Pair<>("", Collections.singletonList(Collections.singleton(sitePinInst.getTile())));
         }
 
         public SitePinInst getSitePinInst() {
@@ -129,6 +142,11 @@ public abstract class ImplsInstancePort {
             if (boundingBox != null) {
                 rect.extendTo(boundingBox);
             }
+        }
+
+        @Override
+        public Pair<String, List<Set<Tile>>> getAllTiles() {
+            return new Pair<>(instance.getName(), instance.getModule().getPortTiles(port));
         }
 
         public ModuleImplsInst getInstance() {

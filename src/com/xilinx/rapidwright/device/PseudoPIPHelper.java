@@ -1,25 +1,26 @@
-/* 
- * Copyright (c) 2020 Xilinx, Inc. 
+/*
+ * Copyright (c) 2020-2022, Xilinx, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
- *  
- * This file is part of RapidWright. 
- * 
+ *
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
- 
+
 package com.xilinx.rapidwright.device;
 
 import java.util.ArrayList;
@@ -70,7 +71,7 @@ public class PseudoPIPHelper {
      * @param pip A prototype pseudo PIP to use.
      */
     private PseudoPIPHelper(PIP pip) {
-        if(pip == null || !pip.isRouteThru()) {
+        if (pip == null || !pip.isRouteThru()) {
             throw new RuntimeException("ERROR: Attempting to initialize "
                     + getClass().getName() + " with non pseudo PIP: " + pip);
         }
@@ -160,19 +161,19 @@ public class PseudoPIPHelper {
      */
     public static Map<TileTypeEnum,HashMap<PIPWires, PseudoPIPHelper>> getPseudoPIPMap(Device device) {
         Map<TileTypeEnum,HashMap<PIPWires, PseudoPIPHelper>> map = deviceMap.get(device.getName());
-        if(map != null) {
+        if (map != null) {
             return map;
         }
         map = new HashMap<TileTypeEnum, HashMap<PIPWires,PseudoPIPHelper>>();
         HashSet<TileTypeEnum> visited = new HashSet<TileTypeEnum>();
-        for(Tile tile : device.getAllTiles()) {
+        for (Tile tile : device.getAllTiles()) {
             TileTypeEnum type = tile.getTileTypeEnum();
-            if(visited.contains(type)) continue;
+            if (visited.contains(type)) continue;
             HashMap<PIPWires, PseudoPIPHelper> pipMap = new HashMap<PIPWires, PseudoPIPHelper>();
             map.put(type, pipMap);
             visited.add(type);
-            for(PIP pip : tile.getPIPs()) {
-                if(!pip.isRouteThru()) continue;
+            for (PIP pip : tile.getPIPs()) {
+                if (!pip.isRouteThru()) continue;
                 PIPWires wirePair = new PIPWires(pip.getStartWireIndex(), pip.getEndWireIndex());
                 pipMap.put(wirePair, new PseudoPIPHelper(pip));
             }
@@ -208,12 +209,12 @@ public class PseudoPIPHelper {
         Deque<BELPin> sinkBelPinsToExplore = new ArrayDeque<BELPin>();
         sinkBelPinsToExplore.addLast(startBELPin);
 
-        while(sinkBelPinsToExplore.size() > 0) {
+        while (sinkBelPinsToExplore.size() > 0) {
             BELPin belPin = sinkBelPinsToExplore.removeFirst();
             siteWires.add(belPin.getSiteWireIndex());
 
             BELPin sourceBelPin = belPin.getSourcePin();
-            for(SitePIP pip : sourceBelPin.getSitePIPs()) {
+            for (SitePIP pip : sourceBelPin.getSitePIPs()) {
                 sinkBelPinsToExplore.addLast(pip.getInputPin());
             }
         }
@@ -233,19 +234,19 @@ public class PseudoPIPHelper {
         nodesToExplore.addLast(firstNode);
 
         SiteNode result = null;
-        while(nodesToExplore.size() > 0) {
+        while (nodesToExplore.size() > 0) {
             SiteNode parentNode = nodesToExplore.removeFirst();
 
             BELPin sourceBelPin = parentNode.sinkBelPin.getSourcePin();
 
-            for(SitePIP pip : sourceBelPin.getSitePIPs()) {
+            for (SitePIP pip : sourceBelPin.getSitePIPs()) {
                 BELPin newSinkBelPin = pip.getInputPin();
 
                 SiteNode node = new SiteNode();
                 node.sinkBelPin = newSinkBelPin;
                 node.parent = parentNode;
 
-                if(siteWires.contains(newSinkBelPin.getSiteWireIndex())) {
+                if (siteWires.contains(newSinkBelPin.getSiteWireIndex())) {
                     // We found a path to a site wire that is driven by the
                     // net used by "start", all done!
                     result = node;
@@ -255,12 +256,12 @@ public class PseudoPIPHelper {
                 }
             }
 
-            if(result != null) {
+            if (result != null) {
                 break;
             }
         }
 
-        if(result == null) {
+        if (result == null) {
             throw new RuntimeException(String.format("ERROR: Failed to find path for pseudo pip from %s/%s to %s/%s",
                         start.getSite().getName(), start.getPinName(),
                         end.getSite().getName(), end.getPinName()));
@@ -272,7 +273,7 @@ public class PseudoPIPHelper {
         // the other path, and isn't consumed by using this pseudo pip.
         belPins.addLast(result.sinkBelPin);
         SiteNode node_cursor = result.parent;
-        while(node_cursor != null) {
+        while (node_cursor != null) {
             belPins.addLast(node_cursor.sinkBelPin.getSourcePin());
             belPins.addLast(node_cursor.sinkBelPin);
             node_cursor = node_cursor.parent;
@@ -287,12 +288,12 @@ public class PseudoPIPHelper {
      * @param end The end site pin
      * @return The list of BELPins occupied when the pseudo PIP is in use for the site.
      */
-    private static List<BELPin> getPath(SitePin start, SitePin end){
+    private static List<BELPin> getPath(SitePin start, SitePin end) {
         BELPin startBELPin = start.getBELPin();
         BELPin endBELPin = end.getBELPin();
 
         // Dual output PIP, search back to common point
-        if(!start.isInput()) {
+        if (!start.isInput()) {
             return findCommonRoute(start, end);
         }
 
@@ -314,22 +315,22 @@ public class PseudoPIPHelper {
      */
     private static LinkedList<BELPin> exploreInput(LinkedList<BELPin> path, BELPin curr, BELPin target) {
         BELPin src = curr.getSourcePin();
-        if(src.equals(target)) {
+        if (src.equals(target)) {
             path.addFirst(src);
             return path;
         }
-        if(curr.getName().equals("PAD")) {
-            if(curr.getSiteWireName().equals(target.getName())) {
+        if (curr.getName().equals("PAD")) {
+            if (curr.getSiteWireName().equals(target.getName())) {
                 path.addFirst(target);
                 return path;
             }
         }
-        for(BELPin input : getRoutableInputs(src)) {
+        for (BELPin input : getRoutableInputs(src)) {
             LinkedList<BELPin> copy = new LinkedList<>(path);
             copy.addFirst(src);
             copy.addFirst(input);
             LinkedList<BELPin> result = exploreInput(copy, input, target);
-            if(result != null) return result;
+            if (result != null) return result;
         }
 
         return null;
@@ -341,14 +342,14 @@ public class PseudoPIPHelper {
      * @param output The output BELPin of a BEL to find backwards arcs through.
      * @return The list of potential source BELPins traveling through a BEL for a pseudo PIP.
      */
-    private static List<BELPin> getRoutableInputs(BELPin output){
+    private static List<BELPin> getRoutableInputs(BELPin output) {
         List<BELPin> pins = new ArrayList<BELPin>();
-        for(SitePIP pip : output.getSitePIPs()) {
+        for (SitePIP pip : output.getSitePIPs()) {
             pins.add(pip.getInputPin());
         }
-        if(pins.size() == 0) {
-            for(BELPin input : output.getBEL().getPins()) {
-                if(input.isOutput()) continue;
+        if (pins.size() == 0) {
+            for (BELPin input : output.getBEL().getPins()) {
+                if (input.isOutput()) continue;
                 pins.add(input);
             }
         }
@@ -361,7 +362,7 @@ public class PseudoPIPHelper {
     }
 
     public static void main(String[] args) {
-        if(args.length != 1) {
+        if (args.length != 1) {
             System.out.println("USAGE: <device name>");
             System.out.println("   Print pseudo pips from device");
             return;
@@ -369,9 +370,9 @@ public class PseudoPIPHelper {
 
         Device device = Device.getDevice(args[0]);
         Map<TileTypeEnum,HashMap<PIPWires, PseudoPIPHelper>> map = getPseudoPIPMap(device);
-        for(Entry<TileTypeEnum, HashMap<PIPWires, PseudoPIPHelper>> e : map.entrySet()) {
+        for (Entry<TileTypeEnum, HashMap<PIPWires, PseudoPIPHelper>> e : map.entrySet()) {
             System.out.println(e.getKey() + ": ");
-            for(Entry<PIPWires, PseudoPIPHelper> e2 : e.getValue().entrySet()) {
+            for (Entry<PIPWires, PseudoPIPHelper> e2 : e.getValue().entrySet()) {
                 Tile t = e2.getValue().getTilePrototype();
                 System.out.println("  " + t.getWireName(e2.getKey().getStartWire())
                                 +  "->" + t.getWireName(e2.getKey().getEndWire())

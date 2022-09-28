@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2021 Xilinx, Inc.
+ * Copyright (c) 2021-2022, Xilinx, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Eddie Hung, Xilinx Research Labs.
@@ -54,7 +55,7 @@ public class DRC {
     }
 
     public static void main(String[] args) {
-        if(args.length < 1 || args.length > 2) {
+        if (args.length < 1 || args.length > 2) {
             printUsageAndExit();
         }
 

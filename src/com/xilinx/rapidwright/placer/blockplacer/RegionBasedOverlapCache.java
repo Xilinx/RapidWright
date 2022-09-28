@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2021 Xilinx, Inc.
+ * Copyright (c) 2021-2022, Xilinx, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Jakob Wenzel, Xilinx Research Labs.
@@ -21,6 +22,7 @@
  */
 package com.xilinx.rapidwright.placer.blockplacer;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
@@ -28,7 +30,7 @@ import java.util.IntSummaryStatistics;
 import java.util.List;
 import java.util.function.Predicate;
 
-import com.xilinx.rapidwright.design.ModuleImplsInst;
+import com.xilinx.rapidwright.design.AbstractModuleInst;
 import com.xilinx.rapidwright.design.RelocatableTileRectangle;
 import com.xilinx.rapidwright.device.Device;
 
@@ -39,10 +41,10 @@ import com.xilinx.rapidwright.device.Device;
  * the region are stored. When a module is moved, overlap detection only needs to be performed for modules that
  * touch the same regions as the module that is being moved.
  */
-public class RegionBasedOverlapCache extends AbstractOverlapCache {
+public class RegionBasedOverlapCache<PlacementT, ModuleInstT extends AbstractModuleInst<?,PlacementT,? super ModuleInstT>>  extends AbstractOverlapCache<PlacementT, ModuleInstT> {
     private final Device device;
-    private final List<ModuleImplsInst> instances;
-    private final Collection<ModuleImplsInst>[][] modulesInArea;
+    private final List<? extends ModuleInstT> instances;
+    private final Collection<ModuleInstT>[][] modulesInArea;
 
     /**
      * Magic Size found by benchmarking
@@ -68,7 +70,7 @@ public class RegionBasedOverlapCache extends AbstractOverlapCache {
         return getRow(device.getRows()-1)+1;
     }
 
-    private boolean allTouchedRegionsMatch(ModuleImplsInst mii, Predicate<Collection<ModuleImplsInst>> predicate) {
+    private boolean allTouchedRegionsMatch(ModuleInstT mii, Predicate<Collection<ModuleInstT>> predicate) {
         final RelocatableTileRectangle bb = mii.getBoundingBox();
 
         final int crMinCol = getColumn(bb.getMinColumn());
@@ -92,7 +94,7 @@ public class RegionBasedOverlapCache extends AbstractOverlapCache {
      * @param mii  the instance
      */
     @Override
-    public void unplace(ModuleImplsInst mii) {
+    public void unplace(ModuleInstT mii) {
         allTouchedRegionsMatch(mii,l->{l.remove(mii); return true;});
     }
 
@@ -101,11 +103,11 @@ public class RegionBasedOverlapCache extends AbstractOverlapCache {
      * @param mii  the instance
      */
     @Override
-    public void place(ModuleImplsInst mii) {
+    public void place(ModuleInstT mii) {
         allTouchedRegionsMatch(mii,l->{l.add(mii); return true;});
     }
 
-    public RegionBasedOverlapCache(Device device, List<ModuleImplsInst> instances, int regionSize) {
+    public RegionBasedOverlapCache(Device device, List<? extends ModuleInstT> instances, int regionSize) {
         this.device = device;
         this.instances = instances;
         this.columnDivider = regionSize;
@@ -116,7 +118,7 @@ public class RegionBasedOverlapCache extends AbstractOverlapCache {
                 modulesInArea[col][row] = new HashSet<>();
             }
         }
-        for (ModuleImplsInst instance : instances) {
+        for (ModuleInstT instance : instances) {
             if (instance.getPlacement()!= null) {
                 place(instance);
             }
@@ -124,21 +126,21 @@ public class RegionBasedOverlapCache extends AbstractOverlapCache {
     }
 
 
-    public RegionBasedOverlapCache(Device device, List<ModuleImplsInst> instances) {
+    public RegionBasedOverlapCache(Device device, List<? extends ModuleInstT> instances) {
         this(device, instances, DEFAULT_REGION_SIZE);
     }
 
     @Override
-    public boolean isValidPlacement(ModuleImplsInst mii) {
-        return allTouchedRegionsMatch(mii, l-> doesNotOverlapAny(mii, l));
+    public boolean isValidPlacement(ModuleInstT mii) {
+        return allTouchedRegionsMatch(mii, l -> doesNotOverlapAny(mii, l));
     }
 
     private void checkCorrectness() {
         boolean error = false;
         for (int col = 0; col < modulesInArea.length; col++) {
             for (int row = 0; row < modulesInArea[col].length; row++) {
-                Collection<ModuleImplsInst> c = modulesInArea[col][row];
-                for (ModuleImplsInst moduleImplsInst : c) {
+                Collection<ModuleInstT> c = modulesInArea[col][row];
+                for (ModuleInstT moduleImplsInst : c) {
 
                     if (moduleImplsInst.getPlacement() == null) {
                         System.out.println(moduleImplsInst +" is wrongly in "+col+"/"+row+", is not placed at all");
@@ -161,8 +163,8 @@ public class RegionBasedOverlapCache extends AbstractOverlapCache {
             }
         }
 
-        for (ModuleImplsInst moduleImplsInst : instances) {
-            for (ModuleImplsInst other : instances) {
+        for (ModuleInstT moduleImplsInst : instances) {
+            for (ModuleInstT other : instances) {
                 if (other != moduleImplsInst && other.overlaps(moduleImplsInst)) {
                     System.out.println(moduleImplsInst +" overlaps "+other);
                     error = true;
@@ -182,7 +184,7 @@ public class RegionBasedOverlapCache extends AbstractOverlapCache {
 
             for (int col = crMinCol ; col <= crMaxCol; col++) {
                 for (int row = crMinRow; row <= crMaxRow; row++) {
-                    Collection<ModuleImplsInst> c = modulesInArea[col][row];
+                    Collection<ModuleInstT> c = modulesInArea[col][row];
                     if (!c.contains(moduleImplsInst)) {
                         System.out.println(moduleImplsInst +" should be in "+col+"/"+row);
                         error = true;
@@ -214,5 +216,15 @@ public class RegionBasedOverlapCache extends AbstractOverlapCache {
         }).summaryStatistics();
         System.out.println("Areas per Inst: "+areasPerInst);
 
+    }
+
+    @Override
+    public List<ModuleInstT> getAllOverlaps(ModuleInstT mii) {
+        List<ModuleInstT> overlaps = new ArrayList<>();
+        allTouchedRegionsMatch(mii, l -> {
+            enterOverlaps(mii, l, overlaps);
+            return true;
+        });
+        return overlaps;
     }
 }
