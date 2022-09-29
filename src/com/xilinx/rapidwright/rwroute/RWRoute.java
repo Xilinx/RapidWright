@@ -1174,9 +1174,9 @@ public class RWRoute{
 
         int nodesPoppedThisConnection = 0;
         boolean successRoute = false;
-        boolean forward = true; // Perform at least one forward iteration
+        boolean forward = true;
         RouteNode rnode = null;
-        while (/*!queue.isEmpty() &&*/ !queueBack.isEmpty()) {
+        while (!queue.isEmpty() && !queueBack.isEmpty()) {
             if (forward) {
                 rnode = queue.poll();
             } else {
@@ -1201,7 +1201,8 @@ public class RWRoute{
 
                 exploreAndExpandBack(rnode, connection, shareWeight, rnodeCostWeight,
                         rnodeWLWeight, estWlWeight, dlyWeight, estDlyWeight);
-                forward = false;
+                forward = true;
+                // forward = false;
             }
         }
         queue.clear();
@@ -1670,8 +1671,8 @@ public class RWRoute{
             }
         }
 
-        // Push all nodes from all net's routed connections onto the queue, so that the
-        // backward router can identify when it has reached
+        // Visit all nodes from all net's other routed connections so that the backward router can
+        // identify when it has reached an intersection point
         NetWrapper netWrapper = connectionToRoute.getNetWrapper();
         for (Connection connection : netWrapper.getConnections()) {
             if (!connection.getSink().isRouted())
@@ -1683,9 +1684,20 @@ public class RWRoute{
             // Go forwards from source
             for (RouteNode childRnode : Lists.reverse(connection.getRnodes())) {
                 if (parentRnode != null) {
-                    // Set the prev pointer in case it was not set
-                    // This marks this node as being "visited" so that the backward router
-                    // can identify an intersection
+                    if (isAccessible(parentRnode, connectionToRoute)) {
+                        boolean longParent = config.isTimingDriven() && DelayEstimatorBase.isLong(parentRnode.getNode());
+                        for (RouteNode otherChildRnode : parentRnode.getChildren()) {
+                            if (otherChildRnode.isVisited()) continue;
+                            assert(!otherChildRnode.isTarget());
+                            if (!isAccessible(otherChildRnode, connectionToRoute)) continue;
+                            evaluateCostAndPush(parentRnode, longParent, otherChildRnode, connectionToRoute, shareWeight, rnodeCostWeight,
+                                    rnodeLengthWeight, rnodeEstWlWeight, rnodeDelayWeight, rnodeEstDlyWeight);
+                        }
+                    }
+
+                    // Set the prev pointer in case it was not set.
+                    // This allows the router to start from a node inside the bounding box that is
+                    // known to be reachable, without congestion, after venturing outside those bounds.
                     RouteNode childPrev = childRnode.getPrev();
                     if (childPrev != parentRnode) {
                         assert(childPrev == null);
