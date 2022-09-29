@@ -1251,7 +1251,7 @@ public class RWRoute{
      * @param target The target rnode to reach.
      * @return true, if the PINBOUNCE rnode is in the same column as the target and within one INT tile of the target.
      */
-    private boolean usablePINBounce(RouteNode pinBounce, RouteNode target) {
+    protected boolean usablePINBounce(RouteNode pinBounce, RouteNode target) {
         Tile bounce = pinBounce.getNode().getTile();
         Tile sink = target.getNode().getTile();
         return bounce.getTileXCoordinate() == sink.getTileXCoordinate() && Math.abs(bounce.getTileYCoordinate() - sink.getTileYCoordinate()) <= 1;
