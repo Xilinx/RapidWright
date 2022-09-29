@@ -350,7 +350,7 @@ abstract public class RouteNode {
     }
 
     public short getTileYCoordinate(boolean end) {
-        return end ? getEndTileYCoordinate() : getEndTileYCoordinate();
+        return end ? getEndTileYCoordinate() : getBeginTileYCoordinate();
     }
 
     public short getBeginTileXCoordinate() {
