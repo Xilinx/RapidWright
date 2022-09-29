@@ -406,8 +406,9 @@ public class PartialRouter extends RWRoute{
                 boolean endPreserved = routingGraph.unpreserve(end);
                 assert(rendAdded == endPreserved);
 
-                // Also check the prev pointer according to the PIP
-                assert(rend.getPrev().equals(rstart));
+                // Check the prev pointer consistent with PIP
+                // (it may be null because isPartOfExistingRoute() will erase prev once rend was created)
+                assert(rend.getPrev() == null || rend.getPrev().equals(rstart));
             }
         } else {
             // Net needs to be created

@@ -59,6 +59,7 @@ import com.xilinx.rapidwright.timing.TimingManager;
 import com.xilinx.rapidwright.timing.TimingVertex;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
+import org.python.google.common.collect.Lists;
 
 /**
  * RWRoute class provides the main methods for routing a design.
@@ -1173,9 +1174,9 @@ public class RWRoute{
 
         int nodesPoppedThisConnection = 0;
         boolean successRoute = false;
-        boolean forward = true;
+        boolean forward = true; // Perform at least one forward iteration
         RouteNode rnode = null;
-        while (!queue.isEmpty() && !queueBack.isEmpty()) {
+        while (/*!queue.isEmpty() &&*/ !queueBack.isEmpty()) {
             if (forward) {
                 rnode = queue.poll();
             } else {
@@ -1200,7 +1201,7 @@ public class RWRoute{
 
                 exploreAndExpandBack(rnode, connection, shareWeight, rnodeCostWeight,
                         rnodeWLWeight, estWlWeight, dlyWeight, estDlyWeight);
-                forward = true;
+                forward = false;
             }
         }
         queue.clear();
@@ -1298,19 +1299,22 @@ public class RWRoute{
     /**
      * Traces back for a connection from its sink rnode to its source, in order to build and store the routing path.
      * @param connection: The connection that is being routed.
-     * @param rnode RouteNode to start backtracking from.
+     * @param intersectRnode RouteNode at which forward/backward router intersected.
      */
-    private void saveRouting(Connection connection, RouteNode targetRnode) {
+    private void saveRouting(Connection connection, RouteNode intersectRnode) {
         assert(connection.getRnodes().isEmpty());
-        assert(targetRnode.getPrev() != null);
+        assert(intersectRnode.getPrev() != null);
 
-        RouteNode rnode = targetRnode;
+        // First go forward from intersection point
+        RouteNode rnode = intersectRnode;
         while ((rnode = rnode.getNext()) != null) {
             connection.addRnode(rnode);
         }
+        // Then reverse the list
         Collections.reverse(connection.getRnodes());
 
-        rnode = targetRnode;
+        // Then add on the walk backwards from intersection
+        rnode = intersectRnode;
         do {
             connection.addRnode(rnode);
         } while ((rnode = rnode.getPrev()) != null);
@@ -1415,6 +1419,11 @@ public class RWRoute{
                 // Already visited by backward router
                 continue;
             }
+            Net parentPreservedNet = routingGraph.getPreservedNet(parentRnode.getNode());
+            if (parentPreservedNet != null && parentPreservedNet != connection.getNetWrapper().getNet()) {
+                // Parent node is preserved by a net other than the one we're routing
+                continue;
+            }
             if (parentRnode.isVisited()) {
                 // Already visited by forward router
                 int occ = parentRnode.getOccupancy();
@@ -1468,11 +1477,12 @@ public class RWRoute{
         return !config.isUseBoundingBox() || child.isInConnectionBoundingBox(connection);
     }
 
-    protected boolean isAccessibleBack(RouteNode child, Connection connection) {
-        if (child.getType() == RouteNodeType.PINFEED_O) {
+    protected boolean isAccessibleBack(RouteNode parent, Connection connection) {
+        if (parent.getType() == RouteNodeType.PINFEED_O) {
+            // TODO: Enable route throughs
             return false;
         }
-        return !config.isUseBoundingBox() || child.isInConnectionBoundingBox(connection);
+        return !config.isUseBoundingBox() || parent.isInConnectionBoundingBox(connection);
     }
 
     /**
@@ -1658,6 +1668,49 @@ public class RWRoute{
                 float newPartialPathCost = rnodeCostWeight * getNodeCost(sinkRnode, connectionToRoute, countSourceUses, sharingFactor);
                 pushBack(sinkRnode, null, newPartialPathCost, newPartialPathCost);
             }
+        }
+
+        // Push all nodes from all net's routed connections onto the queue, so that the
+        // backward router can identify when it has reached
+        NetWrapper netWrapper = connectionToRoute.getNetWrapper();
+        for (Connection connection : netWrapper.getConnections()) {
+            if (!connection.getSink().isRouted())
+                continue;
+
+            RouteNode parentRnode = null;
+            boolean overUsed = false;
+
+            // Go forwards from source
+            for (RouteNode childRnode : Lists.reverse(connection.getRnodes())) {
+                if (parentRnode != null) {
+                    // Set the prev pointer in case it was not set
+                    // This marks this node as being "visited" so that the backward router
+                    // can identify an intersection
+                    RouteNode childPrev = childRnode.getPrev();
+                    if (childPrev != parentRnode) {
+                        assert(childPrev == null);
+                        childRnode.setPrev(parentRnode);
+                        routingGraph.visit(childRnode);
+                    }
+                }
+
+                // Skip all nodes downstream of over used (or to-be-overused if we were to use it) nodes
+                int occ = childRnode.getOccupancy();
+                overUsed = occ > RouteNode.capacity ||
+                        (occ == RouteNode.capacity && childRnode.countConnectionsOfUser(netWrapper) == 0);
+                if (overUsed) {
+                    break;
+                }
+
+                parentRnode = childRnode;
+            }
+
+            // If non-timing driven, there must be at least one over-used node on the
+            // connection-to-be-routed (otherwise we wouldn't expect it to need
+            // re-routing)
+            assert(config.isTimingDriven() ||
+                    connection != connectionToRoute ||
+                    overUsed);
         }
 
         // Clears previous route of the connection

@@ -137,9 +137,8 @@ abstract public class RouteNode {
         List<Node> allUphillNodes = node.getAllUphillNodes();
         List<RouteNode> parentsList = new ArrayList<>(allUphillNodes.size());
         for (Node uphill: allUphillNodes) {
-            if (!mustInclude(uphill, node)) {
-                if (isPreserved(uphill) || isExcluded(uphill, node))
-                    continue;
+            if (isExcludedBack(uphill, node)) {
+                continue;
             }
 
             final RouteNodeType type = RouteNodeType.WIRE;
@@ -694,6 +693,8 @@ abstract public class RouteNode {
      * @return True, if the arc should be excluded from the routing resource graph.
      */
     abstract public boolean isExcluded(Node parent, Node child);
+
+    abstract public boolean isExcludedBack(Node parent, Node child);
 
     abstract public int getSLRIndex();
 }

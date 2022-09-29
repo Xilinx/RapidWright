@@ -116,6 +116,11 @@ public class RouteNodeGraph {
         }
 
         @Override
+        public boolean isExcludedBack(Node parent, Node child) {
+            return RouteNodeGraph.this.isExcludedBack(parent, child);
+        }
+
+        @Override
         public RouteNode[] getChildren() {
             setChildren(setChildrenTimer);
             return super.getChildren();
@@ -262,6 +267,12 @@ public class RouteNodeGraph {
 
     protected boolean isExcluded(Node parent, Node child) {
         Tile tile = child.getTile();
+        TileTypeEnum tileType = tile.getTileTypeEnum();
+        return !allowedTileEnums.contains(tileType);
+    }
+
+    protected boolean isExcludedBack(Node parent, Node child) {
+        Tile tile = parent.getTile();
         TileTypeEnum tileType = tile.getTileTypeEnum();
         return !allowedTileEnums.contains(tileType);
     }
