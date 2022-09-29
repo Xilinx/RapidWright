@@ -23,14 +23,15 @@
 
 package com.xilinx.rapidwright.edif;
 
-import com.xilinx.rapidwright.design.Design;
-import com.xilinx.rapidwright.support.RapidWrightDCP;
-
 import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+
+import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.support.RapidWrightDCP;
 
 public class TestEDIFPort {
 
@@ -65,5 +66,53 @@ public class TestEDIFPort {
                 }
             }
         }
+    }
+
+    @Test
+    public void testCreatePort() {
+        String designName = "design";
+        final EDIFNetlist netlist = EDIFTools.createNewNetlist(designName);
+        final Design design = new Design(designName, Device.KCU105);
+        design.setNetlist(netlist);
+
+        EDIFCell cell = new EDIFCell(netlist.getWorkLibrary(), "cell_1");
+        int outer = 0;
+        for (String range : new String[] { "3:0", "0:3", "5:2", "2:5" }) {
+            int left = Integer.parseInt(range.substring(0, range.indexOf(':')));
+            int right = Integer.parseInt(range.substring(range.indexOf(':') + 1));
+            int width = Math.abs(left - right) + 1;
+            EDIFPort busOutput = cell.createPort("bus_output[" + outer + "][" + range + "]",
+                    EDIFDirection.OUTPUT, width);
+            Assertions.assertEquals(left, busOutput.getLeft());
+            Assertions.assertEquals(right, busOutput.getRight());
+            Assertions.assertTrue(busOutput.isBus());
+            Assertions.assertEquals(left > right, busOutput.isLittleEndian());
+            EDIFPort copy = cell.getPort("bus_output[" + outer + "]");
+            Assertions.assertEquals(busOutput, copy);
+
+            int[] portIndices = busOutput.getBitBlastedIndicies();
+            Assertions.assertEquals(width, portIndices.length);
+            Assertions.assertEquals(left, portIndices[0]);
+            Assertions.assertEquals(right, portIndices[portIndices.length - 1]);
+            for (int i : portIndices) {
+                EDIFNet net = cell.createNet("net[" + outer + "][" + i + "]");
+                String portInstName = "bus_output[" + outer + "][" + i + "]";
+                EDIFPortInst portInst = net.createPortInst(portInstName, cell);
+                Assertions.assertEquals(busOutput, portInst.getPort());
+                Assertions.assertEquals(portInst.getPort().getPortIndexFromNameIndex(i),
+                        portInst.getIndex());
+            }
+
+            outer++;
+        }
+
+        EDIFPort port = cell.createPort("bus_output[0]", EDIFDirection.OUTPUT, 1);
+        Assertions.assertTrue(port.isBus());
+        Assertions.assertEquals(1, port.getWidth());
+        Assertions.assertEquals(port, cell.getPort("bus_output"));
+        Assertions.assertNotEquals(port, cell.getPort("bus_output[0]"));
+
+        Assertions.assertThrows(RuntimeException.class,
+                () -> cell.createPort("bus_output[1]", EDIFDirection.OUTPUT, 1));
     }
 }

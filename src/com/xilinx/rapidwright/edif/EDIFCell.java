@@ -251,26 +251,39 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
                 //   my_port[0]
                 //   my_port[0][3:0]
                 // Find the single bit port and promote it to a single bit bus port
+                EDIFPort oneBitBus = null;
+                EDIFPort multiBitBus = null;
+
                 if (port.getWidth() == 1 && port.getName().endsWith("]")) {
-                    // Let's treat is as a 1-bit bus
-                    String newBusName = EDIFTools.getRootBusName(port.getName());
-                    port.setBusName(newBusName);
-                    ports.put(newBusName, port);
-                    ports.put(collision.getBusName(), collision);
+                    oneBitBus = port;
+                    multiBitBus = collision;
                 } else if (collision.getWidth() == 1 && collision.getName().endsWith("]")) {
-                    String newBusName = EDIFTools.getRootBusName(collision.getName());
-                    collision.setBusName(newBusName);
-                    ports.put(newBusName, collision);
-                    ports.put(port.getBusName(), port);
+                    oneBitBus = collision;
+                    multiBitBus = port;
+                } else {
+                    portNameCollision(port);
                 }
+                // Let's treat is as a 1-bit bus
+                String newBusName = EDIFTools.getRootBusName(oneBitBus.getName());
+                if (ports.containsKey(newBusName)) {
+                    portNameCollision(port);
+                }
+                oneBitBus.setBusName(newBusName);
+                ports.put(newBusName, oneBitBus);
+                ports.put(multiBitBus.getBusName(), multiBitBus);
+
             } else {
-                throw new RuntimeException("ERROR: Name collsion inside EDIFCell " +
-                        getName() + ", trying to add port " + port.getName() +
-                        " which already exists inside this cell.");
+                portNameCollision(port);
             }
 
         }
         return port;
+    }
+
+    private void portNameCollision(EDIFPort port) {
+        throw new RuntimeException("ERROR: Port name collision on EDIFCell " + getName()
+                + ", trying to add port " + port + ", but the cell already contains ports with the "
+                + "same name: " + getPorts());
     }
 
     /**
