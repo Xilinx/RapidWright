@@ -327,19 +327,22 @@ public class PartialRouter extends RWRoute{
     protected Collection<Net> pickNetsToUnpreserve(Connection connection) {
         Set<Net> unpreserveNets = new HashSet<>();
 
-        // Find those reserved signals that are using uphill nodes of the target pin node
-        for (Node node : connection.getSinkRnode().getNode().getAllUphillNodes()) {
-            Net toRoute = routingGraph.getPreservedNet(node);
-            if (toRoute == null) continue;
-            if (toRoute.isClockNet() || toRoute.isStaticNet()) continue;
-            unpreserveNets.add(toRoute);
-        }
+        Node sourceNode = connection.getSourceRnode().getNode();
+        Node sinkNode = connection.getSinkRnode().getNode();
 
+        List<Node> candidateNodes = new ArrayList<>();
+        // Consider the cases of [A-H](X|_I) site pins which are accessed through a bounce node,
+        // meaning this connection may be unroutable because another net is preserving this node
+        candidateNodes.add(sinkNode);
+        // Find those reserved signals that are using uphill nodes of the target pin node
+        candidateNodes.addAll(sinkNode.getAllUphillNodes());
         // Find those preserved nets that are using downhill nodes of the source pin node
-        for (Node node : connection.getSourceRnode().getNode().getAllDownhillNodes()) {
+        candidateNodes.addAll(sourceNode.getAllDownhillNodes());
+
+        for(Node node : candidateNodes) {
             Net toRoute = routingGraph.getPreservedNet(node);
-            if (toRoute == null) continue;
-            if (toRoute.isClockNet() || toRoute.isStaticNet()) continue;
+            if(toRoute == null) continue;
+            if(toRoute.isClockNet() || toRoute.isStaticNet()) continue;
             unpreserveNets.add(toRoute);
         }
 
@@ -409,8 +412,9 @@ public class PartialRouter extends RWRoute{
                 boolean endPreserved = routingGraph.unpreserve(end);
                 assert(rendAdded == endPreserved);
 
-                // Also check the prev pointer according to the PIP
-                assert(rend.getPrev().equals(rstart));
+                // Check the prev pointer consistent with PIP
+                // (it may be null because isPartOfExistingRoute() will erase prev once rend was created)
+                assert(rend.getPrev() == null || rend.getPrev().equals(rstart));
             }
         } else {
             // Net needs to be created

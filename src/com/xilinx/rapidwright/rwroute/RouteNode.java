@@ -44,7 +44,7 @@ import com.xilinx.rapidwright.util.RuntimeTracker;
  * Each RouteNode instance is associated with a {@link Node} instance. It is denoted as "rnode".
  * The routing resource graph is built "lazily", i.e., RouteNode Objects (rnodes) are created when needed.
  */
-abstract public class RouteNode {
+abstract public class RouteNode implements Comparable<RouteNode> {
     /** Each RouteNode Object can be legally used by one net only */
     public static final short capacity = 1;
     /** Memoized static array for use by Collection.toArray() or similar */
@@ -104,6 +104,11 @@ abstract public class RouteNode {
         usersConnectionCounts = null;
         driversCounts = null;
         setPrev(null);
+    }
+
+    @Override
+    public int compareTo(RouteNode that) {
+        return Float.compare(this.lowerBoundTotalPathCost, that.lowerBoundTotalPathCost);
     }
 
     abstract protected RouteNode getOrCreate(Node node, RouteNodeType type);

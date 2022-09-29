@@ -39,6 +39,7 @@ import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
+import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
@@ -173,7 +174,7 @@ public class RWRoute{
         minRerouteCriticality = config.getMinRerouteCriticality();
         criticalConnections = new ArrayList<>();
 
-        queue = new PriorityQueue<>((r1,r2) -> Float.compare(r1.getLowerBoundTotalPathCost(), r2.getLowerBoundTotalPathCost()));
+        queue = new PriorityQueue<>();
         routingGraph = createRouteNodeGraph();
         if (config.isTimingDriven()) {
             nodesDelays = new HashMap<>();
@@ -474,7 +475,8 @@ public class RWRoute{
         assert(existingNetWrapper == null);
         SitePinInst source = net.getSource();
         int indirect = 0;
-        Node sourceINTNode = null;
+        RouteNode sourceINTRnode = null;
+        RouteNode altSourceINTRnode = null;
 
         for (SitePinInst sink : net.getSinkPins()) {
             if (RouterHelper.isExternalConnectionToCout(source, sink)) {
@@ -494,13 +496,26 @@ public class RWRoute{
                 Node sinkINTNode = nodes.get(0);
                 indirectConnections.add(connection);
                 connection.setSinkRnode(getOrCreateRouteNode(sinkINTNode, RouteNodeType.PINFEED_I));
-                if (sourceINTNode == null) {
-                    sourceINTNode = RouterHelper.projectOutputPinToINTNode(source);
+                if (sourceINTRnode == null) {
+                    Node sourceINTNode = RouterHelper.projectOutputPinToINTNode(source);
                     if (sourceINTNode == null) {
                         throw new RuntimeException("ERROR: Null projected INT node for the source of net " + net.toStringFull());
                     }
+                    sourceINTRnode = getOrCreateRouteNode(sourceINTNode, RouteNodeType.PINFEED_O);
+
+                    // Pre-emptively set up alternate source
+                    SitePinInst altSource = net.getAlternateSource();
+                    if (altSource == null) {
+                        altSource = DesignTools.getLegalAlternativeOutputPin(net);
+                        DesignTools.routeAlternativeOutputSitePin(net, altSource);
+                    }
+                    if (altSource != null) {
+                        Node altSourceNode = RouterHelper.projectOutputPinToINTNode(altSource);
+                        altSourceINTRnode = getOrCreateRouteNode(altSourceNode, RouteNodeType.PINFEED_O);
+                    }
                 }
-                connection.setSourceRnode(getOrCreateRouteNode(sourceINTNode, RouteNodeType.PINFEED_O));
+                connection.setSourceRnode(sourceINTRnode);
+                connection.setAltSourceRnode(altSourceINTRnode);
                 connection.setDirect(false);
                 indirect++;
                 connection.computeHpwl();
@@ -1204,16 +1219,14 @@ public class RWRoute{
      * @param connection The connection in question.
      * @return true, if the output pin has been swapped.
      */
-    private boolean swapOutputPin(Connection connection) {
+    protected boolean swapOutputPin(Connection connection) {
         NetWrapper netWrapper = connection.getNetWrapper();
         Net net = netWrapper.getNet();
 
-        SitePinInst altSource = DesignTools.getLegalAlternativeOutputPin(net);
+        SitePinInst altSource = net.getAlternateSource();
         if (altSource == null) {
             System.out.println("INFO: No alternative source to swap");
             return false;
-        } else if (net.getAlternateSource() == null) {
-            DesignTools.routeAlternativeOutputSitePin(net, altSource);
         }
 
         SitePinInst source = connection.getSource();
@@ -1222,12 +1235,13 @@ public class RWRoute{
         }
         System.out.println("INFO: Swap source from " + source + " to " + altSource + "\n");
 
-        Node altSourceNode = RouterHelper.projectOutputPinToINTNode(altSource);
-        RouteNode altSourceRnode = getOrCreateRouteNode(altSourceNode, RouteNodeType.PINFEED_O);
+        RouteNode altSourceRnode = connection.getAltSourceRnode();
+        if (altSourceRnode == null) {
+            throw new RuntimeException();
+        }
         connection.setSource(altSource);
         connection.setSourceRnode(altSourceRnode);
         connection.getSink().setRouted(false);
-
         return true;
     }
 
@@ -1272,17 +1286,14 @@ public class RWRoute{
         // Update the connection source, in case we backtracked onto the alternate source
         if (!sourceRnode.equals(connection.getSourceRnode())) {
             Net net = connection.getNetWrapper().getNet();
-            SitePinInst altSource = DesignTools.getLegalAlternativeOutputPin(net);
+            SitePinInst altSource = net.getAlternateSource();
             if (altSource == null) {
                 throw new RuntimeException(connection + " expected " + connection.getSourceRnode().getNode() +
                         " got " + sourceRnode.getNode());
-            } else if (net.getAlternateSource() == null) {
-                DesignTools.routeAlternativeOutputSitePin(net, altSource);
             }
 
-            Node altSourceINTNode = RouterHelper.projectOutputPinToINTNode(altSource);
-            if (!altSourceINTNode.equals(sourceRnode.getNode())) {
-                throw new RuntimeException(connection + " expected " + altSourceINTNode +
+            if (sourceRnode != connection.getAltSourceRnode()) {
+                throw new RuntimeException(connection + " expected " + connection.getAltSourceRnode().getNode() +
                         " or " + connection.getSourceRnode().getNode() +
                         " got " + sourceRnode.getNode());
             }
@@ -1494,7 +1505,7 @@ public class RWRoute{
      * @param newPartialPathCost The upstream path cost from childRnode to the source.
      * @param newTotalPathCost Total path cost of childRnode.
      */
-    private void push(RouteNode childRnode, float newPartialPathCost, float newTotalPathCost) {
+    protected void push(RouteNode childRnode, float newPartialPathCost, float newTotalPathCost) {
         assert(childRnode.getPrev() != null || childRnode.getType() == RouteNodeType.PINFEED_O);
         childRnode.setLowerBoundTotalPathCost(newTotalPathCost);
         childRnode.setUpstreamPathCost(newPartialPathCost);
@@ -1506,7 +1517,7 @@ public class RWRoute{
      * Prepares for routing a connection.
      * @param connection The target connection to be routed.
      */
-    private void prepareRouteConnection(Connection connection) {
+    protected void prepareRouteConnection(Connection connection) {
         // Rips up the connection
         ripUp(connection);
 
