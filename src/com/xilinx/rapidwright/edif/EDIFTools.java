@@ -1112,9 +1112,8 @@ public class EDIFTools {
         EDIFPortInst pr = n.getTopCellInst().getPortInst(name);
         if (pr == null) {
             int idx = -1;
-            if (port.getWidth() > 1) {
-                idx = getPortIndexFromName(name);
-                if (port.isLittleEndian()) idx = (port.getWidth()-1) - idx;
+            if (port.isBus()) {
+                idx = port.getPortIndexFromNameIndex(getPortIndexFromName(name));
             }
             pr = new EDIFPortInst(port, null, idx);
         }

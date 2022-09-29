@@ -225,16 +225,16 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
     }
 
     /**
-     * Adds a port to the cell.  Checks for naming collisions and throws
-     * RuntimeException if it occurs. Note that ports are usually keyed by
-     * bus name (see {@link EDIFPort#getBusName()}) to enable getPort() to
-     * only require the bus name for getting a port.  However, is situations
-     * where the bus name collides with a single bit bus name, the range
-     * is included for the multi-bit bus and getPort() requires the range.
-     * This is only in the case where a single bit bus collides by having the
-     * same name.  For example single bit port 'my_port[0]' and multi-bit port
-     * 'my_port[0][3:0]' being added will require that requesting the multi-bit
-     * port through getPort() will require the entire name 'my_port[0][3:0]'.
+     * Adds a port to the cell. Checks for naming collisions and throws
+     * RuntimeException if it occurs. Note that ports are usually keyed by bus name
+     * (see {@link EDIFPort#getBusName()}) to enable getPort() to only require the
+     * bus name for getting a port. However, in situations where the bus name
+     * collides with a single bit bus name, the colliding single bit port is
+     * promoted to a single bit bus port. This is only in the case where a single
+     * bit bus collides by having the same name. For example single bit port
+     * 'my_port[0]' and multi-bit port 'my_port[0][3:0]' would both be accommodated
+     * by promoting 'my_port[0]' to a single bit bus called 'my_port'. The port map
+     * would have the entries: {my_port->my_port[0], my_port[0]->my_port[0][3:0]}.
      * Ultimately this naming scheme is discouraged.
      *
      * @param port The port to add.
@@ -250,12 +250,18 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
                 // For example:
                 //   my_port[0]
                 //   my_port[0][3:0]
-                //
-                if (collision.getWidth() > 1) {
-                    ports.put(collision.getName(), collision);
-                } else {
+                // Find the single bit port and promote it to a single bit bus port
+                if (port.getWidth() == 1 && port.getName().endsWith("]")) {
+                    // Let's treat is as a 1-bit bus
+                    String newBusName = EDIFTools.getRootBusName(port.getName());
+                    port.setBusName(newBusName);
+                    ports.put(newBusName, port);
                     ports.put(collision.getBusName(), collision);
-                    ports.put(port.getName(), port);
+                } else if (collision.getWidth() == 1 && collision.getName().endsWith("]")) {
+                    String newBusName = EDIFTools.getRootBusName(collision.getName());
+                    collision.setBusName(newBusName);
+                    ports.put(newBusName, collision);
+                    ports.put(port.getBusName(), port);
                 }
             } else {
                 throw new RuntimeException("ERROR: Name collsion inside EDIFCell " +

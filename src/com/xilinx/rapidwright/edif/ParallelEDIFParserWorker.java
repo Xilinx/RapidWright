@@ -376,6 +376,11 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParserWorker implement
         }
 
         public void name(StringPool uniquifier) {
+            // Here we must accommodate single bit busses that have collided with their
+            // namesake and update the port instance to reference a single bit bussed port
+            if (portInst.getIndex() == -1 && portInst.getPort().isBus() && portInst.getPort().getWidth() == 1) {
+                portInst.setIndex(0);
+            }
             String portInstName = portInst.getPortInstNameFromPort();
             portInst.setName(uniquifier.uniquifyName(portInstName));
         }
