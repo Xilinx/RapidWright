@@ -1202,7 +1202,6 @@ public class RWRoute{
                 exploreAndExpandBack(rnode, connection, shareWeight, rnodeCostWeight,
                         rnodeWLWeight, estWlWeight, dlyWeight, estDlyWeight);
                 forward = true;
-                // forward = false;
             }
         }
         queue.clear();
@@ -1331,6 +1330,12 @@ public class RWRoute{
                         " got " + sourceRnode.getNode());
             } else if (net.getAlternateSource() == null) {
                 DesignTools.routeAlternativeOutputSitePin(net, altSource);
+            }
+
+            if (altSource == connection.getSource()) {
+                // This connection is already using the alternate source.
+                // Swap back to primary source
+                altSource = net.getSource();
             }
 
             Node altSourceINTNode = RouterHelper.projectOutputPinToINTNode(altSource);
@@ -1504,7 +1509,7 @@ public class RWRoute{
                                      float rnodeDelayWeight, float rnodeEstDlyWeight) {
         int countSourceUses = childRnode.countConnectionsOfUser(connection.getNetWrapper());
         float sharingFactor = 1 + sharingWeight* countSourceUses;
-        float newPartialPathCost = rnode.getUpstreamPathCost() + rnodeCostWeight * getNodeCost(childRnode, connection, countSourceUses, sharingFactor)
+        float newPartialPathCost = rnode.getUpstreamPathCost() + rnodeCostWeight * getNodeCost(childRnode, connection, countSourceUses, sharingFactor, true)
                                 + rnodeLengthWeight * childRnode.getLength() / sharingFactor;
         if (config.isTimingDriven()) {
             newPartialPathCost += rnodeDelayWeight * (childRnode.getDelay() + DelayEstimatorBase.getExtraDelay(childRnode.getNode(), longParent));
@@ -1542,17 +1547,17 @@ public class RWRoute{
                                      float rnodeDelayWeight, float rnodeEstDlyWeight) {
         int countSourceUses = parentRnode.countConnectionsOfUser(connection.getNetWrapper());
         float sharingFactor = 1 + sharingWeight* countSourceUses;
-        float newPartialPathCost = rnode.getDownstreamPathCost() + rnodeCostWeight * getNodeCost(parentRnode, connection, countSourceUses, sharingFactor)
+        float newPartialPathCost = rnode.getDownstreamPathCost() + rnodeCostWeight * getNodeCost(parentRnode, connection, countSourceUses, sharingFactor, false)
                 + rnodeLengthWeight * parentRnode.getLength() / sharingFactor;
         if (config.isTimingDriven()) {
             newPartialPathCost += rnodeDelayWeight * (parentRnode.getDelay() + DelayEstimatorBase.getExtraDelay(parentRnode.getNode(), longParent));
         }
 
-        int parentX = parentRnode.getEndTileXCoordinate();
-        int parentY = parentRnode.getEndTileYCoordinate();
+        int parentX = parentRnode.getBeginTileXCoordinate();
+        int parentY = parentRnode.getBeginTileYCoordinate();
         RouteNode sourceRnode = connection.getSourceRnode();
-        int sourceX = sourceRnode.getEndTileXCoordinate();
-        int sourceY = sourceRnode.getEndTileYCoordinate();
+        int sourceX = sourceRnode.getBeginTileXCoordinate();
+        int sourceY = sourceRnode.getBeginTileYCoordinate();
         int deltaX = Math.abs(parentX - sourceX);
         int deltaY = Math.abs(parentY - sourceY);
         if (connection.isCrossSLR()) {
@@ -1584,7 +1589,7 @@ public class RWRoute{
      * @param sharingFactor The sharing factor.
      * @return The sum of the congestion cost and the bias cost of rnode.
      */
-    private float getNodeCost(RouteNode rnode, Connection connection, int countSameSourceUsers, float sharingFactor) {
+    private float getNodeCost(RouteNode rnode, Connection connection, int countSameSourceUsers, float sharingFactor, boolean forward) {
         boolean hasSameSourceUsers = countSameSourceUsers!= 0;
         float presentCongestionCost;
 
@@ -1600,7 +1605,8 @@ public class RWRoute{
         if (!rnode.isTarget()) {
             NetWrapper net = connection.getNetWrapper();
             biasCost = rnode.getBaseCost() / net.getConnections().size() *
-                    (Math.abs(rnode.getEndTileXCoordinate() - net.getXCenter()) + Math.abs(rnode.getEndTileYCoordinate() - net.getYCenter())) / net.getDoubleHpwl();
+                    (Math.abs(rnode.getTileXCoordinate(forward) - net.getXCenter()) +
+                            Math.abs(rnode.getTileYCoordinate(forward) - net.getYCenter())) / net.getDoubleHpwl();
         }
 
         return rnode.getBaseCost() * rnode.getHistoricalCongestionCost() * presentCongestionCost / sharingFactor + biasCost;
@@ -1666,8 +1672,9 @@ public class RWRoute{
                 // Unlike source nodes, sink nodes must be costed since they could be overused
                 int countSourceUses = sinkRnode.countConnectionsOfUser(connectionToRoute.getNetWrapper());
                 float sharingFactor = 1 + shareWeight* countSourceUses;
-                float newPartialPathCost = rnodeCostWeight * getNodeCost(sinkRnode, connectionToRoute, countSourceUses, sharingFactor);
+                float newPartialPathCost = rnodeCostWeight * getNodeCost(sinkRnode, connectionToRoute, countSourceUses, sharingFactor, true);
                 pushBack(sinkRnode, null, newPartialPathCost, newPartialPathCost);
+                assert(sinkRnode.isTarget());
             }
         }
 
@@ -1688,7 +1695,6 @@ public class RWRoute{
                         boolean longParent = config.isTimingDriven() && DelayEstimatorBase.isLong(parentRnode.getNode());
                         for (RouteNode otherChildRnode : parentRnode.getChildren()) {
                             if (otherChildRnode.isVisited()) continue;
-                            assert(!otherChildRnode.isTarget());
                             if (!isAccessible(otherChildRnode, connectionToRoute)) continue;
                             evaluateCostAndPush(parentRnode, longParent, otherChildRnode, connectionToRoute, shareWeight, rnodeCostWeight,
                                     rnodeLengthWeight, rnodeEstWlWeight, rnodeDelayWeight, rnodeEstDlyWeight);

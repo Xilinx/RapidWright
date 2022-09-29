@@ -345,6 +345,22 @@ abstract public class RouteNode {
         return 0;
     }
 
+    public short getTileXCoordinate(boolean end) {
+        return end ? getEndTileXCoordinate() : getBeginTileXCoordinate();
+    }
+
+    public short getTileYCoordinate(boolean end) {
+        return end ? getEndTileYCoordinate() : getEndTileYCoordinate();
+    }
+
+    public short getBeginTileXCoordinate() {
+        return (short) node.getTile().getTileXCoordinate();
+    }
+
+    public short getBeginTileYCoordinate() {
+        return (short) node.getTile().getTileYCoordinate();
+    }
+
     /**
      * Gets the x coordinate of the INT {@link Tile} instance
      * that the associated {@link Node} instance stops at.
