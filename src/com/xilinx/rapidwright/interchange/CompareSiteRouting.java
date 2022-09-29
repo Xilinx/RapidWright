@@ -40,6 +40,11 @@ public class CompareSiteRouting {
     }
     
     public static void main(String[] args) throws IOException {
+        if(args.length != 2) {
+            System.out.println("USAGE: <interchange.netlist> <interchange.phys>");
+            return;
+        }
+        
         EDIFNetlist n2 = LogNetlistReader.readLogNetlist(args[0]);
         Design original = PhysNetlistReader.readPhysNetlist(args[1], n2);
         
