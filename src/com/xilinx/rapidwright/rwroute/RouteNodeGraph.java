@@ -40,7 +40,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -313,8 +312,12 @@ public class RouteNodeGraph {
         visited.add(rnode);
     }
 
-    public void visitBack(RouteNode rnode) {
-        visitedBack.add(rnode);
+    public void visit(boolean forward, RouteNode rnode) {
+        if (forward) {
+            visited.add(rnode);
+        } else {
+            visitedBack.add(rnode);
+        }
     }
 
     /**

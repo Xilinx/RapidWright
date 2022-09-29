@@ -436,50 +436,38 @@ abstract public class RouteNode {
 
     /**
      * Sets the lower bound total path cost.
-     * @param totalPathCost The cost value to be set.
+     * @param cost The cost value to be set.
      */
-    public void setLowerBoundTotalPathCost(float totalPathCost) {
-        lowerBoundTotalPathCost = totalPathCost;
-    }
-
-    public void setLowerBoundTotalPathCostBack(float totalPathCost) {
-        lowerBoundTotalPathCostBack = totalPathCost;
-    }
-
-    /**
-     * Sets the upstream path cost.
-     * @param newPartialPathCost The new value to be set.
-     */
-    public void setUpstreamPathCost(float newPartialPathCost) {
-        this.upstreamPathCost = newPartialPathCost;
-    }
-
-    public void setDownstreamPathCost(float newPartialPathCost) {
-        this.downstreamPathCost = newPartialPathCost;
+    public void setTotalCost(boolean forward, float cost) {
+        if (forward) {
+            lowerBoundTotalPathCost = cost;
+        } else {
+            lowerBoundTotalPathCostBack = cost;
+        }
     }
 
     /**
      * Gets the lower bound total path cost.
      * @return The lower bound total path cost.
      */
-    public float getLowerBoundTotalPathCost() {
-        return lowerBoundTotalPathCost;
-    }
-
-    public float getLowerBoundTotalPathCostBack() {
-        return lowerBoundTotalPathCostBack;
+    public float getTotalCost(boolean forward) {
+        return forward ? lowerBoundTotalPathCost : lowerBoundTotalPathCostBack;
     }
 
     /**
      * Gets the upstream path cost.
      * @return The upstream path cost.
      */
-    public float getUpstreamPathCost() {
-        return upstreamPathCost;
+    public float getKnownCost(boolean forward) {
+        return forward ? upstreamPathCost : downstreamPathCost;
     }
 
-    public float getDownstreamPathCost() {
-        return downstreamPathCost;
+    public void setKnownCost(boolean forward, float cost) {
+        if (forward) {
+            upstreamPathCost = cost;
+        } else {
+            downstreamPathCost = cost;
+        }
     }
 
     /**
@@ -602,6 +590,14 @@ abstract public class RouteNode {
 
     public void setNext(RouteNode next) {
         this.next = next;
+    }
+
+    public void setPrevNext(boolean forward, RouteNode prevNext) {
+        if (forward) {
+            prev = prevNext;
+        } else {
+            next = prevNext;
+        }
     }
 
     /**

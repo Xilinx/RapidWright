@@ -178,17 +178,14 @@ public class RWRoute{
         minRerouteCriticality = config.getMinRerouteCriticality();
         criticalConnections = new ArrayList<>();
 
-        // Latter appears to be slightly faster than the former two since it doesn't use a lambda...
-        // queue = new PriorityQueue<>((r1, r2) -> Float.compare(r1.getLowerBoundTotalPathCost(), r2.getLowerBoundTotalPathCost()));
-        // queue = new PriorityQueue<>(Comparator.comparing(RouteNode::getLowerBoundTotalPathCost));
         queue = new PriorityQueue<>(new Comparator<RouteNode>() {
              public int compare(RouteNode r1, RouteNode r2) {
-                     return Float.compare(r1.getLowerBoundTotalPathCost(), r2.getLowerBoundTotalPathCost());
+                 return Float.compare(r1.getTotalCost(true), r2.getTotalCost(true));
              }
         });
         queueBack = new PriorityQueue<>(new Comparator<RouteNode>() {
             public int compare(RouteNode r1, RouteNode r2) {
-                return Float.compare(r1.getLowerBoundTotalPathCostBack(), r2.getLowerBoundTotalPathCostBack());
+                return Float.compare(r1.getTotalCost(false), r2.getTotalCost(false));
             }
         });
 
@@ -1189,20 +1186,16 @@ public class RWRoute{
                     successRoute = true;
                     break;
                 }
-
-                exploreAndExpand(rnode, connection, shareWeight, rnodeCostWeight,
-                        rnodeWLWeight, estWlWeight, dlyWeight, estDlyWeight);
-                forward = false;
             } else {
                 if (rnode.isVisited()) {
                     successRoute = true;
                     break;
                 }
-
-                exploreAndExpandBack(rnode, connection, shareWeight, rnodeCostWeight,
-                        rnodeWLWeight, estWlWeight, dlyWeight, estDlyWeight);
-                forward = true;
             }
+
+            exploreAndExpand(forward, rnode, connection, shareWeight, rnodeCostWeight,
+                    rnodeWLWeight, estWlWeight, dlyWeight, estDlyWeight);
+            forward = !forward;
         }
         queue.clear();
         queueBack.clear();
@@ -1354,7 +1347,7 @@ public class RWRoute{
     /**
      * Explores children (downhill rnodes) of a rnode for routing a connection and pushes the child into the queue,
      * if it is the target or is an accessible routing resource.
-     * @param rnode The parent rnode popped out from the queue.
+     * @param headRnode The rnode popped out from the queue.
      * @param connection The connection that is being routed.
      * @param shareWeight The criticality-aware share weight for a new sharing factor.
      * @param rnodeCostWeight The cost weight of the childRnode
@@ -1363,139 +1356,136 @@ public class RWRoute{
      * @param rnodeDelayWeight The weight of childRnode's exact delay.
      * @param rnodeEstDlyWeight The weight of estimated delay to the target.
      */
-    private void exploreAndExpand(RouteNode rnode, Connection connection, float shareWeight, float rnodeCostWeight,
-                                  float rnodeLengthWeight, float rnodeEstWlWeight,
-                                  float rnodeDelayWeight, float rnodeEstDlyWeight) {
-        boolean longParent = config.isTimingDriven() && DelayEstimatorBase.isLong(rnode.getNode());
-        boolean targetFound = false;
-        for (RouteNode childRNode:rnode.getChildren()) {
-            if (childRNode.isVisited()) {
-                // Note: it is possible that another (cheaper) path to a rnode is found here
-                // However, because the PriorityQueue class does not support reducing the cost
-                // of nodes already in the queue, this opportunity is discarded
-                continue;
-            }
-            if (childRNode.isTarget()) {
-                // Despite the limitation above, on encountering a target only terminate
-                // immediately by clearing the queue if this target is not overused since
-                // there could be an alternate target that would be less congested
-                int occ = childRNode.getOccupancy();
-                if (occ == 0 || (occ == 1 && childRNode.countConnectionsOfUser(connection.getNetWrapper()) != 0)) {
-                    queue.clear();
-                    targetFound = true;
-                }
-            } else {
-                if (!isAccessible(childRNode, connection)) {
-                    continue;
-                }
-                switch (childRNode.getType()) {
-                    case WIRE:
-                        if (!config.isUseUTurnNodes() && childRNode.getDelay() > 10000) {
-                            // To filter out those nodes that are considered to be excluded with the masking resource approach,
-                            // such as U-turn shape nodes near the boundary
-                            continue;
-                        }
-                        break;
-                    case PINBOUNCE:
-                        if (!usablePINBounce(childRNode, connection.getSinkRnode())) {
-                            continue;
-                        }
-                        break;
-                    case PINFEED_I:
-                        break;
-                    default:
-                        throw new RuntimeException();
-                }
-            }
-
-            evaluateCostAndPush(rnode, longParent, childRNode, connection, shareWeight, rnodeCostWeight,
-                    rnodeLengthWeight, rnodeEstWlWeight, rnodeDelayWeight, rnodeEstDlyWeight);
-            if (targetFound) {
-                break;
-            }
-        }
-    }
-
-    private void exploreAndExpandBack(RouteNode rnode, Connection connection, float shareWeight, float rnodeCostWeight,
+    private void exploreAndExpand(boolean forward,
+                                  RouteNode headRnode, Connection connection, float shareWeight, float rnodeCostWeight,
                                   float rnodeLengthWeight, float rnodeEstWlWeight,
                                   float rnodeDelayWeight, float rnodeEstDlyWeight) {
         boolean targetFound = false;
-        for (RouteNode parentRnode:rnode.getParents()) {
-            if (parentRnode.isTarget()) {
-                // Already visited by backward router
-                continue;
-            }
-            Net parentPreservedNet = routingGraph.getPreservedNet(parentRnode.getNode());
-            if (parentPreservedNet != null && parentPreservedNet != connection.getNetWrapper().getNet()) {
-                // Parent node is preserved by a net other than the one we're routing
-                continue;
-            }
-            if (parentRnode.isVisited()) {
-                // Already visited by forward router
-                int occ = parentRnode.getOccupancy();
-                if (occ == 0 || (occ == 1 && parentRnode.countConnectionsOfUser(connection.getNetWrapper()) != 0)) {
-                    queueBack.clear();
-                    targetFound = true;
-                }
-            } else {
-                if (!isAccessibleBack(parentRnode, connection)) {
+        if (forward) {
+            boolean longParent = config.isTimingDriven() && DelayEstimatorBase.isLong(headRnode.getNode());
+            for (RouteNode childRNode:headRnode.getChildren()) {
+                if (childRNode.isVisited()) {
+                    // Note: it is possible that another (cheaper) path to a rnode is found here
+                    // However, because the PriorityQueue class does not support reducing the cost
+                    // of nodes already in the queue, this opportunity is discarded
                     continue;
                 }
-                switch (parentRnode.getType()) {
-                    case WIRE:
-                        if (!config.isUseUTurnNodes() && parentRnode.getDelay() > 10000) {
-                            // To filter out those nodes that are considered to be excluded with the masking resource approach,
-                            // such as U-turn shape nodes near the boundary
-                            continue;
-                        }
-                        break;
-                    case PINBOUNCE:
-                        if (!usablePINBounce(parentRnode, connection.getSinkRnode())) {
-                            continue;
-                        }
-                        break;
-                    case PINFEED_I:
-                        break;
-                    default:
-                        throw new RuntimeException();
+                if (childRNode.isTarget()) {
+                    // Despite the limitation above, on encountering a target only terminate
+                    // immediately by clearing the queue if this target is not overused since
+                    // there could be an alternate target that would be less congested
+                    int occ = childRNode.getOccupancy();
+                    if (occ == 0 || (occ == 1 && childRNode.countConnectionsOfUser(connection.getNetWrapper()) != 0)) {
+                        queue.clear();
+                        targetFound = true;
+                    }
+                } else {
+                    if (!isAccessible(forward, childRNode, connection)) {
+                        continue;
+                    }
+                    switch (childRNode.getType()) {
+                        case WIRE:
+                            if (!config.isUseUTurnNodes() && childRNode.getDelay() > 10000) {
+                                // To filter out those nodes that are considered to be excluded with the masking resource approach,
+                                // such as U-turn shape nodes near the boundary
+                                continue;
+                            }
+                            break;
+                        case PINBOUNCE:
+                            if (!usablePINBounce(childRNode, connection.getSinkRnode())) {
+                                continue;
+                            }
+                            break;
+                        case PINFEED_I:
+                            break;
+                        default:
+                            throw new RuntimeException();
+                    }
+                }
+
+                evaluateCostAndPush(forward, headRnode, longParent, childRNode, connection, shareWeight, rnodeCostWeight,
+                        rnodeLengthWeight, rnodeEstWlWeight, rnodeDelayWeight, rnodeEstDlyWeight);
+                if (targetFound) {
+                    break;
                 }
             }
+        } else {
+            for (RouteNode parentRnode : headRnode.getParents()) {
+                if (parentRnode.isTarget()) {
+                    // Already visited by backward router
+                    continue;
+                }
+                Net parentPreservedNet = routingGraph.getPreservedNet(parentRnode.getNode());
+                if (parentPreservedNet != null && parentPreservedNet != connection.getNetWrapper().getNet()) {
+                    // Parent node is preserved by a net other than the one we're routing
+                    continue;
+                }
+                if (parentRnode.isVisited()) {
+                    // Already visited by forward router
+                    int occ = parentRnode.getOccupancy();
+                    if (occ == 0 || (occ == 1 && parentRnode.countConnectionsOfUser(connection.getNetWrapper()) != 0)) {
+                        queueBack.clear();
+                        targetFound = true;
+                    }
+                } else {
+                    if (!isAccessible(forward, parentRnode, connection)) {
+                        continue;
+                    }
+                    switch (parentRnode.getType()) {
+                        case WIRE:
+                            if (!config.isUseUTurnNodes() && parentRnode.getDelay() > 10000) {
+                                // To filter out those nodes that are considered to be excluded with the masking resource approach,
+                                // such as U-turn shape nodes near the boundary
+                                continue;
+                            }
+                            break;
+                        case PINBOUNCE:
+                            if (!usablePINBounce(parentRnode, connection.getSinkRnode())) {
+                                continue;
+                            }
+                            break;
+                        case PINFEED_I:
+                            break;
+                        default:
+                            throw new RuntimeException();
+                    }
+                }
 
-            boolean longParent = config.isTimingDriven() && DelayEstimatorBase.isLong(parentRnode.getNode());
-            evaluateCostAndPushBack(rnode, longParent, parentRnode, connection, shareWeight, rnodeCostWeight,
-                    rnodeLengthWeight, rnodeEstWlWeight, rnodeDelayWeight, rnodeEstDlyWeight);
-            if (targetFound) {
-                break;
+                boolean longParent = config.isTimingDriven() && DelayEstimatorBase.isLong(parentRnode.getNode());
+                evaluateCostAndPush(forward, headRnode, longParent, parentRnode, connection, shareWeight, rnodeCostWeight,
+                        rnodeLengthWeight, rnodeEstWlWeight, rnodeDelayWeight, rnodeEstDlyWeight);
+                if (targetFound) {
+                    break;
+                }
             }
         }
     }
 
     /**
      * Checks if a routing resource is accessible.
-     * @param child The routing resource in question.
+     * @param tailRnode The routing resource in question.
      * @param connection The connection to route.
      * @return true, if no bounding box constraints, or if the routing resource is within the connection's bounding box when use the bounding box constraint.
      */
-    protected boolean isAccessible(RouteNode child, Connection connection) {
-        if (child.getType() == RouteNodeType.PINFEED_I) {
-            return connection.isCrossSLR();
+    protected boolean isAccessible(boolean forward, RouteNode tailRnode, Connection connection) {
+        if (forward) {
+            if (tailRnode.getType() == RouteNodeType.PINFEED_I) {
+                return connection.isCrossSLR();
+            }
+        } else {
+            if (tailRnode.getType() == RouteNodeType.PINFEED_O) {
+                // TODO: Enable route throughs
+                return false;
+            }
         }
-        return !config.isUseBoundingBox() || child.isInConnectionBoundingBox(connection);
-    }
-
-    protected boolean isAccessibleBack(RouteNode parent, Connection connection) {
-        if (parent.getType() == RouteNodeType.PINFEED_O) {
-            // TODO: Enable route throughs
-            return false;
-        }
-        return !config.isUseBoundingBox() || parent.isInConnectionBoundingBox(connection);
+        return !config.isUseBoundingBox() || tailRnode.isInConnectionBoundingBox(connection);
     }
 
     /**
      * Evaluates the cost of a child of a rnode and pushes the child into the queue after cost evaluation.
-     * @param rnode The parent rnode of the child in question.
+     * @param headRnode The parent rnode of the child in question.
      * @param longParent A boolean value to indicate if the parent is a Long node
-     * @param childRnode The child rnode in question.
+     * @param tailRnode The child rnode in question.
      * @param connection The target connection being routed.
      * @param sharingWeight The sharing weight based on a connection's criticality and the shareExponent for computing a new sharing factor.
      * @param rnodeCostWeight The cost weight of the childRnode
@@ -1504,64 +1494,28 @@ public class RWRoute{
      * @param rnodeDelayWeight The weight of childRnode's exact delay.
      * @param rnodeEstDlyWeight The weight of estimated delay from childRnode to the target.
      */
-    private void evaluateCostAndPush(RouteNode rnode, boolean longParent, RouteNode childRnode, Connection connection, float sharingWeight, float rnodeCostWeight,
+    private void evaluateCostAndPush(boolean forward,
+                                     RouteNode headRnode, boolean longParent, RouteNode tailRnode, Connection connection, float sharingWeight, float rnodeCostWeight,
                                      float rnodeLengthWeight, float rnodeEstWlWeight,
                                      float rnodeDelayWeight, float rnodeEstDlyWeight) {
-        int countSourceUses = childRnode.countConnectionsOfUser(connection.getNetWrapper());
+        int countSourceUses = tailRnode.countConnectionsOfUser(connection.getNetWrapper());
         float sharingFactor = 1 + sharingWeight* countSourceUses;
-        float newPartialPathCost = rnode.getUpstreamPathCost() + rnodeCostWeight * getNodeCost(childRnode, connection, countSourceUses, sharingFactor, true)
-                                + rnodeLengthWeight * childRnode.getLength() / sharingFactor;
+        float newPartialPathCost = headRnode.getKnownCost(forward) +
+                rnodeCostWeight * getNodeCost(tailRnode, connection, countSourceUses, sharingFactor, forward) +
+                rnodeLengthWeight * tailRnode.getLength() / sharingFactor;
         if (config.isTimingDriven()) {
-            newPartialPathCost += rnodeDelayWeight * (childRnode.getDelay() + DelayEstimatorBase.getExtraDelay(childRnode.getNode(), longParent));
+            newPartialPathCost += rnodeDelayWeight * (tailRnode.getDelay() + DelayEstimatorBase.getExtraDelay(tailRnode.getNode(), longParent));
         }
 
-        int childX = childRnode.getEndTileXCoordinate();
-        int childY = childRnode.getEndTileYCoordinate();
-        RouteNode sinkRnode = connection.getSinkRnode();
-        int sinkX = sinkRnode.getEndTileXCoordinate();
-        int sinkY = sinkRnode.getEndTileYCoordinate();
-        int deltaX = Math.abs(childX - sinkX);
-        int deltaY = Math.abs(childY - sinkY);
+        int tailX = tailRnode.getTileXCoordinate(forward);
+        int tailY = tailRnode.getTileYCoordinate(forward);
+        RouteNode destRnode = forward ? connection.getSinkRnode() : connection.getSourceRnode();
+        int destX = destRnode.getTileXCoordinate(forward);
+        int destY = destRnode.getTileYCoordinate(forward);
+        int deltaX = Math.abs(tailX - destX);
+        int deltaY = Math.abs(tailY - destY);
         if (connection.isCrossSLR()) {
-            int deltaSLR = Math.abs(sinkRnode.getSLRIndex() - childRnode.getSLRIndex());
-            // Check for overshooting which occurs when child and sink node are in
-            // adjacent SLRs and less than a SLL wire's length apart in the Y axis.
-            if (deltaSLR == 1) {
-                int overshootBy = deltaY - RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES;
-                if (overshootBy < 0) {
-                    deltaY = RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES - overshootBy;
-                }
-            }
-        }
-
-        int distanceToSink = deltaX + deltaY;
-        float newTotalPathCost = newPartialPathCost + rnodeEstWlWeight * distanceToSink / sharingFactor;
-        if (config.isTimingDriven()) {
-            newTotalPathCost += rnodeEstDlyWeight * (deltaX * 0.32 + deltaY * 0.16);
-        }
-        push(childRnode, rnode, newPartialPathCost, newTotalPathCost);
-    }
-
-    private void evaluateCostAndPushBack(RouteNode rnode, boolean longParent, RouteNode parentRnode, Connection connection, float sharingWeight, float rnodeCostWeight,
-                                     float rnodeLengthWeight, float rnodeEstWlWeight,
-                                     float rnodeDelayWeight, float rnodeEstDlyWeight) {
-        int countSourceUses = parentRnode.countConnectionsOfUser(connection.getNetWrapper());
-        float sharingFactor = 1 + sharingWeight* countSourceUses;
-        float newPartialPathCost = rnode.getDownstreamPathCost() + rnodeCostWeight * getNodeCost(parentRnode, connection, countSourceUses, sharingFactor, false)
-                + rnodeLengthWeight * parentRnode.getLength() / sharingFactor;
-        if (config.isTimingDriven()) {
-            newPartialPathCost += rnodeDelayWeight * (parentRnode.getDelay() + DelayEstimatorBase.getExtraDelay(parentRnode.getNode(), longParent));
-        }
-
-        int parentX = parentRnode.getBeginTileXCoordinate();
-        int parentY = parentRnode.getBeginTileYCoordinate();
-        RouteNode sourceRnode = connection.getSourceRnode();
-        int sourceX = sourceRnode.getBeginTileXCoordinate();
-        int sourceY = sourceRnode.getBeginTileYCoordinate();
-        int deltaX = Math.abs(parentX - sourceX);
-        int deltaY = Math.abs(parentY - sourceY);
-        if (connection.isCrossSLR()) {
-            int deltaSLR = Math.abs(sourceRnode.getSLRIndex() - parentRnode.getSLRIndex());
+            int deltaSLR = Math.abs(destRnode.getSLRIndex() - tailRnode.getSLRIndex());
             // Check for overshooting which occurs when child and sink node are in
             // adjacent SLRs and less than a SLL wire's length apart in the Y axis.
             if (deltaSLR == 1) {
@@ -1577,7 +1531,7 @@ public class RWRoute{
         if (config.isTimingDriven()) {
             newTotalPathCost += rnodeEstDlyWeight * (deltaX * 0.32 + deltaY * 0.16);
         }
-        pushBack(parentRnode, rnode, newPartialPathCost, newTotalPathCost);
+        push(forward, headRnode, tailRnode, newPartialPathCost, newTotalPathCost);
     }
 
     /**
@@ -1614,26 +1568,23 @@ public class RWRoute{
 
     /**
      * Sets the costs of a rnode and pushes it to the queue.
-     * @param childRnode A child rnode.
-     * @param rnode The parent rnode of the childRnode.
+     * @param headRnode The parent rnode of the childRnode.
+     * @param tailRnode A child rnode.
      * @param newPartialPathCost The upstream path cost from childRnode to the source.
      * @param newTotalPathCost Total path cost of childRnode.
      */
-    private void push(RouteNode childRnode, RouteNode rnode, float newPartialPathCost, float newTotalPathCost) {
-        childRnode.setLowerBoundTotalPathCost(newTotalPathCost);
-        childRnode.setUpstreamPathCost(newPartialPathCost);
-        childRnode.setPrev(rnode);
-        routingGraph.visit(childRnode);
-        queue.add(childRnode);
-    }
+    private void push(boolean forward, RouteNode headRnode, RouteNode tailRnode, float newPartialPathCost, float newTotalPathCost) {
+        tailRnode.setTotalCost(forward, newTotalPathCost);
+        tailRnode.setKnownCost(forward, newPartialPathCost);
+        tailRnode.setPrevNext(forward, headRnode);
+        routingGraph.visit(tailRnode);
 
-    private void pushBack(RouteNode parentRnode, RouteNode rnode, float newPartialPathCost, float newTotalPathCost) {
-        parentRnode.setLowerBoundTotalPathCostBack(newTotalPathCost);
-        parentRnode.setDownstreamPathCost(newPartialPathCost);
-        parentRnode.setTarget(true);
-        parentRnode.setNext(rnode);
-        routingGraph.visitBack(parentRnode);
-        queueBack.add(parentRnode);
+        if (forward) {
+            queue.add(tailRnode);
+        } else {
+            tailRnode.setTarget(true);
+            queueBack.add(tailRnode);
+        }
     }
 
     /**
@@ -1663,7 +1614,7 @@ public class RWRoute{
         connectionToRoute.setTarget(true);
 
         // Adds the source rnode to the queue
-        push(connectionToRoute.getSourceRnode(), null, 0, 0);
+        push(true, null, connectionToRoute.getSourceRnode(), 0, 0);
 
         // Add sink rnodes to the backward queue
         for (RouteNode sinkRnode : Arrays.asList(connectionToRoute.getSinkRnode(),
@@ -1673,7 +1624,7 @@ public class RWRoute{
                 int countSourceUses = sinkRnode.countConnectionsOfUser(connectionToRoute.getNetWrapper());
                 float sharingFactor = 1 + shareWeight* countSourceUses;
                 float newPartialPathCost = rnodeCostWeight * getNodeCost(sinkRnode, connectionToRoute, countSourceUses, sharingFactor, true);
-                pushBack(sinkRnode, null, newPartialPathCost, newPartialPathCost);
+                push(false, null, sinkRnode, newPartialPathCost, newPartialPathCost);
                 assert(sinkRnode.isTarget());
             }
         }
@@ -1691,12 +1642,12 @@ public class RWRoute{
             // Go forwards from source
             for (RouteNode childRnode : Lists.reverse(connection.getRnodes())) {
                 if (parentRnode != null) {
-                    if (isAccessible(parentRnode, connectionToRoute)) {
+                    if (isAccessible(true, parentRnode, connectionToRoute)) {
                         boolean longParent = config.isTimingDriven() && DelayEstimatorBase.isLong(parentRnode.getNode());
                         for (RouteNode otherChildRnode : parentRnode.getChildren()) {
                             if (otherChildRnode.isVisited()) continue;
-                            if (!isAccessible(otherChildRnode, connectionToRoute)) continue;
-                            evaluateCostAndPush(parentRnode, longParent, otherChildRnode, connectionToRoute, shareWeight, rnodeCostWeight,
+                            if (!isAccessible(true, otherChildRnode, connectionToRoute)) continue;
+                            evaluateCostAndPush(true, parentRnode, longParent, otherChildRnode, connectionToRoute, shareWeight, rnodeCostWeight,
                                     rnodeLengthWeight, rnodeEstWlWeight, rnodeDelayWeight, rnodeEstDlyWeight);
                         }
                     }
