@@ -100,35 +100,30 @@ public class RouteNodeGraph {
         }
 
         @Override
-        public boolean mustInclude(Node parent, Node child) {
-            return RouteNodeGraph.this.mustInclude(parent, child);
+        public boolean mustInclude(boolean forward, Node parent, Node child) {
+            return RouteNodeGraph.this.mustInclude(forward, parent, child);
         }
 
         @Override
-        public boolean isPreserved(Node node) {
+        public boolean isPreserved(boolean forward, Node node) {
+            if (!forward) {
+                // When building the routing graph backwards, we can't tell if
+                // a preserved node belongs to our net or not; pretend it doesn't
+                // (expansion will check this before it gets pushed onto the queue)
+                return false;
+            }
             return RouteNodeGraph.this.isPreserved(node);
         }
 
         @Override
-        public boolean isExcluded(Node parent, Node child) {
-            return RouteNodeGraph.this.isExcluded(parent, child);
+        public boolean isExcluded(boolean forward, Node head, Node tail) {
+            return RouteNodeGraph.this.isExcluded(forward, head, tail);
         }
 
         @Override
-        public boolean isExcludedBack(Node parent, Node child) {
-            return RouteNodeGraph.this.isExcludedBack(parent, child);
-        }
-
-        @Override
-        public RouteNode[] getChildren() {
-            setChildren(setChildrenTimer);
-            return super.getChildren();
-        }
-
-        @Override
-        public RouteNode[] getParents() {
-            setParents(setParentsTimer);
-            return super.getParents();
+        public RouteNode[] getChildrenParents(boolean forward) {
+            setChildrenParents(forward, (forward) ? setChildrenTimer : setParentsTimer);
+            return super.getChildrenParents(forward);
         }
 
         @Override
@@ -260,18 +255,18 @@ public class RouteNodeGraph {
         }
     }
 
-    protected boolean mustInclude(Node parent, Node child) {
+    protected boolean mustInclude(boolean forward, Node parent, Node child) {
         return false;
     }
 
-    protected boolean isExcluded(Node parent, Node child) {
-        Tile tile = child.getTile();
+    protected boolean isExcluded(boolean forward, Node head, Node tail) {
+        Tile tile = tail.getTile();
         TileTypeEnum tileType = tile.getTileTypeEnum();
         return !allowedTileEnums.contains(tileType);
     }
 
-    protected boolean isExcludedBack(Node parent, Node child) {
-        Tile tile = parent.getTile();
+    protected boolean isExcludedBack(boolean forward, Node head, Node tail) {
+        Tile tile = head.getTile();
         TileTypeEnum tileType = tile.getTileTypeEnum();
         return !allowedTileEnums.contains(tileType);
     }
@@ -341,7 +336,7 @@ public class RouteNodeGraph {
         int sum = 0;
         for (Map.Entry<Node, RouteNode> e : getNodeEntries()) {
             RouteNodeImpl rnode = (RouteNodeImpl) e.getValue();
-            sum += rnode.everExpanded() ? rnode.getChildren().length : 0;
+            sum += rnode.everExpanded() ? rnode.getChildrenParents(true).length : 0;
         }
         return Math.round((float) sum / numNodes());
     }

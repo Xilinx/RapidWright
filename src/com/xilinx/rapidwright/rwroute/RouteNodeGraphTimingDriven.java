@@ -134,17 +134,17 @@ public class RouteNodeGraphTimingDriven extends RouteNodeGraph {
     }
 
     @Override
-    protected boolean isExcluded(Node parent, Node child) {
-        if (super.isExcluded(parent, child))
+    protected boolean isExcluded(boolean forward, Node head, Node tail) {
+        if (super.isExcluded(forward, head, tail))
             return true;
         if (maskNodesCrossRCLK) {
-            Tile tile = child.getTile();
+            Tile tile = tail.getTile();
             if (tile.getTileTypeEnum() == TileTypeEnum.INT) {
                 int y = tile.getTileYCoordinate();
                 if ((y-30)%60 == 0) { // above RCLK
-                    return excludeAboveRclk.contains(child.getWire());
+                    return excludeAboveRclk.contains(tail.getWire());
                 } else if ((y-29)%60 == 0) { // below RCLK
-                    return excludeBelowRclk.contains(child.getWire());
+                    return excludeBelowRclk.contains(tail.getWire());
                 }
             }
         }

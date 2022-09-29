@@ -61,7 +61,7 @@ abstract public class RouteNode {
     /** The base cost of a rnode */
     private float baseCost;
     /** A flag to indicate if this rnode is the target */
-    private volatile boolean isTarget;
+    private boolean isTarget;
     /** The children (downhill rnodes) of this rnode */
     protected RouteNode[] children;
     /** The parent (uphill rnodes) of this rnode */
@@ -110,43 +110,30 @@ abstract public class RouteNode {
 
     abstract protected RouteNode getOrCreate(Node node, RouteNodeType type);
 
-    protected void setChildren(RuntimeTracker setChildrenTimer) {
-        if (children != null)
+    protected void setChildrenParents(boolean forward, RuntimeTracker timer) {
+        if ((forward && children != null) || (!forward && parents != null))
             return;
-        setChildrenTimer.start();
-        List<Node> allDownHillNodes = node.getAllDownhillNodes();
-        List<RouteNode> childrenList = new ArrayList<>(allDownHillNodes.size());
-        for (Node downhill: allDownHillNodes) {
-            if (!mustInclude(node, downhill)) {
-                if (isPreserved(downhill) || isExcluded(node, downhill))
+        timer.start();
+        Node head = node;
+        List<Node> tails = (forward) ? head.getAllDownhillNodes() :
+                head.getAllUphillNodes();
+        List<RouteNode> list = new ArrayList<>(tails.size());
+        for (Node tail : tails) {
+            if (!mustInclude(forward, head, tail)) {
+                if (isPreserved(forward, tail) || isExcluded(forward, head, tail))
                     continue;
             }
 
             final RouteNodeType type = RouteNodeType.WIRE;
-            RouteNode child = getOrCreate(downhill, type);
-            childrenList.add(child);//the sink rnode of a target connection has been created up-front
+            RouteNode tailRnode = getOrCreate(tail, type);
+            list.add(tailRnode);
         }
-        children = childrenList.toArray(EMPTY_ARRAY);
-        setChildrenTimer.stop();
-    }
-
-    protected void setParents(RuntimeTracker setParentsTimer) {
-        if (parents != null)
-            return;
-        setParentsTimer.start();
-        List<Node> allUphillNodes = node.getAllUphillNodes();
-        List<RouteNode> parentsList = new ArrayList<>(allUphillNodes.size());
-        for (Node uphill: allUphillNodes) {
-            if (isExcludedBack(uphill, node)) {
-                continue;
-            }
-
-            final RouteNodeType type = RouteNodeType.WIRE;
-            RouteNode child = getOrCreate(uphill, type);
-            parentsList.add(child);//the sink rnode of a target connection has been created up-front
-        }
-        parents = parentsList.toArray(EMPTY_ARRAY);
-        setParentsTimer.stop();
+        RouteNode[] array = list.toArray(EMPTY_ARRAY);
+        if (forward)
+            children = array;
+        else
+            parents = array;
+        timer.stop();
     }
 
     private void setBaseCost(RouteNodeType type) {
@@ -317,8 +304,12 @@ abstract public class RouteNode {
      * Checks if a RouteNode Object is the current routing target.
      * @return true, if a RouteNode Object is the current routing target.
      */
-    public boolean isTarget() {
+    private boolean isTarget() {
         return isTarget;
+    }
+
+    public boolean isTarget(boolean forward) {
+        return forward ? isTarget() : isVisited();
     }
 
     /**
@@ -391,7 +382,7 @@ abstract public class RouteNode {
      * Gets the children of a RouteNode Object.
      * @return A list of RouteNode Objects.
      */
-    public RouteNode[] getChildren() {
+    private RouteNode[] getChildren() {
         return children != null ? children : EMPTY_ARRAY;
     }
 
@@ -399,8 +390,12 @@ abstract public class RouteNode {
      * Gets the parents of a RouteNode Object.
      * @return A list of RouteNode Objects.
      */
-    public RouteNode[] getParents() {
+    private RouteNode[] getParents() {
         return parents != null ? parents : EMPTY_ARRAY;
+    }
+
+    public RouteNode[] getChildrenParents(boolean forward) {
+        return forward ? getChildren() : getParents();
     }
 
     /**
@@ -645,8 +640,12 @@ abstract public class RouteNode {
      * Checks if a RouteNode instance has been visited before when routing a connection.
      * @return true, if a RouteNode instance has been visited before.
      */
-    public boolean isVisited() {
+    private boolean isVisited() {
         return prev != null;
+    }
+
+    public boolean isVisited(boolean forward) {
+        return forward ? isVisited() : isTarget();
     }
 
     /**
@@ -689,14 +688,14 @@ abstract public class RouteNode {
      * @param child The routing arc's parent node.
      * @return True, if the arc should be included in the routing resource graph.
      */
-    abstract public boolean mustInclude(Node parent, Node child);
+    abstract public boolean mustInclude(boolean forward, Node parent, Node child);
 
     /**
      * Checks if a node has been preserved and thus cannot be used.
      * @param node The node in question.
      * @return True, if the arc should be excluded from the routing resource graph.
      */
-    abstract public boolean isPreserved(Node node);
+    abstract public boolean isPreserved(boolean forward, Node node);
 
     /**
      * Checks if a routing arc has been excluded thus cannot be used.
@@ -704,9 +703,7 @@ abstract public class RouteNode {
      * @param child The routing arc's parent node.
      * @return True, if the arc should be excluded from the routing resource graph.
      */
-    abstract public boolean isExcluded(Node parent, Node child);
-
-    abstract public boolean isExcludedBack(Node parent, Node child);
+    abstract public boolean isExcluded(boolean forward, Node parent, Node child);
 
     abstract public int getSLRIndex();
 }
