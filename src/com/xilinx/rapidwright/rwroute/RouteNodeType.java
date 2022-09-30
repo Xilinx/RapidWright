@@ -47,6 +47,7 @@ public enum RouteNodeType {
 
     SUPER_LONG_LINE,
     LAGUNA_I,
+    LAGUNA_O,
 
     /**
      * Denotes other wiring {@link RouteNode} Objects

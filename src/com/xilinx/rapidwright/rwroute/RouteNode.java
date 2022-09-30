@@ -61,8 +61,6 @@ abstract public class RouteNode implements Comparable<RouteNode> {
     private short length;
     /** The base cost of a rnode */
     private float baseCost;
-    /** A flag to indicate if this rnode is the target */
-    private boolean isTarget;
     /** The children (downhill rnodes) of this rnode */
     protected RouteNode[] children;
     /** The parent (uphill rnodes) of this rnode */
@@ -150,7 +148,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
         //       The `type` parameter fed to this method is the original
         //       value provided to the constructor
         // type = this.type;
-        if (this.type == RouteNodeType.LAGUNA_I) {
+        if (this.type == RouteNodeType.LAGUNA_I || this.type == RouteNodeType.LAGUNA_O) {
             // Make all approaches to SLLs zero-cost to encourage exploration
             // Assigning a base cost of zero would break congestion resolution for most nodes
             // (since RWroute.getNodeCost() would return zero) but doing it here should be
@@ -229,34 +227,38 @@ abstract public class RouteNode implements Comparable<RouteNode> {
     }
 
     public final static EnumSet<TileTypeEnum> lagunaTileTypes = EnumSet.of(
-              TileTypeEnum.LAG_LAG        // UltraScale+
-            , TileTypeEnum.LAGUNA_TILE     // UltraScale
+              TileTypeEnum.LAG_LAG      // UltraScale+
+            , TileTypeEnum.LAGUNA_TILE  // UltraScale
     );
 
     public static int getLength(Node node, RouteNode that) {
         Wire[] wires = node.getAllWiresInNode();
-        IntentCode ic = null;
+        Tile baseTile = node.getTile();
         Tile endTile = null;
-        boolean lagunaPinfeed = false;
         for (Wire w : wires) {
             Tile tile = w.getTile();
             TileTypeEnum tileType = tile.getTileTypeEnum();
-            boolean lagunaType = false;
-            if (tileType == TileTypeEnum.INT || (lagunaType = lagunaTileTypes.contains(tileType))) {
-                if (lagunaType) {
-                    if (ic == null) {
-                        ic = node.getIntentCode();
+            boolean lagunaTile = false;
+            if (tileType == TileTypeEnum.INT ||
+                    (lagunaTile = lagunaTileTypes.contains(tileType))) {
+                if (!lagunaTile ||
+                        // Only consider a Laguna tile as an end tile if base tile is Laguna too
+                        // (otherwise it's a PINFEED into a Laguna; in US+ Laguna is off-by-one in the X axis)
+                        lagunaTileTypes.contains(baseTile.getTileTypeEnum())) {
+                    if (tileType == TileTypeEnum.LAGUNA_TILE) {
+                        // In UltraScale, Laguna tiles have the same X as the base INT tile
+                        assert(tile.getTileXCoordinate() == baseTile.getTileXCoordinate());
                     }
-                    // TODO: Collect wire indices to save on string comparison
-                    if (ic == IntentCode.NODE_PINFEED && w.getWireName().contains("_TXD")) {
-                        // Only promote the data pinfeeds of a SLL to a LAGUNA_I (and not CLK/CE/SR/etc.)
-                        lagunaPinfeed = true;
+                    boolean endTileWasNotNull = (endTile != null);
+                    endTile = tile;
+                    // Break if this is the second INT tile
+                    if (endTileWasNotNull) break;
+                } else if (lagunaTile) {
+                    assert(!lagunaTileTypes.contains(baseTile.getTileTypeEnum()));
+                    if (that != null && that.type == RouteNodeType.PINFEED_I) {
+                        that.type = RouteNodeType.LAGUNA_I;
                     }
                 }
-                boolean endTileWasNotNull = (endTile != null);
-                endTile = tile;
-                // Break if this is the second INT tile
-                if (endTileWasNotNull) break;
             }
         }
         if (endTile == null) {
@@ -265,17 +267,10 @@ abstract public class RouteNode implements Comparable<RouteNode> {
 
         int endTileXCoordinate = endTile.getTileXCoordinate();
         int endTileYCoordinate = endTile.getTileYCoordinate();
-        Tile base = node.getTile();
-        if (lagunaPinfeed) {
-            endTileXCoordinate = base.getTileXCoordinate();
-        }
-        int length = Math.abs(endTileXCoordinate - base.getTileXCoordinate())
-                + Math.abs(endTileYCoordinate - base.getTileYCoordinate());
+        int length = Math.abs(endTileXCoordinate - baseTile.getTileXCoordinate())
+                + Math.abs(endTileYCoordinate - baseTile.getTileYCoordinate());
 
         if (that != null) {
-            if (lagunaPinfeed) {
-                that.type = RouteNodeType.LAGUNA_I;
-            }
             that.endTileXCoordinate = (short) endTileXCoordinate;
             that.endTileYCoordinate = (short) endTileYCoordinate;
             that.length = (short) length;
@@ -288,11 +283,12 @@ abstract public class RouteNode implements Comparable<RouteNode> {
         getLength(node, this);
         if (node.getTile().getTileTypeEnum() == TileTypeEnum.LAG_LAG) {
             // UltraScale+ only
-            // Correct the X coordinate of all LAGUNA nodes since they are accessed by the INT
+            // Correct the X coordinate of all Laguna nodes since they are accessed by the INT
             // tile to its right, yet has the LAG tile has a tile X coordinate one less
-            // Do not apply this correction for NODE_LAGUNA_OUTPUT nodes unless it is a LAGUNA_I pinfeed
-            // (i.e. do not apply it to nodes that leave the SLL)
-            if (node.getIntentCode() != IntentCode.NODE_LAGUNA_OUTPUT || type == RouteNodeType.LAGUNA_I) {
+            // Do not apply this correction for LAGUNA_O nor VCC_WIREs since their end tiles
+            // are INT tiles.
+            if (type != RouteNodeType.LAGUNA_O && !node.isTiedToVcc()) {
+                assert(node.getTile().getTileXCoordinate() == endTileXCoordinate);
                 endTileXCoordinate++;
             }
         }
@@ -364,24 +360,8 @@ abstract public class RouteNode implements Comparable<RouteNode> {
         return node;
     }
 
-    /**
-     * Checks if a RouteNode Object is the current routing target.
-     * @return true, if a RouteNode Object is the current routing target.
-     */
-    private boolean isTarget() {
-        return isTarget;
-    }
-
-    public boolean isTarget(boolean forward) {
-        return forward ? isTarget() : isVisited();
-    }
-
-    /**
-     * Sets the boolean value of target.
-     * @param isTarget The value to be set.
-     */
-    public void setTarget(boolean isTarget) {
-        this.isTarget = isTarget;
+    public boolean isIntersection() {
+        return isVisited(true) && isVisited(false);
     }
 
     /**
@@ -478,21 +458,27 @@ abstract public class RouteNode implements Comparable<RouteNode> {
         if (type == RouteNodeType.WIRE) {
             // NOTE: IntentCode is device-dependent
             IntentCode ic = node.getIntentCode();
+            String wireName;
             switch (ic) {
                 case NODE_PINBOUNCE:
                     this.type = RouteNodeType.PINBOUNCE;
                     break;
 
                 // Could be PINFEED into SLICE or PINFEED into a LAGUNA
+                // (the latter case is updated by getLength())
                 case NODE_PINFEED:
                     this.type = RouteNodeType.PINFEED_I;
                     break;
 
                 case NODE_LAGUNA_OUTPUT: // UltraScale+ only
+                    assert(node.getTile().getTileTypeEnum() == TileTypeEnum.LAG_LAG);
                     // TODO: Collect wire indices to save on string comparison
-                    if (node.getWireName().endsWith("_TXOUT")) {
-                        assert(node.getTile().getTileTypeEnum() == TileTypeEnum.LAG_LAG);
+                    wireName = node.getWireName();
+                    if (wireName.endsWith("_TXOUT")) {
+                        // This is the inner LAGUNA_I, mark it so it gets a base cost discount
                         this.type = RouteNodeType.LAGUNA_I;
+                    } else if (wireName.startsWith("RXD")) {
+                        this.type = RouteNodeType.LAGUNA_O;
                     }
                     break;
 
@@ -502,17 +488,26 @@ abstract public class RouteNode implements Comparable<RouteNode> {
                     break;
 
                 case INTENT_DEFAULT:
-                    // TODO: Collect wire indices to save on string comparison
-                    String wireName = node.getWireName();
-                    if (wireName.startsWith("UBUMP")) {
-                        // UltraScale
-                        assert(node.getTile().getTileTypeEnum() == TileTypeEnum.LAGUNA_TILE);
-                        this.type = RouteNodeType.SUPER_LONG_LINE;
-                    }
-                    else if (wireName.endsWith("_TXOUT")) {
-                        // UltraScale
-                        assert(node.getTile().getTileTypeEnum() == TileTypeEnum.LAGUNA_TILE);
-                        this.type = RouteNodeType.LAGUNA_I;
+                    if (node.getTile().getTileTypeEnum() == TileTypeEnum.LAG_LAG) { // UltraScale+ only
+                        wireName = node.getWireName();
+                        if (wireName.contains("_RXD")) {
+                            // This is the inner LAGUNA_O, mark it so it gets a base cost discount
+                            this.type = RouteNodeType.LAGUNA_O;
+                        }
+                    } else if (node.getTile().getTileTypeEnum() == TileTypeEnum.LAGUNA_TILE) { // UltraScale only
+                        // TODO: Collect wire indices to save on string comparison
+                        wireName = node.getWireName();
+                        if (wireName.startsWith("UBUMP")) {
+                            this.type = RouteNodeType.SUPER_LONG_LINE;
+                        } else if (wireName.endsWith("_TXOUT")) {
+                            // This is the inner LAGUNA_I, mark it so it gets a base cost discount
+                            this.type = RouteNodeType.LAGUNA_I;
+                        } else if (wireName.startsWith("RXD")) {
+                            this.type = RouteNodeType.LAGUNA_O;
+                        } else if (wireName.contains("_RXD")) {
+                            // This is the inner LAGUNA_O, mark it so it gets a base cost discount
+                            this.type = RouteNodeType.LAGUNA_O;
+                        }
                     }
                     break;
             }
@@ -743,12 +738,8 @@ abstract public class RouteNode implements Comparable<RouteNode> {
      * Checks if a RouteNode instance has been visited before when routing a connection.
      * @return true, if a RouteNode instance has been visited before.
      */
-    private boolean isVisited() {
-        return prev != null;
-    }
-
     public boolean isVisited(boolean forward) {
-        return forward ? isVisited() : isTarget();
+        return (forward ? prev : next) != null;
     }
 
     /**
@@ -759,7 +750,6 @@ abstract public class RouteNode implements Comparable<RouteNode> {
             setPrev(null);
         }
         setNext(null);
-        setTarget(false);
     }
 
     /**

@@ -449,12 +449,4 @@ public class Connection implements Comparable<Connection>{
 
         return s.toString();
     }
-
-    public void setTarget(boolean target) {
-        sinkRnode.setTarget(target);
-        if (altSinkRnode != null) {
-            altSinkRnode.setTarget(target);
-        }
-    }
-
 }

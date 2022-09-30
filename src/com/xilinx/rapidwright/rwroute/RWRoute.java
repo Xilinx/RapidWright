@@ -1203,14 +1203,14 @@ public class RWRoute{
             }
             nodesPoppedThisConnection++;
 
-            if (rnode.isTarget(forward)) {
+            if (rnode.isIntersection()) {
                 successRoute = true;
                 break;
             }
 
             exploreAndExpand(forward, rnode, connection, shareWeight, rnodeCostWeight,
                     rnodeWLWeight, estWlWeight, dlyWeight, estDlyWeight);
-            // forward = !forward;
+            forward = !forward;
         }
         queue.clear();
         queueBack.clear();
@@ -1222,7 +1222,6 @@ public class RWRoute{
             if (config.isTimingDriven()) connection.updateRouteDelay();
         } else {
             connection.getSink().setRouted(false);
-            connection.setTarget(false);
             routingGraph.resetExpansion();
             System.out.printf("CRITICAL WARNING: Unroutable connection in iteration #%d\n", routeIteration);
             System.out.println("                 " + connection);
@@ -1298,7 +1297,6 @@ public class RWRoute{
      */
     protected void finishRouteConnection(Connection connection, RouteNode targetRnode) {
         saveRouting(connection, targetRnode);
-        connection.setTarget(false);
         routingGraph.resetExpansion();
         updateUsersAndPresentCongestionCost(connection);
     }
@@ -1312,13 +1310,19 @@ public class RWRoute{
         assert(connection.getRnodes().isEmpty());
         assert(intersectRnode.getPrev() != null);
 
-        // First go forward from intersection point
         RouteNode rnode = intersectRnode;
-        while ((rnode = rnode.getNext()) != null) {
-            connection.addRnode(rnode);
+        RouteNode nextRnode = rnode.getNext();
+        if (nextRnode != null) {
+            // First go forward from intersection point until we reach the sink node
+            // (which loops back on itself)
+            do {
+                assert (nextRnode != null);
+                rnode = nextRnode;
+                connection.addRnode(rnode);
+            } while ((nextRnode = rnode.getNext()) != rnode);
+            // Then reverse the list
+            Collections.reverse(connection.getRnodes());
         }
-        // Then reverse the list
-        Collections.reverse(connection.getRnodes());
 
         // Then add on the walk backwards from intersection
         rnode = intersectRnode;
@@ -1397,8 +1401,8 @@ public class RWRoute{
                 // Tail node is preserved by a net other than the one we're routing
                 continue;
             }
-            if (tailRnode.isTarget(forward)) {
-                // Despite the limitation above, on encountering a target only terminate
+            if (tailRnode.isVisited(!forward)) {
+                // Despite the limitation above, on encountering an intersection only terminate
                 // immediately by clearing the queue if this target is not overused since
                 // there could be an alternate target that would be less congested
                 int occ = tailRnode.getOccupancy();
@@ -1430,10 +1434,15 @@ public class RWRoute{
                     case PINFEED_I:
                         break;
                     case LAGUNA_I:
-                        if (!connection.isCrossSLR() ||
-                                connection.getSinkRnode().getSLRIndex() == tailRnode.getSLRIndex()) {
-                            // Do not consider approaching a SLL if not needing to cross
-                            continue;
+                    case LAGUNA_O:
+                        if ((forward && tailRnode.getType() == RouteNodeType.LAGUNA_I) ||
+                                (!forward && tailRnode.getType() == RouteNodeType.LAGUNA_O)) {
+                            RouteNode destRnode = forward ? connection.getSinkRnode() : connection.getSourceRnode();
+                            if (!connection.isCrossSLR() ||
+                                    destRnode.getSLRIndex() == tailRnode.getSLRIndex()) {
+                                // Do not consider approaching a SLL if not needing to cross
+                                continue;
+                            }
                         }
                         break;
                     case SUPER_LONG_LINE:
@@ -1569,7 +1578,7 @@ public class RWRoute{
         }
 
         float biasCost = 0;
-        if (!rnode.isTarget(forward)) {
+        if (!rnode.isVisited(!forward)) {
             NetWrapper net = connection.getNetWrapper();
             biasCost = rnode.getBaseCost() / net.getConnections().size() *
                     (Math.abs(rnode.getTileXCoordinate(forward) - net.getXCenter()) +
@@ -1586,6 +1595,7 @@ public class RWRoute{
      * @param newTotalPathCost Total path cost of childRnode.
      */
     protected void push(boolean forward, RouteNode tailRnode, float newPartialPathCost, float newTotalPathCost) {
+        assert(tailRnode.isVisited(forward) || tailRnode.getType() == RouteNodeType.PINFEED_O);
         tailRnode.setTotalCost(forward, newTotalPathCost);
         tailRnode.setKnownCost(forward, newPartialPathCost);
         routingGraph.visit(forward, tailRnode);
@@ -1594,7 +1604,6 @@ public class RWRoute{
             assert(!queue.contains(tailRnode));
             queue.add(tailRnode);
         } else {
-            tailRnode.setTarget(true);
             assert(!queueBack.contains(tailRnode));
             queueBack.add(tailRnode);
         }
@@ -1623,11 +1632,10 @@ public class RWRoute{
         connectionsRoutedIteration++;
         assert(queue.isEmpty());
 
-        // Sets the sink rnode(s) of the connection as the target(s)
-        connectionToRoute.setTarget(true);
-
         // Adds the source rnode to the queue
-        push(true, connectionToRoute.getSourceRnode(), 0, 0);
+        RouteNode sourceRnode = connectionToRoute.getSourceRnode();
+        push(true, sourceRnode, 0, 0);
+        assert(sourceRnode.getPrev() == null);
 
         // Add sink rnodes to the backward queue
         for (RouteNode sinkRnode : Arrays.asList(connectionToRoute.getSinkRnode(),
@@ -1637,8 +1645,9 @@ public class RWRoute{
                 int countSourceUses = sinkRnode.countConnectionsOfUser(connectionToRoute.getNetWrapper());
                 float sharingFactor = 1 + shareWeight* countSourceUses;
                 float newPartialPathCost = rnodeCostWeight * getNodeCost(sinkRnode, connectionToRoute, countSourceUses, sharingFactor, true);
+                // Mark sinks with a next pointer to themselves
+                sinkRnode.setNext(sinkRnode);
                 push(false, sinkRnode, newPartialPathCost, newPartialPathCost);
-                assert(sinkRnode.isTarget(true));
             }
         }
 
