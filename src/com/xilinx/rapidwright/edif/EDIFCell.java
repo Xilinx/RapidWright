@@ -261,29 +261,29 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
                     oneBitBus = collision;
                     multiBitBus = port;
                 } else {
-                    portNameCollision(port);
+                    portNameCollision(port, collision);
                 }
                 // Let's treat is as a 1-bit bus
                 String newBusName = EDIFTools.getRootBusName(oneBitBus.getName());
                 if (ports.containsKey(newBusName)) {
-                    portNameCollision(port);
+                    portNameCollision(port, collision);
                 }
                 oneBitBus.setBusName(newBusName);
                 ports.put(newBusName, oneBitBus);
                 ports.put(multiBitBus.getBusName(), multiBitBus);
 
             } else {
-                portNameCollision(port);
+                portNameCollision(port, collision);
             }
 
         }
         return port;
     }
 
-    private void portNameCollision(EDIFPort port) {
+    private void portNameCollision(EDIFPort port, EDIFPort collision) {
         throw new RuntimeException("ERROR: Port name collision on EDIFCell " + getName()
                 + ", trying to add port " + port + ", but the cell already contains ports with the "
-                + "same name: " + getPorts());
+                + "same name: " + collision);
     }
 
     /**
