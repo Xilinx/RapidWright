@@ -128,7 +128,7 @@ abstract public class RouteNode {
             RouteNode tailRnode = getOrCreate(tail, type);
             list.add(tailRnode);
         }
-        RouteNode[] array = list.toArray(EMPTY_ARRAY);
+        RouteNode[] array = (list.isEmpty()) ? EMPTY_ARRAY : list.toArray(EMPTY_ARRAY);
         if (forward)
             children = array;
         else
