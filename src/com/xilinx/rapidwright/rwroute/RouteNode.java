@@ -25,7 +25,6 @@
 package com.xilinx.rapidwright.rwroute;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
@@ -44,7 +43,7 @@ import com.xilinx.rapidwright.util.RuntimeTracker;
  * Each RouteNode instance is associated with a {@link Node} instance. It is denoted as "rnode".
  * The routing resource graph is built "lazily", i.e., RouteNode Objects (rnodes) are created when needed.
  */
-abstract public class RouteNode implements Comparable<RouteNode> {
+abstract public class RouteNode {
     /** Each RouteNode Object can be legally used by one net only */
     public static final short capacity = 1;
     /** Memoized static array for use by Collection.toArray() or similar */
@@ -63,19 +62,15 @@ abstract public class RouteNode implements Comparable<RouteNode> {
     private float baseCost;
     /** The children (downhill rnodes) of this rnode */
     protected RouteNode[] children;
-    /** The parent (uphill rnodes) of this rnode */
+    /** The parents (uphill rnodes) of this rnode */
     protected RouteNode[] parents;
 
-    /** Present congestion cost */
     private float presentCongestionCost;
-    /** Historical congestion cost */
     private float historicalCongestionCost;
-    /** Upstream path cost */
-    private float upstreamPathCost;
-    private float downstreamPathCost;
-    /** Lower bound of the total path cost */
-    private float lowerBoundTotalPathCost;
-    private float lowerBoundTotalPathCostBack;
+    private float knownCostFromSource;
+    private float knownCostFromSink;
+    private float totalCostToSink;
+    private float totalCostToSource;
     /** A variable that stores the parent of a rnode during expansion to facilitate tracing back */
     private RouteNode prev;
     private RouteNode next;
@@ -105,11 +100,6 @@ abstract public class RouteNode implements Comparable<RouteNode> {
         usersConnectionCounts = null;
         driversCounts = null;
         reset(false);
-    }
-
-    @Override
-    public int compareTo(RouteNode that) {
-        return Float.compare(this.lowerBoundTotalPathCost, that.lowerBoundTotalPathCost);
     }
 
     abstract protected RouteNode getOrCreate(Node node, RouteNodeType type);
@@ -528,9 +518,9 @@ abstract public class RouteNode implements Comparable<RouteNode> {
      */
     public void setTotalCost(boolean forward, float cost) {
         if (forward) {
-            lowerBoundTotalPathCost = cost;
+            totalCostToSink = cost;
         } else {
-            lowerBoundTotalPathCostBack = cost;
+            totalCostToSource = cost;
         }
     }
 
@@ -539,7 +529,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
      * @return The lower bound total path cost.
      */
     public float getTotalCost(boolean forward) {
-        return forward ? lowerBoundTotalPathCost : lowerBoundTotalPathCostBack;
+        return forward ? totalCostToSink : totalCostToSource;
     }
 
     /**
@@ -547,14 +537,14 @@ abstract public class RouteNode implements Comparable<RouteNode> {
      * @return The upstream path cost.
      */
     public float getKnownCost(boolean forward) {
-        return forward ? upstreamPathCost : downstreamPathCost;
+        return forward ? knownCostFromSource : knownCostFromSink;
     }
 
     public void setKnownCost(boolean forward, float cost) {
         if (forward) {
-            upstreamPathCost = cost;
+            knownCostFromSource = cost;
         } else {
-            downstreamPathCost = cost;
+            knownCostFromSink = cost;
         }
     }
 
