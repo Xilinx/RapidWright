@@ -224,34 +224,38 @@ abstract public class RouteNode implements Comparable<RouteNode> {
     }
 
     public final static EnumSet<TileTypeEnum> lagunaTileTypes = EnumSet.of(
-              TileTypeEnum.LAG_LAG        // UltraScale+
-            , TileTypeEnum.LAGUNA_TILE     // UltraScale
+              TileTypeEnum.LAG_LAG      // UltraScale+
+            , TileTypeEnum.LAGUNA_TILE  // UltraScale
     );
 
     public static int getLength(Node node, RouteNode that) {
         Wire[] wires = node.getAllWiresInNode();
-        IntentCode ic = null;
+        Tile baseTile = node.getTile();
         Tile endTile = null;
-        boolean lagunaPinfeed = false;
         for (Wire w : wires) {
             Tile tile = w.getTile();
             TileTypeEnum tileType = tile.getTileTypeEnum();
-            boolean lagunaType = false;
-            if (tileType == TileTypeEnum.INT || (lagunaType = lagunaTileTypes.contains(tileType))) {
-                if (lagunaType) {
-                    if (ic == null) {
-                        ic = node.getIntentCode();
+            boolean lagunaTile = false;
+            if (tileType == TileTypeEnum.INT ||
+                    (lagunaTile = lagunaTileTypes.contains(tileType))) {
+                if (!lagunaTile ||
+                        // Only consider a Laguna tile as an end tile if base tile is Laguna too
+                        // (otherwise it's a PINFEED into a Laguna; in US+ Laguna is off-by-one in the X axis)
+                        lagunaTileTypes.contains(baseTile.getTileTypeEnum())) {
+                    if (tileType == TileTypeEnum.LAGUNA_TILE) {
+                        // In UltraScale, Laguna tiles have the same X as the base INT tile
+                        assert(tile.getTileXCoordinate() == baseTile.getTileXCoordinate());
                     }
-                    // TODO: Collect wire indices to save on string comparison
-                    if (ic == IntentCode.NODE_PINFEED && w.getWireName().contains("_TXD")) {
-                        // Only promote the data pinfeeds of a SLL to a LAGUNA_I (and not CLK/CE/SR/etc.)
-                        lagunaPinfeed = true;
+                    boolean endTileWasNotNull = (endTile != null);
+                    endTile = tile;
+                    // Break if this is the second INT tile
+                    if (endTileWasNotNull) break;
+                } else if (lagunaTile) {
+                    assert(!lagunaTileTypes.contains(baseTile.getTileTypeEnum()));
+                    if (that != null && that.type == RouteNodeType.PINFEED_I) {
+                        that.type = RouteNodeType.LAGUNA_I;
                     }
                 }
-                boolean endTileWasNotNull = (endTile != null);
-                endTile = tile;
-                // Break if this is the second INT tile
-                if (endTileWasNotNull) break;
             }
         }
         if (endTile == null) {
@@ -260,17 +264,10 @@ abstract public class RouteNode implements Comparable<RouteNode> {
 
         int endTileXCoordinate = endTile.getTileXCoordinate();
         int endTileYCoordinate = endTile.getTileYCoordinate();
-        Tile base = node.getTile();
-        if (lagunaPinfeed) {
-            endTileXCoordinate = base.getTileXCoordinate();
-        }
-        int length = Math.abs(endTileXCoordinate - base.getTileXCoordinate())
-                + Math.abs(endTileYCoordinate - base.getTileYCoordinate());
+        int length = Math.abs(endTileXCoordinate - baseTile.getTileXCoordinate())
+                + Math.abs(endTileYCoordinate - baseTile.getTileYCoordinate());
 
         if (that != null) {
-            if (lagunaPinfeed) {
-                that.type = RouteNodeType.LAGUNA_I;
-            }
             that.endTileXCoordinate = (short) endTileXCoordinate;
             that.endTileYCoordinate = (short) endTileYCoordinate;
             that.length = (short) length;
@@ -281,13 +278,15 @@ abstract public class RouteNode implements Comparable<RouteNode> {
 
     private void setEndTileXYCoordinates() {
         getLength(node, this);
-        if (node.getTile().getTileTypeEnum() == TileTypeEnum.LAG_LAG) {
-            // UltraScale+ only
-            // Correct the X coordinate of all LAGUNA nodes since they are accessed by the INT
+        if (node.getTile().getTileTypeEnum() == TileTypeEnum.LAG_LAG) { // UltraScale+ only
+            // Correct the X coordinate of all Laguna nodes since they are accessed by the INT
             // tile to its right, yet has the LAG tile has a tile X coordinate one less
             // Do not apply this correction for NODE_LAGUNA_OUTPUT nodes unless it is a LAGUNA_I pinfeed
             // (i.e. do not apply it to nodes that leave the SLL)
-            if (node.getIntentCode() != IntentCode.NODE_LAGUNA_OUTPUT || type == RouteNodeType.LAGUNA_I) {
+            // Nor apply it to VCC_WIREs since their end tiles are INT tiles.
+            if ((node.getIntentCode() != IntentCode.NODE_LAGUNA_OUTPUT || type == RouteNodeType.LAGUNA_I) &&
+                !node.isTiedToVcc()) {
+                assert(node.getTile().getTileXCoordinate() == endTileXCoordinate);
                 endTileXCoordinate++;
             }
         }
@@ -452,9 +451,9 @@ abstract public class RouteNode implements Comparable<RouteNode> {
                     break;
 
                 case NODE_LAGUNA_OUTPUT: // UltraScale+ only
+                    assert(node.getTile().getTileTypeEnum() == TileTypeEnum.LAG_LAG);
                     // TODO: Collect wire indices to save on string comparison
                     if (node.getWireName().endsWith("_TXOUT")) {
-                        assert(node.getTile().getTileTypeEnum() == TileTypeEnum.LAG_LAG);
                         this.type = RouteNodeType.LAGUNA_I;
                     }
                     break;
@@ -465,17 +464,15 @@ abstract public class RouteNode implements Comparable<RouteNode> {
                     break;
 
                 case INTENT_DEFAULT:
-                    // TODO: Collect wire indices to save on string comparison
-                    String wireName = node.getWireName();
-                    if (wireName.startsWith("UBUMP")) {
-                        // UltraScale
-                        assert(node.getTile().getTileTypeEnum() == TileTypeEnum.LAGUNA_TILE);
-                        this.type = RouteNodeType.SUPER_LONG_LINE;
-                    }
-                    else if (wireName.endsWith("_TXOUT")) {
-                        // UltraScale
-                        assert(node.getTile().getTileTypeEnum() == TileTypeEnum.LAGUNA_TILE);
-                        this.type = RouteNodeType.LAGUNA_I;
+                    if (node.getTile().getTileTypeEnum() == TileTypeEnum.LAGUNA_TILE) { // UltraScale only
+                        // TODO: Collect wire indices to save on string comparison
+                        String wireName = node.getWireName();
+                        if (wireName.startsWith("UBUMP")) {
+                            this.type = RouteNodeType.SUPER_LONG_LINE;
+                        } else if (wireName.endsWith("_TXOUT")) {
+                            // This is the inner LAGUNA_I, mark it so it gets a base cost discount
+                            this.type = RouteNodeType.LAGUNA_I;
+                        }
                     }
                     break;
             }
