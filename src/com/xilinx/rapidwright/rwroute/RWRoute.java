@@ -1433,10 +1433,6 @@ public class RWRoute{
             if (tailRnode.getType() == RouteNodeType.PINFEED_I) {
                 return connection.isCrossSLR();
             }
-        } else {
-            if (tailRnode.getType() == RouteNodeType.PINFEED_O) {
-                return false;
-            }
         }
         return !config.isUseBoundingBox() || tailRnode.isInConnectionBoundingBox(connection);
     }

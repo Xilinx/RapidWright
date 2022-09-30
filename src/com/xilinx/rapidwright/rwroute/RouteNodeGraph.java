@@ -244,7 +244,7 @@ public class RouteNodeGraph {
         return preservedMap.containsKey(node);
     }
 
-    final private static Set<TileTypeEnum> allowedTileEnums;
+    protected final static Set<TileTypeEnum> allowedTileEnums;
     static {
         allowedTileEnums = new HashSet<>();
         allowedTileEnums.add(TileTypeEnum.INT);
@@ -261,12 +261,6 @@ public class RouteNodeGraph {
 
     protected boolean isExcluded(boolean forward, Node head, Node tail) {
         Tile tile = tail.getTile();
-        TileTypeEnum tileType = tile.getTileTypeEnum();
-        return !allowedTileEnums.contains(tileType);
-    }
-
-    protected boolean isExcludedBack(boolean forward, Node head, Node tail) {
-        Tile tile = head.getTile();
         TileTypeEnum tileType = tile.getTileTypeEnum();
         return !allowedTileEnums.contains(tileType);
     }
