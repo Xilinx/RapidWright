@@ -521,12 +521,12 @@ public class RWRoute{
                     if (altSource == null) {
                         altSource = DesignTools.getLegalAlternativeOutputPin(net);
                         if (altSource != null) {
-                            assert(!altSource.equals(source));
                             net.addPin(altSource);
                             DesignTools.routeAlternativeOutputSitePin(net, altSource);
                         }
                     }
                     if (altSource != null) {
+                        assert(!altSource.equals(source));
                         Node altSourceNode = RouterHelper.projectOutputPinToINTNode(altSource);
                         altSourceINTRnode = getOrCreateRouteNode(altSourceNode, RouteNodeType.PINFEED_O);
                     }
