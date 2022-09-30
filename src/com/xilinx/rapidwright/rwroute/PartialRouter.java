@@ -232,7 +232,10 @@ public class PartialRouter extends RWRoute{
             // Use the prev pointers to update the routing for each connection
             for (Connection connection : netWrapper.getConnections()) {
                 if (connection.getSink().isRouted()) {
-                    finishRouteConnection(connection, connection.getSinkRnode());
+                    RouteNode sinkRnode = connection.getSinkRnode();
+                    // Mark sinks with a next pointer to themselves
+                    sinkRnode.setNext(sinkRnode);
+                    finishRouteConnection(connection, sinkRnode);
                 }
             }
         }
