@@ -132,10 +132,7 @@ public class PartialRouter extends RWRoute{
         // is if it came from prev
         if (prev != null) {
             assert((prev.getNode() == start) == prev.getNode().equals(start));
-            if (prev.getNode() == start) {
-                endRnode.setPrev(null);
-                return true;
-            }
+            return prev.getNode() == start;
         }
 
         return false;

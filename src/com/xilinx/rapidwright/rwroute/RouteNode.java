@@ -105,7 +105,7 @@ abstract public class RouteNode {
         historicalCongestionCost = 1;
         usersConnectionCounts = null;
         driversCounts = null;
-        reset();
+        reset(false);
     }
 
     abstract protected RouteNode getOrCreate(Node node, RouteNodeType type);
@@ -651,8 +651,10 @@ abstract public class RouteNode {
     /**
      * Reset the visited, prev, and target state of this node.
      */
-    public void reset() {
-        setPrev(null);
+    public void reset(boolean isPreserved) {
+        if (!isPreserved) {
+            setPrev(null);
+        }
         setNext(null);
         setTarget(false);
     }

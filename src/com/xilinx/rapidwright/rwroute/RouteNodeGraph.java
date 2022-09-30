@@ -303,10 +303,6 @@ public class RouteNodeGraph {
         return nodesMap.computeIfAbsent(node, ($) -> create(node, type));
     }
 
-    public void visit(RouteNode rnode) {
-        visited.add(rnode);
-    }
-
     public void visit(boolean forward, RouteNode rnode) {
         if (forward) {
             visited.add(rnode);
@@ -320,8 +316,8 @@ public class RouteNodeGraph {
      */
     public void resetExpansion() {
         for (Collection<RouteNode> c : Arrays.asList(visited, visitedBack)) {
-            for (RouteNode node : c) {
-                node.reset();
+            for (RouteNode rn : c) {
+                rn.reset(isPreserved(rn.getNode()));
             }
             totalVisited += c.size();
             c.clear();

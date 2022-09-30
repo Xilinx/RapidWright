@@ -1360,7 +1360,14 @@ public class RWRoute{
                 // Note: it is possible that another (cheaper) path to a rnode is found here
                 // However, because the PriorityQueue class does not support reducing the cost
                 // of nodes already in the queue, this opportunity is discarded
-                continue;
+
+                // Do not skip this node if forward routing and tail can be inferred to be a preserved node.
+                // In this scenario, the "visited" state is a byproduct of this preserved node indicating the
+                // path back to the source.
+                if (!forward || tailRnode.getPrev() != headRnode) {
+                    continue;
+                }
+                assert(routingGraph.isPreserved(tailRnode.getNode()));
             }
             // For backward routing only, we must restrict our expansion only to preserved nodes
             // that are preserved for our net only
@@ -1530,7 +1537,7 @@ public class RWRoute{
         tailRnode.setTotalCost(forward, newTotalPathCost);
         tailRnode.setKnownCost(forward, newPartialPathCost);
         tailRnode.setPrevNext(forward, headRnode);
-        routingGraph.visit(tailRnode);
+        routingGraph.visit(forward, tailRnode);
 
         if (forward) {
             queue.add(tailRnode);
@@ -1580,59 +1587,6 @@ public class RWRoute{
                 push(false, null, sinkRnode, newPartialPathCost, newPartialPathCost);
                 assert(sinkRnode.isTarget(true));
             }
-        }
-
-        // Visit all nodes from all net's other routed connections so that the backward router can
-        // identify when it has reached an intersection point
-        NetWrapper netWrapper = connectionToRoute.getNetWrapper();
-        for (Connection connection : netWrapper.getConnections()) {
-            if (!connection.getSink().isRouted())
-                continue;
-
-            RouteNode parentRnode = null;
-            boolean overUsed = false;
-
-            // Go forwards from source
-            for (RouteNode childRnode : Lists.reverse(connection.getRnodes())) {
-                if (parentRnode != null) {
-                    if (isAccessible(true, parentRnode, connectionToRoute)) {
-                        boolean longParent = config.isTimingDriven() && DelayEstimatorBase.isLong(parentRnode.getNode());
-                        for (RouteNode otherChildRnode : parentRnode.getChildrenParents(true)) {
-                            if (otherChildRnode.isVisited(true)) continue;
-                            if (!isAccessible(true, otherChildRnode, connectionToRoute)) continue;
-                            evaluateCostAndPush(true, parentRnode, longParent, otherChildRnode, connectionToRoute, shareWeight, rnodeCostWeight,
-                                    rnodeLengthWeight, rnodeEstWlWeight, rnodeDelayWeight, rnodeEstDlyWeight);
-                        }
-                    }
-
-                    // Set the prev pointer in case it was not set.
-                    // This allows the router to start from a node inside the bounding box that is
-                    // known to be reachable, without congestion, after venturing outside those bounds.
-                    RouteNode childPrev = childRnode.getPrev();
-                    if (childPrev != parentRnode) {
-                        assert(childPrev == null);
-                        childRnode.setPrev(parentRnode);
-                        routingGraph.visit(childRnode);
-                    }
-                }
-
-                // Skip all nodes downstream of over used (or to-be-overused if we were to use it) nodes
-                int occ = childRnode.getOccupancy();
-                overUsed = occ > RouteNode.capacity ||
-                        (occ == RouteNode.capacity && childRnode.countConnectionsOfUser(netWrapper) == 0);
-                if (overUsed) {
-                    break;
-                }
-
-                parentRnode = childRnode;
-            }
-
-            // If non-timing driven, there must be at least one over-used node on the
-            // connection-to-be-routed (otherwise we wouldn't expect it to need
-            // re-routing)
-            assert(config.isTimingDriven() ||
-                    connection != connectionToRoute ||
-                    overUsed);
         }
 
         // Clears previous route of the connection
