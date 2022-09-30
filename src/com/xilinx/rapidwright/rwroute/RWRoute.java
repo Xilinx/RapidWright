@@ -1311,18 +1311,16 @@ public class RWRoute{
         assert(intersectRnode.getPrev() != null);
 
         RouteNode rnode = intersectRnode;
-        RouteNode nextRnode = rnode.getNext();
-        if (nextRnode != null) {
-            // First go forward from intersection point until we reach the sink node
-            // (which loops back on itself)
-            do {
-                assert (nextRnode != null);
-                rnode = nextRnode;
-                connection.addRnode(rnode);
-            } while ((nextRnode = rnode.getNext()) != rnode);
-            // Then reverse the list
-            Collections.reverse(connection.getRnodes());
+        RouteNode nextRnode;
+        // First go forward from intersection point until we reach the sink node
+        // (marked by a node that loops back on itself)
+        while ((nextRnode = rnode.getNext()) != rnode) {
+            assert(nextRnode != null);
+            rnode = nextRnode;
+            connection.addRnode(rnode);
         }
+        // Then reverse the list
+        Collections.reverse(connection.getRnodes());
 
         // Then add on the walk backwards from intersection
         rnode = intersectRnode;
