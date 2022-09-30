@@ -1308,7 +1308,7 @@ public class RWRoute{
      */
     private void saveRouting(Connection connection, RouteNode intersectRnode) {
         assert(connection.getRnodes().isEmpty());
-        assert(intersectRnode.getPrev() != null);
+        assert(intersectRnode.isIntersection());
 
         RouteNode rnode = intersectRnode;
         RouteNode nextRnode;

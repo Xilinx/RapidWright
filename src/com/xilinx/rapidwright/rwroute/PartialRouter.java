@@ -232,10 +232,11 @@ public class PartialRouter extends RWRoute{
             // Use the prev pointers to update the routing for each connection
             for (Connection connection : netWrapper.getConnections()) {
                 if (connection.getSink().isRouted()) {
+                    // Temporarily mark sink with a next pointer to themselves so that routing can be recovered
                     RouteNode sinkRnode = connection.getSinkRnode();
-                    // Mark sinks with a next pointer to themselves
                     sinkRnode.setNext(sinkRnode);
                     finishRouteConnection(connection, sinkRnode);
+                    sinkRnode.setNext(null);
                 }
             }
         }
@@ -456,7 +457,11 @@ public class PartialRouter extends RWRoute{
             // Use the prev pointers to update the routing for each connection
             for (Connection netnewConnection : netWrapper.getConnections()) {
                 if (netnewConnection.getSink().isRouted()) {
-                    finishRouteConnection(netnewConnection, netnewConnection.getSinkRnode());
+                    // Temporarily mark sink with a next pointer to themselves so that routing can be recovered
+                    RouteNode sinkRnode = netnewConnection.getSinkRnode();
+                    sinkRnode.setNext(sinkRnode);
+                    finishRouteConnection(netnewConnection, sinkRnode);
+                    sinkRnode.setNext(null);
                 }
             }
 
