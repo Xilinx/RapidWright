@@ -59,7 +59,6 @@ import com.xilinx.rapidwright.timing.TimingManager;
 import com.xilinx.rapidwright.timing.TimingVertex;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
-import org.python.google.common.collect.Lists;
 
 /**
  * RWRoute class provides the main methods for routing a design.
@@ -489,7 +488,8 @@ public class RWRoute{
         assert(existingNetWrapper == null);
         SitePinInst source = net.getSource();
         int indirect = 0;
-        Node sourceINTNode = null;
+        RouteNode sourceINTRnode = null;
+        RouteNode altSourceINTRnode = null;
 
         for (SitePinInst sink : net.getSinkPins()) {
             if (RouterHelper.isExternalConnectionToCout(source, sink)) {
@@ -509,13 +509,30 @@ public class RWRoute{
                 Node sinkINTNode = nodes.get(0);
                 indirectConnections.add(connection);
                 connection.setSinkRnode(getOrCreateRouteNode(sinkINTNode, RouteNodeType.PINFEED_I));
-                if (sourceINTNode == null) {
-                    sourceINTNode = RouterHelper.projectOutputPinToINTNode(source);
+                if (sourceINTRnode == null) {
+                    Node sourceINTNode = RouterHelper.projectOutputPinToINTNode(source);
                     if (sourceINTNode == null) {
                         throw new RuntimeException("ERROR: Null projected INT node for the source of net " + net.toStringFull());
                     }
+                    sourceINTRnode = getOrCreateRouteNode(sourceINTNode, RouteNodeType.PINFEED_O);
+
+                    // Pre-emptively set up alternate source since we are expanding from both sources
+                    SitePinInst altSource = net.getAlternateSource();
+                    if (altSource == null) {
+                        altSource = DesignTools.getLegalAlternativeOutputPin(net);
+                        if (altSource != null) {
+                            assert(!altSource.equals(source));
+                            net.addPin(altSource);
+                            DesignTools.routeAlternativeOutputSitePin(net, altSource);
+                        }
+                    }
+                    if (altSource != null) {
+                        Node altSourceNode = RouterHelper.projectOutputPinToINTNode(altSource);
+                        altSourceINTRnode = getOrCreateRouteNode(altSourceNode, RouteNodeType.PINFEED_O);
+                    }
                 }
-                connection.setSourceRnode(getOrCreateRouteNode(sourceINTNode, RouteNodeType.PINFEED_O));
+                connection.setSourceRnode(sourceINTRnode);
+                connection.setAltSourceRnode(altSourceINTRnode);
                 connection.setDirect(false);
                 indirect++;
                 connection.computeHpwl();
@@ -524,13 +541,14 @@ public class RWRoute{
         }
 
         if (indirect > 0) {
-            netWrapper.computeHPWLAndCenterCoordinates();
+            netWrapper.computeHPWLAndCenterCoordinates(routingGraph.nextLagunaColumn, routingGraph.prevLagunaColumn);
             if (config.isUseBoundingBox()) {
                 for (Connection connection : netWrapper.getConnections()) {
                     if (connection.isDirect()) continue;
                     connection.computeConnectionBoundingBox(config.getBoundingBoxExtensionX(),
                             config.getBoundingBoxExtensionY(),
-                            routingGraph.getMaxXBetweenLaguna());
+                            routingGraph.nextLagunaColumn,
+                            routingGraph.prevLagunaColumn);
                 }
             }
         }
@@ -987,9 +1005,12 @@ public class RWRoute{
                 netNodes.addAll(connection.getNodes());
             }
             for (Node node:netNodes) {
-                if (node.getTile().getTileTypeEnum() != TileTypeEnum.INT) continue;
+                TileTypeEnum tileType = node.getTile().getTileTypeEnum();
+                if (tileType != TileTypeEnum.INT && !RouteNode.lagunaTileTypes.contains(tileType)) {
+                    continue;
+                }
                 totalINTNodes++;
-                int wl = RouterHelper.getLengthOfNode(node);
+                int wl = RouteNode.getLength(node, null);
                 totalWL += wl;
 
                 RouterHelper.addNodeTypeLengthToMap(node, wl, nodeTypeUsage, nodeTypeLength);
@@ -1009,6 +1030,7 @@ public class RWRoute{
         nodeTypes.add(IntentCode.NODE_LOCAL);
         nodeTypes.add(IntentCode.NODE_PINBOUNCE);
         nodeTypes.add(IntentCode.NODE_PINFEED);
+        nodeTypes.add(IntentCode.NODE_LAGUNA_DATA); // UltraScale+ only
     }
 
     /**
@@ -1188,7 +1210,7 @@ public class RWRoute{
 
             exploreAndExpand(forward, rnode, connection, shareWeight, rnodeCostWeight,
                     rnodeWLWeight, estWlWeight, dlyWeight, estDlyWeight);
-            forward = !forward;
+            // forward = !forward;
         }
         queue.clear();
         queueBack.clear();
@@ -1231,16 +1253,14 @@ public class RWRoute{
      * @param connection The connection in question.
      * @return true, if the output pin has been swapped.
      */
-    private boolean swapOutputPin(Connection connection) {
+    protected boolean swapOutputPin(Connection connection) {
         NetWrapper netWrapper = connection.getNetWrapper();
         Net net = netWrapper.getNet();
 
-        SitePinInst altSource = DesignTools.getLegalAlternativeOutputPin(net);
+        SitePinInst altSource = net.getAlternateSource();
         if (altSource == null) {
             System.out.println("INFO: No alternative source to swap");
             return false;
-        } else if (net.getAlternateSource() == null) {
-            DesignTools.routeAlternativeOutputSitePin(net, altSource);
         }
 
         SitePinInst source = connection.getSource();
@@ -1249,12 +1269,13 @@ public class RWRoute{
         }
         System.out.println("INFO: Swap source from " + source + " to " + altSource + "\n");
 
-        Node altSourceNode = RouterHelper.projectOutputPinToINTNode(altSource);
-        RouteNode altSourceRnode = getOrCreateRouteNode(altSourceNode, RouteNodeType.PINFEED_O);
+        RouteNode altSourceRnode = connection.getAltSourceRnode();
+        if (altSourceRnode == null) {
+            throw new RuntimeException();
+        }
         connection.setSource(altSource);
         connection.setSourceRnode(altSourceRnode);
         connection.getSink().setRouted(false);
-
         return true;
     }
 
@@ -1310,12 +1331,10 @@ public class RWRoute{
         // Update the connection source, in case we backtracked onto the alternate source
         if (!sourceRnode.equals(connection.getSourceRnode())) {
             Net net = connection.getNetWrapper().getNet();
-            SitePinInst altSource = DesignTools.getLegalAlternativeOutputPin(net);
+            SitePinInst altSource = net.getAlternateSource();
             if (altSource == null) {
                 throw new RuntimeException(connection + " expected " + connection.getSourceRnode().getNode() +
                         " got " + sourceRnode.getNode());
-            } else if (net.getAlternateSource() == null) {
-                DesignTools.routeAlternativeOutputSitePin(net, altSource);
             }
 
             if (altSource == connection.getSource()) {
@@ -1331,6 +1350,8 @@ public class RWRoute{
                         " got " + sourceRnode.getNode());
             }
 
+            // Swap primary and alternate sources
+            connection.setAltSourceRnode(connection.getSourceRnode());
             RouteNode altSourceRnode = sourceRnode;
             connection.setSource(altSource);
             connection.setSourceRnode(altSourceRnode);
@@ -1408,6 +1429,17 @@ public class RWRoute{
                         break;
                     case PINFEED_I:
                         break;
+                    case LAGUNA_I:
+                        if (!connection.isCrossSLR() ||
+                                connection.getSinkRnode().getSLRIndex() == tailRnode.getSLRIndex()) {
+                            // Do not consider approaching a SLL if not needing to cross
+                            continue;
+                        }
+                        break;
+                    case SUPER_LONG_LINE:
+                        RouteNode destRnode = forward ? connection.getSinkRnode() : connection.getSourceRnode();
+                        assert(connection.isCrossSLR() && destRnode.getSLRIndex() != headRnode.getSLRIndex());
+                        break;
                     default:
                         throw new RuntimeException();
                 }
@@ -1429,11 +1461,6 @@ public class RWRoute{
      * @return true, if no bounding box constraints, or if the routing resource is within the connection's bounding box when use the bounding box constraint.
      */
     protected boolean isAccessible(boolean forward, RouteNode tailRnode, Connection connection) {
-        if (forward) {
-            if (tailRnode.getType() == RouteNodeType.PINFEED_I) {
-                return connection.isCrossSLR();
-            }
-        }
         return !config.isUseBoundingBox() || tailRnode.isInConnectionBoundingBox(connection);
     }
 
@@ -1463,6 +1490,10 @@ public class RWRoute{
             newPartialPathCost += rnodeDelayWeight * (tailRnode.getDelay() + DelayEstimatorBase.getExtraDelay(tailRnode.getNode(), longParent));
         }
 
+        // Set the prev/next pointer, as RouteNode.getEndTileYCoordinate() and
+        // RouteNode.getSLRIndex() require this
+        tailRnode.setPrevNext(forward, headRnode);
+
         int tailX = tailRnode.getTileXCoordinate(forward);
         int tailY = tailRnode.getTileYCoordinate(forward);
         RouteNode destRnode = forward ? connection.getSinkRnode() : connection.getSourceRnode();
@@ -1472,13 +1503,39 @@ public class RWRoute{
         int deltaY = Math.abs(tailY - destY);
         if (connection.isCrossSLR()) {
             int deltaSLR = Math.abs(destRnode.getSLRIndex() - tailRnode.getSLRIndex());
-            // Check for overshooting which occurs when child and sink node are in
-            // adjacent SLRs and less than a SLL wire's length apart in the Y axis.
-            if (deltaSLR == 1) {
-                int overshootBy = deltaY - RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES;
-                if (overshootBy < 0) {
-                    deltaY = RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES - overshootBy;
+            if (deltaSLR != 0) {
+                // Check for overshooting which occurs when child and sink node are in
+                // adjacent SLRs and less than a SLL wire's length apart in the Y axis.
+                if (deltaSLR == 1) {
+                    int overshootByY = deltaY - RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES;
+                    if (overshootByY < 0) {
+                        assert(deltaY < RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES);
+                        deltaY = RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES - overshootByY;
+                    }
                 }
+
+                // Account for any detours that must be taken to get to and back from the closest Laguna column
+                int nextLagunaColumn = routingGraph.nextLagunaColumn[tailX];
+                int prevLagunaColumn = routingGraph.prevLagunaColumn[tailX];
+                int nextLagunaColumnDist = Math.abs(nextLagunaColumn - tailX);
+                int prevLagunaColumnDist = Math.abs(prevLagunaColumn - tailX);
+                if (destX >= tailX) {
+                    if (nextLagunaColumnDist <= prevLagunaColumnDist || prevLagunaColumn == Integer.MIN_VALUE) {
+                        assert (nextLagunaColumn != Integer.MAX_VALUE);
+                        deltaX = Math.abs(nextLagunaColumn - tailX) + Math.abs(nextLagunaColumn - destX);
+                    } else {
+                        deltaX = Math.abs(tailX - prevLagunaColumn) + Math.abs(destX - prevLagunaColumn);
+                    }
+                } else { // childX > sinkX
+                    if (prevLagunaColumnDist <= nextLagunaColumnDist) {
+                        assert (prevLagunaColumn != Integer.MIN_VALUE);
+                        deltaX = Math.abs(tailX - prevLagunaColumn) + Math.abs(destX - prevLagunaColumn);
+                    } else {
+                        deltaX = Math.abs(nextLagunaColumn - tailX) + Math.abs(nextLagunaColumn - destX);
+                    }
+                }
+
+                assert(deltaX >= 0);
             }
         }
 
@@ -1487,7 +1544,7 @@ public class RWRoute{
         if (config.isTimingDriven()) {
             newTotalPathCost += rnodeEstDlyWeight * (deltaX * 0.32 + deltaY * 0.16);
         }
-        push(forward, headRnode, tailRnode, newPartialPathCost, newTotalPathCost);
+        push(forward, tailRnode, newPartialPathCost, newTotalPathCost);
     }
 
     /**
@@ -1524,21 +1581,21 @@ public class RWRoute{
 
     /**
      * Sets the costs of a rnode and pushes it to the queue.
-     * @param headRnode The parent rnode of the childRnode.
      * @param tailRnode A child rnode.
      * @param newPartialPathCost The upstream path cost from childRnode to the source.
      * @param newTotalPathCost Total path cost of childRnode.
      */
-    private void push(boolean forward, RouteNode headRnode, RouteNode tailRnode, float newPartialPathCost, float newTotalPathCost) {
+    protected void push(boolean forward, RouteNode tailRnode, float newPartialPathCost, float newTotalPathCost) {
         tailRnode.setTotalCost(forward, newTotalPathCost);
         tailRnode.setKnownCost(forward, newPartialPathCost);
-        tailRnode.setPrevNext(forward, headRnode);
         routingGraph.visit(forward, tailRnode);
 
         if (forward) {
+            assert(!queue.contains(tailRnode));
             queue.add(tailRnode);
         } else {
             tailRnode.setTarget(true);
+            assert(!queueBack.contains(tailRnode));
             queueBack.add(tailRnode);
         }
     }
@@ -1556,9 +1613,9 @@ public class RWRoute{
      * @param rnodeDelayWeight The weight of childRnode's exact delay.
      * @param rnodeEstDlyWeight The weight of estimated delay to the target.
      */
-    private void prepareRouteConnection(Connection connectionToRoute, float shareWeight, float rnodeCostWeight,
-                                        float rnodeLengthWeight, float rnodeEstWlWeight,
-                                        float rnodeDelayWeight, float rnodeEstDlyWeight) {
+    protected void prepareRouteConnection(Connection connectionToRoute, float shareWeight, float rnodeCostWeight,
+                                          float rnodeLengthWeight, float rnodeEstWlWeight,
+                                          float rnodeDelayWeight, float rnodeEstDlyWeight) {
         // Rips up the connection
         ripUp(connectionToRoute);
 
@@ -1570,7 +1627,7 @@ public class RWRoute{
         connectionToRoute.setTarget(true);
 
         // Adds the source rnode to the queue
-        push(true, null, connectionToRoute.getSourceRnode(), 0, 0);
+        push(true, connectionToRoute.getSourceRnode(), 0, 0);
 
         // Add sink rnodes to the backward queue
         for (RouteNode sinkRnode : Arrays.asList(connectionToRoute.getSinkRnode(),
@@ -1580,7 +1637,7 @@ public class RWRoute{
                 int countSourceUses = sinkRnode.countConnectionsOfUser(connectionToRoute.getNetWrapper());
                 float sharingFactor = 1 + shareWeight* countSourceUses;
                 float newPartialPathCost = rnodeCostWeight * getNodeCost(sinkRnode, connectionToRoute, countSourceUses, sharingFactor, true);
-                push(false, null, sinkRnode, newPartialPathCost, newPartialPathCost);
+                push(false, sinkRnode, newPartialPathCost, newPartialPathCost);
                 assert(sinkRnode.isTarget(true));
             }
         }
@@ -1640,12 +1697,12 @@ public class RWRoute{
 
     public static void printNodeTypeUsageAndWirelength(boolean verbose, Map<IntentCode, Long> nodeTypeUsage, Map<IntentCode, Long> nodeTypeLength) {
         if (verbose) {
-            System.out.println("Node Usage Per Type\n");
-            System.out.printf(" %-15s  %14s  %12s\n", "Node Type", "Usage", "Length");
+            System.out.println("Node Usage Per Type");
+            System.out.printf(" %-16s  %13s  %12s\n", "Node Type", "Usage", "Length");
             for (IntentCode ic : nodeTypes) {
                 long usage = nodeTypeUsage.getOrDefault(ic, 0L);
                 long length = nodeTypeLength.getOrDefault(ic, 0L);
-                System.out.printf(" %-15s  %14d  %12d\n", ic, usage, length);
+                System.out.printf(" %-16s  %13d  %12d\n", ic, usage, length);
             }
             System.out.println();
         }

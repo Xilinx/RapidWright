@@ -98,7 +98,7 @@ public class TimingAndWirelengthReport{
             for (Node node : RouterHelper.getNodesOfNet(net)) {
                 if (node.getTile().getTileTypeEnum() != TileTypeEnum.INT) continue;
                 usedNodes++;
-                int wl = RouterHelper.getLengthOfNode(node);
+                int wl = RouteNode.getLength(node, null);
                 wirelength += wl;
                 RouterHelper.addNodeTypeLengthToMap(node, wl, nodeTypeUsage, nodeTypeLength);
             }

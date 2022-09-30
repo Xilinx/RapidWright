@@ -41,7 +41,6 @@ import org.junit.jupiter.params.provider.CsvSource;
 import java.util.ArrayList;
 import java.util.List;
 
-@LargeTest
 public class TestRWRoute {
     /**
      * Tests the non-timing driven full routing, i.e., RWRoute running in its wirelength-driven mode.
@@ -51,6 +50,7 @@ public class TestRWRoute {
      * This test takes around 15s on a machine with a CPU @ 2.5GHz.
      */
     @Test
+    @LargeTest
     public void testNonTimingDrivenFullRouting() {
         String dcpPath = RapidWrightDCP.getString("bnn.dcp");
         Design design = Design.readCheckpoint(dcpPath);
@@ -67,6 +67,7 @@ public class TestRWRoute {
      * This test takes around 20s on a machine with a CPU @ 2.5GHz.
      */
     @Test
+    @LargeTest
     public void testTimingDrivenFullRouting() {
         String dcpPath = RapidWrightDCP.getString("bnn.dcp");
         Design design = Design.readCheckpoint(dcpPath);
@@ -81,6 +82,7 @@ public class TestRWRoute {
      * This test takes around 3 minutes on a machine with a CPU @ 2.5GHz.
      */
     @Test
+    @LargeTest
     public void testNonTimingDrivenFullRoutingWithClkDesign() {
         // Sporadically failing due to OutOfMemoryException (see #439)
         long maxMemoryNeeded = 1024L*1024L*1024L*8L;
@@ -97,6 +99,7 @@ public class TestRWRoute {
      * This test takes around 40s on a machine with a CPU @ 2.5GHz.
      */
     @Test
+    @LargeTest
     public void testNonTimingDrivenPartialRouting() {
         // Sporadically failing due to OutOfMemoryException (see #439)
         long maxMemoryNeeded = 1024L*1024L*1024L*8L;
@@ -121,6 +124,7 @@ public class TestRWRoute {
      * Other nets within each kernel are fully routed.
      */
     @Test
+    @LargeTest
     @Disabled("Blocked on TimingGraph.build() being able to build partial graphs")
     public void testTimingDrivenPartialRouting() {
         String dcpPath = RapidWrightDCP.getString("picoblaze_partial.dcp");
@@ -140,20 +144,38 @@ public class TestRWRoute {
     @ParameterizedTest
     @CsvSource({
             // One SLR crossing
-            "SLICE_X9Y299,SLICE_X9Y300,10000",    // Close
-            "SLICE_X9Y241,SLICE_X9Y300,1000",    // Perfect
-            "SLICE_X9Y358,SLICE_X9Y299,1000",    // Perfect
-            "SLICE_X9Y240,SLICE_X9Y359,2000",    // Far
-            "SLICE_X9Y359,SLICE_X9Y240,2000",    // Far (opposite direction as above requires noticeably more nodes?)
+            // (Too) Close
+            "SLICE_X9Y299,SLICE_X9Y300,500",    // On Laguna column
+            "SLICE_X9Y300,SLICE_X9Y299,500",
+            "SLICE_X0Y299,SLICE_X0Y300,200",    // Far from Laguna column
+            "SLICE_X0Y300,SLICE_X0Y299,200",
+            "SLICE_X53Y299,SLICE_X53Y300,300",    // Equidistant from two Laguna columns
+            "SLICE_X53Y300,SLICE_X53Y299,600",
+            // Perfect
+            "SLICE_X9Y241,SLICE_X9Y300,200",
+            "SLICE_X9Y300,SLICE_X9Y241,200",
+            "SLICE_X9Y358,SLICE_X9Y299,100",
+            "SLICE_X9Y299,SLICE_X9Y358,200",
+            "SLICE_X53Y241,SLICE_X69Y300,900",
+            "SLICE_X53Y358,SLICE_X69Y299,1000",
+            // Far
+            "SLICE_X9Y240,SLICE_X9Y359,100",    // On Laguna
+            "SLICE_X9Y359,SLICE_X9Y240,100",
+            "SLICE_X162Y240,SLICE_X162Y430,200",
+            "SLICE_X162Y430,SLICE_X162Y240,100",
+            "SLICE_X0Y240,SLICE_X12Y430,700",    // Far from Laguna
+            "SLICE_X0Y430,SLICE_X12Y240,300",
 
             // Two SLR crossings
-            "SLICE_X0Y240,SLICE_X0Y430,20000",
-            "SLICE_X0Y299,SLICE_X0Y599,10000",
-            "SLICE_X0Y599,SLICE_X0Y299,30000",    // (opposite direction as above requires noticeably more nodes?)
+            "SLICE_X162Y299,SLICE_X162Y599,200",
+            "SLICE_X162Y599,SLICE_X162Y299,100",
 
             // Three SLR crossings
-            "SLICE_X0Y0,SLICE_X168Y899,160000",
-            "SLICE_X168Y0,SLICE_X0Y899,15000",
+            "SLICE_X79Y0,SLICE_X79Y899,300",    // Straight up: next to Laguna column
+            "SLICE_X0Y0,SLICE_X0Y899,600",        // Straight up: far from Laguna column
+            "SLICE_X168Y0,SLICE_X168Y899,1000",    // Straight up: far from Laguna column
+            "SLICE_X9Y0,SLICE_X162Y899,300",    // Up and right
+            "SLICE_X168Y162,SLICE_X9Y899,800",    // Up and left
     })
     public void testSLRCrossingNonTimingDriven(String srcSiteName, String dstSiteName, long nodesPoppedLimit) {
         Design design = new Design("top", Device.AWS_F1);
@@ -169,6 +191,7 @@ public class TestRWRoute {
         pinsToRoute.add(dstSpi);
         PartialRouter.routeDesignPartialNonTimingDriven(design, pinsToRoute);
 
-        Assertions.assertTrue(Long.valueOf(System.getProperty("rapidwright.rwroute.nodesPopped")) < nodesPoppedLimit);
+        Assertions.assertTrue(pinsToRoute.stream().allMatch(SitePinInst::isRouted));
+        Assertions.assertTrue(Long.valueOf(System.getProperty("rapidwright.rwroute.nodesPopped")) <= nodesPoppedLimit);
     }
 }

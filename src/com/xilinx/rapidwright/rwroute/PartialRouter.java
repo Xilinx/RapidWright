@@ -218,7 +218,7 @@ public class PartialRouter extends RWRoute{
             }
 
             // Erase the prev pointer for all RouteNode-s upstream of projected
-            // INT node, otherwise finishRouteConnection() will complain that
+            // output INT node, otherwise finishRouteConnection() will complain that
             // backtracking doesn't terminate at Net's source
             for (SitePinInst spi : Arrays.asList(net.getSource(), net.getAlternateSource())) {
                 if (spi == null) continue;
@@ -326,19 +326,22 @@ public class PartialRouter extends RWRoute{
     protected Collection<Net> pickNetsToUnpreserve(Connection connection) {
         Set<Net> unpreserveNets = new HashSet<>();
 
-        // Find those reserved signals that are using uphill nodes of the target pin node
-        for (Node node : connection.getSinkRnode().getNode().getAllUphillNodes()) {
-            Net toRoute = routingGraph.getPreservedNet(node);
-            if (toRoute == null) continue;
-            if (toRoute.isClockNet() || toRoute.isStaticNet()) continue;
-            unpreserveNets.add(toRoute);
-        }
+        Node sourceNode = connection.getSourceRnode().getNode();
+        Node sinkNode = connection.getSinkRnode().getNode();
 
+        List<Node> candidateNodes = new ArrayList<>();
+        // Consider the cases of [A-H](X|_I) site pins which are accessed through a bounce node,
+        // meaning this connection may be unroutable because another net is preserving this node
+        candidateNodes.add(sinkNode);
+        // Find those reserved signals that are using uphill nodes of the target pin node
+        candidateNodes.addAll(sinkNode.getAllUphillNodes());
         // Find those preserved nets that are using downhill nodes of the source pin node
-        for (Node node : connection.getSourceRnode().getNode().getAllDownhillNodes()) {
+        candidateNodes.addAll(sourceNode.getAllDownhillNodes());
+
+        for(Node node : candidateNodes) {
             Net toRoute = routingGraph.getPreservedNet(node);
-            if (toRoute == null) continue;
-            if (toRoute.isClockNet() || toRoute.isStaticNet()) continue;
+            if(toRoute == null) continue;
+            if(toRoute.isClockNet() || toRoute.isStaticNet()) continue;
             unpreserveNets.add(toRoute);
         }
 
@@ -470,7 +473,7 @@ public class PartialRouter extends RWRoute{
             assert(!routingGraph.isPreserved(toBuild));
 
             // Each rnode should be added as a child to all of its parents
-            // that already exist, unless it was already present
+            // that already exist
             for (Node uphill : toBuild.getAllUphillNodes()) {
                 RouteNode parent = routingGraph.getNode(uphill);
                 if (parent == null)

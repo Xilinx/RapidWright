@@ -51,7 +51,7 @@ public class NetWrapper{
         connections = new ArrayList<>();
     }
 
-    public void computeHPWLAndCenterCoordinates() {
+    public void computeHPWLAndCenterCoordinates(int[] nextLagunaColumn, int[] prevLagunaColumn) {
         int xMin = Integer.MAX_VALUE;
         int yMin = Integer.MAX_VALUE;
         int xMax = Integer.MIN_VALUE;
@@ -69,6 +69,15 @@ public class NetWrapper{
                 yMin = Integer.min(yMin, y);
                 xMax = Integer.max(xMax, x);
                 yMax = Integer.max(yMax, y);
+
+                if (connection.isCrossSLR()) {
+                    // For SLR-crossing connections, ensure it contains at least one Laguna column
+                    int nextLaguna = nextLagunaColumn[xMin];
+                    int prevLaguna = prevLagunaColumn[xMax];
+                    xMin = (short) Math.min(xMin, prevLaguna);
+                    xMax = (short) Math.max(xMax, nextLaguna);
+                }
+
                 xSum += x;
                 ySum += y;
                 sourceRnodeAdded = true;
