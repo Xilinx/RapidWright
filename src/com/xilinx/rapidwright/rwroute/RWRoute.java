@@ -507,7 +507,10 @@ public class RWRoute{
                     SitePinInst altSource = net.getAlternateSource();
                     if (altSource == null) {
                         altSource = DesignTools.getLegalAlternativeOutputPin(net);
-                        DesignTools.routeAlternativeOutputSitePin(net, altSource);
+                        if (altSource != null) {
+                            net.addPin(altSource);
+                            DesignTools.routeAlternativeOutputSitePin(net, altSource);
+                        }
                     }
                     if (altSource != null) {
                         Node altSourceNode = RouterHelper.projectOutputPinToINTNode(altSource);
