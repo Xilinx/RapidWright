@@ -213,43 +213,48 @@ public class RouteNodeGraph {
     public void asyncPreserve(Collection<Node> nodes, Net net) {
         asyncPreserveOutstanding.countUp();
         ParallelismTools.submit(() -> {
-            nodes.forEach((node) -> preserve(node, net));
-            asyncPreserveOutstanding.countDown();
+            try {
+                nodes.forEach((node) -> preserve(node, net));
+            } catch (Throwable t) {
+                t.printStackTrace();
+            } finally {
+                asyncPreserveOutstanding.countDown();
+            }
         });
     }
 
     public void asyncPreserve(Net net) {
         asyncPreserveOutstanding.countUp();
         ParallelismTools.submit(() -> {
-            List<SitePinInst> pins = net.getPins();
-            SitePinInst sourcePin = net.getSource();
-            assert(sourcePin == null || pins.contains(sourcePin));
-            SitePinInst altSourcePin = net.getAlternateSource();
-            assert(altSourcePin == null || pins.contains(altSourcePin));
-            for (SitePinInst pin : net.getPins()) {
-                // SitePinInst.isRouted() is meaningless for output pins
-                if (!pin.isRouted() && !pin.isOutPin()) {
-                    continue;
+            try {
+                List<SitePinInst> pins = net.getPins();
+                SitePinInst sourcePin = net.getSource();
+                assert (sourcePin == null || pins.contains(sourcePin));
+                SitePinInst altSourcePin = net.getAlternateSource();
+                assert (altSourcePin == null || pins.contains(altSourcePin));
+                for (SitePinInst pin : net.getPins()) {
+                    // SitePinInst.isRouted() is meaningless for output pins
+                    if (!pin.isRouted() && !pin.isOutPin()) {
+                        continue;
+                    }
+
+                    preserve(pin.getConnectedNode(), net);
                 }
 
-                preserve(pin.getConnectedNode(), net);
+                for (PIP pip : net.getPIPs()) {
+                    preserve(pip.getStartNode(), net);
+                    preserve(pip.getEndNode(), net);
+                }
+            } catch (Throwable t) {
+                t.printStackTrace();
+            } finally {
+                asyncPreserveOutstanding.countDown();
             }
-
-            for (PIP pip : net.getPIPs()) {
-                preserve(pip.getStartNode(), net);
-                preserve(pip.getEndNode(), net);
-            }
-
-            asyncPreserveOutstanding.countDown();
         });
     }
 
     public void awaitPreserve() {
-        try {
-            asyncPreserveOutstanding.await();
-        } catch (InterruptedException e) {
-            throw new RuntimeException();
-        }
+        asyncPreserveOutstanding.await();
     }
 
     public boolean unpreserve(Node node) {

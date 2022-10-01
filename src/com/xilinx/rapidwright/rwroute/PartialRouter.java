@@ -293,31 +293,25 @@ public class PartialRouter extends RWRoute{
     protected void addNetConnectionToRoutingTargets(Net net) {
         List<SitePinInst> sinkPins = net.getSinkPins();
         List<SitePinInst> pinsToRoute = netToPins.get(net);
-        final boolean partiallyPreserved = (pinsToRoute != null && pinsToRoute.size() < sinkPins.size());
         if (pinsToRoute != null) {
             assert(!pinsToRoute.isEmpty());
 
+            boolean partiallyPreserved = (pinsToRoute.size() < sinkPins.size());
             if (partiallyPreserved) {
                 // Mark all pins as being routed, then unmark those that need routing
                 sinkPins.forEach((spi) -> spi.setRouted(true));
             }
             pinsToRoute.forEach((spi) -> spi.setRouted(false));
+
+            NetWrapper netWrapper = createNetWrapperAndConnections(net);
+            if (partiallyPreserved) {
+                partiallyPreservedNets.add(netWrapper);
+            }
         }
 
         if (net.hasPIPs()) {
-            // NOTE: SitePinInst.isRouted() must be finalized before this method is
-            //       called as it may operate asynchronously
             preserveNet(net);
             increaseNumPreservedWireNets();
-        }
-
-        if (pinsToRoute == null) {
-            return;
-        }
-
-        NetWrapper netWrapper = createNetWrapperAndConnections(net);
-        if (partiallyPreserved) {
-            partiallyPreservedNets.add(netWrapper);
         }
     }
 

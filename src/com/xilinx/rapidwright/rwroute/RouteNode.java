@@ -271,8 +271,7 @@ abstract public class RouteNode {
 
     private void setEndTileXYCoordinates() {
         getLength(node, this);
-        if (node.getTile().getTileTypeEnum() == TileTypeEnum.LAG_LAG) {
-            // UltraScale+ only
+        if (node.getTile().getTileTypeEnum() == TileTypeEnum.LAG_LAG) { // UltraScale+ only
             // Correct the X coordinate of all Laguna nodes since they are accessed by the INT
             // tile to its right, yet has the LAG tile has a tile X coordinate one less
             // Do not apply this correction for LAGUNA_O nor VCC_WIREs since their end tiles
