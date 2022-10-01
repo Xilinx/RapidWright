@@ -27,6 +27,7 @@
 package com.xilinx.rapidwright.util;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import org.json.JSONArray;
@@ -48,7 +49,7 @@ public class LSFJob extends Job {
     private String lsfResource = LSF_RESOURCE;
     private String lsfProject = LSF_PROJECT;
     private String lsfQueue = LSF_QUEUE;
-
+    private boolean lsfExclusive = false;
 
     public String getLsfResource() {
         return lsfResource;
@@ -81,27 +82,28 @@ public class LSFJob extends Job {
         this.lsfQueue = lsfQueue;
     }
 
+    public void setLsfExclusive(boolean lsfExclusive) {
+        this.lsfExclusive = lsfExclusive;
+    }
+
     /* (non-Javadoc)
      * @see com.xilinx.rapidwright.util.Job#launchJob()
      */
     @Override
     public long launchJob() {
         Pair<String,String> launchScriptNames = createLaunchScript();
-        String[] cmd = new String[]{
-                "bsub","-R",
-                lsfResource,
-                "-J",
-                getRunDir()==null? System.getProperty("user.dir") : getRunDir(),
-                "-oo",
-                launchScriptNames.getSecond().replace(DEFAULT_LOG_EXTENSION, "_lsf_%J" + DEFAULT_LOG_EXTENSION),
-                "-P",
-                lsfProject +"-"+ System.getenv("USER"),
-                "-q",
-                lsfQueue,
-                FileTools.isWindows() ? "cmd.exe" : "/bin/bash",
-                launchScriptNames.getFirst()};
-
-        ArrayList<String> commandOutput = FileTools.getCommandOutput(cmd);
+        List<String> cmd = new ArrayList<>();
+        Collections.addAll(cmd, "bsub");
+        Collections.addAll(cmd, "-R", lsfResource);
+        Collections.addAll(cmd, "-J", getRunDir()==null? System.getProperty("user.dir") : getRunDir());
+        Collections.addAll(cmd, "-oo", launchScriptNames.getSecond().replace(DEFAULT_LOG_EXTENSION, "_lsf_%J" + DEFAULT_LOG_EXTENSION));
+        Collections.addAll(cmd, "-P", lsfProject +"-"+ System.getenv("USER"));
+        Collections.addAll(cmd, "-q", lsfQueue);
+        if (lsfExclusive) {
+            Collections.addAll(cmd, "-x");
+        }
+        Collections.addAll(cmd, FileTools.isWindows() ? "cmd.exe" : "/bin/bash", launchScriptNames.getFirst());
+        ArrayList<String> commandOutput = FileTools.getCommandOutput(cmd.toArray(new String[0]));
         try {
             if (commandOutput.size() != 1) {
                 throw new RuntimeException("not one line");
