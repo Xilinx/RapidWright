@@ -245,12 +245,18 @@ public class RouteNodeGraph {
 
             if (type == RouteNodeType.SUPER_LONG_LINE) {
                 Wire[] wires = node.getAllWiresInNode();
-                assert(wires.length == 2);
-                Tile endTile = wires[1].getTile();
-                assert(endTile.getTileTypeEnum() == TileTypeEnum.LAG_LAG && endTile != baseTile);
-                endTileYCoordinate = (short) endTile.getTileYCoordinate();
-                length = SUPER_LONG_LINE_LENGTH_IN_TILES;
-                assert(Math.abs(endTileYCoordinate - baseTile.getTileYCoordinate()) == length);
+                if (wires.length == 2) {
+                    Tile endTile = wires[1].getTile();
+                    assert(endTile.getTileTypeEnum() == TileTypeEnum.LAG_LAG && endTile != baseTile);
+                    endTileYCoordinate = (short) endTile.getTileYCoordinate();
+                    length = SUPER_LONG_LINE_LENGTH_IN_TILES;
+                    assert(Math.abs(endTileYCoordinate - baseTile.getTileYCoordinate()) == length);
+                } else {
+                    // A dummy SLL at the top or bottom edge of device
+                    assert(wires.length == 1);
+                    endTileYCoordinate = (short) baseTile.getTileYCoordinate();
+                    length = 0;
+                }
             } else {
                 endTileYCoordinate = (short) baseTile.getTileYCoordinate();
                 length = 0;
