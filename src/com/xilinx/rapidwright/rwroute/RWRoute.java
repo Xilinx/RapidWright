@@ -1420,12 +1420,14 @@ public class RWRoute{
 
         int childX = childRnode.getEndTileXCoordinate();
         int childY = childRnode.getEndTileYCoordinate();
-        RouteNode sinkRnode = connection.getSinkRnode();
-        int sinkX = sinkRnode.getEndTileXCoordinate();
-        int sinkY = sinkRnode.getEndTileYCoordinate();
+        SitePinInst sink = connection.getSink();
+        Tile sinkTile = sink.getTile();
+        int sinkX = sinkTile.getTileXCoordinate();
+        int sinkY = sinkTile.getTileYCoordinate();
         int deltaX = Math.abs(childX - sinkX);
         int deltaY = Math.abs(childY - sinkY);
         if (connection.isCrossSLR()) {
+            RouteNode sinkRnode = connection.getSinkRnode();
             int deltaSLR = Math.abs(sinkRnode.getSLRIndex() - childRnode.getSLRIndex());
             if (deltaSLR != 0) {
                 // Check for overshooting which occurs when child and sink node are in
