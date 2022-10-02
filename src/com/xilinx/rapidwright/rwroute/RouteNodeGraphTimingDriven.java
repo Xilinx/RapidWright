@@ -98,7 +98,7 @@ public class RouteNodeGraphTimingDriven extends RouteNodeGraph {
         /** The delay of this rnode computed based on the timing model */
         private final float delay;
 
-        public RouteNodeImpl(Node node, RouteNodeType type) {
+        protected RouteNodeImpl(Node node, RouteNodeType type) {
             super(node, type);
             delay = RouterHelper.computeNodeDelay(delayEstimator, node);
         }
