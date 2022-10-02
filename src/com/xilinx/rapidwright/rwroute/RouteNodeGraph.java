@@ -169,7 +169,7 @@ public class RouteNodeGraph {
             boolean reverseSLL = (next != null &&
                     getType() == RouteNodeType.SUPER_LONG_LINE &&
                     next.getBeginTileYCoordinate() == super.getBeginTileYCoordinate());
-            return reverseSLL ? getEndTileYCoordinate() : super.getBeginTileYCoordinate();
+            return reverseSLL ? super.getEndTileYCoordinate() : super.getBeginTileYCoordinate();
         }
 
         @Override
@@ -177,7 +177,7 @@ public class RouteNodeGraph {
             boolean reverseSLL = (prev != null &&
                     getType() == RouteNodeType.SUPER_LONG_LINE &&
                     prev.getEndTileYCoordinate() == super.getEndTileYCoordinate());
-            return reverseSLL ? getBeginTileYCoordinate() : super.getEndTileYCoordinate();
+            return reverseSLL ? super.getBeginTileYCoordinate() : super.getEndTileYCoordinate();
         }
     }
 
