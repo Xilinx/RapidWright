@@ -1456,6 +1456,7 @@ public class RWRoute{
             evaluateCostAndPush(forward, headRnode, forward ? longHead : longTail, tailRnode, connection, shareWeight, rnodeCostWeight,
                     rnodeLengthWeight, rnodeEstWlWeight, rnodeDelayWeight, rnodeEstDlyWeight);
             if (targetFound) {
+                assert(tailRnode.isIntersection());
                 break;
             }
         }
@@ -1491,14 +1492,14 @@ public class RWRoute{
         int countSourceUses = tailRnode.countConnectionsOfUser(connection.getNetWrapper());
         float sharingFactor = 1 + sharingWeight* countSourceUses;
         float newPartialPathCost = headRnode.getKnownCost(forward) +
-                rnodeCostWeight * getNodeCost(tailRnode, connection, countSourceUses, sharingFactor, forward) +
+                rnodeCostWeight * getNodeCost(forward, tailRnode, connection, countSourceUses, sharingFactor) +
                 rnodeLengthWeight * tailRnode.getLength() / sharingFactor;
         if (config.isTimingDriven()) {
             newPartialPathCost += rnodeDelayWeight * (tailRnode.getDelay() + DelayEstimatorBase.getExtraDelay(tailRnode.getNode(), longParent));
         }
 
-        // Set the prev/next pointer, as RouteNode.getEndTileYCoordinate() and
-        // RouteNode.getSLRIndex() require this
+        // Set the prev/next pointer, as RouteNode.getTileYCoordinate(), RouteNode.getSLRIndex(),
+        // and push() all require this
         tailRnode.setPrevNext(forward, headRnode);
 
         int tailX = tailRnode.getTileXCoordinate(forward);
@@ -1564,7 +1565,7 @@ public class RWRoute{
      * @param sharingFactor The sharing factor.
      * @return The sum of the congestion cost and the bias cost of rnode.
      */
-    private float getNodeCost(RouteNode rnode, Connection connection, int countSameSourceUsers, float sharingFactor, boolean forward) {
+    private float getNodeCost(boolean forward, RouteNode rnode, Connection connection, int countSameSourceUsers, float sharingFactor) {
         boolean hasSameSourceUsers = countSameSourceUsers!= 0;
         float presentCongestionCost;
 
@@ -1600,10 +1601,8 @@ public class RWRoute{
         routingGraph.visit(forward, tailRnode);
 
         if (forward) {
-            assert(!queue.contains(tailRnode));
             queue.add(tailRnode);
         } else {
-            assert(!queueBack.contains(tailRnode));
             queueBack.add(tailRnode);
         }
     }
@@ -1640,13 +1639,14 @@ public class RWRoute{
         for (RouteNode sinkRnode : Arrays.asList(connectionToRoute.getSinkRnode(),
                 connectionToRoute.getAltSinkRnode())) {
             if (sinkRnode != null) {
+                final boolean forward = false;
                 // Unlike source nodes, sink nodes must be costed since they could be overused
                 int countSourceUses = sinkRnode.countConnectionsOfUser(connectionToRoute.getNetWrapper());
                 float sharingFactor = 1 + shareWeight* countSourceUses;
-                float newPartialPathCost = rnodeCostWeight * getNodeCost(sinkRnode, connectionToRoute, countSourceUses, sharingFactor, true);
+                float newPartialPathCost = rnodeCostWeight * getNodeCost(forward, sinkRnode, connectionToRoute, countSourceUses, sharingFactor);
                 // Mark sinks with a next pointer to themselves
                 sinkRnode.setNext(sinkRnode);
-                push(false, sinkRnode, newPartialPathCost, newPartialPathCost);
+                push(forward, sinkRnode, newPartialPathCost, newPartialPathCost);
             }
         }
 

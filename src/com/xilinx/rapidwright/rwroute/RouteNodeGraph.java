@@ -27,6 +27,7 @@ import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Series;
@@ -283,7 +284,14 @@ public class RouteNodeGraph {
     protected boolean isExcluded(boolean forward, Node head, Node tail) {
         Tile tile = tail.getTile();
         TileTypeEnum tileType = tile.getTileTypeEnum();
-        return !allowedTileEnums.contains(tileType);
+        if (allowedTileEnums.contains(tileType)) {
+            if (forward)
+                return false;
+            // Backward router: exclude non-CLE outputs (like Laguna) and VCC_WIRE-s
+            if (tail.getIntentCode() != IntentCode.NODE_OUTPUT && !tail.isTiedToVcc())
+                return false;
+        }
+        return true;
     }
 
     public Set<Node> getPreservedNodes() {

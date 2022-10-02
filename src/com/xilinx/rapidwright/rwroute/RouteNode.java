@@ -300,10 +300,14 @@ abstract public class RouteNode {
 
     @Override
     public String toString() {
+        return toString(true);
+    }
+
+    public String toString(boolean forward) {
         StringBuilder s = new StringBuilder();
         s.append("node " + node.toString());
         s.append(", ");
-        s.append("(" + endTileXCoordinate + "," + getEndTileYCoordinate() + ")");
+        s.append("(" + getTileXCoordinate(forward) + "," + getTileYCoordinate(forward) + ")");
         s.append(", ");
         s.append(String.format("type = %s", type));
         s.append(", ");
@@ -378,11 +382,15 @@ abstract public class RouteNode {
     }
 
     public short getBeginTileXCoordinate() {
-        return (short) node.getTile().getTileXCoordinate();
+        Tile baseTile = node.getTile();
+        return (short) (baseTile.getTileXCoordinate() + (baseTile.getTileTypeEnum() == TileTypeEnum.LAG_LAG ? 1 : 0));
     }
 
     public short getBeginTileYCoordinate() {
-        return (short) node.getTile().getTileYCoordinate();
+        boolean reverseSLL = (next != null &&
+                getType() == RouteNodeType.SUPER_LONG_LINE &&
+                next.getNode().getTile() == node.getTile());
+        return reverseSLL ? endTileYCoordinate : (short) node.getTile().getTileYCoordinate();
     }
 
     /**
@@ -508,7 +516,7 @@ abstract public class RouteNode {
      * @return The wirelength, i.e. the number of INT tiles that the associated {@link Node} instance spans.
      */
     public short getLength() {
-        return length;
+        return (type == RouteNodeType.LAGUNA_O) ? 0 : length;
     }
 
     /**
