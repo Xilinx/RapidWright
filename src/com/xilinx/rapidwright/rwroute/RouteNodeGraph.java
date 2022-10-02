@@ -88,6 +88,7 @@ public class RouteNodeGraph {
     final int[] intYToSLRIndex;
     public final int[] nextLagunaColumn;
     public final int[] prevLagunaColumn;
+    public Set<Integer> lagunaWireIsVcc;
 
     protected class RouteNodeImpl extends RouteNode {
 
@@ -327,8 +328,12 @@ public class RouteNodeGraph {
         }
 
         Tile[][] lagunaTiles;
+        int tileXCorrection = 0;
         if (device.getSeries() == Series.UltraScalePlus) {
+            // Looks like on UltraScale+ only Laguna tiles are always on the left side of an INT tile,
+            // with the Laguna tile X coordinate one smaller than the INT. Correct this.
             lagunaTiles = device.getTilesByNameRoot("LAG_LAG");
+            tileXCorrection = 1;
         } else if (device.getSeries() == Series.UltraScale) {
             lagunaTiles = device.getTilesByNameRoot("LAGUNA_TILE");
         } else {
@@ -341,27 +346,29 @@ public class RouteNodeGraph {
             prevLagunaColumn = new int[maxTileColumns];
             Arrays.fill(nextLagunaColumn, Integer.MAX_VALUE);
             Arrays.fill(prevLagunaColumn, Integer.MIN_VALUE);
-            for (int y = 0; y < lagunaTiles.length; y++) {
-                Tile[] lagunaTilesAtY = lagunaTiles[y];
-                for (int x = 0; x < lagunaTilesAtY.length; x++) {
-                    Tile tile = lagunaTilesAtY[x];
-                    if (tile != null) {
-                        if (y == 0) {
-                            assert(x == tile.getTileXCoordinate());
-                            // Looks like (on US+) LAGUNA tiles are always on the left side of an INT tile,
-                            // with tile X coordinate one smaller
-                            final int intTileXCoordinate = x + 1;
+            lagunaWireIsVcc = new HashSet<>();
+            Tile[] lagunaTilesAtY = lagunaTiles[0];
+            for (int x = 0; x < lagunaTilesAtY.length; x++) {
+                Tile tile = lagunaTilesAtY[x];
+                if (tile != null) {
+                    assert(x == tile.getTileXCoordinate());
+                    final int intTileXCoordinate = x + tileXCorrection;
 
-                            // Go backwards til beginning
-                            for (int i = intTileXCoordinate; i >= 0; i--) {
-                                if (nextLagunaColumn[i] != Integer.MAX_VALUE)
-                                    break;
-                                nextLagunaColumn[i] = intTileXCoordinate;
-                            }
-                            // Go forwards til end
-                            for (int i = intTileXCoordinate; i < prevLagunaColumn.length; i++) {
-                                prevLagunaColumn[i] = intTileXCoordinate;
-                            }
+                    // Go backwards til beginning
+                    for (int i = intTileXCoordinate; i >= 0; i--) {
+                        if (nextLagunaColumn[i] != Integer.MAX_VALUE)
+                            break;
+                        nextLagunaColumn[i] = intTileXCoordinate;
+                    }
+                    // Go forwards til end
+                    for (int i = intTileXCoordinate; i < prevLagunaColumn.length; i++) {
+                        prevLagunaColumn[i] = intTileXCoordinate;
+                    }
+
+                    for (int wireIndex = 0; wireIndex < tile.getWireCount(); wireIndex++) {
+                        String wireName = tile.getWireName(wireIndex);
+                        if (wireName.startsWith(Net.VCC_WIRE_NAME)) {
+                            lagunaWireIsVcc.add(wireIndex);
                         }
                     }
                 }
@@ -458,7 +465,8 @@ public class RouteNodeGraph {
             if (forward)
                 return false;
             // Backward router: exclude non-CLE outputs (like Laguna) and VCC_WIRE-s
-            if (tail.getIntentCode() != IntentCode.NODE_OUTPUT && !tail.isTiedToVcc())
+            if (tail.getIntentCode() != IntentCode.NODE_OUTPUT &&
+                    /*!tail.isTiedToVcc() &&*/ (!RouteNode.lagunaTileTypes.contains(tileType) || !lagunaWireIsVcc.contains(tail.getWire())))
                 return false;
         }
         return true;
