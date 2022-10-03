@@ -26,6 +26,8 @@
 package com.xilinx.rapidwright.edif.compare;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
@@ -49,9 +51,13 @@ import com.xilinx.rapidwright.tests.CodePerfTracker;
 /**
  * Created on: Sep 26, 2022
  */
-public class CompareNetlists {
+public class EDIFNetlistComparator {
+
+    private boolean restoreBrackets = false;
     
-    private static boolean equivalentEDIFPropObject(EDIFPropertyObject gold, EDIFPropertyObject test) {
+    private Map<EDIFDiffType, List<EDIFDiff>> diffMap;
+
+    private boolean equivalentEDIFPropObject(EDIFPropertyObject gold, EDIFPropertyObject test) {
         if (gold.getPropertiesMap().size() == 1 && test.getPropertiesMap().size() == 0) {
             if (gold.getPropertiesMap().keySet().iterator().next().equals("RTL_KEEP")) {
                 // Filtering out RTL_KEEP properties as they only exist in EDIF and not XN
@@ -74,7 +80,7 @@ public class CompareNetlists {
         return true;
     }
     
-    private static void checkPorts(EDIFCell gold, EDIFCell test) {
+    private void checkPorts(EDIFCell gold, EDIFCell test) {
         Map<String, EDIFPort> testPorts = new HashMap<>(test.getPortMap());
         for (Entry<String, EDIFPort> e : gold.getPortMap().entrySet()) {
             EDIFPort testPort = testPorts.remove(e.getKey());
@@ -98,7 +104,7 @@ public class CompareNetlists {
         }
     }
     
-    private static void checkNets(EDIFCell gold, EDIFCell test) {
+    private void checkNets(EDIFCell gold, EDIFCell test) {
         Map<String, EDIFNet> testNets = new HashMap<>();
         for (EDIFNet net : test.getNets()) {
             testNets.put(net.getName(), net);
@@ -156,7 +162,7 @@ public class CompareNetlists {
         }
     }
     
-    private static void checkInsts(EDIFCell gold, EDIFCell test) {
+    private void checkInsts(EDIFCell gold, EDIFCell test) {
         Map<String, EDIFCellInst> goldCellInsts = new HashMap<>();
         for (EDIFCellInst inst : gold.getCellInsts()) {
             goldCellInsts.put(inst.getName(), inst);
@@ -184,7 +190,7 @@ public class CompareNetlists {
         }
     }
     
-    private static void checkCell(EDIFCell gold, EDIFCell test) {
+    private void checkCell(EDIFCell gold, EDIFCell test) {
         equivalentEDIFPropObject(gold, test);
         check(gold.getName(), test.getName(), "EDIFCell.getName() [lib=" + gold.getLibrary()+"]");
         check(gold.getView(), test.getView(), "EDIFCell.getView() [lib=" + gold.getLibrary()+", name="+ gold + "]");
@@ -196,48 +202,49 @@ public class CompareNetlists {
         checkInsts(gold, test);
     }
     
-    private static void check(String gold, String test, String desc) {
+    private void check(String gold, String test, String desc) {
         if (!Objects.equals(gold, test)) {
             System.err.println("[" + desc + "] ERROR: expected=" + gold + ", found=" + test);
         }
     }
 
-    private static void check(int gold, int test, String desc) {
+    private void check(int gold, int test, String desc) {
         if (gold != test) {
             System.err.println("[" + desc + "] ERROR: expected=" + gold + ", found=" + test);
         }
     }
 
-    private static void check(Integer gold, Integer test, String desc) {
+    private void check(Integer gold, Integer test, String desc) {
         if (!Objects.equals(gold, test)) {
             System.err.println("[" + desc + "] ERROR: expected=" + gold + ", found=" + test);
         }
     }
 
     
-    private static void check(EDIFValueType gold, EDIFValueType test, String desc) {
+    private void check(EDIFValueType gold, EDIFValueType test, String desc) {
         if (gold != test) {
             System.err.println("[" + desc + "] ERROR: expected=" + gold + ", found=" + test);
         }
     }
 
-    private static void check(EDIFDirection gold, EDIFDirection test, String desc) {
+    private void check(EDIFDirection gold, EDIFDirection test, String desc) {
         if (gold != test) {
             System.err.println("[" + desc + "] ERROR: expected=" + gold + ", found=" + test);
         }
     }
 
-    private static void check(boolean gold, boolean test, String desc) {
+    private void check(boolean gold, boolean test, String desc) {
         if (gold != test) {
             System.err.println("[" + desc + "] ERROR: expected=" + gold + ", found=" + test);
         }
     }
     
-    public static void compareNetlists(EDIFNetlist gold, EDIFNetlist test) {
-        check(gold.getName(), test.getName(), "EDIFNetlist.getName()");
-        check(gold.getDesign().getName(), test.getDesign().getName(), "EDIFNetlist.getDesign().getName()");
-        equivalentEDIFPropObject(gold.getDesign(), test.getDesign());
-        check(gold.getLibraries().size(), test.getLibraries().size(), "EDIFNetlist.getLibraries().size()");
+    public void compareNetlists(EDIFNetlist gold, EDIFNetlist test) {
+        diffMap = new LinkedHashMap<>();
+//        check(gold.getName(), test.getName(), "EDIFNetlist.getName()");
+//        check(gold.getDesign().getName(), test.getDesign().getName(), "EDIFNetlist.getDesign().getName()");
+//        equivalentEDIFPropObject(gold.getDesign(), test.getDesign());
+//        check(gold.getLibraries().size(), test.getLibraries().size(), "EDIFNetlist.getLibraries().size()");
 
         Map<String, EDIFLibrary> testLibs = new HashMap<>(test.getLibrariesMap());
         for (Entry<String, EDIFLibrary> e : gold.getLibrariesMap().entrySet()) {
@@ -289,7 +296,8 @@ public class CompareNetlists {
         EDIFNetlist test = EDIFTools.readEdifFile(args[1]);
         test.expandMacroUnisims(series);
         t.stop().start("Compare");
-        compareNetlists(gold, test);
+        EDIFNetlistComparator comparator = new EDIFNetlistComparator();
+        comparator.compareNetlists(gold, test);
         t.stop().printSummary();
     }
 }
