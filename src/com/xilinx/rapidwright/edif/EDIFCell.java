@@ -251,26 +251,44 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
                 //   my_port[0]
                 //   my_port[0][3:0]
                 // Find the single bit port and promote it to a single bit bus port
+                EDIFPort oneBitPort = null;
                 EDIFPort oneBitBus = null;
                 EDIFPort multiBitBus = null;
 
-                if (port.getWidth() == 1 && port.getName().endsWith("]")) {
-                    oneBitBus = port;
+                if (port.getWidth() == 1) {
+                    if (port.getName().endsWith("]")) {
+                        oneBitBus = port;
+                    } else {
+                        oneBitPort = port;
+                    }
                     multiBitBus = collision;
-                } else if (collision.getWidth() == 1 && collision.getName().endsWith("]")) {
-                    oneBitBus = collision;
+                } else if (collision.getWidth() == 1) {
+                    if (collision.getName().endsWith("]")) {
+                        oneBitBus = collision;
+                    } else {
+                        oneBitPort = collision;
+                    }
                     multiBitBus = port;
                 } else {
                     portNameCollision(port, collision);
                 }
-                // Let's treat is as a 1-bit bus
-                String newBusName = EDIFTools.getRootBusName(oneBitBus.getName());
-                if (ports.containsKey(newBusName)) {
-                    portNameCollision(port, collision);
+
+                if (oneBitBus != null) {
+                    // Let's treat is as a 1-bit bus
+                    String newBusName = EDIFTools.getRootBusName(oneBitBus.getName());
+                    if (ports.containsKey(newBusName)) {
+                        portNameCollision(port, collision);
+                    }
+                    oneBitBus.setBusName(newBusName);
+                    ports.put(newBusName, oneBitBus);
+                    ports.put(multiBitBus.getBusName(), multiBitBus);
+                } else {
+                    // Lets add the port range suffix to the busName
+                    assert (oneBitPort != null);
+                    ports.put(oneBitPort.getName(), oneBitPort);
+                    multiBitBus.setBusName(get);
                 }
-                oneBitBus.setBusName(newBusName);
-                ports.put(newBusName, oneBitBus);
-                ports.put(multiBitBus.getBusName(), multiBitBus);
+
 
             } else {
                 portNameCollision(port, collision);
