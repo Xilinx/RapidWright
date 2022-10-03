@@ -59,6 +59,7 @@ import com.xilinx.rapidwright.timing.TimingManager;
 import com.xilinx.rapidwright.timing.TimingVertex;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
+import org.python.google.common.collect.Lists;
 
 /**
  * RWRoute class provides the main methods for routing a design.
@@ -1384,13 +1385,16 @@ public class RWRoute{
                 // However, because the PriorityQueue class does not support reducing the cost
                 // of nodes already in the queue, this opportunity is discarded
 
-                // Do not skip this node if forward routing and tail can be inferred to be a preserved node.
-                // In this scenario, the "visited" state is a byproduct of this preserved node indicating the
+                // Do not skip this node if forward routing and:tail is not a preserved node that
+                // (a) we're not the same arc it's already visited from (this can indicate a
+                //     preserved node which only accepts that arc)
+                // (b) this is the same arc, but not a preserved node, meaning that we're reusing
+                //     the prior routing iteration's result
+                // In both scenarios, the "visited" state is a byproduct of this preserved node indicating the
                 // path back to the source.
-                if (!forward || tailRnode.getPrev() != headRnode) {
+                if (!forward || tailRnode.getPrev() != headRnode || !routingGraph.isPreserved(tailRnode.getNode())) {
                     continue;
                 }
-                assert(routingGraph.isPreserved(tailRnode.getNode()));
             }
             // For backward routing only, we must restrict our expansion only to preserved nodes
             // that are preserved for our net only
@@ -1403,8 +1407,7 @@ public class RWRoute{
                 // Despite the limitation above, on encountering an intersection only terminate
                 // immediately by clearing the queue if this target is not overused since
                 // there could be an alternate target that would be less congested
-                int occ = tailRnode.getOccupancy();
-                if (occ == 0 || (occ == 1 && tailRnode.countConnectionsOfUser(connection.getNetWrapper()) != 0)) {
+                if (!tailRnode.willOverUse(connection.getNetWrapper())) {
                     if (forward) {
                         queue.clear();
                     } else {
@@ -1630,10 +1633,47 @@ public class RWRoute{
         connectionsRoutedIteration++;
         assert(queue.isEmpty());
 
+        NetWrapper netWrapper = connectionToRoute.getNetWrapper();
+
         // Adds the source rnode to the queue
         RouteNode sourceRnode = connectionToRoute.getSourceRnode();
         push(true, sourceRnode, 0, 0);
         assert(sourceRnode.getPrev() == null);
+
+        // Push all nodes from all net's routed connections onto the queue
+        if (connectionToRoute.getSink().isRouted()) {
+            assert(!connectionToRoute.getRnodes().isEmpty());
+
+            RouteNode parentRnode = null;
+            boolean parentRnodeWillOveruse = false;
+
+            // Go forwards from source
+            for (RouteNode childRnode : Lists.reverse(connectionToRoute.getRnodes())) {
+                if (parentRnode != null) {
+                    boolean forward = true;
+                    assert(isAccessible(forward, parentRnode, connectionToRoute));
+
+                    // Place child onto queue
+                    assert(!childRnode.isVisited(forward) || routingGraph.isPreserved(childRnode.getNode()));
+                    boolean longParent = config.isTimingDriven() && DelayEstimatorBase.isLong(parentRnode.getNode());
+                    evaluateCostAndPush(forward, parentRnode, longParent, childRnode, connectionToRoute, shareWeight, rnodeCostWeight,
+                            rnodeLengthWeight, rnodeEstWlWeight, rnodeDelayWeight, rnodeEstDlyWeight);
+                    assert(childRnode.getPrev() == parentRnode);
+                }
+
+                parentRnode = childRnode;
+                parentRnodeWillOveruse = parentRnode.willOverUse(netWrapper);
+                // Skip all downstream nodes after the first would-be-overused node
+                if (parentRnodeWillOveruse)
+                    break;
+            }
+
+            // If non-timing driven, there must be at least one over-used node on the
+            // connection-to-be-routed (otherwise we wouldn't expect it to need
+            // re-routing)
+            assert(config.isTimingDriven() ||
+                   parentRnodeWillOveruse);
+        }
 
         // Add sink rnodes to the backward queue
         for (RouteNode sinkRnode : Arrays.asList(connectionToRoute.getSinkRnode(),
@@ -1648,6 +1688,32 @@ public class RWRoute{
                 sinkRnode.setNext(sinkRnode);
                 push(forward, sinkRnode, newPartialPathCost, newPartialPathCost);
             }
+        }
+
+        RouteNode childRnode = null;
+
+        // Now go backwards from sink
+        for (RouteNode parentRnode : connectionToRoute.getRnodes()) {
+            // Skip all upstream nodes if next one is to be the first one overused
+            // (or would-be-overused if we were to start using it)
+            if (parentRnode.willOverUse(netWrapper)) {
+                break;
+            }
+
+            assert(!parentRnode.isVisited(true));
+
+            // Mark nodes upstream of the sink as intersection
+            if (childRnode != null) {
+                boolean forward = false;
+                assert(childRnode.isVisited(forward));
+                assert(!parentRnode.isVisited(forward));
+                boolean longParent = config.isTimingDriven() && DelayEstimatorBase.isLong(parentRnode.getNode());
+                evaluateCostAndPush(forward, childRnode, longParent, parentRnode, connectionToRoute, shareWeight, rnodeCostWeight,
+                        rnodeLengthWeight, rnodeEstWlWeight, rnodeDelayWeight, rnodeEstDlyWeight);
+                assert(parentRnode.getNext() == childRnode);
+            }
+
+            childRnode = parentRnode;
         }
 
         // Clears previous route of the connection

@@ -198,6 +198,11 @@ abstract public class RouteNode {
         return RouteNode.capacity < getOccupancy();
     }
 
+    public boolean willOverUse(NetWrapper netWrapper) {
+        int occ = getOccupancy();
+        return occ > RouteNode.capacity || (occ == RouteNode.capacity && countConnectionsOfUser(netWrapper) == 0);
+    }
+
     /**
      * Checks if a RouteNode Object has been used.
      * @return true, if a RouteNode Object has been used.
