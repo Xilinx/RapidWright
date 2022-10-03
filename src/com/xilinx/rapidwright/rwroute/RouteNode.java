@@ -95,15 +95,13 @@ abstract public class RouteNode implements Comparable<RouteNode> {
         this.node = node;
         setType(type);
         children = null;
-        isTarget = false;
         setEndTileXYCoordinates();
         setBaseCost(type);
         presentCongestionCost = 1;
         historicalCongestionCost = 1;
-        setVisited(false);
         usersConnectionCounts = null;
         driversCounts = null;
-        setPrev(null);
+        reset();
     }
 
     @Override
@@ -205,6 +203,11 @@ abstract public class RouteNode implements Comparable<RouteNode> {
      */
     public boolean isOverUsed() {
         return RouteNode.capacity < getOccupancy();
+    }
+
+    public boolean willOverUse(NetWrapper netWrapper) {
+        int occ = getOccupancy();
+        return occ > RouteNode.capacity || (occ == RouteNode.capacity && countConnectionsOfUser(netWrapper) == 0);
     }
 
     /**
@@ -683,12 +686,11 @@ abstract public class RouteNode implements Comparable<RouteNode> {
     }
 
     /**
-     * Sets visited to indicate if a RouteNode instance has been visited before when routing a connection.
-     * @param visited boolean value to set.
+     * Reset the visited, prev, and target state of this node.
      */
-    public void setVisited(boolean visited) {
-        assert(!visited);
+    public void reset() {
         setPrev(null);
+        setTarget(false);
     }
 
     /**

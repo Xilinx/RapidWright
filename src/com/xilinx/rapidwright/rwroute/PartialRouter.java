@@ -131,7 +131,8 @@ public class PartialRouter extends RWRoute{
                 // Now that we're allowing this node to be created, and only be
                 // reachable from prev, remove its 'visited' status so it can be
                 // added to the routing queue
-                endRnode.setVisited(false);
+                endRnode.setPrev(null);
+                assert(!endRnode.isVisited());
                 return true;
             }
         }
@@ -233,7 +234,7 @@ public class PartialRouter extends RWRoute{
             // Use the prev pointers to update the routing for each connection
             for (Connection connection : netWrapper.getConnections()) {
                 if (connection.getSink().isRouted()) {
-                    finishRouteConnection(connection, connection.getSinkRnode());
+                    finishRouteConnection(connection);
                 }
             }
         }
@@ -448,7 +449,7 @@ public class PartialRouter extends RWRoute{
             // Use the prev pointers to update the routing for each connection
             for (Connection netnewConnection : netWrapper.getConnections()) {
                 if (netnewConnection.getSink().isRouted()) {
-                    finishRouteConnection(netnewConnection, netnewConnection.getSinkRnode());
+                    finishRouteConnection(netnewConnection);
                 }
             }
 
