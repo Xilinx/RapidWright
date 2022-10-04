@@ -39,13 +39,13 @@ import com.xilinx.rapidwright.util.RuntimeTracker;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Encapsulation of RWRoute's routing resource graph.
@@ -55,12 +55,14 @@ public class RouteNodeGraph {
     /**
      * A map of nodes to created rnodes
      */
-    final protected Map<Node, RouteNode> nodesMap;
+    final protected Map<Tile, RouteNode[]> nodesMap;
+    private int nodesMapSize;
 
     /**
      * A map of preserved nodes to their nets
      */
-    final private Map<Node, Net> preservedMap;
+    private final Map<Tile, Net[]> preservedMap;
+    private final AtomicInteger preservedMapSize;
 
     /**
      * A synchronization object tracking the number of outstanding calls to
@@ -126,7 +128,9 @@ public class RouteNodeGraph {
 
     public RouteNodeGraph(RuntimeTracker setChildrenTimer, Design design) {
         nodesMap = new HashMap<>();
+        nodesMapSize = 0;
         preservedMap = new ConcurrentHashMap<>();
+        preservedMapSize = new AtomicInteger();
         asyncPreserveOutstanding = new CountUpDownLatch();
         visited = new ArrayList<>();
         this.setChildrenTimer = setChildrenTimer;
@@ -197,8 +201,21 @@ public class RouteNodeGraph {
         visited.clear();
     }
 
-    public Net preserve(Node node, Net net) {
-        return preservedMap.putIfAbsent(node, net);
+    protected Net preserve(Node node, Net net) {
+        Net oldNet = preserve(node.getTile(), node.getWire(), net);
+        if (oldNet == null) {
+            preservedMapSize.incrementAndGet();
+        }
+        return oldNet;
+    }
+
+    private Net preserve(Tile tile, int wireIndex, Net net) {
+        // Assumes that tile/wireIndex describes the base wire on the node
+        // No need to synchronize access to 'nets' since collisions are not expected
+        Net[] nets = preservedMap.computeIfAbsent(tile, (t) -> new Net[t.getWireCount()]);
+        Net oldNet = nets[wireIndex];
+        nets[wireIndex] = net;
+        return oldNet;
     }
 
     public void asyncPreserve(Collection<Node> nodes, Net net) {
@@ -249,11 +266,27 @@ public class RouteNodeGraph {
     }
 
     public boolean unpreserve(Node node) {
-        return preservedMap.remove(node) != null;
+        boolean unpreserved = unpreserve(node.getTile(), node.getWire());
+        if (unpreserved) {
+            preservedMapSize.decrementAndGet();
+        }
+        return unpreserved;
+    }
+
+    private boolean unpreserve(Tile tile, int wireIndex) {
+        // Assumes that tile/wireIndex describes the base wire on its node
+        Net[] nets = preservedMap.get(tile);
+        if (nets == null || nets[wireIndex] == null)
+            return false;
+        nets[wireIndex] = null;
+        return true;
     }
 
     public boolean isPreserved(Node node) {
-        return preservedMap.containsKey(node);
+        Tile tile = node.getTile();
+        int wireIndex = node.getWire();
+        Net[] nets = preservedMap.get(tile);
+        return nets != null && nets[wireIndex] != null;
     }
 
     final private static Set<TileTypeEnum> allowedTileEnums;
@@ -277,28 +310,81 @@ public class RouteNodeGraph {
         return !allowedTileEnums.contains(tileType);
     }
 
-    public Set<Node> getPreservedNodes() {
-        return Collections.unmodifiableSet(preservedMap.keySet());
+    public List<Node> getPreservedNodes() {
+        awaitPreserve();
+        // TODO: Return a custom Interable to save on creating a new List
+        int size = preservedMapSize.get();
+        List<Node> nodes = new ArrayList<>(size);
+        for (Map.Entry<Tile,Net[]> e : preservedMap.entrySet()) {
+            Tile tile = e.getKey();
+            Net[] nets = e.getValue();
+            for (int wireIndex = 0; wireIndex < nets.length; wireIndex++) {
+                if (nets[wireIndex] != null) {
+                    nodes.add(Node.getNode(tile, wireIndex));
+                }
+            }
+        }
+        assert(nodes.size() == size);
+        return nodes;
     }
 
     public Net getPreservedNet(Node node) {
-        return preservedMap.get(node);
+        return getPreservedNet(node.getTile(), node.getWire());
+    }
+
+    private Net getPreservedNet(Tile tile, int wireIndex) {
+        // Assumes that tile/wireIndex describes the base wire on its node
+        Net[] nets = preservedMap.get(tile);
+        return nets != null ? nets[wireIndex] : null;
     }
 
     public RouteNode getNode(Node node) {
-        return nodesMap.get(node);
+        Tile tile = node.getTile();
+        int wireIndex = node.getWire();
+        return getNode(tile, wireIndex);
     }
 
-    public Set<Node> getNodes() {
-        return Collections.unmodifiableSet(nodesMap.keySet());
+    private RouteNode getNode(Tile tile, int wireIndex) {
+        // Assumes that tile/wireIndex describes the base wire on its node
+        RouteNode[] rnodes = nodesMap.get(tile);
+        return rnodes != null ? rnodes[wireIndex] : null;
     }
 
-    public Set<Map.Entry<Node, RouteNode>> getNodeEntries() {
-        return Collections.unmodifiableSet(nodesMap.entrySet());
+    public List<Node> getNodes() {
+        // TODO: Return a custom Interable to save on creating a new List
+        List<Node> nodes = new ArrayList<>(nodesMapSize);
+        for (Map.Entry<Tile,RouteNode[]> e : nodesMap.entrySet()) {
+            Tile tile = e.getKey();
+            RouteNode[] rnodes = e.getValue();
+            for (int wireIndex = 0; wireIndex < rnodes.length; wireIndex++) {
+                RouteNode rnode = rnodes[wireIndex];
+                if (rnode != null) {
+                    nodes.add(Node.getNode(tile, wireIndex));
+                }
+            }
+        }
+        assert(nodes.size() == nodesMapSize);
+        return nodes;
+    }
+
+    public List<RouteNode> getRnodes() {
+        // TODO: Return a custom Interable to save on creating a new List
+        List<RouteNode> rnodes = new ArrayList<>(nodesMapSize);
+        for (Map.Entry<?,RouteNode[]> e : nodesMap.entrySet()) {
+            RouteNode[] array = e.getValue();
+            for (int wireIndex = 0; wireIndex < array.length; wireIndex++) {
+                RouteNode rnode = array[wireIndex];
+                if (rnode != null) {
+                    rnodes.add(rnode);
+                }
+            }
+        }
+        assert(rnodes.size() == nodesMapSize);
+        return rnodes;
     }
 
     public int numNodes() {
-        return nodesMap.size();
+        return nodesMapSize;
     }
 
     protected RouteNode create(Node node, RouteNodeType type) {
@@ -306,7 +392,16 @@ public class RouteNodeGraph {
     }
 
     public RouteNode getOrCreate(Node node, RouteNodeType type) {
-        return nodesMap.computeIfAbsent(node, ($) -> create(node, type));
+        Tile tile = node.getTile();
+        int wireIndex = node.getWire();
+        RouteNode[] rnodes = nodesMap.computeIfAbsent(tile, (t) -> new RouteNode[t.getWireCount()]);
+        RouteNode rnode = rnodes[wireIndex];
+        if (rnode == null) {
+            nodesMapSize++;
+            rnode = create(node, type);
+            rnodes[wireIndex] = rnode;
+        }
+        return rnode;
     }
 
     public void visit(RouteNode rnode) {
@@ -330,8 +425,7 @@ public class RouteNodeGraph {
 
     public int averageChildren() {
         int sum = 0;
-        for (Map.Entry<Node, RouteNode> e : getNodeEntries()) {
-            RouteNodeImpl rnode = (RouteNodeImpl) e.getValue();
+        for (RouteNode rnode : getRnodes()) {
             sum += rnode.everExpanded() ? rnode.getChildren().length : 0;
         }
         return Math.round((float) sum / numNodes());
