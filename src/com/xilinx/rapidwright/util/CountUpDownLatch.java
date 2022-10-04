@@ -49,6 +49,7 @@ public class CountUpDownLatch {
 
     public void await() {
         sem.acquireUninterruptibly(count);
+        count = 0;
     }
 
 }
