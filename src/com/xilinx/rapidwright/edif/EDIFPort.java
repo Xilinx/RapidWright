@@ -147,7 +147,7 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
 
     public String getBusName() {
         if (busName == null) {
-            int idx = EDIFTools.lengthOfNameWithoutBus(getName().toCharArray());
+            int idx = EDIFTools.lengthOfNameWithoutBus(getName().toCharArray(), true);
             busName = getName().substring(0, idx);
         }
         return busName;
@@ -228,7 +228,7 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
     public String getPortInstNameFromPort(int index) {
         if (!isBus()) return getBusName();
         index = getPortIndexFromNameIndex(index);
-        return getBusName() + "[" + index + "]";
+        return getBusName() + index + "]";
     }
 
     /**

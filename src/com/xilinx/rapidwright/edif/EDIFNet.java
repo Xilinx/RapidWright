@@ -149,40 +149,14 @@ public class EDIFNet extends EDIFPropertyObject {
      *         the cell or cell instance.
      */
     private EDIFPortInst createPortInstFromPortInstName(String portInstName, EDIFCell cell, EDIFCellInst inst) {
-        EDIFPort port = cell.getPort(portInstName);
-        if (port != null && port.isBus()) {
-            EDIFPort altPort = cell.getPort(EDIFTools.getRootBusName(portInstName));
-            if (altPort != null) {
-                port = altPort;
-                int lengthRootName = portInstName.lastIndexOf('[');
-                if (lengthRootName == -1)
-                    return null;
-                int idx = Integer.parseInt(portInstName.substring(lengthRootName + 1, portInstName.lastIndexOf(']')));
-                int portIdx = idx;
-                if (port.isBus()) {
-                    portIdx = port.getPortIndexFromNameIndex(idx);
-                }
-                return new EDIFPortInst(port, this, portIdx, inst);
-            }
+        EDIFPort port = cell.getPortByPortInstName(portInstName);
+        if (port == null) return null;
+        int portIdx = -1;
+        if (port.isBus()) {
+            int idx = EDIFTools.getPortIndexFromName(portInstName);
+            portIdx = port.getPortIndexFromNameIndex(idx);
         }
-        if (port == null) {
-            // check if it is a bussed port
-            int lengthRootName = portInstName.lastIndexOf('[');
-            if (lengthRootName == -1)
-                return null;
-            int idx = Integer.parseInt(portInstName.substring(lengthRootName + 1, portInstName.lastIndexOf(']')));
-            String portRootName = portInstName.substring(0, lengthRootName);
-            port = cell.getPort(portRootName);
-            if (port == null) {
-                return null;
-            }
-            int portIdx = idx;
-            if (port.isBus()) {
-                portIdx = port.getPortIndexFromNameIndex(idx);
-            }
-            return new EDIFPortInst(port, this, portIdx, inst);
-        }
-        return new EDIFPortInst(port, this, inst);
+        return new EDIFPortInst(port, this, portIdx, inst);
     }
 
     public EDIFPortInst createPortInst(String portName, int index, EDIFCellInst cellInst) {

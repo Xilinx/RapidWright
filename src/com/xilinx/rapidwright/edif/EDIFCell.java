@@ -226,16 +226,11 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
 
     /**
      * Adds a port to the cell. Checks for naming collisions and throws
-     * RuntimeException if it occurs. Note that ports are usually keyed by bus name
-     * (see {@link EDIFPort#getBusName()}) to enable getPort() to only require the
-     * bus name for getting a port. However, in situations where the bus name
-     * collides with a single bit bus name, the colliding single bit port is
-     * promoted to a single bit bus port. This is only in the case where a single
-     * bit bus collides by having the same name. For example single bit port
-     * 'my_port[0]' and multi-bit port 'my_port[0][3:0]' would both be accommodated
-     * by promoting 'my_port[0]' to a single bit bus called 'my_port'. The port map
-     * would have the entries: {my_port->my_port[0], my_port[0]->my_port[0][3:0]}.
-     * Ultimately this naming scheme is discouraged.
+     * RuntimeException if it occurs. Single bit ports that are not bussed, are
+     * keyed by their full name. Bussed ports, however, have their range truncated
+     * to just the opening square bracket so that the port can be retrieved from a
+     * valid EDIFPortInst name (range being unknown). For example, bus[3:0] would be
+     * keyed by "bus[".
      *
      * @param port The port to add.
      * @return The port that was added.
@@ -245,78 +240,41 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
         port.setParentCell(this);
         EDIFPort collision = ports.put(port.getBusName(), port);
         if (collision != null && port != collision) {
-            if (collision.getWidth() != port.getWidth()) {
-                // We have a situation where two ports have the same root name,
-                // For example:
-                //   my_port[0]
-                //   my_port[0][3:0]
-                // Find the single bit port and promote it to a single bit bus port
-                EDIFPort oneBitPort = null;
-                EDIFPort oneBitBus = null;
-                EDIFPort multiBitBus = null;
-
-                if (port.getWidth() == 1) {
-                    if (port.getName().endsWith("]")) {
-                        oneBitBus = port;
-                    } else {
-                        oneBitPort = port;
-                    }
-                    multiBitBus = collision;
-                } else if (collision.getWidth() == 1) {
-                    if (collision.getName().endsWith("]")) {
-                        oneBitBus = collision;
-                    } else {
-                        oneBitPort = collision;
-                    }
-                    multiBitBus = port;
-                } else {
-                    portNameCollision(port, collision);
-                }
-
-                if (oneBitBus != null) {
-                    // Let's treat is as a 1-bit bus
-                    String newBusName = EDIFTools.getRootBusName(oneBitBus.getName());
-                    if (ports.containsKey(newBusName)) {
-                        portNameCollision(port, collision);
-                    }
-                    oneBitBus.setBusName(newBusName);
-                    ports.put(newBusName, oneBitBus);
-                    ports.put(multiBitBus.getBusName(), multiBitBus);
-                } else {
-                    // Lets add the port range suffix to the busName
-                    assert (oneBitPort != null);
-                    ports.put(oneBitPort.getName(), oneBitPort);
-                    multiBitBus.setBusName(get);
-                }
-
-
-            } else {
-                portNameCollision(port, collision);
-            }
-
+            throw new RuntimeException("ERROR: Port name collision on EDIFCell " + getName()
+                    + ", trying to add port " + port
+                    + ", but the cell already contains ports with the " + "same name: " + collision);
         }
         return port;
     }
 
-    private void portNameCollision(EDIFPort port, EDIFPort collision) {
-        throw new RuntimeException("ERROR: Port name collision on EDIFCell " + getName()
-                + ", trying to add port " + port + ", but the cell already contains ports with the "
-                + "same name: " + collision);
+    /**
+     * Gets a port by bus name (see {@link EDIFPort#getBusName()}). Multi-bit ports
+     * need to have close square bracket and range removed (for example: "bus[3:0]"
+     * -> "bus[". See {@link EDIFCell#addPort(EDIFPort)} for more information.
+     *
+     * @param busName Bus name (ends with '[' to represent a bussed port) of the
+     *                port to get. Single bit ports use their entire name.
+     * @return The port or null if none exists.
+     */
+    public EDIFPort getPort(String busName) {
+        if (ports == null) return null;
+        return ports.get(busName);
     }
 
     /**
-     * Gets a port by bus name (see {@link EDIFPort#getBusName()}).  Multi-bit ports need to
-     * have brackets removed unless the {@link EDIFCell} already has a port
-     * with the same name as the bus name of the multi-bit port.  In only this case,
-     * the range would be required in order to distinguish the ambiguity.
-     * See {@link EDIFCell#addPort(EDIFPort)} for more information.
-     *
-     * @param name Bus name of the port to get.
-     * @return The port or null if none exists.
+     * Given a port instance name (not including the name of the cell instance),
+     * gets the associated port.
+     * 
+     * @param portInstName
+     * @return
      */
-    public EDIFPort getPort(String name) {
+    public EDIFPort getPortByPortInstName(String portInstName) {
         if (ports == null) return null;
-        return ports.get(name);
+        EDIFPort port = ports.get(portInstName);
+        if (port == null && portInstName.charAt(portInstName.length() - 1) == ']') {
+            port = ports.get(portInstName.substring(0, portInstName.lastIndexOf('[') + 1));
+        }
+        return port;
     }
 
     public EDIFCellInst createCellInst(String name, EDIFCell parent) {
