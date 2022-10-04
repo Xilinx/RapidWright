@@ -22,6 +22,10 @@
 
 package com.xilinx.rapidwright.edif.compare;
 
+/**
+ * An enumeration of all the checked difference types between two netlists in
+ * {@link EDIFNetlistComparator}
+ */
 public enum EDIFDiffType {
     PROPERTY_OWNER,
     PROPERTY_VALUE,
@@ -36,6 +40,7 @@ public enum EDIFDiffType {
     PORT_EXTRA,
     PORT_LEFT_RANGE_LIMIT,
     PORT_RIGHT_RANGE_LIMIT,
+    PORT_ENDIANNESS,
     NET_NAME,
     NET_MISSING,
     NET_EXTRA,
@@ -44,6 +49,7 @@ public enum EDIFDiffType {
     NET_PORT_INST_PORT,
     NET_PORT_INST_FULLNAME,
     NET_PORT_INST_INDEX,
+    NET_PORT_INST_INSTNAME,
     NET_PORT_INST_MISSING,
     NET_PORT_INST_EXTRA,
     INST_NAME,

@@ -25,6 +25,11 @@ package com.xilinx.rapidwright.edif.compare;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFLibrary;
 
+/**
+ * This is a helper class for {@link EDIFNetlistComparator} that encapsulates
+ * the reference information for a difference found between two netlists.
+ *
+ */
 public class EDIFDiff {
 
     private EDIFDiffType type;
@@ -33,41 +38,56 @@ public class EDIFDiff {
 
     private Object test;
 
-    private String className;
-
     private EDIFCell parentCell;
 
     private EDIFLibrary parentLibrary;
 
-    public EDIFDiff(EDIFDiffType type, Object gold, Object test, String className,
-            EDIFCell parentCell, EDIFLibrary parentLibrary) {
+    private String notEqualString;
+
+    public EDIFDiff(EDIFDiffType type, Object gold, Object test, EDIFCell parentCell,
+            EDIFLibrary parentLibrary, String notEqualString) {
         this.type = type;
         this.gold = gold;
         this.test = test;
-        this.className = className;
         this.parentCell = parentCell;
         this.parentLibrary = parentLibrary;
+        this.notEqualString = notEqualString;
     }
 
     public String getContext() {
+        if (parentLibrary == null) return "";
         if (parentCell == null) return " in Library " + parentLibrary;
         return " in Cell " + parentCell.getName() + " from Library " + parentLibrary;
     }
 
+    public String getClassName() {
+        if (gold != null)
+            return gold.getClass().getSimpleName();
+        if (test != null)
+            return test.getClass().getSimpleName();
+        return null;
+    }
+    
+    
     public String toString() {
         StringBuilder sb = new StringBuilder();
         if (type.isMissingType()) {
             sb.append("Missing ");
-            sb.append(className);
+            sb.append(getClassName());
             sb.append(" ");
             sb.append(gold);
+            if (notEqualString.length() > 0) {
+                sb.append("(");
+                sb.append(notEqualString);
+                sb.append(")");
+            }
         } else if (type.isExtraType()) {
             sb.append("Extra ");
-            sb.append(className);
+            sb.append(getClassName());
             sb.append(" ");
             sb.append(test);
         } else if (type.isNonNullMismatch()) {
-            sb.append("Mismatch found, expected ");
+            sb.append("Mismatch found (" + notEqualString + "), expected ");
             sb.append(gold);
             sb.append(", but found ");
             sb.append(test);

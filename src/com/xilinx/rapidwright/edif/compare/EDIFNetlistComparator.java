@@ -25,6 +25,11 @@
  */
 package com.xilinx.rapidwright.edif.compare;
 
+import java.io.IOException;
+import java.io.PrintStream;
+import java.io.UncheckedIOException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -36,7 +41,6 @@ import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
-import com.xilinx.rapidwright.edif.EDIFDirection;
 import com.xilinx.rapidwright.edif.EDIFLibrary;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
@@ -45,39 +49,70 @@ import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFPropertyObject;
 import com.xilinx.rapidwright.edif.EDIFPropertyValue;
 import com.xilinx.rapidwright.edif.EDIFTools;
-import com.xilinx.rapidwright.edif.EDIFValueType;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 
 /**
- * Created on: Sep 26, 2022
+ * This is a helper class designed to compare two EDIFNetlists for differences.
+ * It can filter out differences introduced by Vivado by reading in the EDIF and
+ * writing out as a DCP. It can also generate a report file describing all the
+ * differences found.
  */
 public class EDIFNetlistComparator {
 
-    private boolean restoreBrackets = false;
+    private boolean restoreBrackets = true;
+
+    private boolean filterVivadoChanges = true;
     
     private Map<EDIFDiffType, List<EDIFDiff>> diffMap;
 
-    private boolean equivalentEDIFPropObject(EDIFPropertyObject gold, EDIFPropertyObject test) {
-        if (gold.getPropertiesMap().size() == 1 && test.getPropertiesMap().size() == 0) {
-            if (gold.getPropertiesMap().keySet().iterator().next().equals("RTL_KEEP")) {
-                // Filtering out RTL_KEEP properties as they only exist in EDIF and not XN
-                return true;
-            }
+    private int diffCount;
+
+    public EDIFNetlistComparator() {
+        diffMap = new HashMap<>();
+        diffCount = 0;
+    }
+
+    private static EDIFCell getParentCell(EDIFPropertyObject o) {
+        if (o instanceof EDIFNet) {
+            return ((EDIFNet) o).getParentCell();
+        } else if (o instanceof EDIFCellInst) {
+            return ((EDIFCellInst) o).getParentCell();
+        } else if (o instanceof EDIFPort) {
+            return ((EDIFPort) o).getParentCell();
         }
-        check(gold.getPropertiesMap().size(), test.getPropertiesMap().size(), "EDIFPropertyObject.getProperties().size() [name=" + gold + "]");
+        return null;
+    }
+
+    private void equivalentEDIFPropObject(EDIFPropertyObject gold, EDIFPropertyObject test) {
         Map<String, EDIFPropertyValue> testMap = new HashMap<>(test.getPropertiesMap());
+        EDIFCell parent = getParentCell(gold);
+        EDIFLibrary parentLib = parent == null ? ((EDIFCell) gold).getLibrary() : parent.getLibrary();
+
         for (Entry<String, EDIFPropertyValue> e : gold.getPropertiesMap().entrySet()) {
             EDIFPropertyValue testValue = testMap.remove(e.getKey());
+            EDIFPropertyValue goldValue = e.getValue();
             if (testValue == null) {
-                System.err.println("ERROR: Missing property " + e + " on " + gold.getName());
+                if (!filterVivadoChanges) {
+                    addDiff(EDIFDiffType.PROPERTY_MISSING, goldValue, testValue, parent, parentLib,
+                            "key=" + e.getKey());
+                }
                 continue;
             }
-            EDIFPropertyValue goldValue = e.getValue();
-            check(goldValue.getOwner(), testValue.getOwner(), "EDIFPropertyValue.getOwner() [key=" +e.getKey()+ ", obj name=" + gold +"]");
-            check(goldValue.getValue(), testValue.getValue(), "EDIFPropertyValue.getValue() [key=" +e.getKey()+ ", obj name=" + gold +"]");
-            check(goldValue.getType(), testValue.getType(), "EDIFPropertyValue.getType() [key=" +e.getKey()+ ", obj name=" + gold +"]");
+
+            checkDiff(goldValue.getOwner(), testValue.getOwner(), EDIFDiffType.PROPERTY_OWNER,
+                    goldValue, testValue, parent, parentLib);
+            checkDiff(goldValue.getValue(), testValue.getValue(), EDIFDiffType.PROPERTY_VALUE,
+                    goldValue, testValue, parent, parentLib);
+            checkDiff(goldValue.getType(), testValue.getType(), EDIFDiffType.PROPERTY_TYPE, goldValue,
+                    testValue, parent, parentLib);
         }
-        return true;
+
+        if (!filterVivadoChanges) {
+            for (Entry<String, EDIFPropertyValue> e : testMap.entrySet()) {
+                addDiff(EDIFDiffType.PROPERTY_EXTRA, null, e.getValue(), parent, parentLib,
+                        "key=" + e.getKey());
+            }
+        }
     }
     
     private void checkPorts(EDIFCell gold, EDIFCell test) {
@@ -85,22 +120,30 @@ public class EDIFNetlistComparator {
         for (Entry<String, EDIFPort> e : gold.getPortMap().entrySet()) {
             EDIFPort testPort = testPorts.remove(e.getKey());
             if (testPort == null) {
-                System.err.println("ERROR: Missing test port " + e.getKey() + " on cell " + gold 
-                        + " from library " + gold.getLibrary());
+                addDiff(EDIFDiffType.PORT_MISSING, e.getValue(), null, gold, gold.getLibrary(), "");
                 continue;
             }
             EDIFPort goldPort = e.getValue();
             equivalentEDIFPropObject(goldPort, testPort);
-            check(goldPort.getName(), testPort.getName(), "EDIFPort.getName()  [lib=" + gold.getLibrary()+", name="+ gold + "]");
-            check(goldPort.getBusName(), testPort.getBusName(), "EDIFPort.getBusName() [lib=" + gold.getLibrary()+", name="+ gold + "]");
-            check(goldPort.getWidth(), testPort.getWidth(), "EDIFPort.getWidth() [lib=" + gold.getLibrary()+", name="+ gold + "]");
-            check(goldPort.getDirection(), testPort.getDirection(), "EDIFPort.getDirection() [lib=" + gold.getLibrary()+", name="+ gold + "]");
-            check(goldPort.getLeft(), testPort.getLeft(), "EDIFPort.getLeft() [lib=" + gold.getLibrary()+", name="+ gold + "]"); 
-            check(goldPort.getRight(), testPort.getRight(), "EDIFPort.getRight() [lib=" + gold.getLibrary()+", name="+ gold + "]");
-            check(goldPort.isLittleEndian(), testPort.isLittleEndian(), "EDIFPort.isLittleEndian() [lib=" + gold.getLibrary()+", name="+ gold + "]");
+            checkDiff(goldPort.getName(), testPort.getName(), EDIFDiffType.PORT_NAME, goldPort,
+                    testPort, gold, gold.getLibrary());
+            checkDiff(goldPort.getBusName(), testPort.getBusName(), EDIFDiffType.PORT_BUSNAME,
+                    goldPort, testPort, gold, gold.getLibrary());
+            checkDiff(goldPort.getWidth(), testPort.getWidth(), EDIFDiffType.PORT_WIDTH, goldPort,
+                    testPort, gold, gold.getLibrary());
+            checkDiff(goldPort.getDirection(), testPort.getDirection(), EDIFDiffType.PORT_DIRECTION,
+                    goldPort, testPort, gold, gold.getLibrary());
+            checkDiff(goldPort.getLeft(), testPort.getLeft(), EDIFDiffType.PORT_LEFT_RANGE_LIMIT,
+                    goldPort, testPort, gold,
+                        gold.getLibrary());
+            checkDiff(goldPort.getRight(), testPort.getRight(), EDIFDiffType.PORT_RIGHT_RANGE_LIMIT,
+                    goldPort, testPort, gold,
+                        gold.getLibrary());
+            checkDiff(goldPort.isLittleEndian(), testPort.isLittleEndian(),
+                    EDIFDiffType.PORT_ENDIANNESS, goldPort, testPort, gold, gold.getLibrary());
         }
         for (Entry<String, EDIFPort> e : testPorts.entrySet()) {
-            System.err.println("ERROR: Extra port " + e.getKey() + " present on cell " + gold + " in library " + gold.getLibrary());
+            addDiff(EDIFDiffType.PORT_EXTRA, null, e.getValue(), test, test.getLibrary(), "");
         }
     }
     
@@ -116,14 +159,14 @@ public class EDIFNetlistComparator {
         for (Entry<String, EDIFNet> e : goldNets.entrySet()) {
             EDIFNet testNet = testNets.remove(e.getKey());
             if (testNet == null) {
-                System.err.println("ERROR: Missing test net " + e.getKey() + " on cell " + gold 
-                        + " from library " + gold.getLibrary());
+                addDiff(EDIFDiffType.NET_MISSING, e.getValue(), testNet, gold, gold.getLibrary(), "");
                 continue;
             }
             EDIFNet goldNet = e.getValue();
             equivalentEDIFPropObject(goldNet, testNet);
-            check(goldNet.getName(), testNet.getName(), "EDIFNet.getName()  [lib=" + gold.getLibrary()+", name="+ gold + "]");
             Map<String, EDIFPortInst> goldPortInsts = new HashMap<>();
+            checkDiff(goldNet.getName(), testNet.getName(), EDIFDiffType.NET_NAME, goldNet, testNet,
+                    gold, gold.getLibrary());
             for (EDIFPortInst p : goldNet.getPortInsts()) {
                 goldPortInsts.put(p.getName(), p);
             }
@@ -134,31 +177,39 @@ public class EDIFNetlistComparator {
             for (Entry<String, EDIFPortInst> e2 : goldPortInsts.entrySet()) {
                 EDIFPortInst testPortInst = testPortInsts.remove(e2.getKey());
                 if (testPortInst == null) {
-                    System.err.println("ERROR: Missing port inst "+e2.getKey()+" on net " + goldNet 
-                            + " in cell " + gold + " from library " + gold.getLibrary());
+                    addDiff(EDIFDiffType.NET_PORT_INST_MISSING, e2.getValue(), testPortInst, gold,
+                            gold.getLibrary(), "");
                     continue;
                 }
                 EDIFPortInst goldPortInst = e2.getValue();
-                check(goldPortInst.getName(), testPortInst.getName(), "EDIFPortInst.getName() [lib="
-                                            +gold.getLibrary()+", cell="+gold+", net="+goldNet+"]");
-                check(goldPortInst.getDirection(), testPortInst.getDirection(), "EDIFPortInst.getDirection() [lib="
-                        +gold.getLibrary()+", cell="+gold+", net="+goldNet+"]");
-                check(goldPortInst.getFullName(), testPortInst.getFullName(), "EDIFPortInst.getFullName() [lib="
-                        +gold.getLibrary()+", cell="+gold+", net="+goldNet+"]");
-                check(goldPortInst.getIndex(), testPortInst.getIndex(), "EDIFPortInst.getIndex() [lib="
-                        +gold.getLibrary()+", cell="+gold+", net="+goldNet+"]");
-                check(goldPortInst.getPort().getName(), testPortInst.getPort().getName(), "EDIFPortInst.getPort() [lib="
-                        +gold.getLibrary()+", cell="+gold+", net="+goldNet+"]");
+                checkDiff(goldPortInst.getName(), testPortInst.getName(),
+                        EDIFDiffType.NET_PORT_INST_NAME, goldPortInst, testPortInst, gold,
+                        gold.getLibrary());
+                checkDiff(goldPortInst.getDirection(), testPortInst.getDirection(),
+                        EDIFDiffType.NET_PORT_INST_DIRECTION, goldPortInst, testPortInst, gold,
+                        gold.getLibrary());
+                checkDiff(goldPortInst.getFullName(), testPortInst.getFullName(),
+                        EDIFDiffType.NET_PORT_INST_FULLNAME, goldPortInst, testPortInst, gold,
+                        gold.getLibrary());
+                checkDiff(goldPortInst.getIndex(), testPortInst.getIndex(),
+                        EDIFDiffType.NET_PORT_INST_INDEX, goldPortInst, testPortInst, gold,
+                        gold.getLibrary());
+                checkDiff(goldPortInst.getPort().getName(), testPortInst.getPort().getName(),
+                        EDIFDiffType.NET_PORT_INST_PORT, goldPortInst, testPortInst, gold,
+                        gold.getLibrary());
                 String goldInstName = goldPortInst.getCellInst() == null ? null : goldPortInst.getCellInst().getName();
                 String testInstName = testPortInst.getCellInst() == null ? null : testPortInst.getCellInst().getName();
-                check(goldInstName, testInstName,
-                            "EDIFPortInst.getCellInst() [lib=" + gold.getLibrary() + ", cell=" + gold + ", net="
-                                    + goldNet + "]");
+                checkDiff(goldInstName, testInstName, EDIFDiffType.NET_PORT_INST_INSTNAME,
+                        goldPortInst, testPortInst, gold, gold.getLibrary());
             }
             
+            for (Entry<String, EDIFPortInst> e2 : testPortInsts.entrySet()) {
+                addDiff(EDIFDiffType.NET_PORT_INST_EXTRA, null, e2.getValue(), test,
+                        test.getLibrary(), "");
+            }
         }
         for (Entry<String,EDIFNet> e : testNets.entrySet()) {
-            System.err.println("ERROR: Extra net " + e.getKey() + " present in cell " + gold + " in library " + gold.getLibrary());
+            addDiff(EDIFDiffType.NET_EXTRA, null, e.getValue(), test, test.getLibrary(), "");
         }
     }
     
@@ -174,26 +225,28 @@ public class EDIFNetlistComparator {
         for (Entry<String, EDIFCellInst> e : goldCellInsts.entrySet()) {
             EDIFCellInst testInst = testCellInsts.remove(e.getKey());
             if (testInst == null) {
-                System.err.println("ERROR: missing inst " + e.getKey() + " in cell " + gold + " from library "
-                        + gold.getLibrary());
+                addDiff(EDIFDiffType.INST_MISSING, e.getValue(), testInst, gold, gold.getLibrary(),
+                        "");
                 continue;
             }
             EDIFCellInst goldInst = e.getValue();
-            check(goldInst.getName(), testInst.getName(),
-                    "EDIFCellInst.getName() [cell=" + gold + ", lib=" + gold.getLibrary() + "]");
-            check(goldInst.getViewref().getName(), testInst.getViewref().getName(),
-                    "EDIFCellInst.getViewref().getName() [cell=" + gold + ", lib=" + gold.getLibrary() + "]");
+            equivalentEDIFPropObject(goldInst, testInst);
+            checkDiff(goldInst.getName(), testInst.getName(), EDIFDiffType.INST_NAME, goldInst,
+                    testInst, gold, gold.getLibrary());
+            checkDiff(goldInst.getViewref(), testInst.getViewref(), EDIFDiffType.INST_VIEWREF,
+                    goldInst, testInst, gold, gold.getLibrary());
         }
         for (Entry<String, EDIFCellInst> e : testCellInsts.entrySet()) {
-            System.err.println("ERROR: Extra cell inst " + e.getKey() + " present in cell " + gold + " in libarary "
-                    + gold.getLibrary());
+            addDiff(EDIFDiffType.INST_EXTRA, null, e.getValue(), test, test.getLibrary(), "");
         }
     }
     
     private void checkCell(EDIFCell gold, EDIFCell test) {
         equivalentEDIFPropObject(gold, test);
-        check(gold.getName(), test.getName(), "EDIFCell.getName() [lib=" + gold.getLibrary()+"]");
-        check(gold.getView(), test.getView(), "EDIFCell.getView() [lib=" + gold.getLibrary()+", name="+ gold + "]");
+        checkDiff(gold.getName(), test.getName(), EDIFDiffType.CELL_NAME, gold, test, null,
+                gold.getLibrary());
+        checkDiff(gold.getView(), test.getView(), EDIFDiffType.CELL_VIEWREF, gold, test, null,
+                gold.getLibrary());
         
         checkPorts(gold,test);
         
@@ -202,44 +255,35 @@ public class EDIFNetlistComparator {
         checkInsts(gold, test);
     }
     
-    private void check(String gold, String test, String desc) {
-        if (!Objects.equals(gold, test)) {
-            System.err.println("[" + desc + "] ERROR: expected=" + gold + ", found=" + test);
+    private static String restoreEndingSquareBrackets(String name) {
+        StringBuilder sb = new StringBuilder(name.substring(0, name.length() - 1));
+        int idx = sb.lastIndexOf("_");
+        sb.replace(idx, idx + 1, "[");
+        sb.append("]");
+        return sb.toString();
+    }
+
+    private void checkDiff(Object checkGold, Object checkTest, EDIFDiffType type, Object gold,
+            Object test, EDIFCell parentCell, EDIFLibrary parentLibrary) {
+        if (!Objects.equals(checkGold, checkTest)) {
+            if (filterVivadoChanges) {
+                if (type == EDIFDiffType.INST_VIEWREF && checkTest.toString().equals("abstract")) {
+                    return;
+                }
+            }
+            String notEqualString = checkGold + " != " + checkTest;
+            addDiff(type, gold, test, parentCell, parentLibrary, notEqualString);
         }
     }
 
-    private void check(int gold, int test, String desc) {
-        if (gold != test) {
-            System.err.println("[" + desc + "] ERROR: expected=" + gold + ", found=" + test);
-        }
+    private void addDiff(EDIFDiffType type, Object gold, Object test, EDIFCell parentCell,
+            EDIFLibrary parentLibrary, String notEqualString) {
+        List<EDIFDiff> diffs = diffMap.computeIfAbsent(type, l -> new ArrayList<>());
+        diffs.add(new EDIFDiff(type, gold, test, parentCell, parentLibrary, notEqualString));
+        diffCount++;
     }
 
-    private void check(Integer gold, Integer test, String desc) {
-        if (!Objects.equals(gold, test)) {
-            System.err.println("[" + desc + "] ERROR: expected=" + gold + ", found=" + test);
-        }
-    }
-
-    
-    private void check(EDIFValueType gold, EDIFValueType test, String desc) {
-        if (gold != test) {
-            System.err.println("[" + desc + "] ERROR: expected=" + gold + ", found=" + test);
-        }
-    }
-
-    private void check(EDIFDirection gold, EDIFDirection test, String desc) {
-        if (gold != test) {
-            System.err.println("[" + desc + "] ERROR: expected=" + gold + ", found=" + test);
-        }
-    }
-
-    private void check(boolean gold, boolean test, String desc) {
-        if (gold != test) {
-            System.err.println("[" + desc + "] ERROR: expected=" + gold + ", found=" + test);
-        }
-    }
-    
-    public void compareNetlists(EDIFNetlist gold, EDIFNetlist test) {
+    public int compareNetlists(EDIFNetlist gold, EDIFNetlist test) {
         diffMap = new LinkedHashMap<>();
 //        check(gold.getName(), test.getName(), "EDIFNetlist.getName()");
 //        check(gold.getDesign().getName(), test.getDesign().getName(), "EDIFNetlist.getDesign().getName()");
@@ -249,42 +293,87 @@ public class EDIFNetlistComparator {
         Map<String, EDIFLibrary> testLibs = new HashMap<>(test.getLibrariesMap());
         for (Entry<String, EDIFLibrary> e : gold.getLibrariesMap().entrySet()) {
             EDIFLibrary testLib = testLibs.remove(e.getKey());
-            if (testLib == null && e.getKey().endsWith("_")) {
-                StringBuilder sb = new StringBuilder(
-                        e.getKey().substring(0, e.getKey().length() - 1));
-                int idx = sb.lastIndexOf("_");
-                sb.replace(idx, idx + 1, "[");
-                sb.append("]");
-                testLib = testLibs.remove(sb.toString());
+            if (testLib == null && restoreBrackets && e.getKey().endsWith("_")) {
+                testLib = testLibs.remove(restoreEndingSquareBrackets(e.getKey()));
             }
             if (testLib == null) {
-                System.err.println("ERROR: test missing library: " + e.getKey());
+                addDiff(EDIFDiffType.LIBRARY_MISSING, e.getValue(), testLib, null, null, "");
                 continue;
             }
             EDIFLibrary goldLib = e.getValue();
-            check(goldLib.getName(), testLib.getName(), "EDIFLibrary.getName()");
-            check(goldLib.getCells().size(), testLib.getCells().size(), "EDIFLibrary.getCells().size() lib=" + goldLib);
+            checkDiff(gold.getName(), test.getName(), EDIFDiffType.LIBRARY_NAME, gold, test, null,
+                    null);
             Map<String,EDIFCell> testCells = new HashMap<>(testLib.getCellMap());
             for (Entry<String,EDIFCell> e2 : goldLib.getCellMap().entrySet()) {
                 EDIFCell testCell = testCells.remove(e2.getKey());
                 if (testCell == null) {
-                    System.err.println("ERROR: test missing cell " + e2.getKey() + " from library " + goldLib);
+                    addDiff(EDIFDiffType.CELL_MISSING, e2.getValue(), testCell, null, goldLib, "");
                 }
                 EDIFCell goldCell = e2.getValue();
                 checkCell(goldCell, testCell);
             }
             for (Entry<String, EDIFCell> e2 : testCells.entrySet()) {
-                System.err.println("ERROR: Extra cell present: " + e2.getKey() + " in library " + goldLib);
+                if (filterVivadoChanges && isHDUniqueified(e2.getValue())) {
+                    continue;
+                }
+                addDiff(EDIFDiffType.CELL_EXTRA, null, e2.getValue(), null, goldLib, "");
             }
         }
         for (Entry<String, EDIFLibrary> e : testLibs.entrySet()) {
-            System.err.println("ERROR: Extra library present: " + e.getKey() + ", " + e.getValue());
+            addDiff(EDIFDiffType.LIBRARY_EXTRA, null, e.getValue(), null, null, "");
+        }
+        return diffCount;
+    }
+
+    private static boolean isHDUniqueified(EDIFCell cell) {
+        String name = cell.getName();
+        int index = name.length() - 1;
+        while (Character.isDigit(name.charAt(index)) && index > 0) {
+            index--;
+        }
+        if (index == name.length() - 1)
+            return false;
+        if (index > 2 && name.charAt(index) == 'D' && name.charAt(index - 1) == 'H'
+                && name.charAt(index - 2) == '_') {
+            index = index - 2;
+        } else {
+            return false;
+        }
+        String rootName = name.substring(0, index);
+        return cell.getLibrary().containsCell(rootName);
+    }
+
+    public void printDiffReportSummary(PrintStream ps) {
+        ps.println("=============================================================================");
+        ps.println("= EDIFNetlist Diff Summary");
+        ps.println("=============================================================================");
+        int totalSanity = 0;
+        for (EDIFDiffType type : EDIFDiffType.values()) {
+            int typeDiffCount = diffMap.getOrDefault(type, Collections.emptyList()).size();
+            totalSanity += typeDiffCount;
+            ps.printf("%9d %s Diffs\n", typeDiffCount, type.name());
+        }
+        ps.println("-----------------------------------------------------------------------------");
+        assert (totalSanity == diffCount);
+        ps.printf("%9d Total Diffs\n\n", diffCount);
+    }
+
+    public void printDiffReport(PrintStream ps) {
+        printDiffReportSummary(ps);
+
+        for (Entry<EDIFDiffType, List<EDIFDiff>> e : diffMap.entrySet()) {
+            ps.println(" *** " + e.getKey() + ": " + e.getValue().size() + " diffs");
+            for (EDIFDiff diff : e.getValue()) {
+                ps.println("  " + diff.toString());
+            }
+
         }
     }
 
     public static void main(String[] args) {
-        if(args.length != 2) {
-            System.out.println("USAGE: <golden EDIF Netlist> <test EDIFNetlist>");
+        if (args.length != 2 && args.length != 3) {
+            System.out.println(
+                    "USAGE: <golden EDIF Netlist> <test EDIFNetlist> [diff report filename]");
             return;
         }
         CodePerfTracker t = new CodePerfTracker("Compare EDIF Netlists");
@@ -298,6 +387,15 @@ public class EDIFNetlistComparator {
         t.stop().start("Compare");
         EDIFNetlistComparator comparator = new EDIFNetlistComparator();
         comparator.compareNetlists(gold, test);
+        if (args.length == 3) {
+            try (PrintStream ps = new PrintStream(args[2])) {
+                comparator.printDiffReport(ps);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        } else {
+            comparator.printDiffReport(System.out);
+        }
         t.stop().printSummary();
     }
 }
