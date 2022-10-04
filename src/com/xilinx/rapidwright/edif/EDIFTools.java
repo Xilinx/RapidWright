@@ -382,12 +382,15 @@ public class EDIFTools {
     }
 
     /**
-     * Strips off bracket index in a bussed name (ex: {@code "data[0]" --> "data"}).
+     * Strips off bracket index in a bussed name (ex:
+     * {@code "data[0]" --> "data["}). Leaves open bracket by default as this is the
+     * key for bussed ports in the port map of {@link EDIFCell}
+     * 
      * @param name Bracketed bussed name.
-     * @return Name of bus with brackets removed
+     * @return Name of bus with index and close bracket removed
      */
     public static String getRootBusName(String name) {
-        return getRootBusName(name, false);
+        return getRootBusName(name, true);
     }
 
     /**
