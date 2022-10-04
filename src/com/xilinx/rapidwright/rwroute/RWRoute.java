@@ -977,8 +977,7 @@ public class RWRoute{
      */
     private void updateCost() {
         overUsedRnodes.clear();
-        for (Entry<?, RouteNode> e : routingGraph.getNodeEntries()) {
-            RouteNode rnode = e.getValue();
+        for (RouteNode rnode : routingGraph.getRnodes()) {
             int overuse=rnode.getOccupancy() - RouteNode.capacity;
             if (overuse == 0) {
                 rnode.setPresentCongestionCost(1 + presentCongestionFactor);
