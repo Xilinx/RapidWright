@@ -144,6 +144,39 @@ public class RouteNodeGraph {
             super(node, type);
         }
 
+        protected void setLength() {
+            length = (type == RouteNodeType.SUPER_LONG_LINE) ? SUPER_LONG_LINE_LENGTH_IN_TILES : 0;
+        }
+
+        @Override
+        protected void setEndTileXYCoordinates() {
+            setLength();
+
+            Tile baseTile = node.getTile();
+            // Correct the X coordinate of all Laguna nodes since they are accessed by the INT
+            // tile to its right, yet has the LAG tile has a tile X coordinate one less
+            endTileXCoordinate = (short) (baseTile.getTileXCoordinate() + 1);
+
+            if (type == RouteNodeType.SUPER_LONG_LINE) {
+                Wire[] wires = node.getAllWiresInNode();
+                if (wires.length == 2) {
+                    Tile endTile = wires[1].getTile();
+                    assert(endTile.getTileTypeEnum() == baseTile.getTileTypeEnum() && endTile != baseTile);
+                    endTileYCoordinate = (short) endTile.getTileYCoordinate();
+                    length = SUPER_LONG_LINE_LENGTH_IN_TILES;
+                    assert(Math.abs(endTileYCoordinate - baseTile.getTileYCoordinate()) == length);
+                } else {
+                    // A dummy SLL at the top or bottom edge of device
+                    assert(wires.length == 1);
+                    endTileYCoordinate = (short) baseTile.getTileYCoordinate();
+                    length = 0;
+                }
+            } else {
+                endTileYCoordinate = (short) baseTile.getTileYCoordinate();
+                length = 0;
+            }
+        }
+
         @Override
         protected void setBaseCost(RouteNodeType type) {
             assert(type == RouteNodeType.WIRE);
@@ -231,39 +264,6 @@ public class RouteNodeGraph {
 
                 default:
                     throw new RuntimeException();
-            }
-        }
-
-        protected void setLength() {
-            length = (type == RouteNodeType.SUPER_LONG_LINE) ? SUPER_LONG_LINE_LENGTH_IN_TILES : 0;
-        }
-
-        @Override
-        protected void setEndTileXYCoordinates() {
-            setLength();
-
-            Tile baseTile = node.getTile();
-            // Correct the X coordinate of all Laguna nodes since they are accessed by the INT
-            // tile to its right, yet has the LAG tile has a tile X coordinate one less
-            endTileXCoordinate = (short) (baseTile.getTileXCoordinate() + 1);
-
-            if (type == RouteNodeType.SUPER_LONG_LINE) {
-                Wire[] wires = node.getAllWiresInNode();
-                if (wires.length == 2) {
-                    Tile endTile = wires[1].getTile();
-                    assert(endTile.getTileTypeEnum() == TileTypeEnum.LAG_LAG && endTile != baseTile);
-                    endTileYCoordinate = (short) endTile.getTileYCoordinate();
-                    length = SUPER_LONG_LINE_LENGTH_IN_TILES;
-                    assert(Math.abs(endTileYCoordinate - baseTile.getTileYCoordinate()) == length);
-                } else {
-                    // A dummy SLL at the top or bottom edge of device
-                    assert(wires.length == 1);
-                    endTileYCoordinate = (short) baseTile.getTileYCoordinate();
-                    length = 0;
-                }
-            } else {
-                endTileYCoordinate = (short) baseTile.getTileYCoordinate();
-                length = 0;
             }
         }
 
