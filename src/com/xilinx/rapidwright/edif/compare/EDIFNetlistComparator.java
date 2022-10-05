@@ -59,9 +59,20 @@ import com.xilinx.rapidwright.tests.CodePerfTracker;
  */
 public class EDIFNetlistComparator {
 
-    private boolean restoreBrackets = true;
+    /**
+     * Setting this to true will attempt to account for legalized square brackets
+     * replaced by underscores around an indexed suffix on a Library name. For
+     * example, if the Library name was originally 'my_signal[4]' but in translation
+     * by Vivado was changed to 'my_signal_4_', setting this flag to true will
+     * attempt to find the square bracketed name equivalent
+     */
+    public boolean restoreBrackets = true;
 
-    private boolean filterVivadoChanges = true;
+    /**
+     * A netlist will undergo several changes when loaded via DCP vs. via EDIF. This
+     * flag attempts to account for the majority of those changes.
+     */
+    public boolean filterVivadoChanges = true;
     
     private Map<EDIFDiffType, List<EDIFDiff>> diffMap;
 
@@ -268,6 +279,10 @@ public class EDIFNetlistComparator {
         if (!Objects.equals(checkGold, checkTest)) {
             if (filterVivadoChanges) {
                 if (type == EDIFDiffType.INST_VIEWREF && checkTest.toString().equals("abstract")) {
+                    return;
+                } else if (type == EDIFDiffType.PROPERTY_VALUE
+                        && checkGold.toString().endsWith(" nS")
+                        && checkGold.toString().replace(" nS", "").equals(checkTest.toString())) {
                     return;
                 }
             }
