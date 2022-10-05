@@ -77,6 +77,8 @@ public class TestEDIFPort {
 
         EDIFCell cell = new EDIFCell(netlist.getWorkLibrary(), "cell_1");
         int outer = 0;
+        // Creates ports: {bus_output[0][3:0], bus_output[2][5:2],
+        // bus_output[1][0:3], bus_output[3][2:5]}
         for (String range : new String[] { "3:0", "0:3", "5:2", "2:5" }) {
             int left = Integer.parseInt(range.substring(0, range.indexOf(':')));
             int right = Integer.parseInt(range.substring(range.indexOf(':') + 1));
@@ -106,10 +108,25 @@ public class TestEDIFPort {
             outer++;
         }
 
-        EDIFPort port = cell.createPort("bus_output[0]", EDIFDirection.OUTPUT, 1);
-        Assertions.assertFalse(port.isBus());
-        Assertions.assertEquals(1, port.getWidth());
-        Assertions.assertNotEquals(port, cell.getPort("bus_output"));
-        Assertions.assertEquals(port, cell.getPort("bus_output[0]"));
+        // Check for potential collisions (prevalent in older versions), for example:
+        // 'foo' vs 'foo[0]' (both single bit ports)
+        // 'foo[0]' vs 'foo[1]' (both single bit ports)
+        // 'foo[0]' vs 'foo[0][0]' (both single bit ports)
+        // 'foo[0]' vs 'foo[0][7:0]' (single bit vs bussed port)
+        for (String singleBitPort : new String[] { "foo", "foo[0]", "foo[1]", "foo[0][0]", "bar[1]" }) {
+            EDIFPort port = cell.createPort(singleBitPort, EDIFDirection.OUTPUT, 1);
+            // Ensure single bit bracketed port is not converted to a bus
+            Assertions.assertFalse(port.isBus());
+            Assertions.assertEquals(1, port.getWidth());
+            Assertions.assertEquals(port, cell.getPort(singleBitPort));
+            Assertions.assertEquals(port.getBusName(), port.getName());
+        }
+
+        EDIFPort busPort = cell.createPort("foo[0][7:0]", EDIFDirection.OUTPUT, 8);
+        Assertions.assertTrue(busPort.isBus());
+        Assertions.assertEquals(7, busPort.getLeft());
+        Assertions.assertEquals(0, busPort.getRight());
+        Assertions.assertEquals(busPort, cell.getPort("foo[0]["));
+        Assertions.assertNotEquals(busPort, cell.getPort("foo[0]"));
     }
 }
