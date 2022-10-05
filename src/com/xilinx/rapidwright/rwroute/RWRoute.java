@@ -1361,8 +1361,9 @@ public class RWRoute{
                 if (!childRNode.willOverUse(connection.getNetWrapper())) {
                     queue.clear();
                 } else if (childRNode.isVisited()) {
-                    // Child node is congested, but has been marked as visited thus it must
-                    // be in the queue already
+                    // Child node is congested, but has been marked as visited
+                    // (prepareRouteConnection() will not mark a node as a target if it is congested)
+                    // thus it must be in the queue already
                     continue;
                 }
             } else if (childRNode.isVisited()) {
