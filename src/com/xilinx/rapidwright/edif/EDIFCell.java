@@ -258,7 +258,11 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
      */
     public EDIFPort getPort(String busName) {
         if (ports == null) return null;
-        return ports.get(busName);
+        EDIFPort port = ports.get(busName);
+        if (port == null && busName.charAt(busName.length() - 1) != '[') {
+            port = ports.get(busName + "[");
+        }
+        return port;
     }
 
     /**

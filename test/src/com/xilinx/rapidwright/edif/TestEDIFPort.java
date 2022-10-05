@@ -87,7 +87,7 @@ public class TestEDIFPort {
             Assertions.assertEquals(right, busOutput.getRight());
             Assertions.assertTrue(busOutput.isBus());
             Assertions.assertEquals(left > right, busOutput.isLittleEndian());
-            EDIFPort copy = cell.getPort("bus_output[" + outer + "]");
+            EDIFPort copy = cell.getPort("bus_output[" + outer + "][");
             Assertions.assertEquals(busOutput, copy);
 
             int[] portIndices = busOutput.getBitBlastedIndicies();
@@ -107,12 +107,9 @@ public class TestEDIFPort {
         }
 
         EDIFPort port = cell.createPort("bus_output[0]", EDIFDirection.OUTPUT, 1);
-        Assertions.assertTrue(port.isBus());
+        Assertions.assertFalse(port.isBus());
         Assertions.assertEquals(1, port.getWidth());
-        Assertions.assertEquals(port, cell.getPort("bus_output"));
-        Assertions.assertNotEquals(port, cell.getPort("bus_output[0]"));
-
-        Assertions.assertThrows(RuntimeException.class,
-                () -> cell.createPort("bus_output[1]", EDIFDirection.OUTPUT, 1));
+        Assertions.assertNotEquals(port, cell.getPort("bus_output"));
+        Assertions.assertEquals(port, cell.getPort("bus_output[0]"));
     }
 }
