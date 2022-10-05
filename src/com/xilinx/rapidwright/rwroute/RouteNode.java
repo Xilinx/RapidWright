@@ -408,6 +408,10 @@ abstract public class RouteNode implements Comparable<RouteNode> {
      * @return The tileYCoordinate of the INT tile that the associated {@link Node} instance stops at.
      */
     public short getEndTileYCoordinate() {
+        return getEndTileYCoordinate(prev);
+    }
+
+    public short getEndTileYCoordinate(RouteNode prev) {
         boolean reverseSLL = (prev != null &&
                 getType() == RouteNodeType.SUPER_LONG_LINE &&
                 prev.endTileYCoordinate == endTileYCoordinate);

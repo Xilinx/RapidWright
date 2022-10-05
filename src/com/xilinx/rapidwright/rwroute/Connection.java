@@ -80,8 +80,10 @@ public class Connection implements Comparable<Connection>{
 
     /** To indicate if the route delay of a connection has been patched up, when there are consecutive long nodes */
     private boolean dlyPatched;
-    /** true to indicate that a connection cross SLRs */
+    /** true to indicate that this connection crosses SLRs */
     private boolean crossSLR;
+    /** true to indicate that SLLs should only be taken when Y is increased */
+    private boolean sllDirection;
     /** List of nodes assigned to a connection to form the path for generating PIPs */
     private List<Node> nodes;
 
@@ -93,7 +95,11 @@ public class Connection implements Comparable<Connection>{
         rnodes = new ArrayList<>();
         this.netWrapper = netWrapper;
         netWrapper.addConnection(this);
-        crossSLR = !source.getTile().getSLR().equals(sink.getTile().getSLR());
+
+        int sourceSLR = source.getTile().getSLR().getId();
+        int sinkSLR = sink.getTile().getSLR().getId();
+        crossSLR = sourceSLR != sinkSLR;
+        sllDirection = sourceSLR < sinkSLR;
     }
 
     /**
@@ -381,6 +387,10 @@ public class Connection implements Comparable<Connection>{
 
     public boolean isCrossSLR() {
         return crossSLR;
+    }
+
+    public boolean getSLLDirection() {
+        return sllDirection;
     }
 
     public List<Node> getNodes() {

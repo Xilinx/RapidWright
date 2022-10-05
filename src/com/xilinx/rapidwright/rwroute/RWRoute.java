@@ -1401,6 +1401,12 @@ public class RWRoute{
                     case SUPER_LONG_LINE:
                         assert(connection.isCrossSLR() &&
                                 connection.getSinkRnode().getSLRIndex() != rnode.getSLRIndex());
+                        int parentY = rnode.getEndTileYCoordinate();
+                        int childY = childRNode.getEndTileYCoordinate(rnode);
+                        if (connection.getSLLDirection() ? parentY > childY : parentY < childY) {
+                            // Disallow SLLs in the wrong direction
+                            continue;
+                        }
                         break;
                     default:
                         throw new RuntimeException();
