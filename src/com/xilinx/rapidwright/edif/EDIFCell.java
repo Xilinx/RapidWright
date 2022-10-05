@@ -259,6 +259,7 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
     public EDIFPort getPort(String busName) {
         if (ports == null) return null;
         EDIFPort port = ports.get(busName);
+        // For callers who have a port name and its unknown if its a bus, attempt a check with adding the '[' suffix
         if (port == null && busName.charAt(busName.length() - 1) != '[') {
             port = ports.get(busName + "[");
         }
