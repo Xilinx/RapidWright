@@ -239,7 +239,7 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
         if (ports == null) ports = getNewMap();
         port.setParentCell(this);
         EDIFPort collision = ports.put(port.getBusName(), port);
-        if (collision != null && port != collision) {
+        if (port != collision) {
             throw new RuntimeException("ERROR: Port name collision on EDIFCell " + getName()
                     + ", trying to add port " + port
                     + ", but the cell already contains ports with the " + "same name: " + collision);
