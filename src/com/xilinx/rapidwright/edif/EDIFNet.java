@@ -113,7 +113,7 @@ public class EDIFNet extends EDIFPropertyObject {
      *                     if it belongs on a bussed port.
      * @param cellInst     The destination cell instance to receive the port
      *                     instance
-     * @return The newly create port instance or null if none could be created on
+     * @return The newly created port instance or null if none could be created on
      *         the instance.
      */
     public EDIFPortInst createPortInst(String portInstName, EDIFCellInst cellInst) {
@@ -129,7 +129,7 @@ public class EDIFNet extends EDIFPropertyObject {
      *                     if it belongs on a bussed port.
      * @param cell         The destination cell to receive the port instance (on an
      *                     inward facing port).
-     * @return The newly create port instance or null if none could be created on
+     * @return The newly created port instance or null if none could be created on
      *         the cell.
      */
     public EDIFPortInst createPortInst(String portInstName, EDIFCell cell) {
@@ -145,7 +145,7 @@ public class EDIFNet extends EDIFPropertyObject {
      * @param inst         If this is not null, the port instance is added to the
      *                     external facing port connection. If this is null, it will
      *                     add it to the inward facing port connection.
-     * @return The newly create port instance or null if none could be created on
+     * @return The newly created port instance or null if none could be created on
      *         the cell or cell instance.
      */
     private EDIFPortInst createPortInstFromPortInstName(String portInstName, EDIFCell cell, EDIFCellInst inst) {

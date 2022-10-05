@@ -249,7 +249,7 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
 
     /**
      * Gets a port by bus name (see {@link EDIFPort#getBusName()}). Multi-bit ports
-     * need to have close square bracket and range removed (for example: "bus[3:0]"
+     * need to have closing square bracket and range removed (for example: "bus[3:0]"
      * -> "bus[". See {@link EDIFCell#addPort(EDIFPort)} for more information.
      *
      * @param busName Bus name (ends with '[' to represent a bussed port) of the
