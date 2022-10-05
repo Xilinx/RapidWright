@@ -239,7 +239,7 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
         if (ports == null) ports = getNewMap();
         port.setParentCell(this);
         EDIFPort collision = ports.put(port.getBusName(), port);
-        if (port != collision) {
+        if (collision != null && port != collision) {
             throw new RuntimeException("ERROR: Port name collision on EDIFCell " + getName()
                     + ", trying to add port " + port
                     + ", but the cell already contains ports with the " + "same name: " + collision);
@@ -252,16 +252,16 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
      * need to have closing square bracket and range removed (for example: "bus[3:0]"
      * -> "bus[". See {@link EDIFCell#addPort(EDIFPort)} for more information.
      *
-     * @param name Bus name (ends with '[' to represent a bussed port) of the
+     * @param busName Bus name (ends with '[' to represent a bussed port) of the
      *                port to get. Single bit ports use their entire name.
      * @return The port or null if none exists.
      */
-    public EDIFPort getPort(String name) {
+    public EDIFPort getPort(String busName) {
         if (ports == null) return null;
-        EDIFPort port = ports.get(name);
+        EDIFPort port = ports.get(busName);
         // For callers who have a port name and its unknown if its a bus, attempt a check with adding the '[' suffix
-        if (port == null && name.charAt(name.length() - 1) != '[') {
-            port = ports.get(name + "[");
+        if (port == null && busName.charAt(busName.length() - 1) != '[') {
+            port = ports.get(busName + "[");
         }
         return port;
     }
