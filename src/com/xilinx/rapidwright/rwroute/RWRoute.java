@@ -39,7 +39,6 @@ import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
-import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
@@ -1415,6 +1414,10 @@ public class RWRoute{
 
             evaluateCostAndPush(rnode, longParent, childRNode, connection, shareWeight, rnodeCostWeight,
                     rnodeLengthWeight, rnodeEstWlWeight, rnodeDelayWeight, rnodeEstDlyWeight);
+            if (childRNode.getType() == RouteNodeType.SUPER_LONG_LINE) {
+                // Expect that SLLs always take us closer to the sink
+                assert(childRNode.getLowerBoundTotalPathCost() < rnode.getLowerBoundTotalPathCost() || childRNode.willOverUse(connection.getNetWrapper()));
+            }
             if (childRNode.isTarget())
                 break;
         }
@@ -1602,6 +1605,7 @@ public class RWRoute{
             for (RouteNode childRnode : Lists.reverse(connectionToRoute.getRnodes())) {
                 if (parentRnode != null) {
                     assert(isAccessible(parentRnode, connectionToRoute));
+                    assert(!parentRnode.isTarget());
 
                     // Place child onto queue
                     assert(!childRnode.isVisited());
@@ -1637,37 +1641,16 @@ public class RWRoute{
                 break;
             }
 
-            if (!parentRnode.isVisited()) {
-                // Mark nodes upstream of the sink as targets also, unless it has been
-                // placed on the queue already (i.e. this must be the same first congested
-                // node reached from downstream as well as upstream)
-                if (childRnode != null) {
-                    assert(childRnode.isTarget());
-                    assert(!parentRnode.isTarget());
-                    parentRnode.setTarget(true);
-                    childRnode.setPrev(parentRnode);
-                    visited.add(parentRnode);
-                    visited.add(childRnode);
-                }
-            } else {
-                // During non timing driven, at this point parentRnode has been visited
-                // but is not congested, so it must have been visited by another connection
-                // from the same net (since connectionToRoute has been ripped up already)
-                assert(config.isTimingDriven() ||
-                        parentRnode.countConnectionsOfUser(netWrapper) > 0);
-                if (!parentRnode.isTarget()) {
-                    // Since parenRnode has already been visited: we've accidentally stumbled upon an
-                    // uncongested path back to the source! Mark this as a target and make it the only
-                    // node in the queue, so that it can be immediately popped and terminate routing
-                    parentRnode.setTarget(true);
-                    childRnode.setPrev(parentRnode);
-                    visited.add(parentRnode);
-                    visited.add(childRnode);
-                    queue.clear();
-                    queue.add(parentRnode);
-                }
-                // If so, no point in going further upstream
-                break;
+            assert(!parentRnode.isVisited());
+
+            // Mark nodes upstream of the sink as targets also
+            if (childRnode != null) {
+                assert(childRnode.isTarget());
+                assert(!parentRnode.isTarget());
+                parentRnode.setTarget(true);
+                childRnode.setPrev(parentRnode);
+                visited.add(parentRnode);
+                visited.add(childRnode);
             }
 
             childRnode = parentRnode;
