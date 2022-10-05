@@ -382,14 +382,29 @@ public class EDIFTools {
     }
 
     /**
-     * Strips off bracket index in a bussed name (ex: {@code "data[0]" --> "data"}).
+     * Strips off bracket index in a bussed name (ex:
+     * {@code "data[0]" --> "data["}). Leaves open bracket by default as this is the
+     * key for bussed ports in the port map of {@link EDIFCell}
+     * 
      * @param name Bracketed bussed name.
-     * @return Name of bus with brackets removed
+     * @return Name of bus with index and close bracket removed
      */
     public static String getRootBusName(String name) {
+        return getRootBusName(name, true);
+    }
+
+    /**
+     * Strips off bracket index in a bussed name (ex: {@code "data[0]" --> "data"}).
+     * 
+     * @param name               Bracketed bussed name.
+     * @param includeOpenBracket If true, the result will include the open square
+     *                           bracket ("data[")
+     * @return Name of bus with brackets removed
+     */
+    public static String getRootBusName(String name, boolean includeOpenBracket) {
         int bracket = name.lastIndexOf('[');
         if (bracket == -1) return name;
-        return name.substring(0, bracket);
+        return name.substring(0, bracket + (includeOpenBracket ? 1 : 0));
     }
 
     /**
@@ -413,6 +428,22 @@ public class EDIFTools {
      * @return The length of the string
      */
     public static int lengthOfNameWithoutBus(char[] name) {
+        return lengthOfNameWithoutBus(name, false);
+    }
+
+    /**
+     * Determines if the char[] ends with the pattern [#:#] where # are positive bus
+     * values (e.g., [7:0]) and then returns the length of the string without the
+     * bus suffix (if it exists). If the name does not end with the bus pattern, it
+     * returns the original length of the char[].
+     * 
+     * @param name
+     * @param keepOpenBracket In the case of a bussed name, this will return the
+     *                        index of the string including the open square bracket
+     *                        (useful for port the bus name keyed map in EDIFCell).
+     * @return The length of the string
+     */
+    public static int lengthOfNameWithoutBus(char[] name, boolean keepOpenBracket) {
         int len = name.length;
         int i = len-1;
         if (name[i--] != ']') return len;
@@ -424,7 +455,7 @@ public class EDIFTools {
             i--;
         }
         if (name[i] != '[') return len;
-        return i;
+        return i + (keepOpenBracket ? 1 : 0);
     }
 
     public static int getPortIndexFromName(String name) {
@@ -1104,7 +1135,7 @@ public class EDIFTools {
         EDIFPort port = n.getTopCell().getPort(name);
         if (port == null && name.contains("[") && name.contains("]")) {
             // check if this is a part of a bus
-            port = n.getTopCell().getPort(getRootBusName(name));
+            port = n.getTopCell().getPort(getRootBusName(name, true));
         }
         if (port == null) {
             port = d.getTopEDIFCell().createPort(name, EDIFDirection.getDir(dir), 1);
@@ -1112,9 +1143,8 @@ public class EDIFTools {
         EDIFPortInst pr = n.getTopCellInst().getPortInst(name);
         if (pr == null) {
             int idx = -1;
-            if (port.getWidth() > 1) {
-                idx = getPortIndexFromName(name);
-                if (port.isLittleEndian()) idx = (port.getWidth()-1) - idx;
+            if (port.isBus()) {
+                idx = port.getPortIndexFromNameIndex(getPortIndexFromName(name));
             }
             pr = new EDIFPortInst(port, null, idx);
         }
