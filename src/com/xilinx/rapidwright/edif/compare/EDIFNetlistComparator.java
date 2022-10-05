@@ -300,10 +300,6 @@ public class EDIFNetlistComparator {
 
     public int compareNetlists(EDIFNetlist gold, EDIFNetlist test) {
         diffMap = new LinkedHashMap<>();
-//        check(gold.getName(), test.getName(), "EDIFNetlist.getName()");
-//        check(gold.getDesign().getName(), test.getDesign().getName(), "EDIFNetlist.getDesign().getName()");
-//        equivalentEDIFPropObject(gold.getDesign(), test.getDesign());
-//        check(gold.getLibraries().size(), test.getLibraries().size(), "EDIFNetlist.getLibraries().size()");
 
         Map<String, EDIFLibrary> testLibs = new HashMap<>(test.getLibrariesMap());
         for (Entry<String, EDIFLibrary> e : gold.getLibrariesMap().entrySet()) {
