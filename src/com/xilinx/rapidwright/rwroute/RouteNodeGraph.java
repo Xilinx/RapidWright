@@ -150,8 +150,9 @@ public class RouteNodeGraph {
             switch(this.type) {
                 case LAGUNA_I:
                 case LAGUNA_O:
-                    // Make all approaches to SLLs zero-cost to encourage exploration
-                    // Assigning a base cost of zero would break congestion resolution for most nodes
+                    // Make all approaches to SLLs zero-cost to encourage exploration.
+                    // These approaches are only taken if a SLR crossing is needed.
+                    // Assigning a base cost of zero would normally break congestion resolution
                     // (since RWroute.getNodeCost() would return zero) but doing it here should be
                     // okay because this node only leads to a SLL which will have a non-zero base cost
                     baseCost = 0.0f;
