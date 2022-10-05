@@ -468,8 +468,20 @@ public class PhysNetlistReader {
                             Cell belCell = siteInst.getCell(bel);
                             Cell routeThruCell = siteInst.getCell(routeThruLutInput.getBEL());
                             if (routeThruCell == null) {
-                                throw new RuntimeException("Expected routethru cell at " + siteInst.getSiteName() +
-                                        "/" + routeThruLutInput.getBELName());
+                                // Routethru cell does not exist, create one
+
+                                // Make sure nothing placed there already
+                                if (siteInst.getCell(routeThruLutInput.getBEL()) != null) {
+                                    throw new RuntimeException("Routethru inferred for " + siteInst.getSiteName() + "/" + routeThruLutInput.getBELName()
+                                        + " but it is already occupied");
+                                }
+
+                                routeThruCell = new Cell(belCell.getName(), routeThruLutInput.getBEL());
+                                routeThruCell.setRoutethru(true);
+                                routeThruCell.setType(belCell.getType());
+                                routeThruCell.setSiteInst(siteInst);
+                                siteInst.getCellMap().put(routeThruLutInput.getBELName(), routeThruCell);
+                                routeThruCell.addPinMapping(routeThruLutInput.getName(), belCell.getLogicalPinMapping(belPinName));
                             }
                             String physicalPin = routeThruLutInput.getName();
                             String logicalPin = belCell.getLogicalPinMapping(belPinName);
