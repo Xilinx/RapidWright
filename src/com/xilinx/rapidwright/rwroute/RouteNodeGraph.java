@@ -111,14 +111,18 @@ public class RouteNodeGraph {
 
         @Override
         public boolean isPreserved(boolean forward, Node node) {
-            if (!forward) {
-                // When building the routing graph backwards, we can't tell if
-                // a preserved node belongs to our net or not; pretend it doesn't
-                // (expansion will check this before it gets pushed onto the queue)
-                return false;
+            boolean preserved = RouteNodeGraph.this.isPreserved(node);
+            if (forward) {
+                return preserved;
             }
-            return RouteNodeGraph.this.isPreserved(node);
-        }
+
+            // When building the routing graph backwards, we can't tell if a preserved node
+            // belongs to our net or not, however, we can tell if it belongs to any net that
+            // needs routing by checking to see if a rnode exists.
+            // Defer to routing expansion to check for the correct net before pushing it onto
+            // the queue.
+            return RouteNodeGraph.this.isPreserved(node) && RouteNodeGraph.this.getNode(node) == null;
+       }
 
         @Override
         public boolean isExcluded(boolean forward, Node head, Node tail) {
