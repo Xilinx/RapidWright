@@ -1652,6 +1652,11 @@ public class RWRoute{
                     boolean forward = true;
                     assert(isAccessible(forward, parentRnode, connectionToRoute));
 
+                    // Trigger the creation of all children in order to emulate routing expansion;
+                    // not doing so invalidates an assumption of how preserved nodes are visited
+                    // FIXME: Only relevant for PartialRouter
+                    parentRnode.getChildrenParents(forward);
+
                     // Place child onto queue
                     assert(!childRnode.isVisited(forward) || routingGraph.isPreserved(childRnode.getNode()));
                     boolean longParent = config.isTimingDriven() && DelayEstimatorBase.isLong(parentRnode.getNode());

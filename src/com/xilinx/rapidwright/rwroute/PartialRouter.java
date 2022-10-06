@@ -105,9 +105,6 @@ public class PartialRouter extends RWRoute{
      * Connections. In these cases, the RouteNode.prev member is used to restrict
      * incoming arcs to just the RouteNode already used by the Net; this method
      * detects this case and allows the preserved state to be masked.
-     * Note that this method must only be called once for each end Node, since
-     * RouteNode.prev (which is also used to track its "visited" state) is erased
-     * upon masking.
      * @param start Start Node of arc.
      * @param end End Node of arc.
      * @return True if arc is part of an existing route.
@@ -118,22 +115,30 @@ public class PartialRouter extends RWRoute{
             return false;
         }
 
-        if (!routingGraph.isPreserved(end))
-            return false;
-
-        // If preserved, check if end node has been created already
+        // End node can only be part of existing route if it is in the graph already
         RouteNode endRnode = routingGraph.getNode(end);
-        if (endRnode == null)
+        if (endRnode == null) {
             return false;
+        }
 
-        // If so, get the underlying prev pointer (do not use RouteNode.getPrev() as
+        // If end node has been visited already, it can't possibly be using this arc
+        if (endRnode.isVisited(forward)) {
+            assert(!endRnode.getPrev().getNode().equals(start));
+            return false;
+        }
+
+        // Get the underlying prev pointer (do not use RouteNode.getPrev() as
         // that masks prev if it has not been visited)
-        RouteNode prev = endRnode.prev;
+        RouteNode prevRnode = endRnode.prev;
         // Presence means that the only arc allowed to enter this end node
         // is if it came from prev
-        if (prev != null) {
-            assert((prev.getNode() == start) == prev.getNode().equals(start));
-            return prev.getNode() == start;
+        if (prevRnode != null) {
+            assert((prevRnode.getNode() == start) == prevRnode.getNode().equals(start));
+            if (prevRnode.getNode() == start) {
+                assert(routingGraph.isPreserved(end));
+                return true;
+            }
+            return false;
         }
 
         // No presence means that it is used by a fully preserved net which needs no routing
@@ -213,10 +218,22 @@ public class PartialRouter extends RWRoute{
             for (PIP pip : net.getPIPs()) {
                 Node start = (pip.isReversed()) ? pip.getEndNode() : pip.getStartNode();
                 Node end = (pip.isReversed()) ? pip.getStartNode() : pip.getEndNode();
+
+                // Do not include arcs that the router wouldn't explore
+                // e.g. those that leave the INT tile, since we project pins to their INT tile
+                if (routingGraph.isExcluded(true, start, end))
+                    continue;
+
                 RouteNode rstart = getOrCreateRouteNode(start, RouteNodeType.WIRE);
                 RouteNode rend = getOrCreateRouteNode(end, RouteNodeType.WIRE);
                 assert (rend.getPrev() == null);
-                rend.setPrev(rstart);
+
+                if (pip.isStub()) {
+                    // For stub nodes, set the prev pointer without setting visited state
+                    rend.prev = rstart;
+                } else {
+                    rend.setPrev(rstart);
+                }
             }
 
             // Reset the all RouteNode-s upstream of projected output INT node, otherwise finishRouteConnection()
@@ -403,6 +420,11 @@ public class PartialRouter extends RWRoute{
                 Node start = (pip.isReversed()) ? pip.getEndNode() : pip.getStartNode();
                 Node end = (pip.isReversed()) ? pip.getStartNode() : pip.getEndNode();
 
+                // Do not include arcs that the router wouldn't explore
+                // e.g. those that leave the INT tile, since we project pins to their INT tile
+                if (routingGraph.isExcluded(true, start, end))
+                    continue;
+
                 // Since net already exists, all the nodes it uses must already
                 // have been created
                 RouteNode rstart = routingGraph.getNode(start);
@@ -441,7 +463,12 @@ public class PartialRouter extends RWRoute{
 
                 // Also set the prev pointer according to the PIP
                 assert (rend.getPrev() == null);
-                rend.setPrev(rstart);
+                if (pip.isStub()) {
+                    // For stub nodes, set the prev pointer without setting visited state
+                    rend.prev = rstart;
+                } else {
+                    rend.setPrev(rstart);
+                }
             }
 
             // Reset the all RouteNode-s upstream of projected output INT node, otherwise finishRouteConnection()
@@ -463,13 +490,6 @@ public class PartialRouter extends RWRoute{
                     sinkRnode.setNext(sinkRnode);
                     finishRouteConnection(netnewConnection, sinkRnode);
                     sinkRnode.setNext(null);
-                }
-            }
-
-            // Reset all used nodes
-            for (Connection netnewConnection : netWrapper.getConnections()) {
-                for (RouteNode rnode : netnewConnection.getRnodes()) {
-                    rnode.reset();
                 }
             }
 
@@ -495,11 +515,14 @@ public class PartialRouter extends RWRoute{
                 if (parent == null)
                     continue;
 
-                // Reset its list of children so that they may be regenerated to include newly unpreserved node
+                // Reset its list of children so that they may be regenerated to include the
+                // newly unpreserved node
                 parent.resetChildren();
             }
 
             rnode.reset();
+            // Reset the prev pointer too lest it gets mistaken for a preserved node
+            rnode.prev = null;
         }
 
         numPreservedWire--;

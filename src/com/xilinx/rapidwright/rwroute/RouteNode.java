@@ -435,6 +435,16 @@ abstract public class RouteNode {
      * Clears the children of this node so that it can be regenerated.
      */
     public void resetChildren() {
+        if (children == null)
+            return;
+
+        // Make sure no children are pointing back to this node,
+        // lest they get mistaken for a preserved node
+        for (RouteNode rnode : children) {
+            if (rnode.prev == this) {
+                rnode.prev = null;
+            }
+        }
         children = null;
     }
 
