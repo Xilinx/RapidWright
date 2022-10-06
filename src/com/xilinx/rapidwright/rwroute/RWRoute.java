@@ -255,7 +255,7 @@ public class RWRoute{
     protected void determineRoutingTargets() {
         categorizeNets();
 
-        // Wait for all outstanding RoutingGraph.asyncPreserve() calls to complete
+        // Wait for all outstanding RouteNodeGraph.asyncPreserve() calls to complete
         // FIXME: Calling thread does nothing while waiting
         routingGraph.awaitPreserve();
     }
