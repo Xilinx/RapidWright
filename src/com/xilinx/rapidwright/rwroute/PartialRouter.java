@@ -114,7 +114,7 @@ public class PartialRouter extends RWRoute{
      */
     private boolean isPartOfExistingRoute(boolean forward, Node start, Node end) {
         if (!forward) {
-            // Cannot determine if part of existing route when routing backwards
+            // No existing routing from a different connection when going backwards
             return false;
         }
 
