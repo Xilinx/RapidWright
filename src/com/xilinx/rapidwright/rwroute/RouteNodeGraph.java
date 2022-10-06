@@ -615,6 +615,7 @@ public class RouteNodeGraph {
         return rnode;
     }
 
+    // TODO: Just keep track of leaf nodes popped from the queue
     public void visit(boolean forward, RouteNode rnode) {
         if (forward) {
             visited.add(rnode);
@@ -629,7 +630,7 @@ public class RouteNodeGraph {
     public void resetExpansion() {
         for (Collection<RouteNode> c : Arrays.asList(visited, visitedBack)) {
             for (RouteNode rn : c) {
-                rn.reset(isPreserved(rn.getNode()));
+                rn.reset();
             }
             totalVisited += c.size();
             c.clear();

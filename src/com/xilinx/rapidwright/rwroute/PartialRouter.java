@@ -126,8 +126,9 @@ public class PartialRouter extends RWRoute{
         if (endRnode == null)
             return false;
 
-        // If so, get its prev pointer
-        RouteNode prev = endRnode.getPrev();
+        // If so, get the underlying prev pointer (do not use RouteNode.getPrev() as
+        // that masks prev if it has not been visited)
+        RouteNode prev = endRnode.prev;
         // Presence means that the only arc allowed to enter this end node
         // is if it came from prev
         if (prev != null) {
@@ -135,6 +136,7 @@ public class PartialRouter extends RWRoute{
             return prev.getNode() == start;
         }
 
+        // No presence means that it is used by a fully preserved net which needs no routing
         return false;
     }
 
@@ -217,15 +219,14 @@ public class PartialRouter extends RWRoute{
                 rend.setPrev(rstart);
             }
 
-            // Erase the prev pointer for all RouteNode-s upstream of projected
-            // output INT node, otherwise finishRouteConnection() will complain that
-            // backtracking doesn't terminate at Net's source
+            // Reset the all RouteNode-s upstream of projected output INT node, otherwise finishRouteConnection()
+            // will complain that backtracking doesn't terminate at Net's source
             for (SitePinInst spi : Arrays.asList(net.getSource(), net.getAlternateSource())) {
                 if (spi == null) continue;
                 Node n = RouterHelper.projectOutputPinToINTNode(spi);
                 RouteNode rn = routingGraph.getNode(n);
                 if (rn != null) {
-                    rn.setPrev(null);
+                    rn.reset();
                 }
             }
 
@@ -237,6 +238,13 @@ public class PartialRouter extends RWRoute{
                     sinkRnode.setNext(sinkRnode);
                     finishRouteConnection(connection, sinkRnode);
                     sinkRnode.setNext(null);
+                }
+            }
+
+            // Reset all used nodes
+            for (Connection connection : netWrapper.getConnections()) {
+                for (RouteNode rnode : connection.getRnodes()) {
+                    rnode.reset();
                 }
             }
         }
@@ -409,9 +417,9 @@ public class PartialRouter extends RWRoute{
                 boolean endPreserved = routingGraph.unpreserve(end);
                 assert(rendAdded == endPreserved);
 
-                // Check the prev pointer consistent with PIP
-                // (it may be null because isPartOfExistingRoute() will erase prev once rend was created)
-                assert(rend.getPrev() == null || rend.getPrev().equals(rstart));
+                // Check the prev pointer is consistent with PIP
+                // (do not use RouteNode.getPrev() since that masks prev if node wasn't visited)
+                assert(rend.prev == rstart);
             }
         } else {
             // Net needs to be created
@@ -436,15 +444,14 @@ public class PartialRouter extends RWRoute{
                 rend.setPrev(rstart);
             }
 
-            // Erase the prev pointer for all RouteNode-s upstream of projected
-            // INT node, otherwise finishRouteConnection() will complain that
-            // backtracking doesn't terminate at Net's source
+            // Reset the all RouteNode-s upstream of projected output INT node, otherwise finishRouteConnection()
+            // will complain that backtracking doesn't terminate at Net's source
             for (SitePinInst spi : Arrays.asList(net.getSource(), net.getAlternateSource())) {
                 if (spi == null) continue;
                 Node n = RouterHelper.projectOutputPinToINTNode(spi);
                 RouteNode rn = routingGraph.getNode(n);
                 if (rn != null) {
-                    rn.setPrev(null);
+                    rn.reset();
                 }
             }
 
@@ -456,6 +463,13 @@ public class PartialRouter extends RWRoute{
                     sinkRnode.setNext(sinkRnode);
                     finishRouteConnection(netnewConnection, sinkRnode);
                     sinkRnode.setNext(null);
+                }
+            }
+
+            // Reset all used nodes
+            for (Connection netnewConnection : netWrapper.getConnections()) {
+                for (RouteNode rnode : netnewConnection.getRnodes()) {
+                    rnode.reset();
                 }
             }
 
@@ -485,9 +499,7 @@ public class PartialRouter extends RWRoute{
                 parent.resetChildren();
             }
 
-            // Clear the prev pointer (as it is also used to track
-            // whether a node has been visited during expansion)
-            rnode.setPrev(null);
+            rnode.reset();
         }
 
         numPreservedWire--;

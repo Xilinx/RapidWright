@@ -74,6 +74,7 @@ abstract public class RouteNode {
     /** A variable that stores the parent of a rnode during expansion to facilitate tracing back */
     protected RouteNode prev;
     protected RouteNode next;
+    private boolean visited;
     /**
      * A map that records users of a rnode based on all routed connections.
      * Each user is a {@link NetWrapper} instance that corresponds to a {@link Net} instance.
@@ -99,7 +100,7 @@ abstract public class RouteNode {
         historicalCongestionCost = 1;
         usersConnectionCounts = null;
         driversCounts = null;
-        reset(false);
+        reset();
     }
 
     abstract protected RouteNode getOrCreate(Node node, RouteNodeType type);
@@ -396,7 +397,6 @@ abstract public class RouteNode {
     /**
      * Gets the Y coordinate of the INT {@link Tile} instance
      * that the associated {@link Node} instance stops at.
-     * For bidirectional nodes, the prev member is used to determine the end node.
      * @return The tileYCoordinate of the INT tile that the associated {@link Node} instance stops at.
      */
     public short getEndTileYCoordinate() {
@@ -604,23 +604,21 @@ abstract public class RouteNode {
      * @return The driving RouteNode instance.
      */
     public RouteNode getPrev() {
-        return prev;
+        return (visited) ? prev : null;
     }
 
     public RouteNode getNext() {
         return next;
     }
 
-    public RouteNode getPrevNext(boolean forward) {
-        return (forward) ? prev : next;
-    }
-
-
     /**
      * Sets the parent RouteNode instance for routing a connection.
      * @param prev The driving RouteNode instance to set.
      */
     public void setPrev(RouteNode prev) {
+        assert(prev != null);
+        assert(!visited || this.prev == prev);
+        visited = true;
         this.prev = prev;
     }
 
@@ -630,9 +628,9 @@ abstract public class RouteNode {
 
     public void setPrevNext(boolean forward, RouteNode prevNext) {
         if (forward) {
-            prev = prevNext;
+            setPrev(prevNext);
         } else {
-            next = prevNext;
+            setNext(prevNext);
         }
     }
 
@@ -682,16 +680,14 @@ abstract public class RouteNode {
      * @return true, if a RouteNode instance has been visited before.
      */
     public boolean isVisited(boolean forward) {
-        return (forward ? prev : next) != null;
+        return (forward) ? visited : next != null;
     }
 
     /**
-     * Reset the visited, prev, and target state of this node.
+     * Reset the visited, prev, and next state of this node.
      */
-    public void reset(boolean isPreserved) {
-        if (!isPreserved) {
-            setPrev(null);
-        }
+    public void reset() {
+        visited = false;
         setNext(null);
     }
 
