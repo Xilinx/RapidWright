@@ -1586,7 +1586,7 @@ public class RWRoute{
         assert(sourceRnode.getPrev() == null);
         push(sourceRnode, 0, 0);
 
-        // Push all nodes from all net's routed connections onto the queue
+        // Push all nodes from the previous iteration's routing onto the queue
         if (connectionToRoute.getSink().isRouted()) {
             assert(!connectionToRoute.getRnodes().isEmpty());
 
@@ -1596,7 +1596,7 @@ public class RWRoute{
             // Go forwards from source
             for (RouteNode childRnode : Lists.reverse(connectionToRoute.getRnodes())) {
                 if (parentRnode != null) {
-                    assert(isAccessible(parentRnode, connectionToRoute));
+                    assert(isAccessible(childRnode, connectionToRoute));
 
                     // Place child onto queue
                     assert(!childRnode.isVisited());
