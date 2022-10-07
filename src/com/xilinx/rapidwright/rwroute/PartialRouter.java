@@ -254,6 +254,7 @@ public class PartialRouter extends RWRoute{
                     RouteNode sinkRnode = connection.getSinkRnode();
                     sinkRnode.setNext(sinkRnode);
                     finishRouteConnection(connection, sinkRnode);
+                    connection.fitBoundingBoxToRouting();
                     sinkRnode.setNext(null);
                 }
             }

@@ -1639,7 +1639,7 @@ public class RWRoute{
         push(true, sourceRnode, 0, 0);
         assert(sourceRnode.getPrev() == null);
 
-        // Push all nodes from all net's routed connections onto the queue
+        // Push all nodes from the previous iteration's routing onto the queue
         if (connectionToRoute.getSink().isRouted()) {
             assert(!connectionToRoute.getRnodes().isEmpty());
 
@@ -1650,7 +1650,7 @@ public class RWRoute{
             for (RouteNode childRnode : Lists.reverse(connectionToRoute.getRnodes())) {
                 if (parentRnode != null) {
                     boolean forward = true;
-                    assert(isAccessible(forward, parentRnode, connectionToRoute));
+                    assert(isAccessible(forward, childRnode, connectionToRoute));
 
                     // Trigger the creation of all children in order to emulate routing expansion;
                     // not doing so invalidates an assumption of how preserved nodes are visited
