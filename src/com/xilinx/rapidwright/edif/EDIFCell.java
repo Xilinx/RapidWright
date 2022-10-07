@@ -636,6 +636,17 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
         return null;
     }
 
+    public void sortEDIFPortInstLists() {
+        for (EDIFNet net : getNets()) {
+            EDIFPortInstList list = net.getEDIFPortInstList();
+            if(list != null) list._reSortList();
+        }
+        for (EDIFCellInst inst : getCellInsts()) {
+            EDIFPortInstList list = inst.getEDIFPortInstList();
+            if(list != null) list._reSortList();
+        }
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

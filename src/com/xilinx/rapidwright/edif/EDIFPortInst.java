@@ -86,6 +86,20 @@ public class EDIFPortInst {
      * @param cellInst This instance on which this port ref corresponds.
      */
     public EDIFPortInst(EDIFPort port, EDIFNet parentNet, int index, EDIFCellInst cellInst) {
+        this(port, parentNet, index, cellInst, false);
+    }
+
+    /**
+     * Constructor to create a new port ref on the provided instance and connect
+     * it to the provided net
+     * @param port The port on the cell this port ref uses
+     * @param parentNet The net this port ref should be added to
+     * @param index For port refs part of a bussed port, this is the index into
+     * the bussed array, for single bit ports, it should be -1.
+     * @param cellInst This instance on which this port ref corresponds.
+     */
+    public EDIFPortInst(EDIFPort port, EDIFNet parentNet, int index, EDIFCellInst cellInst,
+            boolean parserCreate) {
         if (index == -1 && port.isBus()) {
             throw new RuntimeException("ERROR: Use a different constructor, "
                     + "need index for bussed port " + port.getName());
@@ -104,8 +118,9 @@ public class EDIFPortInst {
         this.index = index;
         this.port = port;
         this.name = getPortInstNameFromPort();
-        setCellInst(cellInst);
-        if (parentNet != null) parentNet.addPortInst(this);
+        setCellInst(cellInst, parserCreate);
+        if (parentNet != null)
+            parentNet.addPortInst(this, parserCreate);
     }
 
     protected EDIFPortInst() {
@@ -154,12 +169,19 @@ public class EDIFPortInst {
      * @param cellInst the cellInst to set
      */
     public void setCellInst(EDIFCellInst cellInst) {
-        if (this.cellInst != null) {
+        setCellInst(cellInst, false);
+    }
+
+    /**
+     * @param cellInst the cellInst to set
+     */
+    public void setCellInst(EDIFCellInst cellInst, boolean parserCreate) {
+        if (this.cellInst != null && !parserCreate) {
             this.cellInst.removePortInst(this);
         }
         this.cellInst = cellInst;
         if (cellInst != null) {
-            cellInst.addPortInst(this);
+            cellInst.addPortInst(this, parserCreate);
         }
     }
 
