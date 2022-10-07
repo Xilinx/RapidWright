@@ -619,7 +619,7 @@ public class RouteNodeGraph {
         return rnode;
     }
 
-    // TODO: Just keep track of leaf nodes popped from the queue
+    // TODO: Just keep track of child-free nodes popped from the queue and walk backwards from those
     public void visit(boolean forward, RouteNode rnode) {
         if (forward) {
             visited.add(rnode);
