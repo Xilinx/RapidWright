@@ -1326,7 +1326,9 @@ public class RWRoute{
         rnode = intersectRnode;
         do {
             connection.addRnode(rnode);
-        } while ((rnode = rnode.getPrev()) != null);
+        // Do not use RouteNode.getPrev() so that routing can be recovered for
+        // PartialRouter.determineRoutingTargets() which doesn't mark the node as being visited
+        } while ((rnode = rnode.prev) != null);
 
         List<RouteNode> rnodes = connection.getRnodes();
         RouteNode sourceRnode = rnodes.get(rnodes.size()-1);

@@ -228,38 +228,28 @@ public class PartialRouter extends RWRoute{
                 RouteNode rend = getOrCreateRouteNode(end, RouteNodeType.WIRE);
                 assert (rend.getPrev() == null);
 
-                if (pip.isStub()) {
-                    // For stub nodes, set the prev pointer without setting visited state
-                    rend.prev = rstart;
-                } else {
-                    rend.setPrev(rstart);
-                }
-            }
-
-            // Reset the all RouteNode-s upstream of projected output INT node, otherwise finishRouteConnection()
-            // will complain that backtracking doesn't terminate at Net's source
-            for (SitePinInst spi : Arrays.asList(net.getSource(), net.getAlternateSource())) {
-                if (spi == null) continue;
-                Node n = RouterHelper.projectOutputPinToINTNode(spi);
-                RouteNode rn = routingGraph.getNode(n);
-                if (rn != null) {
-                    rn.reset();
-                }
+                // Set the prev pointer directly instead of using RouteNode.getPrev() to avoid
+                // marking the node as visited.
+                // This causes a problem for stub nodes for which the visited state is not reset.
+                rend.prev = rstart;
             }
 
             // Use the prev pointers to update the routing for each connection
             for (Connection connection : netWrapper.getConnections()) {
                 if (connection.getSink().isRouted()) {
-                    // Temporarily mark sink with a next pointer to themselves so that routing can be recovered
+                    // Temporarily visit (to avoid an assertion firing) and mark sink with a
+                    // next pointer (to indicate sink) to themselves so that routing can be recovered
                     RouteNode sinkRnode = connection.getSinkRnode();
+                    sinkRnode.setPrev(sinkRnode.prev); // Doesn't change prev, but does mark it as being visited
                     sinkRnode.setNext(sinkRnode);
                     finishRouteConnection(connection, sinkRnode);
                     connection.fitBoundingBoxToRouting();
-                    sinkRnode.setNext(null);
+                    sinkRnode.reset();
                 }
             }
 
             // Reset all used nodes
+            // TODO: Reset all used stubs too, so that we don't need to avoid using RoutNode.getPrev()
             for (Connection connection : netWrapper.getConnections()) {
                 for (RouteNode rnode : connection.getRnodes()) {
                     rnode.reset();
@@ -452,6 +442,12 @@ public class PartialRouter extends RWRoute{
             for (PIP pip : net.getPIPs()) {
                 Node start = (pip.isReversed()) ? pip.getEndNode() : pip.getStartNode();
                 Node end = (pip.isReversed()) ? pip.getStartNode() : pip.getEndNode();
+
+                // Do not include arcs that the router wouldn't explore
+                // e.g. those that leave the INT tile, since we project pins to their INT tile
+                if (routingGraph.isExcluded(true, start, end))
+                    continue;
+
                 boolean startPreserved = routingGraph.unpreserve(start);
                 boolean endPreserved = routingGraph.unpreserve(end);
 
@@ -461,36 +457,24 @@ public class PartialRouter extends RWRoute{
                 boolean rendAdded = rnodes.add(rend);
                 assert(rstartAdded == startPreserved);
                 assert(rendAdded == endPreserved);
+                assert(rend.getPrev() == null);
 
-                // Also set the prev pointer according to the PIP
-                assert (rend.getPrev() == null);
-                if (pip.isStub()) {
-                    // For stub nodes, set the prev pointer without setting visited state
-                    rend.prev = rstart;
-                } else {
-                    rend.setPrev(rstart);
-                }
-            }
-
-            // Reset the all RouteNode-s upstream of projected output INT node, otherwise finishRouteConnection()
-            // will complain that backtracking doesn't terminate at Net's source
-            for (SitePinInst spi : Arrays.asList(net.getSource(), net.getAlternateSource())) {
-                if (spi == null) continue;
-                Node n = RouterHelper.projectOutputPinToINTNode(spi);
-                RouteNode rn = routingGraph.getNode(n);
-                if (rn != null) {
-                    rn.reset();
-                }
+                // Set the prev pointer directly instead of using RouteNode.getPrev() to avoid
+                // marking the node as visited.
+                // This causes a problem for stub nodes for which the visited state is not reset.
+                rend.prev = rstart;
             }
 
             // Use the prev pointers to update the routing for each connection
             for (Connection netnewConnection : netWrapper.getConnections()) {
                 if (netnewConnection.getSink().isRouted()) {
-                    // Temporarily mark sink with a next pointer to themselves so that routing can be recovered
+                    // Temporarily visit (to avoid an assertion firing) and mark sink with a
+                    // next pointer (to indicate sink) to themselves so that routing can be recovered
                     RouteNode sinkRnode = netnewConnection.getSinkRnode();
+                    sinkRnode.setPrev(sinkRnode.prev); // Doesn't change prev, but does mark it as being visited
                     sinkRnode.setNext(sinkRnode);
                     finishRouteConnection(netnewConnection, sinkRnode);
-                    sinkRnode.setNext(null);
+                    assert(rnodes.contains(sinkRnode)); // Rely on the for loop below to reset this
                 }
             }
 
@@ -504,6 +488,7 @@ public class PartialRouter extends RWRoute{
             }
         }
 
+        // TODO: Avoid using a set by backtracking from sinks (and stubs) until an already-reset node is seen
         for (RouteNode rnode : rnodes) {
             Node toBuild = rnode.getNode();
             // Check already unpreserved above
