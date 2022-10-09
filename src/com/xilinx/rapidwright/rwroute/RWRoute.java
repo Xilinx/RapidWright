@@ -1360,8 +1360,9 @@ public class RWRoute{
                 if (!childRNode.willOverUse(connection.getNetWrapper())) {
                     queue.clear();
                 } else if (childRNode.isVisited()) {
-                    // Child node is congested, but has been marked as visited thus it must
-                    // be in the queue already
+                    // Child node is congested, but has been marked as visited
+                    // (prepareRouteConnection() will not mark a node as a target if it is congested)
+                    // thus it must be in the queue already
                     continue;
                 }
             } else if (childRNode.isVisited()) {
@@ -1594,7 +1595,7 @@ public class RWRoute{
         assert(sourceRnode.getPrev() == null);
         push(sourceRnode, 0, 0);
 
-        // Push all nodes from all net's routed connections onto the queue
+        // Push all nodes from the previous iteration's routing onto the queue
         if (connectionToRoute.getSink().isRouted()) {
             assert(!connectionToRoute.getRnodes().isEmpty());
 
@@ -1604,8 +1605,7 @@ public class RWRoute{
             // Go forwards from source
             for (RouteNode childRnode : Lists.reverse(connectionToRoute.getRnodes())) {
                 if (parentRnode != null) {
-                    assert(isAccessible(parentRnode, connectionToRoute));
-                    assert(!parentRnode.isTarget());
+                    assert(isAccessible(childRnode, connectionToRoute));
 
                     // Place child onto queue
                     assert(!childRnode.isVisited());
@@ -1616,6 +1616,9 @@ public class RWRoute{
                 }
 
                 parentRnode = childRnode;
+
+                assert(!parentRnode.isTarget());
+
                 parentRnodeWillOveruse = parentRnode.willOverUse(netWrapper);
                 // Skip all downstream nodes after the first would-be-overused node
                 if (parentRnodeWillOveruse)

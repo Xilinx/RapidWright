@@ -30,6 +30,7 @@ import java.util.List;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
+import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.timing.TimingEdge;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 
@@ -408,6 +409,24 @@ public class Connection implements Comparable<Connection>{
         yMaxBB += verticalIncrement;
         xMinBB = xMinBB < 0? -1:xMinBB;
         yMinBB = yMinBB < 0? -1:yMinBB;
+    }
+
+    public void fitBoundingBoxToRouting() {
+        int xmin = Integer.MAX_VALUE;
+        int xmax = Integer.MIN_VALUE;
+        int ymin = Integer.MAX_VALUE;
+        int ymax = Integer.MIN_VALUE;
+        for (RouteNode rnode : rnodes) {
+            Tile beginTile = rnode.node.getTile();
+            xmin = (short) Math.min(xmin, beginTile.getTileXCoordinate());
+            xmax = (short) Math.max(xmax, rnode.getEndTileXCoordinate());
+            ymin = (short) Math.min(ymin, beginTile.getTileYCoordinate());
+            ymax = (short) Math.max(ymax, rnode.getEndTileYCoordinate());
+        }
+        xMinBB = (short) Math.min(xMinBB, xmin - 1);
+        xMaxBB = (short) Math.max(xMaxBB, xmax + 1);
+        yMinBB = (short) Math.min(yMinBB, ymin - 1);
+        yMaxBB = (short) Math.max(yMaxBB, ymax + 1);
     }
 
     @Override

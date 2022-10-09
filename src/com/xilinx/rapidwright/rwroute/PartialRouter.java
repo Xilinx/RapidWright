@@ -235,6 +235,7 @@ public class PartialRouter extends RWRoute{
             for (Connection connection : netWrapper.getConnections()) {
                 if (connection.getSink().isRouted()) {
                     finishRouteConnection(connection);
+                    connection.fitBoundingBoxToRouting();
                 }
             }
         }
