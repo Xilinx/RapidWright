@@ -826,6 +826,10 @@ public class EDIFTools {
         }
     }
 
+    public static EDIFNetlist readEdifFile(Path edifFileName) {
+        return readEdifFile(edifFileName, Integer.MAX_VALUE);
+    }
+
     public static EDIFNetlist readEdifFile(Path edifFileName, int maxThreads) {
         Path parent = edifFileName.getParent();
         if (parent == null) {
