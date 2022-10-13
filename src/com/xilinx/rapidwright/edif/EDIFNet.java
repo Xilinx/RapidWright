@@ -106,22 +106,59 @@ public class EDIFNet extends EDIFPropertyObject {
         return new EDIFPortInst(port, this, index, null);
     }
 
-    public EDIFPortInst createPortInst(String portName, EDIFCellInst cellInst) {
-        EDIFPort port = cellInst.getPort(portName);
-        if (port == null) {
-            // check if it is a bussed port
-            int lengthRootName = portName.lastIndexOf('[');
-            if (lengthRootName == -1) return null;
-            String name = portName.substring(0, lengthRootName);
-            int idx = Integer.parseInt(portName.substring(lengthRootName+1, portName.lastIndexOf(']')));
-            String portRootName = portName.substring(0,lengthRootName);
-            port = cellInst.getPort(portRootName);
-            if (port == null) {
-                return null;
-            }
-            return createPortInst(name, port.getWidth()-idx-1, cellInst);
+    /**
+     * Creates a new port instance from a name on the external port of the provided
+     * cell instance. It looks up the appropriate port name from the portInstName
+     * and identifies the index if any.
+     * 
+     * @param portInstName The name of the new port instance, including indexed bit
+     *                     if it belongs on a bussed port.
+     * @param cellInst     The destination cell instance to receive the port
+     *                     instance
+     * @return The newly created port instance or null if none could be created on
+     *         the instance.
+     */
+    public EDIFPortInst createPortInst(String portInstName, EDIFCellInst cellInst) {
+        return createPortInstFromPortInstName(portInstName, cellInst.getCellType(), cellInst);
+    }
+
+    /**
+     * Creates a new port instance from a name on the internal port of the provided
+     * cell. It looks up the appropriate port name from the portInstName and
+     * identifies the index if any.
+     * 
+     * @param portInstName The name of the new port instance, including indexed bit
+     *                     if it belongs on a bussed port.
+     * @param cell         The destination cell to receive the port instance (on an
+     *                     inward facing port).
+     * @return The newly created port instance or null if none could be created on
+     *         the cell.
+     */
+    public EDIFPortInst createPortInst(String portInstName, EDIFCell cell) {
+        return createPortInstFromPortInstName(portInstName, cell, null);
+    }
+
+    /**
+     * Creates a port instance from a name. Navigates port naming issues when bussed
+     * names can collide with single bit port names.
+     * 
+     * @param portInstName Proposed name of the new port instance
+     * @param cell         The cell from which to draw the port
+     * @param inst         If this is not null, the port instance is added to the
+     *                     external facing port connection. If this is null, it will
+     *                     add it to the inward facing port connection.
+     * @return The newly created port instance or null if none could be created on
+     *         the cell or cell instance.
+     */
+    private EDIFPortInst createPortInstFromPortInstName(String portInstName, EDIFCell cell, EDIFCellInst inst) {
+        EDIFPort port = cell.getPortByPortInstName(portInstName);
+        if (port == null) return null;
+        int portIdx = -1;
+        if (port.isBus()) {
+            int idx = EDIFTools.getPortIndexFromName(portInstName);
+            portIdx = port.getPortIndexFromNameIndex(idx);
         }
-        return new EDIFPortInst(port, this, cellInst);
+        return new EDIFPortInst(port, this, portIdx, inst);
     }
 
     public EDIFPortInst createPortInst(String portName, int index, EDIFCellInst cellInst) {
