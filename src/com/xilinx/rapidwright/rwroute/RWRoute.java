@@ -516,7 +516,11 @@ public class RWRoute{
                     }
                     if (altSource != null) {
                         Node altSourceNode = RouterHelper.projectOutputPinToINTNode(altSource);
-                        altSourceINTRnode = getOrCreateRouteNode(altSourceNode, RouteNodeType.PINFEED_O);
+                        if (altSourceNode != null) {
+                            altSourceINTRnode = getOrCreateRouteNode(altSourceNode, RouteNodeType.PINFEED_O);
+                        } else {
+                            // No projection exists -- could be a dedicated pin like COUT, for example
+                        }
                     }
                 }
                 connection.setSourceRnode(sourceINTRnode);
