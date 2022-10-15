@@ -25,7 +25,6 @@
 package com.xilinx.rapidwright.rwroute;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -127,11 +126,7 @@ public class PartialRouter extends RWRoute{
         // is if it came from prev
         if (prev != null) {
             assert((prev.getNode() == start) == prev.getNode().equals(start));
-            if (prev.getNode().equals(start)) {
-                // Now that we're allowing this node to be created, and only be
-                // reachable from prev, remove its 'visited' status so it can be
-                // added to the routing queue
-                endRnode.setPrev(null);
+            if (prev.getNode() == start) {
                 assert(!endRnode.isVisited());
                 return true;
             }
@@ -213,28 +208,22 @@ public class PartialRouter extends RWRoute{
             for (PIP pip : net.getPIPs()) {
                 Node start = (pip.isReversed()) ? pip.getEndNode() : pip.getStartNode();
                 Node end = (pip.isReversed()) ? pip.getStartNode() : pip.getEndNode();
+
+                // Do not include arcs that the router wouldn't explore
+                // e.g. those that leave the INT tile, since we project pins to their INT tile
+                if (routingGraph.isExcluded(start, end))
+                    continue;
+
                 RouteNode rstart = getOrCreateRouteNode(start, RouteNodeType.WIRE);
                 RouteNode rend = getOrCreateRouteNode(end, RouteNodeType.WIRE);
                 assert (rend.getPrev() == null);
                 rend.setPrev(rstart);
             }
 
-            // Erase the prev pointer for all RouteNode-s upstream of projected
-            // output INT node, otherwise finishRouteConnection() will complain that
-            // backtracking doesn't terminate at Net's source
-            for (SitePinInst spi : Arrays.asList(net.getSource(), net.getAlternateSource())) {
-                if (spi == null) continue;
-                Node n = RouterHelper.projectOutputPinToINTNode(spi);
-                RouteNode rn = routingGraph.getNode(n);
-                if (rn != null) {
-                    rn.setPrev(null);
-                }
-            }
-
             // Use the prev pointers to update the routing for each connection
             for (Connection connection : netWrapper.getConnections()) {
                 if (connection.getSink().isRouted()) {
-                    finishRouteConnection(connection);
+                    finishRouteConnection(connection, connection.getSinkRnode());
                     connection.fitBoundingBoxToRouting();
                 }
             }
@@ -276,7 +265,7 @@ public class PartialRouter extends RWRoute{
 
         List<SitePinInst> sinks = staticNet.getSinkPins();
         if (sinks.size() > 0) {
-            sinks.removeIf((spi) -> spi.isRouted());
+            sinks.removeIf(SitePinInst::isRouted);
             if (sinks.isEmpty()) {
                 increaseNumPreservedStaticNets();
             } else {
@@ -420,6 +409,12 @@ public class PartialRouter extends RWRoute{
             for (PIP pip : net.getPIPs()) {
                 Node start = (pip.isReversed()) ? pip.getEndNode() : pip.getStartNode();
                 Node end = (pip.isReversed()) ? pip.getStartNode() : pip.getEndNode();
+
+                // Do not include arcs that the router wouldn't explore
+                // e.g. those that leave the INT tile, since we project pins to their INT tile
+                if (routingGraph.isExcluded(start, end))
+                    continue;
+
                 boolean startPreserved = routingGraph.unpreserve(start);
                 boolean endPreserved = routingGraph.unpreserve(end);
 
@@ -435,22 +430,10 @@ public class PartialRouter extends RWRoute{
                 rend.setPrev(rstart);
             }
 
-            // Erase the prev pointer for all RouteNode-s upstream of projected
-            // INT node, otherwise finishRouteConnection() will complain that
-            // backtracking doesn't terminate at Net's source
-            for (SitePinInst spi : Arrays.asList(net.getSource(), net.getAlternateSource())) {
-                if (spi == null) continue;
-                Node n = RouterHelper.projectOutputPinToINTNode(spi);
-                RouteNode rn = routingGraph.getNode(n);
-                if (rn != null) {
-                    rn.setPrev(null);
-                }
-            }
-
             // Use the prev pointers to update the routing for each connection
             for (Connection netnewConnection : netWrapper.getConnections()) {
                 if (netnewConnection.getSink().isRouted()) {
-                    finishRouteConnection(netnewConnection);
+                    finishRouteConnection(netnewConnection, netnewConnection.getSinkRnode());
                 }
             }
 
@@ -480,9 +463,7 @@ public class PartialRouter extends RWRoute{
                 parent.resetChildren();
             }
 
-            // Clear the prev pointer (as it is also used to track
-            // whether a node has been visited during expansion)
-            rnode.setPrev(null);
+            assert(!rnode.isVisited());
         }
 
         numPreservedWire--;

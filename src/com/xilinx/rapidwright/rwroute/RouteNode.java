@@ -100,12 +100,15 @@ abstract public class RouteNode implements Comparable<RouteNode> {
         historicalCongestionCost = 1;
         usersConnectionCounts = null;
         driversCounts = null;
-        reset();
+        assert(prev == null);
+        assert(!isTarget);
     }
 
     @Override
     public int compareTo(RouteNode that) {
-        return Float.compare(this.lowerBoundTotalPathCost, that.lowerBoundTotalPathCost);
+        // Do not use Float.compare() since it also checks NaN, which we'll assume is unreachable
+        // return Float.compare(this.lowerBoundTotalPathCost, that.lowerBoundTotalPathCost);
+        return (int) Math.signum(this.lowerBoundTotalPathCost - that.lowerBoundTotalPathCost);
     }
 
     abstract protected RouteNode getOrCreate(Node node, RouteNodeType type);
@@ -252,7 +255,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
                     endTile = tile;
                     // Break if this is the second INT tile
                     if (endTileWasNotNull) break;
-                } else if (lagunaTile) {
+                } else {
                     assert(!lagunaTileTypes.contains(baseTile.getTileTypeEnum()));
                     if (that != null && that.type == RouteNodeType.PINFEED_I) {
                         that.type = RouteNodeType.LAGUNA_I;
@@ -632,6 +635,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
      * @param prev The driving RouteNode instance to set.
      */
     public void setPrev(RouteNode prev) {
+        assert(prev != null);
         this.prev = prev;
     }
 
@@ -680,17 +684,9 @@ abstract public class RouteNode implements Comparable<RouteNode> {
      * Checks if a RouteNode instance has been visited before when routing a connection.
      * @return true, if a RouteNode instance has been visited before.
      */
-    public boolean isVisited() {
-        return getPrev() != null;
-    }
+    abstract public boolean isVisited();
 
-    /**
-     * Reset the visited, prev, and target state of this node.
-     */
-    public void reset() {
-        setPrev(null);
-        setTarget(false);
-    }
+    abstract public void setVisited();
 
     /**
      * Checks if a node is an exit node of a NodeGroup
