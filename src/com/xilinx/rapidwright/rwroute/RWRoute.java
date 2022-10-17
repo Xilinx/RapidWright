@@ -1386,7 +1386,7 @@ public class RWRoute{
                 // However, because the PriorityQueue class does not support reducing the cost
                 // of nodes already in the queue, this opportunity is discarded
 
-                // Do not skip this node if forward routing and:tail is not a preserved node that
+                // Do not skip this node if forward routing and tail is not a preserved node since
                 // (a) we're not the same arc it's already visited from (this can indicate a
                 //     preserved node which only accepts that arc)
                 // (b) this is the same arc, but not a preserved node, meaning that we're reusing
