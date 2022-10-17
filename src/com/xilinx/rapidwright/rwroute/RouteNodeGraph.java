@@ -40,6 +40,7 @@ import com.xilinx.rapidwright.util.RuntimeTracker;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -75,13 +76,11 @@ public class RouteNodeGraph {
     /**
      * Visited rnodes data during connection routing
      */
-    final protected Collection<RouteNode> visited;
-    final protected Collection<RouteNode> visitedBack;
+    protected final BitSet visited;
+    protected final BitSet visitedBack;
 
     final protected RuntimeTracker setChildrenTimer;
     final protected RuntimeTracker setParentsTimer;
-
-    private long totalVisited;
 
     final Design design;
 
@@ -93,10 +92,17 @@ public class RouteNodeGraph {
     public final int[] prevLagunaColumn;
     public Set<Integer> lagunaWireIsVcc;
 
+
+
     protected class RouteNodeImpl extends RouteNode {
+
+        final private int index;
 
         protected RouteNodeImpl(Node node, RouteNodeType type) {
             super(node, type);
+            index = numNodes();
+            assert(!isVisited(true));
+            assert(!isVisited(false));
         }
 
         @Override
@@ -133,6 +139,18 @@ public class RouteNodeGraph {
         public RouteNode[] getChildrenParents(boolean forward) {
             setChildrenParents(forward, (forward) ? setChildrenTimer : setParentsTimer);
             return super.getChildrenParents(forward);
+        }
+
+        @Override
+        public boolean isVisited(boolean forward) {
+            return (forward ? visited : visitedBack).get(index);
+        }
+
+        @Override
+        public void setVisited(boolean forward) {
+            BitSet v = (forward) ? visited : visitedBack;
+            assert(!v.get(index));
+            v.set(index);
         }
 
         @Override
@@ -323,8 +341,8 @@ public class RouteNodeGraph {
         preservedMap = new ConcurrentHashMap<>();
         preservedMapSize = new AtomicInteger();
         asyncPreserveOutstanding = new CountUpDownLatch();
-        visited = new ArrayList<>();
-        visitedBack = new ArrayList<>();
+        visited = new BitSet();
+        visitedBack = new BitSet();
         this.setChildrenTimer = setChildrenTimer;
         this.setParentsTimer = setChildrenTimer;
         this.design = design;
@@ -396,8 +414,6 @@ public class RouteNodeGraph {
     }
 
     public void initialize() {
-        totalVisited = 0;
-        visited.clear();
     }
 
     protected Net preserve(Node node, Net net) {
@@ -612,37 +628,19 @@ public class RouteNodeGraph {
         RouteNode[] rnodes = nodesMap.computeIfAbsent(tile, (t) -> new RouteNode[t.getWireCount()]);
         RouteNode rnode = rnodes[wireIndex];
         if (rnode == null) {
-            nodesMapSize++;
             rnode = create(node, type);
             rnodes[wireIndex] = rnode;
+            nodesMapSize++;
         }
         return rnode;
-    }
-
-    // TODO: Just keep track of child-free nodes popped from the queue and walk backwards from those
-    public void visit(boolean forward, RouteNode rnode) {
-        if (forward) {
-            visited.add(rnode);
-        } else {
-            visitedBack.add(rnode);
-        }
     }
 
     /**
      * Resets the expansion history.
      */
     public void resetExpansion() {
-        for (Collection<RouteNode> c : Arrays.asList(visited, visitedBack)) {
-            for (RouteNode rn : c) {
-                rn.reset();
-            }
-            totalVisited += c.size();
-            c.clear();
-        }
-    }
-
-    public long getTotalVisited() {
-        return totalVisited;
+        visited.clear();
+        visitedBack.clear();
     }
 
     public int averageChildren() {

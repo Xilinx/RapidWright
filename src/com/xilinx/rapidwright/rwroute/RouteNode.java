@@ -74,7 +74,6 @@ abstract public class RouteNode {
     /** A variable that stores the parent of a rnode during expansion to facilitate tracing back */
     protected RouteNode prev;
     protected RouteNode next;
-    private boolean visited;
     /**
      * A map that records users of a rnode based on all routed connections.
      * Each user is a {@link NetWrapper} instance that corresponds to a {@link Net} instance.
@@ -100,7 +99,8 @@ abstract public class RouteNode {
         historicalCongestionCost = 1;
         usersConnectionCounts = null;
         driversCounts = null;
-        reset();
+        assert(prev == null);
+        assert(next == null);
     }
 
     abstract protected RouteNode getOrCreate(Node node, RouteNodeType type);
@@ -621,7 +621,7 @@ abstract public class RouteNode {
      * @return The driving RouteNode instance.
      */
     public RouteNode getPrev() {
-        return (visited) ? prev : null;
+        return prev;
     }
 
     public RouteNode getNext() {
@@ -634,12 +634,11 @@ abstract public class RouteNode {
      */
     public void setPrev(RouteNode prev) {
         assert(prev != null);
-        assert(!visited || this.prev == prev);
-        visited = true;
         this.prev = prev;
     }
 
     public void setNext(RouteNode next) {
+        assert(next != null);
         this.next = next;
     }
 
@@ -696,17 +695,9 @@ abstract public class RouteNode {
      * Checks if a RouteNode instance has been visited before when routing a connection.
      * @return true, if a RouteNode instance has been visited before.
      */
-    public boolean isVisited(boolean forward) {
-        return (forward) ? visited : next != null;
-    }
+    abstract public boolean isVisited(boolean forward);
 
-    /**
-     * Reset the visited, prev, and next state of this node.
-     */
-    public void reset() {
-        visited = false;
-        setNext(null);
-    }
+    abstract public void setVisited(boolean forward);
 
     /**
      * Checks if a node is an exit node of a NodeGroup

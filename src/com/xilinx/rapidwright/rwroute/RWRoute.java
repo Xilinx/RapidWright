@@ -137,7 +137,8 @@ public class RWRoute{
     private int connectionsRouted;
     /** The total number of connections routed in an iteration */
     private int connectionsRoutedIteration;
-    /** Total number of nodes popped from the queue */
+    /** Total number of nodes pushed/popped from the queue */
+    private long nodesPushed;
     private long nodesPopped;
 
     /** The maximum criticality constraint of connection */
@@ -211,6 +212,7 @@ public class RWRoute{
         sortedIndirectConnections = new ArrayList<>(indirectConnections.size());
         connectionsRouted = 0;
         connectionsRoutedIteration = 0;
+        nodesPushed = 0;
         nodesPopped = 0;
         overUsedRnodes = new HashSet<>();
 
@@ -1192,7 +1194,6 @@ public class RWRoute{
                 rnodeWLWeight, estWlWeight, dlyWeight, estDlyWeight);
 
         int nodesPoppedThisConnection = 0;
-        boolean successRoute = false;
         boolean forward = true;
         RouteNode rnode = null;
         while (!queue.isEmpty() && !queueBack.isEmpty()) {
@@ -1204,29 +1205,31 @@ public class RWRoute{
             nodesPoppedThisConnection++;
 
             if (rnode.isIntersection()) {
-                successRoute = true;
                 break;
             }
 
             exploreAndExpand(forward, rnode, connection, shareWeight, rnodeCostWeight,
                     rnodeWLWeight, estWlWeight, dlyWeight, estDlyWeight);
             forward = !forward;
+            rnode = null;
         }
+        nodesPushed += nodesPoppedThisConnection + queue.size() + queueBack.size();
+        nodesPopped += nodesPoppedThisConnection;
         queue.clear();
         queueBack.clear();
-        nodesPopped += nodesPoppedThisConnection;
 
-        if (successRoute) {
+        if (rnode != null) {
             finishRouteConnection(connection, rnode);
             connection.getSink().setRouted(true);
             if (config.isTimingDriven()) connection.updateRouteDelay();
         } else {
-            connection.getSink().setRouted(false);
-            routingGraph.resetExpansion();
             System.out.printf("CRITICAL WARNING: Unroutable connection in iteration #%d\n", routeIteration);
             System.out.println("                 " + connection);
             System.out.println("                  Nodes popped: " + nodesPoppedThisConnection);
+            assert(!connection.getSink().isRouted());
         }
+
+        routingGraph.resetExpansion();
     }
 
     /**
@@ -1297,7 +1300,6 @@ public class RWRoute{
      */
     protected void finishRouteConnection(Connection connection, RouteNode targetRnode) {
         saveRouting(connection, targetRnode);
-        routingGraph.resetExpansion();
         updateUsersAndPresentCongestionCost(connection);
     }
 
@@ -1332,33 +1334,33 @@ public class RWRoute{
 
         List<RouteNode> rnodes = connection.getRnodes();
         RouteNode sourceRnode = rnodes.get(rnodes.size()-1);
-        // Update the connection source, in case we backtracked onto the alternate source
-        if (!sourceRnode.equals(connection.getSourceRnode())) {
-            Net net = connection.getNetWrapper().getNet();
-            SitePinInst altSource = net.getAlternateSource();
-            if (altSource == null) {
-                throw new RuntimeException(connection + " expected " + connection.getSourceRnode().getNode() +
-                        " got " + sourceRnode.getNode());
-            }
+        if (sourceRnode.equals(connection.getSourceRnode()))
+            return;
 
+        Net net = connection.getNetWrapper().getNet();
+        SitePinInst altSource = DesignTools.getLegalAlternativeOutputPin(net);
+        if (altSource != null) {
+            if (net.getAlternateSource() == null) {
+                DesignTools.routeAlternativeOutputSitePin(net, altSource);
+            }
             if (altSource == connection.getSource()) {
                 // This connection is already using the alternate source.
                 // Swap back to primary source
                 altSource = net.getSource();
             }
-
             Node altSourceINTNode = RouterHelper.projectOutputPinToINTNode(altSource);
-            if (!altSourceINTNode.equals(sourceRnode.getNode())) {
+            if (altSourceINTNode.equals(sourceRnode.getNode())) {
+                RouteNode altSourceRnode = sourceRnode;
+                connection.setSource(altSource);
+                connection.setSourceRnode(altSourceRnode);
+            } else {
                 throw new RuntimeException(connection + " expected " + altSourceINTNode +
                         " or " + connection.getSourceRnode().getNode() +
                         " got " + sourceRnode.getNode());
             }
-
-            // Swap primary and alternate sources
-            connection.setAltSourceRnode(connection.getSourceRnode());
-            RouteNode altSourceRnode = sourceRnode;
-            connection.setSource(altSource);
-            connection.setSourceRnode(altSourceRnode);
+        } else {
+            throw new RuntimeException(connection + " expected " + connection.getSourceRnode().getNode() +
+                    " got " + sourceRnode.getNode());
         }
     }
 
@@ -1378,25 +1380,18 @@ public class RWRoute{
                                   RouteNode headRnode, Connection connection, float shareWeight, float rnodeCostWeight,
                                   float rnodeLengthWeight, float rnodeEstWlWeight,
                                   float rnodeDelayWeight, float rnodeEstDlyWeight) {
-        boolean targetFound = false;
+        boolean intersectionFound = false;
         boolean longHead = config.isTimingDriven() && forward && DelayEstimatorBase.isLong(headRnode.getNode());
         for (RouteNode tailRnode : headRnode.getChildrenParents(forward)) {
             if (tailRnode.isVisited(forward)) {
-                // Note: it is possible that another (cheaper) path to a rnode is found here
-                // However, because the PriorityQueue class does not support reducing the cost
-                // of nodes already in the queue, this opportunity is discarded
+                // Node must be in queue already.
 
-                // Do not skip this node if forward routing and tail is not a preserved node since
-                // (a) we're not the same arc it's already visited from (this can indicate a
-                //     preserved node which only accepts that arc)
-                // (b) this is the same arc, but not a preserved node, meaning that we're reusing
-                //     the prior routing iteration's result
-                // In both scenarios, the "visited" state is a byproduct of this preserved node indicating the
-                // path back to the source.
-                if (!forward || tailRnode.getPrev() != headRnode || !routingGraph.isPreserved(tailRnode.getNode())) {
-                    continue;
-                }
+                // Note: it is possible that another (cheaper) path to a rnode is found here;
+                // however, because the PriorityQueue class does not support (efficiently) reducing
+                // the cost of nodes already in the queue, this opportunity is discarded
+                continue;
             }
+
             // For backward routing only, we must restrict our expansion only to preserved nodes
             // that are preserved for our net only
             Net tailPreservedNet = forward ? null : routingGraph.getPreservedNet(tailRnode.getNode());
@@ -1404,17 +1399,22 @@ public class RWRoute{
                 // Tail node is preserved by a net other than the one we're routing
                 continue;
             }
+
             if (tailRnode.isVisited(!forward)) {
+                // Node is an intersection!
+
                 // Despite the limitation above, on encountering an intersection only terminate
                 // immediately by clearing the queue if this target is not overused since
                 // there could be an alternate target that would be less congested
                 if (!tailRnode.willOverUse(connection.getNetWrapper())) {
                     if (forward) {
+                        nodesPushed += queue.size();
                         queue.clear();
                     } else {
+                        nodesPushed += queueBack.size();
                         queueBack.clear();
                     }
-                    targetFound = true;
+                    intersectionFound = true;
                 }
             } else {
                 if (!isAccessible(forward, tailRnode, connection)) {
@@ -1459,7 +1459,7 @@ public class RWRoute{
             boolean longTail = config.isTimingDriven() && !forward && DelayEstimatorBase.isLong(tailRnode.getNode());
             evaluateCostAndPush(forward, headRnode, forward ? longHead : longTail, tailRnode, connection, shareWeight, rnodeCostWeight,
                     rnodeLengthWeight, rnodeEstWlWeight, rnodeDelayWeight, rnodeEstDlyWeight);
-            if (targetFound) {
+            if (intersectionFound) {
                 assert(tailRnode.isIntersection());
                 break;
             }
@@ -1599,10 +1599,10 @@ public class RWRoute{
      * @param newTotalPathCost Total path cost of childRnode.
      */
     protected void push(boolean forward, RouteNode tailRnode, float newPartialPathCost, float newTotalPathCost) {
-        assert(tailRnode.isVisited(forward) || tailRnode.getType() == RouteNodeType.PINFEED_O);
+        assert(((!forward || tailRnode.getPrev() != null) && (forward || tailRnode.getNext() != null)) || tailRnode.getType() == RouteNodeType.PINFEED_O);
         tailRnode.setTotalCost(forward, newTotalPathCost);
         tailRnode.setKnownCost(forward, newPartialPathCost);
-        routingGraph.visit(forward, tailRnode);
+        tailRnode.setVisited(forward);
 
         if (forward) {
             queue.add(tailRnode);
@@ -1838,7 +1838,7 @@ public class RWRoute{
             System.out.printf("------------------------------------------------------------------------------\n");
             printFormattedString("Num iterations:", routeIteration);
             printFormattedString("Connections routed:", connectionsRouted);
-            printFormattedString("Nodes pushed:", routingGraph.getTotalVisited());
+            printFormattedString("Nodes pushed:", nodesPushed);
             printFormattedString("Nodes popped:", nodesPopped);
             System.out.printf("------------------------------------------------------------------------------\n");
         }

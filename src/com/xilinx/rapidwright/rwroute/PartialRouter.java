@@ -25,7 +25,6 @@
 package com.xilinx.rapidwright.rwroute;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -123,19 +122,16 @@ public class PartialRouter extends RWRoute{
 
         // If end node has been visited already, it can't possibly be using this arc
         if (endRnode.isVisited(forward)) {
-            assert(!endRnode.getPrev().getNode().equals(start));
+            assert(endRnode.getPrev() == null || !endRnode.getPrev().getNode().equals(start));
             return false;
         }
 
-        // Get the underlying prev pointer (do not use RouteNode.getPrev() as
-        // that masks prev if it has not been visited)
-        RouteNode prevRnode = endRnode.prev;
-        // Presence means that the only arc allowed to enter this end node
-        // is if it came from prev
+        // Presence of a prev pointer means that only that arc allowed to enter this end node
+        RouteNode prevRnode = endRnode.getPrev();
         if (prevRnode != null) {
             assert((prevRnode.getNode() == start) == prevRnode.getNode().equals(start));
             if (prevRnode.getNode() == start) {
-                assert(routingGraph.isPreserved(end));
+                assert(!endRnode.isVisited(forward));
                 return true;
             }
             return false;
@@ -231,7 +227,8 @@ public class PartialRouter extends RWRoute{
                 // Set the prev pointer directly instead of using RouteNode.getPrev() to avoid
                 // marking the node as visited.
                 // This causes a problem for stub nodes for which the visited state is not reset.
-                rend.prev = rstart;
+                // rend.prev = rstart;
+                rend.setPrev(rstart);
             }
 
             // Use the prev pointers to update the routing for each connection
@@ -240,22 +237,16 @@ public class PartialRouter extends RWRoute{
                     // Temporarily visit (to avoid an assertion firing) and mark sink with a
                     // next pointer (to indicate sink) to themselves so that routing can be recovered
                     RouteNode sinkRnode = connection.getSinkRnode();
-                    sinkRnode.setPrev(sinkRnode.prev); // Doesn't change prev, but does mark it as being visited
+                    sinkRnode.setVisited(true);
+                    sinkRnode.setVisited(false);
                     sinkRnode.setNext(sinkRnode);
                     finishRouteConnection(connection, sinkRnode);
                     connection.fitBoundingBoxToRouting();
-                    sinkRnode.reset();
-                }
-            }
-
-            // Reset all used nodes
-            // TODO: Reset all used stubs too, so that we don't need to avoid using RoutNode.getPrev()
-            for (Connection connection : netWrapper.getConnections()) {
-                for (RouteNode rnode : connection.getRnodes()) {
-                    rnode.reset();
                 }
             }
         }
+
+        routingGraph.resetExpansion();
 
         // Mark each static sink node -- if it exists -- as being used, unpreserving any nets
         // using those nodes (likely bounce points) as needed
@@ -293,7 +284,7 @@ public class PartialRouter extends RWRoute{
 
         List<SitePinInst> sinks = staticNet.getSinkPins();
         if (sinks.size() > 0) {
-            sinks.removeIf((spi) -> spi.isRouted());
+            sinks.removeIf(SitePinInst::isRouted);
             if (sinks.isEmpty()) {
                 increaseNumPreservedStaticNets();
             } else {
@@ -457,12 +448,10 @@ public class PartialRouter extends RWRoute{
                 boolean rendAdded = rnodes.add(rend);
                 assert(rstartAdded == startPreserved);
                 assert(rendAdded == endPreserved);
-                assert(rend.getPrev() == null);
 
-                // Set the prev pointer directly instead of using RouteNode.getPrev() to avoid
-                // marking the node as visited.
-                // This causes a problem for stub nodes for which the visited state is not reset.
-                rend.prev = rstart;
+                // Also set the prev pointer according to the PIP
+                assert (rend.getPrev() == null);
+                rend.setPrev(rstart);
             }
 
             // Use the prev pointers to update the routing for each connection
@@ -471,10 +460,11 @@ public class PartialRouter extends RWRoute{
                     // Temporarily visit (to avoid an assertion firing) and mark sink with a
                     // next pointer (to indicate sink) to themselves so that routing can be recovered
                     RouteNode sinkRnode = netnewConnection.getSinkRnode();
-                    sinkRnode.setPrev(sinkRnode.prev); // Doesn't change prev, but does mark it as being visited
+                    sinkRnode.setVisited(true);
+                    sinkRnode.setVisited(false);
                     sinkRnode.setNext(sinkRnode);
                     finishRouteConnection(netnewConnection, sinkRnode);
-                    assert(rnodes.contains(sinkRnode)); // Rely on the for loop below to reset this
+                    netnewConnection.fitBoundingBoxToRouting();
                 }
             }
 
@@ -487,6 +477,8 @@ public class PartialRouter extends RWRoute{
                 }
             }
         }
+
+        routingGraph.resetExpansion();
 
         // TODO: Avoid using a set by backtracking from sinks (and stubs) until an already-reset node is seen
         for (RouteNode rnode : rnodes) {
@@ -516,9 +508,7 @@ public class PartialRouter extends RWRoute{
                 child.resetParents();
             }
 
-            rnode.reset();
-            // Reset the prev pointer too lest it gets mistaken for a preserved node
-            rnode.prev = null;
+            assert(!rnode.isVisited(true) && !rnode.isVisited(false));
         }
 
         numPreservedWire--;
