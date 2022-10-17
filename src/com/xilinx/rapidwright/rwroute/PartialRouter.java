@@ -506,6 +506,16 @@ public class PartialRouter extends RWRoute{
                 parent.resetChildren();
             }
 
+            for (Node downhill : toBuild.getAllDownhillNodes()) {
+                RouteNode child = routingGraph.getNode(downhill);
+                if (child == null)
+                    continue;
+
+                // Reset its list of children so that they may be regenerated to include the
+                // newly unpreserved node
+                child.resetParents();
+            }
+
             rnode.reset();
             // Reset the prev pointer too lest it gets mistaken for a preserved node
             rnode.prev = null;

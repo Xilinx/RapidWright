@@ -448,6 +448,13 @@ abstract public class RouteNode {
         children = null;
     }
 
+    /**
+     * Clears the parents of this node so that it can be regenerated.
+     */
+    public void resetParents() {
+        parents = null;
+    }
+
     protected void setType(RouteNodeType type) {
         this.type = type;
         if (type == RouteNodeType.WIRE) {
