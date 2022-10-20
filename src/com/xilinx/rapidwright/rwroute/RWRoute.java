@@ -181,12 +181,12 @@ public class RWRoute{
 
         queue = new PriorityQueue<>(new Comparator<RouteNode>() {
              public int compare(RouteNode r1, RouteNode r2) {
-                 return Float.compare(r1.getTotalCost(true), r2.getTotalCost(true));
+                 return r1.compareTo(r2);
              }
         });
         queueBack = new PriorityQueue<>(new Comparator<RouteNode>() {
             public int compare(RouteNode r1, RouteNode r2) {
-                return Float.compare(r1.getTotalCost(false), r2.getTotalCost(false));
+                return r1.compareToBack(r2);
             }
         });
 

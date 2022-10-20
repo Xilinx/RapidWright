@@ -103,6 +103,18 @@ abstract public class RouteNode {
         assert(next == null);
     }
 
+    public int compareTo(RouteNode that) {
+        // Do not use Float.compare() since it also checks NaN, which we'll assume is unreachable
+        // return Float.compare(this.lowerBoundTotalPathCost, that.lowerBoundTotalPathCost);
+        return (int) Math.signum(this.totalCostToSink - that.totalCostToSink);
+    }
+
+    public int compareToBack(RouteNode that) {
+        // Do not use Float.compare() since it also checks NaN, which we'll assume is unreachable
+        // return Float.compare(this.lowerBoundTotalPathCost, that.lowerBoundTotalPathCost);
+        return (int) Math.signum(this.totalCostToSource - that.totalCostToSource);
+    }
+
     abstract protected RouteNode getOrCreate(Node node, RouteNodeType type);
 
     protected void setChildrenParents(boolean forward, RuntimeTracker timer) {
