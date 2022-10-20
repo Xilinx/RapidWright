@@ -835,16 +835,19 @@ public class EDIFTools {
     }
 
     public static EDIFNetlist loadEDIFStream(InputStream is, long size) throws IOException {
-
         try (EDIFParser p = new EDIFParser(is)) {
             return p.parseEDIFNetlist();
         }
     }
 
     public static EDIFNetlist loadEDIFFile(Path fileName) {
+        return loadEDIFFile(fileName, Integer.MAX_VALUE);
+    }
+
+    public static EDIFNetlist loadEDIFFile(Path fileName, int maxThreads) {
         try {
             final long size = Files.size(fileName);
-            if (ParallelEDIFParser.calcThreads(size) > 1) {
+            if (ParallelEDIFParser.calcThreads(size, maxThreads) > 1) {
                 try (ParallelEDIFParser p = new ParallelEDIFParser(fileName)) {
                     return p.parseEDIFNetlist();
                 }
@@ -859,7 +862,7 @@ public class EDIFTools {
     }
 
     public static EDIFNetlist loadEDIFFile(String fileName) {
-        return loadEDIFFile(Paths.get(fileName));
+        return loadEDIFFile(Paths.get(fileName), Integer.MAX_VALUE);
     }
 
     public static void ensureCorrectPartInEDIF(EDIFNetlist edif, String partName) {
@@ -892,6 +895,10 @@ public class EDIFTools {
     }
 
     public static EDIFNetlist readEdifFile(Path edifFileName) {
+        return readEdifFile(edifFileName, Integer.MAX_VALUE);
+    }
+
+    public static EDIFNetlist readEdifFile(Path edifFileName, int maxThreads) {
         Path parent = edifFileName.getParent();
         if (parent == null) {
             parent = Paths.get(System.getProperty("user.dir"));
@@ -927,7 +934,7 @@ public class EDIFTools {
                     + "be passed to resulting DCP load script.");
             }
         }
-        edif = loadEDIFFile(edifFileName);
+        edif = loadEDIFFile(edifFileName, maxThreads);
         if (edifDirectoryName != null) {
             File origDir = new File(edifDirectoryName);
             edif.setOrigDirectory(edifDirectoryName);
@@ -955,7 +962,7 @@ public class EDIFTools {
     }
 
     public static EDIFNetlist readEdifFile(String edifFileName) {
-        return readEdifFile(Paths.get(edifFileName));
+        return readEdifFile(Paths.get(edifFileName), Integer.MAX_VALUE);
     }
 
     public static void writeEDIFFile(Path fileName, EDIFNetlist edif, String partName) {
