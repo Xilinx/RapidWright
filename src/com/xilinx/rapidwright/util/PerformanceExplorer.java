@@ -297,7 +297,6 @@ public class PerformanceExplorer {
 
 
     public void explorePerformance() {
-
         if (vivadoPath.equals(DEFAULT_VIVADO) && !FileTools.isVivadoOnPath()) {
             throw new RuntimeException("ERROR: Couldn't find \n"
                 + "    vivado on PATH, please update PATH or specify path with option -" + VIVADO_PATH_OPT);
@@ -326,6 +325,8 @@ public class PerformanceExplorer {
         }
 
         int pb = 0;
+        int jobsStarted = 0;
+        int maxConcurrentJobs = JobQueue.isLSFAvailable() ? JobQueue.MAX_LSF_CONCURRENT_JOBS : JobQueue.MAX_LOCAL_CONCURRENT_JOBS;
         for (Entry<PBlock, String> e : pblocks.entrySet()) {
             PBlock pblock = e.getKey();
             for (PlacerDirective p : getPlacerDirectives()) {
@@ -346,16 +347,20 @@ public class PerformanceExplorer {
                         Job j = JobQueue.createJob();
                         j.setRunDir(instDir);
                         j.setCommand(getVivadoPath() + " -mode batch -source " + scriptName);
-                        @SuppressWarnings("unused")
-                        long id = j.launchJob();
-                        jobs.addRunningJob(j);
+                        if (jobsStarted < maxConcurrentJobs) {
+                            j.launchJob();
+                            jobs.addRunningJob(j);
+                            jobsStarted++;
+                        } else {
+                            jobs.addJob(j);
+                        }
                     }
                 }
             }
             pb++;
         }
 
-        boolean success = jobs.runAllToCompletion();
+        boolean success = jobs.runAllToCompletion(maxConcurrentJobs);
 
         System.out.println("Performance Explorer " + (success ? "Finished Successfully." : "Failed!"));
     }

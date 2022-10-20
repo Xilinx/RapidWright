@@ -39,7 +39,7 @@ public class ParallelEDIFParserTestSpecificOffsets extends ParallelEDIFParser{
     private final List<ParseStart>  startOffsets;
 
     ParallelEDIFParserTestSpecificOffsets(Path fileName, long fileSize, InputStreamSupplier inputStreamSupplier, int maxTokenLength, List<ParseStart>  startOffsets) throws IOException {
-        super(fileName, fileSize, inputStreamSupplier, maxTokenLength);
+        super(fileName, fileSize, inputStreamSupplier, maxTokenLength, Integer.MAX_VALUE);
         this.startOffsets = startOffsets;
     }
 
