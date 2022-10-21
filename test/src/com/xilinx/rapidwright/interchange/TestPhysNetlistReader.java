@@ -29,6 +29,8 @@ import java.nio.file.Path;
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.SiteInst;
+import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -60,4 +62,12 @@ public class TestPhysNetlistReader {
         testRoutethruLUTsHelper(output);
     }
 
+    @Test
+    public void testReadPhysNetlist() throws IOException {
+        Path netlistPath = RapidWrightDCP.getPath("interchange/bug546.netlist");
+        Path physPath = RapidWrightDCP.getPath("interchange/bug546.phys");
+
+        EDIFNetlist netlist = LogNetlistReader.readLogNetlist(netlistPath.toString());
+        PhysNetlistReader.readPhysNetlist(physPath.toString(), netlist);
+    }
 }
