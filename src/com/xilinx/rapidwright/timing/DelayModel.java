@@ -1,6 +1,7 @@
 /*
  *
- * Copyright (c) 2019 Xilinx, Inc.
+ * Copyright (c) 2019-2022, Xilinx, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Pongstorn Maidee, Xilinx Research Labs.
@@ -90,14 +91,14 @@ public interface DelayModel {
      * @throws  IllegalArgumentException if the given bel is not recognized by the model.
      */
      public short getLogicDelay(short belIdx, String frBelPin, String toBelPin);
-     
+
      /**
       * TODO - Revisit this as part of the DelayModel
-      * Gets the encoded config code for the value (belname:paramsetting) 
+      * Gets the encoded config code for the value (belname:paramsetting)
       * @return The encoded value
       */
      public int getEncodedConfigCode(String value);
-     
+
      /**
       * TODO - Revisit this is part of the DelayModel
       * Gets the equivalent timing model index for this BEL

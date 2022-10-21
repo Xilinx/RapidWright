@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2021 Xilinx, Inc.
+ * Copyright (c) 2021-2022, Xilinx, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Eddie Hung, Xilinx Research Labs.
@@ -61,13 +62,13 @@ public class RelocateHierarchy {
         int rowOffset = Integer.parseInt(args[3]);
 
         Set<SiteTypeEnum> customSet = RelocationTools.defaultSiteTypes;
-        
-        if(args.length == 6) {
-            for(String siteTypeEnum : args[5].split(",")) {
-                customSet.add(SiteTypeEnum.valueOf(siteTypeEnum));                
+
+        if (args.length == 6) {
+            for (String siteTypeEnum : args[5].split(",")) {
+                customSet.add(SiteTypeEnum.valueOf(siteTypeEnum));
             }
         }
-        
+
         if (!RelocationTools.relocate(design, hierarchyPrefix, colOffset, rowOffset, customSet)) {
             throw new RuntimeException("ERROR: Relocation failed");
         }

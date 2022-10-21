@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2022 Xilinx, Inc.
+ * Copyright (c) 2022, Xilinx, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author Zac Blair, Xilinx Research Labs.
@@ -50,7 +51,7 @@ public enum ComponentType {
 
     static {
         map = new HashMap<>();
-        for(ComponentType e : values()) {
+        for (ComponentType e : values()) {
             map.put(e.toString(), e);
         }
     }

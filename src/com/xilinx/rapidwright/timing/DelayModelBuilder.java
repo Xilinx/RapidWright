@@ -1,6 +1,7 @@
 /*
  *
- * Copyright (c) 2019 Xilinx, Inc.
+ * Copyright (c) 2019-2022, Xilinx, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Pongstorn Maidee, Xilinx Research Labs.
@@ -42,12 +43,12 @@ class DelayModelBuilder {
     // Never change the order of existing entries.
 
     /**
-     * List all the valid modes to store the model. Adding new modes require appending them to the 
+     * List all the valid modes to store the model. Adding new modes require appending them to the
      * end of valid_mode or valid_source. Never change the order of existing entries.
      */
     private static String[]   valid_mode   = {"small"};
     /**
-     * List all the valid sources to store the model. Adding new sources require appending them to 
+     * List all the valid sources to store the model. Adding new sources require appending them to
      * the end of valid_mode or valid_source. Never change the order of existing entries.
      */
     private static String[]   valid_source = {"text"};
@@ -80,7 +81,7 @@ class DelayModelBuilder {
 
     /**
      * The method to build DelayModel and DelayModelSource according to the given parameters.
-     * @param mode      The type of delay model. It defines how data are stored which will affect 
+     * @param mode      The type of delay model. It defines how data are stored which will affect
      * the memory requirement and how fast the lookup is. Currently, the only valid entry is "small".
      * @param source    The source of delay model. Currently, the only valid entry is "text".
      * @param fileName  The text file describing the delay model.
@@ -113,14 +114,14 @@ class DelayModelBuilder {
             if (fileName != null) {
                 writer = new BufferedWriter(new FileWriter(fileName));
             }
-            
+
           int encodedConfig = 0;
           for (String s : config) {
               int e = delayModel.getEncodedConfigCode(belName + ":"+ s);
               encodedConfig = (int) (encodedConfig | e);
           }
           short belIdx = delayModel.getBELIndex(belName);
-            
+
             for (String s : src) {
                 for (String t : dst) {
 //                    System.out.println(s + " " + t);
@@ -145,7 +146,7 @@ class DelayModelBuilder {
         System.out.println("testLogicDelay found " + countNeg + " negative entries.");
         return count;
     }
-    
+
     /**
      * For unit testing.
      */
@@ -460,7 +461,7 @@ class DelayModelBuilder {
             long startTime = System.nanoTime();
             for (int i = 0; i < 10 ; i++) {
                 List<String> config = new ArrayList<String>();
-                config.add("RTL_RAM_TYPE:RAM_SP"); 
+                config.add("RTL_RAM_TYPE:RAM_SP");
                 config.add("CASCADE_ORDER_A:NONE");
                 config.add("DOA_REG:1");
                 count += testLogicDelayRAMB(a, config, "ramb.dly");
