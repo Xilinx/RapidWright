@@ -172,6 +172,12 @@ public class CodePerfTracker {
         return this;
     }
 
+    /**
+     * Gets the current and total peak memory usage. Depends on /proc Linux to get
+     * values.
+     * 
+     * @return A Pair where the first is current and second is peak memory usage.
+     */
     private Pair<Long,Long> getTotalPeakMemUsage() {
         if (linuxProcID == null) return null;
         Pair<Long,Long> totalPeakMemUsage = new Pair<>();
@@ -221,11 +227,12 @@ public class CodePerfTracker {
                         (runtime)/1000000000.0);
             } else {
                 if (totalPeakUsage != null) {
-                    System.out.printf("%"+maxSegmentNameSize+"s: %"+maxRuntimeSize+".3fs %"+maxUsageSize+".3fMBs | %"+maxUsageSize+".3fMBs (curr) %"+maxUsageSize+".3fMBs (peak)\n",
+                    System.out.printf(
+                            "%" + maxSegmentNameSize + "s: %" + maxRuntimeSize + ".3fs %"
+                                    + maxUsageSize + ".3fMBs | %" + maxUsageSize + ".3fMBs (peak)\n",
                                 segmentName,
                                 (runtime)/1000000000.0,
                                 (memUsage)/(1024.0*1024.0),
-                                (totalPeakUsage.getFirst())/1024.0,
                                 (totalPeakUsage.getSecond())/1024.0);
 
                 }else {
