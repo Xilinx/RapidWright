@@ -208,7 +208,8 @@ public class CodePerfTracker {
 
         long end = System.nanoTime();
         if (printProgress && isVerbose()) {
-            print("(" + segmentName + ")", end-start, null, null, true);
+            print("(" + segmentName + ")", end - start, null,
+                    isUsingGCCallsToTrackMemory() ? getTotalPeakMemUsage() : null, true);
         }
         return this;
     }
@@ -220,11 +221,12 @@ public class CodePerfTracker {
     private void print(String segmentName, Long runtime, Long memUsage, Pair<Long,Long> totalPeakUsage, boolean nested) {
         if (isUsingGCCallsToTrackMemory()) {
             if (nested) {
-                System.out.printf("%"+maxSegmentNameSize+"s: %"+maxRuntimeSize+"s %" + maxUsageSize + "s      (%" + maxRuntimeSize + ".3fs)\n",
+                System.out.printf(
+                        "%" + maxSegmentNameSize + "s: %" + maxRuntimeSize + "s %" + maxUsageSize
+                                + "s (%" + maxRuntimeSize + ".3fs) | %" + maxUsageSize
+                                + ".3fMBs (peak)\n",
                         segmentName,
-                        "",
-                        "",
-                        (runtime)/1000000000.0);
+                        "", "", (runtime) / 1000000000.0, (totalPeakUsage.getSecond()) / 1024.0);
             } else {
                 if (totalPeakUsage != null) {
                     System.out.printf(
