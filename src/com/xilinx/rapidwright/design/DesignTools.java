@@ -1033,13 +1033,22 @@ public class DesignTools {
 	 * pins individually.
 	 * @param net The current net to modify routing and to which all pins will have their routing 
 	 * removed. If any pin passed in is not of this net, it is skipped and no effect is taken.
-	 * @param pins Sink pins that belong to the provided net that should have their selective routing 
-	 * removed. This method only works for sink pins.  
-	 * See {@link #unrouteSourcePin(SitePinInst)} for handling source pin unroutes.
+	 * @param pins Pins that belong to the provided net that should have their selective routing
+	 * removed.
+	 * Source pins are handled by {@link #unrouteSourcePin(SitePinInst)}.
 	 */
 	public static void unroutePins(Net net, Collection<SitePinInst> pins) {
-	    removePIPsFromNet(net,getTrimmablePIPsFromPins(net, pins));
-	    for(SitePinInst pin : pins) {
+		List<SitePinInst> sinkPins = new ArrayList<>(pins.size());
+		pins.forEach((spi) -> {
+			if (spi.isOutPin()) {
+				// TODO - This can lead to a slow down in VCC and GND nets as it is not batched                        
+				DesignTools.unrouteSourcePin(spi);
+			} else {
+				sinkPins.add(spi);
+			}
+		});
+	    removePIPsFromNet(net,getTrimmablePIPsFromPins(net, sinkPins));
+	    for(SitePinInst pin : sinkPins) {
 	        pin.setRouted(false);
 	    }	    
 	}
@@ -1432,6 +1441,13 @@ public class DesignTools {
 		t.start("Init");
 		EDIFCellInst futureBlackBox = hierarchicalCell.getInst();
 		if(futureBlackBox == null) throw new RuntimeException("ERROR: Couldn't find cell " + hierarchicalCell + " in source design " + d.getName());
+		
+		if(hierarchicalCell.getCellType() == d.getTopEDIFCell()) {
+		    d.unplaceDesign();
+		    d.getTopEDIFCell().makePrimitive();
+		    d.getTopEDIFCell().addProperty(EDIFCellInst.BLACK_BOX_PROP, true);
+		    return;
+		}
 		
 		Set<SiteInst> touched = new HashSet<>();
 		Map<String,String> boundaryNets = new HashMap<>();
@@ -2271,14 +2287,18 @@ public class DesignTools {
 			    if(destLib == null){
 			        destLib = destNetlist.getWorkLibrary();
 			    }
-			    EDIFCell existingCell = destLib.getCell(cellInst.getCellType().getLegalEDIFName());
+			    EDIFCell existingCell = destLib.getCell(cellInst.getCellType().getName());
 			    if(existingCell != null) {
 			        destLib.removeCell(existingCell);
 			    }
 			}
 			destNetlist.migrateCellAndSubCells(cellInst.getCellType());
 			EDIFHierCellInst bbInst = destNetlist.getHierCellInstFromName(e.getValue());
-			bbInst.getInst().setCellType(cellInst.getCellType());
+			EDIFCell destCell = destNetlist.getCell(cellInst.getCellType().getName());
+			if(destNetlist.getTopCell() == bbInst.getCellType()) {
+			    destNetlist.getDesign().setTopCell(destCell);
+			}
+			bbInst.getInst().setCellType(destCell);
 			instsWithSeparator.add(e.getKey() + EDIFTools.EDIF_HIER_SEP);
 		}
 		destNetlist.resetParentNetMap();

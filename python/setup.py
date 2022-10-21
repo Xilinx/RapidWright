@@ -24,12 +24,12 @@ from setuptools import setup
 
 setup(
     name='rapidwright',
-    version='2022.1.2',
+    version='2022.1.3',
     license='Apache 2.0 and Others',
     description='Xilinx RapidWright Framework Wrapped for Python.',
     long_description='',
     author='Chris Lavin',
-    author_email='chris.lavin@xilinx.com',
+    author_email='chris.lavin@amd.com',
     url='https://github.com/Xilinx/RapidWright',
     packages=find_packages(where='src'),
     package_dir={'': 'src'},

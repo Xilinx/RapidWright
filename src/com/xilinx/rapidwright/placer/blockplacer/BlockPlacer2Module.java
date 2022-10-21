@@ -24,7 +24,6 @@ package com.xilinx.rapidwright.placer.blockplacer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -37,6 +36,7 @@ import com.xilinx.rapidwright.design.ModuleInst;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.design.TileRectangle;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.Tile;
@@ -44,15 +44,17 @@ import com.xilinx.rapidwright.util.MessageGenerator;
 import com.xilinx.rapidwright.util.Utils;
 
 public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Path>{
+
+    private AbstractOverlapCache<Site, HardMacro> overlaps;
+
     /** The current location of all hard macros */
-    private HashMap<Site, HardMacro> currentPlacements;
     private Map<ModuleInst, HardMacro> macroMap;
 
-    public BlockPlacer2Module(Design design, boolean ignoreMostUsedNets, java.nio.file.Path graphData) {
-        super(design, ignoreMostUsedNets, graphData);
+    public BlockPlacer2Module(Design design, boolean ignoreMostUsedNets, java.nio.file.Path graphData, boolean denseDesign, float effort, boolean focusOnWorstModules, TileRectangle placementArea) {
+        super(design, ignoreMostUsedNets, graphData, denseDesign, effort, focusOnWorstModules, placementArea);
     }
     public BlockPlacer2Module(Design design) {
-        super(design, true, null);
+        super(design, true, null, DEFAULT_DENSE, DEFAULT_EFFORT, DEFAULT_FOCUS_ON_WORST, null);
     }
 
     @Override
@@ -87,26 +89,27 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
         for(ModuleInst mi : design.getModuleInsts()){
             HardMacro hm = new HardMacro(mi);
             hardMacros.add(hm);
-            hm.setValidPlacements();
+            if (mi.isPlaced()) {
+                hm.setTempAnchorSite(mi.getAnchor().getSite(), null);
+            }
             macroMap.put(mi, hm);
         }
+        overlaps = new RegionBasedOverlapCache<>(design.getDevice(), hardMacros);
         return hardMacros;
     }
 
-    @Override
-    Comparator<Site> getInitialPlacementComparator() {
-        Tile center = dev.getTile(dev.getRows()/2, dev.getColumns()/2);
-        return Comparator.comparingInt(i -> i.getTile().getManhattanDistance(center));
-    }
 
     @Override
     public void setTempAnchorSite(HardMacro hm, Site site) {
-        hm.setTempAnchorSite(site, currentPlacements);
+        if (hm.getPlacement() != null) {
+            overlaps.unplace(hm);
+        }
+        hm.setTempAnchorSite(site, null);
+        overlaps.place(hm);
     }
 
     @Override
     protected void initialPlacement() {
-        currentPlacements = new HashMap<>();
         super.initialPlacement();
     }
 
@@ -129,9 +132,7 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
         hm.unsetTempAnchorSite();
     }
 
-    @Override
-    protected boolean checkValidPlacement(HardMacro hm) {
-        if(!hm.isValidPlacement()) return false;
+    private boolean checkValidPlacementLegacy(HardMacro hm){
         for(HardMacro hardMacro : hardMacros){
             if(hardMacro.equals(hm)) continue;
             if(hm.getTempAnchorSite().equals(hardMacro.getTempAnchorSite())) return false;
@@ -140,6 +141,17 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
             }
         }
         return true;
+
+    }
+
+    @Override
+    protected boolean checkValidPlacement(HardMacro hm) {
+        return overlaps.isValidPlacement(hm);
+    }
+
+    @Override
+    protected List<HardMacro> getAllOverlaps(HardMacro hm) {
+        return overlaps.getAllOverlaps(hm);
     }
 
     @Override
@@ -161,7 +173,6 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
 
     @Override
     protected void doFinalPlacement() {
-
         // Sort hard macros, largest first to place them first
         HardMacro[] array = new HardMacro[hardMacros.size()];
         array = hardMacros.toArray(array);
@@ -172,8 +183,9 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
         boolean save_and_exit = false;
         // Perform final placement of all hard macros
         for(HardMacro hm : array){
+            hm.place(hm.getTempAnchorSite());
             //System.out.println(moveCount.get(hm) + " " + hm.tileSize + " " + hm.getName());
-            HashSet<Tile> footPrint = isValidPlacement((ModuleInst)hm, hm.getModule().getAnchor(), hm.getTempAnchorSite().getTile(), usedTiles);
+            /*HashSet<Tile> footPrint = isValidPlacement((ModuleInst)hm, hm.getModule().getAnchor(), hm.getTempAnchorSite().getTile(), usedTiles);
             if(footPrint == null){
 
                 if(!placeModuleNear((ModuleInst)hm, hm.getTempAnchorSite().getTile(), usedTiles)){
@@ -185,6 +197,9 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
                         hm.unplace();
                     } else
                         MessageGenerator.briefErrorAndExit("ERROR: Placement failed, couldn't find valid site for " + hm.getName());
+                } else {
+
+                    System.out.println("could not place "+hm.getName()+" at "+hm.getTempAnchorSite()+". Choosing "+hm.getAnchor().getSite()+" instead");
                 }
             }
             else{
@@ -198,7 +213,7 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
                     } else
                         MessageGenerator.briefErrorAndExit("ERROR: Problem placing " + hm.getName() + " on site: " + hm.getTempAnchorSite());
                 }
-            }
+            }*/
         }
 
         System.out.println("Cost = " + currentSystemCost());
@@ -231,12 +246,12 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
     }
 
     @Override
-    protected Collection<Path> getConnectedPaths(HardMacro module) {
+    public Collection<Path> getConnectedPaths(HardMacro module) {
         return module.getConnectedPaths();
     }
 
     @Override
-    Collection<Site> getAllPlacements(HardMacro hm) {
+    List<Site> getAllPlacements(HardMacro hm) {
         return hm.getValidPlacements();
     }
 
@@ -277,6 +292,9 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
         if (allPaths.isEmpty()) {
             throw new RuntimeException("no paths found");
         }
+
+        pruneSameConnectionPaths();
+
         for(Path pa : allPaths){
             for(PathPort po : pa){
                 if(po.getBlock() != null){
@@ -284,12 +302,6 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
                 }
             }
         }
-    }
-
-    @Override
-    protected HardMacro getHmCurrentlyAtPlacement(Site placement) {
-
-        return currentPlacements.get(placement);
     }
 
     public boolean placeModuleNear(ModuleInst modInst, Tile tile, HashSet<Tile> usedTiles){
