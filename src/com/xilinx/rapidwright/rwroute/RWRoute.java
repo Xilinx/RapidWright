@@ -1449,15 +1449,16 @@ public class RWRoute{
                                      float rnodeDelayWeight, float rnodeEstDlyWeight) {
         int countSourceUses = childRnode.countConnectionsOfUser(connection.getNetWrapper());
         float sharingFactor = 1 + sharingWeight* countSourceUses;
+
+        // Set the prev pointer, as RouteNode.getEndTileYCoordinate() and
+        // RouteNode.getSLRIndex() require this
+        childRnode.setPrev(rnode);
+
         float newPartialPathCost = rnode.getUpstreamPathCost() + rnodeCostWeight * getNodeCost(childRnode, connection, countSourceUses, sharingFactor)
                                 + rnodeLengthWeight * childRnode.getLength() / sharingFactor;
         if (config.isTimingDriven()) {
             newPartialPathCost += rnodeDelayWeight * (childRnode.getDelay() + DelayEstimatorBase.getExtraDelay(childRnode.getNode(), longParent));
         }
-
-        // Set the prev pointer, as RouteNode.getEndTileYCoordinate() and
-        // RouteNode.getSLRIndex() require this
-        childRnode.setPrev(rnode);
 
         int childX = childRnode.getEndTileXCoordinate();
         int childY = childRnode.getEndTileYCoordinate();
@@ -1536,7 +1537,7 @@ public class RWRoute{
         }
 
         float biasCost = 0;
-        if (!rnode.isTarget()) {
+        if (!rnode.isTarget() && rnode.getType() != RouteNodeType.SUPER_LONG_LINE) {
             NetWrapper net = connection.getNetWrapper();
             biasCost = rnode.getBaseCost() / net.getConnections().size() *
                     (Math.abs(rnode.getEndTileXCoordinate() - net.getXCenter()) + Math.abs(rnode.getEndTileYCoordinate() - net.getYCenter())) / net.getDoubleHpwl();
@@ -1613,6 +1614,9 @@ public class RWRoute{
                 }
 
                 parentRnode = childRnode;
+
+                assert(!parentRnode.isTarget());
+
                 parentRnodeWillOveruse = parentRnode.willOverUse(netWrapper);
                 // Skip all downstream nodes after the first would-be-overused node
                 if (parentRnodeWillOveruse)

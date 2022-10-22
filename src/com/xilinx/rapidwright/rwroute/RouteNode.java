@@ -152,8 +152,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
             // okay because this node only leads to a SLL which will have a non-zero base cost
             baseCost = 0.0f;
         } else if (this.type == RouteNodeType.SUPER_LONG_LINE) {
-            // Do not allow the cost of SLLs to be scaled with length
-            baseCost = 0.4f;
+            baseCost = 0.3f * length;
         } else if (type == RouteNodeType.WIRE) {
             baseCost = 0.4f;
             // NOTE: IntentCode is device-dependent
