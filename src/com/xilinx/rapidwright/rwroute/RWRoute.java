@@ -1197,11 +1197,13 @@ public class RWRoute{
         if (rnode != null) {
             queue.clear();
             finishRouteConnection(connection, rnode);
-            connection.getSink().setRouted(true);
             if (config.isTimingDriven()) connection.updateRouteDelay();
+            assert(connection.getSink().isRouted());
         } else {
-            assert(!connection.getSink().isRouted());
             assert(queue.isEmpty());
+            // Clears previous route of the connection
+            connection.resetRoute();
+            assert(!connection.getSink().isRouted());
         }
 
         routingGraph.resetExpansion();
@@ -1287,21 +1289,16 @@ public class RWRoute{
         RouteNode sinkRnode = connection.getSinkRnode();
         RouteNode altSinkRnode = connection.getAltSinkRnode();
         if (rnode != sinkRnode && rnode != altSinkRnode) {
+            List<RouteNode> prevRouting = connection.getRnodes();
             // Check that this is the sink path marked by prepareRouteConnection()
-            if (!rnode.isTarget()) {
+            if (!connection.getSink().isRouted() || prevRouting.isEmpty() || !rnode.isTarget()) {
                 throw new RuntimeException();
             }
             // Backtrack from the sink used on that sink path
-            if (sinkRnode.getPrev() != null && sinkRnode.getPrev().isTarget()) {
-                rnode = sinkRnode;
-            } else if (altSinkRnode.getPrev() != null && altSinkRnode.getPrev().isTarget()) {
-                rnode = altSinkRnode;
-            } else {
-                // Neither sink was marked!?
-                throw new RuntimeException();
-            }
+            rnode = prevRouting.get(0);
         }
 
+        connection.resetRoute();
         do {
             connection.addRnode(rnode);
             rnode = rnode.getPrev();
@@ -1309,34 +1306,35 @@ public class RWRoute{
 
         List<RouteNode> rnodes = connection.getRnodes();
         RouteNode sourceRnode = rnodes.get(rnodes.size()-1);
-        if (sourceRnode.equals(connection.getSourceRnode()))
-            return;
-
-        Net net = connection.getNetWrapper().getNet();
-        SitePinInst altSource = DesignTools.getLegalAlternativeOutputPin(net);
-        if (altSource != null) {
-            if (net.getAlternateSource() == null) {
-                DesignTools.routeAlternativeOutputSitePin(net, altSource);
-            }
-            if (altSource == connection.getSource()) {
-                // This connection is already using the alternate source.
-                // Swap back to primary source
-                altSource = net.getSource();
-            }
-            Node altSourceINTNode = RouterHelper.projectOutputPinToINTNode(altSource);
-            if (altSourceINTNode.equals(sourceRnode.getNode())) {
-                RouteNode altSourceRnode = sourceRnode;
-                connection.setSource(altSource);
-                connection.setSourceRnode(altSourceRnode);
+        if (!sourceRnode.equals(connection.getSourceRnode())) {
+            Net net = connection.getNetWrapper().getNet();
+            SitePinInst altSource = DesignTools.getLegalAlternativeOutputPin(net);
+            if (altSource != null) {
+                if (net.getAlternateSource() == null) {
+                    DesignTools.routeAlternativeOutputSitePin(net, altSource);
+                }
+                if (altSource == connection.getSource()) {
+                    // This connection is already using the alternate source.
+                    // Swap back to primary source
+                    altSource = net.getSource();
+                }
+                Node altSourceINTNode = RouterHelper.projectOutputPinToINTNode(altSource);
+                if (altSourceINTNode.equals(sourceRnode.getNode())) {
+                    RouteNode altSourceRnode = sourceRnode;
+                    connection.setSource(altSource);
+                    connection.setSourceRnode(altSourceRnode);
+                } else {
+                    throw new RuntimeException(connection + " expected " + altSourceINTNode +
+                            " or " + connection.getSourceRnode().getNode() +
+                            " got " + sourceRnode.getNode());
+                }
             } else {
-                throw new RuntimeException(connection + " expected " + altSourceINTNode +
-                        " or " + connection.getSourceRnode().getNode() +
+                throw new RuntimeException(connection + " expected " + connection.getSourceRnode().getNode() +
                         " got " + sourceRnode.getNode());
             }
-        } else {
-            throw new RuntimeException(connection + " expected " + connection.getSourceRnode().getNode() +
-                    " got " + sourceRnode.getNode());
         }
+
+        connection.getSink().setRouted(true);
     }
 
     /**
@@ -1615,12 +1613,12 @@ public class RWRoute{
 
                 parentRnode = childRnode;
 
-                assert(!parentRnode.isTarget());
-
                 parentRnodeWillOveruse = parentRnode.willOverUse(netWrapper);
                 // Skip all downstream nodes after the first would-be-overused node
                 if (parentRnodeWillOveruse)
                     break;
+
+                assert(!parentRnode.isTarget());
             }
 
             // If non-timing driven, there must be at least one over-used node on the
@@ -1652,9 +1650,6 @@ public class RWRoute{
 
             childRnode = parentRnode;
         }
-
-        // Clears previous route of the connection
-        connectionToRoute.resetRoute();
     }
 
     /**
