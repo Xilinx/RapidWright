@@ -1224,12 +1224,15 @@ public class RWRoute{
 
         if (rnode != null) {
             finishRouteConnection(connection, rnode);
-            connection.getSink().setRouted(true);
             if (config.isTimingDriven()) connection.updateRouteDelay();
+            assert(connection.getSink().isRouted());
         } else {
             System.out.printf("CRITICAL WARNING: Unroutable connection in iteration #%d\n", routeIteration);
             System.out.println("                 " + connection);
             System.out.println("                  Nodes popped: " + nodesPoppedThisConnection);
+            assert(queue.isEmpty());
+            // Clears previous route of the connection
+            connection.resetRoute();
             assert(!connection.getSink().isRouted());
         }
 
@@ -1336,34 +1339,35 @@ public class RWRoute{
 
         List<RouteNode> rnodes = connection.getRnodes();
         RouteNode sourceRnode = rnodes.get(rnodes.size()-1);
-        if (sourceRnode.equals(connection.getSourceRnode()))
-            return;
-
-        Net net = connection.getNetWrapper().getNet();
-        SitePinInst altSource = DesignTools.getLegalAlternativeOutputPin(net);
-        if (altSource != null) {
-            if (net.getAlternateSource() == null) {
-                DesignTools.routeAlternativeOutputSitePin(net, altSource);
-            }
-            if (altSource == connection.getSource()) {
-                // This connection is already using the alternate source.
-                // Swap back to primary source
-                altSource = net.getSource();
-            }
-            Node altSourceINTNode = RouterHelper.projectOutputPinToINTNode(altSource);
-            if (altSourceINTNode.equals(sourceRnode.getNode())) {
-                RouteNode altSourceRnode = sourceRnode;
-                connection.setSource(altSource);
-                connection.setSourceRnode(altSourceRnode);
+        if (!sourceRnode.equals(connection.getSourceRnode())) {
+            Net net = connection.getNetWrapper().getNet();
+            SitePinInst altSource = DesignTools.getLegalAlternativeOutputPin(net);
+            if (altSource != null) {
+                if (net.getAlternateSource() == null) {
+                    DesignTools.routeAlternativeOutputSitePin(net, altSource);
+                }
+                if (altSource == connection.getSource()) {
+                    // This connection is already using the alternate source.
+                    // Swap back to primary source
+                    altSource = net.getSource();
+                }
+                Node altSourceINTNode = RouterHelper.projectOutputPinToINTNode(altSource);
+                if (altSourceINTNode.equals(sourceRnode.getNode())) {
+                    RouteNode altSourceRnode = sourceRnode;
+                    connection.setSource(altSource);
+                    connection.setSourceRnode(altSourceRnode);
+                } else {
+                    throw new RuntimeException(connection + " expected " + altSourceINTNode +
+                            " or " + connection.getSourceRnode().getNode() +
+                            " got " + sourceRnode.getNode());
+                }
             } else {
-                throw new RuntimeException(connection + " expected " + altSourceINTNode +
-                        " or " + connection.getSourceRnode().getNode() +
+                throw new RuntimeException(connection + " expected " + connection.getSourceRnode().getNode() +
                         " got " + sourceRnode.getNode());
             }
-        } else {
-            throw new RuntimeException(connection + " expected " + connection.getSourceRnode().getNode() +
-                    " got " + sourceRnode.getNode());
         }
+
+        connection.getSink().setRouted(true);
     }
 
     /**
@@ -1497,16 +1501,18 @@ public class RWRoute{
                                      float rnodeDelayWeight, float rnodeEstDlyWeight) {
         int countSourceUses = tailRnode.countConnectionsOfUser(connection.getNetWrapper());
         float sharingFactor = 1 + sharingWeight* countSourceUses;
-        float newPartialPathCost = headRnode.getKnownCost(forward) +
-                rnodeCostWeight * getNodeCost(forward, tailRnode, connection, countSourceUses, sharingFactor) +
-                rnodeLengthWeight * tailRnode.getLength() / sharingFactor;
-        if (config.isTimingDriven()) {
-            newPartialPathCost += rnodeDelayWeight * (tailRnode.getDelay() + DelayEstimatorBase.getExtraDelay(tailRnode.getNode(), longParent));
-        }
 
         // Set the prev/next pointer, as RouteNode.getTileYCoordinate(), RouteNode.getSLRIndex(),
         // and push() all require this
         tailRnode.setPrevNext(forward, headRnode);
+
+        float newPartialPathCost = headRnode.getKnownCost(forward) +
+                rnodeCostWeight * getNodeCost(forward, tailRnode, connection, countSourceUses, sharingFactor) +
+                rnodeLengthWeight * tailRnode.getLength() / sharingFactor;
+
+        if (config.isTimingDriven()) {
+            newPartialPathCost += rnodeDelayWeight * (tailRnode.getDelay() + DelayEstimatorBase.getExtraDelay(tailRnode.getNode(), longParent));
+        }
 
         int tailX = tailRnode.getTileXCoordinate(forward);
         int tailY = tailRnode.getTileYCoordinate(forward);
@@ -1584,7 +1590,7 @@ public class RWRoute{
         }
 
         float biasCost = 0;
-        if (!rnode.isVisited(!forward)) {
+        if (!rnode.isVisited(!forward) && rnode.getType() != RouteNodeType.SUPER_LONG_LINE) {
             NetWrapper net = connection.getNetWrapper();
             biasCost = rnode.getBaseCost() / net.getConnections().size() *
                     (Math.abs(rnode.getTileXCoordinate(forward) - net.getXCenter()) +
@@ -1652,8 +1658,8 @@ public class RWRoute{
 
             // Go forwards from source
             for (RouteNode childRnode : Lists.reverse(connectionToRoute.getRnodes())) {
+                boolean forward = true;
                 if (parentRnode != null) {
-                    boolean forward = true;
                     assert(isAccessible(forward, childRnode, connectionToRoute));
 
                     // Trigger the creation of all children in order to emulate routing expansion;
@@ -1670,10 +1676,13 @@ public class RWRoute{
                 }
 
                 parentRnode = childRnode;
+
                 parentRnodeWillOveruse = parentRnode.willOverUse(netWrapper);
                 // Skip all downstream nodes after the first would-be-overused node
                 if (parentRnodeWillOveruse)
                     break;
+
+                assert(!parentRnode.isVisited(!forward));
             }
 
             // If non-timing driven, there must be at least one over-used node on the
@@ -1723,9 +1732,6 @@ public class RWRoute{
 
             childRnode = parentRnode;
         }
-
-        // Clears previous route of the connection
-        connectionToRoute.resetRoute();
     }
 
     /**

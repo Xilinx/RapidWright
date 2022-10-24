@@ -214,8 +214,7 @@ public class RouteNodeGraph {
                     break;
 
                 case SUPER_LONG_LINE:
-                    // Do not allow the cost of SLLs to be scaled with length
-                    baseCost = 0.4f;
+                    baseCost = 0.3f * length;
                     break;
 
                 default:
