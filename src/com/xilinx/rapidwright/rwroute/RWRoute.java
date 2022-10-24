@@ -1225,14 +1225,13 @@ public class RWRoute{
         if (rnode != null) {
             finishRouteConnection(connection, rnode);
             if (config.isTimingDriven()) connection.updateRouteDelay();
-            assert(connection.getSink().isRouted());
+            connection.getSink().setRouted(true);
         } else {
             System.out.printf("CRITICAL WARNING: Unroutable connection in iteration #%d\n", routeIteration);
             System.out.println("                 " + connection);
             System.out.println("                  Nodes popped: " + nodesPoppedThisConnection);
             assert(queue.isEmpty());
-            // Clears previous route of the connection
-            connection.resetRoute();
+            assert(connection.getRnodes().isEmpty());
             assert(!connection.getSink().isRouted());
         }
 
@@ -1366,8 +1365,6 @@ public class RWRoute{
                         " got " + sourceRnode.getNode());
             }
         }
-
-        connection.getSink().setRouted(true);
     }
 
     /**
@@ -1732,6 +1729,8 @@ public class RWRoute{
 
             childRnode = parentRnode;
         }
+
+        connectionToRoute.resetRoute();
     }
 
     /**
