@@ -183,15 +183,15 @@ public class CodePerfTracker {
      */
     private Pair<Long,Long> getTotalOSMemUsage() {
         if (linuxProcID == null) return null;
-        Pair<Long,Long> totalPeakMemUsage = new Pair<>();
+        Pair<Long,Long> totalOSMemUsage = new Pair<>();
         for (String line : FileTools.getLinesFromTextFile("/proc/" + linuxProcID + "/status")) {
             if (line.startsWith("VmHWM:")) {
-                totalPeakMemUsage.setSecond(Long.parseLong(line.split("\\s+")[1]));
+                totalOSMemUsage.setSecond(Long.parseLong(line.split("\\s+")[1]));
             }else if (line.startsWith("VmRSS:")) {
-                totalPeakMemUsage.setFirst(Long.parseLong(line.split("\\s+")[1]));
+                totalOSMemUsage.setFirst(Long.parseLong(line.split("\\s+")[1]));
             }
         }
-        return totalPeakMemUsage;
+        return totalOSMemUsage;
     }
 
     public synchronized CodePerfTracker start(String segmentName, boolean nested) {
