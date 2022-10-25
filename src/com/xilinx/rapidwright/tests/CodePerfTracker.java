@@ -220,7 +220,7 @@ public class CodePerfTracker {
     private void print(String segmentName, Long runtime, Long memUsage, Pair<Long,Long> totalOSMemUsage) {
         print(segmentName, runtime, memUsage, totalOSMemUsage, false);
     }
-    
+
     private void print(String segmentName, Long runtime, Long memUsage, Pair<Long,Long> totalOSMemUsage, boolean nested) {
         if (isUsingGCCallsToTrackMemory()) {
             if (nested) {
