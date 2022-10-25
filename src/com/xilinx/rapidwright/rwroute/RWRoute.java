@@ -1398,9 +1398,20 @@ public class RWRoute{
             // For backward routing only, we must restrict our expansion only to preserved nodes
             // that are preserved for our net only
             Net tailPreservedNet = forward ? null : routingGraph.getPreservedNet(tailRnode.getNode());
-            if (tailPreservedNet != null && tailPreservedNet != connection.getNetWrapper().getNet()) {
-                // Tail node is preserved by a net other than the one we're routing
-                continue;
+            if (tailPreservedNet != null) {
+                if (tailPreservedNet != connection.getNetWrapper().getNet()) {
+                    // Tail node is preserved by a net other than the one we're routing
+                    continue;
+                }
+
+                // Tail node is preserved by the same net we're routing!
+                // Since it's preserved, it must be an uncongested path back to the source, with
+                // prev pointers.
+                // If it hasn't been visited yet by the forward pass, fake that it has so that
+                // it can be considered an intersection
+                if (!tailRnode.isVisited(!forward)) {
+                    tailRnode.setVisited(!forward);
+                }
             }
 
             if (tailRnode.isVisited(!forward)) {
