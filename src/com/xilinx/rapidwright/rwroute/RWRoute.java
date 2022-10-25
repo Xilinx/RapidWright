@@ -1412,6 +1412,7 @@ public class RWRoute{
                 if (!tailRnode.isVisited(!forward)) {
                     tailRnode.setVisited(!forward);
                 }
+                assert(!tailRnode.willOverUse(connection.getNetWrapper()));
             }
 
             if (tailRnode.isVisited(!forward)) {
@@ -1419,16 +1420,24 @@ public class RWRoute{
 
                 // Despite the limitation above, on encountering an intersection only terminate
                 // immediately by clearing the queue if this target is not overused since
-                // there could be an alternate target that would be less congested
+                // there could be an alternate intersection that would be less congested
                 if (!tailRnode.willOverUse(connection.getNetWrapper())) {
-                    if (forward) {
-                        nodesPushed += queue.size();
-                        queue.clear();
-                    } else {
-                        nodesPushed += queueBack.size();
-                        queueBack.clear();
+                    // Here, we cannot differentiate between whether tail has simply been
+                    // pushed onto the queue (visited) or whether it has been popped yet.
+                    // However, we can know that the tail's prev/next node must have been
+                    // popped, so check whether that will be overused in order to ascertain
+                    // whether we should early-exit with this path
+                    RouteNode prevNext = forward ? tailRnode.getNext() : tailRnode.getPrev();
+                    if (!prevNext.willOverUse(connection.getNetWrapper())) {
+                        if (forward) {
+                            nodesPushed += queue.size();
+                            queue.clear();
+                        } else {
+                            nodesPushed += queueBack.size();
+                            queueBack.clear();
+                        }
+                        intersectionFound = true;
                     }
-                    intersectionFound = true;
                 }
             } else {
                 if (!isAccessible(forward, tailRnode, connection)) {
