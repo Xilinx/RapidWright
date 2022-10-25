@@ -1431,13 +1431,11 @@ public class RWRoute{
                             continue;
                         }
                         break;
-                    case PINBOUNCE: {
-                        RouteNode destRnode = forward ? connection.getSinkRnode() : connection.getSourceRnode();
-                        if (!usablePINBounce(tailRnode, destRnode)) {
+                    case PINBOUNCE:
+                        if (!usablePINBounce(tailRnode, connection.getSinkRnode())) {
                             continue;
                         }
                         break;
-                    }
                     case PINFEED_I:
                         break;
                     case LAGUNA_I:
