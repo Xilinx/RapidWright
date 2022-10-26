@@ -524,9 +524,12 @@ public class RouteNodeGraph {
         if (allowedTileEnums.contains(tileType)) {
             if (forward)
                 return false;
-            // Backward router: exclude non-CLE outputs (like Laguna) and VCC_WIRE-s
-            if (tail.getIntentCode() != IntentCode.NODE_OUTPUT &&
-                    /*!tail.isTiedToVcc() &&*/ (!RouteNode.lagunaTileTypes.contains(tileType) || !lagunaWireIsVcc.contains(tail.getWire())))
+            // Backward router: exclude non-CLE outputs (like Laguna) since they don't support
+            // routethru-s, and VCC_WIRE-s
+            if (tail.getIntentCode() != IntentCode.NODE_OUTPUT && !tail.isTiedToVcc() &&
+                    // See https://github.com/Xilinx/RapidWright/pull/553 for an example of a
+                    // VCC_WIRE not being marked as such
+                    (!RouteNode.lagunaTileTypes.contains(tileType) || !lagunaWireIsVcc.contains(tail.getWire())))
                 return false;
         }
         return true;
