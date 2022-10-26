@@ -103,16 +103,29 @@ abstract public class RouteNode {
         assert(next == null);
     }
 
+    private static int signum(float f) {
+        int bits = Float.floatToRawIntBits(f);
+        if ((bits & ~(1 << 31)) == 0)
+            return 0;
+        return (bits >>> 31 == 0) ? 1 : -1;
+    }
+
     public int compareTo(RouteNode that) {
         // Do not use Float.compare() since it also checks NaN, which we'll assume is unreachable
         // return Float.compare(this.lowerBoundTotalPathCost, that.lowerBoundTotalPathCost);
-        return (int) Math.signum(this.totalCostToSink - that.totalCostToSink);
+        // return (int) Math.signum(this.totalCostToSink - that.totalCostToSink);
+        int signum = signum(this.totalCostToSink - that.totalCostToSink);
+        // Tie break according to larger known cost (thus smaller estimated cost to target)
+        return (signum != 0) ? signum : signum(that.knownCostFromSink - this.knownCostFromSink);
     }
 
     public int compareToBack(RouteNode that) {
         // Do not use Float.compare() since it also checks NaN, which we'll assume is unreachable
         // return Float.compare(this.lowerBoundTotalPathCost, that.lowerBoundTotalPathCost);
-        return (int) Math.signum(this.totalCostToSource - that.totalCostToSource);
+        // return (int) Math.signum(this.totalCostToSource - that.totalCostToSource);
+        int signum = signum(this.totalCostToSource - that.totalCostToSource);
+        // Tie break according to larger known cost (thus smaller estimated cost to target)
+        return (signum != 0) ? signum : signum(that.knownCostFromSource - this.knownCostFromSource);
     }
 
     abstract protected RouteNode getOrCreate(Node node, RouteNodeType type);
