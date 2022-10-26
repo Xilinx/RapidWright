@@ -1464,7 +1464,7 @@ public class RWRoute{
                                 (!forward && tailRnode.getType() == RouteNodeType.LAGUNA_O)) {
                             RouteNode destRnode = forward ? connection.getSinkRnode() : connection.getSourceRnode();
                             if (!connection.isCrossSLR() ||
-                                    destRnode.getSLRIndex() == tailRnode.getSLRIndex()) {
+                                    destRnode.getSLRIndex(forward) == tailRnode.getSLRIndex(forward)) {
                                 // Do not consider approaching a SLL if not needing to cross
                                 continue;
                             }
@@ -1472,7 +1472,7 @@ public class RWRoute{
                         break;
                     case SUPER_LONG_LINE:
                         RouteNode destRnode = forward ? connection.getSinkRnode() : connection.getSourceRnode();
-                        assert(connection.isCrossSLR() && destRnode.getSLRIndex() != headRnode.getSLRIndex());
+                        assert(connection.isCrossSLR() && destRnode.getSLRIndex(forward) != headRnode.getSLRIndex(forward));
                         break;
                     default:
                         throw new RuntimeException();
@@ -1540,7 +1540,7 @@ public class RWRoute{
         int deltaX = Math.abs(tailX - destX);
         int deltaY = Math.abs(tailY - destY);
         if (connection.isCrossSLR()) {
-            int deltaSLR = Math.abs(destRnode.getSLRIndex() - tailRnode.getSLRIndex());
+            int deltaSLR = Math.abs(destRnode.getSLRIndex(forward) - tailRnode.getSLRIndex(forward));
             if (deltaSLR != 0) {
                 // Check for overshooting which occurs when child and sink node are in
                 // adjacent SLRs and less than a SLL wire's length apart in the Y axis.

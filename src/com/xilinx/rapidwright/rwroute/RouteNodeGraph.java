@@ -154,8 +154,8 @@ public class RouteNodeGraph {
         }
 
         @Override
-        public int getSLRIndex() {
-             return intYToSLRIndex[getEndTileYCoordinate()];
+        public int getSLRIndex(boolean forward) {
+             return intYToSLRIndex[getTileYCoordinate(forward)];
         }
     }
 

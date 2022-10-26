@@ -773,5 +773,5 @@ abstract public class RouteNode {
      */
     abstract public boolean isExcluded(boolean forward, Node parent, Node child);
 
-    abstract public int getSLRIndex();
+    abstract public int getSLRIndex(boolean forward);
 }
