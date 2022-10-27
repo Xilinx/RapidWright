@@ -37,6 +37,7 @@ import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.util.CountUpDownLatch;
 import com.xilinx.rapidwright.util.ParallelismTools;
 import com.xilinx.rapidwright.util.RuntimeTracker;
+import com.xilinx.rapidwright.util.Utils;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -90,7 +91,7 @@ public class RouteNodeGraph {
     final int[] intYToSLRIndex;
     public final int[] nextLagunaColumn;
     public final int[] prevLagunaColumn;
-    public Set<Integer> lagunaWireIsVcc;
+    public final Set<Integer> lagunaWireIsVcc;
 
 
 
@@ -386,6 +387,7 @@ public class RouteNodeGraph {
         } else {
             nextLagunaColumn = null;
             prevLagunaColumn = null;
+            lagunaWireIsVcc = null;
         }
     }
 
@@ -501,8 +503,10 @@ public class RouteNodeGraph {
         if (allowedTileEnums.contains(tileType)) {
             if (forward)
                 return false;
+
             // Backward router: exclude non-CLE outputs (like Laguna) since they don't support
             // routethru-s, and VCC_WIRE-s
+            assert(!Utils.isCLB(tail.getTile().getTileTypeEnum()));
             if (tail.getIntentCode() != IntentCode.NODE_OUTPUT && !tail.isTiedToVcc() &&
                     // See https://github.com/Xilinx/RapidWright/pull/553 for an example of a
                     // VCC_WIRE not being marked as such
