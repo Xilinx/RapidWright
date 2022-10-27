@@ -1658,9 +1658,24 @@ public class RWRoute{
         push(true, sourceRnode, 0, 0);
         assert(sourceRnode.getPrev() == null);
 
+        // Add sink rnodes to the backward queue
+        for (RouteNode sinkRnode : Arrays.asList(connectionToRoute.getSinkRnode(),
+                connectionToRoute.getAltSinkRnode())) {
+            if (sinkRnode != null) {
+                final boolean forward = false;
+                // Unlike source nodes, sink nodes must be costed since they could be overused
+                int countSourceUses = sinkRnode.countConnectionsOfUser(connectionToRoute.getNetWrapper());
+                float sharingFactor = 1 + shareWeight* countSourceUses;
+                float newPartialPathCost = rnodeCostWeight * getNodeCost(forward, sinkRnode, connectionToRoute, countSourceUses, sharingFactor);
+                // Mark sinks with a next pointer to themselves
+                sinkRnode.setNext(sinkRnode);
+                push(forward, sinkRnode, newPartialPathCost, newPartialPathCost);
+            }
+        }
+
         // Push all nodes from the previous iteration's routing onto the queue
-        if (connectionToRoute.getSink().isRouted()) {
-            assert(!connectionToRoute.getRnodes().isEmpty());
+        {
+            assert(connectionToRoute.getSink().isRouted() != connectionToRoute.getRnodes().isEmpty());
 
             RouteNode parentRnode = null;
             boolean parentRnodeWillOveruse = false;
@@ -1671,10 +1686,15 @@ public class RWRoute{
                 if (parentRnode != null) {
                     assert(isAccessible(forward, childRnode, connectionToRoute));
 
-                    // Trigger the creation of all children in order to emulate routing expansion;
-                    // not doing so invalidates an assumption of how preserved nodes are visited
                     // FIXME: Only relevant for PartialRouter
-                    parentRnode.getChildrenParents(forward);
+                    boolean assertsEnabled = false;
+                    assert(assertsEnabled = true);
+                    if (assertsEnabled) {
+                        // Trigger the creation of all children in order to emulate routing expansion;
+                        // not doing so invalidates an assumption (enforced by an assertion) of how
+                        // preserved nodes are visited
+                        parentRnode.getChildrenParents(forward);
+                    }
 
                     // Place child onto queue
                     assert(!childRnode.isVisited(forward) || routingGraph.isPreserved(childRnode.getNode()));
@@ -1697,49 +1717,36 @@ public class RWRoute{
             // If non-timing driven, there must be at least one over-used node on the
             // connection-to-be-routed (otherwise we wouldn't expect it to need
             // re-routing)
-            assert(config.isTimingDriven() ||
+            assert(connectionToRoute.getRnodes().isEmpty() ||
+                   config.isTimingDriven() ||
                    parentRnodeWillOveruse);
         }
 
-        // Add sink rnodes to the backward queue
-        for (RouteNode sinkRnode : Arrays.asList(connectionToRoute.getSinkRnode(),
-                connectionToRoute.getAltSinkRnode())) {
-            if (sinkRnode != null) {
-                final boolean forward = false;
-                // Unlike source nodes, sink nodes must be costed since they could be overused
-                int countSourceUses = sinkRnode.countConnectionsOfUser(connectionToRoute.getNetWrapper());
-                float sharingFactor = 1 + shareWeight* countSourceUses;
-                float newPartialPathCost = rnodeCostWeight * getNodeCost(forward, sinkRnode, connectionToRoute, countSourceUses, sharingFactor);
-                // Mark sinks with a next pointer to themselves
-                sinkRnode.setNext(sinkRnode);
-                push(forward, sinkRnode, newPartialPathCost, newPartialPathCost);
-            }
-        }
-
-        RouteNode childRnode = null;
-
         // Now go backwards from sink
-        for (RouteNode parentRnode : connectionToRoute.getRnodes()) {
-            // Skip all upstream nodes if next one is to be the first one overused
-            // (or would-be-overused if we were to start using it)
-            if (parentRnode.willOverUse(netWrapper)) {
-                break;
+        {
+            RouteNode childRnode = null;
+            for (RouteNode parentRnode : connectionToRoute.getRnodes()) {
+                // Skip all upstream nodes if next one is to be the first one overused
+                // (or would-be-overused if we were to start using it)
+                if (parentRnode.willOverUse(netWrapper)) {
+                    break;
+                }
+
+                assert(!parentRnode.isVisited(true));
+
+                // Mark nodes upstream of the sink as intersection
+                if (childRnode != null) {
+                    boolean forward = false;
+                    assert(childRnode.isVisited(forward));
+                    assert(!parentRnode.isVisited(forward));
+                    boolean longParent = config.isTimingDriven() && DelayEstimatorBase.isLong(parentRnode.getNode());
+                    evaluateCostAndPush(forward, childRnode, longParent, parentRnode, connectionToRoute, shareWeight, rnodeCostWeight,
+                            rnodeLengthWeight, rnodeEstWlWeight, rnodeDelayWeight, rnodeEstDlyWeight);
+                    assert(parentRnode.getNext() == childRnode);
+                }
+
+                childRnode = parentRnode;
             }
-
-            assert(!parentRnode.isVisited(true));
-
-            // Mark nodes upstream of the sink as intersection
-            if (childRnode != null) {
-                boolean forward = false;
-                assert(childRnode.isVisited(forward));
-                assert(!parentRnode.isVisited(forward));
-                boolean longParent = config.isTimingDriven() && DelayEstimatorBase.isLong(parentRnode.getNode());
-                evaluateCostAndPush(forward, childRnode, longParent, parentRnode, connectionToRoute, shareWeight, rnodeCostWeight,
-                        rnodeLengthWeight, rnodeEstWlWeight, rnodeDelayWeight, rnodeEstDlyWeight);
-                assert(parentRnode.getNext() == childRnode);
-            }
-
-            childRnode = parentRnode;
         }
 
         connectionToRoute.resetRoute();
