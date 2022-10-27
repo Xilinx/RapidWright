@@ -1526,8 +1526,8 @@ public class RWRoute{
         int tailX = tailRnode.getTileXCoordinate(forward);
         int tailY = tailRnode.getTileYCoordinate(forward);
         RouteNode destRnode = (forward ? queueBack : queue).peek();
-        int destX = destRnode.getTileXCoordinate(forward);
-        int destY = destRnode.getTileYCoordinate(forward);
+        int destX = destRnode.getTileXCoordinate(!forward);
+        int destY = destRnode.getTileYCoordinate(!forward);
         int deltaX = Math.abs(tailX - destX);
         int deltaY = Math.abs(tailY - destY);
         if (connection.isCrossSLR()) {
