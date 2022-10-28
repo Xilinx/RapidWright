@@ -1532,7 +1532,14 @@ public class RWRoute{
 
         int tailX = tailRnode.getTileXCoordinate(forward);
         int tailY = tailRnode.getTileYCoordinate(forward);
+
+        // Only perform front-to-front if in the same SLR
         RouteNode destRnode = (forward ? queueBack : queue).peek();
+        if (tailRnode.getSLRIndex(forward) != destRnode.getSLRIndex(forward)) {
+            // Otherwise front-to-end
+            destRnode = forward ? connection.getSinkRnode() : connection.getSourceRnode();
+        }
+
         int destX = destRnode.getTileXCoordinate(!forward);
         int destY = destRnode.getTileYCoordinate(!forward);
         int deltaX = Math.abs(tailX - destX);
