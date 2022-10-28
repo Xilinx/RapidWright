@@ -95,7 +95,7 @@ public class EDIFPortInstList extends ArrayList<EDIFPortInst> {
      * @return 0 if the left and corresponding right Strings are equal.  A number less than 0 if
      * left is lexicographically before right, or a number greater than 0 if left is after right.
      */
-    private static int compare(EDIFPortInst left, String rightInstName, String rightPortInstName) {
+    protected static int compare(EDIFPortInst left, String rightInstName, String rightPortInstName) {
         if (left.getCellInst() == null) {
             if (rightInstName == null) {
                 // left and right are both a top-level port insts, compare their port insts name only
@@ -122,13 +122,6 @@ public class EDIFPortInstList extends ArrayList<EDIFPortInst> {
     }
 
     public void _reSortList() {
-        Collections.sort(this, new Comparator<EDIFPortInst>() {
-            public int compare(EDIFPortInst left, EDIFPortInst right) {
-                EDIFCellInst cellInst = right.getCellInst();
-                String cellInstName = cellInst == null ? null : cellInst.getName();
-                String portInstName = right.getName();
-                return EDIFPortInstList.compare(left, cellInstName, portInstName);
-            }
-        });
+        Collections.sort(this);
     }
 }

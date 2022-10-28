@@ -81,8 +81,13 @@ public class EDIFNet extends EDIFPropertyObject {
      * using a sorted ArrayList (@link EDIFPortInstList). Worst case O(n) to add.
      * 
      * @param portInst The port instance to add to this net.
+     * @param deferSort The EDIFPortInstList maintains a sorted list of EDIFPortInst 
+     * objects and sorts them upon insertion.  Setting this flag to true will skip a sort addition
+     * but the caller is responsible to conclude a batch of additions with a call to 
+     * {@link EDIFPortInstList#_reSortList()}.  This is useful when a large number of EDIFPortInsts 
+     * will be added consecutively (such as parsing a netlist).
      */
-    public void addPortInst(EDIFPortInst portInst, boolean parserCreate) {
+    public void addPortInst(EDIFPortInst portInst, boolean deferSort) {
         if (portInsts == null) portInsts = new EDIFPortInstList();
         boolean isParentCellNonNull = parentCell != null;
         EDIFCellInst inst = portInst.getCellInst();
@@ -94,7 +99,7 @@ public class EDIFNet extends EDIFPropertyObject {
             // This does not explicitly track the port instance index, in most cases the name should be sufficient.
             trackChanges(EDIFChangeType.PORT_INST_ADD, inst, portInst.getName());
         }
-        if (parserCreate) {
+        if (deferSort) {
             portInsts._parseAdd(portInst);
         } else {
             portInsts.add(portInst);
