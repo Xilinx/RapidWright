@@ -1464,7 +1464,14 @@ public class RWRoute{
                         break;
                     case SUPER_LONG_LINE:
                         RouteNode destRnode = forward ? connection.getSinkRnode() : connection.getSourceRnode();
-                        assert(connection.isCrossSLR() && destRnode.getSLRIndex(forward) != headRnode.getSLRIndex(forward));
+                        assert(connection.isCrossSLR());
+                        int destSLR = destRnode.getSLRIndex(forward);
+                        int headSLR = headRnode.getSLRIndex(forward);
+                        int tailSLR = tailRnode.getSLRIndex(forward);
+                        if (Math.abs(tailSLR - destSLR) > Math.abs(headSLR - destSLR)) {
+                            // Make sure taking this SLL gets us closer to the dest SLR
+                            continue;
+                        }
                         break;
                     default:
                         throw new RuntimeException();
