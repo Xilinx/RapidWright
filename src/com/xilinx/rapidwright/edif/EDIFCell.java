@@ -639,11 +639,11 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
     public void sortEDIFPortInstLists() {
         for (EDIFNet net : getNets()) {
             EDIFPortInstList list = net.getEDIFPortInstList();
-            if(list != null) list._reSortList();
+            if (list != null) list.reSortList();
         }
         for (EDIFCellInst inst : getCellInsts()) {
             EDIFPortInstList list = inst.getEDIFPortInstList();
-            if(list != null) list._reSortList();
+            if (list != null) list.reSortList();
         }
     }
 

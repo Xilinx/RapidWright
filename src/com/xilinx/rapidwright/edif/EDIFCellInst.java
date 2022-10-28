@@ -125,7 +125,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
      * @param deferSort The EDIFPortInstList maintains a sorted list of EDIFPortInst 
      * objects and sorts them upon insertion.  Setting this flag to true will skip a sort addition
      * but the caller is responsible to conclude a batch of additions with a call to 
-     * {@link EDIFPortInstList#_reSortList()}.  This is useful when a large number of EDIFPortInsts 
+     * {@link EDIFPortInstList#reSortList()}.  This is useful when a large number of EDIFPortInsts 
      * will be added consecutively (such as parsing a netlist).
      */
     protected void addPortInst(EDIFPortInst epr, boolean deferSort) {
@@ -134,7 +134,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
             throw new RuntimeException("ERROR: Incorrect EDIFPortInst '"+
                 epr.getFullName()+"' being added to EDIFCellInst " + toString());
         if (deferSort) {
-            portInsts._parseAdd(epr);
+            portInsts.deferSortAdd(epr);
         } else {
             portInsts.add(epr);
         }

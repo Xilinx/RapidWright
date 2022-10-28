@@ -117,11 +117,20 @@ public class EDIFPortInstList extends ArrayList<EDIFPortInst> {
         return compare == 0 ? left.getName().compareTo(rightPortInstName) : compare;
     }
 
-    public void _parseAdd(EDIFPortInst e) {
+    /**
+     * Adds an element without sorting it and appending it to the end of the list.  This method
+     * should be used with caution and generally always in conjunction with {@link #reSortList()} 
+     * after a batch of additions. 
+     * @param e The element to add
+     */
+    public void deferSortAdd(EDIFPortInst e) {
         super.add(e);
     }
 
-    public void _reSortList() {
+    /**
+     * Invokes this list to be re sorted (it maintains a sorted list upon add).  
+     */
+    public void reSortList() {
         Collections.sort(this);
     }
 }

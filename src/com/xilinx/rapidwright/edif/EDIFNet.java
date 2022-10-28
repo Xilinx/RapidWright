@@ -84,7 +84,7 @@ public class EDIFNet extends EDIFPropertyObject {
      * @param deferSort The EDIFPortInstList maintains a sorted list of EDIFPortInst 
      * objects and sorts them upon insertion.  Setting this flag to true will skip a sort addition
      * but the caller is responsible to conclude a batch of additions with a call to 
-     * {@link EDIFPortInstList#_reSortList()}.  This is useful when a large number of EDIFPortInsts 
+     * {@link EDIFPortInstList#reSortList()}.  This is useful when a large number of EDIFPortInsts 
      * will be added consecutively (such as parsing a netlist).
      */
     public void addPortInst(EDIFPortInst portInst, boolean deferSort) {
@@ -100,7 +100,7 @@ public class EDIFNet extends EDIFPropertyObject {
             trackChanges(EDIFChangeType.PORT_INST_ADD, inst, portInst.getName());
         }
         if (deferSort) {
-            portInsts._parseAdd(portInst);
+            portInsts.deferSortAdd(portInst);
         } else {
             portInsts.add(portInst);
         }
@@ -180,15 +180,17 @@ public class EDIFNet extends EDIFPropertyObject {
      * @param inst         If this is not null, the port instance is added to the
      *                     external facing port connection. If this is null, it will
      *                     add it to the inward facing port connection.
-     * @param parserCreate A flag to indicate if this PortInst is being created
-     *                     during parsing of a netlist. Usually this is false. When
-     *                     true, it does not sort the insertion of this PortInst
-     *                     into the EDIFPortInstList.
+     * @param deferSort    The EDIFPortInstList maintains a sorted list of EDIFPortInst 
+     *                     objects and sorts them upon insertion.  Setting this flag to 
+     *                     true will skip a sort addition but the caller is responsible 
+     *                     to conclude a batch of additions with a call to 
+     *                     {@link EDIFPortInstList#reSortList()}.  This is useful when 
+     *                     a large number of EDIFPortInsts.
      * @return The newly created port instance or null if none could be created on
      *         the cell or cell instance.
      */
     public EDIFPortInst createPortInstFromPortInstName(String portInstName, EDIFCell cell,
-            EDIFCellInst inst, boolean parserCreate) {
+            EDIFCellInst inst, boolean deferSort) {
         EDIFPort port = cell.getPortByPortInstName(portInstName);
         if (port == null) return null;
         int portIdx = -1;
@@ -196,7 +198,7 @@ public class EDIFNet extends EDIFPropertyObject {
             int idx = EDIFTools.getPortIndexFromName(portInstName);
             portIdx = port.getPortIndexFromNameIndex(idx);
         }
-        return new EDIFPortInst(port, this, portIdx, inst, parserCreate);
+        return new EDIFPortInst(port, this, portIdx, inst, deferSort);
     }
 
     public EDIFPortInst createPortInst(String portName, int index, EDIFCellInst cellInst) {
