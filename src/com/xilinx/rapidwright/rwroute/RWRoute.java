@@ -1199,6 +1199,8 @@ public class RWRoute{
 
         int nodesPoppedThisConnection = 0;
         boolean forward = true;
+        final int alternateEvery = 100;
+        int alternateCountDown = alternateEvery;
         RouteNode rnode = null;
         while (!queue.isEmpty() && !queueBack.isEmpty()) {
             if (forward) {
@@ -1214,7 +1216,10 @@ public class RWRoute{
 
             exploreAndExpand(forward, rnode, connection, shareWeight, rnodeCostWeight,
                     rnodeWLWeight, estWlWeight, dlyWeight, estDlyWeight);
-            forward = !forward;
+            if (--alternateCountDown == 0) {
+                alternateCountDown = alternateEvery;
+                forward = !forward;
+            }
             rnode = null;
         }
         nodesPushed += nodesPoppedThisConnection + queue.size() + queueBack.size();
