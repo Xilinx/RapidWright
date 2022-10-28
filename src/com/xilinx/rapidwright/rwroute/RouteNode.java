@@ -171,7 +171,13 @@ abstract public class RouteNode {
             // okay because this node only leads to a SLL which will have a non-zero base cost
             baseCost = 0.0f;
         } else if (this.type == RouteNodeType.SUPER_LONG_LINE) {
-            baseCost = 0.3f * length;
+            if (length != 0) {
+                baseCost = 0.3f * length;
+            } else {
+                // U-turn node at the boundary of the device; must have a non-zero cost for
+                // congestion resolution to work
+                baseCost = 0.4f;
+            }
         } else if (type == RouteNodeType.WIRE) {
             baseCost = 0.4f;
             // NOTE: IntentCode is device-dependent
