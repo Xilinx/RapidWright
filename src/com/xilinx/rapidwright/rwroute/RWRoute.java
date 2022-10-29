@@ -972,6 +972,9 @@ public class RWRoute{
                 overUsedRnodes.add(rnode);
                 rnode.setPresentCongestionCost(1 + (overuse + 1) * presentCongestionFactor);
                 rnode.setHistoricalCongestionCost(rnode.getHistoricalCongestionCost() + overuse * historicalCongestionFactor);
+            } else {
+                assert(overuse < 0);
+                assert(rnode.getPresentCongestionCost() == 1);
             }
         }
     }
