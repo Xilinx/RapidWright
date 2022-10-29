@@ -954,11 +954,7 @@ public class RWRoute{
      */
     private void updateCostFactors() {
         updateCongestionCosts.start();
-        if (routeIteration == 1) {
-            presentCongestionFactor = config.getInitialPresentCongestionFactor();
-        } else {
-            presentCongestionFactor *= config.getPresentCongestionMultiplier();
-        }
+        presentCongestionFactor *= config.getPresentCongestionMultiplier();
         updateCost();
         updateCongestionCosts.stop();
     }
