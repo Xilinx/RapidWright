@@ -182,6 +182,7 @@ public class RWRoute{
         }
         rnodesCreatedThisIteration = 0;
         routethruHelper = new RouteThruHelper(design.getDevice());
+        presentCongestionFactor = config.getInitialPresentCongestionFactor();
 
         routerTimer.createRuntimeTracker("determine route targets", "Initialization").start();
         determineRoutingTargets();
