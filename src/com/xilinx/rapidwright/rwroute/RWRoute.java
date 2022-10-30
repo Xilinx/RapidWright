@@ -1199,7 +1199,7 @@ public class RWRoute{
 
         int nodesPoppedThisConnection = 0;
         boolean forward = true;
-        final int alternateEvery = 100;
+        final int alternateEvery = 200;
         int alternateCountDown = alternateEvery;
         RouteNode rnode = null;
         while (!queue.isEmpty() && !queueBack.isEmpty()) {
