@@ -127,9 +127,9 @@ public class PartialRouter extends RWRoute{
 
         List<RouteTerm> unroutedTerms = netToUnroutedTerms.get(clk);
         if (unroutedTerms == null) {
-                increaseNumNotNeedingRouting();
+            increaseNumNotNeedingRouting();
             return;
-            }
+        }
 
         addClkNet(clk);
         if (clk.hasPIPs()) {
@@ -149,8 +149,8 @@ public class PartialRouter extends RWRoute{
 
         addStaticNetRoutingTargets(staticNet, unroutedTerms);
         if (staticNet.hasPIPs()) {
-        increaseNumPreservedStaticNets();
-    }
+            increaseNumPreservedStaticNets();
+        }
     }
 
     @Override
@@ -200,8 +200,8 @@ public class PartialRouter extends RWRoute{
                 // preserveNet() above will have preserved all site/part pin nodes, undo that here
                 for (RouteTerm term : sinkPins) {
                     Node node = term.getConnectedNode();
-                preservedNodes.remove(node);
-            }
+                    preservedNodes.remove(node);
+                }
             }
 
             createsNetWrapperAndConnections(net, sinkPins);
