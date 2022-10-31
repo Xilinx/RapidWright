@@ -54,7 +54,7 @@ public class RouteThruHelper {
     private Device device;
 
     private static String getSerializedFileName(Device device) {
-        String folderName = FileTools.getRapidWrightPath() + File.separator
+        String folderName = FileTools.getRapidWrightPath() + File.separator 
                 + FileTools.ROUTETHRU_FOLDER_NAME;
         FileTools.makeDirs(folderName);
         return folderName + File.separator + device.getName() + ".rt";
