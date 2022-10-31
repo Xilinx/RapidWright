@@ -149,8 +149,8 @@ public class PartialRouter extends RWRoute{
 
         addStaticNetRoutingTargets(staticNet, unroutedTerms);
         if (staticNet.hasPIPs()) {
-        increaseNumPreservedStaticNets();
-    }
+            increaseNumPreservedStaticNets();
+        }
     }
 
     @Override
