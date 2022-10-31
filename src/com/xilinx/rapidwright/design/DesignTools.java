@@ -2939,7 +2939,7 @@ public class DesignTools {
                 if (cell.getName().contains("LOCKED")) continue;// Are there better ways to identify this problem?
 
                 BEL bel = cell.getBEL();
-                if (bel == null || !bel.getName().contains("LUT")) continue;
+                if (bel == null || !bel.isLUT()) continue;
                 if (bel.getName().contains("5LUT")) {
                     bel = si.getBEL(bel.getName().replace("5", "6"));
                 }
@@ -3028,6 +3028,11 @@ public class DesignTools {
                 if (val != null && val.getValue().equals("SRLC32E")) {
                     net = si.getDesign().getGndNet();
                 }
+            }
+            String belName = belPin.getBELName();
+            if (DesignTools.isBELALut(belName) && si.getCell(belName.replace('6', '5')) == null) {
+                // Nothing is placed on the 5LUT BEL, no need for site pin
+                return;
             }
             SitePinInst pin = si.getSitePinInst(siteWireName);
             if (pin == null) {
