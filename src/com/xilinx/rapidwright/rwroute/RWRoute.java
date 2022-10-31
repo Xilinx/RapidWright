@@ -515,27 +515,27 @@ public class RWRoute{
             }
             Connection connection = new Connection(numConnectionsToRoute++, source, sink, netWrapper);;
 
-                List<Node> nodes = RouterHelper.projectInputPinToINTNode(sink);
-                if (nodes.isEmpty()) {
-                    directConnections.add(connection);
-                    connection.setDirect(true);
+            List<Node> nodes = RouterHelper.projectInputPinToINTNode(sink);
+            if (nodes.isEmpty()) {
+                directConnections.add(connection);
+                connection.setDirect(true);
             }
             else {
                 Node sinkINTNode = nodes.get(0);
-            indirectConnections.add(connection);
-            connection.setSinkRnode(createAddRoutableNode(connection.getSink(), sinkINTNode, RoutableType.PINFEED_I));
+                indirectConnections.add(connection);
+                connection.setSinkRnode(createAddRoutableNode(connection.getSink(), sinkINTNode, RoutableType.PINFEED_I));
                 if (sourceINTNode == null) {
                     sourceINTNode = RouterHelper.projectOutputTermToINTNode(source);
                     if (sourceINTNode == null) {
                         throw new RuntimeException("ERROR: Null projected INT node for the source of net " + net.toStringFull());
                     }
+                }
+                connection.setSourceRnode(createAddRoutableNode(connection.getSource(), sourceINTNode, RoutableType.PINFEED_O));
+                connection.setDirect(false);
+                indirect++;
+                connection.computeHpwl();
+                addConnectionSpanInfo(connection);
             }
-            connection.setSourceRnode(createAddRoutableNode(connection.getSource(), sourceINTNode, RoutableType.PINFEED_O));
-            connection.setDirect(false);
-            indirect++;
-            connection.computeHpwl();
-            addConnectionSpanInfo(connection);
-        }
         }
 
         if (indirect > 0) {
@@ -907,26 +907,26 @@ public class RWRoute{
         for (Connection connection : sortedIndirectConnections) {
             connection.newNodes();
             RouteTerm sink = connection.getSink();
-                List<Node> switchBoxToSink = RouterHelper.findPathBetweenNodes(connection.getSinkRnode().getNode(), sink.getConnectedNode());
-                if (switchBoxToSink.size() >= 2) {
-                    for (int i = 0; i < switchBoxToSink.size() -1; i++) {
-                        connection.addNode(switchBoxToSink.get(i));
-                    }
+            List<Node> switchBoxToSink = RouterHelper.findPathBetweenNodes(connection.getSinkRnode().getNode(), sink.getConnectedNode());
+            if (switchBoxToSink.size() >= 2) {
+                for (int i = 0; i < switchBoxToSink.size() -1; i++) {
+                    connection.addNode(switchBoxToSink.get(i));
                 }
+            }
 
             for (Routable rnode:connection.getRnodes()) {
                 connection.addNode(rnode.getNode());
             }
 
             RouteTerm source = connection.getSource();
-                List<Node> sourceToSwitchBox = RouterHelper.findPathBetweenNodes(source.getConnectedNode(), connection.getSourceRnode().getNode());
-                if (sourceToSwitchBox.size() >= 2) {
-                    for (int i = 1; i <= sourceToSwitchBox.size() - 1; i++) {
-                        connection.addNode(sourceToSwitchBox.get(i));
-                    }
+            List<Node> sourceToSwitchBox = RouterHelper.findPathBetweenNodes(source.getConnectedNode(), connection.getSourceRnode().getNode());
+            if (sourceToSwitchBox.size() >= 2) {
+                for (int i = 1; i <= sourceToSwitchBox.size() - 1; i++) {
+                    connection.addNode(sourceToSwitchBox.get(i));
                 }
             }
         }
+    }
 
     /**
      * Sorts indirect connections for routing.
