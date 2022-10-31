@@ -200,8 +200,8 @@ public class PartialRouter extends RWRoute{
                 // preserveNet() above will have preserved all site/part pin nodes, undo that here
                 for (RouteTerm term : sinkPins) {
                     Node node = term.getConnectedNode();
-                preservedNodes.remove(node);
-            }
+                    preservedNodes.remove(node);
+                }
             }
 
             createsNetWrapperAndConnections(net, sinkPins);
