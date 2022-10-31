@@ -36,40 +36,40 @@ import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.PartitionPin;
 import com.xilinx.rapidwright.design.SitePinInst;
-import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFTools;
+import com.xilinx.rapidwright.router.UltraScaleClockRouting;
 
 /**
  * A class extends {@link RWRoute} for partial routing.
  */
 public class PartialRouter extends RWRoute{
-    Map<Net, List<SitePinInst>> netToUnroutedPins;
-    Map<Net, SitePinInst> netToSourcePartPin;
+    Map<Net, List<RouteTerm>> netToUnroutedTerms;
+    Map<Net, RouteTerm> netToSourcePartPin;
 
     public PartialRouter(Design design, RWRouteConfig config) {
         this(design, config, null);
     }
 
-    public PartialRouter(Design design, RWRouteConfig config, Map<Net, List<SitePinInst>> netToUnroutedPins) {
+    public PartialRouter(Design design, RWRouteConfig config, Map<Net, List<RouteTerm>> netToUnroutedTerms) {
         super(design, config);
 
-        if (netToUnroutedPins == null) {
-            netToUnroutedPins = new HashMap<>();
+        if (netToUnroutedTerms == null) {
+            netToUnroutedTerms = new HashMap<>();
             for (Net net : design.getNets()) {
                 if (net.hasPIPs())
                     continue;
                 List<SitePinInst> unroutedPins = net.getSinkPins();
                 if (unroutedPins.isEmpty())
                     continue;
-                netToUnroutedPins.put(net, unroutedPins);
+                netToUnroutedTerms.put(net, RouteTermSitePin.asList(unroutedPins));
             }
         }
-        this.netToUnroutedPins = netToUnroutedPins;
+        this.netToUnroutedTerms = netToUnroutedTerms;
 
         netToSourcePartPin = new HashMap<>();
         Map<Net,Set<Node>> netToNodes = new HashMap<>();
@@ -99,38 +99,40 @@ public class PartialRouter extends RWRoute{
 
                     // Find all routed input part pins
                     Set<Node> nodes = netToNodes.computeIfAbsent(net, (n) -> new HashSet<>(RouterHelper.getNodesOfNet(n)));
-                    boolean sourceFound = false;
-                    for (Node uphill : node.getAllUphillNodes()) {
-                        if (nodes.contains(uphill)) {
-                            SitePinInst source = new SitePinInst();
-                            source.setNet(net);
-                            source.setPinName(node.toString());
+                    if (nodes.contains(node)) {
+                        RouteTerm source = new RouteTermPartPin(node);
                             if (netToSourcePartPin.put(net, source) != null) {
                                 // Expect only one source part pin
                                 throw new RuntimeException(net.getName());
                             }
-                            sourceFound = true;
                         }
                     }
-                    if (sourceFound) {
-                        continue;
                     }
                 }
             }
+
+    @Override
+    protected void routeGlobalClkNet(Net clk) {
+        if (!clk.hasPIPs()) {
+            super.routeGlobalClkNet(clk);
+        } else {
+            List<RouteTerm> terms = netToUnroutedTerms.get(clk);
+            UltraScaleClockRouting.incrementalClockRouter(clk, RouteTermSitePin.fromList(terms));
         }
     }
 
     @Override
     protected void addGlobalClkRoutingTargets(Net clk) {
-        if (!clk.hasPIPs()) {
-            if (RouterHelper.isRoutableNetWithSourceSinks(clk)) {
-                addClkNet(clk);
-            } else {
+        preserveNet(clk);
+
+        List<RouteTerm> unroutedTerms = netToUnroutedTerms.get(clk);
+        if (unroutedTerms == null) {
                 increaseNumNotNeedingRouting();
-                System.err.println("ERROR: Incomplete clk net " + clk.getName());
+            return;
             }
-        } else {
-            preserveNet(clk);
+
+        addClkNet(clk);
+        if (clk.hasPIPs()) {
             increaseNumPreservedClks();
         }
     }
@@ -139,14 +141,16 @@ public class PartialRouter extends RWRoute{
     protected void addStaticNetRoutingTargets(Net staticNet) {
         preserveNet(staticNet);
 
-        List<SitePinInst> unroutedPins = netToUnroutedPins.get(staticNet);
-        if (unroutedPins == null) {
+        List<RouteTerm> unroutedTerms = netToUnroutedTerms.get(staticNet);
+        if (unroutedTerms == null) {
             increaseNumNotNeedingRouting();
             return;
         }
 
-        addStaticNetRoutingTargets(staticNet, unroutedPins);
+        addStaticNetRoutingTargets(staticNet, unroutedTerms);
+        if (staticNet.hasPIPs()) {
         increaseNumPreservedStaticNets();
+    }
     }
 
     @Override
@@ -173,7 +177,7 @@ public class PartialRouter extends RWRoute{
     }
 
     @Override
-    protected SitePinInst getNetSource(Net net) {
+    protected RouteTerm getNetSource(Net net) {
         return netToSourcePartPin.getOrDefault(net, super.getNetSource(net));
     }
 
@@ -186,25 +190,20 @@ public class PartialRouter extends RWRoute{
             increaseNumPreservedWireNets();
         }
 
-        Device device = design.getDevice();
-        List<SitePinInst> sinkPins = netToUnroutedPins.get(net);
+        List<RouteTerm> sinkPins = netToUnroutedTerms.get(net);
         if (sinkPins != null) {
             if (sinkPins.isEmpty()) {
                 throw new RuntimeException(net.getName());
             }
-            for (SitePinInst spi : sinkPins) {
-                // preserveNet() above will also preserve all site/part pin nodes, undo that here
-                Node node;
-                if (spi.getSiteInst() != null) {
-                    node = spi.getConnectedNode();
-                } else {
-                    node = device.getNode(spi.getName());
-                    if (node == null) {
-                        throw new RuntimeException(spi.getName());
-                    }
-                }
+
+            if (net.hasPIPs()) {
+                // preserveNet() above will have preserved all site/part pin nodes, undo that here
+                for (RouteTerm term : sinkPins) {
+                    Node node = term.getConnectedNode();
                 preservedNodes.remove(node);
             }
+            }
+
             createsNetWrapperAndConnections(net, sinkPins);
         }
     }

@@ -112,17 +112,34 @@ public class RouterHelper {
      * @param sink The sink SitePinInst of this connection.
      * @return true, if the source is a COUT while the sink is not CIN.
      */
+    public static boolean isExternalConnectionToCout(RouteTerm source, RouteTerm sink) {
+        SitePinInst sourceSpi = source.getSitePinInst();
+        SitePinInst sinkSpi = sink.getSitePinInst();
+        return sourceSpi != null && sinkSpi != null && isExternalConnectionToCout(sourceSpi, sinkSpi);
+    }
+
     public static boolean isExternalConnectionToCout(SitePinInst source, SitePinInst sink) {
-        return source.getName().equals("COUT") && (!sink.getName().equals("CIN"));
+        return source.getName().equals("COUT") && !sink.getName().equals("CIN");
     }
 
     /**
-     * Gets a {@link Node} instance that connects to an INT {@link Tile} instance from an output {@link SitePinInst} instance.
-     * @param output The output pin.
+     * Gets a {@link Node} instance that connects to an INT {@link Tile} instance from an output {@link RouteTerm} instance.
+     * @param output The output terminal.
      * @return A node that connects to an INT tile from an output pin.
      */
-    public static Node projectOutputPinToINTNode(SitePinInst output) {
-        Node intNode = output.getConnectedNode();
+    public static Node projectOutputTermToINTNode(RouteTerm output) {
+        return projectOutputTermToINTNode(output.getConnectedNode());
+    }
+
+    public static Node projectOutputTermToINTNode(SitePinInst output) {
+        return projectOutputTermToINTNode(output.getConnectedNode());
+    }
+
+    private static Node projectOutputTermToINTNode(Node intNode) {
+        if (intNode.getTile().getTileTypeEnum() == TileTypeEnum.INT) {
+            return intNode;
+        }
+
         int watchdog = 5;
 
         while (intNode.getAllDownhillNodes().get(0).getTile().getTileTypeEnum() != TileTypeEnum.INT) {
@@ -145,13 +162,21 @@ public class RouterHelper {
     }
 
     /**
-     * Gets a list of {@link Node} instances that connect an input {@link SitePinInst} instance to an INT {@link Tile} instance.
-     * @param input The input pin.
+     * Gets a list of {@link Node} instances that connect an input {@link RouteTerm} instance to an INT {@link Tile} instance.
+     * @param input The input terminal.
      * @return A list of nodes from the input SitePinInst to an INT tile.
      */
+    public static List<Node> projectInputPinToINTNode(RouteTerm input) {
+        return projectInputPinToINTNode(input.getConnectedNode());
+    }
+
     public static List<Node> projectInputPinToINTNode(SitePinInst input) {
+        return projectInputPinToINTNode(input.getConnectedNode());
+    }
+
+    private static List<Node> projectInputPinToINTNode(Node input) {
         List<Node> sinkToSwitchBoxPath = new ArrayList<>();
-        RoutingNode sink = new RoutingNode(input.getConnectedNode());
+        RoutingNode sink = new RoutingNode(input);
         sink.setPrev(null);
         Queue<RoutingNode> q = new LinkedList<>();
         q.add(sink);
@@ -330,15 +355,20 @@ public class RouterHelper {
     }
 
     /**
-     * Inverts all possible GND sink pins to VCC pins.
+     * Inverts all possible GND sink terminals to VCC terminals.
      * @param design The target design.
-     * @param gndPins List of GND pins (from which inverted pins are removed)
-     * @param vccPins List of VCC pins (on which inverted pins are inserted)
+     * @param gndTerms List of GND terminals (from which inverted terms are removed)
+     * @param vccTerms List of VCC terminals (on which inverted terms are inserted)
      */
-    public static void invertPossibleGndPinsToVccPins(Design design, List<SitePinInst> gndPins, List<SitePinInst> vccPins) {
+    public static void invertPossibleGndPinsToVccPins(Design design, List<RouteTerm> gndTerms, List<RouteTerm> vccTerms) {
         Net gndNet = design.getGndNet();
         Set<SitePinInst> toInvertPins = new HashSet<>();
-        for (SitePinInst currSitePinInst : gndPins) {
+        List<RouteTerm> toInvertTerms = new ArrayList<>();
+        for (RouteTerm term : gndTerms) {
+            SitePinInst currSitePinInst = term.getSitePinInst();
+            if (currSitePinInst == null) {
+                continue;
+            }
             if (!currSitePinInst.getNet().equals(gndNet))
                 throw new RuntimeException(currSitePinInst.toString());
             SiteInst si = currSitePinInst.getSiteInst();
@@ -353,7 +383,9 @@ public class RouterHelper {
                     if (siteName.contains("RAM") || siteName.contains("DSP") || siteName.startsWith("LAGUNA")) {
                         if (belPin.getBEL().canInvert()) {
                             // SRST2 of SLICE also has an inverter, but should not be invertible
-                            toInvertPins.add(currSitePinInst);
+                            if (toInvertPins.add(currSitePinInst)) {
+                                toInvertTerms.add(term);
+                            }
                         }
                     }
                }
@@ -384,8 +416,8 @@ public class RouterHelper {
         gndNet.setPIPs(gndPIPs);
 
         // Move inverted pins from gnd to vcc net
-        gndPins.removeIf(toInvertPins::contains);
-        vccPins.addAll(toInvertPins);
+        gndTerms.removeIf(toInvertTerms::contains);
+        vccTerms.addAll(toInvertTerms);
     }
 
     /**
