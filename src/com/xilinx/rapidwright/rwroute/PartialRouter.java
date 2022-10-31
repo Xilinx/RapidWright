@@ -101,15 +101,15 @@ public class PartialRouter extends RWRoute{
                     Set<Node> nodes = netToNodes.computeIfAbsent(net, (n) -> new HashSet<>(RouterHelper.getNodesOfNet(n)));
                     if (nodes.contains(node)) {
                         RouteTerm source = new RouteTermPartPin(node);
-                            if (netToSourcePartPin.put(net, source) != null) {
-                                // Expect only one source part pin
-                                throw new RuntimeException(net.getName());
-                            }
+                        if (netToSourcePartPin.put(net, source) != null) {
+                            // Expect only one source part pin
+                            throw new RuntimeException(net.getName());
                         }
-                    }
                     }
                 }
             }
+        }
+    }
 
     @Override
     protected void routeGlobalClkNet(Net clk) {

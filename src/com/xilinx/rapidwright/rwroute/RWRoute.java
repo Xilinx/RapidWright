@@ -513,7 +513,7 @@ public class RWRoute{
                     throw new IllegalArgumentException(errMsg);
                 }
             }
-            Connection connection = new Connection(numConnectionsToRoute++, source, sink, netWrapper);;
+            Connection connection = new Connection(numConnectionsToRoute++, source, sink, netWrapper);
 
             List<Node> nodes = RouterHelper.projectInputPinToINTNode(sink);
             if (nodes.isEmpty()) {
@@ -1320,7 +1320,7 @@ public class RWRoute{
 
         RouteTerm altSourceTerm = new RouteTermSitePin(altSource);
         Node sourceINTNode = RouterHelper.projectOutputTermToINTNode(altSourceTerm);
-        Routable sourceR = createAddRoutableNode(altSourceTerm, sourceINTNode, RoutableType.PINFEED_O);;
+        Routable sourceR = createAddRoutableNode(altSourceTerm, sourceINTNode, RoutableType.PINFEED_O);
         for (Connection otherConnectionOfNet : netWrapper.getConnections()) {
             otherConnectionOfNet.setSource(altSourceTerm);
             otherConnectionOfNet.setSourceRnode(sourceR);
