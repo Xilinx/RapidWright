@@ -1974,10 +1974,10 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
      * @param timingManager A {@link TimingManager} instance to use.
      */
     public void setTimingEdgesOfConnections(List<Connection> connections) {
-		for(Connection connection : connections) {
-			if(connection.isDirect()) continue;
-			List<EDIFHierPortInst> hportsFromSitePinInsts = DesignTools.getPortInstsFromSitePinInst(connection.getSink().getSitePinInst());
-			if(hportsFromSitePinInsts.isEmpty()) {
+        for (Connection connection : connections) {
+            if (connection.isDirect()) continue;
+            List<EDIFHierPortInst> hportsFromSitePinInsts = DesignTools.getPortInstsFromSitePinInst(connection.getSink().getSitePinInst());
+            if (hportsFromSitePinInsts.isEmpty()) {
                 throw new RuntimeException("ERROR: Unable to find hierarchical logical cell pins from: " + connection.getSink());
             }
             EDIFHierPortInst hportSink = hportsFromSitePinInsts.get(0);
