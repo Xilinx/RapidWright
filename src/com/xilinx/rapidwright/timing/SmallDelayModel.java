@@ -1,6 +1,7 @@
 /*
  *
- * Copyright (c) 2019 Xilinx, Inc.
+ * Copyright (c) 2019-2022, Xilinx, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Pongstorn Maidee, Xilinx Research Labs.
@@ -52,15 +53,15 @@ public class SmallDelayModel implements DelayModel {
      * Mapping between config value of a bel to a one-hot binary.
      */
     private Map<String, Integer> configCodeMap;
-    
+
     public int getEncodedConfigCode(String value) {
         return configCodeMap.getOrDefault(value, 0);
     }
 
     public short getBELIndex(String belName) {
-    	return bel2IdxMap.get(belName);
+        return bel2IdxMap.get(belName);
     }
-    
+
     /**
      *  Implement the method with the same signature defined in DelayModel interface.
      */
@@ -69,7 +70,7 @@ public class SmallDelayModel implements DelayModel {
         Short delay = null;
         Short idx = site2IdxMap.get(siteTypeName.name());
         if (idx == null) {
-        	return null;
+            return null;
 //            throw new IllegalArgumentException("SmallDelayModel: Unknown site/belName to getIntraSiteDelay."
 //                    + "  site/belName " + siteTypeName + "  frBelPin " + frBelPin + "  toBelPin " + toBelPin);
         } else {

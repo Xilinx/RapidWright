@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2022 Xilinx, Inc.
+ * Copyright (c) 2022, Xilinx, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author Zac Blair, Xilinx Research Labs.
@@ -37,14 +38,14 @@ public enum TrafficClass {
 
     static {
         map = new HashMap<>();
-        for(TrafficClass e : values()) {
+        for (TrafficClass e : values()) {
             map.put(e.toString(), e);
         }
-    }    
+    }
 
     private final String tc;
 
-    TrafficClass(String tc){
+    TrafficClass(String tc) {
         this.tc = tc;
     }
 

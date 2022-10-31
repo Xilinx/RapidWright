@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2019 Xilinx, Inc.
+ * Copyright (c) 2019-2022, Xilinx, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * This file is part of RapidWright.
@@ -21,7 +22,7 @@
 package com.xilinx.rapidwright.timing;
 
 /**
- * Example distance categories that we created to describe some example filtering options for 
+ * Example distance categories that we created to describe some example filtering options for
  * TimingGroups.
  */
 public enum GroupDistance {

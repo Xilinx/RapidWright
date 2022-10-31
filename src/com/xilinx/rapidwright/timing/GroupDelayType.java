@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2019 Xilinx, Inc.
+ * Copyright (c) 2019-2022, Xilinx, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * This file is part of RapidWright.
@@ -21,7 +22,7 @@
 package com.xilinx.rapidwright.timing;
 
 /**
- * The current set of TimingGroup types including types for each of the basic wire length types, 
+ * The current set of TimingGroup types including types for each of the basic wire length types,
  * bounces, pin types, and other.
  */
 public enum GroupDelayType {

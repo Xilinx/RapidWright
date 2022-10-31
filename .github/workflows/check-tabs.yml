@@ -1,0 +1,14 @@
+name: Check For Tab Characters
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - run: |
+          make check_tabs
+

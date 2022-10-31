@@ -1,25 +1,26 @@
-/* 
- * Copyright (c) 2022 Xilinx, Inc. 
+/*
+ * Copyright (c) 2022, Xilinx, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Jakob Wenzel, Xilinx Research Labs.
- *  
- * This file is part of RapidWright. 
- * 
+ *
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
- 
+
 package com.xilinx.rapidwright.edif;
 
 import java.io.IOException;
@@ -103,7 +104,7 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParserWorker implement
      */
     private boolean parseToNextCellWithinLibrary() {
         String currToken = getNextToken(true);
-        if (LEFT_PAREN.equals(currToken)){
+        if (LEFT_PAREN.equals(currToken)) {
             return true;
         }
         expect(RIGHT_PAREN, currToken);
@@ -124,22 +125,22 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParserWorker implement
         }
 
         String currToken = getNextToken(true);
-        while(LEFT_PAREN.equals(currToken)){
+        while (LEFT_PAREN.equals(currToken)) {
             EDIFToken nextToken = getNextTokenWithOffset(true);
             if (nextToken.text.equalsIgnoreCase(STATUS)) {
                 parseStatus(netlist);
-            } else if(nextToken.text.equalsIgnoreCase(LIBRARY) || nextToken.text.equalsIgnoreCase(EXTERNAL)){
+            } else if (nextToken.text.equalsIgnoreCase(LIBRARY) || nextToken.text.equalsIgnoreCase(EXTERNAL)) {
                 EDIFLibrary library = parseEdifLibraryHead();
                 librariesAndCells.add(new LibraryResult(nextToken, library));
                 if (parseToNextCellWithinLibrary()) {
                     inLibrary = true;
                     return true;
                 }
-            } else if(nextToken.text.equalsIgnoreCase(COMMENT)){
+            } else if (nextToken.text.equalsIgnoreCase(COMMENT)) {
                 // Final Comment on Reference To The Cell Of Highest Level
                 String comment = getNextToken(true);
                 expect(RIGHT_PAREN, getNextToken(true));
-            } else if(nextToken.text.equalsIgnoreCase(DESIGN)){
+            } else if (nextToken.text.equalsIgnoreCase(DESIGN)) {
                 edifDesign = parseEDIFNameObject(new EDIFDesign());
                 expect(LEFT_PAREN, getNextToken(true));
                 expect(CELLREF, getNextToken(true));
@@ -151,7 +152,7 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParserWorker implement
                 expect(RIGHT_PAREN, getNextToken(true));
                 expect(RIGHT_PAREN, getNextToken(true));
                 currToken = null;
-                while(LEFT_PAREN.equals(currToken = getNextToken(true))){
+                while (LEFT_PAREN.equals(currToken = getNextToken(true))) {
                     parseProperty(edifDesign, getNextToken(true));
                 }
                 expect(RIGHT_PAREN, currToken);
@@ -375,12 +376,17 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParserWorker implement
         }
 
         public void name(StringPool uniquifier) {
+            // Here we must accommodate single bit busses that have collided with their
+            // namesake and update the port instance to reference a single bit bussed port
+            if (portInst.getIndex() == -1 && portInst.getPort().isBus() && portInst.getPort().getWidth() == 1) {
+                portInst.setIndex(0);
+            }
             String portInstName = portInst.getPortInstNameFromPort();
             portInst.setName(uniquifier.uniquifyName(portInstName));
         }
 
         public void add() {
-            if(portInst.getCellInst() != null) {
+            if (portInst.getCellInst() != null) {
                 portInst.getCellInst().addPortInst(portInst);
             }
             net.addPortInst(portInst);

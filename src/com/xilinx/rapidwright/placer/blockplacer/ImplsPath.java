@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2021 Xilinx, Inc.
+ * Copyright (c) 2021-2022, Xilinx, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Jakob Wenzel, Xilinx Research Labs.
@@ -60,7 +61,7 @@ public class ImplsPath extends AbstractPath<ImplsInstancePort, ModuleImplsInst>{
         return length;
     }
 
-    public void calculateLength(){
+    public void calculateLength() {
 
         current = new SimpleTileRectangle();
         for (ImplsInstancePort port : ports) {
@@ -73,7 +74,7 @@ public class ImplsPath extends AbstractPath<ImplsInstancePort, ModuleImplsInst>{
         }
 
         int fanOutPenalty = 1;
-        if (getSize() > 30){
+        if (getSize() > 30) {
             fanOutPenalty = 3;
         }
 

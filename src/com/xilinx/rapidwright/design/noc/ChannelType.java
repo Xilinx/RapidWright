@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2022 Xilinx, Inc.
+ * Copyright (c) 2022, Xilinx, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author Zac Blair, Xilinx Research Labs.
@@ -37,14 +38,14 @@ public enum ChannelType {
 
     static {
         map = new HashMap<>();
-        for(ChannelType e : values()) {
+        for (ChannelType e : values()) {
             map.put(e.toString(), e);
         }
-    }    
+    }
 
     private final String nc;
 
-    ChannelType(String nc){
+    ChannelType(String nc) {
         this.nc = nc;
     }
 

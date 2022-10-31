@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2021 Xilinx, Inc.
+ * Copyright (c) 2021-2022, Xilinx, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Jakob Wenzel, Xilinx Research Labs.
@@ -51,7 +52,7 @@ public abstract class AbstractPath<PortT, ModuleInstT extends AbstractModuleInst
 
     public abstract int getLength();
 
-    public int getSize(){
+    public int getSize() {
         return ports.size();
     }
 
