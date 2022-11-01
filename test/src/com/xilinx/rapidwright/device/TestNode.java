@@ -40,11 +40,21 @@ public class TestNode {
         Device device = Device.getDevice(deviceName);
         Node node = device.getNode(nodeName);
 
-        Collection<Node> downhill = node.getAllDownhillNodes(new HashSet<>());
-        Assertions.assertEquals(downhill.size(), new HashSet<>(downhill).size());
+        List<Node> downhill = node.getAllDownhillNodes();
+        if (node.getWireName().equals("WW12_BEG5")) {
+            Assertions.assertNotEquals(downhill.size(), new HashSet<>(downhill).size());
+        } else {
+            Assertions.assertEquals(downhill.size(), new HashSet<>(downhill).size());
+        }
 
-        Collection<Node> uphill = node.getAllUphillNodes(new HashSet<>());
+        Collection<Node> downhillUnique = node.getAllDownhillNodes(new HashSet<>());
+        Assertions.assertEquals(downhillUnique.size(), new HashSet<>(downhillUnique).size());
+
+        List<Node> uphill = node.getAllUphillNodes();
         Assertions.assertEquals(uphill.size(), new HashSet<>(uphill).size());
+        
+        Collection<Node> uphillUnique = node.getAllUphillNodes(new HashSet<>());
+        Assertions.assertEquals(uphillUnique.size(), new HashSet<>(uphillUnique).size());
     }
 }
 
