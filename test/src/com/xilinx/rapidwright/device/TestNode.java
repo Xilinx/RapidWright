@@ -26,6 +26,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 
@@ -39,10 +40,10 @@ public class TestNode {
         Device device = Device.getDevice(deviceName);
         Node node = device.getNode(nodeName);
 
-        List<Node> downhill = node.getAllDownhillNodes();
+        Collection<Node> downhill = node.getAllDownhillNodes(new HashSet<>());
         Assertions.assertEquals(downhill.size(), new HashSet<>(downhill).size());
 
-        List<Node> uphill = node.getAllUphillNodes();
+        Collection<Node> uphill = node.getAllUphillNodes(new HashSet<>());
         Assertions.assertEquals(uphill.size(), new HashSet<>(uphill).size());
     }
 }
