@@ -52,22 +52,26 @@ public class ParallelEDIFParser implements AutoCloseable{
     protected final List<ParallelEDIFParserWorker> workers = new ArrayList<>();
     protected final Path fileName;
     private final long fileSize;
+    private final int maxThreads;
     protected final InputStreamSupplier inputStreamSupplier;
     protected final int maxTokenLength;
     protected StringPool uniquifier = StringPool.concurrentPool();
 
     protected final EDIFReadLegalNameCache cache;
 
-    ParallelEDIFParser(Path fileName, long fileSize, InputStreamSupplier inputStreamSupplier, int maxTokenLength) {
+    ParallelEDIFParser(Path fileName, long fileSize, InputStreamSupplier inputStreamSupplier,
+            int maxTokenLength, int maxThreads) {
         this.fileName = fileName;
         this.fileSize = fileSize;
         this.inputStreamSupplier = inputStreamSupplier;
         this.maxTokenLength = maxTokenLength;
         this.cache = EDIFReadLegalNameCache.createMultiThreaded();
+        this.maxThreads = maxThreads;
     }
 
     public ParallelEDIFParser(Path fileName, long fileSize, InputStreamSupplier inputStreamSupplier) {
-        this(fileName, fileSize, inputStreamSupplier, EDIFTokenizer.DEFAULT_MAX_TOKEN_LENGTH);
+        this(fileName, fileSize, inputStreamSupplier, EDIFTokenizer.DEFAULT_MAX_TOKEN_LENGTH,
+                Integer.MAX_VALUE);
     }
 
     public ParallelEDIFParser(Path p, long fileSize) {
@@ -82,15 +86,15 @@ public class ParallelEDIFParser implements AutoCloseable{
         return new ParallelEDIFParserWorker(fileName, inputStreamSupplier.get(), offset, uniquifier, maxTokenLength, cache);
     }
 
-    public static int calcThreads(long fileSize) {
+    public static int calcThreads(long fileSize, int maxThreads) {
         int maxUsefulThreads = Math.max((int) (fileSize / MIN_BYTES_PER_THREAD),1);
-        return Math.min(maxUsefulThreads, ParallelismTools.maxParallelism());
+        return Math.min(maxUsefulThreads, Math.min(ParallelismTools.maxParallelism(), maxThreads));
     }
 
 
     protected void initializeWorkers() throws IOException {
         workers.clear();
-        int threads = calcThreads(fileSize);
+        int threads = calcThreads(fileSize, maxThreads);
         long offsetPerThread = fileSize / threads;
         for (int i=0;i<threads;i++) {
             ParallelEDIFParserWorker worker = makeWorker(i*offsetPerThread);

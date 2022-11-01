@@ -34,7 +34,7 @@ import java.nio.charset.StandardCharsets;
  * Represents an instance of a port on an {@link EDIFCellInst}.
  * Created on: May 11, 2017
  */
-public class EDIFPortInst {
+public class EDIFPortInst implements Comparable<EDIFPortInst> {
 
     private String name;
 
@@ -86,6 +86,25 @@ public class EDIFPortInst {
      * @param cellInst This instance on which this port ref corresponds.
      */
     public EDIFPortInst(EDIFPort port, EDIFNet parentNet, int index, EDIFCellInst cellInst) {
+        this(port, parentNet, index, cellInst, false);
+    }
+
+    /**
+     * Constructor to create a new port ref on the provided instance and connect
+     * it to the provided net
+     * @param port The port on the cell this port ref uses
+     * @param parentNet The net this port ref should be added to
+     * @param index For port refs part of a bussed port, this is the index into
+     * the bussed array, for single bit ports, it should be -1.
+     * @param cellInst This instance on which this port ref corresponds.
+     * @param deferSort The EDIFPortInstList maintains a sorted list of EDIFPortInst 
+     * objects and sorts them upon insertion.  Setting this flag to true will skip a sort addition
+     * but the caller is responsible to conclude a batch of additions with a call to 
+     * {@link EDIFPortInstList#reSortList()}.  This is useful when a large number of EDIFPortInsts 
+     * will be added consecutively (such as parsing a netlist).
+     */
+    public EDIFPortInst(EDIFPort port, EDIFNet parentNet, int index, EDIFCellInst cellInst,
+            boolean deferSort) {
         if (index == -1 && port.isBus()) {
             throw new RuntimeException("ERROR: Use a different constructor, "
                     + "need index for bussed port " + port.getName());
@@ -104,8 +123,9 @@ public class EDIFPortInst {
         this.index = index;
         this.port = port;
         this.name = getPortInstNameFromPort();
-        setCellInst(cellInst);
-        if (parentNet != null) parentNet.addPortInst(this);
+        setCellInst(cellInst, deferSort);
+        if (parentNet != null)
+            parentNet.addPortInst(this, deferSort);
     }
 
     protected EDIFPortInst() {
@@ -154,12 +174,25 @@ public class EDIFPortInst {
      * @param cellInst the cellInst to set
      */
     public void setCellInst(EDIFCellInst cellInst) {
-        if (this.cellInst != null) {
+        setCellInst(cellInst, false);
+    }
+
+    /**
+     * Sets the corresponding cell instance for this port instance.
+     * @param cellInst the cellInst to set
+     * @param deferSort The EDIFPortInstList maintains a sorted list of EDIFPortInst 
+     * objects and sorts them upon insertion.  Setting this flag to true will skip a sort addition
+     * but the caller is responsible for conclude a batch of additions with a call to 
+     * {@link EDIFPortInstList#reSortList()}.  This is useful when a large number of EDIFPortInsts 
+     * will be added consecutively (such as parsing a netlist).
+     */
+    public void setCellInst(EDIFCellInst cellInst, boolean deferSort) {
+        if (this.cellInst != null && !deferSort) {
             this.cellInst.removePortInst(this);
         }
         this.cellInst = cellInst;
         if (cellInst != null) {
-            cellInst.addPortInst(this);
+            cellInst.addPortInst(this, deferSort);
         }
     }
 
@@ -301,5 +334,13 @@ public class EDIFPortInst {
     public String toString() {
         if (cellInst == null) return name;
         return cellInst.getName() + EDIFTools.EDIF_HIER_SEP + name;
+    }
+
+    @Override
+    public int compareTo(EDIFPortInst o) {
+        EDIFCellInst cellInst = o.getCellInst();
+        String cellInstName = cellInst == null ? null : cellInst.getName();
+        String portInstName = o.getName();
+        return EDIFPortInstList.compare(this, cellInstName, portInstName);
     }
 }
