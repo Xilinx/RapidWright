@@ -147,12 +147,21 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
 
     public String getBusName() {
         if (busName == null) {
-            int idx = EDIFTools.lengthOfNameWithoutBus(getName().toCharArray());
+            int idx = EDIFTools.lengthOfNameWithoutBus(getName().toCharArray(), true);
             busName = getName().substring(0, idx);
         }
         return busName;
     }
 
+    protected void setBusName(String name) {
+        this.busName = name;
+    }
+
+    /**
+     * @return The port name without bussed index (if any)
+     * @deprecated - Please use {@link EDIFTools#getRootBusName(String, boolean)}
+     *             instead. To be removed in 2022.2
+     */
     public String getStemName() {
         int leftBracket = getName().indexOf('[');
         return leftBracket == -1 ? getName() : getName().substring(0, leftBracket);
@@ -161,8 +170,11 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
     public Integer getLeft() {
         if (!isBus()) return null;
         int leftBracket = getName().lastIndexOf('[');
-        int colon = getName().lastIndexOf(':');
-        int value = Integer.parseInt(getName().substring(leftBracket+1,colon));
+        int separator = getName().lastIndexOf(':');
+        if (separator == -1) {
+            separator = getName().lastIndexOf(']');
+        }
+        int value = Integer.parseInt(getName().substring(leftBracket + 1, separator));
         return value;
     }
 
@@ -170,8 +182,11 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
     public Integer getRight() {
         if (!isBus()) return null;
         int rightBracket = getName().lastIndexOf(']');
-        int colon = getName().lastIndexOf(':');
-        int value = Integer.parseInt(getName().substring(colon+1, rightBracket));
+        int separator = getName().lastIndexOf(':');
+        if (separator == -1) {
+            separator = getName().lastIndexOf('[');
+        }
+        int value = Integer.parseInt(getName().substring(separator + 1, rightBracket));
         return value;
     }
 
@@ -217,10 +232,25 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
      */
     public String getPortInstNameFromPort(int index) {
         if (!isBus()) return getBusName();
-        if (isLittleEndian()) {
-            index = (getWidth()-1) - index;
-        }
-        return getBusName() + "[" + index + "]";
+        index = getPortIndexFromNameIndex(index);
+        return getBusName() + index + "]";
+    }
+
+    /**
+     * Gets the internal port instance index from the named index for this port.
+     * Given a bussed port 'bus[4:0]', the bus has an ordered list of named indices
+     * [4, 3, 2, 1, 0]. If the named index is 'bus[1]', the port index is 3. When
+     * the bus is specified using a big endian scheme ('bus[0:4]'), the named index
+     * and port index match if the bus range starts at 0. However, buses can begin
+     * with a non-zero index, such as 'bus[2:5]' ([2, 3, 4, 5]), in which case the
+     * port index for the named 'bus[3]' is actually offset and is 5.
+     * 
+     * @param namedIndex The named index as what appears in the port instance name.
+     * @return The internal port index stored as a class member variable in the port
+     *         instance.
+     */
+    public int getPortIndexFromNameIndex(int namedIndex) {
+        return isLittleEndian() ? getLeft() - namedIndex : namedIndex - getLeft();
     }
 
     public static final byte[] EXPORT_CONST_PORT_BEGIN = "(port ".getBytes(StandardCharsets.UTF_8);
