@@ -2939,7 +2939,7 @@ public class DesignTools {
                 if (cell.getName().contains("LOCKED")) continue;// Are there better ways to identify this problem?
 
                 BEL bel = cell.getBEL();
-                if (bel == null || !bel.getName().contains("LUT")) continue;
+                if (bel == null || !bel.isLUT()) continue;
                 if (bel.getName().contains("5LUT")) {
                     bel = si.getBEL(bel.getName().replace("5", "6"));
                 }
@@ -3030,16 +3030,9 @@ public class DesignTools {
                 }
             }
             String belName = belPin.getBELName();
-            if (DesignTools.isBELALut(belName)) {
-                if (belName.charAt(1) == '6') {
-                    // Anything placed on a LUT6 does not require A6 to be tied to VCC
-                    return;
-                }
-                // Thus it can only be a LUT5
-                if (belName.charAt(1) != '5') {
-                    String lut6Name = belName.replace('5', '6');
-                    throw new RuntimeException("Expected " + lut6Name + " instead of " + belName);
-                }
+            if (belPin.getBEL().isLUT() && si.getCell(belName.replace('6', '5')) == null) {
+                // Nothing is placed on the 5LUT BEL, no need for site pin
+                return;
             }
             SitePinInst pin = si.getSitePinInst(siteWireName);
             if (pin == null) {

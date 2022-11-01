@@ -47,6 +47,7 @@ import com.xilinx.rapidwright.util.Pair;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestDesignTools {
@@ -547,5 +548,30 @@ public class TestDesignTools {
         Assertions.assertFalse(altSrc.isRouted());
         Assertions.assertTrue(snk.isRouted());
         Assertions.assertFalse(altSnk.isRouted());
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "true,false",
+            "false,true",
+            "true,true",
+    })
+    void testCreateA1A6ToStaticNetsFracturedLUT(boolean createLUT6, boolean createLUT5) {
+        Design design = new Design("test", Device.KCU105);
+
+        if (createLUT6) {
+            design.createAndPlaceCell("lut6", Unisim.LUT6, "SLICE_X0Y0/A6LUT");
+        }
+        if (createLUT5) {
+            design.createAndPlaceCell("lut5", Unisim.LUT5, "SLICE_X0Y0/A5LUT");
+        }
+
+        DesignTools.createA1A6ToStaticNets(design);
+
+        if (createLUT5) {
+            Assertions.assertEquals("[IN SLICE_X0Y0.A6]", design.getVccNet().getPins().toString());
+        } else {
+            Assertions.assertTrue(design.getVccNet().getPins().isEmpty());
+        }
     }
 }
