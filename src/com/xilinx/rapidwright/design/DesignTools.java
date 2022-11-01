@@ -3030,7 +3030,7 @@ public class DesignTools {
                 }
             }
             String belName = belPin.getBELName();
-            if (bel.isLUT() && si.getCell(belName.replace('6', '5')) == null) {
+            if (belPin.getBEL().isLUT() && si.getCell(belName.replace('6', '5')) == null) {
                 // Nothing is placed on the 5LUT BEL, no need for site pin
                 return;
             }
