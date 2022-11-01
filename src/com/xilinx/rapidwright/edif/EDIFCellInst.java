@@ -114,11 +114,30 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
      * @param epr The port instance to add
      */
     protected void addPortInst(EDIFPortInst epr) {
+        addPortInst(epr, false);
+    }
+
+    /**
+     * Adds a new EDIFPortInst to this cell instance. The port instances are stored
+     * in a sorted ArrayList, so worst case is O(n).
+     * 
+     * @param epr The port instance to add
+     * @param deferSort The EDIFPortInstList maintains a sorted list of EDIFPortInst 
+     * objects and sorts them upon insertion.  Setting this flag to true will skip a sort addition
+     * but the caller is responsible to conclude a batch of additions with a call to 
+     * {@link EDIFPortInstList#reSortList()}.  This is useful when a large number of EDIFPortInsts 
+     * will be added consecutively (such as parsing a netlist).
+     */
+    protected void addPortInst(EDIFPortInst epr, boolean deferSort) {
         if (portInsts == null) portInsts = new EDIFPortInstList();
         if (!epr.getCellInst().equals(this))
             throw new RuntimeException("ERROR: Incorrect EDIFPortInst '"+
                 epr.getFullName()+"' being added to EDIFCellInst " + toString());
-        portInsts.add(epr);
+        if (deferSort) {
+            portInsts.deferSortAdd(epr);
+        } else {
+            portInsts.add(epr);
+        }
     }
 
     /**
@@ -242,6 +261,10 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
         if (val != null && val.getValue().toLowerCase().equals("1"))
             return true;
         return false;
+    }
+
+    protected EDIFPortInstList getEDIFPortInstList() {
+        return portInsts;
     }
 
     public static final byte[] EXPORT_CONST_INSTANCE_BEGIN = "         (instance ".getBytes(StandardCharsets.UTF_8);
