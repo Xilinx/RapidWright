@@ -112,12 +112,12 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
                     EDIFPort newPort = null;
                     if (prototype.getCellInst() != null) {
                         newPortInst.setCellInst(getCellInst(prototype.getCellInst().getName()));
-                        newPort = newPortInst.getCellInst().getCellType().getPort(prototype.getPort().getBusName());
+                        newPort = newPortInst.getCellInst().getCellType().getPort(prototype.getPort().getBusName(true));
                         if (newPort == null || newPort.getWidth() != prototype.getPort().getWidth()) {
                             newPort = newPortInst.getCellInst().getCellType().getPort(prototype.getPort().getName());
                         }
                     } else {
-                        newPort = getPort(prototype.getPort().getBusName());
+                        newPort = getPort(prototype.getPort().getBusName(true));
                         if (newPort == null || newPort.getWidth() != prototype.getPort().getWidth()) {
                             newPort = getPort(prototype.getPort().getName());
                         }
@@ -487,7 +487,7 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
         if (portMap.size() != cell.getPortMap().size()) return false;
 
         for (EDIFPort port : cell.getPorts()) {
-            EDIFPort match = portMap.remove(port.getBusName());
+            EDIFPort match = portMap.remove(port.getBusName(true));
             if (match == null) {
                 match = portMap.remove(port.getName());
                 if (match == null) {

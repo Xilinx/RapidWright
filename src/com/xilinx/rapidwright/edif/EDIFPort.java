@@ -151,8 +151,11 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
 
     public String getBusName(boolean keepOpenBracket) {
         if (busName == null) {
-            int idx = EDIFTools.lengthOfNameWithoutBus(getName().toCharArray(), keepOpenBracket);
+            int idx = EDIFTools.lengthOfNameWithoutBus(getName().toCharArray(), true);
             busName = getName().substring(0, idx);
+        }
+        if (!keepOpenBracket && busName.charAt(busName.length() - 1) == '[') {
+            return busName.substring(0, busName.length() - 1);
         }
         return busName;
     }
