@@ -24,6 +24,8 @@
 package com.xilinx.rapidwright.edif;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 
 /**
  * Customized ArrayList<EDIFPortInst> for the {@link EDIFNet} and {@link EDIFCellInst} classes.
@@ -93,7 +95,7 @@ public class EDIFPortInstList extends ArrayList<EDIFPortInst> {
      * @return 0 if the left and corresponding right Strings are equal.  A number less than 0 if
      * left is lexicographically before right, or a number greater than 0 if left is after right.
      */
-    private int compare(EDIFPortInst left, String rightInstName, String rightPortInstName) {
+    protected static int compare(EDIFPortInst left, String rightInstName, String rightPortInstName) {
         if (left.getCellInst() == null) {
             if (rightInstName == null) {
                 // left and right are both a top-level port insts, compare their port insts name only
@@ -113,5 +115,22 @@ public class EDIFPortInstList extends ArrayList<EDIFPortInst> {
         // compare their port inst names.
         int compare = left.getCellInst().getName().compareTo(rightInstName);
         return compare == 0 ? left.getName().compareTo(rightPortInstName) : compare;
+    }
+
+    /**
+     * Adds an element without sorting it and appending it to the end of the list.  This method
+     * should be used with caution and generally always in conjunction with {@link #reSortList()} 
+     * after a batch of additions. 
+     * @param e The element to add
+     */
+    public void deferSortAdd(EDIFPortInst e) {
+        super.add(e);
+    }
+
+    /**
+     * Invokes this list to be re sorted (it maintains a sorted list upon add).  
+     */
+    public void reSortList() {
+        Collections.sort(this);
     }
 }
