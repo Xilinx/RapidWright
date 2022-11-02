@@ -29,8 +29,8 @@ import java.util.Comparator;
 
 /**
  * Customized ArrayList<EDIFPortInst> for the {@link EDIFNet} and {@link EDIFCellInst} classes.
- * Maintains a sorted list to allow for a O(log n) retrieval lookup by name.  Does not allow
- * duplicate entries.
+ * Maintains a sorted list to allow for a O(log n) retrieval lookup by name.  Overwrites 
+ * duplicate entries with most recent additions.
  */
 public class EDIFPortInstList extends ArrayList<EDIFPortInst> {
 
@@ -38,12 +38,19 @@ public class EDIFPortInstList extends ArrayList<EDIFPortInst> {
 
     public static final EDIFPortInstList EMPTY = new EDIFPortInstList();
 
+    /**
+     * Inserts the port inst into the list such that the list remains sorted.  If an identical 
+     * element is already in the list, it is overwritten with the new port instance provided.
+     * @param e The port inst to add to the sorted list
+     * @return True if the list changed as a result of this call, false otherwise.
+     */
     @Override
     public boolean add(EDIFPortInst e) {
         int insertionPoint = binarySearch(e.getCellInst(), e.getName());
-        // Do not allow duplicates
+        // Overwrite duplicates
         if (insertionPoint >= 0) {
-            return false;
+            super.set(insertionPoint, e);
+            return true;
         }
         super.add(insertionPoint >= 0 ? insertionPoint : ~insertionPoint, e);
         return true;

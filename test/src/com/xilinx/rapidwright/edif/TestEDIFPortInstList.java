@@ -33,6 +33,33 @@ import org.junit.jupiter.api.Test;
 
 public class TestEDIFPortInstList {
 
+    @Test
+    public void testEDIFPortInstListDuplicateBehavior() {
+
+        String designName = "design";
+        final EDIFNetlist netlist = EDIFTools.createNewNetlist(designName);
+
+        EDIFCell ec = new EDIFCell(netlist.getWorkLibrary(), "foo");
+        EDIFPort port = ec.createPort("in", EDIFDirection.INPUT, 1);
+
+
+        EDIFCell top = netlist.getTopCell();
+        EDIFCellInst cell = ec.createCellInst("a", top);
+
+        EDIFNet netA = top.createNet("netA");
+        EDIFNet netB = top.createNet("netB");
+
+
+        netA.createPortInst(port, cell);
+        netA.removePortInst(netA.getPortInsts().iterator().next());
+
+        netB.createPortInst(port, cell);
+        EDIFPortInst epi = cell.getPortInsts().iterator().next();
+
+
+        Assertions.assertEquals(netB, epi.getNet());
+    }
+    
     public EDIFPortInst makeEDIFPortInst(String portInstName) {
         EDIFPortInst portInst = new EDIFPortInst();
         portInst.setName(portInstName);
