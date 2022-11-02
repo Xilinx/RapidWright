@@ -225,17 +225,12 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
     }
 
     /**
-     * Adds a port to the cell.  Checks for naming collisions and throws
-     * RuntimeException if it occurs. Note that ports are usually keyed by
-     * bus name (see {@link EDIFPort#getBusName()}) to enable getPort() to
-     * only require the bus name for getting a port.  However, is situations
-     * where the bus name collides with a single bit bus name, the range
-     * is included for the multi-bit bus and getPort() requires the range.
-     * This is only in the case where a single bit bus collides by having the
-     * same name.  For example single bit port 'my_port[0]' and multi-bit port
-     * 'my_port[0][3:0]' being added will require that requesting the multi-bit
-     * port through getPort() will require the entire name 'my_port[0][3:0]'.
-     * Ultimately this naming scheme is discouraged.
+     * Adds a port to the cell. Checks for naming collisions and throws
+     * RuntimeException if it occurs. Single bit ports that are not bussed, are
+     * keyed by their full name. Bussed ports, however, have their range truncated
+     * to just the opening square bracket so that the port can be retrieved from a
+     * valid EDIFPortInst name (range being unknown). For example, bus[3:0] would be
+     * keyed by "bus[".
      *
      * @param port The port to add.
      * @return The port that was added.
@@ -245,41 +240,46 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
         port.setParentCell(this);
         EDIFPort collision = ports.put(port.getBusName(), port);
         if (collision != null && port != collision) {
-            if (collision.getWidth() != port.getWidth()) {
-                // We have a situation where two ports have the same root name,
-                // For example:
-                //   my_port[0]
-                //   my_port[0][3:0]
-                //
-                if (collision.getWidth() > 1) {
-                    ports.put(collision.getName(), collision);
-                } else {
-                    ports.put(collision.getBusName(), collision);
-                    ports.put(port.getName(), port);
-                }
-            } else {
-                throw new RuntimeException("ERROR: Name collsion inside EDIFCell " +
-                        getName() + ", trying to add port " + port.getName() +
-                        " which already exists inside this cell.");
-            }
-
+            throw new RuntimeException("ERROR: Port name collision on EDIFCell " + getName()
+                    + ", trying to add port " + port
+                    + ", but the cell already contains ports with the " + "same name: " + collision);
         }
         return port;
     }
 
     /**
-     * Gets a port by bus name (see {@link EDIFPort#getBusName()}).  Multi-bit ports need to
-     * have brackets removed unless the {@link EDIFCell} already has a port
-     * with the same name as the bus name of the multi-bit port.  In only this case,
-     * the range would be required in order to distinguish the ambiguity.
-     * See {@link EDIFCell#addPort(EDIFPort)} for more information.
+     * Gets a port by bus name (see {@link EDIFPort#getBusName()}). Multi-bit ports
+     * need to have closing square bracket and range removed (for example: "bus[3:0]"
+     * -> "bus[". See {@link EDIFCell#addPort(EDIFPort)} for more information.
      *
-     * @param name Bus name of the port to get.
+     * @param name Bus name (ends with '[' to represent a bussed port) of the
+     *                port to get. Single bit ports use their entire name.
      * @return The port or null if none exists.
      */
     public EDIFPort getPort(String name) {
         if (ports == null) return null;
-        return ports.get(name);
+        EDIFPort port = ports.get(name);
+        // For callers who have a port name and its unknown if its a bus, attempt a check with adding the '[' suffix
+        if (port == null && name.charAt(name.length() - 1) != '[') {
+            port = ports.get(name + "[");
+        }
+        return port;
+    }
+
+    /**
+     * Given a port instance name (not including the name of the cell instance),
+     * gets the associated port.
+     * 
+     * @param portInstName
+     * @return
+     */
+    public EDIFPort getPortByPortInstName(String portInstName) {
+        if (ports == null) return null;
+        EDIFPort port = ports.get(portInstName);
+        if (port == null && portInstName.charAt(portInstName.length() - 1) == ']') {
+            port = ports.get(portInstName.substring(0, portInstName.lastIndexOf('[') + 1));
+        }
+        return port;
     }
 
     public EDIFCellInst createCellInst(String name, EDIFCell parent) {
@@ -634,6 +634,17 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
             }
         }
         return null;
+    }
+
+    public void sortEDIFPortInstLists() {
+        for (EDIFNet net : getNets()) {
+            EDIFPortInstList list = net.getEDIFPortInstList();
+            if (list != null) list.reSortList();
+        }
+        for (EDIFCellInst inst : getCellInsts()) {
+            EDIFPortInstList list = inst.getEDIFPortInstList();
+            if (list != null) list.reSortList();
+        }
     }
 
     @Override

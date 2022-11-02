@@ -98,6 +98,28 @@ public class DesignTools {
 
     private static int uniqueBlackBoxCount = 0;
 
+    // Map from site_pin to list of bels
+    // TODO: derive from architecture.
+    private static HashMap<String, List<String>> sitePin2Bels = new HashMap<String, List<String>>()
+    {{
+        put("A_O",  Arrays.asList("A5LUT", "A6LUT"));
+        put("AMUX", Arrays.asList("A5LUT", "A6LUT"));
+        put("B_O",  Arrays.asList("B5LUT", "B6LUT"));
+        put("BMUX", Arrays.asList("B5LUT", "B6LUT"));
+        put("C_O",  Arrays.asList("C5LUT", "C6LUT"));
+        put("CMUX", Arrays.asList("C5LUT", "C6LUT"));
+        put("D_O",  Arrays.asList("D5LUT", "D6LUT"));
+        put("DMUX", Arrays.asList("D5LUT", "D6LUT"));
+        put("E_O",  Arrays.asList("E5LUT", "E6LUT"));
+        put("EMUX", Arrays.asList("E5LUT", "E6LUT"));
+        put("F_O",  Arrays.asList("F5LUT", "F6LUT"));
+        put("FMUX", Arrays.asList("F5LUT", "F6LUT"));
+        put("G_O",  Arrays.asList("G5LUT", "G6LUT"));
+        put("GMUX", Arrays.asList("G5LUT", "G6LUT"));
+        put("H_O",  Arrays.asList("H5LUT", "H6LUT"));
+        put("HMUX", Arrays.asList("H5LUT", "H6LUT"));
+    }};
+
     /**
      * Tries to identify the clock pin source for the given user signal output by
      * tracing back to a FF within a SLICE.  TODO - This method is not very robust.
@@ -1139,6 +1161,7 @@ public class DesignTools {
             }
             rPips.add(pip);
 
+            int endNodeFanout = 0;
             if (pip.isBidirectional()) {
                 rPips = reverseConnsStart.get(startNode);
                 if (rPips == null) {
@@ -1147,13 +1170,18 @@ public class DesignTools {
                 }
                 rPips.add(pip);
 
-                fanout.merge(endNode, 1, Integer::sum);
+                endNodeFanout = 1;
+            } else if (nodeSinkPins.contains(endNode)) {
+                endNodeFanout = 1;
+            }
+            if (endNodeFanout > 0) {
+                fanout.merge(endNode, endNodeFanout, Integer::sum);
             }
 
             // If a site pin was found and it belongs to this net, add an extra fanout to
             // reflect that it was both used for downstream connection as well as this site pin
-            int fanoutCount = nodeSinkPins.contains(startNode) ? 2 : 1;
-            fanout.merge(startNode, fanoutCount, Integer::sum);
+            int startNodeFanout = nodeSinkPins.contains(startNode) ? 2 : 1;
+            fanout.merge(startNode, startNodeFanout, Integer::sum);
         }
 
         HashSet<PIP> toRemove = new HashSet<>();
@@ -2269,13 +2297,31 @@ public class DesignTools {
      * empty String ("") as the destination instance name.
      */
     public static void copyImplementation(Design src, Design dest, boolean lockPlacement,
+                                          boolean lockRouting, Map<String,String> srcToDestInstNames) {
+        copyImplementation(src, dest, false, false, lockPlacement, lockRouting, srcToDestInstNames);
+    }
+
+    /**
+     * Copies the logic and implementation of a set of cells from one design to another with additional flags to control copying nets.
+     * @param src The source design (with partial or full implementation)
+     * @param dest The destination design (with matching cell instance interfaces)
+     * @param copyStaticNets Flag indicating if static nets should be copied
+     * @param copyOnlyInternalNets Flag indicating if only nets with every terminal inside the cell should be copied
+     * @param lockPlacement Flag indicating if the destination implementation copy should have the
+     *     placement locked
+     * @param lockRouting Flag indicating if the destination implementation copy should have the
+     *     routing locked
+     * @param srcToDestInstNames A map of source (key) to destination (value) pairs of cell
+     * instances from which to copy the implementation
+     */
+    public static void copyImplementation(Design src, Design dest, boolean copyStaticNets, boolean copyOnlyInternalNets, boolean lockPlacement,
             boolean lockRouting, Map<String,String> srcToDestInstNames) {
         // Removing existing logic in target cells in destination design
         EDIFNetlist destNetlist = dest.getNetlist();
         for (Entry<String,String> e : srcToDestInstNames.entrySet()) {
             DesignTools.makeBlackBox(dest, e.getValue());
-            destNetlist.removeUnusedCellsFromAllWorkLibraries();
         }
+        destNetlist.removeUnusedCellsFromAllWorkLibraries();
 
         // Populate black boxes with existing logical netlist cells
         HashSet<String> instsWithSeparator = new HashSet<>();
@@ -2293,7 +2339,7 @@ public class DesignTools {
                     destLib.removeCell(existingCell);
                 }
             }
-            destNetlist.migrateCellAndSubCells(cellInst.getCellType());
+            destNetlist.copyCellAndSubCells(cellInst.getCellType());
             EDIFHierCellInst bbInst = destNetlist.getHierCellInstFromName(e.getValue());
             EDIFCell destCell = destNetlist.getCell(cellInst.getCellType().getName());
             if (destNetlist.getTopCell() == bbInst.getCellType()) {
@@ -2314,6 +2360,7 @@ public class DesignTools {
         }
 
         // Identify cells to copy placement
+        Set<SiteInst> siteInstsOfCells = new HashSet<>();
         for (Cell cell : src.getCells()) {
             String cellName = cell.getName();
 
@@ -2321,6 +2368,7 @@ public class DesignTools {
             if ((prefixMatch = StringTools.startsWithAny(cellName, prefixes.keySet())) != null) {
                 SiteInst dstSiteInst = dest.getSiteInstFromSite(cell.getSite());
                 SiteInst srcSiteInst = cell.getSiteInst();
+                siteInstsOfCells.add(srcSiteInst);
                 if (dstSiteInst == null) {
                     dstSiteInst = dest.createSiteInst(srcSiteInst.getName(),
                                     srcSiteInst.getSiteTypeEnum(), srcSiteInst.getSite());
@@ -2336,9 +2384,15 @@ public class DesignTools {
             }
         }
 
+        List<Net> staticNets = new ArrayList();
+
         // Identify nets to copy routing
         for (Net net : src.getNets()) {
-            if (net.isStaticNet()) continue;
+            if (net.isStaticNet()) {
+                staticNets.add(net);
+                continue;
+            }
+
             List<EDIFHierPortInst> pins = src.getNetlist().getPhysicalPins(net);
             if (pins == null) continue;
             // Identify the kinds of routes to preserve:
@@ -2358,6 +2412,9 @@ public class DesignTools {
             }
             // Don't keep routing if source is not in preservation zone
             if (!srcInside) continue;
+            if (copyOnlyInternalNets && outside.size() > 0) {
+                continue;
+            }
             if ((outside.size() + 1) >= pins.size()) continue;
 
             Set<SitePinInst> pinsToRemove = new HashSet<>();
@@ -2388,6 +2445,111 @@ public class DesignTools {
                     dest.createSiteInst(spi.getSite());
                 }
                 copiedNet.createPin(spi.getName(), siteInst);
+            }
+        }
+
+        if (copyStaticNets) {
+            copyStaticNets(dest, staticNets, siteInstsOfCells);
+        }
+    }
+
+    /**
+     * Copy the route of static nets feeding the sinks within the given SiteInst.
+     * The route of static nets connecting to every site pin of the given site instances will be copied.
+     * @param dest The destination design
+     * @param staticNets The list of static nets to copy
+     * @param siteInstsOfCells The set of SiteInst containing the sinks of the static nets
+     */
+    private static void copyStaticNets(Design dest, List<Net> staticNets, Set<SiteInst> siteInstsOfCells) {
+        // This method traces a route similar to that in getTrimmablePIPsFromPins. However, there is one subtle difference.
+        // Let's consider a route from one GND source (S) to two sinks (T1 and T2) and the last common node/pip is X.
+        // If only T1 is in a cell to be copied, the tracing code here will extract all pips from S to T1.
+        // However, getTrimmablePIPsFromPins return only the pips from X to T1.
+
+        // Map from a node to its driver PIP
+        // Note: Some PIPs are bidirectional. But, every PIP allows the signal to flow in only one direction.
+        // The direction of a bidirectional PIP is determined from the context, ie., its connecting directional PIPs.
+        // To determine that context, go through directional PIPs first. This process does not support consecutive bidirectional PIPs.
+        Map<Net,Map<Node,PIP>> netToUphillPIPMap = new HashMap<>();
+        // netToPIPs to store PIPs extracted for static nets.
+        Map<Net,Set<PIP>> netToPIPs = new HashMap<>();
+        for (Net net : staticNets) {
+            netToPIPs.put(net, new HashSet<>());
+            Map<Node,PIP> nodeToDriverPIP = new HashMap<>();
+            List<PIP> biPIPs = new ArrayList<>();
+            for (PIP pip : net.getPIPs()) {
+                if (pip.isBidirectional()) {
+                    biPIPs.add(pip);
+                } else {
+                    nodeToDriverPIP.put(pip.getEndNode(), pip);
+                }
+            }
+            for (PIP pip : biPIPs) {
+                Node stNode = pip.getStartNode();
+                if (nodeToDriverPIP.containsKey(stNode)) {
+                    nodeToDriverPIP.put(pip.getEndNode(), pip);
+                } else {
+                    nodeToDriverPIP.put(stNode, pip);
+                }
+            }
+            netToUphillPIPMap.put(net, nodeToDriverPIP);
+        }
+
+        Set<String> prohibitBels = new HashSet<>();
+
+        for (SiteInst siteInst : siteInstsOfCells) {
+            // Go through the set of pins being used on this site instance.
+            for (SitePinInst sitePinInst : siteInst.getSitePinInsts()) {
+                if (sitePinInst.isOutPin())
+                    continue;
+
+                Net net = sitePinInst.getNet();
+                Map<Node,PIP> nodeToDriverPIP = netToUphillPIPMap.get(net);
+                if (nodeToDriverPIP != null) {
+                    Set<PIP> allPIPs = netToPIPs.get(net);
+                    // This SitePinInst connects to a static net. Trace and collect all the PIPs to a source.
+                    Node node = sitePinInst.getConnectedNode();
+                    SitePin sitePin = node.getSitePin();
+                    // Backtrack through routing nodes (no SitePin)
+                    while ((sitePin == null) || sitePin.isInput()) {
+                        PIP pip = nodeToDriverPIP.get(node);
+                        allPIPs.add(pip);
+                        if (pip.isBidirectional()) {
+                            node = pip.getStartNode().equals(node) ? pip.getEndNode() : pip.getStartNode();
+                        } else {
+                            node = pip.getStartNode();
+                        }
+                        if (node.getWireName().contains(Net.VCC_WIRE_NAME))
+                            break;
+
+                        sitePin = node.getSitePin();
+                    }
+                    if ((sitePin != null) && !node.getWireName().contains(Net.VCC_WIRE_NAME))  { // GND source
+                        String  pinName = sitePin.getPinName();
+                        String  siteName = sitePin.getSite().getName();
+                        List<String> bels = sitePin2Bels.get(pinName);
+                        for (String bel : bels) {
+                            prohibitBels.add(siteName + "/" + bel);
+                        }
+                    }
+                    netToPIPs.put(net,allPIPs);
+                }
+            }
+        }
+
+        // When we copy the static nets, we must preserve their sources so that nothing should be placed on it.
+        for (String bel : prohibitBels) {
+            dest.addXDCConstraint(ConstraintGroup.LATE, "set_property PROHIBIT true [get_bels " + bel + "]");
+        }
+
+
+        for (Map.Entry<Net, Set<PIP>> entry : netToPIPs.entrySet()) {
+            if ((entry == null) || (entry.getKey() == null) || (entry.getValue() == null))
+                continue;
+
+            Net net = dest.getStaticNet(entry.getKey().getType());
+            for (PIP p : entry.getValue()) {
+                net.addPIP(p);
             }
         }
     }
@@ -2777,7 +2939,7 @@ public class DesignTools {
                 if (cell.getName().contains("LOCKED")) continue;// Are there better ways to identify this problem?
 
                 BEL bel = cell.getBEL();
-                if (bel == null || !bel.getName().contains("LUT")) continue;
+                if (bel == null || !bel.isLUT()) continue;
                 if (bel.getName().contains("5LUT")) {
                     bel = si.getBEL(bel.getName().replace("5", "6"));
                 }
@@ -2866,6 +3028,11 @@ public class DesignTools {
                 if (val != null && val.getValue().equals("SRLC32E")) {
                     net = si.getDesign().getGndNet();
                 }
+            }
+            String belName = belPin.getBELName();
+            if (belPin.getBEL().isLUT() && si.getCell(belName.replace('6', '5')) == null) {
+                // Nothing is placed on the 5LUT BEL, no need for site pin
+                return;
             }
             SitePinInst pin = si.getSitePinInst(siteWireName);
             if (pin == null) {
