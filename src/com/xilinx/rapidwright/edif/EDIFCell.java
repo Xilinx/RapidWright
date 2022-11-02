@@ -238,7 +238,7 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
     public EDIFPort addPort(EDIFPort port) {
         if (ports == null) ports = getNewMap();
         port.setParentCell(this);
-        EDIFPort collision = ports.put(port.getBusName(), port);
+        EDIFPort collision = ports.put(port.getBusName(true), port);
         if (collision != null && port != collision) {
             throw new RuntimeException("ERROR: Port name collision on EDIFCell " + getName()
                     + ", trying to add port " + port

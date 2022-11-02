@@ -146,8 +146,12 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
     }
 
     public String getBusName() {
+        return getBusName(false);
+    }
+
+    public String getBusName(boolean keepOpenBracket) {
         if (busName == null) {
-            int idx = EDIFTools.lengthOfNameWithoutBus(getName().toCharArray(), true);
+            int idx = EDIFTools.lengthOfNameWithoutBus(getName().toCharArray(), keepOpenBracket);
             busName = getName().substring(0, idx);
         }
         return busName;
@@ -233,7 +237,7 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
     public String getPortInstNameFromPort(int index) {
         if (!isBus()) return getBusName();
         index = getPortIndexFromNameIndex(index);
-        return getBusName() + index + "]";
+        return getBusName(true) + index + "]";
     }
 
     /**
@@ -300,7 +304,7 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
      * @return
      */
     public boolean isBus() {
-        return width > 1 || !getName().equals(getBusName());
+        return width > 1 || !getName().equals(busName);
     }
 
     public int[] getBitBlastedIndicies() {
