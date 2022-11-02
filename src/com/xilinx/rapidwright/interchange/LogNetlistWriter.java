@@ -1,25 +1,26 @@
-/* 
- * Copyright (c) 2020 Xilinx, Inc. 
+/*
+ * Copyright (c) 2020-2022, Xilinx, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
- *  
- * This file is part of RapidWright. 
- * 
+ *
+ * This file is part of RapidWright.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  */
- 
+
 package com.xilinx.rapidwright.interchange;
 
 import java.io.IOException;
@@ -218,7 +219,7 @@ public class LogNetlistWriter {
                     } else {
                         piBuilder.setExtPort(Void.VOID);
                     }
-                    if(portInst.getPort().isBus()) {
+                    if (portInst.getPort().isBus()) {
                         piBuilder.initBusIdx().setIdx(portInst.getIndex());
                     }
                     k++;
@@ -265,13 +266,13 @@ public class LogNetlistWriter {
     private void writeAllStringsToNetlistBuilder(Netlist.Builder netlist) {
         int stringCount = allStrings.size();
         TextList.Builder strList = netlist.initStrList(stringCount);
-        for(int i=0; i < stringCount; i++) {
+        for (int i=0; i < stringCount; i++) {
             strList.set(i, new Text.Reader(allStrings.get(i)));
         }
     }
 
     /**
-     * Writes a RapidWright netlist to a Cap'n Proto serialized file.  The method attempts to 
+     * Writes a RapidWright netlist to a Cap'n Proto serialized file.  The method attempts to
      * collapse macros in the netlist before writing.
      * @param n RapidWright netlist
      * @param fileName Name of the file to write
@@ -281,7 +282,7 @@ public class LogNetlistWriter {
     public static void writeLogNetlist(EDIFNetlist n, String fileName) throws IOException {
         writeLogNetlist(n, fileName, true);
     }
-    
+
     /**
      * Writes a RapidWright netlist to a Cap'n Proto serialized file.
      * @param n RapidWright netlist
@@ -290,16 +291,16 @@ public class LogNetlistWriter {
      * @throws IOException
      */
     public static void writeLogNetlist(EDIFNetlist n, String fileName, boolean collapseMacros) throws IOException {
-        if(collapseMacros) {
+        if (collapseMacros) {
             Device device = n.getDevice();
-            if(device != null) {
+            if (device != null) {
                 n.collapseMacroUnisims(device.getSeries());
             } else {
                 System.err.println("WARNING: Could not collapse macros in netlist as part target device"
                         + " could not be identified.");
-            }            
+            }
         }
-        
+
         MessageBuilder message = new MessageBuilder();
         Netlist.Builder netlist = message.initRoot(Netlist.factory);
 
