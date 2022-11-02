@@ -1540,11 +1540,6 @@ public class RWRoute{
 
         // Only perform front-to-front if in the same SLR
         RouteNode destRnode = (forward ? queueBack : queue).peek();
-        if (tailRnode.getSLRIndex(forward) != destRnode.getSLRIndex(forward)) {
-            // Otherwise front-to-end
-            destRnode = forward ? connection.getSinkRnode() : connection.getSourceRnode();
-        }
-
         int destX = destRnode.getTileXCoordinate(!forward);
         int destY = destRnode.getTileYCoordinate(!forward);
         int deltaX = Math.abs(tailX - destX);
@@ -1677,32 +1672,85 @@ public class RWRoute{
         assert(sourceRnode.getPrev() == null);
 
         // Add sink rnodes to the backward queue
-        for (RouteNode sinkRnode : Arrays.asList(connectionToRoute.getSinkRnode(),
-                connectionToRoute.getAltSinkRnode())) {
-            if (sinkRnode != null) {
+        RouteNode sinkRnode = connectionToRoute.getSinkRnode();
+        for (RouteNode rnode : Arrays.asList(sinkRnode, connectionToRoute.getAltSinkRnode())) {
+            if (rnode != null) {
                 final boolean forward = false;
                 // Unlike source nodes, sink nodes must be costed since they could be overused
-                int countSourceUses = sinkRnode.countConnectionsOfUser(connectionToRoute.getNetWrapper());
+                int countSourceUses = rnode.countConnectionsOfUser(connectionToRoute.getNetWrapper());
                 float sharingFactor = 1 + shareWeight* countSourceUses;
-                float newPartialPathCost = rnodeCostWeight * getNodeCost(forward, sinkRnode, connectionToRoute, countSourceUses, sharingFactor);
+                float newPartialPathCost = rnodeCostWeight * getNodeCost(forward, rnode, connectionToRoute, countSourceUses, sharingFactor);
                 // Mark sinks with a next pointer to themselves
-                sinkRnode.setNext(sinkRnode);
-                push(forward, sinkRnode, newPartialPathCost, newPartialPathCost);
+                rnode.setNext(rnode);
+                push(forward, rnode, newPartialPathCost, newPartialPathCost);
             }
         }
 
-        // Push all nodes from the previous iteration's routing onto the queue
-        {
-            assert(connectionToRoute.getSink().isRouted() != connectionToRoute.getRnodes().isEmpty());
+        Connection connectionToPush;
+        if (connectionToRoute.getSink().isRouted()) {
+            // Connection was previously routed: push all nodes from the previous iteration's
+            // routing onto the queue
+            connectionToPush = connectionToRoute;
+        } else {
+            // Connection was not routed; find the routed connection with the closest sink
+            // on the same net and push its nodes instead
+            final boolean forward = true;
+            final int sinkSLR = sinkRnode.getSLRIndex(forward);
+            final int sinkX = sinkRnode.getTileXCoordinate(!forward);
+            final int sinkY = sinkRnode.getTileYCoordinate(!forward);
+            connectionToPush = Collections.min(netWrapper.getConnections(), new Comparator<Connection>() {
+                private int distanceFromSink(RouteNode rnode) {
+                    final int connX = rnode.getTileXCoordinate(!forward);
+                    final int connY = rnode.getTileYCoordinate(!forward);
+                    return Math.abs(connX - sinkX) + Math.abs(connY - sinkY);
+                }
+
+                @Override
+                public int compare(Connection c1, Connection c2) {
+                    // Prefer routed connections
+                    boolean c1Routed = c1.getSink().isRouted();
+                    boolean c2Routed = c2.getSink().isRouted();
+                    if (!c1Routed && !c2Routed) {
+                        // Neither routed; nothing else matters
+                        return 0;
+                    } else {
+                        if (c1Routed != c2Routed) {
+                            // Prefer routed connection
+                            return c1Routed ? -1 : 1;
+                        }
+                        // Both routed
+                    }
+
+                    // Prefer closer SLRs
+                    RouteNode c1Rnode = c1.getSinkRnode();
+                    RouteNode c2Rnode = c2.getSinkRnode();
+                    int c1SLR = c1Rnode.getSLRIndex(forward);
+                    int c2SLR = c2Rnode.getSLRIndex(forward);
+                    int c1DeltaSLR = Math.abs(c1SLR - sinkSLR);
+                    int c2DeltaSLR = Math.abs(c2SLR - sinkSLR);
+                    if (c1DeltaSLR != c2DeltaSLR) {
+                        return Integer.compare(c1DeltaSLR, c2DeltaSLR);
+                    }
+
+                    // Prefer closer Manhattan distance
+                    return Integer.compare(distanceFromSink(c1Rnode), distanceFromSink(c2Rnode));
+                }
+            });
+        }
+
+        if (connectionToPush.getSink().isRouted()) {
+            // Connection was previously routed: push all nodes from the previous iteration's
+            // routing onto the queue
+            assert(!connectionToPush.getRnodes().isEmpty());
 
             RouteNode parentRnode = null;
             boolean parentRnodeWillOveruse = false;
 
             // Go forwards from source
-            for (RouteNode childRnode : Lists.reverse(connectionToRoute.getRnodes())) {
+            for (RouteNode childRnode : Lists.reverse(connectionToPush.getRnodes())) {
                 boolean forward = true;
                 if (parentRnode != null) {
-                    assert(isAccessible(forward, childRnode, connectionToRoute));
+                    assert(isAccessible(forward, childRnode, connectionToRoute) || connectionToPush != connectionToRoute);
 
                     // FIXME: Only relevant for PartialRouter
                     boolean assertsEnabled = false;
@@ -1729,13 +1777,20 @@ public class RWRoute{
                 if (parentRnodeWillOveruse)
                     break;
 
-                assert(!parentRnode.isVisited(!forward));
+                if (parentRnode.isVisited(!forward)) {
+                    // Stumbled across a connectionToPush that just so happens to go through
+                    // connectionToRoute's sink!
+                    assert(connectionToPush != connectionToRoute);
+                    assert(!parentRnode.isIntersection());
+                    // Let this be discovered naturally
+                    break;
+                }
             }
 
             // If non-timing driven, there must be at least one over-used node on the
             // connection-to-be-routed (otherwise we wouldn't expect it to need
             // re-routing)
-            assert(connectionToRoute.getRnodes().isEmpty() ||
+            assert(connectionToPush != connectionToRoute ||
                    config.isTimingDriven() ||
                    parentRnodeWillOveruse);
         }
