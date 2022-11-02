@@ -217,10 +217,17 @@ public class TestEDIFPortInstList {
 
         HashSet<String> uniqueSet = new HashSet<>();
         for (String name : allNames) {
-            // Test to ensure duplicates are not allowed
-            boolean success = list.add(makeEDIFPortInst(name));
+            // Test to ensure duplicates are overwritten
+            EDIFPortInst portInst = makeEDIFPortInst(name);
+            EDIFPortInst existingPortInst = list.get(portInst.getCellInst(), portInst.getName());
+            Assertions.assertTrue(list.add(portInst));
             boolean isDuplicate = uniqueSet.add(name);
-            Assertions.assertEquals(success, isDuplicate);
+            if (isDuplicate) {
+                EDIFPortInst currPortInst = list.get(portInst.getCellInst(), portInst.getName());
+                Assertions.assertTrue(currPortInst == portInst);
+                Assertions.assertTrue(existingPortInst != currPortInst);
+            }
+            
         }
 
         Assertions.assertEquals(uniqueSet.size(), list.size());
