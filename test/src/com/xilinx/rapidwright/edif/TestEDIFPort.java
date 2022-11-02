@@ -32,6 +32,8 @@ import org.junit.jupiter.api.Test;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 public class TestEDIFPort {
 
@@ -128,5 +130,27 @@ public class TestEDIFPort {
         Assertions.assertEquals(0, busPort.getRight());
         Assertions.assertEquals(busPort, cell.getPort("foo[0]["));
         Assertions.assertNotEquals(busPort, cell.getPort("foo[0]"));
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "bus[7:0],bus,8",
+            "bus[0:7],bus,8",
+            "bus[15][15:0],bus[15],8",
+            "foo,foo,1",
+            "foo[0],foo[0],1",
+            "foo[1],foo[1],1",
+            "foo[2][2],foo[2][2],1",
+            "foo[3][3:3],foo[3],1",
+    })
+    void testGetBusName(String portName, String busName, int width) {
+        String designName = "design";
+        final EDIFNetlist netlist = EDIFTools.createNewNetlist(designName);
+        final Design design = new Design(designName, Device.KCU105);
+        design.setNetlist(netlist);
+
+        EDIFCell cell = new EDIFCell(netlist.getWorkLibrary(), "cell_1");
+        EDIFPort busOutput = cell.createPort(portName, EDIFDirection.OUTPUT, width);
+        Assertions.assertEquals(busName, busOutput.getBusName());
     }
 }
