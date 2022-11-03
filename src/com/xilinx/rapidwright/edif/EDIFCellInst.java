@@ -238,7 +238,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
         setCellTypeRaw(cellType);
         for (EDIFPortInst portInst : getPortInsts()) {
             EDIFPort origPort = portInst.getPort();
-            EDIFPort port = cellType.getPort(origPort.getBusName());
+            EDIFPort port = cellType.getPort(origPort.getBusName(true));
             if (port == null || port.getWidth() != origPort.getWidth()) {
                 port = cellType.getPort(origPort.getName());
             }

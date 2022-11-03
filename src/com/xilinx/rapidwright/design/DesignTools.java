@@ -845,7 +845,7 @@ public class DesignTools {
         Map<String, EDIFPort> cellPorts = new HashMap<>(target.getPortMap());
         StringBuilder sb = new StringBuilder();
         for (EDIFPort p : src.getPorts()) {
-            EDIFPort otherPort = cellPorts.remove(p.getBusName());
+            EDIFPort otherPort = cellPorts.remove(p.getBusName(true));
             if (otherPort == null) {
                 otherPort = cellPorts.remove(p.getName());
                 if (otherPort == null) {
