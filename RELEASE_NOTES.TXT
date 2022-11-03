@@ -1,3 +1,18 @@
+============= RapidWright 2022.1.4-beta released on 2022-11-03 ================
+Notes: 
+ * Can now load EDIF netlist in parallel with placement and routing when reading a DCP
+ * Allows the Design object to detach the corresponding EDIFNetlist to save working memory
+ * Restores the original EDIFPort.getBusName() behavior
+ * Changes EDIFPortInstList duplicate behavior from prohibit to overwrite 
+ * Net.removePin() to unset alternate source
+ * Fix Net.removePin() for static nets under preserveOtherRoutes
+ * Option to track process peak memory usage
+ * Fix for #548, #572, #564
+ * Fixes intrasite routing to CARRY pins from LUT outputs on UltraScale/+
+ - API Additions:
+   - com.xilinx.rapidwright.device.Node "public Collection<Node> getAllDownhillNodes(Collection<Node> nodes)"
+   - com.xilinx.rapidwright.device.Node "public Collection<Node> getAllUphillNodes(Collection<Node> nodes)"
+
 ============= RapidWright 2022.1.3-beta released on 2022-09-19 ================
 Notes: 
  * Adds support for partition pins, several new APIs added as seen below

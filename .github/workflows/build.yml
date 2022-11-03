@@ -5,7 +5,7 @@ on:
   pull_request:
 
 env:
-  RAPIDWRIGHT_VERSION: v2022.1.4-rc2-beta
+  RAPIDWRIGHT_VERSION: v2022.1.4-beta
 
 jobs:
   build:
