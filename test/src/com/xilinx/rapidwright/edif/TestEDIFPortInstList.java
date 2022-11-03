@@ -53,10 +53,15 @@ public class TestEDIFPortInstList {
         netA.createPortInst(port, cell);
         netA.removePortInst(netA.getPortInsts().iterator().next());
 
+        // At this point, cell has an EDIFPortInst 'a/in', even though it was removed from netA 
+
+        // By creating another EDIFPortInst 'a/in' on netB, we introduce a duplicate EDIFPortInst 
+        // on cell
         netB.createPortInst(port, cell);
+
+        // If the EDIFPortInstList is truly replacing existing equivalent port instances, the port 
+        // instance on the cell and netB should be the same object
         EDIFPortInst epi = cell.getPortInsts().iterator().next();
-
-
         Assertions.assertEquals(netB, epi.getNet());
     }
     
