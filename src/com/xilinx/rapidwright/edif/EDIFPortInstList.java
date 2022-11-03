@@ -30,7 +30,7 @@ import java.util.Comparator;
 /**
  * Customized ArrayList<EDIFPortInst> for the {@link EDIFNet} and {@link EDIFCellInst} classes.
  * Maintains a sorted list to allow for a O(log n) retrieval lookup by name.  Overwrites 
- * duplicate entries with most recent additions.
+ * existing entries with most recent value.
  */
 public class EDIFPortInstList extends ArrayList<EDIFPortInst> {
 
