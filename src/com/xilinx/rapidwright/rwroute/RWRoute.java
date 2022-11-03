@@ -1412,9 +1412,10 @@ public class RWRoute{
                 // Tail node is preserved by the same net we're routing!
                 // Since it's preserved, it must be an uncongested path back to the source, with
                 // prev pointers.
-                // If it hasn't been visited yet by the forward pass, fake that it has so that
-                // it can be considered an intersection
-                if (!tailRnode.isVisited(!forward)) {
+                // If it hasn't been visited yet by the forward pass (and if the forward pass
+                // isn't just about to discover tailRnode) if necessary fake that it has so that
+                // it will be considered an intersection
+                if (!tailRnode.isVisited(!forward) && tailRnode.getPrev() != queue.peek()) {
                     tailRnode.setVisited(!forward);
                 }
                 assert(!tailRnode.willOverUse(connection.getNetWrapper()));
