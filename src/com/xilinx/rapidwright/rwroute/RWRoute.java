@@ -1593,28 +1593,12 @@ public class RWRoute{
         assert(sourceRnode.getPrev() == null);
         push(sourceRnode, 0, 0);
 
-        Connection connectionToPush;
-        if (connectionToRoute.getSink().isRouted()) {
-            // Connection was previously routed: push all nodes from the previous iteration's
-            // routing onto the queue
-            connectionToPush = connectionToRoute;
-        } else {
+        Connection connectionToPush = connectionToRoute;
+        if (!connectionToRoute.getSink().isRouted() && connectionToRoute.isCrossSLR()) {
+            // Cross-SLR connection was not routed; find the connection with the closest sink
+            // on the same net and consider pushing its nodes instead
             RouteNode sinkRnode = connectionToRoute.getSinkRnode();
-
-            // Connection was not routed; find the routed connection with the closest sink
-            // on the same net and push its nodes instead
-            final int sinkSLR = sinkRnode.getSLRIndex();
-            SitePinInst sink = connectionToRoute.getSink();
-            Tile sinkTile = sink.getTile();
-            final int sinkX = sinkTile.getTileXCoordinate();
-            final int sinkY = sinkTile.getTileYCoordinate();
-            connectionToPush = Collections.min(netWrapper.getConnections(), new Comparator<Connection>() {
-                private int distanceFromSink(RouteNode rnode) {
-                    final int connX = rnode.getEndTileXCoordinate();
-                    final int connY = rnode.getEndTileYCoordinate();
-                    return Math.abs(connX - sinkX) + Math.abs(connY - sinkY);
-                }
-
+            Connection closestConnection = Collections.min(netWrapper.getConnections(), new Comparator<Connection>() {
                 @Override
                 public int compare(Connection c1, Connection c2) {
                     // Prefer routed connections
@@ -1634,18 +1618,24 @@ public class RWRoute{
                     // Prefer closer SLRs
                     RouteNode c1Rnode = c1.getSinkRnode();
                     RouteNode c2Rnode = c2.getSinkRnode();
-                    int c1SLR = c1Rnode.getSLRIndex();
-                    int c2SLR = c2Rnode.getSLRIndex();
-                    int c1DeltaSLR = Math.abs(c1SLR - sinkSLR);
-                    int c2DeltaSLR = Math.abs(c2SLR - sinkSLR);
+                    int c1DeltaSLR = sinkRnode.getSLRDistance(c1Rnode);
+                    int c2DeltaSLR = sinkRnode.getSLRDistance(c2Rnode);
                     if (c1DeltaSLR != c2DeltaSLR) {
                         return Integer.compare(c1DeltaSLR, c2DeltaSLR);
                     }
 
                     // Prefer closer Manhattan distance
-                    return Integer.compare(distanceFromSink(c1Rnode), distanceFromSink(c2Rnode));
+                    return Integer.compare(sinkRnode.getManhattanDistance(c1Rnode),
+                            sinkRnode.getManhattanDistance(c2Rnode));
                 }
             });
+
+            if (sinkRnode.getSLRDistance(closestConnection.getSinkRnode()) <
+                    sinkRnode.getSLRDistance(closestConnection.getSourceRnode())) {
+                // Only push if closestConnection's sink SLR is closer to connectionToRoute's sink SLR
+                // than closestConnection's source SLR
+                connectionToPush = closestConnection;
+            }
         }
 
         if (connectionToPush.getSink().isRouted()) {

@@ -736,4 +736,20 @@ abstract public class RouteNode implements Comparable<RouteNode> {
     abstract public boolean isExcluded(Node parent, Node child);
 
     abstract public int getSLRIndex();
+
+    public int getManhattanDistance(RouteNode that) {
+        final Tile thisTile = getNode().getTile();
+        final int thisX = thisTile.getTileXCoordinate();
+        final int thisY = thisTile.getTileYCoordinate();
+        final Tile thatTile = that.getNode().getTile();
+        final int thatX = thatTile.getTileXCoordinate();
+        final int thatY = thatTile.getTileYCoordinate();
+        return Math.abs(thatX - thisX) + Math.abs(thatY - thisY);
+    }
+
+    public int getSLRDistance(RouteNode that) {
+        final int thisSLR = getSLRIndex();
+        final int thatSLR = that.getSLRIndex();
+        return Math.abs(thatSLR - thisSLR);
+    }
 }
