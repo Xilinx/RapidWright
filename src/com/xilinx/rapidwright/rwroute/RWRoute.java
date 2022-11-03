@@ -1385,6 +1385,12 @@ public class RWRoute{
                                   float rnodeDelayWeight, float rnodeEstDlyWeight) {
         boolean intersectionFound = false;
         boolean longHead = config.isTimingDriven() && forward && DelayEstimatorBase.isLong(headRnode.getNode());
+        // Only perform front-to-front if in the same SLR
+        RouteNode destRnode = (forward ? queueBack : queue).peek();
+        if (headRnode.getSLRIndex(forward) != destRnode.getSLRIndex(forward)) {
+            // Otherwise front-to-end
+            destRnode = forward ? connection.getSinkRnode() : connection.getSourceRnode();
+        }
         for (RouteNode tailRnode : headRnode.getChildrenParents(forward)) {
             if (tailRnode.isVisited(forward)) {
                 // Node must be in queue already.
@@ -1455,7 +1461,6 @@ public class RWRoute{
                     case LAGUNA_O:
                         if ((forward && tailRnode.getType() == RouteNodeType.LAGUNA_I) ||
                                 (!forward && tailRnode.getType() == RouteNodeType.LAGUNA_O)) {
-                            RouteNode destRnode = forward ? connection.getSinkRnode() : connection.getSourceRnode();
                             if (!connection.isCrossSLR() ||
                                     destRnode.getSLRIndex(forward) == tailRnode.getSLRIndex(forward)) {
                                 // Do not consider approaching a SLL if not needing to cross
@@ -1464,7 +1469,6 @@ public class RWRoute{
                         }
                         break;
                     case SUPER_LONG_LINE:
-                        RouteNode destRnode = forward ? connection.getSinkRnode() : connection.getSourceRnode();
                         assert(connection.isCrossSLR());
                         // Set the prev/next pointer, as RouteNode.getSLRDistance() requires it
                         assert(!tailRnode.isVisited(forward));
@@ -1480,7 +1484,8 @@ public class RWRoute{
             }
 
             boolean longTail = config.isTimingDriven() && !forward && DelayEstimatorBase.isLong(tailRnode.getNode());
-            evaluateCostAndPush(forward, headRnode, forward ? longHead : longTail, tailRnode, connection, shareWeight, rnodeCostWeight,
+            evaluateCostAndPush(forward, headRnode, forward ? longHead : longTail, tailRnode, destRnode,
+                    connection, shareWeight, rnodeCostWeight,
                     rnodeLengthWeight, rnodeEstWlWeight, rnodeDelayWeight, rnodeEstDlyWeight);
             if (intersectionFound) {
                 assert(tailRnode.isIntersection());
@@ -1513,7 +1518,8 @@ public class RWRoute{
      * @param rnodeEstDlyWeight The weight of estimated delay from childRnode to the target.
      */
     private void evaluateCostAndPush(boolean forward,
-                                     RouteNode headRnode, boolean longParent, RouteNode tailRnode, Connection connection, float sharingWeight, float rnodeCostWeight,
+                                     RouteNode headRnode, boolean longParent, RouteNode tailRnode, RouteNode destRnode,
+                                     Connection connection, float sharingWeight, float rnodeCostWeight,
                                      float rnodeLengthWeight, float rnodeEstWlWeight,
                                      float rnodeDelayWeight, float rnodeEstDlyWeight) {
         int countSourceUses = tailRnode.countConnectionsOfUser(connection.getNetWrapper());
@@ -1533,14 +1539,6 @@ public class RWRoute{
 
         int tailX = tailRnode.getTileXCoordinate(forward);
         int tailY = tailRnode.getTileYCoordinate(forward);
-
-        // Only perform front-to-front if in the same SLR
-        RouteNode destRnode = (forward ? queueBack : queue).peek();
-        if (headRnode.getSLRIndex(forward) != destRnode.getSLRIndex(forward)) {
-            // Otherwise front-to-end
-            destRnode = forward ? connection.getSinkRnode() : connection.getSourceRnode();
-        }
-
         int destX = destRnode.getTileXCoordinate(!forward);
         int destY = destRnode.getTileYCoordinate(!forward);
         int deltaX = Math.abs(tailX - destX);
@@ -1759,7 +1757,8 @@ public class RWRoute{
                     // Place child onto queue
                     assert(!childRnode.isVisited(forward) || routingGraph.isPreserved(childRnode.getNode()));
                     boolean longParent = config.isTimingDriven() && DelayEstimatorBase.isLong(parentRnode.getNode());
-                    evaluateCostAndPush(forward, parentRnode, longParent, childRnode, connectionToRoute, shareWeight, rnodeCostWeight,
+                    evaluateCostAndPush(forward, parentRnode, longParent, childRnode, sinkRnode,
+                            connectionToRoute, shareWeight, rnodeCostWeight,
                             rnodeLengthWeight, rnodeEstWlWeight, rnodeDelayWeight, rnodeEstDlyWeight);
                     assert(childRnode.getPrev() == parentRnode);
                 }
@@ -1807,7 +1806,8 @@ public class RWRoute{
                     assert(childRnode.isVisited(forward));
                     assert(!parentRnode.isVisited(forward));
                     boolean longParent = config.isTimingDriven() && DelayEstimatorBase.isLong(parentRnode.getNode());
-                    evaluateCostAndPush(forward, childRnode, longParent, parentRnode, connectionToRoute, shareWeight, rnodeCostWeight,
+                    evaluateCostAndPush(forward, childRnode, longParent, parentRnode, sourceRnode,
+                            connectionToRoute, shareWeight, rnodeCostWeight,
                             rnodeLengthWeight, rnodeEstWlWeight, rnodeDelayWeight, rnodeEstDlyWeight);
                     assert(parentRnode.getNext() == childRnode);
                 }
