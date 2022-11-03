@@ -33,6 +33,38 @@ import org.junit.jupiter.api.Test;
 
 public class TestEDIFPortInstList {
 
+    @Test
+    public void testEDIFPortInstListDuplicateBehavior() {
+
+        String designName = "design";
+        final EDIFNetlist netlist = EDIFTools.createNewNetlist(designName);
+
+        EDIFCell ec = new EDIFCell(netlist.getWorkLibrary(), "foo");
+        EDIFPort port = ec.createPort("in", EDIFDirection.INPUT, 1);
+
+
+        EDIFCell top = netlist.getTopCell();
+        EDIFCellInst cell = ec.createCellInst("a", top);
+
+        EDIFNet netA = top.createNet("netA");
+        EDIFNet netB = top.createNet("netB");
+
+
+        netA.createPortInst(port, cell);
+        netA.removePortInst(netA.getPortInsts().iterator().next());
+
+        // At this point, cell has an EDIFPortInst 'a/in', even though it was removed from netA 
+
+        // By creating another EDIFPortInst 'a/in' on netB, we introduce a duplicate EDIFPortInst 
+        // on cell
+        netB.createPortInst(port, cell);
+
+        // If the EDIFPortInstList is truly replacing existing equivalent port instances, the port 
+        // instance on the cell and netB should be the same object
+        EDIFPortInst epi = cell.getPortInsts().iterator().next();
+        Assertions.assertEquals(netB, epi.getNet());
+    }
+    
     public EDIFPortInst makeEDIFPortInst(String portInstName) {
         EDIFPortInst portInst = new EDIFPortInst();
         portInst.setName(portInstName);
@@ -190,10 +222,17 @@ public class TestEDIFPortInstList {
 
         HashSet<String> uniqueSet = new HashSet<>();
         for (String name : allNames) {
-            // Test to ensure duplicates are not allowed
-            boolean success = list.add(makeEDIFPortInst(name));
+            // Test to ensure duplicates are overwritten
+            EDIFPortInst portInst = makeEDIFPortInst(name);
+            EDIFPortInst existingPortInst = list.get(portInst.getCellInst(), portInst.getName());
+            Assertions.assertTrue(list.add(portInst));
             boolean isDuplicate = uniqueSet.add(name);
-            Assertions.assertEquals(success, isDuplicate);
+            if (isDuplicate) {
+                EDIFPortInst currPortInst = list.get(portInst.getCellInst(), portInst.getName());
+                Assertions.assertTrue(currPortInst == portInst);
+                Assertions.assertTrue(existingPortInst != currPortInst);
+            }
+            
         }
 
         Assertions.assertEquals(uniqueSet.size(), list.size());
