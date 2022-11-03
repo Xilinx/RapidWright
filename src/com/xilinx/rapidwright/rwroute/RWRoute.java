@@ -1466,6 +1466,9 @@ public class RWRoute{
                     case SUPER_LONG_LINE:
                         RouteNode destRnode = forward ? connection.getSinkRnode() : connection.getSourceRnode();
                         assert(connection.isCrossSLR());
+                        // Set the prev/next pointer, as RouteNode.getSLRDistance() requires it
+                        assert(!tailRnode.isVisited(forward));
+                        tailRnode.setPrevNext(forward, headRnode);
                         if (destRnode.getSLRDistance(forward, tailRnode) >= destRnode.getSLRDistance(forward, headRnode)) {
                             // Make sure taking this SLL gets us closer to the dest SLR
                             continue;
