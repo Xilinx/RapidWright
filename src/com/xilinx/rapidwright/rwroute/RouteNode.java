@@ -780,4 +780,18 @@ abstract public class RouteNode {
     abstract public boolean isExcluded(boolean forward, Node parent, Node child);
 
     abstract public int getSLRIndex(boolean forward);
+
+    public int getManhattanDistance(boolean forward, RouteNode that) {
+        final int thisX = getTileXCoordinate(!forward);
+        final int thisY = getTileYCoordinate(!forward);
+        final int thatX = that.getTileXCoordinate(!forward);
+        final int thatY = that.getTileYCoordinate(!forward);
+        return Math.abs(thatX - thisX) + Math.abs(thatY - thisY);
+    }
+
+    public int getSLRDistance(boolean forward, RouteNode that) {
+        final int thisSLR = getSLRIndex(forward);
+        final int thatSLR = that.getSLRIndex(forward);
+        return Math.abs(thatSLR - thisSLR);
+    }
 }
