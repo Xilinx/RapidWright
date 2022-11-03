@@ -1466,10 +1466,7 @@ public class RWRoute{
                     case SUPER_LONG_LINE:
                         RouteNode destRnode = forward ? connection.getSinkRnode() : connection.getSourceRnode();
                         assert(connection.isCrossSLR());
-                        int destSLR = destRnode.getSLRIndex(forward);
-                        int headSLR = headRnode.getSLRIndex(forward);
-                        int tailSLR = tailRnode.getSLRIndex(forward);
-                        if (Math.abs(tailSLR - destSLR) > Math.abs(headSLR - destSLR)) {
+                        if (destRnode.getSLRDistance(forward, tailRnode) >= destRnode.getSLRDistance(forward, headRnode)) {
                             // Make sure taking this SLL gets us closer to the dest SLR
                             continue;
                         }
@@ -1534,7 +1531,6 @@ public class RWRoute{
         int tailX = tailRnode.getTileXCoordinate(forward);
         int tailY = tailRnode.getTileYCoordinate(forward);
 
-        // Only perform front-to-front if in the same SLR
         RouteNode destRnode = (forward ? queueBack : queue).peek();
         if (tailRnode.getSLRIndex(forward) != destRnode.getSLRIndex(forward)) {
             // Otherwise front-to-end
