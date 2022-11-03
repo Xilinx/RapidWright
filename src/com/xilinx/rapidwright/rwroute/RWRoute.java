@@ -1666,11 +1666,11 @@ public class RWRoute{
                 if (parentRnodeWillOveruse)
                     break;
 
-                if (parentRnode.isVisited()) {
+                if (parentRnode.isTarget()) {
                     // Stumbled across a connectionToPush that just so happens to go through
                     // connectionToRoute's sink!
                     assert(connectionToPush != connectionToRoute);
-                    assert(parentRnode.isTarget());
+                    assert(parentRnode.isVisited());
                     // Let this be discovered naturally
                     break;
                 }
