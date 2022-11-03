@@ -1649,7 +1649,7 @@ public class RWRoute{
             // Go forwards from source
             for (RouteNode childRnode : Lists.reverse(connectionToPush.getRnodes())) {
                 if (parentRnode != null) {
-                    assert(isAccessible(childRnode, connectionToRoute) || connectionToPush != connectionToRoute);
+                    assert(isAccessible(childRnode, connectionToRoute));
 
                     // Place child onto queue
                     assert(!childRnode.isVisited());
