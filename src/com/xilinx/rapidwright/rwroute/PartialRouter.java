@@ -436,6 +436,7 @@ public class PartialRouter extends RWRoute{
                 if (netnewConnection.getSink().isRouted()) {
                     finishRouteConnection(netnewConnection, netnewConnection.getSinkRnode());
                     assert(netnewConnection.getSink().isRouted());
+                    netnewConnection.fitBoundingBoxToRouting();
                 }
             }
 
