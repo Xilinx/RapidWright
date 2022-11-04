@@ -110,7 +110,7 @@ public class EDIFPortInst implements Comparable<EDIFPortInst> {
                     + "need index for bussed port " + port.getName());
         }
         if (cellInst != null) {
-            if (!port.equals(cellInst.getPort(port.getBusName()))) {
+            if (!port.equals(cellInst.getPort(port.getBusName(true)))) {
                 // check for name collision
                 if (!port.equals(cellInst.getPort(port.getName()))) {
                     throw new RuntimeException("ERROR: Provided port '"+

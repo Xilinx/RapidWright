@@ -97,7 +97,7 @@ public class TestNet {
         SitePinInst src = net.createPin("HMUX", si);
         SitePinInst altSrc = net.createPin("H_O", si);
         Assertions.assertNotNull(net.getAlternateSource());
-        Assertions.assertTrue(net.getAlternateSource().getName().equals("H_O"));
+        Assertions.assertTrue(net.getAlternateSource().equals(altSrc));
 
         si = design.createSiteInst(design.getDevice().getSite("SLICE_X64Y158"));
         SitePinInst snk = net.createPin("SRST_B2", si);
@@ -118,5 +118,39 @@ public class TestNet {
             Assertions.assertEquals(0, net.getPIPs().size());
             Assertions.assertFalse(altSnk.isRouted());
         }
+    }
+
+    @Test
+    public void testRemoveAlternateSourcePin() {
+        Design design = new Design("test", Device.KCU105);
+        SiteInst si = design.createSiteInst(design.getDevice().getSite("SLICE_X65Y158"));
+        Net net = design.createNet("net");
+        net.createPin("HMUX", si);
+        SitePinInst altSrc = net.createPin("H_O", si);
+        Assertions.assertNotNull(net.getAlternateSource());
+        Assertions.assertTrue(net.getAlternateSource().equals(altSrc));
+
+        net.removePin(altSrc);
+        Assertions.assertNull(net.getAlternateSource());
+    }
+
+    @Test
+    public void testRemovePinOnStaticNet() {
+        Design design = new Design("test", Device.KCU105);
+        SiteInst si = design.createSiteInst(design.getDevice().getSite("SLICE_X0Y0"));
+        Net gndNet = design.getGndNet();
+        SitePinInst a6 = gndNet.createPin("A6", si);
+        SitePinInst b6 = gndNet.createPin("B6", si);
+        TestDesignTools.addPIPs(gndNet, new String[]{
+                "INT_X0Y0/INT.LOGIC_OUTS_E29->>INT_NODE_SINGLE_DOUBLE_101_INT_OUT",
+                "INT_X0Y0/INT.INT_NODE_SINGLE_DOUBLE_101_INT_OUT->>SS1_E_BEG7",
+                "INT_X0Y0/INT.INT_NODE_IMUX_64_INT_OUT->>IMUX_E16",
+                "INT_X0Y0/INT.NN1_E_END0->>INT_NODE_IMUX_64_INT_OUT",
+                "INT_X0Y0/INT.INT_NODE_IMUX_64_INT_OUT->>IMUX_E17"
+        });
+        gndNet.removePin(a6, true);
+        Assertions.assertEquals(gndNet.getPIPs().size(), 4);
+        gndNet.removePin(b6, true);
+        Assertions.assertEquals(gndNet.getPIPs().size(), 0);
     }
 }
