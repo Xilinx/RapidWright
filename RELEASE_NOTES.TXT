@@ -10,6 +10,8 @@ Notes:
  * Fix for #548, #572, #564
  * Fixes intrasite routing to CARRY pins from LUT outputs on UltraScale/+
  - API Additions:
+   - com.xilinx.rapidwright.design.Cell "public void setEDIFHierCellInst(EDIFHierCellInst inst)"
+   - com.xilinx.rapidwright.design.Design "public void detachNetlist()"
    - com.xilinx.rapidwright.device.Node "public Collection<Node> getAllDownhillNodes(Collection<Node> nodes)"
    - com.xilinx.rapidwright.device.Node "public Collection<Node> getAllUphillNodes(Collection<Node> nodes)"
 
