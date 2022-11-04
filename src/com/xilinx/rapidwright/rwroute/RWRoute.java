@@ -1356,7 +1356,7 @@ public class RWRoute{
                                   float rnodeDelayWeight, float rnodeEstDlyWeight) {
         boolean longParent = config.isTimingDriven() && DelayEstimatorBase.isLong(rnode.getNode());
         for (RouteNode childRNode:rnode.getChildren()) {
-            // Targets thare are visited more than once must be overused
+            // Targets that are visited more than once must be overused
             assert(!childRNode.isTarget() || !childRNode.isVisited() || childRNode.willOverUse(connection.getNetWrapper()));
 
             if (childRNode.isVisited()) {
@@ -1642,7 +1642,14 @@ public class RWRoute{
             // Go forwards from source
             for (RouteNode childRnode : Lists.reverse(connectionToPush.getRnodes())) {
                 if (parentRnode != null) {
-                    assert(isAccessible(childRnode, connectionToRoute));
+                    assert(isAccessible(childRnode, connectionToRoute) || connectionToPush != connectionToRoute);
+
+                    if (childRnode.isTarget() && connectionToPush != connectionToRoute) {
+                        // Stumbled across a connectionToPush that just so happens to go through
+                        // connectionToRoute's (uncongested) sink!
+                        // Let this be discovered naturally (otherwise it causes some exceptions to fire)
+                        break;
+                    }
 
                     // Place child onto queue
                     assert(!childRnode.isVisited());
@@ -1658,23 +1665,17 @@ public class RWRoute{
                 // Skip all downstream nodes after the first would-be-overused node
                 if (parentRnodeWillOveruse)
                     break;
-
-                if (parentRnode.isTarget()) {
-                    // Stumbled across a connectionToPush that just so happens to go through
-                    // connectionToRoute's sink!
-                    assert(connectionToPush != connectionToRoute);
-                    assert(parentRnode.isVisited());
-                    // Let this be discovered naturally
-                    break;
-                }
             }
 
-            // If non-timing driven, there must be at least one over-used node on the
-            // connection-to-be-routed (otherwise we wouldn't expect it to need
-            // re-routing)
-            assert(connectionToPush != connectionToRoute ||
-                   config.isTimingDriven() ||
-                   parentRnodeWillOveruse);
+            if (connectionToPush != connectionToRoute) {
+                connectionToRoute.fitBoundingBoxToRouting(connectionToPush);
+            } else {
+                // If non-timing driven, there must be at least one over-used node on the
+                // connection-to-be-routed (otherwise we wouldn't expect it to need
+                // re-routing)
+                assert(config.isTimingDriven() ||
+                       parentRnodeWillOveruse);
+            }
         }
 
         RouteNode childRnode = null;
