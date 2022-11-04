@@ -120,9 +120,10 @@ public class PartialRouter extends RWRoute{
             return false;
         }
 
-        // If end node has been visited already, it can't possibly be using this arc
+        // If end node has been visited already
         if (endRnode.isVisited(forward)) {
-            assert(endRnode.getPrev() == null || !endRnode.getPrev().getNode().equals(start));
+            // Possibly from a different arc uphill of end, or possibly from the same
+            // start -> end arc
             return false;
         }
 
