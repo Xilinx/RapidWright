@@ -1691,11 +1691,11 @@ public class RWRoute{
         }
 
         Connection connectionToPush = connectionToRoute;
-        if (!connectionToRoute.getSink().isRouted()) {
-            // Connection was not routed; find the connection with the closest sink
+        if (!connectionToRoute.getSink().isRouted() && connectionToRoute.isCrossSLR()) {
+            // Cross-SLR connection was not routed; find the connection with the closest sink
             // on the same net and consider pushing its nodes instead
             final boolean forward = true;
-            connectionToPush = Collections.min(netWrapper.getConnections(), new Comparator<Connection>() {
+            Connection closestConnection = Collections.min(netWrapper.getConnections(), new Comparator<Connection>() {
                 @Override
                 public int compare(Connection c1, Connection c2) {
                     // Prefer routed connections
@@ -1726,10 +1726,18 @@ public class RWRoute{
                             sinkRnode.getManhattanDistance(forward, c2Rnode));
                 }
             });
+
+            if (sinkRnode.getSLRDistance(forward, closestConnection.getSinkRnode()) <
+                    sinkRnode.getSLRDistance(forward, closestConnection.getSourceRnode())) {
+                // Only push if closestConnection's sink SLR is closer to connectionToRoute's sink SLR
+                // than closestConnection's source SLR
+                connectionToPush = closestConnection;
+            }
         }
 
         if (connectionToPush.getSink().isRouted()) {
-            // Connection was previously routed: push all its nodes (from the routing onto the queue
+            // Connection was previously routed: push all nodes from the previous iteration's
+            // routing onto the queue
             assert(!connectionToPush.getRnodes().isEmpty());
 
             RouteNode parentRnode = null;
@@ -1767,15 +1775,12 @@ public class RWRoute{
                 }
             }
 
-            if (connectionToPush != connectionToRoute) {
-                connectionToRoute.fitBoundingBoxToRouting(connectionToPush);
-            } else {
-                // If non-timing driven, there must be at least one over-used node on the
-                // connection-to-be-routed (otherwise we wouldn't expect it to need
-                // re-routing)
-                assert(config.isTimingDriven() ||
-                       parentRnodeWillOveruse);
-            }
+            // If non-timing driven, there must be at least one over-used node on the
+            // connection-to-be-routed (otherwise we wouldn't expect it to need
+            // re-routing)
+            assert(connectionToPush != connectionToRoute ||
+                   config.isTimingDriven() ||
+                   parentRnodeWillOveruse);
         }
 
         // Now go backwards from sink

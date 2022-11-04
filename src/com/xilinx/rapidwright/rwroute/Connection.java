@@ -419,13 +419,6 @@ public class Connection implements Comparable<Connection>{
         yMaxBB = (short) Math.max(yMaxBB, ymax + 1);
     }
 
-    public void fitBoundingBoxToRouting(Connection connection) {
-        xMinBB = (short) Math.min(xMinBB, connection.getXMinBB());
-        xMaxBB = (short) Math.max(xMaxBB, connection.getXMaxBB());
-        yMinBB = (short) Math.min(yMinBB, connection.getYMinBB());
-        yMaxBB = (short) Math.max(yMaxBB, connection.getYMaxBB());
-    }
-
     @Override
     public int hashCode() {
         return id;
