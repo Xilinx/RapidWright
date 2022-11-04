@@ -1508,7 +1508,7 @@ public class RWRoute{
         }
 
         int distanceToSink = deltaX + deltaY;
-        float newTotalPathCost = newPartialPathCost + rnodeEstWlWeight * distanceToSink / sharingFactor;
+        float newTotalPathCost = newPartialPathCost + rnodeEstWlWeight * distanceToSink;
         if (config.isTimingDriven()) {
             newTotalPathCost += rnodeEstDlyWeight * (deltaX * 0.32 + deltaY * 0.16);
         }
