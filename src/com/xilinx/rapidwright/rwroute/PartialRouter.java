@@ -120,6 +120,13 @@ public class PartialRouter extends RWRoute{
         if (endRnode == null)
             return false;
 
+        // Ignore if end node has been visited already
+        if (endRnode.isVisited()) {
+            // Node could have been visited already via expansion from one of its other
+            // uphill arcs, or visited as part of start -> end arc during prepareRouteConnection()
+            return false;
+        }
+
         // If so, get its prev pointer
         RouteNode prev = endRnode.getPrev();
         // Presence means that the only arc allowed to enter this end node

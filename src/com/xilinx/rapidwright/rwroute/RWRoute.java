@@ -1594,11 +1594,11 @@ public class RWRoute{
         push(sourceRnode, 0, 0);
 
         Connection connectionToPush = connectionToRoute;
-        if (!connectionToRoute.getSink().isRouted() && connectionToRoute.isCrossSLR()) {
-            // Cross-SLR connection was not routed; find the connection with the closest sink
+        if (!connectionToRoute.getSink().isRouted()) {
+            // Connection was not previously routed; find the connection with the closest sink
             // on the same net and consider pushing its nodes instead
             RouteNode sinkRnode = connectionToRoute.getSinkRnode();
-            Connection closestConnection = Collections.min(netWrapper.getConnections(), new Comparator<Connection>() {
+            connectionToPush = Collections.min(netWrapper.getConnections(), new Comparator<Connection>() {
                 @Override
                 public int compare(Connection c1, Connection c2) {
                     // Prefer routed connections
@@ -1629,13 +1629,6 @@ public class RWRoute{
                             sinkRnode.getManhattanDistance(c2Rnode));
                 }
             });
-
-            if (sinkRnode.getSLRDistance(closestConnection.getSinkRnode()) <
-                    sinkRnode.getSLRDistance(closestConnection.getSourceRnode())) {
-                // Only push if closestConnection's sink SLR is closer to connectionToRoute's sink SLR
-                // than closestConnection's source SLR
-                connectionToPush = closestConnection;
-            }
         }
 
         if (connectionToPush.getSink().isRouted()) {
