@@ -479,6 +479,44 @@ public class TestDesignTools {
         }
     }
 
+    @Test
+    public void testUnrouteSourcePinBidir() {
+        Design design = new Design("test", "xcvu19p-fsva3824-1-e");
+
+        Net net = createTestNet(design, "net", new String[]{
+                "INT_X193Y606/INT.LOGIC_OUTS_W27->INT_NODE_SDQ_87_INT_OUT0",
+                "INT_X193Y606/INT.INT_NODE_SDQ_87_INT_OUT0->>NN1_W_BEG6",
+                "INT_X193Y607/INT.NN1_W_END6->INT_NODE_SDQ_83_INT_OUT0",
+                "INT_X193Y607/INT.INT_NODE_SDQ_83_INT_OUT0->>WW1_W_BEG5",
+                "INT_X192Y607/INT.WW1_W_END5->INT_NODE_SDQ_34_INT_OUT0",
+                "INT_X192Y607/INT.INT_NODE_SDQ_34_INT_OUT0->>EE1_E_BEG5",
+                "INT_X193Y607/INT.EE1_E_END5->INT_NODE_SDQ_79_INT_OUT0",
+                "INT_X193Y607/INT.INT_NODE_SDQ_79_INT_OUT0->>SS1_W_BEG5",
+                "INT_X193Y606/INT.SS1_W_END5->>INT_NODE_IMUX_49_INT_OUT1",
+                "INT_X193Y606/INT.INT_NODE_IMUX_49_INT_OUT1->>BYPASS_W8",
+                "INT_X193Y606/INT.BYPASS_W8->>INT_NODE_IMUX_36_INT_OUT1",
+                "INT_X193Y606/INT.INT_NODE_IMUX_36_INT_OUT1->>BYPASS_W3",       // DX
+                "INT_X193Y606/INT.INT_NODE_IMUX_37_INT_OUT0<<->>BYPASS_W8",     // (reverse this PIP)
+                "INT_X193Y606/INT.INT_NODE_IMUX_37_INT_OUT0->>BYPASS_W7",       // D_I
+        });
+
+        for (PIP pip : net.getPIPs()) {
+            if (pip.toString().equals("INT_X193Y606/INT.INT_NODE_IMUX_37_INT_OUT0<<->>BYPASS_W8"))
+                pip.setIsReversed(true);
+        }
+
+        SiteInst si = design.createSiteInst(design.getDevice().getSite("SLICE_X369Y606"));
+        SitePinInst DQ2 = net.createPin("DQ2", si);
+        DQ2.setRouted(true);
+        SitePinInst DX = net.createPin("DX", si);
+        DX.setRouted(true);
+        SitePinInst D_I = net.createPin("D_I", si);
+        D_I.setRouted(true);
+
+        DesignTools.unrouteSourcePin(DQ2);
+        Assertions.assertTrue(net.getPIPs().isEmpty());
+    }
+
     public static void addPIPs(Net net, String[] pips) {
         Device device = net.getDesign().getDevice();
         for (String pip : pips) {
