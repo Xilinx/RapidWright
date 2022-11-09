@@ -1143,7 +1143,7 @@ public class DesignTools {
      */
     public static Set<PIP> getTrimmablePIPsFromPins(Net net, Collection<SitePinInst> pins) {
         // Map listing the PIPs that drive a Node
-        Map<Node,ArrayList<PIP>> endNodeToPips = new HashMap<>();
+        Map<Node,ArrayList<PIP>> reverseConns = new HashMap<>();
         Map<Node,Integer> fanout = new HashMap<>();
         Set<Node> nodeSinkPins = new HashSet<>();
         for (SitePinInst sinkPin : net.getSinkPins()) {
@@ -1153,7 +1153,7 @@ public class DesignTools {
             Node endNode = pip.isReversed() ? pip.getStartNode() : pip.getEndNode();
             Node startNode = pip.isReversed() ? pip.getEndNode() : pip.getStartNode();
 
-            ArrayList<PIP> rPips = endNodeToPips.computeIfAbsent(endNode, (n) -> new ArrayList<>());
+            ArrayList<PIP> rPips = reverseConns.computeIfAbsent(endNode, (n) -> new ArrayList<>());
             rPips.add(pip);
 
             fanout.merge(startNode, 1, Integer::sum);
@@ -1181,14 +1181,14 @@ public class DesignTools {
                     // This node is also used to connect another downstream pin, no more
                     // analysis necessary
                 } else {
-                    ArrayList<PIP> curr = endNodeToPips.get(sink);
+                    ArrayList<PIP> curr = reverseConns.get(sink);
                     while (curr != null && curr.size() == 1 && fanoutCount < 2) {
                         PIP pip = curr.get(0);
                         toRemove.add(pip);
                         updateFanout.add(pip.isReversed() ? pip.getEndNode() : pip.getStartNode());
                         sink = new Node(pip.getTile(), pip.isReversed() ? pip.getEndWireIndex() :
                                 pip.getStartWireIndex());
-                        curr = endNodeToPips.get(sink);
+                        curr = reverseConns.get(sink);
                         fanoutCount = fanout.getOrDefault(sink, 0);
                     }
                     if (curr == null && fanout.size() == 1 && !net.isStaticNet()) {
