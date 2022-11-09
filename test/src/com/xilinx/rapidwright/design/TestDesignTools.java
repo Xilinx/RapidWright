@@ -38,6 +38,7 @@ import java.util.Set;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFTools;
@@ -577,5 +578,20 @@ public class TestDesignTools {
         } else {
             Assertions.assertTrue(design.getVccNet().getPins().isEmpty());
         }
+    }
+
+    @Test
+    public void testResolveNetNameFromSiteWireWithoutNetlist() {
+        Design design = new Design(); // This constructor does not create a netlist
+        design.setPartName(Device.KCU105);
+
+        Site site = design.getDevice().getSite("SLICE_X0Y0");
+        SiteInst si = design.createSiteInst(site);
+        Assertions.assertNull(DesignTools.resolveNetNameFromSiteWire(si, site.getSiteWireIndex("A1")));
+
+        Net net = design.createNet("net");
+        BELPin bp = si.getBELPin("A1", "A1");
+        si.routeIntraSiteNet(net, bp, bp);
+        Assertions.assertEquals("net", DesignTools.resolveNetNameFromSiteWire(si, site.getSiteWireIndex("A1")));
     }
 }
