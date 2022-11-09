@@ -166,10 +166,12 @@ public class TestDesignTools {
         testCopyImplementationHelper(keepStaticRouting, numPIPs);
     }
 
-    @Test
-    public void testBatchRemoveSitePins() {
-        Path dcpPath = RapidWrightDCP.getPath("picoblaze_ooc_X10Y235.dcp");
-        Design design = Design.readCheckpoint(dcpPath);
+    @ParameterizedTest
+    @ValueSource(strings = {"picoblaze_ooc_X10Y235.dcp",
+                            "picoblaze_partial.dcp",        // contains a routed clock net, with (many) bidir PIPs
+    })
+    public void testBatchRemoveSitePins(String path) {
+        Design design = RapidWrightDCP.loadDCP(path);
 
         SiteInst si = design.getSiteInstFromSiteName("SLICE_X14Y238");
         Assertions.assertNotNull(si);
