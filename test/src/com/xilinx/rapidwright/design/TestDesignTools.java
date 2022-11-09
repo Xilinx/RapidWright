@@ -589,7 +589,7 @@ public class TestDesignTools {
         SiteInst si = design.createSiteInst(site);
         Assertions.assertNull(DesignTools.resolveNetNameFromSiteWire(si, site.getSiteWireIndex("A1")));
 
-        Net net = design.createNet("net");
+        Net net = new Net("net");
         BELPin bp = si.getBELPin("A1", "A1");
         si.routeIntraSiteNet(net, bp, bp);
         Assertions.assertEquals("net", DesignTools.resolveNetNameFromSiteWire(si, site.getSiteWireIndex("A1")));
