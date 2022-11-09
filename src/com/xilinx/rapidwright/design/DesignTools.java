@@ -1100,7 +1100,7 @@ public class DesignTools {
 
         Map<Node, List<PIP>> pipMap = new HashMap<>();
         for (PIP pip : src.getNet().getPIPs()) {
-            Node node = pip.getStartNode();
+            Node node = pip.isReversed() ? pip.getEndNode() : pip.getStartNode();
             pipMap.computeIfAbsent(node, k -> new ArrayList<>()).add(pip);
         }
 
@@ -1116,7 +1116,7 @@ public class DesignTools {
             List<PIP> pips = pipMap.get(curr);
             if (pips != null) {
                 for (PIP p : pips) {
-                    Node endNode = p.getEndNode();
+                    Node endNode = p.isReversed() ? p.getStartNode() : p.getEndNode();
                     q.add(endNode);
                     pipsToRemove.add(p);
                     SitePinInst sink = sinkNodes.get(endNode);
