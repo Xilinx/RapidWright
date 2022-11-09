@@ -1172,34 +1172,38 @@ public class DesignTools {
             }
         }
 
-        // Assumes that we can't have two bidir PIPs back-to-back
-        // e.g. A ->> B <<->> C <<-->> D ->> E
-        // because the order of iteration through a HashMap is undefined, so if we stary
-        // iterating at node C then it remains unclear whether B or D is driving it
-        for (Map.Entry<Node,ArrayList<PIP>> e : startNodeToBidirPips.entrySet()) {
-            Node startNode = e.getKey();
-            List<PIP> rPIPs = e.getValue();
-            if (endNodeToPips.containsKey(startNode)) {
-                // startNode of bidir PIP is driven by something else, therefore it must also be driving others
-                // (forward direction PIP)
-                for (PIP pip : rPIPs) {
-                    Node endNode = pip.getEndNode();
-                    endNodeToPips.computeIfAbsent(endNode, (n) -> new ArrayList<>()).add(pip);
-                }
-            } else {
-                // startNode of bidir PIP is not driven by anything, therefore endNode must be its driver
-                // (reverse direction PIP)
-                assert(rPIPs.size() == 1);
-                PIP pip = rPIPs.get(0);
-                Node endNode = startNode;
-                startNode = pip.getEndNode();
-                assert(endNodeToPips.containsKey(startNode));
+        boolean fixedPoint = false;
+        while (!fixedPoint) {
+            fixedPoint = !startNodeToBidirPips.entrySet().removeIf((e) -> {
+                Node startNode = e.getKey();
+                List<PIP> rPIPs = e.getValue();
+                if (endNodeToPips.containsKey(startNode)) {
+                    // startNode of bidir PIP is driven by something else, therefore it must also be driving others
+                    // (forward direction PIP)
+                    for (PIP pip : rPIPs) {
+                        Node endNode = pip.getEndNode();
+                        endNodeToPips.computeIfAbsent(endNode, (n) -> new ArrayList<>()).add(pip);
+                    }
+                } else {
+                    // startNode of bidir PIP is not driven by anything, therefore endNode must be its driver
+                    // (reverse direction PIP)
+                    assert(rPIPs.size() == 1);
+                    PIP pip = rPIPs.get(0);
+                    Node endNode = startNode;
+                    startNode = pip.getEndNode();
+                    if (!endNodeToPips.containsKey(startNode)) {
+                        return false;
+                    }
 
-                assert(!endNodeToPips.containsKey(endNode));
-                endNodeToPips.computeIfAbsent(endNode, (n) -> new ArrayList<>()).add(pip);
-                reversedPIPs.add(pip);
-            }
-            fanout.merge(startNode, rPIPs.size(), Integer::sum);
+                    endNodeToPips.computeIfAbsent(endNode, (n) -> new ArrayList<>()).add(pip);
+                    reversedPIPs.add(pip);
+                }
+                fanout.merge(startNode, rPIPs.size(), Integer::sum);
+                return true;
+            });
+        }
+        if (!startNodeToBidirPips.isEmpty()) {
+            throw new RuntimeException();
         }
 
         HashSet<PIP> toRemove = new HashSet<>();
