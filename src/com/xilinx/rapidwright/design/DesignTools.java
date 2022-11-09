@@ -1144,66 +1144,23 @@ public class DesignTools {
     public static Set<PIP> getTrimmablePIPsFromPins(Net net, Collection<SitePinInst> pins) {
         // Map listing the PIPs that drive a Node
         Map<Node,ArrayList<PIP>> endNodeToPips = new HashMap<>();
-        Map<Node,ArrayList<PIP>> startNodeToBidirPips = new HashMap<>();
-        Set<PIP> reversedPIPs = new HashSet<>();
         Map<Node,Integer> fanout = new HashMap<>();
         Set<Node> nodeSinkPins = new HashSet<>();
         for (SitePinInst sinkPin : net.getSinkPins()) {
             nodeSinkPins.add(sinkPin.getConnectedNode());
         }
         for (PIP pip : net.getPIPs()) {
-            Node endNode = pip.getEndNode();
-            Node startNode = pip.getStartNode();
+            Node endNode = pip.isReversed() ? pip.getStartNode() : pip.getEndNode();
+            Node startNode = pip.isReversed() ? pip.getEndNode() : pip.getStartNode();
 
-            if (pip.isBidirectional()) {
-                // Defer updating endNodeToPips and fanout, since we do not know which direction
-                // PIP is being used in
-                ArrayList<PIP> rPips = startNodeToBidirPips.computeIfAbsent(startNode, (n) -> new ArrayList<>());
-                rPips.add(pip);
-            } else {
-                ArrayList<PIP> rPips = endNodeToPips.computeIfAbsent(endNode, (n) -> new ArrayList<>());
-                rPips.add(pip);
+            ArrayList<PIP> rPips = endNodeToPips.computeIfAbsent(endNode, (n) -> new ArrayList<>());
+            rPips.add(pip);
 
-                fanout.merge(startNode, 1, Integer::sum);
-            }
+            fanout.merge(startNode, 1, Integer::sum);
 
             if (nodeSinkPins.contains(endNode)) {
                 fanout.merge(endNode, 1, Integer::sum);
             }
-        }
-
-        boolean fixedPoint = false;
-        while (!fixedPoint) {
-            fixedPoint = !startNodeToBidirPips.entrySet().removeIf((e) -> {
-                Node startNode = e.getKey();
-                List<PIP> rPIPs = e.getValue();
-                if (endNodeToPips.containsKey(startNode)) {
-                    // startNode of bidir PIP is driven by something else, therefore it must also be driving others
-                    // (forward direction PIP)
-                    for (PIP pip : rPIPs) {
-                        Node endNode = pip.getEndNode();
-                        endNodeToPips.computeIfAbsent(endNode, (n) -> new ArrayList<>()).add(pip);
-                    }
-                } else {
-                    // startNode of bidir PIP is not driven by anything, therefore endNode must be its driver
-                    // (reverse direction PIP)
-                    assert(rPIPs.size() == 1);
-                    PIP pip = rPIPs.get(0);
-                    Node endNode = startNode;
-                    startNode = pip.getEndNode();
-                    if (!endNodeToPips.containsKey(startNode)) {
-                        return false;
-                    }
-
-                    endNodeToPips.computeIfAbsent(endNode, (n) -> new ArrayList<>()).add(pip);
-                    reversedPIPs.add(pip);
-                }
-                fanout.merge(startNode, rPIPs.size(), Integer::sum);
-                return true;
-            });
-        }
-        if (!startNodeToBidirPips.isEmpty()) {
-            throw new RuntimeException();
         }
 
         HashSet<PIP> toRemove = new HashSet<>();
@@ -1228,9 +1185,8 @@ public class DesignTools {
                     while (curr != null && curr.size() == 1 && fanoutCount < 2) {
                         PIP pip = curr.get(0);
                         toRemove.add(pip);
-                        boolean reversedPIP = reversedPIPs.contains(pip);
-                        updateFanout.add(reversedPIP ? pip.getEndNode() : pip.getStartNode());
-                        sink = new Node(pip.getTile(), reversedPIP ? pip.getEndWireIndex() :
+                        updateFanout.add(pip.isReversed() ? pip.getEndNode() : pip.getStartNode());
+                        sink = new Node(pip.getTile(), pip.isReversed() ? pip.getEndWireIndex() :
                                 pip.getStartWireIndex());
                         curr = endNodeToPips.get(sink);
                         fanoutCount = fanout.getOrDefault(sink, 0);
