@@ -817,7 +817,8 @@ public class DesignTools {
      */
     public static String resolveNetNameFromSiteWire(SiteInst inst, int siteWire) {
         String parentNetName = null;
-        Map<String,String> parentNetMap = inst.getDesign().getNetlist().getParentNetMapNames();
+        EDIFNetlist netlist = inst.getDesign().getNetlist();
+        Map<String,String> parentNetMap = netlist != null ? netlist.getParentNetMapNames() : Collections.emptyMap();
         BELPin[] pins = inst.getSite().getBELPins(siteWire);
         for (BELPin pin : pins) {
             if (pin.isSitePort()) continue;
@@ -827,7 +828,7 @@ public class DesignTools {
                 if (currNet == null) {
                     continue;
                 } else {
-                    return parentNetMap.get(currNet.getName());
+                    return parentNetMap.getOrDefault(currNet.getName(), currNet.getName());
                 }
             }
             String logPinName = c.getLogicalPinMapping(pin.getName());
@@ -835,7 +836,7 @@ public class DesignTools {
             if (portInst == null) continue;
             EDIFNet net =  portInst.getNet();
             String netName = c.getParentHierarchicalInstName() + EDIFTools.EDIF_HIER_SEP + net.getName();
-            parentNetName = parentNetMap.get(netName);
+            parentNetName = parentNetMap.getOrDefault(netName, netName);
         }
         return parentNetName;
     }
