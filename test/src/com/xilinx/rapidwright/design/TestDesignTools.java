@@ -167,10 +167,12 @@ public class TestDesignTools {
         testCopyImplementationHelper(keepStaticRouting, numPIPs);
     }
 
-    @Test
-    public void testBatchRemoveSitePins() {
-        Path dcpPath = RapidWrightDCP.getPath("picoblaze_ooc_X10Y235.dcp");
-        Design design = Design.readCheckpoint(dcpPath);
+    @ParameterizedTest
+    @ValueSource(strings = {"picoblaze_ooc_X10Y235.dcp",
+                            "picoblaze_partial.dcp",        // contains a routed clock net, with (many) bidir PIPs
+    })
+    public void testBatchRemoveSitePins(String path) {
+        Design design = RapidWrightDCP.loadDCP(path);
 
         SiteInst si = design.getSiteInstFromSiteName("SLICE_X14Y238");
         Assertions.assertNotNull(si);
@@ -300,7 +302,7 @@ public class TestDesignTools {
         Net net = createTestNet(design, "net", new String[]{
                 "INT_X102Y428/INT.LOGIC_OUTS_W30->>INT_NODE_IMUX_60_INT_OUT1",  // EQ output
                 "INT_X102Y428/INT.INT_NODE_IMUX_60_INT_OUT1->>BYPASS_W14",
-                "INT_X102Y428/INT.INT_NODE_IMUX_50_INT_OUT0<<->>BYPASS_W14",    // (bidir PIP!)
+                "INT_X102Y428/INT.INT_NODE_IMUX_50_INT_OUT0<<->>BYPASS_W14",    // (reversed PIP)
                 "INT_X102Y428/INT.INT_NODE_IMUX_50_INT_OUT0->>BOUNCE_W_13_FT0",
                 "INT_X102Y429/INT.BOUNCE_W_BLN_13_FT1->>INT_NODE_IMUX_62_INT_OUT0",
                 "INT_X102Y429/INT.INT_NODE_IMUX_62_INT_OUT0->>BYPASS_W5",       // B_I input
@@ -309,6 +311,11 @@ public class TestDesignTools {
                 "INT_X102Y428/INT.LOGIC_OUTS_W30->>INODE_W_60_FT0",
                 "INT_X102Y429/INT.INODE_W_BLN_60_FT1->>IMUX_W2",                // E1 input
         });
+
+        for (PIP pip : net.getPIPs()) {
+            if (pip.toString().equals("INT_X102Y428/INT.INT_NODE_IMUX_50_INT_OUT0<<->>BYPASS_W14"))
+                pip.setIsReversed(true);
+        }
 
         SiteInst si = design.createSiteInst(design.getDevice().getSite("SLICE_X196Y428"));
         SitePinInst EQ = net.createPin("EQ", si);
@@ -361,9 +368,14 @@ public class TestDesignTools {
                 "INT_X127Y235/INT.INT_NODE_SDQ_78_INT_OUT0->>WW2_W_BEG5",
                 "INT_X126Y235/INT.WW2_W_END5->>INT_NODE_IMUX_49_INT_OUT1",
                 "INT_X126Y235/INT.INT_NODE_IMUX_49_INT_OUT1->>BYPASS_W8",       // EX input
-                "INT_X126Y235/INT.INT_NODE_IMUX_37_INT_OUT0<<->>BYPASS_W8",
+                "INT_X126Y235/INT.INT_NODE_IMUX_37_INT_OUT0<<->>BYPASS_W8",     // (reversed PIP)
                 "INT_X126Y235/INT.INT_NODE_IMUX_37_INT_OUT0->>BYPASS_W7"        // D_I input
         });
+
+        for (PIP pip : net.getPIPs()) {
+            if (pip.toString().equals("INT_X126Y235/INT.INT_NODE_IMUX_37_INT_OUT0<<->>BYPASS_W8"))
+                pip.setIsReversed(true);
+        }
 
         SiteInst si = design.createSiteInst(design.getDevice().getSite("SLICE_X242Y235"));
         SitePinInst DQ2 = net.createPin("DQ2", si);
@@ -428,6 +440,92 @@ public class TestDesignTools {
                 device.getPIP("INT_X115Y444/INT.INT_NODE_GLOBAL_9_INT_OUT0->>INT_NODE_IMUX_37_INT_OUT0"),
                 device.getPIP("INT_X115Y444/INT.INT_NODE_IMUX_37_INT_OUT0<<->>BYPASS_W8")
         )));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testGetTrimmablePIPsFromPinsBidirBounceNode(boolean createBounceSink) {
+        Design design = new Design("test", "xcvu19p-fsva3824-1-e");
+        Device device = design.getDevice();
+
+        Net net = createTestNet(design, "net", new String[]{
+                "INT_X196Y535/INT.LOGIC_OUTS_E10->INT_NODE_SDQ_12_INT_OUT1",                    // DQ
+                "INT_X196Y535/INT.INT_NODE_SDQ_12_INT_OUT1->>INT_INT_SDQ_73_INT_OUT0",
+                "INT_X196Y535/INT.INT_INT_SDQ_73_INT_OUT0->>INT_NODE_GLOBAL_1_INT_OUT1",
+                "INT_X196Y535/INT.INT_NODE_GLOBAL_1_INT_OUT1->>INT_NODE_IMUX_5_INT_OUT0",
+                "INT_X196Y535/INT.INT_NODE_IMUX_5_INT_OUT0<<->>BYPASS_E8",                      // bounce (EX)
+                "INT_X196Y535/INT.BYPASS_E8->>INT_NODE_IMUX_4_INT_OUT1",
+                "INT_X196Y535/INT.INT_NODE_IMUX_4_INT_OUT1->>BYPASS_E3",                        // DX
+                "INT_X196Y535/INT.INT_NODE_IMUX_5_INT_OUT0->>BYPASS_E7",                        // D_I
+        });
+
+        SiteInst si = design.createSiteInst(design.getDevice().getSite("SLICE_X376Y535"));
+        SitePinInst DQ = net.createPin("DQ", si);
+        DQ.setRouted(true);
+        SitePinInst DX = net.createPin("DX", si);
+        DX.setRouted(true);
+        SitePinInst D_I = net.createPin("D_I", si);
+        D_I.setRouted(true);
+        if (createBounceSink) {
+            SitePinInst EX = net.createPin("EX", si);
+            EX.setRouted(true);
+        }
+
+        List<SitePinInst> pinsToUnroute = new ArrayList<>();
+        pinsToUnroute.add(DX);
+        Set<PIP> trimmable = DesignTools.getTrimmablePIPsFromPins(net, pinsToUnroute);
+        if (createBounceSink) {
+            Assertions.assertEquals(2, trimmable.size());
+            Assertions.assertTrue(trimmable.containsAll(Arrays.asList(
+                    device.getPIP("INT_X196Y535/INT.BYPASS_E8->>INT_NODE_IMUX_4_INT_OUT1"),
+                    device.getPIP("INT_X196Y535/INT.INT_NODE_IMUX_4_INT_OUT1->>BYPASS_E3")
+            )));
+        } else {
+            Assertions.assertEquals(3, trimmable.size());
+            Assertions.assertTrue(trimmable.containsAll(Arrays.asList(
+                    device.getPIP("INT_X196Y535/INT.INT_NODE_IMUX_5_INT_OUT0<<->>BYPASS_E8"),
+                    device.getPIP("INT_X196Y535/INT.BYPASS_E8->>INT_NODE_IMUX_4_INT_OUT1"),
+                    device.getPIP("INT_X196Y535/INT.INT_NODE_IMUX_4_INT_OUT1->>BYPASS_E3")
+            )));
+        }
+    }
+
+    @Test
+    public void testUnrouteSourcePinBidir() {
+        Design design = new Design("test", "xcvu19p-fsva3824-1-e");
+
+        Net net = createTestNet(design, "net", new String[]{
+                "INT_X193Y606/INT.LOGIC_OUTS_W27->INT_NODE_SDQ_87_INT_OUT0",
+                "INT_X193Y606/INT.INT_NODE_SDQ_87_INT_OUT0->>NN1_W_BEG6",
+                "INT_X193Y607/INT.NN1_W_END6->INT_NODE_SDQ_83_INT_OUT0",
+                "INT_X193Y607/INT.INT_NODE_SDQ_83_INT_OUT0->>WW1_W_BEG5",
+                "INT_X192Y607/INT.WW1_W_END5->INT_NODE_SDQ_34_INT_OUT0",
+                "INT_X192Y607/INT.INT_NODE_SDQ_34_INT_OUT0->>EE1_E_BEG5",
+                "INT_X193Y607/INT.EE1_E_END5->INT_NODE_SDQ_79_INT_OUT0",
+                "INT_X193Y607/INT.INT_NODE_SDQ_79_INT_OUT0->>SS1_W_BEG5",
+                "INT_X193Y606/INT.SS1_W_END5->>INT_NODE_IMUX_49_INT_OUT1",
+                "INT_X193Y606/INT.INT_NODE_IMUX_49_INT_OUT1->>BYPASS_W8",
+                "INT_X193Y606/INT.BYPASS_W8->>INT_NODE_IMUX_36_INT_OUT1",
+                "INT_X193Y606/INT.INT_NODE_IMUX_36_INT_OUT1->>BYPASS_W3",       // DX
+                "INT_X193Y606/INT.INT_NODE_IMUX_37_INT_OUT0<<->>BYPASS_W8",     // (reversed PIP)
+                "INT_X193Y606/INT.INT_NODE_IMUX_37_INT_OUT0->>BYPASS_W7",       // D_I
+        });
+
+        for (PIP pip : net.getPIPs()) {
+            if (pip.toString().equals("INT_X193Y606/INT.INT_NODE_IMUX_37_INT_OUT0<<->>BYPASS_W8"))
+                pip.setIsReversed(true);
+        }
+
+        SiteInst si = design.createSiteInst(design.getDevice().getSite("SLICE_X369Y606"));
+        SitePinInst DQ2 = net.createPin("DQ2", si);
+        DQ2.setRouted(true);
+        SitePinInst DX = net.createPin("DX", si);
+        DX.setRouted(true);
+        SitePinInst D_I = net.createPin("D_I", si);
+        D_I.setRouted(true);
+
+        DesignTools.unrouteSourcePin(DQ2);
+        Assertions.assertTrue(net.getPIPs().isEmpty());
     }
 
     public static void addPIPs(Net net, String[] pips) {
@@ -539,7 +637,7 @@ public class TestDesignTools {
         SitePinInst altSrc = net3.createPin("H_O", si);
         altSrc.setRouted(true);
         Assertions.assertNotNull(net3.getAlternateSource());
-        Assertions.assertTrue(net3.getAlternateSource().getName().equals("H_O"));
+        Assertions.assertEquals("H_O", net3.getAlternateSource().getName());
         si = design.createSiteInst(design.getDevice().getSite("SLICE_X64Y158"));
         SitePinInst snk = net3.createPin("SRST_B2", si);
         snk.setRouted(true);
