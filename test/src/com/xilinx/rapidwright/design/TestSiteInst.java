@@ -205,6 +205,18 @@ public class TestSiteInst {
 
     @ParameterizedTest
     @ValueSource(strings = {Device.KCU105, Device.PYNQ_Z1})
+    public void testRouteLUTRouteThruToCarryO5(String deviceName) {
+        Design d = new Design("testRouteLutRtCarryO5", deviceName);
+        Net net = d.createNet("net");
+        SiteInst si = d.createSiteInst(d.getDevice().getSite("SLICE_X32Y73"));
+        Unisim unisim = d.getDevice().getSeries() == Series.Series7 ? Unisim.CARRY4 : Unisim.CARRY8;
+        d.createAndPlaceCell("carry", unisim, si.getSiteName() + "/" + unisim);
+        Assertions.assertTrue(si.routeIntraSiteNet(net, si.getBELPin("A1", "A1"),
+                si.getBELPin(unisim.toString(), "DI0")));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {Device.KCU105, Device.PYNQ_Z1})
     public void testUnrouteLUTRouteThruToCarry(String deviceName) {
         Design d = new Design("testUnrouteLutRtCarry", deviceName);
 

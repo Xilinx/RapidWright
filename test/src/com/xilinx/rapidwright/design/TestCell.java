@@ -23,8 +23,10 @@
 
 package com.xilinx.rapidwright.design;
 
+
 import com.xilinx.rapidwright.device.Device;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
@@ -50,5 +52,26 @@ public class TestCell {
         final boolean considerLutRoutethru = true;
         List<String> sitePinNames = cell.getAllCorrespondingSitePinNames(logicalPinName, considerLutRoutethru);
         Assertions.assertEquals(expectedSitePins, sitePinNames.toString());
+    }
+    
+    @Test
+    public void testGetCorrespondingSitePinName() {
+        Device device = Device.getDevice("xcvu3p");
+        Design design = new Design("testDesign", device.getName());
+        Cell cell = design.createAndPlaceCell("testFF", Unisim.FDRE, "SLICE_X10Y10/GFF");
+        SiteInst si = cell.getSiteInst();
+        Net net = design.createNet("testNet");
+        SitePinInst pin = net.createPin("G3", si);
+        
+        // Force the site router to use the LUT5
+        design.createAndPlaceCell("dummyG6LUT", Unisim.LUT4, "SLICE_X10Y10/G6LUT");
+        
+        si.routeIntraSiteNet(net, pin.getBELPin(), cell.getBEL().getPin("D"));
+        
+        Assertions.assertNotNull(si.getCell("G5LUT"));
+        Assertions.assertTrue(si.getCell("G5LUT").isRoutethru());
+        Assertions.assertEquals("D5", si.getUsedSitePIP("FFMUXG1").getInputPinName());
+        
+        Assertions.assertEquals(pin.getName(), cell.getCorrespondingSitePinName("D"));
     }
 }

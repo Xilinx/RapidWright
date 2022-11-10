@@ -112,12 +112,12 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
                     EDIFPort newPort = null;
                     if (prototype.getCellInst() != null) {
                         newPortInst.setCellInst(getCellInst(prototype.getCellInst().getName()));
-                        newPort = newPortInst.getCellInst().getCellType().getPort(prototype.getPort().getBusName());
+                        newPort = newPortInst.getCellInst().getCellType().getPort(prototype.getPort().getBusName(true));
                         if (newPort == null || newPort.getWidth() != prototype.getPort().getWidth()) {
                             newPort = newPortInst.getCellInst().getCellType().getPort(prototype.getPort().getName());
                         }
                     } else {
-                        newPort = getPort(prototype.getPort().getBusName());
+                        newPort = getPort(prototype.getPort().getBusName(true));
                         if (newPort == null || newPort.getWidth() != prototype.getPort().getWidth()) {
                             newPort = getPort(prototype.getPort().getName());
                         }
@@ -238,7 +238,7 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
     public EDIFPort addPort(EDIFPort port) {
         if (ports == null) ports = getNewMap();
         port.setParentCell(this);
-        EDIFPort collision = ports.put(port.getBusName(), port);
+        EDIFPort collision = ports.put(port.getBusName(true), port);
         if (collision != null && port != collision) {
             throw new RuntimeException("ERROR: Port name collision on EDIFCell " + getName()
                     + ", trying to add port " + port
@@ -487,7 +487,7 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
         if (portMap.size() != cell.getPortMap().size()) return false;
 
         for (EDIFPort port : cell.getPorts()) {
-            EDIFPort match = portMap.remove(port.getBusName());
+            EDIFPort match = portMap.remove(port.getBusName(true));
             if (match == null) {
                 match = portMap.remove(port.getName());
                 if (match == null) {
@@ -634,6 +634,17 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
             }
         }
         return null;
+    }
+
+    public void sortEDIFPortInstLists() {
+        for (EDIFNet net : getNets()) {
+            EDIFPortInstList list = net.getEDIFPortInstList();
+            if (list != null) list.reSortList();
+        }
+        for (EDIFCellInst inst : getCellInsts()) {
+            EDIFPortInstList list = inst.getEDIFPortInstList();
+            if (list != null) list.reSortList();
+        }
     }
 
     @Override
