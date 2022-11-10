@@ -111,7 +111,7 @@ public class BinaryEDIFWriter {
                 for (EDIFNet net : cell.getNets()) {
                     addObjectToStringMap(net, stringMap);
                     for (EDIFPortInst pi : net.getPortInsts()) {
-                        String name = pi.getPort().isBus() ? pi.getPort().getBusName() : pi.getName();
+                        String name = pi.getPort().isBus() ? pi.getPort().getBusName(true) : pi.getName();
                         addStringToStringMap(name, stringMap);
                     }
                 }
@@ -276,7 +276,7 @@ public class BinaryEDIFWriter {
         if (port.isBus()) {
             EDIFCell cell = portInst.getCellInst() == null ? portInst.getParentCell() : portInst.getCellInst().getCellType();
             EDIFPort portCollision = cell.getPort(portInst.getPort().getName());
-            returnValue = portCollision != null ? port.getName() : port.getBusName();
+            returnValue = portCollision != null ? port.getName() : port.getBusName(true);
         } else {
             returnValue = portInst.getName();
         }
