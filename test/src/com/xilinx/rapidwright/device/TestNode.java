@@ -22,13 +22,14 @@
 
 package com.xilinx.rapidwright.device;
 
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
-
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 public class TestNode {
     @ParameterizedTest
@@ -55,6 +56,13 @@ public class TestNode {
         
         Collection<Node> uphillUnique = node.getAllUphillNodes(new HashSet<>());
         Assertions.assertEquals(uphillUnique.size(), new HashSet<>(uphillUnique).size());
+    }
+    
+    @Test
+    public void testNullNode() {
+        Device d = Device.getDevice("xcvm1802-vfvc1760-1LHP-i-L");
+        PIP p = d.getPIP("BLI_LS_CORE_X90Y335/BLI_LS_CORE_R180.HSR_GRP1_A_BLI_LOGIC_OUTS0->>BLI_GRP1_A_BLI_LOGIC_OUTS0");
+        Assertions.assertNull(p.getStartNode());
     }
 }
 
