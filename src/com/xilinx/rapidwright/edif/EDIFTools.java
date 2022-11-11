@@ -284,18 +284,6 @@ public class EDIFTools {
     }
 
     /**
-     * Same as EDIFNetlist.getCellInstFromHierName()
-     * @param netlist The netlist to search
-     * @param hierarchicalName The full hierarchical name of the instance
-     * @return The cell instance named, or null if it could not be found
-     * @deprecated
-     * To be removed in 2022.2.0
-     */
-    public static EDIFCellInst getEDIFCellInst(EDIFNetlist netlist, String hierarchicalName) {
-        return netlist.getCellInstFromHierName(hierarchicalName);
-    }
-
-    /**
      * Gets the EDIFNet corresponding to the hierarchical name of a net.
      * @param hierarchicalName The full path name to the het
      * @return The net or null if none was found
@@ -405,18 +393,6 @@ public class EDIFTools {
         int bracket = name.lastIndexOf('[');
         if (bracket == -1) return name;
         return name.substring(0, bracket + (includeOpenBracket ? 1 : 0));
-    }
-
-    /**
-     * Get the previous level of hierarchy
-     *
-     * This cannot handle slashes within names and is therefore deprecated. Use {@link EDIFHierCellInst} instead.
-     */
-    @Deprecated
-    public static String getHierarchicalRootFromPinName(String s) {
-        int idx = s.lastIndexOf(EDIF_HIER_SEP);
-        if (idx < 0) return "";
-        return s.substring(0, idx);
     }
 
     /**
@@ -1240,18 +1216,6 @@ public class EDIFTools {
 
     /**
      * Duplicates EDIFCells such that each EDIFCellInst only instantiates an EDIFCell once
-     * (except primitives and macros).
-     * @param design The design containing the netlist to uniqueify.
-     * @deprecated
-     * Please use {@link #uniqueifyNetlist(Design)} instead
-     * To be removed in 2022.2.0
-     */
-    public static void flattenNetlist(Design design) {
-        uniqueifyNetlist(design);
-    }
-
-    /**
-     * Duplicates EDIFCells such that each EDIFCellInst only instantiates an EDIFCell once
      * (except primitives and macros).  It also updates references throughout the logical and
      * physical netlist so all references are self-consistent.  This transformation is useful when
      * performing netlist manipulations such as adding/removing cells, ports or nets within a design.
@@ -1366,99 +1330,6 @@ public class EDIFTools {
             }
         }
         toUniqueify.remove(cell);
-    }
-
-    /**
-     * Connects an existing logical net to another instances by creating intermediate logical
-     * nets and ports.  Design must be fully flattened (see {@link EDIFTools#uniqueifyNetlist(Design)}.
-     *
-     * Note: EDIF cell instances and nets can contain '/' within their name. This function currently does not support
-     * designs containing these constructs.
-     *
-     * @param sinkParentInstName Hierarchical name of destination parent instance for net
-     * @param srcParentInstName Hierarchical name of source parent instance of net
-     * @param parentInstNameToLogNet A map from hierarchical instance name to equivalent logical net
-     * in that corresponding cell instance.  Needs to be populated with the source parent instance
-     * name to work.
-     * @param netlist Current working netlist.
-     * @return The final logical net in the destination cell instance.  Note also that the
-     * parentInstNameToLogNet map is fully populated with each intermediate logical net created
-     * through the process.  Thus it can be used for multiple fan out paths.
-     */
-    public static EDIFNet connectLogicalNetAcrossHierarchy(String sinkParentInstName,
-            String srcParentInstName,
-            Map<String, EDIFNet> parentInstNameToLogNet,
-            EDIFNetlist netlist) {
-        String currParentInstName = srcParentInstName;
-        String srcDupNetName = parentInstNameToLogNet.get(srcParentInstName).getName();
-        EDIFNet currNet = null;
-
-        while (!currParentInstName.equals(sinkParentInstName)) {
-            currNet = parentInstNameToLogNet.get(currParentInstName);
-            // Go up or down by one level of hierarchy
-            String nextInstName = EDIFNetlist.getNextHierChildName(currParentInstName, sinkParentInstName);
-            boolean goingUpInHier = false;
-            if (nextInstName == null) {
-                nextInstName = EDIFNetlist.getHierParentName(currParentInstName);
-                goingUpInHier = true;
-            }
-
-            EDIFNet prevNet = currNet;
-            currNet = parentInstNameToLogNet.get(nextInstName);
-
-            // This instance doesn't have a logical net yet, let's add a port and create it
-            if (currNet == null) {
-                // Create a new net and port, port instance for this current instance
-                EDIFCell currParent = netlist.getCellInstFromHierName(nextInstName).getCellType();
-                int i=0;
-                while (currParent.getNet(srcDupNetName + "_" + i) != null) {
-                    i++;
-                }
-                currNet = currParent.createNet(srcDupNetName + "_" + i);
-                parentInstNameToLogNet.put(nextInstName, currNet);
-
-                String portName = srcDupNetName +"_port";
-                if (goingUpInHier) {
-                    // We need to go up in hierarchy, create output port out of parent
-                    EDIFCellInst currInst = netlist.getCellInstFromHierName(currParentInstName);
-                    EDIFCell currCell = currInst.getCellType();
-                    int j=0;
-                    while (currCell.getPort(portName + "_" + j) != null) {
-                        j++;
-                    }
-                    EDIFPort port = currInst.getCellType().createPort(portName + "_" + j, EDIFDirection.OUTPUT, 1);
-                    prevNet.createPortInst(port);
-                    currNet.createPortInst(port, currInst);
-                } else {
-                    // We are going down in hierarchy, create input port towards target
-                    EDIFCellInst nextInst = netlist.getCellInstFromHierName(nextInstName);
-                    EDIFCell nextCell = nextInst.getCellType();
-                    int j=0;
-                    while (nextCell.getPort(portName + "_" + j) != null) {
-                        j++;
-                    }
-                    EDIFPort port = nextInst.getCellType().createPort(portName + "_" + j, EDIFDirection.INPUT, 1);
-                    prevNet.createPortInst(port, nextInst);
-                    currNet.createPortInst(port);
-                }
-
-            }
-            currParentInstName = nextInstName;
-        }
-
-        // Update Parent Net Map after creating new nets
-        Map<EDIFHierNet,EDIFHierNet> parentNetMap = netlist.getParentNetMap();
-        EDIFHierNet srcNetName = netlist.getHierCellInstFromName(srcParentInstName).getNet(srcDupNetName);
-        EDIFHierNet parentNetName = parentNetMap.get(srcNetName);
-        if (parentNetName == null) {
-            parentNetName = srcNetName;
-        }
-        for (Entry<String,EDIFNet> e : parentInstNameToLogNet.entrySet()) {
-            EDIFHierNet currNetName = netlist.getHierCellInstFromName(e.getKey()).getNet(e.getValue().getName());
-            parentNetMap.put(currNetName, parentNetName);
-        }
-
-        return currNet;
     }
 
     public static void printHierSepNames(EDIFNetlist netlist) {

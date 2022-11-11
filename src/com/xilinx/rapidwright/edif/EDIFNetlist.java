@@ -830,55 +830,6 @@ public class EDIFNetlist extends EDIFName {
     }
 
     /**
-     * Looks at the hierarchical name and returns the parent or instance above.  For example:
-     * {@code "block0/operator0" -> "block0"; "block0" -> ""; "" -> ""}
-     *
-     * This cannot handle instance names with slashes and is therefore deprecated. Use {@link EDIFHierCellInst#getParent()} instead.
-     *
-     * @param hierReferenceName Hierarchical reference name
-     * @return
-     */
-    @Deprecated
-    public static String getHierParentName(String hierReferenceName) {
-        if (hierReferenceName == null) return null;
-        if (hierReferenceName.length() == 0) return hierReferenceName;
-        int lastSep = hierReferenceName.lastIndexOf(EDIFTools.EDIF_HIER_SEP);
-        if (lastSep != -1) {
-            return hierReferenceName.substring(0,lastSep);
-        }
-        return "";
-    }
-
-    /**
-     * Gets the next level hierarchical child instance name from an ancestor. Assumes descendant is
-     * instantiated within ancestor at some level.
-     *
-     * For example:
-     * {@code
-     * getNextHierChildName("a/b/c", "a/b/c/d/e") returns "a/b/c/d"
-     * getNextHierChildName("a/b/c", "a/b/c/d") returns "a/b/c/d"
-     * getNextHierChildName("a/b/c", "a/b/d") returns null
-     * getNextHierChildName("a/b/c", "a/b/c") returns null
-     * }
-     *
-     * This cannot handle instance names with slashes and is therefore deprecated. Use {@link EDIFHierCellInst} instead.
-     *
-     * @param ancestor The parent or more shallow instance in a netlist
-     * @param descendent The child or deeper instance in a netlist
-     * @return The name of the next hierarchical child instance in the ancestor/descendant chain.
-     * Returns null if none could be found.
-     */
-    @Deprecated
-    public static String getNextHierChildName(String ancestor, String descendent) {
-        if (ancestor == null || descendent == null) return null;
-        if (!descendent.startsWith(ancestor)) return null;
-        if (ancestor.equals(descendent)) return null;
-        int nextHierSeparator = descendent.indexOf(EDIFTools.EDIF_HIER_SEP, ancestor.length()+1);
-        if (nextHierSeparator == -1) return descendent;
-        return descendent.substring(0,nextHierSeparator);
-    }
-
-    /**
      * Resolve as much of a hierarchical name as possible to a List of EDIFCellInsts, suitable for creating a EDIFHierCellInst from.
      * Also return the unmatched portion
      * @param name the hierarchical name
@@ -1549,26 +1500,6 @@ public class EDIFNetlist extends EDIFName {
             }
             curr.addChildren(toProcess);
 
-        }
-        return map;
-    }
-
-    /**
-     * This will be removed in the next release.
-     * Consider using {@link EDIFCell#getPortMap()} instead
-     * @deprecated
-     * @return
-     */
-    public HashMap<String,EDIFPort> generateEDIFPortMap() {
-        HashMap<String,EDIFPort> map = new HashMap<String, EDIFPort>();
-        for (EDIFPort port : getTopCellInst().getCellType().getPorts()) {
-            if (port.isBus()) {
-                for (int idx=0; idx < port.getWidth(); idx++) {
-                    map.put(port.getName() + "["+idx+"]",port);
-                }
-            } else {
-                map.put(port.getName(),port);
-            }
         }
         return map;
     }

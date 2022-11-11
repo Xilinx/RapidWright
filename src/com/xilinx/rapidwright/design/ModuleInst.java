@@ -158,14 +158,6 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
     }
 
     /**
-     * @return the instances
-     * @deprecated Please use {@link #getSiteInsts()}
-     */
-    public ArrayList<SiteInst> getInsts() {
-        return instances;
-    }
-
-    /**
      * Gets the site instance that belong to this module instance.
      * @return The list of site instances that belong to this module instance.
      */
@@ -456,22 +448,6 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
     public Tile getCorrespondingTile(Tile templateTile, Tile newAnchorTile) {
         return module.getCorrespondingTile(templateTile, newAnchorTile);
     }
-
-    /**
-     * This method will calculate and return the corresponding tile of a module instance.
-     * for a new anchor location.
-     * @param templateTile The tile in the module which acts as a template.
-     * @param newAnchorTile This is the tile of the new anchor instance of the module instance.
-     * @param dev The device which corresponds to this module instance.
-     * @return The new tile of the module instance which corresponds to the templateTile, or null
-     * if none exists.
-     * @deprecated Use {@link ModuleInst#getCorrespondingTile(Tile, Tile)} instead
-     */
-    @Deprecated
-    public Tile getCorrespondingTile(Tile templateTile, Tile newAnchorTile, Device dev) {
-        return module.getCorrespondingTile(templateTile, newAnchorTile);
-    }
-
 
     /**
      * Gets the corresponding pins (SitePinInst) on this module instance

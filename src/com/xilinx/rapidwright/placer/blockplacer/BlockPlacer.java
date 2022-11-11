@@ -580,7 +580,7 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
             if (Utils.getLockedSiteTypes().contains(i.getSiteTypeEnum())) {
                 continue;
             }
-            Tile newTile = modInst.getCorrespondingTile(i.getTile(), proposedAnchorTile, dev);
+            Tile newTile = modInst.getCorrespondingTile(i.getTile(), proposedAnchorTile);
             if (newTile == null || usedTiles.contains(newTile)) {
                 return null;
             }
@@ -596,7 +596,7 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
         // Check nets
         for (Net n : modInst.getModule().getNets()) {
             for (PIP p : n.getPIPs()) {
-                Tile newTile = modInst.getCorrespondingTile(p.getTile(), proposedAnchorTile, dev);
+                Tile newTile = modInst.getCorrespondingTile(p.getTile(), proposedAnchorTile);
                 if (newTile == null || usedTiles.contains(newTile)) {
                     return null;
                 }

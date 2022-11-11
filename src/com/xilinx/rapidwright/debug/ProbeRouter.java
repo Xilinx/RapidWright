@@ -80,7 +80,7 @@ public class ProbeRouter {
         ArrayList<SitePinInst> pinsToRoute = new ArrayList<>();
         for (Entry<String,String> e : probeToTargetNets.entrySet()) {
             String hierPinName = e.getKey();
-            String cellInstName = EDIFTools.getHierarchicalRootFromPinName(hierPinName);
+            String cellInstName = d.getNetlist().getHierCellInstFromName(hierPinName).getParent().toString();
             EDIFCellInst i = d.getNetlist().getCellInstFromHierName(cellInstName);
             String pinName = hierPinName.substring(hierPinName.lastIndexOf(EDIFTools.EDIF_HIER_SEP)+1);
             EDIFPortInst portInst = i.getPortInst(pinName);
