@@ -29,6 +29,7 @@ package com.xilinx.rapidwright.debug;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map.Entry;
 
@@ -74,7 +75,8 @@ public class ILAInserter {
     public static List<String> getNetsMarkedForDebug(Design design) {
         // Nets can be marked for debug as a netlist property
         ArrayList<String> debugNets = new ArrayList<>();
-        for (Entry<String,EDIFNet> e : design.getNetlistNetMap().entrySet()) {
+        HashMap<String,EDIFCellInst> instMap = design.getNetlist().generateCellInstMap();
+        for (Entry<String,EDIFNet> e : design.getNetlist().generateEDIFNetMap(instMap).entrySet()) {
             EDIFPropertyValue p = e.getValue().getProperty(EDIF_MARK_DEBUG);
             if (p == null) continue;
             String etv = p.getValue();
@@ -227,7 +229,7 @@ public class ILAInserter {
 
         Design originalDesign = Design.readCheckpoint(inputDcpFileName);
 
-        EDIFNet clk = originalDesign.getNetlistNetMap().get(clkNet);
+        EDIFNet clk = originalDesign.getNetlist().getNetFromHierName(clkNet);
         if (clk == null) {
             throw new RuntimeException("ERROR: Couldn't find the clk net named " + clkNet + " in the original design provided");
         }

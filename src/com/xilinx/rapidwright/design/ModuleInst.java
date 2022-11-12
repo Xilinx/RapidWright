@@ -39,7 +39,6 @@ import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.edif.EDIFCell;
-import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.util.MessageGenerator;
 import com.xilinx.rapidwright.util.Utils;
 
@@ -689,8 +688,7 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
                 // This is a pass-thru situation and we'll need to create the net
                 EDIFCell top = getCellInst().getParentCell();
                 String newNetName = super.getNewNetName(portName, busIndex0, other, otherPortName, busIndex1);
-                EDIFNet logicalNet = top.getNet(newNetName);
-                physicalNet = design.createNet(newNetName, logicalNet);
+                physicalNet = design.createNet(newNetName);
             }
             inPort = p1;
             modInst = other;

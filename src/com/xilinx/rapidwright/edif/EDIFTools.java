@@ -1314,9 +1314,7 @@ public class EDIFTools {
                 String potentialLeafCell = cellInst.getFullHierarchicalInstName()
                         + EDIF_HIER_SEP + inst.getName();
                 Cell physCell = design.getCell(potentialLeafCell);
-                if (physCell != null) {
-                    physCell.setEDIFCellInst(inst);
-                }
+                physCell.setEDIFHierCellInst(cellInst.getChild(inst));
             }
 
             // Update any physical net references
@@ -1325,7 +1323,7 @@ public class EDIFTools {
                         + EDIF_HIER_SEP + net.getName();
                 Net physNet = design.getNet(potentialLeafCell);
                 if (physNet != null) {
-                    physNet.setLogicalNet(net);
+                    physNet.setLogicalHierNet(cellInst.getNet(net.getName()));
                 }
             }
         }

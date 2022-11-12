@@ -41,12 +41,12 @@ import com.xilinx.rapidwright.design.ConstraintGroup;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
-import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.SiteInst;
+import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Unisim;
+import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.ClockRegion;
 import com.xilinx.rapidwright.device.Device;
-import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.PartNameTools;
@@ -55,10 +55,10 @@ import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.Wire;
-import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFDirection;
+import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPort;
@@ -68,9 +68,9 @@ import com.xilinx.rapidwright.placer.blockplacer.Point;
 import com.xilinx.rapidwright.placer.blockplacer.SmallestEnclosingCircle;
 import com.xilinx.rapidwright.router.RouteNode;
 import com.xilinx.rapidwright.router.Router;
+import com.xilinx.rapidwright.router.UltraScaleClockRouting;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.MessageGenerator;
-import com.xilinx.rapidwright.router.UltraScaleClockRouting;
 
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
@@ -174,7 +174,7 @@ public class SLRCrosserGenerator {
             String cellName = path.getHierarchicalInstName(p);
             Cell cell = d.getCell(cellName);
             if (cell == null) {
-                cell = d.createCell(cellName, p.getCellInst());
+                cell = d.createCell(cellName, p.getCellInst().getCellType());
             }
             if (p.getPort().getName().equals("Q")) txCell = cell;
             else rxCell = cell;
@@ -198,7 +198,7 @@ public class SLRCrosserGenerator {
         EDIFNet logicalNetIn = txCell.getEDIFCellInst().getPortInst("D").getNet();
         Net physNetIn = d.getNet(logicalNetIn.getName());
         if (physNetIn == null) {
-            physNetIn = d.createNet(logicalNetIn);
+            physNetIn = d.createNet(logicalNetIn.getName());
         }
         physNetIn.addPin(new SitePinInst(false, txCell.getBELName().replace("_REG", "D"), txCell.getSiteInst()));
 
@@ -211,7 +211,7 @@ public class SLRCrosserGenerator {
         EDIFNet logicalNetOut = rxCell.getEDIFCellInst().getPortInst("Q").getNet();
         Net physNetOut = d.getNet(logicalNetOut.getName());
         if (physNetOut == null) {
-            physNetOut = d.createNet(logicalNetOut);
+            physNetOut = d.createNet(logicalNetOut.getName());
         }
         physNetOut.addPin(new SitePinInst(true, rxCell.getBELName().replace("_REG", "Q"), rxCell.getSiteInst()));
 
@@ -230,7 +230,7 @@ public class SLRCrosserGenerator {
         EDIFNetlist n = d.getNetlist();
         Cell c = d.getCell(bufName);
         if (c == null) {
-            c = d.createCell(bufName, d.getNetlist().getCellInstFromHierName(bufName));
+            c = d.createCell(bufName, Unisim.BUFGCE);
         }
         d.placeCell(c, s, s.getBEL("BUFCE"));
 

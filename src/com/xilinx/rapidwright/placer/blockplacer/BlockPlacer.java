@@ -167,7 +167,7 @@ public class BlockPlacer extends AbstractBlockPlacer<HardMacro, Site>{
                     // Need to check if placements will work with existing implementation
                     ArrayList<Site> openSites = new ArrayList<Site>();
                     for (Site s : sites) {
-                        if (module.isValidPlacement(s, dev, design)) {
+                        if (module.isValidPlacement(s, design)) {
                             openSites.add(s);
                         }
                     }

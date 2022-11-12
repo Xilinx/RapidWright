@@ -701,7 +701,7 @@ public class BlockStitcher {
             SiteInst match = duplicateCheck.get(inst.getSiteName());
             if (match != null) {
                 //System.out.println("Found match: " + match.toString() + " " + inst.toString());
-                if (match.getNetList().size() == 0) {
+                if (match.getConnectedNets().size() == 0) {
                     removeThese.add(match);
                 } else {
                     removeThese.add(inst);
