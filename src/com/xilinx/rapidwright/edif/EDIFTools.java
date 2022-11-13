@@ -1314,7 +1314,9 @@ public class EDIFTools {
                 String potentialLeafCell = cellInst.getFullHierarchicalInstName()
                         + EDIF_HIER_SEP + inst.getName();
                 Cell physCell = design.getCell(potentialLeafCell);
-                physCell.setEDIFHierCellInst(cellInst.getChild(inst));
+                if (physCell != null) {
+                    physCell.setEDIFHierCellInst(cellInst.getChild(inst));
+                }
             }
 
             // Update any physical net references
