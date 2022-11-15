@@ -212,7 +212,7 @@ public class CodePerfTracker {
         long end = System.nanoTime();
         if (printProgress && isVerbose()) {
             print("(" + segmentName + ")", end - start, null,
-                    isUsingGCCallsToTrackMemory() ? getTotalOSMemUsage() : null, true);
+                    totalOSMemUsages != null ? getTotalOSMemUsage() : null, true);
         }
         return this;
     }
@@ -234,25 +234,31 @@ public class CodePerfTracker {
                                 + ".3fMBs",
                         segmentName, (runtime)/1000000000.0, (memUsage)/(1024.0*1024.0));
             }
-            if (totalOSMemUsage != null) {
-                if (reportCurrOSMemUsage) {
-                    System.out.printf(" | %" + maxUsageSize + ".3fMBs (curr)", (totalOSMemUsage.getFirst())/1024.0);
-                }
-                System.out.printf(" | %" + maxUsageSize + ".3fMBs (peak)", (totalOSMemUsage.getSecond())/1024.0);
-            }
-            System.out.println();
         } else {
             if (nested) {
-                System.out.printf("%" + maxSegmentNameSize + "s: %" + maxRuntimeSize + "s  (%" + maxRuntimeSize + ".3fs)\n",
+                System.out.printf(
+                        "%" + maxSegmentNameSize + "s: %" + maxRuntimeSize + "s  (%" + maxRuntimeSize + ".3fs)",
                         segmentName,
                         "",
                         (runtime) / 1000000000.0);
             } else {
-                System.out.printf("%" + maxSegmentNameSize + "s: %" + maxRuntimeSize + ".3fs\n",
+                System.out.printf("%" + maxSegmentNameSize + "s: %" + maxRuntimeSize + ".3fs",
                         segmentName,
                         (runtime) / 1000000000.0);
             }
         }
+        if (totalOSMemUsage != null) {
+            if (!nested) {
+                // Add padding for the space that nested output would occupy
+                int whitespaceCount = (isUsingGCCallsToTrackMemory() ? maxRuntimeSize : (maxRuntimeSize + 4));
+                System.out.printf("%" + whitespaceCount + "s", "");
+            }
+            if (reportCurrOSMemUsage) {
+                System.out.printf(" | %" + maxUsageSize + ".3fMBs (curr)", (totalOSMemUsage.getFirst()) / 1024.0);
+            }
+            System.out.printf(" | %" + maxUsageSize + ".3fMBs (peak)", (totalOSMemUsage.getSecond()) / 1024.0);
+        }
+        System.out.println();
     }
 
     private void print(int idx) {
@@ -271,22 +277,35 @@ public class CodePerfTracker {
     }
 
     /**
-     * By setting this flag, more accurate memory usage numbers can be captured.
-     * The tradeoff is that System.gc() calls can increase total runtime of the program
-     * (although the call is not included in measured runtime).
+     * By setting this flag, more accurate memory usage numbers can be captured. The
+     * tradeoff is that System.gc() calls can increase total runtime of the program
+     * (although the call is not included in measured runtime). When running in
+     * Linux, this also sets {@link #setTrackOSMemUsage(boolean)} as a convenience.
      *
-     * @param useGCCalls Sets a flag that uses System.gc() calls at the beginning and end
-     * of segements to obtain more accurate memory usages.
+     * @param useGCCalls Sets a flag that uses System.gc() calls at the beginning
+     *                   and end of segments to obtain more accurate memory usages.
      */
     public void useGCToTrackMemory(boolean useGCCalls) {
         this.trackMemoryUsingGC = useGCCalls;
-        if (!FileTools.isWindows()) {
+        setTrackOSMemUsage(useGCCalls);
+    }
+    
+    /**
+     * Sets tracking of OS memory usage (in Linux only).
+     * @param trackOSMemUsage If true, will track curr and peak memory usage of the process as 
+     * reported by the OS. 
+     */
+    public void setTrackOSMemUsage(boolean trackOSMemUsage) {
+        if (trackOSMemUsage && !FileTools.isWindows()) {
             String id = ManagementFactory.getRuntimeMXBean().getName();
             int idx = id.indexOf('@');
             if (idx > 0) {
                 linuxProcID = Integer.parseInt(id.substring(0, idx));
                 totalOSMemUsages = new ArrayList<>();
             }
+        } else if (!trackOSMemUsage) {
+            linuxProcID = null;
+            totalOSMemUsages = null;
         }
     }
 
