@@ -250,7 +250,8 @@ public class CodePerfTracker {
         if (totalOSMemUsage != null) {
             if (!nested) {
                 // Add padding for the space that nested output would occupy
-                System.out.printf("  %" + maxRuntimeSize + "s  ", "");
+                int whitespaceCount = (isUsingGCCallsToTrackMemory() ? maxRuntimeSize : (maxRuntimeSize + 4));
+                System.out.printf("%" + whitespaceCount + "s", "");
             }
             if (reportCurrOSMemUsage) {
                 System.out.printf(" | %" + maxUsageSize + ".3fMBs (curr)", (totalOSMemUsage.getFirst()) / 1024.0);
