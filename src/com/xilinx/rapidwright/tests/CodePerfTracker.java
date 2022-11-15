@@ -272,16 +272,17 @@ public class CodePerfTracker {
     }
 
     /**
-     * By setting this flag, more accurate memory usage numbers can be captured.
-     * The tradeoff is that System.gc() calls can increase total runtime of the program
-     * (although the call is not included in measured runtime).
+     * By setting this flag, more accurate memory usage numbers can be captured. The
+     * tradeoff is that System.gc() calls can increase total runtime of the program
+     * (although the call is not included in measured runtime). When running in
+     * Linux, this also sets {@link #setTrackOSMemUsage(boolean)} as a convenience.
      *
-     * @param useGCCalls Sets a flag that uses System.gc() calls at the beginning and end
-     * of segements to obtain more accurate memory usages.
+     * @param useGCCalls Sets a flag that uses System.gc() calls at the beginning
+     *                   and end of segments to obtain more accurate memory usages.
      */
     public void useGCToTrackMemory(boolean useGCCalls) {
         this.trackMemoryUsingGC = useGCCalls;
-        setTrackOSMemUsage(true);
+        setTrackOSMemUsage(useGCCalls);
     }
     
     /**
@@ -290,13 +291,16 @@ public class CodePerfTracker {
      * reported by the OS. 
      */
     public void setTrackOSMemUsage(boolean trackOSMemUsage) {
-        if (!FileTools.isWindows()) {
+        if (trackOSMemUsage && !FileTools.isWindows()) {
             String id = ManagementFactory.getRuntimeMXBean().getName();
             int idx = id.indexOf('@');
             if (idx > 0) {
                 linuxProcID = Integer.parseInt(id.substring(0, idx));
                 totalOSMemUsages = new ArrayList<>();
             }
+        } else if (!trackOSMemUsage) {
+            linuxProcID = null;
+            totalOSMemUsages = null;
         }
     }
 
