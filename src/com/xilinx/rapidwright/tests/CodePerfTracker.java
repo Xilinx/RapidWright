@@ -334,8 +334,10 @@ public class CodePerfTracker {
         for (int i=0; i < runtimes.size(); i++) {
             totalRuntime += runtimes.get(i);
             totalUsage += memUsages.get(i);
-            int len = segmentNames.get(i).length() + 1;
-            if (len > maxSegmentNameSize) maxSegmentNameSize = len;
+            if (!printProgress) {
+                int len = segmentNames.get(i).length();
+                if (len > maxSegmentNameSize) maxSegmentNameSize = len;
+            }
         }
         runtimes.add(totalRuntime);
         memUsages.add(totalUsage);
@@ -344,7 +346,9 @@ public class CodePerfTracker {
         if (linuxProcID != null) {
             totalOSMemUsages.add(getTotalOSMemUsage());
         }
-        if (maxSegmentNameSize < totalName.length()) maxSegmentNameSize = totalName.length();
+        if (!printProgress && maxSegmentNameSize < totalName.length()) {
+            maxSegmentNameSize = totalName.length();
+        }
     }
 
     private void removeTotalEntry() {
