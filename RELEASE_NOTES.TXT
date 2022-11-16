@@ -1,5 +1,19 @@
 ============= RapidWright 2022.2.0-beta released on 2022-11-XX ================
 Notes:
+  - Support for Vivado 2022.2 devices and DCPs
+  - ~5% memory usage improvement over 2022.1.4 when loading (large) DCPs
+  - Removes several deprecated APIs (See list below)
+  - Fixes the method "public synchronized boolean isIOStandardSupported(String ioStandard)" on Package.
+  - Corrects null node scenario as seen in #581
+  - Moving device root tile name cache into open source (#578)
+
+ - API Additions:
+   - com.xilinx.rapidwright.design.Cell "public Cell copyCell(String name, EDIFHierCellInst inst)"
+   - com.xilinx.rapidwright.design.Cell "public Cell copyCell(String name, EDIFHierCellInst inst, SiteInst i)"
+   - com.xilinx.rapidwright.design.Cell "public Map<String, EDIFPropertyValue> getProperties()"
+   - com.xilinx.rapidwright.device.Device "public Tile[][] getTilesByRootName(String rootName)"
+   - com.xilinx.rapidwright.device.Tile.java "public String getRootName()"
+ 
  - API Deprecation Removals (--> Replacements) [Open Source]:
    - com.xilinx.rapidwright.design.ModuleInst "public ArrayList<SiteInst> getInsts()" 
      --> "public List<SiteInst> getSiteInsts()"
