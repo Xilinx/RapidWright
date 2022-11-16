@@ -137,6 +137,10 @@ public class EDIFNet extends EDIFPropertyObject {
         return createPortInstFromPortInstName(portInstName, cellInst.getCellType(), cellInst);
     }
 
+    public EDIFPortInst createPortInst(String portInstName, EDIFCellInst cellInst, boolean deferSort) {
+        return createPortInstFromPortInstName(portInstName, cellInst.getCellType(), cellInst, deferSort);
+    }
+    
     /**
      * Creates a new port instance from a name on the internal port of the provided
      * cell. It looks up the appropriate port name from the portInstName and
@@ -222,7 +226,10 @@ public class EDIFNet extends EDIFPropertyObject {
     public EDIFPortInst createPortInst(EDIFPort port, int index, EDIFCellInst cellInst) {
         return new EDIFPortInst(port, this, index, cellInst);
     }
-
+    
+    public EDIFPortInst createPortInst(EDIFPort port, int index, EDIFCellInst cellInst, boolean deferSort) {
+        return new EDIFPortInst(port, this, index, cellInst, deferSort);
+    }
     /**
      * Gets the sorted ArrayList of EDIFPortInsts on this net as a collection.
      * @return The collection of EDIFPortInsts on this net.
