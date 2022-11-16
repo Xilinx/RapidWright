@@ -230,6 +230,7 @@ public class EDIFNet extends EDIFPropertyObject {
     public EDIFPortInst createPortInst(EDIFPort port, int index, EDIFCellInst cellInst, boolean deferSort) {
         return new EDIFPortInst(port, this, index, cellInst, deferSort);
     }
+
     /**
      * Gets the sorted ArrayList of EDIFPortInsts on this net as a collection.
      * @return The collection of EDIFPortInsts on this net.

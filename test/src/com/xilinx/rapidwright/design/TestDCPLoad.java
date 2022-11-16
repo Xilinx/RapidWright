@@ -121,4 +121,10 @@ public class TestDCPLoad {
     public void testDCPFromVivado2022_1(String dcp) {
         RapidWrightDCP.loadDCP(dcp);
     }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"picoblaze_2022.2.dcp"})
+    public void testDCPFromVivado2022_2(String dcp) {
+        RapidWrightDCP.loadDCP(dcp);
+    }
 }
