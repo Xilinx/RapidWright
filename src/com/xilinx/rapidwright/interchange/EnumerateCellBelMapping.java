@@ -23,53 +23,41 @@
 
 package com.xilinx.rapidwright.interchange;
 
-import java.io.File;
-import java.io.BufferedWriter;
-import java.io.FileWriter;
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.StringWriter;
-import java.nio.charset.Charset;
-import java.nio.file.Files;
-import java.util.HashMap;
-import java.util.Collections;
+import java.util.AbstractMap;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.Arrays;
-import java.util.ArrayList;
-import java.util.AbstractMap;
 
 import org.capnproto.MessageBuilder;
 import org.capnproto.StructList;
 
-import com.xilinx.rapidwright.device.BEL;
-import com.xilinx.rapidwright.device.BELPin;
+import com.xilinx.rapidwright.design.Cell;
+import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.SiteInst;
+import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Series;
-import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
+import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.edif.EDIFCell;
-import com.xilinx.rapidwright.edif.EDIFDesign;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
+import com.xilinx.rapidwright.edif.EDIFDesign;
 import com.xilinx.rapidwright.edif.EDIFLibrary;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
-import com.xilinx.rapidwright.tests.CodePerfTracker;
-import com.xilinx.rapidwright.design.Design;
-import com.xilinx.rapidwright.design.Cell;
-import com.xilinx.rapidwright.design.ConstraintGroup;
-import com.xilinx.rapidwright.design.Unisim;
-import com.xilinx.rapidwright.design.SiteInst;
-import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.PropertyMap;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.CellBelMapping;
+import com.xilinx.rapidwright.interchange.DeviceResources.Device.CellBelPinEntry;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.CommonCellBelPinMaps;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.ParameterCellBelPinMaps;
-import com.xilinx.rapidwright.interchange.DeviceResources.Device.SiteTypeBelEntry;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.ParameterSiteTypeBelEntry;
-import com.xilinx.rapidwright.interchange.DeviceResources.Device.CellBelPinEntry;
+import com.xilinx.rapidwright.interchange.DeviceResources.Device.SiteTypeBelEntry;
+import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.PropertyMap;
+import com.xilinx.rapidwright.tests.CodePerfTracker;
 
 public class EnumerateCellBelMapping {
     private List<SiteTypeEnum> siteTypes;
@@ -725,7 +713,6 @@ public class EnumerateCellBelMapping {
 
     public static void populateCellBelPin(Enumerator<String> allStrings, Map<SiteTypeEnum, List<Site>> siteMap, CellBelMapping.Builder mapping, EDIFCell topLevelCell, EDIFCell cell, Design design) {
         mapping.setCell(allStrings.getIndex(cell.getName()));
-
         EDIFCellInst cellInst = new EDIFCellInst("test", cell, topLevelCell);
         Cell physCell = design.createCell("test", cellInst);
 

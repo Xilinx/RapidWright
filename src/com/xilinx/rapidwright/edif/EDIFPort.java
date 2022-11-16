@@ -164,16 +164,6 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
         this.busName = name;
     }
 
-    /**
-     * @return The port name without bussed index (if any)
-     * @deprecated - Please use {@link EDIFTools#getRootBusName(String, boolean)}
-     *             instead. To be removed in 2022.2
-     */
-    public String getStemName() {
-        int leftBracket = getName().indexOf('[');
-        return leftBracket == -1 ? getName() : getName().substring(0, leftBracket);
-    }
-
     public Integer getLeft() {
         if (!isBus()) return null;
         int leftBracket = getName().lastIndexOf('[');
