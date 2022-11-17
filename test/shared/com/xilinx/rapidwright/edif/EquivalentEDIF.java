@@ -47,9 +47,9 @@ public class EquivalentEDIF {
      * @return True if the two objects are equivalent
      */
     private static boolean equivalentEDIFPropObject(EDIFPropertyObject golden, EDIFPropertyObject test) {
-        Assertions.assertEquals(golden.getProperties().size(), test.getProperties().size());
-        for (Map.Entry<EDIFName, EDIFPropertyValue> e : golden.getProperties().entrySet()) {
-            EDIFPropertyValue testValue = test.getProperty(e.getKey().getName());
+        Assertions.assertEquals(golden.getPropertiesMap().size(), test.getPropertiesMap().size());
+        for (Map.Entry<String, EDIFPropertyValue> e : golden.getPropertiesMap().entrySet()) {
+            EDIFPropertyValue testValue = test.getProperty(e.getKey());
             Assertions.assertNotNull(testValue);
             Assertions.assertEquals(e.getValue().getType(), testValue.getType());
             Assertions.assertEquals(e.getValue().getValue(), testValue.getValue());

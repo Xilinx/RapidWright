@@ -1130,7 +1130,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
             if (myCellName.startsWith("RAMB")) {
                 int encodedConfig = 0;
                 encodedConfig |= intrasiteAndLogicDelayModel.getEncodedConfigCode("RAMB36E2:RTL_RAM_TYPE:RAM_TDP");
-                for (Map.Entry<EDIFName, EDIFPropertyValue> entry : mycellInst.getProperties().entrySet()) {
+                for (Map.Entry<String, EDIFPropertyValue> entry : mycellInst.getPropertiesMap().entrySet()) {
                     encodedConfig |= intrasiteAndLogicDelayModel.getEncodedConfigCode("RAMB36E2:"+ entry.getKey() + ":" + entry.getValue().getValue().toString());
                 }
                 short belIdx = intrasiteAndLogicDelayModel.getBELIndex("RAMB36E2");

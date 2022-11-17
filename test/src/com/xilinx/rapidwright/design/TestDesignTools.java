@@ -23,7 +23,6 @@
 
 package com.xilinx.rapidwright.design;
 
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -35,6 +34,12 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
+
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.PIP;
@@ -45,11 +50,6 @@ import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.Pair;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
-import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestDesignTools {
 
@@ -188,7 +188,7 @@ public class TestDesignTools {
 
         Assertions.assertTrue(si.getSitePinInstMap().isEmpty());
 
-        Map<String,Net> netSiteWireMap = si.getNetSiteWireMap();
+        Map<String, Net> netSiteWireMap = si.getSiteWireToNetMap();
         for (Map.Entry<Net, Set<SitePinInst>> e : deferredRemovals.entrySet()) {
             for (SitePinInst spi : e.getValue()) {
                 Assertions.assertFalse(netSiteWireMap.containsKey(spi.getSiteWireName()));

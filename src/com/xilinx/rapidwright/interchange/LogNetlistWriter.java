@@ -36,18 +36,15 @@ import org.capnproto.TextList;
 import org.capnproto.Void;
 
 import com.xilinx.rapidwright.device.Device;
-import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFLibrary;
-import com.xilinx.rapidwright.edif.EDIFName;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFPropertyObject;
 import com.xilinx.rapidwright.edif.EDIFPropertyValue;
-import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.Bus;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.Cell;
@@ -102,11 +99,11 @@ public class LogNetlistWriter {
      */
     private void populatePropertyMap(PropertyMap.Builder builder, EDIFPropertyObject obj) {
         StructList.Builder<PropertyMap.Entry.Builder> entries =
-                builder.initEntries(obj.getProperties().size());
+                builder.initEntries(obj.getPropertiesMap().size());
         int i = 0;
-        for (Entry<EDIFName, EDIFPropertyValue> e : obj.getProperties().entrySet()) {
+        for (Entry<String, EDIFPropertyValue> e : obj.getPropertiesMap().entrySet()) {
             PropertyMap.Entry.Builder entry = entries.get(i);
-            entry.setKey(allStrings.getIndex(e.getKey().getName()));
+            entry.setKey(allStrings.getIndex(e.getKey()));
             switch (e.getValue().getType()) {
             case BOOLEAN:
                 entry.setBoolValue(e.getValue().getValue().equalsIgnoreCase("true")

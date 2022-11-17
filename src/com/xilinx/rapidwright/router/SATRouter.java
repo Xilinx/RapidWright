@@ -35,10 +35,10 @@ import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Queue;
 import java.util.Random;
 import java.util.Set;
-import java.util.Map.Entry;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
@@ -208,7 +208,7 @@ public class SATRouter {
                     }
                     outputSite = c.getSite();
                     if (net.getLogicalNet() == null) {
-                        net.setLogicalNet(p.getPortInst().getNet());
+                        net.setLogicalHierNet(p.getHierarchicalNet());
                     }
                 }
             }
@@ -260,7 +260,7 @@ public class SATRouter {
                         String sitePinName = belPin.getConnectedSitePinName();
                         SitePinInst pin = si.getSitePinInst(sitePinName);
                         if (pin == null) {
-                            pin = design.getGndNet().createPin(p.isOutput(), sitePinName, si);
+                            pin = design.getGndNet().createPin(sitePinName, si);
                         }
                     }
                 }
@@ -273,10 +273,10 @@ public class SATRouter {
                 if (si.getSitePinInst(pinName) == null) {
                     if (pinName.contains("SRST") && net.getName().equals(Net.GND_NET)) {
                         // Connect to VCC instead and invert in Site
-                        design.getVccNet().createPin(p.isOutput(), pinName, si);
+                        design.getVccNet().createPin(pinName, si);
                         continue;
                     }
-                    net.createPin(p.isOutput(), pinName, si);
+                    net.createPin(pinName, si);
                 }
             }
 
@@ -292,7 +292,7 @@ public class SATRouter {
     private void populateNetsToRoute() {
         Map<String,String> parentNetMap = design.getNetlist().getParentNetMapNames();
         for (SiteInst i : design.getSiteInsts()) {
-            for (Entry<String,Net> e : i.getNetSiteWireMap().entrySet()) {
+            for (Entry<String, Net> e : i.getSiteWireToNetMap().entrySet()) {
                 Net n = e.getValue();
                 if (e.getValue().isStaticNet()) continue;
                 if (n.getName().equals(Net.USED_NET)) continue;
