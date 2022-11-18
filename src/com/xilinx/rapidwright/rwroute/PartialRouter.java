@@ -112,22 +112,27 @@ public class PartialRouter extends RWRoute{
      * @return True if arc is part of an existing route.
      */
     private boolean isPartOfExistingRoute(Node start, Node end) {
+        // End node must be preserved
         if (!routingGraph.isPreserved(end))
             return false;
 
-        // If preserved, check if end node has been created already
+        // End node must have been created already
         RouteNode endRnode = routingGraph.getNode(end);
         if (endRnode == null)
             return false;
 
-        // If so, get its prev pointer
+        // Only check if end node has not been visited
+        if (endRnode.isVisited()) {
+            // Visited possibly from a different arc uphill of end, or possibly from
+            // the same start -> end arc during prepareRouteConnection()
+            return false;
+        }
+
+        // Presence means that the only arc allowed to enter this end node is if it came from prev
         RouteNode prev = endRnode.getPrev();
-        // Presence means that the only arc allowed to enter this end node
-        // is if it came from prev
         if (prev != null) {
             assert((prev.getNode() == start) == prev.getNode().equals(start));
             if (prev.getNode() == start) {
-                assert(!endRnode.isVisited());
                 return true;
             }
         }
@@ -436,6 +441,7 @@ public class PartialRouter extends RWRoute{
                 if (netnewConnection.getSink().isRouted()) {
                     finishRouteConnection(netnewConnection, netnewConnection.getSinkRnode());
                     assert(netnewConnection.getSink().isRouted());
+                    netnewConnection.fitBoundingBoxToRouting();
                 }
             }
 
