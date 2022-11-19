@@ -467,6 +467,7 @@ public class PartialRouter extends RWRoute{
                     finishRouteConnection(netnewConnection, sinkRnode);
                     netnewConnection.fitBoundingBoxToRouting();
                     assert(netnewConnection.getSink().isRouted());
+                    netnewConnection.fitBoundingBoxToRouting();
                 }
             }
 
