@@ -24,11 +24,13 @@
 package com.xilinx.rapidwright.edif;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 
 /**
  * Customized ArrayList<EDIFPortInst> for the {@link EDIFNet} and {@link EDIFCellInst} classes.
- * Maintains a sorted list to allow for a O(log n) retrieval lookup by name.  Does not allow
- * duplicate entries.
+ * Maintains a sorted list to allow for a O(log n) retrieval lookup by name.  Overwrites 
+ * existing entries with most recent value.
  */
 public class EDIFPortInstList extends ArrayList<EDIFPortInst> {
 
@@ -36,12 +38,19 @@ public class EDIFPortInstList extends ArrayList<EDIFPortInst> {
 
     public static final EDIFPortInstList EMPTY = new EDIFPortInstList();
 
+    /**
+     * Inserts the port inst into the list such that the list remains sorted.  If an identical 
+     * element is already in the list, it is overwritten with the new port instance provided.
+     * @param e The port inst to add to the sorted list
+     * @return True if the list changed as a result of this call, false otherwise.
+     */
     @Override
     public boolean add(EDIFPortInst e) {
         int insertionPoint = binarySearch(e.getCellInst(), e.getName());
-        // Do not allow duplicates
+        // Overwrite duplicates
         if (insertionPoint >= 0) {
-            return false;
+            super.set(insertionPoint, e);
+            return true;
         }
         super.add(insertionPoint >= 0 ? insertionPoint : ~insertionPoint, e);
         return true;
@@ -93,7 +102,7 @@ public class EDIFPortInstList extends ArrayList<EDIFPortInst> {
      * @return 0 if the left and corresponding right Strings are equal.  A number less than 0 if
      * left is lexicographically before right, or a number greater than 0 if left is after right.
      */
-    private int compare(EDIFPortInst left, String rightInstName, String rightPortInstName) {
+    protected static int compare(EDIFPortInst left, String rightInstName, String rightPortInstName) {
         if (left.getCellInst() == null) {
             if (rightInstName == null) {
                 // left and right are both a top-level port insts, compare their port insts name only
@@ -113,5 +122,22 @@ public class EDIFPortInstList extends ArrayList<EDIFPortInst> {
         // compare their port inst names.
         int compare = left.getCellInst().getName().compareTo(rightInstName);
         return compare == 0 ? left.getName().compareTo(rightPortInstName) : compare;
+    }
+
+    /**
+     * Adds an element without sorting it and appending it to the end of the list.  This method
+     * should be used with caution and generally always in conjunction with {@link #reSortList()} 
+     * after a batch of additions. 
+     * @param e The element to add
+     */
+    public void deferSortAdd(EDIFPortInst e) {
+        super.add(e);
+    }
+
+    /**
+     * Invokes this list to be re sorted (it maintains a sorted list upon add).  
+     */
+    public void reSortList() {
+        Collections.sort(this);
     }
 }
