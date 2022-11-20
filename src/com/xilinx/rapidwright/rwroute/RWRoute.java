@@ -1385,6 +1385,7 @@ public class RWRoute{
                                   float rnodeDelayWeight, float rnodeEstDlyWeight) {
         boolean intersectionFound = false;
         boolean longHead = config.isTimingDriven() && forward && DelayEstimatorBase.isLong(headRnode.getNode());
+        RouteNode destRnode = forward ? connection.getSinkRnode() : connection.getSourceRnode();
         for (RouteNode tailRnode : headRnode.getChildrenParents(forward)) {
             if (tailRnode.isVisited(forward)) {
                 // Node must be in queue already.
@@ -1407,9 +1408,10 @@ public class RWRoute{
                 // Tail node is preserved by the same net we're routing!
                 // Since it's preserved, it must be an uncongested path back to the source, with
                 // prev pointers.
-                // If it hasn't been visited yet by the forward pass, fake that it has so that
-                // it can be considered an intersection
-                if (!tailRnode.isVisited(!forward)) {
+                // If it hasn't been visited yet by the forward pass (and if the forward pass
+                // isn't just about to discover tailRnode) if necessary fake that it has so that
+                // it will be considered an intersection
+                if (!tailRnode.isVisited(!forward) && tailRnode.getPrev() != queue.peek()) {
                     tailRnode.setVisited(!forward);
                 }
                 assert(!tailRnode.willOverUse(connection.getNetWrapper()));
@@ -1454,7 +1456,6 @@ public class RWRoute{
                     case LAGUNA_O:
                         if ((forward && tailRnode.getType() == RouteNodeType.LAGUNA_I) ||
                                 (!forward && tailRnode.getType() == RouteNodeType.LAGUNA_O)) {
-                            RouteNode destRnode = forward ? connection.getSinkRnode() : connection.getSourceRnode();
                             if (!connection.isCrossSLR() ||
                                     destRnode.getSLRIndex(forward) == tailRnode.getSLRIndex(forward)) {
                                 // Do not consider approaching a SLL if not needing to cross
@@ -1463,8 +1464,14 @@ public class RWRoute{
                         }
                         break;
                     case SUPER_LONG_LINE:
-                        RouteNode destRnode = forward ? connection.getSinkRnode() : connection.getSourceRnode();
-                        assert(connection.isCrossSLR() && destRnode.getSLRIndex(forward) != headRnode.getSLRIndex(forward));
+                        assert(connection.isCrossSLR());
+                        // Set the prev/next pointer, as RouteNode.getSLRDistance() requires it
+                        assert(!tailRnode.isVisited(forward));
+                        tailRnode.setPrevNext(forward, headRnode);
+                        if (destRnode.getSLRDistance(forward, tailRnode) >= destRnode.getSLRDistance(forward, headRnode)) {
+                            // Make sure taking this SLL gets us closer to the dest SLR
+                            continue;
+                        }
                         break;
                     default:
                         throw new RuntimeException();
@@ -1659,17 +1666,17 @@ public class RWRoute{
         assert(sourceRnode.getPrev() == null);
 
         // Add sink rnodes to the backward queue
-        for (RouteNode sinkRnode : Arrays.asList(connectionToRoute.getSinkRnode(),
-                connectionToRoute.getAltSinkRnode())) {
-            if (sinkRnode != null) {
+        RouteNode sinkRnode = connectionToRoute.getSinkRnode();
+        for (RouteNode rnode : Arrays.asList(sinkRnode, connectionToRoute.getAltSinkRnode())) {
+            if (rnode != null) {
                 final boolean forward = false;
                 // Unlike source nodes, sink nodes must be costed since they could be overused
-                int countSourceUses = sinkRnode.countConnectionsOfUser(connectionToRoute.getNetWrapper());
+                int countSourceUses = rnode.countConnectionsOfUser(connectionToRoute.getNetWrapper());
                 float sharingFactor = 1 + shareWeight* countSourceUses;
-                float newPartialPathCost = rnodeCostWeight * getNodeCost(forward, sinkRnode, connectionToRoute, countSourceUses, sharingFactor);
+                float newPartialPathCost = rnodeCostWeight * getNodeCost(forward, rnode, connectionToRoute, countSourceUses, sharingFactor);
                 // Mark sinks with a next pointer to themselves
-                sinkRnode.setNext(sinkRnode);
-                push(forward, sinkRnode, newPartialPathCost, newPartialPathCost);
+                rnode.setNext(rnode);
+                push(forward, rnode, newPartialPathCost, newPartialPathCost);
             }
         }
 

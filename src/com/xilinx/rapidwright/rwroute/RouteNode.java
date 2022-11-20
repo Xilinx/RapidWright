@@ -770,4 +770,10 @@ abstract public class RouteNode {
     abstract public boolean isExcluded(boolean forward, Node parent, Node child);
 
     abstract public int getSLRIndex(boolean forward);
+
+    public int getSLRDistance(boolean forward, RouteNode that) {
+        final int thisSLR = getSLRIndex(forward);
+        final int thatSLR = that.getSLRIndex(forward);
+        return Math.abs(thatSLR - thisSLR);
+    }
 }

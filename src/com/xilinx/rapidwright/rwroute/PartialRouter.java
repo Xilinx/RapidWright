@@ -120,7 +120,7 @@ public class PartialRouter extends RWRoute{
             return false;
         }
 
-        // If end node has been visited already, it can't possibly be using this arc
+        // If end node has been visited already
         if (endRnode.isVisited(forward)) {
             // Visited possibly from a different arc uphill of end, or possibly from
             // the same start -> end arc during prepareRouteConnection()
@@ -235,7 +235,6 @@ public class PartialRouter extends RWRoute{
                     sinkRnode.setVisited(false);
                     sinkRnode.setNext(sinkRnode);
                     finishRouteConnection(connection, sinkRnode);
-                    connection.fitBoundingBoxToRouting();
                     assert(connection.getSink().isRouted());
                 }
             }
@@ -458,9 +457,7 @@ public class PartialRouter extends RWRoute{
                     sinkRnode.setVisited(false);
                     sinkRnode.setNext(sinkRnode);
                     finishRouteConnection(netnewConnection, sinkRnode);
-                    netnewConnection.fitBoundingBoxToRouting();
                     assert(netnewConnection.getSink().isRouted());
-                    netnewConnection.fitBoundingBoxToRouting();
                 }
             }
 
