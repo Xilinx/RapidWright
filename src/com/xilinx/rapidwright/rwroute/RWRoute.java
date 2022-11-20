@@ -1756,7 +1756,6 @@ public class RWRoute{
                     // Stumbled across a connectionToPush that just so happens to go through
                     // connectionToRoute's sink!
                     assert(connectionToPush != connectionToRoute);
-                    assert(!parentRnode.isIntersection());
                     // Let this be discovered naturally
                     break;
                 }
