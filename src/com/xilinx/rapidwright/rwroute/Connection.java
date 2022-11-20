@@ -219,6 +219,10 @@ public class Connection implements Comparable<Connection>{
     }
 
     public void addRnode(RouteNode rn) {
+        xMinBB = (short) Math.min(xMinBB, rn.getTileXCoordinate(false) - 1);
+        xMaxBB = (short) Math.max(xMaxBB, rn.getTileXCoordinate(true) + 1);
+        yMinBB = (short) Math.min(yMinBB, rn.getTileYCoordinate(false) - 1);
+        yMaxBB = (short) Math.max(yMaxBB, rn.getTileYCoordinate(true) + 1);
         rnodes.add(rn);
     }
 
@@ -399,23 +403,6 @@ public class Connection implements Comparable<Connection>{
         yMaxBB += verticalIncrement;
         xMinBB = xMinBB < 0? -1:xMinBB;
         yMinBB = yMinBB < 0? -1:yMinBB;
-    }
-
-    public void fitBoundingBoxToRouting() {
-        int xmin = Integer.MAX_VALUE;
-        int xmax = Integer.MIN_VALUE;
-        int ymin = Integer.MAX_VALUE;
-        int ymax = Integer.MIN_VALUE;
-        for (RouteNode rnode : rnodes) {
-            xmin = (short) Math.min(xmin, rnode.getTileXCoordinate(false));
-            xmax = (short) Math.max(xmax, rnode.getTileXCoordinate(true));
-            ymin = (short) Math.min(ymin, rnode.getTileYCoordinate(false));
-            ymax = (short) Math.max(ymax, rnode.getTileYCoordinate(true));
-        }
-        xMinBB = (short) Math.min(xMinBB, xmin - 1);
-        xMaxBB = (short) Math.max(xMaxBB, xmax + 1);
-        yMinBB = (short) Math.min(yMinBB, ymin - 1);
-        yMaxBB = (short) Math.max(yMaxBB, ymax + 1);
     }
 
     public void fitBoundingBoxToRouting(Connection connection) {
