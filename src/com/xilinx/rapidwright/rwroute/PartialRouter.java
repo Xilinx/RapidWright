@@ -222,11 +222,6 @@ public class PartialRouter extends RWRoute{
                 RouteNode rstart = getOrCreateRouteNode(start, RouteNodeType.WIRE);
                 RouteNode rend = getOrCreateRouteNode(end, RouteNodeType.WIRE);
                 assert (rend.getPrev() == null);
-
-                // Set the prev pointer directly instead of using RouteNode.getPrev() to avoid
-                // marking the node as visited.
-                // This causes a problem for stub nodes for which the visited state is not reset.
-                // rend.prev = rstart;
                 rend.setPrev(rstart);
             }
 
@@ -422,8 +417,7 @@ public class PartialRouter extends RWRoute{
                 assert(rendAdded == endPreserved);
 
                 // Check the prev pointer is consistent with PIP
-                // (do not use RouteNode.getPrev() since that masks prev if node wasn't visited)
-                assert(rend.prev == rstart);
+                assert(rend.getPrev() == rstart);
             }
         } else {
             // Net needs to be created
