@@ -407,11 +407,10 @@ public class Connection implements Comparable<Connection>{
         int ymin = Integer.MAX_VALUE;
         int ymax = Integer.MIN_VALUE;
         for (RouteNode rnode : rnodes) {
-            Tile beginTile = rnode.node.getTile();
-            xmin = (short) Math.min(xmin, beginTile.getTileXCoordinate());
-            xmax = (short) Math.max(xmax, rnode.getEndTileXCoordinate());
-            ymin = (short) Math.min(ymin, beginTile.getTileYCoordinate());
-            ymax = (short) Math.max(ymax, rnode.getEndTileYCoordinate());
+            xmin = (short) Math.min(xmin, rnode.getTileXCoordinate(false));
+            xmax = (short) Math.max(xmax, rnode.getTileXCoordinate(true));
+            ymin = (short) Math.min(ymin, rnode.getTileYCoordinate(false));
+            ymax = (short) Math.max(ymax, rnode.getTileYCoordinate(true));
         }
         xMinBB = (short) Math.min(xMinBB, xmin - 1);
         xMaxBB = (short) Math.max(xMaxBB, xmax + 1);
