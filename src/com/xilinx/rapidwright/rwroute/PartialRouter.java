@@ -122,8 +122,8 @@ public class PartialRouter extends RWRoute{
 
         // If end node has been visited already
         if (endRnode.isVisited(forward)) {
-            // Possibly from a different arc uphill of end, or possibly from the same
-            // start -> end arc
+            // Visited possibly from a different arc uphill of end, or possibly from
+            // the same start -> end arc during prepareRouteConnection()
             return false;
         }
 
@@ -132,10 +132,8 @@ public class PartialRouter extends RWRoute{
         if (prevRnode != null) {
             assert((prevRnode.getNode() == start) == prevRnode.getNode().equals(start));
             if (prevRnode.getNode() == start) {
-                assert(!endRnode.isVisited(forward));
                 return true;
             }
-            return false;
         }
 
         // No presence means that it is used by a fully preserved net which needs no routing
