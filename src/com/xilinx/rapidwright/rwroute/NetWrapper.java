@@ -28,8 +28,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.xilinx.rapidwright.design.Net;
-import com.xilinx.rapidwright.design.SitePinInst;
-import com.xilinx.rapidwright.device.Tile;
 
 /**
  * A wrapper class of {@link Net} with additional information for the router.
@@ -85,10 +83,8 @@ public class NetWrapper{
                 sourceRnodeAdded = true;
                 count++;
             }
-            SitePinInst sink = connection.getSink();
-            Tile sinkTile = sink.getTile();
-            int x = sinkTile.getTileXCoordinate();
-            int y = sinkTile.getTileYCoordinate();
+            short x = connection.getSinkRnode().getEndTileXCoordinate();
+            short y = connection.getSinkRnode().getEndTileYCoordinate();
             xMin = Integer.min(xMin, x);
             yMin = Integer.min(yMin, y);
             xMax = Integer.max(xMax, x);

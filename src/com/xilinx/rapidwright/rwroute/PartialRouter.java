@@ -54,7 +54,7 @@ import com.xilinx.rapidwright.util.RuntimeTracker;
  */
 public class PartialRouter extends RWRoute{
 
-    final protected boolean softPreserve;
+    protected final boolean softPreserve;
 
     protected Set<NetWrapper> partiallyPreservedNets;
 
@@ -112,31 +112,29 @@ public class PartialRouter extends RWRoute{
      * @return True if arc is part of an existing route.
      */
     private boolean isPartOfExistingRoute(Node start, Node end) {
-        // End node must be preserved
-        if (!routingGraph.isPreserved(end))
-            return false;
-
-        // End node must have been created already
+        // End node can only be part of existing route if it is in the graph already
         RouteNode endRnode = routingGraph.getNode(end);
         if (endRnode == null)
             return false;
 
-        // Only check if end node has not been visited
+        // If end node has been visited already
         if (endRnode.isVisited()) {
             // Visited possibly from a different arc uphill of end, or possibly from
             // the same start -> end arc during prepareRouteConnection()
             return false;
         }
 
-        // Presence means that the only arc allowed to enter this end node is if it came from prev
+        // Presence of a prev pointer means that only that arc allowed to enter this end node
         RouteNode prev = endRnode.getPrev();
         if (prev != null) {
             assert((prev.getNode() == start) == prev.getNode().equals(start));
             if (prev.getNode() == start) {
+                assert(routingGraph.isPreserved(end));
                 return true;
             }
         }
 
+        // No presence means that it is used by a fully preserved net which needs no routing
         return false;
     }
 
@@ -229,11 +227,12 @@ public class PartialRouter extends RWRoute{
             for (Connection connection : netWrapper.getConnections()) {
                 if (connection.getSink().isRouted()) {
                     finishRouteConnection(connection, connection.getSinkRnode());
-                    connection.fitBoundingBoxToRouting();
                     assert(connection.getSink().isRouted());
                 }
             }
         }
+
+        routingGraph.resetExpansion();
 
         // Mark each static sink node -- if it exists -- as being used, unpreserving any nets
         // using those nodes (likely bounce points) as needed
@@ -389,6 +388,11 @@ public class PartialRouter extends RWRoute{
                 Node start = (pip.isReversed()) ? pip.getEndNode() : pip.getStartNode();
                 Node end = (pip.isReversed()) ? pip.getStartNode() : pip.getEndNode();
 
+                // Do not include arcs that the router wouldn't explore
+                // e.g. those that leave the INT tile, since we project pins to their INT tile
+                if (routingGraph.isExcluded(start, end))
+                    continue;
+
                 // Since net already exists, all the nodes it uses must already
                 // have been created
                 RouteNode rstart = routingGraph.getNode(start);
@@ -403,9 +407,8 @@ public class PartialRouter extends RWRoute{
                 boolean endPreserved = routingGraph.unpreserve(end);
                 assert(rendAdded == endPreserved);
 
-                // Check the prev pointer consistent with PIP
-                // (it may be null because isPartOfExistingRoute() will erase prev once rend was created)
-                assert(rend.getPrev() == null || rend.getPrev().equals(rstart));
+                // Check the prev pointer is consistent with PIP
+                assert(rend.getPrev() == rstart);
             }
         } else {
             // Net needs to be created
@@ -441,7 +444,6 @@ public class PartialRouter extends RWRoute{
                 if (netnewConnection.getSink().isRouted()) {
                     finishRouteConnection(netnewConnection, netnewConnection.getSinkRnode());
                     assert(netnewConnection.getSink().isRouted());
-                    netnewConnection.fitBoundingBoxToRouting();
                 }
             }
 
@@ -455,6 +457,9 @@ public class PartialRouter extends RWRoute{
             }
         }
 
+        routingGraph.resetExpansion();
+
+        // TODO: Avoid using a set by backtracking from sinks (and stubs) until an already-reset node is seen
         for (RouteNode rnode : rnodes) {
             Node toBuild = rnode.getNode();
             // Check already unpreserved above
@@ -467,7 +472,8 @@ public class PartialRouter extends RWRoute{
                 if (parent == null)
                     continue;
 
-                // Reset its list of children so that they may be regenerated to include newly unpreserved node
+                // Reset its list of children so that they may be regenerated to include the
+                // newly unpreserved node
                 parent.resetChildren();
             }
 

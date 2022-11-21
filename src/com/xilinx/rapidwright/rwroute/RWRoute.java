@@ -138,7 +138,7 @@ public class RWRoute{
     private long nodesPopped;
 
     /** The maximum criticality constraint of connection */
-    final private static float MAX_CRITICALITY = 0.99f;
+    private static final float MAX_CRITICALITY = 0.99f;
     /** The minimum criticality of connections that should be re-routed, updated after each iteration */
     private float minRerouteCriticality;
     /** The list of critical connections */
@@ -243,7 +243,7 @@ public class RWRoute{
     protected void determineRoutingTargets() {
         categorizeNets();
 
-        // Wait for all outstanding RoutingGraph.asyncPreserve() calls to complete
+        // Wait for all outstanding RouteNodeGraph.asyncPreserve() calls to complete
         // FIXME: Calling thread does nothing while waiting
         routingGraph.awaitPreserve();
     }
@@ -505,7 +505,7 @@ public class RWRoute{
                     }
                     sourceINTRnode = getOrCreateRouteNode(sourceINTNode, RouteNodeType.PINFEED_O);
 
-                    // Pre-emptively set up alternate source
+                    // Pre-emptively set up alternate source since we are expanding from both sources
                     SitePinInst altSource = net.getAlternateSource();
                     if (altSource == null) {
                         altSource = DesignTools.getLegalAlternativeOutputPin(net);
@@ -515,6 +515,7 @@ public class RWRoute{
                         }
                     }
                     if (altSource != null) {
+                        assert(!altSource.equals(source));
                         Node altSourceNode = RouterHelper.projectOutputPinToINTNode(altSource);
                         if (altSourceNode != null) {
                             altSourceINTRnode = getOrCreateRouteNode(altSourceNode, RouteNodeType.PINFEED_O);
@@ -975,6 +976,9 @@ public class RWRoute{
                 overUsedRnodes.add(rnode);
                 rnode.setPresentCongestionCost(1 + (overuse + 1) * presentCongestionFactor);
                 rnode.setHistoricalCongestionCost(rnode.getHistoricalCongestionCost() + overuse * historicalCongestionFactor);
+            } else {
+                assert(overuse < 0);
+                assert(rnode.getPresentCongestionCost() == 1);
             }
         }
     }
@@ -1203,11 +1207,11 @@ public class RWRoute{
             assert(queue.isEmpty());
             // Clears previous route of the connection
             connection.resetRoute();
+            assert(connection.getRnodes().isEmpty());
             assert(!connection.getSink().isRouted());
         }
 
         routingGraph.resetExpansion();
-        assert(!connection.getSinkRnode().isVisited());
     }
 
     /**
@@ -1301,8 +1305,7 @@ public class RWRoute{
         connection.resetRoute();
         do {
             connection.addRnode(rnode);
-            rnode = rnode.getPrev();
-        } while (rnode != null);
+        } while ((rnode = rnode.getPrev()) != null);
 
         List<RouteNode> rnodes = connection.getRnodes();
         RouteNode sourceRnode = rnodes.get(rnodes.size()-1);
@@ -1340,7 +1343,7 @@ public class RWRoute{
     /**
      * Explores children (downhill rnodes) of a rnode for routing a connection and pushes the child into the queue,
      * if it is the target or is an accessible routing resource.
-     * @param rnode The parent rnode popped out from the queue.
+     * @param rnode The rnode popped out from the queue.
      * @param connection The connection that is being routed.
      * @param shareWeight The criticality-aware share weight for a new sharing factor.
      * @param rnodeCostWeight The cost weight of the childRnode
@@ -1460,14 +1463,12 @@ public class RWRoute{
 
         int childX = childRnode.getEndTileXCoordinate();
         int childY = childRnode.getEndTileYCoordinate();
-        SitePinInst sink = connection.getSink();
-        Tile sinkTile = sink.getTile();
-        int sinkX = sinkTile.getTileXCoordinate();
-        int sinkY = sinkTile.getTileYCoordinate();
+        RouteNode sinkRnode = connection.getSinkRnode();
+        int sinkX = sinkRnode.getBeginTileXCoordinate();
+        int sinkY = sinkRnode.getBeginTileYCoordinate();
         int deltaX = Math.abs(childX - sinkX);
         int deltaY = Math.abs(childY - sinkY);
         if (connection.isCrossSLR()) {
-            RouteNode sinkRnode = connection.getSinkRnode();
             int deltaSLR = Math.abs(sinkRnode.getSLRIndex() - childRnode.getSLRIndex());
             if (deltaSLR != 0) {
                 // Check for overshooting which occurs when child and sink node are in

@@ -131,7 +131,7 @@ public class RouteFixer{
         }
     }
 
-    final private static Comparator<NodeWithDelay> NodeWithDelayComparator = (a, b) -> Float.compare(a.getDelay(), b.getDelay());
+    private static final Comparator<NodeWithDelay> NodeWithDelayComparator = (a, b) -> Float.compare(a.getDelay(), b.getDelay());
 
     static class NodeWithDelay{
         private int id;

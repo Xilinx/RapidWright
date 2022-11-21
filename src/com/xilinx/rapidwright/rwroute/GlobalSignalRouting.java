@@ -58,7 +58,7 @@ import com.xilinx.rapidwright.router.UltraScaleClockRouting;
  * Adapted from RapidWright APIs.
  */
 public class GlobalSignalRouting {
-    final private static HashSet<String> lutOutputPinNames;
+    private static final HashSet<String> lutOutputPinNames;
     static {
         lutOutputPinNames = new HashSet<>();
         for (String cle : new String[]{"L", "M"}) {

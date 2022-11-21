@@ -106,9 +106,12 @@ abstract public class RouteNode implements Comparable<RouteNode> {
 
     @Override
     public int compareTo(RouteNode that) {
-        // Do not use Float.compare() since it also checks NaN, which we'll assume is unreachable
+        // Do not use Float.compare() since it also compares NaN, which we'll assume is unreachable
         // return Float.compare(this.lowerBoundTotalPathCost, that.lowerBoundTotalPathCost);
-        return (int) Math.signum(this.lowerBoundTotalPathCost - that.lowerBoundTotalPathCost);
+        float signum = Math.signum(this.lowerBoundTotalPathCost - that.lowerBoundTotalPathCost);
+        // Tie break according to larger known cost (thus smaller estimated cost to target)
+        return (int) ((signum != 0) ? signum : Math.signum(that.upstreamPathCost - this.upstreamPathCost));
+
     }
 
     abstract protected RouteNode getOrCreate(Node node, RouteNodeType type);
@@ -227,7 +230,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
         return RouteNode.capacity < uniqueDriverCount();
     }
 
-    public final static EnumSet<TileTypeEnum> lagunaTileTypes = EnumSet.of(
+    public static final EnumSet<TileTypeEnum> lagunaTileTypes = EnumSet.of(
               TileTypeEnum.LAG_LAG      // UltraScale+
             , TileTypeEnum.LAGUNA_TILE  // UltraScale
     );
@@ -392,6 +395,14 @@ abstract public class RouteNode implements Comparable<RouteNode> {
      */
     public float getDelay() {
         return 0;
+    }
+
+    public short getBeginTileXCoordinate() {
+        return (short) node.getTile().getTileXCoordinate();
+    }
+
+    public short getBeginTileYCoordinate() {
+        return (short) node.getTile().getTileYCoordinate();
     }
 
     /**
