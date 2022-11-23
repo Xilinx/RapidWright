@@ -81,8 +81,8 @@ public class PopulateMacroParamRules {
         }
         List<EDIFCellInst> insts = new ArrayList<>();
         for (EDIFCellInst inst : cell.getCellInsts()) {
-            for (EDIFName name : inst.getProperties().keySet()) {
-                if (name.getName().contains(INIT)) {
+            for (String name : inst.getPropertiesMap().keySet()) {
+                if (name.contains(INIT)) {
                     insts.add(inst);
                 }
             }
@@ -150,7 +150,7 @@ public class PopulateMacroParamRules {
         return job;
     }
 
-    private static MacroParamRule findRule(String instName, Entry<EDIFName,EDIFPropertyValue> prop, Map<String,String> primParams) {
+    private static MacroParamRule findRule(String instName, Entry<String,EDIFPropertyValue> prop, Map<String,String> primParams) {
         String val = prop.getValue().getValue();
         val = val.substring(val.indexOf('h')+1);
         for (Entry<String, String> e : primParams.entrySet()) {
@@ -159,7 +159,7 @@ public class PopulateMacroParamRules {
                 int primLength = primVal.length() * 4;
                 int count = val.length() * 4;
                 int start = primLength - ((primVal.indexOf(val) * 4) + count);
-                return MacroParamRule.bitRange(e.getKey(), instName, prop.getKey().getName(), start, count);
+                return MacroParamRule.bitRange(e.getKey(), instName, prop.getKey(), start, count);
             }
         }
         return null;
@@ -203,8 +203,8 @@ public class PopulateMacroParamRules {
                     EDIFCell cell = netlist.getCell(macroName);
                     for (EDIFCellInst inst : cell.getCellInsts()) {
                         boolean printedInst = false;
-                        for (Entry<EDIFName,EDIFPropertyValue> e : inst.getProperties().entrySet()) {
-                            String paramName = e.getKey().getName();
+                        for (Entry<String,EDIFPropertyValue> e : inst.getPropertiesMap().entrySet()) {
+                            String paramName = e.getKey();
                             if (paramName.contains(INIT)) {
                                 if (!printedInst) {
                                     System.out.println(" " + inst.getName() + ":");
