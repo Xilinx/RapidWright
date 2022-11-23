@@ -34,6 +34,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
@@ -94,6 +95,15 @@ public class PartialRouter extends RWRoute{
 
     public PartialRouter(Design design, RWRouteConfig config, Collection<SitePinInst> pinsToRoute) {
         this(design, config, pinsToRoute, false);
+    }
+
+    @Override
+    protected void preprocess() {
+        // Pre-processing of the design regarding physical net names pins
+        DesignTools.makePhysNetNamesConsistent(design);
+        // FIXME: Enable for PartialRouter
+        // DesignTools.createPossiblePinsToStaticNets(design);
+        DesignTools.createMissingSitePinInsts(design);
     }
 
     /**
@@ -268,18 +278,17 @@ public class PartialRouter extends RWRoute{
     protected void addStaticNetRoutingTargets(Net staticNet) {
         preserveNet(staticNet);
 
-        List<SitePinInst> sinks = staticNet.getSinkPins();
-        if (sinks.size() > 0) {
-            sinks.removeIf(SitePinInst::isRouted);
-            if (sinks.isEmpty()) {
+        List<SitePinInst> staticPins = netToPins.get(staticNet);
+        if (staticPins == null || staticPins.isEmpty()) {
+            if (staticNet.hasPIPs()) {
                 increaseNumPreservedStaticNets();
             } else {
-                addStaticNetRoutingTargets(staticNet, sinks);
+                increaseNumNotNeedingRouting();
             }
-
-        } else {// internally routed (sinks.size = 0)
-            increaseNumNotNeedingRouting();
+            return;
         }
+
+        addStaticNetRoutingTargets(staticNet, staticPins);
     }
 
     @Override

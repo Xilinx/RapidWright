@@ -107,7 +107,8 @@ public class TestRWRoute {
         String dcpPath = RapidWrightDCP.getString("picoblaze_partial.dcp");
         Design design = Design.readCheckpoint(dcpPath);
         DesignTools.createMissingSitePinInsts(design);
-        DesignTools.createPossiblePinsToStaticNets(design);
+        // FIXME:
+        // DesignTools.createPossiblePinsToStaticNets(design);
 
         List<SitePinInst> pinsToRoute = new ArrayList<>();
         for (Net net : design.getNets()) {
