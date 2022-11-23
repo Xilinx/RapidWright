@@ -42,6 +42,7 @@ import java.util.BitSet;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -387,18 +388,41 @@ public class RouteNodeGraph {
         return nodes;
     }
 
-    public List<RouteNode> getRnodes() {
-        // TODO: Return a custom Interable to save on creating a new List
-        List<RouteNode> rnodes = new ArrayList<>(nodesMapSize);
-        for (Map.Entry<?,RouteNode[]> e : nodesMap.entrySet()) {
-            for (RouteNode rnode : e.getValue()) {
-                if (rnode != null) {
-                    rnodes.add(rnode);
-                }
+    public Iterable<RouteNode> getRnodes() {
+        return new Iterable<RouteNode>() {
+            final Iterator<Map.Entry<Tile, RouteNode[]>> it = nodesMap.entrySet().iterator();
+            RouteNode[] curr = it.hasNext() ? it.next().getValue() : null;
+            int index = 0;
+
+            @Override
+            public Iterator<RouteNode> iterator() {
+                return new Iterator() {
+                    @Override
+                    public boolean hasNext() {
+                        while(true) {
+                            while (index < curr.length) {
+                                if (curr[index] != null) {
+                                    return true;
+                                }
+                                index++;
+                            }
+                            if (!it.hasNext()) {
+                                return false;
+                            }
+                            curr = it.next().getValue();
+                            index = 0;
+                        }
+                    }
+
+                    @Override
+                    public RouteNode next() {
+                        hasNext();
+                        assert(curr[index] != null);
+                        return curr[index++];
+                    }
+                };
             }
-        }
-        assert(rnodes.size() == nodesMapSize);
-        return rnodes;
+        };
     }
 
     public int numNodes() {
