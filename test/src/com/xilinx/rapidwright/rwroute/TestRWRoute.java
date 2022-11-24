@@ -42,6 +42,24 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class TestRWRoute {
+    private static void assertAllSinksRouted(List<SitePinInst> pins) {
+        for (SitePinInst spi : pins) {
+            if (spi.isOutPin())
+                continue;
+            Assertions.assertTrue(spi.isRouted());
+        }
+    }
+
+    private static void assertAllSinksRouted(Design design) {
+        for (Net net : design.getNets()) {
+            if (net.getSource() == null) {
+                // Source-less nets may exist in out-of-context design
+                continue;
+            }
+            assertAllSinksRouted(net.getPins());
+        }
+    }
+
     /**
      * Tests the non-timing driven full routing, i.e., RWRoute running in its wirelength-driven mode.
      * The bnn design from Rosetta benchmarks is used.
@@ -55,6 +73,7 @@ public class TestRWRoute {
         String dcpPath = RapidWrightDCP.getString("bnn.dcp");
         Design design = Design.readCheckpoint(dcpPath);
         RWRoute.routeDesignFullNonTimingDriven(design);
+        assertAllSinksRouted(design);
     }
 
     /**
@@ -72,6 +91,7 @@ public class TestRWRoute {
         String dcpPath = RapidWrightDCP.getString("bnn.dcp");
         Design design = Design.readCheckpoint(dcpPath);
         RWRoute.routeDesignFullTimingDriven(design);
+        assertAllSinksRouted(design);
     }
 
     /**
@@ -90,6 +110,7 @@ public class TestRWRoute {
         String dcpPath = RapidWrightDCP.getString("optical-flow.dcp");
         Design design = Design.readCheckpoint(dcpPath);
         RWRoute.routeDesignFullNonTimingDriven(design);
+        assertAllSinksRouted(design);
     }
 
     /**
@@ -112,11 +133,16 @@ public class TestRWRoute {
 
         List<SitePinInst> pinsToRoute = new ArrayList<>();
         for (Net net : design.getNets()) {
+            if (net.getSource() == null) {
+                // Source-less nets may exist since this is an out-of-context design
+                continue;
+            }
             if (!net.hasPIPs()) {
                 pinsToRoute.addAll(net.getSinkPins());
             }
         }
         PartialRouter.routeDesignPartialNonTimingDriven(design, pinsToRoute);
+        assertAllSinksRouted(pinsToRoute);
     }
 
     /**
@@ -140,6 +166,7 @@ public class TestRWRoute {
             }
         }
         PartialRouter.routeDesignPartialTimingDriven(design, pinsToRoute);
+        assertAllSinksRouted(design);
     }
 
     @ParameterizedTest
