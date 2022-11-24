@@ -407,36 +407,28 @@ public class RWRoute{
                     .addAll(newVccPins);
         }
 
-        // If connections of other nets are routed first, used resources should be preserved.
-        Set<Node> unavailableNodes = getAllUsedNodesOfRoutedConnections();
-        unavailableNodes.addAll(routingGraph.getPreservedNodes());
-        // If the connections of other nets are not routed yet,
-        // the nodes connected to pins of other nets must be preserved.
-        unavailableNodes.addAll(routingGraph.getNodes());
-
         for (Map.Entry<Net,List<SitePinInst>> e : staticNetAndRoutingTargets.entrySet()) {
             Net net = e.getKey();
             List<SitePinInst> pins = e.getValue();
             System.out.println("INFO: Route " + pins.size() + " pins of " + net);
-            Map<SitePinInst, List<Node>> sinksRoutingPaths = GlobalSignalRouting.routeStaticNet(net, unavailableNodes, design, routethruHelper);
+            Map<SitePinInst, List<Node>> sinksRoutingPaths = GlobalSignalRouting.routeStaticNet(net,
+                    (node) -> {
+                        Net preservedNet = routingGraph.getPreservedNet(node);
+                        if (net == null) {
+                            return true;
+                        }
+                        if (net == preservedNet) {
+                            return false;
+                        }
+                        return routingGraph.getNode(node) != null;
+                    },
+                    design, routethruHelper);
 
-            for (Entry<SitePinInst, List<Node>> sinkPath : sinksRoutingPaths.entrySet()) {
+            for (Entry<?, List<Node>> sinkPath : sinksRoutingPaths.entrySet()) {
                 addPreservedNodes(sinkPath.getValue(), net);
-                unavailableNodes.addAll(sinkPath.getValue());
             }
+            routingGraph.awaitPreserve();
         }
-    }
-
-    /**
-     * Gets a set of nodes used by all the routed connections.
-     * @return A set of used nodes.
-     */
-    private Set<Node> getAllUsedNodesOfRoutedConnections() {
-        Set<Node> nodes = new HashSet<>();
-        for (Connection connection : sortedIndirectConnections) {
-            if (connection.getNodes() != null) nodes.addAll(connection.getNodes());
-        }
-        return nodes;
     }
 
     /**
