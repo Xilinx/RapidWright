@@ -182,6 +182,7 @@ public class RWRoute{
         }
         rnodesCreatedThisIteration = 0;
         routethruHelper = new RouteThruHelper(design.getDevice());
+        presentCongestionFactor = config.getInitialPresentCongestionFactor();
 
         routerTimer.createRuntimeTracker("determine route targets", "Initialization").start();
         determineRoutingTargets();
@@ -953,11 +954,7 @@ public class RWRoute{
      */
     private void updateCostFactors() {
         updateCongestionCosts.start();
-        if (routeIteration == 1) {
-            presentCongestionFactor = config.getInitialPresentCongestionFactor();
-        } else {
-            presentCongestionFactor *= config.getPresentCongestionMultiplier();
-        }
+        presentCongestionFactor *= config.getPresentCongestionMultiplier();
         updateCost();
         updateCongestionCosts.stop();
     }
@@ -975,6 +972,9 @@ public class RWRoute{
                 overUsedRnodes.add(rnode);
                 rnode.setPresentCongestionCost(1 + (overuse + 1) * presentCongestionFactor);
                 rnode.setHistoricalCongestionCost(rnode.getHistoricalCongestionCost() + overuse * historicalCongestionFactor);
+            } else {
+                assert(overuse < 0);
+                assert(rnode.getPresentCongestionCost() == 1);
             }
         }
     }
