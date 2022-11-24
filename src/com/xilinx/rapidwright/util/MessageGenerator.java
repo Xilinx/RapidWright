@@ -56,34 +56,12 @@ public class MessageGenerator{
     }
 
     /**
-     * Used as a general way to create an error message and send it to
-     * std.err. Exits the program.
-     * @param msg The message to print to standard error
-     * @deprecated
-     */
-    public static void briefErrorAndExit(String msg) {
-        briefError(msg);
-        System.exit(1);
-    }
-
-    /**
-     * Used as a general way to create an error message and send it to
-     * std.err.
+     * Used as a general way to create an error message and send it to std.err.
+     * 
      * @param msg The message to print to standard error
      */
     public static void briefError(String msg) {
         System.err.println(msg);
-    }
-
-    /**
-     * Used as a general way to create a message and send it to
-     * std.out. Exits the program with return value of 0.
-     * @param msg The message to print to standard outs
-     * @deprecated Use 'System.out.println()' and 'return' instead.
-     */
-    public static void briefMessageAndExit(String msg) {
-        briefMessage(msg);
-        System.exit(0);
     }
 
     /**

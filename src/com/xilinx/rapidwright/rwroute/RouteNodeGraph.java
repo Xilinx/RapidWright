@@ -331,24 +331,6 @@ public class RouteNodeGraph {
         return !allowedTileEnums.contains(tileType);
     }
 
-    public List<Node> getPreservedNodes() {
-        awaitPreserve();
-        // TODO: Return a custom Interable to save on creating a new List
-        int size = preservedMapSize.get();
-        List<Node> nodes = new ArrayList<>(size);
-        for (Map.Entry<Tile,Net[]> e : preservedMap.entrySet()) {
-            Tile tile = e.getKey();
-            Net[] nets = e.getValue();
-            for (int wireIndex = 0; wireIndex < nets.length; wireIndex++) {
-                if (nets[wireIndex] != null) {
-                    nodes.add(Node.getNode(tile, wireIndex));
-                }
-            }
-        }
-        assert(nodes.size() == size);
-        return nodes;
-    }
-
     public Net getPreservedNet(Node node) {
         return getPreservedNet(node.getTile(), node.getWire());
     }
@@ -371,23 +353,6 @@ public class RouteNodeGraph {
         return rnodes != null ? rnodes[wireIndex] : null;
     }
 
-    public List<Node> getNodes() {
-        // TODO: Return a custom Interable to save on creating a new List
-        List<Node> nodes = new ArrayList<>(nodesMapSize);
-        for (Map.Entry<Tile,RouteNode[]> e : nodesMap.entrySet()) {
-            Tile tile = e.getKey();
-            RouteNode[] rnodes = e.getValue();
-            for (int wireIndex = 0; wireIndex < rnodes.length; wireIndex++) {
-                RouteNode rnode = rnodes[wireIndex];
-                if (rnode != null) {
-                    nodes.add(Node.getNode(tile, wireIndex));
-                }
-            }
-        }
-        assert(nodes.size() == nodesMapSize);
-        return nodes;
-    }
-
     public Iterable<RouteNode> getRnodes() {
         return new Iterable<RouteNode>() {
             final Iterator<Map.Entry<Tile, RouteNode[]>> it = nodesMap.entrySet().iterator();
@@ -399,6 +364,9 @@ public class RouteNodeGraph {
                 return new Iterator() {
                     @Override
                     public boolean hasNext() {
+                        if (curr == null) {
+                            return false;
+                        }
                         while(true) {
                             while (index < curr.length) {
                                 if (curr[index] != null) {
@@ -410,6 +378,7 @@ public class RouteNodeGraph {
                                 return false;
                             }
                             curr = it.next().getValue();
+                            assert(curr != null);
                             index = 0;
                         }
                     }

@@ -261,14 +261,14 @@ public class DefaultDesignMerger extends AbstractDesignMerger {
             if (dstCell == null) {
                 EDIFHierCellInst cellInst = s0.getDesign().getNetlist().getHierCellInstFromName(c.getName());
                 if (cellInst != null && s0.getCell(c.getBEL()) == null) {
-                    dstCell = c.copyCell(cellInst.getFullHierarchicalInstName(), cellInst.getInst(), s0);
+                    dstCell = c.copyCell(cellInst.getFullHierarchicalInstName(), cellInst, s0);
                     s0.addCell(dstCell);
                     modifiedSite = true;
                 }
             }
         }
 
-        for (Net net : new ArrayList<>(s0.getNetSiteWireMap().values())) {
+        for (Net net : new ArrayList<>(s0.getSiteWireToNetMap().values())) {
             String newNetName = replacedNets.get(net.getName());
             if (newNetName != null) {
                 Net newNet = s0.getDesign().getNet(newNetName);

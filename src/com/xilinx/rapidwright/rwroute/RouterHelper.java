@@ -329,7 +329,7 @@ public class RouterHelper {
      * @param design The target design.
      * @param pins The static net pins.
      */
-    public static void invertPossibleGndPinsToVccPins(Design design, List<SitePinInst> pins) {
+    public static Set<SitePinInst> invertPossibleGndPinsToVccPins(Design design, List<SitePinInst> pins) {
         Net staticNet = design.getGndNet();
         Set<SitePinInst> toInvertPins = new HashSet<>();
         for (SitePinInst currSitePinInst : pins) {
@@ -356,15 +356,21 @@ public class RouterHelper {
             }
         }
 
-        DesignTools.batchRemoveSitePins(new HashMap<Net, Set<SitePinInst>>() {{
-            put(staticNet, toInvertPins);
-        }}, true);
+        // Unroute all pins in a batch fashion
+        DesignTools.unroutePins(staticNet, toInvertPins);
+        // Manually remove pins from net, because using DesignTools.batchRemoveSitePins()
+        // will cause SitePinInst.detachSiteInst() to be called, which we do not want
+        // as we are simply moving the SPI from one net to another
+        staticNet.getPins().removeAll(toInvertPins);
         for (SitePinInst toinvert:toInvertPins) {
+            assert(toinvert.getSiteInst() != null);
             if (!design.getVccNet().addPin(toinvert)) {
                   throw new RuntimeException("ERROR: Couldn't invert site pin " +
                           toinvert);
             }
         }
+
+        return toInvertPins;
     }
 
     /**
