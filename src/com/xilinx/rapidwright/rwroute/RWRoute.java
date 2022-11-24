@@ -402,7 +402,10 @@ public class RWRoute{
 
         List<SitePinInst> gndPins = staticNetAndRoutingTargets.get(design.getGndNet());
         if (gndPins != null) {
-            RouterHelper.invertPossibleGndPinsToVccPins(design, gndPins);
+            Set<SitePinInst> newVccPins = RouterHelper.invertPossibleGndPinsToVccPins(design, gndPins);
+            gndPins.removeAll(newVccPins);
+            staticNetAndRoutingTargets.computeIfAbsent(design.getVccNet(), (net) -> new ArrayList<>())
+                    .addAll(newVccPins);
         }
 
         // If connections of other nets are routed first, used resources should be preserved.
