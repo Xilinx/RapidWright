@@ -56,7 +56,6 @@ import com.xilinx.rapidwright.timing.TimingManager;
 import com.xilinx.rapidwright.timing.TimingVertex;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
-import org.python.google.common.collect.Lists;
 
 /**
  * RWRoute class provides the main methods for routing a design.
@@ -1448,9 +1447,9 @@ public class RWRoute{
      * @param rnodeDelayWeight The weight of childRnode's exact delay.
      * @param rnodeEstDlyWeight The weight of estimated delay from childRnode to the target.
      */
-    private void evaluateCostAndPush(RouteNode rnode, boolean longParent, RouteNode childRnode, Connection connection, float sharingWeight, float rnodeCostWeight,
-                                     float rnodeLengthWeight, float rnodeEstWlWeight,
-                                     float rnodeDelayWeight, float rnodeEstDlyWeight) {
+    protected void evaluateCostAndPush(RouteNode rnode, boolean longParent, RouteNode childRnode, Connection connection, float sharingWeight, float rnodeCostWeight,
+                                       float rnodeLengthWeight, float rnodeEstWlWeight,
+                                       float rnodeDelayWeight, float rnodeEstDlyWeight) {
         int countSourceUses = childRnode.countConnectionsOfUser(connection.getNetWrapper());
         float sharingFactor = 1 + sharingWeight* countSourceUses;
 
@@ -1588,72 +1587,10 @@ public class RWRoute{
         // Sets the sink rnode(s) of the connection as the target(s)
         connectionToRoute.setTarget(true);
 
-        NetWrapper netWrapper = connectionToRoute.getNetWrapper();
-
         // Adds the source rnode to the queue
         RouteNode sourceRnode = connectionToRoute.getSourceRnode();
         assert(sourceRnode.getPrev() == null);
         push(sourceRnode, 0, 0);
-
-        // Push all nodes from the previous iteration's routing onto the queue
-        if (connectionToRoute.getSink().isRouted()) {
-            assert(!connectionToRoute.getRnodes().isEmpty());
-
-            RouteNode parentRnode = null;
-            boolean parentRnodeWillOveruse = false;
-
-            // Go forwards from source
-            for (RouteNode childRnode : Lists.reverse(connectionToRoute.getRnodes())) {
-                if (parentRnode != null) {
-                    assert(isAccessible(childRnode, connectionToRoute));
-
-                    // Place child onto queue
-                    assert(!childRnode.isVisited());
-                    boolean longParent = config.isTimingDriven() && DelayEstimatorBase.isLong(parentRnode.getNode());
-                    evaluateCostAndPush(parentRnode, longParent, childRnode, connectionToRoute, shareWeight, rnodeCostWeight,
-                            rnodeLengthWeight, rnodeEstWlWeight, rnodeDelayWeight, rnodeEstDlyWeight);
-                    assert(childRnode.getPrev() == parentRnode);
-                }
-
-                parentRnode = childRnode;
-
-                parentRnodeWillOveruse = parentRnode.willOverUse(netWrapper);
-                // Skip all downstream nodes after the first would-be-overused node
-                if (parentRnodeWillOveruse)
-                    break;
-
-                assert(!parentRnode.isTarget());
-            }
-
-            // If non-timing driven, there must be at least one over-used node on the
-            // connection-to-be-routed (otherwise we wouldn't expect it to need
-            // re-routing)
-            assert(config.isTimingDriven() ||
-                   parentRnodeWillOveruse);
-        }
-
-        RouteNode childRnode = null;
-
-        // For the connectionToRoute only, go backwards from sink
-        for (RouteNode parentRnode : connectionToRoute.getRnodes()) {
-            // Skip all nodes upstream of first over used node
-            // (or would-be-overused if we were to start using it)
-            if (parentRnode.willOverUse(netWrapper)) {
-                break;
-            }
-
-            assert(!parentRnode.isVisited());
-
-            // Mark nodes upstream of the sink as targets also
-            if (childRnode != null) {
-                assert(childRnode.isTarget());
-                assert(!parentRnode.isTarget());
-                parentRnode.setTarget(true);
-                childRnode.setPrev(parentRnode);
-            }
-
-            childRnode = parentRnode;
-        }
     }
 
     /**
