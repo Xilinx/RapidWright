@@ -412,14 +412,16 @@ public class RWRoute{
             List<SitePinInst> pins = e.getValue();
             System.out.println("INFO: Route " + pins.size() + " pins of " + net);
             Map<SitePinInst, List<Node>> sinksRoutingPaths = GlobalSignalRouting.routeStaticNet(net,
+                    // Predicate to determine whether a node is unavailable for global routing
                     (node) -> {
                         Net preservedNet = routingGraph.getPreservedNet(node);
-                        if (net == null) {
-                            return true;
+                        if (preservedNet != null) {
+                            // If one is present, it is unavailable only if it isn't carrying
+                            // the net undergoing routing
+                            return preservedNet != net;
                         }
-                        if (net == preservedNet) {
-                            return false;
-                        }
+                        // A RouteNode will only be created if the net is necessary for
+                        // a to-be-routed connection
                         return routingGraph.getNode(node) != null;
                     },
                     design, routethruHelper);
