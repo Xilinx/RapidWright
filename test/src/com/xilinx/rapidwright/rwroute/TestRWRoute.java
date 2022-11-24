@@ -52,7 +52,7 @@ public class TestRWRoute {
 
     private static void assertAllSinksRouted(Design design) {
         for (Net net : design.getNets()) {
-            if (net.getSource() == null) {
+            if (net.getSource() == null && !net.isStaticNet()) {
                 // Source-less nets may exist in out-of-context design
                 continue;
             }
@@ -128,12 +128,11 @@ public class TestRWRoute {
         String dcpPath = RapidWrightDCP.getString("picoblaze_partial.dcp");
         Design design = Design.readCheckpoint(dcpPath);
         DesignTools.createMissingSitePinInsts(design);
-        // FIXME:
-        // DesignTools.createPossiblePinsToStaticNets(design);
+        DesignTools.createPossiblePinsToStaticNets(design);
 
         List<SitePinInst> pinsToRoute = new ArrayList<>();
         for (Net net : design.getNets()) {
-            if (net.getSource() == null) {
+            if (net.getSource() == null && !net.isStaticNet()) {
                 // Source-less nets may exist since this is an out-of-context design
                 continue;
             }

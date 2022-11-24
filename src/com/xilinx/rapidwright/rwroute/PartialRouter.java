@@ -101,8 +101,7 @@ public class PartialRouter extends RWRoute{
     protected void preprocess() {
         // Pre-processing of the design regarding physical net names pins
         DesignTools.makePhysNetNamesConsistent(design);
-        // FIXME: Enable for PartialRouter
-        // DesignTools.createPossiblePinsToStaticNets(design);
+        DesignTools.createPossiblePinsToStaticNets(design);
         DesignTools.createMissingSitePinInsts(design);
     }
 
