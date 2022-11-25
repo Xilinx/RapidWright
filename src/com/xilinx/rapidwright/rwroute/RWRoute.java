@@ -1351,8 +1351,13 @@ public class RWRoute{
                                   float rnodeDelayWeight, float rnodeEstDlyWeight) {
         boolean longParent = config.isTimingDriven() && DelayEstimatorBase.isLong(rnode.getNode());
         for (RouteNode childRNode:rnode.getChildren()) {
-            // Targets thare are visited more than once must be overused
+            // Targets that are visited more than once must be overused
             assert(!childRNode.isTarget() || !childRNode.isVisited() || childRNode.willOverUse(connection.getNetWrapper()));
+
+            // If childRnode is preserved, then it must be preserved for the current net we're routing
+            Net preservedNet;
+            assert((preservedNet = routingGraph.getPreservedNet(childRNode.getNode())) == null ||
+                    preservedNet == connection.getNetWrapper().getNet());
 
             if (childRNode.isVisited()) {
                 // Node must be in queue already.

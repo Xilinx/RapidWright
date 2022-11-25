@@ -133,12 +133,15 @@ public class PartialRouter extends RWRoute{
             return false;
         }
 
-        // Presence of a prev pointer means that only that arc allowed to enter this end node
+        // Presence of a prev pointer means that only that arc is allowed to enter this end node
         RouteNode prev = endRnode.getPrev();
         if (prev != null) {
             assert((prev.getNode() == start) == prev.getNode().equals(start));
-            if (prev.getNode() == start) {
-                assert(routingGraph.isPreserved(end));
+            if (prev.getNode() == start && routingGraph.isPreserved(end)) {
+                // Arc matches start node and end node is preserved
+                // This implies that both start and end nodes must be preserved for the same net
+                // (which assumedly is the net we're currently routing, and is asserted upstream)
+                assert(routingGraph.getPreservedNet(start) == routingGraph.getPreservedNet(end));
                 return true;
             }
         }
