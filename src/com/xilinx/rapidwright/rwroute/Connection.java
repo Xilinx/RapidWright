@@ -30,6 +30,7 @@ import java.util.List;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
+import com.xilinx.rapidwright.device.SLR;
 import com.xilinx.rapidwright.timing.TimingEdge;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 
@@ -80,8 +81,8 @@ public class Connection implements Comparable<Connection>{
 
     /** To indicate if the route delay of a connection has been patched up, when there are consecutive long nodes */
     private boolean dlyPatched;
-    /** true to indicate that a connection cross SLRs */
-    private boolean crossSLR;
+    /** Indicates which SLR index the source and sink resides; <0 indicates cross-SLR */
+    private final int slr;
     /** List of nodes assigned to a connection to form the path for generating PIPs */
     private List<Node> nodes;
 
@@ -93,7 +94,9 @@ public class Connection implements Comparable<Connection>{
         rnodes = new ArrayList<>();
         this.netWrapper = netWrapper;
         netWrapper.addConnection(this);
-        crossSLR = !source.getTile().getSLR().equals(sink.getTile().getSLR());
+        SLR sourceSLR = source.getTile().getSLR();
+        SLR sinkSLR = sink.getTile().getSLR();
+        slr = sourceSLR.equals(sinkSLR) ? sourceSLR.getId() : -1;
     }
 
     /**
@@ -384,7 +387,11 @@ public class Connection implements Comparable<Connection>{
     }
 
     public boolean isCrossSLR() {
-        return crossSLR;
+        return slr < 0;
+    }
+
+    public int getSLR() {
+        return slr;
     }
 
     public List<Node> getNodes() {
