@@ -408,9 +408,11 @@ public class RWRoute{
         List<SitePinInst> gndPins = staticNetAndRoutingTargets.get(design.getGndNet());
         if (gndPins != null) {
             Set<SitePinInst> newVccPins = RouterHelper.invertPossibleGndPinsToVccPins(design, gndPins);
-            gndPins.removeAll(newVccPins);
-            staticNetAndRoutingTargets.computeIfAbsent(design.getVccNet(), (net) -> new ArrayList<>())
-                    .addAll(newVccPins);
+            if (!newVccPins.isEmpty()) {
+                gndPins.removeAll(newVccPins);
+                staticNetAndRoutingTargets.computeIfAbsent(design.getVccNet(), (net) -> new ArrayList<>())
+                        .addAll(newVccPins);
+            }
         }
 
         for (Map.Entry<Net,List<SitePinInst>> e : staticNetAndRoutingTargets.entrySet()) {
