@@ -97,14 +97,6 @@ public class PartialRouter extends RWRoute{
         this(design, config, pinsToRoute, false);
     }
 
-    @Override
-    protected void preprocess() {
-        // Pre-processing of the design regarding physical net names pins
-        DesignTools.makePhysNetNamesConsistent(design);
-        DesignTools.createPossiblePinsToStaticNets(design);
-        DesignTools.createMissingSitePinInsts(design);
-    }
-
     /**
      * Checks whether this arc is part of an existing route.
      * For Nets containing at least one Connection to be routed, all fully routed
@@ -146,7 +138,7 @@ public class PartialRouter extends RWRoute{
             }
         }
 
-        // No presence means that it is used by a fully preserved net which needs no routing
+        // No presence means that it cannot be a preserved node belonging to the current net's routing
         return false;
     }
 
