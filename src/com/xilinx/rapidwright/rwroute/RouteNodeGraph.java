@@ -35,10 +35,10 @@ import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.util.CountUpDownLatch;
 import com.xilinx.rapidwright.util.ParallelismTools;
 import com.xilinx.rapidwright.util.RuntimeTracker;
+import com.xilinx.rapidwright.util.SparseBitSet;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.BitSet;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -86,7 +86,7 @@ public class RouteNodeGraph {
     public final int[] nextLagunaColumn;
     public final int[] prevLagunaColumn;
 
-    protected final ThreadLocal<BitSet> visited;
+    protected final ThreadLocal<SparseBitSet> visited;
 
     protected class RouteNodeImpl extends RouteNode {
 
@@ -156,7 +156,7 @@ public class RouteNodeGraph {
         preservedMapSize = new AtomicInteger();
         asyncPreserveOutstanding = new CountUpDownLatch();
         targets = ThreadLocal.withInitial(() -> new ArrayList<>());
-        visited = ThreadLocal.withInitial(() -> new BitSet());
+        visited = ThreadLocal.withInitial(() -> new SparseBitSet());
         this.setChildrenTimer = setChildrenTimer;
 
         Device device = design.getDevice();
