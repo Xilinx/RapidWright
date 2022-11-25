@@ -57,8 +57,8 @@ public class RouteNodeGraph {
     /**
      * A map of nodes to created rnodes
      */
-    protected final Map<Tile, RouteNode[]> nodesMap;
-    private int nodesMapSize;
+    protected Map<Tile, RouteNode[]> nodesMap;
+    private final AtomicInteger nodesMapSize;
 
     /**
      * A map of preserved nodes to their nets
@@ -75,7 +75,7 @@ public class RouteNodeGraph {
     /**
      * Visited rnodes data during connection routing
      */
-    protected final Collection<RouteNode> targets;
+    protected final ThreadLocal<List<RouteNode>> targets;
 
     protected final RuntimeTracker setChildrenTimer;
 
@@ -86,7 +86,7 @@ public class RouteNodeGraph {
     public final int[] nextLagunaColumn;
     public final int[] prevLagunaColumn;
 
-    private final BitSet visited;
+    protected final ThreadLocal<BitSet> visited;
 
     protected class RouteNodeImpl extends RouteNode {
 
@@ -94,7 +94,7 @@ public class RouteNodeGraph {
 
         public RouteNodeImpl(Node node, RouteNodeType type) {
             super(node, type);
-            index = numNodes();
+            index = nodesMapSize.getAndIncrement();
             assert(!isVisited());
         }
 
@@ -120,19 +120,19 @@ public class RouteNodeGraph {
 
         @Override
         public boolean isVisited() {
-            return visited.get(index);
+            return visited.get().get(index);
         }
 
         @Override
         public void setVisited() {
-            assert(!visited.get(index));
-            visited.set(index);
+            assert(!isVisited());
+            visited.get().set(index);
         }
 
         @Override
         public void setTarget(boolean isTarget) {
             if (isTarget) {
-                targets.add(this);
+                targets.get().add(this);
             }
             super.setTarget(isTarget);
         }
@@ -151,12 +151,12 @@ public class RouteNodeGraph {
 
     public RouteNodeGraph(RuntimeTracker setChildrenTimer, Design design) {
         nodesMap = new HashMap<>();
-        nodesMapSize = 0;
+        nodesMapSize = new AtomicInteger();
         preservedMap = new ConcurrentHashMap<>();
         preservedMapSize = new AtomicInteger();
         asyncPreserveOutstanding = new CountUpDownLatch();
-        targets = new ArrayList<>();
-        visited = new BitSet();
+        targets = ThreadLocal.withInitial(() -> new ArrayList<>());
+        visited = ThreadLocal.withInitial(() -> new BitSet());
         this.setChildrenTimer = setChildrenTimer;
 
         Device device = design.getDevice();
@@ -219,7 +219,7 @@ public class RouteNodeGraph {
     }
 
     public void initialize() {
-        targets.clear();
+        assert(targets.get().isEmpty());
     }
 
     protected Net preserve(Node node, Net net) {
@@ -395,7 +395,7 @@ public class RouteNodeGraph {
     }
 
     public int numNodes() {
-        return nodesMapSize;
+        return nodesMapSize.get();
     }
 
     protected RouteNode create(Node node, RouteNodeType type) {
@@ -410,7 +410,6 @@ public class RouteNodeGraph {
         if (rnode == null) {
             rnode = create(node, type);
             rnodes[wireIndex] = rnode;
-            nodesMapSize++;
         }
         return rnode;
     }
@@ -419,7 +418,8 @@ public class RouteNodeGraph {
      * Resets the expansion history.
      */
     public void resetExpansion() {
-        visited.clear();
+        visited.get().clear();
+        List<RouteNode> targets = this.targets.get();
         for (RouteNode node : targets) {
             assert(node.isTarget());
             node.setTarget(false);
