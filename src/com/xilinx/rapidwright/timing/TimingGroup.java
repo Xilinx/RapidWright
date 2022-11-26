@@ -69,7 +69,7 @@ public class TimingGroup implements Comparable<TimingGroup> {
     public int sameSpotCounter;
 
     /** Memoized static array for use by Collection.toArray() or similar */
-    public final static TimingGroup[] EMPTY_ARRAY = new TimingGroup[0];
+    public static final TimingGroup[] EMPTY_ARRAY = new TimingGroup[0];
 
     /**
      * Default constructor used by the TimingModel to create a TimingGroup.

@@ -178,9 +178,9 @@ public class TimingModel {
 
     public HashMap<String, List<TimingGroup>> forDebugTimingGroupByPorts;
 
-    private final static HashSet<String> ultraScaleFlopNames;
-    private final static HashSet<String> xPinNames;
-    private final static HashSet<String> iPinNames;
+    private static final HashSet<String> ultraScaleFlopNames;
+    private static final HashSet<String> xPinNames;
+    private static final HashSet<String> iPinNames;
 
     static {
         ultraScaleFlopNames = new HashSet<>();

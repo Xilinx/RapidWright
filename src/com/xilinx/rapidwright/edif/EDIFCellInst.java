@@ -31,8 +31,6 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -90,22 +88,6 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
      */
     public void setViewref(EDIFName viewref) {
         this.viewref = EDIFCell.DEFAULT_VIEW.equals(viewref) ? EDIFCell.DEFAULT_VIEW : viewref;
-    }
-
-    /**
-     * Creates a new map of all the EDIFPortInst objects stored on this EDIFCellInst.  The new map
-     * contains a copy of EDIFPortInsts available at the time of invocation as returned from
-     * {@link #getPortInstList()}.
-     * @return A map of EDIFPortInst names ({@link EDIFPortInst#getName()} to the corresponding objects.
-     * @deprecated
-     */
-    public Map<String, EDIFPortInst> getPortInstMap() {
-        if (portInsts == null) return Collections.emptyMap();
-        HashMap<String, EDIFPortInst> map = new HashMap<>();
-        for (EDIFPortInst e : getPortInsts()) {
-            map.put(e.getName(), e);
-        }
-        return map;
     }
 
     /**
@@ -244,13 +226,6 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
             }
             portInst.setPort(port);
         }
-    }
-
-    /**
-     * @deprecated
-     */
-    public void updateCellType(EDIFCell cellType) {
-        setCellType(cellType);
     }
 
     public boolean isBlackBox() {

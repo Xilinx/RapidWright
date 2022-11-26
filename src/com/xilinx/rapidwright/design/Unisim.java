@@ -1,9 +1,8 @@
 /*
- * Copyright (c) 2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
- * Author: Chris Lavin, Xilinx Research Labs.
+ * Author: Chris Lavin, Advanced Micro Devices, Inc.
  *
  * This file is part of RapidWright.
  *
@@ -34,7 +33,7 @@ import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFLibrary;
 
 /**
- * Generated on: Mon Apr 25 23:31:34 2022
+ * Generated on: Wed Oct 26 12:59:37 2022
  * by: com.xilinx.rapidwright.release.UnisimParser
  *
  * Enumerates supported Unisim primitives that map to Xilinx devices.
@@ -100,6 +99,7 @@ public enum Unisim {
     BUFG_FABRIC,
     BUFG_GT,
     BUFG_GT_SYNC,
+    BUFG_HM,
     BUFG_LB,
     BUFG_PS,
     BUFH,
@@ -122,10 +122,16 @@ public enum Unisim {
     CLKDLL,
     CLKDLLE,
     CLKDLLHF,
+    CLOCK_MOD_CLE_FF,
+    CLOCK_MOD_CLE_IMR,
+    CLOCK_MOD_IRI_FF,
+    CLOCK_MOD_IRI_IMR,
     CMAC,
     CMACE4,
+    CMPHY_OCTAD,
     CPM,
     CPM5,
+    CPM5N,
     CPM_EXT,
     CPM_MAIN,
     DCIRESET,
@@ -136,6 +142,7 @@ public enum Unisim {
     DCM_PS,
     DCM_SP,
     DDRMC,
+    DDRMC5,
     DDRMC_RIU,
     DFE_CFR,
     DFE_DUC_DDC,
@@ -238,6 +245,8 @@ public enum Unisim {
     FRAME_ECCE4,
     FRAME_ECC_VIRTEX6,
     GND,
+    GTF_CHANNEL,
+    GTF_COMMON,
     GTHE2_CHANNEL,
     GTHE2_COMMON,
     GTHE3_CHANNEL,
@@ -258,6 +267,7 @@ public enum Unisim {
     GTYE4_COMMON,
     GTYE5_QUAD,
     GTYP_QUAD,
+    HARD_INV,
     HARD_SYNC,
     HBM_IO_CHNL,
     HBM_IO_MS,
@@ -269,6 +279,8 @@ public enum Unisim {
     HBM_SNGLBLI_INTF_APB,
     HBM_SNGLBLI_INTF_AXI,
     HBM_TWO_STACK_INTF,
+    HNICPIPE_QUAD,
+    HNICX,
     HPIO_VREF,
     HPLL,
     HSADC,
@@ -457,6 +469,8 @@ public enum Unisim {
     ILKN,
     ILKNE4,
     ILKNF,
+    IMC_FF,
+    IMI_FF,
     INBUF,
     INV,
     IN_FIFO,
@@ -469,7 +483,11 @@ public enum Unisim {
     IOBUFDS_DIFF_OUT,
     IOBUFDS_DIFF_OUT_DCIEN,
     IOBUFDS_DIFF_OUT_INTERMDISABLE,
+    IOBUFDS_DIFF_OUT_INTERMDISABLE_ODDR,
+    IOBUFDS_DIFF_OUT_ODDR,
     IOBUFDS_INTERMDISABLE,
+    IOBUFDS_INTERMDISABLE_ODDR,
+    IOBUFDS_ODDR,
     IOBUFE3,
     IOBUF_AGP,
     IOBUF_ANALOG,
@@ -590,6 +608,7 @@ public enum Unisim {
     IOBUF_LVTTL_S_4,
     IOBUF_LVTTL_S_6,
     IOBUF_LVTTL_S_8,
+    IOBUF_ODDR,
     IOBUF_PCI33_3,
     IOBUF_PCI33_5,
     IOBUF_PCI66_3,
@@ -667,6 +686,7 @@ public enum Unisim {
     MBUFGCE_DIV,
     MBUFGCTRL,
     MBUFG_GT,
+    MBUFG_HM,
     MBUFG_PS,
     ME_NOC_M_AXI,
     ME_NOC_M_AXIS,
@@ -728,6 +748,16 @@ public enum Unisim {
     NAND5B3,
     NAND5B4,
     NAND5B5,
+    NOC2_NMU128,
+    NOC2_NMU256,
+    NOC2_NMU512,
+    NOC2_NPS5555,
+    NOC2_NPS7575,
+    NOC2_NSU128,
+    NOC2_NSU256,
+    NOC2_NSU512,
+    NOC2_XBR2X4,
+    NOC2_XBR4X2,
     NOC_NCRB,
     NOC_NIDB,
     NOC_NMU128,
@@ -784,6 +814,7 @@ public enum Unisim {
     OBUFDS_LVDS_33,
     OBUFDS_LVPECL_25,
     OBUFDS_LVPECL_33,
+    OBUFDS_ODDR,
     OBUFDS_ULVDS_25,
     OBUFT,
     OBUFTDS,
@@ -797,6 +828,7 @@ public enum Unisim {
     OBUFTDS_LVDS_33,
     OBUFTDS_LVPECL_25,
     OBUFTDS_LVPECL_33,
+    OBUFTDS_ODDR,
     OBUFTDS_ULVDS_25,
     OBUFT_AGP,
     OBUFT_CTT,
@@ -919,6 +951,7 @@ public enum Unisim {
     OBUFT_LVTTL_S_4,
     OBUFT_LVTTL_S_6,
     OBUFT_LVTTL_S_8,
+    OBUFT_ODDR,
     OBUFT_PCI33_3,
     OBUFT_PCI33_5,
     OBUFT_PCI66_3,
@@ -1063,6 +1096,7 @@ public enum Unisim {
     OBUF_LVTTL_S_4,
     OBUF_LVTTL_S_6,
     OBUF_LVTTL_S_8,
+    OBUF_ODDR,
     OBUF_PCI33_3,
     OBUF_PCI33_5,
     OBUF_PCI66_3,
@@ -1142,6 +1176,7 @@ public enum Unisim {
     PS7,
     PS8,
     PS9,
+    PSX,
     PULLDOWN,
     PULLUP,
     PVT_SAS,
@@ -1280,6 +1315,13 @@ public enum Unisim {
     USR_ACCESS_VIRTEX6,
     VCC,
     VCU,
+    X5PHIO_CMUIF,
+    X5PHIO_CMU_X32,
+    X5PHIO_DCCINVBUF,
+    X5PHIO_XCVR_X2,
+    X5PLL,
+    X5PLL_INTF,
+    X5PLL_S2P,
     XADC,
     XNOR2,
     XNOR3,
