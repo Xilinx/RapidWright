@@ -33,9 +33,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import com.xilinx.rapidwright.design.Cell;
 
@@ -142,6 +140,10 @@ public class EDIFNet extends EDIFPropertyObject {
         return createPortInstFromPortInstName(portInstName, cellInst.getCellType(), cellInst);
     }
 
+    public EDIFPortInst createPortInst(String portInstName, EDIFCellInst cellInst, boolean deferSort) {
+        return createPortInstFromPortInstName(portInstName, cellInst.getCellType(), cellInst, deferSort);
+    }
+    
     /**
      * Creates a new port instance from a name on the internal port of the provided
      * cell. It looks up the appropriate port name from the portInstName and
@@ -227,21 +229,9 @@ public class EDIFNet extends EDIFPropertyObject {
     public EDIFPortInst createPortInst(EDIFPort port, int index, EDIFCellInst cellInst) {
         return new EDIFPortInst(port, this, index, cellInst);
     }
-
-    /**
-     * Creates a new map of all the EDIFPortInst objects stored on this net.  The new map
-     * contains a copy of EDIFPortInsts available at the time of invocation as returned from
-     * {@link #getPortInstList()}.
-     * @return A map of EDIFPortInst names ({@link EDIFPortInst#getName()} to the corresponding objects.
-     * @deprecated
-     */
-    public Map<String, EDIFPortInst> getPortInstMap() {
-        if (portInsts == null) return Collections.emptyMap();
-        HashMap<String, EDIFPortInst> map = new HashMap<>();
-        for (EDIFPortInst e : getPortInsts()) {
-            map.put(e.getFullName(), e);
-        }
-        return map;
+    
+    public EDIFPortInst createPortInst(EDIFPort port, int index, EDIFCellInst cellInst, boolean deferSort) {
+        return new EDIFPortInst(port, this, index, cellInst, deferSort);
     }
 
     /**
@@ -272,16 +262,6 @@ public class EDIFNet extends EDIFPropertyObject {
             if (includePort) srcs.add(portInst);
         }
         return srcs;
-    }
-
-    /**
-     * @deprecated
-     * Poor performance, please use {@link #getPortInst(EDIFCellInst, String)}.
-     * @param fullName Full name of the port instance {@link EDIFPortInst#getFullName()}
-     * @return The port instance connected to this net, or null if none exists.
-     */
-    public EDIFPortInst getPortInst(String fullName) {
-        return getPortInstMap().get(fullName);
     }
 
     /**
@@ -336,24 +316,6 @@ public class EDIFNet extends EDIFPropertyObject {
      */
     public EDIFPortInst removePortInst(EDIFPortInst portInst) {
         return removePortInst(portInst.getCellInst(), portInst.getName());
-    }
-
-    /**
-     * Removes the port instance by full name.
-     * @param portInstName Full name of the port instance (if its on a cell instance, it includes
-     * the instance name suffixed with '/' followed by bit-wise port name.
-     * @return The removed port instance, or null if none removed.
-     * @deprecated
-     */
-    public EDIFPortInst removePortInst(String portInstName) {
-        int hierIdx = portInstName.lastIndexOf('/');
-        if (hierIdx == -1) {
-            return removePortInst(null, portInstName);
-        }
-        String instName = portInstName.substring(0, hierIdx);
-        EDIFCellInst inst = getParentCell().getCellInst(instName);
-        String pinName = portInstName.substring(hierIdx+1);
-        return removePortInst(inst,pinName);
     }
 
     /**

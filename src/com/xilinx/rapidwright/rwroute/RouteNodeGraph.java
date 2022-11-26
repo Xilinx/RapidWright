@@ -42,6 +42,7 @@ import java.util.BitSet;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -56,7 +57,7 @@ public class RouteNodeGraph {
     /**
      * A map of nodes to created rnodes
      */
-    final protected Map<Tile, RouteNode[]> nodesMap;
+    protected final Map<Tile, RouteNode[]> nodesMap;
     private int nodesMapSize;
 
     /**
@@ -69,29 +70,27 @@ public class RouteNodeGraph {
      * A synchronization object tracking the number of outstanding calls to
      * asyncPreserve()
      */
-    final private CountUpDownLatch asyncPreserveOutstanding;
+    private final CountUpDownLatch asyncPreserveOutstanding;
 
     /**
      * Visited rnodes data during connection routing
      */
-    final protected Collection<RouteNode> targets;
+    protected final Collection<RouteNode> targets;
 
-    final protected RuntimeTracker setChildrenTimer;
-
-    final Design design;
+    protected final RuntimeTracker setChildrenTimer;
 
     public static final short SUPER_LONG_LINE_LENGTH_IN_TILES = 60;
 
     /** Array mapping an INT tile's Y coordinate, to its SLR index */
-    final int[] intYToSLRIndex;
+    private final int[] intYToSLRIndex;
     public final int[] nextLagunaColumn;
     public final int[] prevLagunaColumn;
 
-    BitSet visited;
+    private final BitSet visited;
 
     protected class RouteNodeImpl extends RouteNode {
 
-        final private int index;
+        private final int index;
 
         public RouteNodeImpl(Node node, RouteNodeType type) {
             super(node, type);
@@ -159,15 +158,13 @@ public class RouteNodeGraph {
         targets = new ArrayList<>();
         visited = new BitSet();
         this.setChildrenTimer = setChildrenTimer;
-        this.design = design;
 
         Device device = design.getDevice();
         intYToSLRIndex = new int[device.getRows()];
         Tile[][] intTiles = device.getTilesByNameRoot("INT");
         for (int y = 0; y < intTiles.length; y++) {
             Tile[] intTilesAtY = intTiles[y];
-            for (int x = 0; x < intTilesAtY.length; x++) {
-                Tile tile = intTilesAtY[x];
+            for (Tile tile : intTilesAtY) {
                 if (tile != null) {
                     intYToSLRIndex[y] = tile.getSLR().getId();
                     break;
@@ -313,7 +310,7 @@ public class RouteNodeGraph {
         return nets != null && nets[wireIndex] != null;
     }
 
-    final private static Set<TileTypeEnum> allowedTileEnums;
+    private static final Set<TileTypeEnum> allowedTileEnums;
     static {
         allowedTileEnums = new HashSet<>();
         allowedTileEnums.add(TileTypeEnum.INT);
@@ -332,24 +329,6 @@ public class RouteNodeGraph {
         Tile tile = child.getTile();
         TileTypeEnum tileType = tile.getTileTypeEnum();
         return !allowedTileEnums.contains(tileType);
-    }
-
-    public List<Node> getPreservedNodes() {
-        awaitPreserve();
-        // TODO: Return a custom Interable to save on creating a new List
-        int size = preservedMapSize.get();
-        List<Node> nodes = new ArrayList<>(size);
-        for (Map.Entry<Tile,Net[]> e : preservedMap.entrySet()) {
-            Tile tile = e.getKey();
-            Net[] nets = e.getValue();
-            for (int wireIndex = 0; wireIndex < nets.length; wireIndex++) {
-                if (nets[wireIndex] != null) {
-                    nodes.add(Node.getNode(tile, wireIndex));
-                }
-            }
-        }
-        assert(nodes.size() == size);
-        return nodes;
     }
 
     public Net getPreservedNet(Node node) {
@@ -374,37 +353,45 @@ public class RouteNodeGraph {
         return rnodes != null ? rnodes[wireIndex] : null;
     }
 
-    public List<Node> getNodes() {
-        // TODO: Return a custom Interable to save on creating a new List
-        List<Node> nodes = new ArrayList<>(nodesMapSize);
-        for (Map.Entry<Tile,RouteNode[]> e : nodesMap.entrySet()) {
-            Tile tile = e.getKey();
-            RouteNode[] rnodes = e.getValue();
-            for (int wireIndex = 0; wireIndex < rnodes.length; wireIndex++) {
-                RouteNode rnode = rnodes[wireIndex];
-                if (rnode != null) {
-                    nodes.add(Node.getNode(tile, wireIndex));
-                }
-            }
-        }
-        assert(nodes.size() == nodesMapSize);
-        return nodes;
-    }
+    public Iterable<RouteNode> getRnodes() {
+        return new Iterable<RouteNode>() {
+            final Iterator<Map.Entry<Tile, RouteNode[]>> it = nodesMap.entrySet().iterator();
+            RouteNode[] curr = it.hasNext() ? it.next().getValue() : null;
+            int index = 0;
 
-    public List<RouteNode> getRnodes() {
-        // TODO: Return a custom Interable to save on creating a new List
-        List<RouteNode> rnodes = new ArrayList<>(nodesMapSize);
-        for (Map.Entry<?,RouteNode[]> e : nodesMap.entrySet()) {
-            RouteNode[] array = e.getValue();
-            for (int wireIndex = 0; wireIndex < array.length; wireIndex++) {
-                RouteNode rnode = array[wireIndex];
-                if (rnode != null) {
-                    rnodes.add(rnode);
-                }
+            @Override
+            public Iterator<RouteNode> iterator() {
+                return new Iterator() {
+                    @Override
+                    public boolean hasNext() {
+                        if (curr == null) {
+                            return false;
+                        }
+                        while(true) {
+                            while (index < curr.length) {
+                                if (curr[index] != null) {
+                                    return true;
+                                }
+                                index++;
+                            }
+                            if (!it.hasNext()) {
+                                return false;
+                            }
+                            curr = it.next().getValue();
+                            assert(curr != null);
+                            index = 0;
+                        }
+                    }
+
+                    @Override
+                    public RouteNode next() {
+                        hasNext();
+                        assert(curr[index] != null);
+                        return curr[index++];
+                    }
+                };
             }
-        }
-        assert(rnodes.size() == nodesMapSize);
-        return rnodes;
+        };
     }
 
     public int numNodes() {

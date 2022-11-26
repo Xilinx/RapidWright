@@ -957,7 +957,7 @@ public class DesignTools {
             EDIFHierNet parentNetName = netlist.getParentNet(netName);
             Net parentNet = design.getNet(parentNetName.getHierarchicalNetName());
             if (parentNet == null) {
-                parentNet = new Net(parentNetName.getHierarchicalNetName(),parentNetName.getNet());
+                parentNet = new Net(parentNetName);
             }
             for (EDIFHierNet netAlias : netlist.getNetAliases(netName)) {
                 if (parentNet.getName().equals(netAlias.getHierarchicalNetName())) continue;
@@ -1595,7 +1595,7 @@ public class DesignTools {
 
         d.removeNet(currNet);
 
-        Net newNet = d.createNet(newName, newSource);
+        Net newNet = d.createNet(newName);
         newNet.setPIPs(pips);
         for (SitePinInst pin : pins) {
             newNet.addPin(pin);
@@ -1648,8 +1648,8 @@ public class DesignTools {
                     newNet = n.getName().equals(Net.GND_NET) ? design.getGndNet() : design.getVccNet();
                 } else {
                     String newNetName = prefix + n.getName();
-                    EDIFNet newEDIFNet = design.getNetlist().getNetFromHierName(newNetName);
-                    newNet = design.createNet(newNetName, newEDIFNet);
+                    EDIFHierNet newEDIFNet = design.getNetlist().getHierNetFromName(newNetName);
+                    newNet = design.createNet(newEDIFNet);
                 }
 
                 for (SitePinInst p : n.getPins()) {
@@ -1677,7 +1677,7 @@ public class DesignTools {
                     return false;
                 for (Cell c : si.getCells()) {
                     String newCellName = prefix + c.getName();
-                    EDIFCellInst cellInst = design.getNetlist().getCellInstFromHierName(newCellName);
+                    EDIFHierCellInst cellInst = design.getNetlist().getHierCellInstFromName(newCellName);
                     if (cellInst == null && c.getEDIFCellInst() != null) {
                         System.out.println("WARNING: Stamped cell not found: " + newCellName);
                         continue;
@@ -1691,7 +1691,7 @@ public class DesignTools {
                     newSiteInst.addSitePIP(sitePIP);
                 }
 
-                for (Entry<String,Net> e2 : si.getNetSiteWireMap().entrySet()) {
+                for (Entry<String, Net> e2 : si.getSiteWireToNetMap().entrySet()) {
                     String siteWire = e2.getKey();
                     String netName = e2.getValue().getName();
                     Net newNet = null;
@@ -1847,7 +1847,7 @@ public class DesignTools {
             SiteInst si = c.getSiteInst();
             SitePinInst newPin = si.getSitePinInst(sitePinName);
             if (newPin != null) continue;
-            newPin = net.createPin(p.isOutput(), sitePinName, c.getSiteInst());
+            newPin = net.createPin(sitePinName, c.getSiteInst());
             if (newPin != null) newPins.add(newPin);
             Set<String> physPinMappings = c.getAllPhysicalPinMappings(logicalPinName);
             // BRAMs can have two (or more) physical pin mappings for a logical pin
@@ -1859,7 +1859,7 @@ public class DesignTools {
                     if (sitePinName == null) continue;
                     newPin = si.getSitePinInst(sitePinName);
                     if (newPin != null) continue;
-                    newPin = net.createPin(p.isOutput(), sitePinName, c.getSiteInst());
+                    newPin = net.createPin(sitePinName, c.getSiteInst());
                     if (newPin != null) newPins.add(newPin);
                 }
             }
@@ -2000,7 +2000,7 @@ public class DesignTools {
         for (SiteInst siteInst : design.getSiteInsts()) {
             if (Utils.isSLICE(siteInst)) {
                 ArrayList<String> toRemove = null;
-                for (Entry<String,Net> e : siteInst.getNetSiteWireMap().entrySet()) {
+                for (Entry<String, Net> e : siteInst.getSiteWireToNetMap().entrySet()) {
                     if (muxPins.contains(e.getKey())) {
                         // MUX output is used, is the same net also driving the direct output?
                         String directPin = e.getKey().charAt(0) + (isSeries7 ? "" : "_O");
@@ -2336,7 +2336,7 @@ public class DesignTools {
                                     srcSiteInst.getSiteTypeEnum(), srcSiteInst.getSite());
                 }
                 String newCellName = getNewHierName(cellName, srcToDestInstNames, prefixes, prefixMatch);
-                Cell copy = cell.copyCell(newCellName, cell.getEDIFCellInst(), dstSiteInst);
+                Cell copy = cell.copyCell(newCellName, cell.getEDIFHierCellInst(), dstSiteInst);
                 dstSiteInst.addCell(copy);
                 copy.setBELFixed(lockPlacement);
                 copy.setSiteFixed(lockPlacement);
@@ -2391,8 +2391,7 @@ public class DesignTools {
             if ((prefixMatch = StringTools.startsWithAny(net.getName(), prefixes.keySet())) != null) {
                 newNetName = getNewHierName(newNetName, srcToDestInstNames, prefixes, prefixMatch);
             }
-            EDIFNet logicalNet = destNetlist.getNetFromHierName(newNetName);
-            Net copiedNet = dest.createNet(newNetName, logicalNet);
+            Net copiedNet = dest.createNet(newNetName);
             for (PIP p : net.getPIPs()) {
                 if (pipsToRemove.contains(p)) continue;
                 copiedNet.addPIP(p);
@@ -2603,7 +2602,7 @@ public class DesignTools {
                 }
                 net = dest.getNet(parentNetName);
                 if (net == null) {
-                    net = dest.createNet(parentNetName, edifNet);
+                    net = dest.createNet(parentNetName);
                 }
             }
 
@@ -2644,7 +2643,7 @@ public class DesignTools {
                             }
                             String newCellName = getNewHierName(cellName, srcToDestNames, prefixes, prefixMatch);
                             Cell rtCopy = tmpCell
-                                    .copyCell(newCellName, tmpCell.getEDIFCellInst(), dstSiteInst);
+                                    .copyCell(newCellName, tmpCell.getEDIFHierCellInst(), dstSiteInst);
                             dstSiteInst.getCellMap().put(belName, rtCopy);
                             for (String belPinName : rtCopy.getPinMappingsP2L().keySet()) {
                                 BELPin tmp = rtCopy.getBEL().getPin(belPinName);
@@ -3126,7 +3125,7 @@ public class DesignTools {
                             String updateNetName = parentNet.getHierarchicalNetName();
                             Net updateNet = design.getNet(updateNetName);
                             if (updateNet == null) {
-                                updateNet = design.createNet(updateNetName, parentNet.getNet());
+                                updateNet = design.createNet(parentNet);
                             }
                             BELPin belPin = i.getSiteWirePins(siteWire)[0];
                             i.unrouteIntraSiteNet(belPin, belPin);

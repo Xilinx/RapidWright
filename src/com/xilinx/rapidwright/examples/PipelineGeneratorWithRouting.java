@@ -25,6 +25,31 @@
 package com.xilinx.rapidwright.examples;
 
 
+import static com.xilinx.rapidwright.timing.GroupDistance.FAR;
+import static com.xilinx.rapidwright.timing.GroupDistance.MID;
+import static com.xilinx.rapidwright.timing.GroupDistance.NEAR;
+import static com.xilinx.rapidwright.timing.GroupDistance.SAME;
+import static com.xilinx.rapidwright.timing.TimingDirection.EAST;
+import static com.xilinx.rapidwright.timing.TimingDirection.NORTH;
+import static com.xilinx.rapidwright.timing.TimingDirection.NULL;
+import static com.xilinx.rapidwright.timing.TimingDirection.SOUTH;
+import static com.xilinx.rapidwright.timing.TimingDirection.WEST;
+
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.PrintStream;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.PriorityQueue;
+import java.util.Set;
+
+import org.jgrapht.GraphPath;
+
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.ConstraintGroup;
 import com.xilinx.rapidwright.design.Design;
@@ -62,25 +87,9 @@ import com.xilinx.rapidwright.timing.TimingManager;
 import com.xilinx.rapidwright.timing.TimingModel;
 import com.xilinx.rapidwright.timing.TimingVertex;
 import com.xilinx.rapidwright.util.MessageGenerator;
+
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
-import org.jgrapht.GraphPath;
-
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.PrintStream;
-import java.util.Set;
-import java.util.HashSet;
-import java.util.List;
-import java.util.LinkedList;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.PriorityQueue;
-import java.util.Arrays;
-
-import static com.xilinx.rapidwright.timing.GroupDistance.*;
-import static com.xilinx.rapidwright.timing.TimingDirection.*;
 
 /**
  * Generates a delay of "depth" cycles for a bus of "width" w
@@ -207,9 +216,9 @@ public class PipelineGeneratorWithRouting {
 
         // The "Net" objects below are used later for representing the physical connections in the
         // implementation of the design.
-        Net clkNet = d.createNet(clk);
-        Net rstNet = d.createNet(rst);
-        Net ceNet = d.createNet(ce);
+        Net clkNet = d.createNet(clk.getName());
+        Net rstNet = d.createNet(rst.getName());
+        Net ceNet = d.createNet(ce.getName());
         EDIFNet[][] ic = new EDIFNet[depth+1][width];
         Net[][] icNet = new Net[depth+1][width];
         Cell[][] ffs = new Cell[depth][width];
@@ -340,15 +349,15 @@ public class PipelineGeneratorWithRouting {
                 ceNet.getLogicalNet().createPortInst("CE", ffCell);
 
                 if (ff_si.getSitePinInst(clkPinName) == null) {
-                    clkNet.createPin(true, clkPinName, ff_si);
+                    clkNet.createPin(clkPinName, ff_si);
                     ff_si.addSitePIP(clkPinName + "INV","CLK");
                 }
                 if (ff_si.getSitePinInst(rstPinName) == null) {
-                    rstNet.createPin(true, rstPinName, ff_si);
+                    rstNet.createPin(rstPinName, ff_si);
                     ff_si.addSitePIP("RST_"+(isLowerSlice ? "ABCD" : "EFGH")+"INV","RST");
                 }
                 if (ff_si.getSitePinInst(cePinName) == null) {
-                    ceNet.createPin(true, cePinName, ff_si);
+                    ceNet.createPin(cePinName, ff_si);
                 }
             }
         }
