@@ -1195,6 +1195,7 @@ public class RWRoute{
 
         prepareRouteConnection(connection, shareWeight, rnodeCostWeight,
                 rnodeWLWeight, estWlWeight, dlyWeight, estDlyWeight);
+        connection.resetRoute();
 
         int nodesPoppedThisConnection = 0;
         boolean forward = true;
