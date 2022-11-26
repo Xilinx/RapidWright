@@ -42,13 +42,13 @@ import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
-import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.SiteInst;
+import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.blocks.PBlock;
-import com.xilinx.rapidwright.device.ClockRegion;
+import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELClass;
 import com.xilinx.rapidwright.device.BELPin;
-import com.xilinx.rapidwright.device.BEL;
+import com.xilinx.rapidwright.device.ClockRegion;
 import com.xilinx.rapidwright.device.FamilyType;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
@@ -1040,7 +1040,7 @@ public class Router extends AbstractRouter {
         //   This is to avoid conflicts and safeguard internal site nets where the LUT
         //   is supplying VCC/GND to the CARRY BEL for example
         for (SiteInst i : design.getSiteInsts()) {
-            for (Entry<String,Net> e : i.getNetSiteWireMap().entrySet()) {
+            for (Entry<String, Net> e : i.getSiteWireToNetMap().entrySet()) {
                 Net n = e.getValue();
                 if (e.getKey().equals(Net.GND_WIRE_NAME)) continue;
                 if (n.getType() == NetType.GND || n.getType() == NetType.VCC) {
@@ -1957,7 +1957,7 @@ public class Router extends AbstractRouter {
                         if (sitePinName == null) continue; //TODO - failed to figure out site pin
                         SitePinInst spi = c.getSiteInst().getSitePinInst(sitePinName);
                         if (spi == null) {
-                            spi = parentNet.createPin(p.isOutput(), sitePinName, c.getSiteInst());
+                            spi = parentNet.createPin(sitePinName, c.getSiteInst());
                         }
                     }
                 }

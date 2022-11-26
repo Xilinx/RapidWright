@@ -81,7 +81,6 @@ import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.FamilyType;
 import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.PartNameTools;
-import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.timing.TimingModel;
 
 /**
@@ -1003,24 +1002,6 @@ public class FileTools {
     }
 
     /**
-     * Checks if a particular RapidWright file or jar resource exists.
-     * This will prioritize checking first in the location indicated by the
-     * RAPIDWRIGHT_PATH environment variable, then check in the location from
-     * the running class files.
-     * @param name Name of the RapidWright resource file.
-     * @return True if the resource exists, false otherwise.
-     * @deprecated
-     */
-    public static boolean checkIfRapidWrightResourceExists(String name) {
-        String rwPath = getRapidWrightPath();
-        if (rwPath != null) {
-            boolean foundFile = new File(rwPath + File.separator + name).exists();
-            if (foundFile) return foundFile;
-        }
-        return null != FileTools.class.getResourceAsStream("/" + name.replace(File.separator, "/"));
-    }
-
-    /**
      * Finds and returns a file name that can be read for the corresponding
      * RapidWright resource.
      * @param name Name of the RapidWright resource
@@ -1723,16 +1704,6 @@ public class FileTools {
             }
         }
         return true;
-    }
-
-    /**
-     * Check if file/folder name is available to be used
-     * @param name Name of the file/directory to check
-     * @return True if the the file/folder name is free (unused), false otherwise.
-     * @deprecated
-     */
-    public static boolean folderCheck(String name) {
-        return !(new File(name).exists());
     }
 
     /**

@@ -583,7 +583,7 @@ public class BlockStitcher {
         EDIFLibrary work = stitched.getNetlist().getLibrary(EDIFTools.EDIF_LIBRARY_WORK_NAME);
         work.addCell(top);
         for (Entry<ModuleInst,EDIFNetlist> e : miMap.entrySet()) {
-            EDIFCellInst inst = EDIFTools.getEDIFCellInst(stitched.getNetlist(), e.getKey().getName());//top.getCellInstance(e.getKey().getName());
+            EDIFCellInst inst = stitched.getNetlist().getCellInstFromHierName(e.getKey().getName());
             if (inst == null) throw new RuntimeException("ERROR: Couldn't update EDIF cell instance.");
             EDIFCell cellType = work.getCell(e.getValue().getName() + "_" + e.getValue().getName());
             if (cellType == null) throw new RuntimeException("ERROR: Couldn't update EDIF cell type " + e.getValue().getName());
@@ -701,7 +701,7 @@ public class BlockStitcher {
             SiteInst match = duplicateCheck.get(inst.getSiteName());
             if (match != null) {
                 //System.out.println("Found match: " + match.toString() + " " + inst.toString());
-                if (match.getNetList().size() == 0) {
+                if (match.getConnectedNets().size() == 0) {
                     removeThese.add(match);
                 } else {
                     removeThese.add(inst);

@@ -103,29 +103,21 @@ abstract public class RouteNode {
         assert(next == null);
     }
 
-    private static int signum(float f) {
-        int bits = Float.floatToRawIntBits(f);
-        if ((bits & ~(1 << 31)) == 0)
-            return 0;
-        return (bits >>> 31 == 0) ? 1 : -1;
-    }
-
     public int compareTo(RouteNode that) {
-        // Do not use Float.compare() since it also checks NaN, which we'll assume is unreachable
-        // return Float.compare(this.lowerBoundTotalPathCost, that.lowerBoundTotalPathCost);
-        // return (int) Math.signum(this.totalCostToSink - that.totalCostToSink);
-        int signum = signum(this.totalCostToSink - that.totalCostToSink);
+        // Do not use Float.compare() since it also compares NaN, which we'll assume is unreachable
+        // return Float.compare(this.totalCostToSink, that.totalCostToSink);
+        float signum = Math.signum(this.totalCostToSink - that.totalCostToSink);
         // Tie break according to larger known cost (thus smaller estimated cost to target)
-        return (signum != 0) ? signum : signum(that.knownCostFromSink - this.knownCostFromSink);
+        return (int) ((signum != 0) ? signum : Math.signum(that.knownCostFromSource - this.knownCostFromSource));
     }
 
     public int compareToBack(RouteNode that) {
         // Do not use Float.compare() since it also checks NaN, which we'll assume is unreachable
         // return Float.compare(this.lowerBoundTotalPathCost, that.lowerBoundTotalPathCost);
         // return (int) Math.signum(this.totalCostToSource - that.totalCostToSource);
-        int signum = signum(this.totalCostToSource - that.totalCostToSource);
+        float signum = Math.signum(this.totalCostToSource - that.totalCostToSource);
         // Tie break according to larger known cost (thus smaller estimated cost to target)
-        return (signum != 0) ? signum : signum(that.knownCostFromSource - this.knownCostFromSource);
+        return (int) ((signum != 0) ? signum : Math.signum(that.knownCostFromSink - this.knownCostFromSink));
     }
 
     abstract protected RouteNode getOrCreate(Node node, RouteNodeType type);
@@ -252,7 +244,7 @@ abstract public class RouteNode {
         return RouteNode.capacity < uniqueDriverCount();
     }
 
-    public final static EnumSet<TileTypeEnum> lagunaTileTypes = EnumSet.of(
+    public static final EnumSet<TileTypeEnum> lagunaTileTypes = EnumSet.of(
               TileTypeEnum.LAG_LAG      // UltraScale+
             , TileTypeEnum.LAGUNA_TILE  // UltraScale
     );

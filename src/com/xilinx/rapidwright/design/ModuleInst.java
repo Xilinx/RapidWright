@@ -39,7 +39,6 @@ import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.edif.EDIFCell;
-import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.util.MessageGenerator;
 import com.xilinx.rapidwright.util.Utils;
 
@@ -155,14 +154,6 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
      */
     public void setModule(Module module) {
         this.module = module;
-    }
-
-    /**
-     * @return the instances
-     * @deprecated Please use {@link #getSiteInsts()}
-     */
-    public ArrayList<SiteInst> getInsts() {
-        return instances;
     }
 
     /**
@@ -458,22 +449,6 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
     }
 
     /**
-     * This method will calculate and return the corresponding tile of a module instance.
-     * for a new anchor location.
-     * @param templateTile The tile in the module which acts as a template.
-     * @param newAnchorTile This is the tile of the new anchor instance of the module instance.
-     * @param dev The device which corresponds to this module instance.
-     * @return The new tile of the module instance which corresponds to the templateTile, or null
-     * if none exists.
-     * @deprecated Use {@link ModuleInst#getCorrespondingTile(Tile, Tile)} instead
-     */
-    @Deprecated
-    public Tile getCorrespondingTile(Tile templateTile, Tile newAnchorTile, Device dev) {
-        return module.getCorrespondingTile(templateTile, newAnchorTile);
-    }
-
-
-    /**
      * Gets the corresponding pins (SitePinInst) on this module instance
      * that corresponds to the module's SitePinInst.
      * @param modulePin The SitePinInst on the prototype module.
@@ -713,8 +688,7 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
                 // This is a pass-thru situation and we'll need to create the net
                 EDIFCell top = getCellInst().getParentCell();
                 String newNetName = super.getNewNetName(portName, busIndex0, other, otherPortName, busIndex1);
-                EDIFNet logicalNet = top.getNet(newNetName);
-                physicalNet = design.createNet(newNetName, logicalNet);
+                physicalNet = design.createNet(newNetName);
             }
             inPort = p1;
             modInst = other;

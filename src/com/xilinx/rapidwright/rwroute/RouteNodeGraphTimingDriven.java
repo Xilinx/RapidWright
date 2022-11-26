@@ -43,8 +43,8 @@ public class RouteNodeGraphTimingDriven extends RouteNodeGraph {
     /** A flag to indicate if the routing resource exclusion should disable exclusion of nodes cross RCLK */
     protected final boolean maskNodesCrossRCLK;
 
-    private final static Set<String> excludeAboveRclkString;
-    private final static Set<String> excludeBelowRclkString;
+    private static final Set<String> excludeAboveRclkString;
+    private static final Set<String> excludeBelowRclkString;
     static {
         // these nodes are bleeding down
         excludeAboveRclkString = new HashSet<String>() {{
