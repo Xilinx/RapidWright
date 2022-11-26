@@ -228,7 +228,7 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
         if (save_and_exit) {
             String placedDCPName = "partialy_placed.dcp";
             design.writeCheckpoint(placedDCPName);
-            MessageGenerator.briefErrorAndExit("ERROR: Placement failed, couldn't find valid site for all the IPs. Partially placed .dcp saved for debug " );
+            throw new RuntimeException("ERROR: Placement failed, couldn't find valid site for all the IPs. Partially placed .dcp saved for debug " );
         }
     }
 
@@ -425,7 +425,7 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
             if (Utils.getLockedSiteTypes().contains(i.getSiteTypeEnum())) {
                 continue;
             }
-            Tile newTile = modInst.getCorrespondingTile(i.getTile(), proposedAnchorTile, dev);
+            Tile newTile = modInst.getCorrespondingTile(i.getTile(), proposedAnchorTile);
             if (newTile == null || usedTiles.contains(newTile)) {
                 return null;
             }
@@ -441,7 +441,7 @@ public class BlockPlacer2Module extends BlockPlacer2<Module, HardMacro, Site, Pa
         // Check nets
         for (Net n : modInst.getModule().getNets()) {
             for (PIP p : n.getPIPs()) {
-                Tile newTile = modInst.getCorrespondingTile(p.getTile(), proposedAnchorTile, dev);
+                Tile newTile = modInst.getCorrespondingTile(p.getTile(), proposedAnchorTile);
                 if (newTile == null || usedTiles.contains(newTile)) {
                     return null;
                 }

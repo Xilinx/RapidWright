@@ -29,6 +29,13 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.HashSet;
 
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Site;
@@ -44,12 +51,6 @@ import com.xilinx.rapidwright.util.Job;
 import com.xilinx.rapidwright.util.JobQueue;
 import com.xilinx.rapidwright.util.LocalJob;
 import com.xilinx.rapidwright.util.ParallelismTools;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Assumptions;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Test that we can write a DCP file and read it back in. We currently don't have a way to check designs for equality,
@@ -107,7 +108,7 @@ public class TestDesign {
 
         Module module = new Module(createSampleDesign());
 
-        Design design = new Design("top", device.getDeviceName());
+        Design design = new Design("top", device.getName());
         ModuleInst mi = design.createModuleInst("inst", module);
         mi.placeOnOriginalAnchor();
         String oldAnchor = mi.getAnchor().toString();

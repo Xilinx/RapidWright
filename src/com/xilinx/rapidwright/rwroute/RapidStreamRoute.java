@@ -46,7 +46,7 @@ public class RapidStreamRoute extends PartialRouter{
     /** Nets with conflicting nodes that should be added to the routing targets */
     protected Set<Net> conflictNets;
     /** A keyword to help recognize the target conflict nets */
-    final private String anchorNameKeyword;
+    private final String anchorNameKeyword;
 
     public RapidStreamRoute(Design design, RWRouteConfig config, String anchorNameKeyword) {
         // FIXME

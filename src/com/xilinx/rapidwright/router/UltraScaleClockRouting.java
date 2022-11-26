@@ -434,6 +434,7 @@ public class UltraScaleClockRouting {
                     if (target.equals(curr)) {
                         List<PIP> pips = curr.getPIPsBackToSource();
                         currPIPs.addAll(pips);
+                        sink.setRouted(true);
                         continue nextPin;
                     }
                     for (Wire w : curr.getWireConnections()) {

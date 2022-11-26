@@ -24,6 +24,12 @@
 
 package com.xilinx.rapidwright.examples;
 
+import java.io.File;
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
+
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.ConstraintGroup;
 import com.xilinx.rapidwright.design.Design;
@@ -48,14 +54,9 @@ import com.xilinx.rapidwright.edif.EDIFValueType;
 import com.xilinx.rapidwright.router.Router;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.MessageGenerator;
+
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
-
-import java.io.File;
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
 
 /**
  * Generates a delay of {@code <depth>} cycles for a bus of {@code <width>} w
@@ -165,9 +166,9 @@ public class PipelineGenerator {
         }
 
         /* The "Net" objects below are used later for representing the physical connections in the implementation of the design. */
-        Net clkNet = d.createNet(clk);
-        Net rstNet = d.createNet(rst);
-        Net ceNet = d.createNet(ce);
+        Net clkNet = d.createNet(clk.getName());
+        Net rstNet = d.createNet(rst.getName());
+        Net ceNet = d.createNet(ce.getName());
 
 
         EDIFNet gnd = EDIFTools.getStaticNet(NetType.GND, top, d.getNetlist());
@@ -296,15 +297,15 @@ public class PipelineGenerator {
                 ceNet.getLogicalNet().createPortInst("CE", ffCell);
 
                 if (ff_si.getSitePinInst(clkPinName) == null) {
-                    clkNet.createPin(false, clkPinName, ff_si);
+                    clkNet.createPin(clkPinName, ff_si);
                     ff_si.addSitePIP(clkPinName + "INV","CLK");
                 }
                 if (ff_si.getSitePinInst(rstPinName) == null) {
-                    rstNet.createPin(false, rstPinName, ff_si);
+                    rstNet.createPin(rstPinName, ff_si);
                     ff_si.addSitePIP("RST_"+(isLowerSlice ? "ABCD" : "EFGH")+"INV","RST");
                 }
                 if (ff_si.getSitePinInst(cePinName) == null) {
-                    ceNet.createPin(false, cePinName, ff_si);
+                    ceNet.createPin(cePinName, ff_si);
                 }
             }
         }

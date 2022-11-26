@@ -30,7 +30,6 @@ import java.util.List;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
-import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.timing.TimingEdge;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 
@@ -219,10 +218,10 @@ public class Connection implements Comparable<Connection>{
     }
 
     public void addRnode(RouteNode rn) {
-        xMinBB = (short) Math.min(xMinBB, rn.getTileXCoordinate(false) - 1);
-        xMaxBB = (short) Math.max(xMaxBB, rn.getTileXCoordinate(true) + 1);
-        yMinBB = (short) Math.min(yMinBB, rn.getTileYCoordinate(false) - 1);
-        yMaxBB = (short) Math.max(yMaxBB, rn.getTileYCoordinate(true) + 1);
+        xMinBB = (short) Math.min(xMinBB, rn.getBeginTileXCoordinate() - 1);
+        xMaxBB = (short) Math.max(xMaxBB, rn.getEndTileXCoordinate() + 1);
+        yMinBB = (short) Math.min(yMinBB, rn.getBeginTileYCoordinate() - 1);
+        yMaxBB = (short) Math.max(yMaxBB, rn.getEndTileYCoordinate() + 1);
         rnodes.add(rn);
     }
 
@@ -403,13 +402,6 @@ public class Connection implements Comparable<Connection>{
         yMaxBB += verticalIncrement;
         xMinBB = xMinBB < 0? -1:xMinBB;
         yMinBB = yMinBB < 0? -1:yMinBB;
-    }
-
-    public void fitBoundingBoxToRouting(Connection connection) {
-        xMinBB = (short) Math.min(xMinBB, connection.getXMinBB());
-        xMaxBB = (short) Math.max(xMaxBB, connection.getXMaxBB());
-        yMinBB = (short) Math.min(yMinBB, connection.getYMinBB());
-        yMaxBB = (short) Math.max(yMaxBB, connection.getYMaxBB());
     }
 
     @Override

@@ -33,8 +33,8 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 
-import com.trolltech.qt.core.Qt;
 import com.trolltech.qt.core.QPointF;
+import com.trolltech.qt.core.Qt;
 import com.trolltech.qt.gui.QBrush;
 import com.trolltech.qt.gui.QColor;
 import com.trolltech.qt.gui.QGraphicsItemInterface;
@@ -47,9 +47,9 @@ import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Module;
 import com.xilinx.rapidwright.design.ModuleInst;
 import com.xilinx.rapidwright.design.Net;
-import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Port;
 import com.xilinx.rapidwright.design.SiteInst;
+import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.gui.GUIModuleInst;
@@ -217,7 +217,7 @@ public class FloorPlanScene extends TileScene {
                     String instName = moduleName + "/" + sitePinInst.getSite().getName();
                     SiteInst portInst = getDesign().getSiteInst(instName);
                     if (portInst == null) continue;
-                    for (Net portInstNet : portInst.getNetList()) {
+                    for (Net portInstNet : portInst.getConnectedNets()) {
                         if (!portInstNet.isStaticNet()
                                 && portInstNet.getModuleInst() == null
                                 && !portInstNet.getName().contains("clk")

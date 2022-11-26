@@ -30,7 +30,6 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 
-
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.ConstraintGroup;
 import com.xilinx.rapidwright.design.Design;
@@ -39,16 +38,15 @@ import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.design.blocks.PBlock;
-import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELPin;
+import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.edif.EDIFCell;
-import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFDirection;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFPort;
@@ -89,15 +87,15 @@ public class AddSubGenerator extends ArithmeticGenerator {
         String rstPinName = isLowerSlice ? "SRST1" : "SRST2";
         String cePinName = "CKEN" + (isLowerSlice ? (isFF2 ? "2" : "1") : (isFF2 ? "4" : "3"));
         if (ff.getSiteInst().getSitePinInst(clkPinName) == null) {
-            clk.createPin(false, clkPinName, ff.getSiteInst());
+            clk.createPin(clkPinName, ff.getSiteInst());
             ff.getSiteInst().addSitePIP(clkPinName + "INV","CLK");
         }
         if (ff.getSiteInst().getSitePinInst(rstPinName) == null) {
-            rst.createPin(false, rstPinName, ff.getSiteInst());
+            rst.createPin(rstPinName, ff.getSiteInst());
             ff.getSiteInst().addSitePIP("RST_"+(isLowerSlice ? "ABCD" : "EFGH")+"INV","RST");
         }
         if (ff.getSiteInst().getSitePinInst(cePinName) == null) {
-            ce.createPin(false, cePinName, ff.getSiteInst());
+            ce.createPin(cePinName, ff.getSiteInst());
         }
     }
 
@@ -140,9 +138,9 @@ public class AddSubGenerator extends ArithmeticGenerator {
             clk.createPortInst(clkPort);
             rst.createPortInst(rstPort);
             ce.createPortInst(cePort);
-            clkNet = d.createNet(clk);
-            rstNet = d.createNet(rst);
-            ceNet = d.createNet(ce);
+            clkNet = d.createNet(clk.getName());
+            rstNet = d.createNet(rst.getName());
+            ceNet = d.createNet(ce.getName());
         }
 
 
@@ -178,7 +176,7 @@ public class AddSubGenerator extends ArithmeticGenerator {
                     EDIFNet c = top.getNet("c" + (i-1));
                     c.createPortInst("CI", carryCell);
                     Net cNet = d.getNet(c.getName());
-                    cNet.createPin(false, "CIN",si);
+                    cNet.createPin("CIN", si);
 
                     if (si.getSiteTypeEnum() == SiteTypeEnum.SLICEL) {
                         cNet.addPIP(new PIP(si.getTile(), "CLE_CLE_L_SITE_0_CIN","CLE_CLE_L_SITE_0_CIN_PIN"));
@@ -219,16 +217,16 @@ public class AddSubGenerator extends ArithmeticGenerator {
             so.createPortInst(outPort, outPort.getWidth()-i-1);
 
             // Physical Nets
-            Net aNet = d.createNet(a);
-            Net bNet = d.createNet(b);
-            Net aNetInt = inputFlop ? d.createNet(aInt) : null;
-            Net bNetInt = inputFlop ? d.createNet(bInt) : null;
-            Net pNet = d.createNet(p);
-            Net sNet = d.createNet(s);
-            Net soNet = outputFlop ? d.createNet(so) : sNet;
-            (inputFlop ? aNetInt : aNet).createPin(false,letter +"5",si);
-            (inputFlop ? aNetInt : aNet).createPin(false,letter +"X",si);
-            (inputFlop ? bNetInt : bNet).createPin(false,letter +"6",si);
+            Net aNet = d.createNet(a.getName());
+            Net bNet = d.createNet(b.getName());
+            Net aNetInt = inputFlop ? d.createNet(aInt.getName()) : null;
+            Net bNetInt = inputFlop ? d.createNet(bInt.getName()) : null;
+            Net pNet = d.createNet(p.getName());
+            Net sNet = d.createNet(s.getName());
+            Net soNet = outputFlop ? d.createNet(so.getName()) : sNet;
+            (inputFlop ? aNetInt : aNet).createPin(letter + "5", si);
+            (inputFlop ? aNetInt : aNet).createPin(letter + "X", si);
+            (inputFlop ? bNetInt : bNet).createPin(letter + "6", si);
 
             BELPin src = lut.getPin("O6");
             BELPin snk = carryCell.getBEL().getPin("S" + cleIndex);
@@ -241,7 +239,7 @@ public class AddSubGenerator extends ArithmeticGenerator {
             }
             si.addSitePIP((outputFlop ? "FFMUX"+letter+"1" : "OUTMUX"+letter), "XORIN");
 
-            soNet.createPin(true,letter + (outputFlop ? "Q" : "MUX"),si);
+            soNet.createPin(letter + (outputFlop ? "Q" : "MUX"), si);
 
             if (inputFlop) {
                 Site inputFFSite = null;
@@ -266,10 +264,10 @@ public class AddSubGenerator extends ArithmeticGenerator {
                 bInt.createPortInst("Q", bFFCell);
 
                 SiteInst siNeighbor = d.getSiteInstFromSite(inputFFSite);
-                aNet.createPin(false, letter +"X", siNeighbor);
-                bNet.createPin(false, letter +"_I", siNeighbor);
-                aNetInt.createPin(true, letter +"Q", siNeighbor);
-                bNetInt.createPin(true, letter +"Q2", siNeighbor);
+                aNet.createPin(letter + "X", siNeighbor);
+                bNet.createPin(letter + "_I", siNeighbor);
+                aNetInt.createPin(letter + "Q", siNeighbor);
+                bNetInt.createPin(letter + "Q2", siNeighbor);
                 siNeighbor.addSitePIP("FFMUX" + letter +"1", "BYP");
                 siNeighbor.addSitePIP("FFMUX" + letter +"2", "BYP");
             }
@@ -278,8 +276,8 @@ public class AddSubGenerator extends ArithmeticGenerator {
             if (i%8==7 && width > i+1) {
                 EDIFNet c = top.createNet("c" + i);
                 c.createPortInst("CO", edifIndex, carryCell);
-                Net cNet = d.createNet(c);
-                cNet.createPin(true,"COUT",si);
+                Net cNet = d.createNet(c.getName());
+                cNet.createPin("COUT", si);
             }
         }
 

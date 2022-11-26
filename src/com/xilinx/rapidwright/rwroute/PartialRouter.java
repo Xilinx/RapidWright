@@ -34,6 +34,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
@@ -54,7 +55,7 @@ import com.xilinx.rapidwright.util.RuntimeTracker;
  */
 public class PartialRouter extends RWRoute{
 
-    final protected boolean softPreserve;
+    protected final boolean softPreserve;
 
     protected Set<NetWrapper> partiallyPreservedNets;
 
@@ -127,16 +128,20 @@ public class PartialRouter extends RWRoute{
             return false;
         }
 
-        // Presence of a prev pointer means that only that arc allowed to enter this end node
-        RouteNode prevRnode = endRnode.getPrev();
-        if (prevRnode != null) {
-            assert((prevRnode.getNode() == start) == prevRnode.getNode().equals(start));
-            if (prevRnode.getNode() == start) {
+        // Presence of a prev pointer means that only that arc is allowed to enter this end node
+        RouteNode prev = endRnode.getPrev();
+        if (prev != null) {
+            assert((prev.getNode() == start) == prev.getNode().equals(start));
+            if (prev.getNode() == start && routingGraph.isPreserved(end)) {
+                // Arc matches start node and end node is preserved
+                // This implies that both start and end nodes must be preserved for the same net
+                // (which assumedly is the net we're currently routing, and is asserted upstream)
+                assert(routingGraph.getPreservedNet(start) == routingGraph.getPreservedNet(end));
                 return true;
             }
         }
 
-        // No presence means that it is used by a fully preserved net which needs no routing
+        // No presence means that it cannot be a preserved node belonging to the current net's routing
         return false;
     }
 
@@ -222,11 +227,6 @@ public class PartialRouter extends RWRoute{
                 RouteNode rstart = getOrCreateRouteNode(start, RouteNodeType.WIRE);
                 RouteNode rend = getOrCreateRouteNode(end, RouteNodeType.WIRE);
                 assert (rend.getPrev() == null);
-
-                // Set the prev pointer directly instead of using RouteNode.getPrev() to avoid
-                // marking the node as visited.
-                // This causes a problem for stub nodes for which the visited state is not reset.
-                // rend.prev = rstart;
                 rend.setPrev(rstart);
             }
 
@@ -281,18 +281,17 @@ public class PartialRouter extends RWRoute{
     protected void addStaticNetRoutingTargets(Net staticNet) {
         preserveNet(staticNet);
 
-        List<SitePinInst> sinks = staticNet.getSinkPins();
-        if (sinks.size() > 0) {
-            sinks.removeIf(SitePinInst::isRouted);
-            if (sinks.isEmpty()) {
+        List<SitePinInst> staticPins = netToPins.get(staticNet);
+        if (staticPins == null || staticPins.isEmpty()) {
+            if (staticNet.hasPIPs()) {
                 increaseNumPreservedStaticNets();
             } else {
-                addStaticNetRoutingTargets(staticNet, sinks);
+                increaseNumNotNeedingRouting();
             }
-
-        } else {// internally routed (sinks.size = 0)
-            increaseNumNotNeedingRouting();
+            return;
         }
+
+        addStaticNetRoutingTargets(staticNet, staticPins);
     }
 
     @Override
@@ -421,8 +420,7 @@ public class PartialRouter extends RWRoute{
                 assert(rendAdded == endPreserved);
 
                 // Check the prev pointer is consistent with PIP
-                // (do not use RouteNode.getPrev() since that masks prev if node wasn't visited)
-                assert(rend.prev == rstart);
+                assert(rend.getPrev() == rstart);
             }
         } else {
             // Net needs to be created

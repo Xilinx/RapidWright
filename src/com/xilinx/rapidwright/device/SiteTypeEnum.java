@@ -1,9 +1,8 @@
 /*
- * Copyright (c) 2022, Xilinx, Inc.
  * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
- * Author: Chris Lavin, Xilinx Research Labs.
+ * Author: Chris Lavin, Advanced Micro Devices, Inc.
  *
  * This file is part of RapidWright.
  *
@@ -28,7 +27,7 @@ package com.xilinx.rapidwright.device;
 
 
 /**
- * Generated on: Mon Apr 25 23:31:34 2022
+ * Generated on: Wed Oct 26 12:59:37 2022
  * by: com.xilinx.rapidwright.release.SiteAndTileTypeUpdater
  *
  * Enumeration of SiteTypeEnum type for all valid devices within Vivado.
@@ -61,6 +60,8 @@ public enum SiteTypeEnum {
     AIE_TILECTRL,
     AMS_ADC,
     AMS_DAC,
+    BFR_A,
+    BFR_B,
     BIAS,
     BITSLICE_COMPONENT_RX_TX,
     BITSLICE_CONTROL,
@@ -111,14 +112,18 @@ public enum SiteTypeEnum {
     CFG_IO_ACCESS,
     CMACE4,
     CMAC_SITE,
+    CMPHY_DFX_HB,
+    CMPHY_OCTAD,
     CONFIG_SITE,
     CPM5,
+    CPM5N,
     CPM_EXT,
     CPM_MAIN,
     DCI,
     DCIRESET,
     DCMAC,
     DDRMC,
+    DDRMC5,
     DDRMC_RIU,
     DFE_A,
     DFE_B,
@@ -178,6 +183,11 @@ public enum SiteTypeEnum {
     GTY_REFCLK,
     GTZE2_OCTAL,
     HARD_SYNC,
+    HBM_IO_CHNL,
+    HBM_IO_MS,
+    HBM_MC,
+    HBM_PHY_CHNL,
+    HBM_PHY_MS,
     HBM_REF_CLK,
     HDIOB,
     HDIOBDIFFINBUF,
@@ -190,6 +200,8 @@ public enum SiteTypeEnum {
     HDIO_VREF,
     HDLOGIC_APB,
     HDLOGIC_CSSD,
+    HNICPIPE_QUAD,
+    HNICX,
     HPIOB,
     HPIOBDIFFINBUF,
     HPIOBDIFFOUTBUF,
@@ -200,6 +212,7 @@ public enum SiteTypeEnum {
     HPIO_RCLK_PRBS,
     HPIO_VREF_SITE,
     HPIO_ZMATCH_BLK_HCLK,
+    HPLL,
     HRIO,
     HRIODIFFINBUF,
     HRIODIFFOUTBUF,
@@ -240,13 +253,28 @@ public enum SiteTypeEnum {
     MRMAC,
     MTBF2,
     MTBF3,
+    NOC2_NMU128,
+    NOC2_NMU256,
+    NOC2_NMU512,
+    NOC2_NPS5555,
+    NOC2_NPS7575,
+    NOC2_NSU128,
+    NOC2_NSU256,
+    NOC2_NSU512,
+    NOC2_SCAN,
+    NOC2_XBR2X4,
+    NOC2_XBR4X2,
+    NOC_HBM_BLI_SCAN,
     NOC_NCRB,
     NOC_NCRB_SSIT,
     NOC_NIDB,
     NOC_NMU128,
     NOC_NMU512,
+    NOC_NMU_HBM2E,
     NOC_NPP_RPTR,
+    NOC_NPS4,
     NOC_NPS5555,
+    NOC_NPS6,
     NOC_NPS7575,
     NOC_NPS_VNOC,
     NOC_NSU128,
@@ -286,6 +314,7 @@ public enum SiteTypeEnum {
     PS7,
     PS8,
     PS9,
+    PSX,
     RAMB180,
     RAMB181,
     RAMB18E1,
@@ -301,6 +330,8 @@ public enum SiteTypeEnum {
     RFDAC,
     RIU_OR,
     RPI_HD_APB,
+    SDFEC_A,
+    SDFEC_B,
     SLICEL,
     SLICEM,
     STARTUP,
@@ -314,6 +345,14 @@ public enum SiteTypeEnum {
     VBUS_SWITCH,
     VCU,
     VDU,
+    X5PHIO_CMUIF,
+    X5PHIO_CMU_X32,
+    X5PHIO_DCCIBUF,
+    X5PHIO_HARD_INV,
+    X5PHIO_XCVR,
+    X5PLL,
+    X5PLL_INTF,
+    X5PLL_S2P,
     XADC,
     XIPHY_FEEDTHROUGH,
     XPHY,

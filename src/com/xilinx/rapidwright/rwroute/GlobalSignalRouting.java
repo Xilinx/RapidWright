@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Queue;
 import java.util.Set;
+import java.util.function.Predicate;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
@@ -58,7 +59,7 @@ import com.xilinx.rapidwright.router.UltraScaleClockRouting;
  * Adapted from RapidWright APIs.
  */
 public class GlobalSignalRouting {
-    final private static HashSet<String> lutOutputPinNames;
+    private static final HashSet<String> lutOutputPinNames;
     static {
         lutOutputPinNames = new HashSet<>();
         for (String cle : new String[]{"L", "M"}) {
@@ -281,11 +282,13 @@ public class GlobalSignalRouting {
     /**
      * Routes a static net (GND or VCC).
      * @param currNet The current static net to be routed.
-     * @param unavailableNodes A set of unavailable nodes.
+     * @param isNodeUnavailable A Predicate lambda to check if node is unavailable for use.
      * @param design The {@link Design} instance to use.
      * @param routeThruHelper The {@link RouteThruHelper} instance to use.
      */
-    public static Map<SitePinInst, List<Node>> routeStaticNet(Net currNet, Set<Node> unavailableNodes, Design design, RouteThruHelper routeThruHelper) {
+    public static Map<SitePinInst, List<Node>> routeStaticNet(Net currNet,
+                                                              Predicate<Node> isNodeUnavailable,
+                                                              Design design, RouteThruHelper routeThruHelper) {
         NetType netType = currNet.getType();
         Set<PIP> netPIPs = new HashSet<>();
         Map<SitePinInst, List<Node>> sinkPathNodes = new HashMap<>();
@@ -347,7 +350,7 @@ public class GlobalSignalRouting {
                 for (Node uphillNode : routingNode.getNode().getAllUphillNodes()) {
                     if (routeThruHelper.isRouteThru(uphillNode, routingNode.getNode())) continue;
                     LightweightRouteNode nParent = RouterHelper.createRoutingNode(uphillNode, createdRoutingNodes);
-                    if (!pruneNode(nParent, unavailableNodes, visitedRoutingNodes)) {
+                    if (!pruneNode(nParent, isNodeUnavailable, visitedRoutingNodes)) {
                         nParent.setPrev(routingNode);
                         q.add(nParent);
                     }
@@ -375,11 +378,13 @@ public class GlobalSignalRouting {
     /**
      * Checks if a {@link LightweightRouteNode} instance that represents a {@link Node} object should be pruned.
      * @param routingNode The RoutingNode in question.
-     * @param unavailableNodes A set of unavailable Node instances.
+     * @param isNodeUnavailable A Predicate lambda to check if node is unavailable for use.
      * @param visitedRoutingNodes RoutingNode instances that have been visited.
      * @return true, if the RoutingNode instance should not be considered as an available resource.
      */
-    private static boolean pruneNode(LightweightRouteNode routingNode, Set<Node> unavailableNodes, Set<LightweightRouteNode> visitedRoutingNodes) {
+    private static boolean pruneNode(LightweightRouteNode routingNode,
+                                     Predicate<Node> isNodeUnavailable,
+                                     Set<LightweightRouteNode> visitedRoutingNodes) {
         Node node = routingNode.getNode();
         IntentCode ic = node.getTile().getWireIntentCode(node.getWire());
         switch(ic) {
@@ -394,7 +399,7 @@ public class GlobalSignalRouting {
                 return true;
             default:
         }
-        if (unavailableNodes.contains(node)) return true;
+        if (isNodeUnavailable.test(node)) return true;
         return visitedRoutingNodes.contains(routingNode);
     }
 
