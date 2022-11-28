@@ -933,7 +933,7 @@ public class FileTools {
      * @param name Name of the RapidWright data file resource
      * @return The MD5 hash of a downloaded file, null if the file present is the correct version
      */
-    private static String ensureCorrectDataFile(String name) {
+    public static String ensureCorrectDataFile(String name) {
         if (overrideDataFileDownload()) return null;
         String rwPath = getRapidWrightPath();
         String fileName = rwPath + File.separator + name;
