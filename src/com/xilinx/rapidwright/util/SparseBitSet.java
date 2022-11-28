@@ -15,14 +15,14 @@ public class SparseBitSet {
     protected static final int MASK_SECOND_DIM = ((1 << BITS_SECOND_DIM) - 1) << BITS_LAST_DIM;
 
     protected long[][] words = new long[INITIAL_SIZE_FIRST_DIM][];
-    protected int highestNonZeroWord = -1;
+    protected int highestSetWord = -1;
 
     public SparseBitSet() {
     }
 
     public boolean get(int bit) {
         final int firstDim = bit >> SHIFT_FIRST_DIM;
-        if (firstDim > highestNonZeroWord) {
+        if (firstDim > highestSetWord) {
             return false;
         }
         if (words[firstDim] == null)
@@ -35,8 +35,8 @@ public class SparseBitSet {
     public void set(int bit) {
         final int firstDim = bit >> SHIFT_FIRST_DIM;
         if (firstDim >= words.length) {
-            // Double capacity of first dimension
-            words = Arrays.copyOf(words, words.length << 1);
+            // Round up to next power of 2
+            words = Arrays.copyOf(words, Integer.highestOneBit(firstDim) << 1);
         }
         if (words[firstDim] == null) {
             words[firstDim] = new long[1 << BITS_SECOND_DIM];
@@ -44,15 +44,15 @@ public class SparseBitSet {
         final int secondDim = (bit & MASK_SECOND_DIM) >> SHIFT_SECOND_DIM;
         final long bitMask = 1L << (bit & MASK_LAST_DIM);
         words[firstDim][secondDim] |= bitMask;
-        highestNonZeroWord = Math.max(highestNonZeroWord, firstDim);
+        highestSetWord = Math.max(highestSetWord, firstDim);
     }
 
     public void clear() {
-        Arrays.fill(words, 0, highestNonZeroWord + 1,null);
-        highestNonZeroWord = -1;
+        Arrays.fill(words, 0, highestSetWord + 1,null);
+        highestSetWord = -1;
     }
 
     public boolean isEmpty() {
-        return highestNonZeroWord == -1;
+        return highestSetWord == -1;
     }
 }
