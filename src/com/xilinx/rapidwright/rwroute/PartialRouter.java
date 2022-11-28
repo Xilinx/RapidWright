@@ -105,9 +105,6 @@ public class PartialRouter extends RWRoute{
      * Connections. In these cases, the RouteNode.prev member is used to restrict
      * incoming arcs to just the RouteNode already used by the Net; this method
      * detects this case and allows the preserved state to be masked.
-     * Note that this method must only be called once for each end Node, since
-     * RouteNode.prev (which is also used to track its "visited" state) is erased
-     * upon masking.
      * @param start Start Node of arc.
      * @param end End Node of arc.
      * @return True if arc is part of an existing route.

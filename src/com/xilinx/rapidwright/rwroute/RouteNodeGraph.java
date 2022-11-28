@@ -57,7 +57,7 @@ public class RouteNodeGraph {
     /**
      * A map of nodes to created rnodes
      */
-    protected Map<Tile, RouteNode[]> nodesMap;
+    protected final Map<Tile, RouteNode[]> nodesMap;
     private final AtomicInteger nodesMapSize;
 
     /**
@@ -75,7 +75,7 @@ public class RouteNodeGraph {
     /**
      * Visited rnodes data during connection routing
      */
-    protected final ThreadLocal<List<RouteNode>> targets;
+    protected final ThreadLocal<Collection<RouteNode>> targets;
 
     protected final RuntimeTracker setChildrenTimer;
 
@@ -150,7 +150,7 @@ public class RouteNodeGraph {
     }
 
     public RouteNodeGraph(RuntimeTracker setChildrenTimer, Design design) {
-        nodesMap = new HashMap<>();
+        nodesMap = new ConcurrentHashMap<>();
         nodesMapSize = new AtomicInteger();
         preservedMap = new ConcurrentHashMap<>();
         preservedMapSize = new AtomicInteger();
@@ -419,7 +419,7 @@ public class RouteNodeGraph {
      */
     public void resetExpansion() {
         visited.get().clear();
-        List<RouteNode> targets = this.targets.get();
+        Collection<RouteNode> targets = this.targets.get();
         for (RouteNode node : targets) {
             assert(node.isTarget());
             node.setTarget(false);

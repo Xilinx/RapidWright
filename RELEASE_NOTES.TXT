@@ -1,4 +1,4 @@
-============= RapidWright 2022.2.0-beta released on 2022-11-XX ================
+============= RapidWright 2022.2.0-beta released on 2022-11-16 ================
 Notes:
   - Support for Vivado 2022.2 devices and DCPs
   - ~5% memory usage improvement over 2022.1.4 when loading (large) DCPs
