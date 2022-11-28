@@ -59,6 +59,8 @@ import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import java.util.zip.DeflaterOutputStream;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
@@ -66,6 +68,8 @@ import java.util.zip.InflaterInputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipInputStream;
+
+import org.apache.commons.io.input.ProxyInputStream;
 
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.io.Input;
@@ -78,7 +82,6 @@ import com.xilinx.rapidwright.device.FamilyType;
 import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.timing.TimingModel;
-import org.apache.commons.io.input.ProxyInputStream;
 
 /**
  * This class is specifically written to allow for efficient file import/export of different semi-primitive
@@ -117,6 +120,8 @@ public class FileTools {
     public static final String PART_DB_PATH = DATA_FOLDER_NAME + File.separator + "parts.db";
     /** Location of the cell pins default data file */
     public static final String CELL_PIN_DEFAULTS_FILE_NAME = DATA_FOLDER_NAME + File.separator + "cell_pin_defaults.dat";
+    /** Location of cached routethru helper files */
+    public static final String ROUTETHRU_FOLDER_NAME = DATA_FOLDER_NAME + File.separator + "routeThrus";
     /** Common instance of the Kryo class for serialization purposes */
     private static Kryo kryo;
     /** Supporting data folders packed in standalone jars of RapidWright */
@@ -997,24 +1002,6 @@ public class FileTools {
     }
 
     /**
-     * Checks if a particular RapidWright file or jar resource exists.
-     * This will prioritize checking first in the location indicated by the
-     * RAPIDWRIGHT_PATH environment variable, then check in the location from
-     * the running class files.
-     * @param name Name of the RapidWright resource file.
-     * @return True if the resource exists, false otherwise.
-     * @deprecated
-     */
-    public static boolean checkIfRapidWrightResourceExists(String name) {
-        String rwPath = getRapidWrightPath();
-        if (rwPath != null) {
-            boolean foundFile = new File(rwPath + File.separator + name).exists();
-            if (foundFile) return foundFile;
-        }
-        return null != FileTools.class.getResourceAsStream("/" + name.replace(File.separator, "/"));
-    }
-
-    /**
      * Finds and returns a file name that can be read for the corresponding
      * RapidWright resource.
      * @param name Name of the RapidWright resource
@@ -1720,16 +1707,6 @@ public class FileTools {
     }
 
     /**
-     * Check if file/folder name is available to be used
-     * @param name Name of the file/directory to check
-     * @return True if the the file/folder name is free (unused), false otherwise.
-     * @deprecated
-     */
-    public static boolean folderCheck(String name) {
-        return !(new File(name).exists());
-    }
-
-    /**
      * Appends an extension to the file. if there is already an extension, the result will have two extensions.
      * @param path
      * @param extension
@@ -1783,9 +1760,67 @@ public class FileTools {
     }
 
     /**
-     * For Java 16 and below, calling this method will prevent System.exit() calls from
-     * exiting the JVM and instead throws a {@link SecurityException} in its place.  This method
-     * allows for a check to avoid the JVM WARNING message in Java 17.
+     * Gets all files (Path objects) recursively (including all sub-directories)
+     * starting at a root directory of a particular extension (or file name suffix).
+     * 
+     * @param root   The root directory from which to start the query
+     * @param suffix The file name extension (or suffix pattern) of the files to get
+     * @return A list of all files found in the directory and all sub-directories
+     *         with the provided suffix (extension)
+     */
+    private static List<Path> getAllFilesWithSuffixUsingNIO(Path root, String suffix) {
+        assert (Files.isDirectory(root));
+        try (Stream<Path> stream = Files.walk(root, Integer.MAX_VALUE)) {
+            return stream.filter(p -> Files.isRegularFile(p) && p.toString().endsWith(suffix))
+                    .collect(Collectors.toList());
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /**
+     * Gets all files (Path objects) recursively (including all sub-directories)
+     * starting at a root directory of a particular extension (or file name suffix). 
+     * This tries to use the native Linux 'find' command if available as it is 4-5X 
+     * faster than the Java Files.walk() method.  Otherwise it defaults to using the 
+     * conventional Files.walk() approach.
+     * 
+     * @param root   The root directory from which to start the query
+     * @param suffix The file name extension (or suffix pattern) of the files to get
+     * @return A list of all files found in the directory and all sub-directories
+     *         with the provided suffix (extension)
+     */
+    public static List<Path> getAllFilesWithSuffix(Path root, String suffix) {
+        // Calling find externally is 4-5X faster for most operations than Files.walk()
+        if (!isWindows() && isExecutableOnPath("find")) {
+            ProcessBuilder pb = new ProcessBuilder("find", root.toString(), "-type", "f", "-name",
+                    "*" + suffix);
+            pb.redirectErrorStream();
+            Process p = null;
+            List<Path> paths = new ArrayList<>();
+            try {
+                p = pb.start();
+                try (BufferedReader br = new BufferedReader(
+                        new InputStreamReader(p.getInputStream()))) {
+                    String line = null;
+                    while ((line = br.readLine()) != null) {
+                        paths.add(Paths.get(line));
+                    }
+                }
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+            return paths;
+        } else {
+            return getAllFilesWithSuffixUsingNIO(root, suffix);
+        }
+    }
+
+    /**
+     * For Java 16 and below, calling this method will prevent System.exit() calls
+     * from exiting the JVM and instead throws a {@link SecurityException} in its
+     * place. This method allows for a check to avoid the JVM WARNING message in
+     * Java 17.
      */
     public static void blockSystemExitCalls() {
         if (getJavaVersion() < 17) {

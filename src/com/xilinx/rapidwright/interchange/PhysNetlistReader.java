@@ -24,13 +24,13 @@
 package com.xilinx.rapidwright.interchange;
 
 import java.io.IOException;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.ArrayDeque;
-import java.util.Queue;
 import java.util.Map;
+import java.util.Queue;
 import java.util.Set;
 
 import org.capnproto.MessageReader;
@@ -60,7 +60,6 @@ import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
-import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.edif.EDIFLibrary;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
@@ -373,8 +372,7 @@ public class PhysNetlistReader {
         for (int i=0; i < netCount; i++) {
             PhysNet.Reader netReader = nets.get(i);
             String netName = strings.get(netReader.getName());
-            EDIFHierNet edifNet = netlist.getHierNetFromName(netName);
-            Net net = new Net(netName, edifNet == null ? null : edifNet.getNet());
+            Net net = new Net(netName);
             design.addNet(net);
             net.setType(getNetType(netReader, netName));
 
@@ -468,8 +466,20 @@ public class PhysNetlistReader {
                             Cell belCell = siteInst.getCell(bel);
                             Cell routeThruCell = siteInst.getCell(routeThruLutInput.getBEL());
                             if (routeThruCell == null) {
-                                throw new RuntimeException("Expected routethru cell at " + siteInst.getSiteName() +
-                                        "/" + routeThruLutInput.getBELName());
+                                // Routethru cell does not exist, create one
+
+                                // Make sure nothing placed there already
+                                if (siteInst.getCell(routeThruLutInput.getBEL()) != null) {
+                                    throw new RuntimeException("Routethru inferred for " + siteInst.getSiteName() + "/" + routeThruLutInput.getBELName()
+                                        + " but it is already occupied");
+                                }
+
+                                routeThruCell = new Cell(belCell.getName(), routeThruLutInput.getBEL());
+                                routeThruCell.setRoutethru(true);
+                                routeThruCell.setType(belCell.getType());
+                                routeThruCell.setSiteInst(siteInst);
+                                siteInst.getCellMap().put(routeThruLutInput.getBELName(), routeThruCell);
+                                routeThruCell.addPinMapping(routeThruLutInput.getName(), belCell.getLogicalPinMapping(belPinName));
                             }
                             String physicalPin = routeThruLutInput.getName();
                             String logicalPin = belCell.getLogicalPinMapping(belPinName);

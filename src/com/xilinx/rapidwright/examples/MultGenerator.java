@@ -38,9 +38,9 @@ import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.design.blocks.PBlock;
-import com.xilinx.rapidwright.device.Device;
-import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.BEL;
+import com.xilinx.rapidwright.device.BELPin;
+import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.device.Site;
@@ -50,7 +50,6 @@ import com.xilinx.rapidwright.edif.EDIFDirection;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFTools;
-import com.xilinx.rapidwright.examples.ArithmeticGenerator;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.MessageGenerator;
 import com.xilinx.rapidwright.util.StringTools;
@@ -207,7 +206,7 @@ public class MultGenerator extends ArithmeticGenerator {
             String[] pins = type == NetType.GND ? gndPins : vccPins;
             for (String pin : pins) {
                 logicSrc.createPortInst(pin, inst);
-                physNet.createPin(false, pin, si);
+                physNet.createPin(pin, si);
             }
             String[] busPins = type == NetType.GND ? gndBusses : vccBusses;
 
@@ -222,7 +221,7 @@ public class MultGenerator extends ArithmeticGenerator {
                 for (int i=0; i < stop; i++) {
                     logicSrc.createPortInst(p, i, inst);
                     if (bus.equals("D")) bus = "DIN";
-                    physNet.createPin(false, bus + (isAorB ? i+width : i), si);
+                    physNet.createPin(bus + (isAorB ? i + width : i), si);
                 }
             }
         }
@@ -267,8 +266,8 @@ public class MultGenerator extends ArithmeticGenerator {
 
         // Connect logical outside connections/ports
         clk.createPortInst("CLK",inst);
-        Net physClk = d.createNet(clk);
-        physClk.createPin(false, "CLK", si);
+        Net physClk = d.createNet(clk.getName());
+        physClk.createPin("CLK", si);
 
         int aWidth = inst.getPort(INPUT_A_NAME).getWidth();
         int bWidth = inst.getPort(INPUT_B_NAME).getWidth();
@@ -293,21 +292,21 @@ public class MultGenerator extends ArithmeticGenerator {
             bNet.createPortInst(INPUT_B_NAME, bWidth-i-1, inst);
             rNet.createPortInst(RESULT_NAME, pWidth-i-1, inst);
 
-            Net physA = d.createNet(aNet);
-            Net physB = d.createNet(bNet);
-            Net physR = d.createNet(rNet);
+            Net physA = d.createNet(aNet.getName());
+            Net physB = d.createNet(bNet.getName());
+            Net physR = d.createNet(rNet.getName());
 
-            physA.createPin(false, INPUT_A_NAME+i, si);
-            physB.createPin(false, INPUT_B_NAME+i, si);
-            physR.createPin(true, RESULT_NAME+i, si);
+            physA.createPin(INPUT_A_NAME + i, si);
+            physB.createPin(INPUT_B_NAME + i, si);
+            physR.createPin(RESULT_NAME + i, si);
         }
         for (int i=width; i < pWidth; i++) {
             suffix = "["+i+"]";
             EDIFNet rNet = top.createNet(designName + "/" + RESULT_NAME + suffix);
             rNet.createPortInst(r,pWidth-i-1);
             rNet.createPortInst(RESULT_NAME, pWidth-i-1, inst);
-            Net physR = d.createNet(rNet);
-            physR.createPin(true, RESULT_NAME+i, si);
+            Net physR = d.createNet(rNet.getName());
+            physR.createPin(RESULT_NAME + i, si);
         }
 
         // ADD SitePIPs
@@ -341,7 +340,7 @@ public class MultGenerator extends ArithmeticGenerator {
             for (int i=0; i < port.getWidth(); i++) {
                 EDIFNet net = top.createNet(designName + "/" + port.getBusName() + (port.getWidth() > 1 ? "["+i+"]" : ""));
                 net.createPortInst(port.getBusName(), i, inst);
-                Net physNet = d.createNet(net);
+                Net physNet = d.createNet(net.getName());
 
                 // Correct differences in physical pin names
                 String busName = port.getBusName();
@@ -353,7 +352,7 @@ public class MultGenerator extends ArithmeticGenerator {
                     busName = "PATTERN_B_DETECT";
                 }
 
-                physNet.createPin(true, busName + (port.getWidth() > 1 ? i : ""), si);
+                physNet.createPin(busName + (port.getWidth() > 1 ? i : ""), si);
             }
         }
 
@@ -378,7 +377,7 @@ public class MultGenerator extends ArithmeticGenerator {
                     pinName = StringTools.addIndexingAngleBrackets(outpin.getName());
                 }
 
-                Net n = d.createNet(designName + "/" + outpin.getBEL().getName() +"." + pinName, null);
+                Net n = d.createNet(designName + "/" + outpin.getBEL().getName() + "." + pinName);
                 si.routeIntraSiteNet(n, outpin, outpin.getSiteConns().get(0));
             }
         }
