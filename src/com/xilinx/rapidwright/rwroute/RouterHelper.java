@@ -122,22 +122,24 @@ public class RouterHelper {
      */
     public static Node projectOutputPinToINTNode(SitePinInst output) {
         Node intNode = output.getConnectedNode();
-        int watchdog = 5;
-
-        while (intNode.getAllDownhillNodes().get(0).getTile().getTileTypeEnum() != TileTypeEnum.INT) {
-            List<Node> downhills = intNode.getAllDownhillNodes();
-            intNode = downhills.get(0);
-            if (downhills.size() > 1) {
-                int i = 1;
-                while (intNode.getAllDownhillNodes().size() == 0) {
-                    intNode = downhills.get(i);
-                    i++;
+        List<Node> downhills = intNode.getAllDownhillNodes();
+        if (!downhills.isEmpty()) {
+            int watchdog = 5;
+            while (downhills.get(0).getTile().getTileTypeEnum() != TileTypeEnum.INT) {
+                intNode = downhills.get(0);
+                if (downhills.size() > 1) {
+                    int i = 1;
+                    while (intNode.getAllDownhillNodes().isEmpty()) {
+                        intNode = downhills.get(i);
+                        i++;
+                    }
                 }
-            }
-            watchdog--;
-            if (intNode.getAllDownhillNodes().size() == 0 || watchdog < 0) {
-                intNode = null;
-                break;
+                watchdog--;
+                downhills = intNode.getAllDownhillNodes();
+                if (downhills.isEmpty() || watchdog < 0) {
+                    intNode = null;
+                    break;
+                }
             }
         }
         return intNode;
