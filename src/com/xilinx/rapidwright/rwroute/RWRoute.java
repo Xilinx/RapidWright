@@ -34,6 +34,7 @@ import java.util.Map.Entry;
 import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.design.Design;
@@ -83,7 +84,7 @@ public class RWRoute{
     private int numPreservedStaticNets;
     protected int numPreservedWire;
     private int numWireNetsToRoute;
-    protected int numConnectionsToRoute;
+    private int numConnectionsToRoute;
     private int numNotNeedingRoutingNets;
     private int numUnrecognizedNets;
 
@@ -134,8 +135,8 @@ public class RWRoute{
     /** The total number of connections routed in an iteration */
     private final AtomicInteger connectionsRoutedIteration;
     /** Total number of nodes pushed/popped from the queue */
-    private final AtomicInteger nodesPushed;
-    private final AtomicInteger nodesPopped;
+    private final AtomicLong nodesPushed;
+    private final AtomicLong nodesPopped;
 
     /** The maximum criticality constraint of connection */
     private static final float MAX_CRITICALITY = 0.99f;
@@ -158,8 +159,8 @@ public class RWRoute{
         this.config = config;
         connectionsRouted = new AtomicInteger();
         connectionsRoutedIteration = new AtomicInteger();
-        nodesPushed = new AtomicInteger();
-        nodesPopped = new AtomicInteger();
+        nodesPushed = new AtomicLong();
+        nodesPopped = new AtomicLong();
         queue = ThreadLocal.withInitial(() -> new PriorityQueue<>());
     }
 
@@ -719,7 +720,7 @@ public class RWRoute{
                 }
             }
 
-            System.err.printf("Routed %d cross-SLR connections in %.2f\n", connectionsRoutedIteration.get(),
+            System.err.printf("Routed %7d cross-SLR connections in %.2f\n", connectionsRoutedIteration.get(),
                     (System.nanoTime() - startIteration) * 1e-9);
             finishRoutingIteration();
 
