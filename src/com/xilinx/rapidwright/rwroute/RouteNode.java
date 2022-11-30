@@ -51,17 +51,17 @@ abstract public class RouteNode implements Comparable<RouteNode> {
 
     /** The associated {@link Node} instance */
     protected Node node;
-    /** The type of a rnode*/
-    private RouteNodeType type;
     /** The tileXCoordinate and tileYCoordinate of the INT tile that the associated node stops at */
     private short endTileXCoordinate;
     private short endTileYCoordinate;
     /** The wirelength of a rnode */
     private short length;
-    /** The base cost of a rnode */
-    private float baseCost;
-    /** A flag to indicate if this rnode is the target */
-    private boolean isTarget;
+    /** Bit mask used for storing the target flag */
+    private static final int IS_TARGET_MASK = 0x80;
+    /** Bit mask to store RouteNodeType ordinal */
+    private static final int ROUTE_NODE_TYPE_MASK = 0x07;
+    /** Stores a flag to indicate that this node is the target and also node type */
+    private byte isTargetAndType;
     /** The children (downhill rnodes) of this rnode */
     protected RouteNode[] children;
 
@@ -95,13 +95,12 @@ abstract public class RouteNode implements Comparable<RouteNode> {
         setType(type);
         children = null;
         setEndTileXYCoordinates();
-        setBaseCost(type);
         presentCongestionCost = 1;
         historicalCongestionCost = 1;
         usersConnectionCounts = null;
         driversCounts = null;
         assert(prev == null);
-        assert(!isTarget);
+        assert(!isTarget());
     }
 
     @Override
@@ -138,67 +137,6 @@ abstract public class RouteNode implements Comparable<RouteNode> {
             children = EMPTY_ARRAY;
         }
         setChildrenTimer.stop();
-    }
-
-    private void setBaseCost(RouteNodeType type) {
-        // TODO: Why does enabling the following line cause unroutability?
-        //       setRouteType() is called before this, and it setting
-        //       this.type disrupts the base cost such that
-        //       testNonTimingDrivenPartialRouting becomes unroutable.
-        //       The `type` parameter fed to this method is the original
-        //       value provided to the constructor
-        // type = this.type;
-        if (this.type == RouteNodeType.LAGUNA_I) {
-            // Make all approaches to SLLs zero-cost to encourage exploration
-            // Assigning a base cost of zero would break congestion resolution for most nodes
-            // (since RWroute.getNodeCost() would return zero) but doing it here should be
-            // okay because this node only leads to a SLL which will have a non-zero base cost
-            baseCost = 0.0f;
-        } else if (this.type == RouteNodeType.SUPER_LONG_LINE) {
-            baseCost = 0.3f * length;
-        } else if (type == RouteNodeType.WIRE) {
-            baseCost = 0.4f;
-            // NOTE: IntentCode is device-dependent
-            IntentCode ic = node.getIntentCode();
-            switch(ic) {
-            case NODE_PINBOUNCE:
-            case NODE_PINFEED:
-                break;
-            case NODE_DOUBLE:
-                if (endTileXCoordinate != node.getTile().getTileXCoordinate()) {
-                    baseCost = 0.4f*length;
-                }
-                break;
-            case NODE_HQUAD:
-                assert(length != 0 || node.getAllDownhillNodes().isEmpty());
-                baseCost = 0.35f*length;
-                break;
-            case NODE_VQUAD:
-                // In case of U-turn nodes
-                if (length != 0) baseCost = 0.15f*length;// VQUADs have length 4 and 5
-                break;
-            case NODE_HLONG:
-                assert(length != 0 || node.getAllDownhillNodes().isEmpty());
-                baseCost = 0.15f*length;// HLONGs have length 6 and 7
-                break;
-            case NODE_VLONG:
-                // Not true for UltraScale? (e.g. seen on VU440)
-                // assert(length != 0);
-                baseCost = 0.7f;
-                break;
-            default:
-                if (length != 0) baseCost *= length;
-                break;
-            }
-        } else if (type == RouteNodeType.PINFEED_I) {
-            baseCost = 0.4f;
-        } else if (type == RouteNodeType.PINFEED_O) {
-            baseCost = 1f;
-        }
-
-        // Node.getNode("INT_X182Y535/WW4_W_BEG7", Device.getDevice("xcvu19p")).getAllWiresInNode()
-        // returns two wires, both X182Y535
-        // assert(baseCost != 0);
     }
 
     /**
@@ -259,8 +197,8 @@ abstract public class RouteNode implements Comparable<RouteNode> {
                     if (endTileWasNotNull) break;
                 } else {
                     assert(!lagunaTileTypes.contains(baseTile.getTileTypeEnum()));
-                    if (that != null && that.type == RouteNodeType.PINFEED_I) {
-                        that.type = RouteNodeType.LAGUNA_I;
+                    if (that != null && that.getType() == RouteNodeType.PINFEED_I) {
+                        that.isTargetAndType = (byte) (((that.isTargetAndType & ~ROUTE_NODE_TYPE_MASK) | (RouteNodeType.LAGUNA_I.ordinal())));
                     }
                 }
             }
@@ -291,7 +229,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
             // Do not apply this correction for NODE_LAGUNA_OUTPUT nodes unless it is a LAGUNA_I pinfeed
             // (i.e. do not apply it to nodes that leave the SLL)
             // Nor apply it to VCC_WIREs since their end tiles are INT tiles.
-            if ((node.getIntentCode() != IntentCode.NODE_LAGUNA_OUTPUT || type == RouteNodeType.LAGUNA_I) &&
+            if ((node.getIntentCode() != IntentCode.NODE_LAGUNA_OUTPUT || getType() == RouteNodeType.LAGUNA_I) &&
                 !node.isTiedToVcc()) {
                 assert(node.getTile().getTileXCoordinate() == endTileXCoordinate);
                 endTileXCoordinate++;
@@ -321,7 +259,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
         s.append(", ");
         s.append("(" + endTileXCoordinate + "," + getEndTileYCoordinate() + ")");
         s.append(", ");
-        s.append(String.format("type = %s", type));
+        s.append(String.format("type = %s", getType()));
         s.append(", ");
         s.append(String.format("ic = %s", node.getIntentCode()));
         s.append(", ");
@@ -370,7 +308,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
      * @return true, if a RouteNode Object is the current routing target.
      */
     public boolean isTarget() {
-        return isTarget;
+        return (isTargetAndType & IS_TARGET_MASK) == IS_TARGET_MASK;
     }
 
     /**
@@ -378,7 +316,8 @@ abstract public class RouteNode implements Comparable<RouteNode> {
      * @param isTarget The value to be set.
      */
     public void setTarget(boolean isTarget) {
-        this.isTarget = isTarget;
+        if (isTarget) isTargetAndType |= IS_TARGET_MASK;
+        else isTargetAndType &= ~IS_TARGET_MASK;
     }
 
     /**
@@ -386,7 +325,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
      * @return The RouteNodeType of a RouteNode Object.
      */
     public RouteNodeType getType() {
-        return type;
+        return RouteNodeType.values[isTargetAndType & ROUTE_NODE_TYPE_MASK];
     }
 
     /**
@@ -432,7 +371,70 @@ abstract public class RouteNode implements Comparable<RouteNode> {
      * @return The base cost of a RouteNode Object.
      */
     public float getBaseCost() {
-        return baseCost;
+        float _baseCost = 0;
+        RouteNodeType _type = getType();
+        // TODO: Why does enabling the following line cause unroutability?
+        //       setRouteType() is called before this, and it setting
+        //       this.type disrupts the base cost such that
+        //       testNonTimingDrivenPartialRouting becomes unroutable.
+        //       The `type` parameter fed to this method is the original
+        //       value provided to the constructor
+        // type = this.type;
+        if (_type == RouteNodeType.LAGUNA_I) {
+            // Make all approaches to SLLs zero-cost to encourage exploration
+            // Assigning a base cost of zero would break congestion resolution for most nodes
+            // (since RWroute.getNodeCost() would return zero) but doing it here should be
+            // okay because this node only leads to a SLL which will have a non-zero base cost
+            _baseCost = 0.0f;
+        } else if (_type == RouteNodeType.SUPER_LONG_LINE) {
+            _baseCost = 0.3f * length;
+        } else if (_type == RouteNodeType.PINBOUNCE || _type == RouteNodeType.PINFEED_I) {
+            _baseCost = 0.4f;
+        } else if (_type == RouteNodeType.WIRE) {
+            _baseCost = 0.4f;
+            // NOTE: IntentCode is device-dependent
+            IntentCode ic = node.getIntentCode();
+            switch(ic) {
+            case NODE_PINBOUNCE:
+            case NODE_PINFEED:
+                break;
+            case NODE_DOUBLE:
+                if (endTileXCoordinate != node.getTile().getTileXCoordinate()) {
+                    _baseCost = 0.4f*length;
+                }
+                break;
+            case NODE_HQUAD:
+                assert(length != 0 || node.getAllDownhillNodes().isEmpty());
+                _baseCost = 0.35f*length;
+                break;
+            case NODE_VQUAD:
+                // In case of U-turn nodes
+                if (length != 0) _baseCost = 0.15f*length;// VQUADs have length 4 and 5
+                break;
+            case NODE_HLONG:
+                assert(length != 0 || node.getAllDownhillNodes().isEmpty());
+                _baseCost = 0.15f*length;// HLONGs have length 6 and 7
+                break;
+            case NODE_VLONG:
+                // Not true for UltraScale? (e.g. seen on VU440)
+                // assert(length != 0);
+                _baseCost = 0.7f;
+                break;
+            default:
+                if (length != 0) _baseCost *= length;
+                break;
+            }
+        } else if (_type == RouteNodeType.PINFEED_I) {
+            _baseCost = 0.4f;
+        } else if (_type == RouteNodeType.PINFEED_O) {
+            _baseCost = 1f;
+        }
+
+        // Node.getNode("INT_X182Y535/WW4_W_BEG7", Device.getDevice("xcvu19p")).getAllWiresInNode()
+        // returns two wires, both X182Y535
+        // assert(baseCost != 0);
+        
+        return _baseCost;
     }
 
     /**
@@ -451,31 +453,31 @@ abstract public class RouteNode implements Comparable<RouteNode> {
     }
 
     private void setType(RouteNodeType type) {
-        this.type = type;
+        RouteNodeType typeToSet = type;
         if (type == RouteNodeType.WIRE) {
             // NOTE: IntentCode is device-dependent
             IntentCode ic = node.getIntentCode();
             switch (ic) {
                 case NODE_PINBOUNCE:
-                    this.type = RouteNodeType.PINBOUNCE;
+                    typeToSet = RouteNodeType.PINBOUNCE;
                     break;
 
                 // Could be PINFEED into SLICE or PINFEED into a LAGUNA
                 case NODE_PINFEED:
-                    this.type = RouteNodeType.PINFEED_I;
+                    typeToSet = RouteNodeType.PINFEED_I;
                     break;
 
                 case NODE_LAGUNA_OUTPUT: // UltraScale+ only
                     assert(node.getTile().getTileTypeEnum() == TileTypeEnum.LAG_LAG);
                     // TODO: Collect wire indices to save on string comparison
                     if (node.getWireName().endsWith("_TXOUT")) {
-                        this.type = RouteNodeType.LAGUNA_I;
+                        typeToSet = RouteNodeType.LAGUNA_I;
                     }
                     break;
 
                 case NODE_LAGUNA_DATA: // UltraScale+ only
                     assert(node.getTile().getTileTypeEnum() == TileTypeEnum.LAG_LAG);
-                    this.type = RouteNodeType.SUPER_LONG_LINE;
+                    typeToSet = RouteNodeType.SUPER_LONG_LINE;
                     break;
 
                 case INTENT_DEFAULT:
@@ -483,15 +485,16 @@ abstract public class RouteNode implements Comparable<RouteNode> {
                         // TODO: Collect wire indices to save on string comparison
                         String wireName = node.getWireName();
                         if (wireName.startsWith("UBUMP")) {
-                            this.type = RouteNodeType.SUPER_LONG_LINE;
+                            typeToSet = RouteNodeType.SUPER_LONG_LINE;
                         } else if (wireName.endsWith("_TXOUT")) {
                             // This is the inner LAGUNA_I, mark it so it gets a base cost discount
-                            this.type = RouteNodeType.LAGUNA_I;
+                            typeToSet = RouteNodeType.LAGUNA_I;
                         }
                     }
                     break;
             }
         }
+        isTargetAndType = (byte) (((isTargetAndType & ~ROUTE_NODE_TYPE_MASK) | (typeToSet.ordinal())));
     }
 
     /**
@@ -555,7 +558,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
      */
     public void incrementUser(NetWrapper user) {
         if (usersConnectionCounts == null) {
-            usersConnectionCounts = new HashMap<>();
+            usersConnectionCounts = new HashMap<>(1);
         }
         usersConnectionCounts.merge(user, 1, Integer::sum);
     }
@@ -611,7 +614,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
      */
     public void incrementDriver(RouteNode parent) {
         if (driversCounts == null) {
-            driversCounts = new HashMap<>();
+            driversCounts = new HashMap<>(1);
         }
         driversCounts.merge(parent, 1, Integer::sum);
     }
