@@ -52,6 +52,9 @@ abstract public class RouteNode implements Comparable<RouteNode> {
 
     /** The associated {@link Node} instance */
     protected Node node;
+    /** The tileXCoordinate and tileYCoordinate of the INT tile that the associated node stops at */
+    private short endTileXCoordinate;
+    private short endTileYCoordinate;
     /** Bit mask used for storing the target flag */
     private static final int IS_TARGET_MASK = 0x80;
     /** Bit mask to store RouteNodeType ordinal */
@@ -96,6 +99,8 @@ abstract public class RouteNode implements Comparable<RouteNode> {
         driversCounts = null;
         assert(prev == null);
         assert(!isTarget());
+        endTileXCoordinate = _getEndTileXCoordinate();
+        endTileYCoordinate = _getEndTileYCoordinate();
     }
 
     @Override
@@ -266,8 +271,6 @@ abstract public class RouteNode implements Comparable<RouteNode> {
      * @return true, if coordinates of a RouteNode is within the connection's bounding box.
      */
     public boolean isInConnectionBoundingBox(Connection connection) {
-        short endTileXCoordinate = getEndTileXCoordinate();
-        short endTileYCoordinate = getEndTileYCoordinate();
         return endTileXCoordinate > connection.getXMinBB() && 
                endTileXCoordinate < connection.getXMaxBB() && 
                endTileYCoordinate > connection.getYMinBB() && 
@@ -329,6 +332,10 @@ abstract public class RouteNode implements Comparable<RouteNode> {
      * @return The tileXCoordinate of the INT tile that the associated {@link Node} instance stops at.
      */
     public short getEndTileXCoordinate() {
+        return endTileXCoordinate;
+    }
+    
+    public short _getEndTileXCoordinate() {
         short endTileXCoord = (short) node.getEndTile().getTileXCoordinate();
         if (node.getTile().getTileTypeEnum() == TileTypeEnum.LAG_LAG) { // UltraScale+ only
             // Correct the X coordinate of all Laguna nodes since they are accessed by the INT
@@ -352,13 +359,16 @@ abstract public class RouteNode implements Comparable<RouteNode> {
      * @return The tileYCoordinate of the INT tile that the associated {@link Node} instance stops at.
      */
     public short getEndTileYCoordinate() {
-        short endTileYCoord = (short) node.getEndTile().getTileYCoordinate();
         boolean reverseSLL = (prev != null &&
                 getType() == RouteNodeType.SUPER_LONG_LINE &&
-                prev.getEndTileYCoordinate() == endTileYCoord);
-        return reverseSLL ? (short) node.getTile().getTileYCoordinate() : endTileYCoord;
+                prev.getEndTileYCoordinate() == endTileYCoordinate);
+        return reverseSLL ? (short) node.getTile().getTileYCoordinate() : endTileYCoordinate;  
     }
 
+    public short _getEndTileYCoordinate() {
+        return (short) node.getEndTile().getTileYCoordinate();
+    }
+    
     /**
      * Gets the base cost of a RouteNode Object.
      * @return The base cost of a RouteNode Object.
