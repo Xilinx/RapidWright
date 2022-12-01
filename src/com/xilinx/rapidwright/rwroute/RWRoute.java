@@ -1552,13 +1552,14 @@ public class RWRoute{
         }
 
         float biasCost = 0;
+        float baseCost = rnode.getBaseCost();
         if (!rnode.isTarget() && rnode.getType() != RouteNodeType.SUPER_LONG_LINE) {
             NetWrapper net = connection.getNetWrapper();
-            biasCost = rnode.getBaseCost() / net.getConnections().size() *
+            biasCost = baseCost / net.getConnections().size() *
                     (Math.abs(rnode.getEndTileXCoordinate() - net.getXCenter()) + Math.abs(rnode.getEndTileYCoordinate() - net.getYCenter())) / net.getDoubleHpwl();
         }
 
-        return rnode.getBaseCost() * rnode.getHistoricalCongestionCost() * presentCongestionCost / sharingFactor + biasCost;
+        return baseCost * rnode.getHistoricalCongestionCost() * presentCongestionCost / sharingFactor + biasCost;
     }
 
     /**
