@@ -1013,7 +1013,7 @@ public class RWRoute{
                     continue;
                 }
                 totalINTNodes++;
-                int wl = RouteNode.getLength(node, null);
+                int wl = node.getLength();
                 totalWL += wl;
 
                 RouterHelper.addNodeTypeLengthToMap(node, wl, nodeTypeUsage, nodeTypeLength);

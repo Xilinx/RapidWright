@@ -100,6 +100,8 @@ public class FileTools {
     public static final String DEVICE_FILE_SUFFIX = "_db.dat";
     /** Suffix of the device part files */
     public static final String DEVICE_CACHE_FILE_SUFFIX = "_db_cache.dat";
+    /** Suffix for RouteNode cache files */
+    public static final String ROUTE_NODE_CACHE_FILE_SUFFIX = "_rn_cache.dat";
     /** Data folder name */
     public static final String DATA_FOLDER_NAME = "data";
     /** Tcl source folder name */
@@ -1073,6 +1075,10 @@ public class FileTools {
 
     public static String getDeviceResourceCache(Part part) {
         return getDeviceResourceSuffix(part) + DEVICE_CACHE_FILE_SUFFIX;
+    }
+    
+    public static String getDeviceRouteNodeCache(Part part) { 
+        return getDeviceResourceSuffix(part) + ROUTE_NODE_CACHE_FILE_SUFFIX;
     }
 
     /**

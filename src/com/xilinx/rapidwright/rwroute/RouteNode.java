@@ -36,6 +36,7 @@ import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
+import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.RuntimeTracker;
 
 /**
@@ -51,11 +52,6 @@ abstract public class RouteNode implements Comparable<RouteNode> {
 
     /** The associated {@link Node} instance */
     protected Node node;
-    /** The tileXCoordinate and tileYCoordinate of the INT tile that the associated node stops at */
-    private short endTileXCoordinate;
-    private short endTileYCoordinate;
-    /** The wirelength of a rnode */
-    private short length;
     /** Bit mask used for storing the target flag */
     private static final int IS_TARGET_MASK = 0x80;
     /** Bit mask to store RouteNodeType ordinal */
@@ -94,7 +90,6 @@ abstract public class RouteNode implements Comparable<RouteNode> {
         this.node = node;
         setType(type);
         children = null;
-        setEndTileXYCoordinates();
         presentCongestionCost = 1;
         historicalCongestionCost = 1;
         usersConnectionCounts = null;
@@ -173,16 +168,16 @@ abstract public class RouteNode implements Comparable<RouteNode> {
             , TileTypeEnum.LAGUNA_TILE  // UltraScale
     );
 
-    public static int getLength(Node node, RouteNode that) {
+    public static Pair<Tile,Pair<Short, Boolean>> getEndTile(Node node) {
         Wire[] wires = node.getAllWiresInNode();
         Tile baseTile = node.getTile();
         Tile endTile = null;
+        boolean setTypeToLagunaIIfPinFeedI = false;
         for (Wire w : wires) {
             Tile tile = w.getTile();
             TileTypeEnum tileType = tile.getTileTypeEnum();
             boolean lagunaTile = false;
-            if (tileType == TileTypeEnum.INT ||
-                    (lagunaTile = lagunaTileTypes.contains(tileType))) {
+            if (tileType == TileTypeEnum.INT || (lagunaTile = lagunaTileTypes.contains(tileType))) {
                 if (!lagunaTile ||
                         // Only consider a Laguna tile as an end tile if base tile is Laguna too
                         // (otherwise it's a PINFEED into a Laguna; in US+ Laguna is off-by-one in the X axis)
@@ -197,46 +192,25 @@ abstract public class RouteNode implements Comparable<RouteNode> {
                     if (endTileWasNotNull) break;
                 } else {
                     assert(!lagunaTileTypes.contains(baseTile.getTileTypeEnum()));
-                    if (that != null && that.getType() == RouteNodeType.PINFEED_I) {
-                        that.isTargetAndType = (byte) (((that.isTargetAndType & ~ROUTE_NODE_TYPE_MASK) | (RouteNodeType.LAGUNA_I.ordinal())));
-                    }
+                    setTypeToLagunaIIfPinFeedI = true;
                 }
             }
         }
         if (endTile == null) {
             endTile = node.getTile();
         }
-
-        int endTileXCoordinate = endTile.getTileXCoordinate();
-        int endTileYCoordinate = endTile.getTileYCoordinate();
-        int length = Math.abs(endTileXCoordinate - baseTile.getTileXCoordinate())
-                + Math.abs(endTileYCoordinate - baseTile.getTileYCoordinate());
-
-        if (that != null) {
-            that.endTileXCoordinate = (short) endTileXCoordinate;
-            that.endTileYCoordinate = (short) endTileYCoordinate;
-            that.length = (short) length;
-        }
-
-        return length;
-    }
-
-    private void setEndTileXYCoordinates() {
-        getLength(node, this);
-        if (node.getTile().getTileTypeEnum() == TileTypeEnum.LAG_LAG) { // UltraScale+ only
-            // Correct the X coordinate of all Laguna nodes since they are accessed by the INT
-            // tile to its right, yet has the LAG tile has a tile X coordinate one less
-            // Do not apply this correction for NODE_LAGUNA_OUTPUT nodes unless it is a LAGUNA_I pinfeed
-            // (i.e. do not apply it to nodes that leave the SLL)
-            // Nor apply it to VCC_WIREs since their end tiles are INT tiles.
-            if ((node.getIntentCode() != IntentCode.NODE_LAGUNA_OUTPUT || getType() == RouteNodeType.LAGUNA_I) &&
-                !node.isTiedToVcc()) {
-                assert(node.getTile().getTileXCoordinate() == endTileXCoordinate);
-                endTileXCoordinate++;
+        
+        Short baseTileIndex = null;
+        for (int i=0; i < wires.length; i++) {
+            if (wires[i].getTile() == endTile) {
+                baseTileIndex = (short) i;
+                break;
             }
         }
-    }
 
+        return new Pair<Tile, Pair<Short, Boolean>>(endTile, new Pair<Short,Boolean>(baseTileIndex, setTypeToLagunaIIfPinFeedI));
+    }
+    
     /**
      * Updates the present congestion cost based on the present congestion penalty factor.
      * @param pres_fac The present congestion penalty factor.
@@ -257,7 +231,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
         StringBuilder s = new StringBuilder();
         s.append("node " + node.toString());
         s.append(", ");
-        s.append("(" + endTileXCoordinate + "," + getEndTileYCoordinate() + ")");
+        s.append("(" + getEndTileXCoordinate() + "," + getEndTileYCoordinate() + ")");
         s.append(", ");
         s.append(String.format("type = %s", getType()));
         s.append(", ");
@@ -292,6 +266,8 @@ abstract public class RouteNode implements Comparable<RouteNode> {
      * @return true, if coordinates of a RouteNode is within the connection's bounding box.
      */
     public boolean isInConnectionBoundingBox(Connection connection) {
+        int endTileXCoordinate = getEndTileXCoordinate();
+        int endTileYCoordinate = getEndTileYCoordinate();
         return endTileXCoordinate > connection.getXMinBB() && endTileXCoordinate < connection.getXMaxBB() && endTileYCoordinate > connection.getYMinBB() && endTileYCoordinate < connection.getYMaxBB();
     }
 
@@ -350,7 +326,20 @@ abstract public class RouteNode implements Comparable<RouteNode> {
      * @return The tileXCoordinate of the INT tile that the associated {@link Node} instance stops at.
      */
     public short getEndTileXCoordinate() {
-        return endTileXCoordinate;
+        short endTileXCoord = (short) node.getEndTile().getTileXCoordinate();
+        if (node.getTile().getTileTypeEnum() == TileTypeEnum.LAG_LAG) { // UltraScale+ only
+            // Correct the X coordinate of all Laguna nodes since they are accessed by the INT
+            // tile to its right, yet has the LAG tile has a tile X coordinate one less
+            // Do not apply this correction for NODE_LAGUNA_OUTPUT nodes unless it is a LAGUNA_I pinfeed
+            // (i.e. do not apply it to nodes that leave the SLL)
+            // Nor apply it to VCC_WIREs since their end tiles are INT tiles.
+            if ((node.getIntentCode() != IntentCode.NODE_LAGUNA_OUTPUT || getType() == RouteNodeType.LAGUNA_I) &&
+                !node.isTiedToVcc()) {
+                assert(node.getTile().getTileXCoordinate() == endTileXCoord);
+                endTileXCoord++;
+            }
+        }
+        return endTileXCoord;
     }
 
     /**
@@ -360,10 +349,11 @@ abstract public class RouteNode implements Comparable<RouteNode> {
      * @return The tileYCoordinate of the INT tile that the associated {@link Node} instance stops at.
      */
     public short getEndTileYCoordinate() {
+        short endTileYCoord = (short) node.getEndTile().getTileYCoordinate();
         boolean reverseSLL = (prev != null &&
                 getType() == RouteNodeType.SUPER_LONG_LINE &&
-                prev.endTileYCoordinate == endTileYCoordinate);
-        return reverseSLL ? (short) node.getTile().getTileYCoordinate() : endTileYCoordinate;
+                prev.getEndTileYCoordinate() == endTileYCoord);
+        return reverseSLL ? (short) node.getTile().getTileYCoordinate() : endTileYCoord;
     }
 
     /**
@@ -372,14 +362,8 @@ abstract public class RouteNode implements Comparable<RouteNode> {
      */
     public float getBaseCost() {
         float _baseCost = 0;
+        short _length = getLength();
         RouteNodeType _type = getType();
-        // TODO: Why does enabling the following line cause unroutability?
-        //       setRouteType() is called before this, and it setting
-        //       this.type disrupts the base cost such that
-        //       testNonTimingDrivenPartialRouting becomes unroutable.
-        //       The `type` parameter fed to this method is the original
-        //       value provided to the constructor
-        // type = this.type;
         if (_type == RouteNodeType.LAGUNA_I) {
             // Make all approaches to SLLs zero-cost to encourage exploration
             // Assigning a base cost of zero would break congestion resolution for most nodes
@@ -387,7 +371,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
             // okay because this node only leads to a SLL which will have a non-zero base cost
             _baseCost = 0.0f;
         } else if (_type == RouteNodeType.SUPER_LONG_LINE) {
-            _baseCost = 0.3f * length;
+            _baseCost = 0.3f * _length;
         } else if (_type == RouteNodeType.PINBOUNCE || _type == RouteNodeType.PINFEED_I) {
             _baseCost = 0.4f;
         } else if (_type == RouteNodeType.WIRE) {
@@ -399,21 +383,21 @@ abstract public class RouteNode implements Comparable<RouteNode> {
             case NODE_PINFEED:
                 break;
             case NODE_DOUBLE:
-                if (endTileXCoordinate != node.getTile().getTileXCoordinate()) {
-                    _baseCost = 0.4f*length;
+                if (getEndTileXCoordinate() != node.getTile().getTileXCoordinate()) {
+                    _baseCost = 0.4f*_length;
                 }
                 break;
             case NODE_HQUAD:
-                assert(length != 0 || node.getAllDownhillNodes().isEmpty());
-                _baseCost = 0.35f*length;
+                assert(_length != 0 || node.getAllDownhillNodes().isEmpty());
+                _baseCost = 0.35f*_length;
                 break;
             case NODE_VQUAD:
                 // In case of U-turn nodes
-                if (length != 0) _baseCost = 0.15f*length;// VQUADs have length 4 and 5
+                if (_length != 0) _baseCost = 0.15f*_length;// VQUADs have length 4 and 5
                 break;
             case NODE_HLONG:
-                assert(length != 0 || node.getAllDownhillNodes().isEmpty());
-                _baseCost = 0.15f*length;// HLONGs have length 6 and 7
+                assert(_length != 0 || node.getAllDownhillNodes().isEmpty());
+                _baseCost = 0.15f*_length;// HLONGs have length 6 and 7
                 break;
             case NODE_VLONG:
                 // Not true for UltraScale? (e.g. seen on VU440)
@@ -421,7 +405,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
                 _baseCost = 0.7f;
                 break;
             default:
-                if (length != 0) _baseCost *= length;
+                if (_length != 0) _baseCost *= _length;
                 break;
             }
         } else if (_type == RouteNodeType.PINFEED_I) {
@@ -494,6 +478,10 @@ abstract public class RouteNode implements Comparable<RouteNode> {
                     break;
             }
         }
+        if(typeToSet == RouteNodeType.PINFEED_I && node.containsLagunaTile()) {
+            typeToSet = RouteNodeType.LAGUNA_I;
+        }
+        
         isTargetAndType = (byte) (((isTargetAndType & ~ROUTE_NODE_TYPE_MASK) | (typeToSet.ordinal())));
     }
 
@@ -502,7 +490,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
      * @return The wirelength, i.e. the number of INT tiles that the associated {@link Node} instance spans.
      */
     public short getLength() {
-        return length;
+        return node.getLength();
     }
 
     /**
