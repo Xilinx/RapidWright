@@ -48,6 +48,8 @@ abstract public class RouteNode implements Comparable<RouteNode> {
     public static final short capacity = 1;
     /** Memoized static array for use by Collection.toArray() or similar */
     public static final RouteNode[] EMPTY_ARRAY = new RouteNode[0];
+    public static final int initialPresentCongestionCost = 1;
+    public static final int initialHistoricalCongestionCost = 1;
 
     /** The associated {@link Node} instance */
     protected Node node;
@@ -96,8 +98,8 @@ abstract public class RouteNode implements Comparable<RouteNode> {
         children = null;
         setEndTileXYCoordinates();
         setBaseCost(type);
-        presentCongestionCost = 1;
-        historicalCongestionCost = 1;
+        presentCongestionCost = initialPresentCongestionCost;
+        historicalCongestionCost = initialHistoricalCongestionCost;
         usersConnectionCounts = null;
         driversCounts = null;
         assert(prev == null);
