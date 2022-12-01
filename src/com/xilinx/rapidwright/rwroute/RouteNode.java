@@ -266,9 +266,12 @@ abstract public class RouteNode implements Comparable<RouteNode> {
      * @return true, if coordinates of a RouteNode is within the connection's bounding box.
      */
     public boolean isInConnectionBoundingBox(Connection connection) {
-        int endTileXCoordinate = getEndTileXCoordinate();
-        int endTileYCoordinate = getEndTileYCoordinate();
-        return endTileXCoordinate > connection.getXMinBB() && endTileXCoordinate < connection.getXMaxBB() && endTileYCoordinate > connection.getYMinBB() && endTileYCoordinate < connection.getYMaxBB();
+        short endTileXCoordinate = getEndTileXCoordinate();
+        short endTileYCoordinate = getEndTileYCoordinate();
+        return endTileXCoordinate > connection.getXMinBB() && 
+               endTileXCoordinate < connection.getXMaxBB() && 
+               endTileYCoordinate > connection.getYMinBB() && 
+               endTileYCoordinate < connection.getYMaxBB();
     }
 
     /**
