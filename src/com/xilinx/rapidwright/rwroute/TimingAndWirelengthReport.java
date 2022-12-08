@@ -162,14 +162,14 @@ public class TimingAndWirelengthReport{
             float delay = 0;
             if (endNode.getTile().getTileTypeEnum() == TileTypeEnum.INT) {
                 delay = RouterHelper.computeNodeDelay(estimator, endrn.getNode())
-                        + DelayEstimatorBase.getExtraDelay(endNode, DelayEstimatorBase.isLong(startNode));
+                        + DelayEstimatorBase.getExtraDelay(endNode.getIntentCode(), DelayEstimatorBase.isLong(startNode));
             }
             endrn.setDelayFromSource(startrn.getDelayFromSource() + delay);
         }
 
         for (Connection connection : netWrapper.getConnections()) {
             if (connection.isDirect()) continue;
-            Node sinkNode = connection.getSinkRnode().getNode();
+            Node sinkNode = connection.getSinkRnode().getNodeCopy();
             LightweightRouteNode sinkrn = nodeRoutingNodeMap.get(sinkNode);
             if (sinkrn == null) continue;
             float connectionDelay = sinkrn.getDelayFromSource();

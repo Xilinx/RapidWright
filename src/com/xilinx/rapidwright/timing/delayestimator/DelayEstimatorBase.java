@@ -39,6 +39,7 @@ import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
+import com.xilinx.rapidwright.rwroute.RouteNode;
 import com.xilinx.rapidwright.timing.GroupDelayType;
 import com.xilinx.rapidwright.timing.TimingModel;
 
@@ -96,23 +97,31 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
      * @param node the node to be checked
      * @return true if the node is a long node
      */
-    public static boolean isLong(Node node) {
+    public static boolean isLong(RouteNode node) {
         return node.getIntentCode() == IntentCode.NODE_VLONG || node.getIntentCode() == IntentCode.NODE_HLONG;
     }
 
-
+    /**
+     * Check if the node is a long node or not
+     *
+     * @param node the node to be checked
+     * @return true if the node is a long node
+     */
+    public static boolean isLong(Node node) {
+        return node.getIntentCode() == IntentCode.NODE_VLONG || node.getIntentCode() == IntentCode.NODE_HLONG;
+    }
+    
     /**
      * Return an extra delay if both parent and child are long node.
      *
-     * @param child      a child node
+     * @param childIntentCode      a child node IntentCode
      * @param longParent an indicator if the parent is a long node
      * @return the extra delay if any
      */
-    public static short getExtraDelay(Node child, boolean longParent) {
+    public static short getExtraDelay(IntentCode childIntentCode, boolean longParent) {
         if (!longParent) return 0;
 
-        IntentCode icChild = child.getIntentCode();
-        if ((icChild == IntentCode.NODE_VLONG) || (icChild == IntentCode.NODE_HLONG)) {
+        if ((childIntentCode == IntentCode.NODE_VLONG) || (childIntentCode == IntentCode.NODE_HLONG)) {
             // TODO: this should come from a delay file
             return 45;
         }

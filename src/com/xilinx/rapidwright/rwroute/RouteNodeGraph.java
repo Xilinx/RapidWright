@@ -110,7 +110,7 @@ public class RouteNodeGraph {
 
         @Override
         public boolean isPreserved(Node node) {
-            return RouteNodeGraph.this.isPreserved(node);
+            return RouteNodeGraph.this.isPreserved(node.getTile(), node.getWire());
         }
 
         @Override
@@ -303,11 +303,15 @@ public class RouteNodeGraph {
         return true;
     }
 
-    public boolean isPreserved(Node node) {
+    public boolean isPreserved(RouteNode node) {
         Tile tile = node.getTile();
         int wireIndex = node.getWire();
+        return isPreserved(tile, wireIndex);
+    }
+    
+    public boolean isPreserved(Tile tile, int wireIndex) {
         Net[] nets = preservedMap.get(tile);
-        return nets != null && nets[wireIndex] != null;
+        return nets != null && nets[wireIndex] != null;        
     }
 
     private static final Set<TileTypeEnum> allowedTileEnums;
@@ -335,7 +339,7 @@ public class RouteNodeGraph {
         return getPreservedNet(node.getTile(), node.getWire());
     }
 
-    private Net getPreservedNet(Tile tile, int wireIndex) {
+    public Net getPreservedNet(Tile tile, int wireIndex) {
         // Assumes that tile/wireIndex describes the base wire on its node
         Net[] nets = preservedMap.get(tile);
         return nets != null ? nets[wireIndex] : null;

@@ -118,7 +118,7 @@ public class TimingManager {
                      Node child = connection.getNodes().get(i);
                      Node parent = connection.getNodes().get(i+1);
                      netDelay += nodesDelays.getOrDefault(child, 0f)
-                             + DelayEstimatorBase.getExtraDelay(child, DelayEstimatorBase.isLong(parent));
+                             + DelayEstimatorBase.getExtraDelay(child.getIntentCode(), DelayEstimatorBase.isLong(parent));
                  }
                  connection.setTimingEdgesDelay(netDelay);
                  connection.setDlyPatched(true);
@@ -138,7 +138,7 @@ public class TimingManager {
             for (int i = connection.getRnodes().size() - 2; i >= 0; i--) {
                 RouteNode child = connection.getRnodes().get(i);
                 RouteNode parent = connection.getRnodes().get(i+1);
-                netDelay += child.getDelay() + DelayEstimatorBase.getExtraDelay(child.getNode(), DelayEstimatorBase.isLong(parent.getNode()));
+                netDelay += child.getDelay() + DelayEstimatorBase.getExtraDelay(child.getIntentCode(), DelayEstimatorBase.isLong(parent));
             }
             connection.setTimingEdgesDelay(netDelay);
             connection.setDlyPatched(true);
@@ -237,7 +237,7 @@ public class TimingManager {
                     for (int iGroup = nodes.size() -1; iGroup >= 0; iGroup--) {
                         RouteNode rnode = routingGraph.getNode(nodes.get(iGroup));
                         if (rnode != null) {
-                            System.out.println("\t " + rnode.getNode() + ", " + rnode.getNode().getIntentCode() + ", delay = " + (short) rnode.getDelay());
+                            System.out.println("\t " + rnode.getNodeString() + ", " + rnode.getIntentCode() + ", delay = " + (short) rnode.getDelay());
                         } else {
                             System.out.println("\t " + nodes.get(iGroup) + ", " + nodes.get(iGroup).getIntentCode() + ", delay = " + 0);
                         }

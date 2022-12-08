@@ -33,6 +33,7 @@ import java.util.Map;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
+import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
@@ -50,8 +51,12 @@ abstract public class RouteNode implements Comparable<RouteNode> {
     /** Memoized static array for use by Collection.toArray() or similar */
     public static final RouteNode[] EMPTY_ARRAY = new RouteNode[0];
 
-    /** The associated {@link Node} instance */
-    protected Node node;
+    private static ThreadLocal<Node> staticNode = new ThreadLocal<>();
+    
+    private Tile tile;
+    
+    private int wire;
+    
     /** The tileXCoordinate and tileYCoordinate of the INT tile that the associated node stops at */
     private short endTileXCoordinate;
     private short endTileYCoordinate;
@@ -90,7 +95,8 @@ abstract public class RouteNode implements Comparable<RouteNode> {
     private Map<RouteNode, Integer> driversCounts;
 
     public RouteNode(Node node, RouteNodeType type) {
-        this.node = node;
+        this.tile = node.getTile();
+        this.wire = node.getWire();
         setType(type);
         children = null;
         presentCongestionCost = 1;
@@ -119,8 +125,9 @@ abstract public class RouteNode implements Comparable<RouteNode> {
         if (children != null)
             return;
         setChildrenTimer.start();
-        List<Node> allDownHillNodes = node.getAllDownhillNodes();
+        List<Node> allDownHillNodes = getAllDownhillNodes();
         List<RouteNode> childrenList = new ArrayList<>(allDownHillNodes.size());
+        Node node = getStaticNode();
         for (Node downhill: allDownHillNodes) {
             if (!mustInclude(node, downhill)) {
                 if (isPreserved(downhill) || isExcluded(node, downhill))
@@ -234,13 +241,13 @@ abstract public class RouteNode implements Comparable<RouteNode> {
     @Override
     public String toString() {
         StringBuilder s = new StringBuilder();
-        s.append("node " + node.toString());
+        s.append("node " + getNodeString());
         s.append(", ");
         s.append("(" + getEndTileXCoordinate() + "," + getEndTileYCoordinate() + ")");
         s.append(", ");
         s.append(String.format("type = %s", getType()));
         s.append(", ");
-        s.append(String.format("ic = %s", node.getIntentCode()));
+        s.append(String.format("ic = %s", getIntentCode()));
         s.append(", ");
         s.append(String.format("user = %s", getOccupancy()));
         s.append(", ");
@@ -250,7 +257,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
 
     @Override
     public int hashCode() {
-        return node.hashCode();
+        return getStaticNode().hashCode();
     }
 
     @Override
@@ -262,7 +269,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
         if (getClass() != obj.getClass())
             return false;
         RouteNode that = (RouteNode) obj;
-        return node.equals(that.node);
+        return getTile().equals(that.getTile()) && getWire() == that.getWire();
     }
 
     /**
@@ -276,15 +283,63 @@ abstract public class RouteNode implements Comparable<RouteNode> {
                endTileYCoordinate > connection.getYMinBB() && 
                endTileYCoordinate < connection.getYMaxBB();
     }
-
+    
     /**
-     * Gets the associated Node of a RouteNode Object.
-     * @return The associated Node of a RouteNode Object.
+     * Gets the current tile associated with the base wire of the node
+     * @return Current tile of the base wire of the node
      */
-    public Node getNode() {
-        return node;
+    public Tile getTile() {
+        return tile;
+    }
+    
+    /**
+     * Get the wire index of the base wire of the node 
+     * @return the wire index of the base wire of the node
+     */
+    public int getWire() {
+        return wire;
+    }
+    
+    /**
+     * Gets the IntentCode of this node (base wire of the node)
+     * @return The IntentCode of the base wire of this node
+     */
+    public IntentCode getIntentCode() {
+        return getTile().getWireIntentCode(getWire());
     }
 
+    private Node getStaticNode() { 
+        Node curr = null;
+        if(staticNode.get() == null) {
+            curr = Node.getNode(getTile(), getWire());
+            staticNode.set(curr);
+        } else {
+            curr = staticNode.get();
+            curr.setRawTileWire(getTile(), getWire());
+        }
+        return curr;
+    }
+    
+    public Node getNodeCopy() {
+        return Node.getNode(getTile(), getWire());
+    }
+    
+    public List<Node> getAllDownhillNodes() {
+        return getStaticNode().getAllDownhillNodes();
+    }
+    
+    public List<Node> getAllUphillNodes() {
+        return getStaticNode().getAllUphillNodes();
+    }
+    
+    public String getNodeString() {
+        return getTile() + "/" + getTile().getWireName(getWire());
+    }
+    
+    public SitePin getSitePin() {
+        return getStaticNode().getSitePin();
+    }
+    
     /**
      * Checks if a RouteNode Object is the current routing target.
      * @return true, if a RouteNode Object is the current routing target.
@@ -319,11 +374,11 @@ abstract public class RouteNode implements Comparable<RouteNode> {
     }
 
     public short getBeginTileXCoordinate() {
-        return (short) node.getTile().getTileXCoordinate();
+        return (short) getTile().getTileXCoordinate();
     }
 
     public short getBeginTileYCoordinate() {
-        return (short) node.getTile().getTileYCoordinate();
+        return (short) getTile().getTileYCoordinate();
     }
 
     /**
@@ -336,16 +391,16 @@ abstract public class RouteNode implements Comparable<RouteNode> {
     }
     
     public short _getEndTileXCoordinate() {
-        short endTileXCoord = (short) node.getEndTile().getTileXCoordinate();
-        if (node.getTile().getTileTypeEnum() == TileTypeEnum.LAG_LAG) { // UltraScale+ only
+        short endTileXCoord = (short) getStaticNode().getEndTile().getTileXCoordinate();
+        if (tile.getTileTypeEnum() == TileTypeEnum.LAG_LAG) { // UltraScale+ only
             // Correct the X coordinate of all Laguna nodes since they are accessed by the INT
             // tile to its right, yet has the LAG tile has a tile X coordinate one less
             // Do not apply this correction for NODE_LAGUNA_OUTPUT nodes unless it is a LAGUNA_I pinfeed
             // (i.e. do not apply it to nodes that leave the SLL)
             // Nor apply it to VCC_WIREs since their end tiles are INT tiles.
-            if ((node.getIntentCode() != IntentCode.NODE_LAGUNA_OUTPUT || getType() == RouteNodeType.LAGUNA_I) &&
-                !node.isTiedToVcc()) {
-                assert(node.getTile().getTileXCoordinate() == endTileXCoord);
+            if ((getIntentCode() != IntentCode.NODE_LAGUNA_OUTPUT || getType() == RouteNodeType.LAGUNA_I) &&
+                !getStaticNode().isTiedToVcc()) {
+                assert(tile.getTileXCoordinate() == endTileXCoord);
                 endTileXCoord++;
             }
         }
@@ -362,11 +417,11 @@ abstract public class RouteNode implements Comparable<RouteNode> {
         boolean reverseSLL = (prev != null &&
                 getType() == RouteNodeType.SUPER_LONG_LINE &&
                 prev.getEndTileYCoordinate() == endTileYCoordinate);
-        return reverseSLL ? (short) node.getTile().getTileYCoordinate() : endTileYCoordinate;  
+        return reverseSLL ? (short) getTile().getTileYCoordinate() : endTileYCoordinate;  
     }
 
     public short _getEndTileYCoordinate() {
-        return (short) node.getEndTile().getTileYCoordinate();
+        return (short) getStaticNode().getEndTile().getTileYCoordinate();
     }
     
     /**
@@ -390,18 +445,18 @@ abstract public class RouteNode implements Comparable<RouteNode> {
         } else if (_type == RouteNodeType.WIRE) {
             _baseCost = 0.4f;
             // NOTE: IntentCode is device-dependent
-            IntentCode ic = node.getIntentCode();
+            IntentCode ic = getIntentCode();
             switch(ic) {
             case NODE_PINBOUNCE:
             case NODE_PINFEED:
                 break;
             case NODE_DOUBLE:
-                if (getEndTileXCoordinate() != node.getTile().getTileXCoordinate()) {
+                if (getEndTileXCoordinate() != getTile().getTileXCoordinate()) {
                     _baseCost = 0.4f*_length;
                 }
                 break;
             case NODE_HQUAD:
-                assert(_length != 0 || node.getAllDownhillNodes().isEmpty());
+                assert(_length != 0 || getAllDownhillNodes().isEmpty());
                 _baseCost = 0.35f*_length;
                 break;
             case NODE_VQUAD:
@@ -409,7 +464,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
                 if (_length != 0) _baseCost = 0.15f*_length;// VQUADs have length 4 and 5
                 break;
             case NODE_HLONG:
-                assert(_length != 0 || node.getAllDownhillNodes().isEmpty());
+                assert(_length != 0 || getAllDownhillNodes().isEmpty());
                 _baseCost = 0.15f*_length;// HLONGs have length 6 and 7
                 break;
             case NODE_VLONG:
@@ -453,7 +508,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
         RouteNodeType typeToSet = type;
         if (type == RouteNodeType.WIRE) {
             // NOTE: IntentCode is device-dependent
-            IntentCode ic = node.getIntentCode();
+            IntentCode ic = getIntentCode();
             switch (ic) {
                 case NODE_PINBOUNCE:
                     typeToSet = RouteNodeType.PINBOUNCE;
@@ -465,22 +520,22 @@ abstract public class RouteNode implements Comparable<RouteNode> {
                     break;
 
                 case NODE_LAGUNA_OUTPUT: // UltraScale+ only
-                    assert(node.getTile().getTileTypeEnum() == TileTypeEnum.LAG_LAG);
+                    assert(getTile().getTileTypeEnum() == TileTypeEnum.LAG_LAG);
                     // TODO: Collect wire indices to save on string comparison
-                    if (node.getWireName().endsWith("_TXOUT")) {
+                    if (getTile().getWireName(getWire()).endsWith("_TXOUT")) {
                         typeToSet = RouteNodeType.LAGUNA_I;
                     }
                     break;
 
                 case NODE_LAGUNA_DATA: // UltraScale+ only
-                    assert(node.getTile().getTileTypeEnum() == TileTypeEnum.LAG_LAG);
+                    assert(getTile().getTileTypeEnum() == TileTypeEnum.LAG_LAG);
                     typeToSet = RouteNodeType.SUPER_LONG_LINE;
                     break;
 
                 case INTENT_DEFAULT:
-                    if (node.getTile().getTileTypeEnum() == TileTypeEnum.LAGUNA_TILE) { // UltraScale only
+                    if (getTile().getTileTypeEnum() == TileTypeEnum.LAGUNA_TILE) { // UltraScale only
                         // TODO: Collect wire indices to save on string comparison
-                        String wireName = node.getWireName();
+                        String wireName = getTile().getWireName(getWire());
                         if (wireName.startsWith("UBUMP")) {
                             typeToSet = RouteNodeType.SUPER_LONG_LINE;
                         } else if (wireName.endsWith("_TXOUT")) {
@@ -491,7 +546,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
                     break;
             }
         }
-        if(typeToSet == RouteNodeType.PINFEED_I && node.containsLagunaTile()) {
+        if(typeToSet == RouteNodeType.PINFEED_I && getStaticNode().containsLagunaTile()) {
             typeToSet = RouteNodeType.LAGUNA_I;
         }
         
@@ -503,7 +558,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
      * @return The wirelength, i.e. the number of INT tiles that the associated {@link Node} instance spans.
      */
     public short getLength() {
-        return node.getLength();
+        return getStaticNode().getLength();
     }
 
     /**

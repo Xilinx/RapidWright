@@ -118,7 +118,7 @@ public class RouteFixer{
             if (nexts == null || nexts.isEmpty()) continue;
             for (NodeWithDelay next : nexts) {
                 float newCost = cur.cost + next.getDelay()
-                        + DelayEstimatorBase.getExtraDelay(next.getNode(), DelayEstimatorBase.isLong(cur.getNode()));
+                        + DelayEstimatorBase.getExtraDelay(next.getNode().getIntentCode(), DelayEstimatorBase.isLong(cur.getNode()));
                 if (!next.isVisited() || (next.isVisited() && newCost < next.cost)) {
                     // The second condition is necessary,
                     // because a smaller path delay from the source to the current "next" could be achieved later.

@@ -111,13 +111,13 @@ public class RouteNodeGraphTimingDriven extends RouteNodeGraph {
         @Override
         public String toString() {
             StringBuilder s = new StringBuilder();
-            s.append("node " + node.toString());
+            s.append("node " + getTile().toString() + "/" + getTile().getWireName(getWire()));
             s.append(", ");
             s.append("(" + getEndTileXCoordinate() + "," + getEndTileYCoordinate() + ")");
             s.append(", ");
             s.append(String.format("type = %s", getType()));
             s.append(", ");
-            s.append(String.format("ic = %s", node.getIntentCode()));
+            s.append(String.format("ic = %s", getIntentCode()));
             s.append(", ");
             s.append(String.format("dly = %f", delay));
             s.append(", ");

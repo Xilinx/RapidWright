@@ -420,7 +420,7 @@ public class RouterHelper {
             int delay = 0;
             if (endNode.getTile().getTileTypeEnum() == TileTypeEnum.INT) {//device independent?
                 delay = computeNodeDelay(estimator, endNode)
-                        + DelayEstimatorBase.getExtraDelay(endNode, DelayEstimatorBase.isLong(startNode));
+                        + DelayEstimatorBase.getExtraDelay(endNode.getIntentCode(), DelayEstimatorBase.isLong(startNode));
             }
 
             endrn.setDelayFromSource(startrn.getDelayFromSource() + delay);
