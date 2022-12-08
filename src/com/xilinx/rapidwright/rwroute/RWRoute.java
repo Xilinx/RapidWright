@@ -666,19 +666,20 @@ public class RWRoute{
     private void estimateDelayOfConnections() {
         for (Connection connection : indirectConnections) {
             RouteNode source = connection.getSourceRnode();
-            if (source.getChildren().length == 0) {
+            if (source.getChildrenCount() == 0) {
                 // output pin is blocked
                 swapOutputPin(connection);
                 source = connection.getSourceRnode();
             }
             short estDelay = (short) 10000;
-            for (RouteNode child : source.getChildren()) {
+            RouteNode[] childrenArray = source.getChildren();
+            for (int i=source.getChildrenStartIdx(); i < childrenArray.length; i++) {
+                RouteNode child = source.getChildren()[i];
                 short tmpDelay = 113;
                 tmpDelay += child.getDelay();
                 if (tmpDelay < estDelay) {
                     estDelay = tmpDelay;
                 }
-
             }
             estDelay += source.getDelay();
             connection.setTimingEdgesDelay(estDelay);
@@ -1367,7 +1368,9 @@ public class RWRoute{
                                   float rnodeDelayWeight, float rnodeEstDlyWeight) {
         PriorityQueue<RouteNode> queue = this.queue.get();
         boolean longParent = config.isTimingDriven() && DelayEstimatorBase.isLong(rnode.getNode());
-        for (RouteNode childRNode:rnode.getChildren()) {
+        RouteNode[] childrenArray = rnode.getChildren();
+        for (int i=rnode.getChildrenStartIdx(); i < childrenArray.length; i++) {
+            RouteNode childRNode = childrenArray[i];
             // Targets that are visited more than once must be overused
             assert(!childRNode.isTarget() || !childRNode.isVisited() || childRNode.willOverUse(connection.getNetWrapper()));
 

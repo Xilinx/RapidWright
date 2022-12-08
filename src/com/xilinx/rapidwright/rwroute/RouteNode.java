@@ -25,10 +25,12 @@
 package com.xilinx.rapidwright.rwroute;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.device.IntentCode;
@@ -73,8 +75,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
     private float upstreamPathCost;
     /** Lower bound of the total path cost */
     private float lowerBoundTotalPathCost;
-    /** A variable that stores the parent of a rnode during expansion to facilitate tracing back */
-    private RouteNode prev;
+
     /**
      * A map that records users of a rnode based on all routed connections.
      * Each user is a {@link NetWrapper} instance that corresponds to a {@link Net} instance.
@@ -100,7 +101,6 @@ abstract public class RouteNode implements Comparable<RouteNode> {
         historicalCongestionCost = 1;
         usersConnectionCounts = null;
         driversCounts = null;
-        assert(prev == null);
         assert(!isTarget);
     }
 
@@ -117,7 +117,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
     abstract protected RouteNode getOrCreate(Node node, RouteNodeType type);
 
     protected void setChildren(RuntimeTracker setChildrenTimer) {
-        if (children != null)
+        if (children != null && children.length > 1)
             return;
         setChildrenTimer.start();
         List<Node> allDownHillNodes = node.getAllDownhillNodes();
@@ -132,10 +132,11 @@ abstract public class RouteNode implements Comparable<RouteNode> {
             RouteNode child = getOrCreate(downhill, type);
             childrenList.add(child);//the sink rnode of a target connection has been created up-front
         }
-        if (!childrenList.isEmpty()) {
-            children = childrenList.toArray(EMPTY_ARRAY);
-        } else {
-            children = EMPTY_ARRAY;
+        RouteNode prev = getPrev();
+        children = new RouteNode[childrenList.size() + 1];
+        children[0] = prev;
+        for(int i=0; i < childrenList.size(); i++) {
+            children[i+1] = childrenList.get(i);
         }
         setChildrenTimer.stop();
     }
@@ -421,9 +422,9 @@ abstract public class RouteNode implements Comparable<RouteNode> {
      * @return The tileYCoordinate of the INT tile that the associated {@link Node} instance stops at.
      */
     public short getEndTileYCoordinate() {
-        boolean reverseSLL = (prev != null &&
+        boolean reverseSLL = (getPrev() != null &&
                 getType() == RouteNodeType.SUPER_LONG_LINE &&
-                prev.endTileYCoordinate == endTileYCoordinate);
+                getPrev().endTileYCoordinate == endTileYCoordinate);
         return reverseSLL ? (short) node.getTile().getTileYCoordinate() : endTileYCoordinate;
     }
 
@@ -443,6 +444,14 @@ abstract public class RouteNode implements Comparable<RouteNode> {
         return children != null ? children : EMPTY_ARRAY;
     }
 
+    public int getChildrenCount() {
+        return children != null && children.length > 0 ? children.length - 1 : 0;
+    }
+    
+    public int getChildrenStartIdx() {
+        return children != null && children.length > 0 ? 1 : 0;
+    }
+    
     /**
      * Clears the children of this node so that it can be regenerated.
      */
@@ -637,7 +646,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
      * @return The driving RouteNode instance.
      */
     public RouteNode getPrev() {
-        return prev;
+        return children != null && children.length > 0 ? children[0] : null;
     }
 
     /**
@@ -646,7 +655,10 @@ abstract public class RouteNode implements Comparable<RouteNode> {
      */
     public void setPrev(RouteNode prev) {
         assert(prev != null);
-        this.prev = prev;
+        if (children == null) {
+            children = new RouteNode[1];
+        }
+        children[0] = prev;
     }
 
     /**

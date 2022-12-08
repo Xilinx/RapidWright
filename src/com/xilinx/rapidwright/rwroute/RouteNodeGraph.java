@@ -430,7 +430,7 @@ public class RouteNodeGraph {
     public int averageChildren() {
         int sum = 0;
         for (RouteNode rnode : getRnodes()) {
-            sum += rnode.everExpanded() ? rnode.getChildren().length : 0;
+            sum += rnode.everExpanded() ? rnode.getChildrenCount() : 0;
         }
         return Math.round((float) sum / numNodes());
     }
