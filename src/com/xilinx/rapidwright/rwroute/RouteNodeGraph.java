@@ -38,7 +38,6 @@ import com.xilinx.rapidwright.util.RuntimeTracker;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.BitSet;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -86,15 +85,12 @@ public class RouteNodeGraph {
     public final int[] nextLagunaColumn;
     public final int[] prevLagunaColumn;
 
-    private final BitSet visited;
+    private int visitedCount;
+    private int visitedId;
 
     protected class RouteNodeImpl extends RouteNode {
-
-        private final int index;
-
         public RouteNodeImpl(Node node, RouteNodeType type) {
             super(node, type);
-            index = numNodes();
             assert(!isVisited());
         }
 
@@ -120,13 +116,13 @@ public class RouteNodeGraph {
 
         @Override
         public boolean isVisited() {
-            return visited.get(index);
+            return isVisited(visitedId);
         }
 
         @Override
         public void setVisited() {
-            assert(!visited.get(index));
-            visited.set(index);
+            assert(!isVisited());
+            setVisited(visitedId);
         }
 
         @Override
@@ -156,7 +152,8 @@ public class RouteNodeGraph {
         preservedMapSize = new AtomicInteger();
         asyncPreserveOutstanding = new CountUpDownLatch();
         targets = new ArrayList<>();
-        visited = new BitSet();
+        visitedCount = 0;
+        visitedId = ++visitedCount;
         this.setChildrenTimer = setChildrenTimer;
 
         Device device = design.getDevice();
@@ -419,12 +416,12 @@ public class RouteNodeGraph {
      * Resets the expansion history.
      */
     public void resetExpansion() {
-        visited.clear();
         for (RouteNode node : targets) {
             assert(node.isTarget());
             node.setTarget(false);
         }
         targets.clear();
+        visitedId = ++visitedCount;
     }
 
     public int averageChildren() {

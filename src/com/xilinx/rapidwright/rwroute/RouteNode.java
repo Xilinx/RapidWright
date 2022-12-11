@@ -75,6 +75,8 @@ abstract public class RouteNode implements Comparable<RouteNode> {
     private float upstreamPathCost;
     /** Lower bound of the total path cost */
     private float lowerBoundTotalPathCost;
+    /** A variable indicating which id this rnode was last visited by during the expansion */
+    private int visited;
     /** A variable that stores the parent of a rnode during expansion to facilitate tracing back */
     private RouteNode prev;
     /**
@@ -102,6 +104,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
         historicalCongestionCost = initialHistoricalCongestionCost;
         usersConnectionCounts = null;
         driversCounts = null;
+        visited = 0;
         assert(prev == null);
         assert(!isTarget);
     }
@@ -698,7 +701,17 @@ abstract public class RouteNode implements Comparable<RouteNode> {
      */
     abstract public boolean isVisited();
 
+    protected boolean isVisited(int id) {
+        assert(id > 0);
+        return visited == id;
+    }
+
     abstract public void setVisited();
+
+    public void setVisited(int id) {
+        assert(id > 0);
+        visited = id;
+    }
 
     /**
      * Checks if a node is an exit node of a NodeGroup
