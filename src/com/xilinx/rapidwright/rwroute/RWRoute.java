@@ -1219,6 +1219,7 @@ public class RWRoute{
 
         prepareRouteConnection(connection, shareWeight, rnodeCostWeight,
                 rnodeWLWeight, estWlWeight, dlyWeight, estDlyWeight);
+        connection.resetRoute();
 
         int nodesPoppedThisConnection = 0;
         RouteNode rnode;
@@ -1240,8 +1241,6 @@ public class RWRoute{
             assert(connection.getSink().isRouted());
         } else {
             assert(queue.isEmpty());
-            // Clears previous route of the connection
-            connection.resetRoute();
             assert(connection.getRnodes().isEmpty());
             assert(!connection.getSink().isRouted());
         }
@@ -1334,7 +1333,6 @@ public class RWRoute{
         }
         assert(rnode == connection.getSinkRnode() || rnode == connection.getAltSinkRnode());
 
-        connection.resetRoute();
         do {
             connection.addRnode(rnode);
         } while ((rnode = rnode.getPrev()) != null);
