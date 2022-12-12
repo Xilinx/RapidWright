@@ -87,8 +87,8 @@ public class Connection implements Comparable<Connection>{
     /** List of nodes assigned to a connection to form the path for generating PIPs */
     private List<Node> nodes;
 
-    /** Map of all RouteNodes upstream of sinks, where value indicates primary sink (if true) or alternate sink */
-    private final Map<RouteNode, Boolean> sinkUphillRnodes;
+    /** For non-sink targets, mark the next rnode on the uncongested path back to the sink */
+    private final Map<RouteNode, RouteNode> nextRnodes;
 
     public Connection(int id, SitePinInst source, SitePinInst sink, NetWrapper netWrapper) {
         this.id = id;
@@ -99,7 +99,7 @@ public class Connection implements Comparable<Connection>{
         this.netWrapper = netWrapper;
         netWrapper.addConnection(this);
         crossSLR = !source.getTile().getSLR().equals(sink.getTile().getSLR());
-        sinkUphillRnodes = new HashMap<>();
+        nextRnodes = new HashMap<>();
     }
 
     /**
@@ -467,15 +467,16 @@ public class Connection implements Comparable<Connection>{
         }
     }
 
-    public void addSinkUphill(RouteNode rnode, Boolean primarySink) {
-        sinkUphillRnodes.put(rnode, primarySink);
+    public void addNextRnode(RouteNode rnode, RouteNode nextRnode) {
+        RouteNode existingRnode = nextRnodes.put(rnode, nextRnode);
+        assert(existingRnode == null);
     }
 
-    public Boolean isSinkUphill(RouteNode rnode) {
-        return sinkUphillRnodes.get(rnode);
+    public RouteNode getNextRnode(RouteNode rnode) {
+        return nextRnodes.get(rnode);
     }
 
-    public void clearSinkUphills() {
-        sinkUphillRnodes.clear();
+    public void clearNextRnodes() {
+        nextRnodes.clear();
     }
 }

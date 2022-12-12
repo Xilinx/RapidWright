@@ -25,7 +25,6 @@
 package com.xilinx.rapidwright.rwroute;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Collection;
 import java.util.EnumMap;
@@ -1247,7 +1246,7 @@ public class RWRoute{
             assert(!connection.getSink().isRouted());
         }
 
-        connection.clearSinkUphills();
+        connection.clearNextRnodes();
         routingGraph.resetExpansion();
     }
 
@@ -1326,32 +1325,14 @@ public class RWRoute{
      * @param connection: The connection that is being routed.
      * @param rnode RouteNode to start backtracking from.
      */
-    private void saveRouting(Connection connection, RouteNode rnode) {
-        RouteNode sinkRnode = connection.getSinkRnode();
-        RouteNode altSinkRnode = connection.getAltSinkRnode();
-        if (rnode != sinkRnode && rnode != altSinkRnode) {
-            Boolean isSinkUphill = connection.isSinkUphill(rnode);
-            if (isSinkUphill != null) {
-                if (isSinkUphill) {
-                    assert(Arrays.asList(rnode.getChildren()).contains(sinkRnode));
-                    sinkRnode.setPrev(rnode);
-                    rnode = sinkRnode;
-                } else {
-                    assert(altSinkRnode != null && Arrays.asList(rnode.getChildren()).contains(altSinkRnode));
-                    altSinkRnode.setPrev(rnode);
-                    rnode = altSinkRnode;
-                }
-            } else {
-                // Check that this is the sink path marked by prepareRouteConnection()
-                List<RouteNode> prevRouting = connection.getRnodes();
-                if (!connection.getSink().isRouted() || prevRouting.isEmpty() || !rnode.isTarget()) {
-                    throw new RuntimeException();
-                } else {
-                    // Backtrack from the sink used by the previous iteration
-                    rnode = prevRouting.get(0);
-                }
-            }
+    protected void saveRouting(Connection connection, RouteNode rnode) {
+        RouteNode nextRnode;
+        while ((nextRnode = connection.getNextRnode(rnode)) != null) {
+            assert(nextRnode.isTarget());
+            nextRnode.setPrev(rnode);
+            rnode = nextRnode;
         }
+        assert(rnode == connection.getSinkRnode() || rnode == connection.getAltSinkRnode());
 
         connection.resetRoute();
         do {
@@ -1673,25 +1654,23 @@ public class RWRoute{
         // Since targets are typically IMUX_* nodes, its parent INT_NODE_IMUX_* nodes do not normally
         // undergo lookahead, but enable them here for faster convergence
         NetWrapper netWrapper = connectionToRoute.getNetWrapper();
-        for (RouteNode sinkRnode : Arrays.asList(connectionToRoute.getSinkRnode(), connectionToRoute.getAltSinkRnode())) {
-            if (sinkRnode == null) {
+        RouteNode sinkRnode = connectionToRoute.getSinkRnode();
+        // Don't mark uphill nodes of will-be-congested (primary) sinks if an alternate sink exists,
+        // as terminating on any such uphills may hide the fact that the alternate sink may be less congested
+        if (connectionToRoute.getAltSinkRnode() == null || !sinkRnode.willOverUse(netWrapper)) {
+            setUphillTargets(connectionToRoute, sinkRnode);
+        }
+    }
+
+    protected void setUphillTargets(Connection connectionToRoute, RouteNode rnode) {
+        for (Node uphill : rnode.getNode().getAllUphillNodes()) {
+            if (routingGraph.isPreserved(uphill))
                 continue;
-            }
-            if (connectionToRoute.getAltSinkRnode() != null && sinkRnode.willOverUse(netWrapper)) {
-                // Don't mark uphill nodes of will-be-congested (primary) sinks if an alternate sink exists,
-                // as terminating on any uphills may hide the fact that the alternate sink may be less congested
-                continue;
-            }
-            Boolean primarySink = (sinkRnode == connectionToRoute.getSinkRnode());
-            for (Node uphill : sinkRnode.getNode().getAllUphillNodes()) {
-                if (routingGraph.isPreserved(uphill))
-                    continue;
-                RouteNode uphillRnode = getOrCreateRouteNode(uphill, RouteNodeType.WIRE);
-                // Mindful that uphill nodes may be duplicated, e.g. INT_X131Y900/IMUX_E0 on VU19P
-                if (!uphillRnode.isTarget()) {
-                    uphillRnode.setTarget(true);
-                    connectionToRoute.addSinkUphill(uphillRnode, primarySink);
-                }
+            RouteNode uphillRnode = getOrCreateRouteNode(uphill, RouteNodeType.WIRE);
+            // Mindful that uphill nodes may be duplicated, e.g. INT_X131Y900/IMUX_E0 on VU19P
+            if (!uphillRnode.isTarget()) {
+                uphillRnode.setTarget(true);
+                connectionToRoute.addNextRnode(uphillRnode, rnode);
             }
         }
     }
