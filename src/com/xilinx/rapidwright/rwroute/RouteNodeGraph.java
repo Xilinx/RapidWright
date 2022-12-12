@@ -128,6 +128,7 @@ public class RouteNodeGraph {
         @Override
         public void setTarget(boolean isTarget) {
             if (isTarget) {
+                assert(!isTarget());
                 targets.add(this);
             }
             super.setTarget(isTarget);

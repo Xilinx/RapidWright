@@ -25,7 +25,10 @@
 package com.xilinx.rapidwright.rwroute;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.BitSet;
 import java.util.Collection;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -40,9 +43,11 @@ import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.util.MessageGenerator;
@@ -152,9 +157,44 @@ public class RWRoute{
     /** A map storing routes from CLK_OUT to different INT tiles that connect to sink pins of a global clock net */
     private Map<String, List<String>> routesToSinkINTTiles;
 
+    /** A map indicating whether a node described by (TileTypeEnum, WireIndex) should undergo lookahead */
+    private final EnumMap<TileTypeEnum, BitSet> lookaheadFilter;
+    private final BitSet EMPTY_BITSET = new BitSet(0);
+
     public RWRoute(Design design, RWRouteConfig config) {
         this.design = design;
         this.config = config;
+
+        lookaheadFilter = new EnumMap<>(TileTypeEnum.class);
+        Device device = design.getDevice();
+        {
+            Tile intTile = device.getArbitraryTileOfType(TileTypeEnum.INT);
+            BitSet bs = new BitSet();
+            for (int wire = 0; wire < intTile.getWireCount(); wire++) {
+                String wireName = intTile.getWireName(wire);
+                if (wireName.startsWith("INT_NODE_SDQ_")    // UltraScale+
+                        || wireName.startsWith("INT_NODE_QUAD_LONG_") || wireName.startsWith("INT_NODE_SINGLE_DOUBLE_") // UltraScale
+                ) {
+                    bs.set(wire);
+                }
+            }
+            lookaheadFilter.put(intTile.getTileTypeEnum(), bs);
+        }
+        {
+            Tile lagunaTile = device.getArbitraryTileOfType(device.getSeries() == Series.UltraScale ? TileTypeEnum.LAGUNA_TILE
+                    /* device.getSeries() == Series.UltraScalePlus */ : TileTypeEnum.LAG_LAG);
+            if (lagunaTile != null) {
+                BitSet bs = new BitSet(lagunaTile.getWireCount());
+                for (int wire = 0; wire < lagunaTile.getWireCount(); wire++) {
+                    String wireName = lagunaTile.getWireName(wire);
+                    if (wireName.endsWith("_TXOUT")) {
+                        bs.set(wire);
+                        // TODO: Lookahead for preceding IMUX too
+                    }
+                }
+                lookaheadFilter.put(lagunaTile.getTileTypeEnum(), bs);
+            }
+        }
     }
 
     protected void preprocess() {
@@ -1207,6 +1247,7 @@ public class RWRoute{
             assert(!connection.getSink().isRouted());
         }
 
+        connection.clearSinkUphills();
         routingGraph.resetExpansion();
     }
 
@@ -1289,13 +1330,27 @@ public class RWRoute{
         RouteNode sinkRnode = connection.getSinkRnode();
         RouteNode altSinkRnode = connection.getAltSinkRnode();
         if (rnode != sinkRnode && rnode != altSinkRnode) {
-            List<RouteNode> prevRouting = connection.getRnodes();
-            // Check that this is the sink path marked by prepareRouteConnection()
-            if (!connection.getSink().isRouted() || prevRouting.isEmpty() || !rnode.isTarget()) {
-                throw new RuntimeException();
+            Boolean isSinkUphill = connection.isSinkUphill(rnode);
+            if (isSinkUphill != null) {
+                if (isSinkUphill) {
+                    assert(Arrays.asList(rnode.getChildren()).contains(sinkRnode));
+                    sinkRnode.setPrev(rnode);
+                    rnode = sinkRnode;
+                } else {
+                    assert(altSinkRnode != null && Arrays.asList(rnode.getChildren()).contains(altSinkRnode));
+                    altSinkRnode.setPrev(rnode);
+                    rnode = altSinkRnode;
+                }
+            } else {
+                // Check that this is the sink path marked by prepareRouteConnection()
+                List<RouteNode> prevRouting = connection.getRnodes();
+                if (!connection.getSink().isRouted() || prevRouting.isEmpty() || !rnode.isTarget()) {
+                    throw new RuntimeException();
+                } else {
+                    // Backtrack from the sink used by the previous iteration
+                    rnode = prevRouting.get(0);
+                }
             }
-            // Backtrack from the sink used on that sink path
-            rnode = prevRouting.get(0);
         }
 
         connection.resetRoute();
@@ -1364,17 +1419,19 @@ public class RWRoute{
             if (childRNode.isVisited()) {
                 // Node must be in queue already.
 
-                // Note: it is possible that another (cheaper) path to a rnode is found here;
-                // however, because the PriorityQueue class does not support (efficiently) reducing
-                // the cost of nodes already in the queue, this opportunity is discarded
+                // Note: it is possible this is a cheaper path to childRNode; however, because the
+                // PriorityQueue class does not support (efficiently) reducing the cost of nodes
+                // already in the queue, this opportunity is discarded
                 continue;
             }
 
             if (childRNode.isTarget()) {
-                // Despite the limitation above, on encountering a target only terminate
-                // immediately by clearing the queue if this target is not overused since
-                // there could be an alternate target that may be less congested
-                if (!childRNode.willOverUse(connection.getNetWrapper())) {
+                // Despite the limitation above, on encountering a target only terminate immediately
+                // by clearing the queue if childRnode is the one and only sink on this connection,
+                // otherwise terminate if this target will not be overused since we may find that
+                // the alternate sink is less congested
+                if ((childRNode == connection.getSinkRnode() && connection.getAltSinkRnode() == null) ||
+                        !childRNode.willOverUse(connection.getNetWrapper())) {
                     assert(!childRNode.isVisited());
                     nodesPushed += queue.size();
                     queue.clear();
@@ -1414,9 +1471,10 @@ public class RWRoute{
                 }
             }
 
-            evaluateCostAndPush(rnode, longParent, childRNode, connection, shareWeight, rnodeCostWeight,
-                    rnodeLengthWeight, rnodeEstWlWeight, rnodeDelayWeight, rnodeEstDlyWeight);
-            if (childRNode.isTarget() && queue.size() == 1) {
+            boolean lookahead = !childRNode.isTarget();
+            evaluateCostAndPush(rnode, longParent, childRNode, connection, lookahead,
+                    shareWeight, rnodeCostWeight, rnodeLengthWeight, rnodeEstWlWeight, rnodeDelayWeight, rnodeEstDlyWeight);
+            if (queue.size() == 1 && queue.peek().isTarget()) {
                 // Target is uncongested and the only thing in the (previously cleared) queue, abandon immediately
                 break;
             }
@@ -1439,6 +1497,8 @@ public class RWRoute{
      * @param longParent A boolean value to indicate if the parent is a Long node
      * @param childRnode The child rnode in question.
      * @param connection The target connection being routed.
+     * @param lookahead Indicates that whether this child rnode should consider lookahead -- instead of pushing onto the queue,
+     *                  recurse into this child's children to find more discernible nodes to be pushed onto queue.
      * @param sharingWeight The sharing weight based on a connection's criticality and the shareExponent for computing a new sharing factor.
      * @param rnodeCostWeight The cost weight of the childRnode
      * @param rnodeLengthWeight The wirelength weight of childRnode's exact length.
@@ -1446,7 +1506,8 @@ public class RWRoute{
      * @param rnodeDelayWeight The weight of childRnode's exact delay.
      * @param rnodeEstDlyWeight The weight of estimated delay from childRnode to the target.
      */
-    protected void evaluateCostAndPush(RouteNode rnode, boolean longParent, RouteNode childRnode, Connection connection, float sharingWeight, float rnodeCostWeight,
+    protected void evaluateCostAndPush(RouteNode rnode, boolean longParent, RouteNode childRnode, Connection connection, boolean lookahead,
+                                       float sharingWeight, float rnodeCostWeight,
                                        float rnodeLengthWeight, float rnodeEstWlWeight,
                                        float rnodeDelayWeight, float rnodeEstDlyWeight) {
         int countSourceUses = childRnode.countConnectionsOfUser(connection.getNetWrapper());
@@ -1512,7 +1573,26 @@ public class RWRoute{
         if (config.isTimingDriven()) {
             newTotalPathCost += rnodeEstDlyWeight * (deltaX * 0.32 + deltaY * 0.16);
         }
-        push(childRnode, newPartialPathCost, newTotalPathCost);
+
+        childRnode.setLowerBoundTotalPathCost(newTotalPathCost);
+        childRnode.setUpstreamPathCost(newPartialPathCost);
+
+        // Perform lookahead only if matching all these conditions:
+        //   (i)   explicitly told to (e.g. child is not a target, or outside of prepareRouteConnection())
+        //   (ii)  a lookahead node, or present in the lookaheadFilter
+        //   (iii) would not be overused
+        if (lookahead &&
+                lookaheadFilter.getOrDefault(childRnode.getNode().getTile().getTileTypeEnum(), EMPTY_BITSET).get(childRnode.getNode().getWire()) &&
+                !childRnode.willOverUse(connection.getNetWrapper())) {
+            assert(!childRnode.isTarget()); // expect the caller to set lookahead == false for targets
+            assert(childRnode.getPrev() != null);
+            childRnode.setVisited();
+
+            exploreAndExpand(childRnode, connection, sharingWeight, rnodeCostWeight,
+                    rnodeLengthWeight, rnodeEstWlWeight, rnodeDelayWeight, rnodeEstDlyWeight);
+        } else {
+            push(childRnode);
+        }
     }
 
     /**
@@ -1549,13 +1629,9 @@ public class RWRoute{
     /**
      * Sets the costs of a rnode and pushes it to the queue.
      * @param childRnode A child rnode.
-     * @param newPartialPathCost The upstream path cost from childRnode to the source.
-     * @param newTotalPathCost Total path cost of childRnode.
      */
-    protected void push(RouteNode childRnode, float newPartialPathCost, float newTotalPathCost) {
+    protected void push(RouteNode childRnode) {
         assert(childRnode.getPrev() != null || childRnode.getType() == RouteNodeType.PINFEED_O);
-        childRnode.setLowerBoundTotalPathCost(newTotalPathCost);
-        childRnode.setUpstreamPathCost(newPartialPathCost);
         childRnode.setVisited();
         queue.add(childRnode);
     }
@@ -1589,7 +1665,35 @@ public class RWRoute{
         // Adds the source rnode to the queue
         RouteNode sourceRnode = connectionToRoute.getSourceRnode();
         assert(sourceRnode.getPrev() == null);
-        push(sourceRnode, 0, 0);
+        sourceRnode.setLowerBoundTotalPathCost(0);
+        sourceRnode.setUpstreamPathCost(0);
+        push(sourceRnode);
+
+        // Mark all the non-preserved nodes immediately upstream of the sinks as lookahead nodes
+        // Since targets are typically IMUX_* nodes, its parent INT_NODE_IMUX_* nodes do not normally
+        // undergo lookahead, but enable them here for faster convergence
+        NetWrapper netWrapper = connectionToRoute.getNetWrapper();
+        for (RouteNode sinkRnode : Arrays.asList(connectionToRoute.getSinkRnode(), connectionToRoute.getAltSinkRnode())) {
+            if (sinkRnode == null) {
+                continue;
+            }
+            if (connectionToRoute.getAltSinkRnode() != null && sinkRnode.willOverUse(netWrapper)) {
+                // Don't mark uphill nodes of will-be-congested (primary) sinks if an alternate sink exists,
+                // as terminating on any uphills may hide the fact that the alternate sink may be less congested
+                continue;
+            }
+            Boolean primarySink = (sinkRnode == connectionToRoute.getSinkRnode());
+            for (Node uphill : sinkRnode.getNode().getAllUphillNodes()) {
+                if (routingGraph.isPreserved(uphill))
+                    continue;
+                RouteNode uphillRnode = getOrCreateRouteNode(uphill, RouteNodeType.WIRE);
+                // Mindful that uphill nodes may be duplicated, e.g. INT_X131Y900/IMUX_E0 on VU19P
+                if (!uphillRnode.isTarget()) {
+                    uphillRnode.setTarget(true);
+                    connectionToRoute.addSinkUphill(uphillRnode, primarySink);
+                }
+            }
+        }
     }
 
     /**
