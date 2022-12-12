@@ -35,6 +35,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.PriorityQueue;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.design.Design;
@@ -158,6 +160,18 @@ public class RWRoute{
 
     /** A map indicating whether a node described by (TileTypeEnum, WireIndex) should undergo lookahead */
     private final EnumMap<TileTypeEnum, BitSet> lookaheadFilter;
+    private static final Map<TileTypeEnum, Pattern> lookaheadTileWireNameRegex;
+    static {
+        lookaheadTileWireNameRegex = new EnumMap<TileTypeEnum,Pattern>(TileTypeEnum.class) {{
+            put(TileTypeEnum.INT, Pattern.compile("(" +
+                    "INT_NODE_SDQ"                                  + "|" + // UltraScale+
+                    "INT_NODE_QUAD_LONG_|INT_NODE_SINGLE_DOUBLE_"   + ")" + // UltraScale
+                    "_.*"
+            ));
+            put(TileTypeEnum.LAGUNA_TILE,   Pattern.compile(".*_TXOUT"));   // UltraScale
+            put(TileTypeEnum.LAG_LAG,       Pattern.compile(".*_TXOUT"));   // UltraScale+
+        }};
+    }
     private final BitSet EMPTY_BITSET = new BitSet(0);
 
     public RWRoute(Design design, RWRouteConfig config) {
@@ -166,33 +180,23 @@ public class RWRoute{
 
         lookaheadFilter = new EnumMap<>(TileTypeEnum.class);
         Device device = design.getDevice();
-        {
-            Tile intTile = device.getArbitraryTileOfType(TileTypeEnum.INT);
+        for (Entry<TileTypeEnum,Pattern> e : lookaheadTileWireNameRegex.entrySet()) {
+            TileTypeEnum type = e.getKey();
+            Tile tile = device.getArbitraryTileOfType(type);
+            if (tile == null) {
+                continue;
+            }
+            Pattern pattern = e.getValue();
+            Matcher m = pattern.matcher("");
             BitSet bs = new BitSet();
-            for (int wire = 0; wire < intTile.getWireCount(); wire++) {
-                String wireName = intTile.getWireName(wire);
-                if (wireName.startsWith("INT_NODE_SDQ_")    // UltraScale+
-                        || wireName.startsWith("INT_NODE_QUAD_LONG_") || wireName.startsWith("INT_NODE_SINGLE_DOUBLE_") // UltraScale
-                ) {
+            for (int wire = 0; wire < tile.getWireCount(); wire++) {
+                String wireName = tile.getWireName(wire);
+                m.reset(wireName);
+                if (m.matches()) {
                     bs.set(wire);
                 }
             }
-            lookaheadFilter.put(intTile.getTileTypeEnum(), bs);
-        }
-        {
-            Tile lagunaTile = device.getArbitraryTileOfType(device.getSeries() == Series.UltraScale ? TileTypeEnum.LAGUNA_TILE
-                    /* device.getSeries() == Series.UltraScalePlus */ : TileTypeEnum.LAG_LAG);
-            if (lagunaTile != null) {
-                BitSet bs = new BitSet(lagunaTile.getWireCount());
-                for (int wire = 0; wire < lagunaTile.getWireCount(); wire++) {
-                    String wireName = lagunaTile.getWireName(wire);
-                    if (wireName.endsWith("_TXOUT")) {
-                        bs.set(wire);
-                        // TODO: Lookahead for preceding IMUX too
-                    }
-                }
-                lookaheadFilter.put(lagunaTile.getTileTypeEnum(), bs);
-            }
+            lookaheadFilter.put(type, bs);
         }
     }
 
