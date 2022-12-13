@@ -38,7 +38,9 @@ import com.xilinx.rapidwright.util.RuntimeTracker;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.Collection;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -47,6 +49,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Encapsulation of RWRoute's routing resource graph.
@@ -88,9 +92,33 @@ public class RouteNodeGraph {
     private int visitedCount;
     private int visitedId;
 
+    /** A map indicating whether a node described by (TileTypeEnum, WireIndex) should undergo lookahead */
+    private final EnumMap<TileTypeEnum, BitSet> lookaheadFilter;
+    private static final Map<TileTypeEnum, Pattern> lookaheadTileWireNameRegex;
+    static {
+        lookaheadTileWireNameRegex = new EnumMap<TileTypeEnum,Pattern>(TileTypeEnum.class) {{
+            put(TileTypeEnum.INT, Pattern.compile("(" +
+                    "INT_NODE_SDQ"                              + "|" + // UltraScale+
+                    "INT_NODE_QUAD_LONG|INT_NODE_SINGLE_DOUBLE" + ")" + // UltraScale
+                    "_.*"
+            ));
+
+            // The path to a SLL is thus:
+            //   INT/IMUX_* -> LAG/*_TXOUT -> UBUMP\d+ -> LAG/*_RXD\d -> LAG/RXD\d+
+            // Undergo lookahead on the nodes leading into and out from the UBUMP* long line.
+            // Since the first node is based in an INT tile and cannot be differentiated from an IMUX
+            // into a LUT based on its wire name, its lookahead state is set directly in the RouteNode
+            // constructor
+            put(TileTypeEnum.LAGUNA_TILE,   Pattern.compile("(.*_(TXOUT|RXD\\d))|RXD\\d+")); // UltraScale
+            put(TileTypeEnum.LAG_LAG,       Pattern.compile("(.*_(TXOUT|RXD\\d))|RXD\\d+")); // UltraScale+
+        }};
+    }
+    private final BitSet EMPTY_BITSET = new BitSet(0);
+
     protected class RouteNodeImpl extends RouteNode {
-        public RouteNodeImpl(Node node, RouteNodeType type) {
-            super(node, type);
+        protected RouteNodeImpl(Node node, RouteNodeType type) {
+            super(node, type,
+                    lookaheadFilter.getOrDefault(node.getTile().getTileTypeEnum(), EMPTY_BITSET).get(node.getWire()));
             assert(!isVisited());
         }
 
@@ -213,6 +241,26 @@ public class RouteNodeGraph {
         } else {
             nextLagunaColumn = null;
             prevLagunaColumn = null;
+        }
+
+        lookaheadFilter = new EnumMap<>(TileTypeEnum.class);
+        for (Map.Entry<TileTypeEnum,Pattern> e : lookaheadTileWireNameRegex.entrySet()) {
+            TileTypeEnum type = e.getKey();
+            Tile tile = device.getArbitraryTileOfType(type);
+            if (tile == null) {
+                continue;
+            }
+            Pattern pattern = e.getValue();
+            Matcher m = pattern.matcher("");
+            BitSet bs = new BitSet();
+            for (int wire = 0; wire < tile.getWireCount(); wire++) {
+                String wireName = tile.getWireName(wire);
+                m.reset(wireName);
+                if (m.matches()) {
+                    bs.set(wire);
+                }
+            }
+            lookaheadFilter.put(type, bs);
         }
     }
 

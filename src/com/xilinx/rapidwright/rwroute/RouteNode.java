@@ -64,6 +64,8 @@ abstract public class RouteNode implements Comparable<RouteNode> {
     private float baseCost;
     /** A flag to indicate if this rnode is the target */
     private boolean isTarget;
+    /** A flag to indicate if router should lookahead of this rnode rather than enqueueing it */
+    private final boolean isLookahead;
     /** The children (downhill rnodes) of this rnode */
     protected RouteNode[] children;
 
@@ -94,7 +96,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
      */
     private Map<RouteNode, Integer> driversCounts;
 
-    public RouteNode(Node node, RouteNodeType type) {
+    protected RouteNode(Node node, RouteNodeType type, boolean isLookahead) {
         this.node = node;
         setType(type);
         children = null;
@@ -107,6 +109,10 @@ abstract public class RouteNode implements Comparable<RouteNode> {
         visited = 0;
         assert(prev == null);
         assert(!isTarget);
+
+        // The IMUX wire into a LAGUNA tile cannot be differentiated from one into a CLE
+        // tile by the wire name alone; however, this.type does reflect this.
+        this.isLookahead = isLookahead || this.type == RouteNodeType.LAGUNA_I;
     }
 
     @Override
@@ -762,4 +768,8 @@ abstract public class RouteNode implements Comparable<RouteNode> {
     abstract public boolean isExcluded(Node parent, Node child);
 
     abstract public int getSLRIndex();
+
+    public boolean isLookahead() {
+        return isLookahead;
+    }
 }

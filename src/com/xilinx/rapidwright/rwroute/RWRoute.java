@@ -25,9 +25,7 @@
 package com.xilinx.rapidwright.rwroute;
 
 import java.util.ArrayList;
-import java.util.BitSet;
 import java.util.Collection;
-import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -35,8 +33,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.PriorityQueue;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.design.Design;
@@ -44,11 +40,9 @@ import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SitePinInst;
-import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
-import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.util.MessageGenerator;
@@ -158,46 +152,13 @@ public class RWRoute{
     /** A map storing routes from CLK_OUT to different INT tiles that connect to sink pins of a global clock net */
     private Map<String, List<String>> routesToSinkINTTiles;
 
-    /** A map indicating whether a node described by (TileTypeEnum, WireIndex) should undergo lookahead */
-    private final EnumMap<TileTypeEnum, BitSet> lookaheadFilter;
-    private static final Map<TileTypeEnum, Pattern> lookaheadTileWireNameRegex;
-    static {
-        lookaheadTileWireNameRegex = new EnumMap<TileTypeEnum,Pattern>(TileTypeEnum.class) {{
-            put(TileTypeEnum.INT, Pattern.compile("(" +
-                    "INT_NODE_SDQ"                                  + "|" + // UltraScale+
-                    "INT_NODE_QUAD_LONG_|INT_NODE_SINGLE_DOUBLE_"   + ")" + // UltraScale
-                    "_.*"
-            ));
-            put(TileTypeEnum.LAGUNA_TILE,   Pattern.compile(".*_TXOUT"));   // UltraScale
-            put(TileTypeEnum.LAG_LAG,       Pattern.compile(".*_TXOUT"));   // UltraScale+
-        }};
-    }
-    private final BitSet EMPTY_BITSET = new BitSet(0);
+    /** For non-sink targets, mark the next rnode on the uncongested path back to the sink */
+    protected final Map<RouteNode,RouteNode> nextRnodes;
 
     public RWRoute(Design design, RWRouteConfig config) {
         this.design = design;
         this.config = config;
-
-        lookaheadFilter = new EnumMap<>(TileTypeEnum.class);
-        Device device = design.getDevice();
-        for (Entry<TileTypeEnum,Pattern> e : lookaheadTileWireNameRegex.entrySet()) {
-            TileTypeEnum type = e.getKey();
-            Tile tile = device.getArbitraryTileOfType(type);
-            if (tile == null) {
-                continue;
-            }
-            Pattern pattern = e.getValue();
-            Matcher m = pattern.matcher("");
-            BitSet bs = new BitSet();
-            for (int wire = 0; wire < tile.getWireCount(); wire++) {
-                String wireName = tile.getWireName(wire);
-                m.reset(wireName);
-                if (m.matches()) {
-                    bs.set(wire);
-                }
-            }
-            lookaheadFilter.put(type, bs);
-        }
+        nextRnodes = new HashMap<>();
     }
 
     protected void preprocess() {
@@ -1249,7 +1210,7 @@ public class RWRoute{
             assert(!connection.getSink().isRouted());
         }
 
-        connection.clearNextRnodes();
+        nextRnodes.clear();
         routingGraph.resetExpansion();
     }
 
@@ -1330,7 +1291,7 @@ public class RWRoute{
      */
     protected void saveRouting(Connection connection, RouteNode rnode) {
         RouteNode nextRnode;
-        while ((nextRnode = connection.getNextRnode(rnode)) != null) {
+        while ((nextRnode = nextRnodes.get(rnode)) != null) {
             assert(nextRnode.isTarget());
             nextRnode.setPrev(rnode);
             rnode = nextRnode;
@@ -1454,7 +1415,13 @@ public class RWRoute{
                 }
             }
 
-            boolean lookahead = !childRNode.isTarget();
+            // Perform lookahead only if matching all these conditions:
+            //   (i)  is marked for lookahead
+            //   (ii) is not a target
+            //   (iii) would not be overused
+            boolean lookahead = childRNode.isLookahead() &&
+                    !childRNode.isTarget() &&
+                    !childRNode.willOverUse(connection.getNetWrapper());
             evaluateCostAndPush(rnode, longParent, childRNode, connection, lookahead,
                     shareWeight, rnodeCostWeight, rnodeLengthWeight, rnodeEstWlWeight, rnodeDelayWeight, rnodeEstDlyWeight);
             if (queue.size() == 1 && queue.peek().isTarget()) {
@@ -1560,13 +1527,7 @@ public class RWRoute{
         childRnode.setLowerBoundTotalPathCost(newTotalPathCost);
         childRnode.setUpstreamPathCost(newPartialPathCost);
 
-        // Perform lookahead only if matching all these conditions:
-        //   (i)   explicitly told to (e.g. child is not a target, or outside of prepareRouteConnection())
-        //   (ii)  a lookahead node, or present in the lookaheadFilter
-        //   (iii) would not be overused
-        if (lookahead &&
-                lookaheadFilter.getOrDefault(childRnode.getNode().getTile().getTileTypeEnum(), EMPTY_BITSET).get(childRnode.getNode().getWire()) &&
-                !childRnode.willOverUse(connection.getNetWrapper())) {
+        if (lookahead) {
             assert(!childRnode.isTarget()); // expect the caller to set lookahead == false for targets
             assert(childRnode.getPrev() != null);
             childRnode.setVisited();
@@ -1672,7 +1633,8 @@ public class RWRoute{
             // Mindful that uphill nodes may be duplicated, e.g. INT_X131Y900/IMUX_E0 on VU19P
             if (!uphillRnode.isTarget()) {
                 uphillRnode.setTarget(true);
-                connectionToRoute.addNextRnode(uphillRnode, rnode);
+                RouteNode existingRnode = nextRnodes.put(uphillRnode, rnode);
+                assert(existingRnode == null);
             }
         }
     }

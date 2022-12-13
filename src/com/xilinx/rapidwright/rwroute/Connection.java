@@ -25,9 +25,7 @@
 package com.xilinx.rapidwright.rwroute;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
@@ -87,9 +85,6 @@ public class Connection implements Comparable<Connection>{
     /** List of nodes assigned to a connection to form the path for generating PIPs */
     private List<Node> nodes;
 
-    /** For non-sink targets, mark the next rnode on the uncongested path back to the sink */
-    private final Map<RouteNode, RouteNode> nextRnodes;
-
     public Connection(int id, SitePinInst source, SitePinInst sink, NetWrapper netWrapper) {
         this.id = id;
         this.source = source;
@@ -99,7 +94,6 @@ public class Connection implements Comparable<Connection>{
         this.netWrapper = netWrapper;
         netWrapper.addConnection(this);
         crossSLR = !source.getTile().getSLR().equals(sink.getTile().getSLR());
-        nextRnodes = new HashMap<>();
     }
 
     /**
@@ -467,16 +461,4 @@ public class Connection implements Comparable<Connection>{
         }
     }
 
-    public void addNextRnode(RouteNode rnode, RouteNode nextRnode) {
-        RouteNode existingRnode = nextRnodes.put(rnode, nextRnode);
-        assert(existingRnode == null);
-    }
-
-    public RouteNode getNextRnode(RouteNode rnode) {
-        return nextRnodes.get(rnode);
-    }
-
-    public void clearNextRnodes() {
-        nextRnodes.clear();
-    }
 }
