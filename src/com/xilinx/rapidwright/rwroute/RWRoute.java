@@ -1289,10 +1289,14 @@ public class RWRoute{
      * @param connection: The connection that is being routed.
      * @param rnode RouteNode to start backtracking from.
      */
-    protected void saveRouting(Connection connection, RouteNode rnode) {
+    private void saveRouting(Connection connection, RouteNode rnode) {
         RouteNode nextRnode;
         while ((nextRnode = nextRnodes.get(rnode)) != null) {
             assert(nextRnode.isTarget());
+            // Subsequent nodes -- all the way back to the sink -- should all be uncongested ..
+            assert(!nextRnode.willOverUse(connection.getNetWrapper()) ||
+                    // ... unless (for an uphill-of-sink target) it is the one and only sink
+                    (nextRnode == connection.getSinkRnode() && connection.getAltSinkRnode() == null));
             nextRnode.setPrev(rnode);
             rnode = nextRnode;
         }
@@ -1621,11 +1625,11 @@ public class RWRoute{
         // Don't mark uphill nodes of will-be-congested (primary) sinks if an alternate sink exists,
         // as terminating on any such uphills may hide the fact that the alternate sink may be less congested
         if (connectionToRoute.getAltSinkRnode() == null || !sinkRnode.willOverUse(netWrapper)) {
-            setUphillTargets(connectionToRoute, sinkRnode);
+            setUphillTargets(sinkRnode);
         }
     }
 
-    protected void setUphillTargets(Connection connectionToRoute, RouteNode rnode) {
+    protected void setUphillTargets(RouteNode rnode) {
         for (Node uphill : rnode.getNode().getAllUphillNodes()) {
             if (routingGraph.isPreserved(uphill))
                 continue;
