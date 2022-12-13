@@ -94,7 +94,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
      */
     private Map<RouteNode, Integer> driversCounts;
 
-    public RouteNode(Node node, RouteNodeType type) {
+    protected RouteNode(Node node, RouteNodeType type) {
         this.node = node;
         setType(type);
         children = null;
