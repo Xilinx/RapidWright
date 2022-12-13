@@ -103,14 +103,13 @@ public class RouteNodeGraph {
                     "_.*"
             ));
 
-            // The path to a SLL is thus:
+            // Allow lookahead along the entire path for a SLR crossing (lookahead does not occur for any overused node):
             //   INT/IMUX_* -> LAG/*_TXOUT -> UBUMP\d+ -> LAG/*_RXD\d -> LAG/RXD\d+
-            // Undergo lookahead on the nodes leading into and out from the UBUMP* long line.
             // Since the first node is based in an INT tile and cannot be differentiated from an IMUX
             // into a LUT based on its wire name, its lookahead state is set directly in the RouteNode
             // constructor
-            put(TileTypeEnum.LAGUNA_TILE,   Pattern.compile("(.*_(TXOUT|RXD\\d))|RXD\\d+")); // UltraScale
-            put(TileTypeEnum.LAG_LAG,       Pattern.compile("(.*_(TXOUT|RXD\\d))|RXD\\d+")); // UltraScale+
+            put(TileTypeEnum.LAGUNA_TILE,   Pattern.compile("(.*_(TXOUT|RXD\\d))|(UBUMP|RXD)\\d+")); // UltraScale
+            put(TileTypeEnum.LAG_LAG,       Pattern.compile("(.*_(TXOUT|RXD\\d))|(UBUMP|RXD)\\d+")); // UltraScale+
         }};
     }
     private final BitSet EMPTY_BITSET = new BitSet(0);
