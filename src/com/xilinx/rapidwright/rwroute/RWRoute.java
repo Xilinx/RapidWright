@@ -1364,17 +1364,19 @@ public class RWRoute{
             if (childRNode.isVisited()) {
                 // Node must be in queue already.
 
-                // Note: it is possible that another (cheaper) path to a rnode is found here;
-                // however, because the PriorityQueue class does not support (efficiently) reducing
-                // the cost of nodes already in the queue, this opportunity is discarded
+                // Note: it is possible this is a cheaper path to childRNode; however, because the
+                // PriorityQueue class does not support (efficiently) reducing the cost of nodes
+                // already in the queue, this opportunity is discarded
                 continue;
             }
 
             if (childRNode.isTarget()) {
-                // Despite the limitation above, on encountering a target only terminate
-                // immediately by clearing the queue if this target is not overused since
-                // there could be an alternate target that may be less congested
-                if (!childRNode.willOverUse(connection.getNetWrapper())) {
+                // Despite the limitation above, on encountering a target only terminate immediately
+                // by clearing the queue if childRnode is the one and only sink on this connection,
+                // otherwise terminate if this target will not be overused since we may find that
+                // the alternate sink is less congested
+                if ((childRNode == connection.getSinkRnode() && connection.getAltSinkRnode() == null) ||
+                        !childRNode.willOverUse(connection.getNetWrapper())) {
                     assert(!childRNode.isVisited());
                     nodesPushed += queue.size();
                     queue.clear();
