@@ -97,11 +97,7 @@ public class RouteNodeGraph {
     private static final Map<TileTypeEnum, Pattern> lookaheadTileWireNameRegex;
     static {
         lookaheadTileWireNameRegex = new EnumMap<TileTypeEnum,Pattern>(TileTypeEnum.class) {{
-            put(TileTypeEnum.INT, Pattern.compile("(" +
-                    "INT_NODE_SDQ"                              + "|" + // UltraScale+
-                    "INT_NODE_QUAD_LONG|INT_NODE_SINGLE_DOUBLE" + ")" + // UltraScale
-                    "_.*"
-            ));
+            put(TileTypeEnum.INT, Pattern.compile("INT_NODE_SDQ_.*"));  // UltraScale+
 
             // Allow lookahead along the entire path for a SLR crossing (lookahead does not occur for any overused node):
             //   INT/IMUX_* -> LAG/*_TXOUT -> UBUMP\d+ -> LAG/*_RXD\d -> LAG/RXD\d+
