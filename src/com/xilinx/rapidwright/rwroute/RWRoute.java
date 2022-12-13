@@ -1533,6 +1533,8 @@ public class RWRoute{
 
         if (lookahead) {
             assert(!childRnode.isTarget()); // expect the caller to set lookahead == false for targets
+            // Never lookahead from a congested node, since that locks in the path for all downhill nodes
+            assert(!childRnode.willOverUse(connection.getNetWrapper()));
             assert(childRnode.getPrev() != null);
             childRnode.setVisited();
 
