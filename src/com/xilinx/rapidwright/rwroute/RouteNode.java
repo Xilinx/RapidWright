@@ -159,13 +159,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
         //       The `type` parameter fed to this method is the original
         //       value provided to the constructor
         // type = this.type;
-        if (this.type == RouteNodeType.LAGUNA_I) {
-            // Make all approaches to SLLs zero-cost to encourage exploration
-            // Assigning a base cost of zero would break congestion resolution for most nodes
-            // (since RWroute.getNodeCost() would return zero) but doing it here should be
-            // okay because this node only leads to a SLL which will have a non-zero base cost
-            baseCost = 0.0f;
-        } else if (this.type == RouteNodeType.SUPER_LONG_LINE) {
+        if (this.type == RouteNodeType.SUPER_LONG_LINE) {
             baseCost = 0.3f * length;
         } else if (type == RouteNodeType.WIRE) {
             baseCost = 0.4f;
@@ -496,7 +490,6 @@ abstract public class RouteNode implements Comparable<RouteNode> {
                         if (wireName.startsWith("UBUMP")) {
                             this.type = RouteNodeType.SUPER_LONG_LINE;
                         } else if (wireName.endsWith("_TXOUT")) {
-                            // This is the inner LAGUNA_I, mark it so it gets a base cost discount
                             this.type = RouteNodeType.LAGUNA_I;
                         }
                     }
