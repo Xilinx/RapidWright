@@ -1619,9 +1619,9 @@ public class RWRoute{
         sourceRnode.setUpstreamPathCost(0);
         push(sourceRnode);
 
-        // Mark all the non-preserved nodes immediately upstream of the sinks as lookahead nodes
-        // Since targets are typically IMUX_* nodes, its parent INT_NODE_IMUX_* nodes do not normally
-        // undergo lookahead, but enable them here for faster convergence
+        // Mark all the non-preserved nodes immediately uphill of the sinks as targets
+        // Since sinks are typically IMUX_* nodes, their parent INT_NODE_IMUX_* nodes would not normally
+        // undergo lookahead so mark them as an target for faster convergence
         NetWrapper netWrapper = connectionToRoute.getNetWrapper();
         RouteNode sinkRnode = connectionToRoute.getSinkRnode();
         // Don't mark uphill nodes of will-be-congested (primary) sinks if an alternate sink exists,
