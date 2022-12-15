@@ -89,7 +89,7 @@ public class RWRoute{
     /** A {@link RWRouteConfig} instance consisting of a list of routing parameters */
     protected RWRouteConfig config;
     /** The present congestion cost factor */
-    private float presentCongestionFactor;
+    protected float presentCongestionFactor;
     /** The historical congestion cost factor */
     private float historicalCongestionFactor;
     /** Wirelength-driven weighting factor */
@@ -1174,7 +1174,7 @@ public class RWRoute{
      * Routes a connection.
      * @param connection The connection to route.
      */
-    private void routeConnection(Connection connection) {
+    protected void routeConnection(Connection connection) {
         float rnodeCostWeight = 1 - connection.getCriticality();
         float shareWeight = (float) (Math.pow(rnodeCostWeight, config.getShareExponent()));
         float rnodeWLWeight = rnodeCostWeight * oneMinusWlWeight;
