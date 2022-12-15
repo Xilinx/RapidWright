@@ -192,23 +192,16 @@ public class Connection implements Comparable<Connection>{
     }
 
     /**
-     * @return First congested RouteNode from current routing. Null if no routing or congestion exists.
-     */
-    public RouteNode getFirstCongestedRnode() {
-        for (RouteNode rn : getRnodes()) {
-            if (rn.isOverUsed()) {
-                return rn;
-            }
-        }
-        return null;
-    }
-
-    /**
      * Checks if a connection has any overused rnodes to indicate the congestion status.
      * @return
      */
     public boolean isCongested() {
-        return getFirstCongestedRnode() != null;
+        for (RouteNode rn : getRnodes()) {
+            if (rn.isOverUsed()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
