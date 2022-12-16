@@ -62,10 +62,12 @@ abstract public class RouteNode implements Comparable<RouteNode> {
     private short length;
     /** The base cost of a rnode */
     private float baseCost;
+    /** Byte for internal flags */
+    private byte internalFlags;
     /** A flag to indicate if this rnode is the target */
-    private boolean isTarget;
+    private final static int TARGET_INTERNAL_FLAG_MASK = 1 << 0;
     /** A flag to indicate if router should lookahead of this rnode rather than enqueueing it */
-    private final boolean isLookahead;
+    private final static int LOOKAHEAD_INTERNAL_FLAG_MASK = 1 << 1;
     /** Byte for the use as general purpose flags */
     private byte flags;
     /** The children (downhill rnodes) of this rnode */
@@ -109,12 +111,15 @@ abstract public class RouteNode implements Comparable<RouteNode> {
         usersConnectionCounts = null;
         driversCounts = null;
         visited = 0;
+        internalFlags = 0;
+        flags = 0;
         assert(prev == null);
-        assert(!isTarget);
 
         // The IMUX wire into a LAGUNA tile cannot be differentiated from one into a CLE
         // tile by the wire name alone; however, this.type does reflect this.
-        this.isLookahead = isLookahead || this.type == RouteNodeType.LAGUNA_I;
+        if (isLookahead || this.type == RouteNodeType.LAGUNA_I) {
+            internalFlags |= LOOKAHEAD_INTERNAL_FLAG_MASK;
+        }
     }
 
     @Override
@@ -377,7 +382,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
      * @return true, if a RouteNode Object is the current routing target.
      */
     public boolean isTarget() {
-        return isTarget;
+        return (internalFlags & TARGET_INTERNAL_FLAG_MASK) != 0;
     }
 
     /**
@@ -385,7 +390,11 @@ abstract public class RouteNode implements Comparable<RouteNode> {
      * @param isTarget The value to be set.
      */
     public void setTarget(boolean isTarget) {
-        this.isTarget = isTarget;
+        if (isTarget) {
+            internalFlags |= TARGET_INTERNAL_FLAG_MASK;
+        } else {
+            internalFlags &= ~TARGET_INTERNAL_FLAG_MASK;
+        }
     }
 
     /**
@@ -765,7 +774,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
     abstract public int getSLRIndex();
 
     public boolean isLookahead() {
-        return isLookahead;
+        return (internalFlags & LOOKAHEAD_INTERNAL_FLAG_MASK) != 0;
     }
 
     /**
