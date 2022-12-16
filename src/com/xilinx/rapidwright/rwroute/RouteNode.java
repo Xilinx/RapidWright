@@ -66,6 +66,8 @@ abstract public class RouteNode implements Comparable<RouteNode> {
     private boolean isTarget;
     /** A flag to indicate if router should lookahead of this rnode rather than enqueueing it */
     private final boolean isLookahead;
+    /** Byte for the use as general purpose flags */
+    private byte flags;
     /** The children (downhill rnodes) of this rnode */
     protected RouteNode[] children;
 
@@ -764,5 +766,20 @@ abstract public class RouteNode implements Comparable<RouteNode> {
 
     public boolean isLookahead() {
         return isLookahead;
+    }
+
+    /**
+     * @param index Bit index.
+     * @return True if index is set.
+     */
+    public boolean getFlag(int index) {
+        return (flags & (1 << index)) != 0;
+    }
+
+    /**
+     * @param index Bit index to set.
+     */
+    public void setFlag(int index) {
+        flags |= (1 << index);
     }
 }
