@@ -1170,7 +1170,7 @@ public class RWRoute{
      * Routes a connection.
      * @param connection The connection to route.
      */
-    protected void routeConnection(Connection connection) {
+    private void routeConnection(Connection connection) {
         float rnodeCostWeight = 1 - connection.getCriticality();
         float shareWeight = (float) (Math.pow(rnodeCostWeight, config.getShareExponent()));
         float rnodeWLWeight = rnodeCostWeight * oneMinusWlWeight;
