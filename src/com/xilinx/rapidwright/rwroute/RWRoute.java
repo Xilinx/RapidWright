@@ -139,7 +139,7 @@ public class RWRoute{
     /** The maximum criticality constraint of connection */
     private static final float MAX_CRITICALITY = 0.99f;
     /** The minimum criticality of connections that should be re-routed, updated after each iteration */
-    private float minRerouteCriticality;
+    protected float minRerouteCriticality;
     /** The list of critical connections */
     private List<Connection> criticalConnections;
     /** A {@link TimingManager} instance to use that handles timing related tasks */
@@ -803,7 +803,7 @@ public class RWRoute{
      * @param connection The connection in question.
      * @return true, if the connection should be routed.
      */
-    private boolean shouldRoute(Connection connection) {
+    protected boolean shouldRoute(Connection connection) {
         if (routeIteration > 1) {
             if (connection.getCriticality() > minRerouteCriticality) {
                 return true;
@@ -1170,7 +1170,7 @@ public class RWRoute{
      * Routes a connection.
      * @param connection The connection to route.
      */
-    private void routeConnection(Connection connection) {
+    protected void routeConnection(Connection connection) {
         float rnodeCostWeight = 1 - connection.getCriticality();
         float shareWeight = (float) (Math.pow(rnodeCostWeight, config.getShareExponent()));
         float rnodeWLWeight = rnodeCostWeight * oneMinusWlWeight;
