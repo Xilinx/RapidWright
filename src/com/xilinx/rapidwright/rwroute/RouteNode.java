@@ -776,7 +776,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
 
     /**
      * @param index Bit index to change.
-     * @param value Boolean value to set.
+     * @param value True to set. False to clear.
      */
     public void setFlag(int index, boolean value) {
         if (value) {
