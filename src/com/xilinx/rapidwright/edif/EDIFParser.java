@@ -129,7 +129,8 @@ public class EDIFParser extends AbstractEDIFParserWorker implements AutoCloseabl
             throw new EDIFParseException(token, "Expected EOF but found "+token);
         }
 
-        if (tokenizer.getFileName().toString().endsWith(".gz")) {
+        Path fileName = tokenizer.getFileName();
+        if (fileName != null && fileName.toString().endsWith(".gz")) {
             try {
                 Files.delete(
                         FileTools.getDecompressedGZIPFileName(tokenizer.getFileName()));
