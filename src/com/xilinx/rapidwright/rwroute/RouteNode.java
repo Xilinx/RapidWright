@@ -64,6 +64,8 @@ abstract public class RouteNode implements Comparable<RouteNode> {
     private float baseCost;
     /** A flag to indicate if this rnode is the target */
     private boolean isTarget;
+    /** Byte for the use as general purpose flags */
+    private byte flags;
     /** The children (downhill rnodes) of this rnode */
     protected RouteNode[] children;
 
@@ -94,7 +96,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
      */
     private Map<RouteNode, Integer> driversCounts;
 
-    public RouteNode(Node node, RouteNodeType type) {
+    protected RouteNode(Node node, RouteNodeType type) {
         this.node = node;
         setType(type);
         children = null;
@@ -107,6 +109,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
         visited = 0;
         assert(prev == null);
         assert(!isTarget);
+        flags = 0;
     }
 
     @Override
@@ -762,4 +765,24 @@ abstract public class RouteNode implements Comparable<RouteNode> {
     abstract public boolean isExcluded(Node parent, Node child);
 
     abstract public int getSLRIndex();
+
+    /**
+     * @param index Bit index.
+     * @return True if index is set.
+     */
+    public boolean getFlag(int index) {
+        return (flags & (1 << index)) != 0;
+    }
+
+    /**
+     * @param index Bit index to change.
+     * @param value True to set. False to clear.
+     */
+    public void setFlag(int index, boolean value) {
+        if (value) {
+            flags |= (1 << index);
+        } else {
+            flags &= ~(1 << index);
+        }
+    }
 }

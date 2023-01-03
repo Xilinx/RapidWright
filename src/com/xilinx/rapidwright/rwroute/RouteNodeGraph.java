@@ -89,7 +89,7 @@ public class RouteNodeGraph {
     private int visitedId;
 
     protected class RouteNodeImpl extends RouteNode {
-        public RouteNodeImpl(Node node, RouteNodeType type) {
+        protected RouteNodeImpl(Node node, RouteNodeType type) {
             super(node, type);
             assert(!isVisited());
         }
@@ -128,6 +128,7 @@ public class RouteNodeGraph {
         @Override
         public void setTarget(boolean isTarget) {
             if (isTarget) {
+                assert(!isTarget());
                 targets.add(this);
             }
             super.setTarget(isTarget);

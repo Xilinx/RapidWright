@@ -89,7 +89,7 @@ public class RWRoute{
     /** A {@link RWRouteConfig} instance consisting of a list of routing parameters */
     protected RWRouteConfig config;
     /** The present congestion cost factor */
-    private float presentCongestionFactor;
+    protected float presentCongestionFactor;
     /** The historical congestion cost factor */
     private float historicalCongestionFactor;
     /** Wirelength-driven weighting factor */
@@ -139,7 +139,7 @@ public class RWRoute{
     /** The maximum criticality constraint of connection */
     private static final float MAX_CRITICALITY = 0.99f;
     /** The minimum criticality of connections that should be re-routed, updated after each iteration */
-    private float minRerouteCriticality;
+    protected float minRerouteCriticality;
     /** The list of critical connections */
     private List<Connection> criticalConnections;
     /** A {@link TimingManager} instance to use that handles timing related tasks */
@@ -803,7 +803,7 @@ public class RWRoute{
      * @param connection The connection in question.
      * @return true, if the connection should be routed.
      */
-    private boolean shouldRoute(Connection connection) {
+    protected boolean shouldRoute(Connection connection) {
         if (routeIteration > 1) {
             if (connection.getCriticality() > minRerouteCriticality) {
                 return true;
@@ -1170,7 +1170,7 @@ public class RWRoute{
      * Routes a connection.
      * @param connection The connection to route.
      */
-    private void routeConnection(Connection connection) {
+    protected void routeConnection(Connection connection) {
         float rnodeCostWeight = 1 - connection.getCriticality();
         float shareWeight = (float) (Math.pow(rnodeCostWeight, config.getShareExponent()));
         float rnodeWLWeight = rnodeCostWeight * oneMinusWlWeight;
@@ -1364,17 +1364,19 @@ public class RWRoute{
             if (childRNode.isVisited()) {
                 // Node must be in queue already.
 
-                // Note: it is possible that another (cheaper) path to a rnode is found here;
-                // however, because the PriorityQueue class does not support (efficiently) reducing
-                // the cost of nodes already in the queue, this opportunity is discarded
+                // Note: it is possible this is a cheaper path to childRNode; however, because the
+                // PriorityQueue class does not support (efficiently) reducing the cost of nodes
+                // already in the queue, this opportunity is discarded
                 continue;
             }
 
             if (childRNode.isTarget()) {
-                // Despite the limitation above, on encountering a target only terminate
-                // immediately by clearing the queue if this target is not overused since
-                // there could be an alternate target that may be less congested
-                if (!childRNode.willOverUse(connection.getNetWrapper())) {
+                // Despite the limitation above, on encountering a target only terminate immediately
+                // by clearing the queue if childRnode is the one and only sink on this connection,
+                // otherwise terminate if this target will not be overused since we may find that
+                // the alternate sink is less congested
+                if ((childRNode == connection.getSinkRnode() && connection.getAltSinkRnode() == null) ||
+                        !childRNode.willOverUse(connection.getNetWrapper())) {
                     assert(!childRNode.isVisited());
                     nodesPushed += queue.size();
                     queue.clear();
