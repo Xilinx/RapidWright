@@ -755,7 +755,7 @@ public class EDIFTools {
     public static EDIFNetlist loadEDIFFile(Path fileName, int maxThreads) {
         try {
             final long size = Files.size(fileName);
-            if (ParallelEDIFParser.calcThreads(size, maxThreads) > 1) {
+            if (ParallelEDIFParser.calcThreads(size, maxThreads, fileName.toString().endsWith(".gz")) > 1) {
                 try (ParallelEDIFParser p = new ParallelEDIFParser(fileName)) {
                     return p.parseEDIFNetlist();
                 }

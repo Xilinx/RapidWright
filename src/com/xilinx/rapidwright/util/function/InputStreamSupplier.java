@@ -23,14 +23,39 @@
 
 package com.xilinx.rapidwright.util.function;
 
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.InputStream;
-import java.nio.file.Files;
+import java.io.UncheckedIOException;
 import java.nio.file.Path;
 
 import org.apache.commons.io.function.IOSupplier;
 
+import com.xilinx.rapidwright.util.FileTools;
+
 public interface InputStreamSupplier extends IOSupplier<InputStream> {
     static InputStreamSupplier fromPath(Path p) {
-        return () -> Files.newInputStream(p);
+        return () -> getInputStream(p);
+    }
+
+    /**
+     * Gets the InputStream for the provided file path. If the file is gzipped (*.gz
+     * extension), it will decompress the file alongside the original with the '.gz'
+     * extension removed.
+     * 
+     * @param fileName Path to the file or gzipped file from which to get an InputStream.
+     * @return An InputStream of the file, or of a decompressed copy of a gzipped file.
+     */
+    public static InputStream getInputStream(Path fileName) {
+        InputStream in = null;
+        try {
+            if (fileName.toString().endsWith(".gz")) {
+                fileName = FileTools.decompressGZIPFile(fileName);
+            }
+            in = new FileInputStream(fileName.toString());
+        } catch (FileNotFoundException e) {
+            throw new UncheckedIOException("ERROR: Could not find file: " + fileName, e);
+        }
+        return in;
     }
 }

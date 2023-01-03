@@ -33,13 +33,16 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
-import com.xilinx.rapidwright.support.RapidWrightDCP;
-import com.xilinx.rapidwright.tests.CodePerfTracker;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+
+import com.xilinx.rapidwright.support.RapidWrightDCP;
+import com.xilinx.rapidwright.tests.CodePerfTracker;
+import com.xilinx.rapidwright.util.FileTools;
 
 public class TestEDIFParser {
     private static final Path input = RapidWrightDCP.getPath("edif_parsing_stress_test.edf");
@@ -118,5 +121,31 @@ public class TestEDIFParser {
             parser.parseEDIFNetlist();
         }
 
+    }
+
+    @Test
+    public void testGZIPEDIFParsing(@TempDir Path tempDir) throws IOException {
+        Path src = tempDir.resolve(input.getFileName());
+        Files.copy(input, src);
+        Path compressed = FileTools.compressFileUsingGZIP(src);
+        Assertions.assertTrue(compressed.toString().endsWith(".gz"));
+        Assertions.assertTrue(src.toFile().exists());
+        Files.delete(src);
+        EDIFTools.loadEDIFFile(compressed);
+        Assertions.assertFalse(src.toFile().exists());
+    }
+
+    @Test
+    public void testGZIPEDIFParsingParallel(@TempDir Path tempDir) throws IOException {
+        Path src = tempDir.resolve(input.getFileName());
+        Files.copy(input, src);
+        Path compressed = FileTools.compressFileUsingGZIP(src);
+        Assertions.assertTrue(compressed.toString().endsWith(".gz"));
+        Assertions.assertTrue(src.toFile().exists());
+        Files.delete(src);
+        try (ParallelEDIFParser p = new ParallelEDIFParser(compressed)) {
+            p.parseEDIFNetlist();
+        }
+        Assertions.assertFalse(src.toFile().exists());
     }
 }

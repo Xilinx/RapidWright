@@ -51,6 +51,7 @@ import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.FileTime;
 import java.security.CodeSource;
 import java.text.SimpleDateFormat;
@@ -1831,6 +1832,63 @@ public class FileTools {
     public static void main(String[] args) {
         if (args[0].equals("--get_vivado_path"))
             System.out.println(getVivadoPath());
+    }
+
+    /**
+     * Decompresses a gzipped file to a file with the '.gz' extension removed. Does
+     * not delete the original file and overwrites any existing file with the same
+     * file name as the original with the '.gz' extension removed.
+     * 
+     * @param gzipFile Path to the original gzipped file
+     * @return Path to the decompressed file (same as
+     *         {@link FileTools#getDecompressedGZIPFileName(Path)}) or null if the provided
+     *         file is not a gzipped file.
+     */
+    public static Path decompressGZIPFile(Path gzipFile) {
+        String fileNameStr = gzipFile.toString();
+        if (!fileNameStr.endsWith(".gz")) return null;
+        Path target = FileTools.getDecompressedGZIPFileName(gzipFile);
+        // Using a larger buffer size for GZIPInputStream improved runtime 5-10%
+        try (GZIPInputStream gis = new GZIPInputStream(new FileInputStream(fileNameStr), 65536)) {
+            Files.copy(gis, target, StandardCopyOption.REPLACE_EXISTING);
+        } catch (FileNotFoundException e) {
+            throw new UncheckedIOException(e);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        return target;
+    }
+    
+    /**
+     * Compresses the provided file using GZIP (adds '.gz' extension) 
+     * @param uncompressedFile The path to the uncompressed file
+     * @return The path to the compressed file which has a '.gz' extension
+     */
+    public static Path compressFileUsingGZIP(Path uncompressedFile) {
+        Path compressedFile = Paths.get(uncompressedFile.toString() + ".gz");
+        try (GZIPOutputStream gos = new GZIPOutputStream(new FileOutputStream(compressedFile.toFile()), 65536)) {
+            Files.copy(uncompressedFile, gos);
+        } catch (FileNotFoundException e) {
+            throw new UncheckedIOException(e);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        return compressedFile;
+    }
+
+    /**
+     * Gets a Path to the corresponding uncompressed name of the provided path. If
+     * the path does not have a '.gz' extension, it returns the provided path.
+     * 
+     * @param gzipFile The path to the gzipped file.
+     * @return The path to the corresponding uncompressed file if the provided path
+     *         is a gzipped file. If the provided path doesn't have the '.gz'
+     *         extension, it returns the provided path.
+     */
+    public static Path getDecompressedGZIPFileName(Path gzipFile) {
+        String fileName = gzipFile.toString();
+        if (!fileName.endsWith(".gz")) return gzipFile;
+        return Paths.get(fileName.substring(0, fileName.length() - 3));
     }
 }
 

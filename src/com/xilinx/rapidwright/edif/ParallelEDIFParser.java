@@ -40,6 +40,7 @@ import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
+import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.ParallelismTools;
 import com.xilinx.rapidwright.util.StringPool;
 import com.xilinx.rapidwright.util.function.InputStreamSupplier;
@@ -86,15 +87,16 @@ public class ParallelEDIFParser implements AutoCloseable{
         return new ParallelEDIFParserWorker(fileName, inputStreamSupplier.get(), offset, uniquifier, maxTokenLength, cache);
     }
 
-    public static int calcThreads(long fileSize, int maxThreads) {
-        int maxUsefulThreads = Math.max((int) (fileSize / MIN_BYTES_PER_THREAD),1);
+    public static int calcThreads(long fileSize, int maxThreads, boolean isGzipped) {
+        long sizeThreshold = isGzipped ? (MIN_BYTES_PER_THREAD >> 4) : MIN_BYTES_PER_THREAD;
+        int maxUsefulThreads = Math.max((int) (fileSize / sizeThreshold), 1);
         return Math.min(maxUsefulThreads, Math.min(ParallelismTools.maxParallelism(), maxThreads));
     }
 
 
     protected void initializeWorkers() throws IOException {
         workers.clear();
-        int threads = calcThreads(fileSize, maxThreads);
+        int threads = calcThreads(fileSize, maxThreads, fileName.toString().endsWith(".gz"));
         long offsetPerThread = fileSize / threads;
         for (int i=0;i<threads;i++) {
             ParallelEDIFParserWorker worker = makeWorker(i*offsetPerThread);
@@ -105,7 +107,11 @@ public class ParallelEDIFParser implements AutoCloseable{
     private int numberOfThreads;
 
     public EDIFNetlist parseEDIFNetlist() throws IOException {
-        return parseEDIFNetlist(CodePerfTracker.SILENT);
+        EDIFNetlist netlist = parseEDIFNetlist(CodePerfTracker.SILENT);
+        if (this.fileName.toString().endsWith(".gz")) {
+            Files.delete(FileTools.getDecompressedGZIPFileName(fileName));
+        }
+        return netlist;
     }
 
     public EDIFNetlist parseEDIFNetlist(CodePerfTracker t) throws IOException {
