@@ -31,7 +31,6 @@ import java.nio.file.Path;
 
 import org.apache.commons.io.function.IOSupplier;
 
-import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.FileTools;
 
 public interface InputStreamSupplier extends IOSupplier<InputStream> {
@@ -54,11 +53,7 @@ public interface InputStreamSupplier extends IOSupplier<InputStream> {
                 Path decompressed = FileTools.getDecompressedGZIPFileName(fileName);
                 synchronized (InputStreamSupplier.class) {
                     if (!decompressed.toFile().exists()) {
-                        System.out.println("Decompress");
-                        CodePerfTracker t = new CodePerfTracker("decompress");
-                        t.start("Decompress");
                         fileName = FileTools.decompressGZIPFile(fileName);
-                        t.stop().printSummary();
                     } else {
                         fileName = decompressed;
                     }
