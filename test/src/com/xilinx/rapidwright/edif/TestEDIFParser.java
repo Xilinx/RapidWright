@@ -131,7 +131,8 @@ public class TestEDIFParser {
         Assertions.assertTrue(compressed.toString().endsWith(".gz"));
         Assertions.assertTrue(src.toFile().exists());
         Files.delete(src);
-        EDIFTools.loadEDIFFile(compressed);
+        Assertions.assertFalse(src.toFile().exists());
+        Assertions.assertNotNull(EDIFTools.loadEDIFFile(compressed));
         Assertions.assertFalse(src.toFile().exists());
     }
 
@@ -143,8 +144,9 @@ public class TestEDIFParser {
         Assertions.assertTrue(compressed.toString().endsWith(".gz"));
         Assertions.assertTrue(src.toFile().exists());
         Files.delete(src);
+        Assertions.assertFalse(src.toFile().exists());
         try (ParallelEDIFParser p = new ParallelEDIFParser(compressed)) {
-            p.parseEDIFNetlist();
+            Assertions.assertNotNull(p.parseEDIFNetlist());
         }
         Assertions.assertFalse(src.toFile().exists());
     }

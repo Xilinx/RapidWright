@@ -60,8 +60,12 @@ public class ParallelEDIFParser implements AutoCloseable{
 
     protected final EDIFReadLegalNameCache cache;
 
-    public static final int EDIF_GZIP_RATIO = 16;
-    
+    /**
+     * Estimated ratio of EDIF to gzipped EDIF file size, used in calculating the
+     * number of thread workers for parallel EDIF parsing
+     */
+    public static final int EDIF_GZIP_COMPRESSION_RATIO = 16;
+
     ParallelEDIFParser(Path fileName, long fileSize, InputStreamSupplier inputStreamSupplier,
             int maxTokenLength, int maxThreads) {
         this.fileName = fileName;
@@ -90,7 +94,8 @@ public class ParallelEDIFParser implements AutoCloseable{
     }
 
     public static int calcThreads(long fileSize, int maxThreads, boolean isGzipped) {
-        long sizeThreshold = isGzipped ? (MIN_BYTES_PER_THREAD / EDIF_GZIP_RATIO) : MIN_BYTES_PER_THREAD;
+        long sizeThreshold = isGzipped ? (MIN_BYTES_PER_THREAD / EDIF_GZIP_COMPRESSION_RATIO)
+                : MIN_BYTES_PER_THREAD;
         int maxUsefulThreads = Math.max((int) (fileSize / sizeThreshold), 1);
         return Math.min(maxUsefulThreads, Math.min(ParallelismTools.maxParallelism(), maxThreads));
     }
@@ -100,7 +105,8 @@ public class ParallelEDIFParser implements AutoCloseable{
         workers.clear();
         boolean isGzipped = fileName.toString().endsWith(".gz");
         int threads = calcThreads(fileSize, maxThreads, isGzipped);
-        long offsetPerThread = (isGzipped ? (fileSize * EDIF_GZIP_RATIO) : fileSize) / threads;
+        long offsetPerThread = (isGzipped ? (fileSize * EDIF_GZIP_COMPRESSION_RATIO) : fileSize)
+                / threads;
         for (int i=0;i<threads;i++) {
             ParallelEDIFParserWorker worker = makeWorker(i*offsetPerThread);
             workers.add(worker);
@@ -111,7 +117,7 @@ public class ParallelEDIFParser implements AutoCloseable{
 
     public EDIFNetlist parseEDIFNetlist() throws IOException {
         EDIFNetlist netlist = parseEDIFNetlist(CodePerfTracker.SILENT);
-        if (this.fileName.toString().endsWith(".gz")) {
+        if (fileName.toString().endsWith(".gz")) {
             Files.delete(FileTools.getDecompressedGZIPFileName(fileName));
         }
         return netlist;

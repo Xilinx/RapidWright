@@ -1851,8 +1851,6 @@ public class FileTools {
         // Using a larger buffer size for GZIPInputStream improved runtime 5-10%
         try (GZIPInputStream gis = new GZIPInputStream(new FileInputStream(fileNameStr), 65536)) {
             Files.copy(gis, target, StandardCopyOption.REPLACE_EXISTING);
-        } catch (FileNotFoundException e) {
-            throw new UncheckedIOException(e);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -1868,8 +1866,6 @@ public class FileTools {
         Path compressedFile = Paths.get(uncompressedFile.toString() + ".gz");
         try (GZIPOutputStream gos = new GZIPOutputStream(new FileOutputStream(compressedFile.toFile()), 65536)) {
             Files.copy(uncompressedFile, gos);
-        } catch (FileNotFoundException e) {
-            throw new UncheckedIOException(e);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
