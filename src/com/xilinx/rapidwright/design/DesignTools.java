@@ -2891,7 +2891,11 @@ public class DesignTools {
             }
             String belName = belPin.getBELName();
             if (LUTTools.isCellALUT(cell) &&
+                    // No cell placed in the 5LUT spot
+                    si.getCell(belName.replace('6', '5')) == null &&
+                    // No net originally present on input sitewire
                     netOnSiteWire != net &&
+                    // No net present on output sitewire
                     si.getNetFromSiteWire(belName.charAt(0) + "5LUT_O5") == null) {
                 // LUT input siteWire has no net attached, nor does the LUT output sitewire: no need for site pin
                 return;
