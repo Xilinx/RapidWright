@@ -3218,6 +3218,11 @@ public class DesignTools {
             return false;
         }
 
+        if (net.isStaticNet()) {
+            // Static nets cannot be driven by a hier port
+            return false;
+        }
+
         EDIFNet en = net.getLogicalNet();
         List<EDIFPortInst> sourcePorts = en.getSourcePortInsts(true);
         if (sourcePorts.isEmpty()) {
