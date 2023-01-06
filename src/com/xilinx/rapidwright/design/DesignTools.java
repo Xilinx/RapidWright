@@ -50,6 +50,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.design.blocks.UtilizationType;
+import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELClass;
 import com.xilinx.rapidwright.device.BELPin;
@@ -2889,7 +2890,7 @@ public class DesignTools {
                 }
             }
             String belName = belPin.getBELName();
-            if (belPin.getBEL().isLUT() &&
+            if (LUTTools.isCellALUT(cell) &&
                     netOnSiteWire != net &&
                     si.getNetFromSiteWire(belName.charAt(0) + "5LUT_O5") == null) {
                 // LUT input siteWire has no net attached, nor does the LUT output sitewire: no need for site pin
