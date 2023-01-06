@@ -226,6 +226,40 @@ public class TestDesignTools {
     }
 
     @Test
+    public void testCreateA1A6ToStaticNets() {
+        String dcpPath = RapidWrightDCP.getString("bnn.dcp");
+        Design design = Design.readCheckpoint(dcpPath);
+        DesignTools.createA1A6ToStaticNets(design);
+
+        String[] pins = new String[]{
+                // 5LUT used as a static source
+                "SLICE_X79Y169/A6",
+                "SLICE_X73Y164/A6",
+                "SLICE_X82Y161/A6",
+                "SLICE_X79Y159/A6",
+                "SLICE_X76Y156/A6",
+                "SLICE_X73Y155/A6",
+                "SLICE_X83Y153/A6",
+                "SLICE_X77Y150/A6",
+                "SLICE_X79Y145/A6",
+                "SLICE_X78Y145/A6",
+
+                // Tied to VCC because RAMS32
+                "SLICE_X87Y203/H6",
+                "SLICE_X87Y202/H6"
+        };
+
+        Set<SitePinInst> vccPins = new HashSet<>(design.getVccNet().getPins());
+        for (String pin : pins) {
+            String[] split = pin.split("/");
+            SiteInst si = design.getSiteInstFromSiteName(split[0]);
+            SitePinInst spi = si.getSitePinInst(split[1]);
+            Assertions.assertNotNull(spi);
+            Assertions.assertTrue(vccPins.contains(spi));
+        }
+    }
+
+    @Test
     public void testBlackBoxCreation() {
         Design design = RapidWrightDCP.loadDCP("bnn.dcp");
         String hierCellName = "bd_0_i/hls_inst/inst/dmem_V_U";
