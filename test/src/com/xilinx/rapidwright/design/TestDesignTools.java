@@ -713,6 +713,36 @@ public class TestDesignTools {
     }
 
     @Test
+    public void testCreateA1A6ToStaticNetsGnd() {
+        String dcpPath = RapidWrightDCP.getString("optical-flow.dcp");
+        Design design = Design.readCheckpoint(dcpPath);
+        DesignTools.createA1A6ToStaticNets(design);
+
+        String[] pins = new String[]{
+                // SRLC32E transformed to SRL16E
+                "SLICE_X68Y164/A6",
+                "SLICE_X68Y164/D6",
+                "SLICE_X68Y163/A6",
+                "SLICE_X68Y163/D6",
+                "SLICE_X68Y162/A6",
+                "SLICE_X68Y162/D6",
+                "SLICE_X68Y161/A6",
+                "SLICE_X68Y161/D6",
+                "SLICE_X68Y160/A6",
+                "SLICE_X68Y160/D6",
+        };
+
+        Set<SitePinInst> gndPins = new HashSet<>(design.getGndNet().getPins());
+        for (String pin : pins) {
+            String[] split = pin.split("/");
+            SiteInst si = design.getSiteInstFromSiteName(split[0]);
+            SitePinInst spi = si.getSitePinInst(split[1]);
+            Assertions.assertNotNull(spi);
+            Assertions.assertTrue(gndPins.contains(spi));
+        }
+    }
+
+    @Test
     public void testResolveNetNameFromSiteWireWithoutNetlist() {
         Design design = new Design(); // This constructor does not create a netlist
         design.setPartName(Device.KCU105);
