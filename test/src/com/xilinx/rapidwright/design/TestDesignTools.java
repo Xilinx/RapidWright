@@ -793,6 +793,9 @@ public class TestDesignTools {
         String dcpPath = RapidWrightDCP.getString("bnn.dcp");
         Design design = Design.readCheckpoint(dcpPath);
 
+        // These nets contain [A-H](X|_I) sink pins which must be identified
+        // by any router lest their corresponding nodes are claimed by other
+        // nets (nonHierPortNets below!)
         String[] hierPortNets = new String[]{
                 "dmem_mode_V[0]",
                 "n_inputs_V[13]",
