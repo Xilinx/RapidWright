@@ -1820,37 +1820,14 @@ public class DesignTools {
             Cell c = design.getCell(p.getFullHierarchicalInstName());
             if (c == null || c.getBEL() == null) continue;
             String logicalPinName = p.getPortInst().getName();
-            String sitePinName = getRoutedSitePin(c, net, logicalPinName);
-            if (sitePinName == null) continue;
-            //TODO NOTE: The following if clause adds some unexpected pins to GND, e.g. SLICE.CIN
-            /*if (sitePinName == null) {
-                if (net.equals(design.getGndNet())) {
-                    sitePinName = c.getCorrespondingSitePinName(logicalPinName);
-                }
-                if (sitePinName == null) {
-                    continue;
-                }
-                if (c.getPhysicalPinMapping(logicalPinName) == null) {
-                    String physPinMapping = c.getDefaultPinMapping(logicalPinName);
-                    if (physPinMapping != null) {
-                        c.addPinMapping(physPinMapping, logicalPinName);
-                    }
-                }
-            }*/
-            SiteInst si = c.getSiteInst();
-            SitePinInst newPin = si.getSitePinInst(sitePinName);
-            if (newPin != null) continue;
-            newPin = net.createPin(sitePinName, c.getSiteInst());
-            if (newPin != null) newPins.add(newPin);
             Set<String> physPinMappings = c.getAllPhysicalPinMappings(logicalPinName);
             // BRAMs can have two (or more) physical pin mappings for a logical pin
-            String existing = c.getPhysicalPinMapping(logicalPinName);
-            if (physPinMappings != null && physPinMappings.size() > 1) {
+            if (physPinMappings != null) {
+                SiteInst si = c.getSiteInst();
                 for (String physPin : physPinMappings) {
-                    if (existing.equals(physPin)) continue;
-                    sitePinName = getRoutedSitePinFromPhysicalPin(c, net, physPin);
+                    String sitePinName = getRoutedSitePinFromPhysicalPin(c, net, physPin);
                     if (sitePinName == null) continue;
-                    newPin = si.getSitePinInst(sitePinName);
+                    SitePinInst newPin = si.getSitePinInst(sitePinName);
                     if (newPin != null) continue;
                     newPin = net.createPin(sitePinName, c.getSiteInst());
                     if (newPin != null) newPins.add(newPin);
