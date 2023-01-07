@@ -679,6 +679,70 @@ public class TestDesignTools {
     }
 
     @Test
+    public void testCreateA1A6ToStaticNetsVcc() {
+        String dcpPath = RapidWrightDCP.getString("bnn.dcp");
+        Design design = Design.readCheckpoint(dcpPath);
+        DesignTools.createA1A6ToStaticNets(design);
+
+        String[] pins = new String[]{
+                // 5LUT used as a static source
+                "SLICE_X79Y169/A6",
+                "SLICE_X73Y164/A6",
+                "SLICE_X82Y161/A6",
+                "SLICE_X79Y159/A6",
+                "SLICE_X76Y156/A6",
+                "SLICE_X73Y155/A6",
+                "SLICE_X83Y153/A6",
+                "SLICE_X77Y150/A6",
+                "SLICE_X79Y145/A6",
+                "SLICE_X78Y145/A6",
+
+                // Tied to VCC because RAMS32
+                "SLICE_X87Y203/H6",
+                "SLICE_X87Y202/H6"
+        };
+
+        Set<SitePinInst> vccPins = new HashSet<>(design.getVccNet().getPins());
+        for (String pin : pins) {
+            String[] split = pin.split("/");
+            SiteInst si = design.getSiteInstFromSiteName(split[0]);
+            SitePinInst spi = si.getSitePinInst(split[1]);
+            Assertions.assertNotNull(spi);
+            Assertions.assertTrue(vccPins.contains(spi));
+        }
+    }
+
+    @Test
+    public void testCreateA1A6ToStaticNetsGnd() {
+        String dcpPath = RapidWrightDCP.getString("optical-flow.dcp");
+        Design design = Design.readCheckpoint(dcpPath);
+        DesignTools.createA1A6ToStaticNets(design);
+
+        String[] pins = new String[]{
+                // SRLC32E transformed to SRL16E
+                "SLICE_X68Y164/A6",
+                "SLICE_X68Y164/D6",
+                "SLICE_X68Y163/A6",
+                "SLICE_X68Y163/D6",
+                "SLICE_X68Y162/A6",
+                "SLICE_X68Y162/D6",
+                "SLICE_X68Y161/A6",
+                "SLICE_X68Y161/D6",
+                "SLICE_X68Y160/A6",
+                "SLICE_X68Y160/D6",
+        };
+
+        Set<SitePinInst> gndPins = new HashSet<>(design.getGndNet().getPins());
+        for (String pin : pins) {
+            String[] split = pin.split("/");
+            SiteInst si = design.getSiteInstFromSiteName(split[0]);
+            SitePinInst spi = si.getSitePinInst(split[1]);
+            Assertions.assertNotNull(spi);
+            Assertions.assertTrue(gndPins.contains(spi));
+        }
+    }
+
+    @Test
     public void testResolveNetNameFromSiteWireWithoutNetlist() {
         Design design = new Design(); // This constructor does not create a netlist
         design.setPartName(Device.KCU105);

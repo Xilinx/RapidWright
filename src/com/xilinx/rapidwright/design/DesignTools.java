@@ -50,6 +50,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.design.blocks.UtilizationType;
+import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELClass;
 import com.xilinx.rapidwright.device.BELPin;
@@ -2878,10 +2879,8 @@ public class DesignTools {
         // SiteWire and SitePin Name are the same for LUT inputs
         String siteWireName = belPin.getSiteWireName();
         // VCC returned based on the site wire, site pins are not stored in dcp
-        Net net = si.getNetFromSiteWire(siteWireName);
-        if (net == null) {
-            net = si.getDesign().getVccNet();
-        }
+        Net netOnSiteWire = si.getNetFromSiteWire(siteWireName);
+        Net net = (netOnSiteWire != null) ? netOnSiteWire : si.getDesign().getVccNet();
         if (net.isStaticNet()) {
             // SRL16Es that have been transformed from SRLC32E require GND on their A6 pin
             if (cell.getType().equals("SRL16E") && siteWireName.endsWith("6")) {
@@ -2891,8 +2890,14 @@ public class DesignTools {
                 }
             }
             String belName = belPin.getBELName();
-            if (belPin.getBEL().isLUT() && si.getCell(belName.replace('6', '5')) == null) {
-                // Nothing is placed on the 5LUT BEL, no need for site pin
+            if (LUTTools.isCellALUT(cell) &&
+                    // No cell placed in the 5LUT spot
+                    si.getCell(belName.replace('6', '5')) == null &&
+                    // No net originally present on input sitewire
+                    netOnSiteWire != net &&
+                    // No net present on output sitewire
+                    si.getNetFromSiteWire(belName.charAt(0) + "5LUT_O5") == null) {
+                // LUT input siteWire has no net attached, nor does the LUT output sitewire: no need for site pin
                 return;
             }
             SitePinInst pin = si.getSitePinInst(siteWireName);
