@@ -3240,12 +3240,6 @@ public class DesignTools {
             return false;
         }
 
-        Cell cell = net.getDesign().getCell(epi.getName());
-        if (cell != null) {
-            // Hier ports have no corresponding cell
-            return false;
-        }
-
         return true;
     }
 }
