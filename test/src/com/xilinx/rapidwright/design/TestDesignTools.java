@@ -226,6 +226,37 @@ public class TestDesignTools {
     }
 
     @Test
+    public void testCreateMissingSitePinInstsMultiPinMap() {
+        String dcpPath = RapidWrightDCP.getString("bnn.dcp");
+        Design design = Design.readCheckpoint(dcpPath);
+        DesignTools.createMissingSitePinInsts(design);
+
+        Net net = design.getNet("bd_0_i/hls_inst/inst/grp_bin_conv_fu_485/grp_process_word_fu_2716/grp_conv_word_fu_523/conv_out_buffer_V_address0[1]");
+        // Net connects to logical pins that map onto more than one physical pin
+        // (H2 and [^H]2); make sure those non H2 pins are present
+        String[] pins = new String[]{
+                "SLICE_X81Y218/A2",
+                "SLICE_X81Y218/B2",
+                "SLICE_X81Y218/C2",
+                "SLICE_X81Y218/D2",
+                "SLICE_X81Y218/E2",
+                "SLICE_X81Y218/F2",
+                "SLICE_X81Y218/G2",
+
+                "SLICE_X81Y218/H2"
+        };
+
+        Set<SitePinInst> netPins = new HashSet<>(net.getPins());
+        for (String pin : pins) {
+            String[] split = pin.split("/");
+            SiteInst si = design.getSiteInstFromSiteName(split[0]);
+            SitePinInst spi = si.getSitePinInst(split[1]);
+            Assertions.assertNotNull(spi);
+            Assertions.assertTrue(netPins.contains(spi));
+        }
+    }
+
+    @Test
     public void testBlackBoxCreation() {
         Design design = RapidWrightDCP.loadDCP("bnn.dcp");
         String hierCellName = "bd_0_i/hls_inst/inst/dmem_V_U";
