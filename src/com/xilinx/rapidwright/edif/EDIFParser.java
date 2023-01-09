@@ -29,12 +29,15 @@ package com.xilinx.rapidwright.edif;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 
 import com.xilinx.rapidwright.tests.CodePerfTracker;
+import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.StringPool;
 
 /**
@@ -124,6 +127,16 @@ public class EDIFParser extends AbstractEDIFParserWorker implements AutoCloseabl
         final EDIFToken token = tokenizer.getOptionalNextToken(true);
         if (token != null) {
             throw new EDIFParseException(token, "Expected EOF but found "+token);
+        }
+
+        Path fileName = tokenizer.getFileName();
+        if (fileName != null && fileName.toString().endsWith(".gz")) {
+            try {
+                Files.delete(
+                        FileTools.getDecompressedGZIPFileName(tokenizer.getFileName()));
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
         }
 
         return currNetlist;
