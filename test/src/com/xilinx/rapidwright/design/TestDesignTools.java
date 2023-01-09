@@ -787,4 +787,44 @@ public class TestDesignTools {
         si.routeIntraSiteNet(net, bp, bp);
         Assertions.assertEquals("net", DesignTools.resolveNetNameFromSiteWire(si, site.getSiteWireIndex("A1")));
     }
+
+    @Test
+    public void testIsNetDrivenByHierPort() {
+        String dcpPath = RapidWrightDCP.getString("bnn.dcp");
+        Design design = Design.readCheckpoint(dcpPath);
+
+        // These nets contain [A-H](X|_I) sink pins which must be identified
+        // by any router lest their corresponding nodes are claimed by other
+        // nets (nonHierPortNets below!)
+        String[] hierPortNets = new String[]{
+                "dmem_mode_V[0]",
+                "n_inputs_V[13]",
+                "n_inputs_V[1]",
+                "n_inputs_V[3]",
+                "n_inputs_V[5]",
+                "n_inputs_V[7]",
+                "n_inputs_V[9]",
+        };
+
+        for (String name : hierPortNets) {
+            Net net = design.getNet(name);
+            Assertions.assertNotNull(net);
+            Assertions.assertTrue(DesignTools.isNetDrivenByHierPort(net));
+        }
+
+        String[] nonHierPortNets = new String[]{
+                "bd_0_i/hls_inst/inst/ap_CS_fsm_state12",
+                "bd_0_i/hls_inst/inst/grp_bin_conv_fu_485/zext_ln180_41_fu_4196_p1[3]",
+                "bd_0_i/hls_inst/inst/p_0882_0_reg_394_reg[2]",
+                "bd_0_i/hls_inst/inst/p_0882_0_reg_394_reg[4]",
+                "bd_0_i/hls_inst/inst/zext_ln544_12_cast_fu_1208_p4[6]",
+                "bd_0_i/hls_inst/inst/zext_ln879_1_reg_1396",
+        };
+
+        for (String name : nonHierPortNets) {
+            Net net = design.getNet(name);
+            Assertions.assertNotNull(net);
+            Assertions.assertFalse(DesignTools.isNetDrivenByHierPort(net));
+        }
+    }
 }

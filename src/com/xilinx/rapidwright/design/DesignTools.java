@@ -3206,4 +3206,40 @@ public class DesignTools {
         }
     }
 
+    /**
+     * Determine if a Net is driven by a hierarchical port, created as part of an out-of-context
+     * synthesis flow, for example.
+     * @param net Net to examine.
+     * @returns True if driven by a hierport.
+     */
+    public static boolean isNetDrivenByHierPort(Net net) {
+        if (net.getSource() != null) {
+            // Net can only be driven by a hier port if it has no site pin driver
+            return false;
+        }
+
+        if (net.isStaticNet()) {
+            // Static nets cannot be driven by a hier port
+            return false;
+        }
+
+        EDIFNet en = net.getLogicalNet();
+        List<EDIFPortInst> sourcePorts = en.getSourcePortInsts(true);
+        if (sourcePorts.isEmpty()) {
+            // Net has no source ports; truly an driver-less net
+            return false;
+        }
+
+        if (sourcePorts.size() != 1) {
+            return false;
+        }
+
+        EDIFPortInst epi = sourcePorts.get(0);
+        if (!epi.isTopLevelPort()) {
+            // Hier ports must be top level ports
+            return false;
+        }
+
+        return true;
+    }
 }
