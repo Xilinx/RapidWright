@@ -44,6 +44,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.FileTools;
+import com.xilinx.rapidwright.util.Params;
 
 public class TestEDIFParser {
     private static final Path input = RapidWrightDCP.getPath("edif_parsing_stress_test.edf");
@@ -129,7 +130,7 @@ public class TestEDIFParser {
     public void testGZIPEDIFParsing(boolean decompressToDisk, @TempDir Path tempDir)
             throws IOException {
         if (decompressToDisk) {
-            System.setProperty("RW_DECOMPRESS_GZIPPED_EDIF", "1");
+            System.setProperty(Params.RW_DECOMPRESS_GZIPPED_EDIF_NAME, "1");
         }
 
         Path src = tempDir.resolve(input.getFileName());
@@ -148,7 +149,7 @@ public class TestEDIFParser {
     public void testGZIPEDIFParsingParallel(boolean decompressToDisk, @TempDir Path tempDir)
             throws IOException {
         if (decompressToDisk) {
-            System.setProperty("RW_DECOMPRESS_GZIPPED_EDIF", "1");
+            System.setProperty(Params.RW_DECOMPRESS_GZIPPED_EDIF_NAME, "1");
         }
 
         Path src = tempDir.resolve(input.getFileName());
