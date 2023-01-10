@@ -32,7 +32,7 @@ public class Params {
 
     /**
      * Flag to have RapidWright decompress gzipped EDIF files to disk prior to
-     * parsing. This is a tradeoff where pre-decompression improves runtime of the
+     * parsing. This is a tradeoff where pre-decompression improves runtime over the
      * default method which is to decompress in memory. The disadvantage is that
      * this will temporarily consume ~18x more disk space than original gzipped EDIF
      * file, but loading of the EDIF file will be ~2x faster.
