@@ -25,13 +25,16 @@ package com.xilinx.rapidwright.util.function;
 
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
+import java.util.zip.GZIPInputStream;
 
 import org.apache.commons.io.function.IOSupplier;
 
 import com.xilinx.rapidwright.util.FileTools;
+import com.xilinx.rapidwright.util.Params;
 
 public interface InputStreamSupplier extends IOSupplier<InputStream> {
     static InputStreamSupplier fromPath(Path p) {
@@ -49,7 +52,7 @@ public interface InputStreamSupplier extends IOSupplier<InputStream> {
     public static InputStream getInputStream(Path fileName) {
         InputStream in = null;
         try {
-            if (fileName.toString().endsWith(".gz")) {
+            if (fileName.toString().endsWith(".gz") && Params.RW_DECOMPRESS_GZIPPED_EDIF) {
                 Path decompressed = FileTools.getDecompressedGZIPFileName(fileName);
                 synchronized (InputStreamSupplier.class) {
                     if (!decompressed.toFile().exists()) {
@@ -60,8 +63,13 @@ public interface InputStreamSupplier extends IOSupplier<InputStream> {
                 }
             }
             in = new FileInputStream(fileName.toString());
+            if (fileName.toString().endsWith(".gz")) {
+                in = new GZIPInputStream(in);
+            }
         } catch (FileNotFoundException e) {
             throw new UncheckedIOException("ERROR: Could not find file: " + fileName, e);
+        } catch (IOException e) {
+            throw new UncheckedIOException("ERROR: Problem reading file: " + fileName, e);
         }
         return in;
     }
