@@ -226,6 +226,37 @@ public class TestDesignTools {
     }
 
     @Test
+    public void testCreateMissingSitePinInstsMultiPinMap() {
+        String dcpPath = RapidWrightDCP.getString("bnn.dcp");
+        Design design = Design.readCheckpoint(dcpPath);
+        DesignTools.createMissingSitePinInsts(design);
+
+        Net net = design.getNet("bd_0_i/hls_inst/inst/grp_bin_conv_fu_485/grp_process_word_fu_2716/grp_conv_word_fu_523/conv_out_buffer_V_address0[1]");
+        // Net connects to logical pins that map onto more than one physical pin
+        // (H2 and [^H]2); make sure those non H2 pins are present
+        String[] pins = new String[]{
+                "SLICE_X81Y218/A2",
+                "SLICE_X81Y218/B2",
+                "SLICE_X81Y218/C2",
+                "SLICE_X81Y218/D2",
+                "SLICE_X81Y218/E2",
+                "SLICE_X81Y218/F2",
+                "SLICE_X81Y218/G2",
+
+                "SLICE_X81Y218/H2"
+        };
+
+        Set<SitePinInst> netPins = new HashSet<>(net.getPins());
+        for (String pin : pins) {
+            String[] split = pin.split("/");
+            SiteInst si = design.getSiteInstFromSiteName(split[0]);
+            SitePinInst spi = si.getSitePinInst(split[1]);
+            Assertions.assertNotNull(spi);
+            Assertions.assertTrue(netPins.contains(spi));
+        }
+    }
+
+    @Test
     public void testBlackBoxCreation() {
         Design design = RapidWrightDCP.loadDCP("bnn.dcp");
         String hierCellName = "bd_0_i/hls_inst/inst/dmem_V_U";
@@ -679,6 +710,70 @@ public class TestDesignTools {
     }
 
     @Test
+    public void testCreateA1A6ToStaticNetsVcc() {
+        String dcpPath = RapidWrightDCP.getString("bnn.dcp");
+        Design design = Design.readCheckpoint(dcpPath);
+        DesignTools.createA1A6ToStaticNets(design);
+
+        String[] pins = new String[]{
+                // 5LUT used as a static source
+                "SLICE_X79Y169/A6",
+                "SLICE_X73Y164/A6",
+                "SLICE_X82Y161/A6",
+                "SLICE_X79Y159/A6",
+                "SLICE_X76Y156/A6",
+                "SLICE_X73Y155/A6",
+                "SLICE_X83Y153/A6",
+                "SLICE_X77Y150/A6",
+                "SLICE_X79Y145/A6",
+                "SLICE_X78Y145/A6",
+
+                // Tied to VCC because RAMS32
+                "SLICE_X87Y203/H6",
+                "SLICE_X87Y202/H6"
+        };
+
+        Set<SitePinInst> vccPins = new HashSet<>(design.getVccNet().getPins());
+        for (String pin : pins) {
+            String[] split = pin.split("/");
+            SiteInst si = design.getSiteInstFromSiteName(split[0]);
+            SitePinInst spi = si.getSitePinInst(split[1]);
+            Assertions.assertNotNull(spi);
+            Assertions.assertTrue(vccPins.contains(spi));
+        }
+    }
+
+    @Test
+    public void testCreateA1A6ToStaticNetsGnd() {
+        String dcpPath = RapidWrightDCP.getString("optical-flow.dcp");
+        Design design = Design.readCheckpoint(dcpPath);
+        DesignTools.createA1A6ToStaticNets(design);
+
+        String[] pins = new String[]{
+                // SRLC32E transformed to SRL16E
+                "SLICE_X68Y164/A6",
+                "SLICE_X68Y164/D6",
+                "SLICE_X68Y163/A6",
+                "SLICE_X68Y163/D6",
+                "SLICE_X68Y162/A6",
+                "SLICE_X68Y162/D6",
+                "SLICE_X68Y161/A6",
+                "SLICE_X68Y161/D6",
+                "SLICE_X68Y160/A6",
+                "SLICE_X68Y160/D6",
+        };
+
+        Set<SitePinInst> gndPins = new HashSet<>(design.getGndNet().getPins());
+        for (String pin : pins) {
+            String[] split = pin.split("/");
+            SiteInst si = design.getSiteInstFromSiteName(split[0]);
+            SitePinInst spi = si.getSitePinInst(split[1]);
+            Assertions.assertNotNull(spi);
+            Assertions.assertTrue(gndPins.contains(spi));
+        }
+    }
+
+    @Test
     public void testResolveNetNameFromSiteWireWithoutNetlist() {
         Design design = new Design(); // This constructor does not create a netlist
         design.setPartName(Device.KCU105);
@@ -691,5 +786,45 @@ public class TestDesignTools {
         BELPin bp = si.getBELPin("A1", "A1");
         si.routeIntraSiteNet(net, bp, bp);
         Assertions.assertEquals("net", DesignTools.resolveNetNameFromSiteWire(si, site.getSiteWireIndex("A1")));
+    }
+
+    @Test
+    public void testIsNetDrivenByHierPort() {
+        String dcpPath = RapidWrightDCP.getString("bnn.dcp");
+        Design design = Design.readCheckpoint(dcpPath);
+
+        // These nets contain [A-H](X|_I) sink pins which must be identified
+        // by any router lest their corresponding nodes are claimed by other
+        // nets (nonHierPortNets below!)
+        String[] hierPortNets = new String[]{
+                "dmem_mode_V[0]",
+                "n_inputs_V[13]",
+                "n_inputs_V[1]",
+                "n_inputs_V[3]",
+                "n_inputs_V[5]",
+                "n_inputs_V[7]",
+                "n_inputs_V[9]",
+        };
+
+        for (String name : hierPortNets) {
+            Net net = design.getNet(name);
+            Assertions.assertNotNull(net);
+            Assertions.assertTrue(DesignTools.isNetDrivenByHierPort(net));
+        }
+
+        String[] nonHierPortNets = new String[]{
+                "bd_0_i/hls_inst/inst/ap_CS_fsm_state12",
+                "bd_0_i/hls_inst/inst/grp_bin_conv_fu_485/zext_ln180_41_fu_4196_p1[3]",
+                "bd_0_i/hls_inst/inst/p_0882_0_reg_394_reg[2]",
+                "bd_0_i/hls_inst/inst/p_0882_0_reg_394_reg[4]",
+                "bd_0_i/hls_inst/inst/zext_ln544_12_cast_fu_1208_p4[6]",
+                "bd_0_i/hls_inst/inst/zext_ln879_1_reg_1396",
+        };
+
+        for (String name : nonHierPortNets) {
+            Net net = design.getNet(name);
+            Assertions.assertNotNull(net);
+            Assertions.assertFalse(DesignTools.isNetDrivenByHierPort(net));
+        }
     }
 }
