@@ -56,7 +56,7 @@ public interface InputStreamSupplier extends IOSupplier<InputStream> {
     public static InputStream getInputStream(Path fileName, boolean decompressToDisk) {
         InputStream in = null;
         try {
-            if (decompressToDisk) {
+            if (fileName.toString().endsWith(".gz") && decompressToDisk) {
                 Path decompressed = FileTools.getDecompressedGZIPFileName(fileName);
                 synchronized (InputStreamSupplier.class) {
                     if (!decompressed.toFile().exists()) {
