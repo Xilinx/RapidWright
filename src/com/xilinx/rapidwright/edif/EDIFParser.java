@@ -132,7 +132,7 @@ public class EDIFParser extends AbstractEDIFParserWorker implements AutoCloseabl
 
         Path fileName = tokenizer.getFileName();
         if (fileName != null && fileName.toString().endsWith(".gz")
-                && Params.RW_DECOMPRESS_GZIPPED_EDIF) {
+                && Params.RW_DECOMPRESS_GZIPPED_EDIF_TO_DISK) {
             try {
                 Files.delete(
                         FileTools.getDecompressedGZIPFileName(tokenizer.getFileName()));

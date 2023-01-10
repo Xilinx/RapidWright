@@ -28,7 +28,7 @@ package com.xilinx.rapidwright.util;
  */
 public class Params {
 
-    public static String RW_DECOMPRESS_GZIPPED_EDIF_NAME = "RW_DECOMPRESS_GZIPPED_EDIF";
+    public static String RW_DECOMPRESS_GZIPPED_EDIF_TO_DISK_NAME = "RW_DECOMPRESS_GZIPPED_EDIF_TO_DISK";
 
     /**
      * Flag to have RapidWright decompress gzipped EDIF files to disk prior to
@@ -37,7 +37,7 @@ public class Params {
      * this will temporarily consume ~18x more disk space than original gzipped EDIF
      * file, but loading of the EDIF file will be ~2x faster.
      */
-    public static boolean RW_DECOMPRESS_GZIPPED_EDIF = isParamSet(RW_DECOMPRESS_GZIPPED_EDIF_NAME);
+    public static boolean RW_DECOMPRESS_GZIPPED_EDIF_TO_DISK = isParamSet(RW_DECOMPRESS_GZIPPED_EDIF_TO_DISK_NAME);
     
     /**
      * Checks if the named RapidWright parameter is set via an environment variable

@@ -34,11 +34,10 @@ import java.util.zip.GZIPInputStream;
 import org.apache.commons.io.function.IOSupplier;
 
 import com.xilinx.rapidwright.util.FileTools;
-import com.xilinx.rapidwright.util.Params;
 
 public interface InputStreamSupplier extends IOSupplier<InputStream> {
-    static InputStreamSupplier fromPath(Path p) {
-        return () -> getInputStream(p);
+    static InputStreamSupplier fromPath(Path p, boolean decompressToDisk) {
+        return () -> getInputStream(p, decompressToDisk);
     }
 
     /**
@@ -46,13 +45,18 @@ public interface InputStreamSupplier extends IOSupplier<InputStream> {
      * extension), it will decompress the file alongside the original with the '.gz'
      * extension removed.
      * 
-     * @param fileName Path to the file or gzipped file from which to get an InputStream.
-     * @return An InputStream of the file, or of a decompressed copy of a gzipped file.
+     * @param fileName         Path to the file or gzipped file from which to get an
+     *                         InputStream.
+     * @param decompressToDisk To make certain operations faster, decompress the
+     *                         file to disk first rather than to decompress through
+     *                         the InputStream.
+     * @return An InputStream of the file, or of a decompressed copy of a gzipped
+     *         file.
      */
-    public static InputStream getInputStream(Path fileName) {
+    public static InputStream getInputStream(Path fileName, boolean decompressToDisk) {
         InputStream in = null;
         try {
-            if (fileName.toString().endsWith(".gz") && Params.RW_DECOMPRESS_GZIPPED_EDIF) {
+            if (decompressToDisk) {
                 Path decompressed = FileTools.getDecompressedGZIPFileName(fileName);
                 synchronized (InputStreamSupplier.class) {
                     if (!decompressed.toFile().exists()) {

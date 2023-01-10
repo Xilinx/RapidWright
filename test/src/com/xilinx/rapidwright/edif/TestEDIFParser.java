@@ -130,7 +130,7 @@ public class TestEDIFParser {
     public void testGZIPEDIFParsing(boolean decompressToDisk, @TempDir Path tempDir)
             throws IOException {
         if (decompressToDisk) {
-            System.setProperty(Params.RW_DECOMPRESS_GZIPPED_EDIF_NAME, "1");
+            System.setProperty(Params.RW_DECOMPRESS_GZIPPED_EDIF_TO_DISK_NAME, "1");
         }
 
         Path src = tempDir.resolve(input.getFileName());
@@ -149,7 +149,7 @@ public class TestEDIFParser {
     public void testGZIPEDIFParsingParallel(boolean decompressToDisk, @TempDir Path tempDir)
             throws IOException {
         if (decompressToDisk) {
-            System.setProperty(Params.RW_DECOMPRESS_GZIPPED_EDIF_NAME, "1");
+            System.setProperty(Params.RW_DECOMPRESS_GZIPPED_EDIF_TO_DISK_NAME, "1");
         }
 
         Path src = tempDir.resolve(input.getFileName());
