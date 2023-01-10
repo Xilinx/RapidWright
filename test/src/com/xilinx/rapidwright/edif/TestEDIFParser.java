@@ -39,6 +39,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
@@ -123,8 +124,14 @@ public class TestEDIFParser {
 
     }
 
-    @Test
-    public void testGZIPEDIFParsing(@TempDir Path tempDir) throws IOException {
+    @ParameterizedTest
+    @ValueSource(booleans = { false, true })
+    public void testGZIPEDIFParsing(boolean decompressToDisk, @TempDir Path tempDir)
+            throws IOException {
+        if (decompressToDisk) {
+            System.setProperty("RW_DECOMPRESS_GZIPPED_EDIF", "1");
+        }
+
         Path src = tempDir.resolve(input.getFileName());
         Files.copy(input, src);
         Path compressed = FileTools.compressFileUsingGZIP(src);
@@ -136,8 +143,14 @@ public class TestEDIFParser {
         Assertions.assertFalse(src.toFile().exists());
     }
 
-    @Test
-    public void testGZIPEDIFParsingParallel(@TempDir Path tempDir) throws IOException {
+    @ParameterizedTest
+    @ValueSource(booleans = { false, true })
+    public void testGZIPEDIFParsingParallel(boolean decompressToDisk, @TempDir Path tempDir)
+            throws IOException {
+        if (decompressToDisk) {
+            System.setProperty("RW_DECOMPRESS_GZIPPED_EDIF", "1");
+        }
+
         Path src = tempDir.resolve(input.getFileName());
         Files.copy(input, src);
         Path compressed = FileTools.compressFileUsingGZIP(src);
