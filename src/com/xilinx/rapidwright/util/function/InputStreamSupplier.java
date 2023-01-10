@@ -25,17 +25,19 @@ package com.xilinx.rapidwright.util.function;
 
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
+import java.util.zip.GZIPInputStream;
 
 import org.apache.commons.io.function.IOSupplier;
 
 import com.xilinx.rapidwright.util.FileTools;
 
 public interface InputStreamSupplier extends IOSupplier<InputStream> {
-    static InputStreamSupplier fromPath(Path p) {
-        return () -> getInputStream(p);
+    static InputStreamSupplier fromPath(Path p, boolean decompressToDisk) {
+        return () -> getInputStream(p, decompressToDisk);
     }
 
     /**
@@ -43,13 +45,18 @@ public interface InputStreamSupplier extends IOSupplier<InputStream> {
      * extension), it will decompress the file alongside the original with the '.gz'
      * extension removed.
      * 
-     * @param fileName Path to the file or gzipped file from which to get an InputStream.
-     * @return An InputStream of the file, or of a decompressed copy of a gzipped file.
+     * @param fileName         Path to the file or gzipped file from which to get an
+     *                         InputStream.
+     * @param decompressToDisk To make certain operations faster, decompress the
+     *                         file to disk first rather than to decompress through
+     *                         the InputStream.
+     * @return An InputStream of the file, or of a decompressed copy of a gzipped
+     *         file.
      */
-    public static InputStream getInputStream(Path fileName) {
+    public static InputStream getInputStream(Path fileName, boolean decompressToDisk) {
         InputStream in = null;
         try {
-            if (fileName.toString().endsWith(".gz")) {
+            if (fileName.toString().endsWith(".gz") && decompressToDisk) {
                 Path decompressed = FileTools.getDecompressedGZIPFileName(fileName);
                 synchronized (InputStreamSupplier.class) {
                     if (!decompressed.toFile().exists()) {
@@ -60,8 +67,13 @@ public interface InputStreamSupplier extends IOSupplier<InputStream> {
                 }
             }
             in = new FileInputStream(fileName.toString());
+            if (fileName.toString().endsWith(".gz")) {
+                in = new GZIPInputStream(in);
+            }
         } catch (FileNotFoundException e) {
             throw new UncheckedIOException("ERROR: Could not find file: " + fileName, e);
+        } catch (IOException e) {
+            throw new UncheckedIOException("ERROR: Problem reading file: " + fileName, e);
         }
         return in;
     }
