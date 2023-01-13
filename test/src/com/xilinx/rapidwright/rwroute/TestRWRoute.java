@@ -23,16 +23,43 @@
 
 package com.xilinx.rapidwright.rwroute;
 
+import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.DesignTools;
+import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.SiteInst;
+import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.support.LargeTest;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
-
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
-import com.xilinx.rapidwright.design.Design;
+import java.util.ArrayList;
+import java.util.List;
 
-@LargeTest
 public class TestRWRoute {
+    private static void assertAllSinksRouted(List<SitePinInst> pins) {
+        for (SitePinInst spi : pins) {
+            if (spi.isOutPin())
+                continue;
+            Assertions.assertTrue(spi.isRouted());
+        }
+    }
+
+    private static void assertAllSinksRouted(Design design) {
+        for (Net net : design.getNets()) {
+            if (net.getSource() == null && !net.isStaticNet()) {
+                // Source-less nets may exist in out-of-context design
+                continue;
+            }
+            assertAllSinksRouted(net.getPins());
+        }
+    }
+
     /**
      * Tests the non-timing driven full routing, i.e., RWRoute running in its wirelength-driven mode.
      * The bnn design from Rosetta benchmarks is used.
@@ -41,10 +68,12 @@ public class TestRWRoute {
      * This test takes around 15s on a machine with a CPU @ 2.5GHz.
      */
     @Test
+    @LargeTest
     public void testNonTimingDrivenFullRouting() {
         String dcpPath = RapidWrightDCP.getString("bnn.dcp");
         Design design = Design.readCheckpoint(dcpPath);
         RWRoute.routeDesignFullNonTimingDriven(design);
+        assertAllSinksRouted(design);
     }
 
     /**
@@ -57,27 +86,31 @@ public class TestRWRoute {
      * This test takes around 20s on a machine with a CPU @ 2.5GHz.
      */
     @Test
+    @LargeTest
     public void testTimingDrivenFullRouting() {
         String dcpPath = RapidWrightDCP.getString("bnn.dcp");
         Design design = Design.readCheckpoint(dcpPath);
         RWRoute.routeDesignFullTimingDriven(design);
+        assertAllSinksRouted(design);
     }
 
     /**
-     * Tests the non-timing driven full routing with a design that has a global clock net.
+     * Tests the non-timing driven full routing with a design that has a global net.
      * The optical-flow design from Rosetta benchmarks is used.
-     * It is the largest heterogeneous design from the Rosetta benchmark set.
-     * It has a global clock net, fitting in this test purpose of routing with a clock net.
+     * It is the largest heterogeneous design from the Rosetta benchmark set, and has
+     * a global enable net.
      * This test takes around 3 minutes on a machine with a CPU @ 2.5GHz.
      */
     @Test
-    public void testNonTimingDrivenFullRoutingWithClkDesign() {
+    @LargeTest(max_memory_gb = 8)
+    public void testNonTimingDrivenFullRoutingWithGlobalNet() {
         // Sporadically failing due to OutOfMemoryException (see #439)
         long maxMemoryNeeded = 1024L*1024L*1024L*8L;
         Assumptions.assumeTrue(Runtime.getRuntime().maxMemory() >= maxMemoryNeeded);
         String dcpPath = RapidWrightDCP.getString("optical-flow.dcp");
         Design design = Design.readCheckpoint(dcpPath);
         RWRoute.routeDesignFullNonTimingDriven(design);
+        assertAllSinksRouted(design);
     }
 
     /**
@@ -87,12 +120,105 @@ public class TestRWRoute {
      * This test takes around 40s on a machine with a CPU @ 2.5GHz.
      */
     @Test
+    @LargeTest(max_memory_gb = 8)
     public void testNonTimingDrivenPartialRouting() {
         // Sporadically failing due to OutOfMemoryException (see #439)
         long maxMemoryNeeded = 1024L*1024L*1024L*8L;
         Assumptions.assumeTrue(Runtime.getRuntime().maxMemory() >= maxMemoryNeeded);
         String dcpPath = RapidWrightDCP.getString("picoblaze_partial.dcp");
         Design design = Design.readCheckpoint(dcpPath);
-        RWRoute.routeDesignPartialNonTimingDriven(design);
+        DesignTools.createMissingSitePinInsts(design);
+        DesignTools.createPossiblePinsToStaticNets(design);
+
+        List<SitePinInst> pinsToRoute = new ArrayList<>();
+        for (Net net : design.getNets()) {
+            if (net.getSource() == null && !net.isStaticNet()) {
+                // Source-less nets may exist since this is an out-of-context design
+                continue;
+            }
+            if (!net.hasPIPs()) {
+                pinsToRoute.addAll(net.getSinkPins());
+            }
+        }
+        PartialRouter.routeDesignPartialNonTimingDriven(design, pinsToRoute);
+        assertAllSinksRouted(pinsToRoute);
+    }
+
+    /**
+     * Tests timing driven partial routing.
+     * The picoblaze design is from one of the RapidWright tutorials with nets between computing kernels not routed.
+     * Other nets within each kernel are fully routed.
+     */
+    @Test
+    @LargeTest
+    @Disabled("Blocked on TimingGraph.build() being able to build partial graphs")
+    public void testTimingDrivenPartialRouting() {
+        String dcpPath = RapidWrightDCP.getString("picoblaze_partial.dcp");
+        Design design = Design.readCheckpoint(dcpPath);
+        DesignTools.createMissingSitePinInsts(design);
+        DesignTools.createPossiblePinsToStaticNets(design);
+
+        List<SitePinInst> pinsToRoute = new ArrayList<>();
+        for (Net net : design.getNets()) {
+            if (!net.hasPIPs()) {
+                pinsToRoute.addAll(net.getSinkPins());
+            }
+        }
+        PartialRouter.routeDesignPartialTimingDriven(design, pinsToRoute);
+        assertAllSinksRouted(design);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            // One SLR crossing
+            // (Too) Close
+            "SLICE_X9Y299,SLICE_X9Y300,500",    // On Laguna column
+            "SLICE_X9Y300,SLICE_X9Y299,400",
+            "SLICE_X0Y299,SLICE_X0Y300,200",    // Far from Laguna column
+            "SLICE_X0Y300,SLICE_X0Y299,200",
+            "SLICE_X53Y299,SLICE_X53Y300,300",  // Equidistant from two Laguna columns
+            "SLICE_X53Y300,SLICE_X53Y299,600",
+            // Perfect
+            "SLICE_X9Y241,SLICE_X9Y300,200",
+            "SLICE_X9Y300,SLICE_X9Y241,200",
+            "SLICE_X9Y358,SLICE_X9Y299,100",
+            "SLICE_X9Y299,SLICE_X9Y358,200",
+            "SLICE_X53Y241,SLICE_X69Y300,500",
+            "SLICE_X53Y358,SLICE_X69Y299,1000",
+            // Far
+            "SLICE_X9Y240,SLICE_X9Y359,100",    // On Laguna
+            "SLICE_X9Y359,SLICE_X9Y240,100",
+            "SLICE_X162Y240,SLICE_X162Y430,300",
+            "SLICE_X162Y430,SLICE_X162Y240,100",
+            "SLICE_X0Y240,SLICE_X12Y430,1400",  // Far from Laguna
+            "SLICE_X0Y430,SLICE_X12Y240,300",
+
+            // Two SLR crossings
+            "SLICE_X162Y299,SLICE_X162Y599,300",
+            "SLICE_X162Y599,SLICE_X162Y299,100",
+
+            // Three SLR crossings
+            "SLICE_X79Y0,SLICE_X79Y899,300",    // Straight up: next to Laguna column
+            "SLICE_X0Y0,SLICE_X0Y899,300",      // Straight up: far from Laguna column
+            "SLICE_X168Y0,SLICE_X168Y899,300",  // Straight up: far from Laguna column
+            "SLICE_X9Y0,SLICE_X162Y899,500",    // Up and right
+            "SLICE_X168Y162,SLICE_X9Y899,1900", // Up and left
+    })
+    public void testSLRCrossingNonTimingDriven(String srcSiteName, String dstSiteName, long nodesPoppedLimit) {
+        Design design = new Design("top", Device.AWS_F1);
+
+        Net net = design.createNet("net");
+        SiteInst srcSi = design.createSiteInst(srcSiteName);
+        net.createPin("AQ", srcSi);
+
+        SiteInst dstSi = design.createSiteInst(dstSiteName);
+        SitePinInst dstSpi = net.createPin("A1", dstSi);
+
+        List<SitePinInst> pinsToRoute = new ArrayList<>();
+        pinsToRoute.add(dstSpi);
+        PartialRouter.routeDesignPartialNonTimingDriven(design, pinsToRoute);
+
+        Assertions.assertTrue(pinsToRoute.stream().allMatch(SitePinInst::isRouted));
+        Assertions.assertTrue(Long.valueOf(System.getProperty("rapidwright.rwroute.nodesPopped")) <= nodesPoppedLimit);
     }
 }
