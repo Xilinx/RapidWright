@@ -56,6 +56,7 @@ import com.xilinx.rapidwright.timing.TimingManager;
 import com.xilinx.rapidwright.timing.TimingVertex;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
+import com.xilinx.rapidwright.util.Utils;
 
 /**
  * RWRoute class provides the main methods for routing a design.
@@ -966,7 +967,7 @@ public class RWRoute{
             }
             for (Node node:netNodes) {
                 TileTypeEnum tileType = node.getTile().getTileTypeEnum();
-                if (tileType != TileTypeEnum.INT && !RouteNode.lagunaTileTypes.contains(tileType)) {
+                if (tileType != TileTypeEnum.INT && !Utils.isLaguna(tileType)) {
                     continue;
                 }
                 totalINTNodes++;
@@ -1221,7 +1222,7 @@ public class RWRoute{
 
         RouteNode altSourceRnode = connection.getAltSourceRnode();
         if (altSourceRnode == null) {
-            throw new RuntimeException();
+            throw new RuntimeException("No alternate source pin on net: " + net.getName());
         }
         connection.setSource(altSource);
         connection.setSourceRnode(altSourceRnode);
@@ -1262,7 +1263,7 @@ public class RWRoute{
             List<RouteNode> prevRouting = connection.getRnodes();
             // Check that this is the sink path marked by prepareRouteConnection()
             if (!connection.getSink().isRouted() || prevRouting.isEmpty() || !rnode.isTarget()) {
-                throw new RuntimeException();
+                throw new RuntimeException("Unexpected rnode to backtrack from: " + rnode);
             }
             // Backtrack from the sink used on that sink path
             rnode = prevRouting.get(0);
@@ -1382,7 +1383,7 @@ public class RWRoute{
                                 connection.getSinkRnode().getSLRIndex() != rnode.getSLRIndex());
                         break;
                     default:
-                        throw new RuntimeException();
+                        throw new RuntimeException("Unexpected rnode type: " + childRNode.getType());
                 }
             }
 

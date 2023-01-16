@@ -52,6 +52,8 @@ public class Utils{
 
     private static Set<TileTypeEnum> urams;
 
+    private static Set<TileTypeEnum> lagunas;
+
     private static Set<SiteTypeEnum> lockedSiteTypes;
 
     private static Set<SiteTypeEnum> moduleSiteTypes;
@@ -159,6 +161,10 @@ public class Utils{
 
     public static boolean isURAM(TileTypeEnum type) {
         return urams.contains(type);
+    }
+
+    public static boolean isLaguna(TileTypeEnum type) {
+        return lagunas.contains(type);
     }
 
     public static boolean isLockedSiteType(SiteTypeEnum type) {
@@ -320,6 +326,11 @@ public class Utils{
             TileTypeEnum.URAM_ROCF_BL_TILE,
             TileTypeEnum.URAM_DELAY_LOCF_TL_TILE,
             TileTypeEnum.URAM_DELAY_ROCF_TL_TILE
+        );
+
+        lagunas = EnumSet.of(
+                TileTypeEnum.LAG_LAG,       // UltraScale+
+                TileTypeEnum.LAGUNA_TILE    // UltraScale
         );
 
         lockedSiteTypes = EnumSet.of(

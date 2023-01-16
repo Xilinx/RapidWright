@@ -37,6 +37,7 @@ import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.util.RuntimeTracker;
+import com.xilinx.rapidwright.util.Utils;
 
 /**
  * A RouteNode Object corresponds to a vertex of the routing resource graph.
@@ -242,11 +243,6 @@ abstract public class RouteNode implements Comparable<RouteNode> {
         return RouteNode.capacity < uniqueDriverCount();
     }
 
-    public static final EnumSet<TileTypeEnum> lagunaTileTypes = EnumSet.of(
-              TileTypeEnum.LAG_LAG      // UltraScale+
-            , TileTypeEnum.LAGUNA_TILE  // UltraScale
-    );
-
     public static class NodeInfo {
         public final short endTileXCoordinate;
         public final short endTileYCoordinate;
@@ -275,20 +271,18 @@ abstract public class RouteNode implements Comparable<RouteNode> {
             TileTypeEnum tileType = tile.getTileTypeEnum();
             boolean lagunaTile = false;
             if (tileType == TileTypeEnum.INT ||
-                    (lagunaTile = lagunaTileTypes.contains(tileType))) {
+                    (lagunaTile = Utils.isLaguna(tileType))) {
                 if (!lagunaTile ||
                         // Only consider a Laguna tile as an end tile if base tile is Laguna too
                         // (otherwise it's a PINFEED into a Laguna; in US+ Laguna is off-by-one in the X axis)
-                        lagunaTileTypes.contains(baseType)) {
+                        Utils.isLaguna(baseType)) {
                     boolean endTileWasNotNull = (endTile != null);
                     endTile = tile;
                     // Break if this is the second INT tile
                     if (endTileWasNotNull) break;
                 } else {
-                    assert(!lagunaTileTypes.contains(baseType));
-                    if (node.getIntentCode() == IntentCode.NODE_PINFEED) {
-                        laguna_i = true;
-                    }
+                    assert(!Utils.isLaguna(baseType));
+                    laguna_i = (node.getIntentCode() == IntentCode.NODE_PINFEED);
                 }
             }
         }

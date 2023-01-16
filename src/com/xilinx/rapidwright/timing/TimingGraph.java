@@ -538,43 +538,6 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         return result;
     }
 
-/*
-    private TimingEdge getEdgeIntoCurrent(TimingVertex node) {
-        TimingEdge result = null;
-
-        for (TimingEdge e : edgesOf(node)) {
-            if (e.getDst().equals(node)) {
-                result = e;
-                break;
-            }
-        }
-        return result;
-    }
-
-
-    public boolean removePartialTimingPath(GraphPath<TimingVertex, TimingEdge> path) {
-        boolean result = false;
-        List<TimingEdge> edges = path.getEdgeList();
-        boolean nofanout = true;
-        TimingVertex sink = path.getEndVertex();
-        TimingVertex cur = sink;
-        TimingEdge intoCurrent = getEdgeIntoCurrent(cur);
-        int timer =100;
-        while (cur != null && inDegreeOf(cur) == 1 &&
-                (outDegreeOf(cur)==0 || outDegreeOf(cur)==1)) {
-            cur = intoCurrent.getSrc();
-            removeEdge(intoCurrent);
-            result = true;
-            timer--;
-            if (timer == 0)
-                break;
-        }
-        if (result)
-            graphPathHashSet.remove(path);
-        return result;
-    }
-*/
-
     /**
      * Finds and returns the value of the worst slack from the TimingGraph.
      * @return The value of the worst slack found in the TimingGraph, which might be null if slack 
@@ -593,28 +556,6 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         return result;
     }
 
-/*
-    public float getMaxDelay() {
-        float result = 0;
-        for (GraphPath p : graphPathHashSet) {
-            float w = (float)p.getWeight();
-            if (w > result)
-                result = w;
-        }
-        return result;
-    }
-
-
-    public float getAvgDelay() {
-        float result = 0;
-        for (GraphPath p : graphPathHashSet) {
-            float w = (float)p.getWeight();
-            result += w;
-        }
-        return result/ graphPathHashSet.size();
-    }
-*/
-    
     /**
      * Finds and returns the path from the TimingGraph having maximum delay.
      * @return The GraphPath that is the critical path found in the TimingGraph, which might be null
@@ -665,34 +606,6 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         graphVizPrintStream.println("}");
         graphVizPrintStream.close();
     }
-
-    /*
-    List<String> getChildStrings(EDIFCellInst eci, List<String> workingSet) {
-        List<String> result = new ArrayList<>();
-        List<String> tmpList = new ArrayList<>();
-        for (String s : workingSet) {
-            //String tmp = s + "/" + eci.getName();
-            String tmp = s;
-            tmpList.add(tmp);
-        }
-        result.addAll(tmpList);
-        if (eci.getCellType().getCellInsts().size() == 0) {
-        }
-        else {
-            Collection<EDIFCellInst> children = eci.getCellType().getCellInsts();
-            for (EDIFCellInst child : children) {
-                List<String> tmpList2 = new ArrayList<>();
-                for (String s : workingSet) {
-                    String tmp = s + "/" + child.getName() ;
-                    tmpList2.add(tmp);
-                }
-                List<String> tmp2 = getChildStrings(child, tmpList2);
-                result.addAll(tmp2);
-            }
-        }
-        return result;
-    }
-*/
 
     /** Returns a set of built GraphPaths.
      * @return The HashSet of current set of GraphPaths that were prebuilt by running buildGraphPaths()
@@ -1032,38 +945,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
      * @return Boolean indication of whether any paths were removed.
      */
     protected boolean removeClockCrossingPaths() {
-
         boolean result = false;
-/*
-        boolean nullSourceClock = false;
-        boolean nullDestClock = false;
-        List<GraphPath> paths = buildGraphPaths();
-
-        List<TimingVertex> pathEndVertices = new LinkedList();
-        for (GraphPath<TimingVertex, TimingEdge> path : paths) {
-            List<TimingVertex> pathVertices = new LinkedList<>();
-            if (!path.getEndVertex().getFlopInput()) {
-                removePartialTimingPath(path);
-                result = true;
-            }
-        }
-/*
-        for (GraphPath<TimingVertex, TimingEdge> path : buildGraphPaths()) {
-            if (path.getStartVertex().getClockName() == null) {
-                nullSourceClock = true;
-                System.err.println("Graph path has null StartVertex clock:"+path);
-            }
-            else if (path.getEndVertex().getClockName() == null) {
-                nullDestClock = true;
-                System.err.println("Graph path has null EndVertex clock:"+path);
-            }
-            if ( !nullDestClock &&  !nullSourceClock && !path.getStartVertex().getClockName().equals(path.getEndVertex().getClockName())) {
-                System.out.println("removing glock crossing graph path "+(++clockCrossingGraphPathCntr)+": "+path);
-                removePartialTimingPath(path);
-                graphPathHashMap.remove(path.toString());
-                result = true;
-            }
-        } */
         return result;
     }
 
