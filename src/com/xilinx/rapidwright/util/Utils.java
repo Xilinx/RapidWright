@@ -1,7 +1,7 @@
 /*
  * Original work: Copyright (c) 2010-2011 Brigham Young University
  * Modified work: Copyright (c) 2017-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -21,6 +21,7 @@
  * limitations under the License.
  *
  */
+
 package com.xilinx.rapidwright.util;
 
 import com.xilinx.rapidwright.design.SiteInst;
@@ -51,6 +52,8 @@ public class Utils{
     private static Set<TileTypeEnum> interconnects;
 
     private static Set<TileTypeEnum> urams;
+
+    private static Set<TileTypeEnum> lagunas;
 
     private static Set<SiteTypeEnum> lockedSiteTypes;
 
@@ -159,6 +162,10 @@ public class Utils{
 
     public static boolean isURAM(TileTypeEnum type) {
         return urams.contains(type);
+    }
+
+    public static boolean isLaguna(TileTypeEnum type) {
+        return lagunas.contains(type);
     }
 
     public static boolean isLockedSiteType(SiteTypeEnum type) {
@@ -320,6 +327,11 @@ public class Utils{
             TileTypeEnum.URAM_ROCF_BL_TILE,
             TileTypeEnum.URAM_DELAY_LOCF_TL_TILE,
             TileTypeEnum.URAM_DELAY_ROCF_TL_TILE
+        );
+
+        lagunas = EnumSet.of(
+                TileTypeEnum.LAG_LAG,       // UltraScale+
+                TileTypeEnum.LAGUNA_TILE    // UltraScale
         );
 
         lockedSiteTypes = EnumSet.of(
