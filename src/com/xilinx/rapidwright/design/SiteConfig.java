@@ -33,7 +33,7 @@ import com.xilinx.rapidwright.device.SiteTypeEnum;
  * Represents a site and its configurable attributes.
  * 
  */
-public class AttrSite {
+public class SiteConfig {
 
     private Site site;
 
@@ -42,11 +42,11 @@ public class AttrSite {
     private Map<BEL, Map<String, BELAttr>> belAttrs;
 
 
-    public static AttrSite getAttrSite(Site site, SiteTypeEnum type) {
-        return new AttrSite(site, type);
+    public static SiteConfig getAttrSite(Site site, SiteTypeEnum type) {
+        return new SiteConfig(site, type);
     }
 
-    private AttrSite(Site site, SiteTypeEnum type) {
+    private SiteConfig(Site site, SiteTypeEnum type) {
         this.site = site;
         this.type = type;
     }
