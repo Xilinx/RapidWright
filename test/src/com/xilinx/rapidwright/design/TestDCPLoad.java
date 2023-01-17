@@ -129,6 +129,8 @@ public class TestDCPLoad {
     public void testDCPFromVivado2022_2(String dcp) {
         Design design = RapidWrightDCP.loadDCP(dcp);
         for (Cell c : design.getCells()) {
+            // Exclude PAD cells (port cells) as they don't have a corresponding
+            // EDIFHierCellInst, all cells with 'processor' are hierarchical
             if (c.getName().contains("processor")) {
                 EDIFHierCellInst inst = c.getEDIFHierCellInst();
                 Assertions.assertNotNull(inst);
