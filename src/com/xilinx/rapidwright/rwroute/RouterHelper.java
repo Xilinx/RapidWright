@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2021 Ghent University.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Yun Zhou, Ghent University.
@@ -29,6 +29,7 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -38,6 +39,7 @@ import java.util.Queue;
 import java.util.Set;
 
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.BELPin;
@@ -148,13 +150,13 @@ public class RouterHelper {
      */
     public static List<Node> projectInputPinToINTNode(SitePinInst input) {
         List<Node> sinkToSwitchBoxPath = new ArrayList<>();
-        RoutingNode sink = new RoutingNode(input.getConnectedNode());
+        LightweightRouteNode sink = new LightweightRouteNode(input.getConnectedNode());
         sink.setPrev(null);
-        Queue<RoutingNode> q = new LinkedList<>();
+        Queue<LightweightRouteNode> q = new LinkedList<>();
         q.add(sink);
         int watchdog = 1000;
         while (!q.isEmpty()) {
-            RoutingNode n = q.poll();
+            LightweightRouteNode n = q.poll();
             if (n.getNode().getTile().getTileTypeEnum() == TileTypeEnum.INT) {
                 while (n != null) {
                     sinkToSwitchBoxPath.add(n.getNode());
@@ -164,7 +166,7 @@ public class RouterHelper {
             }
             for (Node uphill : n.getNode().getAllUphillNodes()) {
                 if (uphill.getAllUphillNodes().size() == 0) continue;
-                RoutingNode prev = new RoutingNode(uphill);
+                LightweightRouteNode prev = new LightweightRouteNode(uphill);
                 prev.setPrev(n);
                 q.add(prev);
             }
@@ -180,7 +182,7 @@ public class RouterHelper {
     public static Tile getUpstreamINTTileOfClkIn(SitePinInst clkIn) {
         List<Node> pathToINTTile = projectInputPinToINTNode(clkIn);
         if (pathToINTTile.isEmpty()) {
-            throw new RuntimeException("ERROR: CLK_IN does not connet to INT Tile directly");
+            throw new RuntimeException("ERROR: CLK_IN does not connect to INT Tile directly");
         }
 
         return pathToINTTile.get(0).getTile();
@@ -192,26 +194,27 @@ public class RouterHelper {
      * @return A list of PIPs for the connection.
      */
     public static List<PIP> getConnectionPIPs(Connection connection) {
-        return getPIPsFromListOfReversedNodes(connection.getNodes());
+        return getPIPsFromNodes(connection.getNodes());
     }
 
+
     /**
-     * Gets a list of {@link PIP} instances from a list of {@link Node} instances in a reversed order.
+     * Gets a list of {@link PIP} instances from a list of {@link Node} instances.
      * @param connectionNodes The list of nodes of a routed {@link Connection} instance.
      * @return A list of PIPs generated from the list of nodes.
      */
-    public static List<PIP> getPIPsFromListOfReversedNodes(List<Node> connectionNodes) {
+    public static List<PIP> getPIPsFromNodes(List<Node> connectionNodes) {
         List<PIP> connectionPIPs = new ArrayList<>();
         if (connectionNodes == null) return connectionPIPs;
         // Nodes of a connection are added to the list starting from its sink to its source
-        for (int i = connectionNodes.size() -1; i > 0; i--) {
-            Node driver = connectionNodes.get(i);
-            Node load = connectionNodes.get(i-1);
+        for (int i = 0; i < connectionNodes.size() - 1; i++) {
+            Node driver = connectionNodes.get(i+1);
+            Node load = connectionNodes.get(i);
             PIP pip = findPIPbetweenNodes(driver, load);
             if (pip != null) {
                 connectionPIPs.add(pip);
             } else {
-                System.err.println("ERROR: Null PIP connecting these two nodes: " + driver.toString() + ", " + load.toString());
+                System.err.println("ERROR: Null PIP connecting these two nodes: " + driver+ ", " + load);
             }
         }
         return connectionPIPs;
@@ -260,7 +263,6 @@ public class RouterHelper {
      * @return The PIP from the driver node to the load node.
      */
     public static PIP getPIP(Node driver, Node load) {
-        PIP pip = null;
         for (PIP p : driver.getAllDownhillPIPs()) {
             if (p.getEndNode().equals(load))
                 return p;
@@ -269,45 +271,28 @@ public class RouterHelper {
             if (p.getStartNode().equals(load))
                 return p;
         }
-        return pip;
+        return null;
     }
 
     /**
-     * Gets {@link Node} instances of a {@link Net} instance from its {@link PIP} instances,
-     * in the order of source pin node, sink pin nodes, and other intermediate nodes.
+     * Gets a (non-unique) collection of {@link Node} instances used by a {@link Net} instance.
+     * Nodes associated with unrouted sink pins on this net will be excluded.
      * @param net The target net.
-     * @return All nodes used by the net.
+     * @return A collection of nodes used by target net.
      */
-    public static List<Node> getNodesOfNet(Net net) {
-        List<Node> nodes = new ArrayList<>();
-        if (net.getSource() != null) nodes.add(net.getSource().getConnectedNode());
-        for (SitePinInst pin : net.getSinkPins()) {
-            Node pinNode = pin.getConnectedNode();
-            if (pinNode != null) {
-                nodes.add(pinNode);
-            } else {
-                System.err.println("ERROR: No node connects to pin " + pin + ", net " + net);
+    public static Collection<Node> getNodesOfNet(Net net) {
+        List<SitePinInst> pins = net.getPins();
+        List<Node> nodes = new ArrayList<>(net.getPins().size() + net.getPIPs().size() / 2);
+        SitePinInst sourcePin = net.getSource();
+        assert(sourcePin == null || pins.contains(sourcePin));
+        SitePinInst altSourcePin = net.getAlternateSource();
+        assert(altSourcePin == null || pins.contains(altSourcePin));
+        for (SitePinInst pin : net.getPins()) {
+            // SitePinInst.isRouted() is meaningless for output pins
+            if (!pin.isRouted() && !pin.isOutPin()) {
+                continue;
             }
-        }
 
-        for (PIP pip : net.getPIPs()) {
-            Node end = pip.getEndNode();
-            Node start = pip.getStartNode();
-            if (!nodes.contains(end)) nodes.add(end);
-            if (!nodes.contains(start)) nodes.add(start);
-        }
-        return nodes;
-    }
-
-    /**
-     * Gets a set of {@link Node} instances used by a {@link Net} instance.
-     * @param net The target net.
-     * @return A set of nodes used by a net.
-     */
-    public static Set<Node> getUsedNodesOfNet(Net net) {
-        Set<Node> nodes = new HashSet<>();
-        if (net.getSource() != null) nodes.add(net.getSource().getConnectedNode());
-        for (SitePinInst pin : net.getSinkPins()) {
             Node pinNode = pin.getConnectedNode();
             if (pinNode != null) {
                 nodes.add(pinNode);
@@ -342,12 +327,14 @@ public class RouterHelper {
     /**
      * Inverts all possible GND sink pins to VCC pins.
      * @param design The target design.
-     * @param staticNet The static net, should be VCC only.
+     * @param pins The static net pins.
      */
-    public static void invertPossibleGndPinsToVccPins(Design design, Net staticNet) {
-        if (!staticNet.getName().equals(Net.GND_NET)) return;
-        List<SitePinInst> toInvertPins = new ArrayList<>();
-        for (SitePinInst currSitePinInst:staticNet.getPins()) {
+    public static Set<SitePinInst> invertPossibleGndPinsToVccPins(Design design, List<SitePinInst> pins) {
+        Net staticNet = design.getGndNet();
+        Set<SitePinInst> toInvertPins = new HashSet<>();
+        for (SitePinInst currSitePinInst : pins) {
+            if (!currSitePinInst.getNet().equals(staticNet))
+                throw new RuntimeException(currSitePinInst.toString());
             BELPin[] belPins = currSitePinInst.getSiteInst().getSiteWirePins(currSitePinInst.getName());
             // DSP or BRAM
             if (belPins.length == 2) {
@@ -369,40 +356,21 @@ public class RouterHelper {
             }
         }
 
+        // Unroute all pins in a batch fashion
+        DesignTools.unroutePins(staticNet, toInvertPins);
+        // Manually remove pins from net, because using DesignTools.batchRemoveSitePins()
+        // will cause SitePinInst.detachSiteInst() to be called, which we do not want
+        // as we are simply moving the SPI from one net to another
+        staticNet.getPins().removeAll(toInvertPins);
         for (SitePinInst toinvert:toInvertPins) {
-            boolean success = staticNet.removePin(toinvert, true);
-            success |= design.getVccNet().addPin(toinvert);
-            if (!success) {
+            assert(toinvert.getSiteInst() != null);
+            if (!design.getVccNet().addPin(toinvert)) {
                   throw new RuntimeException("ERROR: Couldn't invert site pin " +
                           toinvert);
             }
         }
-    }
 
-    /**
-     * Gets the wirelength of a node.
-     * @param node The target node.
-     * @return The wirelength of the node.
-     */
-    public static int getLengthOfNode(Node node) {
-        Tile entry = node.getTile();
-        Tile exit = null;
-        List<Tile> intTiles = new ArrayList<>();
-        for (Wire w : node.getAllWiresInNode()) {
-            Tile wireTile = w.getTile();
-            if (wireTile.getTileTypeEnum() == TileTypeEnum.INT) {
-                if (!intTiles.contains(wireTile)) {
-                    intTiles.add(wireTile);
-                }
-            }
-        }
-        if (intTiles.size() > 1) {
-            exit = intTiles.get(1);
-        } else if (intTiles.size() == 1) {
-            exit = entry;
-        }
-        return Math.abs(entry.getTileXCoordinate()- exit.getTileXCoordinate())
-                + Math.abs(entry.getTileYCoordinate() - exit.getTileYCoordinate());
+        return toInvertPins;
     }
 
     /**
@@ -412,23 +380,17 @@ public class RouterHelper {
      * @param typeUsage The map between each node type and the number of used nodes for the node type.
      * @param typeLength The map between each node type and the total wirelength of used nodes for the node type.
      */
-    public static void addNodeTypeLengthToMap(Node node, int wlNode, Map<IntentCode, Long> typeUsage, Map<IntentCode, Long> typeLength) {
+    public static void addNodeTypeLengthToMap(Node node, long wlNode, Map<IntentCode, Long> typeUsage, Map<IntentCode, Long> typeLength) {
         IntentCode ic = node.getIntentCode();
-        Long counter = typeUsage.get(ic);
-        if (counter == null) {
-            counter = (long) 1;
-        } else {
-            counter++;
+        if (node.getTile().getTileTypeEnum() == TileTypeEnum.LAGUNA_TILE) {
+            // UltraScale only
+            if (node.getWireName().startsWith("UBUMP")) {
+                // Use the intent code from US+
+                ic = IntentCode.NODE_LAGUNA_DATA;
+            }
         }
-        typeUsage.put(ic, counter);
-
-        Long length = typeLength.get(ic);
-        if (length == null) {
-            length = (long) wlNode;
-        } else {
-            length += wlNode;
-        }
-        typeLength.put(ic, length);
+        typeUsage.merge(ic, 1L, Long::sum);
+        typeLength.merge(ic, wlNode, Long::sum);
     }
 
     /**
@@ -439,11 +401,11 @@ public class RouterHelper {
      */
     public static Map<Pair<SitePinInst, Node>, Short> getSourceToSinkINTNodeDelays(Net net, DelayEstimatorBase estimator) {
         List<PIP> pips = net.getPIPs();
-        Map<Node, RoutingNode> nodeRoutingNodeMap = new HashMap<>();
+        Map<Node, LightweightRouteNode> nodeRoutingNodeMap = new HashMap<>();
         boolean firstPIP = true;
         for (PIP pip : pips) {
             Node startNode = pip.getStartNode();
-            RoutingNode startrn = createRoutingNode(pip.getStartNode(), nodeRoutingNodeMap);
+            LightweightRouteNode startrn = createRoutingNode(pip.getStartNode(), nodeRoutingNodeMap);
 
             if (firstPIP) {
                 startrn.setDelayFromSource(0);
@@ -451,7 +413,7 @@ public class RouterHelper {
             firstPIP = false;
 
             Node endNode = pip.getEndNode();
-            RoutingNode endrn = createRoutingNode(endNode, nodeRoutingNodeMap);
+            LightweightRouteNode endrn = createRoutingNode(endNode, nodeRoutingNodeMap);
             endrn.setPrev(startrn);
             int delay = 0;
             if (endNode.getTile().getTileTypeEnum() == TileTypeEnum.INT) {//device independent?
@@ -477,15 +439,15 @@ public class RouterHelper {
     }
 
     /**
-     * Creates a {@link RoutingNode} Object based on a {@link Node} Object, avoiding duplicates.
+     * Creates a {@link LightweightRouteNode} Object based on a {@link Node} Object, avoiding duplicates.
      * @param node The {@link Node} instance that is used to create a RoutingNode object.
-     * @param createdRoutingNodes A map storing created {@link RoutingNode} instances and corresponding {@link Node} instances.
+     * @param createdRoutingNodes A map storing created {@link LightweightRouteNode} instances and corresponding {@link Node} instances.
      * @return A created RoutingNode instance based on a node
      */
-    public static RoutingNode createRoutingNode(Node node, Map<Node, RoutingNode> createdRoutingNodes) {
-        RoutingNode resourceNode = createdRoutingNodes.get(node);
+    public static LightweightRouteNode createRoutingNode(Node node, Map<Node, LightweightRouteNode> createdRoutingNodes) {
+        LightweightRouteNode resourceNode = createdRoutingNodes.get(node);
         if (resourceNode == null) {
-            resourceNode = new RoutingNode(node);
+            resourceNode = new LightweightRouteNode(node);
             createdRoutingNodes.put(node, resourceNode);
         }
         return resourceNode;
@@ -498,7 +460,7 @@ public class RouterHelper {
      * @return The delay of the node.
      */
     public static short computeNodeDelay(DelayEstimatorBase estimator, Node node) {
-        if (RoutableNode.isExitNode(node)) {
+        if (RouteNode.isExitNode(node)) {
             return estimator.getDelayOf(node);
         }
         return 0;
@@ -510,9 +472,8 @@ public class RouterHelper {
      * @return true, if the connection is successfully routed.
      */
     public static boolean routeDirectConnection(Connection directConnection) {
-        directConnection.newNodes();
         directConnection.setNodes(findPathBetweenNodes(directConnection.getSource().getConnectedNode(), directConnection.getSink().getConnectedNode()));
-        return directConnection.getNodes() != null? true : false;
+        return directConnection.getNodes() != null;
     }
 
     /**
@@ -531,15 +492,15 @@ public class RouterHelper {
             path.add(source);
             return path;
         }
-        RoutingNode sourcer = new RoutingNode(source);
+        LightweightRouteNode sourcer = new LightweightRouteNode(source);
         sourcer.setPrev(null);
-        Queue<RoutingNode> queue = new LinkedList<>();
+        Queue<LightweightRouteNode> queue = new LinkedList<>();
         queue.add(sourcer);
 
         int watchdog = 10000;
         boolean success = false;
         while (!queue.isEmpty()) {
-            RoutingNode curr = queue.poll();
+            LightweightRouteNode curr = queue.poll();
             if (curr.getNode().equals(sink)) {
                 while (curr != null) {
                     path.add(curr.getNode());
@@ -549,19 +510,19 @@ public class RouterHelper {
                 break;
             }
             for (Node n : curr.getNode().getAllDownhillNodes()) {
-                RoutingNode child = new RoutingNode(n);
+                LightweightRouteNode child = new LightweightRouteNode(n);
                 child.setPrev(curr);
                 queue.add(child);
             }
             watchdog--;
             if (watchdog < 0) {
-                success = false;
                 break;
             }
         }
 
         if (!success) {
             System.err.println("ERROR: Failed to find a path between two nodes: " + source + ", " + sink);
+            return null;
         }
         return path;
     }
@@ -572,7 +533,7 @@ public class RouterHelper {
      *  {@code superSource -> Q -> O -> --- -> D.}
      */
     public static void getSamplePathDelay(String filePath, TimingManager timingManager,
-            Map<TimingEdge, Connection> timingEdgeConnectionMap, Map<Node, Routable> rnodesCreated) {
+            Map<TimingEdge, Connection> timingEdgeConnectionMap, RouteNodeGraph routingGraph) {
         List<String> verticesOfVivadoPath = new ArrayList<>();
         // Include CLK if the first in the path is BRAM or DSP to check the logic delay
         // NOTE: remember to change the pin names of DSPs from subblock to top-level block that we use
@@ -591,7 +552,7 @@ public class RouterHelper {
             e.printStackTrace();
         }
         System.out.println(verticesOfVivadoPath);
-        timingManager.getSamplePathDelayInfo(verticesOfVivadoPath, timingEdgeConnectionMap, true, rnodesCreated);
+        timingManager.getSamplePathDelayInfo(verticesOfVivadoPath, timingEdgeConnectionMap, true, routingGraph);
     }
 
     /**
