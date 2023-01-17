@@ -27,16 +27,18 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-import com.xilinx.rapidwright.edif.EDIFTools;
-import com.xilinx.rapidwright.support.RapidWrightDCP;
-import com.xilinx.rapidwright.tests.CodePerfTracker;
-import com.xilinx.rapidwright.util.FileTools;
-import com.xilinx.rapidwright.util.Installer;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+
+import com.xilinx.rapidwright.edif.EDIFHierCellInst;
+import com.xilinx.rapidwright.edif.EDIFTools;
+import com.xilinx.rapidwright.support.RapidWrightDCP;
+import com.xilinx.rapidwright.tests.CodePerfTracker;
+import com.xilinx.rapidwright.util.FileTools;
+import com.xilinx.rapidwright.util.Installer;
 
 /**
  * Tests the EDIF auto-generate mechanism when reading DCPs
@@ -125,6 +127,13 @@ public class TestDCPLoad {
     @ParameterizedTest
     @ValueSource(strings = {"picoblaze_2022.2.dcp"})
     public void testDCPFromVivado2022_2(String dcp) {
-        RapidWrightDCP.loadDCP(dcp);
+        Design design = RapidWrightDCP.loadDCP(dcp);
+        for (Cell c : design.getCells()) {
+            if (c.getName().contains("processor")) {
+                EDIFHierCellInst inst = c.getEDIFHierCellInst();
+                Assertions.assertNotNull(inst);
+                Assertions.assertEquals(inst.toString(), c.getName());
+            }
+        }
     }
 }
