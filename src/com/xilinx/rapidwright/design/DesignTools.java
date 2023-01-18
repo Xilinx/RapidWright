@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -2868,10 +2868,10 @@ public class DesignTools {
             }
             String belName = belPin.getBELName();
             if (LUTTools.isCellALUT(cell) &&
-                    // No cell placed in the 5LUT spot
-                    si.getCell(belName.replace('6', '5')) == null &&
                     // No net originally present on input sitewire
                     netOnSiteWire != net &&
+                    // No cell placed in the 5LUT spot
+                    si.getCell(belName.replace('6', '5')) == null &&
                     // No net present on output sitewire
                     si.getNetFromSiteWire(belName.charAt(0) + "5LUT_O5") == null) {
                 // LUT input siteWire has no net attached, nor does the LUT output sitewire: no need for site pin
@@ -3224,6 +3224,11 @@ public class DesignTools {
         }
 
         EDIFNet en = net.getLogicalNet();
+        if (en == null) {
+            // No corresponding logical net (e.g. present inside an encrypted cell)
+            return false;
+        }
+
         List<EDIFPortInst> sourcePorts = en.getSourcePortInsts(true);
         if (sourcePorts.isEmpty()) {
             // Net has no source ports; truly an driver-less net

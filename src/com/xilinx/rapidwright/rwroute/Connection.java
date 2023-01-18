@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2021 Ghent University.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Yun Zhou, Ghent University.
@@ -43,11 +43,13 @@ public class Connection implements Comparable<Connection>{
     private SitePinInst source;
     private final SitePinInst sink;
     /**
-     * The source and sink {@link RoutableNode} instances (rnodes) of a connection.
+     * The source and sink {@link RouteNode} instances (rnodes) of a connection.
      * They are created based on the INT tile nodes the source and sink SitePinInsts connect to, respectively.
      */
-    private Routable sourceRnode;
-    private Routable sinkRnode;
+    private RouteNode sourceRnode;
+    private RouteNode altSourceRnode;
+    private RouteNode sinkRnode;
+    private RouteNode altSinkRnode;
     /**
      * true to indicate the source and the sink are connected through dedicated resources,
      * such as the carry chain connections and connections between cascaded BRAMs.
@@ -73,8 +75,8 @@ public class Connection implements Comparable<Connection>{
     private List<TimingEdge> timingEdges;
     /** The criticality factor to indicate how timing-critical a connection is */
     private float criticality;
-    /** List of Routable instances that make up of the route of a connection */
-    private List<Routable> rnodes;
+    /** List of RouteNodes that make up of the route of a connection */
+    private List<RouteNode> rnodes;
 
     /** To indicate if the route delay of a connection has been patched up, when there are consecutive long nodes */
     private boolean dlyPatched;
@@ -90,7 +92,8 @@ public class Connection implements Comparable<Connection>{
         criticality = 0f;
         rnodes = new ArrayList<>();
         this.netWrapper = netWrapper;
-        this.netWrapper.addConnection(this);
+        netWrapper.addConnection(this);
+        crossSLR = !source.getTile().getSLR().equals(sink.getTile().getSLR());
     }
 
     /**
@@ -102,13 +105,15 @@ public class Connection implements Comparable<Connection>{
     }
 
     /**
-     * Computes the connection bounding box based on the geometric center of the net, source and sink rnodes.
+     * Computes the connection bounding box based on the geometric center of the net, source and sink rnodes,
+     * and for cross SLR connections the location of Laguna columns.
      * @param boundingBoxExtensionX To indicate the extension on top of the minimum bounding box in the horizontal direction.
      * @param boundingBoxExtensionY To indicate the extension on top of the minimum bounding box in the vertical direction.
-     * that contains the source rnode, sink rnode and the center of its {@link NetWrapper} Object.
-     * @param checkSLRCrossing A flag to indicate if SLR-crossing check is needed.
+     * @param nextLagunaColumn Array mapping arbitrary tile columns to the next Laguna column
+     * @param prevLagunaColumn Array mapping arbitrary tile columns to the previous Laguna column
      */
-    public void computeConnectionBoundingBox(short boundingBoxExtensionX, short boundingBoxExtensionY, boolean checkSLRCrossing) {
+    public void computeConnectionBoundingBox(short boundingBoxExtensionX, short boundingBoxExtensionY,
+                                             int[] nextLagunaColumn, int[] prevLagunaColumn) {
         short xMin, xMax, yMin, yMax;
         short xNetCenter = (short) Math.ceil(netWrapper.getXCenter());
         short yNetCenter = (short) Math.ceil(netWrapper.getYCenter());
@@ -116,48 +121,54 @@ public class Connection implements Comparable<Connection>{
         xMin = minOfThree(sourceRnode.getEndTileXCoordinate(), sinkRnode.getEndTileXCoordinate(), xNetCenter);
         yMax = maxOfThree(sourceRnode.getEndTileYCoordinate(), sinkRnode.getEndTileYCoordinate(), yNetCenter);
         yMin = minOfThree(sourceRnode.getEndTileYCoordinate(), sinkRnode.getEndTileYCoordinate(), yNetCenter);
+
+        if (isCrossSLR()) {
+            // For SLR-crossing connections, ensure the bounding box width contains at least one Laguna column
+            // before bounding box extension
+            int nextLaguna = nextLagunaColumn[xMin];
+            int prevLaguna = prevLagunaColumn[xMax];
+            if (nextLaguna != Integer.MAX_VALUE) {
+                xMax = (short) Math.max(xMax, nextLaguna);
+            }
+            if (prevLaguna != Integer.MIN_VALUE) {
+                xMin = (short) Math.min(xMin, prevLaguna);
+            }
+        }
+
         xMaxBB = (short) (xMax + boundingBoxExtensionX);
         xMinBB = (short) (xMin - boundingBoxExtensionX);
         yMaxBB = (short) (yMax + boundingBoxExtensionY);
         yMinBB = (short) (yMin - boundingBoxExtensionY);
 
-        // allow more space for resource expansion of SLR-crossing connections
-        if (checkSLRCrossing) {
-            if (crossSLR()) {
-                yMaxBB += 2 * boundingBoxExtensionY;
-                yMinBB -= 2 * boundingBoxExtensionY;
+        if (isCrossSLR()) {
+            // Equivalently, ensure that cross-SLR connections are at least as high as a SLL;
+            // if necessary, expand the sink side of the bounding box
+            short heightMinusSLL = (short) ((yMaxBB - yMinBB - 1) - RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES);
+            if (heightMinusSLL < 0) {
+                if (sourceRnode.getEndTileYCoordinate() <= sinkRnode.getEndTileYCoordinate()) {
+                    // Upwards
+                    short newYMaxBB = (short) (yMin + RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES + 1);
+                    assert(newYMaxBB > yMaxBB);
+                    yMaxBB = newYMaxBB;
+                } else {
+                    // Downwards
+                    short newYMinBB = (short) (yMax - RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES - 1);
+                    assert(newYMinBB < yMinBB);
+                    yMinBB = newYMinBB;
+                }
             }
         }
+
         xMinBB = xMinBB < 0? -1:xMinBB;
         yMinBB = yMinBB < 0? -1:yMinBB;
     }
 
-    private boolean crossSLR() {
-        if (getSource().getTile().getSLR().equals(sink.getTile().getSLR())) {
-            return false;
-        }
-        crossSLR = true;
-        return true;
-    }
-
     private short maxOfThree(short var1, short var2, short var3) {
-        if (var1 >= var2 && var1 >= var3) {
-            return var1;
-        } else if (var2 >= var1 && var2 >= var3) {
-            return var2;
-        } else {
-            return var3;
-        }
+        return (short) Math.max(Math.max(var1, var2), var3);
     }
 
     private short minOfThree(short var1, short var2, short var3) {
-        if (var1 <= var2 && var1 <= var3) {
-            return var1;
-        } else if (var2 <= var1 && var2 <= var3) {
-            return var2;
-        } else {
-            return var3;
-        }
+        return (short) Math.min(Math.min(var1, var2), var3);
     }
 
     /**
@@ -167,14 +178,17 @@ public class Connection implements Comparable<Connection>{
      * @param criticalityExponent The exponent to separate critical connections and non-critical connections.
      */
     public void calculateCriticality(float maxDelay, float maxCriticality, float criticalityExponent) {
-        float slackCon = Float.MAX_VALUE;
+        float minSlack = Float.MAX_VALUE;
         for (TimingEdge e : getTimingEdges()) {
-            float tmpslackCon = e.getDst().getRequiredTime() - e.getSrc().getArrivalTime() - e.getDelay();
-            if (tmpslackCon < slackCon)
-                slackCon = tmpslackCon;
+            float slack = e.getDst().getRequiredTime() - e.getSrc().getArrivalTime() - e.getDelay();
+            minSlack = Float.min(minSlack, slack);
         }
 
-        float tempCriticality  = (1 - slackCon / maxDelay);
+        // Negative slacks are not supported, and should not occur if maxDelay was
+        // normalized correctly.
+        assert(minSlack >= 0);
+
+        float tempCriticality  = (1 - minSlack / maxDelay);
 
         tempCriticality = (float) Math.pow(tempCriticality, criticalityExponent) * maxCriticality;
 
@@ -187,7 +201,7 @@ public class Connection implements Comparable<Connection>{
      * @return
      */
     public boolean isCongested() {
-        for (Routable rn : getRnodes()) {
+        for (RouteNode rn : getRnodes()) {
             if (rn.isOverUsed()) {
                 return true;
             }
@@ -200,7 +214,7 @@ public class Connection implements Comparable<Connection>{
      * @return
      */
     public boolean useRnodesWithMultiDrivers() {
-        for (Routable rn : getRnodes()) {
+        for (RouteNode rn : getRnodes()) {
             if (rn.hasMultiDrivers()) {
                 return true;
             }
@@ -208,7 +222,17 @@ public class Connection implements Comparable<Connection>{
         return false;
     }
 
-    public void addRnode(Routable rn) {
+    /**
+     * Add the give RouteNode to the list of those used by this Connection.
+     * Expand the bounding box accordingly, since this node could describe an
+     * existing routing path computed using a different bounding box.
+     * @param rn RouteNode to add
+     */
+    public void addRnode(RouteNode rn) {
+        xMinBB = (short) Math.min(xMinBB, rn.getBeginTileXCoordinate() - 1);
+        xMaxBB = (short) Math.max(xMaxBB, rn.getEndTileXCoordinate() + 1);
+        yMinBB = (short) Math.min(yMinBB, rn.getBeginTileYCoordinate() - 1);
+        yMaxBB = (short) Math.max(yMaxBB, rn.getEndTileYCoordinate() + 1);
         rnodes.add(rn);
     }
 
@@ -225,8 +249,8 @@ public class Connection implements Comparable<Connection>{
     private float getRouteDelay() {
         float routeDelay = getRnodes().get(getRnodes().size() - 1).getDelay();
         for (int i = getRnodes().size() - 2; i >= 0; i--) {
-            Routable rnode = getRnodes().get(i);
-            Routable parent = getRnodes().get(i+1);
+            RouteNode rnode = getRnodes().get(i);
+            RouteNode parent = getRnodes().get(i+1);
             routeDelay += rnode.getDelay() +
                     DelayEstimatorBase.getExtraDelay(rnode.getNode(), DelayEstimatorBase.isLong(parent.getNode()));
         }
@@ -250,21 +274,33 @@ public class Connection implements Comparable<Connection>{
         sink.setRouted(false);
     }
 
-    public Routable getSourceRnode() {
+    public RouteNode getSourceRnode() {
         return sourceRnode;
     }
 
-    public void setSourceRnode(Routable sourceNode) {
+    public void setSourceRnode(RouteNode sourceNode) {
         sourceRnode = sourceNode;
     }
 
-    public Routable getSinkRnode() {
+    public RouteNode getAltSourceRnode() {
+        return altSourceRnode;
+    }
+
+    public void setAltSourceRnode(RouteNode altSourceNode) {
+        altSourceRnode = altSourceNode;
+    }
+
+    public RouteNode getSinkRnode() {
         return sinkRnode;
     }
 
-    public void setSinkRnode(Routable childRnode) {
+    public void setSinkRnode(RouteNode childRnode) {
         sinkRnode = childRnode;
     }
+
+    public RouteNode getAltSinkRnode() { return altSinkRnode; }
+
+    public void setAltSinkRnode(RouteNode childRnode) { altSinkRnode = childRnode; }
 
     public short getXMinBB() {
         return xMinBB;
@@ -342,11 +378,11 @@ public class Connection implements Comparable<Connection>{
         hpwl = conHpwl;
     }
 
-    public List<Routable> getRnodes() {
+    public List<RouteNode> getRnodes() {
         return rnodes;
     }
 
-    public void setRnodes(List<Routable> rnodes) {
+    public void setRnodes(List<RouteNode> rnodes) {
         this.rnodes = rnodes;
     }
 
@@ -360,18 +396,6 @@ public class Connection implements Comparable<Connection>{
 
     public boolean isCrossSLR() {
         return crossSLR;
-    }
-
-    public void setCrossSLR(boolean crossSLR) {
-        this.crossSLR = crossSLR;
-    }
-
-    public void newNodes() {
-        setNodes(new ArrayList<>());
-    }
-
-    public void addNode(Node node) {
-        getNodes().add(node);
     }
 
     public List<Node> getNodes() {
@@ -398,6 +422,8 @@ public class Connection implements Comparable<Connection>{
 
     @Override
     public int compareTo(Connection arg0) {
+        if (this == arg0)
+            return 0;
         if (netWrapper.getConnections().size() > arg0.getNetWrapper().getConnections().size()) {
             return 1;
         } else if (netWrapper.getConnections().size() == arg0.getNetWrapper().getConnections().size()) {
@@ -441,4 +467,10 @@ public class Connection implements Comparable<Connection>{
         return s.toString();
     }
 
+    public void setTarget(boolean target) {
+        sinkRnode.setTarget(target);
+        if (altSinkRnode != null) {
+            altSinkRnode.setTarget(target);
+        }
+    }
 }
