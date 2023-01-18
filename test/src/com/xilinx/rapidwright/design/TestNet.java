@@ -24,6 +24,7 @@
 package com.xilinx.rapidwright.design;
 
 import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.support.RapidWrightDCP;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -152,5 +153,27 @@ public class TestNet {
         Assertions.assertEquals(gndNet.getPIPs().size(), 4);
         gndNet.removePin(b6, true);
         Assertions.assertEquals(gndNet.getPIPs().size(), 0);
+    }
+
+    @Test
+    public void testGetLogicalHierNetDetachedNetlist() {
+        String dcpPath = RapidWrightDCP.getString("bnn.dcp");
+        Design design = Design.readCheckpoint(dcpPath);
+        design.detachNetlist();
+
+        String[] hierPortNets = new String[]{
+                "dmem_mode_V[0]",
+                "n_inputs_V[13]",
+                "n_inputs_V[1]",
+                "n_inputs_V[3]",
+                "n_inputs_V[5]",
+                "n_inputs_V[7]",
+                "n_inputs_V[9]",
+        };
+        for (String name : hierPortNets) {
+            Net net = design.getNet(name);
+            Assertions.assertNotNull(net);
+            Assertions.assertNull(net.getLogicalHierNet());
+        }
     }
 }
