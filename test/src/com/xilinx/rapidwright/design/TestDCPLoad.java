@@ -138,4 +138,19 @@ public class TestDCPLoad {
             }
         }
     }
+
+    @ParameterizedTest
+    @ValueSource(strings = { "bnn.dcp", "picoblaze_2022.2.dcp" })
+    public void testUpdatePlaceAndRouteOfDesign(String dcp) {
+        boolean skipLoadingPlaceAndRoute = true;
+        Path dcpPath = RapidWrightDCP.getPath(dcp);
+        Design design = Design.readCheckpoint(dcpPath, skipLoadingPlaceAndRoute);
+        Assertions.assertEquals(0, design.getSiteInsts().size());
+        design.updateDesignWithCheckpointPlaceAndRoute(dcpPath);
+
+        Design origDesign = Design.readCheckpoint(dcpPath);
+
+        Assertions.assertEquals(origDesign.getSiteInsts().size(), design.getSiteInsts().size());
+        Assertions.assertEquals(origDesign.getNets().size(), design.getNets().size());
+    }
 }
