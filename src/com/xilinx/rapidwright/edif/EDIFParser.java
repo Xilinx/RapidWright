@@ -38,6 +38,7 @@ import java.util.Map;
 
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.FileTools;
+import com.xilinx.rapidwright.util.Params;
 import com.xilinx.rapidwright.util.StringPool;
 
 /**
@@ -130,7 +131,8 @@ public class EDIFParser extends AbstractEDIFParserWorker implements AutoCloseabl
         }
 
         Path fileName = tokenizer.getFileName();
-        if (fileName != null && fileName.toString().endsWith(".gz")) {
+        if (fileName != null && fileName.toString().endsWith(".gz")
+                && Params.RW_DECOMPRESS_GZIPPED_EDIF_TO_DISK) {
             try {
                 Files.delete(
                         FileTools.getDecompressedGZIPFileName(tokenizer.getFileName()));

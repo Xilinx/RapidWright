@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2021 Ghent University.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Yun Zhou, Ghent University.
@@ -27,6 +27,7 @@ package com.xilinx.rapidwright.rwroute;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Set;
@@ -41,39 +42,39 @@ import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 public class RouteFixer{
     private NetWrapper netp;
     private Map<Node, NodeWithDelay> nodeMap;
-    private NodeWithDelay source;
+    private Set<NodeWithDelay> sources;
     private int vertexId;
 
-    public RouteFixer(NetWrapper netp, Map<Node, Routable> rnodesCreated) {
+    public RouteFixer(NetWrapper netp, RouteNodeGraph routingGraph) {
         this.netp = netp;
         nodeMap = new HashMap<>();
-        source = null;
+        sources = new HashSet<>();
         vertexId = 0;
-        buildGraph(netp, rnodesCreated);
+        buildGraph(netp, routingGraph);
     }
 
-    private void buildGraph(NetWrapper netWrapper, Map<Node, Routable> rnodesCreated) {
+    private void buildGraph(NetWrapper netWrapper, RouteNodeGraph routingGraph) {
         for (Connection connection:netWrapper.getConnections()) {
+            List<Node> nodes = connection.getNodes();
             // nodes of connections are in the order from sink to source
-            int vertexSize = connection.getNodes().size();
+            int vertexSize = nodes.size();
             for (int i = vertexSize - 1; i > 0; i--) {
-                Node cur = connection.getNodes().get(i);
-                Node next = connection.getNodes().get(i - 1);
+                Node cur = nodes.get(i);
+                Node next = nodes.get(i - 1);
 
-                Routable currRnode = rnodesCreated.get(cur);
-                Routable nextRnode = rnodesCreated.get(next);
+                RouteNode currRnode = routingGraph.getNode(cur);
+                RouteNode nextRnode = routingGraph.getNode(next);
                 float currDly = currRnode == null? 0f : currRnode.getDelay();
                 float nextDly = nextRnode == null? 0f : nextRnode.getDelay();
 
-                NodeWithDelay newCur = nodeMap.containsKey(cur) ? nodeMap.get(cur) : new NodeWithDelay(vertexId++, cur, currDly);
-                NodeWithDelay newNext = nodeMap.containsKey(next) ? nodeMap.get(next) : new NodeWithDelay(vertexId++, next, nextDly);
-                nodeMap.put(cur, newCur);
-                nodeMap.put(next, newNext);
-
+                NodeWithDelay newCur = nodeMap.computeIfAbsent(cur, (k) -> new NodeWithDelay(vertexId++, cur, currDly));
+                NodeWithDelay newNext = nodeMap.computeIfAbsent(next, (k) -> new NodeWithDelay(vertexId++, next, nextDly));
                 if (i == 1) {
                     newNext.setSink(true);
                 }
-                if (i == vertexSize - 1) source = newCur;
+                if (i == vertexSize - 1) {
+                    sources.add(newCur);
+                }
                 newCur.addChildren(newNext);
             }
         }
@@ -86,24 +87,30 @@ public class RouteFixer{
         setShortestPathToEachVertex();
 
         for (Connection connection : netp.getConnections()) {
-            NodeWithDelay csink = nodeMap.get(connection.getNodes().get(0));
-            connection.getNodes().clear();
-            connection.getNodes().add(csink.getNode());
+            List<Node> nodes = connection.getNodes();
+            if (nodes.isEmpty()) {
+                continue;
+            }
+            NodeWithDelay csink = nodeMap.get(nodes.get(0));
+            nodes.clear();
+            nodes.add(csink.getNode());
             NodeWithDelay prev = csink.getPrev();
             while (prev != null) {
-                connection.getNodes().add(prev.getNode());
+                nodes.add(prev.getNode());
                 prev = prev.getPrev();
             }
         }
     }
 
     private void setShortestPathToEachVertex() {
-        PriorityQueue<NodeWithDelay> queue = new PriorityQueue<NodeWithDelay>(NodeWithDelayComparator);
+        PriorityQueue<NodeWithDelay> queue = new PriorityQueue<>(NodeWithDelayComparator);
 
         queue.clear();
-        source.cost = source.delay;
-        source.setPrev(null);
-        queue.add(source);
+        for (NodeWithDelay source : sources) {
+            source.cost = source.delay;
+            source.setPrev(null);
+            queue.add(source);
+        }
 
         while (!queue.isEmpty()) {
             NodeWithDelay cur = queue.poll();
@@ -124,18 +131,9 @@ public class RouteFixer{
         }
     }
 
-    private static Comparator<NodeWithDelay> NodeWithDelayComparator = new Comparator<NodeWithDelay>() {
-        @Override
-        public int compare(NodeWithDelay a, NodeWithDelay b) {
-            if (a.getDelay() < b.getDelay()) {
-                return -1;
-            } else {
-                return 1;
-            }
-        }
-    };
+    private static final Comparator<NodeWithDelay> NodeWithDelayComparator = (a, b) -> Float.compare(a.getDelay(), b.getDelay());
 
-    class NodeWithDelay{
+    static class NodeWithDelay{
         private int id;
         private Node node;
         private float delay;

@@ -42,6 +42,7 @@ import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.ParallelismTools;
+import com.xilinx.rapidwright.util.Params;
 import com.xilinx.rapidwright.util.StringPool;
 import com.xilinx.rapidwright.util.function.InputStreamSupplier;
 
@@ -82,7 +83,8 @@ public class ParallelEDIFParser implements AutoCloseable{
     }
 
     public ParallelEDIFParser(Path p, long fileSize) {
-        this(p, fileSize, InputStreamSupplier.fromPath(p));
+        this(p, fileSize, InputStreamSupplier.fromPath(p,
+                p.toString().endsWith(".gz") && Params.RW_DECOMPRESS_GZIPPED_EDIF_TO_DISK));
     }
 
     public ParallelEDIFParser(Path p) throws IOException {
@@ -117,7 +119,8 @@ public class ParallelEDIFParser implements AutoCloseable{
 
     public EDIFNetlist parseEDIFNetlist() throws IOException {
         EDIFNetlist netlist = parseEDIFNetlist(CodePerfTracker.SILENT);
-        if (fileName.toString().endsWith(".gz")) {
+        if (fileName != null && fileName.toString().endsWith(".gz")
+                && Params.RW_DECOMPRESS_GZIPPED_EDIF_TO_DISK) {
             Files.delete(FileTools.getDecompressedGZIPFileName(fileName));
         }
         return netlist;
