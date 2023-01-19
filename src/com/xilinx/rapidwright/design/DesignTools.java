@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -50,6 +50,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.design.blocks.UtilizationType;
+import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELClass;
 import com.xilinx.rapidwright.device.BELPin;
@@ -1827,37 +1828,14 @@ public class DesignTools {
             Cell c = design.getCell(p.getFullHierarchicalInstName());
             if (c == null || c.getBEL() == null) continue;
             String logicalPinName = p.getPortInst().getName();
-            String sitePinName = getRoutedSitePin(c, net, logicalPinName);
-            if (sitePinName == null) continue;
-            //TODO NOTE: The following if clause adds some unexpected pins to GND, e.g. SLICE.CIN
-            /*if (sitePinName == null) {
-                if (net.equals(design.getGndNet())) {
-                    sitePinName = c.getCorrespondingSitePinName(logicalPinName);
-                }
-                if (sitePinName == null) {
-                    continue;
-                }
-                if (c.getPhysicalPinMapping(logicalPinName) == null) {
-                    String physPinMapping = c.getDefaultPinMapping(logicalPinName);
-                    if (physPinMapping != null) {
-                        c.addPinMapping(physPinMapping, logicalPinName);
-                    }
-                }
-            }*/
-            SiteInst si = c.getSiteInst();
-            SitePinInst newPin = si.getSitePinInst(sitePinName);
-            if (newPin != null) continue;
-            newPin = net.createPin(sitePinName, c.getSiteInst());
-            if (newPin != null) newPins.add(newPin);
             Set<String> physPinMappings = c.getAllPhysicalPinMappings(logicalPinName);
             // BRAMs can have two (or more) physical pin mappings for a logical pin
-            String existing = c.getPhysicalPinMapping(logicalPinName);
-            if (physPinMappings != null && physPinMappings.size() > 1) {
+            if (physPinMappings != null) {
+                SiteInst si = c.getSiteInst();
                 for (String physPin : physPinMappings) {
-                    if (existing.equals(physPin)) continue;
-                    sitePinName = getRoutedSitePinFromPhysicalPin(c, net, physPin);
+                    String sitePinName = getRoutedSitePinFromPhysicalPin(c, net, physPin);
                     if (sitePinName == null) continue;
-                    newPin = si.getSitePinInst(sitePinName);
+                    SitePinInst newPin = si.getSitePinInst(sitePinName);
                     if (newPin != null) continue;
                     newPin = net.createPin(sitePinName, c.getSiteInst());
                     if (newPin != null) newPins.add(newPin);
@@ -2886,10 +2864,8 @@ public class DesignTools {
         // SiteWire and SitePin Name are the same for LUT inputs
         String siteWireName = belPin.getSiteWireName();
         // VCC returned based on the site wire, site pins are not stored in dcp
-        Net net = si.getNetFromSiteWire(siteWireName);
-        if (net == null) {
-            net = si.getDesign().getVccNet();
-        }
+        Net netOnSiteWire = si.getNetFromSiteWire(siteWireName);
+        Net net = (netOnSiteWire != null) ? netOnSiteWire : si.getDesign().getVccNet();
         if (net.isStaticNet()) {
             // SRL16Es that have been transformed from SRLC32E require GND on their A6 pin
             if (cell.getType().equals("SRL16E") && siteWireName.endsWith("6")) {
@@ -2899,8 +2875,14 @@ public class DesignTools {
                 }
             }
             String belName = belPin.getBELName();
-            if (belPin.getBEL().isLUT() && si.getCell(belName.replace('6', '5')) == null) {
-                // Nothing is placed on the 5LUT BEL, no need for site pin
+            if (LUTTools.isCellALUT(cell) &&
+                    // No net originally present on input sitewire
+                    netOnSiteWire != net &&
+                    // No cell placed in the 5LUT spot
+                    si.getCell(belName.replace('6', '5')) == null &&
+                    // No net present on output sitewire
+                    si.getNetFromSiteWire(belName.charAt(0) + "5LUT_O5") == null) {
+                // LUT input siteWire has no net attached, nor does the LUT output sitewire: no need for site pin
                 return;
             }
             SitePinInst pin = si.getSitePinInst(siteWireName);
@@ -3232,4 +3214,45 @@ public class DesignTools {
         }
     }
 
+    /**
+     * Determine if a Net is driven by a hierarchical port, created as part of an out-of-context
+     * synthesis flow, for example.
+     * @param net Net to examine.
+     * @returns True if driven by a hierport.
+     */
+    public static boolean isNetDrivenByHierPort(Net net) {
+        if (net.getSource() != null) {
+            // Net can only be driven by a hier port if it has no site pin driver
+            return false;
+        }
+
+        if (net.isStaticNet()) {
+            // Static nets cannot be driven by a hier port
+            return false;
+        }
+
+        EDIFNet en = net.getLogicalNet();
+        if (en == null) {
+            // No corresponding logical net (e.g. present inside an encrypted cell)
+            return false;
+        }
+
+        List<EDIFPortInst> sourcePorts = en.getSourcePortInsts(true);
+        if (sourcePorts.isEmpty()) {
+            // Net has no source ports; truly an driver-less net
+            return false;
+        }
+
+        if (sourcePorts.size() != 1) {
+            return false;
+        }
+
+        EDIFPortInst epi = sourcePorts.get(0);
+        if (!epi.isTopLevelPort()) {
+            // Hier ports must be top level ports
+            return false;
+        }
+
+        return true;
+    }
 }

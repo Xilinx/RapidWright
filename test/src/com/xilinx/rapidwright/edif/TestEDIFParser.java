@@ -33,13 +33,18 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
-import com.xilinx.rapidwright.support.RapidWrightDCP;
-import com.xilinx.rapidwright.tests.CodePerfTracker;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
+
+import com.xilinx.rapidwright.support.RapidWrightDCP;
+import com.xilinx.rapidwright.tests.CodePerfTracker;
+import com.xilinx.rapidwright.util.FileTools;
+import com.xilinx.rapidwright.util.Params;
 
 public class TestEDIFParser {
     private static final Path input = RapidWrightDCP.getPath("edif_parsing_stress_test.edf");
@@ -118,5 +123,45 @@ public class TestEDIFParser {
             parser.parseEDIFNetlist();
         }
 
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = { false, true })
+    public void testGZIPEDIFParsing(boolean decompressToDisk, @TempDir Path tempDir)
+            throws IOException {
+        if (decompressToDisk) {
+            System.setProperty(Params.RW_DECOMPRESS_GZIPPED_EDIF_TO_DISK_NAME, "1");
+        }
+
+        Path src = tempDir.resolve(input.getFileName());
+        Files.copy(input, src);
+        Path compressed = FileTools.compressFileUsingGZIP(src);
+        Assertions.assertTrue(compressed.toString().endsWith(".gz"));
+        Assertions.assertTrue(src.toFile().exists());
+        Files.delete(src);
+        Assertions.assertFalse(src.toFile().exists());
+        Assertions.assertNotNull(EDIFTools.loadEDIFFile(compressed));
+        Assertions.assertFalse(src.toFile().exists());
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = { false, true })
+    public void testGZIPEDIFParsingParallel(boolean decompressToDisk, @TempDir Path tempDir)
+            throws IOException {
+        if (decompressToDisk) {
+            System.setProperty(Params.RW_DECOMPRESS_GZIPPED_EDIF_TO_DISK_NAME, "1");
+        }
+
+        Path src = tempDir.resolve(input.getFileName());
+        Files.copy(input, src);
+        Path compressed = FileTools.compressFileUsingGZIP(src);
+        Assertions.assertTrue(compressed.toString().endsWith(".gz"));
+        Assertions.assertTrue(src.toFile().exists());
+        Files.delete(src);
+        Assertions.assertFalse(src.toFile().exists());
+        try (ParallelEDIFParser p = new ParallelEDIFParser(compressed)) {
+            Assertions.assertNotNull(p.parseEDIFNetlist());
+        }
+        Assertions.assertFalse(src.toFile().exists());
     }
 }

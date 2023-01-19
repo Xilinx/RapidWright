@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2021 Ghent University.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Yun Zhou, Ghent University.
@@ -105,11 +105,15 @@ public class Connection implements Comparable<Connection>{
     }
 
     /**
-     * Computes the connection bounding box based on the geometric center of the net, source and sink rnodes.
+     * Computes the connection bounding box based on the geometric center of the net, source and sink rnodes,
+     * and for cross SLR connections the location of Laguna columns.
      * @param boundingBoxExtensionX To indicate the extension on top of the minimum bounding box in the horizontal direction.
      * @param boundingBoxExtensionY To indicate the extension on top of the minimum bounding box in the vertical direction.
+     * @param nextLagunaColumn Array mapping arbitrary tile columns to the next Laguna column
+     * @param prevLagunaColumn Array mapping arbitrary tile columns to the previous Laguna column
      */
-    public void computeConnectionBoundingBox(short boundingBoxExtensionX, short boundingBoxExtensionY, int[] nextLagunaColumn, int[] prevLagunaColumn) {
+    public void computeConnectionBoundingBox(short boundingBoxExtensionX, short boundingBoxExtensionY,
+                                             int[] nextLagunaColumn, int[] prevLagunaColumn) {
         short xMin, xMax, yMin, yMax;
         short xNetCenter = (short) Math.ceil(netWrapper.getXCenter());
         short yNetCenter = (short) Math.ceil(netWrapper.getYCenter());
@@ -137,7 +141,8 @@ public class Connection implements Comparable<Connection>{
         yMinBB = (short) (yMin - boundingBoxExtensionY);
 
         if (isCrossSLR()) {
-            // Equivalently, ensure that source and sink can both access a SLL without moving
+            // Equivalently, ensure that cross-SLR connections are at least as high as a SLL;
+            // if necessary, expand the sink side of the bounding box
             short heightMinusSLL = (short) ((yMaxBB - yMinBB - 1) - RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES);
             if (heightMinusSLL < 0) {
                 if (sourceRnode.getEndTileYCoordinate() <= sinkRnode.getEndTileYCoordinate()) {
@@ -217,6 +222,12 @@ public class Connection implements Comparable<Connection>{
         return false;
     }
 
+    /**
+     * Add the give RouteNode to the list of those used by this Connection.
+     * Expand the bounding box accordingly, since this node could describe an
+     * existing routing path computed using a different bounding box.
+     * @param rn RouteNode to add
+     */
     public void addRnode(RouteNode rn) {
         xMinBB = (short) Math.min(xMinBB, rn.getBeginTileXCoordinate() - 1);
         xMaxBB = (short) Math.max(xMaxBB, rn.getEndTileXCoordinate() + 1);
@@ -411,6 +422,8 @@ public class Connection implements Comparable<Connection>{
 
     @Override
     public int compareTo(Connection arg0) {
+        if (this == arg0)
+            return 0;
         if (netWrapper.getConnections().size() > arg0.getNetWrapper().getConnections().size()) {
             return 1;
         } else if (netWrapper.getConnections().size() == arg0.getNetWrapper().getConnections().size()) {
@@ -460,5 +473,4 @@ public class Connection implements Comparable<Connection>{
             altSinkRnode.setTarget(target);
         }
     }
-
 }

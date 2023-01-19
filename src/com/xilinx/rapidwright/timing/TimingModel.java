@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2019-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * This file is part of RapidWright.
@@ -46,7 +46,6 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
-import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
@@ -55,7 +54,6 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.LinkedList;
-import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -172,8 +170,6 @@ public class TimingModel {
 
     private TimingManager timingManager;
     private Tile[] goodRowTypes;
-    // FIXME: Read but never written to
-    private PrintStream printStream;
     private Device device;
 
     public HashMap<String, List<TimingGroup>> forDebugTimingGroupByPorts;
@@ -251,8 +247,6 @@ public class TimingModel {
 
         // create a good row for netDelay model, in terms of capturing resource types within a row
         Tile[][] tiles = device.getTiles();
-        // FIXME: Written but never read
-        HashMap<TileTypeEnum, Integer> tiletypes = new LinkedHashMap<>();
         goodRowTypes = new Tile[tiles[1].length];
 
         for (int u = START_TILE_ROW; u < tiles.length; u++) { // start at row START_TILE_ROW
@@ -272,12 +266,6 @@ public class TimingModel {
             if (consecutiveTilesNonNull) {
                 if (verbose)
                     System.out.println("Found good consecutive row at:" + u);
-            }
-        }
-        for (Tile tile : goodRowTypes) {
-            if (tile != null) {
-                TileTypeEnum tte = tile.getTileTypeEnum();
-                tiletypes.merge(tte, 1, Integer::sum);
             }
         }
         buildDistArrays(tiles[0].length, tiles.length);
@@ -346,15 +334,6 @@ public class TimingModel {
             node_start_wires.add(node.getAllWiresInNode()[0]);
         }
 
-        // FIXME: Written but never read
-        String[] ptkeys = new String[pipTypes.size()];
-        int ptkCntr = 0;
-        for (
-                PIPType ptk : pipTypes.keySet()) {
-            ptkeys[ptkCntr++] = "" + ptk;
-        }
-        Arrays.sort(ptkeys);
-
         for (Wire w : node_start_wires) {
             IntentCode code = w.getIntentCode();
             nodeIntents.add(code);
@@ -363,20 +342,6 @@ public class TimingModel {
             }
         }
 
-        IntentCode[] codes = intentCodes.toArray(new IntentCode[0]);
-        // FIXME: Written but never read
-        HashMap<IntentCode, Integer> intentHash = new LinkedHashMap<>();
-        Arrays.sort(codes);
-        for (
-                IntentCode c : codes) {
-            List<String> intentList = new LinkedList<>();
-            for (Wire w : node_start_wires) {
-                if (w.getIntentCode() == c) {
-                    intentList.add(w.getWireName());
-                }
-            }
-            intentHash.put(c, intentList.size());
-        }
 
         List<TimingGroup> groups = null;
 
@@ -387,34 +352,10 @@ public class TimingModel {
         if (groups != null) {
             result = calcDelay(startPinInst, endPinInst, sourceBELPin, sinkBELPin, groups);
         } else {
-            
             checkForIntrasiteDelay();
         }
 
         return result;
-    }
-
-    // FIXME: Never called
-    void checkTimingGroup(TimingGroup tg) {
-        // INT_X46Y110/IMUX_E17
-        // INT_X45Y109/EE2_E_BEG6
-        Pattern isE = Pattern.compile("_E\\d|_E_BEG");
-        Pattern isW = Pattern.compile("_W\\d|_W_BEG");
-        Matcher matchE = isE.matcher(tg.getLastNode().toString());
-        if (matchE.find()) {
-            System.out.printf("PM:PM node  %40s is on E side \n", tg.getLastNode().toString());
-        } else {
-            Matcher matchW = isW.matcher(tg.getLastNode().toString());
-            if (matchW.find()) {
-                System.out.printf("PM:PM node  %40s is on W side \n", tg.getLastNode().toString());
-            } else {
-                System.out.printf("PM:PM node  %40s is on NOT on e or W side : ", tg.getLastNode().toString());
-                for (Node n : tg.getNodes()) {
-                    System.out.printf(" " + n.toString());
-                }
-                System.out.println();
-            }
-        }
     }
 
     /**
@@ -437,14 +378,12 @@ public class TimingModel {
         if (nodes.size()>= 2 && pips.size() >=1) {
             TimingGroup initialGroup = new TimingGroup(this);
             initialGroup.add(nodes.get(0), nodeTypes.get(0));
-            // FIXME: Always false
-            boolean initialHasPinbounce = false;
             initialGroup.setInitialGroup(true);
             result.add(initialGroup);
             
             // Comment out to avoid lots of printout
             //checkTimingGroup(initialGroup);
-            for (int i = !initialHasPinbounce? 1:2; i < nodes.size() - 1; ) {
+            for (int i = 1; i < nodes.size() - 1; ) {
                 TimingGroup midGroup = new TimingGroup(this);
                 boolean thisNodeContainsGlobal = false;
                 for (Wire w : nodes.get(i).getAllWiresInNode()) {
@@ -1202,7 +1141,6 @@ public class TimingModel {
         this.sourceBELPin = sourceBELPin;
         this.sinkBELPin = sinkBELPin;
 
-        int GroupCntr = 0;
         float netDelayCalc = 0;
 
         for (TimingGroup group : groups) {
@@ -1315,23 +1253,10 @@ public class TimingModel {
                     && !group.isFinalGroup()) {
                 netDelayCalc += GroupDelayCalc;
             }                
-
-            GroupCntr++;
-            if (debugFile) {
-                printStream.print("\tTimingGroup[" + GroupCntr + "]:" + group);
-                printStream.println("\n");
-            }
         }
 
         netDelayCalc += checkForSitePinDelay(groups);
         
-//        //TODO debug on intra site delay
-//        if (startPinInst.toString().contains("SLICE_X26Y101.BMUX")) {
-//            checkIntraSiteDelay = true;
-//        } else {
-//            checkIntraSiteDelay = false;
-//        }
-
         checkForIntrasiteDelay();  // implementation refactored into a helper method below
 
         for (int i =1 ; i < groups.size(); i++) {
@@ -1346,9 +1271,6 @@ public class TimingModel {
                 netDelayCalc += 9;
             }
         }
-
-        if (debugFile)
-            printStream.println();
 
         if (verbose) {
             for (TimingGroup group : groups) {
@@ -1596,119 +1518,23 @@ public class TimingModel {
          *  An ordered list of PIPs is created called "relevantPIPs".
          *  The associated types for the PIPs is stored in "pipTypesForGroups".
          */
-        // FIXME: Value is always false
-        boolean skipRelevantPipCheck = false;
-        if (!skipRelevantPipCheck) {
-            Node node = null;
-            if (endPinInst != null)
-                node = endPinInst.getConnectedNode();
+        Node node = null;
+        if (endPinInst != null)
+            node = endPinInst.getConnectedNode();
 
-            while (node != null && !node.equals(sourcePinNode)) {
-                PIP p = pipEndNodeHashMap.get(node.toString());
-                if (p != null) {
-                    relevantPIPs.add(relevantPIPs.size(), p);
-                    nodeList.add(nodeList.size(), node);
-                } else
-                    break;
-                node = p.getStartNode();//pipStartNodeHashMap.get(p);//p.getStartNode();
-                //node = pipStartNodeHashMap.get(p);//p.getStartNode();
-            }
-            if (node != null) {
+        while (node != null && !node.equals(sourcePinNode)) {
+            PIP p = pipEndNodeHashMap.get(node.toString());
+            if (p != null) {
+                relevantPIPs.add(relevantPIPs.size(), p);
                 nodeList.add(nodeList.size(), node);
-            }
-        } else {
-            relevantPIPs.addAll(net.getPIPs());
+            } else
+                break;
+            node = p.getStartNode();//pipStartNodeHashMap.get(p);//p.getStartNode();
+            //node = pipStartNodeHashMap.get(p);//p.getStartNode();
         }
-
-/* experimental code towards handling bi-directional PIPs, not debugged yet
-        HashMap<String, Node> pipStartNodeHashMap2 = new LinkedHashMap<>();
-        HashMap<String, PIP> pipEndNodeHashMap2 = new LinkedHashMap<>();
-
-        // some nets contain bidirectional PIPs and the code for figuring out the path of PIPs will need to take this into account
-        for (PIP p : net.getPIPs()) {
-            pipStartNodeHashMap.put(p.toString(), p.getStartNode());
-            pipEndNodeHashMap.put(p.getEndNode().toString(), p);
-            if (p.isBidirectional()) {
-                pipStartNodeHashMap2.put(p.toString(), p.getEndNode());
-                pipEndNodeHashMap2.put(p.getStartNode().toString(), p);
-            } else {
-                pipEndNodeHashMap2.put(p.getEndNode().toString(), p);
-            }
+        if (node != null) {
+            nodeList.add(nodeList.size(), node);
         }
-
-        Node sourcePinNode = null;
-        if (startPinInst != null)
-            sourcePinNode=  startPinInst.getConnectedNode();
-        else if (net.getPIPs().size() > 0)
-            sourcePinNode = net.getPIPs().get(0).getStartNode();
-        else sourcePinNode = null;
-
-        boolean skipRelevantPipCheck = false;
-
-        if (!skipRelevantPipCheck) {
-            Node node = null;
-            if (endPinInst != null)
-                node = endPinInst.getConnectedNode();
-            else if (net.getSinkPins() != null) {
-                boolean debugCheckCondition1 = true;
-            }
-            else
-                node = null;
-
-            while (node != null && !node.equals(sourcePinNode)) {
-                PIP p = null;
-                p = pipEndNodeHashMap.get(node.toString());
-                //if (p != null && p.isBidirectional()) {
-                //    node = p.getStartNode();
-                //    if (!nodeList.contains(node))
-                //        nodeList.add(node);
-                //} else
-                if (p != null && !p.isBidirectional()) {
-                    relevantPIPs.add(relevantPIPs.size(), p);
-                    pipTypesForGroups.add(pipTypesForGroups.size(), p.getPIPType());
-                    if (!nodeList.contains(node))
-                        nodeList.add(nodeList.size(), node);
-                    Node tmpNode = p.getStartNode();
-                    if (p.isBidirectional() && nodeList.contains(tmpNode))
-                        tmpNode = pipStartNodeHashMap2.get(pipStartNodeHashMap2.get(p));
-                    node =tmpNode;
-                } else {
-                    p = pipEndNodeHashMap2.get(node.toString());
-                    if (p != null  && p.isBidirectional()) {
-                        relevantPIPs.add(relevantPIPs.size(), p);
-                        pipTypesForGroups.add(pipTypesForGroups.size(), p.getPIPType());
-                        if (!nodeList.contains(node))
-                            nodeList.add(nodeList.size(), node);
-                        Node tmpNode = pipStartNodeHashMap2.get(p.toString());
-                        if (p.isBidirectional() && nodeList.contains(tmpNode))
-                            tmpNode = pipStartNodeHashMap2.get(pipStartNodeHashMap.get(p).toString());
-                        node = tmpNode;
-                    } else if (p != null && !p.isBidirectional()) {
-                        relevantPIPs.add(relevantPIPs.size(), p);
-                        pipTypesForGroups.add(pipTypesForGroups.size(), p.getPIPType());
-                        if (!nodeList.contains(node))
-                            nodeList.add(nodeList.size(), node);
-                        Node tmpNode = p.getStartNode();
-                        if (p.isBidirectional() && nodeList.contains(tmpNode))
-                            tmpNode = pipStartNodeHashMap2.get(pipStartNodeHashMap2.get(p));
-                        node = tmpNode;
-                    }
-                    else
-                        break;
-                }
-            }
-            if (node != null) {
-                nodeList.add(nodeList.size(), node);
-            }
-           //if (!nodeList.contains(sourcePinNode))
-           //     nodeList.add(sourcePinNode);
-        } else {
-            for (PIP p : net.getPIPs()) {
-                relevantPIPs.add(p);
-                pipTypesForGroups.add(p.getPIPType());
-            }
-        }
-*/
     }
     
     private void checkForIntrasiteDelay() {

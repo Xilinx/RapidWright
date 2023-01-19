@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2021 Ghent University.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Yun Zhou, Ghent University.
@@ -24,12 +24,6 @@
 
 package com.xilinx.rapidwright.rwroute;
 
-import java.util.ArrayList;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
@@ -37,6 +31,12 @@ import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.util.RuntimeTracker;
+import com.xilinx.rapidwright.util.Utils;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * A RouteNode Object corresponds to a vertex of the routing resource graph.
@@ -102,10 +102,12 @@ abstract public class RouteNode implements Comparable<RouteNode> {
 
     protected RouteNode(Node node, RouteNodeType type, boolean isLookahead) {
         this.node = node;
-        setType(type);
+        NodeInfo nodeInfo = getNodeInfo(node);
+        setType(type, nodeInfo);
         children = null;
-        setEndTileXYCoordinates();
-        setBaseCost(type);
+        length = nodeInfo.length;
+        setEndTileXYCoordinates(nodeInfo);
+        setBaseCost();
         presentCongestionCost = initialPresentCongestionCost;
         historicalCongestionCost = initialHistoricalCongestionCost;
         usersConnectionCounts = null;
@@ -126,10 +128,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
     public int compareTo(RouteNode that) {
         // Do not use Float.compare() since it also compares NaN, which we'll assume is unreachable
         // return Float.compare(this.lowerBoundTotalPathCost, that.lowerBoundTotalPathCost);
-        float signum = Math.signum(this.lowerBoundTotalPathCost - that.lowerBoundTotalPathCost);
-        // Tie break according to larger known cost (thus smaller estimated cost to target)
-        return (int) ((signum != 0) ? signum : Math.signum(that.upstreamPathCost - this.upstreamPathCost));
-
+        return (int) Math.signum(this.lowerBoundTotalPathCost - that.lowerBoundTotalPathCost);
     }
 
     abstract protected RouteNode getOrCreate(Node node, RouteNodeType type);
@@ -158,59 +157,70 @@ abstract public class RouteNode implements Comparable<RouteNode> {
         setChildrenTimer.stop();
     }
 
-    private void setBaseCost(RouteNodeType type) {
-        // TODO: Why does enabling the following line cause unroutability?
-        //       setRouteType() is called before this, and it setting
-        //       this.type disrupts the base cost such that
-        //       testNonTimingDrivenPartialRouting becomes unroutable.
-        //       The `type` parameter fed to this method is the original
-        //       value provided to the constructor
-        // type = this.type;
-        if (this.type == RouteNodeType.SUPER_LONG_LINE) {
-            baseCost = 0.3f * length;
-        } else if (type == RouteNodeType.WIRE) {
-            baseCost = 0.4f;
-            // NOTE: IntentCode is device-dependent
-            IntentCode ic = node.getIntentCode();
-            switch(ic) {
-            case NODE_PINBOUNCE:
-            case NODE_PINFEED:
+    private void setBaseCost() {
+        switch (type) {
+            case LAGUNA_I:
+                // Make all approaches to SLLs zero-cost to encourage exploration
+                // Assigning a base cost of zero would normally break congestion resolution
+                // (since RWroute.getNodeCost() would return zero) but doing it here should be
+                // okay because this node only leads to a SLL which will have a non-zero base cost
+                baseCost = 0.0f;
                 break;
-            case NODE_DOUBLE:
-                if (endTileXCoordinate != node.getTile().getTileXCoordinate()) {
-                    baseCost = 0.4f*length;
+            case SUPER_LONG_LINE:
+                baseCost = 0.3f * length;
+                break;
+            case WIRE:
+                baseCost = 0.4f;
+                // NOTE: IntentCode is device-dependent
+                IntentCode ic = node.getIntentCode();
+                switch(ic) {
+                    case NODE_OUTPUT:       // LUT route-thru
+                    case NODE_CLE_OUTPUT:
+                        assert(length == 0);
+                        break;
+                    case NODE_LOCAL:
+                    case INTENT_DEFAULT:
+                    case NODE_LAGUNA_OUTPUT:
+                        assert(length <= 1);
+                        break;
+                    case NODE_SINGLE:
+                        assert(length <= 2);
+                        if (length > 1) baseCost *= length;
+                        break;
+                    case NODE_DOUBLE:
+                        if (endTileXCoordinate != node.getTile().getTileXCoordinate()) {
+                            baseCost = 0.4f * length;
+                        }
+                        break;
+                    case NODE_HQUAD:
+                        assert (length != 0 || node.getAllDownhillNodes().isEmpty());
+                        baseCost = 0.35f * length;
+                        break;
+                    case NODE_VQUAD:
+                        // In case of U-turn nodes
+                        if (length != 0) baseCost = 0.15f * length;// VQUADs have length 4 and 5
+                        break;
+                    case NODE_HLONG:
+                        assert (length != 0 || node.getAllDownhillNodes().isEmpty());
+                        baseCost = 0.15f * length;// HLONGs have length 6 and 7
+                        break;
+                    case NODE_VLONG:
+                        baseCost = 0.7f;
+                        break;
+                    default:
+                        throw new RuntimeException(ic.toString());
                 }
                 break;
-            case NODE_HQUAD:
-                assert(length != 0 || node.getAllDownhillNodes().isEmpty());
-                baseCost = 0.35f*length;
+            case PINFEED_I:
+            case PINBOUNCE:
+                baseCost = 0.4f;
                 break;
-            case NODE_VQUAD:
-                // In case of U-turn nodes
-                if (length != 0) baseCost = 0.15f*length;// VQUADs have length 4 and 5
-                break;
-            case NODE_HLONG:
-                assert(length != 0 || node.getAllDownhillNodes().isEmpty());
-                baseCost = 0.15f*length;// HLONGs have length 6 and 7
-                break;
-            case NODE_VLONG:
-                // Not true for UltraScale? (e.g. seen on VU440)
-                // assert(length != 0);
-                baseCost = 0.7f;
+            case PINFEED_O:
+                baseCost = 1f;
                 break;
             default:
-                if (length != 0) baseCost *= length;
-                break;
-            }
-        } else if (type == RouteNodeType.PINFEED_I) {
-            baseCost = 0.4f;
-        } else if (type == RouteNodeType.PINFEED_O) {
-            baseCost = 1f;
+                throw new RuntimeException(type.toString());
         }
-
-        // Node.getNode("INT_X182Y535/WW4_W_BEG7", Device.getDevice("xcvu19p")).getAllWiresInNode()
-        // returns two wires, both X182Y535
-        // assert(baseCost != 0);
     }
 
     /**
@@ -242,38 +252,46 @@ abstract public class RouteNode implements Comparable<RouteNode> {
         return RouteNode.capacity < uniqueDriverCount();
     }
 
-    public static final EnumSet<TileTypeEnum> lagunaTileTypes = EnumSet.of(
-              TileTypeEnum.LAG_LAG      // UltraScale+
-            , TileTypeEnum.LAGUNA_TILE  // UltraScale
-    );
+    public static class NodeInfo {
+        public final short endTileXCoordinate;
+        public final short endTileYCoordinate;
+        public final short length;
+        public final boolean pinfeedIntoLaguna;
 
-    public static int getLength(Node node, RouteNode that) {
+        public NodeInfo(short endTileXCoordinate,
+                        short endTileYCoordinate,
+                        short length,
+                        boolean laguna_i) {
+            this.endTileXCoordinate = endTileXCoordinate;
+            this.endTileYCoordinate = endTileYCoordinate;
+            this.length = length;
+            this.pinfeedIntoLaguna = laguna_i;
+        }
+    }
+
+    private static NodeInfo getNodeInfo(Node node) {
         Wire[] wires = node.getAllWiresInNode();
         Tile baseTile = node.getTile();
+        TileTypeEnum baseType = baseTile.getTileTypeEnum();
         Tile endTile = null;
+        boolean laguna_i = false;
         for (Wire w : wires) {
             Tile tile = w.getTile();
             TileTypeEnum tileType = tile.getTileTypeEnum();
             boolean lagunaTile = false;
             if (tileType == TileTypeEnum.INT ||
-                    (lagunaTile = lagunaTileTypes.contains(tileType))) {
+                    (lagunaTile = Utils.isLaguna(tileType))) {
                 if (!lagunaTile ||
                         // Only consider a Laguna tile as an end tile if base tile is Laguna too
                         // (otherwise it's a PINFEED into a Laguna; in US+ Laguna is off-by-one in the X axis)
-                        lagunaTileTypes.contains(baseTile.getTileTypeEnum())) {
-                    if (tileType == TileTypeEnum.LAGUNA_TILE) {
-                        // In UltraScale, Laguna tiles have the same X as the base INT tile
-                        assert(tile.getTileXCoordinate() == baseTile.getTileXCoordinate());
-                    }
+                        Utils.isLaguna(baseType)) {
                     boolean endTileWasNotNull = (endTile != null);
                     endTile = tile;
                     // Break if this is the second INT tile
                     if (endTileWasNotNull) break;
                 } else {
-                    assert(!lagunaTileTypes.contains(baseTile.getTileTypeEnum()));
-                    if (that != null && that.type == RouteNodeType.PINFEED_I) {
-                        that.type = RouteNodeType.LAGUNA_I;
-                    }
+                    assert(!Utils.isLaguna(baseType));
+                    laguna_i = (node.getIntentCode() == IntentCode.NODE_PINFEED);
                 }
             }
         }
@@ -281,33 +299,39 @@ abstract public class RouteNode implements Comparable<RouteNode> {
             endTile = node.getTile();
         }
 
-        int endTileXCoordinate = endTile.getTileXCoordinate();
-        int endTileYCoordinate = endTile.getTileYCoordinate();
-        int length = Math.abs(endTileXCoordinate - baseTile.getTileXCoordinate())
-                + Math.abs(endTileYCoordinate - baseTile.getTileYCoordinate());
+        short endTileXCoordinate = (short) endTile.getTileXCoordinate();
+        short endTileYCoordinate = (short) endTile.getTileYCoordinate();
+        short length = (short) (Math.abs(endTileXCoordinate - baseTile.getTileXCoordinate())
+                + Math.abs(endTileYCoordinate - baseTile.getTileYCoordinate()));
 
-        if (that != null) {
-            that.endTileXCoordinate = (short) endTileXCoordinate;
-            that.endTileYCoordinate = (short) endTileYCoordinate;
-            that.length = (short) length;
-        }
-
-        return length;
+        return new NodeInfo(endTileXCoordinate, endTileYCoordinate, length, laguna_i);
     }
 
-    private void setEndTileXYCoordinates() {
-        getLength(node, this);
-        if (node.getTile().getTileTypeEnum() == TileTypeEnum.LAG_LAG) { // UltraScale+ only
+    public static short getLength(Node node) {
+        return getNodeInfo(node).length;
+    }
+
+    private void setEndTileXYCoordinates(NodeInfo nodeInfo) {
+        endTileXCoordinate = nodeInfo.endTileXCoordinate;
+        endTileYCoordinate = nodeInfo.endTileYCoordinate;
+
+        Tile tile = node.getTile();
+        TileTypeEnum tileType = node.getTile().getTileTypeEnum();
+        if (tileType == TileTypeEnum.LAG_LAG) { // UltraScale+ only
             // Correct the X coordinate of all Laguna nodes since they are accessed by the INT
-            // tile to its right, yet has the LAG tile has a tile X coordinate one less
-            // Do not apply this correction for NODE_LAGUNA_OUTPUT nodes unless it is a LAGUNA_I pinfeed
-            // (i.e. do not apply it to nodes that leave the SLL)
+            // tile to its right, yet the LAG tile has a tile X coordinate one less than this.
+            // Do not apply this correction for NODE_LAGUNA_OUTPUT nodes (which the fanin and
+            // fanout nodes of the SLL are marked as) unless it is a fanin (LAGUNA_I)
+            // (i.e. do not apply it to the fanout nodes).
             // Nor apply it to VCC_WIREs since their end tiles are INT tiles.
             if ((node.getIntentCode() != IntentCode.NODE_LAGUNA_OUTPUT || type == RouteNodeType.LAGUNA_I) &&
                 !node.isTiedToVcc()) {
-                assert(node.getTile().getTileXCoordinate() == endTileXCoordinate);
+                assert(tile.getTileXCoordinate() == endTileXCoordinate);
                 endTileXCoordinate++;
             }
+        } else if (tileType == TileTypeEnum.LAGUNA_TILE) { // UltraScale only
+            // In UltraScale, Laguna tiles have the same X as the base INT tile
+            assert(tile.getTileXCoordinate() == endTileXCoordinate);
         }
     }
 
@@ -466,7 +490,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
         children = null;
     }
 
-    private void setType(RouteNodeType type) {
+    private void setType(RouteNodeType type, NodeInfo nodeInfo) {
         this.type = type;
         if (type == RouteNodeType.WIRE) {
             // NOTE: IntentCode is device-dependent
@@ -476,14 +500,12 @@ abstract public class RouteNode implements Comparable<RouteNode> {
                     this.type = RouteNodeType.PINBOUNCE;
                     break;
 
-                // Could be PINFEED into SLICE or PINFEED into a LAGUNA
                 case NODE_PINFEED:
-                    this.type = RouteNodeType.PINFEED_I;
+                    this.type = nodeInfo.pinfeedIntoLaguna ? RouteNodeType.LAGUNA_I : RouteNodeType.PINFEED_I;
                     break;
 
                 case NODE_LAGUNA_OUTPUT: // UltraScale+ only
                     assert(node.getTile().getTileTypeEnum() == TileTypeEnum.LAG_LAG);
-                    // TODO: Collect wire indices to save on string comparison
                     if (node.getWireName().endsWith("_TXOUT")) {
                         this.type = RouteNodeType.LAGUNA_I;
                     }
@@ -496,7 +518,6 @@ abstract public class RouteNode implements Comparable<RouteNode> {
 
                 case INTENT_DEFAULT:
                     if (node.getTile().getTileTypeEnum() == TileTypeEnum.LAGUNA_TILE) { // UltraScale only
-                        // TODO: Collect wire indices to save on string comparison
                         String wireName = node.getWireName();
                         if (wireName.startsWith("UBUMP")) {
                             this.type = RouteNodeType.SUPER_LONG_LINE;
@@ -706,18 +727,19 @@ abstract public class RouteNode implements Comparable<RouteNode> {
     }
 
     /**
-     * Checks if a RouteNode instance has been visited before when routing a connection.
+     * Checks if a RouteNode instance has been visited by a specific integer identifier.
+     * @param id Integer identifier.
      * @return true, if a RouteNode instance has been visited before.
      */
-    abstract public boolean isVisited();
-
-    protected boolean isVisited(int id) {
+    public boolean isVisited(int id) {
         assert(id > 0);
         return visited == id;
     }
 
-    abstract public void setVisited();
-
+    /**
+     * Mark a RouteNode instance as being visited by a specific integer identifier.
+     * @param id Integer identifier.
+     */
     public void setVisited(int id) {
         assert(id > 0);
         visited = id;

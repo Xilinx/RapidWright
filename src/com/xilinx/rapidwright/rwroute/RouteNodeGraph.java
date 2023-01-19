@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Eddie Hung, Xilinx Research Labs.
@@ -24,6 +24,7 @@
 package com.xilinx.rapidwright.rwroute;
 
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Device;
@@ -89,9 +90,6 @@ public class RouteNodeGraph {
     public final int[] nextLagunaColumn;
     public final int[] prevLagunaColumn;
 
-    private int visitedCount;
-    private int visitedId;
-
     /** A map indicating whether a node described by (TileTypeEnum, WireIndex) should undergo lookahead */
     private final EnumMap<TileTypeEnum, BitSet> lookaheadFilter;
     private static final Map<TileTypeEnum, Pattern> lookaheadTileWireNameRegex;
@@ -118,7 +116,6 @@ public class RouteNodeGraph {
         protected RouteNodeImpl(Node node, RouteNodeType type) {
             super(node, type,
                     lookaheadFilter.getOrDefault(node.getTile().getTileTypeEnum(), EMPTY_BITSET).get(node.getWire()));
-            assert(!isVisited());
         }
 
         @Override
@@ -139,17 +136,6 @@ public class RouteNodeGraph {
         @Override
         public boolean isExcluded(Node parent, Node child) {
             return RouteNodeGraph.this.isExcluded(parent, child);
-        }
-
-        @Override
-        public boolean isVisited() {
-            return isVisited(visitedId);
-        }
-
-        @Override
-        public void setVisited() {
-            assert(!isVisited());
-            setVisited(visitedId);
         }
 
         @Override
@@ -180,8 +166,6 @@ public class RouteNodeGraph {
         preservedMapSize = new AtomicInteger();
         asyncPreserveOutstanding = new CountUpDownLatch();
         targets = new ArrayList<>();
-        visitedCount = 0;
-        visitedId = ++visitedCount;
         this.setChildrenTimer = setChildrenTimer;
 
         Device device = design.getDevice();
@@ -284,41 +268,35 @@ public class RouteNodeGraph {
         return oldNet;
     }
 
-    public void asyncPreserve(Collection<Node> nodes, Net net) {
-        asyncPreserveOutstanding.countUp();
-        ParallelismTools.submit(() -> {
-            try {
-                nodes.forEach((node) -> preserve(node, net));
-            } catch (Throwable t) {
-                t.printStackTrace();
-            } finally {
-                asyncPreserveOutstanding.countDown();
+    public void preserve(Net net) {
+        List<SitePinInst> pins = net.getPins();
+        SitePinInst sourcePin = net.getSource();
+        assert (sourcePin == null || pins.contains(sourcePin));
+        SitePinInst altSourcePin = net.getAlternateSource();
+        assert (altSourcePin == null || pins.contains(altSourcePin));
+        boolean drivenByHierPort = DesignTools.isNetDrivenByHierPort(net);
+        for (SitePinInst pin : net.getPins()) {
+            // Do not preserve if pin is not routed unless it's a hier port in which
+            // case do so otherwise Vivado will recognize it as a conflict.
+            // (SitePinInst.isRouted() is meaningless for output pins)
+            if (!pin.isOutPin() && !pin.isRouted() && !drivenByHierPort) {
+                continue;
             }
-        });
+
+            preserve(pin.getConnectedNode(), net);
+        }
+
+        for (PIP pip : net.getPIPs()) {
+            preserve(pip.getStartNode(), net);
+            preserve(pip.getEndNode(), net);
+        }
     }
 
-    public void asyncPreserve(Net net) {
+    public void preserveAsync(Net net) {
         asyncPreserveOutstanding.countUp();
         ParallelismTools.submit(() -> {
             try {
-                List<SitePinInst> pins = net.getPins();
-                SitePinInst sourcePin = net.getSource();
-                assert (sourcePin == null || pins.contains(sourcePin));
-                SitePinInst altSourcePin = net.getAlternateSource();
-                assert (altSourcePin == null || pins.contains(altSourcePin));
-                for (SitePinInst pin : net.getPins()) {
-                    // SitePinInst.isRouted() is meaningless for output pins
-                    if (!pin.isRouted() && !pin.isOutPin()) {
-                        continue;
-                    }
-
-                    preserve(pin.getConnectedNode(), net);
-                }
-
-                for (PIP pip : net.getPIPs()) {
-                    preserve(pip.getStartNode(), net);
-                    preserve(pip.getEndNode(), net);
-                }
+                preserve(net);
             } catch (Throwable t) {
                 t.printStackTrace();
             } finally {
@@ -328,6 +306,7 @@ public class RouteNodeGraph {
     }
 
     public void awaitPreserve() {
+        // TODO: Calling thread to do useful work when waiting
         asyncPreserveOutstanding.await();
     }
 
@@ -406,7 +385,7 @@ public class RouteNodeGraph {
 
             @Override
             public Iterator<RouteNode> iterator() {
-                return new Iterator() {
+                return new Iterator<RouteNode>() {
                     @Override
                     public boolean hasNext() {
                         if (curr == null) {
@@ -469,7 +448,6 @@ public class RouteNodeGraph {
             node.setTarget(false);
         }
         targets.clear();
-        visitedId = ++visitedCount;
     }
 
     public int averageChildren() {

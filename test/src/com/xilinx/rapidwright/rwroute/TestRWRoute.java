@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Eddie Hung, Xilinx Research Labs.
@@ -95,15 +95,15 @@ public class TestRWRoute {
     }
 
     /**
-     * Tests the non-timing driven full routing with a design that has a global clock net.
+     * Tests the non-timing driven full routing with a design that has a global net.
      * The optical-flow design from Rosetta benchmarks is used.
-     * It is the largest heterogeneous design from the Rosetta benchmark set.
-     * It has a global clock net, fitting in this test purpose of routing with a clock net.
+     * It is the largest heterogeneous design from the Rosetta benchmark set, and has
+     * a global enable net.
      * This test takes around 3 minutes on a machine with a CPU @ 2.5GHz.
      */
     @Test
-    @LargeTest
-    public void testNonTimingDrivenFullRoutingWithClkDesign() {
+    @LargeTest(max_memory_gb = 8)
+    public void testNonTimingDrivenFullRoutingWithGlobalNet() {
         // Sporadically failing due to OutOfMemoryException (see #439)
         long maxMemoryNeeded = 1024L*1024L*1024L*8L;
         Assumptions.assumeTrue(Runtime.getRuntime().maxMemory() >= maxMemoryNeeded);
@@ -120,7 +120,7 @@ public class TestRWRoute {
      * This test takes around 40s on a machine with a CPU @ 2.5GHz.
      */
     @Test
-    @LargeTest
+    @LargeTest(max_memory_gb = 8)
     public void testNonTimingDrivenPartialRouting() {
         // Sporadically failing due to OutOfMemoryException (see #439)
         long maxMemoryNeeded = 1024L*1024L*1024L*8L;
