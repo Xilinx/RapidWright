@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2021 Ghent University.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Yun Zhou, Ghent University.
@@ -286,12 +286,11 @@ public class GlobalSignalRouting {
      * @param design The {@link Design} instance to use.
      * @param routeThruHelper The {@link RouteThruHelper} instance to use.
      */
-    public static Map<SitePinInst, List<Node>> routeStaticNet(Net currNet,
-                                                              Predicate<Node> isNodeUnavailable,
-                                                              Design design, RouteThruHelper routeThruHelper) {
+    public static void routeStaticNet(Net currNet,
+                                      Predicate<Node> isNodeUnavailable,
+                                      Design design, RouteThruHelper routeThruHelper) {
         NetType netType = currNet.getType();
         Set<PIP> netPIPs = new HashSet<>();
-        Map<SitePinInst, List<Node>> sinkPathNodes = new HashMap<>();
         Queue<LightweightRouteNode> q = new LinkedList<>();
         Set<LightweightRouteNode> visitedRoutingNodes = new HashSet<>();
         Set<LightweightRouteNode> usedRoutingNodes = new HashSet<>();
@@ -336,7 +335,7 @@ public class GlobalSignalRouting {
                         if (debug) System.out.println("  " + routingNode.toString());
                         routingNode = routingNode.getPrev();
                     }
-                    sinkPathNodes.put(sink, pathNodes);
+                    netPIPs.addAll(RouterHelper.getPIPsFromNodes(pathNodes));
                     if (debug) {
                         for (Node pathNode:pathNodes) {
                             System.out.println(pathNode.toString());
@@ -367,12 +366,7 @@ public class GlobalSignalRouting {
             }
         }
 
-        for (List<Node> nodes:sinkPathNodes.values()) {
-            netPIPs.addAll(RouterHelper.getPIPsFromNodes(nodes));
-        }
-
         currNet.setPIPs(netPIPs);
-        return sinkPathNodes;
     }
 
     /**

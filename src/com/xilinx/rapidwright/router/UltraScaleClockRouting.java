@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2018-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -21,22 +21,8 @@
  * limitations under the License.
  *
  */
-/**
- *
- */
-package com.xilinx.rapidwright.router;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.PriorityQueue;
-import java.util.Map.Entry;
-import java.util.Queue;
-import java.util.Set;
+package com.xilinx.rapidwright.router;
 
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
@@ -48,7 +34,18 @@ import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.Wire;
-import com.xilinx.rapidwright.router.RouteNode;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.PriorityQueue;
+import java.util.Queue;
+import java.util.Set;
 
 /**
  * A collection of utility methods for routing clocks on

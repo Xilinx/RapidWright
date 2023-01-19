@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2021 Ghent University.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Yun Zhou, Ghent University.
@@ -24,17 +24,7 @@
 
 package com.xilinx.rapidwright.rwroute;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
-
 import com.xilinx.rapidwright.design.Design;
-import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
@@ -44,6 +34,15 @@ import com.xilinx.rapidwright.timing.TimingManager;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
 import com.xilinx.rapidwright.util.RuntimeTracker;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * A class extending {@link RWRoute} for partial routing.
@@ -97,6 +96,17 @@ public class PartialRouter extends RWRoute{
         this(design, config, pinsToRoute, false);
     }
 
+    @Override
+    protected void preprocess() {
+        // Any preprocessing is expected to be performed manually and added to pinsToRoute
+        // ahead of constructing this PartialRouter class
+    }
+
+    @Override
+    protected Collection<Net> getTimingNets() {
+        return Collections.unmodifiableSet(netToPins.keySet());
+    }
+
     /**
      * Checks whether this arc is part of an existing route.
      * For Nets containing at least one Connection to be routed, all fully routed
@@ -116,7 +126,7 @@ public class PartialRouter extends RWRoute{
             return false;
 
         // If end node has been visited already
-        if (endRnode.isVisited()) {
+        if (endRnode.isVisited(connectionsRouted)) {
             // Visited possibly from a different arc uphill of end, or possibly from
             // the same start -> end arc during prepareRouteConnection()
             return false;
@@ -260,21 +270,23 @@ public class PartialRouter extends RWRoute{
         if (!clk.hasPIPs()) {
             super.addGlobalClkRoutingTargets(clk);
         } else {
-            preserveNet(clk);
-            increaseNumPreservedClks();
+            preserveNet(clk, false);
+            numPreservedClks++;
+            numPreservedRoutableNets++;
         }
     }
 
     @Override
     protected void addStaticNetRoutingTargets(Net staticNet) {
-        preserveNet(staticNet);
+        preserveNet(staticNet, false);
 
         List<SitePinInst> staticPins = netToPins.get(staticNet);
         if (staticPins == null || staticPins.isEmpty()) {
             if (staticNet.hasPIPs()) {
-                increaseNumPreservedStaticNets();
+                numPreservedStaticNets++;
+                numPreservedRoutableNets++;
             } else {
-                increaseNumNotNeedingRouting();
+                numNotNeedingRoutingNets++;
             }
             return;
         }
@@ -303,8 +315,9 @@ public class PartialRouter extends RWRoute{
         }
 
         if (net.hasPIPs()) {
-            preserveNet(net);
-            increaseNumPreservedWireNets();
+            preserveNet(net, true);
+            numPreservedWire++;
+            numPreservedRoutableNets++;
         }
     }
 
@@ -448,7 +461,7 @@ public class PartialRouter extends RWRoute{
             }
 
             // Update the timing graph
-            if (config.isTimingDriven()) {
+            if (timingManager != null) {
                 timingManager.getTimingGraph().addNetDelayEdges(net);
                 timingManager.setTimingEdgesOfConnections(netWrapper.getConnections());
                 for (Connection netnewConnection : netWrapper.getConnections()) {
@@ -459,7 +472,6 @@ public class PartialRouter extends RWRoute{
 
         routingGraph.resetExpansion();
 
-        // TODO: Avoid using a set by backtracking from sinks (and stubs) until an already-reset node is seen
         for (RouteNode rnode : rnodes) {
             Node toBuild = rnode.getNode();
             // Check already unpreserved above
@@ -476,8 +488,6 @@ public class PartialRouter extends RWRoute{
                 // newly unpreserved node
                 parent.resetChildren();
             }
-
-            assert(!rnode.isVisited());
         }
 
         numPreservedWire--;
