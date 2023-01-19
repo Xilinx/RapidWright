@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2019-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * This file is part of RapidWright.
@@ -300,8 +300,6 @@ public class TimingGroup implements Comparable<TimingGroup> {
         nodeToCheckIntent = nodeTypes.get(nodeToCheckInx);
 
         Wire[] wires;
-        // FIXME: Written to but never used
-        Tile t1, t2;
         String wName;
 
         switch(nodeToCheckIntent) {
@@ -313,8 +311,8 @@ public class TimingGroup implements Comparable<TimingGroup> {
             case NODE_SINGLE:
                 dist = 1;
                 wires = nodes.get(nodeToCheckInx).getAllWiresInNode();
-                t1 = wires[0].getTile();
-                t2 = wires[wires.length-1].getTile();
+                Tile t1 = wires[0].getTile();
+                Tile t2 = wires[wires.length-1].getTile();
                 wName = wires[0].getWireName();
                 if (wName.startsWith("SS"))
                     direction = TimingDirection.SOUTH;
@@ -346,8 +344,6 @@ public class TimingGroup implements Comparable<TimingGroup> {
                 dist = 2;
                 groupDelayType = GroupDelayType.DOUBLE;
                 wires = nodes.get(nodeToCheckInx).getAllWiresInNode();
-                t1 = wires[0].getTile();
-                t2 = wires[wires.length-1].getTile();
                 wName = wires[0].getWireName();
                 if (wName.startsWith("SS"))
                     direction = TimingDirection.SOUTH;
@@ -373,8 +369,6 @@ public class TimingGroup implements Comparable<TimingGroup> {
                 dist = 4;
                 groupDelayType = GroupDelayType.QUAD;
                 wires = nodes.get(nodeToCheckInx).getAllWiresInNode();
-                t1 = wires[0].getTile();
-                t2 = wires[wires.length-1].getTile();
                 wName = wires[0].getWireName();
                 if (wName.startsWith("SS"))
                     direction = TimingDirection.SOUTH;
@@ -395,8 +389,6 @@ public class TimingGroup implements Comparable<TimingGroup> {
                 dist = 4;
                 groupDelayType = GroupDelayType.QUAD;
                 wires = nodes.get(nodeToCheckInx).getAllWiresInNode();
-                t1 = wires[0].getTile();
-                t2 = wires[wires.length-1].getTile();
                 wName = wires[0].getWireName();
                 if (wName.startsWith("SS"))
                     direction = TimingDirection.SOUTH;
@@ -417,8 +409,6 @@ public class TimingGroup implements Comparable<TimingGroup> {
                 dist = 12;
                 groupDelayType = GroupDelayType.LONG;
                 wires = nodes.get(nodeToCheckInx).getAllWiresInNode();
-                t1 = wires[0].getTile();
-                t2 = wires[wires.length-1].getTile();
                 wName = wires[0].getWireName();
                 if (wName.startsWith("SS"))
                     direction = TimingDirection.SOUTH;
@@ -439,8 +429,6 @@ public class TimingGroup implements Comparable<TimingGroup> {
                 dist = 12;
                 groupDelayType = GroupDelayType.LONG;
                 wires = nodes.get(nodeToCheckInx).getAllWiresInNode();
-                t1 = wires[0].getTile();
-                t2 = wires[wires.length-1].getTile();
                 wName = wires[0].getWireName();
                 if (wName.startsWith("SS"))
                     direction = TimingDirection.SOUTH;

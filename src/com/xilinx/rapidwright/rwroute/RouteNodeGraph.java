@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Eddie Hung, Xilinx Research Labs.
@@ -24,6 +24,7 @@
 package com.xilinx.rapidwright.rwroute;
 
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Device;
@@ -41,7 +42,6 @@ import com.xilinx.rapidwright.util.Utils;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.BitSet;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -75,12 +75,6 @@ public class RouteNodeGraph {
      */
     private final CountUpDownLatch asyncPreserveOutstanding;
 
-    /**
-     * Visited rnodes data during connection routing
-     */
-    protected final BitSet visited;
-    protected final BitSet visitedBack;
-
     protected final RuntimeTracker setChildrenTimer;
     protected final RuntimeTracker setParentsTimer;
 
@@ -92,16 +86,9 @@ public class RouteNodeGraph {
     public final int[] prevLagunaColumn;
     public final Set<Integer> lagunaWireIsVcc;
 
-
     protected class RouteNodeImpl extends RouteNode {
-
-        private final int index;
-
         protected RouteNodeImpl(Node node, RouteNodeType type) {
             super(node, type);
-            index = numNodes();
-            assert(!isVisited(true));
-            assert(!isVisited(false));
         }
 
         @Override
@@ -141,172 +128,8 @@ public class RouteNodeGraph {
         }
 
         @Override
-        public boolean isVisited(boolean forward) {
-            return (forward ? visited : visitedBack).get(index);
-        }
-
-        @Override
-        public void setVisited(boolean forward) {
-            BitSet v = (forward) ? visited : visitedBack;
-            assert(!v.get(index));
-            v.set(index);
-        }
-
-        @Override
         public int getSLRIndex(boolean forward) {
              return intYToSLRIndex[getTileYCoordinate(forward)];
-        }
-    }
-
-    // Class to hold methods common to RouteNodeLagLagImpl and RouteNodeLagunaImpl
-    protected abstract class RouteNodeLagunaBase extends RouteNodeImpl {
-
-        protected RouteNodeLagunaBase(Node node, RouteNodeType type) {
-            super(node, type);
-        }
-
-        protected void setLength() {
-            length = (type == RouteNodeType.SUPER_LONG_LINE) ? SUPER_LONG_LINE_LENGTH_IN_TILES : 0;
-        }
-
-        @Override
-        protected void setEndTileXYCoordinates() {
-            setLength();
-
-            Tile baseTile = node.getTile();
-            // Correct the X coordinate of all Laguna nodes since they are accessed by the INT
-            // tile to its right, yet has the LAG tile has a tile X coordinate one less
-            endTileXCoordinate = (short) (baseTile.getTileXCoordinate() + 1);
-
-            if (type == RouteNodeType.SUPER_LONG_LINE) {
-                Wire[] wires = node.getAllWiresInNode();
-                if (wires.length == 2) {
-                    Tile endTile = wires[1].getTile();
-                    assert(endTile.getTileTypeEnum() == baseTile.getTileTypeEnum() && endTile != baseTile);
-                    endTileYCoordinate = (short) endTile.getTileYCoordinate();
-                    length = SUPER_LONG_LINE_LENGTH_IN_TILES;
-                    assert(Math.abs(endTileYCoordinate - baseTile.getTileYCoordinate()) == length);
-                } else {
-                    // A dummy SLL at the top or bottom edge of device
-                    assert(wires.length == 1);
-                    endTileYCoordinate = (short) baseTile.getTileYCoordinate();
-                    length = 0;
-                }
-            } else {
-                endTileYCoordinate = (short) baseTile.getTileYCoordinate();
-                length = 0;
-            }
-        }
-
-        @Override
-        public short getBeginTileYCoordinate() {
-            boolean reverseSLL = (next != null &&
-                    getType() == RouteNodeType.SUPER_LONG_LINE &&
-                    next.getBeginTileYCoordinate() == super.getBeginTileYCoordinate());
-            return reverseSLL ? super.getEndTileYCoordinate() : super.getBeginTileYCoordinate();
-        }
-
-        @Override
-        public short getEndTileYCoordinate() {
-            boolean reverseSLL = (prev != null &&
-                    getType() == RouteNodeType.SUPER_LONG_LINE &&
-                    prev.getEndTileYCoordinate() == super.getEndTileYCoordinate());
-            return reverseSLL ? super.getBeginTileYCoordinate() : super.getEndTileYCoordinate();
-        }
-    }
-
-    // TileTypeEnum.LAG_LAG only present in UltraScale+
-    protected class RouteNodeLagLagImpl extends RouteNodeLagunaBase {
-
-        protected RouteNodeLagLagImpl(Node node, RouteNodeType type) {
-            super(node, type);
-            assert(node.getTile().getTileTypeEnum() == TileTypeEnum.LAG_LAG);
-        }
-
-        @Override
-        protected void setType(RouteNodeType type) {
-            assert(type == RouteNodeType.WIRE);
-            // NOTE: IntentCode is device-dependent
-            IntentCode ic = node.getIntentCode();
-            String wireName;
-            switch (ic) {
-                case NODE_LAGUNA_OUTPUT:
-                    // TODO: Collect wire indices to save on string comparison
-                    wireName = node.getWireName();
-                    if (wireName.endsWith("_TXOUT")) {
-                        // This is the inner LAGUNA_I, mark it so it gets a base cost discount
-                        this.type = RouteNodeType.LAGUNA_I;
-                    } else if (wireName.startsWith("RXD")) {
-                        this.type = RouteNodeType.LAGUNA_O;
-                    } else {
-                        throw new RuntimeException();
-                    }
-                    break;
-
-                case NODE_LAGUNA_DATA:
-                    assert (node.getTile().getTileTypeEnum() == TileTypeEnum.LAG_LAG);
-                    this.type = RouteNodeType.SUPER_LONG_LINE;
-                    break;
-
-                case INTENT_DEFAULT:
-                    // TODO: Collect wire indices to save on string comparison
-                    wireName = node.getWireName();
-                    if (wireName.contains("_RXD")) {
-                        // This is the inner LAGUNA_O, mark it so it gets a base cost discount
-                        this.type = RouteNodeType.LAGUNA_O;
-                    } else {
-                        throw new RuntimeException();
-                    }
-                    break;
-
-                default:
-                    throw new RuntimeException();
-            }
-        }
-
-        @Override
-        public short getBeginTileXCoordinate() {
-            // Use end tile coordinate as that's already been correct (see setEndTileXYCoordinates())
-            return getEndTileXCoordinate();
-        }
-    }
-
-    // TileTypeEnum.LAGUNA_TILE only present in UltraScale
-    protected class RouteNodeLagunaImpl extends RouteNodeLagunaBase {
-
-        protected RouteNodeLagunaImpl(Node node, RouteNodeType type) {
-            super(node, type);
-            assert(node.getTile().getTileTypeEnum() == TileTypeEnum.LAGUNA_TILE);
-        }
-
-        @Override
-        protected void setType(RouteNodeType type) {
-            assert(type == RouteNodeType.WIRE);
-            // NOTE: IntentCode is device-dependent
-            IntentCode ic = node.getIntentCode();
-            String wireName;
-            switch (ic) {
-                case INTENT_DEFAULT:
-                    // TODO: Collect wire indices to save on string comparison
-                    wireName = node.getWireName();
-                    if (wireName.startsWith("UBUMP")) {
-                        this.type = RouteNodeType.SUPER_LONG_LINE;
-                    } else if (wireName.endsWith("_TXOUT")) {
-                        // This is the inner LAGUNA_I, mark it so it gets a base cost discount
-                        this.type = RouteNodeType.LAGUNA_I;
-                    } else if (wireName.startsWith("RXD")) {
-                        this.type = RouteNodeType.LAGUNA_O;
-                    } else if (wireName.contains("_RXD")) {
-                        // This is the inner LAGUNA_O, mark it so it gets a base cost discount
-                        this.type = RouteNodeType.LAGUNA_O;
-                    } else {
-                        throw new RuntimeException();
-                    }
-                    break;
-
-                default:
-                    throw new RuntimeException();
-            }
         }
     }
 
@@ -316,8 +139,6 @@ public class RouteNodeGraph {
         preservedMap = new ConcurrentHashMap<>();
         preservedMapSize = new AtomicInteger();
         asyncPreserveOutstanding = new CountUpDownLatch();
-        visited = new BitSet();
-        visitedBack = new BitSet();
         this.setChildrenTimer = setChildrenTimer;
         this.setParentsTimer = setChildrenTimer;
 
@@ -407,41 +228,35 @@ public class RouteNodeGraph {
         return oldNet;
     }
 
-    public void asyncPreserve(Collection<Node> nodes, Net net) {
-        asyncPreserveOutstanding.countUp();
-        ParallelismTools.submit(() -> {
-            try {
-                nodes.forEach((node) -> preserve(node, net));
-            } catch (Throwable t) {
-                t.printStackTrace();
-            } finally {
-                asyncPreserveOutstanding.countDown();
+    public void preserve(Net net) {
+        List<SitePinInst> pins = net.getPins();
+        SitePinInst sourcePin = net.getSource();
+        assert (sourcePin == null || pins.contains(sourcePin));
+        SitePinInst altSourcePin = net.getAlternateSource();
+        assert (altSourcePin == null || pins.contains(altSourcePin));
+        boolean drivenByHierPort = DesignTools.isNetDrivenByHierPort(net);
+        for (SitePinInst pin : net.getPins()) {
+            // Do not preserve if pin is not routed unless it's a hier port in which
+            // case do so otherwise Vivado will recognize it as a conflict.
+            // (SitePinInst.isRouted() is meaningless for output pins)
+            if (!pin.isOutPin() && !pin.isRouted() && !drivenByHierPort) {
+                continue;
             }
-        });
+
+            preserve(pin.getConnectedNode(), net);
+        }
+
+        for (PIP pip : net.getPIPs()) {
+            preserve(pip.getStartNode(), net);
+            preserve(pip.getEndNode(), net);
+        }
     }
 
-    public void asyncPreserve(Net net) {
+    public void preserveAsync(Net net) {
         asyncPreserveOutstanding.countUp();
         ParallelismTools.submit(() -> {
             try {
-                List<SitePinInst> pins = net.getPins();
-                SitePinInst sourcePin = net.getSource();
-                assert (sourcePin == null || pins.contains(sourcePin));
-                SitePinInst altSourcePin = net.getAlternateSource();
-                assert (altSourcePin == null || pins.contains(altSourcePin));
-                for (SitePinInst pin : net.getPins()) {
-                    // SitePinInst.isRouted() is meaningless for output pins
-                    if (!pin.isRouted() && !pin.isOutPin()) {
-                        continue;
-                    }
-
-                    preserve(pin.getConnectedNode(), net);
-                }
-
-                for (PIP pip : net.getPIPs()) {
-                    preserve(pip.getStartNode(), net);
-                    preserve(pip.getEndNode(), net);
-                }
+                preserve(net);
             } catch (Throwable t) {
                 t.printStackTrace();
             } finally {
@@ -451,6 +266,7 @@ public class RouteNodeGraph {
     }
 
     public void awaitPreserve() {
+        // TODO: Calling thread to do useful work when waiting
         asyncPreserveOutstanding.await();
     }
 
@@ -506,7 +322,7 @@ public class RouteNodeGraph {
             if (tail.getIntentCode() != IntentCode.NODE_OUTPUT && !tail.isTiedToVcc() &&
                     // See https://github.com/Xilinx/RapidWright/pull/553 for an example of a
                     // VCC_WIRE not being marked as such
-                    (!RouteNode.lagunaTileTypes.contains(tileType) || !lagunaWireIsVcc.contains(tail.getWire())))
+                    (!Utils.isLaguna(tileType) || !lagunaWireIsVcc.contains(tail.getWire())))
                 return false;
         }
         return true;
@@ -542,7 +358,7 @@ public class RouteNodeGraph {
 
             @Override
             public Iterator<RouteNode> iterator() {
-                return new Iterator() {
+                return new Iterator<RouteNode>() {
                     @Override
                     public boolean hasNext() {
                         if (curr == null) {
@@ -580,14 +396,6 @@ public class RouteNodeGraph {
     }
 
     protected RouteNode create(Node node, RouteNodeType type) {
-        TileTypeEnum tileType = node.getTile().getTileTypeEnum();
-        switch (tileType) {
-            case LAG_LAG: // UltraScale+
-                return new RouteNodeLagLagImpl(node, type);
-
-            case LAGUNA_TILE: // UltraScale
-                return new RouteNodeLagunaImpl(node, type);
-        }
         return new RouteNodeImpl(node, type);
     }
 
@@ -608,8 +416,6 @@ public class RouteNodeGraph {
      * Resets the expansion history.
      */
     public void resetExpansion() {
-        visited.clear();
-        visitedBack.clear();
     }
 
     public int averageChildren() {

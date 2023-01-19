@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2021 Ghent University.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Yun Zhou, Ghent University.
@@ -59,6 +59,7 @@ import com.xilinx.rapidwright.timing.TimingManager;
 import com.xilinx.rapidwright.timing.TimingVertex;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
+import com.xilinx.rapidwright.util.Utils;
 
 /**
  * RWRoute class provides the main methods for routing a design.
@@ -81,18 +82,18 @@ public class RWRoute{
     protected Map<Net, List<SitePinInst>> staticNetAndRoutingTargets;
     /** Several integers to indicate the netlist info */
     protected int numPreservedRoutableNets;
-    private int numPreservedClks;
-    private int numPreservedStaticNets;
+    protected int numPreservedClks;
+    protected int numPreservedStaticNets;
     protected int numPreservedWire;
     private int numWireNetsToRoute;
     private int numConnectionsToRoute;
-    private int numNotNeedingRoutingNets;
+    protected int numNotNeedingRoutingNets;
     private int numUnrecognizedNets;
 
     /** A {@link RWRouteConfig} instance consisting of a list of routing parameters */
     protected RWRouteConfig config;
     /** The present congestion cost factor */
-    private float presentCongestionFactor;
+    protected float presentCongestionFactor;
     /** The historical congestion cost factor */
     private float historicalCongestionFactor;
     /** Wirelength-driven weighting factor */
@@ -133,7 +134,7 @@ public class RWRoute{
     /** A map from node types to the total wirelength of used nodes of the types */
     private Map<IntentCode, Long> nodeTypeLength;
     /** The total number of connections that are routed */
-    private int connectionsRouted;
+    protected int connectionsRouted;
     /** The total number of connections routed in an iteration */
     private int connectionsRoutedIteration;
     /** Total number of nodes pushed/popped from the queue */
@@ -143,7 +144,7 @@ public class RWRoute{
     /** The maximum criticality constraint of connection */
     private static final float MAX_CRITICALITY = 0.99f;
     /** The minimum criticality of connections that should be re-routed, updated after each iteration */
-    private float minRerouteCriticality;
+    protected float minRerouteCriticality;
     /** The list of critical connections */
     private List<Connection> criticalConnections;
     /** A {@link TimingManager} instance to use that handles timing related tasks */
@@ -258,7 +259,6 @@ public class RWRoute{
         categorizeNets();
 
         // Wait for all outstanding RouteNodeGraph.asyncPreserve() calls to complete
-        // FIXME: Calling thread does nothing while waiting
         routingGraph.awaitPreserve();
     }
 
@@ -286,10 +286,10 @@ public class RWRoute{
                 if (RouterHelper.isRoutableNetWithSourceSinks(net)) {
                     addNetConnectionToRoutingTargets(net);
                 } else if (RouterHelper.isDriverLessOrLoadLessNet(net)) {
-                    preserveNet(net);
+                    preserveNet(net, true);
                     numNotNeedingRoutingNets++;
                 } else if (RouterHelper.isInternallyRoutedNet(net)) {
-                    preserveNet(net);
+                    preserveNet(net, true);
                     numNotNeedingRoutingNets++;
                 } else {
                     numNotNeedingRoutingNets++;
@@ -367,7 +367,7 @@ public class RWRoute{
                 System.out.println("INFO: Route with symmetric non-timing-driven clock router");
                  GlobalSignalRouting.symmetricClkRouting(clk, design.getDevice());
              }
-            preserveNet(clk);
+             preserveNet(clk, false);
          }
     }
 
@@ -385,14 +385,12 @@ public class RWRoute{
      * @param staticNet The static net in question, i.e. VCC or GND.
      */
     protected void addStaticNetRoutingTargets(Net staticNet) {
+        preserveNet(staticNet, false);
+
         List<SitePinInst> sinks = staticNet.getSinkPins();
-        if (sinks.size() > 0 ) {
-            List<Node> sinkNodes = new ArrayList<>(sinks.size());
-            sinks.forEach((p) -> sinkNodes.add(p.getConnectedNode()));
-            addPreservedNodes(sinkNodes, staticNet);
+        if (sinks.size() > 0) {
             addStaticNetRoutingTargets(staticNet, sinks);
         } else {
-            preserveNet(staticNet);
             numNotNeedingRoutingNets++;
         }
     }
@@ -428,7 +426,7 @@ public class RWRoute{
             Net net = e.getKey();
             List<SitePinInst> pins = e.getValue();
             System.out.println("INFO: Route " + pins.size() + " pins of " + net);
-            Map<SitePinInst, List<Node>> sinksRoutingPaths = GlobalSignalRouting.routeStaticNet(net,
+            GlobalSignalRouting.routeStaticNet(net,
                     // Predicate to determine whether a node is unavailable for global routing
                     (node) -> {
                         Net preservedNet = routingGraph.getPreservedNet(node);
@@ -443,10 +441,7 @@ public class RWRoute{
                     },
                     design, routethruHelper);
 
-            for (Entry<?, List<Node>> sinkPath : sinksRoutingPaths.entrySet()) {
-                addPreservedNodes(sinkPath.getValue(), net);
-            }
-            routingGraph.awaitPreserve();
+            preserveNet(net, false);
         }
     }
 
@@ -454,27 +449,12 @@ public class RWRoute{
      * Preserves a net by preserving all nodes use by the net.
      * @param net The net to be preserved.
      */
-    protected void preserveNet(Net net) {
-        routingGraph.asyncPreserve(net);
-    }
-
-    protected void increaseNumNotNeedingRouting() {
-        numNotNeedingRoutingNets++;
-    }
-
-    protected void increaseNumPreservedClks() {
-        numPreservedClks++;
-        numPreservedRoutableNets++;
-    }
-
-    protected void increaseNumPreservedStaticNets() {
-        numPreservedStaticNets++;
-        numPreservedRoutableNets++;
-    }
-
-    protected void increaseNumPreservedWireNets() {
-        numPreservedWire++;
-        numPreservedRoutableNets++;
+    protected void preserveNet(Net net, boolean async) {
+        if (async) {
+            routingGraph.preserveAsync(net);
+        } else {
+            routingGraph.preserve(net);
+        }
     }
 
     private Map<Short, Integer> connectionSpan = new HashMap<>();
@@ -567,15 +547,6 @@ public class RWRoute{
      */
     private void addConnectionSpanInfo(Connection connection) {
         connectionSpan.merge(connection.getHpwl(), 1, Integer::sum);
-    }
-
-    /**
-     * Adds preserved nodes.
-     * @param nodes A collection of nodes to be preserved.
-     * @param netToPreserve The net that uses those nodes.
-     */
-    protected void addPreservedNodes(Collection<Node> nodes, Net netToPreserve) {
-        routingGraph.asyncPreserve(nodes, netToPreserve);
     }
 
     /**
@@ -818,7 +789,7 @@ public class RWRoute{
      * @param connection The connection in question.
      * @return true, if the connection should be routed.
      */
-    private boolean shouldRoute(Connection connection) {
+    protected boolean shouldRoute(Connection connection) {
         if (routeIteration > 1) {
             if (connection.getCriticality() > minRerouteCriticality) {
                 return true;
@@ -1011,11 +982,11 @@ public class RWRoute{
             }
             for (Node node:netNodes) {
                 TileTypeEnum tileType = node.getTile().getTileTypeEnum();
-                if (tileType != TileTypeEnum.INT && !RouteNode.lagunaTileTypes.contains(tileType)) {
+                if (tileType != TileTypeEnum.INT && !Utils.isLaguna(tileType)) {
                     continue;
                 }
                 totalINTNodes++;
-                int wl = RouteNode.getLength(node, null);
+                int wl = RouteNode.getLength(node);
                 totalWL += wl;
 
                 RouterHelper.addNodeTypeLengthToMap(node, wl, nodeTypeUsage, nodeTypeLength);
@@ -1185,7 +1156,7 @@ public class RWRoute{
      * Routes a connection.
      * @param connection The connection to route.
      */
-    private void routeConnection(Connection connection) {
+    protected void routeConnection(Connection connection) {
         float rnodeCostWeight = 1 - connection.getCriticality();
         float shareWeight = (float) (Math.pow(rnodeCostWeight, config.getShareExponent()));
         float rnodeWLWeight = rnodeCostWeight * oneMinusWlWeight;
@@ -1208,7 +1179,7 @@ public class RWRoute{
             }
             nodesPoppedThisConnection++;
 
-            if (rnode.isIntersection()) {
+            if (rnode.isIntersection(connectionsRouted)) {
                 break;
             }
 
@@ -1279,7 +1250,7 @@ public class RWRoute{
 
         RouteNode altSourceRnode = connection.getAltSourceRnode();
         if (altSourceRnode == null) {
-            throw new RuntimeException();
+            throw new RuntimeException("No alternate source pin on net: " + net.getName());
         }
         connection.setSource(altSource);
         connection.setSourceRnode(altSourceRnode);
@@ -1387,12 +1358,12 @@ public class RWRoute{
         boolean longHead = config.isTimingDriven() && forward && DelayEstimatorBase.isLong(headRnode.getNode());
         RouteNode destRnode = forward ? connection.getSinkRnode() : connection.getSourceRnode();
         for (RouteNode tailRnode : headRnode.getChildrenParents(forward)) {
-            if (tailRnode.isVisited(forward)) {
+            if (tailRnode.isVisited(forward, connectionsRouted)) {
                 // Node must be in queue already.
 
-                // Note: it is possible that another (cheaper) path to a rnode is found here;
-                // however, because the PriorityQueue class does not support (efficiently) reducing
-                // the cost of nodes already in the queue, this opportunity is discarded
+                // Note: it is possible this is a cheaper path to childRNode; however, because the
+                // PriorityQueue class does not support (efficiently) reducing the cost of nodes
+                // already in the queue, this opportunity is discarded
                 continue;
             }
 
@@ -1411,8 +1382,8 @@ public class RWRoute{
                 // If it hasn't been visited yet by the forward pass (and if the forward pass
                 // isn't just about to discover tailRnode) if necessary fake that it has so that
                 // it will be considered an intersection
-                if (!tailRnode.isVisited(!forward) && tailRnode.getPrev() != queue.peek()) {
-                    tailRnode.setVisited(!forward);
+                if (!tailRnode.isVisited(!forward, connectionsRouted) && tailRnode.getPrev() != queue.peek()) {
+                    tailRnode.setVisited(!forward, connectionsRouted);
                 }
                 assert(!tailRnode.willOverUse(connection.getNetWrapper()));
             }
@@ -1422,7 +1393,7 @@ public class RWRoute{
                     (tailPreservedNet = routingGraph.getPreservedNet(tailRnode.getNode())) == null ||
                     tailPreservedNet == connection.getNetWrapper().getNet());
 
-            if (tailRnode.isVisited(!forward)) {
+            if (tailRnode.isVisited(!forward, connectionsRouted)) {
                 // Node is an intersection!
 
                 // Despite the limitation above, on encountering an intersection only terminate
@@ -1471,7 +1442,7 @@ public class RWRoute{
                     case SUPER_LONG_LINE:
                         assert(connection.isCrossSLR());
                         // Set the prev/next pointer, as RouteNode.getSLRDistance() requires it
-                        assert(!tailRnode.isVisited(forward));
+                        assert(!tailRnode.isVisited(forward, connectionsRouted));
                         tailRnode.setPrevNext(forward, headRnode);
                         if (destRnode.getSLRDistance(forward, tailRnode) >= destRnode.getSLRDistance(forward, headRnode)) {
                             // Make sure taking this SLL gets us closer to the dest SLR
@@ -1479,7 +1450,7 @@ public class RWRoute{
                         }
                         break;
                     default:
-                        throw new RuntimeException();
+                        throw new RuntimeException("Unexpected rnode type: " + tailRnode.getType());
                 }
             }
 
@@ -1487,7 +1458,7 @@ public class RWRoute{
             evaluateCostAndPush(forward, headRnode, forward ? longHead : longTail, tailRnode, connection, shareWeight, rnodeCostWeight,
                     rnodeLengthWeight, rnodeEstWlWeight, rnodeDelayWeight, rnodeEstDlyWeight);
             if (intersectionFound) {
-                assert(tailRnode.isIntersection());
+                assert(tailRnode.isIntersection(connectionsRouted));
                 break;
             }
         }
@@ -1612,7 +1583,7 @@ public class RWRoute{
         }
 
         float biasCost = 0;
-        if (!rnode.isVisited(!forward) && rnode.getType() != RouteNodeType.SUPER_LONG_LINE) {
+        if (!rnode.isVisited(!forward, connectionsRouted) && rnode.getType() != RouteNodeType.SUPER_LONG_LINE) {
             NetWrapper net = connection.getNetWrapper();
             biasCost = rnode.getBaseCost() / net.getConnections().size() *
                     (Math.abs(rnode.getTileXCoordinate(forward) - net.getXCenter()) +
@@ -1632,7 +1603,9 @@ public class RWRoute{
         assert(((!forward || tailRnode.getPrev() != null) && (forward || tailRnode.getNext() != null)) || tailRnode.getType() == RouteNodeType.PINFEED_O);
         tailRnode.setTotalCost(forward, newTotalPathCost);
         tailRnode.setKnownCost(forward, newPartialPathCost);
-        tailRnode.setVisited(forward);
+        // Use the number-of-connections-routed-so-far as the identifier for whether a rnode
+        // has been visited by this connection before
+        tailRnode.setVisited(forward, connectionsRouted);
 
         if (forward) {
             queue.add(tailRnode);

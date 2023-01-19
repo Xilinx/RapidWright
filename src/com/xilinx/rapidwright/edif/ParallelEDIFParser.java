@@ -40,7 +40,9 @@ import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
+import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.ParallelismTools;
+import com.xilinx.rapidwright.util.Params;
 import com.xilinx.rapidwright.util.StringPool;
 import com.xilinx.rapidwright.util.function.InputStreamSupplier;
 
@@ -59,6 +61,12 @@ public class ParallelEDIFParser implements AutoCloseable{
 
     protected final EDIFReadLegalNameCache cache;
 
+    /**
+     * Estimated ratio of EDIF to gzipped EDIF file size, used in calculating the
+     * number of thread workers for parallel EDIF parsing
+     */
+    public static final int EDIF_GZIP_COMPRESSION_RATIO = 16;
+
     ParallelEDIFParser(Path fileName, long fileSize, InputStreamSupplier inputStreamSupplier,
             int maxTokenLength, int maxThreads) {
         this.fileName = fileName;
@@ -75,7 +83,8 @@ public class ParallelEDIFParser implements AutoCloseable{
     }
 
     public ParallelEDIFParser(Path p, long fileSize) {
-        this(p, fileSize, InputStreamSupplier.fromPath(p));
+        this(p, fileSize, InputStreamSupplier.fromPath(p,
+                p.toString().endsWith(".gz") && Params.RW_DECOMPRESS_GZIPPED_EDIF_TO_DISK));
     }
 
     public ParallelEDIFParser(Path p) throws IOException {
@@ -86,16 +95,20 @@ public class ParallelEDIFParser implements AutoCloseable{
         return new ParallelEDIFParserWorker(fileName, inputStreamSupplier.get(), offset, uniquifier, maxTokenLength, cache);
     }
 
-    public static int calcThreads(long fileSize, int maxThreads) {
-        int maxUsefulThreads = Math.max((int) (fileSize / MIN_BYTES_PER_THREAD),1);
+    public static int calcThreads(long fileSize, int maxThreads, boolean isGzipped) {
+        long sizeThreshold = isGzipped ? (MIN_BYTES_PER_THREAD / EDIF_GZIP_COMPRESSION_RATIO)
+                : MIN_BYTES_PER_THREAD;
+        int maxUsefulThreads = Math.max((int) (fileSize / sizeThreshold), 1);
         return Math.min(maxUsefulThreads, Math.min(ParallelismTools.maxParallelism(), maxThreads));
     }
 
 
     protected void initializeWorkers() throws IOException {
         workers.clear();
-        int threads = calcThreads(fileSize, maxThreads);
-        long offsetPerThread = fileSize / threads;
+        boolean isGzipped = fileName.toString().endsWith(".gz");
+        int threads = calcThreads(fileSize, maxThreads, isGzipped);
+        long offsetPerThread = (isGzipped ? (fileSize * EDIF_GZIP_COMPRESSION_RATIO) : fileSize)
+                / threads;
         for (int i=0;i<threads;i++) {
             ParallelEDIFParserWorker worker = makeWorker(i*offsetPerThread);
             workers.add(worker);
@@ -105,7 +118,12 @@ public class ParallelEDIFParser implements AutoCloseable{
     private int numberOfThreads;
 
     public EDIFNetlist parseEDIFNetlist() throws IOException {
-        return parseEDIFNetlist(CodePerfTracker.SILENT);
+        EDIFNetlist netlist = parseEDIFNetlist(CodePerfTracker.SILENT);
+        if (fileName != null && fileName.toString().endsWith(".gz")
+                && Params.RW_DECOMPRESS_GZIPPED_EDIF_TO_DISK) {
+            Files.delete(FileTools.getDecompressedGZIPFileName(fileName));
+        }
+        return netlist;
     }
 
     public EDIFNetlist parseEDIFNetlist(CodePerfTracker t) throws IOException {

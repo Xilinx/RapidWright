@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2021 Ghent University.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Yun Zhou, Ghent University.
@@ -98,7 +98,7 @@ public class TimingAndWirelengthReport{
             for (Node node : RouterHelper.getNodesOfNet(net)) {
                 if (node.getTile().getTileTypeEnum() != TileTypeEnum.INT) continue;
                 usedNodes++;
-                int wl = RouteNode.getLength(node, null);
+                int wl = RouteNode.getLength(node);
                 wirelength += wl;
                 RouterHelper.addNodeTypeLengthToMap(node, wl, nodeTypeUsage, nodeTypeLength);
             }
