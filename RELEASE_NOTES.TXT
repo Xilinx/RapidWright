@@ -1,3 +1,18 @@
+============= RapidWright 2022.2.1-beta released on 2023-01-19 ================
+Notes:
+  - Preserves hwdef information in DCP (#597)
+  - Adds APIs to access BELAttr information in design (#598)
+  - Many improvements to RWRoute to cleanup code and improves both quality and runtime performance
+  - Fixes a bug with 2022.2 DCPs where hierarchical names were getting mangled in RapidWright (#603)
+  - Adds support for reading gzipped EDIF files
+  - Fixes an issue with Design.updateDesignWithCheckpointPlaceAndRoute() on more recent version DCPs (#601)
+
+- API Additions:
+  - com.xilinx.rapidwright.design.Design "public Map<Site, SiteConfig> getBELAttrs()"
+  - com.xilinx.rapidwright.design.Design "public BELAttr addBELAttr(Net net, Site site, SiteTypeEnum type, BEL bel, String name, String value)"
+  - com.xilinx.rapidwright.device.Device "public BEL getBEL(SiteTypeEnum type, String belName)"
+  - com.xilinx.rapidwright.device.Device "public BEL[] getBELs(SiteTypeEnum type)"
+
 ============= RapidWright 2022.2.0-beta released on 2022-11-16 ================
 Notes:
   - Support for Vivado 2022.2 devices and DCPs
