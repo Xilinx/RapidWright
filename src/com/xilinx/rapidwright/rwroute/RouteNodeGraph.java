@@ -42,6 +42,7 @@ import com.xilinx.rapidwright.util.Utils;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -84,7 +85,7 @@ public class RouteNodeGraph {
     private final int[] intYToSLRIndex;
     public final int[] nextLagunaColumn;
     public final int[] prevLagunaColumn;
-    public final Set<Integer> lagunaWireIsVcc;
+    public final BitSet lagunaWireIsVcc;
 
     protected class RouteNodeImpl extends RouteNode {
         protected RouteNodeImpl(Node node, RouteNodeType type) {
@@ -174,7 +175,7 @@ public class RouteNodeGraph {
             prevLagunaColumn = new int[maxTileColumns];
             Arrays.fill(nextLagunaColumn, Integer.MAX_VALUE);
             Arrays.fill(prevLagunaColumn, Integer.MIN_VALUE);
-            lagunaWireIsVcc = new HashSet<>();
+            lagunaWireIsVcc = new BitSet();
             Tile[] lagunaTilesAtY = lagunaTiles[0];
             for (int x = 0; x < lagunaTilesAtY.length; x++) {
                 Tile tile = lagunaTilesAtY[x];
@@ -196,7 +197,7 @@ public class RouteNodeGraph {
                     for (int wireIndex = 0; wireIndex < tile.getWireCount(); wireIndex++) {
                         String wireName = tile.getWireName(wireIndex);
                         if (wireName.startsWith(Net.VCC_WIRE_NAME)) {
-                            lagunaWireIsVcc.add(wireIndex);
+                            lagunaWireIsVcc.set(wireIndex);
                         }
                     }
                 }
@@ -322,7 +323,7 @@ public class RouteNodeGraph {
             if (tail.getIntentCode() != IntentCode.NODE_OUTPUT && !tail.isTiedToVcc() &&
                     // See https://github.com/Xilinx/RapidWright/pull/553 for an example of a
                     // VCC_WIRE not being marked as such
-                    (!Utils.isLaguna(tileType) || !lagunaWireIsVcc.contains(tail.getWire())))
+                    (!Utils.isLaguna(tileType) || !lagunaWireIsVcc.get(tail.getWire())))
                 return false;
         }
         return true;

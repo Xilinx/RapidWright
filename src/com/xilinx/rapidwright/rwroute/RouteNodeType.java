@@ -52,8 +52,9 @@ public enum RouteNodeType {
     SUPER_LONG_LINE,
 
     /**
-     * Denotes {@link RouteNode} objects that correspond to {@link Node} objects that enter
-     * a Laguna tile from an INT tile, or those Laguna tile nodes leading to a SUPER_LONG_LINE.
+     * Denotes {@link RouteNode} objects that correspond to {@link Node} objects that
+     * enter/leave a Laguna tile from an INT tile, or those Laguna tile nodes leading
+     * to/from a SUPER_LONG_LINE.
      */
     LAGUNA_I,
     LAGUNA_O,
