@@ -533,7 +533,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
                         this.type = RouteNodeType.SUPER_LONG_LINE;
                     } else {
                         // U-turn node at the boundary of the device
-                        assert(length == 0);
+                        assert(nodeInfo.length == 0);
                         assert(this.type == RouteNodeType.WIRE);
                     }
                     break;
