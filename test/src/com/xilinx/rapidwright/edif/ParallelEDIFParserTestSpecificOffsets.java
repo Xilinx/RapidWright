@@ -29,6 +29,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
+import com.xilinx.rapidwright.util.Params;
 import com.xilinx.rapidwright.util.StringPool;
 import com.xilinx.rapidwright.util.function.InputStreamSupplier;
 
@@ -44,7 +45,11 @@ public class ParallelEDIFParserTestSpecificOffsets extends ParallelEDIFParser{
     }
 
     ParallelEDIFParserTestSpecificOffsets(Path fileName, int maxTokenLength, List<ParseStart> startOffsets) throws IOException {
-        this(fileName, Files.size(fileName), InputStreamSupplier.fromPath(fileName), maxTokenLength, startOffsets);
+        this(fileName, Files.size(fileName),
+                InputStreamSupplier.fromPath(fileName,
+                        fileName.toString().endsWith(".gz")
+                                && Params.RW_DECOMPRESS_GZIPPED_EDIF_TO_DISK),
+                maxTokenLength, startOffsets);
     }
 
     @Override

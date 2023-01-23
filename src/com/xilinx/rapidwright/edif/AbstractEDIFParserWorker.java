@@ -24,15 +24,14 @@
 package com.xilinx.rapidwright.edif;
 
 import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.io.InputStream;
-import java.io.UncheckedIOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.xilinx.rapidwright.util.Params;
 import com.xilinx.rapidwright.util.StringPool;
+import com.xilinx.rapidwright.util.function.InputStreamSupplier;
 
 public abstract class AbstractEDIFParserWorker {
 
@@ -93,15 +92,10 @@ public abstract class AbstractEDIFParserWorker {
     }
 
     public AbstractEDIFParserWorker(Path fileName, StringPool uniquifier, EDIFReadLegalNameCache cache) throws FileNotFoundException {
-        try {
-            in = Files.newInputStream(fileName);
-            tokenizer = new EDIFTokenizer(fileName, in, uniquifier);
-            this.cache = cache;
-        } catch (FileNotFoundException e) {
-            throw e;
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+        in = InputStreamSupplier.getInputStream(fileName,
+                fileName.toString().endsWith(".gz") && Params.RW_DECOMPRESS_GZIPPED_EDIF_TO_DISK);
+        tokenizer = new EDIFTokenizer(fileName, in, uniquifier);
+        this.cache = cache;
     }
 
     private static <T> T requireToken(T t) {

@@ -1,3 +1,159 @@
+============= RapidWright 2022.2.1-beta released on 2023-01-19 ================
+Notes:
+  - Preserves hwdef information in DCP (#597)
+  - Adds APIs to access BELAttr information in design (#598)
+  - Many improvements to RWRoute to cleanup code and improves both quality and runtime performance
+  - Fixes a bug with 2022.2 DCPs where hierarchical names were getting mangled in RapidWright (#603)
+  - Adds support for reading gzipped EDIF files
+  - Fixes an issue with Design.updateDesignWithCheckpointPlaceAndRoute() on more recent version DCPs (#601)
+
+- API Additions:
+  - com.xilinx.rapidwright.design.Design "public Map<Site, SiteConfig> getBELAttrs()"
+  - com.xilinx.rapidwright.design.Design "public BELAttr addBELAttr(Net net, Site site, SiteTypeEnum type, BEL bel, String name, String value)"
+  - com.xilinx.rapidwright.device.Device "public BEL getBEL(SiteTypeEnum type, String belName)"
+  - com.xilinx.rapidwright.device.Device "public BEL[] getBELs(SiteTypeEnum type)"
+
+============= RapidWright 2022.2.0-beta released on 2022-11-16 ================
+Notes:
+  - Support for Vivado 2022.2 devices and DCPs
+  - ~5% memory usage improvement over 2022.1.4 when loading (large) DCPs
+  - Removes several deprecated APIs (See list below)
+  - Fixes the method "public synchronized boolean isIOStandardSupported(String ioStandard)" on Package.
+  - Corrects null node scenario as seen in #581
+  - Moving device root tile name cache into open source (#578)
+
+ - API Additions:
+   - com.xilinx.rapidwright.design.Cell "public Cell copyCell(String name, EDIFHierCellInst inst)"
+   - com.xilinx.rapidwright.design.Cell "public Cell copyCell(String name, EDIFHierCellInst inst, SiteInst i)"
+   - com.xilinx.rapidwright.design.Cell "public Map<String, EDIFPropertyValue> getProperties()"
+   - com.xilinx.rapidwright.device.Device "public Tile[][] getTilesByRootName(String rootName)"
+   - com.xilinx.rapidwright.device.Tile.java "public String getRootName()"
+ 
+ - API Deprecation Removals (--> Replacements) [Open Source]:
+   - com.xilinx.rapidwright.design.ModuleInst "public ArrayList<SiteInst> getInsts()" 
+     --> "public List<SiteInst> getSiteInsts()"
+   - com.xilinx.rapidwright.design.ModuleInst "public Tile getCorrespondingTile(Tile templateTile, Tile newAnchorTile, Device dev)"
+     --> "public Tile getCorrespondingTile(Tile templateTile, Tile newAnchorTile)"
+   - com.xilinx.rapidwright.edif.EDIFCellInst "public Map<String, EDIFPortInst> getPortInstMap()"
+     --> "public Collection<EDIFPortInst> getPortInsts()"
+   - com.xilinx.rapidwright.edif.EDIFCellInst "public void updateCellType(EDIFCell cellType)"
+     --> "public void setCellType(EDIFCell cellType)"
+   - com.xilinx.rapidwright.edif.EDIFNet "public Map<String, EDIFPortInst> getPortInstMap()"
+     --> "public Collection<EDIFPortInst> getPortInsts()"
+   - com.xilinx.rapidwright.edif.EDIFNet "public EDIFPortInst getPortInst(String fullName)"
+     --> "public EDIFPortInst getPortInst(EDIFCellInst inst, String portInstName)"
+   - com.xilinx.rapidwright.edif.EDIFNet "public EDIFPortInst removePortInst(String portInstName)"
+     --> "public EDIFPortInst removePortInst(EDIFCellInst inst, String portInstName)"
+     --> "public EDIFPortInst removePortInst(EDIFPortInst portInst)"
+   - com.xilinx.rapidwright.edif.EDIFNetlist "public static String getHierParentName(String hierReferenceName)"
+     --> com.xilinx.rapidwright.edif.EDIFHierCellInst.getParent().toString()
+     --> com.xilinx.rapidwright.edif.EDIFHierNet.getParent().toString()
+     --> com.xilinx.rapidwright.edif.EDIFHierPortInst.getParent().toString()
+   - com.xilinx.rapidwright.edif.EDIFNetlist "public static String getNextHierChildName(String ancestor, String descendent)"
+     --> com.xilinx.rapidwright.edif.EDIFHierCellInst.getParent().toString()
+   - com.xilinx.rapidwright.edif.EDIFNetlist "public HashMap<String,EDIFPort> generateEDIFPortMap()"
+     --> com.xilinx.rapidwright.edif.EDIFCell.getPortMap()  
+   - com.xilinx.rapidwright.edif.EDIFTools "public static EDIFNet connectLogicalNetAcrossHierarchy(String sinkParentInstName, String srcParentInstName, Map<String, EDIFNet> parentInstNameToLogNet, EDIFNetlist netlist)"
+     --> "public static void connectPortInstsThruHier(EDIFHierPortInst src, EDIFHierPortInst snk, String newName)"
+   - com.xilinx.rapidwright.edif.EDIFPort "public String getStemName()"
+     --> "public static String getRootBusName(String name, boolean includeOpenBracket)"
+   - com.xilinx.rapidwright.edif.EDIFPropertyObject "public EDIFPropertyValue addProperty(EDIFName key, EDIFPropertyValue value)"
+     --> "public EDIFPropertyValue addProperty(String key, EDIFPropertyValue value)"
+   - com.xilinx.rapidwright.edif.EDIFPropertyObject "public void addProperties(Map<EDIFName,EDIFPropertyValue> properties)"
+     --> "public EDIFPropertyValue addProperty(String key, EDIFPropertyValue value)"
+   - com.xilinx.rapidwright.edif.EDIFPropertyObject "public Map<EDIFName, EDIFPropertyValue> getProperties()"
+     --> "public Map<String, EDIFPropertyValue> getPropertiesMap()"
+   - com.xilinx.rapidwright.edif.EDIFPropertyObject "public void setProperties(Map<EDIFName, EDIFPropertyValue> properties)"
+     --> "public void setPropertiesMap(Map<String, EDIFPropertyValue> properties)"
+   - com.xilinx.rapidwright.edif.EDIFTools "public static EDIFCellInst getEDIFCellInst(EDIFNetlist netlist, String hierarchicalName)"
+     --> com.xilinx.rapidwright.edif.EDIFNetlist.getCellInstFromHierName()
+   - com.xilinx.rapidwright.edif.EDIFTools "public static String getHierarchicalRootFromPinName(String s)"
+     --> com.xilinx.rapidwright.edif.EDIFHierCellInst.getParent().toString()
+   - com.xilinx.rapidwright.edif.EDIFTools "public static void flattenNetlist(Design design)"
+     --> "public static Boolean uniqueifyNetlist(Design design)" 
+   - com.xilinx.rapidwright.util.FileTools "public static boolean checkIfRapidWrightResourceExists(String name)"
+     --> N/A
+   - com.xilinx.rapidwright.util.FileTools "public static boolean folderCheck(String name)"
+     --> java.io.File().exists()
+   - com.xilinx.rapidwright.util.MessageGenerator "public static void briefErrorAndExit(String msg)"
+     --> System.err.println(), return or throw new RuntimeException() (avoid System.exit())
+   - com.xilinx.rapidwright.util.MessageGenerator "public static void briefMessageAndExit(String msg)"
+     --> System.out.println(), return or throw new RuntimeException() (avoid System.exit())
+ - API Deprecation Removals (--> Replacements) [Closed Source]:
+   - com.xilinx.rapidwright.design.Cell "public Map<EDIFName, EDIFPropertyValue> getProperties()"
+     --> "public Map<String, EDIFPropertyValue> getProperties()"
+   - com.xilinx.rapidwright.design.Cell "public Cell(String name, EDIFCellInst edifCellInst)"
+     --> "public Cell(String name)"
+   - com.xilinx.rapidwright.design.Cell "public Cell(String name, BEL bel, EDIFCellInst edifCellInst)"
+     --> "public Cell(String name, BEL bel)" 
+   - com.xilinx.rapidwright.design.Cell "public Cell(String name, SiteInst siteInst, BEL bel, EDIFCellInst edifCellInst)"
+     --> "public Cell(String name, SiteInst siteInst, BEL bel)"
+   - com.xilinx.rapidwright.design.Cell "public Cell copyCell(String name, EDIFCellInst edifCellInst)"
+     --> "public Cell(String name)"
+   - com.xilinx.rapidwright.design.Cell "public Cell copyCell(String name, EDIFCellInst edifCellInst, SiteInst i)"
+     --> "public Cell(String name)"
+   - com.xilinx.rapidwright.design.Cell "public void setEDIFCellInst(EDIFCellInst edifCellInst)"
+     --> "public void setEDIFHierCellInst(EDIFHierCellInst inst)"
+   - com.xilinx.rapidwright.design.Cell "public void setProperties(Map<EDIFName, EDIFPropertyValue> properties)"
+     --> "public void setPropertiesMap(Map<String, EDIFPropertyValue> properties)"
+   - com.xilinx.rapidwright.design.Design "public Net createNet(EDIFNet net)"
+     --> "public Net createNet(EDIFHierNet net)"
+   - com.xilinx.rapidwright.design.Design "public Net createNet(String name, EDIFNet net)"
+     --> "public Net createNet(EDIFHierNet net)"
+   - com.xilinx.rapidwright.design.Design "public HashMap<String,EDIFCellInst> getNetlistInstMap()"   
+     --> com.xilinx.rapidwright.netlist.EDIFNetlist.generateCellInstMap();
+   - com.xilinx.rapidwright.design.Design "public HashMap<String, EDIFNet> getNetlistNetMap()"   
+     --> com.xilinx.rapidwright.netlist.EDIFNetlist.generateEDIFNetMap();
+   - com.xilinx.rapidwright.design.Module "public boolean isValidPlacement(Site proposedAnchorSite, Device dev, Design design)"
+     --> "public boolean isValidPlacement(Site proposedAnchorSite, Design design)"
+   - com.xilinx.rapidwright.design.Module "public Tile getCorrespondingTile(Tile templateTile, Tile newAnchorTile, Device dev)"
+     --> "public Tile getCorrespondingTile(Tile templateTile, Tile newAnchorTile)"
+   - com.xilinx.rapidwright.design.Net "public Net(String name, EDIFNet logicalNet)"
+     --> "public Net(String name)"
+   - com.xilinx.rapidwright.design.Net "public Net(EDIFNet logicalNet)"
+     --> "public Net(EDIFHierNet net)"
+   - com.xilinx.rapidwright.design.Net "public SitePinInst createPin(boolean isOutput, String pinName, SiteInst si)"
+     --> "public SitePinInst createPin(String pinName, SiteInst si)"
+   - com.xilinx.rapidwright.design.Net "public void setLogicalNet(EDIFNet logicalNet)"
+     --> "public void setLogicalHierNet(EDIFHierNet logicalHierNet)"
+   - com.xilinx.rapidwright.design.SiteInst "public Set<Net> getNetList()"
+     --> "public Set<Net> getConnectedNets()"
+   - com.xilinx.rapidwright.design.SiteInst "public Map<String,Net> getNetSiteWireMap()"
+     --> "public Map<String, Net> getSiteWireToNetMap()"  
+   - com.xilinx.rapidwright.device.Device "public String getDeviceName()"
+     --> "public String getName()"
+   - com.xilinx.rapidwright.device.Node "public Node(Tile tile, int wire)"
+     --> "public static Node getNode(Tile tile, int wire)"
+   - com.xilinx.rapidwright.device.Node "public Node(Wire w)"
+     --> "public static Node getNode(Wire wire)"   
+   - com.xilinx.rapidwright.device.Node "public Node(Tile tile, String wireName)"
+     --> "public static Node getNode(Tile tile, int wire)"
+   - com.xilinx.rapidwright.device.Node "public Node(String nodeName, Device dev)"
+     --> "public static Node getNode(String nodeName, Device dev)"
+   - com.xilinx.rapidwright.device.Node "public Node(RouteNode routeNode)"
+     --> "public static Node getNode(RouteNode routeNode)"
+   - com.xilinx.rapidwright.device.Package "public String getSiteType(String packagePinName)"
+     --> "public Site getSiteFromPackagePin(String packagePinName)"
+   - com.xilinx.rapidwright.device.PackagePin "public String getSiteType()"
+     --> "public Site getSite()"
+          
+============= RapidWright 2022.1.4-beta released on 2022-11-03 ================
+Notes: 
+ * Can now load EDIF netlist in parallel with placement and routing when reading a DCP
+ * Allows the Design object to detach the corresponding EDIFNetlist to save working memory
+ * Restores the original EDIFPort.getBusName() behavior
+ * Changes EDIFPortInstList duplicate behavior from prohibit to overwrite 
+ * Net.removePin() to unset alternate source
+ * Fix Net.removePin() for static nets under preserveOtherRoutes
+ * Option to track process peak memory usage
+ * Fix for #548, #572, #564
+ * Fixes intrasite routing to CARRY pins from LUT outputs on UltraScale/+
+ - API Additions:
+   - com.xilinx.rapidwright.design.Cell "public void setEDIFHierCellInst(EDIFHierCellInst inst)"
+   - com.xilinx.rapidwright.design.Design "public void detachNetlist()"
+   - com.xilinx.rapidwright.device.Node "public Collection<Node> getAllDownhillNodes(Collection<Node> nodes)"
+   - com.xilinx.rapidwright.device.Node "public Collection<Node> getAllUphillNodes(Collection<Node> nodes)"
+
 ============= RapidWright 2022.1.3-beta released on 2022-09-19 ================
 Notes: 
  * Adds support for partition pins, several new APIs added as seen below

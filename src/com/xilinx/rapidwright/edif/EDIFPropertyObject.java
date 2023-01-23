@@ -33,7 +33,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.stream.Collectors;
 
 /**
  * All EDIF netlist objects that can possess properties inherit from this
@@ -65,9 +64,8 @@ public class EDIFPropertyObject extends EDIFName {
      * @return The previous property value stored under the provided key
      */
     public EDIFPropertyValue addProperty(String key, String value, EDIFValueType type) {
-        EDIFName k = new EDIFName(key);
         EDIFPropertyValue p = new EDIFPropertyValue(value, type);
-        return addProperty(k,p);
+        return addProperty(key, p);
     }
 
     /**
@@ -88,9 +86,8 @@ public class EDIFPropertyObject extends EDIFName {
      * @return The previous property value stored under the provided key
      */
     public EDIFPropertyValue addProperty(String key, int value) {
-        EDIFName k = new EDIFName(key);
         EDIFPropertyValue p = new EDIFPropertyValue(Integer.toString(value), EDIFValueType.INTEGER);
-        return addProperty(k,p);
+        return addProperty(key, p);
     }
 
     /**
@@ -100,9 +97,8 @@ public class EDIFPropertyObject extends EDIFName {
      * @return The previous property value stored under the provided key
      */
     public EDIFPropertyValue addProperty(String key, boolean value) {
-        EDIFName k = new EDIFName(key);
         EDIFPropertyValue p = new EDIFPropertyValue(value ? "true" : "false", EDIFValueType.BOOLEAN);
-        return addProperty(k,p);
+        return addProperty(key, p);
     }
 
     /**
@@ -121,47 +117,14 @@ public class EDIFPropertyObject extends EDIFName {
      * @param value Value entry for the property
      * @return Old property value for the provided key
      */
-    @Deprecated
-    public EDIFPropertyValue addProperty(EDIFName key, EDIFPropertyValue value) {
-        return addProperty(key.getName(), value);
-    }
-
-    /**
-     * Adds the property entry mapping for this object.
-     * @param key Key entry for the property
-     * @param value Value entry for the property
-     * @return Old property value for the provided key
-     */
     public EDIFPropertyValue addProperty(String key, EDIFPropertyValue value) {
         if (properties == null) properties = getNewMap();
         return properties.put(key, value);
     }
 
-    @Deprecated
-    public void addProperties(Map<EDIFName,EDIFPropertyValue> properties) {
-        for (Entry<EDIFName,EDIFPropertyValue> p : properties.entrySet()) {
-            addProperty(p.getKey(),p.getValue());
-        }
-    }
-
     public EDIFPropertyValue getProperty(String key) {
         if (properties == null) return null;
         return properties.get(key);
-    }
-
-    /**
-     * Get all properties. Because the internal representation has changed, this is read-only and
-     * includes a conversion step.
-     * Replaced by {@link #getPropertiesMap()}
-     * @return the properties
-     */
-    @Deprecated
-    public Map<EDIFName, EDIFPropertyValue> getProperties() {
-        if (properties == null) {
-            return Collections.emptyMap();
-        }
-        return Collections.unmodifiableMap(properties.entrySet().stream()
-                .collect(Collectors.toMap(e->new EDIFName(e.getKey()), Entry::getValue)));
     }
 
     /**
@@ -185,18 +148,6 @@ public class EDIFPropertyObject extends EDIFName {
             return Collections.emptyMap();
         }
         return properties;
-    }
-
-    /**
-     * This function does not work anymore and is only kept around to give users a hint on how to change their code.
-     * Please use {@link #setPropertiesMap(Map)} instead.
-     */
-    @Deprecated
-    public void setProperties(Map<EDIFName, EDIFPropertyValue> properties) {
-        // We can't just copy the values from the user-supplied map into a Map<String, EDIFPropertyValue>. The user might
-        // update the supplied map after calling this method. Those changes would not be reflected in the copied map.
-        // In order to not silently change behaviour, let's just throw an exception.
-        throw new RuntimeException("The internal representation of Properties has changed. Please use setPropertiesMap instead of this function.");
     }
 
     /**

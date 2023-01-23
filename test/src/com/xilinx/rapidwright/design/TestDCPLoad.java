@@ -27,16 +27,18 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-import com.xilinx.rapidwright.edif.EDIFTools;
-import com.xilinx.rapidwright.support.RapidWrightDCP;
-import com.xilinx.rapidwright.tests.CodePerfTracker;
-import com.xilinx.rapidwright.util.FileTools;
-import com.xilinx.rapidwright.util.Installer;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+
+import com.xilinx.rapidwright.edif.EDIFHierCellInst;
+import com.xilinx.rapidwright.edif.EDIFTools;
+import com.xilinx.rapidwright.support.RapidWrightDCP;
+import com.xilinx.rapidwright.tests.CodePerfTracker;
+import com.xilinx.rapidwright.util.FileTools;
+import com.xilinx.rapidwright.util.Installer;
 
 /**
  * Tests the EDIF auto-generate mechanism when reading DCPs
@@ -120,5 +122,35 @@ public class TestDCPLoad {
     @ValueSource(strings = {"picoblaze_ooc_X10Y235_2022_1.dcp"})
     public void testDCPFromVivado2022_1(String dcp) {
         RapidWrightDCP.loadDCP(dcp);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"picoblaze_2022.2.dcp"})
+    public void testDCPFromVivado2022_2(String dcp) {
+        Design design = RapidWrightDCP.loadDCP(dcp);
+        for (Cell c : design.getCells()) {
+            // Exclude PAD cells (port cells) as they don't have a corresponding
+            // EDIFHierCellInst, all cells with 'processor' are hierarchical
+            if (c.getName().contains("processor")) {
+                EDIFHierCellInst inst = c.getEDIFHierCellInst();
+                Assertions.assertNotNull(inst);
+                Assertions.assertEquals(inst.toString(), c.getName());
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = { "bnn.dcp", "picoblaze_2022.2.dcp" })
+    public void testUpdatePlaceAndRouteOfDesign(String dcp) {
+        boolean skipLoadingPlaceAndRoute = true;
+        Path dcpPath = RapidWrightDCP.getPath(dcp);
+        Design design = Design.readCheckpoint(dcpPath, skipLoadingPlaceAndRoute);
+        Assertions.assertEquals(0, design.getSiteInsts().size());
+        design.updateDesignWithCheckpointPlaceAndRoute(dcpPath);
+
+        Design origDesign = Design.readCheckpoint(dcpPath);
+
+        Assertions.assertEquals(origDesign.getSiteInsts().size(), design.getSiteInsts().size());
+        Assertions.assertEquals(origDesign.getNets().size(), design.getNets().size());
     }
 }

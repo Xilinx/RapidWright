@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2021 Ghent University.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Yun Zhou, Ghent University.
@@ -28,16 +28,16 @@ import com.xilinx.rapidwright.device.Node;
 
 /**
  * A lightweight useful class for different simple routing-related scenarios,
- * each {@link RoutingNode} Object is associated to a {@link Node} Object.
+ * each {@link LightweightRouteNode} Object is associated to a {@link Node} Object.
  */
-public class RoutingNode{
+public class LightweightRouteNode {
     private Node node;
-    private RoutingNode prev;
+    private LightweightRouteNode prev;
     private boolean isTarget;
-    /** Accumulative delay from a source to a {@link RoutingNode} instance */
+    /** Accumulative delay from a source to a {@link LightweightRouteNode} instance */
     private float delayFromSource;
 
-    RoutingNode (Node node) {
+    LightweightRouteNode(Node node) {
         this.node = node;
         prev = null;
         isTarget = false;
@@ -59,11 +59,11 @@ public class RoutingNode{
         this.delayFromSource = delayFromSource;
     }
 
-    public void setPrev(RoutingNode prev) {
+    public void setPrev(LightweightRouteNode prev) {
         this.prev = prev;
     }
 
-    public RoutingNode getPrev() {
+    public LightweightRouteNode getPrev() {
         return prev;
     }
 

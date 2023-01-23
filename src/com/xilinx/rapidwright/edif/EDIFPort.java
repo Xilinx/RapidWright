@@ -146,25 +146,22 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
     }
 
     public String getBusName() {
+        return getBusName(false);
+    }
+
+    public String getBusName(boolean keepOpenBracket) {
         if (busName == null) {
             int idx = EDIFTools.lengthOfNameWithoutBus(getName().toCharArray(), true);
             busName = getName().substring(0, idx);
+        }
+        if (!keepOpenBracket && busName.charAt(busName.length() - 1) == '[') {
+            return busName.substring(0, busName.length() - 1);
         }
         return busName;
     }
 
     protected void setBusName(String name) {
         this.busName = name;
-    }
-
-    /**
-     * @return The port name without bussed index (if any)
-     * @deprecated - Please use {@link EDIFTools#getRootBusName(String, boolean)}
-     *             instead. To be removed in 2022.2
-     */
-    public String getStemName() {
-        int leftBracket = getName().indexOf('[');
-        return leftBracket == -1 ? getName() : getName().substring(0, leftBracket);
     }
 
     public Integer getLeft() {
@@ -233,7 +230,7 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
     public String getPortInstNameFromPort(int index) {
         if (!isBus()) return getBusName();
         index = getPortIndexFromNameIndex(index);
-        return getBusName() + index + "]";
+        return getBusName(true) + index + "]";
     }
 
     /**
@@ -300,7 +297,7 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
      * @return
      */
     public boolean isBus() {
-        return width > 1 || !getName().equals(getBusName());
+        return width > 1 || !getName().equals(busName);
     }
 
     public int[] getBitBlastedIndicies() {
