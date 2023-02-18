@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
+import com.xilinx.rapidwright.edif.EDIFPortInst;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -826,5 +827,26 @@ public class TestDesignTools {
             Assertions.assertNotNull(net);
             Assertions.assertFalse(DesignTools.isNetDrivenByHierPort(net));
         }
+    }
+
+    @Test
+    public void testGetPortInstsFromSitePinInstLutRoutethru() {
+        Device device = Device.getDevice("xcvu3p");
+        Design design = new Design("design", device.getName());
+
+        Cell ff1 = design.createAndPlaceCell("ff1", Unisim.FDRE, "SLICE_X0Y0/AFF");
+        Cell ff2 = design.createAndPlaceCell("ff2", Unisim.FDRE, "SLICE_X0Y0/AFF2");
+        SiteInst si = ff1.getSiteInst();
+        Net net = design.createNet("net");
+        SitePinInst spi = net.createPin("A6", si);
+        new EDIFPortInst(ff1.getEDIFCellInst().getPort("D"), null, ff1.getEDIFCellInst());
+        new EDIFPortInst(ff2.getEDIFCellInst().getPort("D"), null, ff2.getEDIFCellInst());
+
+        // Routethru LUT to reach both flops
+        Assertions.assertTrue(si.routeIntraSiteNet(net, spi.getBELPin(), ff1.getBEL().getPin("D")));
+        Assertions.assertTrue(si.routeIntraSiteNet(net, spi.getBELPin(), ff2.getBEL().getPin("D")));
+
+        Assertions.assertEquals("[ff1/D, ff2/D]",
+                DesignTools.getPortInstsFromSitePinInst(spi).toString());
     }
 }
