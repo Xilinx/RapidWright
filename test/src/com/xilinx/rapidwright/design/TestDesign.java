@@ -35,6 +35,7 @@ import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import com.xilinx.rapidwright.device.BEL;
@@ -250,12 +251,22 @@ public class TestDesign {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = { "cell_with_backslash_2022.2.dcp",
-            "cell_with_backslash_2022.1.dcp",
+    @CsvSource({
+            "cell_with_backslash_2022.2.dcp,false",
+            "cell_with_backslash_2022.1.dcp,false",
+            "cell_with_backslash_2021.2.dcp,false",
+            "cell_with_backslash_double_2021.2.dcp,true",
+            "cell_with_backslash_double_2022.1.dcp,true",
+            "cell_with_backslash_double_2022.2.dcp,true",
     })
-    public void testCellWithBackslash(String dcp) {
+    public void testCellWithBackslash(String dcp, boolean doubleBackslash) {
         Design design = RapidWrightDCP.loadDCP(dcp);
-        String cellName = "this.is.an\\.escaped\\.identifier";
+        String cellName;
+        if (doubleBackslash) {
+            cellName = "this.is.an\\\\.escaped\\.identifier";
+        } else {
+            cellName = "this.is.an\\.escaped\\.identifier";
+        }
         EDIFHierCellInst ehci = design.getNetlist().getHierCellInstFromName(cellName);
         Assertions.assertNotNull(ehci);
         Cell c = design.getCell(cellName);
