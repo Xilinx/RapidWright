@@ -29,6 +29,7 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.HashSet;
 
+import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
@@ -254,8 +255,11 @@ public class TestDesign {
     })
     public void testCellWithBackslash(String dcp) {
         Design design = RapidWrightDCP.loadDCP(dcp);
-        Cell c = design.getCell("this.is.an\\.escaped\\.identifier");
+        String cellName = "this.is.an\\.escaped\\.identifier";
+        EDIFHierCellInst ehci = design.getNetlist().getHierCellInstFromName(cellName);
+        Assertions.assertNotNull(ehci);
+        Cell c = design.getCell(cellName);
         Assertions.assertNotNull(c);
-        Assertions.assertNotNull(c.getEDIFHierCellInst());
+        Assertions.assertEquals(ehci.getFullHierarchicalInstName(), c.getName());
     }
 }
